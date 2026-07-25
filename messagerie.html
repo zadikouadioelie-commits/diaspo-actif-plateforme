@@ -64,6 +64,16 @@
 .bubble-row.me{flex-direction:row-reverse;}
 .bubble-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0;}
 .bubble{max-width:68%;padding:10px 14px;border-radius:16px;font-size:13.5px;line-height:1.5;position:relative;word-break:break-word;}
+/* Colonne qui empile le nom, la bulle, les réactions.
+
+   Sans largeur imposée ici, elle se dimensionnait sur son contenu — et la bulle demandait
+   alors 68 % d'un parent dont la largeur dépendait d'elle-même. Le calcul s'effondrait par
+   itérations jusqu'à la largeur d'un caractère : les messages s'affichaient en colonne de
+   lettres. C'est la colonne qui doit porter la contrainte, car elle a une largeur réelle
+   (celle de .bubble-row, étirée par .msg-body). La bulle se limite ensuite à 100 % d'elle.
+   min-width:0 évite qu'un mot long ne l'élargisse au-delà. */
+.bubble-col{display:flex;flex-direction:column;gap:2px;max-width:68%;min-width:0;}
+.bubble-col .bubble{max-width:100%;}
 .bubble.them{background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px;}
 .bubble.me{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-bottom-right-radius:4px;}
 .bubble-time{font-size:10.5px;opacity:.65;margin-top:4px;display:block;text-align:right;}
@@ -1044,7 +1054,7 @@ function renderMessages(msgs) {
     html+=`
       <div class="bubble-row ${isMe?"me":""}" id="msg-${m.id}" onmouseenter="var a=this.querySelector('.bubble-hover-actions');if(a)a.style.opacity=1" onmouseleave="var a=this.querySelector('.bubble-hover-actions');if(a)a.style.opacity=0" style="position:relative;">
         ${!isMe?`<div class="bubble-avatar">${avatarLetter(nom)}</div>`:""}
-        <div style="display:flex;flex-direction:column;gap:2px;${isMe?'align-items:flex-end':'align-items:flex-start'};">
+        <div class="bubble-col" style="${isMe?'align-items:flex-end':'align-items:flex-start'};">
           ${!isMe&&msgs.filter(x=>x.expediteur_id!==me.id).length>0?`<span style="font-size:11px;color:var(--muted);margin-left:4px;">${escHtml(nom)}</span>`:""}
           <div style="position:relative;">
             <div class="bubble ${isMe?"me":"them"}">${inner}</div>

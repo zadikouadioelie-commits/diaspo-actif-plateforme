@@ -5124,7 +5124,11 @@ async function demandeDeLiaisonExigee(user, cible, origine) {
              error: "Une collectivité doit accepter votre demande avant tout échange privé." };
   }
 
-  if (cible.role === "initiative" && user.role === "utilisateur") {
+  /* Une Initiative qui en contacte une autre est soumise aux mêmes règles qu'un Utilisateur :
+     premier contact par demande de liaison, message imposé, échange libre après acceptation.
+     Seule la vitrine publique reste une porte ouverte — c'est un espace commercial, y publier
+     ses coordonnées vaut invitation à être contacté. */
+  if (cible.role === "initiative" && (user.role === "utilisateur" || user.role === "initiative")) {
     if (origine === "vitrine") {
       /* Vérification serveur : l'exception commerciale suppose une vitrine réellement publique. */
       const init = await db.prepare("SELECT vitrine_active FROM initiatives WHERE owner_user_id=?").get(cible.id);

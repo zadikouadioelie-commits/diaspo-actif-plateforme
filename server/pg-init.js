@@ -69,6 +69,80 @@ async function createMissingTables(pool) {
    aucun signal. Ici l'exécution est immédiate, sur l'instance qui répond, et le
    message PostgreSQL exact revient dans la réponse HTTP — le diagnostic et la
    réparation dans le même geste, plutôt qu'une hypothèse suivie d'un déploiement. */
+/* Colonnes déclarées dans les CREATE TABLE de db.js, table par table.
+
+   Angle mort majeur : `CREATE TABLE IF NOT EXISTS` ne modifie JAMAIS une table existante.
+   Une colonne ajoutée à un CREATE TABLE après le premier déploiement n'atteint donc
+   jamais la production, et rien ne le signale — la table existe, schema-check la voit,
+   le bouton Réparer n'a rien à créer, et pourtant chaque requête qui touche la nouvelle
+   colonne renvoie 500. C'est le cas de demandes_contact, constaté le 2026-07-25 :
+   demandes_contact_config (même bloc) répondait 200 pendant que demandes_contact
+   échouait systématiquement.
+
+   COLONNES_MIGRATION couvrait ce besoin, mais uniquement pour les colonnes qu'on pense
+   à y recopier à la main. Ici on lit la source de vérité : la définition elle-même. */
+function colonnesDeclareesParTable() {
+  const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
+  const parTable = {};
+  const reTable = /CREATE TABLE IF NOT EXISTS\s+([a-zA-Z0-9_]+)\s*\(([\s\S]*?)\n\s*\)\s*;/g;
+  let m;
+  while ((m = reTable.exec(dbSrc)) !== null) {
+    const table = m[1];
+    const corps = m[2];
+    const colonnes = [];
+    let profondeur = 0, courante = '';
+    for (const c of corps) {
+      if (c === '(') profondeur++;
+      else if (c === ')') profondeur--;
+      if (c === ',' && profondeur === 0) { colonnes.push(courante); courante = ''; }
+      else courante += c;
+    }
+    colonnes.push(courante);
+    parTable[table] = colonnes
+      .map(l => l.replace(/--[^\n]*/g, '').trim())
+      .filter(Boolean)
+      // On ignore les contraintes de table : ce ne sont pas des colonnes.
+      .filter(l => !/^(PRIMARY KEY|FOREIGN KEY|UNIQUE|CHECK|CONSTRAINT)\b/i.test(l))
+      .map(l => {
+        const nom = (l.match(/^([a-zA-Z0-9_]+)/) || [])[1];
+        return nom ? { nom, definition: l.slice(nom.length).trim() } : null;
+      })
+      .filter(Boolean);
+  }
+  return parTable;
+}
+
+/* Ajoute les colonnes déclarées mais absentes des tables déjà existantes. */
+async function ajouterColonnesManquantes(pool) {
+  const ajoutees = [], echecs = [];
+  const declarees = colonnesDeclareesParTable();
+  const { rows: tablesReelles } = await pool.query(
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+  );
+  const existe = new Set(tablesReelles.map(r => r.table_name));
+
+  for (const [table, colonnes] of Object.entries(declarees)) {
+    if (!existe.has(table)) continue;   // absente : c'est createMissingTables qui s'en charge
+    const { rows } = await pool.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1", [table]
+    );
+    const presentes = new Set(rows.map(r => r.column_name.toLowerCase()));
+    for (const c of colonnes) {
+      if (presentes.has(c.nom.toLowerCase())) continue;
+      /* La définition passe par le même traducteur SQLite→Postgres que le reste du schéma,
+         sinon des types comme INTEGER PRIMARY KEY AUTOINCREMENT arriveraient tels quels. */
+      const def = pg.toPg(`X ${c.definition}`).replace(/^X\s*/, '').replace(/\bREFERENCES\b[\s\S]*$/i, '').trim();
+      try {
+        await pg.exec(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${c.nom} ${def};`);
+        ajoutees.push(`${table}.${c.nom}`);
+      } catch (e) {
+        echecs.push({ objet: `${table}.${c.nom}`, erreur: e.message });
+      }
+    }
+  }
+  return { ajoutees, echecs };
+}
+
 async function listerTables(pool) {
   const { rows } = await pool.query(
     "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
@@ -82,12 +156,18 @@ async function reparerSchema() {
   const echecs = await createMissingTables(pool);
   let migration = 'ok';
   try { await migratePg(pool); } catch (e) { migration = e.message; }
+  /* Après les tables, les colonnes : une table créée avant l'ajout d'une colonne à sa
+     définition ne l'obtient jamais autrement (CREATE TABLE IF NOT EXISTS ne modifie rien). */
+  let colonnes = { ajoutees: [], echecs: [] };
+  try { colonnes = await ajouterColonnesManquantes(pool); }
+  catch (e) { colonnes.echecs.push({ objet: '(analyse des colonnes)', erreur: e.message }); }
   const apres = await listerTables(pool);
   return {
     tables_avant: avant.length,
     tables_apres: apres.length,
     tables_creees: apres.filter(t => !avant.includes(t)),
-    echecs,
+    colonnes_ajoutees: colonnes.ajoutees,
+    echecs: [...echecs, ...colonnes.echecs],
     migration,
   };
 }

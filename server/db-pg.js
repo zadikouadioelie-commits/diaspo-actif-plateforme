@@ -267,4 +267,6 @@ pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT").catch((
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT FALSE").catch(() => {});
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS nom_institution TEXT").catch(() => {});
 
-module.exports = { prepare, exec, pool };
+/* toPg est exposé pour pg-init.js : les définitions de colonnes lues dans db.js doivent
+   passer par le même traducteur que le reste du schéma avant d'être appliquées. */
+module.exports = { prepare, exec, pool, toPg };
