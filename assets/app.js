@@ -3924,25 +3924,57 @@ document.addEventListener('DOMContentLoaded', function () {
 /* ══════════════════════════════════════════════════════════════════════════
    BOUTON DE CONTACT — composant partagé
    ──────────────────────────────────────────────────────────────────────────
-   Ce composant choisissait entre « Message », « Demande de liaison » et « Demande de
-   mise en relation » selon le compte visé, en interrogeant le serveur avant le clic.
-   Ces règles ont été supprimées le 2026-07-25 : tout compte écrit directement à tout
-   autre. Il ne reste donc qu'une action possible, et plus rien à demander au serveur.
+   Affiche la SEULE action possible, au lieu de proposer « Message » puis d'opposer un
+   refus au clic : « Établir contact » tant que le lien n'existe pas, « Demande en
+   attente » si elle est déjà partie, « Message » une fois le contact établi.
 
-   Le composant est conservé parce que plusieurs pages posent déjà ses emplacements
-   dans leur HTML — le retirer imposerait de toutes les modifier pour un gain nul.
+   La décision vient toujours du serveur (/api/relation-statut) : l'interface la reflète,
+   elle ne la rejoue pas. Deux implémentations de la même règle finiraient par diverger,
+   et c'est l'interface qui aurait tort.
 
    Usage : <span data-relation-user="123"></span>
    puis window.initBoutonsRelation() après insertion dans le DOM.
    ══════════════════════════════════════════════════════════════════════════ */
 
-window.initBoutonsRelation = function (racine) {
+window.etablirContact = async function (userId, messagePredefini, bouton) {
+  const texte = messagePredefini ? `\n\nMessage transmis :\n« ${messagePredefini} »` : '';
+  if (!confirm(`Envoyer une demande de contact ?${texte}`)) return;
+  const ancien = bouton ? bouton.innerHTML : null;
+  if (bouton) { bouton.disabled = true; bouton.innerHTML = '⏳ Envoi…'; }
+  try {
+    await api('POST', '/demandes-contact', { destinataire_id: Number(userId) });
+    if (bouton) { bouton.innerHTML = '⏳ Demande en attente'; bouton.disabled = true; }
+    else alert('Demande envoyée.');
+  } catch (e) {
+    if (bouton) { bouton.innerHTML = ancien; bouton.disabled = false; }
+    alert(e.message);
+  }
+};
+
+window.initBoutonsRelation = async function (racine) {
   const cibles = (racine || document).querySelectorAll('[data-relation-user]:not([data-relation-prete])');
   for (const el of cibles) {
     el.setAttribute('data-relation-prete', '1');
     const userId = el.getAttribute('data-relation-user');
     const classe = el.getAttribute('data-relation-classe') || 'pvz-btn';
-    el.innerHTML = `<a href="messagerie.html?with=${userId}" class="${classe}">✉️ Message</a>`;
+    let st = null;
+    try { st = await api('GET', `/relation-statut?user_id=${encodeURIComponent(userId)}`); }
+    catch (e) { el.innerHTML = ''; continue; }   // non connecté : on n'affiche rien
+
+    if (st.action === 'message') {
+      el.innerHTML = `<a href="messagerie.html?with=${userId}" class="${classe}">✉️ Message</a>`;
+    } else if (st.action === 'en_attente') {
+      /* Bouton inerte : renvoyer une demande déjà en attente serait refusé par le serveur,
+         autant l'annoncer plutôt que de laisser cliquer dans le vide. */
+      el.innerHTML = `<button class="${classe}" disabled style="opacity:.65;cursor:default;">⏳ Demande en attente</button>`;
+    } else if (st.action === 'a_repondre') {
+      el.innerHTML = `<a href="messagerie.html" class="${classe}">🤝 Répondre à sa demande</a>`;
+    } else if (st.action === 'bloque') {
+      el.innerHTML = '';   // rien à proposer : l'échange est fermé des deux côtés
+    } else {
+      const msg = (st.message_predefini || '').replace(/'/g, "\\'");
+      el.innerHTML = `<button class="${classe}" onclick="etablirContact('${userId}', '${msg}', this)">🤝 Établir contact</button>`;
+    }
   }
 };
 

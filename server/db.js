@@ -1850,13 +1850,39 @@ db.exec(`
     FOREIGN KEY(destinataire_id) REFERENCES users(id)
   );
 
-  /* Les tables demandes_contact et demandes_contact_config ont été retirées le 2026-07-25,
-     en même temps que le module qu'elles servaient : le contact est désormais direct entre
-     tous les comptes, sans consentement préalable. */
+  /* ===== ÉTABLIR CONTACT =====
+     Porte d'entrée de TOUTE nouvelle conversation privée : aucune conversation ne peut
+     être créée entre deux comptes tant que la demande n'a pas été acceptée. Règle unique,
+     sans distinction de type de compte — seule l'administration en est exemptée, pour
+     qu'un membre ne puisse jamais devenir injoignable par le support.
+
+     Deux garde-fous portés par le schéma lui-même plutôt que par le code, afin qu'aucun
+     chemin d'appel ne puisse les contourner :
+       - une seule demande EN ATTENTE par couple (demandeur, destinataire) ;
+       - la colonne statut restreinte aux quatre états réellement gérés.
+     L'index unique est partiel : une fois la demande traitée, elle n'occupe plus la place,
+     donc une nouvelle demande reste possible après un refus. */
+  CREATE TABLE IF NOT EXISTS demandes_contact (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    demandeur_id INTEGER NOT NULL,
+    destinataire_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'en_attente'
+      CHECK(statut IN ('en_attente','acceptee','refusee','bloquee')),
+    conversation_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    repondu_at TEXT,
+    FOREIGN KEY(demandeur_id) REFERENCES users(id),
+    FOREIGN KEY(destinataire_id) REFERENCES users(id)
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_dc_en_attente_unique
+    ON demandes_contact(demandeur_id, destinataire_id) WHERE statut='en_attente';
+  CREATE INDEX IF NOT EXISTS idx_dc_destinataire ON demandes_contact(destinataire_id, statut);
+  CREATE INDEX IF NOT EXISTS idx_dc_demandeur ON demandes_contact(demandeur_id, statut);
 
   /* ===== BLOCAGES DE CONTACT =====
-     Conservé : le blocage n'est PAS une autorisation demandée avant, mais une mise à
-     l'écart décidée après coup par le destinataire. */
+     Un blocage interdit désormais RÉELLEMENT l'échange : plus de demande possible, et
+     plus aucun message. Auparavant la table existait mais n'était vérifiée nulle part. */
   CREATE TABLE IF NOT EXISTS contacts_bloques (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bloqueur_id INTEGER NOT NULL,
@@ -5326,7 +5352,30 @@ db.exec(`
   );
 `);
 
-// Migration retirée le 2026-07-25 avec la table demandes_contact qu'elle complétait.
+/* Remplace l'ANCIENNE table demandes_contact par celle du module « Établir contact ».
+   L'ancienne portait motif NOT NULL, que le nouveau module n'enregistre pas : ses
+   insertions échoueraient. CREATE TABLE IF NOT EXISTS ne modifiant jamais une table
+   existante, cette étape est le seul moyen d'appliquer la nouvelle définition.
+   On reconnaît l'ancienne forme à sa colonne « motif », absente de la nouvelle. */
+{
+  const dc = db.prepare("PRAGMA table_info(demandes_contact)").all().map(c => c.name);
+  if (dc.includes('motif')) {
+    db.exec("DROP TABLE IF EXISTS demandes_contact");
+    db.exec(`CREATE TABLE IF NOT EXISTS demandes_contact (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      demandeur_id INTEGER NOT NULL,
+      destinataire_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      statut TEXT NOT NULL DEFAULT 'en_attente'
+        CHECK(statut IN ('en_attente','acceptee','refusee','bloquee')),
+      conversation_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      repondu_at TEXT,
+      FOREIGN KEY(demandeur_id) REFERENCES users(id),
+      FOREIGN KEY(destinataire_id) REFERENCES users(id))`);
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_dc_en_attente_unique ON demandes_contact(demandeur_id, destinataire_id) WHERE statut='en_attente'");
+  }
+}
 
 /* ===== SUPPORT TECHNIQUE — signalement de dysfonctionnements =====
    Distinct du module "Parler à Diaspo'Actif" (chatbot, demandes générales) :

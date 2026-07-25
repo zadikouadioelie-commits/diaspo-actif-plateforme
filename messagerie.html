@@ -25,6 +25,43 @@
 .msg-tabs{display:flex;border-bottom:1px solid var(--border);}
 .msg-tab{flex:1;padding:9px 0;text-align:center;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--muted);border:none;background:none;}
 .msg-tab.active{color:#2563EB;border-bottom:2px solid var(--orange);}
+
+/* ===== Rubriques du module Messages =====
+   Conversations / Établir contact / Contacts. Distinctes des onglets ci-dessus, qui ne
+   filtrent que la liste des conversations : ici on change de contenu, pas de filtre. */
+.msg-rubriques{display:flex;gap:4px;padding:10px 12px 0;}
+.msg-rubrique{
+  flex:1;padding:8px 6px;border:none;background:none;cursor:pointer;border-radius:9px;
+  font-size:12px;font-weight:700;color:var(--muted);font-family:inherit;
+  display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
+}
+.msg-rubrique:hover{background:var(--bg);}
+.msg-rubrique.active{background:#EEF2FF;color:#1d4ed8;}
+/* Compteur des demandes en attente : c'est l'information qui doit sauter aux yeux. */
+.rub-badge{
+  display:none;min-width:17px;height:17px;padding:0 5px;border-radius:99px;
+  background:#DC2626;color:#fff;font-size:10.5px;font-weight:800;
+  align-items:center;justify-content:center;
+}
+.rub-badge.on{display:inline-flex;}
+
+/* Carte de demande : photo, identité, type de compte, date, message imposé, actions. */
+.dc-carte{padding:14px 14px 12px;border-bottom:1px solid var(--border);}
+.dc-tete{display:flex;gap:10px;align-items:flex-start;}
+.dc-photo{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,#2563EB,#0D2B4E);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px;text-decoration:none;}
+.dc-nom{font-size:13.5px;font-weight:800;color:var(--text);text-decoration:none;}
+.dc-nom:hover{text-decoration:underline;}
+.dc-role{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;background:#EEF2FF;color:#3730A3;font-size:10px;font-weight:800;text-transform:uppercase;}
+.dc-date{font-size:11px;color:var(--muted);margin-top:2px;}
+.dc-msg{margin:8px 0 10px;padding:8px 11px;background:var(--bg);border-radius:9px;font-size:12.5px;line-height:1.5;color:var(--text);}
+.dc-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.dc-btn{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--text);font-family:inherit;}
+.dc-btn.oui{background:#16a34a;border-color:#16a34a;color:#fff;}
+.dc-btn.non:hover{border-color:#9ca3af;}
+.dc-btn.bloc{color:#DC2626;border-color:#FCA5A5;}
+.dc-btn.bloc:hover{background:#FEF2F2;}
+.dc-statut{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;}
 .msg-conv-list{flex:1;overflow-y:auto;}
 .msg-conv-item{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;position:relative;}
 .msg-conv-item:hover{background:var(--surface2);}
@@ -181,6 +218,12 @@
         <button class="btn btn-sm btn-orange" id="btn-new-conv" title="Nouvelle conversation">+ Nouveau</button>
       </div>
 
+      <div class="msg-rubriques">
+        <button class="msg-rubrique active" data-rubrique="conversations">💬 Conversations</button>
+        <button class="msg-rubrique" data-rubrique="demandes">🤝 Établir contact <span class="rub-badge" id="rub-demandes-count"></span></button>
+        <button class="msg-rubrique" data-rubrique="contacts">👥 Contacts</button>
+      </div>
+
       <div class="msg-search">
         <input id="conv-search" placeholder="Rechercher par nom, organisation…" autocomplete="off">
       </div>
@@ -200,6 +243,11 @@
       <div class="msg-conv-list" id="conv-list">
         <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;">Chargement…</div>
       </div>
+
+      <!-- Rubrique « Établir contact » : demandes reçues en attente, puis historique traité. -->
+      <div class="msg-conv-list" id="panneau-demandes" style="display:none;"></div>
+      <!-- Rubrique « Contacts » : comptes avec qui le lien est établi. -->
+      <div class="msg-conv-list" id="panneau-contacts" style="display:none;"></div>
     </div>
 
     <!-- PANNEAU DROIT : conversation active -->
@@ -1122,6 +1170,175 @@ document.getElementById("conv-liste-filter").addEventListener("change", function
   loadConvList(document.getElementById("conv-search").value.trim() || undefined);
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   RUBRIQUE « ÉTABLIR CONTACT »
+
+   Porte d'entrée de toute nouvelle conversation : tant qu'une demande n'est pas
+   acceptée, aucune conversation n'existe entre les deux comptes. Le destinataire
+   décide — accepter, refuser, ou bloquer durablement.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+const ROLE_LIBELLE = { utilisateur:'Utilisateur', initiative:'Initiative',
+                       collectivite:'Collectivité', administrateur:'Administration' };
+const DC_STATUT = { acceptee:['✅ Acceptée','#166534','#F0FDF4'], refusee:['❌ Refusée','#991B1B','#FEF2F2'],
+                    bloquee:['🚫 Bloquée','#991B1B','#FEF2F2'] };
+
+function dcAvatar(d){
+  const nom = escH([d.autre_prenom, d.autre_nom].filter(Boolean).join(' ') || d.autre_nom || '?');
+  const lien = `profil.html?id=${d.autre_id}`;
+  return d.autre_photo
+    ? `<a href="${lien}" title="Voir le profil public"><img class="dc-photo" src="${escH(d.autre_photo)}" alt="${nom}"></a>`
+    : `<a href="${lien}" class="dc-photo" title="Voir le profil public">${nom.trim().charAt(0).toUpperCase() || '?'}</a>`;
+}
+
+function dcCarte(d, traitee){
+  const nom = escH([d.autre_prenom, d.autre_nom].filter(Boolean).join(' ') || d.autre_nom || 'Compte');
+  const st = DC_STATUT[d.statut];
+  return `
+    <div class="dc-carte" id="dc-${d.id}">
+      <div class="dc-tete">
+        ${dcAvatar(d)}
+        <div style="flex:1;min-width:0;">
+          <a class="dc-nom" href="profil.html?id=${d.autre_id}">${nom}</a>
+          <span class="dc-role">${escH(ROLE_LIBELLE[d.autre_role] || d.autre_role || '')}</span>
+          <div class="dc-date">${fmtDateDC(d.created_at)}</div>
+        </div>
+        ${traitee && st ? `<span class="dc-statut" style="color:${st[1]};background:${st[2]};">${st[0]}</span>` : ''}
+      </div>
+      <div class="dc-msg">${escH(d.message || '')}</div>
+      ${traitee ? '' : `
+      <div class="dc-actions">
+        <button class="dc-btn oui"  onclick="dcRepondre(${d.id},'accepter')">Accepter</button>
+        <button class="dc-btn non"  onclick="dcRepondre(${d.id},'refuser')">Refuser</button>
+        <button class="dc-btn bloc" onclick="dcRepondre(${d.id},'bloquer')">Bloquer</button>
+      </div>`}
+    </div>`;
+}
+
+function fmtDateDC(s){
+  if(!s) return '';
+  const d = new Date(String(s).replace(' ','T'));
+  if (isNaN(d)) return escH(String(s));
+  return d.toLocaleDateString('fr',{day:'2-digit',month:'long',year:'numeric'});
+}
+
+async function chargerDemandesContact(){
+  const zone = document.getElementById('panneau-demandes');
+  if (!zone) return;
+  zone.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;">Chargement…</div>`;
+  try {
+    const [att, trt] = await Promise.all([
+      api('GET','/demandes-contact?direction=recues&statut=en_attente'),
+      api('GET','/demandes-contact?direction=recues&statut=traitees'),
+    ]);
+    const enAttente = att.demandes || [], traitees = trt.demandes || [];
+    majBadgeDemandes(enAttente.length);
+    zone.innerHTML =
+      (enAttente.length
+        ? enAttente.map(d => dcCarte(d, false)).join('')
+        : `<div style="padding:26px 20px;color:var(--muted);font-size:13px;text-align:center;">Aucune demande en attente.</div>`)
+      + (traitees.length
+        ? `<div style="padding:12px 14px 6px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Demandes traitées</div>`
+          + traitees.map(d => dcCarte(d, true)).join('')
+        : '');
+  } catch(e) {
+    zone.innerHTML = `<div style="padding:20px;color:#DC2626;font-size:13px;">${escH(e.message)}</div>`;
+  }
+}
+
+function majBadgeDemandes(n){
+  const b = document.getElementById('rub-demandes-count');
+  if (!b) return;
+  b.textContent = n;
+  b.classList.toggle('on', n > 0);
+}
+
+window.dcRepondre = async function(id, action){
+  if (action === 'bloquer' && !confirm("Bloquer ce compte ?\n\nIl ne pourra plus vous envoyer de demande ni de message, tant que vous n'aurez pas levé le blocage.")) return;
+  if (action === 'refuser' && !confirm('Refuser cette demande ? Aucune conversation ne sera créée.')) return;
+  try {
+    const r = await api('POST', `/demandes-contact/${id}/repondre`, { action });
+    await chargerDemandesContact();
+    /* Acceptée : on bascule directement dans la conversation, comme demandé —
+       sans repasser par la liste générale. */
+    if (action === 'accepter' && r.conversation_id) {
+      basculerRubrique('conversations');
+      await loadConvList();
+      openConv(r.conversation_id);
+    }
+  } catch(e) { alert(e.message); }
+};
+
+async function chargerContacts(){
+  const zone = document.getElementById('panneau-contacts');
+  if (!zone) return;
+  zone.innerHTML = `<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;">Chargement…</div>`;
+  try {
+    const r = await api('GET','/contacts');
+    const contacts = r.contacts || [];
+    if (!contacts.length) {
+      zone.innerHTML = `<div style="padding:26px 20px;color:var(--muted);font-size:13px;text-align:center;">Aucun contact pour l'instant.<br>Un contact se crée dès qu'une demande est acceptée.</div>`;
+      return;
+    }
+    zone.innerHTML = contacts.map(c => {
+      const nom = escH([c.prenom, c.nom].filter(Boolean).join(' ') || c.nom || 'Compte');
+      const av = c.photo_url
+        ? `<img class="dc-photo" src="${escH(c.photo_url)}" alt="${nom}">`
+        : `<span class="dc-photo">${nom.trim().charAt(0).toUpperCase() || '?'}</span>`;
+      return `
+        <div class="dc-carte">
+          <div class="dc-tete">
+            ${av}
+            <div style="flex:1;min-width:0;">
+              <a class="dc-nom" href="profil.html?id=${c.id}">${nom}</a>
+              <span class="dc-role">${escH(ROLE_LIBELLE[c.role] || c.role || '')}</span>
+              <div class="dc-date">Contact depuis le ${fmtDateDC(c.depuis)}</div>
+            </div>
+            <button class="dc-btn" onclick="ouvrirDepuisContact(${c.id})">✉️ Message</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    zone.innerHTML = `<div style="padding:20px;color:#DC2626;font-size:13px;">${escH(e.message)}</div>`;
+  }
+}
+
+/* Ouvre directement l'échange avec ce contact, sans passer par la liste générale. */
+window.ouvrirDepuisContact = async function(userId){
+  basculerRubrique('conversations');
+  await openConvWithUser(Number(userId));
+};
+
+function basculerRubrique(nom){
+  document.querySelectorAll('.msg-rubrique').forEach(b => b.classList.toggle('active', b.dataset.rubrique === nom));
+  const conv = document.getElementById('conv-list');
+  const dem  = document.getElementById('panneau-demandes');
+  const con  = document.getElementById('panneau-contacts');
+  const tabs = document.querySelector('.msg-tabs');
+  const rech = document.querySelector('.msg-search');
+  conv.style.display = nom === 'conversations' ? '' : 'none';
+  dem.style.display  = nom === 'demandes'      ? '' : 'none';
+  con.style.display  = nom === 'contacts'      ? '' : 'none';
+  /* Onglets et recherche ne concernent que les conversations : les laisser visibles
+     ailleurs laisserait croire qu'ils filtrent la rubrique affichée. */
+  if (tabs) tabs.style.display = nom === 'conversations' ? '' : 'none';
+  if (rech) rech.style.display = nom === 'conversations' ? '' : 'none';
+  if (nom === 'demandes') chargerDemandesContact();
+  if (nom === 'contacts') chargerContacts();
+}
+
+document.querySelectorAll('.msg-rubrique').forEach(b => {
+  b.addEventListener('click', () => basculerRubrique(b.dataset.rubrique));
+});
+
+/* Compteur alimenté dès l'ouverture, sans attendre que l'utilisateur visite la rubrique. */
+(async function badgeInitial(){
+  try {
+    const r = await api('GET','/demandes-contact?direction=recues&statut=en_attente');
+    majBadgeDemandes((r.demandes || []).length);
+  } catch(e) {}
+})();
+
 /* ---- Filtres ---- */
 document.querySelectorAll(".msg-tab").forEach(tab=>{
   tab.addEventListener("click",()=>{
@@ -1166,10 +1383,25 @@ async function openConvWithUser(userId, produitId, objet, origine){
       if (inp){ inp.value = OBJET_TEMPLATES[objet]; inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,200)+'px'; inp.focus(); }
     }
   }catch(e){
-    /* Le serveur ne peut plus exiger de demande préalable (règles supprimées le 2026-07-25) :
-       une erreur ici en est donc réellement une, et s'affiche telle quelle. */
+    /* Le serveur refuse d'ouvrir une conversation tant que le contact n'est pas établi.
+       Ce n'est pas un échec mais une étape du parcours : on propose donc l'envoi de la
+       demande en un clic, plutôt que d'afficher une erreur qui laisserait sans issue.
+       api() range la réponse du serveur dans e.data, jamais sur l'erreur elle-même. */
+    const info = e && e.data;
+    if (info && info.code === 'contact_requis') { proposerEtablirContact(info); return; }
     alert(e.message);
   }
+}
+
+/* Le message imposé est affiché tel quel : l'utilisateur doit voir exactement ce qui
+   sera transmis en son nom. */
+function proposerEtablirContact(info){
+  const nom = info.destinataire_nom ? ` à ${info.destinataire_nom}` : '';
+  const msg = info.message_predefini ? `\n\nMessage transmis :\n« ${info.message_predefini} »` : '';
+  if (!confirm(`${info.error}\n\nEnvoyer une demande de contact${nom} ?${msg}`)) return;
+  api("POST","/demandes-contact",{destinataire_id: info.destinataire_id})
+    .then(()=> alert("Demande envoyée. Vous serez prévenu dès qu'elle aura une réponse."))
+    .catch(err=> alert(err.message));
 }
 
 /* Préremplit le champ message avec les infos du produit (variante dispo/indispo) */

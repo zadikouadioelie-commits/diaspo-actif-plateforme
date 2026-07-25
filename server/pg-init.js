@@ -271,6 +271,29 @@ async function enregistrerEmpreinte(client, empreinte) {
   } catch (e) { console.error('[pg-init] empreinte non enregistrée :', e.message); }
 }
 
+/* Migration ponctuelle : remplacer l'ANCIENNE table demandes_contact par la nouvelle.
+
+   L'ancienne portait motif/urgence/expires_at, dont motif NOT NULL — le module « Établir
+   contact » n'en enregistre aucun, ses insertions échoueraient donc. Or CREATE TABLE
+   IF NOT EXISTS ne modifie jamais une table existante : sans cette étape, la nouvelle
+   définition ne serait jamais appliquée et la panne serait silencieuse.
+
+   On reconnaît l'ancienne forme à sa colonne « motif », absente de la nouvelle. La
+   suppression du contenu a été explicitement demandée le 2026-07-25 ; ces demandes
+   n'avaient de toute façon plus de module pour les traiter. */
+async function remplacerAncienneTableDemandesContact(client) {
+  try {
+    const { rows } = await client.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='demandes_contact' AND column_name='motif'"
+    );
+    if (!rows.length) return;                       // absente, ou déjà à la nouvelle forme
+    await client.query('DROP TABLE IF EXISTS demandes_contact CASCADE');
+    console.log('[pg-init] ancienne table demandes_contact remplacée (module Établir contact).');
+  } catch (e) {
+    console.error('[pg-init] remplacement de demandes_contact impossible :', e.message);
+  }
+}
+
 async function pgInit() {
   if (_initialized) return;
 
@@ -293,6 +316,8 @@ async function pgInit() {
         _initialized = true;
         return;
       }
+
+      await remplacerAncienneTableDemandesContact(client);
 
       // Vérifie si les tables existent déjà
       const { rows } = await client.query(

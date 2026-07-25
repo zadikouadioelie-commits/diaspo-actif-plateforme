@@ -5367,13 +5367,28 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
   const other = await db.prepare("SELECT id, nom, role FROM users WHERE id = ?").get(otherId);
   if (!other) return sendJSON(res, 404, { error: "Destinataire introuvable." });
 
+  if (await contactBloque(user.id, otherId)) {
+    return sendJSON(res, 403, { code: "contact_bloque", error: "Aucun échange n'est possible avec ce compte." });
+  }
+
   let conv = await db.prepare("SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(user.id, otherId, otherId, user.id);
 
-  // Vérification d'initiation uniquement pour les NOUVELLES conversations
+  /* Porte d'entrée unique : une conversation NEUVE suppose que les deux comptes soient
+     devenus contacts, donc qu'une demande ait été acceptée. Une conversation existante
+     reste ouverte — le lien a déjà été noué, on ne le redemande pas. */
   if (!conv) {
     const allowed = PEUT_INITIER[user.role] || [];
     if (!allowed.includes(other.role)) {
       return sendJSON(res, 403, { error: `Votre rôle (${user.role}) ne peut pas initier une conversation avec ce type de compte (${other.role}).` });
+    }
+    if (!(await peutEcrireDirectement(user, otherId))) {
+      return sendJSON(res, 403, {
+        code: "contact_requis",
+        error: "Vous devez d'abord établir le contact avec ce compte.",
+        destinataire_id: otherId,
+        destinataire_nom: other.nom,
+        message_predefini: MESSAGE_ETABLIR_CONTACT,
+      });
     }
   }
   if (conv) {
@@ -5391,24 +5406,81 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 });
 
 /* ===========================================================================
-   Les DEMANDES DE CONTACT ont été retirées le 2026-07-25.
+   ÉTABLIR CONTACT — porte d'entrée de toute nouvelle conversation privée
 
-   Ce module imposait un consentement explicite du destinataire avant tout premier
-   message : « demande de liaison » vers une Initiative, « demande de mise en relation »
-   vers une Collectivité. Il portait aussi le quota quotidien, le délai de carence,
-   l'expiration automatique et le calcul de compatibilité entre les deux comptes.
+   Aucune conversation ne peut naître entre deux comptes tant que la demande n'a pas
+   été acceptée. Règle unique, sans distinction de type de compte : le destinataire
+   garde la maîtrise de qui peut lui écrire.
 
-   Tout cela est supprimé : n'importe quel compte écrit directement à n'importe quel
-   autre. Seules subsistent les routes de BLOCAGE ci-dessous (table contacts_bloques),
-   qui relèvent d'un autre principe — le destinataire écarte un importun après coup,
-   il n'accorde pas une autorisation avant.
+   Une seule exception : l'administration, pour qu'un membre ne puisse jamais devenir
+   injoignable par le support.
+
+   Différence essentielle avec le module retiré le matin du 2026-07-25 : le BLOCAGE
+   interdit désormais réellement l'échange. Auparavant la table contacts_bloques
+   existait mais n'était vérifiée nulle part — bloquer quelqu'un ne l'empêchait ni
+   d'écrire, ni de redemander.
    =========================================================================== */
 
-/* GET /api/relation-statut?user_id= — quelle action l'interface doit-elle proposer ?
+/* Message imposé : l'utilisateur clique, il ne rédige pas. Un texte identique pour tous
+   évite qu'une demande soit jugée sur sa forme plutôt que sur son auteur. */
+const MESSAGE_ETABLIR_CONTACT = "Bonjour, je souhaite entrer en contact avec vous sur Diaspo'Actif.";
 
-   Il n'y a plus qu'une seule réponse possible depuis la suppression des demandes préalables :
-   écrire. La route est conservée parce que plusieurs pages l'interrogent pour construire leur
-   bouton ; elle répond désormais invariablement « Message ». */
+/* Blocage dans UN SENS OU L'AUTRE : celui qui bloque ne veut plus d'échange, et celui
+   qui est bloqué ne doit pas pouvoir forcer le contact en inversant les rôles. */
+async function contactBloque(a, b) {
+  const r = await db.prepare(
+    "SELECT id FROM contacts_bloques WHERE (bloqueur_id=? AND bloque_id=?) OR (bloqueur_id=? AND bloque_id=?) LIMIT 1"
+  ).get(a, b, b, a);
+  return !!r;
+}
+
+/* Sont-ils contacts ? Une demande acceptée, dans un sens ou dans l'autre, vaut lien
+   définitif — on ne redemande jamais l'autorisation à quelqu'un qui l'a déjà donnée. */
+async function sontContacts(a, b) {
+  const r = await db.prepare(
+    "SELECT id FROM demandes_contact WHERE statut='acceptee' AND ((demandeur_id=? AND destinataire_id=?) OR (demandeur_id=? AND destinataire_id=?)) LIMIT 1"
+  ).get(a, b, b, a);
+  return !!r;
+}
+
+/* Peut-on ouvrir une conversation neuve sans passer par une demande ?
+   Oui si l'un des deux est l'administration, ou si le lien existe déjà. */
+async function peutEcrireDirectement(user, cibleId) {
+  if (user.role === "administrateur") return true;
+  const cible = await db.prepare("SELECT role FROM users WHERE id=?").get(cibleId);
+  if (cible && cible.role === "administrateur") return true;
+  return await sontContacts(user.id, cibleId);
+}
+
+/* Décision unique consommée par toute l'interface. Le serveur tranche, les pages
+   reflètent — deux implémentations de la même règle finiraient par diverger. */
+async function statutRelation(userId, cibleId) {
+  if (await contactBloque(userId, cibleId)) {
+    return { action: "bloque", libelle: "Contact bloqué", contact_direct: false };
+  }
+  const conv = await db.prepare(
+    "SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)"
+  ).get(userId, cibleId, cibleId, userId);
+  const cible = await db.prepare("SELECT role FROM users WHERE id=?").get(cibleId);
+  const admin = cible && cible.role === "administrateur";
+  if (conv || admin || await sontContacts(userId, cibleId)) {
+    return { action: "message", libelle: "Message", contact_direct: true, conversation_id: conv ? conv.id : null };
+  }
+  const envoyee = await db.prepare(
+    "SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'"
+  ).get(userId, cibleId);
+  if (envoyee) return { action: "en_attente", libelle: "Demande en attente", contact_direct: false, demande_id: envoyee.id };
+
+  const recue = await db.prepare(
+    "SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'"
+  ).get(cibleId, userId);
+  if (recue) return { action: "a_repondre", libelle: "Répondre à la demande", contact_direct: false, demande_id: recue.id };
+
+  return { action: "etablir_contact", libelle: "Établir contact", contact_direct: false,
+           message_predefini: MESSAGE_ETABLIR_CONTACT };
+}
+
+/* GET /api/relation-statut?user_id= — quel bouton afficher pour ce compte ? */
 route("GET", "/api/relation-statut", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -5416,10 +5488,127 @@ route("GET", "/api/relation-statut", async (req, res, params, body, query) => {
   if (!cibleId || cibleId === user.id) return sendJSON(res, 400, { error: "Compte invalide." });
   const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(cibleId);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
-  sendJSON(res, 200, { action: "message", libelle: "Message", contact_direct: true });
+  sendJSON(res, 200, await statutRelation(user.id, cibleId));
 });
-/* GET /api/demandes-contact/blocages — comptes que j'ai bloqués */
-route("GET", "/api/demandes-contact/blocages", async (req, res) => {
+
+/* POST /api/demandes-contact — envoyer une demande. Message imposé côté serveur : ce que
+   le client enverrait n'est pas lu, sans quoi la règle ne tiendrait qu'à l'interface. */
+route("POST", "/api/demandes-contact", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const destId = Number(body.destinataire_id);
+  if (!destId || destId === user.id) return sendJSON(res, 400, { error: "Destinataire invalide." });
+  const dest = await db.prepare("SELECT id, nom FROM users WHERE id=?").get(destId);
+  if (!dest) return sendJSON(res, 404, { error: "Destinataire introuvable." });
+
+  if (await contactBloque(user.id, destId)) {
+    return sendJSON(res, 403, { error: "Aucun échange n'est possible avec ce compte." });
+  }
+  if (await sontContacts(user.id, destId)) {
+    return sendJSON(res, 409, { code: "deja_contacts", error: "Vous êtes déjà en contact avec ce compte." });
+  }
+  const existante = await db.prepare(
+    "SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'"
+  ).get(user.id, destId);
+  if (existante) {
+    return sendJSON(res, 409, { code: "deja_en_attente", error: "Une demande est déjà en attente auprès de ce compte.", demande_id: existante.id });
+  }
+
+  const id = (await db.prepare(
+    "INSERT INTO demandes_contact (demandeur_id, destinataire_id, message) VALUES (?,?,?)"
+  ).run(user.id, destId, MESSAGE_ETABLIR_CONTACT)).lastInsertRowid;
+
+  creerNotif(destId, "demande_contact", "Nouvelle demande de contact",
+    (user.nom || "Un membre") + " souhaite entrer en contact avec vous.", { demande_id: id });
+
+  sendJSON(res, 201, { ok: true, demande_id: id, statut: "en_attente" });
+});
+
+/* GET /api/demandes-contact?direction=recues|envoyees&statut=en_attente|traitees */
+route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const envoyees = query.direction === "envoyees";
+  const col = envoyees ? "demandeur_id" : "destinataire_id";
+  const autre = envoyees ? "destinataire_id" : "demandeur_id";
+  let filtre = "";
+  if (query.statut === "en_attente") filtre = " AND d.statut='en_attente'";
+  else if (query.statut === "traitees") filtre = " AND d.statut<>'en_attente'";
+  const demandes = await db.prepare(
+    "SELECT d.id, d.statut, d.message, d.created_at, d.repondu_at, d.conversation_id," +
+    " u.id AS autre_id, u.nom AS autre_nom, u.prenom AS autre_prenom, u.role AS autre_role, u.photo_url AS autre_photo" +
+    " FROM demandes_contact d JOIN users u ON u.id=d." + autre +
+    " WHERE d." + col + "=?" + filtre + " ORDER BY d.created_at DESC LIMIT 200"
+  ).all(user.id);
+  const en_attente = (await db.prepare(
+    "SELECT COUNT(*) n FROM demandes_contact WHERE destinataire_id=? AND statut='en_attente'"
+  ).get(user.id))?.n || 0;
+  sendJSON(res, 200, { demandes, en_attente });
+});
+
+/* POST /api/demandes-contact/:id/repondre — accepter, refuser ou bloquer */
+route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const demande = await db.prepare("SELECT * FROM demandes_contact WHERE id=?").get(params.id);
+  if (!demande || Number(demande.destinataire_id) !== Number(user.id)) {
+    return sendJSON(res, 404, { error: "Demande introuvable." });
+  }
+  if (demande.statut !== "en_attente") return sendJSON(res, 409, { error: "Cette demande a déjà été traitée." });
+
+  const action = ["accepter", "refuser", "bloquer"].includes(body.action) ? body.action : null;
+  if (!action) return sendJSON(res, 400, { error: "Action invalide." });
+
+  if (action === "refuser") {
+    await db.prepare("UPDATE demandes_contact SET statut='refusee', repondu_at=datetime('now') WHERE id=?").run(demande.id);
+    return sendJSON(res, 200, { ok: true, statut: "refusee" });
+  }
+
+  if (action === "bloquer") {
+    /* Le blocage vaut refus ET interdiction durable : plus de demande, plus de message,
+       tant qu'il n'est pas levé. */
+    await db.prepare("INSERT OR IGNORE INTO contacts_bloques (bloqueur_id, bloque_id) VALUES (?,?)").run(user.id, demande.demandeur_id);
+    await db.prepare("UPDATE demandes_contact SET statut='bloquee', repondu_at=datetime('now') WHERE id=?").run(demande.id);
+    return sendJSON(res, 200, { ok: true, statut: "bloquee" });
+  }
+
+  /* Acceptation : les deux comptes deviennent contacts et la conversation est créée,
+     ou réutilisée si elle existe déjà — jamais dupliquée. */
+  let conv = await db.prepare(
+    "SELECT * FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)"
+  ).get(user.id, demande.demandeur_id, demande.demandeur_id, user.id);
+  if (!conv) {
+    const cid = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?,?,?)")
+      .run(demande.demandeur_id, user.id, null)).lastInsertRowid;
+    conv = { id: cid };
+  } else {
+    if (Number(conv.user1_id) === Number(user.id) && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
+    if (Number(conv.user2_id) === Number(user.id) && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
+  }
+  await db.prepare("UPDATE demandes_contact SET statut='acceptee', conversation_id=?, repondu_at=datetime('now') WHERE id=?").run(conv.id, demande.id);
+  creerNotif(demande.demandeur_id, "demande_contact_acceptee",
+    (user.nom || "Votre demande") + " a accepté votre demande de contact",
+    "Vous pouvez maintenant échanger librement.", { conversation_id: conv.id });
+
+  sendJSON(res, 200, { ok: true, statut: "acceptee", conversation_id: conv.id });
+});
+
+/* GET /api/contacts — comptes avec lesquels le lien est établi */
+route("GET", "/api/contacts", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const contacts = await db.prepare(
+    "SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, d.repondu_at AS depuis, d.conversation_id" +
+    " FROM demandes_contact d" +
+    " JOIN users u ON u.id = CASE WHEN d.demandeur_id=? THEN d.destinataire_id ELSE d.demandeur_id END" +
+    " WHERE d.statut='acceptee' AND (d.demandeur_id=? OR d.destinataire_id=?)" +
+    " ORDER BY d.repondu_at DESC LIMIT 500"
+  ).all(user.id, user.id, user.id);
+  sendJSON(res, 200, { contacts });
+});
+
+/* GET /api/contacts/blocages — comptes que j'ai bloqués */
+route("GET", "/api/contacts/blocages", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const blocages = await db.prepare(
@@ -5428,8 +5617,8 @@ route("GET", "/api/demandes-contact/blocages", async (req, res) => {
   sendJSON(res, 200, { blocages });
 });
 
-/* DELETE /api/demandes-contact/blocages/:userId — lever un blocage */
-route("DELETE", "/api/demandes-contact/blocages/:userId", async (req, res, params) => {
+/* DELETE /api/contacts/blocages/:userId — lever un blocage */
+route("DELETE", "/api/contacts/blocages/:userId", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("DELETE FROM contacts_bloques WHERE bloqueur_id=? AND bloque_id=?").run(user.id, Number(params.userId));
@@ -5628,12 +5817,13 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
   if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
 
-  // Un compte Collectivité perd le droit de reprendre contact si le membre a supprimé la
-  // conversation — il doit effectuer une nouvelle demande de mise en relation (règles de
-  // communication des comptes Collectivités : le consentement du membre prime toujours).
-  if (user.role === "collectivite") {
-    const autreSupprimee = conv.user1_id === user.id ? conv.deleted_u2 : conv.deleted_u1;
-    if (autreSupprimee) return sendJSON(res, 403, { error: "Ce membre a mis fin à la conversation. Vous devez envoyer une nouvelle demande de mise en relation." });
+  /* Un blocage interdit RÉELLEMENT l'échange, dans les deux sens et y compris sur une
+     conversation déjà ouverte. C'était le manque le plus grave de l'ancien module : la
+     table des blocages existait, mais aucune route ne la consultait — bloquer quelqu'un
+     ne l'empêchait ni d'écrire, ni de revenir. */
+  const autreId = Number(conv.user1_id) === Number(user.id) ? Number(conv.user2_id) : Number(conv.user1_id);
+  if (await contactBloque(user.id, autreId)) {
+    return sendJSON(res, 403, { code: "contact_bloque", error: "Aucun échange n'est possible avec ce compte." });
   }
 
   const contenu = (body.contenu || "").trim();
