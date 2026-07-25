@@ -74,8 +74,10 @@ async function checkProjEvalDossier(req, did, { porteurAussi } = {}) {
 }
 
 /* Upsert de la configuration billetterie d'un événement (event_billetterie_config, 1 ligne par event_id). */
-function upsertBilletterieConfig(eid, c) {
-  db.prepare(`INSERT INTO event_billetterie_config
+/* async : l'écriture doit avoir abouti avant que la réponse ne parte, sinon la
+   configuration billetterie peut être perdue si l'instance Vercel gèle. */
+async function upsertBilletterieConfig(eid, c) {
+  await db.prepare(`INSERT INTO event_billetterie_config
     (event_id,billetterie_active,vente_ouverture,vente_fermeture,places_totales,max_billets_par_commande,
      vente_en_ligne,billets_nominatifs,billets_remboursables,validation_commande,autoriser_partage_billet,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
@@ -93,14 +95,16 @@ function upsertBilletterieConfig(eid, c) {
 }
 
 /* Insertion d'un ticket_type avec les champs enrichis Billetterie V1 (avantages, devise, dates de vente, couleur, early-bird). */
-function insererTicketType(eid, tt) {
-  return db.prepare(`INSERT INTO ticket_types
+/* async : renvoyait .lastInsertRowid lu sur une promesse, donc undefined en production —
+   le type de billet était créé mais son identifiant jamais connu de l'appelant. */
+async function insererTicketType(eid, tt) {
+  return (await db.prepare(`INSERT INTO ticket_types
     (event_id,nom,description,prix,quantite_totale,type,avantages,devise,max_par_acheteur,date_vente_debut,date_vente_fin,couleur,prix_early_bird,early_bird_fin)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(eid, tt.nom, tt.description || null, parseFloat(tt.prix) || 0, parseInt(tt.quantite) || 100, tt.type || 'standard',
          tt.avantages || null, tt.devise || 'EUR', tt.max_par_acheteur != null ? parseInt(tt.max_par_acheteur) : null,
          tt.date_vente_debut || null, tt.date_vente_fin || null, tt.couleur || '#2563EB',
-         tt.prix_early_bird != null ? parseFloat(tt.prix_early_bird) : null, tt.early_bird_fin || null).lastInsertRowid;
+         tt.prix_early_bird != null ? parseFloat(tt.prix_early_bird) : null, tt.early_bird_fin || null)).lastInsertRowid;
 }
 
 /* Consomme le quota d'un code promo : +1 utilisation par billet acheté (décision produit validée),
@@ -111,7 +115,7 @@ async function consommerCodePromo(codeId, userId, ticketIds, quantite) {
       WHERE id=? AND (nb_max_utilisations IS NULL OR nb_utilisations + ? <= nb_max_utilisations)`)
       .run(quantite, codeId, quantite);
     for (const tid of ticketIds) {
-      db.prepare(`INSERT INTO event_codes_promo_usages (code_id,user_id,ticket_id) VALUES (?,?,?)`).run(codeId, userId, tid);
+      await db.prepare(`INSERT INTO event_codes_promo_usages (code_id,user_id,ticket_id) VALUES (?,?,?)`).run(codeId, userId, tid);
     }
   } catch (e) { /* best-effort : ne jamais bloquer un paiement déjà confirmé pour un souci de comptage promo */ }
 }
@@ -357,9 +361,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     const LISTES_DEFAUT = [
       ["Correspondants", "🤝"], ["Partenaires", "🏢"], ["Prospects", "🎯"], ["Collaborateurs", "👥"],
     ];
-    LISTES_DEFAUT.forEach(([nomListe, icone], i) => {
-      db.prepare("INSERT INTO listes_diffusion (proprietaire_id, nom, icone, ordre) VALUES (?,?,?,?)").run(id, nomListe, icone, i);
-    });
+    /* for…of et non forEach : une fonction fléchée non-async ne peut rien attendre,
+       les insertions partaient donc sans garantie d'aboutir avant la fin de la requête. */
+    for (const [i, [nomListe, icone]] of LISTES_DEFAUT.entries()) {
+      await db.prepare("INSERT INTO listes_diffusion (proprietaire_id, nom, icone, ordre) VALUES (?,?,?,?)").run(id, nomListe, icone, i);
+    }
   } catch (_) {}
   // Profil public enrichi : publics/besoins facultatifs du formulaire d'inscription
   try {
@@ -370,7 +376,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   // Pour un compte Initiative : créer l'enregistrement d'initiative associé
   if (role === "initiative") {
     const slug = nom.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + id;
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO initiatives (slug, nom, type, description, domaine, objectifs,
         pays, region, ville, adresse, code_postal, site_web, reseaux_sociaux,
         nationalite1, nationalite2, origine1, origine2,
@@ -469,7 +475,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   // ── Abonnement obligatoire au compte officiel Diaspo'Actif ──
   const officialId = await getOfficialUserId();
   if (officialId && Number(id) !== Number(officialId)) {
-    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(Number(id), officialId);
+    await db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(Number(id), officialId);
   }
 
   const token = createSession(id);
@@ -511,7 +517,7 @@ async function dbLoginRecord(cle, reussite) {
   try {
     await db.prepare("INSERT INTO auth_tentatives (cle, reussite) VALUES (?,?)").run(cle, reussite ? 1 : 0);
     // Purge paresseuse (1 requête sur ~50) pour éviter la croissance illimitée de la table.
-    if (Math.random() < 0.02) db.prepare("DELETE FROM auth_tentatives WHERE created_at < datetime('now','-2 days')").run();
+    if (Math.random() < 0.02) await db.prepare("DELETE FROM auth_tentatives WHERE created_at < datetime('now','-2 days')").run();
   } catch (_) {}
 }
 
@@ -555,7 +561,7 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   }
   dbLoginRecord(`ip:${ip}`, true);
   dbLoginRecord(`email:${email}`, true);
-  db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
+  await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
   const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
@@ -3108,7 +3114,7 @@ route("POST", "/api/vote-scrutins/:id/voter", async (req, res, params, body) => 
     await db.prepare("INSERT INTO vote_bulletins (scrutin_id,resolution_id,choix) VALUES (?,?,?)").run(params.id, r.resolution_id, choix);
   }
   await db.prepare("UPDATE vote_electeurs SET a_vote=1, vote_le=datetime('now') WHERE id=?").run(electeur.id);
-  db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`)
+  await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`)
     .run(user.id, 'signature', ip, req.headers['user-agent'] || null);
   sendJSON(res, 200, { ok: true });
 });
@@ -4264,7 +4270,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     site_web, membres } = body;
   if (!nom) return sendJSON(res, 400, { error: "Le nom de l'initiative est requis." });
   const slug = nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now();
-  const id = db.prepare(`
+  const id = (await db.prepare(`
     INSERT INTO initiatives (slug, nom, sigle, pays, pays_origine, region, ville, commune, departement, zone,
       nationalite1, nationalite2, nationalites_concernees, nationalite_unique,
       origine1, origine2, rayonnement, pays_intervention,
@@ -4287,7 +4293,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     comment_entendu || null, attentes || null, autorisation_temoignage ? 1 : 0,
     nb_salaries != null ? parseInt(nb_salaries) || 0 : 0,
     site_web || null, linkedin || null, twitter || null, youtube || null, forme_autre || null,
-    user.id).lastInsertRowid;
+    user.id)).lastInsertRowid;
   /* Inviter les membres optionnels (envoi de demandes d'affiliation) */
   if (Array.isArray(membres) && membres.length > 0) {
     const notifStmt = db.prepare(`INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)`);
@@ -4383,10 +4389,10 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
   const row = await db.prepare('SELECT password_hash, password_salt, ds_id FROM users WHERE id=?').get(user.id);
   if (!row) return sendJSON(res, 404, { error: 'Compte introuvable.' });
   if (!verifyPassword(password, row.password_salt, row.password_hash)) {
-    db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'echec_validation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
+    await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'echec_validation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
     return sendJSON(res, 403, { error: 'Mot de passe incorrect.' });
   }
-  db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'consultation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
+  await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'consultation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
   sendJSON(res, 200, { ds_id: row.ds_id });
 });
 
@@ -4394,7 +4400,7 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
 route("POST", "/api/profil/ds-id/log-copy", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
-  db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'copie', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
+  await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'copie', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -4407,12 +4413,12 @@ route("POST", "/api/profil/ds-id/regenerate", async (req, res, params, body) => 
   const row = await db.prepare('SELECT password_hash, password_salt FROM users WHERE id=?').get(user.id);
   if (!row) return sendJSON(res, 404, { error: 'Compte introuvable.' });
   if (!verifyPassword(password, row.password_salt, row.password_hash)) {
-    db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'echec_validation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
+    await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'echec_validation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
     return sendJSON(res, 403, { error: 'Mot de passe incorrect.' });
   }
   const newDsId = generateDsId();
   await db.prepare('UPDATE users SET ds_id=? WHERE id=?').run(newDsId, user.id);
-  db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'regeneration', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
+  await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'regeneration', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
   sendJSON(res, 200, { ds_id: newDsId });
 });
 
@@ -4474,13 +4480,13 @@ route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => 
   const target = await db.prepare("SELECT id, nom, prenom FROM users WHERE id = ?").get(userId);
   if (!target) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
   try {
-    db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, fonction, statut) VALUES (?, ?, ?, 'en_attente')").run(params.id, userId, fonction || null);
+    await db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, fonction, statut) VALUES (?, ?, ?, 'en_attente')").run(params.id, userId, fonction || null);
   } catch(e) {
     if (e.message.includes("UNIQUE")) return sendJSON(res, 409, { error: "Ce membre a déjà été invité." });
     throw e;
   }
   try {
-    db.prepare("INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)").run(
+    await db.prepare("INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)").run(
       userId, 'affiliation_initiative',
       `Invitation à rejoindre une initiative`,
       `Vous avez été identifié comme membre de l'initiative « ${init.nom} ». Souhaitez-vous accepter cette affiliation ?`,
@@ -4500,12 +4506,12 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
   /* Accepter/refuser : seul le membre concerné peut changer son statut */
   if (statut && ['accepte','refuse'].includes(statut)) {
     if (user.id !== parseInt(params.userId)) return sendJSON(res, 403, { error: "Vous ne pouvez modifier que votre propre affiliation." });
-    db.prepare("UPDATE initiative_membres SET statut = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(statut, params.id, params.userId);
+    await db.prepare("UPDATE initiative_membres SET statut = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(statut, params.id, params.userId);
     /* Notifier le responsable si refus */
     if (statut === 'refuse') {
       try {
         const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
-        db.prepare("INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)").run(
+        await db.prepare("INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)").run(
           init.owner_user_id, 'affiliation_refusee',
           `Affiliation refusée`,
           `${u?.prenom || ''} ${u?.nom || ''} a refusé de rejoindre « ${init.nom} ».`,
@@ -4515,7 +4521,7 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
   } else if (fonction !== undefined) {
     /* Modifier la fonction : seul le responsable */
     if (init.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Seul le responsable peut modifier les fonctions." });
-    db.prepare("UPDATE initiative_membres SET fonction = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(fonction || null, params.id, params.userId);
+    await db.prepare("UPDATE initiative_membres SET fonction = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(fonction || null, params.id, params.userId);
   }
   sendJSON(res, 200, { ok: true });
 });
@@ -4616,7 +4622,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   const hashtagsFromText = (contenu + " " + article_contenu).match(/#[\wÀ-ÿ]+/g) || [];
   const allHashtags = JSON.stringify([...new Set([...JSON.parse(hashtags), ...hashtagsFromText])]);
 
-  const id = db.prepare(`
+  const id = (await db.prepare(`
     INSERT INTO fil_posts
       (auteur_id, auteur_nom, type, pub_type, categorie, contenu,
        media_url, media_type, article_titre, article_contenu, video_duree,
@@ -4636,8 +4642,8 @@ route("POST", "/api/fil", async (req, res, params, body) => {
     body.programmed_at || null,
     body.localisation_pays || null,
     body.localisation_ville || null,
-  ).lastInsertRowid;
-  if (body.source_import) db.prepare("UPDATE fil_posts SET source_import=? WHERE id=?").run(body.source_import, id);
+  )).lastInsertRowid;
+  if (body.source_import) await db.prepare("UPDATE fil_posts SET source_import=? WHERE id=?").run(body.source_import, id);
 
   // Récupère le post complet pour le renvoyer
   const post = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(id);
@@ -4711,7 +4717,7 @@ route("POST", "/api/fil/:id/dwell", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 200, { ok: false });
   const duree = Math.max(0, Math.min(600, Number(body.duree_sec) || 0));
   if (duree < 2) return sendJSON(res, 200, { ok: true, ignore: true });
-  try { db.prepare("INSERT INTO fil_post_dwell (post_id, user_id, duree_sec) VALUES (?,?,?)").run(params.id, user.id, duree); } catch (_) {}
+  try { await db.prepare("INSERT INTO fil_post_dwell (post_id, user_id, duree_sec) VALUES (?,?,?)").run(params.id, user.id, duree); } catch (_) {}
   sendJSON(res, 200, { ok: true });
 });
 
@@ -4720,7 +4726,7 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const type = body.type || "like";
   try {
-    db.prepare("INSERT INTO fil_reactions (post_id, user_id, type) VALUES (?, ?, ?)").run(params.id, user.id, type);
+    await db.prepare("INSERT INTO fil_reactions (post_id, user_id, type) VALUES (?, ?, ?)").run(params.id, user.id, type);
   } catch (e) { /* déjà réagi avec ce type : ignorer (contrainte UNIQUE) */ }
   const reactions = await db.prepare("SELECT type, COUNT(*) AS n FROM fil_reactions WHERE post_id = ? GROUP BY type").all(params.id);
   const counts = {};
@@ -4811,9 +4817,9 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
   const contenu = (body.contenu || "").trim();
   if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
 
-  const id = db.prepare(
+  const id = (await db.prepare(
     "INSERT INTO fil_commentaires (post_id, auteur_id, auteur_nom, contenu) VALUES (?,?,?,?)"
-  ).run(params.id, user.id, user.nom, contenu).lastInsertRowid;
+  ).run(params.id, user.id, user.nom, contenu)).lastInsertRowid;
 
   const comm = await db.prepare(`
     SELECT c.id, c.contenu, c.created_at, c.auteur_id, c.auteur_nom,
@@ -4891,7 +4897,7 @@ route("GET", "/api/fil/:id", async (req, res, params) => {
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
   // Enregistrer la vue
-  if (cu) { try { db.prepare("INSERT OR IGNORE INTO fil_post_views (post_id, user_id) VALUES (?,?)").run(p.id, cu.id); } catch(e){} }
+  if (cu) { try { await db.prepare("INSERT OR IGNORE INTO fil_post_views (post_id, user_id) VALUES (?,?)").run(p.id, cu.id); } catch(e){} }
   sendJSON(res, 200, { post: await enrichPost(p, cu) });
 });
 
@@ -4969,7 +4975,7 @@ route("POST", "/api/fil/:id/bookmark", async (req, res, params) => {
     await db.prepare("DELETE FROM fil_bookmarks WHERE user_id=? AND post_id=?").run(user.id, params.id);
     sendJSON(res, 200, { bookmarked: false });
   } else {
-    db.prepare("INSERT OR IGNORE INTO fil_bookmarks (user_id, post_id) VALUES (?,?)").run(user.id, params.id);
+    await db.prepare("INSERT OR IGNORE INTO fil_bookmarks (user_id, post_id) VALUES (?,?)").run(user.id, params.id);
     sendJSON(res, 200, { bookmarked: true });
   }
 });
@@ -4999,7 +5005,7 @@ route("POST", "/api/fil/:id/contribuer", async (req, res, params, body) => {
   const type_contribution = (body.type_contribution || "").trim();
   if (!type_contribution) return sendJSON(res, 400, { error: "Type de contribution requis." });
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO fil_contributions (post_id, user_id, user_nom, user_email, type_contribution, message)
     VALUES (?,?,?,?,?,?)
   `).run(params.id, user.id, user.nom, user.email, type_contribution, (body.message || "").trim() || null);
@@ -5065,7 +5071,7 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
 
   const commentaire = (body.commentaire || "").trim();
 
-  const newId = db.prepare(`
+  const newId = (await db.prepare(`
     INSERT INTO fil_posts
       (auteur_id, auteur_nom, type, pub_type, categorie, contenu, original_post_id, repost_commentaire)
     VALUES (?,?,?,?,?,?,?,?)
@@ -5075,7 +5081,7 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
     commentaire || "",
     original.id,
     commentaire || null
-  ).lastInsertRowid;
+  )).lastInsertRowid;
 
   // Notifier l'auteur de l'original
   if (original.auteur_id && original.auteur_id !== user.id) {
@@ -5296,8 +5302,11 @@ function similariteChaine(a, b) {
   const tokenSim = (ta.size && tb.size) ? inter / Math.min(ta.size, tb.size) : 0;
   return Math.max(distSim, tokenSim);
 }
-function journalColl(collId, action, detail) {
-  try { db.prepare("INSERT INTO collectivite_journal (collectivite_id,action,detail) VALUES (?,?,?)").run(collId, action, detail || null); } catch(e) {}
+/* async avec try/catch INTERNE : la promesse renvoyée ne rejette donc jamais, et les
+   nombreux appels qui ne l'attendent pas ne peuvent pas produire d'unhandledRejection.
+   Ceux qui l'attendent ont la garantie que l'écriture a abouti. */
+async function journalColl(collId, action, detail) {
+  try { await db.prepare("INSERT INTO collectivite_journal (collectivite_id,action,detail) VALUES (?,?,?)").run(collId, action, detail || null); } catch(e) {}
 }
 
 /* Portée d'une requête Observatoire selon le paramètre ?scope=
@@ -6099,7 +6108,7 @@ route("POST", "/api/initiatives/:id/suivre", async (req, res, params) => {
   const init = await db.prepare("SELECT id, abonnes FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   try {
-    db.prepare("INSERT INTO abonnements (user_id, initiative_id) VALUES (?, ?)").run(user.id, params.id);
+    await db.prepare("INSERT INTO abonnements (user_id, initiative_id) VALUES (?, ?)").run(user.id, params.id);
     await db.prepare("UPDATE initiatives SET abonnes = abonnes + 1 WHERE id = ?").run(params.id);
     sendJSON(res, 201, { ok: true, abonne: true });
   } catch (e) {
@@ -6111,7 +6120,7 @@ route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const info = await db.prepare("DELETE FROM abonnements WHERE user_id = ? AND initiative_id = ?").run(user.id, params.id);
-  if (info.changes > 0) db.prepare("UPDATE initiatives SET abonnes = MAX(0, abonnes - 1) WHERE id = ?").run(params.id);
+  if (info.changes > 0) await db.prepare("UPDATE initiatives SET abonnes = MAX(0, abonnes - 1) WHERE id = ?").run(params.id);
   sendJSON(res, 200, { ok: true, abonne: false });
 });
 
@@ -6651,10 +6660,10 @@ route("POST", "/api/formation-besoins", async (req, res, params, body) => {
   const domaine = SEC.sanitizeString(body.domaine || "", 100);
   const description = SEC.sanitizeString(body.description || "", 3000);
   if (!titre) return sendJSON(res, 400, { error: "Le titre du besoin est obligatoire." });
-  const id = await db.prepare("INSERT INTO formation_besoins (user_id,titre,domaine,description) VALUES (?,?,?,?)")
-    .run(me.id, titre, domaine || null, description || null).lastInsertRowid;
+  const id = await (await db.prepare("INSERT INTO formation_besoins (user_id,titre,domaine,description) VALUES (?,?,?,?)")
+    .run(me.id, titre, domaine || null, description || null)).lastInsertRowid;
   /* L'auteur soutient automatiquement son propre besoin */
-  try { db.prepare("INSERT OR IGNORE INTO formation_besoins_votes (besoin_id,user_id,commentaire) VALUES (?,?,?)").run(id, me.id, null); } catch(_) {}
+  try { await db.prepare("INSERT OR IGNORE INTO formation_besoins_votes (besoin_id,user_id,commentaire) VALUES (?,?,?)").run(id, me.id, null); } catch(_) {}
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -6665,7 +6674,7 @@ route("POST", "/api/formation-besoins/:id/voter", async (req, res, params, body)
   const besoin = await db.prepare("SELECT id FROM formation_besoins WHERE id=?").get(params.id);
   if (!besoin) return sendJSON(res, 404, { error: "Besoin introuvable." });
   const commentaire = body.commentaire ? SEC.sanitizeString(body.commentaire, 1000) : null;
-  db.prepare(`INSERT INTO formation_besoins_votes (besoin_id,user_id,commentaire) VALUES (?,?,?)
+  await db.prepare(`INSERT INTO formation_besoins_votes (besoin_id,user_id,commentaire) VALUES (?,?,?)
     ON CONFLICT(besoin_id,user_id) DO UPDATE SET commentaire=?`).run(params.id, me.id, commentaire, commentaire);
   const nb_votes = (await db.prepare("SELECT COUNT(*) AS n FROM formation_besoins_votes WHERE besoin_id=?").get(params.id))?.n;
   sendJSON(res, 200, { ok: true, nb_votes });
@@ -6704,7 +6713,7 @@ route("GET", "/api/formation-favoris", async (req, res) => {
 route("POST", "/api/formation-favoris/:formationId", async (req, res, params) => {
   const me = await getCurrentUser(req);
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
-  db.prepare("INSERT OR IGNORE INTO formation_favoris (user_id,formation_id) VALUES (?,?)").run(me.id, params.formationId);
+  await db.prepare("INSERT OR IGNORE INTO formation_favoris (user_id,formation_id) VALUES (?,?)").run(me.id, params.formationId);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/formation-favoris/:formationId", async (req, res, params) => {
@@ -6746,8 +6755,8 @@ route("POST", "/api/formations/suivi", async (req, res, params, body) => {
     if (f) formTitre = f.titre;
   }
   if (!formTitre) return sendJSON(res, 400, { error: "Titre requis." });
-  const id = db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)")
-    .run(me.id, formation_id||null, formTitre, organisme||null).lastInsertRowid;
+  const id = (await db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)")
+    .run(me.id, formation_id||null, formTitre, organisme||null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PATCH", "/api/formations/suivi/:id", async (req, res, params, body) => {
@@ -6940,7 +6949,7 @@ route("POST", "/api/formations", async (req, res, params, body) => {
   const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 5;
   const gratuit = modeAcces === 'gratuit' ? 1 : 0;
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id = ?").get(user.id);
-  const id = db.prepare(`
+  const id = (await db.prepare(`
     INSERT INTO formations (titre, type_formation, organisme, domaine, nationalite, langue, niveau, description,
       prix, gratuit, duree, duree_heures, places, initiative_id, owner_user_id,
       statut, mode_acces, commission_pct, telecharge_autorise, objectifs, prerequis, categorie, video_intro,
@@ -6962,7 +6971,7 @@ route("POST", "/api/formations", async (req, res, params, body) => {
     sous_categorie||null, mots_cles||null, pays_concerne||null, secteur_activite||null,
     devise||'EUR', promo_active?1:0, promo_reduction_pct||null, promo_date_fin||null,
     acces_type||'public', acces_liste_id||null, banniere_url||null, image_url||null
-  ).lastInsertRowid;
+  )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -6986,7 +6995,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   const newStatut = (f.statut === 'refusee') ? 'brouillon' : f.statut;
   const newMotif = (f.statut === 'refusee') ? null : f.motif_refus;
   const b = k => (body[k] === undefined ? null : (typeof body[k] === 'boolean' ? (body[k]?1:0) : body[k]));
-  db.prepare(`UPDATE formations SET
+  await db.prepare(`UPDATE formations SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
     prerequis=COALESCE(?,prerequis), niveau=COALESCE(?,niveau), langue=COALESCE(?,langue),
     duree=COALESCE(?,duree), duree_heures=COALESCE(?,duree_heures), places=COALESCE(?,places),
@@ -7064,8 +7073,8 @@ route("POST", "/api/formations/:id/coupons", async (req, res, params, body) => {
   if (!code) return sendJSON(res, 400, { error: "Le code du coupon est requis." });
   if (!reduction || reduction <= 0 || reduction > 100) return sendJSON(res, 400, { error: "La réduction doit être comprise entre 1 et 100 %." });
   try {
-    const id = db.prepare(`INSERT INTO formation_coupons (formation_id, code, reduction_pct, max_utilisations)
-      VALUES (?,?,?,?)`).run(params.id, code, reduction, body.max_utilisations ? parseInt(body.max_utilisations) : null).lastInsertRowid;
+    const id = (await db.prepare(`INSERT INTO formation_coupons (formation_id, code, reduction_pct, max_utilisations)
+      VALUES (?,?,?,?)`).run(params.id, code, reduction, body.max_utilisations ? parseInt(body.max_utilisations) : null)).lastInsertRowid;
     sendJSON(res, 201, { id });
   } catch(e) {
     sendJSON(res, 400, { error: "Ce code de coupon existe déjà pour cette formation." });
@@ -7226,8 +7235,8 @@ route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du module est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_modules WHERE formation_id=?").get(params.id);
-  const id = db.prepare("INSERT INTO formation_modules (formation_id,titre,description,ordre) VALUES (?,?,?,?)")
-    .run(params.id, body.titre, body.description||null, max+1).lastInsertRowid;
+  const id = (await db.prepare("INSERT INTO formation_modules (formation_id,titre,description,ordre) VALUES (?,?,?,?)")
+    .run(params.id, body.titre, body.description||null, max+1)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, body) => {
@@ -7236,7 +7245,7 @@ route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, b
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
-  db.prepare("UPDATE formation_modules SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND formation_id=?")
+  await db.prepare("UPDATE formation_modules SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND formation_id=?")
     .run(body.titre||null, body.description||null, params.moduleId, params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -7262,7 +7271,9 @@ route("PUT", "/api/formations/:id/modules/reorder", async (req, res, params, bod
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const ids = body.ordre || [];
-  ids.forEach((mid, i) => { db.prepare("UPDATE formation_modules SET ordre=? WHERE id=? AND formation_id=?").run(i, mid, params.id); });
+  /* Réordonnancement : la réponse ne doit pas partir avant que les positions soient
+     réellement enregistrées, sinon l'ordre affiché après rechargement peut être l'ancien. */
+  for (const [i, mid] of ids.entries()) await db.prepare("UPDATE formation_modules SET ordre=? WHERE id=? AND formation_id=?").run(i, mid, params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -7275,8 +7286,8 @@ route("POST", "/api/formations/:id/modules/:moduleId/chapitres", async (req, res
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du chapitre est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_chapitres WHERE module_id=?").get(params.moduleId);
-  const id = db.prepare("INSERT INTO formation_chapitres (module_id,titre,description,ordre) VALUES (?,?,?,?)")
-    .run(params.moduleId, body.titre, body.description||null, max+1).lastInsertRowid;
+  const id = (await db.prepare("INSERT INTO formation_chapitres (module_id,titre,description,ordre) VALUES (?,?,?,?)")
+    .run(params.moduleId, body.titre, body.description||null, max+1)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", async (req, res, params, body) => {
@@ -7285,7 +7296,7 @@ route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", asyn
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
-  db.prepare("UPDATE formation_chapitres SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND module_id=?")
+  await db.prepare("UPDATE formation_chapitres SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND module_id=?")
     .run(body.titre||null, body.description||null, params.chapitreId, params.moduleId);
   sendJSON(res, 200, { ok: true });
 });
@@ -7307,7 +7318,7 @@ route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/reorder", async (r
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const ids = body.ordre || [];
-  ids.forEach((cid, i) => { db.prepare("UPDATE formation_chapitres SET ordre=? WHERE id=? AND module_id=?").run(i, cid, params.moduleId); });
+  for (const [i, cid] of ids.entries()) await db.prepare("UPDATE formation_chapitres SET ordre=? WHERE id=? AND module_id=?").run(i, cid, params.moduleId);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -7321,12 +7332,12 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   const chapitre = await db.prepare("SELECT module_id FROM formation_chapitres WHERE id=?").get(params.chapitreId);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_lecons WHERE chapitre_id=?").get(params.chapitreId);
-  const id = db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages)
+  const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
     body.contenu_url||null, body.contenu_texte||null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
     body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null
-  ).lastInsertRowid;
+  )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, body) => {
@@ -7336,7 +7347,7 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const n = v => (v === undefined ? null : v);
-  db.prepare(`UPDATE formation_lecons SET
+  await db.prepare(`UPDATE formation_lecons SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), type=COALESCE(?,type),
     duree_minutes=COALESCE(?,duree_minutes), contenu_url=COALESCE(?,contenu_url),
     contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url),
@@ -7363,7 +7374,7 @@ route("PUT", "/api/formations/:id/chapitres/:chapitreId/lecons/reorder", async (
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const ids = body.ordre || [];
-  ids.forEach((lid, i) => { db.prepare("UPDATE formation_lecons SET ordre=? WHERE id=? AND chapitre_id=?").run(i, lid, params.chapitreId); });
+  for (const [i, lid] of ids.entries()) await db.prepare("UPDATE formation_lecons SET ordre=? WHERE id=? AND chapitre_id=?").run(i, lid, params.chapitreId);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -7382,9 +7393,9 @@ route("POST", "/api/formations/:id/quiz", async (req, res, params, body) => {
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du quiz est requis." });
-  const id = db.prepare(`INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,temps_limite_min,correction_auto,commentaires_personnalises)
+  const id = (await db.prepare(`INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,temps_limite_min,correction_auto,commentaires_personnalises)
     VALUES (?,?,?,?,?,?,?,?)`).run(params.id, body.lecon_id||null, body.titre, body.type||'intermediaire',
-    body.note_minimale||50, body.temps_limite_min||null, body.correction_auto===false?0:1, body.commentaires_personnalises||null).lastInsertRowid;
+    body.note_minimale||50, body.temps_limite_min||null, body.correction_auto===false?0:1, body.commentaires_personnalises||null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("PUT", "/api/formations/:id/quiz/:quizId", async (req, res, params, body) => {
@@ -7394,7 +7405,7 @@ route("PUT", "/api/formations/:id/quiz/:quizId", async (req, res, params, body) 
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
   const n = v => (v === undefined ? null : v);
-  db.prepare(`UPDATE formation_quiz SET titre=COALESCE(?,titre), type=COALESCE(?,type),
+  await db.prepare(`UPDATE formation_quiz SET titre=COALESCE(?,titre), type=COALESCE(?,type),
     note_minimale=COALESCE(?,note_minimale), temps_limite_min=COALESCE(?,temps_limite_min),
     correction_auto=COALESCE(?,correction_auto), commentaires_personnalises=COALESCE(?,commentaires_personnalises)
     WHERE id=?`).run(n(body.titre),n(body.type),n(body.note_minimale),n(body.temps_limite_min),
@@ -7419,9 +7430,9 @@ route("POST", "/api/formations/:id/quiz/:quizId/questions", async (req, res, par
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.question) return sendJSON(res, 400, { error: "L'énoncé de la question est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_quiz_questions WHERE quiz_id=?").get(params.quizId);
-  const id = db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre)
+  const id = (await db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre)
     VALUES (?,?,?,?,?,?,?)`).run(params.quizId, body.question, body.type||'qcm',
-    body.options ? JSON.stringify(body.options) : null, body.reponse_correcte||null, body.points||1, max+1).lastInsertRowid;
+    body.options ? JSON.stringify(body.options) : null, body.reponse_correcte||null, body.points||1, max+1)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 route("DELETE", "/api/formations/:id/quiz/:quizId/questions/:questionId", async (req, res, params) => {
@@ -7441,7 +7452,7 @@ route("PUT", "/api/formations/:id/certificat", async (req, res, params, body) =>
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   if (!(await exigerPremium(user, res, "formations"))) return;
-  db.prepare(`UPDATE formations SET certificat_actif=?, certificat_modele=COALESCE(?,certificat_modele),
+  await db.prepare(`UPDATE formations SET certificat_actif=?, certificat_modele=COALESCE(?,certificat_modele),
     certificat_conditions=COALESCE(?,certificat_conditions), certificat_qr=? WHERE id=?`)
     .run(body.certificat_actif?1:0, body.certificat_modele||null, body.certificat_conditions||null, body.certificat_qr===false?0:1, params.id);
   sendJSON(res, 200, { ok: true });
@@ -7466,8 +7477,8 @@ route("POST", "/api/formations/:id/messages", async (req, res, params, body) => 
   if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.message) return sendJSON(res, 400, { error: "Message vide." });
   const senderRole = user.role === 'administrateur' ? 'administrateur' : 'formateur';
-  const id = db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,?,?)")
-    .run(params.id, user.id, senderRole, body.message).lastInsertRowid;
+  const id = (await db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,?,?)")
+    .run(params.id, user.id, senderRole, body.message)).lastInsertRowid;
   const destId = senderRole === 'administrateur' ? f.owner_user_id : null;
   if (destId) {
     creerNotif(destId, 'formation', 'Nouveau message sur votre dossier', `Diaspo'Actif a répondu concernant « ${f.titre} ».`, { formation_id: params.id });
@@ -7525,7 +7536,7 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   if (erreurs.length) return sendJSON(res, 400, { error: "Formation incomplète.", details: erreurs });
 
   await db.prepare("UPDATE formations SET statut='soumise', date_soumission=datetime('now'), motif_refus=NULL WHERE id=?").run(params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'soumise',?,?)").run(params.id, user.id, user.nom);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'soumise',?,?)").run(params.id, user.id, user.nom);
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
   for (const a of admins) {
     creerNotif(a.id, 'formation', 'Nouvelle formation à valider', `« ${f.titre} » est en attente de validation.`, { formation_id: params.id });
@@ -7560,7 +7571,7 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
 
   /* Formation gratuite (ou code d'accès valide) : inscription immédiate, comme avant. */
   if (montant <= 0) {
-    db.prepare(`INSERT INTO formation_inscriptions
+    await db.prepare(`INSERT INTO formation_inscriptions
       (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces,paiement_statut)
       VALUES (?,?,0,?,?,'paye')`).run(params.id, user.id, acces_gratuit, code_valide);
     creerNotif(user.id, 'formation', 'Inscription confirmée', `Vous êtes inscrit à la formation « ${f.titre} ».`, { formation_id: params.id });
@@ -7571,9 +7582,9 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
      Même modèle que la billetterie/boutique — voir handleStripeWebhook(). */
   const { stripe, getOrCreateStripeCustomer } = require('./stripe-client');
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
-  const inscriptionId = db.prepare(`INSERT INTO formation_inscriptions
+  const inscriptionId = (await db.prepare(`INSERT INTO formation_inscriptions
     (formation_id,user_id,montant_paye,acces_gratuit_membre,code_acces,paiement_statut)
-    VALUES (?,?,0,?,?,'en_attente')`).run(params.id, user.id, acces_gratuit, code_valide).lastInsertRowid;
+    VALUES (?,?,0,?,?,'en_attente')`).run(params.id, user.id, acces_gratuit, code_valide)).lastInsertRowid;
   try {
     const origin = getOrigin(req);
     const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
@@ -7592,10 +7603,10 @@ route("POST", "/api/formations/:id/inscrire", async (req, res, params, body) => 
       success_url: `${origin}/formations.html?paiement=succes&inscription=${inscriptionId}`,
       cancel_url: `${origin}/formations.html?paiement=annule&inscription=${inscriptionId}`,
     });
-    db.prepare(`UPDATE formation_inscriptions SET stripe_session_id=? WHERE id=?`).run(session.id, inscriptionId);
+    await db.prepare(`UPDATE formation_inscriptions SET stripe_session_id=? WHERE id=?`).run(session.id, inscriptionId);
     sendJSON(res, 201, { checkout_url: session.url, en_attente_paiement: true });
   } catch (e) {
-    db.prepare(`DELETE FROM formation_inscriptions WHERE id=?`).run(inscriptionId);
+    await db.prepare(`DELETE FROM formation_inscriptions WHERE id=?`).run(inscriptionId);
     sendJSON(res, 500, SEC.safeError(e, 'formation-checkout'));
   }
 });
@@ -7608,7 +7619,7 @@ route("POST", "/api/formations/:id/avis", async (req, res, params, body) => {
   if (!inscrit) return sendJSON(res, 403, { error: "Vous devez être inscrit pour laisser un avis." });
   const { note, commentaire } = body;
   if (!note || note < 1 || note > 5) return sendJSON(res, 400, { error: "Note entre 1 et 5 requise." });
-  db.prepare("INSERT OR REPLACE INTO formation_avis (formation_id,user_id,note,commentaire) VALUES (?,?,?,?)").run(params.id, user.id, note, commentaire||null);
+  await db.prepare("INSERT OR REPLACE INTO formation_avis (formation_id,user_id,note,commentaire) VALUES (?,?,?,?)").run(params.id, user.id, note, commentaire||null);
   sendJSON(res, 201, { ok: true });
 });
 
@@ -7645,7 +7656,7 @@ route("PATCH", "/api/admin/formations/:id/analyser", async (req, res, params, bo
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   await db.prepare("UPDATE formations SET statut='en_cours_analyse' WHERE id=?").run(params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'en_cours_analyse',?,?)").run(params.id, user.id, user.nom);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom) VALUES (?,'en_cours_analyse',?,?)").run(params.id, user.id, user.nom);
   creerNotif(f.owner_user_id, 'formation', 'Formation en cours d\'analyse', `« ${f.titre} » est en cours d'analyse par l'équipe Diaspo'Actif.`, { formation_id: params.id });
   sendJSON(res, 200, { ok: true });
 });
@@ -7657,9 +7668,9 @@ route("PATCH", "/api/admin/formations/:id/demander-modifications", async (req, r
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   const motif = body.motif || "Des modifications sont nécessaires avant publication.";
   await db.prepare("UPDATE formations SET statut='modifications_demandees', motif_refus=? WHERE id=?").run(motif, params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'modifications_demandees',?,?,?)").run(params.id, user.id, user.nom, motif);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'modifications_demandees',?,?,?)").run(params.id, user.id, user.nom, motif);
   if (body.message) {
-    db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,'administrateur',?)").run(params.id, user.id, body.message);
+    await db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,'administrateur',?)").run(params.id, user.id, body.message);
   }
   creerNotif(f.owner_user_id, 'formation', 'Modifications demandées', `L'équipe Diaspo'Actif demande des modifications sur « ${f.titre} ». Motif : ${motif}`, { formation_id: params.id });
   sendJSON(res, 200, { ok: true });
@@ -7672,7 +7683,7 @@ route("PATCH", "/api/admin/formations/:id/programmer", async (req, res, params, 
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (!body.date_publication) return sendJSON(res, 400, { error: "La date de publication est requise." });
   await db.prepare("UPDATE formations SET statut='programmee', valide_at=? WHERE id=?").run(body.date_publication, params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'programmee',?,?,?)").run(params.id, user.id, user.nom, body.date_publication);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'programmee',?,?,?)").run(params.id, user.id, user.nom, body.date_publication);
   creerNotif(f.owner_user_id, 'formation', 'Formation validée et programmée', `« ${f.titre} » sera publiée le ${body.date_publication}.`, { formation_id: params.id });
   sendJSON(res, 200, { ok: true });
 });
@@ -7692,8 +7703,8 @@ route("PATCH", "/api/admin/formations/:id/valider", async (req, res, params, bod
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
-  db.prepare("UPDATE formations SET statut='publiee', validateur_id=?, valide_at=datetime('now') WHERE id=?").run(user.id, params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'validee',?,?,?)").run(params.id, user.id, user.nom, body.motif||null);
+  await db.prepare("UPDATE formations SET statut='publiee', validateur_id=?, valide_at=datetime('now') WHERE id=?").run(user.id, params.id);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'validee',?,?,?)").run(params.id, user.id, user.nom, body.motif||null);
   creerNotif(f.owner_user_id, 'formation', 'Formation publiée ! 🎉', `Votre formation « ${f.titre} » a été validée et publiée sur Diaspo Formation.`, { formation_id: params.id });
   sendJSON(res, 200, { ok: true });
 });
@@ -7705,7 +7716,7 @@ route("PATCH", "/api/admin/formations/:id/refuser", async (req, res, params, bod
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   const motif = body.motif || 'Contenu non conforme.';
   await db.prepare("UPDATE formations SET statut='refusee', motif_refus=? WHERE id=?").run(motif, params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'refusee',?,?,?)").run(params.id, user.id, user.nom, motif);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,'refusee',?,?,?)").run(params.id, user.id, user.nom, motif);
   creerNotif(f.owner_user_id, 'formation', 'Formation refusée', `Votre formation « ${f.titre} » n'a pas été validée. Motif : ${motif}`, { formation_id: params.id });
   sendJSON(res, 200, { ok: true });
 });
@@ -7718,7 +7729,7 @@ route("PATCH", "/api/admin/formations/:id/suspendre", async (req, res, params, b
   const motif = body.motif || '';
   const newStatut = f.statut === 'suspendue' ? 'publiee' : 'suspendue';
   await db.prepare("UPDATE formations SET statut=? WHERE id=?").run(newStatut, params.id);
-  db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)").run(params.id, newStatut, user.id, user.nom, motif);
+  await db.prepare("INSERT INTO formation_historique (formation_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)").run(params.id, newStatut, user.id, user.nom, motif);
   creerNotif(f.owner_user_id, 'formation', newStatut==='suspendue'?'Formation suspendue':'Formation réactivée',
     newStatut==='suspendue' ? `Votre formation « ${f.titre} » a été suspendue.${motif?' Motif : '+motif:''}` : `Votre formation « ${f.titre} » est de nouveau publiée.`,
     { formation_id: params.id });
@@ -7737,8 +7748,8 @@ route("POST", "/api/admin/codes-acces", async (req, res, params, body) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
   const { code, description, limite_utilisations, date_expiration } = body;
   if (!code) return sendJSON(res, 400, { error: "Code requis." });
-  const id = db.prepare(`INSERT INTO formation_codes_acces (code,description,limite_utilisations,date_expiration,created_by) VALUES (?,?,?,?,?)`)
-    .run(code.toUpperCase().trim(), description||null, limite_utilisations||null, date_expiration||null, user.id).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO formation_codes_acces (code,description,limite_utilisations,date_expiration,created_by) VALUES (?,?,?,?,?)`)
+    .run(code.toUpperCase().trim(), description||null, limite_utilisations||null, date_expiration||null, user.id)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -7750,7 +7761,7 @@ route("PATCH", "/api/admin/codes-acces/:id", async (req, res, params, body) => {
   if (body.toggle_actif !== undefined) {
     await db.prepare("UPDATE formation_codes_acces SET actif=? WHERE id=?").run(c.actif?0:1, params.id);
   } else {
-    db.prepare("UPDATE formation_codes_acces SET description=COALESCE(?,description), limite_utilisations=COALESCE(?,limite_utilisations), date_expiration=COALESCE(?,date_expiration) WHERE id=?")
+    await db.prepare("UPDATE formation_codes_acces SET description=COALESCE(?,description), limite_utilisations=COALESCE(?,limite_utilisations), date_expiration=COALESCE(?,date_expiration) WHERE id=?")
       .run(body.description, body.limite_utilisations||null, body.date_expiration||null, params.id);
   }
   sendJSON(res, 200, { ok: true });
@@ -8235,10 +8246,10 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
     if (user.role === "collectivite" || user.role === "administrateur") {
       fields.push("nom_institution=?"); vals.push(nomStructure || null);
     } else if (user.role === "initiative" && nomStructure) {
-      db.prepare("UPDATE initiatives SET nom=? WHERE owner_user_id=?").run(nomStructure, user.id);
+      await db.prepare("UPDATE initiatives SET nom=? WHERE owner_user_id=?").run(nomStructure, user.id);
     }
   }
-  if (fields.length) { vals.push(user.id); db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
+  if (fields.length) { vals.push(user.id); await db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
   const up = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json,privacy_json,nom_institution FROM users WHERE id=?").get(user.id);
   let nomStructureOut = up.role === "collectivite" || up.role === "administrateur" ? (up.nom_institution || null) : null;
   if (up.role === "initiative") {
@@ -8456,7 +8467,7 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
   if (me.id == params.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   const followedId = parseInt(params.id);
   try {
-    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
+    await db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
     const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId).n;
     // Notifie le compte suivi + propose un abonnement en retour (sauf s'il suit déjà)
     const dejaReciproque = await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(followedId, me.id);
@@ -8474,7 +8485,7 @@ route("POST", "/api/users/:id/suivre-retour", async (req, res, params) => {
   const followedId = parseInt(params.id);
   if (me.id == followedId) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   try {
-    db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
+    await db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
     const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId).n;
     sendJSON(res, 200, { ok: true, nbAbonnes: n });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
@@ -8511,9 +8522,9 @@ route("POST", "/api/upload", async (req, res, params, body) => {
   const buf = Buffer.from(match[2], "base64");
   if (buf.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop volumineux (5 Mo max)." });
 
-  const id = db.prepare("INSERT INTO uploads (user_id, nom, mime, taille, data) VALUES (?,?,?,?,?)").run(
+  const id = await (await db.prepare("INSERT INTO uploads (user_id, nom, mime, taille, data) VALUES (?,?,?,?,?)").run(
     user.id, nom || "upload", mime, buf.length, buf
-  ).lastInsertRowid;
+  )).lastInsertRowid;
 
   sendJSON(res, 200, { url: `/api/uploads/${id}`, id, nom: nom || "upload" });
 });
@@ -8547,8 +8558,8 @@ route("POST", "/api/atelier/upload", async (req, res, params, body) => {
     const { file, mime } = AV.writeDataUrl(body.dataUrl);
     const duree = mime.startsWith("image") ? null : await AV.probeDuration(file);
     const folder = body.folder || avFolderFor(mime);
-    const id = db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'upload')")
-      .run(user.id, folder, (body.nom || "media").slice(0, 120), mime, file, duree).lastInsertRowid;
+    const id = (await db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'upload')")
+      .run(user.id, folder, (body.nom || "media").slice(0, 120), mime, file, duree)).lastInsertRowid;
     const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
     sendJSON(res, 201, { media: avMediaDto(m) });
   } catch (e) { sendJSON(res, 400, { error: e.message }); }
@@ -8675,8 +8686,8 @@ route("POST", "/api/atelier/process", async (req, res, params, body) => {
       return sendJSON(res, 400, { error: "Opération inconnue." });
     }
     const duree = type.startsWith("audio") || type.startsWith("video") ? await AV.probeDuration(outFile) : null;
-    const id = db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'render')")
-      .run(user.id, folder, nom.slice(0, 120), type, outFile, duree).lastInsertRowid;
+    const id = (await db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'render')")
+      .run(user.id, folder, nom.slice(0, 120), type, outFile, duree)).lastInsertRowid;
     const out = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
     sendJSON(res, 200, { media: avMediaDto(out) });
   } catch (e) { logError(e, "atelier_process", req); sendJSON(res, 500, { error: e.message }); }
@@ -8736,7 +8747,7 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
 
   // Priorité 3 (loi de priorité fil) : trace la recherche pour affiner les recommandations OZ
   const cuRech = await getCurrentUser(req);
-  if (cuRech) { try { db.prepare("INSERT INTO recherches_utilisateur (user_id, requete) VALUES (?,?)").run(cuRech.id, q.slice(0, 200)); } catch (_) {} }
+  if (cuRech) { try { await db.prepare("INSERT INTO recherches_utilisateur (user_id, requete) VALUES (?,?)").run(cuRech.id, q.slice(0, 200)); } catch (_) {} }
 
   const utilisateurs = (type === "tous" || type === "utilisateurs")
     ? await db.prepare("SELECT id,nom,role,ville,pays FROM users WHERE (nom LIKE ? OR ville LIKE ?) AND role != 'administrateur' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 8").all(like, like)
@@ -8867,7 +8878,7 @@ route("GET", "/api/recherche-contacts", async (req, res, params, body, query) =>
 /* ---------- Notifications ---------- */
 async function creerNotif(userId, type, titre, contenu, data = {}) {
   try {
-    db.prepare("INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES (?,?,?,?,?)").run(userId, type, titre, contenu, JSON.stringify(data));
+    await db.prepare("INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES (?,?,?,?,?)").run(userId, type, titre, contenu, JSON.stringify(data));
   } catch (e) { /* silencieux */ }
 }
 
@@ -9096,7 +9107,7 @@ async function handleStripeWebhook(req, res) {
         await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, ev.organisateur_id);
         await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
         try {
-          db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,'reussi',?,?)`)
+          await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,'reussi',?,?)`)
             .run(ticket.user_id, ticket.prix_paye, 'billet_evenement', ts);
         } catch(e) { /* table transactions peut avoir schema différent */ }
         creerNotif(ticket.user_id, "billet_paye", "Billet payé ✅", `Votre billet pour « ${ev.titre} » est confirmé.`, { event_id: ev.id });
@@ -9136,7 +9147,7 @@ async function handleStripeWebhook(req, res) {
             promoUsageParCode.get(ticket.code_promo_id).push(ticket.id);
           }
           try {
-            db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,'reussi',?,?)`)
+            await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'billet_evenement',?,'reussi',?,?)`)
               .run(ticket.user_id, ticket.prix_paye, 'billet_evenement', new Date().toISOString());
           } catch (e) { /* table transactions peut avoir schema différent */ }
         }
@@ -9193,7 +9204,7 @@ async function handleStripeWebhook(req, res) {
         await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
         await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
         try {
-          db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'commande_boutique',?,'reussi',?,?)`)
+          await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'commande_boutique',?,'reussi',?,?)`)
             .run(cmd.acheteur_id, montant, 'commande_boutique', new Date().toISOString());
         } catch (e) { /* table transactions peut avoir schema différent */ }
         creerNotif(cmd.acheteur_id, "commande_payee", "Commande payée ✅", `Votre commande « ${prod?.nom || ''} » (x${cmd.quantite}) est confirmée.`, { commande_id: commandeId });
@@ -9232,7 +9243,7 @@ async function handleStripeWebhook(req, res) {
            ferme l'onglet avant le retour sur le site. */
         try {
           const exists = await db.prepare("SELECT id FROM user_formations_suivi WHERE user_id=? AND formation_id=?").get(insc.user_id, insc.formation_id);
-          if (!exists && f) db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)").run(insc.user_id, insc.formation_id, f.titre, f.organisme||null);
+          if (!exists && f) await db.prepare("INSERT INTO user_formations_suivi (user_id,formation_id,titre,organisme) VALUES (?,?,?,?)").run(insc.user_id, insc.formation_id, f.titre, f.organisme||null);
         } catch(_) {}
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
@@ -9614,7 +9625,7 @@ route("POST", "/api/ads/create", async (req, res) => {
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "ads");
-    const id = db.prepare(`
+    const id = (await db.prepare(`
       INSERT INTO publicites (user_id, annonceur, media_type, media_url, titre, description, cta, lien_url, duree_jours,
         cible_pays, cible_langue, cible_interet, emplacements, statut, date_debut, date_fin, charte_acceptee_le,
         cible_zones, cible_ville, cible_departement, cible_region, cible_listes)
@@ -9628,7 +9639,7 @@ route("POST", "/api/ads/create", async (req, res) => {
       JSON.stringify(fields.cible_interet ? [fields.cible_interet] : []),
       JSON.stringify(emplacements),
       JSON.stringify(cibleZones), cibleVille, cibleDepartement, cibleRegion, JSON.stringify(cibleListes)
-    ).lastInsertRowid;
+    )).lastInsertRowid;
 
     if (abo) await db.prepare("UPDATE pub_abonnements SET credits_restants=credits_restants-1, updated_at=datetime('now') WHERE id=?").run(abo.id);
 
@@ -9682,7 +9693,7 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
   }
   if (!ad) return sendJSON(res, 200, { ad: null });
 
-  db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1, updated_at=datetime('now') WHERE id=?").run(ad.id);
+  await db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1, updated_at=datetime('now') WHERE id=?").run(ad.id);
   sendJSON(res, 200, { ad: {
     id: ad.id, media_type: ad.media_type, media_url: ad.media_url,
     titre: ad.titre, description: ad.description, cta: ad.cta, lien_url: ad.lien_url,
@@ -9690,15 +9701,15 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
 });
 
 route("POST", "/api/ads/:id/clic", async (req, res, params) => {
-  db.prepare("UPDATE publicites SET nb_clics=nb_clics+1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE publicites SET nb_clics=nb_clics+1, updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 route("POST", "/api/ads/:id/video-view", async (req, res, params) => {
-  db.prepare("UPDATE publicites SET nb_video_views=nb_video_views+1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE publicites SET nb_video_views=nb_video_views+1, updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 route("POST", "/api/ads/:id/video-full-view", async (req, res, params) => {
-  db.prepare("UPDATE publicites SET nb_full_video_views=nb_full_video_views+1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE publicites SET nb_full_video_views=nb_full_video_views+1, updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -9789,20 +9800,20 @@ route("POST", "/api/ads/:id/renouveler", async (req, res, params) => {
   if (!(await exigerPremium(user, res, "publicites"))) return;
   if (ad.statut !== 'approved' && ad.statut !== 'paused') return sendJSON(res, 400, { error: "Seule une campagne active ou en pause peut être renouvelée." });
   const dureeJours = Math.min(Math.max(parseInt(ad.duree_jours) || 7, 1), 30);
-  db.prepare(`UPDATE publicites SET statut='approved', date_debut=date('now'), date_fin=date('now','+${dureeJours} days'), updated_at=datetime('now') WHERE id=?`).run(ad.id);
+  await db.prepare(`UPDATE publicites SET statut='approved', date_debut=date('now'), date_fin=date('now','+${dureeJours} days'), updated_at=datetime('now') WHERE id=?`).run(ad.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("POST", "/api/admin/ads/:id/pause", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE publicites SET statut='paused', updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE publicites SET statut='paused', updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 route("POST", "/api/admin/ads/:id/resume", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE publicites SET statut='approved', updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE publicites SET statut='approved', updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/admin/ads/:id", async (req, res, params) => {
@@ -10016,7 +10027,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   const coverImg = image_couverture || image_url || null;
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || '[]');
-  const id = db.prepare(`INSERT INTO evenements
+  const id = (await db.prepare(`INSERT INTO evenements
     (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
@@ -10033,7 +10044,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null
-    ).lastInsertRowid;
+    )).lastInsertRowid;
   // Notifier abonnés de l'initiative
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   if (init) {
@@ -10069,14 +10080,14 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
   const tel = (body?.telephone || "").toString().trim().slice(0, 40);
   const message = (body?.message || "").toString().trim().slice(0, 500);
   try {
-    db.prepare("INSERT INTO evenements_participants (evenement_id,user_id,nom_complet,email,telephone,nb_personnes,message) VALUES (?,?,?,?,?,?,?)")
+    await db.prepare("INSERT INTO evenements_participants (evenement_id,user_id,nom_complet,email,telephone,nb_personnes,message) VALUES (?,?,?,?,?,?,?)")
       .run(params.id, user.id, nomComplet || null, email || null, tel || null, nbPers, message || null);
     if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${nomComplet || user.nom} s'est inscrit à « ${evt.titre} »${nbPers > 1 ? ` (${nbPers} pers.)` : ''}`, { evenement_id: evt.id });
     sendJSON(res, 201, { ok: true, inscrit: true });
   } catch(e) {
     // Déjà inscrit → on met à jour ses infos plutôt que d'échouer
     try {
-      db.prepare("UPDATE evenements_participants SET nom_complet=?,email=?,telephone=?,nb_personnes=?,message=? WHERE evenement_id=? AND user_id=?")
+      await db.prepare("UPDATE evenements_participants SET nom_complet=?,email=?,telephone=?,nb_personnes=?,message=? WHERE evenement_id=? AND user_id=?")
         .run(nomComplet || null, email || null, tel || null, nbPers, message || null, params.id, user.id);
     } catch(_) {}
     sendJSON(res, 200, { ok: true, inscrit: true, message: "Inscription mise à jour." });
@@ -10121,7 +10132,7 @@ route("POST", "/api/admin/tutoriels", async (req, res, params, body) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   const { titre, sujet, objectif, niveau = "debutant", format_souhaite = "texte", contenu_json } = body;
   if (!titre || !sujet) return sendJSON(res, 400, { error: "Titre et sujet obligatoires." });
-  const r = db.prepare("INSERT INTO da_tutoriels (titre,sujet,objectif,niveau,format_souhaite,contenu_json) VALUES (?,?,?,?,?,?)").run(
+  const r = await db.prepare("INSERT INTO da_tutoriels (titre,sujet,objectif,niveau,format_souhaite,contenu_json) VALUES (?,?,?,?,?,?)").run(
     titre, sujet, objectif||null, niveau, format_souhaite, JSON.stringify(contenu_json||{})
   );
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -10131,7 +10142,7 @@ route("PUT", "/api/admin/tutoriels/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au Super Administrateur." });
   const { titre, sujet, objectif, niveau, statut, contenu_json } = body;
-  db.prepare("UPDATE da_tutoriels SET titre=COALESCE(?,titre), sujet=COALESCE(?,sujet), objectif=COALESCE(?,objectif), niveau=COALESCE(?,niveau), statut=COALESCE(?,statut), contenu_json=COALESCE(?,contenu_json), updated_at=datetime('now') WHERE id=?")
+  await db.prepare("UPDATE da_tutoriels SET titre=COALESCE(?,titre), sujet=COALESCE(?,sujet), objectif=COALESCE(?,objectif), niveau=COALESCE(?,niveau), statut=COALESCE(?,statut), contenu_json=COALESCE(?,contenu_json), updated_at=datetime('now') WHERE id=?")
     .run(titre||null, sujet||null, objectif||null, niveau||null, statut||null, contenu_json ? JSON.stringify(contenu_json) : null, params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -10243,7 +10254,7 @@ route("GET", "/api/admin/contenus", async (req, res) => {
 
 /* Helper : enregistrer une action dans l'historique */
 async function histoCertif(initiative_id, action, admin, motif, contenu) {
-  db.prepare("INSERT INTO certification_historique (initiative_id,action,admin_id,admin_nom,motif,contenu) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO certification_historique (initiative_id,action,admin_id,admin_nom,motif,contenu) VALUES (?,?,?,?,?,?)")
     .run(initiative_id, action, admin.id, admin.nom, motif || null, contenu || null);
 }
 
@@ -10285,7 +10296,7 @@ route("PUT", "/api/admin/certifications/:id/evaluation", async (req, res, params
   } else {
     const cols = ["initiative_id", ...fields].join(",");
     const placeholders = ["?", ...fields.map(()=>"?")].join(",");
-    db.prepare(`INSERT INTO certification_evaluations (${cols}) VALUES (${placeholders})`).run(params.id, ...vals);
+    await db.prepare(`INSERT INTO certification_evaluations (${cols}) VALUES (${placeholders})`).run(params.id, ...vals);
   }
   histoCertif(Number(params.id), "evaluation", user, "Mise à jour de la fiche d'évaluation", null);
   sendJSON(res, 200, { ok: true });
@@ -10300,9 +10311,9 @@ route("POST", "/api/admin/certifications/:id/attribuer", async (req, res, params
   const niveau = body.niveau || "verifie";
   const existing = await db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
   if (existing) {
-    db.prepare("UPDATE certifications SET statut='actif',niveau=?,admin_id=?,date_attribution=datetime('now'),updated_at=datetime('now') WHERE initiative_id=?").run(niveau, user.id, params.id);
+    await db.prepare("UPDATE certifications SET statut='actif',niveau=?,admin_id=?,date_attribution=datetime('now'),updated_at=datetime('now') WHERE initiative_id=?").run(niveau, user.id, params.id);
   } else {
-    db.prepare("INSERT INTO certifications (initiative_id,niveau,statut,admin_id) VALUES (?,?,'actif',?)").run(params.id, niveau, user.id);
+    await db.prepare("INSERT INTO certifications (initiative_id,niveau,statut,admin_id) VALUES (?,?,'actif',?)").run(params.id, niveau, user.id);
   }
   histoCertif(Number(params.id), "attribution", user, body.motif || "Badge attribué", `Niveau : ${niveau}`);
   // Notifier le propriétaire de l'initiative
@@ -10319,7 +10330,7 @@ route("POST", "/api/admin/certifications/:id/suspendre", async (req, res, params
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const existing = await db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
   if (!existing) return sendJSON(res, 404, { error: "Aucune certification pour cette initiative." });
-  db.prepare("UPDATE certifications SET statut='suspendu',updated_at=datetime('now') WHERE initiative_id=?").run(params.id);
+  await db.prepare("UPDATE certifications SET statut='suspendu',updated_at=datetime('now') WHERE initiative_id=?").run(params.id);
   histoCertif(Number(params.id), "suspension", user, body.motif || null, null);
   sendJSON(res, 200, { ok: true });
 });
@@ -10330,7 +10341,7 @@ route("POST", "/api/admin/certifications/:id/retirer", async (req, res, params, 
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const existing = await db.prepare("SELECT id FROM certifications WHERE initiative_id=?").get(params.id);
   if (!existing) return sendJSON(res, 404, { error: "Aucune certification pour cette initiative." });
-  db.prepare("UPDATE certifications SET statut='retire',updated_at=datetime('now') WHERE initiative_id=?").run(params.id);
+  await db.prepare("UPDATE certifications SET statut='retire',updated_at=datetime('now') WHERE initiative_id=?").run(params.id);
   histoCertif(Number(params.id), "retrait", user, body.motif || null, null);
   sendJSON(res, 200, { ok: true });
 });
@@ -10367,7 +10378,7 @@ route("POST", "/api/financements", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const { projet, montant } = body;
   if (!projet || !montant) return sendJSON(res, 400, { error: "Champs manquants." });
-  const r = db.prepare("INSERT INTO financements (user_id, projet, montant) VALUES (?,?,?)").run(user.id, projet, montant);
+  const r = await db.prepare("INSERT INTO financements (user_id, projet, montant) VALUES (?,?,?)").run(user.id, projet, montant);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -10387,8 +10398,8 @@ route("POST", "/api/collaborations", async (req, res, params, body) => {
   const { titre, partenaire, description, type_collab, competences, deadline } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
-  const id = db.prepare("INSERT INTO collaborations (user_id,partenaire,titre,description,type_collab,competences,deadline,statut,initiative_id) VALUES (?,?,?,?,?,?,?,'ouvert',?)")
-    .run(user.id, partenaire||user.nom, titre, description||null, type_collab||"benevolat", JSON.stringify(Array.isArray(competences)?competences:[]), deadline||null, init?.id||null).lastInsertRowid;
+  const id = (await db.prepare("INSERT INTO collaborations (user_id,partenaire,titre,description,type_collab,competences,deadline,statut,initiative_id) VALUES (?,?,?,?,?,?,?,'ouvert',?)")
+    .run(user.id, partenaire||user.nom, titre, description||null, type_collab||"benevolat", JSON.stringify(Array.isArray(competences)?competences:[]), deadline||null, init?.id||null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -10406,7 +10417,7 @@ route("POST", "/api/collaborations/:id/candidater", async (req, res, params, bod
   if (!collab) return sendJSON(res, 404, { error: "Collaboration introuvable." });
   if (collab.user_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas candidater à votre propre appel." });
   try {
-    db.prepare("INSERT INTO candidatures (collaboration_id,user_id,message) VALUES (?,?,?)").run(params.id, user.id, body.message||null);
+    await db.prepare("INSERT INTO candidatures (collaboration_id,user_id,message) VALUES (?,?,?)").run(params.id, user.id, body.message||null);
     creerNotif(collab.user_id, "candidature", "Nouvelle candidature", `${user.nom} a postulé à votre appel « ${collab.titre||collab.partenaire} »`, { collaboration_id: collab.id, candidat_id: user.id });
     sendJSON(res, 201, { ok: true });
   } catch(e) { sendJSON(res, 409, { ok: false, message: "Vous avez déjà candidaté." }); }
@@ -10746,7 +10757,7 @@ route("POST", "/api/follow/:id", async (req, res, params) => {
   const targetId = Number(params.id);
   if (targetId === cu.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   try {
-    db.prepare("INSERT INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(cu.id, targetId);
+    await db.prepare("INSERT INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(cu.id, targetId);
     creerNotif(targetId, "abonnement", `${cu.nom} vous suit maintenant`, "", { user_id: cu.id });
   } catch(e) { /* déjà suivi */ }
   sendJSON(res, 200, { ok: true, suivi: true });
@@ -11377,11 +11388,11 @@ route("POST", "/api/admin/plans", async (req, res, params, body) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, description, prix_mensuel, prix_annuel, cible, avantages } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
-  const id = db.prepare(`
+  const id = (await db.prepare(`
     INSERT INTO plans_abonnement (nom, description, prix_mensuel, prix_annuel, cible, avantages)
     VALUES (?,?,?,?,?,?)
   `).run(nom, description||null, prix_mensuel||0, prix_annuel||0, cible||"tous",
-    JSON.stringify(avantages||{})).lastInsertRowid;
+    JSON.stringify(avantages||{}))).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -11389,7 +11400,7 @@ route("PUT", "/api/admin/plans/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, description, prix_mensuel, prix_annuel, cible, avantages, actif } = body;
-  db.prepare(`
+  await db.prepare(`
     UPDATE plans_abonnement SET nom=?,description=?,prix_mensuel=?,prix_annuel=?,cible=?,avantages=?,
     actif=?,updated_at=datetime('now') WHERE id=?
   `).run(nom, description||null, prix_mensuel||0, prix_annuel||0, cible||"tous",
@@ -11417,11 +11428,11 @@ route("POST", "/api/admin/promos", async (req, res, params, body) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible } = body;
   if (!nom || !code || !type) return sendJSON(res, 400, { error: "Nom, code et type requis." });
-  const id = db.prepare(`
+  const id = (await db.prepare(`
     INSERT INTO codes_promo (nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible, created_by)
     VALUES (?,?,?,?,?,?,?,?,?)
   `).run(nom, code.toUpperCase(), type, valeur||0, date_debut||null, date_fin||null,
-    nb_max_utilisations||null, cible||"tous", user.id).lastInsertRowid;
+    nb_max_utilisations||null, cible||"tous", user.id)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -11605,9 +11616,9 @@ function buildObsWhere(accred, tableAlias = "u") {
 
 /* Helper : historique accréditation */
 async function histoAccred(accredId, action, admin, details) {
-  db.prepare("INSERT INTO accreditations_historique (accreditation_id,action,admin_id,admin_nom,details) VALUES (?,?,?,?,?)")
+  await db.prepare("INSERT INTO accreditations_historique (accreditation_id,action,admin_id,admin_nom,details) VALUES (?,?,?,?,?)")
     .run(accredId, action, admin.id, admin.nom, details || null);
-  db.prepare("UPDATE accreditations_observatoire SET updated_at=datetime('now') WHERE id=?").run(accredId);
+  await db.prepare("UPDATE accreditations_observatoire SET updated_at=datetime('now') WHERE id=?").run(accredId);
 }
 
 /* ===========================
@@ -11635,10 +11646,10 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!inst) return sendJSON(res, 404, { error: "Institution introuvable." });
     const existing = await db.prepare("SELECT id FROM accreditations_observatoire WHERE institution_id=? AND statut='actif'").get(institution_id);
     if (existing) return sendJSON(res, 409, { error: "Cette institution possède déjà une accréditation active." });
-    const id = db.prepare(`INSERT INTO accreditations_observatoire (institution_id,date_fin,nationalites_autorisees,territoires_autorises,droits,notes_admin)
+    const id = (await db.prepare(`INSERT INTO accreditations_observatoire (institution_id,date_fin,nationalites_autorisees,territoires_autorises,droits,notes_admin)
       VALUES (?,?,?,?,?,?)`).run(institution_id, date_fin||null,
       JSON.stringify(nationalites_autorisees||[]), JSON.stringify(territoires_autorises||[]),
-      JSON.stringify(droits||{}), notes_admin||null).lastInsertRowid;
+      JSON.stringify(droits||{}), notes_admin||null)).lastInsertRowid;
     histoAccred(id, "creation", user, `Accréditation créée pour ${inst.nom}`);
     creerNotif(institution_id, "accreditation", "🏛️ Accréditation Observatoire obtenue",
       "Vous avez reçu l'accréditation Observatoire Diaspora Diaspo'Actif. Accédez à votre tableau de bord pour consulter les statistiques.");
@@ -11651,7 +11662,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const accred = await db.prepare("SELECT * FROM accreditations_observatoire WHERE id=?").get(params.id);
     if (!accred) return sendJSON(res, 404, { error: "Accréditation introuvable." });
     const { date_fin, nationalites_autorisees, territoires_autorises, droits, notes_admin } = body;
-    db.prepare(`UPDATE accreditations_observatoire SET date_fin=?,nationalites_autorisees=?,territoires_autorises=?,droits=?,notes_admin=?,updated_at=datetime('now') WHERE id=?`)
+    await db.prepare(`UPDATE accreditations_observatoire SET date_fin=?,nationalites_autorisees=?,territoires_autorises=?,droits=?,notes_admin=?,updated_at=datetime('now') WHERE id=?`)
       .run(date_fin||null, JSON.stringify(nationalites_autorisees||[]), JSON.stringify(territoires_autorises||[]),
         JSON.stringify(droits||{}), notes_admin||null, params.id);
     histoAccred(params.id, "modification", user, "Périmètre et droits mis à jour");
@@ -11663,7 +11674,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const accred = await db.prepare("SELECT * FROM accreditations_observatoire WHERE id=?").get(params.id);
     if (!accred) return sendJSON(res, 404, { error: "Accréditation introuvable." });
-    db.prepare("UPDATE accreditations_observatoire SET statut='suspendu',updated_at=datetime('now') WHERE id=?").run(params.id);
+    await db.prepare("UPDATE accreditations_observatoire SET statut='suspendu',updated_at=datetime('now') WHERE id=?").run(params.id);
     histoAccred(params.id, "suspension", user, body.motif || "Suspension administrative");
     sendJSON(res, 200, { ok: true });
   });
@@ -11673,7 +11684,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
     const accred = await db.prepare("SELECT * FROM accreditations_observatoire WHERE id=?").get(params.id);
     if (!accred) return sendJSON(res, 404, { error: "Accréditation introuvable." });
-    db.prepare("UPDATE accreditations_observatoire SET statut='retire',updated_at=datetime('now') WHERE id=?").run(params.id);
+    await db.prepare("UPDATE accreditations_observatoire SET statut='retire',updated_at=datetime('now') WHERE id=?").run(params.id);
     histoAccred(params.id, "retrait", user, body.motif || "Retrait définitif");
     sendJSON(res, 200, { ok: true });
   });
@@ -11681,7 +11692,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   route("POST", "/api/admin/accreditations/:id/reactiver", async (req, res, params, body) => {
     const user = await getCurrentUser(req);
     if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
-    db.prepare("UPDATE accreditations_observatoire SET statut='actif',updated_at=datetime('now') WHERE id=?").run(params.id);
+    await db.prepare("UPDATE accreditations_observatoire SET statut='actif',updated_at=datetime('now') WHERE id=?").run(params.id);
     histoAccred(params.id, "reactivation", user, body.motif || "Réactivation");
     sendJSON(res, 200, { ok: true });
   });
@@ -12066,14 +12077,14 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const { titre, description, pays, ville, origine, secteur, priorite, responsable, echeance, notes, pieces_json, source } = body;
     if (!titre || !titre.trim()) return sendJSON(res, 400, { error: "Titre requis." });
     const prio = OPP_PRIORITES.includes(priorite) ? priorite : "moyenne";
-    const id = db.prepare(`INSERT INTO opportunites
+    const id = (await db.prepare(`INSERT INTO opportunites
       (collectivite_id,titre,description,pays,ville,origine,secteur,priorite,responsable,echeance,notes,pieces_json,source_json)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       user.id, titre.trim(), description||null, pays||null, ville||null, origine||null, secteur||null,
       prio, responsable||null, echeance||null, notes||null,
       JSON.stringify(Array.isArray(pieces_json)?pieces_json:[]), JSON.stringify(source||{})
-    ).lastInsertRowid;
-    db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail) VALUES (?,?,?)")
+    )).lastInsertRowid;
+    await db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail) VALUES (?,?,?)")
       .run(id, "creation", source?.libelle ? "Détectée depuis l'Observatoire Mondial : " + source.libelle : "Fiche créée manuellement.");
     sendJSON(res, 201, { id });
   });
@@ -12086,12 +12097,12 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const f = k => body[k] !== undefined ? body[k] : opp[k];
     const prio = OPP_PRIORITES.includes(body.priorite) ? body.priorite : opp.priorite;
     const etat = OPP_ETATS.includes(body.etat) ? body.etat : opp.etat;
-    db.prepare(`UPDATE opportunites SET titre=?,description=?,pays=?,ville=?,origine=?,secteur=?,priorite=?,responsable=?,echeance=?,etat=?,notes=?,pieces_json=?,updated_at=datetime('now') WHERE id=?`).run(
+    await db.prepare(`UPDATE opportunites SET titre=?,description=?,pays=?,ville=?,origine=?,secteur=?,priorite=?,responsable=?,echeance=?,etat=?,notes=?,pieces_json=?,updated_at=datetime('now') WHERE id=?`).run(
       f("titre"), f("description"), f("pays"), f("ville"), f("origine"), f("secteur"), prio, f("responsable"), f("echeance"), etat, f("notes"),
       JSON.stringify(Array.isArray(body.pieces_json)?body.pieces_json:(()=>{try{return JSON.parse(opp.pieces_json||"[]")}catch(e){return[]}})()),
       opp.id
     );
-    if (body.etat && body.etat !== opp.etat) db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail) VALUES (?,?,?)").run(opp.id, "changement_etat", "Nouvel état : " + etat);
+    if (body.etat && body.etat !== opp.etat) await db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail) VALUES (?,?,?)").run(opp.id, "changement_etat", "Nouvel état : " + etat);
     sendJSON(res, 200, { ok: true });
   });
 
@@ -12100,8 +12111,8 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const opp = await db.prepare("SELECT id FROM opportunites WHERE id=? AND collectivite_id=?").get(params.id, user.id);
     if (!opp) return sendJSON(res, 404, { error: "Opportunité introuvable." });
-    db.prepare("DELETE FROM opportunite_historique WHERE opportunite_id=?").run(opp.id);
-    db.prepare("DELETE FROM opportunites WHERE id=?").run(opp.id);
+    await db.prepare("DELETE FROM opportunite_historique WHERE opportunite_id=?").run(opp.id);
+    await db.prepare("DELETE FROM opportunites WHERE id=?").run(opp.id);
     sendJSON(res, 200, { ok: true });
   });
 
@@ -12128,14 +12139,14 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       const p = getPerimetre(coll);
       const { where: pw, params: pp } = perimetreWhere(p, "u");
       let nb = 0; try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`).get(...pp))?.n || 0; } catch(e) {}
-      action_ref_id = db.prepare("INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires) VALUES (?,?,?,?,?,?)")
-        .run(user.id, titre, contenu, type === "appel_projets" ? "appel_projets" : "info", JSON.stringify({ perimetre: p, libelle: libellePerimetre(p) }), nb).lastInsertRowid;
-      try { db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)").run(user.id, user.nom, "institutionnel", type, `**${titre}**\n\n${contenu}`); } catch(e) {}
+      action_ref_id = (await db.prepare("INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires) VALUES (?,?,?,?,?,?)")
+        .run(user.id, titre, contenu, type === "appel_projets" ? "appel_projets" : "info", JSON.stringify({ perimetre: p, libelle: libellePerimetre(p) }), nb)).lastInsertRowid;
+      try { await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)").run(user.id, user.nom, "institutionnel", type, `**${titre}**\n\n${contenu}`); } catch(e) {}
       lien = "dashboard-collectivite.html#communications";
       message = `${LABELS[type]} publiée à ${nb} membre(s) de votre juridiction.`;
     } else if (type === "consultation") {
-      action_ref_id = db.prepare("INSERT INTO consultations (emetteur_id,titre,description,type,statut) VALUES (?,?,?,?,?)")
-        .run(user.id, titre, contenu, "consultation_citoyenne", "ouverte").lastInsertRowid;
+      action_ref_id = (await db.prepare("INSERT INTO consultations (emetteur_id,titre,description,type,statut) VALUES (?,?,?,?,?)")
+        .run(user.id, titre, contenu, "consultation_citoyenne", "ouverte")).lastInsertRowid;
       lien = "dashboard-collectivite.html#consultations";
       message = "Consultation citoyenne créée. Complétez ses questions dans le module Consultations.";
     } else {
@@ -12143,9 +12154,9 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       message = `${LABELS[type]} planifiée. Cette action est enregistrée dans l'historique de l'opportunité.`;
     }
 
-    db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail,action_type,action_ref_id) VALUES (?,?,?,?,?)")
+    await db.prepare("INSERT INTO opportunite_historique (opportunite_id,action,detail,action_type,action_ref_id) VALUES (?,?,?,?,?)")
       .run(opp.id, "action", `${LABELS[type]} — ${titre}`, type, action_ref_id);
-    db.prepare("UPDATE opportunites SET etat='en_action', updated_at=datetime('now') WHERE id=?").run(opp.id);
+    await db.prepare("UPDATE opportunites SET etat='en_action', updated_at=datetime('now') WHERE id=?").run(opp.id);
     sendJSON(res, 201, { ok: true, action_type: type, action_ref_id, lien, message });
   });
 
@@ -12329,13 +12340,13 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       await db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN video_b64 TEXT DEFAULT NULL").run();
       await db.prepare("ALTER TABLE communications_institutionnelles ADD COLUMN audio_b64 TEXT DEFAULT NULL").run();
     } catch(e) {} // colonnes déjà présentes
-    const id = db.prepare(
+    const id = (await db.prepare(
       "INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires,photos_json,video_b64,audio_b64) VALUES (?,?,?,?,?,?,?,?,?)"
     ).run(user.id, titre, contenu, type||"info", JSON.stringify(cibleAppliquee), nb,
-          JSON.stringify(photos), video_b64||null, audio_b64||null).lastInsertRowid;
+          JSON.stringify(photos), video_b64||null, audio_b64||null)).lastInsertRowid;
     // Publication sur le fil (sans médias lourds)
     try {
-      db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
+      await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
         .run(user.id, user.nom, "institutionnel", type||"info", `**${titre}**\n\n${contenu}`);
     } catch(e) {}
     sendJSON(res, 201, { id, nb_destinataires: nb });
@@ -12385,7 +12396,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     const comm = await db.prepare("SELECT emetteur_id FROM communications_institutionnelles WHERE id=?").get(params.id);
     if (!comm) return sendJSON(res, 404, { error: "Communication introuvable." });
     try {
-      db.prepare("INSERT OR IGNORE INTO comm_desabonnements (user_id,institution_id) VALUES (?,?)").run(user.id, comm.emetteur_id);
+      await db.prepare("INSERT OR IGNORE INTO comm_desabonnements (user_id,institution_id) VALUES (?,?)").run(user.id, comm.emetteur_id);
     } catch(e) {}
     sendJSON(res, 200, { ok: true });
   });
@@ -12398,8 +12409,8 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités." });
     const { titre, description, type, date_cloture, cible, questions, statut } = body;
     if (!titre) return sendJSON(res, 400, { error: "titre requis." });
-    const id = db.prepare("INSERT INTO consultations (emetteur_id,titre,description,type,statut,date_cloture,cible_json) VALUES (?,?,?,?,?,?,?)")
-      .run(user.id, titre, description||null, type||"sondage", statut||"ouverte", date_cloture||null, JSON.stringify(cible||{})).lastInsertRowid;
+    const id = (await db.prepare("INSERT INTO consultations (emetteur_id,titre,description,type,statut,date_cloture,cible_json) VALUES (?,?,?,?,?,?,?)")
+      .run(user.id, titre, description||null, type||"sondage", statut||"ouverte", date_cloture||null, JSON.stringify(cible||{}))).lastInsertRowid;
     if (questions?.length) {
       const ins = db.prepare("INSERT INTO consultation_questions (consultation_id,texte,type,options_json,ordre) VALUES (?,?,?,?,?)");
       questions.forEach((q, i) => ins.run(id, q.texte, q.type||"texte_libre", JSON.stringify(q.options||[]), i));
@@ -12525,9 +12536,9 @@ route("PUT", "/api/collectivite/profil-ambassade", async (req, res, params, body
     description: body.description || null,
   };
   if (exists) {
-    db.prepare(`UPDATE ambassade_profil SET nom_officiel=?,pays_represente=?,ambassadeur=?,adresse=?,telephone=?,email_officiel=?,site_web=?,horaires=?,zone_pays=?,zone_regions=?,zone_villes=?,consulats=?,logo_url=?,photo_couverture=?,description=?,updated_at=datetime('now') WHERE user_id=?`).run(...Object.values(data), user.id);
+    await db.prepare(`UPDATE ambassade_profil SET nom_officiel=?,pays_represente=?,ambassadeur=?,adresse=?,telephone=?,email_officiel=?,site_web=?,horaires=?,zone_pays=?,zone_regions=?,zone_villes=?,consulats=?,logo_url=?,photo_couverture=?,description=?,updated_at=datetime('now') WHERE user_id=?`).run(...Object.values(data), user.id);
   } else {
-    db.prepare(`INSERT INTO ambassade_profil(nom_officiel,pays_represente,ambassadeur,adresse,telephone,email_officiel,site_web,horaires,zone_pays,zone_regions,zone_villes,consulats,logo_url,photo_couverture,description,user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(...Object.values(data), user.id);
+    await db.prepare(`INSERT INTO ambassade_profil(nom_officiel,pays_represente,ambassadeur,adresse,telephone,email_officiel,site_web,horaires,zone_pays,zone_regions,zone_villes,consulats,logo_url,photo_couverture,description,user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(...Object.values(data), user.id);
   }
   sendJSON(res, 200, { ok: true });
 });
@@ -12582,7 +12593,7 @@ route("POST", "/api/collectivite/services", async (req, res, params, body) => {
   const user = requireCollectivite(req, res); if (!user) return;
   if (!body.nom) return sendJSON(res, 400, { error: "Nom requis." });
   const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
-  const r = db.prepare("INSERT INTO ambassade_services(user_id,nom,type,icone,description,conditions,documents_requis,delai,tarif,procedure,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(user.id, body.nom, body.type||"document", body.icone||"📄", body.description||null, body.conditions||null, j(body.documents_requis), body.delai||null, body.tarif||null, body.procedure||null, body.ordre||0);
+  const r = await db.prepare("INSERT INTO ambassade_services(user_id,nom,type,icone,description,conditions,documents_requis,delai,tarif,procedure,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(user.id, body.nom, body.type||"document", body.icone||"📄", body.description||null, body.conditions||null, j(body.documents_requis), body.delai||null, body.tarif||null, body.procedure||null, body.ordre||0);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -12609,7 +12620,7 @@ route("GET", "/api/collectivite/agenda", async (req, res) => {
 route("POST", "/api/collectivite/agenda", async (req, res, params, body) => {
   const user = requireCollectivite(req, res); if (!user) return;
   if (!body.titre || !body.date_debut) return sendJSON(res, 400, { error: "Titre et date requis." });
-  const r = db.prepare("INSERT INTO ambassade_agenda(user_id,titre,type,description,date_debut,date_fin,lieu,lien,public) VALUES(?,?,?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"evenement", body.description||null, body.date_debut, body.date_fin||null, body.lieu||null, body.lien||null, body.public??1);
+  const r = await db.prepare("INSERT INTO ambassade_agenda(user_id,titre,type,description,date_debut,date_fin,lieu,lien,public) VALUES(?,?,?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"evenement", body.description||null, body.date_debut, body.date_fin||null, body.lieu||null, body.lien||null, body.public??1);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -12635,7 +12646,7 @@ route("GET", "/api/collectivite/partenariats-inst", async (req, res) => {
 route("POST", "/api/collectivite/partenariats-inst", async (req, res, params, body) => {
   const user = requireCollectivite(req, res); if (!user) return;
   if (!body.nom) return sendJSON(res, 400, { error: "Nom requis." });
-  const r = db.prepare("INSERT INTO ambassade_partenariats(user_id,nom,type,description,logo_url,site_web) VALUES(?,?,?,?,?,?)").run(user.id, body.nom, body.type||"institutionnel", body.description||null, body.logo_url||null, body.site_web||null);
+  const r = await db.prepare("INSERT INTO ambassade_partenariats(user_id,nom,type,description,logo_url,site_web) VALUES(?,?,?,?,?,?)").run(user.id, body.nom, body.type||"institutionnel", body.description||null, body.logo_url||null, body.site_web||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -12661,7 +12672,7 @@ route("GET", "/api/collectivite/opportunites", async (req, res) => {
 route("POST", "/api/collectivite/opportunites", async (req, res, params, body) => {
   const user = requireCollectivite(req, res); if (!user) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Titre requis." });
-  const r = db.prepare("INSERT INTO ambassade_opportunites(user_id,titre,type,description,date_limite,lien,budget) VALUES(?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"appel_offres", body.description||null, body.date_limite||null, body.lien||null, body.budget||null);
+  const r = await db.prepare("INSERT INTO ambassade_opportunites(user_id,titre,type,description,date_limite,lien,budget) VALUES(?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"appel_offres", body.description||null, body.date_limite||null, body.lien||null, body.budget||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -12783,8 +12794,8 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
         .run(message||null, documentsJson, lettre_motivation ? SEC.sanitizeString(lettre_motivation, 8000) : null, video_url||null, champsSpecifiquesJson, existingDem.id);
       id = existingDem.id;
     } else {
-      id = await db.prepare(`INSERT INTO accred_demandes (user_id,accred_id,message,documents_json,lettre_motivation,video_url,champs_specifiques_json) VALUES (?,?,?,?,?,?,?)`)
-        .run(user.id, def.id, message||null, documentsJson, lettre_motivation ? SEC.sanitizeString(lettre_motivation, 8000) : null, video_url||null, champsSpecifiquesJson).lastInsertRowid;
+      id = await (await db.prepare(`INSERT INTO accred_demandes (user_id,accred_id,message,documents_json,lettre_motivation,video_url,champs_specifiques_json) VALUES (?,?,?,?,?,?,?)`)
+        .run(user.id, def.id, message||null, documentsJson, lettre_motivation ? SEC.sanitizeString(lettre_motivation, 8000) : null, video_url||null, champsSpecifiquesJson)).lastInsertRowid;
     }
     let autoApprouvee = false;
     if (!tarif || tarif.validation_admin !== 0) {
@@ -12794,7 +12805,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
     } else {
       /* Accès immédiat sans validation */
       await db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(id);
-      db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')").run(user.id, def.id);
+      await db.prepare("INSERT OR IGNORE INTO user_accreditations (user_id,accred_id,statut) VALUES (?,?,'active')").run(user.id, def.id);
       autoApprouvee = true;
     }
     return sendJSON(res, 201, { id, ok: true, auto_approuvee: autoApprouvee });
@@ -12855,14 +12866,14 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/accorder", async (req, r
   const { userId, type } = params;
   const TYPES_DA = ["mobilisation_active","createur_opportunites","observatoire_diaspora","institutionnelle"];
   if (!TYPES_DA.includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
-  db.prepare(`INSERT INTO compte_accreditations (user_id,type,statut,admin_id,frais_acces,notes,date_expiration)
+  await db.prepare(`INSERT INTO compte_accreditations (user_id,type,statut,admin_id,frais_acces,notes,date_expiration)
     VALUES (?,?,'active',?,?,?,?)
     ON CONFLICT(user_id,type) DO UPDATE SET statut='active',admin_id=?,frais_acces=?,notes=?,date_expiration=?,updated_at=datetime('now')`
   ).run(userId, type, admin.id, body.frais_acces||0, body.notes||null, body.date_expiration||null,
         admin.id, body.frais_acces||0, body.notes||null, body.date_expiration||null);
   // Mettre à jour la demande si elle existe
   await db.prepare("UPDATE demandes_accreditation SET statut='approuvee' WHERE user_id=? AND type=? AND statut='en_attente'").run(userId, type);
-  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif,frais_acces) VALUES (?,?,?,?,?,?,?)").run(userId, type, "accorde", admin.id, admin.nom, body.motif||null, body.frais_acces||0);
+  await db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif,frais_acces) VALUES (?,?,?,?,?,?,?)").run(userId, type, "accorde", admin.id, admin.nom, body.motif||null, body.frais_acces||0);
   const DA_LBL = { mobilisation_active:"Mobilisation Active 📢", createur_opportunites:"Créateur d'Opportunités 💼", observatoire_diaspora:"Observatoire Diaspora 📊", institutionnelle:"Institutionnelle 🏛️" };
   const label = DA_LBL[type] || type;
   creerNotif(Number(userId), "validation", "Accréditation accordée !", `Félicitations ! Votre accréditation « ${label} » vient d'être validée par l'équipe Diaspo'Actif.`, { type });
@@ -12875,7 +12886,7 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/refuser", async (req, re
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
   await db.prepare("UPDATE demandes_accreditation SET statut='refusee', motif_refus=? WHERE user_id=? AND type=? AND statut='en_attente'").run(body.motif||null, userId, type);
-  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "refuse", admin.id, admin.nom, body.motif||null);
+  await db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "refuse", admin.id, admin.nom, body.motif||null);
   creerNotif(Number(userId), "validation", "Demande d'accréditation non retenue", `Votre demande d'accréditation n'a pas été retenue${body.motif?` : ${body.motif}`:". Contactez-nous pour plus d'informations."}.`, { type });
   sendJSON(res, 200, { ok: true });
 });
@@ -12885,8 +12896,8 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/suspendre", async (req, 
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
-  db.prepare("UPDATE compte_accreditations SET statut='suspendue', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
-  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "suspendu", admin.id, admin.nom, body.motif||null);
+  await db.prepare("UPDATE compte_accreditations SET statut='suspendue', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
+  await db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "suspendu", admin.id, admin.nom, body.motif||null);
   creerNotif(Number(userId), "validation", "Accréditation suspendue", `Votre accréditation a été suspendue temporairement${body.motif?` : ${body.motif}`:"."}.`, { type });
   sendJSON(res, 200, { ok: true });
 });
@@ -12896,8 +12907,8 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/retirer", async (req, re
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
-  db.prepare("UPDATE compte_accreditations SET statut='retiree', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
-  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "retire", admin.id, admin.nom, body.motif||null);
+  await db.prepare("UPDATE compte_accreditations SET statut='retiree', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
+  await db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)").run(userId, type, "retire", admin.id, admin.nom, body.motif||null);
   creerNotif(Number(userId), "validation", "Accréditation retirée", `Votre accréditation a été définitivement retirée${body.motif?` : ${body.motif}`:"."}.`, { type });
   sendJSON(res, 200, { ok: true });
 });
@@ -12907,8 +12918,8 @@ route("PATCH", "/api/admin/accreditations/:userId/:type/reactiver", async (req, 
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const { userId, type } = params;
-  db.prepare("UPDATE compte_accreditations SET statut='active', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
-  db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom) VALUES (?,?,?,?,?)").run(userId, type, "reactiver", admin.id, admin.nom);
+  await db.prepare("UPDATE compte_accreditations SET statut='active', updated_at=datetime('now') WHERE user_id=? AND type=?").run(userId, type);
+  await db.prepare("INSERT INTO accreditations_da_historique (user_id,type,action,admin_id,admin_nom) VALUES (?,?,?,?,?)").run(userId, type, "reactiver", admin.id, admin.nom);
   creerNotif(Number(userId), "validation", "Accréditation réactivée", "Votre accréditation a été réactivée.", { type });
   sendJSON(res, 200, { ok: true });
 });
@@ -12938,20 +12949,23 @@ route("POST", "/api/sondages", async (req, res, params, body) => {
   const { titre, description, type, sous_type, anonyme, cible_roles, cible_pays, date_cloture, questions } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (!questions || !questions.length) return sendJSON(res, 400, { error: "Au moins une question requise." });
-  const id = db.prepare(`INSERT INTO sondages (createur_id,titre,description,type,sous_type,statut,anonyme,cible_roles,cible_pays,date_cloture)
+  /* Parenthèses + await : sans elles, .lastInsertRowid est lu sur la promesse et vaut
+     undefined — le sondage était créé mais ses questions rattachées à un identifiant vide,
+     donc introuvables. Et la réponse partait avant leur enregistrement. */
+  const id = (await db.prepare(`INSERT INTO sondages (createur_id,titre,description,type,sous_type,statut,anonyme,cible_roles,cible_pays,date_cloture)
     VALUES (?,?,?,?,?,'ouvert',?,?,?,?)`).run(
     user.id, titre, description||null, type||"sondage", sous_type||null, anonyme?1:0,
     JSON.stringify(Array.isArray(cible_roles)?cible_roles:[]),
     JSON.stringify(Array.isArray(cible_pays)?cible_pays:[]),
     date_cloture||null
-  ).lastInsertRowid;
-  questions.forEach((q, i) => {
-    db.prepare("INSERT INTO sondage_questions (sondage_id,texte,type,options_json,obligatoire,ordre) VALUES (?,?,?,?,?,?)").run(
+  )).lastInsertRowid;
+  for (const [i, q] of questions.entries()) {
+    await db.prepare("INSERT INTO sondage_questions (sondage_id,texte,type,options_json,obligatoire,ordre) VALUES (?,?,?,?,?,?)").run(
       id, q.texte, q.type||"choix_unique",
       JSON.stringify(Array.isArray(q.options)?q.options:[]),
       q.obligatoire!==false?1:0, i
     );
-  });
+  }
   sendJSON(res, 201, { id });
 });
 
@@ -12983,7 +12997,7 @@ route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
   for (const q of questions) {
     const rep = reponses[q.id];
     if (q.obligatoire && (rep === undefined || rep === null || rep === "")) return sendJSON(res, 400, { error: `Question obligatoire sans réponse : "${q.texte}"` });
-    db.prepare("INSERT INTO sondage_reponses (sondage_id,question_id,user_id,reponse) VALUES (?,?,?,?)").run(
+    await db.prepare("INSERT INTO sondage_reponses (sondage_id,question_id,user_id,reponse) VALUES (?,?,?,?)").run(
       params.id, q.id, s.anonyme ? null : user.id,
       rep !== undefined ? (typeof rep === "object" ? JSON.stringify(rep) : String(rep)) : null
     );
@@ -13006,7 +13020,7 @@ route("GET", "/api/sondages/:id/resultats", async (req, res, params) => {
     return { question: q.texte, type: q.type, options: safeParse(q.options_json), reponses: reps };
   }));
   // Stats géographiques des répondants
-  const repartition_pays = db.prepare(
+  const repartition_pays = await db.prepare(
     "SELECT u.pays, COUNT(DISTINCT sr.user_id) AS n FROM sondage_reponses sr JOIN users u ON u.id=sr.user_id WHERE sr.sondage_id=? AND u.pays IS NOT NULL GROUP BY u.pays ORDER BY n DESC LIMIT 10"
   ).all(params.id);
   const nb_repondants = (await db.prepare("SELECT COUNT(DISTINCT user_id) AS n FROM sondage_reponses WHERE sondage_id=?").get(params.id))?.n;
@@ -13587,7 +13601,7 @@ async function scrapeSite() {
    sans passer par le verrou consultatif de pg-init.js.
 
    Il lance une trentaine d'écritures NON ATTENDUES (les `add(...)` et les
-   `try { db.prepare(...).run(); } catch` — un try/catch n'intercepte pas le rejet d'une
+   `try { await db.prepare(...).run(); } catch` — un try/catch n'intercepte pas le rejet d'une
    promesse qu'on n'attend pas) sur un pool de 5 connexions. D'où la salve constatée le
    2026-07-25 : « timeout exceeded when trying to connect », « Connection terminated due to
    connection timeout », toutes étiquetées unhandledRejection, 370 erreurs en 24 h.
@@ -13620,7 +13634,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   add("created_by","INTEGER");
   add("updated_at","TEXT DEFAULT (datetime('now'))");
   // Tables annexes
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_memoire_historique (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_memoire_historique (
     id INTEGER PRIMARY KEY AUTOINCREMENT, memoire_id INTEGER NOT NULL,
     auteur_id INTEGER, auteur_nom TEXT,
     ancien_titre TEXT, nouveau_titre TEXT,
@@ -13628,7 +13642,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     ancien_categorie TEXT, nouveau_categorie TEXT,
     commentaire TEXT, created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(memoire_id) REFERENCES chatbot_memoire(id) ON DELETE CASCADE)`).run(); } catch(e){}
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_questions (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT, question TEXT NOT NULL,
     question_norm TEXT NOT NULL, nb_fois INTEGER DEFAULT 1,
     langue TEXT DEFAULT 'fr', categorie_estimee TEXT,
@@ -13639,7 +13653,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     last_asked_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* ──────── FAQ ──────── */
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_categories (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS faq_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
@@ -13647,7 +13661,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     ordre INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_questions (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS faq_questions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER REFERENCES faq_categories(id) ON DELETE SET NULL,
     compte_types TEXT NOT NULL DEFAULT '["tous"]',
@@ -13666,21 +13680,21 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_views (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS faq_views (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     question_id INTEGER REFERENCES faq_questions(id) ON DELETE CASCADE,
     user_id INTEGER,
     user_role TEXT,
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_searches (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS faq_searches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     query TEXT NOT NULL,
     results_count INTEGER DEFAULT 0,
     user_role TEXT,
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_ratings (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS faq_ratings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     question_id INTEGER REFERENCES faq_questions(id) ON DELETE CASCADE,
     user_id INTEGER,
@@ -13925,7 +13939,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   }
 
   /* ──────── D'A TUTOR AI — TUTOS CRÉÉS PAR SUPER ADMIN ──────── */
-  db.prepare(`CREATE TABLE IF NOT EXISTS da_tutoriels (
+  await db.prepare(`CREATE TABLE IF NOT EXISTS da_tutoriels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     titre TEXT NOT NULL,
     sujet TEXT NOT NULL,
@@ -13940,7 +13954,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   )`).run();
 
   /* ──────── ONBOARDING ──────── */
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_tutorials (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_tutorials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     compte_type TEXT NOT NULL UNIQUE,
     titre TEXT NOT NULL,
@@ -13952,7 +13966,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_steps (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tutorial_id INTEGER REFERENCES onboarding_tutorials(id) ON DELETE CASCADE,
     ordre INTEGER DEFAULT 0,
@@ -13967,7 +13981,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     module_label TEXT,
     actif INTEGER DEFAULT 1)`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_progress (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_progress (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     tutorial_id INTEGER,
@@ -13979,7 +13993,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     completed_at TEXT,
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_stats (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tutorial_id INTEGER,
     step_id INTEGER,
@@ -14058,7 +14072,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   }
 
   /* ──────── FAQ — QUESTIONS SANS RÉPONSE ──────── */
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS faq_sans_reponse (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS faq_sans_reponse (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     question TEXT NOT NULL,
     question_norm TEXT,
@@ -14079,7 +14093,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
   /* ── O-Z : tables ── */
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS oz_settings (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS oz_settings (
     user_id INTEGER PRIMARY KEY,
     avatar TEXT DEFAULT 'robot',
     avatar_custom TEXT,
@@ -14092,7 +14106,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     pos_y INTEGER,
     updated_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS oz_audit (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS oz_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     action TEXT,
@@ -14102,7 +14116,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     ip TEXT,
     created_at TEXT DEFAULT (datetime('now')))`).run(); } catch(e){}
 
-  try { db.prepare(`CREATE TABLE IF NOT EXISTS oz_knowledge (
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS oz_knowledge (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     topic TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -14196,12 +14210,12 @@ route("POST", "/api/chatbot/memoire", async (req, res, params, body) => {
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { titre, contenu, categorie="Général", mots_cles=[], priorite=5, liens_json=[], ordre=0 } = body || {};
   if (!titre?.trim() || !contenu?.trim()) return sendJSON(res, 400, { error: "Titre et contenu requis." });
-  const r = db.prepare(
+  const r = await db.prepare(
     "INSERT INTO chatbot_memoire (titre,contenu,categorie,mots_cles,priorite,liens_json,source,ordre,created_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))"
   ).run(titre.trim(), contenu.trim(), categorie, JSON.stringify(mots_cles), priorite, JSON.stringify(liens_json), "admin", ordre, user.id);
   // Historique
-  db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,nouveau_titre,nouveau_contenu,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?)")
-    .run(r.lastInsertRowid, user.id, user.nom, titre.trim(), contenu.trim(), categorie, "Création");
+  (await db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,nouveau_titre,nouveau_contenu,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?)")
+    .run(r).lastInsertRowid, user.id, user.nom, titre.trim(), contenu.trim(), categorie, "Création");
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -14213,7 +14227,7 @@ route("PUT", "/api/chatbot/memoire/:id", async (req, res, params, body) => {
   const ancien = await db.prepare("SELECT * FROM chatbot_memoire WHERE id=?").get(id);
   if (!ancien) return sendJSON(res, 404, { error: "Connaissance introuvable." });
   const { titre, contenu, categorie, mots_cles, priorite, liens_json, ordre, actif, commentaire } = body || {};
-  db.prepare(`UPDATE chatbot_memoire SET
+  await db.prepare(`UPDATE chatbot_memoire SET
     titre=COALESCE(?,titre), contenu=COALESCE(?,contenu),
     categorie=COALESCE(?,categorie), mots_cles=COALESCE(?,mots_cles),
     priorite=COALESCE(?,priorite), liens_json=COALESCE(?,liens_json),
@@ -14226,7 +14240,7 @@ route("PUT", "/api/chatbot/memoire/:id", async (req, res, params, body) => {
          ordre!=null?ordre:null, actif!=null?actif:null, id);
   // Historique si contenu ou titre modifié
   if ((titre && titre !== ancien.titre) || (contenu && contenu !== ancien.contenu) || (categorie && categorie !== ancien.categorie)) {
-    db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,ancien_titre,nouveau_titre,ancien_contenu,nouveau_contenu,ancien_categorie,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)")
+    await db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,ancien_titre,nouveau_titre,ancien_contenu,nouveau_contenu,ancien_categorie,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)")
       .run(id, user.id, user.nom, ancien.titre, titre||ancien.titre, ancien.contenu, contenu||ancien.contenu, ancien.categorie, categorie||ancien.categorie, commentaire||"Modification");
   }
   sendJSON(res, 200, { ok: true });
@@ -14256,9 +14270,9 @@ route("POST", "/api/chatbot/memoire/:id/restaurer", async (req, res, params, bod
   const version = await db.prepare("SELECT * FROM chatbot_memoire_historique WHERE id=? AND memoire_id=?").get(historique_id, params.id);
   if (!version) return sendJSON(res, 404, { error: "Version introuvable." });
   const ancien = await db.prepare("SELECT * FROM chatbot_memoire WHERE id=?").get(params.id);
-  db.prepare("UPDATE chatbot_memoire SET titre=?,contenu=?,categorie=?,updated_at=datetime('now') WHERE id=?")
+  await db.prepare("UPDATE chatbot_memoire SET titre=?,contenu=?,categorie=?,updated_at=datetime('now') WHERE id=?")
     .run(version.ancien_titre||ancien.titre, version.ancien_contenu||ancien.contenu, version.ancien_categorie||ancien.categorie, params.id);
-  db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,ancien_titre,nouveau_titre,ancien_contenu,nouveau_contenu,ancien_categorie,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,ancien_titre,nouveau_titre,ancien_contenu,nouveau_contenu,ancien_categorie,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)")
     .run(params.id, user.id, user.nom, ancien.titre, version.ancien_titre, ancien.contenu, version.ancien_contenu, ancien.categorie, version.ancien_categorie, `Restauration vers version du ${version.created_at}`);
   sendJSON(res, 200, { ok: true });
 });
@@ -14316,10 +14330,10 @@ route("POST", "/api/chatbot/questions", async (req, res, params, body) => {
   const norm = normQuestion(question);
   const existing = await db.prepare("SELECT id, nb_fois FROM chatbot_questions WHERE question_norm=? AND statut='ouvert'").get(norm);
   if (existing) {
-    db.prepare("UPDATE chatbot_questions SET nb_fois=nb_fois+1, last_asked_at=datetime('now') WHERE id=?").run(existing.id);
+    await db.prepare("UPDATE chatbot_questions SET nb_fois=nb_fois+1, last_asked_at=datetime('now') WHERE id=?").run(existing.id);
     return sendJSON(res, 200, { id: existing.id, incremented: true });
   }
-  const r = db.prepare(
+  const r = await db.prepare(
     "INSERT INTO chatbot_questions (question,question_norm,langue,categorie_estimee,utilisateur_id,contexte) VALUES (?,?,?,?,?,?)"
   ).run(question.trim(), norm, langue, categorie_estimee||null, user?.id||null, contexte||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -14330,7 +14344,7 @@ route("PUT", "/api/chatbot/questions/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
   const { reponse_admin, statut } = body || {};
-  db.prepare("UPDATE chatbot_questions SET reponse_admin=COALESCE(?,reponse_admin), statut=COALESCE(?,statut) WHERE id=?")
+  await db.prepare("UPDATE chatbot_questions SET reponse_admin=COALESCE(?,reponse_admin), statut=COALESCE(?,statut) WHERE id=?")
     .run(reponse_admin||null, statut||null, params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -14343,14 +14357,14 @@ route("POST", "/api/chatbot/questions/:id/convertir", async (req, res, params, b
   if (!q) return sendJSON(res, 404, { error: "Question introuvable." });
   const { titre, contenu, categorie="Général", mots_cles=[], priorite=5 } = body || {};
   if (!titre?.trim() || !contenu?.trim()) return sendJSON(res, 400, { error: "Titre et contenu requis." });
-  const r = db.prepare(
+  const r = await db.prepare(
     "INSERT INTO chatbot_memoire (titre,contenu,categorie,mots_cles,priorite,source,ordre,created_by,updated_at) VALUES (?,?,?,?,?,?,?,?,datetime('now'))"
   ).run(titre.trim(), contenu.trim(), categorie, JSON.stringify(mots_cles), priorite, "admin", 0, user.id);
-  db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,nouveau_titre,nouveau_contenu,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?)")
-    .run(r.lastInsertRowid, user.id, user.nom, titre.trim(), contenu.trim(), categorie, `Créé depuis la question : "${q.question}"`);
+  (await db.prepare("INSERT INTO chatbot_memoire_historique (memoire_id,auteur_id,auteur_nom,nouveau_titre,nouveau_contenu,nouveau_categorie,commentaire) VALUES (?,?,?,?,?,?,?)")
+    .run(r).lastInsertRowid, user.id, user.nom, titre.trim(), contenu.trim(), categorie, `Créé depuis la question : "${q.question}"`);
   // Marquer la question comme répondue
-  await db.prepare("UPDATE chatbot_questions SET statut='repondu', memoire_id=?, reponse_admin=? WHERE id=?")
-    .run(r.lastInsertRowid, contenu.trim(), params.id);
+  await (await db.prepare("UPDATE chatbot_questions SET statut='repondu', memoire_id=?, reponse_admin=? WHERE id=?")
+    .run(r).lastInsertRowid, contenu.trim(), params.id);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -14477,7 +14491,7 @@ route("GET", "/api/faq/search", async (req, res, _p, _b, q) => {
 
   /* Log la recherche */
   try {
-    db.prepare(`INSERT INTO faq_searches (query, results_count, user_role) VALUES (?,?,?)`)
+    await db.prepare(`INSERT INTO faq_searches (query, results_count, user_role) VALUES (?,?,?)`)
       .run(query.slice(0,200), scored.length, role);
   } catch(e){}
 
@@ -14523,14 +14537,14 @@ route("POST", "/api/faq/sans-reponse", async (req, res, _p, body) => {
   }
   if (matched) {
     const newCount = matched.count + 1;
-    db.prepare(`UPDATE faq_sans_reponse SET count=?,priorite=?,last_asked_at=datetime('now'),updated_at=datetime('now') WHERE id=?`)
+    await db.prepare(`UPDATE faq_sans_reponse SET count=?,priorite=?,last_asked_at=datetime('now'),updated_at=datetime('now') WHERE id=?`)
       .run(newCount, calcPriorite(newCount), matched.id);
     return sendJSON(res, 200, { id: matched.id, merged: true, count: newCount });
   }
   const cats = await db.prepare(`SELECT nom FROM faq_categories`).all();
   let catSugg = null, bestScore = 0;
   cats.forEach(c => { const s = similariteSR(norm, normSR(c.nom)); if (s > bestScore) { bestScore = s; catSugg = c.nom; } });
-  const r = db.prepare(`INSERT INTO faq_sans_reponse (question,question_norm,source,compte_type,pays,langue,user_id,categorie_suggeree,priorite) VALUES (?,?,?,?,?,?,?,?,?)`)
+  const r = await db.prepare(`INSERT INTO faq_sans_reponse (question,question_norm,source,compte_type,pays,langue,user_id,categorie_suggeree,priorite) VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(question.trim(), norm, source||'faq', compte_type||'tous', pays||null, langue||'fr', user?.id||null, catSugg, 'faible');
   sendJSON(res, 201, { id: r.lastInsertRowid, merged: false });
 });
@@ -14573,7 +14587,7 @@ route("GET", "/api/faq/sans-reponse", async (req, res, _p, _b, query) => {
   if (statut)   { where.push(`statut=?`);         params.push(statut); }
   if (priorite) { where.push(`priorite=?`);       params.push(priorite); }
   if (search)   { where.push(`question LIKE ?`);  params.push(`%${search}%`); }
-  const rows = db.prepare(
+  const rows = await db.prepare(
     `SELECT s.*, u.nom user_nom, a.nom admin_nom FROM faq_sans_reponse s
      LEFT JOIN users u ON u.id=s.user_id LEFT JOIN users a ON a.id=s.admin_id
      WHERE ${where.join(' AND ')} ORDER BY s.count DESC, s.last_asked_at DESC LIMIT ?`
@@ -14591,14 +14605,14 @@ route("PUT", "/api/faq/sans-reponse/:id", async (req, res, params, body) => {
   if (admin_id !== undefined) { sets.push(`admin_id=?`); vals.push(admin_id||null); }
   if (!sets.length) return sendJSON(res, 400, { error: 'Rien à modifier' });
   sets.push(`updated_at=datetime('now')`);
-  db.prepare(`UPDATE faq_sans_reponse SET ${sets.join(',')} WHERE id=?`).run(...vals, parseInt(params.id));
+  await db.prepare(`UPDATE faq_sans_reponse SET ${sets.join(',')} WHERE id=?`).run(...vals, parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
 route("POST", "/api/faq/sans-reponse/:id/ignorer", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
-  db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id=?`).run(parseInt(params.id));
+  await db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id=?`).run(parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
@@ -14609,9 +14623,9 @@ route("POST", "/api/faq/sans-reponse/:id/convertir", async (req, res, params, bo
   if (!sr) return sendJSON(res, 404, { error: 'Question introuvable' });
   const { category_id, reponse, compte_types, mots_cles, module_lien, module_label } = body;
   if (!reponse || reponse.trim().length < 10) return sendJSON(res, 400, { error: 'Réponse trop courte' });
-  const r = db.prepare(`INSERT INTO faq_questions (category_id,compte_types,question,reponse,mots_cles,module_lien,module_label,statut,created_by) VALUES (?,?,?,?,?,?,?,'active',?)`)
+  const r = await db.prepare(`INSERT INTO faq_questions (category_id,compte_types,question,reponse,mots_cles,module_lien,module_label,statut,created_by) VALUES (?,?,?,?,?,?,?,'active',?)`)
     .run(category_id||null, JSON.stringify(compte_types||['tous']), sr.question, reponse.trim(), JSON.stringify(mots_cles||[]), module_lien||null, module_label||null, user.id);
-  db.prepare(`UPDATE faq_sans_reponse SET statut='resolu',faq_id=?,updated_at=datetime('now') WHERE id=?`).run(r.lastInsertRowid, sr.id);
+  await (await db.prepare(`UPDATE faq_sans_reponse SET statut='resolu',faq_id=?,updated_at=datetime('now') WHERE id=?`).run(r).lastInsertRowid, sr.id);
   sendJSON(res, 201, { faq_id: r.lastInsertRowid, ok: true });
 });
 
@@ -14623,10 +14637,10 @@ route("POST", "/api/faq/sans-reponse/fusion", async (req, res, _p, body) => {
   const rows = await db.prepare(`SELECT * FROM faq_sans_reponse WHERE id IN (${ids.map(()=>'?').join(',')})`).all(...ids.map(Number));
   const totalCount = rows.reduce((s, r) => s + (r.count||1), 0);
   const mainId = ids[0];
-  db.prepare(`UPDATE faq_sans_reponse SET question=?,question_norm=?,count=?,priorite=?,updated_at=datetime('now') WHERE id=?`)
+  await db.prepare(`UPDATE faq_sans_reponse SET question=?,question_norm=?,count=?,priorite=?,updated_at=datetime('now') WHERE id=?`)
     .run(question_principale, normSR(question_principale), totalCount, calcPriorite(totalCount), mainId);
   const otherIds = ids.slice(1).map(Number);
-  if (otherIds.length > 0) db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id IN (${otherIds.map(()=>'?').join(',')})`).run(...otherIds);
+  if (otherIds.length > 0) await db.prepare(`UPDATE faq_sans_reponse SET statut='ignore',updated_at=datetime('now') WHERE id IN (${otherIds.map(()=>'?').join(',')})`).run(...otherIds);
   sendJSON(res, 200, { id: mainId, count: totalCount });
 });
 
@@ -14652,7 +14666,7 @@ route("POST", "/api/faq/:id/view", async (req, res, params, _b) => {
   await db.prepare(`UPDATE faq_questions SET vues = vues + 1 WHERE id = ?`).run(id);
   const user = await getCurrentUser(req);
   try {
-    db.prepare(`INSERT INTO faq_views (question_id, user_id, user_role) VALUES (?,?,?)`)
+    await db.prepare(`INSERT INTO faq_views (question_id, user_id, user_role) VALUES (?,?,?)`)
       .run(id, user?.id || null, user?.role || null);
   } catch(e){}
   sendJSON(res, 200, { ok: true });
@@ -14663,7 +14677,7 @@ route("POST", "/api/faq/:id/rating", async (req, res, params, body) => {
   const id      = parseInt(params.id);
   const helpful = body.helpful ? 1 : 0;
   const user    = await getCurrentUser(req);
-  db.prepare(`INSERT INTO faq_ratings (question_id, user_id, helpful, comment) VALUES (?,?,?,?)`)
+  await db.prepare(`INSERT INTO faq_ratings (question_id, user_id, helpful, comment) VALUES (?,?,?,?)`)
     .run(id, user?.id || null, helpful, body.comment || null);
   sendJSON(res, 200, { ok: true });
 });
@@ -14677,7 +14691,7 @@ route("POST", "/api/faq", async (req, res, _p, body) => {
   const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre } = body;
   if (!question?.trim() || !reponse?.trim()) return sendJSON(res, 400, { error: 'Question et réponse requises' });
   const types = JSON.stringify(Array.isArray(compte_types) ? compte_types : ['tous']);
-  const r = db.prepare(`INSERT INTO faq_questions
+  const r = await db.prepare(`INSERT INTO faq_questions
     (category_id,compte_types,question,reponse,synonymes,mots_cles,etapes,medias,module_lien,module_label,ordre,created_by)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       category_id || null,
@@ -14703,7 +14717,7 @@ route("PUT", "/api/faq/:id", async (req, res, params, body) => {
   const id = parseInt(params.id);
   const { category_id, compte_types, question, reponse, synonymes, mots_cles, etapes, medias, module_lien, module_label, ordre, statut } = body;
   const types = JSON.stringify(Array.isArray(compte_types) ? compte_types : ['tous']);
-  db.prepare(`UPDATE faq_questions SET
+  await db.prepare(`UPDATE faq_questions SET
     category_id=?, compte_types=?, question=?, reponse=?, synonymes=?, mots_cles=?, etapes=?,
     medias=?, module_lien=?, module_label=?, ordre=?, statut=?, updated_at=datetime('now')
     WHERE id=?`).run(
@@ -14726,7 +14740,7 @@ route("PATCH", "/api/faq/:id/statut", async (req, res, params, body) => {
   const id     = parseInt(params.id);
   const statut = body.statut;
   if (!['active','inactive','archived'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
-  db.prepare(`UPDATE faq_questions SET statut=?, updated_at=datetime('now') WHERE id=?`).run(statut, id);
+  await db.prepare(`UPDATE faq_questions SET statut=?, updated_at=datetime('now') WHERE id=?`).run(statut, id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -14736,7 +14750,7 @@ route("POST", "/api/faq/:id/duplicate", async (req, res, params) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const src = await db.prepare(`SELECT * FROM faq_questions WHERE id=?`).get(parseInt(params.id));
   if (!src) return sendJSON(res, 404, { error: 'Introuvable' });
-  const r = db.prepare(`INSERT INTO faq_questions
+  const r = await db.prepare(`INSERT INTO faq_questions
     (category_id,compte_types,question,reponse,synonymes,mots_cles,etapes,medias,module_lien,module_label,ordre,statut,created_by)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       src.category_id, src.compte_types, `[Copie] ${src.question}`, src.reponse,
@@ -14762,7 +14776,7 @@ route("POST", "/api/faq/categories", async (req, res, _p, body) => {
   if (!nom?.trim()) return sendJSON(res, 400, { error: 'Nom requis' });
   const slug = nom.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
   try {
-    const r = db.prepare(`INSERT INTO faq_categories (nom,slug,icone,ordre) VALUES (?,?,?,?)`).run(nom.trim(), slug, icone||'📋', parseInt(ordre)||0);
+    const r = await db.prepare(`INSERT INTO faq_categories (nom,slug,icone,ordre) VALUES (?,?,?,?)`).run(nom.trim(), slug, icone||'📋', parseInt(ordre)||0);
     sendJSON(res, 201, { id: r.lastInsertRowid, slug });
   } catch(e) { sendJSON(res, 409, { error: 'Ce nom existe déjà' }); }
 });
@@ -14834,10 +14848,10 @@ route("POST", "/api/onboarding/progress", async (req, res, _p, body) => {
   const { tutorial_id, statut, etapes_completees, note, commentaire } = body;
   const existing = await db.prepare(`SELECT id FROM onboarding_progress WHERE user_id=? AND tutorial_id=?`).get(user.id, tutorial_id);
   if (existing) {
-    db.prepare(`UPDATE onboarding_progress SET statut=?,etapes_completees=?,note=?,commentaire=?,updated_at=datetime('now')${statut==='termine'?",completed_at=datetime('now')":""} WHERE id=?`)
+    await db.prepare(`UPDATE onboarding_progress SET statut=?,etapes_completees=?,note=?,commentaire=?,updated_at=datetime('now')${statut==='termine'?",completed_at=datetime('now')":""} WHERE id=?`)
       .run(statut, JSON.stringify(etapes_completees||[]), note||null, commentaire||null, existing.id);
   } else {
-    db.prepare(`INSERT INTO onboarding_progress (user_id,tutorial_id,statut,etapes_completees,note,commentaire${statut==='termine'?',completed_at':''}) VALUES (?,?,?,?,?,?${statut==='termine'?",datetime('now')":''})`
+    await db.prepare(`INSERT INTO onboarding_progress (user_id,tutorial_id,statut,etapes_completees,note,commentaire${statut==='termine'?',completed_at':''}) VALUES (?,?,?,?,?,?${statut==='termine'?",datetime('now')":''})`
     ).run(user.id, tutorial_id||null, statut, JSON.stringify(etapes_completees||[]), note||null, commentaire||null);
   }
   sendJSON(res, 200, { ok: true });
@@ -14848,7 +14862,7 @@ route("POST", "/api/onboarding/stats", async (req, res, _p, body) => {
   const user = await getCurrentUser(req);
   const { tutorial_id, step_id, action, data } = body;
   try {
-    db.prepare(`INSERT INTO onboarding_stats (tutorial_id,step_id,user_id,action,data) VALUES (?,?,?,?,?)`)
+    await db.prepare(`INSERT INTO onboarding_stats (tutorial_id,step_id,user_id,action,data) VALUES (?,?,?,?,?)`)
       .run(tutorial_id||null, step_id||null, user?.id||null, action||'', JSON.stringify(data||{}));
   } catch(e){}
   sendJSON(res, 200, { ok: true });
@@ -14869,7 +14883,7 @@ route("PUT", "/api/onboarding/admin/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, description, duree_estimee, obligatoire, actif } = body;
-  db.prepare(`UPDATE onboarding_tutorials SET titre=?,description=?,duree_estimee=?,obligatoire=?,actif=?,version=version+1,updated_at=datetime('now') WHERE id=?`)
+  await db.prepare(`UPDATE onboarding_tutorials SET titre=?,description=?,duree_estimee=?,obligatoire=?,actif=?,version=version+1,updated_at=datetime('now') WHERE id=?`)
     .run(titre||'', description||'', parseInt(duree_estimee)||3, obligatoire?1:0, actif?1:0, parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
@@ -14887,7 +14901,7 @@ route("POST", "/api/onboarding/admin/:id/steps", async (req, res, params, body) 
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre } = body;
-  const r = db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label) VALUES (?,?,?,?,?,?,?,?,?)`)
+  const r = await db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label) VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(parseInt(params.id), parseInt(ordre)||0, titre||'', contenu||'', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
@@ -14939,7 +14953,7 @@ route("PUT", "/api/oz/settings", async (req, res, _p, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Non connecté' });
   const { avatar, theme, size, animations, voice_enabled, language, pos_x, pos_y } = body;
-  db.prepare(`INSERT INTO oz_settings (user_id,avatar,theme,size,animations,voice_enabled,language,pos_x,pos_y,updated_at)
+  await db.prepare(`INSERT INTO oz_settings (user_id,avatar,theme,size,animations,voice_enabled,language,pos_x,pos_y,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
     ON CONFLICT(user_id) DO UPDATE SET
     avatar=excluded.avatar, theme=excluded.theme, size=excluded.size,
@@ -14953,7 +14967,7 @@ route("PUT", "/api/oz/settings", async (req, res, _p, body) => {
 route("POST", "/api/oz/audit", async (req, res, _p, body) => {
   const user = await getCurrentUser(req);
   const { action, module, params, result } = body;
-  db.prepare('INSERT INTO oz_audit (user_id,action,module,params,result) VALUES (?,?,?,?,?)')
+  await db.prepare('INSERT INTO oz_audit (user_id,action,module,params,result) VALUES (?,?,?,?,?)')
     .run(user?.id||null, action||'', module||'', params||null, result||'ok');
   sendJSON(res, 201, { ok: true });
 });
@@ -14998,7 +15012,7 @@ route("POST", "/api/oz/knowledge", async (req, res, _p, body) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { topic, content, tags } = body;
   if (!topic || !content) return sendJSON(res, 400, { error: 'topic + content requis' });
-  const r = db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(topic.trim(), content.trim(), tags||'');
+  const r = await db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(topic.trim(), content.trim(), tags||'');
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -15006,7 +15020,7 @@ route("PUT", "/api/oz/knowledge/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { topic, content, tags, actif } = body;
-  db.prepare(`UPDATE oz_knowledge SET topic=?,content=?,tags=?,actif=?,updated_at=datetime('now') WHERE id=?`)
+  await db.prepare(`UPDATE oz_knowledge SET topic=?,content=?,tags=?,actif=?,updated_at=datetime('now') WHERE id=?`)
     .run(topic||'', content||'', tags||'', actif??1, parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
@@ -15050,15 +15064,15 @@ async function autoGererRecrutement() {
   try {
     const now = new Date().toISOString();
     // Expiration automatique à 2 mois
-    db.prepare(`UPDATE recrutement_campagnes SET statut='expiree', updated_at=datetime('now')
+    await db.prepare(`UPDATE recrutement_campagnes SET statut='expiree', updated_at=datetime('now')
       WHERE statut='active' AND expire_at IS NOT NULL AND expire_at < ?`).run(now);
     // Notification J-7 fin de promotion (30j)
-    const aNotifPromo7 = db.prepare(`SELECT id,recruteur_id,nom FROM recrutement_campagnes
+    const aNotifPromo7 = await db.prepare(`SELECT id,recruteur_id,nom FROM recrutement_campagnes
       WHERE statut='active' AND notif_promo_7j=0 AND promotion_fin IS NOT NULL
         AND promotion_fin BETWEEN datetime(?,'+0 days') AND datetime(?,'+7 days')`).all(now, now);
     for (const c of aNotifPromo7) {
       try {
-        db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
+        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
           .run(c.recruteur_id,'systeme',`📣 La promotion de votre campagne "${c.nom}" se termine dans 7 jours.`,`/recrutement.html`);
         await db.prepare(`UPDATE recrutement_campagnes SET notif_promo_7j=1 WHERE id=?`).run(c.id);
       } catch(_){}
@@ -15068,18 +15082,18 @@ async function autoGererRecrutement() {
       WHERE statut='active' AND notif_promo_fin=0 AND promotion_fin IS NOT NULL AND promotion_fin < ?`).all(now);
     for (const c of aNotifPromoFin) {
       try {
-        db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
+        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
           .run(c.recruteur_id,'systeme',`📣 La période de promotion de "${c.nom}" est terminée. La campagne reste accessible jusqu'à expiration.`,`/recrutement.html`);
         await db.prepare(`UPDATE recrutement_campagnes SET notif_promo_fin=1 WHERE id=?`).run(c.id);
       } catch(_){}
     }
     // Notification J-7 expiration (2 mois)
-    const aNotifExpir7 = db.prepare(`SELECT id,recruteur_id,nom FROM recrutement_campagnes
+    const aNotifExpir7 = await db.prepare(`SELECT id,recruteur_id,nom FROM recrutement_campagnes
       WHERE statut='active' AND notif_expir_7j=0 AND expire_at IS NOT NULL
         AND expire_at BETWEEN datetime(?,'+0 days') AND datetime(?,'+7 days')`).all(now, now);
     for (const c of aNotifExpir7) {
       try {
-        db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
+        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
           .run(c.recruteur_id,'systeme',`⚠️ Votre campagne "${c.nom}" expire dans 7 jours et sera automatiquement clôturée.`,`/recrutement.html`);
         await db.prepare(`UPDATE recrutement_campagnes SET notif_expir_7j=1 WHERE id=?`).run(c.id);
       } catch(_){}
@@ -15089,7 +15103,7 @@ async function autoGererRecrutement() {
       WHERE statut='expiree' AND notif_cloture=0`).all();
     for (const c of aClotures) {
       try {
-        db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
+        await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
           .run(c.recruteur_id,'systeme',`🔒 Votre campagne "${c.nom}" a été clôturée automatiquement. Les statistiques restent accessibles.`,`/recrutement.html`);
         // Archiver les candidatures
         await db.prepare(`UPDATE recrutement_candidatures SET statut='archivee' WHERE campagne_id=? AND statut='en_attente'`).run(c.id);
@@ -15105,7 +15119,7 @@ async function autoPublierProgrammes() {
     const now = new Date().toISOString();
     const dues = await db.prepare("SELECT id,organisateur_id,titre,cible_liste_ids,fc_partenaires_ids FROM events WHERE statut='brouillon_programme' AND programmed_at IS NOT NULL AND programmed_at <= ?").all(now);
     for (const e of dues) {
-      db.prepare("UPDATE events SET statut='publie', publie_at=COALESCE(publie_at,datetime('now')), updated_at=datetime('now') WHERE id=?").run(e.id);
+      await db.prepare("UPDATE events SET statut='publie', publie_at=COALESCE(publie_at,datetime('now')), updated_at=datetime('now') WHERE id=?").run(e.id);
       try { envoyerNotificationsEvenement(e.id, e.organisateur_id, e.titre, e.cible_liste_ids, e.fc_partenaires_ids); } catch(_){}
     }
   } catch(_){}
@@ -15125,11 +15139,11 @@ async function autoGererDossiersQR() {
     `).all();
     for (const e of aNotifier) {
       try {
-        db.prepare(`INSERT INTO notifications (user_id,type,contenu,lien,created_at) VALUES (?,?,?,?,datetime('now'))`)
+        await db.prepare(`INSERT INTO notifications (user_id,type,contenu,lien,created_at) VALUES (?,?,?,?,datetime('now'))`)
           .run(e.organisateur_id, 'systeme',
             `⚠️ Le dossier "QR Code Participants — ${e.titre}" sera supprimé dans 24h. Exportez les données si nécessaire.`,
             `/billetterie.html`);
-        db.prepare(`UPDATE events SET qr_folder_notified_at=datetime('now') WHERE id=?`).run(e.id);
+        await db.prepare(`UPDATE events SET qr_folder_notified_at=datetime('now') WHERE id=?`).run(e.id);
       } catch(_){}
     }
     // 2. Suppression automatique des données opérationnelles J+5 après date_fin
@@ -15144,10 +15158,10 @@ async function autoGererDossiersQR() {
         // Supprimer journaux de scans
         await db.prepare(`DELETE FROM event_checkins WHERE event_id=?`).run(e.id);
         // Archiver inscriptions sécurisées (supprimer QR, garder statut + identité pour obligations légales)
-        db.prepare(`UPDATE event_inscriptions_securisees SET billet_qr=NULL, statut='archive', updated_at=datetime('now') WHERE event_id=?`).run(e.id);
+        await db.prepare(`UPDATE event_inscriptions_securisees SET billet_qr=NULL, statut='archive', updated_at=datetime('now') WHERE event_id=?`).run(e.id);
         // Invalider tokens QR des billets (garder enregistrements financiers)
         await db.prepare(`UPDATE tickets SET qr_token=NULL WHERE event_id=?`).run(e.id);
-        db.prepare(`UPDATE events SET qr_folder_purged_at=datetime('now') WHERE id=?`).run(e.id);
+        await db.prepare(`UPDATE events SET qr_folder_purged_at=datetime('now') WHERE id=?`).run(e.id);
       } catch(_){}
     }
   } catch(_){}
@@ -15686,7 +15700,7 @@ async function handleRequest(req, res) {
           const dejaEnvoye = await db.prepare("SELECT 1 FROM candidature_historique WHERE candidature_id=? AND statut='entretien_imminent_notifie'").get(c.id);
           if (!dejaEnvoye) {
             creerNotif(c.createur_id, 'offre_relance', '⏰ Entretien imminent', `L'entretien pour la candidature à « ${c.offre_titre} » a lieu dans moins de 24 heures.`, { offre_id: c.offre_id, candidature_id: c.id });
-            db.prepare("INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,'entretien_imminent_notifie',NULL)").run(c.id);
+            await db.prepare("INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,'entretien_imminent_notifie',NULL)").run(c.id);
             relancesEnvoyees++;
           }
         }
@@ -15906,7 +15920,7 @@ ${jsonLd}
     if (req.method === "GET" && pathname === "/api/visits") {
       try {
         db.exec(`CREATE TABLE IF NOT EXISTS counters (key TEXT PRIMARY KEY, value INTEGER NOT NULL DEFAULT 0)`);
-        db.prepare(`INSERT OR IGNORE INTO counters (key, value) VALUES (?, ?)`).run('page_visits', 0);
+        await db.prepare(`INSERT OR IGNORE INTO counters (key, value) VALUES (?, ?)`).run('page_visits', 0);
         await db.prepare(`UPDATE counters SET value = value + 1 WHERE key = ?`).run('page_visits');
         const row = await db.prepare(`SELECT value FROM counters WHERE key = ?`).get('page_visits');
         return sendJSON(res, 200, { count: row ? row.value : 1 });
@@ -15956,11 +15970,11 @@ ${jsonLd}
           if (versions.length > 10) versions = versions.slice(0, 10);
           version_saved = true;
         }
-        db.prepare(`UPDATE cv_profiles SET titre=?, theme=?, data_json=?, versions_json=?, updated_at=datetime('now') WHERE id=?`)
+        await db.prepare(`UPDATE cv_profiles SET titre=?, theme=?, data_json=?, versions_json=?, updated_at=datetime('now') WHERE id=?`)
           .run(titre, theme, JSON.stringify(data), JSON.stringify(versions), existing.id);
         return sendJSON(res, 200, { id: existing.id, saved: true, version_saved, versions });
       } else {
-        const r = db.prepare(`INSERT INTO cv_profiles(user_id,numero,titre,theme,data_json,versions_json) VALUES(?,?,?,?,?,?)`)
+        const r = await db.prepare(`INSERT INTO cv_profiles(user_id,numero,titre,theme,data_json,versions_json) VALUES(?,?,?,?,?,?)`)
           .run(me.id, numero, titre, theme, JSON.stringify(data), '[]');
         return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true, versions: [] });
       }
@@ -15998,11 +16012,11 @@ ${jsonLd}
       if (![1, 2].includes(Number(numero))) return sendJSON(res, 400, { error: "numero doit être 1 ou 2" });
       const existing = await db.prepare(`SELECT id FROM lettres_motivation WHERE user_id = ? AND numero = ?`).get(me.id, numero);
       if (existing) {
-        db.prepare(`UPDATE lettres_motivation SET titre=?, data_json=?, updated_at=datetime('now') WHERE id=?`)
+        await db.prepare(`UPDATE lettres_motivation SET titre=?, data_json=?, updated_at=datetime('now') WHERE id=?`)
           .run(titre, JSON.stringify(data), existing.id);
         return sendJSON(res, 200, { id: existing.id, saved: true });
       } else {
-        const r = db.prepare(`INSERT INTO lettres_motivation(user_id,numero,titre,data_json) VALUES(?,?,?,?)`)
+        const r = await db.prepare(`INSERT INTO lettres_motivation(user_id,numero,titre,data_json) VALUES(?,?,?,?)`)
           .run(me.id, numero, titre, JSON.stringify(data));
         return sendJSON(res, 201, { id: r.lastInsertRowid, saved: true });
       }
@@ -16092,7 +16106,7 @@ ${jsonLd}
       const embaucheSql = statut_detail === 'embauchee' ? "datetime('now')" : 'embauche_le';
       await db.prepare(`UPDATE offres_candidatures SET statut_detail=?, date_entretien=?, lieu_entretien=?, type_entretien=?, vu_recruteur=1, embauche_le=${embaucheSql} WHERE id=?`)
         .run(statut_detail || cand.statut_detail, date_entretien || cand.date_entretien, lieu_entretien || cand.lieu_entretien, type_entretien || cand.type_entretien, id);
-      db.prepare(`INSERT INTO candidature_historique(candidature_id,statut,note,auteur_id) VALUES(?,?,?,?)`)
+      await db.prepare(`INSERT INTO candidature_historique(candidature_id,statut,note,auteur_id) VALUES(?,?,?,?)`)
         .run(id, statut_detail, note || null, me.id);
       const LABELS_STATUT = { nouvelle:'Nouvelle candidature', en_etude:"En cours d'étude", preselectionnee:'Présélectionnée',
         entretien_prevu:'Entretien prévu', test_demande:'Test demandé', en_attente:'En attente',
@@ -16322,7 +16336,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const { titre, description, date_debut, date_fin, lieu, lieu_type, couleur, notes_privees, all_day, rdv_id, meeting_id } = body;
       if (!titre || !date_debut || !date_fin) return sendJSON(res, 400, { error: "Champs requis manquants" });
-      const r = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,notes_privees,all_day,rdv_id,meeting_id)
+      const r = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,notes_privees,all_day,rdv_id,meeting_id)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(me.id, titre, description||null, date_debut, date_fin, lieu||null, lieu_type||'physique', couleur||'#4a90d9', notes_privees||null, all_day?1:0, rdv_id||null, meeting_id||null);
       // Créer rappels
       try {
@@ -16335,15 +16349,15 @@ ${jsonLd}
         for (const rem of reminders) {
           const remAt = new Date(evDate.getTime() - rem.ms).toISOString();
           if (new Date(remAt) > new Date()) {
-            db.prepare(`INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)`)
-              .run(me.id, r.lastInsertRowid, remAt, rem.type);
+            (await db.prepare(`INSERT INTO agenda_reminders(user_id,event_id,remind_at,type) VALUES(?,?,?,?)`)
+              .run(me.id, r).lastInsertRowid, remAt, rem.type);
           }
         }
       } catch(e) {}
       try {
         const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
         if (u?.google_calendar_sync_mode === 'diaspo_vers_google' && u.google_calendar_refresh_token) {
-          const ev = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(r.lastInsertRowid);
+          const ev = await (await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(r).lastInsertRowid);
           gcalPushEvent(me.id, ev).catch(() => {});
         }
       } catch (_) {}
@@ -16357,7 +16371,7 @@ ${jsonLd}
       const ev = await db.prepare(`SELECT * FROM agenda_events WHERE id=? AND user_id=?`).get(evId, me.id);
       if (!ev) return sendJSON(res, 404, { error: "Événement introuvable" });
       const { titre, description, date_debut, date_fin, lieu, lieu_type, couleur, notes_privees, all_day } = body;
-      db.prepare(`UPDATE agenda_events SET titre=?,description=?,date_debut=?,date_fin=?,lieu=?,lieu_type=?,couleur=?,notes_privees=?,all_day=?,updated_at=datetime('now') WHERE id=?`)
+      await db.prepare(`UPDATE agenda_events SET titre=?,description=?,date_debut=?,date_fin=?,lieu=?,lieu_type=?,couleur=?,notes_privees=?,all_day=?,updated_at=datetime('now') WHERE id=?`)
         .run(titre||ev.titre, description??ev.description, date_debut||ev.date_debut, date_fin||ev.date_fin, lieu??ev.lieu, lieu_type||ev.lieu_type, couleur||ev.couleur, notes_privees??ev.notes_privees, all_day?1:0, evId);
       try {
         const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
@@ -16451,7 +16465,7 @@ ${jsonLd}
       const debut = `${date_proposee}T${heure_debut}:00`;
       const fin   = `${date_proposee}T${heure_fin}:00`;
 
-      const r = db.prepare(`INSERT INTO rdv_proposals(proposeur_id,destinataire_id,titre,description,date_proposee,heure_debut,heure_fin,duree_minutes,lieu,lieu_type,lien_visio,participants_json)
+      const r = await db.prepare(`INSERT INTO rdv_proposals(proposeur_id,destinataire_id,titre,description,date_proposee,heure_debut,heure_fin,duree_minutes,lieu,lieu_type,lien_visio,participants_json)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(
           me.id, uniqueDests[0], titre, description||null, date_proposee, heure_debut, heure_fin,
           duree_minutes||30, lieu||null, lieu_type||'virtuel', lien_visio||null,
@@ -16463,7 +16477,7 @@ ${jsonLd}
       const moi = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
       for (const destId of uniqueDests) {
         try {
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             destId, 'rdv_proposition',
             `Nouveau rendez-vous proposé`,
             `${moi.prenom} ${moi.nom} vous propose un RDV : "${titre}" le ${date_proposee} à ${heure_debut}`,
@@ -16492,33 +16506,33 @@ ${jsonLd}
           const roomId = genId(12);
           const tokenHost  = genId(16);
           const tokenGuest = genId(16);
-          const mr = db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
+          const mr = await db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
             .run(roomId, tokenHost, tokenGuest, rdv.titre, rdv.proposeur_id, rdvId);
           meetingId = mr.lastInsertRowid;
-          db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.proposeur_id, 'host');
-          try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.destinataire_id, 'guest'); } catch(e) {}
+          await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.proposeur_id, 'host');
+          try { await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.destinataire_id, 'guest'); } catch(e) {}
         }
         // Créer agenda_events pour l'organisateur
-        const evP = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+        const evP = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
           .run(rdv.proposeur_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
         // Créer agenda_events pour le destinataire principal
-        const evD = db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+        const evD = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
           .run(rdv.destinataire_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
         // Créer agenda_events pour les participants additionnels
         let extraIds = [];
         try { extraIds = JSON.parse(rdv.participants_json || '[]').map(Number).filter(id => id !== rdv.proposeur_id && id !== rdv.destinataire_id); } catch(e) {}
         for (const pid of extraIds) {
           try {
-            db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+            await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
               .run(pid, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
-            if (meetingId) try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, pid, 'guest'); } catch(e) {}
+            if (meetingId) try { await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, pid, 'guest'); } catch(e) {}
           } catch(e) {}
         }
-        db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
-          .run(evP.lastInsertRowid, evD.lastInsertRowid, meetingId, message_reponse||null, rdvId);
+        (await db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
+          .run(evP.lastInsertRowid, evD).lastInsertRowid, meetingId, message_reponse||null, rdvId);
         try {
           const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             rdv.proposeur_id, 'rdv_accepte', 'Rendez-vous accepté',
             `${dest.prenom} ${dest.nom} a accepté votre RDV "${rdv.titre}"`,
             JSON.stringify({ rdv_id: rdvId, meeting_id: meetingId })
@@ -16528,10 +16542,10 @@ ${jsonLd}
         return sendJSON(res, 200, { statut: 'accepte', meeting });
 
       } else if (action === 'refuse') {
-        db.prepare(`UPDATE rdv_proposals SET statut='refuse',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
+        await db.prepare(`UPDATE rdv_proposals SET statut='refuse',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
         try {
           const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             rdv.proposeur_id, 'rdv_refuse', 'Rendez-vous refusé',
             `${dest.prenom} ${dest.nom} a refusé votre RDV "${rdv.titre}"`,
             JSON.stringify({ rdv_id: rdvId })
@@ -16542,11 +16556,11 @@ ${jsonLd}
       } else if (action === 'contre_proposition') {
         if (!contre_date || !contre_heure_debut || !contre_heure_fin)
           return sendJSON(res, 400, { error: "Nouvelle date/heure requise" });
-        db.prepare(`UPDATE rdv_proposals SET statut='contre_proposition',contre_date=?,contre_heure_debut=?,contre_heure_fin=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
+        await db.prepare(`UPDATE rdv_proposals SET statut='contre_proposition',contre_date=?,contre_heure_debut=?,contre_heure_fin=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
           .run(contre_date, contre_heure_debut, contre_heure_fin, message_reponse||null, rdvId);
         try {
           const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             rdv.proposeur_id, 'rdv_contre_prop', 'Contre-proposition de RDV',
             `${dest.prenom} ${dest.nom} propose une autre date pour "${rdv.titre}" : ${contre_date} à ${contre_heure_debut}`,
             JSON.stringify({ rdv_id: rdvId })
@@ -16555,7 +16569,7 @@ ${jsonLd}
         return sendJSON(res, 200, { statut: 'contre_proposition' });
 
       } else if (action === 'annule') {
-        db.prepare(`UPDATE rdv_proposals SET statut='annule',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
+        await db.prepare(`UPDATE rdv_proposals SET statut='annule',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
         // Supprimer les événements liés
         if (rdv.event_proposeur_id) await db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_proposeur_id);
         if (rdv.event_destinataire_id) await db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_destinataire_id);
@@ -16563,7 +16577,7 @@ ${jsonLd}
         const autreUser = me.id === rdv.proposeur_id ? rdv.destinataire_id : rdv.proposeur_id;
         try {
           const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             autreUser, 'rdv_annule', 'Rendez-vous annulé',
             `${dest.prenom} ${dest.nom} a annulé le RDV "${rdv.titre}"`,
             JSON.stringify({ rdv_id: rdvId })
@@ -16611,14 +16625,14 @@ ${jsonLd}
       const titreF  = titre_evt || rdv.titre;
       const descF   = description_evt || rdv.description || '';
       const lieuF   = body.lieu || rdv.lieu || '';
-      const r = db.prepare(`INSERT INTO evenements(titre, description, date_evt, heure_debut, lieu, ville, pays, createur_id, visibilite, statut)
+      const r = await db.prepare(`INSERT INTO evenements(titre, description, date_evt, heure_debut, lieu, ville, pays, createur_id, visibilite, statut)
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
           titreF, descF, dateEvt, rdv.heure_debut, lieuF,
           ville || '', pays || '', me.id,
           visibilite || 'public', 'publie'
         );
       // Marquer le RDV comme converti
-      try { db.prepare(`UPDATE rdv_proposals SET converted_event_id=?,statut='annule',updated_at=datetime('now') WHERE id=?`).run(r.lastInsertRowid, rdvId); } catch(e) {}
+      try { await (await db.prepare(`UPDATE rdv_proposals SET converted_event_id=?,statut='annule',updated_at=datetime('now') WHERE id=?`).run(r).lastInsertRowid, rdvId); } catch(e) {}
       return sendJSON(res, 201, { event_id: r.lastInsertRowid, titre: titreF });
     }
 
@@ -16633,14 +16647,14 @@ ${jsonLd}
       const roomId = genId(12);
       const tokenHost  = genId(16);
       const tokenGuest = genId(16);
-      const r = db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
+      const r = await db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
         .run(roomId, tokenHost, tokenGuest, titre||'Réunion', me.id, rdv_id||null);
-      db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r.lastInsertRowid, me.id, 'host');
+      await (await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r).lastInsertRowid, me.id, 'host');
       if (destinataire_id) {
-        try { db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r.lastInsertRowid, destinataire_id, 'guest'); } catch(e) {}
+        try { await (await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r).lastInsertRowid, destinataire_id, 'guest'); } catch(e) {}
         const moi = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
         try {
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             destinataire_id, 'meeting_invite', 'Invitation à une réunion',
             `${moi.prenom} ${moi.nom} vous invite à rejoindre une réunion : "${titre||'Réunion'}"`,
             JSON.stringify({ meeting_id: r.lastInsertRowid, room_id: roomId, token: tokenGuest })
@@ -16663,7 +16677,7 @@ ${jsonLd}
     if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/start$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const meetId = parseInt(pathname.split('/')[3]);
-      db.prepare(`UPDATE meetings SET statut='actif', started_at=datetime('now') WHERE id=? AND host_id=?`).run(meetId, me.id);
+      await db.prepare(`UPDATE meetings SET statut='actif', started_at=datetime('now') WHERE id=? AND host_id=?`).run(meetId, me.id);
       return sendJSON(res, 200, { started: true });
     }
 
@@ -16673,12 +16687,12 @@ ${jsonLd}
       const meetId = parseInt(pathname.split('/')[3]);
       const m = await db.prepare(`SELECT * FROM meetings WHERE id=?`).get(meetId);
       if (!m) return sendJSON(res, 404, { error: "Salle introuvable" });
-      db.prepare(`UPDATE meetings SET statut='termine', ended_at=datetime('now') WHERE id=?`).run(meetId);
+      await db.prepare(`UPDATE meetings SET statut='termine', ended_at=datetime('now') WHERE id=?`).run(meetId);
       if (m.started_at) {
         const duree = Math.round((Date.now() - new Date(m.started_at).getTime()) / 60000);
         const parts = await db.prepare(`SELECT user_id FROM meeting_participants WHERE meeting_id=?`).all(meetId);
         for (const p of parts) {
-          try { db.prepare(`INSERT INTO meeting_history(meeting_id,user_id,duree_effective_minutes,statut) VALUES(?,?,?,?)`).run(meetId, p.user_id, duree, 'termine'); } catch(e) {}
+          try { await db.prepare(`INSERT INTO meeting_history(meeting_id,user_id,duree_effective_minutes,statut) VALUES(?,?,?,?)`).run(meetId, p.user_id, duree, 'termine'); } catch(e) {}
         }
       }
       return sendJSON(res, 200, { ended: true });
@@ -16689,10 +16703,10 @@ ${jsonLd}
       const roomId = pathname.split('/')[3];
       const { from_peer, to_peer, type, data } = body;
       if (!from_peer || !type || !data) return sendJSON(res, 400, { error: "Manque from_peer/type/data" });
-      db.prepare(`INSERT INTO meeting_signals(room_id,from_peer,to_peer,type,data) VALUES(?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO meeting_signals(room_id,from_peer,to_peer,type,data) VALUES(?,?,?,?,?)`)
         .run(roomId, from_peer, to_peer||null, type, JSON.stringify(data));
       // Purger les vieux signaux (>5 min)
-      try { db.prepare(`DELETE FROM meeting_signals WHERE room_id=? AND datetime(created_at) < datetime('now','-5 minutes')`).run(roomId); } catch(e) {}
+      try { await db.prepare(`DELETE FROM meeting_signals WHERE room_id=? AND datetime(created_at) < datetime('now','-5 minutes')`).run(roomId); } catch(e) {}
       return sendJSON(res, 200, { sent: true });
     }
 
@@ -16711,7 +16725,7 @@ ${jsonLd}
       // Marquer comme consommés pour ce peer
       if (signals.length > 0 && peer) {
         const ids = signals.map(s=>s.id).join(',');
-        try { db.prepare(`UPDATE meeting_signals SET consumed=1 WHERE id IN (${ids}) AND (to_peer=? OR to_peer IS NULL)`).run(peer); } catch(e) {}
+        try { await db.prepare(`UPDATE meeting_signals SET consumed=1 WHERE id IN (${ids}) AND (to_peer=? OR to_peer IS NULL)`).run(peer); } catch(e) {}
       }
       return sendJSON(res, 200, signals.map(s => ({ ...s, data: JSON.parse(s.data) })));
     }
@@ -16740,7 +16754,7 @@ ${jsonLd}
       `).all(me.id, now);
       for (const rem of dues) {
         try {
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             me.id, 'agenda_rappel',
             `Rappel : ${rem.titre}`,
             `Votre événement "${rem.titre}" commence dans ${rem.type === '24h' ? '24 heures' : rem.type === '1h' ? '1 heure' : '15 minutes'}`,
@@ -16796,7 +16810,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
       if (!titre) return sendJSON(res, 400, { error: 'Titre obligatoire' });
-      const r = db.prepare(`INSERT INTO projets (titre,description,type,categorie,pays,region,ville,budget_estime,date_debut,date_fin,tags,createur_id,statut) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'brouillon')`)
+      const r = await db.prepare(`INSERT INTO projets (titre,description,type,categorie,pays,region,ville,budget_estime,date_debut,date_fin,tags,createur_id,statut) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'brouillon')`)
         .run(titre, description||null, type||'projet', categorie||'Général', pays||null, region||null, ville||null, budget_estime||null, date_debut||null, date_fin||null, JSON.stringify(tags||[]), me.id);
       return sendJSON(res, 201, { id: r.lastInsertRowid });
     }
@@ -16840,7 +16854,7 @@ ${jsonLd}
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
       if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
       const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
-      db.prepare(`UPDATE projets SET titre=?,description=?,type=?,categorie=?,pays=?,region=?,ville=?,budget_estime=?,date_debut=?,date_fin=?,tags=?,updated_at=datetime('now') WHERE id=?`)
+      await db.prepare(`UPDATE projets SET titre=?,description=?,type=?,categorie=?,pays=?,region=?,ville=?,budget_estime=?,date_debut=?,date_fin=?,tags=?,updated_at=datetime('now') WHERE id=?`)
         .run(titre||p.titre, description??p.description, type||p.type, categorie||p.categorie, pays??p.pays, region??p.region, ville??p.ville, budget_estime??p.budget_estime, date_debut??p.date_debut, date_fin??p.date_fin, JSON.stringify(tags||JSON.parse(p.tags||'[]')), id);
       return sendJSON(res, 200, { updated: true });
     }
@@ -16860,10 +16874,10 @@ ${jsonLd}
         if (!allowed.includes(statut)) return sendJSON(res, 403, { error: 'Transition non autorisée' });
         if (!isValidator) return sendJSON(res, 403, { error: 'Action réservée aux validateurs' });
       }
-      db.prepare(`UPDATE projets SET statut=?,motif_rejet=?,validateur_id=?,date_validation=datetime('now'),updated_at=datetime('now') WHERE id=?`)
+      await db.prepare(`UPDATE projets SET statut=?,motif_rejet=?,validateur_id=?,date_validation=datetime('now'),updated_at=datetime('now') WHERE id=?`)
         .run(statut, motif_rejet||null, isValidator ? me.id : null, id);
       if (commentaire) {
-        db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu,type) VALUES (?,?,?,?)`)
+        await db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu,type) VALUES (?,?,?,?)`)
           .run(id, me.id, commentaire, statut === 'rejete' ? 'rejet' : 'validation');
       }
       return sendJSON(res, 200, { updated: true, statut });
@@ -16875,7 +16889,7 @@ ${jsonLd}
       const id = parseInt(pathname.split('/')[3]);
       const { contenu } = body;
       if (!contenu) return sendJSON(res, 400, { error: 'Contenu obligatoire' });
-      db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu) VALUES (?,?,?)`).run(id, me.id, contenu);
+      await db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu) VALUES (?,?,?)`).run(id, me.id, contenu);
       return sendJSON(res, 201, { ok: true });
     }
 
@@ -16955,12 +16969,12 @@ ${jsonLd}
       const modeFinal = mode === 'dynamique' ? 'dynamique' : 'figee';
       const filtresJson = filtres ? JSON.stringify(filtres) : null;
       const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
-      const id = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,mode,filtres_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(me.id, nom.trim(), description||null, couleur||'#1B3A6B', icone||'📋', notes||null, maxOrdre+1, modeFinal, filtresJson, ts, ts).lastInsertRowid;
+      const id = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,mode,filtres_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(me.id, nom.trim(), description||null, couleur||'#1B3A6B', icone||'📋', notes||null, maxOrdre+1, modeFinal, filtresJson, ts, ts)).lastInsertRowid;
       if (filtres) {
         const membres = appliquerFiltresListe(filtres);
         for (const m of membres) {
-          try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(id, m.id, m.email, m.nom, ts); } catch(e) {}
+          try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(id, m.id, m.email, m.nom, ts); } catch(e) {}
         }
       }
       return sendJSON(res, 201, { id });
@@ -16973,7 +16987,7 @@ ${jsonLd}
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
       const { nom, description, couleur, icone, notes } = body;
-      db.prepare(`UPDATE listes_diffusion SET nom=COALESCE(?,nom), description=COALESCE(?,description), couleur=COALESCE(?,couleur), icone=COALESCE(?,icone), notes=COALESCE(?,notes), updated_at=? WHERE id=?`)
+      await db.prepare(`UPDATE listes_diffusion SET nom=COALESCE(?,nom), description=COALESCE(?,description), couleur=COALESCE(?,couleur), icone=COALESCE(?,icone), notes=COALESCE(?,notes), updated_at=? WHERE id=?`)
         .run(nom?.trim()||null, description??null, couleur||null, icone||null, notes??null, new Date().toISOString(), lid);
       return sendJSON(res, 200, { ok: true });
     }
@@ -17002,7 +17016,7 @@ ${jsonLd}
       /* Ne retire que les membres ajoutés automatiquement (user_id renseigné) ; conserve les contacts externes ajoutés manuellement */
       await db.prepare(`DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).run(lid);
       for (const m of membres) {
-        try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, m.id, m.email, m.nom, ts); } catch(e) {}
+        try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, m.id, m.email, m.nom, ts); } catch(e) {}
       }
       await db.prepare(`UPDATE listes_diffusion SET updated_at=? WHERE id=?`).run(ts, lid);
       return sendJSON(res, 200, { ok: true, total: membres.length });
@@ -17018,8 +17032,8 @@ ${jsonLd}
       if (listes.length !== liste_ids.length) return sendJSON(res, 403, { error: 'Accès refusé sur une des listes.' });
       const ts = new Date().toISOString();
       const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
-      const newId = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,ordre,mode,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-        .run(me.id, nom.trim(), `Fusion de : ${listes.map(l=>l.nom).join(', ')}`, listes[0].couleur, listes[0].icone, maxOrdre+1, 'figee', ts, ts).lastInsertRowid;
+      const newId = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,ordre,mode,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(me.id, nom.trim(), `Fusion de : ${listes.map(l=>l.nom).join(', ')}`, listes[0].couleur, listes[0].icone, maxOrdre+1, 'figee', ts, ts)).lastInsertRowid;
       const seen = new Set();
       for (const l of listes) {
         const contacts = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE liste_id=?`).all(l.id);
@@ -17027,7 +17041,7 @@ ${jsonLd}
           const key = c.user_id ? `u${c.user_id}` : `e${(c.email||'').toLowerCase()}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(newId, c.user_id||null, c.email||null, c.nom||null, ts); } catch(e) {}
+          try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(newId, c.user_id||null, c.email||null, c.nom||null, ts); } catch(e) {}
         }
       }
       return sendJSON(res, 201, { id: newId });
@@ -17044,7 +17058,7 @@ ${jsonLd}
       const contact = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE id=? AND liste_id=?`).get(contact_id, lid);
       if (!contact) return sendJSON(res, 404, { error: 'Contact introuvable.' });
       const ts = new Date().toISOString();
-      try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(vers_liste_id, contact.user_id, contact.email, contact.nom, ts); } catch(e) {}
+      try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(vers_liste_id, contact.user_id, contact.email, contact.nom, ts); } catch(e) {}
       await db.prepare(`DELETE FROM listes_diffusion_contacts WHERE id=?`).run(contact_id);
       return sendJSON(res, 200, { ok: true });
     }
@@ -17063,7 +17077,7 @@ ${jsonLd}
       const ts = new Date().toISOString();
       let copies = 0;
       for (const c of cibles) {
-        try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(c.id, contact.user_id, contact.email, contact.nom, ts); copies++; } catch(e) {}
+        try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(c.id, contact.user_id, contact.email, contact.nom, ts); copies++; } catch(e) {}
       }
       return sendJSON(res, 200, { ok: true, copies });
     }
@@ -17133,11 +17147,11 @@ ${jsonLd}
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
       const ts = new Date().toISOString();
       const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
-      const newId = db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-        .run(me.id, `${liste.nom} (copie)`, liste.description, liste.couleur, liste.icone, liste.notes, maxOrdre+1, ts, ts).lastInsertRowid;
+      const newId = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(me.id, `${liste.nom} (copie)`, liste.description, liste.couleur, liste.icone, liste.notes, maxOrdre+1, ts, ts)).lastInsertRowid;
       const contacts = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE liste_id=?`).all(lid);
       for (const c of contacts) {
-        try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(newId, c.user_id||null, c.email||null, c.nom||null, ts); } catch(e) {}
+        try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(newId, c.user_id||null, c.email||null, c.nom||null, ts); } catch(e) {}
       }
       return sendJSON(res, 201, { id: newId });
     }
@@ -17187,7 +17201,7 @@ ${jsonLd}
           const membres = appliquerFiltresListe(JSON.parse(liste.filtres_json));
           const ts2 = new Date().toISOString();
           await db.prepare(`DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).run(lid);
-          for (const m of membres) { try { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, m.id, m.email, m.nom, ts2); } catch(e) {} }
+          for (const m of membres) { try { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, m.id, m.email, m.nom, ts2); } catch(e) {} }
         } catch (e) { /* filtres corrompus — on garde l'état existant */ }
       }
       const contacts = await db.prepare(`
@@ -17214,7 +17228,7 @@ ${jsonLd}
         const u = await db.prepare(`SELECT id,nom,email FROM users WHERE id=?`).get(user_id);
         if (u) {
           const exists = await db.prepare(`SELECT id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id=?`).get(lid, u.id);
-          if (!exists) { db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, u.id, u.email, u.nom, ts); added++; }
+          if (!exists) { await db.prepare(`INSERT INTO listes_diffusion_contacts (liste_id,user_id,email,nom,created_at) VALUES (?,?,?,?,?)`).run(lid, u.id, u.email, u.nom, ts); added++; }
         }
       }
       // Ajout de contacts externes [{email, nom}]
@@ -17222,7 +17236,7 @@ ${jsonLd}
         for (const c of contacts) {
           if (!c.email?.includes('@')) continue;
           try {
-            db.prepare(`INSERT OR IGNORE INTO listes_diffusion_contacts (liste_id,email,nom,created_at) VALUES (?,?,?,?)`)
+            await db.prepare(`INSERT OR IGNORE INTO listes_diffusion_contacts (liste_id,email,nom,created_at) VALUES (?,?,?,?)`)
               .run(lid, c.email.toLowerCase().trim(), c.nom||null, ts);
             added++;
           } catch(e) {}
@@ -17470,7 +17484,7 @@ ${jsonLd}
       // Statut final
       let finalStatut = statutInit || 'brouillon';
       if (programmed_at && finalStatut !== 'publie') finalStatut = 'brouillon_programme';
-      const eid = db.prepare(`INSERT INTO events
+      const eid = (await db.prepare(`INSERT INTO events
         (titre,description,organisateur_id,pays,ville,adresse,date_debut,date_fin,capacite,categorie,
          image_b64,statut,created_at,updated_at,
          image_couverture,galerie_photos,
@@ -17491,19 +17505,19 @@ ${jsonLd}
              fc_programme||null, fc_partenaires||null, partenairesIdsStr, fc_contact||null, fc_notes||null,
              programmed_at||null, timezone||'Europe/Paris',
              rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
-             region||null, departement||null, communaute||null).lastInsertRowid;
+             region||null, departement||null, communaute||null)).lastInsertRowid;
       // Fixer publie_at et envoyer notifications si publication immédiate
       if (finalStatut === 'publie') {
-        db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=?`).run(eid);
+        await db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=?`).run(eid);
         try { envoyerNotificationsEvenement(eid, me.id, titre, cibleListeStr, partenairesIdsStr); } catch(_){}
       }
       if (Array.isArray(ticket_types)) {
         for (const tt of ticket_types) {
           if (!tt.nom || tt.prix == null) continue;
-          insererTicketType(eid, tt);
+          await insererTicketType(eid, tt);
         }
       }
-      if (billetterie_config && typeof billetterie_config === 'object') upsertBilletterieConfig(eid, billetterie_config);
+      if (billetterie_config && typeof billetterie_config === "object") await upsertBilletterieConfig(eid, billetterie_config);
       return sendJSON(res, 201, { id: eid });
     }
 
@@ -17542,7 +17556,7 @@ ${jsonLd}
       if (finalStatut === 'publie' && !ev.programmed_at) {/* ok */}
       else if (programmed_at && finalStatut !== 'publie') finalStatut = 'brouillon_programme';
       const wasPublie = ev.statut === 'publie';
-      db.prepare(`UPDATE events SET
+      await db.prepare(`UPDATE events SET
         titre=COALESCE(?,titre), description=COALESCE(?,description),
         pays=COALESCE(?,pays), ville=COALESCE(?,ville), adresse=COALESCE(?,adresse),
         date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin),
@@ -17581,12 +17595,12 @@ ${jsonLd}
              finalStatut, eid);
       // Fixer publie_at (première publication, ou rétroactivement si publie_at est null)
       if (finalStatut === 'publie') {
-        db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=? AND publie_at IS NULL`).run(eid);
+        await db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=? AND publie_at IS NULL`).run(eid);
         if (!wasPublie) {
           try { envoyerNotificationsEvenement(eid, me.id, titre||ev.titre, cibleListeUpd||ev.cible_liste_ids, partenairesUpd||ev.fc_partenaires_ids); } catch(_){}
         }
       }
-      if (billetterie_config && typeof billetterie_config === 'object') upsertBilletterieConfig(eid, billetterie_config);
+      if (billetterie_config && typeof billetterie_config === "object") await upsertBilletterieConfig(eid, billetterie_config);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -17599,7 +17613,7 @@ ${jsonLd}
       if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { nom, description: desc, prix, quantite, type } = body;
       if (!nom || prix == null) return sendJSON(res, 400, { error: 'Nom et prix requis.' });
-      const id = insererTicketType(eid, { nom, description: desc, prix, quantite, type, ...body });
+      const id = await insererTicketType(eid, { nom, description: desc, prix, quantite, type, ...body });
       return sendJSON(res, 201, { id });
     }
 
@@ -17612,7 +17626,7 @@ ${jsonLd}
       if (!tt) return sendJSON(res, 404, { error: 'Type de billet introuvable.' });
       if (tt.quantite_vendue > 0) return sendJSON(res, 400, { error: 'Ce type de billet a déjà des ventes, il ne peut plus être modifié (seule la quantité totale peut être augmentée).' });
       const { nom, description: desc, prix, quantite, type, avantages, devise, max_par_acheteur, date_vente_debut, date_vente_fin, couleur, prix_early_bird, early_bird_fin, actif } = body;
-      db.prepare(`UPDATE ticket_types SET nom=COALESCE(?,nom), description=COALESCE(?,description), prix=COALESCE(?,prix),
+      await db.prepare(`UPDATE ticket_types SET nom=COALESCE(?,nom), description=COALESCE(?,description), prix=COALESCE(?,prix),
         quantite_totale=COALESCE(?,quantite_totale), type=COALESCE(?,type), avantages=COALESCE(?,avantages), devise=COALESCE(?,devise),
         max_par_acheteur=COALESCE(?,max_par_acheteur), date_vente_debut=COALESCE(?,date_vente_debut), date_vente_fin=COALESCE(?,date_vente_fin),
         couleur=COALESCE(?,couleur), prix_early_bird=COALESCE(?,prix_early_bird), early_bird_fin=COALESCE(?,early_bird_fin),
@@ -17653,7 +17667,7 @@ ${jsonLd}
         validation_commande: body.validation_commande !== undefined ? body.validation_commande : (existing.validation_commande || 'auto'),
         autoriser_partage_billet: body.autoriser_partage_billet !== undefined ? body.autoriser_partage_billet : (existing.autoriser_partage_billet == null ? true : !!existing.autoriser_partage_billet),
       };
-      upsertBilletterieConfig(eid, merged);
+      await upsertBilletterieConfig(eid, merged);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -17675,13 +17689,13 @@ ${jsonLd}
       const { code, nom, description, type, valeur, date_debut, date_fin, nb_max_utilisations, nb_max_par_utilisateur, ticket_type_ids } = body;
       if (!code || valeur == null) return sendJSON(res, 400, { error: 'Code et valeur requis.' });
       try {
-        const id = db.prepare(`INSERT INTO event_codes_promo
+        const id = (await db.prepare(`INSERT INTO event_codes_promo
           (event_id,code,nom,description,type,valeur,date_debut,date_fin,nb_max_utilisations,nb_max_par_utilisateur,ticket_type_ids,created_by)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(eid, String(code).trim().toUpperCase(), nom||null, description||null, type==='montant_fixe'?'montant_fixe':'pourcentage',
                parseFloat(valeur)||0, date_debut||null, date_fin||null,
                nb_max_utilisations!=null?parseInt(nb_max_utilisations):null, nb_max_par_utilisateur!=null?parseInt(nb_max_par_utilisateur):1,
-               JSON.stringify(Array.isArray(ticket_type_ids)?ticket_type_ids:[]), check.me.id).lastInsertRowid;
+               JSON.stringify(Array.isArray(ticket_type_ids)?ticket_type_ids:[]), check.me.id)).lastInsertRowid;
         return sendJSON(res, 201, { id });
       } catch (e) {
         if (String(e.message).includes('UNIQUE')) return sendJSON(res, 409, { error: 'Ce code existe déjà pour cet événement.' });
@@ -17697,7 +17711,7 @@ ${jsonLd}
       const promo = await db.prepare(`SELECT * FROM event_codes_promo WHERE id=? AND event_id=?`).get(promoId, eid);
       if (!promo) return sendJSON(res, 404, { error: 'Code promo introuvable.' });
       const { nom, description, type, valeur, date_debut, date_fin, nb_max_utilisations, nb_max_par_utilisateur, ticket_type_ids, actif } = body;
-      db.prepare(`UPDATE event_codes_promo SET nom=?, description=?, type=?, valeur=?, date_debut=?, date_fin=?,
+      await db.prepare(`UPDATE event_codes_promo SET nom=?, description=?, type=?, valeur=?, date_debut=?, date_fin=?,
         nb_max_utilisations=?, nb_max_par_utilisateur=?, ticket_type_ids=?, actif=? WHERE id=?`)
         .run(nom ?? promo.nom, description ?? promo.description, type==='montant_fixe'?'montant_fixe':(type==='pourcentage'?'pourcentage':promo.type),
              valeur!=null?parseFloat(valeur):promo.valeur, date_debut ?? promo.date_debut, date_fin ?? promo.date_fin,
@@ -17713,7 +17727,7 @@ ${jsonLd}
       const parts = pathname.split('/'); const eid = parseInt(parts[3]); const promoId = parseInt(parts[5]);
       const check = await checkEventOwner(req, eid);
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
-      db.prepare(`UPDATE event_codes_promo SET actif=0 WHERE id=? AND event_id=?`).run(promoId, eid);
+      await db.prepare(`UPDATE event_codes_promo SET actif=0 WHERE id=? AND event_id=?`).run(promoId, eid);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -17796,12 +17810,12 @@ ${jsonLd}
           const ts = new Date().toISOString();
           const tempSig = crypto.randomBytes(8).toString('hex');
           const titulaire = billetsNominatifs ? titulaires[i] : null;
-          const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at,commande_id,titulaire_nom,titulaire_prenom,code_promo_id,montant_reduction,validation_manuelle_statut) VALUES (?,?,?,?,?,'paid','valid',?,?,?,?,?,?,?,?)`)
-            .run(eid, me.id, tt.id, 0, 0, tempSig, ts, commandeId, titulaire?.nom || null, titulaire?.prenom || null, promo?.id || null, reductionUnitaire, validationManuelle ? 'en_attente' : null).lastInsertRowid;
+          const tid = (await db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at,commande_id,titulaire_nom,titulaire_prenom,code_promo_id,montant_reduction,validation_manuelle_statut) VALUES (?,?,?,?,?,'paid','valid',?,?,?,?,?,?,?,?)`)
+            .run(eid, me.id, tt.id, 0, 0, tempSig, ts, commandeId, titulaire?.nom || null, titulaire?.prenom || null, promo?.id || null, reductionUnitaire, validationManuelle ? 'en_attente' : null)).lastInsertRowid;
           if (!validationManuelle) {
             const qrToken = await signTicket(tid, eid, ts);
             await db.prepare(`UPDATE tickets SET qr_token=? WHERE id=?`).run(qrToken, tid);
-            db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
+            await db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) VALUES (?,?,?,?,?)`)
               .run(tid, eid, me.id, me.nom, me.pays || null);
           }
           tickets.push(tid);
@@ -17837,8 +17851,8 @@ ${jsonLd}
         const ts = new Date().toISOString();
         const tempSig = crypto.randomBytes(8).toString('hex');
         const titulaire = billetsNominatifs ? titulaires[i] : null;
-        const tid = db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at,commande_id,titulaire_nom,titulaire_prenom,code_promo_id,montant_reduction) VALUES (?,?,?,?,?,'pending','valid',?,?,?,?,?,?,?)`)
-          .run(eid, me.id, tt.id, prixNetUnitaire, commissionUnitaire, tempSig, ts, commandeId, titulaire?.nom || null, titulaire?.prenom || null, promo?.id || null, reductionUnitaire).lastInsertRowid;
+        const tid = (await db.prepare(`INSERT INTO tickets (event_id,user_id,ticket_type_id,prix_paye,commission,payment_status,statut,qr_token,created_at,commande_id,titulaire_nom,titulaire_prenom,code_promo_id,montant_reduction) VALUES (?,?,?,?,?,'pending','valid',?,?,?,?,?,?,?)`)
+          .run(eid, me.id, tt.id, prixNetUnitaire, commissionUnitaire, tempSig, ts, commandeId, titulaire?.nom || null, titulaire?.prenom || null, promo?.id || null, reductionUnitaire)).lastInsertRowid;
         tempTicketIds.push(tid);
       }
 
@@ -17861,10 +17875,10 @@ ${jsonLd}
           success_url: `${origin}/billetterie.html?paiement=succes&commande=${commandeId}`,
           cancel_url: `${origin}/billetterie.html?paiement=annule&commande=${commandeId}`,
         });
-        db.prepare(`UPDATE tickets SET transaction_ref=? WHERE commande_id=?`).run(session.id, commandeId);
+        await db.prepare(`UPDATE tickets SET transaction_ref=? WHERE commande_id=?`).run(session.id, commandeId);
         return sendJSON(res, 201, { ticket_ids: tempTicketIds, commande_id: commandeId, checkout_url: session.url, en_attente_paiement: true });
       } catch (e) {
-        db.prepare(`DELETE FROM tickets WHERE commande_id=?`).run(commandeId);
+        await db.prepare(`DELETE FROM tickets WHERE commande_id=?`).run(commandeId);
         return sendJSON(res, 500, SEC.safeError(e, 'ticket-checkout'));
       }
     }
@@ -17938,9 +17952,9 @@ ${jsonLd}
       const platformFee = platformLine?.montant ?? parseFloat((ticket.prix_paye * 0.05).toFixed(2));
       const organizerAmount = organizerLine?.montant ?? parseFloat((ticket.prix_paye - platformFee).toFixed(2));
 
-      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_platform_fee',NULL,?,?,?,?,?,'debit')`)
+      await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_platform_fee',NULL,?,?,?,?,?,'debit')`)
         .run(tid, ticket.event_id, platformFee, 0.05, ticket.prix_paye, platformFee, organizerAmount);
-      db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_organizer_debit',?,?,?,?,?,?,'debit')`)
+      await db.prepare(`INSERT INTO wallet_transactions (ticket_id,event_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount,sens) VALUES (?,?,'refund_organizer_debit',?,?,?,?,?,?,'debit')`)
         .run(tid, ticket.event_id, ev.organisateur_id, organizerAmount, 0.05, ticket.prix_paye, platformFee, organizerAmount);
 
       /* Solde négatif toléré si l'organisateur a déjà retiré les fonds — choix produit assumé pour le MVP */
@@ -17973,7 +17987,7 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const qrToken = await signTicket(ticket.id, ticket.event_id, ticket.created_at);
       await db.prepare(`UPDATE tickets SET validation_manuelle_statut='approuve', qr_token=? WHERE id=?`).run(qrToken, tid);
-      db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) SELECT ?,?,u.id,COALESCE(?,u.nom),u.pays FROM users u WHERE u.id=?`)
+      await db.prepare(`INSERT OR IGNORE INTO event_attendees (ticket_id,event_id,user_id,nom_display,pays) SELECT ?,?,u.id,COALESCE(?,u.nom),u.pays FROM users u WHERE u.id=?`)
         .run(tid, ticket.event_id, ticket.titulaire_nom ? `${ticket.titulaire_prenom||''} ${ticket.titulaire_nom}`.trim() : null, ticket.user_id);
       creerNotif(ticket.user_id, 'billetterie_validation', 'Commande approuvée ✅', `Votre billet pour « ${check.ev.titre} » a été approuvé, il est maintenant scannable.`, { event_id: ticket.event_id });
       return sendJSON(res, 200, { ok: true });
@@ -18025,8 +18039,8 @@ ${jsonLd}
     if (req.method === 'POST' && /^\/api\/events\/\d+\/view$/.test(pathname)) {
       const eid = parseInt(pathname.split('/')[3]);
       const me = await getCurrentUser(req);
-      db.prepare(`UPDATE events SET vues_total=COALESCE(vues_total,0)+1 WHERE id=?`).run(eid);
-      if (!me) db.prepare(`UPDATE events SET vues_uniques=COALESCE(vues_uniques,0)+1 WHERE id=?`).run(eid);
+      await db.prepare(`UPDATE events SET vues_total=COALESCE(vues_total,0)+1 WHERE id=?`).run(eid);
+      if (!me) await db.prepare(`UPDATE events SET vues_uniques=COALESCE(vues_uniques,0)+1 WHERE id=?`).run(eid);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -18044,7 +18058,7 @@ ${jsonLd}
         WHERE eis.event_id=? ORDER BY eis.created_at DESC`).all(eid);
 
       // Acheteurs de billets (tickets)
-      const acheteurs = db.prepare(`SELECT t.*,u.nom,u.role,u.ville,u.pays,u.da_id,tt.nom AS type_nom
+      const acheteurs = await db.prepare(`SELECT t.*,u.nom,u.role,u.ville,u.pays,u.da_id,tt.nom AS type_nom
         FROM tickets t JOIN users u ON u.id=t.user_id JOIN ticket_types tt ON tt.id=t.ticket_type_id
         WHERE t.event_id=? ORDER BY t.created_at DESC`).get ?
         await db.prepare(`SELECT t.*,u.nom,u.role,u.ville,u.pays,u.da_id,tt.nom AS type_nom
@@ -18124,7 +18138,7 @@ ${jsonLd}
       const nom = compte.nom || '';
       const prenom = compte.prenom || '';
       const typeCompte = compte.role || '';
-      db.prepare(`INSERT INTO event_inscriptions_securisees (event_id,user_id,da_id_utilise,nom,type_compte,ip,user_agent) VALUES (?,?,?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO event_inscriptions_securisees (event_id,user_id,da_id_utilise,nom,type_compte,ip,user_agent) VALUES (?,?,?,?,?,?,?)`)
         .run(eid, user ? user.id : null, normalizedId, nom, typeCompte, req.headers['x-forwarded-for']||'', req.headers['user-agent']||'');
       const _insc = await db.prepare(`SELECT id FROM event_inscriptions_securisees WHERE event_id=? AND da_id_utilise=? ORDER BY id DESC LIMIT 1`).get(eid, normalizedId);
       const inscriptionId = _insc ? _insc.id : null;
@@ -18151,10 +18165,10 @@ ${jsonLd}
       const dsIdAttendu = userRow.ds_id;
       const succes = dsIdSaisi === dsIdAttendu;
       // Log dans ds_id_history
-      db.prepare(`INSERT INTO ds_id_history (user_id,action,ip,user_agent) VALUES (?,?,?,?)`)
+      await db.prepare(`INSERT INTO ds_id_history (user_id,action,ip,user_agent) VALUES (?,?,?,?)`)
         .run(userRow.id, succes ? 'signature' : 'echec_validation', req.headers['x-forwarded-for']||'', req.headers['user-agent']||'');
       // Log dans ds_id_validations
-      db.prepare(`INSERT INTO ds_id_validations (user_id,action_type,action_ref,action_id,da_id,succes,ip,user_agent) VALUES (?,?,?,?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO ds_id_validations (user_id,action_type,action_ref,action_id,da_id,succes,ip,user_agent) VALUES (?,?,?,?,?,?,?,?)`)
         .run(userRow.id, 'inscription_evenement', `event_${eid}`, eid, insc.da_id_utilise, succes ? 1 : 0, req.headers['x-forwarded-for']||'', req.headers['user-agent']||'');
       if (!succes) {
         return sendJSON(res, 401, { error: 'Code de Sécurité incorrect. Veuillez vérifier et réessayer.' });
@@ -18176,12 +18190,12 @@ ${jsonLd}
       const billetData = { type: 'inscription_da', eid, iid: inscription_id, da_id: insc.da_id_utilise, ts: Date.now() };
       const billetQr = Buffer.from(JSON.stringify(billetData)).toString('base64');
       // Finaliser inscription
-      db.prepare(`UPDATE event_inscriptions_securisees SET statut=?,ds_id_signe=1,ds_id_signe_at=datetime('now'),billet_qr=?,updated_at=datetime('now') WHERE id=?`)
+      await db.prepare(`UPDATE event_inscriptions_securisees SET statut=?,ds_id_signe=1,ds_id_signe_at=datetime('now'),billet_qr=?,updated_at=datetime('now') WHERE id=?`)
         .run(statutFinal, billetQr, inscription_id);
       // Ajouter à l'agenda personnel
       let agendaId = null;
       try {
-        const r = db.prepare(`INSERT INTO agenda_events (user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,source_type,source_id,event_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+        const r = await db.prepare(`INSERT INTO agenda_events (user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,source_type,source_id,event_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
           .run(userRow.id, `🎟️ ${ev.titre}`, ev.description||'', ev.date_debut, ev.date_fin||ev.date_debut, [ev.adresse,ev.ville,ev.pays].filter(Boolean).join(', ')||'', 'physique', '#FF6B00', 'evenement', inscription_id, eid);
         agendaId = r.lastInsertRowid;
         await db.prepare(`UPDATE event_inscriptions_securisees SET agenda_event_id=? WHERE id=?`).run(agendaId, inscription_id);
@@ -18296,7 +18310,7 @@ ${jsonLd}
         // Compter les scans précédents
         const nbScans = (await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(iid, eid))?.n || 0;
         // Enregistrer le scan (on autorise mais on signale si déjà scanné)
-        db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(iid, eid, me.id);
+        await db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(iid, eid, me.id);
         return sendJSON(res, 200, {
           valid: true,
           deja_scanne: nbScans > 0,
@@ -18330,7 +18344,7 @@ ${jsonLd}
       if (ticket.statut === 'cancelled') return logRejection('Billet annulé');
       const deja = ticket.statut === 'used';
       if (!deja) await db.prepare(`UPDATE tickets SET statut='used' WHERE id=?`).run(tid);
-      db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(tid, eid, me.id);
+      await db.prepare(`INSERT INTO event_checkins (ticket_id,event_id,scanner_id,resultat) VALUES (?,?,?,'accepted')`).run(tid, eid, me.id);
       const nbScans = (await db.prepare(`SELECT COUNT(*) n FROM event_checkins WHERE ticket_id=? AND event_id=? AND resultat='accepted'`).get(tid, eid))?.n || 1;
       return sendJSON(res, 200, {
         valid: true,
@@ -18439,7 +18453,7 @@ ${jsonLd}
       const acc = await db.prepare(`SELECT * FROM stripe_connect_accounts WHERE initiative_id=?`).get(initiative.id);
       if (!acc || !acc.payouts_enabled) return sendJSON(res, 400, { error: "Votre compte Stripe Connect n'est pas encore activé pour recevoir des virements (payouts_enabled=false)." });
 
-      const r = db.prepare(`INSERT INTO retraits (user_id, montant, statut) VALUES (?,?,'demande')`).run(me.id, montantDemande);
+      const r = await db.prepare(`INSERT INTO retraits (user_id, montant, statut) VALUES (?,?,'demande')`).run(me.id, montantDemande);
       const retraitId = r.lastInsertRowid;
 
       try {
@@ -18450,11 +18464,11 @@ ${jsonLd}
           currency: 'eur',
           destination: acc.stripe_account_id,
         });
-        db.prepare(`UPDATE retraits SET statut='traite', stripe_transfer_id=?, traite_at=datetime('now') WHERE id=?`).run(transfer.id, retraitId);
-        db.prepare(`UPDATE users SET wallet_balance = wallet_balance - ? WHERE id=?`).run(montantDemande, me.id);
+        await db.prepare(`UPDATE retraits SET statut='traite', stripe_transfer_id=?, traite_at=datetime('now') WHERE id=?`).run(transfer.id, retraitId);
+        await db.prepare(`UPDATE users SET wallet_balance = wallet_balance - ? WHERE id=?`).run(montantDemande, me.id);
         return sendJSON(res, 200, { ok: true, statut: 'traite', stripe_transfer_id: transfer.id });
       } catch (e) {
-        db.prepare(`UPDATE retraits SET statut='echoue', erreur_msg=? WHERE id=?`).run(e.message || 'Erreur Stripe', retraitId);
+        await db.prepare(`UPDATE retraits SET statut='echoue', erreur_msg=? WHERE id=?`).run(e.message || 'Erreur Stripe', retraitId);
         return sendJSON(res, 502, { error: "Le virement Stripe a échoué : " + (e.message || 'erreur inconnue') + ". En mode test, cela signifie généralement qu'aucune charge réelle n'a encore alimenté le solde de la plateforme." });
       }
     }
@@ -18531,16 +18545,16 @@ ${jsonLd}
       const publie_at = finalStatut === 'active' ? now : null;
       const promotion_fin = publie_at ? new Date(new Date(publie_at).getTime() + 30*86400000).toISOString() : null;
       const expire_at = publie_at ? new Date(new Date(publie_at).getTime() + 60*86400000).toISOString() : null;
-      const r = db.prepare(`INSERT INTO recrutement_campagnes
+      const r = await db.prepare(`INSERT INTO recrutement_campagnes
         (recruteur_id,nom,description,titre_poste,type_recrutement,organisme,secteur_activite,pays,region,departement,ville,adresse,teletravail,rayon_publication,image_b64,statut,publie_at,promotion_fin,expire_at,niveau_etudes,experience_annees,competences,langues,certifications,qualites,date_debut,duree_mission,remuneration,devise,nb_postes,photos_json,pdf_b64,pdf_nom,date_limite_candidature,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`)
         .run(me.id,nom,description||null,titre_poste||null,type_recrutement||'emploi',organisme||null,secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,teletravail||'non',rayon_publication||'national',image_b64||null,finalStatut,publie_at,promotion_fin,expire_at,niveau_etudes||null,experience_annees||null,JSON.stringify(competences||[]),JSON.stringify(langues||[]),JSON.stringify(certifications||[]),JSON.stringify(qualites||[]),date_debut||null,duree_mission||null,remuneration||null,devise||'EUR',nb_postes||1,JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,date_limite_candidature||null);
       const cid = Number(r.lastInsertRowid);
       // Publication dans le fil si active
       if (finalStatut === 'active' && await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-        const fp = db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
+        const fp = await db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
           .run(me.id,`📢 Recrutement — ${nom}`,'recrutement',cid);
-        await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp.lastInsertRowid), cid);
+        await (await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp).lastInsertRowid), cid);
       }
       return sendJSON(res, 201, { ok: true, id: cid });
     }
@@ -18548,7 +18562,7 @@ ${jsonLd}
     /* ── GET /api/recrutement/:id — détail ── */
     if (req.method === 'GET' && /^\/api\/recrutement\/\d+$/.test(pathname)) {
       const cid = parseInt(pathname.split('/')[3]);
-      const c = db.prepare(`SELECT c.*, u.nom AS recruteur_nom, u.da_id AS recruteur_da_id, u.photo_url AS recruteur_photo, u.ville AS recruteur_ville,
+      const c = await db.prepare(`SELECT c.*, u.nom AS recruteur_nom, u.da_id AS recruteur_da_id, u.photo_url AS recruteur_photo, u.ville AS recruteur_ville,
         (SELECT COUNT(*) FROM recrutement_candidatures r WHERE r.campagne_id=c.id) AS nb_candidatures,
         CASE WHEN c.promotion_fin > datetime('now') THEN 1 ELSE 0 END AS en_promotion
         FROM recrutement_campagnes c LEFT JOIN users u ON u.id=c.recruteur_id WHERE c.id=?`).get(cid);
@@ -18579,12 +18593,12 @@ ${jsonLd}
         expire_at = new Date(new Date(publie_at).getTime() + 60*86400000).toISOString();
         // Publier dans le fil
         if (await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-          const fp = db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
+          const fp = await db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
             .run(me.id,`📢 Recrutement — ${nom||c.nom}`,'recrutement',cid);
-          await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp.lastInsertRowid), cid);
+          await (await db.prepare(`UPDATE recrutement_campagnes SET fil_post_id=? WHERE id=?`).run(Number(fp).lastInsertRowid), cid);
         }
       }
-      db.prepare(`UPDATE recrutement_campagnes SET
+      await db.prepare(`UPDATE recrutement_campagnes SET
         nom=COALESCE(?,nom), description=COALESCE(?,description), titre_poste=COALESCE(?,titre_poste),
         type_recrutement=COALESCE(?,type_recrutement), organisme=COALESCE(?,organisme),
         secteur_activite=COALESCE(?,secteur_activite), pays=COALESCE(?,pays), region=COALESCE(?,region),
@@ -18613,7 +18627,7 @@ ${jsonLd}
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c) return sendJSON(res, 404, { error: 'Introuvable.' });
       if (c.recruteur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
-      db.prepare(`UPDATE recrutement_campagnes SET statut='archivee', updated_at=datetime('now') WHERE id=?`).run(cid);
+      await db.prepare(`UPDATE recrutement_campagnes SET statut='archivee', updated_at=datetime('now') WHERE id=?`).run(cid);
       await db.prepare(`UPDATE recrutement_candidatures SET statut='archivee' WHERE campagne_id=?`).run(cid);
       return sendJSON(res, 200, { ok: true });
     }
@@ -18628,11 +18642,11 @@ ${jsonLd}
       if (c.expire_at && c.expire_at < new Date().toISOString()) return sendJSON(res, 400, { error: 'Cette campagne est expirée.' });
       const { message, cv_b64 } = body;
       try {
-        db.prepare(`INSERT INTO recrutement_candidatures(campagne_id,candidat_id,message,cv_b64,created_at,updated_at)
+        await db.prepare(`INSERT INTO recrutement_candidatures(campagne_id,candidat_id,message,cv_b64,created_at,updated_at)
           VALUES(?,?,?,?,datetime('now'),datetime('now'))`).run(cid, me.id, message||null, cv_b64||null);
         // Notifier le recruteur
         try {
-          db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
+          await db.prepare(`INSERT INTO notifications(user_id,type,contenu,lien,created_at) VALUES(?,?,?,?,datetime('now'))`)
             .run(c.recruteur_id,'recrutement',`👤 Nouvelle candidature pour "${c.nom}" de ${me.nom||me.da_id}`,`/recrutement.html`);
         } catch(_){}
         return sendJSON(res, 201, { ok: true });
@@ -18663,14 +18677,14 @@ ${jsonLd}
       const c = await db.prepare(`SELECT * FROM recrutement_campagnes WHERE id=?`).get(cid);
       if (!c || (c.recruteur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { statut } = body;
-      db.prepare(`UPDATE recrutement_candidatures SET statut=?,updated_at=datetime('now') WHERE id=? AND campagne_id=?`).run(statut, candId, cid);
+      await db.prepare(`UPDATE recrutement_candidatures SET statut=?,updated_at=datetime('now') WHERE id=? AND campagne_id=?`).run(statut, candId, cid);
       return sendJSON(res, 200, { ok: true });
     }
 
     /* ── POST /api/recrutement/:id/view — compteur vues ── */
     if (req.method === 'POST' && /^\/api\/recrutement\/\d+\/view$/.test(pathname)) {
       const cid = parseInt(pathname.split('/')[3]);
-      db.prepare(`UPDATE recrutement_campagnes SET vues_total=COALESCE(vues_total,0)+1 WHERE id=?`).run(cid);
+      await db.prepare(`UPDATE recrutement_campagnes SET vues_total=COALESCE(vues_total,0)+1 WHERE id=?`).run(cid);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -18704,11 +18718,11 @@ ${jsonLd}
           await db.prepare(`DELETE FROM recrutement_reactions WHERE campagne_id=? AND user_id=?`).run(cid, me.id);
           action = 'removed';
         } else {
-          db.prepare(`UPDATE recrutement_reactions SET type=?, created_at=datetime('now') WHERE campagne_id=? AND user_id=?`).run(type, cid, me.id);
+          await db.prepare(`UPDATE recrutement_reactions SET type=?, created_at=datetime('now') WHERE campagne_id=? AND user_id=?`).run(type, cid, me.id);
           action = 'changed';
         }
       } else {
-        db.prepare(`INSERT INTO recrutement_reactions(campagne_id,user_id,type) VALUES(?,?,?)`).run(cid, me.id, type);
+        await db.prepare(`INSERT INTO recrutement_reactions(campagne_id,user_id,type) VALUES(?,?,?)`).run(cid, me.id, type);
         action = 'added';
       }
       const nb = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_reactions WHERE campagne_id=?`).get(cid))?.n || 0;
@@ -18741,7 +18755,7 @@ ${jsonLd}
       const cid = parseInt(pathname.split('/')[3]);
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
-      const r = db.prepare(`INSERT INTO recrutement_commentaires(campagne_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(cid, me.id, contenu.trim(), parent_id || null);
+      const r = await db.prepare(`INSERT INTO recrutement_commentaires(campagne_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(cid, me.id, contenu.trim(), parent_id || null);
       const nb = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_commentaires WHERE campagne_id=?`).get(cid))?.n || 0;
       await db.prepare(`UPDATE recrutement_campagnes SET nb_commentaires=? WHERE id=?`).run(nb, cid);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid), nb_commentaires: nb });
@@ -18757,7 +18771,7 @@ ${jsonLd}
         await db.prepare(`DELETE FROM recrutement_favoris WHERE campagne_id=? AND user_id=?`).run(cid, me.id);
         action = 'removed';
       } else {
-        db.prepare(`INSERT INTO recrutement_favoris(campagne_id,user_id) VALUES(?,?)`).run(cid, me.id);
+        await db.prepare(`INSERT INTO recrutement_favoris(campagne_id,user_id) VALUES(?,?)`).run(cid, me.id);
         action = 'added';
       }
       const nb = (await db.prepare(`SELECT COUNT(*) n FROM recrutement_favoris WHERE campagne_id=?`).get(cid))?.n || 0;
@@ -18774,7 +18788,7 @@ ${jsonLd}
       const { commentaire = '' } = body;
       // Créer une publication dans le fil
       if (await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-        db.prepare(`INSERT INTO fil_posts(user_id, contenu, pub_type, original_post_id, repost_commentaire) VALUES(?,?,?,?,?)`)
+        await db.prepare(`INSERT INTO fil_posts(user_id, contenu, pub_type, original_post_id, repost_commentaire) VALUES(?,?,?,?,?)`)
           .run(me.id, `📢 Recrutement — ${c.nom}`, 'recrutement_repost', cid, commentaire);
       }
       const nb = (c.nb_republications || 0) + 1;
@@ -19139,10 +19153,10 @@ ${jsonLd}
       const { situation, types_opportunites, secteurs, metier, competences, experience, niveau_etudes, langues, mobilite, teletravail, salaire_min, salaire_max, devise, date_disponibilite, disponible_pour_travailler, suspendre_offres, lettre_contenu, cv_pdf, lettre_pdf, portfolio_pdf } = body;
       const existing = await db.prepare(`SELECT id FROM profil_emploi WHERE user_id=?`).get(me.id);
       if (existing) {
-        db.prepare(`UPDATE profil_emploi SET situation=?,types_opportunites=?,secteurs=?,metier=?,competences=?,experience=?,niveau_etudes=?,langues=?,mobilite=?,teletravail=?,salaire_min=?,salaire_max=?,devise=?,date_disponibilite=?,disponible_pour_travailler=?,suspendre_offres=?,lettre_contenu=?,cv_pdf=COALESCE(?,cv_pdf),lettre_pdf=COALESCE(?,lettre_pdf),portfolio_pdf=COALESCE(?,portfolio_pdf),updated_at=datetime('now') WHERE user_id=?`)
+        await db.prepare(`UPDATE profil_emploi SET situation=?,types_opportunites=?,secteurs=?,metier=?,competences=?,experience=?,niveau_etudes=?,langues=?,mobilite=?,teletravail=?,salaire_min=?,salaire_max=?,devise=?,date_disponibilite=?,disponible_pour_travailler=?,suspendre_offres=?,lettre_contenu=?,cv_pdf=COALESCE(?,cv_pdf),lettre_pdf=COALESCE(?,lettre_pdf),portfolio_pdf=COALESCE(?,portfolio_pdf),updated_at=datetime('now') WHERE user_id=?`)
           .run(situation,JSON.stringify(types_opportunites||[]),JSON.stringify(secteurs||[]),metier,JSON.stringify(competences||[]),experience,niveau_etudes,JSON.stringify(langues||[]),mobilite,teletravail,salaire_min||null,salaire_max||null,devise||'EUR',date_disponibilite,disponible_pour_travailler?1:0,suspendre_offres?1:0,lettre_contenu,cv_pdf||null,lettre_pdf||null,portfolio_pdf||null,me.id);
       } else {
-        db.prepare(`INSERT INTO profil_emploi(user_id,situation,types_opportunites,secteurs,metier,competences,experience,niveau_etudes,langues,mobilite,teletravail,salaire_min,salaire_max,devise,date_disponibilite,disponible_pour_travailler,suspendre_offres,lettre_contenu,cv_pdf,lettre_pdf,portfolio_pdf) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        await db.prepare(`INSERT INTO profil_emploi(user_id,situation,types_opportunites,secteurs,metier,competences,experience,niveau_etudes,langues,mobilite,teletravail,salaire_min,salaire_max,devise,date_disponibilite,disponible_pour_travailler,suspendre_offres,lettre_contenu,cv_pdf,lettre_pdf,portfolio_pdf) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(me.id,situation,JSON.stringify(types_opportunites||[]),JSON.stringify(secteurs||[]),metier,JSON.stringify(competences||[]),experience,niveau_etudes,JSON.stringify(langues||[]),mobilite,teletravail,salaire_min||null,salaire_max||null,devise||'EUR',date_disponibilite,disponible_pour_travailler?1:0,suspendre_offres?1:0,lettre_contenu,cv_pdf||null,lettre_pdf||null,portfolio_pdf||null);
       }
       // Mettre à jour le badge sur le user
@@ -19157,7 +19171,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { poste, entreprise, ville, pays, date_debut, date_fin, en_cours, description, realisations, ordre } = body;
       if (!poste) return sendJSON(res, 400, { error: 'Poste requis.' });
-      const r = db.prepare(`INSERT INTO profil_emploi_experiences(user_id,poste,entreprise,ville,pays,date_debut,date_fin,en_cours,description,realisations,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+      const r = await db.prepare(`INSERT INTO profil_emploi_experiences(user_id,poste,entreprise,ville,pays,date_debut,date_fin,en_cours,description,realisations,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
         .run(me.id,poste,entreprise,ville,pays,date_debut,date_fin,en_cours?1:0,description,realisations,ordre||0);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid) });
     }
@@ -19185,7 +19199,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { diplome, etablissement, ville, pays, date_obtention, description, ordre } = body;
       if (!diplome) return sendJSON(res, 400, { error: 'Diplôme requis.' });
-      const r = db.prepare(`INSERT INTO profil_emploi_formations(user_id,diplome,etablissement,ville,pays,date_obtention,description,ordre) VALUES(?,?,?,?,?,?,?,?)`)
+      const r = await db.prepare(`INSERT INTO profil_emploi_formations(user_id,diplome,etablissement,ville,pays,date_obtention,description,ordre) VALUES(?,?,?,?,?,?,?,?)`)
         .run(me.id,diplome,etablissement,ville,pays,date_obtention,description,ordre||0);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid) });
     }
@@ -19213,7 +19227,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const profil = await db.prepare(`SELECT * FROM profil_emploi WHERE user_id=?`).get(me.id);
       // Récupère les campagnes actives
-      let camps = db.prepare(`SELECT c.*, u.nom AS recruteur_nom, u.photo_url AS recruteur_photo, u.da_id AS recruteur_da_id,
+      let camps = await db.prepare(`SELECT c.*, u.nom AS recruteur_nom, u.photo_url AS recruteur_photo, u.da_id AS recruteur_da_id,
         (SELECT COUNT(*) FROM recrutement_candidatures rc WHERE rc.campagne_id=c.id AND rc.candidat_id=?) AS deja_postule
         FROM recrutement_campagnes c LEFT JOIN users u ON u.id=c.recruteur_id
         WHERE c.statut='active' AND (c.date_limite_candidature IS NULL OR c.date_limite_candidature > datetime('now'))
@@ -19258,7 +19272,7 @@ ${jsonLd}
       sql += ' ORDER BY s.created_at DESC LIMIT 50';
       const sondages_list = await db.prepare(sql).all(...args);
       // Auto-clôturer les sondages expirés
-      db.prepare(`UPDATE sondages SET statut='cloture' WHERE statut='ouvert' AND date_cloture IS NOT NULL AND date_cloture < datetime('now')`).run();
+      await db.prepare(`UPDATE sondages SET statut='cloture' WHERE statut='ouvert' AND date_cloture IS NOT NULL AND date_cloture < datetime('now')`).run();
       return sendJSON(res, 200, { sondages: sondages_list });
     }
 
@@ -19273,22 +19287,22 @@ ${jsonLd}
         const diffDays = (new Date(date_cloture) - new Date(date_debut)) / 86400000;
         if (diffDays > 30) return sendJSON(res, 400, { error: 'Durée maximale : 30 jours.' });
       }
-      const r = db.prepare(`INSERT INTO sondages(createur_id,titre,description,objectif,categorie,type,ville,pays,region,departement,rayon_publication,date_debut,date_cloture,anonyme,confidentialite,resultats_visibles,une_reponse_par_compte,modification_autorisee,cible_roles,photos_json,pdf_b64,pdf_nom,video_url,statut)
+      const r = await db.prepare(`INSERT INTO sondages(createur_id,titre,description,objectif,categorie,type,ville,pays,region,departement,rayon_publication,date_debut,date_cloture,anonyme,confidentialite,resultats_visibles,une_reponse_par_compte,modification_autorisee,cible_roles,photos_json,pdf_b64,pdf_nom,video_url,statut)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(me.id,titre,description,objectif,categorie||'autre',type,ville,pays,region,departement,rayon_publication||'national',date_debut,date_cloture,anonyme?1:0,confidentialite||'anonyme',resultats_visibles||'apres_cloture',une_reponse_par_compte?1:1,modification_autorisee?1:0,JSON.stringify(cible_roles||[]),JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,video_url||null,statut);
       const sid = Number(r.lastInsertRowid);
       // Insérer les questions
       for (let i = 0; i < questions.length; i++) {
         const q2 = questions[i];
-        db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+        await db.prepare(`INSERT INTO sondage_questions(sondage_id,texte,type,options_json,obligatoire,ordre,description,min_label,max_label,min_val,max_val) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
           .run(sid,q2.texte,q2.type||'choix_unique',JSON.stringify(q2.options||[]),q2.obligatoire?1:1,i,q2.description||null,q2.min_label||null,q2.max_label||null,q2.min_val||1,q2.max_val||5);
       }
       // Publication dans le fil si statut=ouvert
       if (statut === 'ouvert') {
         if (await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
-          const fp = db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
+          const fp = await db.prepare(`INSERT INTO fil_posts(user_id,contenu,pub_type,original_post_id) VALUES(?,?,?,?)`)
             .run(me.id,`📊 Sondage — ${titre}`,'sondage',sid);
-          await db.prepare(`UPDATE sondages SET fil_post_id=? WHERE id=?`).run(Number(fp.lastInsertRowid), sid);
+          await (await db.prepare(`UPDATE sondages SET fil_post_id=? WHERE id=?`).run(Number(fp).lastInsertRowid), sid);
         }
       }
       return sendJSON(res, 201, { id: sid });
@@ -19321,7 +19335,7 @@ ${jsonLd}
       if (!s || (s.createur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const { titre, description, objectif, categorie, date_cloture, statut, rayon_publication, confidentialite, resultats_visibles, photos_json, pdf_b64, pdf_nom, video_url } = body;
       if (pdf_b64 && SEC.isDangerousFile(Buffer.from(String(pdf_b64).split(',').pop(), 'base64'))) return sendJSON(res, 400, { error: 'Fichier PDF invalide.' });
-      db.prepare(`UPDATE sondages SET titre=COALESCE(?,titre),description=COALESCE(?,description),objectif=COALESCE(?,objectif),categorie=COALESCE(?,categorie),date_cloture=COALESCE(?,date_cloture),statut=COALESCE(?,statut),rayon_publication=COALESCE(?,rayon_publication),confidentialite=COALESCE(?,confidentialite),resultats_visibles=COALESCE(?,resultats_visibles),photos_json=COALESCE(?,photos_json),pdf_b64=COALESCE(?,pdf_b64),pdf_nom=COALESCE(?,pdf_nom),video_url=COALESCE(?,video_url) WHERE id=?`)
+      await db.prepare(`UPDATE sondages SET titre=COALESCE(?,titre),description=COALESCE(?,description),objectif=COALESCE(?,objectif),categorie=COALESCE(?,categorie),date_cloture=COALESCE(?,date_cloture),statut=COALESCE(?,statut),rayon_publication=COALESCE(?,rayon_publication),confidentialite=COALESCE(?,confidentialite),resultats_visibles=COALESCE(?,resultats_visibles),photos_json=COALESCE(?,photos_json),pdf_b64=COALESCE(?,pdf_b64),pdf_nom=COALESCE(?,pdf_nom),video_url=COALESCE(?,video_url) WHERE id=?`)
         .run(titre,description,objectif,categorie,date_cloture,statut,rayon_publication,confidentialite,resultats_visibles,photos_json?JSON.stringify(photos_json):null,pdf_b64,pdf_nom,video_url,sid);
       return sendJSON(res, 200, { message: 'Sondage mis à jour.' });
     }
@@ -19358,7 +19372,7 @@ ${jsonLd}
       }
       const { reponses = [] } = body;
       for (const rep of reponses) {
-        db.prepare(`INSERT INTO sondage_reponses(sondage_id,question_id,user_id,reponse) VALUES(?,?,?,?)`)
+        await db.prepare(`INSERT INTO sondage_reponses(sondage_id,question_id,user_id,reponse) VALUES(?,?,?,?)`)
           .run(sid, rep.question_id, s.anonyme ? null : me.id, JSON.stringify(rep.valeur));
       }
       await db.prepare(`UPDATE sondages SET nb_reponses=nb_reponses+1 WHERE id=?`).run(sid);
@@ -19406,7 +19420,7 @@ ${jsonLd}
       if (existing) {
         if (existing.type === type) { await db.prepare(`DELETE FROM sondage_reactions WHERE sondage_id=? AND user_id=?`).run(sid, me.id); action = 'removed'; }
         else { await db.prepare(`UPDATE sondage_reactions SET type=? WHERE sondage_id=? AND user_id=?`).run(type,sid,me.id); action = 'changed'; }
-      } else { db.prepare(`INSERT INTO sondage_reactions(sondage_id,user_id,type) VALUES(?,?,?)`).run(sid,me.id,type); action = 'added'; }
+      } else { await db.prepare(`INSERT INTO sondage_reactions(sondage_id,user_id,type) VALUES(?,?,?)`).run(sid,me.id,type); action = 'added'; }
       const nb = (await db.prepare(`SELECT COUNT(*) n FROM sondage_reactions WHERE sondage_id=?`).get(sid))?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_reactions=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 200, { action, nb_reactions: nb });
@@ -19428,7 +19442,7 @@ ${jsonLd}
       const sid = parseInt(pathname.split('/')[3]);
       const { contenu, parent_id } = body;
       if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis.' });
-      const r = db.prepare(`INSERT INTO sondage_commentaires(sondage_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(sid,me.id,contenu.trim(),parent_id||null);
+      const r = await db.prepare(`INSERT INTO sondage_commentaires(sondage_id,user_id,contenu,parent_id) VALUES(?,?,?,?)`).run(sid,me.id,contenu.trim(),parent_id||null);
       const nb = (await db.prepare(`SELECT COUNT(*) n FROM sondage_commentaires WHERE sondage_id=?`).get(sid))?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_commentaires=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 201, { id: Number(r.lastInsertRowid), nb_commentaires: nb });
@@ -19441,7 +19455,7 @@ ${jsonLd}
       const existing = await db.prepare(`SELECT id FROM sondage_favoris WHERE sondage_id=? AND user_id=?`).get(sid, me.id);
       let action;
       if (existing) { await db.prepare(`DELETE FROM sondage_favoris WHERE sondage_id=? AND user_id=?`).run(sid,me.id); action='removed'; }
-      else { db.prepare(`INSERT INTO sondage_favoris(sondage_id,user_id) VALUES(?,?)`).run(sid,me.id); action='added'; }
+      else { await db.prepare(`INSERT INTO sondage_favoris(sondage_id,user_id) VALUES(?,?)`).run(sid,me.id); action='added'; }
       const nb = (await db.prepare(`SELECT COUNT(*) n FROM sondage_favoris WHERE sondage_id=?`).get(sid))?.n || 0;
       await db.prepare(`UPDATE sondages SET nb_favoris=? WHERE id=?`).run(nb, sid);
       return sendJSON(res, 200, { action, nb_favoris: nb, est_favori: action === 'added' });
@@ -19475,7 +19489,7 @@ ${jsonLd}
     if (req.method === 'GET' && pathname === '/api/admin/events') {
       const me = await getCurrentUser(req);
       if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
-      const events = db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
+      const events = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
         (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') nb_billets,
         (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') revenu
         FROM events e LEFT JOIN users u ON u.id=e.organisateur_id ORDER BY e.created_at DESC LIMIT 200`).all();
@@ -19539,7 +19553,7 @@ ${jsonLd}
     if (req.method === 'GET' && pathname === '/api/dashboard/financier') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
 
-      const events = db.prepare(`SELECT e.id, e.titre, e.date_debut, e.statut, e.pays, e.ville,
+      const events = await db.prepare(`SELECT e.id, e.titre, e.date_debut, e.statut, e.pays, e.ville,
         (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS nb_billets,
         (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS ca_brut,
         (SELECT COALESCE(SUM(prix_paye-commission),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') AS revenu_net,
@@ -19555,7 +19569,7 @@ ${jsonLd}
 
       const wallet = await db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
 
-      const par_mois = db.prepare(`SELECT strftime('%Y-%m', t.created_at) AS mois,
+      const par_mois = await db.prepare(`SELECT strftime('%Y-%m', t.created_at) AS mois,
         COUNT(*) AS nb, COALESCE(SUM(prix_paye),0) AS ca
         FROM tickets t JOIN events e ON e.id=t.event_id
         WHERE e.organisateur_id=? AND t.payment_status='paid'
@@ -19632,9 +19646,9 @@ ${jsonLd}
 
       // Mise en cache
       try {
-        db.prepare(`INSERT OR REPLACE INTO trust_cache (user_id,score,detail_json,label,computed_at) VALUES (?,?,?,?,datetime('now'))`)
+        await db.prepare(`INSERT OR REPLACE INTO trust_cache (user_id,score,detail_json,label,computed_at) VALUES (?,?,?,?,datetime('now'))`)
           .run(userId, score, JSON.stringify(detail), label);
-        db.prepare(`UPDATE users SET trust_score=?, trust_computed_at=datetime('now') WHERE id=?`).run(score, userId);
+        await db.prepare(`UPDATE users SET trust_score=?, trust_computed_at=datetime('now') WHERE id=?`).run(score, userId);
       } catch(e){}
 
       return { score, detail, label, color };
@@ -19736,7 +19750,7 @@ ${jsonLd}
       const { mode, fin, message } = body;
       const MODES = ['vacances','deplacement','indisponible','mission','conge','autre'];
       if (!MODES.includes(mode)) return sendJSON(res, 400, { error: 'Mode invalide.' });
-      db.prepare(`INSERT OR REPLACE INTO user_absence (user_id,mode,debut,fin,message,updated_at) VALUES (?,?,date('now'),?,?,datetime('now'))`)
+      await db.prepare(`INSERT OR REPLACE INTO user_absence (user_id,mode,debut,fin,message,updated_at) VALUES (?,?,date('now'),?,?,datetime('now'))`)
         .run(me.id, mode, fin||null, message||null);
       return sendJSON(res, 200, { ok: true });
     }
@@ -19775,7 +19789,7 @@ ${jsonLd}
       const existing = await db.prepare(`SELECT id FROM account_reports WHERE reporter_id=? AND reported_id=?`).get(me.id, uid);
       if (existing) return sendJSON(res, 400, { error: 'Vous avez déjà signalé ce compte.' });
 
-      db.prepare(`INSERT INTO account_reports (reporter_id,reported_id,conv_id) VALUES (?,?,?)`).run(me.id, uid, conv.id);
+      await db.prepare(`INSERT INTO account_reports (reporter_id,reported_id,conv_id) VALUES (?,?,?)`).run(me.id, uid, conv.id);
 
       // Auto-action si plusieurs signalements (≥3 en 30 jours)
       const recentCount = (await db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE reported_id=? AND created_at >= datetime('now','-30 days')`).get(uid))?.n;
@@ -19806,7 +19820,7 @@ ${jsonLd}
       const existing = await db.prepare(`SELECT id FROM initiative_reports WHERE reporter_id=? AND initiative_id=? AND created_at >= datetime('now','-30 days')`).get(me.id, iid);
       if (existing) return sendJSON(res, 400, { error: 'Vous avez déjà signalé cette initiative récemment.' });
 
-      db.prepare(`INSERT INTO initiative_reports (reporter_id,initiative_id,motif,description,preuves) VALUES (?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO initiative_reports (reporter_id,initiative_id,motif,description,preuves) VALUES (?,?,?,?,?)`)
         .run(me.id, iid, motif, description||null, JSON.stringify(preuves||[]));
 
       // Auto-compteur
@@ -19848,9 +19862,9 @@ ${jsonLd}
       const { action, note } = body;
       const ACTIONS = ['classe','rappel_envoye','masque','resolu'];
       if (!ACTIONS.includes(action)) return sendJSON(res, 400, { error: 'Action invalide.' });
-      db.prepare(`UPDATE account_reports SET statut=?,admin_id=?,admin_note=?,updated_at=datetime('now') WHERE id=?`)
+      await db.prepare(`UPDATE account_reports SET statut=?,admin_id=?,admin_note=?,updated_at=datetime('now') WHERE id=?`)
         .run(action, me.id, note||null, rid);
-      db.prepare(`INSERT INTO report_history (report_type,report_id,admin_id,admin_nom,action,note) VALUES ('account',?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO report_history (report_type,report_id,admin_id,admin_nom,action,note) VALUES ('account',?,?,?,?,?)`)
         .run(rid, me.id, me.nom, action, note||null);
       // Si masqué : incrémenter signalements_confirmes
       if (action === 'masque') {
@@ -19868,9 +19882,9 @@ ${jsonLd}
       const { action, note } = body;
       const ACTIONS_INIT = ['classe','en_cours','suspendu','masque','transmis'];
       if (!ACTIONS_INIT.includes(action)) return sendJSON(res, 400, { error: 'Action invalide.' });
-      db.prepare(`UPDATE initiative_reports SET statut=?,admin_id=?,admin_note=?,admin_action=?,updated_at=datetime('now') WHERE id=?`)
+      await db.prepare(`UPDATE initiative_reports SET statut=?,admin_id=?,admin_note=?,admin_action=?,updated_at=datetime('now') WHERE id=?`)
         .run(action, me.id, note||null, action, rid);
-      db.prepare(`INSERT INTO report_history (report_type,report_id,admin_id,admin_nom,action,note) VALUES ('initiative',?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO report_history (report_type,report_id,admin_id,admin_nom,action,note) VALUES ('initiative',?,?,?,?,?)`)
         .run(rid, me.id, me.nom, action, note||null);
       if (action === 'suspendu' || action === 'masque') {
         const rep = await db.prepare(`SELECT initiative_id FROM initiative_reports WHERE id=?`).get(rid);
@@ -19892,7 +19906,7 @@ ${jsonLd}
       if (entreprise_verifiee !== undefined) { fields.push(`entreprise_verifiee=${entreprise_verifiee?1:0}`); }
       if (is_verified !== undefined) { fields.push(`is_verified=${is_verified?1:0}`); }
       if (!fields.length) return sendJSON(res, 400, { error: 'Aucun champ fourni.' });
-      db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).run(uid);
+      await db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).run(uid);
       // Invalider le cache trust score
       await db.prepare(`DELETE FROM trust_cache WHERE user_id=?`).run(uid);
       return sendJSON(res, 200, { ok: true });
@@ -20451,9 +20465,9 @@ ${jsonLd}
       if (!dest) return sendJSON(res, 404, { error: "Initiative destinataire introuvable ou non immatriculée." });
       const { message } = body;
       try {
-        const r = db.prepare(`INSERT INTO reseau_affiliations(demandeur_id,destinataire_id,message) VALUES(?,?,?)`).run(myInit.id, destId, message||null);
+        const r = await db.prepare(`INSERT INTO reseau_affiliations(demandeur_id,destinataire_id,message) VALUES(?,?,?)`).run(myInit.id, destId, message||null);
         // Notification au destinataire
-        db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+        await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
           dest.owner_user_id, 'reseau_affiliation',
           `Nouvelle demande d'affiliation`,
           `"${myInit.nom}" souhaite rejoindre votre Réseau Professionnel`,
@@ -20475,12 +20489,12 @@ ${jsonLd}
       if (aff.owner_user_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
       const { statut, reponse, mise_en_avant } = body;
       if (statut) {
-        db.prepare(`UPDATE reseau_affiliations SET statut=?,reponse=COALESCE(?,reponse),updated_at=datetime('now') WHERE id=?`).run(statut, reponse||null, affId);
+        await db.prepare(`UPDATE reseau_affiliations SET statut=?,reponse=COALESCE(?,reponse),updated_at=datetime('now') WHERE id=?`).run(statut, reponse||null, affId);
         // Notification au demandeur
         const demInit = await db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(aff.demandeur_id);
         if (demInit?.owner_user_id) {
           const msgs = { accepte:`Votre demande d'affiliation au réseau "${aff.dest_nom}" a été acceptée !`, refuse:`Votre demande d'affiliation au réseau "${aff.dest_nom}" a été refusée.`, info_demandee:`Des informations complémentaires vous sont demandées pour rejoindre "${aff.dest_nom}".`, suspendu:`Votre affiliation au réseau "${aff.dest_nom}" a été suspendue.` };
-          if (msgs[statut]) db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(demInit.owner_user_id,'reseau_statut',`Réseau professionnel`,msgs[statut],JSON.stringify({affiliation_id:affId}));
+          if (msgs[statut]) await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(demInit.owner_user_id,'reseau_statut',`Réseau professionnel`,msgs[statut],JSON.stringify({affiliation_id:affId}));
         }
       }
       if (mise_en_avant !== undefined) await db.prepare(`UPDATE reseau_affiliations SET mise_en_avant=? WHERE id=?`).run(mise_en_avant?1:0, affId);
@@ -20507,9 +20521,9 @@ ${jsonLd}
       if (myInit.id === targetId) return sendJSON(res, 400, { error: "Impossible de se recommander soi-même." });
       const { contenu } = body;
       try {
-        db.prepare(`INSERT INTO reseau_recommandations(initiative_id,auteur_initiative_id,contenu) VALUES(?,?,?)`).run(targetId, myInit.id, contenu||null);
+        await db.prepare(`INSERT INTO reseau_recommandations(initiative_id,auteur_initiative_id,contenu) VALUES(?,?,?)`).run(targetId, myInit.id, contenu||null);
         const target = await db.prepare(`SELECT owner_user_id, nom FROM initiatives WHERE id=?`).get(targetId);
-        if (target?.owner_user_id) db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(target.owner_user_id,'reseau_reco',`Nouvelle recommandation`,`"${myInit.nom}" a recommandé votre initiative.`,JSON.stringify({init_id:targetId}));
+        if (target?.owner_user_id) await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(target.owner_user_id,'reseau_reco',`Nouvelle recommandation`,`"${myInit.nom}" a recommandé votre initiative.`,JSON.stringify({init_id:targetId}));
         return sendJSON(res, 201, { ok: true });
       } catch(e) {
         if (e.message?.includes('UNIQUE')) return sendJSON(res, 409, { error: "Vous avez déjà recommandé cette initiative." });
@@ -20533,7 +20547,7 @@ ${jsonLd}
       const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
       const { numero_immatriculation, pays_immatriculation, taille_structure, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
-      db.prepare(`UPDATE initiatives SET
+      await db.prepare(`UPDATE initiatives SET
         numero_immatriculation=COALESCE(?,numero_immatriculation),
         pays_immatriculation=COALESCE(?,pays_immatriculation),
         taille_structure=COALESCE(?,taille_structure),
@@ -20564,13 +20578,13 @@ ${jsonLd}
       const { titre, description, type, acces, date_debut, date_fin, ordre_du_jour, enregistrement_active } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: "Titre et date de début requis." });
       const jitsi_room = `diaspoactif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const r = db.prepare(`INSERT INTO reunions(titre,description,type,acces,date_debut,date_fin,ordre_du_jour,enregistrement_active,jitsi_room,organisateur_id)
+      const r = await db.prepare(`INSERT INTO reunions(titre,description,type,acces,date_debut,date_fin,ordre_du_jour,enregistrement_active,jitsi_room,organisateur_id)
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
         titre.trim(), description||null, type||'reunion', acces||'prive',
         date_debut, date_fin||null, ordre_du_jour||null, enregistrement_active?1:0, jitsi_room, me.id
       );
       /* L'organisateur est invité comme coorganisateur + accepté */
-      db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role,statut) VALUES(?,?,?,?)`).run(r.lastInsertRowid, me.id, 'coorganisateur', 'accepte');
+      await (await db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role,statut) VALUES(?,?,?,?)`).run(r).lastInsertRowid, me.id, 'coorganisateur', 'accepte');
       return sendJSON(res, 201, { id: r.lastInsertRowid, jitsi_room });
     }
 
@@ -20644,7 +20658,7 @@ ${jsonLd}
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
       if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
       const { titre, description, date_debut, date_fin, ordre_du_jour, statut } = body;
-      db.prepare(`UPDATE reunions SET titre=COALESCE(?,titre),description=COALESCE(?,description),date_debut=COALESCE(?,date_debut),date_fin=COALESCE(?,date_fin),ordre_du_jour=COALESCE(?,ordre_du_jour),statut=COALESCE(?,statut) WHERE id=?`)
+      await db.prepare(`UPDATE reunions SET titre=COALESCE(?,titre),description=COALESCE(?,description),date_debut=COALESCE(?,date_debut),date_fin=COALESCE(?,date_fin),ordre_du_jour=COALESCE(?,ordre_du_jour),statut=COALESCE(?,statut) WHERE id=?`)
         .run(titre||null, description||null, date_debut||null, date_fin||null, ordre_du_jour||null, statut||null, rid);
       return sendJSON(res, 200, { ok: true });
     }
@@ -20656,7 +20670,7 @@ ${jsonLd}
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
       if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
-      db.prepare(`UPDATE reunions SET statut='en_cours', started_at=datetime('now') WHERE id=?`).run(rid);
+      await db.prepare(`UPDATE reunions SET statut='en_cours', started_at=datetime('now') WHERE id=?`).run(rid);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -20674,7 +20688,7 @@ ${jsonLd}
       /* Marquer quitte_at pour les présents */
       await db.prepare(`UPDATE reunion_invites SET quitte_at=? WHERE reunion_id=? AND quitte_at IS NULL AND rejoint_at IS NOT NULL`).run(now, rid);
       /* Créer résumé brouillon si pas encore */
-      try { db.prepare(`INSERT OR IGNORE INTO reunion_resumes(reunion_id,redacteur_id) VALUES(?,?)`).run(rid, me.id); } catch(e) {}
+      try { await db.prepare(`INSERT OR IGNORE INTO reunion_resumes(reunion_id,redacteur_id) VALUES(?,?)`).run(rid, me.id); } catch(e) {}
       return sendJSON(res, 200, { ok: true, duree_minutes: duree });
     }
 
@@ -20690,10 +20704,10 @@ ${jsonLd}
       let added = 0;
       for (const uid of userIds) {
         try {
-          db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role) VALUES(?,?,?)`).run(rid, uid, role||'participant');
+          await db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role) VALUES(?,?,?)`).run(rid, uid, role||'participant');
           /* Notification */
           const org = await db.prepare(`SELECT prenom,nom FROM users WHERE id=?`).get(me.id);
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             uid, 'reunion_invite', `Invitation à une réunion`,
             `${org?.prenom||''} ${org?.nom||''} vous invite à "${r.titre}"`,
             JSON.stringify({ reunion_id: rid })
@@ -20716,7 +20730,7 @@ ${jsonLd}
         const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
         if (r) {
           try {
-            db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,description,date_debut,date_fin,couleur,type,source_id,source_type)
+            await db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,description,date_debut,date_fin,couleur,type,source_id,source_type)
               VALUES(?,?,?,?,?,?,?,?,?)`).run(
               me.id, `📹 ${r.titre}`, r.description||`Réunion ${r.type}`,
               r.date_debut, r.date_fin||r.date_debut, '#7c3aed', 'reunion', rid, 'reunion'
@@ -20731,7 +20745,7 @@ ${jsonLd}
     if (req.method === "POST" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const rid = parseInt(pathname.split('/')[3]);
-      db.prepare(`UPDATE reunion_invites SET rejoint_at=COALESCE(rejoint_at,datetime('now')),statut='accepte' WHERE reunion_id=? AND user_id=?`).run(rid, me.id);
+      await db.prepare(`UPDATE reunion_invites SET rejoint_at=COALESCE(rejoint_at,datetime('now')),statut='accepte' WHERE reunion_id=? AND user_id=?`).run(rid, me.id);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -20765,7 +20779,7 @@ ${jsonLd}
       const canEdit = r.organisateur_id === me.id || me.role === 'administrateur';
       if (!canEdit) return sendJSON(res, 403, { error: "Accès refusé." });
       const { sujets, decisions: decisionsData, actions, notes } = body;
-      db.prepare(`INSERT INTO reunion_resumes(reunion_id,redacteur_id,sujets,decisions,actions,notes,updated_at)
+      await db.prepare(`INSERT INTO reunion_resumes(reunion_id,redacteur_id,sujets,decisions,actions,notes,updated_at)
         VALUES(?,?,?,?,?,?,datetime('now'))
         ON CONFLICT(reunion_id) DO UPDATE SET sujets=excluded.sujets,decisions=excluded.decisions,actions=excluded.actions,notes=excluded.notes,redacteur_id=excluded.redacteur_id,updated_at=datetime('now')
       `).run(rid, me.id, JSON.stringify(sujets||[]), JSON.stringify(decisionsData||[]), JSON.stringify(actions||[]), notes||null);
@@ -20778,7 +20792,7 @@ ${jsonLd}
       const rid = parseInt(pathname.split('/')[3]);
       const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
       if (!r || (r.organisateur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: "Accès refusé." });
-      db.prepare(`UPDATE reunion_resumes SET statut='valide',valide_at=datetime('now'),valide_par=? WHERE reunion_id=?`).run(me.id, rid);
+      await db.prepare(`UPDATE reunion_resumes SET statut='valide',valide_at=datetime('now'),valide_par=? WHERE reunion_id=?`).run(me.id, rid);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -20795,7 +20809,7 @@ ${jsonLd}
       let sent = 0;
       for (const uid of user_ids) {
         try {
-          db.prepare(`INSERT INTO messages(expediteur_id,destinataire_id,contenu) VALUES(?,?,?)`).run(me.id, uid, contenu);
+          await db.prepare(`INSERT INTO messages(expediteur_id,destinataire_id,contenu) VALUES(?,?,?)`).run(me.id, uid, contenu);
           sent++;
         } catch(e) {}
       }
@@ -20808,18 +20822,18 @@ ${jsonLd}
       const rid = parseInt(pathname.split('/')[3]);
       const { titre, description, responsable_id, type_suivi, echeance } = body;
       if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-      const d = db.prepare(`INSERT INTO reunion_decisions(reunion_id,titre,description,responsable_id,type_suivi,echeance) VALUES(?,?,?,?,?,?)`)
+      const d = await db.prepare(`INSERT INTO reunion_decisions(reunion_id,titre,description,responsable_id,type_suivi,echeance) VALUES(?,?,?,?,?,?)`)
         .run(rid, titre.trim(), description||null, responsable_id||null, type_suivi||'action', echeance||null);
       if (responsable_id) {
         const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
         try {
-          db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
+          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             responsable_id, 'reunion_decision', `Action assignée`,
             `Vous avez été désigné responsable de : "${titre}" (réunion "${r?.titre||'—'}")`,
             JSON.stringify({ reunion_id: rid, decision_id: d.lastInsertRowid })
           );
           if (echeance) {
-            db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,date_debut,couleur,type) VALUES(?,?,?,?,?)`).run(
+            await db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,date_debut,couleur,type) VALUES(?,?,?,?,?)`).run(
               responsable_id, `✅ ${titre}`, echeance.slice(0,10), '#10b981', 'tache'
             );
           }
@@ -20833,7 +20847,7 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const did = parseInt(pathname.split('/')[3]);
       const { statut, echeance } = body;
-      db.prepare(`UPDATE reunion_decisions SET statut=COALESCE(?,statut),echeance=COALESCE(?,echeance) WHERE id=?`).run(statut||null, echeance||null, did);
+      await db.prepare(`UPDATE reunion_decisions SET statut=COALESCE(?,statut),echeance=COALESCE(?,echeance) WHERE id=?`).run(statut||null, echeance||null, did);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -20889,7 +20903,7 @@ ${jsonLd}
       const { name, slug, icon, url, enabled, sort_order, show_on, category } = body;
       if (!name || !slug || !icon) return sendJSON(res, 400, { error: "name, slug et icon requis." });
       try {
-        const r = db.prepare(
+        const r = await db.prepare(
           "INSERT INTO da_packages (name,slug,icon,url,enabled,sort_order,show_on,category) VALUES (?,?,?,?,?,?,?,?)"
         ).run(name, slug, icon, url || "", enabled ? 1 : 0, sort_order || 0,
               JSON.stringify(show_on || ["home","footer"]), category || "social");
@@ -20918,7 +20932,7 @@ ${jsonLd}
       if (req.method === "PUT") {
         const body = await readBody(req);
         const { name, icon, url, enabled, sort_order, show_on, category } = body;
-        db.prepare(`UPDATE da_packages SET
+        await db.prepare(`UPDATE da_packages SET
           name=COALESCE(?,name), icon=COALESCE(?,icon), url=COALESCE(?,url),
           enabled=COALESCE(?,enabled), sort_order=COALESCE(?,sort_order),
           show_on=COALESCE(?,show_on), category=COALESCE(?,category),
@@ -20954,7 +20968,7 @@ ${jsonLd}
     }
     // Helper : logguer une action dans le journal du deal
     async function dealLog(deal_id, acteur_id, acteur_nom, action, detail) {
-      db.prepare("INSERT INTO deal_history (deal_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)").run(deal_id, acteur_id, acteur_nom, action, detail||null);
+      await db.prepare("INSERT INTO deal_history (deal_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)").run(deal_id, acteur_id, acteur_nom, action, detail||null);
     }
 
     /* ── ADMIN : accréditation Gérer un Deal ── */
@@ -20969,10 +20983,10 @@ ${jsonLd}
       const statut = action === "attribuer" ? "active" : action === "suspendre" ? "suspendue" : "retiree";
       const existing = await db.prepare("SELECT id FROM deal_accreditations WHERE initiative_id=?").get(init_id);
       if (existing) {
-        db.prepare("UPDATE deal_accreditations SET statut=?,admin_id=?,admin_nom=?,motif=?,updated_at=datetime('now') WHERE initiative_id=?")
+        await db.prepare("UPDATE deal_accreditations SET statut=?,admin_id=?,admin_nom=?,motif=?,updated_at=datetime('now') WHERE initiative_id=?")
           .run(statut, admin.id, admin.nom, body.motif||null, init_id);
       } else {
-        db.prepare("INSERT INTO deal_accreditations (initiative_id,statut,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
+        await db.prepare("INSERT INTO deal_accreditations (initiative_id,statut,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
           .run(init_id, statut, admin.id, admin.nom, body.motif||null);
       }
       const owner = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(init_id);
@@ -20987,7 +21001,7 @@ ${jsonLd}
     if (req.method === "GET" && pathname === "/api/admin/deals") {
       const admin = await getCurrentUser(req);
       if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-      const deals = db.prepare(`SELECT d.*,i.nom as createur_nom,
+      const deals = await db.prepare(`SELECT d.*,i.nom as createur_nom,
         (SELECT COUNT(*) FROM deal_participants dp WHERE dp.deal_id=d.id AND dp.statut='accepte') as nb_participants
         FROM deals d JOIN initiatives i ON i.id=d.createur_id ORDER BY d.created_at DESC`).all();
       return sendJSON(res, 200, { deals });
@@ -21011,7 +21025,7 @@ ${jsonLd}
         // Création lazy si le seed ne l'a pas encore créée
         const adminUser = await db.prepare("SELECT id FROM users WHERE email='admin@diaspoactif.demo'").get();
         if (!adminUser) return sendJSON(res, 500, { error: "Compte admin introuvable." });
-        const r2 = db.prepare(`INSERT INTO initiatives
+        const r2 = await db.prepare(`INSERT INTO initiatives
           (nom,slug,domaine,type,pays,ville,description,mission,owner_user_id,abonnement_actif)
           VALUES (?,?,?,?,?,?,?,?,?,1)`).run(
           "Diaspo'Actif","diaspoactif-platform","diaspora","Organisation","International","Paris",
@@ -21020,13 +21034,13 @@ ${jsonLd}
           adminUser.id
         );
         daInit = { id: Number(r2.lastInsertRowid) };
-        db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
+        await db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
       }
       // S'assurer que l'accréditation deal existe toujours
-      db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
+      await db.prepare("INSERT OR IGNORE INTO deal_accreditations (initiative_id,statut,admin_nom,motif) VALUES (?,'active','Système','Initiative officielle Diaspo''Actif')").run(daInit.id);
 
       if (req.method === "GET") {
-        const deals = db.prepare(`SELECT d.*, i.nom as createur_nom,
+        const deals = await db.prepare(`SELECT d.*, i.nom as createur_nom,
           dp.statut as ma_participation,
           (SELECT COUNT(*) FROM deal_participants p WHERE p.deal_id=d.id AND p.statut='accepte') as nb_participants
           FROM deals d
@@ -21040,19 +21054,19 @@ ${jsonLd}
         const body = await readBody(req);
         const { titre, description, objectif, categorie, confidentialite, date_debut, date_fin_prev, invites } = body;
         if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-        const r = db.prepare(`INSERT INTO deals (titre,description,objectif,categorie,confidentialite,createur_id,date_debut,date_fin_prev,statut)
+        const r = await db.prepare(`INSERT INTO deals (titre,description,objectif,categorie,confidentialite,createur_id,date_debut,date_fin_prev,statut)
           VALUES (?,?,?,?,?,?,?,?,'brouillon')`).run(
           titre, description||null, objectif||null,
           categorie||'partenariat', confidentialite||'prive',
           daInit.id, date_debut||null, date_fin_prev||null
         );
         const dealId = Number(r.lastInsertRowid);
-        db.prepare("INSERT INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'createur','accepte')").run(dealId, daInit.id);
+        await db.prepare("INSERT INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'createur','accepte')").run(dealId, daInit.id);
         const inviteList = Array.isArray(invites) ? invites.filter(Boolean) : [];
         for (const iid of inviteList) {
           const inv = await db.prepare("SELECT id FROM initiatives WHERE id=?").get(iid);
           if (inv) {
-            db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut,message_inv) VALUES (?,?,'participant','invite',?)")
+            await db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut,message_inv) VALUES (?,?,'participant','invite',?)")
               .run(dealId, iid, body.message_inv||null);
             const owner = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(iid);
             if (owner?.owner_user_id) {
@@ -21074,7 +21088,7 @@ ${jsonLd}
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const myInit = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(me.id);
       if (!myInit) return sendJSON(res, 403, { error: "Compte initiative requis." });
-      const deals = db.prepare(`SELECT d.*,i.nom as createur_nom,
+      const deals = await db.prepare(`SELECT d.*,i.nom as createur_nom,
         dp.statut as ma_participation,
         (SELECT COUNT(*) FROM deal_participants p WHERE p.deal_id=d.id AND p.statut='accepte') as nb_participants
         FROM deals d
@@ -21094,19 +21108,19 @@ ${jsonLd}
       const body = await readBody(req);
       const { titre, description, objectif, categorie, confidentialite, date_debut, date_fin_prev, invites } = body;
       if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-      const r = db.prepare(`INSERT INTO deals (titre,description,objectif,categorie,confidentialite,createur_id,date_debut,date_fin_prev,statut)
+      const r = await db.prepare(`INSERT INTO deals (titre,description,objectif,categorie,confidentialite,createur_id,date_debut,date_fin_prev,statut)
         VALUES (?,?,?,?,?,?,?,?,'brouillon')`).run(titre, description||null, objectif||null,
         categorie||'partenariat', confidentialite||'prive', myInit.id, date_debut||null, date_fin_prev||null);
       const dealId = Number(r.lastInsertRowid);
       // Ajouter le créateur comme participant accepté
-      db.prepare("INSERT INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'createur','accepte')").run(dealId, myInit.id);
+      await db.prepare("INSERT INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'createur','accepte')").run(dealId, myInit.id);
       dealLog(dealId, me.id, myInit.nom, "creation", `Deal créé par ${myInit.nom}`);
       // Envoyer les invitations
       if (Array.isArray(invites)) {
         invites.forEach(async invId => {
           const inv = await db.prepare("SELECT id,nom,owner_user_id FROM initiatives WHERE id=?").get(invId);
           if (!inv || inv.id === myInit.id) return;
-          db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'participant','invite')").run(dealId, inv.id);
+          await db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut) VALUES (?,?,'participant','invite')").run(dealId, inv.id);
           dealLog(dealId, me.id, myInit.nom, "invitation", `${inv.nom} invitée`);
           if (inv.owner_user_id) {
             creerNotif(inv.owner_user_id, "deal", `🤝 Invitation au Deal « ${titre} »`,
@@ -21152,7 +21166,7 @@ ${jsonLd}
       const part = await db.prepare("SELECT role FROM deal_participants WHERE deal_id=? AND initiative_id=? AND statut='accepte'").get(did, myInit.id);
       if (!part || (part.role !== 'createur' && me.role !== 'administrateur')) return sendJSON(res, 403, { error: "Seul le créateur peut modifier ce deal." });
       const body = await readBody(req);
-      db.prepare(`UPDATE deals SET titre=COALESCE(?,titre),description=COALESCE(?,description),
+      await db.prepare(`UPDATE deals SET titre=COALESCE(?,titre),description=COALESCE(?,description),
         objectif=COALESCE(?,objectif),categorie=COALESCE(?,categorie),
         date_debut=COALESCE(?,date_debut),date_fin_prev=COALESCE(?,date_fin_prev),updated_at=datetime('now') WHERE id=?`)
         .run(body.titre||null,body.description||null,body.objectif||null,body.categorie||null,body.date_debut||null,body.date_fin_prev||null,did);
@@ -21174,11 +21188,11 @@ ${jsonLd}
       if (part.statut !== "invite") return sendJSON(res, 400, { error: "Invitation déjà traitée." });
       const accepte = body.reponse === "accepter";
       const nouveauStatut = accepte ? "accepte" : "refuse";
-      db.prepare("UPDATE deal_participants SET statut=?,repondu_at=datetime('now') WHERE deal_id=? AND initiative_id=?").run(nouveauStatut, did, myInit.id);
+      await db.prepare("UPDATE deal_participants SET statut=?,repondu_at=datetime('now') WHERE deal_id=? AND initiative_id=?").run(nouveauStatut, did, myInit.id);
       dealLog(did, me.id, myInit.nom, accepte ? "acceptation" : "refus", `${myInit.nom} ${accepte ? "a rejoint" : "a décliné"} le deal`);
       // Si tout le monde a répondu → passer en actif
       const pending = (await db.prepare("SELECT COUNT(*) as n FROM deal_participants WHERE deal_id=? AND statut='invite'").get(did))?.n;
-      if (pending === 0 && accepte) db.prepare("UPDATE deals SET statut='actif',updated_at=datetime('now') WHERE id=? AND statut='en_attente'").run(did);
+      if (pending === 0 && accepte) await db.prepare("UPDATE deals SET statut='actif',updated_at=datetime('now') WHERE id=? AND statut='en_attente'").run(did);
       return sendJSON(res, 200, { ok: true, statut: nouveauStatut });
     }
 
@@ -21195,7 +21209,7 @@ ${jsonLd}
       const invId = body.initiative_id;
       const inv = await db.prepare("SELECT id,nom,owner_user_id FROM initiatives WHERE id=?").get(invId);
       if (!inv) return sendJSON(res, 404, { error: "Initiative introuvable." });
-      db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut,message_inv) VALUES (?,?,'participant','invite',?)").run(did, inv.id, body.message||null);
+      await db.prepare("INSERT OR IGNORE INTO deal_participants (deal_id,initiative_id,role,statut,message_inv) VALUES (?,?,'participant','invite',?)").run(did, inv.id, body.message||null);
       dealLog(did, me.id, myInit.nom, "invitation", `${inv.nom} invitée`);
       const deal = await db.prepare("SELECT titre FROM deals WHERE id=?").get(did);
       if (inv.owner_user_id) creerNotif(inv.owner_user_id, "deal", `🤝 Invitation au Deal « ${deal.titre} »`,
@@ -21218,9 +21232,9 @@ ${jsonLd}
         const body = await readBody(req);
         if (!body.contenu) return sendJSON(res, 400, { error: "Contenu requis." });
         const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
-        db.prepare("INSERT INTO deal_messages (deal_id,auteur_id,auteur_nom,contenu,type) VALUES (?,?,?,?,?)")
+        await db.prepare("INSERT INTO deal_messages (deal_id,auteur_id,auteur_nom,contenu,type) VALUES (?,?,?,?,?)")
           .run(did, me.id, myInit?.nom||me.nom, body.contenu, body.type||'message');
-        db.prepare("UPDATE deals SET updated_at=datetime('now') WHERE id=?").run(did);
+        await db.prepare("UPDATE deals SET updated_at=datetime('now') WHERE id=?").run(did);
         dealLog(did, me.id, myInit?.nom||me.nom, "message", null);
         return sendJSON(res, 201, { ok: true });
       }
@@ -21239,7 +21253,7 @@ ${jsonLd}
       if (req.method === "POST") {
         const body = await readBody(req);
         const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
-        const r = db.prepare("INSERT INTO deal_tasks (deal_id,titre,description,assignee_id,priorite,date_echeance,created_by) VALUES (?,?,?,?,?,?,?)")
+        const r = await db.prepare("INSERT INTO deal_tasks (deal_id,titre,description,assignee_id,priorite,date_echeance,created_by) VALUES (?,?,?,?,?,?,?)")
           .run(did, body.titre, body.description||null, body.assignee_id||null, body.priorite||'normale', body.date_echeance||null, me.id);
         dealLog(did, me.id, myInit?.nom||me.nom, "tache_creee", `Tâche : ${body.titre}`);
         return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
@@ -21255,7 +21269,7 @@ ${jsonLd}
       const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
       if (req.method === "PUT") {
         const body = await readBody(req);
-        db.prepare(`UPDATE deal_tasks SET titre=COALESCE(?,titre),description=COALESCE(?,description),
+        await db.prepare(`UPDATE deal_tasks SET titre=COALESCE(?,titre),description=COALESCE(?,description),
           statut=COALESCE(?,statut),priorite=COALESCE(?,priorite),assignee_id=COALESCE(?,assignee_id),
           date_echeance=COALESCE(?,date_echeance),updated_at=datetime('now') WHERE id=? AND deal_id=?`)
           .run(body.titre||null,body.description||null,body.statut||null,body.priorite||null,body.assignee_id||null,body.date_echeance||null,tid,did);
@@ -21283,7 +21297,7 @@ ${jsonLd}
         const body = await readBody(req);
         if (!body.nom || !body.contenu_b64) return sendJSON(res, 400, { error: "Nom et contenu requis." });
         const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
-        db.prepare("INSERT INTO deal_documents (deal_id,dossier,nom,type_mime,taille,contenu_b64,uploaded_by) VALUES (?,?,?,?,?,?,?)")
+        await db.prepare("INSERT INTO deal_documents (deal_id,dossier,nom,type_mime,taille,contenu_b64,uploaded_by) VALUES (?,?,?,?,?,?,?)")
           .run(did, body.dossier||'/', body.nom, body.type_mime||null, body.taille||0, body.contenu_b64, me.id);
         dealLog(did, me.id, myInit?.nom||me.nom, "document_ajoute", `Document : ${body.nom}`);
         return sendJSON(res, 201, { ok: true });
@@ -21324,7 +21338,7 @@ ${jsonLd}
       if (req.method === "POST") {
         const body = await readBody(req);
         const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
-        const r = db.prepare("INSERT INTO deal_notes (deal_id,titre,contenu,type,auteur_id,auteur_nom) VALUES (?,?,?,?,?,?)")
+        const r = await db.prepare("INSERT INTO deal_notes (deal_id,titre,contenu,type,auteur_id,auteur_nom) VALUES (?,?,?,?,?,?)")
           .run(did, body.titre||'Sans titre', body.contenu||'', body.type||'note', me.id, myInit?.nom||me.nom);
         dealLog(did, me.id, myInit?.nom||me.nom, "note_creee", `Note : ${body.titre||'Sans titre'}`);
         return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
@@ -21338,7 +21352,7 @@ ${jsonLd}
       const [, did, nid] = dealNoteItem;
       if (!isDealMember(did, me)) return sendJSON(res, 403, { error: "Accès refusé." });
       const body = await readBody(req);
-      db.prepare("UPDATE deal_notes SET titre=COALESCE(?,titre),contenu=COALESCE(?,contenu),updated_at=datetime('now') WHERE id=? AND deal_id=?")
+      await db.prepare("UPDATE deal_notes SET titre=COALESCE(?,titre),contenu=COALESCE(?,contenu),updated_at=datetime('now') WHERE id=? AND deal_id=?")
         .run(body.titre||null, body.contenu!==undefined?body.contenu:null, nid, did);
       return sendJSON(res, 200, { ok: true });
     }
@@ -21357,7 +21371,7 @@ ${jsonLd}
         const body = await readBody(req);
         const myInit = await db.prepare("SELECT id,nom FROM initiatives WHERE owner_user_id=?").get(me.id);
         if (!body.titre || !body.date_debut) return sendJSON(res, 400, { error: "Titre et date_debut requis." });
-        const r = db.prepare("INSERT INTO deal_events (deal_id,titre,description,type,date_debut,date_fin,created_by) VALUES (?,?,?,?,?,?,?)")
+        const r = await db.prepare("INSERT INTO deal_events (deal_id,titre,description,type,date_debut,date_fin,created_by) VALUES (?,?,?,?,?,?,?)")
           .run(did, body.titre, body.description||null, body.type||'reunion', body.date_debut, body.date_fin||null, me.id);
         dealLog(did, me.id, myInit?.nom||me.nom, "evenement_ajoute", `${body.type||'reunion'} : ${body.titre}`);
         return sendJSON(res, 201, { ok: true, id: Number(r.lastInsertRowid) });
@@ -21394,7 +21408,7 @@ ${jsonLd}
       const part = await db.prepare("SELECT role FROM deal_participants WHERE deal_id=? AND initiative_id=? AND statut='accepte'").get(did, myInit?.id);
       if ((!part || part.role !== 'createur') && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Seul le créateur peut effectuer cette action." });
       const newStatut = action === 'cloturer' ? 'cloture' : action === 'archiver' ? 'archive' : 'actif';
-      db.prepare("UPDATE deals SET statut=?,updated_at=datetime('now') WHERE id=?").run(newStatut, did);
+      await db.prepare("UPDATE deals SET statut=?,updated_at=datetime('now') WHERE id=?").run(newStatut, did);
       dealLog(did, me.id, myInit?.nom||me.nom, action, `Deal ${action === 'cloturer' ? 'clôturé' : action === 'archiver' ? 'archivé' : 'réactivé'}`);
       return sendJSON(res, 200, { ok: true, statut: newStatut });
     }
@@ -21454,7 +21468,7 @@ ${jsonLd}
       if (req.method === "POST" && objBase) {
         const { titre, responsable_nom, date_limite, progression=0, ordre=0 } = body;
         if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-        const r = db.prepare("INSERT INTO deal_objectifs (deal_id,titre,responsable_nom,date_limite,progression,ordre) VALUES (?,?,?,?,?,?)").run(did,titre,responsable_nom||null,date_limite||null,progression,ordre);
+        const r = await db.prepare("INSERT INTO deal_objectifs (deal_id,titre,responsable_nom,date_limite,progression,ordre) VALUES (?,?,?,?,?,?)").run(did,titre,responsable_nom||null,date_limite||null,progression,ordre);
         dealLog(did, me.id, me.nom, 'objectif_ajouté', titre);
         return sendJSON(res, 201, { ok:true, id:r.lastInsertRowid });
       }
@@ -21469,7 +21483,7 @@ ${jsonLd}
         if (statut!==undefined){sets.push("statut=?");vals.push(statut);}
         if (ordre!==undefined){sets.push("ordre=?");vals.push(ordre);}
         if (!sets.length) return sendJSON(res, 400, { error: "Rien à modifier." });
-        db.prepare(`UPDATE deal_objectifs SET ${sets.join(',')} WHERE id=? AND deal_id=?`).run(...vals,oid,did);
+        await db.prepare(`UPDATE deal_objectifs SET ${sets.join(',')} WHERE id=? AND deal_id=?`).run(...vals,oid,did);
         return sendJSON(res, 200, { ok:true });
       }
       if (req.method === "DELETE" && objItem) {
@@ -21493,7 +21507,7 @@ ${jsonLd}
       if (req.method === "POST" && jalBase) {
         const { titre, description, date_prevue, statut='prevu', ordre=0 } = body;
         if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-        const r = db.prepare("INSERT INTO deal_jalons (deal_id,titre,description,date_prevue,statut,ordre) VALUES (?,?,?,?,?,?)").run(did,titre,description||null,date_prevue||null,statut,ordre);
+        const r = await db.prepare("INSERT INTO deal_jalons (deal_id,titre,description,date_prevue,statut,ordre) VALUES (?,?,?,?,?,?)").run(did,titre,description||null,date_prevue||null,statut,ordre);
         dealLog(did, me.id, me.nom, 'jalon_ajouté', titre);
         return sendJSON(res, 201, { ok:true, id:r.lastInsertRowid });
       }
@@ -21508,7 +21522,7 @@ ${jsonLd}
         if (statut!==undefined){sets.push("statut=?");vals.push(statut);}
         if (ordre!==undefined){sets.push("ordre=?");vals.push(ordre);}
         if (!sets.length) return sendJSON(res, 400, { error: "Rien à modifier." });
-        db.prepare(`UPDATE deal_jalons SET ${sets.join(',')} WHERE id=? AND deal_id=?`).run(...vals,jid,did);
+        await db.prepare(`UPDATE deal_jalons SET ${sets.join(',')} WHERE id=? AND deal_id=?`).run(...vals,jid,did);
         return sendJSON(res, 200, { ok:true });
       }
       if (req.method === "DELETE" && jalItem) {
@@ -21527,7 +21541,7 @@ ${jsonLd}
       const editionIds = editions.map(e => e.id);
       const activeEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
       const laureats = editionIds.length
-        ? db.prepare(`SELECT dml.*, u.nom, u.prenom, u.photo_url, u.banner_url, u.titre_pro, u.ville, u.pays,
+        ? await db.prepare(`SELECT dml.*, u.nom, u.prenom, u.photo_url, u.banner_url, u.titre_pro, u.ville, u.pays,
             dme.label AS edition_label, dme.periode_debut, dme.periode_fin
           FROM deal_master_laureats dml
           JOIN users u ON u.id = dml.user_id
@@ -21589,7 +21603,7 @@ ${jsonLd}
       if (!isMaster) return sendJSON(res, 403, { error: "Réservé aux Deal Masters actifs." });
       const { contenu } = body;
       if (!contenu || contenu.trim().length < 20) return sendJSON(res, 400, { error: "Témoignage trop court (min 20 caractères)." });
-      db.prepare("INSERT INTO deal_master_temoignages (user_id,edition_id,contenu) VALUES (?,?,?)")
+      await db.prepare("INSERT INTO deal_master_temoignages (user_id,edition_id,contenu) VALUES (?,?,?)")
         .run(me.id, isMaster.edition_id, contenu.trim().slice(0, 1000));
       return sendJSON(res, 201, { ok: true });
     }
@@ -21610,7 +21624,7 @@ ${jsonLd}
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const { label, periode_debut, periode_fin, top_pct = 10 } = body;
       if (!label || !periode_debut || !periode_fin) return sendJSON(res, 400, { error: "label, periode_debut, periode_fin requis." });
-      const r = db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'planifiee',?)").run(label, periode_debut, periode_fin, top_pct);
+      const r = await db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'planifiee',?)").run(label, periode_debut, periode_fin, top_pct);
       return sendJSON(res, 201, { id: r.lastInsertRowid });
     }
 
@@ -21667,7 +21681,7 @@ ${jsonLd}
       laureats.forEach((l, i) => insLaureat.run(edId, l.user_id, l.score, i+1, JSON.stringify(l.detail), ed.periode_fin));
       await db.prepare("UPDATE users SET is_deal_master=0, deal_master_edition_id=NULL WHERE is_deal_master=1").run();
       await Promise.all(laureats.map(async l => await db.prepare("UPDATE users SET is_deal_master=1, deal_master_edition_id=? WHERE id=?").run(edId, l.user_id)));
-      db.prepare("UPDATE deal_master_editions SET statut='calculee', nb_laureats=?, calcule_at=datetime('now'), criteres_json=?, updated_at=datetime('now') WHERE id=?")
+      await db.prepare("UPDATE deal_master_editions SET statut='calculee', nb_laureats=?, calcule_at=datetime('now'), criteres_json=?, updated_at=datetime('now') WHERE id=?")
         .run(laureats.length, JSON.stringify(Object.fromEntries(criteres.map(c=>[c.cle,c.poids]))), edId);
       return { nb_scores: scores.length, nb_laureats: laureats.length, top_pct: ed.top_pct };
     }
@@ -21679,8 +21693,8 @@ ${jsonLd}
         for (const ed of expired) {
           if (ed.statut !== 'calculee') _dmScoreEdition(ed.id);
           // Auto-publier
-          db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
-          db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=COALESCE(publie_at,datetime('now')), updated_at=datetime('now') WHERE id=?").run(ed.id);
+          await db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
+          await db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=COALESCE(publie_at,datetime('now')), updated_at=datetime('now') WHERE id=?").run(ed.id);
           // Créer l'édition suivante si elle n'existe pas
           const nextStart = new Date(ed.periode_fin);
           nextStart.setDate(nextStart.getDate() + 1);
@@ -21693,7 +21707,7 @@ ${jsonLd}
           const nextLabel = `Semestre ${nextSem} – ${nextStart.getFullYear()}`;
           const existingNext = await db.prepare("SELECT id FROM deal_master_editions WHERE date(periode_debut)=date(?)").get(ns);
           if (!existingNext) {
-            db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'en_cours',10.0)").run(nextLabel, ns, ne);
+            await db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'en_cours',10.0)").run(nextLabel, ns, ne);
           }
         }
       } catch(e) { /* autorecalcul silencieux */ }
@@ -21721,8 +21735,8 @@ ${jsonLd}
       if (!ed) return sendJSON(res, 404, { error: "Édition introuvable." });
       if (ed.statut !== 'calculee') return sendJSON(res, 400, { error: "L'édition doit être calculée avant publication." });
       // Archiver les autres publiées
-      db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
-      db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(edId);
+      await db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
+      await db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(edId);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -21732,7 +21746,7 @@ ${jsonLd}
       const me = await getCurrentUser(req);
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const { poids, actif, label, description } = body;
-      db.prepare(`UPDATE deal_master_criteres SET
+      await db.prepare(`UPDATE deal_master_criteres SET
         poids=COALESCE(?,poids), actif=COALESCE(?,actif),
         label=COALESCE(?,label), description=COALESCE(?,description),
         updated_at=datetime('now') WHERE cle=?`)
@@ -21898,7 +21912,7 @@ ${jsonLd}
       if (suggestions && suggestions.trim().length > 20) score += 1;
       if (consentement_affichage) score += 1;
       const nomFinal = consentement_affichage ? (nom_affichage || me.nom) : null;
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO temoignages (user_id,note,description,fonctionnalites,points_positifs,suggestions,
           type_usage,consentement_affichage,nom_affichage,pays_utilisateur,role_utilisateur,statut,score_pertinence)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,'en_attente',?)
@@ -21910,7 +21924,7 @@ ${jsonLd}
       `).run(me.id, note || null, description.trim(), JSON.stringify(fonctionnalites || []),
         points_positifs || null, suggestions || null, type_usage || 'personnel',
         consentement_affichage ? 1 : 0, nomFinal, me.pays || null, me.role, score);
-      db.prepare("UPDATE users SET temoignage_statut='fourni', updated_at=datetime('now') WHERE id=?").run(me.id);
+      await db.prepare("UPDATE users SET temoignage_statut='fourni', updated_at=datetime('now') WHERE id=?").run(me.id);
       return sendJSON(res, 201, { ok: true, message: "Merci pour votre témoignage ! Il sera affiché après validation." });
     }
 
@@ -21920,7 +21934,7 @@ ${jsonLd}
       if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
       const body2 = await readBody(req);
       const statut = body2.refus_definitif ? 'refuse' : 'non_demande';
-      db.prepare("UPDATE users SET temoignage_statut=?, temoignage_derniere_demande=datetime('now') WHERE id=?").run(statut, me.id);
+      await db.prepare("UPDATE users SET temoignage_statut=?, temoignage_derniere_demande=datetime('now') WHERE id=?").run(statut, me.id);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -21958,7 +21972,7 @@ ${jsonLd}
       const body2 = await readBody(req);
       const { statut, admin_note } = body2;
       if (!['approuve','rejete','signale'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
-      db.prepare("UPDATE temoignages SET statut=?, admin_id=?, admin_note=?, updated_at=datetime('now') WHERE id=?")
+      await db.prepare("UPDATE temoignages SET statut=?, admin_id=?, admin_note=?, updated_at=datetime('now') WHERE id=?")
         .run(statut, me.id, admin_note || null, tid);
       return sendJSON(res, 200, { ok: true });
     }
@@ -22015,7 +22029,7 @@ ${jsonLd}
       const pid = parseInt(impM[1]);
       const { event_type = "view", source = "homepage" } = body;
       if (!['view','click','contact','profile_visit'].includes(event_type)) return sendJSON(res, 400, { error: "event_type invalide." });
-      db.prepare("INSERT INTO partenaires_impressions (partenaire_id,user_id,event_type,source) VALUES (?,?,?,?)")
+      await db.prepare("INSERT INTO partenaires_impressions (partenaire_id,user_id,event_type,source) VALUES (?,?,?,?)")
         .run(pid, me?.id || null, event_type, source);
       if (event_type === 'click' || event_type === 'profile_visit') {
         await db.prepare("UPDATE partenaires_officiels SET nbr_recommandations=nbr_recommandations+1 WHERE id=?").run(pid);
@@ -22061,7 +22075,7 @@ ${jsonLd}
       if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
       const pid = parseInt(configM[1]);
       const { priorite, mise_en_avant, periode_debut, periode_fin, slogan, cles_matching } = body;
-      db.prepare(`UPDATE partenaires_officiels SET
+      await db.prepare(`UPDATE partenaires_officiels SET
         priorite=COALESCE(?,priorite), mise_en_avant=COALESCE(?,mise_en_avant),
         periode_debut=COALESCE(?,periode_debut), periode_fin=COALESCE(?,periode_fin),
         slogan=COALESCE(?,slogan), cles_matching=COALESCE(?,cles_matching),
@@ -22122,7 +22136,7 @@ ${jsonLd}
       const po = await db.prepare("SELECT id FROM partenaires_officiels WHERE user_id=? AND statut='active'").get(me.id);
       if (!po) return sendJSON(res, 403, { error: "Vous n'êtes pas Partenaire Officiel." });
       const { description_complete, domaines_expertise, pays_intervention, services, site_web, liens_utiles } = body;
-      db.prepare(`UPDATE partenaires_officiels SET
+      await db.prepare(`UPDATE partenaires_officiels SET
         description_complete=COALESCE(?,description_complete),
         domaines_expertise=COALESCE(?,domaines_expertise),
         pays_intervention=COALESCE(?,pays_intervention),
@@ -22199,7 +22213,7 @@ ${jsonLd}
         if (!user_id) return sendJSON(res, 400, { error: "user_id requis." });
         const u = await db.prepare("SELECT id,nom FROM users WHERE id=?").get(user_id);
         if (!u) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
-        db.prepare(`INSERT INTO partenaires_officiels (user_id,statut,domaines_expertise,pays_intervention,services,description_complete,categorie,admin_id,admin_notes,date_expiration)
+        await db.prepare(`INSERT INTO partenaires_officiels (user_id,statut,domaines_expertise,pays_intervention,services,description_complete,categorie,admin_id,admin_notes,date_expiration)
           VALUES (?,?,?,?,?,?,?,?,?,?)
           ON CONFLICT(user_id) DO UPDATE SET statut='active',domaines_expertise=excluded.domaines_expertise,
           pays_intervention=excluded.pays_intervention,services=excluded.services,
@@ -22212,7 +22226,7 @@ ${jsonLd}
           JSON.stringify(services||[]),
           description_complete||null, categorie||'general', me.id, admin_notes||null, date_expiration||null
         );
-        db.prepare("INSERT INTO partenaires_officiels_historique (user_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
+        await db.prepare("INSERT INTO partenaires_officiels_historique (user_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
           .run(user_id, 'attribution', me.id, me.nom, admin_notes||null);
         creerNotif(user_id, "accreditation", "🏅 Partenaire Officiel Diaspo'Actif",
           `Félicitations ! Vous êtes désormais Partenaire Officiel Diaspo'Actif.`, {});
@@ -22229,8 +22243,8 @@ ${jsonLd}
       if (!['active','suspendue','retiree'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
       const po = await db.prepare("SELECT user_id FROM partenaires_officiels WHERE id=?").get(pid);
       if (!po) return sendJSON(res, 404, { error: "Introuvable." });
-      db.prepare("UPDATE partenaires_officiels SET statut=?,updated_at=datetime('now') WHERE id=?").run(statut, pid);
-      db.prepare("INSERT INTO partenaires_officiels_historique (user_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
+      await db.prepare("UPDATE partenaires_officiels SET statut=?,updated_at=datetime('now') WHERE id=?").run(statut, pid);
+      await db.prepare("INSERT INTO partenaires_officiels_historique (user_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?)")
         .run(po.user_id, statut, me.id, me.nom, motif||null);
       const msgs = { suspendue:'Votre statut de Partenaire Officiel a été suspendu.', retiree:'Votre statut de Partenaire Officiel a été retiré.', active:'Votre statut de Partenaire Officiel a été réactivé.' };
       creerNotif(po.user_id, "accreditation", "Partenaire Officiel — Mise à jour", msgs[statut]||'', {});
@@ -22259,11 +22273,11 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
       const { nom_projet, categorie, secteur, pays, resume, description, objectifs, budget_estime, avancement, date_souhaitee, business_plan_id, lettre_accompagnement } = body;
       if (!nom_projet) return sendJSON(res, 400, { error: 'Nom du projet requis.' });
-      const id = db.prepare(`INSERT INTO proj_eval_projets
+      const id = (await db.prepare(`INSERT INTO proj_eval_projets
         (createur_id,nom_projet,categorie,secteur,pays,resume,description,objectifs,budget_estime,avancement,date_souhaitee,business_plan_id,lettre_accompagnement)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(me.id, nom_projet, categorie||null, secteur||null, pays||null, resume||null, description||null, objectifs||null,
-             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null, lettre_accompagnement||null).lastInsertRowid;
+             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null, lettre_accompagnement||null)).lastInsertRowid;
       return sendJSON(res, 201, { id });
     }
 
@@ -22273,7 +22287,7 @@ ${jsonLd}
       const check = await checkProjEvalOwner(req, pid);
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { nom_projet, categorie, secteur, pays, resume, description, objectifs, budget_estime, avancement, date_souhaitee, business_plan_id, lettre_accompagnement } = body;
-      db.prepare(`UPDATE proj_eval_projets SET
+      await db.prepare(`UPDATE proj_eval_projets SET
         nom_projet=COALESCE(?,nom_projet), categorie=COALESCE(?,categorie), secteur=COALESCE(?,secteur), pays=COALESCE(?,pays),
         resume=COALESCE(?,resume), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
         budget_estime=COALESCE(?,budget_estime), avancement=COALESCE(?,avancement), date_souhaitee=COALESCE(?,date_souhaitee),
@@ -22310,16 +22324,16 @@ ${jsonLd}
       for (const d of destinataires) {
         if (!d.user_id) continue;
         try {
-          const did = db.prepare(`INSERT INTO proj_eval_destinataires (projet_id,destinataire_id,type_destinataire) VALUES (?,?,?)`)
-            .run(pid, d.user_id, d.type_destinataire || 'membre').lastInsertRowid;
+          const did = (await db.prepare(`INSERT INTO proj_eval_destinataires (projet_id,destinataire_id,type_destinataire) VALUES (?,?,?)`)
+            .run(pid, d.user_id, d.type_destinataire || 'membre')).lastInsertRowid;
           dossiers.push(did);
-          db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+          await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
             .run(did, check.me.id, check.me.nom, 'projet_recu', `Projet « ${check.projet.nom_projet} » reçu.`);
           creerNotif(d.user_id, 'projet_recu', 'Nouveau projet reçu 📁',
             `${check.me.nom} vous a transmis le projet « ${check.projet.nom_projet} » pour évaluation.`, { destinataire_id: did, projet_id: pid });
         } catch (e) { /* déjà envoyé à ce destinataire (UNIQUE), on ignore silencieusement */ }
       }
-      db.prepare(`UPDATE proj_eval_projets SET statut_global='envoye', updated_at=datetime('now') WHERE id=?`).run(pid);
+      await db.prepare(`UPDATE proj_eval_projets SET statut_global='envoye', updated_at=datetime('now') WHERE id=?`).run(pid);
       return sendJSON(res, 200, { ok: true, dossiers_crees: dossiers.length });
     }
 
@@ -22330,10 +22344,10 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { nom, type_mime, categorie, taille, url_bunny, contenu_b64, duree_secondes } = body;
       if (!nom) return sendJSON(res, 400, { error: 'Nom du document requis.' });
-      const docId = db.prepare(`INSERT INTO proj_eval_documents (projet_id,destinataire_id,nom,type_mime,categorie,taille,url_bunny,contenu_b64,duree_secondes,uploaded_by)
+      const docId = (await db.prepare(`INSERT INTO proj_eval_documents (projet_id,destinataire_id,nom,type_mime,categorie,taille,url_bunny,contenu_b64,duree_secondes,uploaded_by)
         VALUES (?,?,?,?,?,?,?,?,?,?)`)
-        .run(check.dossier.projet_id, did, nom, type_mime||null, categorie||'autre', taille||null, url_bunny||null, contenu_b64||null, duree_secondes||null, check.me.id).lastInsertRowid;
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+        .run(check.dossier.projet_id, did, nom, type_mime||null, categorie||'autre', taille||null, url_bunny||null, contenu_b64||null, duree_secondes||null, check.me.id)).lastInsertRowid;
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'document_ajoute', nom);
       const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
       creerNotif(notifCible, 'projet_document', 'Document ajouté 📎',
@@ -22355,9 +22369,9 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { contenu, fichier } = body;
       if (!contenu && !fichier) return sendJSON(res, 400, { error: 'Message vide.' });
-      const msgId = db.prepare(`INSERT INTO proj_eval_messages (destinataire_id,auteur_id,contenu,fichier_json) VALUES (?,?,?,?)`)
-        .run(did, check.me.id, contenu||null, fichier ? JSON.stringify(fichier) : null).lastInsertRowid;
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+      const msgId = (await db.prepare(`INSERT INTO proj_eval_messages (destinataire_id,auteur_id,contenu,fichier_json) VALUES (?,?,?,?)`)
+        .run(did, check.me.id, contenu||null, fichier ? JSON.stringify(fichier) : null)).lastInsertRowid;
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'message', (contenu||'').slice(0,140));
       const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
       creerNotif(notifCible, 'projet_message', 'Nouveau message 💬',
@@ -22416,7 +22430,7 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       if (check.dossier.statut !== 'recu') return sendJSON(res, 400, { error: 'Ce dossier a déjà été pris en charge.' });
       await db.prepare(`UPDATE proj_eval_destinataires SET statut='en_analyse', pris_en_charge_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(did);
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'statut_change', 'Projet pris en charge — en cours d\'évaluation.');
       creerNotif(check.dossier.createur_id, 'projet_maj', 'Projet pris en charge ✅',
         `${check.me.nom} a pris en charge votre projet « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
@@ -22430,10 +22444,10 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { items, message } = body;
       if (!Array.isArray(items) || !items.length) return sendJSON(res, 400, { error: 'Sélectionnez au moins un document.' });
-      const reqId = db.prepare(`INSERT INTO proj_eval_demandes_documents (destinataire_id,items_json,message) VALUES (?,?,?)`)
-        .run(did, JSON.stringify(items), message || null).lastInsertRowid;
+      const reqId = (await db.prepare(`INSERT INTO proj_eval_demandes_documents (destinataire_id,items_json,message) VALUES (?,?,?)`)
+        .run(did, JSON.stringify(items), message || null)).lastInsertRowid;
       await db.prepare(`UPDATE proj_eval_destinataires SET statut='documents_demandes', updated_at=datetime('now') WHERE id=?`).run(did);
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'statut_change', `Documents complémentaires demandés : ${items.join(', ')}.`);
       creerNotif(check.dossier.createur_id, 'projet_documents_demandes', 'Documents complémentaires demandés 📋',
         `${check.me.nom} demande des documents complémentaires pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
@@ -22449,7 +22463,7 @@ ${jsonLd}
       const clamp = v => v != null ? Math.min(5, Math.max(1, parseInt(v))) : null;
       await db.prepare(`UPDATE proj_eval_destinataires SET note_qualite=?, note_faisabilite=?, note_impact=?, commentaire_eval=?, updated_at=datetime('now') WHERE id=?`)
         .run(clamp(note_qualite), clamp(note_faisabilite), clamp(note_impact), commentaire_eval || null, did);
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'evaluation', `Qualité ${note_qualite||'—'}/5, Faisabilité ${note_faisabilite||'—'}/5, Impact ${note_impact||'—'}/5.`);
       return sendJSON(res, 200, { ok: true });
     }
@@ -22464,7 +22478,7 @@ ${jsonLd}
       if ((decision === 'refuse' || decision === 'amelioration_demandee') && !motif) return sendJSON(res, 400, { error: 'Un motif est obligatoire pour ce choix.' });
       await db.prepare(`UPDATE proj_eval_destinataires SET statut=?, motif_decision=?, decision_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
         .run(decision, motif || null, did);
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'decision', `${decision}${motif ? ' — ' + motif : ''}`);
       const labels = { accepte: 'Projet accepté ✅', refuse: 'Projet refusé ❌', amelioration_demandee: 'Amélioration demandée 🔄' };
       creerNotif(check.dossier.createur_id, 'projet_decision', labels[decision],
@@ -22505,9 +22519,9 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { date_heure, lieu_ou_lien, note } = body;
       if (!date_heure) return sendJSON(res, 400, { error: 'Date et heure requises.' });
-      const rid = db.prepare(`INSERT INTO proj_eval_rendezvous (destinataire_id,propose_par,date_heure,lieu_ou_lien,note) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, date_heure, lieu_ou_lien || null, note || null).lastInsertRowid;
-      db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
+      const rid = (await db.prepare(`INSERT INTO proj_eval_rendezvous (destinataire_id,propose_par,date_heure,lieu_ou_lien,note) VALUES (?,?,?,?,?)`)
+        .run(did, check.me.id, date_heure, lieu_ou_lien || null, note || null)).lastInsertRowid;
+      await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, check.me.nom, 'rendezvous_propose', `Rendez-vous proposé le ${date_heure}.`);
       const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
       creerNotif(notifCible, 'projet_rendezvous', 'Rendez-vous proposé 📅',
@@ -22567,9 +22581,9 @@ ${jsonLd}
       } catch (e) {
         contenu_b64 = data_base64; // Bunny indisponible → repli base64
       }
-      const docId = db.prepare(`INSERT INTO proj_eval_documents (projet_id,destinataire_id,nom,type_mime,categorie,taille,url_bunny,contenu_b64,duree_secondes,uploaded_by)
+      const docId = (await db.prepare(`INSERT INTO proj_eval_documents (projet_id,destinataire_id,nom,type_mime,categorie,taille,url_bunny,contenu_b64,duree_secondes,uploaded_by)
         VALUES (?,?,?,?,?,?,?,?,?,?)`)
-        .run(projet_id, destinataire_id || null, nom, type_mime || null, categorie || 'autre', taille, url_bunny, contenu_b64, duree_secondes || null, me.id).lastInsertRowid;
+        .run(projet_id, destinataire_id || null, nom, type_mime || null, categorie || 'autre', taille, url_bunny, contenu_b64, duree_secondes || null, me.id)).lastInsertRowid;
       return sendJSON(res, 201, { id: docId, url: url_bunny });
     }
 
@@ -22628,12 +22642,12 @@ ${jsonLd}
         return sendJSON(res, 400, { error: 'Nom du partenaire requis.' });
       }
       const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM initiative_partenaires WHERE initiative_id=?`).get(initId)).m;
-      const id = db.prepare(`INSERT INTO initiative_partenaires
+      const id = (await db.prepare(`INSERT INTO initiative_partenaires
         (initiative_id,type,linked_user_id,nom,logo_url,description,type_partenaire,site_web,email,telephone,pays,afficher_contact,ordre)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(initId, type === 'compte' ? 'compte' : 'externe', type === 'compte' ? linked_user_id : null,
              nom || '', logo_url || null, description || null, type_partenaire || null, site_web || null,
-             email || null, telephone || null, pays || null, afficher_contact ? 1 : 0, maxOrdre + 1).lastInsertRowid;
+             email || null, telephone || null, pays || null, afficher_contact ? 1 : 0, maxOrdre + 1)).lastInsertRowid;
       return sendJSON(res, 201, { id });
     }
 
@@ -22645,7 +22659,7 @@ ${jsonLd}
       if (!p) return sendJSON(res, 404, { error: 'Partenaire introuvable.' });
       if (Number(p.owner_user_id) !== Number(me.id)) return sendJSON(res, 403, { error: 'Réservé au propriétaire.' });
       const { nom, logo_url, description, type_partenaire, site_web, email, telephone, pays, afficher_contact } = body;
-      db.prepare(`UPDATE initiative_partenaires SET
+      await db.prepare(`UPDATE initiative_partenaires SET
         nom=COALESCE(?,nom), logo_url=COALESCE(?,logo_url), description=COALESCE(?,description),
         type_partenaire=COALESCE(?,type_partenaire), site_web=COALESCE(?,site_web), email=COALESCE(?,email),
         telephone=COALESCE(?,telephone), pays=COALESCE(?,pays),
@@ -22741,8 +22755,8 @@ route("POST", "/api/asso/demande", async (req, res, params, body) => {
   if (existante) return sendJSON(res, 409, { error: "Une demande est déjà en cours de traitement." });
   const accred = getAssoAccred(user.id);
   if (accred && accred.niveau === niveau) return sendJSON(res, 409, { error: "Vous possédez déjà ce niveau." });
-  const id = db.prepare(`INSERT INTO asso_demandes (user_id,niveau,periodicite,nom_asso,pays,ville,siret,description) VALUES (?,?,?,?,?,?,?,?)`)
-    .run(user.id, niveau, periodicite, nom_asso, pays||null, ville||null, siret||null, description||null).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_demandes (user_id,niveau,periodicite,nom_asso,pays,ville,siret,description) VALUES (?,?,?,?,?,?,?,?)`)
+    .run(user.id, niveau, periodicite, nom_asso, pays||null, ville||null, siret||null, description||null)).lastInsertRowid;
   const admins = await db.prepare(`SELECT id FROM users WHERE role IN ('administrateur','super_administrateur')`).all();
   admins.forEach(a => creerNotif(a.id, "validation", "Demande accréditation association",
     `${user.nom} demande l'accréditation « Association ${niveau === "accreditee" ? "Accréditée" : "Vérifiée"} »`, { demande_id: Number(id) }));
@@ -22781,8 +22795,8 @@ route("POST", "/api/asso/adherents", async (req, res, params, body) => {
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
   const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, type_adhesion = "standard", date_expiration, notes } = body;
   if (!prenom || !nom) return sendJSON(res, 400, { error: "Prénom et nom requis." });
-  const id = db.prepare(`INSERT INTO asso_adherents (asso_user_id,prenom,nom,email,telephone,adresse,pays,date_naissance,nationalite,type_adhesion,date_expiration,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, prenom, nom, email||null, telephone||null, adresse||null, pays||null, date_naissance||null, nationalite||null, type_adhesion, date_expiration||null, notes||null).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_adherents (asso_user_id,prenom,nom,email,telephone,adresse,pays,date_naissance,nationalite,type_adhesion,date_expiration,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, prenom, nom, email||null, telephone||null, adresse||null, pays||null, date_naissance||null, nationalite||null, type_adhesion, date_expiration||null, notes||null)).lastInsertRowid;
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -22794,7 +22808,7 @@ route("PUT", "/api/asso/adherents/:id", async (req, res, params, body) => {
   const adh = await db.prepare(`SELECT * FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
   if (!adh) return sendJSON(res, 404, { error: "Adhérent introuvable." });
   const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, statut, type_adhesion, date_expiration, notes } = body;
-  db.prepare(`UPDATE asso_adherents SET prenom=COALESCE(?,prenom),nom=COALESCE(?,nom),email=COALESCE(?,email),telephone=COALESCE(?,telephone),
+  await db.prepare(`UPDATE asso_adherents SET prenom=COALESCE(?,prenom),nom=COALESCE(?,nom),email=COALESCE(?,email),telephone=COALESCE(?,telephone),
     adresse=COALESCE(?,adresse),pays=COALESCE(?,pays),date_naissance=COALESCE(?,date_naissance),nationalite=COALESCE(?,nationalite),
     statut=COALESCE(?,statut),type_adhesion=COALESCE(?,type_adhesion),date_expiration=COALESCE(?,date_expiration),notes=COALESCE(?,notes),updated_at=datetime('now') WHERE id=?`)
     .run(prenom||null,nom||null,email||null,telephone||null,adresse||null,pays||null,date_naissance||null,nationalite||null,statut||null,type_adhesion||null,date_expiration||null,notes||null,adh.id);
@@ -22835,8 +22849,8 @@ route("POST", "/api/asso/cotisations", async (req, res, params, body) => {
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { adherent_id, intitule, montant, devise = "EUR", periodicite = "annuel", statut = "en_attente", date_echeance, date_paiement, mode_paiement, reference, notes } = body;
   if (!intitule || montant == null) return sendJSON(res, 400, { error: "Intitulé et montant requis." });
-  const id = db.prepare(`INSERT INTO asso_cotisations (asso_user_id,adherent_id,intitule,montant,devise,periodicite,statut,date_echeance,date_paiement,mode_paiement,reference,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, adherent_id||null, intitule, Number(montant), devise, periodicite, statut, date_echeance||null, date_paiement||null, mode_paiement||null, reference||null, notes||null).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_cotisations (asso_user_id,adherent_id,intitule,montant,devise,periodicite,statut,date_echeance,date_paiement,mode_paiement,reference,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, adherent_id||null, intitule, Number(montant), devise, periodicite, statut, date_echeance||null, date_paiement||null, mode_paiement||null, reference||null, notes||null)).lastInsertRowid;
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -22848,7 +22862,7 @@ route("PUT", "/api/asso/cotisations/:id/statut", async (req, res, params, body) 
   const cot = await db.prepare(`SELECT id FROM asso_cotisations WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
   if (!cot) return sendJSON(res, 404, { error: "Cotisation introuvable." });
   const { statut, date_paiement, mode_paiement } = body;
-  db.prepare(`UPDATE asso_cotisations SET statut=COALESCE(?,statut),date_paiement=COALESCE(?,date_paiement),mode_paiement=COALESCE(?,mode_paiement) WHERE id=?`)
+  await db.prepare(`UPDATE asso_cotisations SET statut=COALESCE(?,statut),date_paiement=COALESCE(?,date_paiement),mode_paiement=COALESCE(?,mode_paiement) WHERE id=?`)
     .run(statut||null, date_paiement||null, mode_paiement||null, cot.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -22877,8 +22891,8 @@ route("POST", "/api/asso/finances", async (req, res, params, body) => {
   const { type, categorie, intitule, montant, devise = "EUR", date_op, mode_paiement, piece_justif, notes } = body;
   if (!["recette","depense"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
   if (!intitule || montant == null) return sendJSON(res, 400, { error: "Intitulé et montant requis." });
-  const id = db.prepare(`INSERT INTO asso_finances (asso_user_id,type,categorie,intitule,montant,devise,date_op,mode_paiement,piece_justif,notes) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, type, categorie||null, intitule, Number(montant), devise, date_op||new Date().toISOString().slice(0,10), mode_paiement||null, piece_justif||null, notes||null).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_finances (asso_user_id,type,categorie,intitule,montant,devise,date_op,mode_paiement,piece_justif,notes) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, type, categorie||null, intitule, Number(montant), devise, date_op||new Date().toISOString().slice(0,10), mode_paiement||null, piece_justif||null, notes||null)).lastInsertRowid;
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -22909,8 +22923,8 @@ route("POST", "/api/asso/documents", async (req, res, params, body) => {
   if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
   const { nom, type = "autre", url, taille, acces = "bureau" } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom du document requis." });
-  const id = db.prepare(`INSERT INTO asso_documents (asso_user_id,nom,type,url,taille,acces,created_by) VALUES (?,?,?,?,?,?,?)`)
-    .run(user.id, nom, type, url||null, taille||null, acces, user.id).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_documents (asso_user_id,nom,type,url,taille,acces,created_by) VALUES (?,?,?,?,?,?,?)`)
+    .run(user.id, nom, type, url||null, taille||null, acces, user.id)).lastInsertRowid;
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -22942,8 +22956,8 @@ route("POST", "/api/asso/votes", async (req, res, params, body) => {
   const { titre, description, type = "resolution", options = [], anonyme = true, date_debut, date_fin, quorum = 0 } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (!Array.isArray(options) || options.length < 2) return sendJSON(res, 400, { error: "Au moins 2 options requises." });
-  const id = db.prepare(`INSERT INTO asso_votes (asso_user_id,titre,description,type,options_json,anonyme,date_debut,date_fin,quorum,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, titre, description||null, type, JSON.stringify(options), anonyme?1:0, date_debut||null, date_fin||null, Number(quorum), user.id).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_votes (asso_user_id,titre,description,type,options_json,anonyme,date_debut,date_fin,quorum,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, titre, description||null, type, JSON.stringify(options), anonyme?1:0, date_debut||null, date_fin||null, Number(quorum), user.id)).lastInsertRowid;
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -22981,7 +22995,7 @@ route("POST", "/api/asso/votes/:id/voter", async (req, res, params, body) => {
   const options = JSON.parse(v.options_json || "[]");
   if (!options.includes(choix)) return sendJSON(res, 400, { error: "Option invalide." });
   try {
-    db.prepare(`INSERT INTO asso_votes_reponses (vote_id,adherent_id,choix) VALUES (?,?,?)`)
+    await db.prepare(`INSERT INTO asso_votes_reponses (vote_id,adherent_id,choix) VALUES (?,?,?)`)
       .run(v.id, adherent_id||null, choix);
     sendJSON(res, 201, { ok: true });
   } catch(e) {
@@ -23026,17 +23040,17 @@ route("POST", "/api/admin/asso/demandes/:id/approuver", async (req, res, params,
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const dem = await db.prepare(`SELECT * FROM asso_demandes WHERE id=?`).get(Number(params.id));
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
-  db.prepare(`UPDATE asso_demandes SET statut='approuvee', updated_at=datetime('now') WHERE id=?`).run(dem.id);
+  await db.prepare(`UPDATE asso_demandes SET statut='approuvee', updated_at=datetime('now') WHERE id=?`).run(dem.id);
   const existing = await db.prepare(`SELECT id FROM asso_accreditations WHERE user_id=?`).get(dem.user_id);
   const { date_fin } = body;
   if (existing) {
-    db.prepare(`UPDATE asso_accreditations SET niveau=?,statut='active',periodicite=?,date_debut=date('now'),date_fin=?,admin_id=?,updated_at=datetime('now') WHERE id=?`)
+    await db.prepare(`UPDATE asso_accreditations SET niveau=?,statut='active',periodicite=?,date_debut=date('now'),date_fin=?,admin_id=?,updated_at=datetime('now') WHERE id=?`)
       .run(dem.niveau, dem.periodicite, date_fin||null, user.id, existing.id);
   } else {
-    db.prepare(`INSERT INTO asso_accreditations (user_id,niveau,statut,periodicite,date_debut,date_fin,admin_id) VALUES (?,?,'active',?,date('now'),?,?)`)
+    await db.prepare(`INSERT INTO asso_accreditations (user_id,niveau,statut,periodicite,date_debut,date_fin,admin_id) VALUES (?,?,'active',?,date('now'),?,?)`)
       .run(dem.user_id, dem.niveau, dem.periodicite, date_fin||null, user.id);
   }
-  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,niveau,admin_id) VALUES (?,?,?,?)`)
+  await db.prepare(`INSERT INTO asso_accred_historique (user_id,action,niveau,admin_id) VALUES (?,?,?,?)`)
     .run(dem.user_id, "approuvee", dem.niveau, user.id);
   creerNotif(dem.user_id, "success", "Accréditation accordée",
     `Votre accréditation « Association ${dem.niveau === "accreditee" ? "Accréditée" : "Vérifiée"} » a été approuvée.`);
@@ -23049,8 +23063,8 @@ route("POST", "/api/admin/asso/demandes/:id/refuser", async (req, res, params, b
   const dem = await db.prepare(`SELECT * FROM asso_demandes WHERE id=?`).get(Number(params.id));
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
   const { motif } = body;
-  db.prepare(`UPDATE asso_demandes SET statut='refusee', motif_refus=?, updated_at=datetime('now') WHERE id=?`).run(motif||null, dem.id);
-  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,niveau,admin_id,motif) VALUES (?,?,?,?,?)`)
+  await db.prepare(`UPDATE asso_demandes SET statut='refusee', motif_refus=?, updated_at=datetime('now') WHERE id=?`).run(motif||null, dem.id);
+  await db.prepare(`INSERT INTO asso_accred_historique (user_id,action,niveau,admin_id,motif) VALUES (?,?,?,?,?)`)
     .run(dem.user_id, "refusee", dem.niveau, user.id, motif||null);
   creerNotif(dem.user_id, "alerte", "Demande refusée",
     `Votre demande d'accréditation association a été refusée.${motif ? " Motif : " + motif : ""}`);
@@ -23061,8 +23075,8 @@ route("POST", "/api/admin/asso/:userId/suspendre", async (req, res, params, body
   const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const { motif } = body;
-  db.prepare(`UPDATE asso_accreditations SET statut='suspendue',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
-  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,admin_id,motif) VALUES (?,?,?,?)`).run(Number(params.userId), "suspendue", user.id, motif||null);
+  await db.prepare(`UPDATE asso_accreditations SET statut='suspendue',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
+  await db.prepare(`INSERT INTO asso_accred_historique (user_id,action,admin_id,motif) VALUES (?,?,?,?)`).run(Number(params.userId), "suspendue", user.id, motif||null);
   creerNotif(Number(params.userId), "alerte", "Accréditation suspendue", `Votre accréditation a été suspendue.${motif ? " Motif : " + motif : ""}`);
   sendJSON(res, 200, { ok: true });
 });
@@ -23071,8 +23085,8 @@ route("POST", "/api/admin/asso/:userId/retirer", async (req, res, params, body) 
   const user = await getCurrentUser(req);
   if (!user || !["administrateur","super_administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé." });
   const { motif } = body;
-  db.prepare(`UPDATE asso_accreditations SET statut='retiree',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
-  db.prepare(`INSERT INTO asso_accred_historique (user_id,action,admin_id,motif) VALUES (?,?,?,?)`).run(Number(params.userId), "retiree", user.id, motif||null);
+  await db.prepare(`UPDATE asso_accreditations SET statut='retiree',motif=?,updated_at=datetime('now') WHERE user_id=?`).run(motif||null, Number(params.userId));
+  await db.prepare(`INSERT INTO asso_accred_historique (user_id,action,admin_id,motif) VALUES (?,?,?,?)`).run(Number(params.userId), "retiree", user.id, motif||null);
   creerNotif(Number(params.userId), "alerte", "Accréditation retirée", `Votre accréditation a été retirée.${motif ? " Motif : " + motif : ""}`);
   sendJSON(res, 200, { ok: true });
 });
@@ -23118,7 +23132,7 @@ async function assoGuard(req, res, action) {
 /* Journalisation d'audit (DSL SECURITY.AUDIT_LOGS / FINANCE.AUDIT_TRAIL) */
 async function assoAudit(assoUserId, acteurId, action, entite, entiteId, details) {
   try {
-    db.prepare(`INSERT INTO asso_audit_log (asso_user_id,acteur_id,action,entite,entite_id,details) VALUES (?,?,?,?,?,?)`)
+    await db.prepare(`INSERT INTO asso_audit_log (asso_user_id,acteur_id,action,entite,entite_id,details) VALUES (?,?,?,?,?,?)`)
       .run(assoUserId, acteurId || null, action, entite || null, entiteId || null, details ? JSON.stringify(details) : null);
   } catch (e) { /* l'audit ne doit jamais bloquer l'opération métier */ }
 }
@@ -23148,10 +23162,10 @@ route("PUT", "/api/asso/bank-info", async (req, res, params, body) => {
   if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée par le DSL." });
   const existing = await db.prepare(`SELECT id FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
   if (existing) {
-    db.prepare(`UPDATE asso_bank_info SET holder_name=?,bank_name=?,iban=?,bic=?,devise=?,reference_modele=COALESCE(?,reference_modele),display_to_members=?,instructions=?,updated_at=datetime('now') WHERE asso_user_id=?`)
+    await db.prepare(`UPDATE asso_bank_info SET holder_name=?,bank_name=?,iban=?,bic=?,devise=?,reference_modele=COALESCE(?,reference_modele),display_to_members=?,instructions=?,updated_at=datetime('now') WHERE asso_user_id=?`)
       .run(holder_name, bank_name||null, iban, bic||null, devise, reference_modele||null, display_to_members?1:0, instructions||null, g.user.id);
   } else {
-    db.prepare(`INSERT INTO asso_bank_info (asso_user_id,holder_name,bank_name,iban,bic,devise,reference_modele,display_to_members,instructions) VALUES (?,?,?,?,?,?,COALESCE(?,'COTISATION-{ANNEE}-{PRENOM}-{NOM}'),?,?)`)
+    await db.prepare(`INSERT INTO asso_bank_info (asso_user_id,holder_name,bank_name,iban,bic,devise,reference_modele,display_to_members,instructions) VALUES (?,?,?,?,?,?,COALESCE(?,'COTISATION-{ANNEE}-{PRENOM}-{NOM}'),?,?)`)
       .run(g.user.id, holder_name, bank_name||null, iban, bic||null, devise, reference_modele||null, display_to_members?1:0, instructions||null);
   }
   assoAudit(g.user.id, g.user.id, "bank_info.update", "bank_info", null, { iban: iban.slice(0,8)+"…" });
@@ -23188,7 +23202,7 @@ route("POST", "/api/asso/relances/run", async (req, res, params, body) => {
   if (!DAA.NOTIFICATIONS.PAYMENT_REMINDERS) return sendJSON(res, 200, { ok: true, relances: 0 });
   const canal = (body && body.canal && DAA.isValid("channel", body.canal)) ? String(body.canal).toUpperCase() : "APP";
   const offsets = DAA.reminderOffsets(); // [0,7,15,30,60]
-  const impayees = db.prepare(`SELECT c.*, a.prenom, a.nom, a.da_user_id FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id
+  const impayees = await db.prepare(`SELECT c.*, a.prenom, a.nom, a.da_user_id FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id
     WHERE c.asso_user_id=? AND c.statut IN ('en_attente','en_retard') AND c.date_echeance IS NOT NULL`).all(g.user.id);
   const today = new Date();
   let count = 0;
@@ -23203,7 +23217,7 @@ route("POST", "/api/asso/relances/run", async (req, res, params, body) => {
     if (deja) continue;
     const niveau = DAA.reminderLevelFor(daysLate);
     const message = `Relance ${niveau} — cotisation « ${cot.intitule} » (${cot.montant} ${cot.devise}) en retard de ${daysLate} jour(s).`;
-    db.prepare(`INSERT INTO asso_relances (asso_user_id,cotisation_id,adherent_id,niveau,canal,jours_retard,message) VALUES (?,?,?,?,?,?,?)`)
+    await db.prepare(`INSERT INTO asso_relances (asso_user_id,cotisation_id,adherent_id,niveau,canal,jours_retard,message) VALUES (?,?,?,?,?,?,?)`)
       .run(g.user.id, cot.id, cot.adherent_id, niveau, canal, daysLate, message);
     // Marque la cotisation en retard
     if (cot.statut !== "en_retard") await db.prepare(`UPDATE asso_cotisations SET statut='en_retard' WHERE id=?`).run(cot.id);
@@ -23255,8 +23269,8 @@ route("POST", "/api/asso/budgets", async (req, res, params, body) => {
   if (!categorie || montant_prevu == null) return sendJSON(res, 400, { error: "Catégorie et montant prévu requis." });
   if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée par le DSL." });
   const an = Number(annee) || new Date().getFullYear();
-  const id = db.prepare(`INSERT INTO asso_budgets (asso_user_id,categorie,montant_prevu,devise,annee,notes) VALUES (?,?,?,?,?,?)`)
-    .run(g.user.id, categorie, Number(montant_prevu), devise, an, notes||null).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_budgets (asso_user_id,categorie,montant_prevu,devise,annee,notes) VALUES (?,?,?,?,?,?)`)
+    .run(g.user.id, categorie, Number(montant_prevu), devise, an, notes||null)).lastInsertRowid;
   assoAudit(g.user.id, g.user.id, "budget.create", "budget", Number(id), { categorie, montant_prevu });
   sendJSON(res, 201, { id, ok: true });
 });
@@ -23278,7 +23292,7 @@ route("GET", "/api/asso/finance/rapport", async (req, res, params, body, query) 
   if (!g) return;
   const annee = Number(query.annee) || new Date().getFullYear();
   // Ventilation mensuelle (AUTO_CALCULATIONS)
-  const parMois = db.prepare(`SELECT strftime('%m',date_op) mois,
+  const parMois = await db.prepare(`SELECT strftime('%m',date_op) mois,
       SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes,
       SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses
     FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY mois ORDER BY mois`).all(g.user.id, String(annee));
@@ -23325,7 +23339,7 @@ route("POST", "/api/asso/documents/:id/ocr", async (req, res, params, body) => {
     await db.prepare(`UPDATE asso_doc_meta SET type_detecte=?,ocr_text=?,fournisseur=?,montant_ttc=?,montant_ht=?,tva=?,date_facture=?,num_facture=?,hash_doublon=?,classement=? WHERE document_id=?`)
       .run(type_detecte||null, ocr_text||null, fournisseur||null, montant_ttc!=null?Number(montant_ttc):null, montant_ht!=null?Number(montant_ht):null, tva!=null?Number(tva):null, date_facture||null, num_facture||null, hash||null, classement, doc.id);
   } else {
-    db.prepare(`INSERT INTO asso_doc_meta (document_id,type_detecte,ocr_text,fournisseur,montant_ttc,montant_ht,tva,date_facture,num_facture,hash_doublon,classement) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    await db.prepare(`INSERT INTO asso_doc_meta (document_id,type_detecte,ocr_text,fournisseur,montant_ttc,montant_ht,tva,date_facture,num_facture,hash_doublon,classement) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
       .run(doc.id, type_detecte||null, ocr_text||null, fournisseur||null, montant_ttc!=null?Number(montant_ttc):null, montant_ht!=null?Number(montant_ht):null, tva!=null?Number(tva):null, date_facture||null, num_facture||null, hash||null, classement);
   }
   assoAudit(g.user.id, g.user.id, "document.ocr", "document", doc.id, { fournisseur, num_facture });
@@ -23362,8 +23376,8 @@ route("POST", "/api/asso/assemblees", async (req, res, params, body) => {
   // DSL AUTO_CONVOCATION + AGENDA_GENERATION_AI
   const odj = ordre_du_jour || "1. Émargement et vérification du quorum\n2. Rapport moral du président\n3. Rapport financier du trésorier\n4. Approbation des comptes\n5. Questions diverses\n6. Clôture";
   const convocation = `Convocation — ${titre}\n\nVous êtes convoqué(e) à l'assemblée générale ${type} qui se tiendra le ${date_prevue || "(date à définir)"}${lieu ? " à " + lieu : ""}${lien_visio ? " (visio : " + lien_visio + ")" : ""}.\n\nOrdre du jour :\n${odj}`;
-  const id = db.prepare(`INSERT INTO asso_assemblees (asso_user_id,titre,type,date_prevue,lieu,lien_visio,ordre_du_jour,convocation,quorum_requis,features_json,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(g.user.id, titre, type, date_prevue||null, lieu||null, lien_visio||null, odj, convocation, Number(quorum_requis)||0, JSON.stringify(DAA.GENERAL_ASSEMBLY.FEATURES), g.user.id).lastInsertRowid;
+  const id = (await db.prepare(`INSERT INTO asso_assemblees (asso_user_id,titre,type,date_prevue,lieu,lien_visio,ordre_du_jour,convocation,quorum_requis,features_json,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(g.user.id, titre, type, date_prevue||null, lieu||null, lien_visio||null, odj, convocation, Number(quorum_requis)||0, JSON.stringify(DAA.GENERAL_ASSEMBLY.FEATURES), g.user.id)).lastInsertRowid;
   assoAudit(g.user.id, g.user.id, "assemblee.create", "assemblee", Number(id), { titre });
   sendJSON(res, 201, { id, ok: true, convocation, ordre_du_jour: odj });
 });
@@ -23378,7 +23392,7 @@ route("PUT", "/api/asso/assemblees/:id", async (req, res, params, body) => {
   // DSL QUORUM_CHECK
   let quorum_atteint = null;
   if (presents != null && ag.quorum_requis > 0) quorum_atteint = Number(presents) >= ag.quorum_requis;
-  db.prepare(`UPDATE asso_assemblees SET statut=COALESCE(?,statut),presents=COALESCE(?,presents),pv=COALESCE(?,pv),ordre_du_jour=COALESCE(?,ordre_du_jour),date_prevue=COALESCE(?,date_prevue) WHERE id=?`)
+  await db.prepare(`UPDATE asso_assemblees SET statut=COALESCE(?,statut),presents=COALESCE(?,presents),pv=COALESCE(?,pv),ordre_du_jour=COALESCE(?,ordre_du_jour),date_prevue=COALESCE(?,date_prevue) WHERE id=?`)
     .run(statut||null, presents!=null?Number(presents):null, pv||null, ordre_du_jour||null, date_prevue||null, ag.id);
   assoAudit(g.user.id, g.user.id, "assemblee.update", "assemblee", ag.id, { statut, quorum_atteint });
   sendJSON(res, 200, { ok: true, quorum_atteint });
@@ -23430,7 +23444,7 @@ route("POST", "/api/asso/ai", async (req, res, params, body) => {
     const solde = (b.r||0) - (b.d||0);
     out.resume = `Recettes ${b.r||0} / Dépenses ${b.d||0} → solde ${solde}. ${solde < 0 ? "Attention : trésorerie déficitaire." : "Trésorerie positive."}`;
   } else if (tache === "ENGAGEMENT_PREDICTION" && DAA.AI_ASSISTANT.ENGAGEMENT_PREDICTION) {
-    const risque = db.prepare(`SELECT a.prenom||' '||a.nom nom FROM asso_adherents a WHERE a.asso_user_id=? AND a.statut='actif'
+    const risque = await db.prepare(`SELECT a.prenom||' '||a.nom nom FROM asso_adherents a WHERE a.asso_user_id=? AND a.statut='actif'
       AND NOT EXISTS (SELECT 1 FROM asso_cotisations c WHERE c.adherent_id=a.id AND c.statut='payee' AND c.date_paiement >= date('now','-1 year')) LIMIT 20`).all(uid);
     out.a_risque = risque.map(x => x.nom);
     out.resume = `${risque.length} membre(s) à risque de non-renouvellement (aucun paiement sur 12 mois).`;
@@ -23453,7 +23467,7 @@ route("GET", "/api/asso/subscription", async (req, res) => {
   if (!g) return;
   let sub = await db.prepare(`SELECT * FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
   if (!sub) {
-    db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat) VALUES (?,?, 'TRIAL')`).run(g.user.id, "YEARLY");
+    await db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat) VALUES (?,?, 'TRIAL')`).run(g.user.id, "YEARLY");
     sub = await db.prepare(`SELECT * FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
   }
   // DSL FREE_MODE / UNPAID_STATE : capacités selon l'état
@@ -23475,14 +23489,14 @@ route("POST", "/api/asso/subscription/pay", async (req, res, params, body) => {
   const ech = echeance.toISOString().slice(0, 10);
   const existing = await db.prepare(`SELECT id FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
   if (existing) {
-    db.prepare(`UPDATE asso_subscription SET billing=?,etat='ACTIVE',montant=?,devise=?,date_echeance=?,dernier_paiement=date('now'),updated_at=datetime('now') WHERE asso_user_id=?`)
+    await db.prepare(`UPDATE asso_subscription SET billing=?,etat='ACTIVE',montant=?,devise=?,date_echeance=?,dernier_paiement=date('now'),updated_at=datetime('now') WHERE asso_user_id=?`)
       .run(billing, Number(montant), devise, ech, g.user.id);
   } else {
-    db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat,montant,devise,date_echeance,dernier_paiement) VALUES (?,?, 'ACTIVE',?,?,?,date('now'))`)
+    await db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat,montant,devise,date_echeance,dernier_paiement) VALUES (?,?, 'ACTIVE',?,?,?,date('now'))`)
       .run(g.user.id, billing, Number(montant), devise, ech);
   }
   // BADGE_GRANTED_ON_PAYMENT : (ré)active l'accréditation
-  db.prepare(`UPDATE asso_accreditations SET statut='active',date_fin=?,updated_at=datetime('now') WHERE user_id=?`).run(ech, g.user.id);
+  await db.prepare(`UPDATE asso_accreditations SET statut='active',date_fin=?,updated_at=datetime('now') WHERE user_id=?`).run(ech, g.user.id);
   assoAudit(g.user.id, g.user.id, "subscription.pay", "subscription", null, { billing, montant, devise });
   sendJSON(res, 200, { ok: true, date_echeance: ech });
 });
@@ -23513,7 +23527,7 @@ route("POST", "/api/asso/membre-roles", async (req, res, params, body) => {
   if (existing) {
     await db.prepare(`UPDATE asso_membre_roles SET role=?,role_custom=? WHERE id=?`).run(finalRole, role_custom||null, existing.id);
   } else {
-    db.prepare(`INSERT INTO asso_membre_roles (asso_user_id,da_user_id,role,role_custom) VALUES (?,?,?,?)`).run(g.user.id, Number(da_user_id), finalRole, role_custom||null);
+    await db.prepare(`INSERT INTO asso_membre_roles (asso_user_id,da_user_id,role,role_custom) VALUES (?,?,?,?)`).run(g.user.id, Number(da_user_id), finalRole, role_custom||null);
   }
   assoAudit(g.user.id, g.user.id, "role.assign", "membre_role", Number(da_user_id), { role: finalRole, role_custom });
   sendJSON(res, 200, { ok: true });
@@ -23580,12 +23594,12 @@ route("POST", "/api/admin/accred/definitions", async (req, res, params, body) =>
   if (await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type))
     return sendJSON(res, 409, { error: "Ce type existe déjà." });
 
-  const id = db.prepare(`INSERT INTO accred_definitions
+  const id = (await db.prepare(`INSERT INTO accred_definitions
     (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,fonctionnalite,ordre,created_by)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(type, label, emoji||'', description||'', JSON.stringify(droits||[]),
          couleur||'#6366f1', couleur_bg||'#f5f3ff', couleur_border||'#6366f1', couleur_text||'#3730a3',
-         mod||null, fonctionnalite||null, ordre||0, admin.id).lastInsertRowid;
+         mod||null, fonctionnalite||null, ordre||0, admin.id)).lastInsertRowid;
 
   if (Array.isArray(regles)) {
     const insR = db.prepare("INSERT OR REPLACE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)");
@@ -23662,7 +23676,7 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
     duree_validite_jours: def.duree_validite_jours
   });
 
-  db.prepare(`UPDATE accred_definitions SET
+  await db.prepare(`UPDATE accred_definitions SET
     label=COALESCE(?,label), emoji=COALESCE(?,emoji), description=COALESCE(?,description),
     droits=COALESCE(?,droits), couleur=COALESCE(?,couleur), couleur_bg=COALESCE(?,couleur_bg),
     couleur_border=COALESCE(?,couleur_border), couleur_text=COALESCE(?,couleur_text),
@@ -23708,7 +23722,7 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
 
   /* Journal d'audit */
   const nb_titulaires = (await db.prepare("SELECT COUNT(*) AS n FROM user_accreditations WHERE accred_id=? AND statut='active'").get(params.id))?.n;
-  db.prepare(`INSERT INTO accred_audit_log
+  await db.prepare(`INSERT INTO accred_audit_log
     (accred_id,admin_id,admin_nom,champ,ancienne_valeur,nouvelle_valeur,motif,mode_application,date_application,nb_comptes_impactes)
     VALUES (?,?,?,'definition_complete',?,?,?,?,?,?)`)
     .run(params.id, admin.id, admin.nom, snap_avant, snap_apres, motif||null,
@@ -23718,7 +23732,7 @@ route("PUT", "/api/admin/accred/definitions/:id", async (req, res, params, body)
   if (mode_application === 'tous' && actif !== undefined) {
     /* Si désactivation : retirer l'accred à tous */
     if (!actif) {
-      db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE accred_id=?").run(params.id);
+      await db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE accred_id=?").run(params.id);
     }
   }
 
@@ -23759,7 +23773,7 @@ route("DELETE", "/api/admin/accred/definitions/:id", async (req, res, params, bo
     await db.prepare("DELETE FROM accred_definitions WHERE id=?").run(params.id);
     return sendJSON(res, 200, { ok: true, purged: true, forced: query.force === '1', nbTitulairesSupprimes: query.force==='1'?nbTitulaires:0, nbDemandesSupprimees: query.force==='1'?nbDemandes:0 });
   }
-  db.prepare("UPDATE accred_definitions SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE accred_definitions SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -23789,12 +23803,12 @@ route("PATCH", "/api/admin/accred/demandes/:id/approuver", async (req, res, para
   const _userForTarif = await db.prepare("SELECT role FROM users WHERE id=?").get(dem.user_id);
   const tarif = def?.tarifs?.find(t => _userForTarif && t.role === _userForTarif.role);
   await db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(params.id);
-  db.prepare(`INSERT INTO user_accreditations (user_id,accred_id,statut,admin_id,type_tarif,date_expiration,notes)
+  await db.prepare(`INSERT INTO user_accreditations (user_id,accred_id,statut,admin_id,type_tarif,date_expiration,notes)
     VALUES (?,?,'active',?,?,?,?)
     ON CONFLICT(user_id,accred_id) DO UPDATE SET statut='active',admin_id=?,date_expiration=?,updated_at=datetime('now')`)
     .run(dem.user_id, dem.accred_id, admin.id, tarif?.type_tarif||'gratuit', body.date_expiration||null, body.notes||null,
          admin.id, body.date_expiration||null);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(dem.user_id, dem.accred_id, 'accorde', admin.id, admin.nom, body.motif||null);
   creerNotif(dem.user_id, "validation", "Accréditation accordée !",
     `Félicitations ! Votre accréditation « ${def?.emoji||''} ${def?.label||''} » vient d'être validée.`,
@@ -23817,7 +23831,7 @@ route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params
   const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
   await db.prepare("UPDATE accred_demandes SET statut='refusee',motif_refus=? WHERE id=?").run(body.motif||null, params.id);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(dem.user_id, dem.accred_id, 'refuse', admin.id, admin.nom, body.motif||null);
   const def = await getAccredDef(dem.accred_id);
   creerNotif(dem.user_id, "validation", "Demande d'accréditation non retenue",
@@ -23852,9 +23866,9 @@ route("GET", "/api/admin/accred/users", async (req, res) => {
 route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, res, params, body) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+  await db.prepare("UPDATE user_accreditations SET statut='retiree',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
     .run(params.userId, params.accredId);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(params.userId, params.accredId, 'retire', admin.id, admin.nom, body.motif||null);
   sendJSON(res, 200, { ok: true });
 });
@@ -23863,9 +23877,9 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/retirer", async (req, 
 route("PATCH", "/api/admin/accred/users/:userId/:accredId/suspendre", async (req, res, params, body) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE user_accreditations SET statut='suspendue',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+  await db.prepare("UPDATE user_accreditations SET statut='suspendue',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
     .run(params.userId, params.accredId);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(params.userId, params.accredId, 'suspendu', admin.id, admin.nom, body.motif||null);
   const def = await getAccredDef(params.accredId);
   creerNotif(Number(params.userId), "validation", "Accréditation suspendue",
@@ -23877,9 +23891,9 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/suspendre", async (req
 route("PATCH", "/api/admin/accred/users/:userId/:accredId/geler", async (req, res, params, body) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE user_accreditations SET statut='gelee',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+  await db.prepare("UPDATE user_accreditations SET statut='gelee',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
     .run(params.userId, params.accredId);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(params.userId, params.accredId, 'gele', admin.id, admin.nom, body.motif||null);
   const def = await getAccredDef(params.accredId);
   creerNotif(Number(params.userId), "validation", "Accréditation gelée",
@@ -23891,9 +23905,9 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/geler", async (req, re
 route("PATCH", "/api/admin/accred/users/:userId/:accredId/reactiver", async (req, res, params, body) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE user_accreditations SET statut='active',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+  await db.prepare("UPDATE user_accreditations SET statut='active',updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
     .run(params.userId, params.accredId);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(params.userId, params.accredId, 'reactive', admin.id, admin.nom, body.motif||null);
   const def = await getAccredDef(params.accredId);
   creerNotif(Number(params.userId), "validation", "Accréditation réactivée",
@@ -23905,9 +23919,9 @@ route("PATCH", "/api/admin/accred/users/:userId/:accredId/reactiver", async (req
 route("PATCH", "/api/admin/accred/users/:userId/:accredId/renouveler", async (req, res, params, body) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE user_accreditations SET statut='active',date_expiration=?,updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
+  await db.prepare("UPDATE user_accreditations SET statut='active',date_expiration=?,updated_at=datetime('now') WHERE user_id=? AND accred_id=?")
     .run(body.date_expiration||null, params.userId, params.accredId);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(params.userId, params.accredId, 'renouvele', admin.id, admin.nom, body.motif||null);
   const def = await getAccredDef(params.accredId);
   creerNotif(Number(params.userId), "validation", "Accréditation renouvelée",
@@ -23936,7 +23950,7 @@ route("PATCH", "/api/admin/accred/demandes/:id/statut", async (req, res, params,
   const dem = await db.prepare("SELECT * FROM accred_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
   await db.prepare("UPDATE accred_demandes SET statut=? WHERE id=?").run(body.statut, params.id);
-  db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
     .run(dem.user_id, dem.accred_id, `statut_${body.statut}`, admin.id, admin.nom, body.motif||null);
   const def = await getAccredDef(dem.accred_id);
   const LABELS = { en_cours_analyse: "en cours d'analyse", info_complementaire_demandee: "informations complémentaires demandées", deposee: "déposée" };
@@ -24012,7 +24026,7 @@ async function computeFeatureStates(userId, userRole) {
       if (uf.source === 'accreditation' && f.require_accreditation && f.accred_type) {
         const encoreValide = await hasAccreditation(userId, f.accred_type);
         if (!encoreValide) {
-          try { db.prepare("UPDATE user_features SET statut='locked' WHERE user_id=? AND feature_id=?").run(userId, f.id); } catch(_) {}
+          try { await db.prepare("UPDATE user_features SET statut='locked' WHERE user_id=? AND feature_id=?").run(userId, f.id); } catch(_) {}
           results.push({ ...f, statut: 'locked', source: 'accreditation_revoquee', uf: { ...uf, statut: 'locked' } });
           continue;
         }
@@ -24028,7 +24042,7 @@ async function computeFeatureStates(userId, userRole) {
       // Activer automatiquement si pas encore dans user_features
       if (!uf) {
         try {
-          db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','automatique')")
+          await db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','automatique')")
             .run(userId, f.id);
         } catch(_) {}
       }
@@ -24041,7 +24055,7 @@ async function computeFeatureStates(userId, userRole) {
       if (await hasAccreditation(userId, f.accred_type)) {
         if (!uf) {
           try {
-            db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','accreditation')")
+            await db.prepare("INSERT OR IGNORE INTO user_features (user_id,feature_id,statut,source) VALUES (?,?,'active','accreditation')")
               .run(userId, f.id);
           } catch(_) {}
         }
@@ -24064,7 +24078,7 @@ async function trackFeatureUsage(userId, featureSlug) {
   try {
     const f = await db.prepare("SELECT id FROM features WHERE slug=? AND actif=1").get(featureSlug);
     if (!f) return;
-    db.prepare(`INSERT INTO feature_usage (user_id,feature_id,nb_utilisations,derniere_utilisation)
+    await db.prepare(`INSERT INTO feature_usage (user_id,feature_id,nb_utilisations,derniere_utilisation)
       VALUES (?,?,1,datetime('now'))
       ON CONFLICT(user_id,feature_id) DO UPDATE SET
         nb_utilisations=nb_utilisations+1,
@@ -24094,7 +24108,7 @@ async function runFreezeSuggestionEngine(userId) {
       if (!uf || uf.statut !== 'active') continue;
 
       const niveau = u.inactive_days >= 60 ? 'high' : u.inactive_days >= 40 ? 'medium' : 'low';
-      db.prepare(`INSERT INTO freeze_suggestions (user_id,feature_id,inactive_days,niveau)
+      await db.prepare(`INSERT INTO freeze_suggestions (user_id,feature_id,inactive_days,niveau)
         VALUES (?,?,?,?)
         ON CONFLICT(user_id,feature_id) DO UPDATE SET
           inactive_days=excluded.inactive_days, niveau=excluded.niveau`)
@@ -24118,7 +24132,7 @@ async function runFreezeSuggestionEngine(userId) {
       const featId = (await db.prepare("SELECT id FROM features WHERE slug=?").get(u.slug))?.id;
       if (!featId) continue;
       creerNotif(userId, 'freeze_suggestion', `💡 Simplifiez votre espace`, msg, { feature_slug: u.slug, action: 'freeze_suggestion' });
-      db.prepare("INSERT INTO feature_notification_logs (user_id,feature_id,type,message,semaine_iso) VALUES (?,?,'freeze_suggestion',?,?)")
+      await db.prepare("INSERT INTO feature_notification_logs (user_id,feature_id,type,message,semaine_iso) VALUES (?,?,'freeze_suggestion',?,?)")
         .run(userId, featId, msg, weekIso);
     }
   } catch(_) {}
@@ -24182,11 +24196,11 @@ route("POST", "/api/features/:slug/freeze", async (req, res, params) => {
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
-  db.prepare(`INSERT INTO user_features (user_id,feature_id,statut,source,frozen_at) VALUES (?,?,'frozen','manuel',datetime('now'))
+  await db.prepare(`INSERT INTO user_features (user_id,feature_id,statut,source,frozen_at) VALUES (?,?,'frozen','manuel',datetime('now'))
     ON CONFLICT(user_id,feature_id) DO UPDATE SET statut='frozen', frozen_at=datetime('now')`)
     .run(me.id, f.id);
   // Dismiss la suggestion de gel si elle existait
-  db.prepare("UPDATE freeze_suggestions SET dismissed=1,dismissed_at=datetime('now') WHERE user_id=? AND feature_id=?")
+  await db.prepare("UPDATE freeze_suggestions SET dismissed=1,dismissed_at=datetime('now') WHERE user_id=? AND feature_id=?")
     .run(me.id, f.id);
   sendJSON(res, 200, { ok: true, statut: 'frozen', message: `« ${f.nom} » a été gelée. Vous pouvez la réactiver à tout moment.` });
 });
@@ -24197,7 +24211,7 @@ route("POST", "/api/features/:slug/unfreeze", async (req, res, params) => {
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM features WHERE slug=? AND actif=1").get(params.slug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
-  db.prepare(`INSERT INTO user_features (user_id,feature_id,statut,source,activated_at) VALUES (?,?,'active','manuel',datetime('now'))
+  await db.prepare(`INSERT INTO user_features (user_id,feature_id,statut,source,activated_at) VALUES (?,?,'active','manuel',datetime('now'))
     ON CONFLICT(user_id,feature_id) DO UPDATE SET statut='active', activated_at=datetime('now')`)
     .run(me.id, f.id);
   sendJSON(res, 200, { ok: true, statut: 'active', message: `« ${f.nom} » est de nouveau active.` });
@@ -24235,7 +24249,7 @@ route("POST", "/api/me/freeze-suggestions/:featureSlug/dismiss", async (req, res
   if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT id FROM features WHERE slug=?").get(params.featureSlug);
   if (!f) return sendJSON(res, 404, { error: "Feature inconnue." });
-  db.prepare("UPDATE freeze_suggestions SET dismissed=1,dismissed_at=datetime('now') WHERE user_id=? AND feature_id=?")
+  await db.prepare("UPDATE freeze_suggestions SET dismissed=1,dismissed_at=datetime('now') WHERE user_id=? AND feature_id=?")
     .run(me.id, f.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -24304,7 +24318,7 @@ async function _generateRecommendations(userId, userRole) {
 
       if (!raison || score < 0.5) continue;
 
-      db.prepare(`INSERT INTO feature_recommendations (user_id,feature_id,raison,action,score)
+      await db.prepare(`INSERT INTO feature_recommendations (user_id,feature_id,raison,action,score)
         VALUES (?,?,?,?,?)
         ON CONFLICT(user_id,feature_id) DO UPDATE SET raison=excluded.raison, score=excluded.score`)
         .run(userId, f.id, raison, action, score);
@@ -24336,7 +24350,7 @@ route("POST", "/api/admin/features", async (req, res, params, body) => {
   const { slug, nom, description, categorie, visibilite_defaut, require_accreditation, accred_type,
           roles_acces, emoji, couleur, ordre } = body;
   if (!slug || !nom) return sendJSON(res, 400, { error: "slug et nom requis." });
-  const { lastInsertRowid: id } = db.prepare(`
+  const { lastInsertRowid: id } = await db.prepare(`
     INSERT INTO features (slug,nom,description,categorie,visibilite_defaut,require_accreditation,
       accred_type,roles_acces,emoji,couleur,ordre)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)
@@ -24362,7 +24376,7 @@ route("PUT", "/api/admin/features/:id", async (req, res, params, body) => {
   const n = v => v === undefined ? null : v;
   const { slug, nom, description, categorie, visibilite_defaut, require_accreditation, accred_type,
           roles_acces, emoji, couleur, ordre, actif } = body;
-  db.prepare(`UPDATE features SET
+  await db.prepare(`UPDATE features SET
     slug=COALESCE(?,slug), nom=COALESCE(?,nom), description=COALESCE(?,description),
     categorie=COALESCE(?,categorie), visibilite_defaut=COALESCE(?,visibilite_defaut),
     require_accreditation=COALESCE(?,require_accreditation), accred_type=COALESCE(?,accred_type),
@@ -24380,7 +24394,7 @@ route("PUT", "/api/admin/features/:id", async (req, res, params, body) => {
 route("DELETE", "/api/admin/features/:id", async (req, res, params) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE features SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE features SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -24462,13 +24476,13 @@ route("POST", "/api/accreditations/packs/:id/demande", async (req, res, params, 
   const actifDeja = await db.prepare("SELECT id FROM user_packs WHERE user_id=? AND pack_id=? AND statut='active'").get(me.id, params.id);
   if (actifDeja) return sendJSON(res, 409, { error: "Vous possédez déjà ce pack." });
   if (regle.mode === 'automatique') {
-    db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut) VALUES (?,?,'active')").run(me.id, params.id);
+    await db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut) VALUES (?,?,'active')").run(me.id, params.id);
     _attribuerPackItems(me, params.id);
     creerNotif(me.id, 'pack', `Pack attribué : ${pack.nom}`,
       `Le pack « ${pack.nom} » vous a été attribué automatiquement.`, { pack_id: params.id });
     return sendJSON(res, 200, { ok: true, statut: 'active' });
   }
-  db.prepare("INSERT INTO accred_pack_demandes (user_id,pack_id,message) VALUES (?,?,?)").run(me.id, params.id, body.message||null);
+  await db.prepare("INSERT INTO accred_pack_demandes (user_id,pack_id,message) VALUES (?,?,?)").run(me.id, params.id, body.message||null);
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
   admins.forEach(a => creerNotif(a.id, 'pack_demande', `Demande pack : ${pack.nom}`,
     `${me.nom} demande le pack « ${pack.nom} ».`, { pack_id: params.id, user_id: me.id }));
@@ -24501,7 +24515,7 @@ route("POST", "/api/admin/accred/packs", async (req, res, params, body) => {
   const { nom, description, emoji, couleur, couleur_bg, slug, ordre, date_debut, date_fin, accred_ids, regles, tarifs } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
   const packSlug = slug || nom.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  const { lastInsertRowid: id } = db.prepare(`
+  const { lastInsertRowid: id } = await db.prepare(`
     INSERT INTO accred_packs (nom,description,emoji,couleur,couleur_bg,slug,ordre,date_debut,date_fin,created_by)
     VALUES (?,?,?,?,?,?,?,?,?,?)
   `).run(nom, description||null, emoji||'📦', couleur||'#6366f1', couleur_bg||'#f5f3ff',
@@ -24538,7 +24552,7 @@ route("PUT", "/api/admin/accred/packs/:id", async (req, res, params, body) => {
   const n = v => v === undefined ? null : v;
   const { nom, description, emoji, couleur, couleur_bg, slug, ordre, date_debut, date_fin, actif,
           accred_ids, regles, tarifs, notifier_titulaires } = body;
-  db.prepare(`UPDATE accred_packs SET
+  await db.prepare(`UPDATE accred_packs SET
     nom=COALESCE(?,nom), description=COALESCE(?,description), emoji=COALESCE(?,emoji),
     couleur=COALESCE(?,couleur), couleur_bg=COALESCE(?,couleur_bg), slug=COALESCE(?,slug),
     ordre=COALESCE(?,ordre), date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin),
@@ -24573,7 +24587,7 @@ route("PUT", "/api/admin/accred/packs/:id", async (req, res, params, body) => {
 route("DELETE", "/api/admin/accred/packs/:id", async (req, res, params) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  db.prepare("UPDATE accred_packs SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
+  await db.prepare("UPDATE accred_packs SET actif=0,updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -24597,7 +24611,7 @@ route("PATCH", "/api/admin/accred/packs/demandes/:id/approuver", async (req, res
   const dem = await db.prepare("SELECT * FROM accred_pack_demandes WHERE id=?").get(params.id);
   if (!dem) return sendJSON(res, 404, { error: "Demande introuvable." });
   await db.prepare("UPDATE accred_pack_demandes SET statut='approuvee' WHERE id=?").run(params.id);
-  db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut,admin_id,notes) VALUES (?,?,'active',?,?)")
+  await db.prepare("INSERT OR IGNORE INTO user_packs (user_id,pack_id,statut,admin_id,notes) VALUES (?,?,'active',?,?)")
     .run(dem.user_id, dem.pack_id, admin.id, body.notes||null);
   const user = await db.prepare("SELECT id,nom,email,role FROM users WHERE id=?").get(dem.user_id);
   _attribuerPackItems(user, dem.pack_id);
@@ -24632,7 +24646,7 @@ route("PATCH", "/api/admin/accred/packs/:id/attribuer", async (req, res, params,
   if (!pack) return sendJSON(res, 404, { error: "Pack introuvable." });
   const user = await db.prepare("SELECT id,nom,email,role FROM users WHERE id=?").get(user_id);
   if (!user) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
-  db.prepare("INSERT OR REPLACE INTO user_packs (user_id,pack_id,statut,admin_id) VALUES (?,?,'active',?)").run(user_id, params.id, admin.id);
+  await db.prepare("INSERT OR REPLACE INTO user_packs (user_id,pack_id,statut,admin_id) VALUES (?,?,'active',?)").run(user_id, params.id, admin.id);
   _attribuerPackItems(user, params.id);
   creerNotif(user_id, 'pack', `Pack attribué : ${pack.nom}`,
     `Le pack « ${pack.nom} » vous a été attribué par l'administration.`, { pack_id: params.id });
@@ -24650,7 +24664,7 @@ route("POST", "/api/profil/:id/visit", async (req, res, params) => {
   if (!pid) return sendJSON(res, 400, { error: "id requis." });
   // Ne pas enregistrer les auto-visites
   if (visitor && visitor.id === pid) return sendJSON(res, 200, { ok: true });
-  db.prepare(`INSERT INTO profil_visites (profil_user_id, visiteur_id, visiteur_pays, visiteur_ville, visiteur_role)
+  await db.prepare(`INSERT INTO profil_visites (profil_user_id, visiteur_id, visiteur_pays, visiteur_ville, visiteur_role)
     VALUES (?, ?, ?, ?, ?)`).run(
     pid,
     visitor ? visitor.id : null,
@@ -25059,7 +25073,7 @@ route("POST", "/api/audit-log", async (req, res, params, body) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé." });
   const { action, cible_type, cible_id, detail } = body;
   if (!action) return sendJSON(res, 400, { error: "action requis." });
-  db.prepare("INSERT INTO audit_log (admin_id, action, cible_type, cible_id, detail) VALUES (?,?,?,?,?)").run(user.id, action, cible_type || null, cible_id || null, detail ? JSON.stringify(detail) : null);
+  await db.prepare("INSERT INTO audit_log (admin_id, action, cible_type, cible_id, detail) VALUES (?,?,?,?,?)").run(user.id, action, cible_type || null, cible_id || null, detail ? JSON.stringify(detail) : null);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -25377,7 +25391,7 @@ app.post('/api/conversations/:cid/messages/:mid/reactions', requireAuth, async (
     await db.prepare('DELETE FROM message_reactions WHERE id=?').run(existing.id);
     return sendJSON(res, 200, { action: 'removed', emoji });
   }
-  db.prepare('INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji) VALUES (?,?,?)').run(mid, uid, emoji);
+  await db.prepare('INSERT OR IGNORE INTO message_reactions (message_id, user_id, emoji) VALUES (?,?,?)').run(mid, uid, emoji);
   sendJSON(res, 200, { action: 'added', emoji });
 });
 
@@ -25401,7 +25415,7 @@ app.post('/api/messages/:id/favori', requireAuth, async (req, res) => {
     await db.prepare('DELETE FROM message_favorites WHERE id=?').run(existing.id);
     return sendJSON(res, 200, { favori: false });
   }
-  db.prepare('INSERT OR IGNORE INTO message_favorites (message_id, user_id) VALUES (?,?)').run(mid, uid);
+  await db.prepare('INSERT OR IGNORE INTO message_favorites (message_id, user_id) VALUES (?,?)').run(mid, uid);
   sendJSON(res, 200, { favori: true });
 });
 
@@ -25432,7 +25446,7 @@ app.post('/api/conversations/:cid/messages/:mid/epingle', requireAuth, async (re
     await db.prepare('UPDATE messages SET est_epingle=0 WHERE id=?').run(mid);
     return sendJSON(res, 200, { epingle: false });
   }
-  db.prepare('INSERT OR IGNORE INTO message_epingles (conversation_id, message_id, epingle_par) VALUES (?,?,?)').run(cid, mid, uid);
+  await db.prepare('INSERT OR IGNORE INTO message_epingles (conversation_id, message_id, epingle_par) VALUES (?,?,?)').run(cid, mid, uid);
   await db.prepare('UPDATE messages SET est_epingle=1 WHERE id=?').run(mid);
   sendJSON(res, 200, { epingle: true });
 });
@@ -25506,7 +25520,7 @@ app.post('/api/conversations/:cid/membres', requireAuth, async (req, res) => {
   const isAdmin = await db.prepare('SELECT 1 FROM conversation_members WHERE conversation_id=? AND user_id=? AND role=?').get(cid, uid, 'admin');
   if (!isAdmin) return sendJSON(res, 403, { error: 'Réservé aux admins' });
   try {
-    db.prepare('INSERT OR IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?,?)').run(cid, user_id);
+    await db.prepare('INSERT OR IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?,?)').run(cid, user_id);
     sendJSON(res, 200, { ok: true });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
@@ -25526,7 +25540,7 @@ app.post('/api/profil/portfolio', requireAuth, async (req, res) => {
   const uid = req.user.id;
   const { titre, description, annee, lien, partenaires, resultats, type, images_json, fichiers_json } = req.body;
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const r = db.prepare(`
+  const r = await db.prepare(`
     INSERT INTO user_portfolio (user_id, titre, description, annee, lien, partenaires, resultats, type, images_json, fichiers_json)
     VALUES (?,?,?,?,?,?,?,?,?,?)
   `).run(uid, titre, description||null, annee||null, lien||null, partenaires||null, resultats||null, type||'projet',
@@ -25570,7 +25584,7 @@ app.post('/api/profil/langues', requireAuth, async (req, res) => {
   const { langue, niveau, is_maternelle, certification } = req.body;
   if (!langue) return sendJSON(res, 400, { error: 'Langue requise' });
   try {
-    const r = db.prepare('INSERT OR REPLACE INTO user_langues (user_id, langue, niveau, is_maternelle, certification) VALUES (?,?,?,?,?)')
+    const r = await db.prepare('INSERT OR REPLACE INTO user_langues (user_id, langue, niveau, is_maternelle, certification) VALUES (?,?,?,?,?)')
       .run(uid, langue, niveau||'intermediaire', is_maternelle?1:0, certification||null);
     sendJSON(res, 201, { id: r.lastInsertRowid });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
@@ -25621,7 +25635,7 @@ app.post('/api/profil/:id/recommandations', requireAuth, async (req, res) => {
   const { texte, relation, note } = req.body;
   if (!texte || texte.length < 20) return sendJSON(res, 400, { error: 'Texte trop court (min 20 caractères)' });
   try {
-    db.prepare(`INSERT OR REPLACE INTO user_recommendations (from_user_id, to_user_id, texte, relation, note)
+    await db.prepare(`INSERT OR REPLACE INTO user_recommendations (from_user_id, to_user_id, texte, relation, note)
       VALUES (?,?,?,?,?)`).run(fromId, toId, texte, relation||null, parseInt(note)||5);
     sendJSON(res, 201, { ok: true });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
@@ -25672,7 +25686,7 @@ app.post('/api/formations/suivi', requireAuth, async (req, res) => {
     if (f) formTitre = f.titre;
   }
   if (!formTitre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const r = db.prepare('INSERT INTO user_formations_suivi (user_id, formation_id, titre, organisme) VALUES (?,?,?,?)')
+  const r = await db.prepare('INSERT INTO user_formations_suivi (user_id, formation_id, titre, organisme) VALUES (?,?,?,?)')
     .run(uid, formation_id||null, formTitre, organisme||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
@@ -25700,7 +25714,7 @@ app.post('/api/certifications', requireAuth, async (req, res) => {
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
   const code = 'CERT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2,6).toUpperCase();
   const qr_data = JSON.stringify({ code, titre, organisme, uid, date: date_obtention || new Date().toISOString().slice(0,10) });
-  const r = db.prepare(`INSERT INTO user_certifications_obtenues (user_id, titre, organisme, formation_id, date_obtention, date_expiration, code_verification, qr_data)
+  const r = await db.prepare(`INSERT INTO user_certifications_obtenues (user_id, titre, organisme, formation_id, date_obtention, date_expiration, code_verification, qr_data)
     VALUES (?,?,?,?,?,?,?,?)`).run(uid, titre, organisme||null, formation_id||null, date_obtention||new Date().toISOString().slice(0,10), date_expiration||null, code, qr_data);
   sendJSON(res, 201, { id: r.lastInsertRowid, code_verification: code });
 });
@@ -25785,7 +25799,7 @@ app.post('/api/oz/chat', requireAuth, async (req, res) => {
       msgs.push({ role: 'user', content: message, at: new Date().toISOString() });
       msgs.push({ role: 'oz', content: reply, at: new Date().toISOString() });
       if (msgs.length > 100) msgs.splice(0, msgs.length - 100);
-      db.prepare(`UPDATE oz_conversations SET messages_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(msgs), convId);
+      await db.prepare(`UPDATE oz_conversations SET messages_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(msgs), convId);
     }
   } catch(e) {}
 
@@ -25898,7 +25912,7 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
 app.post('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const body = await parseBody(req);
   const { nom_projet='Sans titre', type_initiative='startup', template='startup', secteur='' } = body;
-  const r = db.prepare(`
+  const r = await db.prepare(`
     INSERT INTO business_plans (user_id, nom_projet, type_initiative, template, secteur, sections_json)
     VALUES (?,?,?,?,?,?)
   `).run(req.user.id, nom_projet, type_initiative, template, secteur, JSON.stringify({
@@ -25937,7 +25951,7 @@ app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
 
   if (sections) await recordFieldHistory(bp.id, req.user.id, currentSections, sections);
 
-  db.prepare(`UPDATE business_plans SET
+  await db.prepare(`UPDATE business_plans SET
     sections_json=?, progression=?,
     nom_projet=COALESCE(?,nom_projet),
     slogan=COALESCE(?,slogan),
@@ -25996,13 +26010,13 @@ app.post('/api/business-plans/:id/versions', requireAuth, requireUtilisateurAbon
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   const newVer = (bp.version || 1) + 1;
-  db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
+  await db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
     bp.id, bp.version, bp.sections_json, req.user.id, `Version ${bp.version}`
   );
-  db.prepare(`UPDATE business_plans SET version=?, updated_at=datetime('now') WHERE id=?`).run(newVer, bp.id);
+  await db.prepare(`UPDATE business_plans SET version=?, updated_at=datetime('now') WHERE id=?`).run(newVer, bp.id);
   // Garder max 20 versions
   const oldVersions = await db.prepare('SELECT id FROM bp_versions WHERE bp_id=? ORDER BY version DESC LIMIT -1 OFFSET 20').all(bp.id);
-  if (oldVersions.length) db.prepare(`DELETE FROM bp_versions WHERE id IN (${oldVersions.map(()=>'?').join(',')})`).run(...oldVersions.map(v=>v.id));
+  if (oldVersions.length) await db.prepare(`DELETE FROM bp_versions WHERE id IN (${oldVersions.map(()=>'?').join(',')})`).run(...oldVersions.map(v=>v.id));
   sendJSON(res, 201, { version: newVer });
 });
 
@@ -26023,10 +26037,10 @@ app.post('/api/business-plans/:id/versions/:v/restore', requireAuth, requireUtil
   const ver = await db.prepare('SELECT * FROM bp_versions WHERE bp_id=? AND version=?').get(req.params.id, req.params.v);
   if (!ver) return sendJSON(res, 404, { error: 'Version introuvable' });
   // Sauvegarder version actuelle avant restauration
-  db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
+  await db.prepare('INSERT INTO bp_versions (bp_id, version, snapshot_json, saved_by, label) VALUES (?,?,?,?,?)').run(
     bp.id, bp.version, bp.sections_json, req.user.id, `Avant restauration v${ver.version}`
   );
-  db.prepare(`UPDATE business_plans SET sections_json=?, version=version+1, updated_at=datetime('now') WHERE id=?`).run(ver.snapshot_json, bp.id);
+  await db.prepare(`UPDATE business_plans SET sections_json=?, version=version+1, updated_at=datetime('now') WHERE id=?`).run(ver.snapshot_json, bp.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -26060,7 +26074,7 @@ app.post('/api/business-plans/:id/collaborateurs', requireAuth, requireUtilisate
   if (!user_id) return sendJSON(res, 400, { error: 'user_id requis' });
   if (!['lecteur','commentateur','editeur','validateur'].includes(role)) return sendJSON(res, 400, { error: 'Rôle invalide' });
   try {
-    db.prepare('INSERT OR REPLACE INTO bp_collaborateurs (bp_id, user_id, role, invite_par) VALUES (?,?,?,?)').run(req.params.id, user_id, role, req.user.id);
+    await db.prepare('INSERT OR REPLACE INTO bp_collaborateurs (bp_id, user_id, role, invite_par) VALUES (?,?,?,?)').run(req.params.id, user_id, role, req.user.id);
     sendJSON(res, 201, { ok: true });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
@@ -26093,7 +26107,7 @@ app.post('/api/business-plans/:id/commentaires/:section', requireAuth, requireUt
   if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
   const { texte } = await parseBody(req);
   if (!texte?.trim()) return sendJSON(res, 400, { error: 'Texte requis' });
-  const r = db.prepare('INSERT INTO bp_commentaires (bp_id, section_key, user_id, texte) VALUES (?,?,?,?)').run(req.params.id, req.params.section, req.user.id, texte.trim());
+  const r = await db.prepare('INSERT INTO bp_commentaires (bp_id, section_key, user_id, texte) VALUES (?,?,?,?)').run(req.params.id, req.params.section, req.user.id, texte.trim());
   sendJSON(res, 201, { id: r.lastInsertRowid, texte: texte.trim() });
 });
 
@@ -26525,9 +26539,9 @@ app.post('/api/business-plans/:id/assistant', requireAuth, requireUtilisateurAbo
   // Garder 50 derniers messages
   const trimmed = msgs.slice(-50);
   if (conv) {
-    db.prepare(`UPDATE bp_assistant_conv SET messages_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(trimmed), conv.id);
+    await db.prepare(`UPDATE bp_assistant_conv SET messages_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(trimmed), conv.id);
   } else {
-    db.prepare('INSERT INTO bp_assistant_conv (bp_id, user_id, messages_json) VALUES (?,?,?)').run(bp.id, req.user.id, JSON.stringify(trimmed));
+    await db.prepare('INSERT INTO bp_assistant_conv (bp_id, user_id, messages_json) VALUES (?,?,?)').run(bp.id, req.user.id, JSON.stringify(trimmed));
   }
 
   sendJSON(res, 200, { response, messages: trimmed });
@@ -26816,7 +26830,7 @@ app.post('/api/bp-simulations', requireAuth, async (req, res) => {
   // Première question
   const firstQ = getSimulationQuestion(scenario, difficulte, bp, sections, 0, null);
   const initMessages = [{ role:'assistant', content:firstQ, ts:new Date().toISOString() }];
-  const r = db.prepare('INSERT INTO bp_simulations (bp_id, user_id, scenario, difficulte, messages_json) VALUES (?,?,?,?,?)').run(bp_id, req.user.id, scenario, difficulte, JSON.stringify(initMessages));
+  const r = await db.prepare('INSERT INTO bp_simulations (bp_id, user_id, scenario, difficulte, messages_json) VALUES (?,?,?,?,?)').run(bp_id, req.user.id, scenario, difficulte, JSON.stringify(initMessages));
   sendJSON(res, 201, { id: r.lastInsertRowid, firstQuestion: firstQ });
 });
 
@@ -26858,7 +26872,7 @@ app.post('/api/bp-simulations/:id/finish', requireAuth, async (req, res) => {
   const body = await parseBody(req);
   const sections = safeJSON(sim.sections_json, {});
   const rapport = await generateSimulationReport(sim, sim, sections);
-  db.prepare("UPDATE bp_simulations SET statut='termine', rapport_json=?, score=?, finished_at=datetime('now'), duree_seconds=? WHERE id=?").run(JSON.stringify(rapport), rapport.score, body.duree_seconds||sim.duree_seconds, sim.id);
+  await db.prepare("UPDATE bp_simulations SET statut='termine', rapport_json=?, score=?, finished_at=datetime('now'), duree_seconds=? WHERE id=?").run(JSON.stringify(rapport), rapport.score, body.duree_seconds||sim.duree_seconds, sim.id);
   sendJSON(res, 200, { rapport });
 });
 
@@ -26908,7 +26922,7 @@ app.post('/api/audiovisuel/lives', requireAuth, async (req, res) => {
   const body = await parseBody(req);
   const { titre, description='', type='conference', acces='public', prix=0, code_acces='', url_stream='', vignette_url='', date_debut, date_fin, tags=[] } = body;
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const r = db.prepare('INSERT INTO av_lives (initiative_id,titre,description,type,acces,prix,code_acces,url_stream,vignette_url,date_debut,date_fin,tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, titre, description, type, acces, prix, code_acces, url_stream, vignette_url, date_debut||null, date_fin||null, JSON.stringify(tags));
+  const r = await db.prepare('INSERT INTO av_lives (initiative_id,titre,description,type,acces,prix,code_acces,url_stream,vignette_url,date_debut,date_fin,tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, titre, description, type, acces, prix, code_acces, url_stream, vignette_url, date_debut||null, date_fin||null, JSON.stringify(tags));
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -26928,7 +26942,7 @@ app.put('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
   const sets = []; const vals = [];
   fields.forEach(async f => { if (body[f] !== undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
   sets.push("updated_at=datetime('now')");
-  db.prepare(`UPDATE av_lives SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
+  await db.prepare(`UPDATE av_lives SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -26978,7 +26992,7 @@ app.post('/api/audiovisuel/lives/:id/chat', requireAuth, async (req, res) => {
   const { message } = body;
   if (!message?.trim()) return sendJSON(res, 400, { error: 'Message vide' });
   const pseudo = `${req.user.prenom||''} ${req.user.nom||''}`.trim() || 'Anonyme';
-  const r = db.prepare('INSERT INTO av_live_chat (live_id, user_id, pseudo, message) VALUES (?,?,?,?)').run(req.params.id, req.user.id, pseudo, message.trim().slice(0,500));
+  const r = await db.prepare('INSERT INTO av_live_chat (live_id, user_id, pseudo, message) VALUES (?,?,?,?)').run(req.params.id, req.user.id, pseudo, message.trim().slice(0,500));
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -27007,7 +27021,7 @@ app.post('/api/audiovisuel/lives/:id/sondages', requireAuth, async (req, res) =>
   const body = await parseBody(req);
   const { question, options=[] } = body;
   if (!question || options.length < 2) return sendJSON(res, 400, { error: 'Question et min 2 options requises' });
-  const r = db.prepare('INSERT INTO av_sondages (live_id, question, options_json) VALUES (?,?,?)').run(req.params.id, question, JSON.stringify(options));
+  const r = await db.prepare('INSERT INTO av_sondages (live_id, question, options_json) VALUES (?,?,?)').run(req.params.id, question, JSON.stringify(options));
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -27015,7 +27029,7 @@ app.post('/api/audiovisuel/sondages/:id/voter', requireAuth, async (req, res) =>
   const body = await parseBody(req);
   const { option_index } = body;
   try {
-    db.prepare('INSERT INTO av_votes (sondage_id, user_id, option_index) VALUES (?,?,?)').run(req.params.id, req.user.id, option_index);
+    await db.prepare('INSERT INTO av_votes (sondage_id, user_id, option_index) VALUES (?,?,?)').run(req.params.id, req.user.id, option_index);
     sendJSON(res, 201, { ok: true });
   } catch(e) { sendJSON(res, 409, { error: 'Vous avez déjà voté' }); }
 });
@@ -27025,7 +27039,7 @@ app.post('/api/audiovisuel/sondages/:id/voter', requireAuth, async (req, res) =>
 app.post('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
   const body = await parseBody(req);
   const { emoji='❤️', user_id=null } = body;
-  db.prepare('INSERT INTO av_reactions (live_id, user_id, emoji) VALUES (?,?,?)').run(req.params.id, user_id||null, emoji);
+  await db.prepare('INSERT INTO av_reactions (live_id, user_id, emoji) VALUES (?,?,?)').run(req.params.id, user_id||null, emoji);
   const total = await db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji').all(req.params.id);
   sendJSON(res, 200, { ok: true, reactions: total });
 });
@@ -27051,7 +27065,7 @@ app.post('/api/audiovisuel/series', requireAuth, async (req, res) => {
   const body = await parseBody(req);
   const { titre, description='', categorie='general', image_url='' } = body;
   if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const r = db.prepare('INSERT INTO av_series (initiative_id, titre, description, categorie, image_url) VALUES (?,?,?,?,?)').run(req.user.id, titre, description, categorie, image_url);
+  const r = await db.prepare('INSERT INTO av_series (initiative_id, titre, description, categorie, image_url) VALUES (?,?,?,?,?)').run(req.user.id, titre, description, categorie, image_url);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -27082,7 +27096,7 @@ app.post('/api/audiovisuel/episodes', requireAuth, async (req, res) => {
   if (!titre || !url_audio) return sendJSON(res, 400, { error: 'Titre et URL audio requis' });
   const resume = await genResumeIA(titre, description, categorie);
   const chapitres = duree_secondes > 600 ? [{ time:'0:00', titre:'Introduction' }, { time:`${Math.floor(duree_secondes/3/60)}:${String(Math.floor((duree_secondes/3)%60)).padStart(2,'0')}`, titre:'Développement' }, { time:`${Math.floor(duree_secondes*2/3/60)}:${String(Math.floor((duree_secondes*2/3)%60)).padStart(2,'0')}`, titre:'Conclusion' }] : [];
-  const r = db.prepare('INSERT INTO av_episodes (initiative_id, serie_id, titre, description, url_audio, duree_secondes, intervenants, categorie, image_url, is_public, published_at, resume_ia, chapitres, mots_cles) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, serie_id||null, titre, description, url_audio, duree_secondes, JSON.stringify(intervenants), categorie, image_url, is_public?1:0, published_at||new Date().toISOString().slice(0,10), resume, JSON.stringify(chapitres), JSON.stringify(mots_cles));
+  const r = await db.prepare('INSERT INTO av_episodes (initiative_id, serie_id, titre, description, url_audio, duree_secondes, intervenants, categorie, image_url, is_public, published_at, resume_ia, chapitres, mots_cles) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, serie_id||null, titre, description, url_audio, duree_secondes, JSON.stringify(intervenants), categorie, image_url, is_public?1:0, published_at||new Date().toISOString().slice(0,10), resume, JSON.stringify(chapitres), JSON.stringify(mots_cles));
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -27093,7 +27107,7 @@ app.put('/api/audiovisuel/episodes/:id', requireAuth, async (req, res) => {
   const fields = ['titre','description','url_audio','serie_id','duree_secondes','intervenants','categorie','image_url','is_public','published_at','transcription','resume_ia','chapitres','mots_cles'];
   const sets=[]; const vals=[];
   fields.forEach(f => { if (body[f]!==undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
-  db.prepare(`UPDATE av_episodes SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
+  await db.prepare(`UPDATE av_episodes SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -27113,8 +27127,8 @@ app.post('/api/audiovisuel/episodes/:id/commentaires', requireAuth, async (req, 
   const body = await parseBody(req);
   const { contenu, note=null } = body;
   if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis' });
-  const r = db.prepare('INSERT INTO av_commentaires (episode_id, user_id, contenu, note) VALUES (?,?,?,?)').run(req.params.id, req.user.id, contenu.trim(), note||null);
-  if (note) db.prepare('UPDATE av_episodes SET note=ROUND((note*nb_notes+?)/(nb_notes+1),1), nb_notes=nb_notes+1 WHERE id=?').run(note, req.params.id);
+  const r = await db.prepare('INSERT INTO av_commentaires (episode_id, user_id, contenu, note) VALUES (?,?,?,?)').run(req.params.id, req.user.id, contenu.trim(), note||null);
+  if (note) await db.prepare('UPDATE av_episodes SET note=ROUND((note*nb_notes+?)/(nb_notes+1),1), nb_notes=nb_notes+1 WHERE id=?').run(note, req.params.id);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -27290,12 +27304,12 @@ app.post('/api/social/detected/:id/publish', requireAuth, async (req, res) => {
   const hashtags = body.hashtags || post.hashtags_suggeres || '[]';
   const categorie = body.categorie || post.categorie_suggeree || 'Actualité';
 
-  const r = db.prepare(`
+  const r = await db.prepare(`
     INSERT INTO fil_posts (auteur_id, auteur_nom, type, pub_type, categorie, contenu, visibilite, medias, hashtags, statut, source_import)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)
   `).run(req.user.id, req.user.nom, 'texte', 'texte', categorie, contenu, 'public', '[]', typeof hashtags==='string'?hashtags:JSON.stringify(hashtags), 'publie', post.reseau);
 
-  await db.prepare("UPDATE social_posts_detectes SET statut='importe', diaspo_post_id=?, imported_at=datetime('now') WHERE id=?").run(r.lastInsertRowid, post.id);
+  await (await db.prepare("UPDATE social_posts_detectes SET statut='importe', diaspo_post_id=?, imported_at=datetime('now') WHERE id=?").run(r).lastInsertRowid, post.id);
   sendJSON(res, 200, { ok: true, diaspo_post_id: r.lastInsertRowid });
 });
 
