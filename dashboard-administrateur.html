@@ -8514,16 +8514,108 @@ async function submitAccordDirect(){
   }
 
   // ══ MEMBRES ═════════════════════════════════════════════════
+  let _adminMembres = [];
+
+  /* « auto » est la valeur PAR DÉFAUT d'un compte inscrit normalement (users.statut_verification
+     DEFAULT 'auto'), pas un refus. L'affichage précédent rangeait toute valeur autre que
+     « valide » ou « en_attente » dans « ❌ Rejeté » : la moitié des membres apparaissaient donc
+     comme rejetés à l'administrateur alors que leur compte était parfaitement normal. */
+  const STATUT_MEMBRE = {
+    valide:     { txt: '✅ Validé',     col: '#16a34a' },
+    en_attente: { txt: '⏳ En attente', col: '#b45309' },
+    rejete:     { txt: '❌ Rejeté',     col: '#dc2626' },
+    refuse:     { txt: '❌ Rejeté',     col: '#dc2626' },
+    auto:       { txt: 'Standard',      col: 'var(--muted)' },
+  };
+  const statutMembre = s => STATUT_MEMBRE[s] || STATUT_MEMBRE.auto;
+
+  /* Recherche insensible à la casse ET aux accents : « leandre » doit trouver « Léandre ».
+     Plage ̀-ͯ = signes diacritiques isolés par la décomposition NFD. */
+  const normaliserRech = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+  /* Filtre par type de compte. Les effectifs sont calculés sur la liste complète, pas sur le
+     résultat affiché : l'administrateur voit toujours combien de comptes existe chaque type. */
+  let _filtreRoleMembre = '';
+  const ROLES_MEMBRE = [
+    { val: '',               lbl: 'Tous' },
+    { val: 'utilisateur',    lbl: '👤 Utilisateurs' },
+    { val: 'initiative',     lbl: '🏢 Initiatives' },
+    { val: 'collectivite',   lbl: '🏛️ Collectivités' },
+    { val: 'administrateur', lbl: '🛡️ Administrateurs' },
+  ];
+
+  function membresChips() {
+    return ROLES_MEMBRE.map(r => {
+      const n = r.val ? _adminMembres.filter(m => m.role === r.val).length : _adminMembres.length;
+      const actif = _filtreRoleMembre === r.val;
+      return `<button type="button" onclick="setFiltreRoleMembre('${r.val}')"
+        style="padding:6px 13px;border-radius:99px;font-size:12px;font-weight:700;cursor:pointer;
+               border:1.5px solid ${actif ? '#2563EB' : 'var(--border)'};
+               background:${actif ? '#2563EB' : 'transparent'};color:${actif ? '#fff' : 'var(--text)'};">
+        ${r.lbl} <span style="opacity:.65;">${n}</span></button>`;
+    }).join('');
+  }
+
+  window.setFiltreRoleMembre = function (role) {
+    _filtreRoleMembre = role;
+    document.getElementById('membres-chips').innerHTML = membresChips();
+    filtrerMembres();
+  };
+
+  function membresLignes(liste) {
+    const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
+    if (!liste.length) return '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Aucun membre ne correspond à cette recherche.</td></tr>';
+    return liste.map(m => {
+      const st = statutMembre(m.statut_verification);
+      return `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;font-weight:600;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
+        <td style="padding:8px;"><a href="mailto:${esc(m.email)}" style="color:#2563EB;text-decoration:none;">${esc(m.email)}</a></td>
+        <td style="padding:8px;">${m.telephone ? `<a href="tel:${esc(m.telephone)}" style="color:var(--text);text-decoration:none;">${esc(m.telephone)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="padding:8px;">${esc(m.role)}</td>
+        <td style="padding:8px;color:${st.col};">${st.txt}</td>
+        <td style="padding:8px;color:var(--muted);">${fmtDate(m.created_at)}</td>
+        <td style="padding:8px;text-align:right;">
+          ${m.statut_verification==='en_attente'?`<button class="btn btn-sm btn-orange" onclick="adminValiderMembre(${m.id})">Valider</button> `:''}
+          <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="adminSupprimerMembre(${m.id},'${esc(m.nom||m.email)}')">Suppr.</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* Filtrage côté client : la liste est déjà chargée, inutile de rappeler le serveur à
+     chaque frappe. Seul le <tbody> est réécrit, donc le champ ne perd pas le focus. */
+  function filtrerMembres() {
+    const q = normaliserRech(document.getElementById('membres-recherche')?.value);
+    let liste = _filtreRoleMembre ? _adminMembres.filter(m => m.role === _filtreRoleMembre) : _adminMembres;
+    if (q) liste = liste.filter(m =>
+      normaliserRech(`${m.nom||''} ${m.prenom||''} ${m.email||''} ${m.telephone||''} ${m.role||''}`).includes(q));
+    document.getElementById('membres-tbody').innerHTML = membresLignes(liste);
+    const c = document.getElementById('membres-compte');
+    const pluriel = n => `${n} membre${n > 1 ? 's' : ''}`;
+    if (c) c.textContent = (q || _filtreRoleMembre)
+      ? `${pluriel(liste.length)} sur ${_adminMembres.length}`
+      : pluriel(_adminMembres.length);
+  }
+  window.filtrerMembres = filtrerMembres;
+
   async function loadAdminMembres() {
     const el = document.getElementById('membres-list');
-    const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
     el.innerHTML = '<div class="notice">Chargement…</div>';
     try {
       const { membres = [] } = await api('GET', '/admin/membres');
+      _adminMembres = membres;
       if (!membres.length) { el.innerHTML = '<div class="notice">Aucun membre.</div>'; return; }
       el.innerHTML = `
         <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#92400e;">
           🔐 <strong>Accès administrateur uniquement.</strong> Les coordonnées (email, téléphone) sont confidentielles et ne sont jamais affichées aux autres membres.
+        </div>
+        <div id="membres-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${membresChips()}</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <input id="membres-recherche" type="search" class="input-field" oninput="filtrerMembres()"
+                 placeholder="🔍 Rechercher un membre (nom, e-mail, téléphone, rôle)…"
+                 style="flex:1;min-width:260px;font-size:13px;padding:9px 12px;">
+          <span id="membres-compte" style="font-size:12px;color:var(--muted);white-space:nowrap;"></span>
         </div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -8536,22 +8628,10 @@ async function submitAccordDirect(){
               <th style="padding:8px;text-align:left;">Inscription</th>
               <th style="padding:8px;"></th>
             </tr></thead>
-            <tbody>${membres.map(m => `
-              <tr style="border-bottom:1px solid var(--border);">
-                <td style="padding:8px;font-weight:600;">${esc(m.nom||'')} ${esc(m.prenom||'')}</td>
-                <td style="padding:8px;"><a href="mailto:${esc(m.email)}" style="color:#2563EB;text-decoration:none;">${esc(m.email)}</a></td>
-                <td style="padding:8px;">${m.telephone ? `<a href="tel:${esc(m.telephone)}" style="color:var(--text);text-decoration:none;">${esc(m.telephone)}</a>` : '<span style="color:var(--muted)">—</span>'}</td>
-                <td style="padding:8px;">${esc(m.role)}</td>
-                <td style="padding:8px;">${m.statut_verification==='valide'?'✅ Validé':m.statut_verification==='en_attente'?'⏳ En attente':'❌ Rejeté'}</td>
-                <td style="padding:8px;color:var(--muted);">${fmtDate(m.created_at)}</td>
-                <td style="padding:8px;text-align:right;">
-                  ${m.statut_verification==='en_attente'?`<button class="btn btn-sm btn-orange" onclick="adminValiderMembre(${m.id})">Valider</button> `:''}
-                  <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="adminSupprimerMembre(${m.id},'${esc(m.nom||m.email)}')">Suppr.</button>
-                </td>
-              </tr>`).join('')}
-            </tbody>
+            <tbody id="membres-tbody"></tbody>
           </table>
         </div>`;
+      filtrerMembres();
     } catch(e) { el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
   }
 

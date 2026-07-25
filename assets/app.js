@@ -716,8 +716,12 @@ const RAY_LABEL = {locale:'Locale', régionale:'Régionale', nationale:'National
 
 function renderInitiativeCard(it){
   const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
-  const seed    = encodeURIComponent(it.slug || it.nom || 'init');
-  const photo   = it.vitrine_banniere_url || it.logo_url || `https://picsum.photos/seed/${seed}/400/240`;
+  /* Seulement les visuels chargés par le compte lui-même. À défaut, ses initiales sur la
+     couleur de son domaine : une photo d'illustration ferait passer une image sans rapport
+     pour celle de l'initiative. */
+  const photo   = it.vitrine_banniere_url || it.logo_url || '';
+  const initiales = String(it.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
+    .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
   const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && CURRENT_USER.id === it.owner_user_id);
   const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
   const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
@@ -748,8 +752,9 @@ function renderInitiativeCard(it){
 
   return `
   <div class="ann-card" onclick="window.location.href='${initHref}'" style="cursor:pointer;">
-    <div class="ann-card-photo" style="position:relative;">
-      <img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.src='https://picsum.photos/seed/${it.id||0}/400/240'">
+    <div class="ann-card-photo" style="position:relative;background:linear-gradient(135deg,${badge.bg},#0D1B2A);">
+      <span class="ann-card-initiales">${initiales}</span>
+      ${photo ? `<img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.remove()">` : ''}
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
       ${it.type ? `<span class="ann-type-badge">${it.type}</span>` : ''}
       ${certifBadgeHtml}
