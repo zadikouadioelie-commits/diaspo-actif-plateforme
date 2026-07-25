@@ -714,6 +714,78 @@ const DOMAIN_BADGE = {
 const RAY_ICON = {locale:'📍', régionale:'🗺️', nationale:'🏳️', internationale:'🌐'};
 const RAY_LABEL = {locale:'Locale', régionale:'Régionale', nationale:'Nationale', internationale:'Internationale'};
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ORIGINE D'UN COMPTE — repère visuel pour la mise en relation entre diasporas
+
+   L'origine était affichée en petit texte sous la carte, quand elle l'était : illisible
+   au premier coup d'œil, donc inutile pour repérer un compatriote en parcourant l'annuaire.
+   Un drapeau se lit instantanément et survit au coup d'œil rapide.
+
+   La NATIONALITÉ sert de repli quand l'origine n'est pas renseignée — c'est le cas de la
+   plupart des comptes — mais elle n'est jamais présentée comme une origine : l'infobulle
+   dit toujours d'où vient l'information. Faire passer une nationalité pour une origine
+   induirait en erreur précisément là où la précision compte.
+   ══════════════════════════════════════════════════════════════════════════ */
+const DA_PAYS_ISO = {
+  "france":"FR","côte d'ivoire":"CI","cote d'ivoire":"CI","sénégal":"SN","senegal":"SN",
+  "cameroun":"CM","mali":"ML","canada":"CA","belgique":"BE","suisse":"CH","maroc":"MA",
+  "congo":"CG","royaume-uni":"GB","états-unis":"US","etats-unis":"US","espagne":"ES",
+  "allemagne":"DE","italie":"IT","portugal":"PT","bénin":"BJ","benin":"BJ","togo":"TG",
+  "guinée":"GN","guinee":"GN","burkina faso":"BF","gabon":"GA","niger":"NE","tchad":"TD",
+  "algérie":"DZ","algerie":"DZ","tunisie":"TN","mauritanie":"MR","madagascar":"MG",
+  "rdc":"CD","république démocratique du congo":"CD","haïti":"HT","haiti":"HT",
+  "nigéria":"NG","nigeria":"NG","ghana":"GH","kenya":"KE","éthiopie":"ET","ethiopie":"ET",
+  "comores":"KM","djibouti":"DJ","centrafrique":"CF","burundi":"BI","rwanda":"RW",
+};
+/* Nationalité → pays. Une gentilée ne se déduit pas d'un nom de pays par règle simple
+   (« ivoirienne » n'est pas « Côte d'Ivoire » à une lettre près) : la table est explicite. */
+const DA_NAT_PAYS = {
+  "française":"France","francaise":"France","ivoirienne":"Côte d'Ivoire","sénégalaise":"Sénégal",
+  "senegalaise":"Sénégal","camerounaise":"Cameroun","malienne":"Mali","tchadienne":"Tchad",
+  "guinéenne":"Guinée","guineenne":"Guinée","béninoise":"Bénin","beninoise":"Bénin",
+  "togolaise":"Togo","burkinabè":"Burkina Faso","burkinabe":"Burkina Faso","gabonaise":"Gabon",
+  "nigérienne":"Niger","nigerienne":"Niger","marocaine":"Maroc","algérienne":"Algérie",
+  "algerienne":"Algérie","tunisienne":"Tunisie","congolaise":"Congo","haïtienne":"Haïti",
+  "haitienne":"Haïti","malgache":"Madagascar","comorienne":"Comores","rwandaise":"Rwanda",
+  "belge":"Belgique","suisse":"Suisse","canadienne":"Canada","portugaise":"Portugal",
+  "espagnole":"Espagne","italienne":"Italie","allemande":"Allemagne","britannique":"Royaume-Uni",
+};
+const _daNorm = s => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/* Emoji drapeau construit depuis le code ISO — pas d'image, donc pas de requête réseau
+   ni de dépendance à un service extérieur. */
+function daDrapeau(pays) {
+  const n = _daNorm(pays);
+  let iso = DA_PAYS_ISO[n];
+  if (!iso) { for (const [k, v] of Object.entries(DA_PAYS_ISO)) { if (_daNorm(k) === n) { iso = v; break; } } }
+  if (!iso) return '🌍';
+  return String.fromCodePoint(...[...iso.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+/* Renvoie { pays, source } — ou null si rien de fiable n'est disponible. */
+function daOrigine(o) {
+  const dir = [o.origine1, o.origine2].filter(Boolean);
+  if (dir.length) return { pays: dir.join(' · '), source: 'origine' };
+  if (o.pays_origine) return { pays: o.pays_origine, source: 'origine' };
+  const nat = [o.nationalite1, o.nationalite2].filter(Boolean)
+    .map(x => DA_NAT_PAYS[_daNorm(x)] || null).filter(Boolean);
+  if (nat.length) return { pays: [...new Set(nat)].join(' · '), source: 'nationalite' };
+  return null;
+}
+
+/* Pastille posée sur l'image de la carte : c'est la zone que l'œil balaie en premier. */
+function daBadgeOrigine(o, style) {
+  const org = daOrigine(o);
+  if (!org) return '';
+  const premier = org.pays.split(' · ')[0];
+  const titre = org.source === 'origine'
+    ? `Origine : ${org.pays}`
+    : `Nationalité : ${org.pays} — origine non renseignée par ce compte`;
+  const opacite = org.source === 'origine' ? '1' : '.82';
+  return `<span class="ann-origine-badge" title="${(titre||'').replace(/"/g,'&quot;')}" style="opacity:${opacite};${style||''}">
+    <span style="font-size:14px;line-height:1;">${daDrapeau(premier)}</span>${escapeHtml(org.pays)}</span>`;
+}
+
 function renderInitiativeCard(it){
   const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
   /* Seulement les visuels chargés par le compte lui-même. À défaut, ses initiales sur la
@@ -756,6 +828,7 @@ function renderInitiativeCard(it){
       <span class="ann-card-initiales">${initiales}</span>
       ${photo ? `<img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.remove()">` : ''}
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
+      ${daBadgeOrigine(it)}
       ${it.type ? `<span class="ann-type-badge">${it.type}</span>` : ''}
       ${certifBadgeHtml}
       ${isOwnInit ? `<button type="button" class="ann-card-cover-edit" onclick="event.stopPropagation(); annuaireEditInitiativeCover(${it.id})">📷 Modifier la couverture</button>` : ''}
@@ -909,7 +982,7 @@ async function initAnnuaire(){
     const origs = [u.origine1, u.origine2].filter(Boolean).join(' • ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`, isOwn)}
+      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u)}`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
@@ -934,7 +1007,7 @@ async function initAnnuaire(){
     const responsableNom = [o.prenom_responsable_etatique, o.nom_responsable_etatique].filter(Boolean).join(' ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(o.id, nomAffiche, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>`, isOwn)}
+      ${annCardCoverHtml(o.id, nomAffiche, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>${daBadgeOrigine(o)}`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nomAffiche}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>

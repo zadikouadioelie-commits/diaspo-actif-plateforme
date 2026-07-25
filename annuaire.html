@@ -139,6 +139,18 @@
   padding:4px 10px;border-radius:4px;
   font-size:10px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase;
 }
+/* Origine du compte : posée en haut à DROITE de l'image, la zone que l'œil balaie en
+   premier après le titre. Fond clair pour rester lisible sur une photo comme sur un
+   dégradé, quel qu'en soit le contraste. */
+.ann-origine-badge{
+  position:absolute;top:10px;right:10px;z-index:2;
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:99px;
+  background:rgba(255,255,255,.94);color:#0D2B4E;
+  font-size:11px;font-weight:800;
+  box-shadow:0 1px 4px rgba(0,0,0,.18);
+  max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 
 /* Card profil (utilisateur/organisme) : bandeau + avatar rond superposé, plus de zone vide */
 .ann-card-banner{height:80px;position:relative;}
