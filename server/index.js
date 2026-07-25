@@ -6070,6 +6070,12 @@ async function getPremiumStatut(userId, role) {
        utile pour graduer un éventuel retrait progressif. */
     jours_restants: joursRestants,
     jours_depuis_expiration: joursDepuisFin,
+    /* Diagnostic : permet de comprendre POURQUOI cette échéance a été retenue — la fin de
+       période gratuite calculée, et si l'abonnement a été payé (auquel cas il n'est jamais
+       prolongé). Sans ces deux valeurs, un écart entre l'attendu et le réel est indiagnosticable
+       depuis l'extérieur. */
+    fin_periode_gratuite: finGratuite ? finGratuite.toISOString() : null,
+    montant_paye: montantPaye,
     /* Aucune purge : les contenus restent indéfiniment et reviennent intacts au réabonnement. */
     conservation_illimitee: PREMIUM_CONSERVATION_ILLIMITEE,
     source,
