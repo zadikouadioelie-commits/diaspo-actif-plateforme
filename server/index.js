@@ -5062,6 +5062,57 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
    demande de mise en relation (table demandes_relation), acceptée explicitement
    par le destinataire, seule voie créant la conversation. Ils peuvent en
    revanche échanger librement avec d'autres comptes institutionnels. */
+/* ═══ RÈGLES DE MISE EN RELATION (cahier des charges 2026-07-25) ═══
+   Trois règles, appliquées selon le type du compte visé ET l'espace d'où part le contact :
+
+     Utilisateur → Initiative, depuis l'annuaire / le profil public  → demande de liaison
+     Utilisateur → Initiative, depuis une VITRINE                    → contact direct
+     Utilisateur → Collectivité, depuis n'importe quel espace        → demande obligatoire
+
+   L'exception de la vitrine existe parce qu'une vitrine est un espace COMMERCIAL : son
+   propriétaire la publie précisément pour être joint. Exiger une autorisation avant qu'un
+   client puisse poser une question sur un produit reviendrait à saboter l'objet même de
+   l'abonnement.
+
+   ⚠ L'origine est déclarée par le navigateur, donc falsifiable. Elle n'est donc PAS crue sur
+   parole : l'exception ne s'applique que si l'initiative possède réellement une vitrine
+   publique (vitrine_active=1). Sans vitrine, prétendre venir d'une vitrine ne donne rien. */
+const MESSAGE_DEMANDE_LIAISON = "Nous sommes intéressés par votre initiative et nous aimerions rentrer en contact avec vous.";
+
+/* Une liaison acceptée existe-t-elle entre deux comptes, dans un sens ou dans l'autre ? */
+async function liaisonAcceptee(a, b) {
+  const r = await db.prepare(
+    `SELECT id FROM demandes_contact WHERE statut='acceptee'
+       AND ((demandeur_id=? AND destinataire_id=?) OR (demandeur_id=? AND destinataire_id=?)) LIMIT 1`
+  ).get(a, b, b, a);
+  return !!r;
+}
+
+/* Renvoie null si le contact direct est autorisé, sinon la nature de la demande exigée. */
+async function demandeDeLiaisonExigee(user, cible, origine) {
+  if (user.role === "administrateur" || cible.role === "administrateur") return null;
+
+  if (cible.role === "collectivite") {
+    return { code: "demande_liaison_requise", type: "mise_en_relation",
+             libelle: "Demande de mise en relation",
+             error: "Une collectivité doit accepter votre demande avant tout échange privé." };
+  }
+
+  if (cible.role === "initiative" && user.role === "utilisateur") {
+    if (origine === "vitrine") {
+      /* Vérification serveur : l'exception commerciale suppose une vitrine réellement publique. */
+      const init = await db.prepare("SELECT vitrine_active FROM initiatives WHERE owner_user_id=?").get(cible.id);
+      if (init && Number(init.vitrine_active) === 1) return null;
+    }
+    return { code: "demande_liaison_requise", type: "liaison",
+             libelle: "Demande de liaison",
+             message_predefini: MESSAGE_DEMANDE_LIAISON,
+             error: "Cette initiative doit accepter votre demande de liaison avant que vous puissiez lui écrire." };
+  }
+
+  return null;
+}
+
 const PEUT_INITIER = {
   utilisateur:   ["utilisateur", "initiative", "collectivite", "administrateur"],
   initiative:    ["utilisateur", "initiative", "collectivite", "administrateur"],
@@ -5291,6 +5342,13 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
 
   // Vérification d'initiation uniquement pour les NOUVELLES conversations
   if (!conv) {
+    /* Règles de mise en relation. Une liaison déjà acceptée vaut autorisation définitive :
+       le bouton devient « Message » et l'échange est libre, comme prévu au cahier des charges. */
+    if (!(await liaisonAcceptee(user.id, otherId))) {
+      const exigence = await demandeDeLiaisonExigee(user, other, String(body.origine || ""));
+      if (exigence) return sendJSON(res, 403, { ...exigence, destinataire_id: otherId, destinataire_nom: other.nom });
+    }
+
     const allowed = PEUT_INITIER[user.role] || [];
     if (!allowed.includes(other.role)) {
       const msg = user.role === "collectivite"
@@ -5392,7 +5450,10 @@ route("PUT", "/api/admin/demandes-contact/config", async (req, res, params, body
 });
 
 /* POST /api/demandes-contact — envoyer une demande de contact */
-route("POST", "/api/demandes-contact", async (req, res, params, body) => {
+/* Creation d'une demande de contact. Extrait en fonction nommee pour etre reutilise par
+   /api/demandes-liaison, qui impose un message predefini : une seule mecanique de quota,
+   de carence, d'expiration et de blocage, donc aucune divergence possible entre les deux. */
+async function creerDemandeContact(req, res, body) {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
 
@@ -5456,7 +5517,8 @@ route("POST", "/api/demandes-contact", async (req, res, params, body) => {
     `Motif : ${motifAutre || motif}. ${message}`.slice(0, 300), { demande_id: id });
 
   sendJSON(res, 201, { id, expires_at: expiresAt });
-});
+}
+route("POST", "/api/demandes-contact", async (req, res, params, body) => creerDemandeContact(req, res, body));
 
 /* Points communs entre demandeur et destinataire, calculés à partir des données déjà en
    base (pas d'IA externe) — alimente « Pourquoi cette mise en relation peut vous intéresser ? ». */
@@ -5484,6 +5546,29 @@ async function calculerCompatibilite(demandeurId, destinataireId) {
 }
 
 /* GET /api/demandes-contact?direction=recues|envoyees&statut= — historique */
+/* POST /api/demandes-liaison — demande de liaison en un clic (annuaire, profil public).
+   Le cahier des charges impose un message préenregistré NON MODIFIABLE : l'utilisateur clique,
+   il ne rédige pas. On réutilise donc entièrement la mécanique des demandes de contact — quota
+   quotidien, délai de carence, expiration, blocages, notification — en imposant simplement le
+   contenu. Cela évite un second système parallèle qui divergerait avec le temps. */
+route("POST", "/api/demandes-liaison", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const destinataireId = Number(body.destinataire_id);
+  if (!destinataireId) return sendJSON(res, 400, { error: "Destinataire invalide." });
+  const dest = await db.prepare("SELECT id, role FROM users WHERE id=?").get(destinataireId);
+  if (!dest) return sendJSON(res, 404, { error: "Destinataire introuvable." });
+
+  /* On délègue à la route existante en lui imposant objet, motif et message. */
+  return creerDemandeContact(req, res, {
+    destinataire_id: destinataireId,
+    objet: dest.role === "collectivite" ? "Demande de mise en relation" : "Demande de liaison",
+    motif: "Demande d'informations",
+    message: MESSAGE_DEMANDE_LIAISON,
+    urgence: "normal",
+  });
+});
+
 route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
