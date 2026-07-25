@@ -2051,6 +2051,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
   const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
   if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
           media_type, media_url, media_duree_secondes, liste_stockage_id } = body;
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
@@ -2087,6 +2088,7 @@ route("DELETE", "/api/adhesion-formules/:id", async (req, res, params) => {
   const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
   if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   await db.prepare(`DELETE FROM adhesion_formules WHERE id=?`).run(params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -2098,6 +2100,7 @@ route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params,
   const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
   if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const actif = body.actif !== undefined ? (body.actif ? 1 : 0) : (f.actif ? 0 : 1);
   await db.prepare(`UPDATE adhesion_formules SET actif=?, updated_at=datetime('now') WHERE id=?`).run(actif, params.id);
   sendJSON(res, 200, { ok: true, actif: !!actif });
@@ -2134,6 +2137,7 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { formule_id, nom, prenom, email, telephone } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom requis." });
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, params.id);
@@ -2152,6 +2156,7 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   const m = await db.prepare(`SELECT m.*, i.owner_user_id FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
   if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, prenom, email, telephone, statut } = body;
   await db.prepare(`UPDATE adhesion_membres SET
       nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, statut=COALESCE(?,statut), updated_at=datetime('now')
@@ -2168,6 +2173,7 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   const m = await db.prepare(`SELECT m.*, i.owner_user_id FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
   if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=?").get(m.formule_id);
   const montant = Number(body.montant) || 0;
   const MODES_MANUELS = ['virement', 'carte', 'paypal'];
@@ -2203,6 +2209,7 @@ route("PUT", "/api/adhesion-membres/:id/badges", async (req, res, params, body) 
   const m = await db.prepare(`SELECT m.*, i.owner_user_id FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
   if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const VALID_BADGES = ['fondateur', 'bienfaiteur', 'donateur', 'ambassadeur', 'grand_mecene'];
   const badges = Array.isArray(body.badges) ? body.badges.filter(b => VALID_BADGES.includes(b)) : [];
   await db.prepare(`UPDATE adhesion_membres SET badges_json=?, updated_at=datetime('now') WHERE id=?`).run(JSON.stringify(badges), params.id);
@@ -2272,6 +2279,7 @@ route("PUT", "/api/adhesion-campagnes/:id", async (req, res, params, body) => {
   const c = await db.prepare(`SELECT c.*, i.owner_user_id FROM adhesion_campagnes c JOIN initiatives i ON i.id=c.initiative_id WHERE c.id=?`).get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Campagne introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, objectif_membres, date_debut, date_fin, statut } = body;
   await db.prepare(`UPDATE adhesion_campagnes SET nom=COALESCE(?,nom), objectif_membres=COALESCE(?,objectif_membres),
       date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin), statut=COALESCE(?,statut) WHERE id=?`)
@@ -2612,6 +2620,7 @@ route("DELETE", "/api/vote-scrutins/:id", async (req, res, params) => {
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   if (s.statut !== "brouillon") {
     return sendJSON(res, 400, { error: "Seul un scrutin en brouillon peut être supprimé. Archivez plutôt ce scrutin pour conserver les votes." });
   }
@@ -2626,6 +2635,7 @@ route("POST", "/api/vote-scrutins/:id/archiver", async (req, res, params) => {
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   await db.prepare("UPDATE vote_scrutins SET archived=1, updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -2636,6 +2646,7 @@ route("POST", "/api/vote-scrutins/:id/desarchiver", async (req, res, params) => 
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   await db.prepare("UPDATE vote_scrutins SET archived=0, updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -2667,6 +2678,7 @@ route("PUT", "/api/vote-scrutins/:id", async (req, res, params, body) => {
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   if (s.statut !== "brouillon") return sendJSON(res, 400, { error: "Seul un scrutin en brouillon peut être modifié." });
   const { nom, type_scrutin, description, date_ouverture, date_fermeture, fermeture_mode,
           vote_secret, vote_nominatif, resultats_direct, pv_auto, quorum_requis } = body;
@@ -2690,6 +2702,7 @@ route("POST", "/api/vote-scrutins/:id/resolutions", async (req, res, params, bod
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   const { titre, description, type_reponse, options } = body;
   if (!titre?.trim()) return sendJSON(res, 400, { error: "Titre de la résolution requis." });
   const maxOrdre = (await db.prepare("SELECT COALESCE(MAX(ordre),0) AS m FROM vote_resolutions WHERE scrutin_id=?").get(params.id)).m;
@@ -2743,6 +2756,7 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
   const s = await db.prepare(`SELECT s.*, i.owner_user_id, i.nom AS init_nom FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   const sources = Array.isArray(body.sources) ? body.sources : [];
   if (!sources.length) return sendJSON(res, 400, { error: "Au moins une source d'électeurs requise." });
   const userIds = await resolveVoteElecteurs(s.initiative_id, sources, body.criteres || {});
@@ -2799,6 +2813,7 @@ route("POST", "/api/vote-scrutins/:id/ouvrir", async (req, res, params) => {
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   const nbResolutions = (await db.prepare("SELECT COUNT(*) c FROM vote_resolutions WHERE scrutin_id=?").get(params.id)).c;
   if (!nbResolutions) return sendJSON(res, 400, { error: "Ajoutez au moins une résolution avant d'ouvrir le scrutin." });
   await db.prepare("UPDATE vote_scrutins SET statut='ouvert', updated_at=datetime('now') WHERE id=?").run(params.id);
@@ -2811,6 +2826,7 @@ route("POST", "/api/vote-scrutins/:id/clore", async (req, res, params) => {
   const s = await db.prepare(`SELECT s.*, i.owner_user_id, i.nom AS init_nom FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "votes"))) return;
   if (s.statut !== "ouvert") return sendJSON(res, 400, { error: "Seul un scrutin ouvert peut être clôturé." });
 
   const resolutions = await db.prepare("SELECT * FROM vote_resolutions WHERE scrutin_id=? ORDER BY ordre ASC").all(params.id);
@@ -6069,12 +6085,56 @@ route("GET", "/api/admin/premium/observations", async (req, res) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
   const parContexte = {};
   __premiumObservations.forEach(o => { parContexte[o.contexte] = (parContexte[o.contexte] || 0) + 1; });
+  /* Impact PRÉDICTIF calculé sur la base, et pas seulement sur les tentatives observées :
+     tant que personne n'a essayé d'agir, le journal reste vide et ne dit rien de l'ampleur
+     réelle. On parcourt donc les comptes pour savoir qui serait bloqué dès l'activation. */
+  const comptes = await db.prepare("SELECT id, role, email FROM users").all();
+  const parStatut = { actif: 0, bientot_expire: 0, expire: 0 };
+  const parRole = {};
+  const exemplesBloques = [];
+  for (const c of comptes) {
+    const st = await getPremiumStatut(c.id, c.role);
+    if (!st.concerne) continue;
+    parStatut[st.statut] = (parStatut[st.statut] || 0) + 1;
+    parRole[c.role] = parRole[c.role] || { total: 0, seraient_bloques: 0 };
+    parRole[c.role].total++;
+    if (st.statut === 'expire') {
+      parRole[c.role].seraient_bloques++;
+      if (exemplesBloques.length < 15) {
+        exemplesBloques.push({ id: c.id, role: c.role, email: c.email,
+                               expire_depuis_jours: st.jours_depuis_expiration, source: st.source });
+      }
+    }
+  }
+
+  /* Vitrines qui basculeraient en maintenance : c'est l'effet le plus exposé au public. */
+  let vitrinesConcernees = 0;
+  try {
+    const vitrines = await db.prepare("SELECT owner_user_id FROM initiatives WHERE vitrine_active=1 AND owner_user_id IS NOT NULL").all();
+    for (const v of vitrines) {
+      const u = await db.prepare("SELECT id, role FROM users WHERE id=?").get(v.owner_user_id);
+      if (!u) continue;
+      const st = await getPremiumStatut(u.id, u.role);
+      if (st.concerne && !st.actif) vitrinesConcernees++;
+    }
+  } catch (_) {}
+
   sendJSON(res, 200, {
     application_active: premiumApplicationActive(),
-    total: __premiumObservations.length,
-    par_contexte: parContexte,
-    comptes_distincts: [...new Set(__premiumObservations.map(o => o.userId))].length,
-    dernieres: __premiumObservations.slice(-20),
+    /* Ce qui se produirait si l'on activait maintenant. */
+    impact_si_activation: {
+      comptes_par_statut: parStatut,
+      par_role: parRole,
+      vitrines_passant_en_maintenance: vitrinesConcernees,
+      exemples_comptes_bloques: exemplesBloques,
+    },
+    /* Ce qui a réellement été tenté depuis le démarrage du serveur. */
+    observations: {
+      total: __premiumObservations.length,
+      par_contexte: parContexte,
+      comptes_distincts: [...new Set(__premiumObservations.map(o => o.userId))].length,
+      dernieres: __premiumObservations.slice(-20),
+    },
   });
 });
 

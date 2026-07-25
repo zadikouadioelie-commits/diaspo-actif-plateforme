@@ -3770,3 +3770,149 @@ window.openApercuAppareils = function () {
   document.getElementById('apercu-frame').addEventListener('load', apercuLancerAnalyse);
   apercuSetAppareil(__apercuAppareil);
 };
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CYCLE DE VIE PREMIUM — INTERFACE
+   ──────────────────────────────────────────────────────────────────────────
+   Deux éléments prévus au cahier des charges « fin d'abonnement Premium » :
+
+   1. Fenêtre d'alerte à partir de J-60 : date d'expiration, jours restants,
+      rappel des avantages, invitation au renouvellement.
+   2. Message de blocage des modules privés une fois l'abonnement expiré.
+
+   Le statut vient d'une source unique (/api/premium/statut), jamais recalculé
+   ici : c'est la dispersion des règles qui avait laissé certains modules
+   protégés seulement côté navigateur.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let __premiumStatut = null;
+
+async function premiumStatut(forcer) {
+  if (__premiumStatut && !forcer) return __premiumStatut;
+  try {
+    const r = await fetch('/api/premium/statut', { credentials: 'include' });
+    if (!r.ok) return null;
+    __premiumStatut = await r.json();
+    return __premiumStatut;
+  } catch (_) { return null; }
+}
+
+/* La fenêtre ne doit pas réapparaître à chaque page : une fois par jour suffit
+   pour informer sans harceler. Le rappel devient quotidien dans la dernière
+   semaine, où l'urgence est réelle. */
+function premiumAlerteDejaVue(st) {
+  const cle = 'da_premium_alerte_' + (st.date_expiration || '') ;
+  const dernier = localStorage.getItem(cle);
+  if (!dernier) return false;
+  const heures = (Date.now() - Number(dernier)) / 3600000;
+  return heures < 24;
+}
+function premiumMarquerAlerteVue(st) {
+  try { localStorage.setItem('da_premium_alerte_' + (st.date_expiration || ''), String(Date.now())); } catch (_) {}
+}
+
+const PREMIUM_AVANTAGES = [
+  '📣 Campagnes publicitaires',
+  '📅 Événements et billetterie',
+  '🎓 Création de formations',
+  '🎫 Cotisations et adhésions',
+  '🗳️ Votes sécurisés',
+  '⭐ Vitrine publique personnalisable',
+];
+
+window.fermerAlertePremium = function () {
+  const o = document.getElementById('premium-alerte-modal');
+  if (o) o.remove();
+};
+
+/* Fenêtre d'alerte — à partir de 60 jours avant l'échéance. */
+function afficherAlertePremium(st) {
+  if (document.getElementById('premium-alerte-modal')) return;
+  const j = st.jours_restants;
+  const dateFr = st.date_expiration ? new Date(st.date_expiration).toLocaleDateString('fr-FR') : '—';
+  const urgent = j !== null && j <= 7;
+
+  const o = document.createElement('div');
+  o.id = 'premium-alerte-modal';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.7);z-index:2500;display:flex;align-items:center;justify-content:center;padding:18px;';
+  o.innerHTML =
+    '<div style="background:#fff;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    + '<div style="background:linear-gradient(135deg,' + (urgent ? '#c2410c,#f97316' : '#c8960c,#f2c94c') + ');padding:20px 24px;position:relative;">'
+    +   '<button onclick="fermerAlertePremium()" aria-label="Fermer" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,.35);border:none;border-radius:50%;width:28px;height:28px;font-size:15px;cursor:pointer;line-height:1;">×</button>'
+    +   '<div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.9;">👑 Abonnement Premium</div>'
+    +   '<h2 style="margin:6px 0 0;font-size:19px;color:#2a1e00;">Votre abonnement arrive bientôt à expiration</h2>'
+    + '</div>'
+    + '<div style="padding:20px 24px;">'
+    +   '<div style="display:flex;gap:14px;margin-bottom:16px;">'
+    +     '<div style="flex:1;background:#F8FAFD;border-radius:10px;padding:12px;text-align:center;">'
+    +       '<div style="font-size:22px;font-weight:800;color:' + (urgent ? '#c2410c' : '#0D2B4E') + ';">' + (j !== null ? j : '—') + '</div>'
+    +       '<div style="font-size:11px;color:#6C757D;">jour' + (j > 1 ? 's' : '') + ' restant' + (j > 1 ? 's' : '') + '</div>'
+    +     '</div>'
+    +     '<div style="flex:1;background:#F8FAFD;border-radius:10px;padding:12px;text-align:center;">'
+    +       '<div style="font-size:14.5px;font-weight:800;color:#0D2B4E;margin-top:4px;">' + dateFr + '</div>'
+    +       '<div style="font-size:11px;color:#6C757D;">date d\'expiration</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="font-size:11.5px;font-weight:800;color:#6C757D;text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;">Ce que vous conservez en renouvelant</div>'
+    +   '<ul style="margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.8;color:#374151;">'
+    +     PREMIUM_AVANTAGES.map(function (a) { return '<li>' + a + '</li>'; }).join('')
+    +   '</ul>'
+    /* Point rassurant essentiel : l'expiration ne détruit rien. Sans cette phrase,
+       l'alerte se lit comme une menace sur les données. */
+    +   '<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:9px;padding:10px 12px;font-size:12.5px;color:#166534;line-height:1.55;margin-bottom:16px;">'
+    +     '✓ <strong>Aucune donnée n\'est supprimée</strong> à l\'expiration. Vos contenus sont conservés et redeviennent accessibles dès le renouvellement.'
+    +   '</div>'
+    +   '<a href="premium.html" style="display:block;text-align:center;background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;padding:13px;border-radius:10px;text-decoration:none;">Renouveler mon abonnement</a>'
+    +   '<button onclick="fermerAlertePremium()" style="display:block;width:100%;margin-top:8px;background:none;border:none;color:#6C757D;font-size:12.5px;cursor:pointer;padding:6px;">Plus tard</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(o);
+  o.addEventListener('click', function (e) { if (e.target === o) window.fermerAlertePremium(); });
+  premiumMarquerAlerteVue(st);
+}
+
+/* Bandeau permanent une fois l'abonnement expiré — modules privés bloqués.
+   Bandeau et non fenêtre : à ce stade le message doit rester visible en
+   permanence, sans qu'on puisse le refermer et l'oublier. */
+function afficherBandeauPremiumExpire(st) {
+  if (document.getElementById('premium-expire-bandeau')) return;
+  const cible = document.querySelector('.content') || document.querySelector('main') || document.body;
+  const b = document.createElement('div');
+  b.id = 'premium-expire-bandeau';
+  b.style.cssText = 'margin:0 0 18px;padding:14px 16px;background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:12px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;';
+  b.innerHTML =
+    '<div style="flex:1;min-width:200px;">'
+    + '<div style="font-weight:800;color:#991b1b;font-size:13.5px;">🔒 Votre abonnement Premium est arrivé à expiration</div>'
+    + '<div style="font-size:12.5px;color:#991b1b;margin-top:4px;line-height:1.6;">'
+    +   'Renouvelez votre abonnement pour retrouver l\'accès à vos fonctionnalités Premium. '
+    +   '<strong>Vos données, configurations et contenus sont conservés</strong> — rien n\'a été supprimé.'
+    + '</div>'
+    + '</div>'
+    + '<a href="premium.html" style="flex:none;background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;font-size:12.5px;padding:9px 16px;border-radius:9px;text-decoration:none;white-space:nowrap;">Renouveler</a>';
+  cible.insertBefore(b, cible.firstChild);
+}
+
+/* Point d'entrée : appelé au chargement des espaces personnels. */
+window.initCyclePremium = async function () {
+  const st = await premiumStatut();
+  if (!st || !st.concerne) return;
+  if (st.statut === 'expire') { afficherBandeauPremiumExpire(st); return; }
+  if (st.statut === 'bientot_expire' && !premiumAlerteDejaVue(st)) afficherAlertePremium(st);
+};
+
+/* Affiche le message du serveur lorsqu'une action est refusée faute d'abonnement.
+   Le texte vient de la réponse 402 : une seule formulation, côté serveur. */
+window.gererRefusPremium = function (reponse, donnees) {
+  if (!reponse || reponse.status !== 402) return false;
+  const msg = (donnees && donnees.error) || "Votre abonnement Premium est arrivé à expiration.";
+  alert(msg);
+  premiumStatut(true).then(function (st) { if (st && st.statut === 'expire') afficherBandeauPremiumExpire(st); });
+  return true;
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+  /* Uniquement sur les espaces personnels : inutile d'alerter un visiteur. */
+  if (/dashboard|profil|premium/i.test(location.pathname)) {
+    setTimeout(function () { window.initCyclePremium(); }, 1200);
+  }
+});
