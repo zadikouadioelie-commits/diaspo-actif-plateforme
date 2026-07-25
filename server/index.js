@@ -5992,7 +5992,7 @@ const PREMIUM_PALIERS_RELANCE = [
 
    Les abonnements PAYANTS en sont exclus : leur échéance propre fait foi, on ne prolonge
    jamais gratuitement un abonnement acheté. */
-const PREMIUM_DATE_PLANCHER = new Date('2026-07-26T00:00:00.000Z');
+const PREMIUM_DATE_PLANCHER = new Date(process.env.PREMIUM_DATE_PLANCHER || '2026-07-26T00:00:00.000Z');
 
 /* Fin de la période gratuite d'un compte, en tenant compte de la remise à zéro. */
 function finPeriodeGratuite(createdAt) {
@@ -6107,6 +6107,10 @@ function noterObservationPremium(userId, contexte) {
    réinvente sa règle, dérive qui a laissé plusieurs modules protégés seulement
    côté navigateur. */
 async function exigerPremium(user, res, contexte) {
+  /* L'administration n'est jamais bloquee par un abonnement : elle gere la plateforme, elle
+     ne la consomme pas. Sans cette exemption, un administrateur dont la periode gratuite
+     s'acheve perdrait l'acces aux outils de moderation. */
+  if (user.role === 'administrateur') return true;
   const st = await getPremiumStatut(user.id, user.role);
   if (!st.concerne || st.actif) return true;
   if (!premiumApplicationActive()) {
@@ -6591,6 +6595,7 @@ route("GET", "/api/formations/:id/suivi", async (req, res, params) => {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const modules = await db.prepare("SELECT id FROM formation_modules WHERE formation_id=?").all(params.id);
   const nb_modules = modules.length;
   let nb_lecons = 0;
@@ -6699,6 +6704,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!['brouillon','refusee'].includes(f.statut||'brouillon') && user.role !== 'administrateur') {
     return sendJSON(res, 400, { error: "Seules les formations en brouillon ou refusées peuvent être modifiées." });
   }
@@ -6772,6 +6778,7 @@ route("GET", "/api/formations/:id/coupons", async (req, res, params) => {
   const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const coupons = await db.prepare("SELECT * FROM formation_coupons WHERE formation_id=? ORDER BY created_at DESC").all(params.id);
   sendJSON(res, 200, { coupons });
 });
@@ -6782,6 +6789,7 @@ route("POST", "/api/formations/:id/coupons", async (req, res, params, body) => {
   const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const code = (body.code||'').trim().toUpperCase();
   const reduction = parseFloat(body.reduction_pct);
   if (!code) return sendJSON(res, 400, { error: "Le code du coupon est requis." });
@@ -6801,6 +6809,7 @@ route("DELETE", "/api/formations/:id/coupons/:couponId", async (req, res, params
   const f = await db.prepare("SELECT owner_user_id FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   await db.prepare("DELETE FROM formation_coupons WHERE id=? AND formation_id=?").run(params.couponId, params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -6829,6 +6838,7 @@ route("DELETE", "/api/formations/:id", async (req, res, params) => {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if ((f.statut||'brouillon') !== 'brouillon' && user.role !== 'administrateur') return sendJSON(res, 400, { error: "Seule une formation en brouillon peut être supprimée immédiatement. Pour une formation publiée, utilisez la suppression programmée." });
   await cascadeDeleteFormation(params.id);
   sendJSON(res, 200, { ok: true });
@@ -6842,6 +6852,7 @@ route("POST", "/api/formations/:id/programmer-suppression", async (req, res, par
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (f.statut !== 'publiee') return sendJSON(res, 400, { error: "Seule une formation publiée peut faire l'objet d'une suppression programmée." });
   const date = body.date;
   if (!date || isNaN(Date.parse(date))) return sendJSON(res, 400, { error: "Date invalide." });
@@ -6858,6 +6869,7 @@ route("DELETE", "/api/formations/:id/programmer-suppression", async (req, res, p
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   await db.prepare("UPDATE formations SET date_suppression_prevue=NULL, suppression_alerte_7j=0, suppression_alerte_3j=0, suppression_alerte_24h=0 WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -6942,6 +6954,7 @@ route("POST", "/api/formations/:id/modules", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du module est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_modules WHERE formation_id=?").get(params.id);
   const id = db.prepare("INSERT INTO formation_modules (formation_id,titre,description,ordre) VALUES (?,?,?,?)")
@@ -6953,6 +6966,7 @@ route("PUT", "/api/formations/:id/modules/:moduleId", async (req, res, params, b
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   db.prepare("UPDATE formation_modules SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND formation_id=?")
     .run(body.titre||null, body.description||null, params.moduleId, params.id);
   sendJSON(res, 200, { ok: true });
@@ -6962,6 +6976,7 @@ route("DELETE", "/api/formations/:id/modules/:moduleId", async (req, res, params
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const chapitres = await db.prepare("SELECT id FROM formation_chapitres WHERE module_id=?").all(params.moduleId);
   for (const c of chapitres) {
     const lecons = await db.prepare("SELECT id FROM formation_lecons WHERE chapitre_id=?").all(c.id);
@@ -6976,6 +6991,7 @@ route("PUT", "/api/formations/:id/modules/reorder", async (req, res, params, bod
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const ids = body.ordre || [];
   ids.forEach((mid, i) => { db.prepare("UPDATE formation_modules SET ordre=? WHERE id=? AND formation_id=?").run(i, mid, params.id); });
   sendJSON(res, 200, { ok: true });
@@ -6987,6 +7003,7 @@ route("POST", "/api/formations/:id/modules/:moduleId/chapitres", async (req, res
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du chapitre est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_chapitres WHERE module_id=?").get(params.moduleId);
   const id = db.prepare("INSERT INTO formation_chapitres (module_id,titre,description,ordre) VALUES (?,?,?,?)")
@@ -6998,6 +7015,7 @@ route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", asyn
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   db.prepare("UPDATE formation_chapitres SET titre=COALESCE(?,titre), description=COALESCE(?,description) WHERE id=? AND module_id=?")
     .run(body.titre||null, body.description||null, params.chapitreId, params.moduleId);
   sendJSON(res, 200, { ok: true });
@@ -7007,6 +7025,7 @@ route("DELETE", "/api/formations/:id/modules/:moduleId/chapitres/:chapitreId", a
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const lecons = await db.prepare("SELECT id FROM formation_lecons WHERE chapitre_id=?").all(params.chapitreId);
   for (const l of lecons) { await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(l.id); await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(l.id); }
   await db.prepare("DELETE FROM formation_chapitres WHERE id=? AND module_id=?").run(params.chapitreId, params.moduleId);
@@ -7017,6 +7036,7 @@ route("PUT", "/api/formations/:id/modules/:moduleId/chapitres/reorder", async (r
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const ids = body.ordre || [];
   ids.forEach((cid, i) => { db.prepare("UPDATE formation_chapitres SET ordre=? WHERE id=? AND module_id=?").run(i, cid, params.moduleId); });
   sendJSON(res, 200, { ok: true });
@@ -7027,6 +7047,7 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre de la leçon est requis." });
   const chapitre = await db.prepare("SELECT module_id FROM formation_chapitres WHERE id=?").get(params.chapitreId);
   if (!chapitre) return sendJSON(res, 404, { error: "Chapitre introuvable." });
@@ -7044,6 +7065,7 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const n = v => (v === undefined ? null : v);
   db.prepare(`UPDATE formation_lecons SET
     titre=COALESCE(?,titre), description=COALESCE(?,description), type=COALESCE(?,type),
@@ -7060,6 +7082,7 @@ route("DELETE", "/api/formations/:id/lecons/:leconId", async (req, res, params) 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   await db.prepare("DELETE FROM formation_quiz WHERE lecon_id=?").run(params.leconId);
   await db.prepare("DELETE FROM formation_lecons WHERE id=?").run(params.leconId);
   sendJSON(res, 200, { ok: true });
@@ -7069,6 +7092,7 @@ route("PUT", "/api/formations/:id/chapitres/:chapitreId/lecons/reorder", async (
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const ids = body.ordre || [];
   ids.forEach((lid, i) => { db.prepare("UPDATE formation_lecons SET ordre=? WHERE id=? AND chapitre_id=?").run(i, lid, params.chapitreId); });
   sendJSON(res, 200, { ok: true });
@@ -7087,6 +7111,7 @@ route("POST", "/api/formations/:id/quiz", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Le titre du quiz est requis." });
   const id = db.prepare(`INSERT INTO formation_quiz (formation_id,lecon_id,titre,type,note_minimale,temps_limite_min,correction_auto,commentaires_personnalises)
     VALUES (?,?,?,?,?,?,?,?)`).run(params.id, body.lecon_id||null, body.titre, body.type||'intermediaire',
@@ -7098,6 +7123,7 @@ route("PUT", "/api/formations/:id/quiz/:quizId", async (req, res, params, body) 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const n = v => (v === undefined ? null : v);
   db.prepare(`UPDATE formation_quiz SET titre=COALESCE(?,titre), type=COALESCE(?,type),
     note_minimale=COALESCE(?,note_minimale), temps_limite_min=COALESCE(?,temps_limite_min),
@@ -7111,6 +7137,7 @@ route("DELETE", "/api/formations/:id/quiz/:quizId", async (req, res, params) => 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   await db.prepare("DELETE FROM formation_quiz_questions WHERE quiz_id=?").run(params.quizId);
   await db.prepare("DELETE FROM formation_quiz WHERE id=?").run(params.quizId);
   sendJSON(res, 200, { ok: true });
@@ -7120,6 +7147,7 @@ route("POST", "/api/formations/:id/quiz/:quizId/questions", async (req, res, par
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.question) return sendJSON(res, 400, { error: "L'énoncé de la question est requis." });
   const { max } = await db.prepare("SELECT COALESCE(MAX(ordre),-1) AS max FROM formation_quiz_questions WHERE quiz_id=?").get(params.quizId);
   const id = db.prepare(`INSERT INTO formation_quiz_questions (quiz_id,question,type,options_json,reponse_correcte,points,ordre)
@@ -7132,6 +7160,7 @@ route("DELETE", "/api/formations/:id/quiz/:quizId/questions/:questionId", async 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   await db.prepare("DELETE FROM formation_quiz_questions WHERE id=? AND quiz_id=?").run(params.questionId, params.quizId);
   sendJSON(res, 200, { ok: true });
 });
@@ -7142,6 +7171,7 @@ route("PUT", "/api/formations/:id/certificat", async (req, res, params, body) =>
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   db.prepare(`UPDATE formations SET certificat_actif=?, certificat_modele=COALESCE(?,certificat_modele),
     certificat_conditions=COALESCE(?,certificat_conditions), certificat_qr=? WHERE id=?`)
     .run(body.certificat_actif?1:0, body.certificat_modele||null, body.certificat_conditions||null, body.certificat_qr===false?0:1, params.id);
@@ -7154,6 +7184,7 @@ route("GET", "/api/formations/:id/messages", async (req, res, params) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   const messages = await db.prepare(`SELECT m.*, u.nom AS sender_nom FROM formation_dossier_messages m
     LEFT JOIN users u ON u.id=m.sender_id WHERE m.formation_id=? ORDER BY m.created_at ASC`).all(params.id);
   sendJSON(res, 200, { messages });
@@ -7163,6 +7194,7 @@ route("POST", "/api/formations/:id/messages", async (req, res, params, body) => 
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!body.message) return sendJSON(res, 400, { error: "Message vide." });
   const senderRole = user.role === 'administrateur' ? 'administrateur' : 'formateur';
   const id = db.prepare("INSERT INTO formation_dossier_messages (formation_id,sender_id,sender_role,message) VALUES (?,?,?,?)")
@@ -7184,6 +7216,7 @@ route("POST", "/api/formations/:id/publier", async (req, res, params) => {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   if (f.owner_user_id !== user.id) return sendJSON(res, 403, { error: "Interdit." });
+  if (!(await exigerPremium(user, res, "formations"))) return;
   if (!['brouillon','refusee'].includes(f.statut||'brouillon')) return sendJSON(res, 400, { error: `Statut actuel : ${f.statut}` });
 
   /* Vérifications automatiques avant soumission */
@@ -9408,6 +9441,7 @@ route("PUT", "/api/ads/:id", async (req, res, params, body) => {
   const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
   if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
   if (Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  if (!(await exigerPremium(user, res, "publicites"))) return;
 
   const titre = body.titre !== undefined ? String(body.titre).trim() : ad.titre;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
@@ -9445,6 +9479,7 @@ route("DELETE", "/api/ads/:id", async (req, res, params) => {
   const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
   if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
   if (Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  if (!(await exigerPremium(user, res, "publicites"))) return;
   await db.prepare("DELETE FROM publicites WHERE id=?").run(ad.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -9482,6 +9517,7 @@ route("POST", "/api/ads/:id/renouveler", async (req, res, params) => {
   const ad = await db.prepare("SELECT * FROM publicites WHERE id=?").get(params.id);
   if (!ad) return sendJSON(res, 404, { error: "Publicité introuvable." });
   if (Number(ad.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  if (!(await exigerPremium(user, res, "publicites"))) return;
   if (ad.statut !== 'approved' && ad.statut !== 'paused') return sendJSON(res, 400, { error: "Seule une campagne active ou en pause peut être renouvelée." });
   const dureeJours = Math.min(Math.max(parseInt(ad.duree_jours) || 7, 1), 30);
   db.prepare(`UPDATE publicites SET statut='approved', date_debut=date('now'), date_fin=date('now','+${dureeJours} days'), updated_at=datetime('now') WHERE id=?`).run(ad.id);
@@ -9697,6 +9733,9 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
 route("POST", "/api/evenements", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur","collectivite"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative, Collectivité et Administrateur." });
+  /* Module presente comme Premium (bouton dore + fenetre d'abonnement) : le controle serveur
+     manquait. Rejoindre ou quitter un evenement reste libre — ce sont des participants. */
+  if (!(await exigerPremium(user, res, "evenements"))) return;
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
     places_max, inscription_ouverte, lien_inscription, image_url,
