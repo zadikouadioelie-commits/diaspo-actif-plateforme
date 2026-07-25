@@ -51,6 +51,7 @@
       <a href="business-plan.html">📋 Business Plans</a>
       <a href="#adhesions-init" data-section="adhesions-init">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init">🗳️ Votes sécurisés</a>
+      <a href="#parametres-vitrine" data-section="parametres-vitrine">⭐ Paramètres Vitrine</a>
 
       <div class="sb-group-lbl">01 — OUTILS</div>
       <a href="profil.html">👤 Mon profil public</a>
@@ -77,7 +78,6 @@
       <a href="messagerie.html">🟥 Messages <span class="pill" id="msg-count">—</span></a>
       <a href="demandes-relation.html">🤝 Demandes de mise en relation <span class="pill" id="demandes-relation-count" style="display:none;"></span></a>
       <a href="#messages-vitrine" data-section="messages-vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
-      <a href="#parametres-vitrine" data-section="parametres-vitrine">⭐ Paramètres Vitrine</a>
       <a href="#partenaires-liste" data-section="partenaires-liste">🤝 Liste des partenaires</a>
       <a href="#offres-emploi" data-section="offres-emploi">💼 Emplois & Stages</a>
       <a href="#recrutement" data-section="recrutement">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
@@ -2997,6 +2997,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* ══ ROUTER DE SECTIONS ══ */
   const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
   window.initShowSection = function(name) {
+    if (name === 'parametres-vitrine' && !window._daPremiumInitiative && !window.daBypassActive?.('parametres_vitrine')) {
+      window.openPremiumUpsell?.('parametres_vitrine');
+      return;
+    }
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
       if(el) el.style.display = s===name ? '' : 'none';
@@ -6485,7 +6489,8 @@ document.querySelector('[data-section="formations-gestion"]')?.addEventListener(
 
 /* ── Modules réservés aux comptes Premium (initiative_abonne) ──
    Bouton doré + modal d'upsell partagé, appliqué à : Publicités, Événements, Business Plans,
-   Paiements boutique (Stripe Connect), Module de paiement billetterie & cotisations. */
+   Paiements boutique (Stripe Connect), Module de paiement billetterie & cotisations,
+   Cotisations & Adhésions, Votes sécurisés, Paramètres Vitrine. */
 const PREMIUM_UPSELL_CONTEXTS = {
   publicites:  { title:'Créez vos campagnes publicitaires', intro:"La création de publicités est réservée aux comptes Premium." },
   evenements:  { title:'Créez vos événements', intro:"La création d'événements est réservée aux comptes Premium." },
@@ -6495,6 +6500,7 @@ const PREMIUM_UPSELL_CONTEXTS = {
   espace_formateur: { title:'Devenez créateur de formations', intro:"L'Espace Formateur (créer et vendre vos propres formations) est réservé aux comptes Premium." },
   adhesions: { title:'Gérez cotisations & adhésions', intro:"Le module Cotisations & Adhésions est réservé aux comptes Premium." },
   votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
+  parametres_vitrine: { title:'Personnalisez votre vitrine', intro:"La configuration avancée de la vitrine (modèles, modules, apparence, aperçu en direct) est réservée aux comptes Premium." },
 };
 /* 🛠 Bypass Premium (développement / tests uniquement) — visible seulement quand la variable
    serveur PREMIUM_DEMO_UNLOCK=1 est active (window._daDemoUnlock). Le contournement est
@@ -6559,7 +6565,7 @@ async function initPremiumGates() {
   if (window._daPremiumInitiative) return;
   applyPremiumButtonStyles();
 
-  /* Les 5 liens du groupe « ⭐ MODULES PREMIUM » (sidebar) — tous dorés, une seule fois chacun. */
+  /* Les 8 liens du groupe « ⭐ MODULES PREMIUM » (sidebar) — tous dorés, une seule fois chacun. */
   const SIDEBAR_PREMIUM_LINKS = [
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
@@ -6568,6 +6574,7 @@ async function initPremiumGates() {
     { href: 'business-plan.html', context: 'business_plans', intercept: true },
     { href: '#adhesions-init', context: 'adhesions', intercept: true },
     { href: '#votes-init', context: 'votes', intercept: true },
+    { href: '#parametres-vitrine', context: 'parametres_vitrine', intercept: true },
   ];
   SIDEBAR_PREMIUM_LINKS.forEach(({ href, context, intercept }) => {
     const link = document.querySelector(`.sidebar a[href="${href}"]`);
