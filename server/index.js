@@ -10767,7 +10767,12 @@ route("GET", "/api/admin/reseau", async (req, res) => {
   const parNat1     = await db.prepare("SELECT nationalite1 AS nat, COUNT(*) n FROM users WHERE nationalite1 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 10").all();
   const parNat2     = await db.prepare("SELECT nationalite2 AS nat, COUNT(*) n FROM users WHERE nationalite2 IS NOT NULL GROUP BY nat ORDER BY n DESC LIMIT 8").all();
   const parOrig1    = []; // "origine1" n'existe que sur la table initiatives, pas sur users — pas de données pertinentes ici
-  const parVille    = await db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville ORDER BY n DESC LIMIT 10").all();
+  /* PostgreSQL exige que toute colonne sélectionnée figure dans le GROUP BY ; SQLite le
+     tolère et renvoie une valeur arbitraire. Ces deux requêtes passaient donc en local et
+     cassaient les pages Finances et Réseau en production (constaté le 2026-07-25).
+     Grouper sur (ville, pays) est au passage plus juste : une même ville existe dans
+     plusieurs pays. */
+  const parVille    = await db.prepare("SELECT ville, pays, COUNT(*) n FROM users WHERE ville IS NOT NULL GROUP BY ville, pays ORDER BY n DESC LIMIT 10").all();
 
   // Top pays actifs = pays avec le plus d'activité (user_activity JOIN users)
   const paysActifs  = await db.prepare(`
@@ -11187,7 +11192,7 @@ route("GET", "/api/admin/finances", async (req, res) => {
       SUM(t.montant) total_depense
     FROM transactions t JOIN users u ON u.id = t.user_id
     WHERE t.statut='reussi'
-    GROUP BY t.user_id ORDER BY total_depense DESC LIMIT 5
+    GROUP BY t.user_id, u.nom, u.role, u.pays ORDER BY total_depense DESC LIMIT 5
   `).all();
 
   // Taux de conversion (abonnés / total utilisateurs)

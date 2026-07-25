@@ -36,7 +36,11 @@ async function createMissingTables(pool) {
     if (!createOnly.length) continue;
     for (const stmt of createOnly) {
       try {
-        await pg.exec(stmt + ';');
+        /* pool.query et NON pg.exec() : exec() intercepte toute erreur et se contente de
+           l'ecrire en console (db-pg.js). Le try/catch ci-dessous ne voyait donc jamais
+           rien, et le rapport annoncait « rien a reparer » alors que demandes_contact
+           n'avait jamais ete creee. C'est ce silence qui a masque la panne des semaines. */
+        await pool.query(pg.toPg(stmt));
       } catch (e) {
         /* Une table qui ne se crée pas est une panne SILENCIEUSE : la route qui l'utilise
            renvoie 500 à chaque appel, sans que rien ne le signale. Cas réel du 2026-07-25 —
@@ -133,7 +137,8 @@ async function ajouterColonnesManquantes(pool) {
          sinon des types comme INTEGER PRIMARY KEY AUTOINCREMENT arriveraient tels quels. */
       const def = pg.toPg(`X ${c.definition}`).replace(/^X\s*/, '').replace(/\bREFERENCES\b[\s\S]*$/i, '').trim();
       try {
-        await pg.exec(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${c.nom} ${def};`);
+        /* pool.query et non pg.exec(), pour la meme raison : exec() avale les erreurs. */
+        await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${c.nom} ${def}`);
         ajoutees.push(`${table}.${c.nom}`);
       } catch (e) {
         echecs.push({ objet: `${table}.${c.nom}`, erreur: e.message });

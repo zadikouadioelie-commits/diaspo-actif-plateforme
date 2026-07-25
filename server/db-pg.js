@@ -127,6 +127,14 @@ function toPg(sql) {
     // MIN(val, expr) SQLite (LEAST) → LEAST PostgreSQL (MIN() seul est un agrégat)
     .replace(/\bMIN\((\d+),/gi, "LEAST($1,")
     .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/gi, "BIGSERIAL PRIMARY KEY")
+    /* Dans un CREATE TABLE uniquement : une colonne *_id qui référence users(id) doit être
+       de type compatible. users.id devient BIGSERIAL (bigint) par la règle ci-dessus, et
+       PostgreSQL refuse une clé étrangère entre integer et bigint — là où SQLite l'accepte
+       sans broncher. Hypothèse pour l'échec silencieux de demandes_contact ; sans risque,
+       car seules les tables PAS ENCORE créées sont concernées (CREATE TABLE IF NOT EXISTS
+       ne touche jamais une table existante). L'erreur désormais remontée tranchera. */
+    .replace(/^(\s*CREATE TABLE[\s\S]*)$/i, bloc =>
+      bloc.replace(/\b([a-z0-9]+_id)\s+INTEGER\b/gi, "$1 BIGINT"))
     .replace(/\bBLOB\b/gi, "BYTEA")
     .replace(/\bINSERT OR IGNORE INTO\b/gi, "INSERT INTO")
     .replace(/\bINSERT OR REPLACE INTO\b/gi, "INSERT INTO")
