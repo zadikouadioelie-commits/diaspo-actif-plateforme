@@ -1453,7 +1453,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
         </div>
 
-        <div class="pv-builder-right" style="position:sticky;top:70px;align-self:start;min-width:0;">
+        <!-- margin-right : ecarte la barre de defilement de l'apercu de celle de la page.
+             Les deux restent actives car elles n'ont pas le meme role (l'apercu vs le
+             tableau de bord entier) ; elles ne sont simplement plus collees. -->
+        <div class="pv-builder-right" style="position:sticky;top:70px;align-self:start;min-width:0;margin-right:28px;">
           <div class="card" style="display:flex;flex-direction:column;max-height:calc(100vh - 86px);overflow:hidden;">
             <h3 style="margin:0 0 4px;font-size:15px;">📱 Aperçu en direct</h3>
             <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Se met à jour automatiquement après chaque modification.</p>
@@ -1481,7 +1484,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     body{ overflow-x:clip; }
     @media(max-width:1000px){
       .pv-builder-layout{ grid-template-columns:1fr!important; }
-      .pv-builder-right{ position:static!important; }
+      .pv-builder-right{ position:static!important; margin-right:0!important; }
       .pv-builder-right .card{ max-height:none!important; overflow:visible!important; }
       #pv-preview-frame-wrap{ max-height:70vh; }
     }</style>
