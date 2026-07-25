@@ -376,11 +376,9 @@ tbody td {
   box-shadow: 0 2px 8px rgba(37,99,235,.1) !important;
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #F1F5F9; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+/* ── Scrollbar : voir responsive.v2.css (source unique de verite) ──
+   Ce fichier etant charge en dernier, son pouce #CBD5E1 sur piste #F1F5F9
+   ecrasait les autres et rendait les barres pratiquement invisibles. */
 
 /* ── Page Login / Inscription ── */
 .auth-page,

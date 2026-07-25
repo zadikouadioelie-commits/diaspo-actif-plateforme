@@ -654,12 +654,39 @@ img:not([loading]) { loading: auto; }
   .page { padding-bottom: 0; }
 }
 
-/* ─── SCROLLBAR STYLING (desktop) ───────────────────────────────── */
+/* ─── SCROLLBAR STYLING (desktop) ───────────────────────────────────
+   SOURCE UNIQUE DE VERITE pour les barres de defilement de la plateforme.
+   Ce fichier est charge par les 90 pages du site ; ui-enhancements.v2.css et
+   design-upgrade.v2.css definissaient chacun leur propre barre, la derniere
+   chargee ecrasant les autres avec un pouce #CBD5E1 sur piste #F1F5F9 (deux
+   gris quasi identiques = barre invisible). Ces blocs ont ete retires au
+   profit de celui-ci. Ne pas re-declarer ::-webkit-scrollbar ailleurs.
+   Contraste pouce/piste ~3.9:1 (seuil WCAG des composants non textuels : 3:1).
+
+   Deux mecanismes, volontairement redondants :
+   1. scrollbar-color (standard, heritee) — Firefox, Chrome 121+, Safari 18+.
+      C'est ce qui s'applique aujourd'hui : barre de largeur systeme (~15px).
+   2. ::-webkit-scrollbar — repli pour les moteurs plus anciens uniquement.
+      Des que scrollbar-color est reconnue, Chrome IGNORE ces regles ; ne pas
+      s'attendre a voir le 12px ci-dessous sur un navigateur recent. */
 @media (min-width: 768px) {
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(26,58,92,.15); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(26,58,92,.25); }
+  html { scrollbar-color: #64748B #E2E8F0; }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: #E2E8F0; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb {
+    background: #64748B;
+    border-radius: 8px;
+    border: 2px solid #E2E8F0; /* detache le pouce de la piste */
+  }
+  ::-webkit-scrollbar-thumb:hover  { background: #475569; }
+  ::-webkit-scrollbar-thumb:active { background: #334155; }
+  ::-webkit-scrollbar-corner { background: #E2E8F0; }
+
+  /* Surfaces sombres (sidebar navy) : le pouce clair reste lisible. */
+  .sidebar { scrollbar-color: rgba(255,255,255,.55) rgba(255,255,255,.12); }
+  .sidebar::-webkit-scrollbar-track { background: rgba(255,255,255,.12); }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.55); border-color: transparent; }
+  .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.78); }
 }
 
 /* ─── FOCUS OUTLINE UNIVERSEL ────────────────────────────────────── */

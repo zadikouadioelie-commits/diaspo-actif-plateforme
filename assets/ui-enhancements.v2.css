@@ -371,11 +371,9 @@ input::placeholder { color: var(--muted); opacity: .7; }
   50%      { box-shadow: 0 0 0 4px rgba(21,101,192,.0); }
 }
 
-/* ── Scrollbar custom (Webkit) ── */
-::-webkit-scrollbar       { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+/* ── Scrollbar : voir responsive.v2.css (source unique de verite) ──
+   Le bloc qui se trouvait ici a ete retire : il entrait en concurrence avec
+   deux autres declarations globales et rendait les barres illisibles. */
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
