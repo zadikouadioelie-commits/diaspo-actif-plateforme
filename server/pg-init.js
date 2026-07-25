@@ -27,7 +27,18 @@ async function createMissingTables(pool) {
     // Ne garder que les instructions CREATE TABLE / CREATE INDEX (idempotentes grâce à IF NOT EXISTS).
     // Certains blocs mélangent CREATE TABLE + INSERT OR IGNORE de seed — ces INSERT ne sont
     // pas rejouables sans risque ici (rôle de seedPg()), donc on les exclut explicitement.
-    const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
+    /* Les commentaires sont retirés AVANT le découpage, et non après.
+
+       Cause racine du 2026-07-25 : un commentaire de db.js contenait un point-virgule
+       (« ...voir PEUT_INITIER) ; disponible aussi pour tout compte... »). Le découpage le
+       coupait en deux, et le morceau suivant commençait par « disponible aussi... » au lieu
+       de CREATE TABLE. Le filtre l'écartait, et demandes_contact n'a JAMAIS été soumise à
+       PostgreSQL — pendant que ses index, eux, partaient bien et échouaient. Table absente
+       en production pendant des semaines, sans le moindre signal.
+
+       Une ponctuation dans une phrase en français ne doit pas pouvoir supprimer une table. */
+    const sansCommentaires = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+    const statements = sansCommentaires.split(';').map(s => s.trim()).filter(Boolean);
     // On ignore les commentaires SQL (-- ... et /* ... */) en tête de bloc avant de tester le préfixe
     // CREATE, sinon un commentaire juste avant CREATE TABLE fait échouer le filtre (table jamais créée
     // sur Postgres). Bug réel observé sur abonnements_collectivite (commentaire /* */ non filtré).
@@ -86,7 +97,13 @@ async function createMissingTables(pool) {
    COLONNES_MIGRATION couvrait ce besoin, mais uniquement pour les colonnes qu'on pense
    à y recopier à la main. Ici on lit la source de vérité : la définition elle-même. */
 function colonnesDeclareesParTable() {
-  const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
+  /* Commentaires retirés d'abord : sans cela l'expression débordait de la table et avalait
+     du code JavaScript, produisant des « colonnes » fantômes (event_codes_promo.vide,
+     wallet_transactions.sinon — « vide » et « sinon » venant de phrases en français).
+     Elles échouaient ensuite bruyamment dans le rapport de réparation. */
+  const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\n]*/g, ' ');
   const parTable = {};
   const reTable = /CREATE TABLE IF NOT EXISTS\s+([a-zA-Z0-9_]+)\s*\(([\s\S]*?)\n\s*\)\s*;/g;
   let m;
