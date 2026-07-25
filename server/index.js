@@ -621,15 +621,39 @@ async function autoResoudreErreursSiNouveauDeploiement() {
   if (!deploiement) return null;   // hors Vercel (local) : on ne touche à rien
   try {
     const cle = 'error_logs_dernier_deploiement';
+    const cleDate = 'error_logs_dernier_deploiement_le';
     const precedent = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(cle);
     if (precedent && precedent.valeur === deploiement) return null;   // déjà traité
+    const precedentLe = (await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(cleDate))?.valeur || null;
 
-    const avant = (await db.prepare("SELECT COUNT(*) n FROM error_logs WHERE resolu=0").get())?.n || 0;
-    await db.prepare("UPDATE error_logs SET resolu=1 WHERE resolu=0").run();
-    if (precedent) await db.prepare("UPDATE parametres_plateforme SET valeur=? WHERE cle=?").run(deploiement, cle);
-    else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
-      .run(cle, deploiement, 'texte', "Dernier déploiement ayant déclenché l'auto-résolution du journal d'erreurs");
-    return { auto_resolues: avant, deploiement };
+    /* On ne coche QUE les erreurs antérieures au déploiement précédent.
+
+       Auparavant tout était coché sans distinction, y compris les pannes que le
+       déploiement ne corrigeait pas — le tableau affichait « 0 non résolue » pendant
+       que le compteur des 24 h grimpait. C'est ainsi que la table demandes_contact
+       manquante est restée invisible : sa route ne plante que lorsqu'un visiteur clique
+       sur « Écrire », donc rarement, et chaque déploiement effaçait la trace.
+
+       Avec cette règle, une erreur survenue sur le code actuellement en ligne reste
+       visible pendant tout son cycle de vie. Si elle cesse, elle s'efface seule au
+       déploiement d'après. Si elle persiste, elle génère de nouvelles lignes, toujours
+       récentes, donc toujours affichées. Aucune intervention manuelle. */
+    const conditionAge = precedentLe ? "AND created_at < ?" : "";
+    const args = precedentLe ? [precedentLe] : [];
+    const avant = (await db.prepare(`SELECT COUNT(*) n FROM error_logs WHERE resolu=0 ${conditionAge}`).get(...args))?.n || 0;
+    await db.prepare(`UPDATE error_logs SET resolu=1 WHERE resolu=0 ${conditionAge}`).run(...args);
+
+    const memoriser = async (c, v, desc) => {
+      const ex = await db.prepare("SELECT cle FROM parametres_plateforme WHERE cle=?").get(c);
+      if (ex) await db.prepare("UPDATE parametres_plateforme SET valeur=? WHERE cle=?").run(v, c);
+      else await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)").run(c, v, 'texte', desc);
+    };
+    await memoriser(cle, deploiement, "Dernier déploiement ayant déclenché l'auto-résolution du journal d'erreurs");
+    const maintenant = (await db.prepare("SELECT datetime('now') AS t").get())?.t;
+    await memoriser(cleDate, maintenant, "Horodatage de ce déploiement — borne d'ancienneté de l'auto-résolution");
+
+    const restantes = (await db.prepare("SELECT COUNT(*) n FROM error_logs WHERE resolu=0").get())?.n || 0;
+    return { auto_resolues: avant, restantes, deploiement };
   } catch (e) { return null; }
 }
 
