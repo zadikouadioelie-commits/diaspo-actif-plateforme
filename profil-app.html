@@ -1640,7 +1640,11 @@ function renderVisitorProfile() {
   const followBtn = !CU
     ? `<a href="login.html" class="pvz-btn primary follow-main">🔔 S'abonner</a>`
     : `<button class="pvz-btn follow-main ${following?'following':'primary'}" id="pvz-follow" onclick="pvzToggleFollow()">${following?'✓ Abonné':'🔔 S\'abonner'}</button>`;
-  const msgBtn = `<a href="messagerie.html?user=${profil.id}" class="pvz-btn">✉️ Message</a>`;
+  /* Profil public : le bouton dépend de la règle de mise en relation. Un utilisateur qui
+     découvre une initiative ici doit passer par une demande de liaison ; s'il vient d'une
+     vitrine, il a déjà pu écrire directement. L'emplacement est rempli par le composant
+     partagé (assets/app.js), qui interroge le serveur — l'interface n'invente pas la règle. */
+  const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Vitrine…</button>` : '';
   const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button><button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${vitrineToggleBtn}${shareBtn}`;
@@ -1767,6 +1771,9 @@ function renderVisitorProfile() {
   const dpBlock = (!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBlockHtml(profil._decouverte_premium.date_expiration, 'pvz-dp-block') : '';
 
   root.innerHTML = hero + dpBlock + grid;
+  /* Le profil est rendu APRÈS le chargement de la page : sans cet appel, l'emplacement du
+     bouton de mise en relation resterait vide, le composant ne balayant le DOM qu'au démarrage. */
+  window.initBoutonsRelation && window.initBoutonsRelation(root);
   if (dpBlock) window.startDecouvertePremiumCountdown();
 
   if (isOwn && isInit) pvzInitVitrineToggleBtn();

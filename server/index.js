@@ -5553,6 +5553,44 @@ async function calculerCompatibilite(demandeurId, destinataireId) {
    il ne rédige pas. On réutilise donc entièrement la mécanique des demandes de contact — quota
    quotidien, délai de carence, expiration, blocages, notification — en imposant simplement le
    contenu. Cela évite un second système parallèle qui divergerait avec le temps. */
+/* GET /api/relation-statut?user_id=&origine= — quel bouton l'interface doit-elle afficher ?
+   Interroger le serveur AVANT le clic vaut mieux que d'intercepter un refus après : l'utilisateur
+   voit d'emblée la seule action possible, au lieu de découvrir la règle en se heurtant à une
+   erreur. La décision reste prise côté serveur — l'interface ne fait que la refléter, elle ne
+   la rejoue pas, ce qui évite deux implémentations qui divergeraient. */
+route("GET", "/api/relation-statut", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cibleId = Number(query.user_id);
+  if (!cibleId || cibleId === user.id) return sendJSON(res, 400, { error: "Compte invalide." });
+  const cible = await db.prepare("SELECT id, nom, role FROM users WHERE id=?").get(cibleId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+
+  /* Une conversation déjà ouverte vaut autorisation : on ne redemande jamais une liaison
+     à quelqu'un avec qui l'échange a commencé. */
+  const conv = await db.prepare(
+    "SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)"
+  ).get(user.id, cibleId, cibleId, user.id);
+  if (conv || await liaisonAcceptee(user.id, cibleId)) {
+    return sendJSON(res, 200, { action: "message", libelle: "Message", contact_direct: true });
+  }
+
+  const enAttente = await db.prepare(
+    "SELECT id FROM demandes_contact WHERE demandeur_id=? AND destinataire_id=? AND statut='en_attente'"
+  ).get(user.id, cibleId);
+  if (enAttente) {
+    return sendJSON(res, 200, { action: "en_attente", libelle: "Demande envoyée", contact_direct: false, demande_id: enAttente.id });
+  }
+
+  const exigence = await demandeDeLiaisonExigee(user, cible, String(query.origine || ""));
+  if (exigence) {
+    return sendJSON(res, 200, { action: "demande_liaison", libelle: exigence.libelle,
+                                contact_direct: false, type: exigence.type,
+                                message_predefini: MESSAGE_DEMANDE_LIAISON });
+  }
+  sendJSON(res, 200, { action: "message", libelle: "Message", contact_direct: true });
+});
+
 route("POST", "/api/demandes-liaison", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
