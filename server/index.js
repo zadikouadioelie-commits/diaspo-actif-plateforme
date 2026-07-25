@@ -5234,6 +5234,28 @@ function audienceOrigineWhere(origine, collectiviteId, alias = "u") {
   };
 }
 
+/* Critères de ciblage choisis par la collectivité au moment de diffuser.
+
+   Ils ne peuvent que RESTREINDRE l'audience légitime, jamais l'élargir : ces conditions
+   s'ajoutent au périmètre territorial et à la règle d'origine, elles ne les remplacent
+   pas. Une collectivité peut donc viser une ville de son territoire ou ses seuls abonnés,
+   mais aucun critère ne lui ouvre une audience à laquelle elle n'avait pas déjà droit. */
+function criteresDiffusionWhere(criteres, collectiviteId, alias = "u") {
+  const conds = [], params = [];
+  if (!criteres || typeof criteres !== "object") return { where: "", params, resume: null };
+  const resume = {};
+  for (const champ of ["pays", "region", "departement", "ville"]) {
+    const v = (criteres[champ] || "").toString().trim();
+    if (v) { conds.push(`${alias}.${champ} = ?`); params.push(v); resume[champ] = v; }
+  }
+  if (criteres.abonnes_seulement) {
+    conds.push(`${alias}.id IN (SELECT user_id FROM abonnements_collectivite WHERE collectivite_id = ?)`);
+    params.push(collectiviteId);
+    resume.abonnes_seulement = true;
+  }
+  return { where: conds.length ? " AND " + conds.join(" AND ") : "", params, resume: Object.keys(resume).length ? resume : null };
+}
+
 /* Un membre relève-t-il du périmètre de compétence d'une collectivité ?
    Utilisé pour la diffusion (principe 4) : un membre ne reçoit les contenus
    poussés (communications, consultations) que des collectivités dont il dépend. */
@@ -12383,6 +12405,47 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     sendJSON(res, 200, { doublon_probable: matches.length > 0, matches });
   });
 
+  /* POST /api/communications/audience — combien de personnes cette diffusion toucherait ?
+
+     Diffuser sans savoir à qui revient à écrire à l'aveugle : l'émetteur doit pouvoir
+     mesurer l'effet de ses critères AVANT d'envoyer, et voir immédiatement qu'une cible
+     hors de sa communauté est refusée plutôt que de le découvrir au moment de publier. */
+  route("POST", "/api/communications/audience", async (req, res, params, body) => {
+    const user = await getCurrentUser(req);
+    if (!user || user.role !== "collectivite") return sendJSON(res, 403, { error: "Réservé aux collectivités." });
+    const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville,pays_origine_institution,origine1 FROM users WHERE id=?").get(user.id);
+    const origine = origineCollectivite(coll);
+    if (!origine) return sendJSON(res, 403, { code: "origine_indefinie", error: "Votre origine institutionnelle n'est pas renseignée." });
+
+    const cibleOrigine = body.cible_origine ? String(body.cible_origine).trim() : null;
+    let derogation = null;
+    if (cibleOrigine && normOrigine(cibleOrigine) !== normOrigine(origine)) {
+      derogation = await autorisationDiffusion(user.id, cibleOrigine);
+      if (!derogation) {
+        return sendJSON(res, 403, {
+          code: "diffusion_hors_origine",
+          error: "Cette diffusion n'est pas autorisée vers cette communauté. Pour établir une collaboration avec ce groupe, utilisez le système Établir contact.",
+          origine_collectivite: origine, origine_ciblee: cibleOrigine,
+        });
+      }
+    }
+    const perimetre = getPerimetre(coll);
+    const { where: pw, params: pp } = perimetreWhere(perimetre, "u");
+    const aud = audienceOrigineWhere(derogation ? cibleOrigine : origine, user.id, "u");
+    const crit = criteresDiffusionWhere(body.criteres, user.id, "u");
+    let nb = 0;
+    try {
+      nb = (await db.prepare(
+        `SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw}) AND ${aud.where}${crit.where}`
+      ).get(...pp, ...aud.params, ...crit.params))?.n || 0;
+    } catch (e) { nb = 0; }
+    sendJSON(res, 200, {
+      nb_destinataires: nb, origine, origine_ciblee: derogation ? cibleOrigine : origine,
+      perimetre, libelle: libellePerimetre(perimetre),
+      criteres: crit.resume, derogation: derogation ? { id: derogation.id, motif: derogation.motif } : null,
+    });
+  });
+
   route("POST", "/api/communications", async (req, res, params, body) => {
     const user = await getCurrentUser(req);
     if (!user || !["collectivite","administrateur"].includes(user.role)) return sendJSON(res, 403, { error: "Réservé aux collectivités et administrateurs." });
@@ -12408,7 +12471,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       liste = await db.prepare("SELECT id,nom FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_id, user.id);
       if (!liste) return sendJSON(res, 404, { error: "Liste de diffusion introuvable." });
     }
-    let origine = null, derogation = null;
+    let origine = null, derogation = null, criteresAppliques = null;
     if (user.role === "collectivite") {
       const coll = await db.prepare("SELECT type_organisme,type_institution,pays_exercice,region_exercice,departement_exercice,ville_exercice,pays,region,departement,ville,pays_origine_institution,origine1 FROM users WHERE id=?").get(user.id);
       perimetre = getPerimetre(coll);
@@ -12439,8 +12502,10 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
         ? audienceOrigineWhere(cibleOrigine, user.id, "u")   // dérogation : la communauté visée
         : audienceOrigineWhere(origine, user.id, "u");       // règle générale : la sienne
       const { where: pw, params: pp } = perimetreWhere(perimetre, "u");
-      let sql = `SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw}) AND ${audienceOrigine.where}`;
-      const args = [...pp, ...audienceOrigine.params];
+      const crit = criteresDiffusionWhere(body.criteres, user.id, "u");
+      criteresAppliques = crit.resume;
+      let sql = `SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw}) AND ${audienceOrigine.where}${crit.where}`;
+      const args = [...pp, ...audienceOrigine.params, ...crit.params];
       if (liste) { sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL)`; args.push(liste.id); }
       try { nb = (await db.prepare(sql).get(...args))?.n || 0; } catch(e) { nb = 0; }
     } else {
@@ -12461,6 +12526,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
          RÉCEPTION consulte : sans elle, la règle ne vaudrait qu'à l'envoi et n'importe
          quel appel direct la contournerait. */
       ...(origine ? { origine_diffusee: derogation ? String(body.cible_origine).trim() : origine } : {}),
+      ...(criteresAppliques ? { criteres: criteresAppliques } : {}),
       ...(derogation ? { derogation_id: derogation.id, derogation_motif: derogation.motif } : {}),
     };
     // Alter table si colonnes manquantes (migration SQLite)
