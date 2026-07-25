@@ -11487,13 +11487,24 @@ async function diagPremium() {
     const i = d.impact_si_activation || {};
     const s = i.comptes_par_statut || {};
     const bloques = s.expire || 0;
+    const vitrines = i.vitrines_passant_en_maintenance || 0;
     const couleur = bloques ? '#f59e0b' : '#16a34a';
+    /* Le message était au conditionnel dans les deux cas : il annonçait « activer maintenant
+       ne bloquerait personne » alors que les restrictions sont actives depuis le 2026-07-25.
+       Les chiffres sont les mêmes, mais leur sens change du tout au tout — ce qui « serait »
+       bloqué l'EST déjà. Un tableau de bord qui décrit une hypothèse là où il y a un fait
+       induit en erreur sur l'état réel de la plateforme. */
+    const actif = !!d.application_active;
     diagAfficher(
-      `<strong>Restrictions ${d.application_active ? 'ACTIVES' : 'désactivées'}</strong><br>`
+      `<strong>Restrictions ${actif ? 'ACTIVES' : 'désactivées'}</strong><br>`
       + `Comptes : ${s.actif || 0} actifs · ${s.bientot_expire || 0} bientôt expirés · <strong>${bloques} expirés</strong><br>`
-      + `Vitrines qui passeraient en maintenance : <strong>${i.vitrines_passant_en_maintenance || 0}</strong><br>`
-      + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) seraient bloqués dès l'activation.</span>`
-                 : `<span style="color:#166534;">Activer maintenant ne bloquerait personne.</span>`),
+      + (actif
+          ? `Vitrines actuellement en maintenance : <strong>${vitrines}</strong><br>`
+            + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) <strong>sont bloqués en ce moment</strong>.</span>`
+                       : `<span style="color:#166534;">Aucun compte n'est bloqué pour l'instant.</span>`)
+          : `Vitrines qui passeraient en maintenance : <strong>${vitrines}</strong><br>`
+            + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) seraient bloqués dès l'activation.</span>`
+                       : `<span style="color:#166534;">Activer maintenant ne bloquerait personne.</span>`)),
       couleur);
   } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
