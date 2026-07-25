@@ -16,6 +16,7 @@ let _initialized = false;
    Corrige le bug racine : avant, une base déjà initialisée ne recevait jamais
    les nouvelles tables ajoutées ultérieurement dans db.js (ex: error_logs). */
 async function createMissingTables(pool) {
+  const echecs = [];
   const dbSrc = fs.readFileSync(path.join(__dirname, 'db.js'), 'utf8');
   const sqlRegex = /db\.exec\(`([\s\S]*?)`\)/g;
   let match;
@@ -37,10 +38,58 @@ async function createMissingTables(pool) {
       try {
         await pg.exec(stmt + ';');
       } catch (e) {
-        console.error('[pg-init] createMissingTables — erreur sur une instruction:', e.message);
+        /* Une table qui ne se crée pas est une panne SILENCIEUSE : la route qui l'utilise
+           renvoie 500 à chaque appel, sans que rien ne le signale. Cas réel du 2026-07-25 —
+           demandes_contact absente en production, découvert par un utilisateur en cliquant
+           sur « Écrire ». La console Vercel ne se consulte pas ; le journal d'erreurs si.
+           On y écrit donc l'objet fautif ET le message PostgreSQL exact. */
+        const objet = (stmt.match(/CREATE (?:TABLE|INDEX|UNIQUE INDEX)(?: IF NOT EXISTS)? ([a-zA-Z0-9_]+)/i) || [])[1] || '(inconnu)';
+        echecs.push({ objet, erreur: e.message });
+        console.error(`[pg-init] createMissingTables — échec sur ${objet}:`, e.message);
+        try {
+          /* pool.query et non pg.exec() : exec() n'accepte pas de paramètres et découpe
+             sur « ; » — un message PostgreSQL en contenant un casserait l'insertion. */
+          await pool.query(
+            "INSERT INTO error_logs (message, stack, context, url, method) VALUES ($1,$2,$3,$4,$5)",
+            [`Création impossible : ${objet} — ${e.message}`, stmt.slice(0, 2000), 'pg-init/createMissingTables', null, null]
+          );
+        } catch (_) { /* si error_logs elle-même manque, la console reste le dernier recours */ }
       }
     }
   }
+  return echecs;
+}
+
+/* Réparation du schéma à la demande, déclenchée depuis le tableau de bord administrateur.
+
+   Pourquoi une route dédiée alors que pgInit() fait déjà ce travail au démarrage :
+   pgInit() n'agit que sur l'instance qui décroche le verrou consultatif, et ses échecs
+   partent dans une console Vercel que personne ne consulte. Résultat observé le
+   2026-07-25 : une table absente pendant des semaines, sa route en 500 permanent,
+   aucun signal. Ici l'exécution est immédiate, sur l'instance qui répond, et le
+   message PostgreSQL exact revient dans la réponse HTTP — le diagnostic et la
+   réparation dans le même geste, plutôt qu'une hypothèse suivie d'un déploiement. */
+async function listerTables(pool) {
+  const { rows } = await pool.query(
+    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
+  );
+  return rows.map(r => r.table_name);
+}
+
+async function reparerSchema() {
+  const { pool } = pg;
+  const avant  = await listerTables(pool);
+  const echecs = await createMissingTables(pool);
+  let migration = 'ok';
+  try { await migratePg(pool); } catch (e) { migration = e.message; }
+  const apres = await listerTables(pool);
+  return {
+    tables_avant: avant.length,
+    tables_apres: apres.length,
+    tables_creees: apres.filter(t => !avant.includes(t)),
+    echecs,
+    migration,
+  };
 }
 
 /* Verrou consultatif Postgres — évite que plusieurs cold starts Vercel concurrents
@@ -1036,6 +1085,7 @@ async function seedPg(pool) {
 }
 
 module.exports = pgInit;
+module.exports.reparerSchema = reparerSchema;
 
 /* Colonnes attendues par le schema, exposees pour le controle post-deploiement.
    migratePg() les applique au demarrage, mais uniquement lors d'un demarrage a froid ET si

@@ -4122,6 +4122,7 @@
             <button class="btn btn-sm btn-outline" onclick="diagSchema()">🗄️ Vérifier la base</button>
             <button class="btn btn-sm btn-outline" onclick="diagPremium()">👑 Impact des restrictions Premium</button>
             <button class="btn btn-sm btn-outline" onclick="diagEmail()">✉️ Tester l'envoi d'e-mail</button>
+            <button class="btn btn-sm btn-outline" onclick="diagReparer()">🔧 Réparer la base</button>
           </div>
           <div id="diag-resultat" style="margin-top:14px;"></div>
         </div>
@@ -11403,6 +11404,32 @@ async function diagPremium() {
       + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) seraient bloqués dès l'activation.</span>`
                  : `<span style="color:#166534;">Activer maintenant ne bloquerait personne.</span>`),
       couleur);
+  } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
+}
+
+/* « Vérifier la base » constate l'écart ; celle-ci le comble. Elle rejoue les créations de
+   tables et les migrations immédiatement, au lieu d'attendre un démarrage à froid qui décroche
+   le verrou. Surtout, elle REMONTE le message PostgreSQL exact quand une création échoue —
+   sans quoi l'échec finit dans une console que personne ne consulte, et la route concernée
+   reste en 500 indéfiniment. Sans danger : rien n'est supprimé ni réécrit. */
+async function diagReparer() {
+  if (!confirm("Recréer les tables et colonnes manquantes ?\n\nAucune donnée existante n'est modifiée ni supprimée.")) return;
+  diagPatiente('Réparation en cours');
+  try {
+    const d = await api('POST', '/admin/reparer-schema');
+    const creees = d.tables_creees || [], echecs = d.echecs || [];
+    let html = `Base passée de <strong>${d.tables_avant}</strong> à <strong>${d.tables_apres}</strong> tables.`;
+    if (creees.length) html += `<br>✅ Créées : <code style="font-size:11.5px;">${creees.join(', ')}</code>`;
+    if (d.migration && d.migration !== 'ok') html += `<br>⚠️ Migration des colonnes : ${d.migration}`;
+    if (echecs.length) {
+      html += `<br><br>❌ <strong>${echecs.length} création(s) impossible(s)</strong> :<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;">`
+           + echecs.map(x => `<li><code>${x.objet}</code> — ${x.erreur}</li>`).join('') + `</ul>`;
+      diagAfficher(html, '#dc2626');
+    } else if (creees.length) {
+      diagAfficher(`✅ <strong>Base réparée</strong><br>${html}`, '#16a34a');
+    } else {
+      diagAfficher(`✅ <strong>Rien à réparer</strong> — ${html}`, '#16a34a');
+    }
   } catch (e) { diagAfficher(`❌ ${e.message}`, '#dc2626'); }
 }
 

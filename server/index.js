@@ -6349,6 +6349,29 @@ route("GET", "/api/admin/premium/observations", async (req, res) => {
   });
 });
 
+/* POST /api/admin/reparer-schema — rejoue les créations de tables et les migrations, MAINTENANT.
+
+   schema-check dit ce qui manque ; celle-ci le crée et rapporte pourquoi elle n'y arrive pas.
+   La différence tient au moment : pgInit() ne s'exécute qu'au démarrage à froid, et seulement
+   sur l'instance qui décroche le verrou consultatif — ses échecs s'écrivent dans une console
+   Vercel que personne ne lit. Une table pouvait donc rester absente indéfiniment, sa route en
+   500 permanent, sans le moindre signal (cas demandes_contact, 2026-07-25).
+   Sans risque : tout est en CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS — les objets
+   déjà présents sont ignorés, aucune donnée n'est touchée. */
+route("POST", "/api/admin/reparer-schema", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  if (!process.env.DATABASE_URL) return sendJSON(res, 400, { error: "Réparation réservée à PostgreSQL (production)." });
+  try {
+    const rapport = await require('./pg-init').reparerSchema();
+    sendJSON(res, 200, rapport);
+  } catch (e) {
+    /* Le message brut est indispensable ici : c'est précisément ce qu'on cherche. */
+    logError(e, 'reparer-schema', req);
+    sendJSON(res, 500, { error: e.message });
+  }
+});
+
 /* GET /api/admin/schema-check — colonnes déclarées mais absentes de la base réelle.
    Né d'un incident : un déploiement avait ajouté trois colonnes à une requête UPDATE
    existante alors que la migration PostgreSQL n'avait pas encore tourné. Résultat, TOUTE
