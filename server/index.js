@@ -1442,8 +1442,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?,
       vitrine_temoignages_json=?, vitrine_vision_objectifs=?, vitrine_resultats_impact_json=?,
       vitrine_expertise_json=?, vitrine_certifications_json=?, vitrine_devis_active=?, vitrine_partenariat_active=?,
-      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?,
-      vitrine_videos_json=?, vitrine_portfolio_json=?, vitrine_reservation_json=?
+      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -1489,11 +1488,23 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     logo_url !== undefined ? logo_url : init.logo_url,
     reseaux_sociaux !== undefined ? (typeof reseaux_sociaux === 'object' ? JSON.stringify(reseaux_sociaux) : reseaux_sociaux) : init.reseaux_sociaux,
     slogan !== undefined ? slogan : init.slogan,
-    vitrine_videos_json !== undefined ? vitrine_videos_json : init.vitrine_videos_json,
-    vitrine_portfolio_json !== undefined ? vitrine_portfolio_json : init.vitrine_portfolio_json,
-    vitrine_reservation_json !== undefined ? vitrine_reservation_json : init.vitrine_reservation_json,
     params.id
   );
+
+  /* Colonnes des modules Galerie videos / Portfolio / Reservation : ecrites SEPAREMENT.
+     Les inclure dans la requete principale rendait TOUTE sauvegarde de vitrine impossible
+     tant que la migration PostgreSQL n'avait pas tourne (constate en production : erreur
+     500 sur chaque enregistrement). Isolees et protegees, une colonne encore absente ne
+     fait perdre que son propre champ, jamais le reste de la fiche. */
+  for (const [champ, valeur] of [
+    ['vitrine_videos_json', vitrine_videos_json],
+    ['vitrine_portfolio_json', vitrine_portfolio_json],
+    ['vitrine_reservation_json', vitrine_reservation_json],
+  ]) {
+    if (valeur === undefined) continue;
+    try { await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(valeur, params.id); }
+    catch (e) { console.error('[vitrine] colonne indisponible', champ, e.message); }
+  }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -3782,11 +3793,17 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
      Requêtes séparées et paramétrées — le nom de colonne provient exclusivement de
      VITRINE_CHAMPS_BROUILLON, jamais du corps de la requête. */
   const contenu = (draft.contenu && typeof draft.contenu === "object") ? draft.contenu : {};
+  let publies = 0;
   for (const champ of Object.keys(contenu)) {
     if (!VITRINE_CHAMPS_BROUILLON.includes(champ)) continue;
-    await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(contenu[champ], params.id);
+    /* Protégé champ par champ : une colonne récente pas encore migrée en PostgreSQL ne doit
+       pas faire échouer TOUTE la publication et laisser la vitrine à moitié publiée. */
+    try {
+      await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(contenu[champ], params.id);
+      publies++;
+    } catch (e) { console.error('[vitrine-publish] colonne indisponible', champ, e.message); }
   }
-  sendJSON(res, 200, { ok: true, champsPublies: Object.keys(contenu).length });
+  sendJSON(res, 200, { ok: true, champsPublies: publies });
 });
 
 /* ===========================================================================
