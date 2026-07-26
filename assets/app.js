@@ -524,6 +524,21 @@ function showOrigineBanner(user) {
   };
 }
 
+/* Après avoir renseigné son origine (modale d'édition, quelle que soit la page), le bandeau
+   restait affiché : il est injecté une seule fois au chargement de la page et rien ne le
+   ré-évaluait après l'enregistrement — l'utilisateur devait recharger la page pour le voir
+   disparaître, ce qui donnait l'impression que sa correction n'avait servi à rien. À appeler
+   juste après un enregistrement réussi d'origine, quel que soit le type de compte. */
+async function recheckOrigineBanner() {
+  try {
+    const r = await api("GET", "/auth/me");
+    if (!r.user || !r.user.origine_manquante) {
+      document.getElementById("origine-banner")?.remove();
+    }
+  } catch (e) { /* silencieux : le bandeau réapparaîtra au pire au prochain chargement */ }
+}
+window.recheckOrigineBanner = recheckOrigineBanner;
+
 /* ─── Comptes de test (démo) — réservé à l'administrateur ───
    Ouvre une fenêtre listant les comptes de démonstration et permet de s'y
    connecter en un clic (déconnexion admin → connexion démo → redirection). */
@@ -675,7 +690,10 @@ async function applyAuthState() {
         <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div> ${user.nom}
       </a>
       <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
-      <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>`;
+      <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>
+      <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
+        <span style="font-size:14px;">💎</span> Mon Associé
+      </a>`;
     const logout = document.getElementById("logout-link");
     if (logout) logout.addEventListener("click", async (e) => {
       e.preventDefault();

@@ -136,6 +136,7 @@
       if (res.email_a_reverifier) msg += ' Un e-mail de confirmation vous a été envoyé pour valider votre nouvelle adresse.';
       ok.textContent = msg;
       ok.style.display = 'block';
+      if (window.recheckOrigineBanner) window.recheckOrigineBanner();
     } catch(e) {
       err.textContent = e.message || 'Erreur lors de l’enregistrement.';
       err.style.display = 'block';
@@ -183,6 +184,7 @@
         });
         ok.textContent = '✅ Origine enregistrée.';
         ok.style.display = 'block';
+        if (window.recheckOrigineBanner) window.recheckOrigineBanner();
       } catch(e) {
         err.textContent = e.message || 'Erreur lors de l’enregistrement.';
         err.style.display = 'block';

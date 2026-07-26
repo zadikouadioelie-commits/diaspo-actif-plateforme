@@ -7075,6 +7075,7 @@ async function saveIdentity() {
     const r = await api('PUT', '/profil', body);
     Object.assign(profil, body);
     ok.style.display='block'; ok.textContent='Profil mis à jour ✓';
+    if (window.recheckOrigineBanner) window.recheckOrigineBanner();
     setTimeout(()=>{ renderVisitorProfile(); }, 800);
   } catch(e) { err.style.display='block'; err.textContent=e.message||'Erreur.'; }
 }

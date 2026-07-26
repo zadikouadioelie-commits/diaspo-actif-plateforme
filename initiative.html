@@ -853,6 +853,7 @@ const DOMAIN_GRAD = {
     Object.assign(init, r.initiative);
     renderColLeft(); renderColRight();
     if (window.initBoutonsRelation) window.initBoutonsRelation(document);
+    if (window.recheckOrigineBanner) window.recheckOrigineBanner();
   }
 
   function openEditModal(titre, bodyHtml, onSave) {
