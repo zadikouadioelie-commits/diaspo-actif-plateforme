@@ -324,7 +324,11 @@ const DOMAIN_GRAD = {
           <div class="strip-icon">🌍</div>
           <div>
             <div class="strip-label">Origine</div>
-            <div class="strip-val">${nats.length ? nats.slice(0,2).join(', ') + (nats.length > 2 ? '…' : '') : 'Non renseigné'}</div>
+            <!-- Ce bandeau affichait les NATIONALITÉS sous l'étiquette « Origine » : deux
+                 informations différentes, dont l'une était donnée pour l'autre. Il utilise
+                 désormais la même résolution que l'annuaire — origine de la structure, à
+                 défaut celle de son propriétaire. -->
+            <div class="strip-val">${(window.daOrigineDeclaree ? daOrigineDeclaree(init) : '') || 'Non renseigné'}</div>
           </div>
         </div>
         <div class="init-strip-item">
@@ -609,7 +613,11 @@ const DOMAIN_GRAD = {
        de toutes les initiatives créées avant le 2026-07-24 — et la ligne « 🌍 Origines » ne
        s'affichait sur aucune cartouche de l'annuaire faute de donnée. La carte reste visible
        pour le propriétaire même vide, sans quoi il n'aurait aucun moyen de la renseigner. */
-    const origines = [init.origine1, init.origine2].filter(Boolean);
+    /* Même résolution que l'annuaire : origine propre, à défaut celle du propriétaire.
+       Sans ce repli, cette page annonçait « Non renseignées » alors que le compte
+       responsable avait bien déclaré son pays — les deux écrans se contredisaient. */
+    const origineResolue = window.daOrigineDeclaree ? daOrigineDeclaree(init) : '';
+    const origines = origineResolue ? origineResolue.split(' · ') : [];
     const nationalites = [init.nationalite1, init.nationalite2].filter(Boolean);
 
     document.getElementById('col-left').innerHTML = `
