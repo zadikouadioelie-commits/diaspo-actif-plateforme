@@ -475,93 +475,16 @@
     };
   }
 
-  /* ──────────────── Modal signalement compte inactif ─────── */
+  /* ──────────────── Signalement de compte ────────────────
+     Délègue au module Signalement de compte & Gestion des litiges
+     (assets/signalement.js). `userId` est déjà le compte réel (users.id) —
+     y compris pour une initiative, où le paramètre reçu ici est owner_user_id
+     (voir l'appel TrustWidget.render(init.owner_user_id, …, {targetType:'initiative'})). */
   function reportAccount(userId) {
-    const bg = document.createElement('div');
-    bg.className = 'ts-modal-bg';
-    bg.innerHTML = `
-      <div class="ts-modal">
-        <h3>🚩 Signaler un compte inactif</h3>
-        <p style="font-size:12.5px;color:#64748b;margin:0 0 12px">
-          Ce signalement est transmis à nos modérateurs. Il n'est possible que si vous avez envoyé
-          un message il y a plus de 14 jours sans réponse.
-        </p>
-        <div id="ts-report-msg" style="font-size:12px;margin-bottom:8px;"></div>
-        <div class="ts-modal-actions">
-          <button class="ts-modal-btn" onclick="this.closest('.ts-modal-bg').remove()">Annuler</button>
-          <button class="ts-modal-btn primary" id="ts-report-submit">Envoyer le signalement</button>
-        </div>
-      </div>`;
-    document.body.appendChild(bg);
-
-    bg.querySelector('#ts-report-submit').onclick = async () => {
-      const msgEl = bg.querySelector('#ts-report-msg');
-      msgEl.style.color = '#64748b';
-      msgEl.textContent = 'Envoi…';
-      try {
-        const r = await fetch(`/api/users/${userId}/signaler`, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
-        const d = await r.json();
-        if (r.ok) {
-          msgEl.style.color = '#10b981';
-          msgEl.textContent = d.message || 'Signalement enregistré.';
-          setTimeout(() => bg.remove(), 2000);
-        } else {
-          msgEl.style.color = '#ef4444';
-          msgEl.textContent = d.error || 'Erreur.';
-        }
-      } catch { msgEl.style.color='#ef4444'; msgEl.textContent = 'Erreur réseau.'; }
-    };
+    if (typeof window.ouvrirSignalementModal === 'function') window.ouvrirSignalementModal(userId);
   }
-
-  /* ──────────────── Modal signalement initiative ─────────── */
-  const MOTIFS = [
-    'Suspicion d\'escroquerie','Faux documents','Informations mensongères',
-    'Collecte de fonds suspecte','Usurpation d\'identité','Contenu illégal',
-    'Discours haineux','Spam','Publicité abusive',
-    'Violation des règles Diaspo\'Actif','Conflit d\'intérêt non déclaré','Autre'
-  ];
-
-  function reportInitiative(initId) {
-    const bg = document.createElement('div');
-    bg.className = 'ts-modal-bg';
-    bg.innerHTML = `
-      <div class="ts-modal">
-        <h3>🚩 Signaler cette initiative</h3>
-        <label>Motif *</label>
-        <select id="ts-motif">
-          <option value="">-- Choisir un motif --</option>
-          ${MOTIFS.map(m => `<option value="${m}">${m}</option>`).join('')}
-        </select>
-        <label>Description (facultatif)</label>
-        <textarea id="ts-desc" placeholder="Décrivez le problème en détail…"></textarea>
-        <div id="ts-rep-msg" style="font-size:12px;margin-top:8px;"></div>
-        <div class="ts-modal-actions">
-          <button class="ts-modal-btn" onclick="this.closest('.ts-modal-bg').remove()">Annuler</button>
-          <button class="ts-modal-btn primary" id="ts-rep-submit">Envoyer</button>
-        </div>
-      </div>`;
-    document.body.appendChild(bg);
-
-    bg.querySelector('#ts-rep-submit').onclick = async () => {
-      const motif = bg.querySelector('#ts-motif').value;
-      const description = bg.querySelector('#ts-desc').value.trim();
-      const msgEl = bg.querySelector('#ts-rep-msg');
-      if (!motif) { msgEl.style.color='#ef4444'; msgEl.textContent='Veuillez choisir un motif.'; return; }
-      msgEl.style.color='#64748b'; msgEl.textContent='Envoi…';
-      try {
-        const r = await fetch(`/api/initiatives/${initId}/signaler`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ motif, description })
-        });
-        const d = await r.json();
-        if (r.ok) {
-          msgEl.style.color='#10b981'; msgEl.textContent = d.message || 'Signalement transmis.';
-          setTimeout(() => bg.remove(), 2000);
-        } else {
-          msgEl.style.color='#ef4444'; msgEl.textContent = d.error || 'Erreur.';
-        }
-      } catch { msgEl.style.color='#ef4444'; msgEl.textContent='Erreur réseau.'; }
-    };
+  function reportInitiative(userId) {
+    if (typeof window.ouvrirSignalementModal === 'function') window.ouvrirSignalementModal(userId);
   }
 
   /* ──────────────── Modal mode absence ────────────────────── */

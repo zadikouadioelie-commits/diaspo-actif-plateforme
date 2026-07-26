@@ -11,6 +11,11 @@
   <link rel="stylesheet" href="/assets/theme-manager.css">
 <style>
   .codes-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;max-width:520px;}
+  /* Classe plutôt que style en ligne : gsap-animations.js anime la page au chargement avec
+     clearProps:'all', qui efface l'INTÉGRALITÉ du style en ligne d'un élément animé — y
+     compris un outline posé par un tout autre script, sans lien avec cette animation.
+     Une classe CSS n'est pas concernée par clearProps. */
+  .origine-mise-en-avant{outline:3px solid #F26422;outline-offset:3px;}
   .codes-card h4{margin:0 0 6px;font-size:14px;font-weight:800;}
   .codes-card .codes-sub{font-size:12px;color:var(--muted);margin:0 0 14px;}
   .ds-masked{font-size:20px;letter-spacing:4px;color:var(--muted);margin-bottom:12px;font-family:monospace;}
@@ -52,6 +57,7 @@
 
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
     <div id="mes-infos-zone"></div>
+    <div id="origine-institution-zone"></div>
     <div id="ds-id-zone"></div>
 
     <h2 style="margin:0 0 4px;">Niveau de confidentialité des données</h2>
@@ -135,6 +141,66 @@
       err.style.display = 'block';
     }
   };
+
+  /* ══ Origine officielle de l'institution ══ (collectivité / institutionnel / officiel)
+     Carte séparée à dessein : contrairement à "Mes informations déclarées" ci-dessus, la
+     modifier n'invalide JAMAIS un badge d'identité vérifiée — l'origine d'une préfecture
+     n'a rien à voir avec la vérification d'identité d'une personne physique. Avant cette
+     carte, ce champ n'était écrit qu'une fois, à l'inscription, sans aucun moyen de le
+     corriger ensuite. */
+  if (['collectivite', 'institutionnel', 'officiel'].includes(inf.role)) {
+    const zoneOI = document.getElementById('origine-institution-zone');
+    zoneOI.innerHTML = `
+      <div class="codes-card" id="origine-institution-card" style="max-width:560px;">
+        <h4>🏛️ Origine officielle de l'institution</h4>
+        <p class="codes-sub">Le pays auquel votre institution est rattachée. Affiché dans l'annuaire et utilisé pour les statistiques territoriales — sans lien avec la vérification d'identité.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label style="font-size:12px;font-weight:700;">Pays d'origine <span style="color:#2563EB">*</span></label><input id="oi-pays" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.pays_origine_institution)}" placeholder="Côte d'Ivoire"></div>
+          <div><label style="font-size:12px;font-weight:700;">Région d'origine</label><input id="oi-region" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.region_origine)}" placeholder="Facultatif"></div>
+          <div><label style="font-size:12px;font-weight:700;">Ministère de tutelle</label><input id="oi-ministere" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.ministere_tutelle)}" placeholder="Facultatif"></div>
+          <div><label style="font-size:12px;font-weight:700;">Administration de rattachement</label><input id="oi-admin" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;margin-top:4px;" value="${esc(inf.administration_rattachement)}" placeholder="Facultatif"></div>
+        </div>
+        <div id="oi-err" class="ds-err"></div>
+        <div id="oi-ok" style="display:none;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:8px;padding:8px 12px;font-size:12px;color:#166534;margin-top:10px;"></div>
+        <div class="codes-btn-row" style="margin-top:14px;">
+          <button class="codes-btn green" onclick="window._saveOrigineInstitution()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;">💾 Enregistrer</button>
+        </div>
+      </div>
+    `;
+
+    window._saveOrigineInstitution = async function() {
+      const err = document.getElementById('oi-err');
+      const ok = document.getElementById('oi-ok');
+      err.style.display = 'none'; ok.style.display = 'none';
+      const pays = document.getElementById('oi-pays').value.trim();
+      if (!pays) { err.textContent = "Le pays d'origine est obligatoire."; err.style.display = 'block'; return; }
+      try {
+        await api('PUT', '/profil/origine-institution', {
+          pays_origine_institution: pays,
+          region_origine: document.getElementById('oi-region').value.trim(),
+          ministere_tutelle: document.getElementById('oi-ministere').value.trim(),
+          administration_rattachement: document.getElementById('oi-admin').value.trim(),
+        });
+        ok.textContent = '✅ Origine enregistrée.';
+        ok.style.display = 'block';
+      } catch(e) {
+        err.textContent = e.message || 'Erreur lors de l’enregistrement.';
+        err.style.display = 'block';
+      }
+    };
+  }
+
+  /* Arrivée depuis le bandeau ou une notification de rappel : on scrolle jusqu'à la bonne
+     carte et on la met brièvement en évidence, pour que "Renseigner l'origine" mène
+     vraiment quelque part de visible plutôt que de déposer sur une page sans repère. */
+  if (new URLSearchParams(location.search).get('completer') === 'origine') {
+    const cible = document.getElementById('origine-institution-card') || zone.firstElementChild;
+    if (cible) {
+      cible.classList.add('origine-mise-en-avant');
+      setTimeout(() => cible.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+      setTimeout(() => cible.classList.remove('origine-mise-en-avant'), 4000);
+    }
+  }
 })();
 
 (async function initDsIdCard(){

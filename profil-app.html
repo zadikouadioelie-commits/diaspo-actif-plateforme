@@ -1016,6 +1016,7 @@ html, body { overflow-x:clip; }
 <script src="assets/app.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/recherche-contacts.js"></script>
+<script src="assets/signalement.js"></script>
 <script>
 /* ===================================================
    PROFIL UTILISATEUR — logique complète
@@ -1600,6 +1601,21 @@ function render() {
       if (typeof renderIdentityCard === 'function') renderIdentityCard();
     }, 600);
   }
+
+  /* Arrivée depuis le bandeau ou une notification "Complétez votre origine"
+     (?completer=origine) : ouvre directement la fenêtre d'édition plutôt que de laisser
+     le membre chercher où cliquer. Sans ce déclencheur, le lien de la relance déposait
+     simplement sur le profil, sans rien montrer de plus qu'une visite ordinaire. */
+  if (isOwn && new URLSearchParams(location.search).get('completer') === 'origine') {
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => {
+      if (typeof openEditIdentity === 'function' && !document.getElementById('identity-edit-form')) {
+        openEditIdentity();
+      }
+      const form = document.getElementById('identity-edit-form');
+      if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 600);
+  }
 }
 
 /* ======================================================
@@ -1667,6 +1683,7 @@ function renderVisitorProfile() {
      partagé (assets/app.js), qui interroge le serveur — l'interface n'invente pas la règle. */
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
+  const reportBtn = CU ? `<button class="pvz-btn" style="color:#dc2626;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g,"\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : '';
   const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Vitrine…</button>` : '';
   const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button><button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${vitrineToggleBtn}${shareBtn}`;
 
@@ -1710,7 +1727,7 @@ function renderVisitorProfile() {
             ${responsableLine}
             ${chips.length ? `<div class="pvz-chips">${chips.join('')}</div>` : ''}
           </div>
-          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+msgBtn+shareBtn}</div>
+          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+msgBtn+shareBtn+reportBtn}</div>
         </div>
       </div>
     </div>
@@ -5746,9 +5763,75 @@ function buildPrivacyPanel() {
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p>
       <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeleteAccountModal()">🙈 Masquer mon compte</button>
       <div id="del-req-zone" style="margin-top:16px;"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
+    </div>
+    <div id="mes-signalements-block" style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);display:none;">
+      <h3 style="font-size:14px;margin:0 0 6px;">🚩 Mes signalements</h3>
+      <div id="mes-signalements-zone"><p style="font-size:13px;color:var(--muted);">Chargement…</p></div>
     </div>`;
   setTimeout(loadDeletionRequestStatus, 0);
+  setTimeout(loadMesSignalements, 0);
   return div;
+}
+
+/* ---- Mes dossiers de signalement (en tant que compte signalé ou signalant) ---- */
+const SIG_STATUT_LABELS = {
+  nouveau: '🆕 Nouveau', en_analyse: '🔎 En analyse', litige_ouvert: '⚖️ Litige ouvert',
+  decision_attente: '⏳ Décision en attente', classe_sans_suite: '✅ Classé sans suite',
+  archive: '📁 Archivé', suspendu: '⛔ Compte suspendu',
+};
+async function loadMesSignalements() {
+  const block = document.getElementById('mes-signalements-block');
+  const zone = document.getElementById('mes-signalements-zone');
+  if (!zone) return;
+  try {
+    const rows = await api('GET', '/signalements/mine');
+    if (!rows.length) { block.style.display = 'none'; return; }
+    block.style.display = 'block';
+    zone.innerHTML = rows.map(r => `
+      <div class="sig-dossier-card" data-sig-id="${r.id}" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <p style="font-size:13px;font-weight:700;color:#374151;margin:0;">
+            ${r.cible_id === profil.id ? 'Signalement vous concernant' : `Votre signalement de ${esc(r.cible_nom || 'un compte')}`}
+            — ${r.numero_dossier}
+          </p>
+          <span style="font-size:11.5px;font-weight:700;">${SIG_STATUT_LABELS[r.statut] || r.statut}</span>
+        </div>
+        <p style="font-size:12.5px;color:var(--muted);margin:4px 0 0;">Motif : ${esc(r.motif)}</p>
+        ${r.cible_id === profil.id ? `<div id="sig-msgs-${r.id}" style="margin-top:10px;"><button class="btn-ico" style="font-size:12px;padding:6px 12px;" onclick="loadSignalementDossier(${r.id})">💬 Voir l'échange et répondre</button></div>` : ''}
+      </div>`).join('');
+  } catch (e) { block.style.display = 'none'; }
+}
+
+async function loadSignalementDossier(id) {
+  const zone = document.getElementById(`sig-msgs-${id}`);
+  if (!zone) return;
+  zone.innerHTML = '<p style="font-size:12.5px;color:var(--muted);">Chargement…</p>';
+  try {
+    const msgs = await api('GET', `/signalements/${id}/messages`);
+    zone.innerHTML = `
+      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;background:#fafbfc;">
+        ${msgs.map(m => `
+          <div style="margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;color:${m.sender_id !== profil.id ? '#2563eb' : '#374151'};">${m.sender_id !== profil.id ? 'Administration' : 'Vous'} · ${fmtDateFrCourt(m.created_at)}</div>
+            <div style="font-size:13px;color:#1f2937;">${esc(m.contenu)}</div>
+          </div>`).join('') || '<p style="font-size:12.5px;color:var(--muted);">Aucun message pour le moment.</p>'}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="sig-msg-input-${id}" placeholder="Répondre, vous justifier…" style="flex:1;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;">
+        <button onclick="sendSignalementMessage(${id})" style="padding:8px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer;">Envoyer</button>
+      </div>`;
+  } catch (e) { zone.innerHTML = `<p style="font-size:12.5px;color:#dc2626;">${esc(e.message || 'Erreur.')}</p>`; }
+}
+
+async function sendSignalementMessage(id) {
+  const input = document.getElementById(`sig-msg-input-${id}`);
+  const contenu = input.value.trim();
+  if (!contenu) return;
+  try {
+    await api('POST', `/signalements/${id}/messages`, { contenu });
+    input.value = '';
+    await loadSignalementDossier(id);
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
 }
 
 /* ---- Demande de suppression définitive (workflow admin) ---- */

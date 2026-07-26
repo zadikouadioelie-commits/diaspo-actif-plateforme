@@ -580,6 +580,21 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   }
   dbLoginRecord(`ip:${ip}`, true);
   dbLoginRecord(`email:${email}`, true);
+
+  /* Compte suspendu (module Signalement de compte & Gestion des litiges) :
+     bloque la connexion tant que la sanction est active. Une suspension temporaire
+     expirée se lève automatiquement (comparaison de date), pas besoin de tâche planifiée. */
+  if (user.suspendu_definitif) {
+    SEC.logSecurity("login_blocked_suspension", { ip, uid: Number(user.id), type: "definitive" });
+    return sendJSON(res, 403, { error: "Ce compte a été suspendu définitivement suite à une décision administrative." });
+  }
+  if (user.suspendu_jusqu_au && new Date(user.suspendu_jusqu_au) > new Date()) {
+    SEC.logSecurity("login_blocked_suspension", { ip, uid: Number(user.id), type: "temporaire", jusqu_au: user.suspendu_jusqu_au });
+    return sendJSON(res, 403, {
+      error: `Ce compte est suspendu jusqu'au ${new Date(user.suspendu_jusqu_au).toLocaleDateString('fr-FR')} suite à une décision administrative.`
+    });
+  }
+
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
@@ -948,7 +963,10 @@ route("GET", "/api/profil/informations-declarees", async (req, res) => {
   const cu = await getCurrentUser(req);
   if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
   const u = await db.prepare(
-    "SELECT nom,prenom,email,date_naissance,nationalite1,nationalite2,origine1,origine2,email_verifie,identite_verifiee FROM users WHERE id=?"
+    /* pays_origine_institution & co ajoutés en lecture seule : affichés dans la carte dédiée
+       de confidentialite.html, sauvegardés par la route séparée /profil/origine-institution
+       (qui, elle, ne touche jamais à identite_verifiee). */
+    "SELECT nom,prenom,email,date_naissance,nationalite1,nationalite2,origine1,origine2,email_verifie,identite_verifiee,role,pays_origine_institution,ministere_tutelle,administration_rattachement,region_origine FROM users WHERE id=?"
   ).get(cu.id);
   if (!u) return sendJSON(res, 404, { error: "Introuvable." });
   sendJSON(res, 200, { informations: u });
@@ -1015,6 +1033,39 @@ route("PUT", "/api/profil/informations-declarees", async (req, res, params, body
   sendJSON(res, 200, { ok: true, identite_a_revalider: changed && !!current.identite_verifiee, email_a_reverifier: emailChanged });
 });
 
+/* PUT /api/profil/origine-institution — collectivité/institutionnel/officiel uniquement.
+   Route VOLONTAIREMENT séparée de /profil/informations-declarees : cette dernière invalide
+   un badge d'identité vérifiée à chaque modification (nom, naissance, nationalité…), ce qui
+   n'a aucun sens pour un champ institutionnel (l'origine officielle d'une préfecture n'a
+   aucun rapport avec la vérification d'identité d'une personne physique). Avant cette route,
+   pays_origine_institution n'était écrit qu'une fois, à l'inscription, sans aucun moyen de
+   le corriger ensuite — un vrai trou trouvé en creusant le système de rappel d'origine. */
+route("PUT", "/api/profil/origine-institution", async (req, res, params, body) => {
+  const cu = await getCurrentUser(req);
+  if (!cu) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!['collectivite', 'institutionnel', 'officiel'].includes(cu.role)) {
+    return sendJSON(res, 403, { error: "Réservé aux comptes collectivité, institutionnel et officiel." });
+  }
+  const pays = String(body.pays_origine_institution || '').trim();
+  if (!pays) return sendJSON(res, 400, { error: "Le pays d'origine est obligatoire." });
+
+  await db.prepare(`
+    UPDATE users SET
+      pays_origine_institution=?,
+      ministere_tutelle=?,
+      administration_rattachement=?,
+      region_origine=?
+    WHERE id=?
+  `).run(
+    pays,
+    String(body.ministere_tutelle || '').trim() || null,
+    String(body.administration_rattachement || '').trim() || null,
+    String(body.region_origine || '').trim() || null,
+    cu.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
 route("POST", "/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);
@@ -1023,7 +1074,36 @@ route("POST", "/api/auth/logout", async (req, res) => {
 
 route("GET", "/api/auth/me", async (req, res) => {
   const user = await getCurrentUser(req);
-  sendJSON(res, 200, { user: publicUser(user) });
+  const pub = publicUser(user);
+
+  /* Indicateur d'origine manquante, calculé UNE SEULE FOIS ici et lu tel quel par le
+     bandeau (assets/app.js) — pour ne pas dupliquer la définition de "origine complète"
+     une troisième fois (elle existe déjà dans le cron de relance et dans daOrigine()).
+     Chaque type de compte est vérifié sur SES PROPRES champs d'origine déclarée, jamais
+     sur une nationalité ni, pour une initiative, sur l'origine de son responsable. */
+  if (pub) {
+    try {
+      if (pub.role === 'utilisateur') {
+        const u = await db.prepare("SELECT origine1, origine2 FROM users WHERE id=?").get(user.id);
+        pub.origine_manquante = !(u?.origine1 || u?.origine2);
+        pub.origine_lien = 'profil.html?completer=origine';
+      } else if (['collectivite', 'institutionnel', 'officiel'].includes(pub.role)) {
+        const u = await db.prepare("SELECT pays_origine_institution, origine1 FROM users WHERE id=?").get(user.id);
+        pub.origine_manquante = !(u?.pays_origine_institution || u?.origine1);
+        pub.origine_lien = 'confidentialite.html?completer=origine';
+      } else if (pub.role === 'initiative') {
+        const ini = await db.prepare(
+          "SELECT id, slug, origine1, origine2, pays_origine FROM initiatives WHERE owner_user_id=? ORDER BY created_at DESC LIMIT 1"
+        ).get(user.id);
+        pub.origine_manquante = !!ini && !(ini.origine1 || ini.origine2 || ini.pays_origine);
+        pub.origine_lien = ini ? `initiative.html?id=${ini.slug || ini.id}&completer=origine` : null;
+      } else {
+        pub.origine_manquante = false;
+      }
+    } catch (e) { pub.origine_manquante = false; }
+  }
+
+  sendJSON(res, 200, { user: pub });
 });
 
 /* POST /api/upload/avatar — upload photo de profil vers Bunny.net */
@@ -1674,6 +1754,74 @@ route("DELETE", "/api/rencontres/:id", async (req, res, params) => {
 });
 
 /* GET /api/admin/rencontres — la file des demandes */
+/* GET /api/admin/origines/stats — tableau de suivi "Origines manquantes".
+   Reprend exactement la même définition de "origine complète" que le cron de relance et
+   que GET /api/auth/me, pour ne jamais afficher un taux qui contredit ce que les comptes
+   reçoivent réellement comme rappel. */
+route("GET", "/api/admin/origines/stats", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+
+  const groupe = async (label, sqlIncomplet, sqlTotal) => {
+    const total = (await db.prepare(sqlTotal).get())?.c || 0;
+    const incomplets = (await db.prepare(sqlIncomplet).get())?.c || 0;
+    return { label, total, incomplets, complets: total - incomplets, taux_completion: total ? Math.round(((total - incomplets) / total) * 100) : 100 };
+  };
+
+  const utilisateur = await groupe('Utilisateurs',
+    `SELECT COUNT(*) c FROM users WHERE role='utilisateur' AND (is_demo IS NULL OR is_demo=FALSE) AND nom!='Compte supprimé' AND (origine1 IS NULL OR origine1='') AND (origine2 IS NULL OR origine2='')`,
+    `SELECT COUNT(*) c FROM users WHERE role='utilisateur' AND (is_demo IS NULL OR is_demo=FALSE) AND nom!='Compte supprimé'`);
+
+  const institution = await groupe('Collectivités & institutions',
+    `SELECT COUNT(*) c FROM users WHERE role IN ('collectivite','institutionnel','officiel') AND (is_demo IS NULL OR is_demo=FALSE) AND nom!='Compte supprimé' AND (pays_origine_institution IS NULL OR pays_origine_institution='') AND (origine1 IS NULL OR origine1='')`,
+    `SELECT COUNT(*) c FROM users WHERE role IN ('collectivite','institutionnel','officiel') AND (is_demo IS NULL OR is_demo=FALSE) AND nom!='Compte supprimé'`);
+
+  const initiative = await groupe('Initiatives',
+    `SELECT COUNT(*) c FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (i.origine1 IS NULL OR i.origine1='') AND (i.origine2 IS NULL OR i.origine2='') AND (i.pays_origine IS NULL OR i.pays_origine='')`,
+    `SELECT COUNT(*) c FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)`);
+
+  const derniereRelance = await db.prepare(`SELECT created_at FROM origine_relances ORDER BY id DESC LIMIT 1`).get();
+  const totalRelances = (await db.prepare(`SELECT COUNT(*) c FROM origine_relances`).get())?.c || 0;
+
+  sendJSON(res, 200, { groupes: [utilisateur, institution, initiative], derniere_relance: derniereRelance?.created_at || null, total_relances_envoyees: totalRelances });
+});
+
+/* GET /api/admin/origines/liste?type=utilisateur|institution|initiative — le détail nominatif */
+route("GET", "/api/admin/origines/liste", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const type = query.type || 'utilisateur';
+
+  let rows = [];
+  if (type === 'utilisateur') {
+    rows = await db.prepare(`
+      SELECT u.id, u.nom, u.prenom, u.email, u.created_at,
+        (SELECT COUNT(*) FROM origine_relances r WHERE r.user_id=u.id) AS nb_relances,
+        (SELECT MAX(created_at) FROM origine_relances r WHERE r.user_id=u.id) AS derniere_relance
+      FROM users u WHERE u.role='utilisateur' AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom!='Compte supprimé'
+        AND (u.origine1 IS NULL OR u.origine1='') AND (u.origine2 IS NULL OR u.origine2='')
+      ORDER BY u.created_at DESC LIMIT 200`).all();
+  } else if (type === 'institution') {
+    rows = await db.prepare(`
+      SELECT u.id, u.nom, u.prenom, u.email, u.role, u.created_at,
+        (SELECT COUNT(*) FROM origine_relances r WHERE r.user_id=u.id) AS nb_relances,
+        (SELECT MAX(created_at) FROM origine_relances r WHERE r.user_id=u.id) AS derniere_relance
+      FROM users u WHERE u.role IN ('collectivite','institutionnel','officiel') AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom!='Compte supprimé'
+        AND (u.pays_origine_institution IS NULL OR u.pays_origine_institution='') AND (u.origine1 IS NULL OR u.origine1='')
+      ORDER BY u.created_at DESC LIMIT 200`).all();
+  } else if (type === 'initiative') {
+    rows = await db.prepare(`
+      SELECT i.id, i.nom, i.slug, i.created_at, u.email AS owner_email,
+        (SELECT COUNT(*) FROM origine_relances r WHERE r.initiative_id=i.id) AS nb_relances,
+        (SELECT MAX(created_at) FROM origine_relances r WHERE r.initiative_id=i.id) AS derniere_relance
+      FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id
+      WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)
+        AND (i.origine1 IS NULL OR i.origine1='') AND (i.origine2 IS NULL OR i.origine2='') AND (i.pays_origine IS NULL OR i.pays_origine='')
+      ORDER BY i.created_at DESC LIMIT 200`).all();
+  }
+  sendJSON(res, 200, { type, rows });
+});
+
 route("GET", "/api/admin/rencontres", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
@@ -16292,6 +16440,153 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Relances automatiques Origines manquantes (Vercel Cron, quotidien) ──
+     Le cron tourne CHAQUE JOUR (comme les autres, pattern Vercel imposé — pas de process
+     persistant possible), mais n'envoie une relance à un compte donné que si 5 jours REELS
+     se sont écoulés depuis sa précédente. Un cron calé sur "tous les 5 jours" dans
+     vercel.json dériverait à chaque changement de mois (jours de calendrier, pas un vrai
+     intervalle roulant) ; ici l'espacement se mesure sur `origine_relances.created_at`,
+     par compte, indépendamment du jour où le cron s'exécute.
+
+     Ce qui compte comme "origine renseignée" reprend exactement les mêmes champs que
+     l'affichage des cartouches (daOrigine, assets/app.js) et que la validation obligatoire
+     à l'inscription (index.js ~ligne 320) :
+       - utilisateur                          : origine1 OU origine2
+       - collectivite/institutionnel/officiel : pays_origine_institution OU origine1
+                                                 (champ officiel en priorité, origine1 en repli)
+       - initiative                           : origine1 OU origine2 OU pays_origine —
+         DE L'INITIATIVE ELLE-MÊME, jamais celle du responsable (précision explicite de
+         l'utilisateur : l'origine de l'initiative n'est pas celle de son responsable).
+
+     Les comptes de démonstration (is_demo=1) sont exclus, comme partout ailleurs sur la
+     plateforme — les relancer n'aurait aucun sens, ce sont des jeux de données figés. */
+  if (pathname === '/api/cron/origine-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const ORIGIN_PUBLIC = process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app';
+      const CINQ_JOURS_MS = 5 * 24 * 3600 * 1000;
+
+      /* Messages qui tournent au fil des relances plutôt que de répéter le même texte
+         indéfiniment (la cadence est sans fin, per décision explicite : "jusqu'à ce que
+         la modification soit faite"). Au-delà du 4e, on reboucle sur les 3 derniers. */
+      const MESSAGES_ORIGINE = [
+        "Votre profil est incomplet. Ajoutez votre origine pour améliorer votre visibilité dans le réseau Diaspo'Actif et faciliter les mises en relation avec votre territoire.",
+        "Rappel : votre origine n'est toujours pas renseignée. Cette information permet aux membres de Diaspo'Actif de mieux identifier votre territoire et vos liens avec la diaspora.",
+        "Votre fiche de présentation reste incomplète. Ajoutez votre origine pour augmenter votre visibilité.",
+        "Votre origine manque toujours sur votre présentation. Complétez votre profil pour bénéficier pleinement des outils Diaspo'Actif.",
+      ];
+      const messagePourRang = rang => MESSAGES_ORIGINE[Math.min(rang - 1, MESSAGES_ORIGINE.length - 1)];
+
+      let relancesEnvoyees = 0, confirmationsEnvoyees = 0;
+
+      /* ═══ 1. COMPTES (utilisateur / collectivite / institutionnel / officiel) ═══ */
+      const usersIncomplets = await db.prepare(`
+        SELECT id, role, origine1, origine2, pays_origine_institution
+        FROM users
+        WHERE role IN ('utilisateur','collectivite','institutionnel','officiel')
+          AND (is_demo IS NULL OR is_demo=FALSE)
+          AND nom != 'Compte supprimé'
+          AND (
+            (role='utilisateur' AND (origine1 IS NULL OR origine1='') AND (origine2 IS NULL OR origine2=''))
+            OR (role IN ('collectivite','institutionnel','officiel')
+                AND (pays_origine_institution IS NULL OR pays_origine_institution='')
+                AND (origine1 IS NULL OR origine1=''))
+          )
+      `).all();
+
+      for (const u of usersIncomplets) {
+        const derniere = await db.prepare(
+          `SELECT created_at FROM origine_relances WHERE user_id=? ORDER BY id DESC LIMIT 1`
+        ).get(u.id);
+        if (derniere && (Date.now() - new Date(derniere.created_at).getTime()) < CINQ_JOURS_MS) continue;
+
+        const rang = ((await db.prepare(`SELECT COUNT(*) c FROM origine_relances WHERE user_id=?`).get(u.id))?.c || 0) + 1;
+        await db.prepare(`INSERT INTO origine_relances (user_id, rang) VALUES (?,?)`).run(u.id, rang);
+
+        const lien = (u.role === 'utilisateur')
+          ? `${ORIGIN_PUBLIC}/profil.html?completer=origine`
+          : `${ORIGIN_PUBLIC}/confidentialite.html?completer=origine`;
+        creerNotif(u.id, 'origine_relance', "Origine à renseigner", messagePourRang(rang), { lien, rang });
+        relancesEnvoyees++;
+      }
+
+      /* Comptes désormais complets qui avaient déjà reçu au moins une relance : message de
+         confirmation, envoyé UNE SEULE FOIS (vérifié via l'historique des notifications,
+         pas via une nouvelle colonne — évite toute migration supplémentaire). */
+      const userIdsAvecHistorique = await db.prepare(
+        `SELECT DISTINCT user_id FROM origine_relances WHERE user_id IS NOT NULL`
+      ).all();
+      for (const { user_id } of userIdsAvecHistorique) {
+        const u = await db.prepare(`SELECT role, origine1, origine2, pays_origine_institution FROM users WHERE id=?`).get(user_id);
+        if (!u) continue;
+        const complet = u.role === 'utilisateur'
+          ? !!(u.origine1 || u.origine2)
+          : !!(u.pays_origine_institution || u.origine1);
+        if (!complet) continue;
+        const dejaConfirme = await db.prepare(
+          `SELECT 1 FROM notifications WHERE user_id=? AND type='origine_confirmee' LIMIT 1`
+        ).get(user_id);
+        if (dejaConfirme) continue;
+        creerNotif(user_id, 'origine_confirmee', "Origine enregistrée",
+          "Merci ! Votre origine est maintenant enregistrée. Votre profil est mieux connecté aux territoires et aux réseaux Diaspo'Actif.", {});
+        confirmationsEnvoyees++;
+      }
+
+      /* ═══ 2. INITIATIVES — origine PROPRE, jamais celle du responsable ═══ */
+      const initiativesIncompletes = await db.prepare(`
+        SELECT i.id, i.slug, i.owner_user_id
+        FROM initiatives i
+        LEFT JOIN users u ON u.id = i.owner_user_id
+        WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)
+          AND (i.origine1 IS NULL OR i.origine1='')
+          AND (i.origine2 IS NULL OR i.origine2='')
+          AND (i.pays_origine IS NULL OR i.pays_origine='')
+      `).all();
+
+      for (const ini of initiativesIncompletes) {
+        if (!ini.owner_user_id) continue; // pas de destinataire à notifier
+        const derniere = await db.prepare(
+          `SELECT created_at FROM origine_relances WHERE initiative_id=? ORDER BY id DESC LIMIT 1`
+        ).get(ini.id);
+        if (derniere && (Date.now() - new Date(derniere.created_at).getTime()) < CINQ_JOURS_MS) continue;
+
+        const rang = ((await db.prepare(`SELECT COUNT(*) c FROM origine_relances WHERE initiative_id=?`).get(ini.id))?.c || 0) + 1;
+        await db.prepare(`INSERT INTO origine_relances (initiative_id, rang) VALUES (?,?)`).run(ini.id, rang);
+
+        const lien = `${ORIGIN_PUBLIC}/initiative.html?id=${ini.slug || ini.id}&completer=origine`;
+        creerNotif(ini.owner_user_id, 'origine_relance', "Origine de l'initiative à renseigner", messagePourRang(rang), { initiative_id: ini.id, lien, rang });
+        relancesEnvoyees++;
+      }
+
+      const initIdsAvecHistorique = await db.prepare(
+        `SELECT DISTINCT initiative_id FROM origine_relances WHERE initiative_id IS NOT NULL`
+      ).all();
+      for (const { initiative_id } of initIdsAvecHistorique) {
+        const ini = await db.prepare(`SELECT owner_user_id, origine1, origine2, pays_origine FROM initiatives WHERE id=?`).get(initiative_id);
+        if (!ini || !ini.owner_user_id) continue;
+        const complet = !!(ini.origine1 || ini.origine2 || ini.pays_origine);
+        if (!complet) continue;
+        const dejaConfirme = await db.prepare(
+          `SELECT 1 FROM notifications WHERE user_id=? AND type='origine_initiative_confirmee' AND data_json LIKE ? LIMIT 1`
+        ).get(ini.owner_user_id, `%"initiative_id":${initiative_id}%`);
+        if (dejaConfirme) continue;
+        creerNotif(ini.owner_user_id, 'origine_initiative_confirmee', "Origine de l'initiative enregistrée",
+          "Merci ! L'origine de votre initiative est maintenant enregistrée.", { initiative_id });
+        confirmationsEnvoyees++;
+      }
+
+      sendJSON(res, 200, { ok: true, relances_envoyees: relancesEnvoyees, confirmations_envoyees: confirmationsEnvoyees });
+    } catch (e) {
+      console.error('[origine-relances]', e.stack || e.message);
+      sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
+    }
+    return;
+  }
+
   /* ── Relances automatiques Votes sécurisés (Vercel Cron, quotidien) ──
      Rappels à J-ouverture, 50% du délai écoulé, J-24h avant clôture. */
   if (pathname === '/api/cron/vote-relances') {
@@ -20866,6 +21161,358 @@ ${jsonLd}
         await db.prepare(`UPDATE initiatives SET signalements_confirmes=signalements_confirmes+1 WHERE id=?`).run(iid);
       }
       return sendJSON(res, 201, { ok: true, message: 'Signalement transmis aux modérateurs.' });
+    }
+
+    /* =====================================================================
+       MODULE SIGNALEMENT DE COMPTE & GESTION DES LITIGES (nouveau modèle)
+       Remplace le flux ci-dessus (POST /api/users/:id/signaler et
+       POST /api/initiatives/:id/signaler écrivent encore dans account_reports/
+       initiative_reports — laissés en place pour ne pas casser trust-score.js
+       le temps de la transition, cf. tâche de rebranchement final).
+       ===================================================================== */
+    const MOTIFS_SIGNALEMENT = [
+      'Fraude / escroquerie', 'Faux compte', "Usurpation d'identité", 'Informations fausses',
+      'Harcèlement', 'Comportement abusif', 'Contenu interdit', 'Publicité abusive',
+      "Non-respect d'un engagement", 'Problème commercial', 'Autre'
+    ];
+
+    /* ── POST /api/signalements — un utilisateur signale un compte ── */
+    if (req.method === 'POST' && pathname === '/api/signalements') {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const { cible_id, motif, description, preuves } = body;
+      if (!MOTIFS_SIGNALEMENT.includes(motif)) return sendJSON(res, 400, { error: 'Motif invalide.' });
+      const cid = parseInt(cible_id);
+      if (!cid || cid === me.id) return sendJSON(res, 400, { error: 'Compte à signaler invalide.' });
+      const cible = await db.prepare('SELECT id, role FROM users WHERE id=?').get(cid);
+      if (!cible) return sendJSON(res, 404, { error: 'Compte introuvable.' });
+      if (!['utilisateur', 'initiative', 'collectivite'].includes(cible.role)) {
+        return sendJSON(res, 400, { error: 'Ce compte ne peut pas être signalé.' });
+      }
+      const existing = await db.prepare(
+        `SELECT id FROM signalements WHERE reporter_id=? AND cible_id=? AND created_at >= datetime('now','-30 days')`
+      ).get(me.id, cid);
+      if (existing) return sendJSON(res, 400, { error: 'Vous avez déjà signalé ce compte récemment.' });
+
+      const preuvesArr = Array.isArray(preuves) ? preuves : [];
+      const id = (await db.prepare(
+        `INSERT INTO signalements (cible_type, cible_id, reporter_id, motif, description, preuves_json) VALUES (?,?,?,?,?,?)`
+      ).run(cible.role, cid, me.id, motif, (description || '').trim() || null, JSON.stringify(preuvesArr))).lastInsertRowid;
+
+      const numeroDossier = 'SIGN-' + String(id).padStart(6, '0');
+      await db.prepare('UPDATE signalements SET numero_dossier=? WHERE id=?').run(numeroDossier, id);
+      await db.prepare(`INSERT INTO signalement_historique (dossier_id,action,note) VALUES (?,?,?)`).run(id, 'creation', motif);
+
+      const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+      for (const a of admins) {
+        creerNotif(a.id, 'signalement_compte', `🚩 Nouveau signalement — ${numeroDossier}`,
+          `${me.nom} a signalé un compte pour : ${motif}.`, { signalement_id: id });
+      }
+      return sendJSON(res, 201, { id, numero_dossier: numeroDossier });
+    }
+
+    /* ── GET /api/signalements/mine — mes dossiers (en tant que signalant ou compte signalé) ── */
+    if (req.method === 'GET' && pathname === '/api/signalements/mine') {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const rows = await db.prepare(`
+        SELECT s.*, u.nom AS cible_nom
+        FROM signalements s LEFT JOIN users u ON u.id = s.cible_id
+        WHERE s.reporter_id=? OR s.cible_id=?
+        ORDER BY s.created_at DESC`).all(me.id, me.id);
+      return sendJSON(res, 200, rows);
+    }
+
+    /* ── GET /api/admin/dossiers-signalement — liste des dossiers (admin) ── */
+    if (req.method === 'GET' && pathname === '/api/admin/dossiers-signalement') {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const q = parsed.query || {};
+      let sql = `
+        SELECT s.*, u1.nom AS cible_nom, u2.nom AS reporter_nom, ua.nom AS admin_nom
+        FROM signalements s
+        LEFT JOIN users u1 ON u1.id = s.cible_id
+        LEFT JOIN users u2 ON u2.id = s.reporter_id
+        LEFT JOIN users ua ON ua.id = s.admin_id
+        WHERE 1=1`;
+      const p = [];
+      if (q.statut) { sql += ' AND s.statut=?'; p.push(q.statut); }
+      if (q.gravite) { sql += ' AND s.gravite=?'; p.push(parseInt(q.gravite)); }
+      if (q.cible_type) { sql += ' AND s.cible_type=?'; p.push(q.cible_type); }
+      sql += ' ORDER BY s.created_at DESC LIMIT 300';
+      const rows = await db.prepare(sql).all(...p);
+      const stats = {
+        nouveau: rows.filter(r => r.statut === 'nouveau').length,
+        litige_ouvert: rows.filter(r => r.statut === 'litige_ouvert').length,
+        decision_attente: rows.filter(r => r.statut === 'decision_attente').length,
+      };
+      return sendJSON(res, 200, { dossiers: rows, stats });
+    }
+
+    /* ── GET /api/admin/dossiers-signalement/:id — fiche détaillée d'un dossier ── */
+    if (req.method === 'GET' && /^\/api\/admin\/dossiers-signalement\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const id = parseInt(pathname.split('/')[4]);
+      const dossier = await db.prepare(`
+        SELECT s.*, u1.nom AS cible_nom, u1.email AS cible_email, u1.role AS cible_role, u1.created_at AS cible_created_at,
+               u1.suspendu_jusqu_au, u1.suspendu_definitif,
+               u2.nom AS reporter_nom, u2.email AS reporter_email, u2.telephone AS reporter_telephone
+        FROM signalements s
+        LEFT JOIN users u1 ON u1.id = s.cible_id
+        LEFT JOIN users u2 ON u2.id = s.reporter_id
+        WHERE s.id=?`).get(id);
+      if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
+
+      const historique = await db.prepare('SELECT * FROM signalement_historique WHERE dossier_id=? ORDER BY created_at ASC').all(id);
+      const litige = await db.prepare('SELECT * FROM signalement_litiges WHERE dossier_id=? ORDER BY id DESC LIMIT 1').get(id);
+      const messages = await db.prepare(`
+        SELECT sm.*, u.nom AS sender_nom FROM signalement_messages sm
+        LEFT JOIN users u ON u.id = sm.sender_id WHERE sm.dossier_id=? ORDER BY sm.created_at ASC`).all(id);
+      const signalementsPrecedents = await db.prepare(
+        `SELECT id, numero_dossier, motif, statut, created_at FROM signalements WHERE cible_id=? AND id != ? ORDER BY created_at DESC`
+      ).all(dossier.cible_id, id);
+      const historiqueDisciplinaire = await db.prepare(
+        `SELECT * FROM sanctions_disciplinaires WHERE cible_id=? ORDER BY created_at DESC`
+      ).all(dossier.cible_id);
+      const signalementsEffectues = await db.prepare(
+        `SELECT id, numero_dossier, motif, statut, created_at FROM signalements WHERE reporter_id=? AND id != ? ORDER BY created_at DESC`
+      ).all(dossier.reporter_id, id);
+
+      return sendJSON(res, 200, { dossier, historique, litige, messages, signalementsPrecedents, historiqueDisciplinaire, signalementsEffectues });
+    }
+
+    /* ── PATCH /api/admin/dossiers-signalement/:id — passer en analyse / fixer la gravité / assigner ── */
+    if (req.method === 'PATCH' && /^\/api\/admin\/dossiers-signalement\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const id = parseInt(pathname.split('/')[4]);
+      const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
+      if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
+      const { statut, gravite, note } = body;
+      const sets = [], vals = [];
+      if (statut !== undefined) {
+        // Les autres statuts (litige_ouvert, decision_*) passent par les routes dédiées ci-dessous
+        if (statut !== 'en_analyse') return sendJSON(res, 400, { error: 'Statut invalide ici — utilisez les actions litige/décision.' });
+        sets.push('statut=?'); vals.push(statut);
+      }
+      if (gravite !== undefined) {
+        if (![1, 2, 3, 4].includes(Number(gravite))) return sendJSON(res, 400, { error: 'Gravité invalide.' });
+        sets.push('gravite=?'); vals.push(Number(gravite));
+      }
+      if (!sets.length) return sendJSON(res, 400, { error: 'Aucune modification fournie.' });
+      sets.push('admin_id=?'); vals.push(me.id);
+      sets.push("updated_at=datetime('now')");
+      vals.push(id);
+      await db.prepare(`UPDATE signalements SET ${sets.join(',')} WHERE id=?`).run(...vals);
+      await db.prepare(`INSERT INTO signalement_historique (dossier_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+        .run(id, me.id, me.nom, statut ? `statut:${statut}` : `gravite:${gravite}`, note || null);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── POST /api/admin/dossiers-signalement/:id/litige — ouvrir un litige (médiation) ── */
+    if (req.method === 'POST' && /^\/api\/admin\/dossiers-signalement\/\d+\/litige$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const id = parseInt(pathname.split('/')[4]);
+      const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
+      if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
+      if (dossier.statut === 'litige_ouvert') return sendJSON(res, 400, { error: 'Un litige est déjà ouvert sur ce dossier.' });
+
+      const litigeId = (await db.prepare(
+        `INSERT INTO signalement_litiges (dossier_id, ouvert_par_admin_id) VALUES (?,?)`
+      ).run(id, me.id)).lastInsertRowid;
+      const numeroLitige = 'LITIGE-' + String(litigeId).padStart(6, '0');
+      await db.prepare('UPDATE signalement_litiges SET numero_litige=? WHERE id=?').run(numeroLitige, litigeId);
+      await db.prepare(`UPDATE signalements SET statut='litige_ouvert', admin_id=?, updated_at=datetime('now') WHERE id=?`).run(me.id, id);
+      await db.prepare(`INSERT INTO signalement_historique (dossier_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+        .run(id, me.id, me.nom, 'litige_ouvert', numeroLitige);
+
+      creerNotif(dossier.cible_id, 'litige_signalement', `⚖️ Un litige a été ouvert — ${numeroLitige}`,
+        `Un signalement vous concernant fait l'objet d'un litige (motif : ${dossier.motif}). Merci de répondre depuis votre espace.`,
+        { signalement_id: id });
+
+      return sendJSON(res, 201, { litige_id: litigeId, numero_litige: numeroLitige });
+    }
+
+    /* ── POST /api/signalements/:id/messages — échange dans l'espace de discussion du dossier ── */
+    if (req.method === 'POST' && /^\/api\/signalements\/\d+\/messages$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const id = parseInt(pathname.split('/')[3]);
+      const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
+      if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
+      const isAdmin = me.role === 'administrateur';
+      const isCible = Number(me.id) === Number(dossier.cible_id);
+      if (!isAdmin && !isCible) return sendJSON(res, 403, { error: 'Vous ne pouvez pas répondre à ce dossier.' });
+
+      const { contenu, fichier, interne } = body;
+      if (!contenu || !contenu.trim()) return sendJSON(res, 400, { error: 'Message vide.' });
+
+      const estInterne = (isAdmin && !!interne) ? 1 : 0;
+      await db.prepare(`INSERT INTO signalement_messages (dossier_id, sender_id, contenu, fichier_json, interne) VALUES (?,?,?,?,?)`)
+        .run(id, me.id, contenu.trim(), fichier ? JSON.stringify(fichier) : null, estInterne);
+
+      if (!estInterne) {
+        await db.prepare(`INSERT INTO signalement_historique (dossier_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+          .run(id, isAdmin ? me.id : null, isAdmin ? me.nom : null, isAdmin ? 'message_admin' : 'message_cible', null);
+        if (isAdmin) {
+          creerNotif(dossier.cible_id, 'litige_signalement', `💬 Nouveau message — dossier ${dossier.numero_dossier}`,
+            contenu.trim(), { signalement_id: id });
+        } else {
+          const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+          for (const a of admins) {
+            creerNotif(a.id, 'litige_signalement', `💬 Réponse du compte signalé — ${dossier.numero_dossier}`,
+              contenu.trim(), { signalement_id: id });
+          }
+        }
+      }
+      return sendJSON(res, 201, { ok: true });
+    }
+
+    /* ── GET /api/signalements/:id/messages — lire l'échange (notes internes réservées aux admins) ── */
+    if (req.method === 'GET' && /^\/api\/signalements\/\d+\/messages$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const id = parseInt(pathname.split('/')[3]);
+      const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
+      if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
+      const isAdmin = me.role === 'administrateur';
+      const isCible = Number(me.id) === Number(dossier.cible_id);
+      const isReporter = Number(me.id) === Number(dossier.reporter_id);
+      if (!isAdmin && !isCible && !isReporter) return sendJSON(res, 403, { error: 'Accès refusé.' });
+
+      let rows = await db.prepare(`
+        SELECT sm.*, u.nom AS sender_nom FROM signalement_messages sm
+        LEFT JOIN users u ON u.id = sm.sender_id WHERE sm.dossier_id=? ORDER BY sm.created_at ASC`).all(id);
+      if (!isAdmin) rows = rows.filter(m => !m.interne);
+      return sendJSON(res, 200, rows);
+    }
+
+    /* ── POST /api/admin/dossiers-signalement/:id/decision — décision finale ── */
+    if (req.method === 'POST' && /^\/api\/admin\/dossiers-signalement\/\d+\/decision$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const id = parseInt(pathname.split('/')[4]);
+      const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
+      if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
+
+      const { decision, note, duree, gravite } = body;
+      if (!['classer', 'archiver', 'suspendre'].includes(decision)) return sendJSON(res, 400, { error: 'Décision invalide.' });
+
+      let nouveauStatut, sanctionType = null, dateFin = null;
+      if (decision === 'classer') {
+        nouveauStatut = 'classe_sans_suite';
+      } else if (decision === 'archiver') {
+        nouveauStatut = 'archive';
+        sanctionType = 'archive';
+      } else {
+        nouveauStatut = 'suspendu';
+        const DUREES = { '24h': 1, '7j': 7, '30j': 30 };
+        if (duree === 'definitive') {
+          sanctionType = 'suspension_definitive';
+          await db.prepare('UPDATE users SET suspendu_definitif=1, suspendu_jusqu_au=NULL WHERE id=?').run(dossier.cible_id);
+        } else {
+          const jours = DUREES[duree] || parseInt(duree) || 0;
+          if (!jours) return sendJSON(res, 400, { error: 'Durée de suspension invalide.' });
+          sanctionType = 'suspension_temporaire';
+          dateFin = new Date(Date.now() + jours * 86400000).toISOString();
+          await db.prepare('UPDATE users SET suspendu_jusqu_au=?, suspendu_definitif=0 WHERE id=?').run(dateFin, dossier.cible_id);
+        }
+      }
+
+      await db.prepare(`UPDATE signalements SET statut=?, admin_id=?, gravite=COALESCE(?,gravite), updated_at=datetime('now') WHERE id=?`)
+        .run(nouveauStatut, me.id, gravite ? Number(gravite) : null, id);
+      await db.prepare(`INSERT INTO signalement_historique (dossier_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
+        .run(id, me.id, me.nom, `decision:${decision}`, note || null);
+
+      if (sanctionType) {
+        await db.prepare(
+          `INSERT INTO sanctions_disciplinaires (cible_type,cible_id,dossier_id,type,gravite,motif,date_fin) VALUES (?,?,?,?,?,?,?)`
+        ).run(dossier.cible_type, dossier.cible_id, id, sanctionType, gravite ? Number(gravite) : dossier.gravite, note || dossier.motif, dateFin);
+
+        /* ── Impact sur le score de confiance — UNIQUEMENT ici (décision admin confirmant un
+           signalement avéré), jamais au simple dépôt d'un signalement. Un dossier "classé sans
+           suite" (sanctionType=null) ne passe jamais par ce bloc. Pénalité cumulative selon la
+           gravité, plafonnée à 100 ; le niveau 4 (100%) accompagne le verrouillage déjà appliqué
+           ci-dessus (suspendu_definitif). Répercutée immédiatement sur le score déjà en cache —
+           best-effort : si le module Score de confiance recalcule plus tard sans lire
+           penalite_disciplinaire, cet ajustement peut être écrasé par un recalcul propre. */
+        const graviteAppliquee = gravite ? Number(gravite) : (dossier.gravite || 2);
+        const PENALITE_PAR_GRAVITE = { 1: 5, 2: 15, 3: 35, 4: 100 };
+        const pct = PENALITE_PAR_GRAVITE[graviteAppliquee] || 15;
+        try {
+          await db.prepare(
+            `UPDATE users SET signalements_confirmes = COALESCE(signalements_confirmes,0) + 1,
+               penalite_disciplinaire = MIN(100, COALESCE(penalite_disciplinaire,0) + ?) WHERE id=?`
+          ).run(pct, dossier.cible_id);
+          const cache = await db.prepare('SELECT score FROM trust_cache WHERE user_id=?').get(dossier.cible_id);
+          if (cache) {
+            const nouveauScore = Math.max(0, Math.round(cache.score - pct));
+            await db.prepare('UPDATE trust_cache SET score=? WHERE user_id=?').run(nouveauScore, dossier.cible_id);
+            await db.prepare('UPDATE users SET trust_score=? WHERE id=?').run(nouveauScore, dossier.cible_id);
+          }
+        } catch (e) { /* best-effort : ne doit jamais faire échouer la décision */ }
+      }
+
+      await db.prepare(`UPDATE signalement_litiges SET statut='clos', closed_at=datetime('now') WHERE dossier_id=? AND statut='ouvert'`).run(id);
+
+      const messageDecision = decision === 'classer'
+        ? `Le signalement ${dossier.numero_dossier} vous concernant a été classé sans suite.`
+        : decision === 'archiver'
+          ? `Une décision a été prise concernant le signalement ${dossier.numero_dossier} : aucune sanction immédiate, mais un rappel des règles est conservé dans votre historique.${note ? ' Motif : ' + note : ''}`
+          : `Votre compte a été suspendu suite au dossier ${dossier.numero_dossier}${dateFin ? " jusqu'au " + new Date(dateFin).toLocaleDateString('fr-FR') : ' de façon définitive'}.${note ? ' Motif : ' + note : ''}`;
+      creerNotif(dossier.cible_id, 'decision_signalement', `📋 Décision — ${dossier.numero_dossier}`, messageDecision, { signalement_id: id });
+
+      return sendJSON(res, 200, { ok: true, statut: nouveauStatut });
+    }
+
+    /* ── POST /api/admin/dossiers-signalement/migrer-anciens — migration ponctuelle et idempotente
+       depuis account_reports/initiative_reports (anciennes tables conservées, non supprimées) ── */
+    if (req.method === 'POST' && pathname === '/api/admin/dossiers-signalement/migrer-anciens') {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+
+      let migres = 0, ignores = 0;
+      const STATUT_ACCOUNT = { en_attente: 'nouveau', classe: 'classe_sans_suite', rappel_envoye: 'en_analyse', masque: 'suspendu', resolu: 'archive' };
+      const oldAccounts = await db.prepare('SELECT * FROM account_reports').all();
+      for (const r of oldAccounts) {
+        const marker = `account_reports:${r.id}`;
+        const already = await db.prepare('SELECT id FROM signalements WHERE origine_migration=?').get(marker);
+        if (already) { ignores++; continue; }
+        const cible = await db.prepare('SELECT role FROM users WHERE id=?').get(r.reported_id);
+        if (!cible) { ignores++; continue; }
+        const id = (await db.prepare(`
+          INSERT INTO signalements (cible_type, cible_id, reporter_id, motif, description, statut, admin_id, created_at, updated_at, origine_migration)
+          VALUES (?,?,?,?,?,?,?,?,?,?)
+        `).run(cible.role, r.reported_id, r.reporter_id, 'Compte inactif (signalement historique)', r.admin_note || null,
+            STATUT_ACCOUNT[r.statut] || 'nouveau', r.admin_id || null, r.created_at, r.updated_at, marker)).lastInsertRowid;
+        const numeroDossier = 'SIGN-' + String(id).padStart(6, '0');
+        await db.prepare('UPDATE signalements SET numero_dossier=? WHERE id=?').run(numeroDossier, id);
+        await db.prepare(`INSERT INTO signalement_historique (dossier_id,action,note) VALUES (?,?,?)`).run(id, 'migration', marker);
+        migres++;
+      }
+
+      const STATUT_INIT = { en_attente: 'nouveau', en_cours: 'en_analyse', classe: 'classe_sans_suite', suspendu: 'suspendu', masque: 'suspendu', transmis: 'en_analyse' };
+      const oldInits = await db.prepare('SELECT * FROM initiative_reports').all();
+      for (const r of oldInits) {
+        const marker = `initiative_reports:${r.id}`;
+        const already = await db.prepare('SELECT id FROM signalements WHERE origine_migration=?').get(marker);
+        if (already) { ignores++; continue; }
+        const init = await db.prepare('SELECT owner_user_id FROM initiatives WHERE id=?').get(r.initiative_id);
+        if (!init || !init.owner_user_id) { ignores++; continue; }
+        const id = (await db.prepare(`
+          INSERT INTO signalements (cible_type, cible_id, reporter_id, motif, description, preuves_json, statut, admin_id, created_at, updated_at, origine_migration)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        `).run('initiative', init.owner_user_id, r.reporter_id, r.motif, r.description || null, r.preuves || '[]',
+            STATUT_INIT[r.statut] || 'nouveau', r.admin_id || null, r.created_at, r.updated_at, marker)).lastInsertRowid;
+        const numeroDossier = 'SIGN-' + String(id).padStart(6, '0');
+        await db.prepare('UPDATE signalements SET numero_dossier=? WHERE id=?').run(numeroDossier, id);
+        await db.prepare(`INSERT INTO signalement_historique (dossier_id,action,note) VALUES (?,?,?)`).run(id, 'migration', marker);
+        migres++;
+      }
+
+      return sendJSON(res, 200, { ok: true, migres, ignores });
     }
 
     /* ── GET /api/admin/signalements — tous les signalements (admin) ── */

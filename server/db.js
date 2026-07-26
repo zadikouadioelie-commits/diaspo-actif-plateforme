@@ -1506,6 +1506,15 @@ const MIGRATIONS = [
   ["sondage_questions", "max_label TEXT"],
   ["sondage_questions", "min_val INTEGER DEFAULT 1"],
   ["sondage_questions", "max_val INTEGER DEFAULT 5"],
+  // Module Signalement de compte & Gestion des litiges — suspension effective
+  ["users", "suspendu_jusqu_au TEXT"],
+  ["users", "suspendu_definitif INTEGER DEFAULT 0"],
+  // Traçabilité de la migration ponctuelle depuis account_reports/initiative_reports
+  // (ex: "account_reports:12") — empêche une double migration si le bouton est cliqué 2 fois
+  ["signalements", "origine_migration TEXT"],
+  // Pénalité disciplinaire cumulée (0-100) issue des décisions de signalement avérées,
+  // appliquée au score de confiance UNIQUEMENT après décision admin (jamais sur simple signalement)
+  ["users", "penalite_disciplinaire INTEGER DEFAULT 0"],
 ];
 
 /* ===== COMPTES ÉTATIQUES : tables spécifiques ===== */
@@ -2230,6 +2239,91 @@ db.exec(`
     action      TEXT NOT NULL,
     note        TEXT,
     created_at  TEXT DEFAULT (datetime('now'))
+  );
+
+  /* =====================================================================
+     MODULE SIGNALEMENT DE COMPTE & GESTION DES LITIGES
+     Remplace account_reports/initiative_reports (conservées telles quelles,
+     non réutilisées, pour historique) par un vrai modèle de dossier :
+     signalement → analyse → litige (médiation) → décision → sanction.
+     ===================================================================== */
+
+  /* ── Dossier de signalement (SIGN-000001) ── */
+  CREATE TABLE IF NOT EXISTS signalements (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero_dossier TEXT,
+    cible_type     TEXT NOT NULL CHECK(cible_type IN ('utilisateur','initiative','collectivite')),
+    cible_id       INTEGER NOT NULL,                    -- users.id du compte signalé, quel que soit son role
+    reporter_id    INTEGER NOT NULL,
+    motif          TEXT NOT NULL,
+    description    TEXT,
+    preuves_json   TEXT DEFAULT '[]',                   -- [{type:'image'|'document'|'capture'|'lien', url, nom}]
+    gravite        INTEGER CHECK(gravite IS NULL OR gravite BETWEEN 1 AND 4),
+    statut         TEXT NOT NULL DEFAULT 'nouveau'
+                     CHECK(statut IN ('nouveau','en_analyse','litige_ouvert','decision_attente','classe_sans_suite','archive','suspendu')),
+    admin_id       INTEGER,                             -- administrateur médiateur assigné
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cible_id) REFERENCES users(id),
+    FOREIGN KEY(reporter_id) REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  /* ── Litige ouvert sur un dossier (LITIGE-000001) ── */
+  CREATE TABLE IF NOT EXISTS signalement_litiges (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    dossier_id          INTEGER NOT NULL,
+    numero_litige       TEXT,
+    statut              TEXT NOT NULL DEFAULT 'ouvert' CHECK(statut IN ('ouvert','clos')),
+    ouvert_par_admin_id INTEGER,
+    created_at          TEXT DEFAULT (datetime('now')),
+    closed_at           TEXT,
+    FOREIGN KEY(dossier_id) REFERENCES signalements(id),
+    FOREIGN KEY(ouvert_par_admin_id) REFERENCES users(id)
+  );
+
+  /* ── Échanges du dossier (admin ↔ compte signalé), + notes internes admin (interne=1, invisibles
+     au compte signalé et au signalant) ── */
+  CREATE TABLE IF NOT EXISTS signalement_messages (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    dossier_id   INTEGER NOT NULL,
+    sender_id    INTEGER,
+    contenu      TEXT NOT NULL,
+    fichier_json TEXT,
+    interne      INTEGER DEFAULT 0,
+    lu           INTEGER DEFAULT 0,
+    created_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(dossier_id) REFERENCES signalements(id),
+    FOREIGN KEY(sender_id) REFERENCES users(id)
+  );
+
+  /* ── Traçabilité de toutes les actions d'un dossier (création, analyse, litige, décision...) ── */
+  CREATE TABLE IF NOT EXISTS signalement_historique (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    dossier_id  INTEGER NOT NULL,
+    admin_id    INTEGER,
+    admin_nom   TEXT,
+    action      TEXT NOT NULL,
+    note        TEXT,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(dossier_id) REFERENCES signalements(id)
+  );
+
+  /* ── Historique disciplinaire d'un compte : sanction issue d'une décision de dossier
+     (archivage = trace sans sanction immédiate, suspension = sanction effective) ── */
+  CREATE TABLE IF NOT EXISTS sanctions_disciplinaires (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    cible_type  TEXT NOT NULL,
+    cible_id    INTEGER NOT NULL,
+    dossier_id  INTEGER,
+    type        TEXT NOT NULL CHECK(type IN ('avertissement','surveillance','suspension_temporaire','suspension_definitive','archive')),
+    gravite     INTEGER,
+    motif       TEXT,
+    date_debut  TEXT DEFAULT (datetime('now')),
+    date_fin    TEXT,                                   -- NULL = permanent (definitive) ou sans échéance (avertissement/surveillance/archive)
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cible_id) REFERENCES users(id),
+    FOREIGN KEY(dossier_id) REFERENCES signalements(id)
   );
 
   /* ── Historique des suppressions directes par un admin (bouton "Suppr." de Gestion des membres),
@@ -4707,6 +4801,25 @@ db.exec(`
       created_at          TEXT DEFAULT (datetime('now')),
       FOREIGN KEY(membre_id) REFERENCES adhesion_membres(id) ON DELETE CASCADE
     );
+
+    /* ===== RELANCES ORIGINE =====
+       Trace chaque relance envoyee pour une origine manquante, pour espacer reellement les
+       rappels de 5 jours (pas caler sur un cron calendaire, qui derape a chaque fin de mois)
+       et pour alimenter le tableau de bord administrateur. Polymorphe : soit user_id, soit
+       initiative_id est rempli, jamais les deux (meme pattern que contact_historique) - un
+       utilisateur et son initiative sont deux entites distinctes qui declarent CHACUNE leur
+       propre origine, et sont donc relancees independamment. */
+    CREATE TABLE IF NOT EXISTS origine_relances (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id       INTEGER,
+      initiative_id INTEGER,
+      rang          INTEGER NOT NULL DEFAULT 1,
+      created_at    TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_origine_relances_user ON origine_relances(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_origine_relances_init ON origine_relances(initiative_id, created_at);
 
     CREATE TABLE IF NOT EXISTS adhesion_relances (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,

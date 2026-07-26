@@ -495,6 +495,35 @@ function showEmailVerifBanner(user) {
   };
 }
 
+/* ── Bandeau "Complétez votre origine" ──
+   L'indicateur origine_manquante/origine_lien est calculé UNE SEULE FOIS côté serveur
+   (GET /api/auth/me) : ce bandeau ne fait que le lire, pour ne pas réécrire une troisième
+   fois la définition de "origine complète" (déjà dans le cron de relance et daOrigine()).
+   "Ignorer pour le moment" masque le bandeau 24h — assez long pour ne pas harceler à
+   chaque page vue, assez court pour revenir avant la prochaine relance par e-mail/cloche
+   à 5 jours. */
+function showOrigineBanner(user) {
+  if (!user || !user.origine_manquante || !user.origine_lien) return;
+  const dismissKey = "da_origine_banner_dismiss";
+  const dismissedAt = Number(localStorage.getItem(dismissKey) || 0);
+  if (Date.now() - dismissedAt < 24 * 3600000) return;
+  if (document.getElementById("origine-banner")) return;
+
+  const bar = document.createElement("div");
+  bar.id = "origine-banner";
+  bar.style.cssText = "position:sticky;top:0;z-index:900;background:#EFF6FF;color:#1E3A8A;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid #BFDBFE;";
+  bar.innerHTML = `
+    <span>🌍 Votre origine n'est pas renseignée — elle permet aux membres de votre diaspora de vous identifier et facilite les mises en relation.</span>
+    <a href="${user.origine_lien}" id="origine-fill-btn" style="background:#F26422;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;">Renseigner l'origine</a>
+    <button id="origine-dismiss-btn" type="button" style="background:none;border:1.5px solid #1E3A8A;color:#1E3A8A;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;">Ignorer pour le moment</button>`;
+  document.body.prepend(bar);
+
+  document.getElementById("origine-dismiss-btn").onclick = () => {
+    localStorage.setItem(dismissKey, String(Date.now()));
+    bar.remove();
+  };
+}
+
 /* ─── Comptes de test (démo) — réservé à l'administrateur ───
    Ouvre une fenêtre listant les comptes de démonstration et permet de s'y
    connecter en un clic (déconnexion admin → connexion démo → redirection). */
@@ -683,6 +712,7 @@ async function applyAuthState() {
       }
     } catch (e) { /* silencieux */ }
     showEmailVerifBanner(user);
+    showOrigineBanner(user);
   } else {
     el.innerHTML = `
       <a href="login.html" class="btn btn-sm btn-outline">Se connecter</a>

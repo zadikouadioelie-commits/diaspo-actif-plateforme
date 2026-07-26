@@ -1006,6 +1006,11 @@ const COLONNES_MIGRATION = [
     ['formations', 'date_archivage', 'TEXT'],
     ['formations', 'date_suppression_definitive', 'TEXT'],
     ['formations', 'logo_url', 'TEXT'],
+    // Module Signalement de compte & Gestion des litiges — suspension effective
+    ['users', 'suspendu_jusqu_au', 'TEXT'],
+    ['users', 'suspendu_definitif', 'INTEGER DEFAULT 0'],
+    ['signalements', 'origine_migration', 'TEXT'],
+    ['users', 'penalite_disciplinaire', 'INTEGER DEFAULT 0'],
 ];
 
 async function migratePg(pool) {

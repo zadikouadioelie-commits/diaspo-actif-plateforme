@@ -223,6 +223,7 @@ html, body{overflow-x:clip !important;}
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/signalement.js"></script>
 <!-- Requis par les boutons « Modifier la bannière / le logo » du propriétaire.
      Sans eux, annuaireEditInitiativeCover s'interrompt sur « module de recadrage indisponible ». -->
 <script src="assets/upload-media.js"></script>
@@ -370,6 +371,7 @@ const DOMAIN_GRAD = {
                heurtait à la règle après coup. Voir initBoutonsRelation (assets/app.js). */
             ? `<span data-relation-user="${init.owner_user_id}" data-relation-origine="profil" data-relation-classe="btn btn-outline"></span>`
             : `<a href="messagerie.html?init=${init.id}" class="btn btn-outline">✏️ Écrire</a>`}
+          ${(!isOwner && me && init.owner_user_id) ? `<button type="button" class="btn btn-outline" style="color:#dc2626;" onclick="ouvrirSignalementModal(${init.owner_user_id},'${(init.nom || '').replace(/'/g, "\\'").replace(/</g, '')}')" title="Signaler ce compte">🚩 Signaler</button>` : ''}
         </div>
       </div>
 
@@ -919,6 +921,16 @@ const DOMAIN_GRAD = {
       });
   }
   renderBandeInfos();
+
+  /* Arrivée depuis le bandeau ou une notification "Complétez l'origine de l'initiative"
+     (?completer=origine) : ouvre directement la fenêtre d'édition de l'origine plutôt que
+     de laisser le propriétaire chercher le bon crayon parmi toute la page.
+     Appel différé (setTimeout) car window.editSection n'est assigné que plus loin dans
+     cette même fonction d'initialisation — l'appeler ici directement échouerait. */
+  if (isOwner && new URLSearchParams(location.search).get('completer') === 'origine') {
+    history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(() => { if (typeof window.editSection === 'function') window.editSection('origines'); }, 300);
+  }
 
   /* La bordure et le fond étaient calculés UNE SEULE FOIS, à la construction du HTML,
      puis figés dans l'attribut style. Cliquer une pastille cochait bien la case, mais
