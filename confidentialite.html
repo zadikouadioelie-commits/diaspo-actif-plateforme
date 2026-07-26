@@ -230,7 +230,11 @@
       </div>
       <div class="ds-pwd-form" id="ds-pwd-form">
         <div id="ds-pwd-title" style="font-size:13px;font-weight:700;margin-bottom:8px;">🔑 Entrez votre mot de passe pour continuer</div>
-        <input type="password" id="ds-pwd-input" placeholder="Votre mot de passe" autocomplete="current-password">
+        <div style="position:relative;">
+          <input type="password" id="ds-pwd-input" placeholder="Votre mot de passe" autocomplete="current-password" style="padding-right:40px;">
+          <button type="button" id="ds-pwd-toggle" aria-label="Afficher le mot de passe" title="Afficher le mot de passe"
+            style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;font-size:16px;padding:4px 6px;line-height:1;">👁</button>
+        </div>
         <div id="ds-pwd-err" class="ds-err"></div>
         <div class="codes-btn-row" style="margin-top:4px;">
           <button class="codes-btn green" onclick="window._submitDsId()" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;">Valider</button>
@@ -252,9 +256,22 @@
       ? '⚠️ Régénérer le DS-ID — entrez votre mot de passe (l\'ancien code sera invalidé)'
       : '🔑 Entrez votre mot de passe pour afficher votre DS-ID';
     document.getElementById('ds-pwd-input').value = '';
+    document.getElementById('ds-pwd-input').type = 'password';
+    document.getElementById('ds-pwd-toggle').textContent = '👁';
     document.getElementById('ds-pwd-err').style.display = 'none';
     document.getElementById('ds-pwd-input').focus();
   };
+  document.getElementById('ds-pwd-toggle').addEventListener('click', () => {
+    const input = document.getElementById('ds-pwd-input');
+    const btn = document.getElementById('ds-pwd-toggle');
+    const enClair = input.type === 'password';
+    input.type = enClair ? 'text' : 'password';
+    btn.textContent = enClair ? '🙈' : '👁';
+    const libelle = enClair ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
+    btn.title = libelle;
+    btn.setAttribute('aria-label', libelle);
+    input.focus();
+  });
   window._cancelDsId = function() { document.getElementById('ds-pwd-form').style.display = 'none'; };
   window._hideDsId = function() {
     document.getElementById('ds-revealed-view').style.display = 'none';
