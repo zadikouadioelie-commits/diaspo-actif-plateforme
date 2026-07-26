@@ -85,8 +85,17 @@ html, body{overflow-x:clip !important;}
 .init-card-header{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:16px;}
 
 /* Banner */
-.init-banner{height:180px;position:relative;overflow:hidden;}
+/* 180px de bandeau décoratif repoussaient le contenu réel très bas dans la page.
+   132px suffisent à porter le nom et la cloche sans voler l'espace de lecture. */
+.init-banner{height:132px;position:relative;overflow:hidden;}
 .init-banner-img{width:100%;height:100%;object-fit:cover;}
+
+/* Boutons de modification en place, réservés au propriétaire */
+.init-edit-media{position:absolute;border:0;border-radius:999px;background:rgba(15,42,80,.72);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background .18s;backdrop-filter:blur(4px);}
+.init-edit-media:hover{background:rgba(15,42,80,.92);}
+.init-edit-media:focus-visible{outline:3px solid #F26422;outline-offset:2px;}
+.init-edit-banniere{left:16px;bottom:12px;padding:7px 13px;font-size:12.5px;font-weight:600;}
+.init-edit-logo{right:-2px;bottom:-2px;width:30px;height:30px;font-size:14px;border:2px solid #fff;}
 .init-banner-overlay{position:absolute;inset:0;background:linear-gradient(135deg,#0F2A50 0%,#1B3A6B 50%,#1565C0 100%);opacity:.88;}
 
 /* Top-right: name + bell */
@@ -96,11 +105,13 @@ html, body{overflow-x:clip !important;}
 .bell-btn:hover,.bell-btn.active{background:rgba(255,255,255,.3);}
 
 /* Profile header row (below banner) */
-.init-profile-header{display:flex;align-items:flex-end;gap:16px;padding:0 24px 20px;margin-top:-44px;flex-wrap:wrap;}
-.init-profile-logo-wrap{flex-shrink:0;}
-.init-profile-logo{width:88px;height:88px;border-radius:50%;border:4px solid #fff;background:var(--orange-light);overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.15);}
+.init-profile-header{display:flex;align-items:flex-end;gap:16px;padding:0 24px 16px;margin-top:-36px;flex-wrap:wrap;}
+.init-profile-logo-wrap{flex-shrink:0;position:relative;}
+.init-profile-logo{width:76px;height:76px;border-radius:50%;border:4px solid #fff;background:var(--orange-light);overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.15);}
 .init-profile-logo img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
-.init-profile-info{flex:1;min-width:200px;padding-top:44px;}
+/* Initiales dessinées sur place, sans appel à un service extérieur */
+.init-profile-initiales{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1B3A6B,#1565C0);color:#fff;font-size:26px;font-weight:800;letter-spacing:.5px;}
+.init-profile-info{flex:1;min-width:200px;padding-top:40px;}
 .init-profile-info h1{margin:0 0 4px;font-size:20px;font-weight:800;line-height:1.2;}
 .init-profile-meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;}
 .init-profile-meta .sep{color:var(--border);}
@@ -185,6 +196,10 @@ html, body{overflow-x:clip !important;}
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<!-- Requis par les boutons « Modifier la bannière / le logo » du propriétaire.
+     Sans eux, annuaireEditInitiativeCover s'interrompt sur « module de recadrage indisponible ». -->
+<script src="assets/upload-media.js"></script>
+<script src="assets/image-cropper.js"></script>
 <script src="assets/back-to-dashboard.js"></script>
 <script>
 /* Gradient cover selon domaine */
@@ -219,6 +234,9 @@ const DOMAIN_GRAD = {
   }
 
   const init = data.initiative;
+  /* Déclaré ici, et non plus après la construction de l'en-tête : les boutons de
+     modification de la bannière et du logo en ont besoin dès le premier gabarit. */
+  const isOwner = me && init.owner_user_id && Number(me.id) === Number(init.owner_user_id);
   const nats = Array.isArray(init.nationalites_concernees) ? init.nationalites_concernees : [];
   const reseaux = (init.reseaux_sociaux && typeof init.reseaux_sociaux === 'object') ? init.reseaux_sociaux : {};
   const galerie = Array.isArray(init.galerie_json) ? init.galerie_json : [];
@@ -232,7 +250,14 @@ const DOMAIN_GRAD = {
   }
 
   const coverGrad = DOMAIN_GRAD[init.domaine] || 'linear-gradient(135deg,#0F2A50 0%,#1B3A6B 50%,#1565C0 100%)';
-  const logoUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(init.nom)}&backgroundColor=1B3A6B,1565C0,24487E&fontColor=ffffff&fontSize=38`;
+  /* Le logo venait d'un service extérieur (api.dicebear.com) qui fabriquait des initiales,
+     en ignorant le logo réellement chargé par l'initiative — celui que la cartouche de
+     l'annuaire affiche pourtant. Résultat : deux représentations différentes du même compte,
+     et une requête vers un tiers à chaque ouverture de page.
+     On utilise désormais le vrai logo ; à défaut, les initiales sont dessinées sur place. */
+  const logoReel = init.logo_url || init.vitrine_banniere_url || null;
+  const initialesInit = String(init.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
+    .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
 
   const localisation = [init.ville, init.region, init.pays].filter(Boolean).join(' · ');
 
@@ -255,6 +280,8 @@ const DOMAIN_GRAD = {
 
       <!-- Banner -->
       <div class="init-banner" style="background:${coverGrad};">
+        ${init.vitrine_banniere_url ? `<img class="init-banner-img" src="${init.vitrine_banniere_url}" alt="">` : ''}
+        ${isOwner ? `<button type="button" class="init-edit-media init-edit-banniere" id="btn-edit-banniere">📷 Modifier la bannière</button>` : ''}
         <!-- Nom en haut à droite + cloche -->
         <div class="init-banner-topright">
           <div class="init-banner-name">${init.nom}${init.sigle ? '<br><span style="font-size:12px;opacity:.75">'+init.sigle+'</span>' : ''}</div>
@@ -270,8 +297,11 @@ const DOMAIN_GRAD = {
       <div class="init-profile-header">
         <div class="init-profile-logo-wrap">
           <div class="init-profile-logo">
-            <img loading="lazy" src="${logoUrl}" alt="${init.nom}">
+            ${logoReel
+              ? `<img loading="lazy" src="${logoReel}" alt="Logo de ${init.nom}">`
+              : `<div class="init-profile-initiales" aria-label="${init.nom}">${initialesInit}</div>`}
           </div>
+          ${isOwner ? `<button type="button" class="init-edit-media init-edit-logo" id="btn-edit-logo" title="Modifier le logo" aria-label="Modifier le logo">📷</button>` : ''}
         </div>
         <div class="init-profile-info">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -316,7 +346,17 @@ const DOMAIN_GRAD = {
         </div>
       </div>
 
-      ${(!init.accreditations?.includes('initiative_abonne') && init.decouverte_premium && window.decouvertePremiumBlockHtml) ? `<div style="padding:0 24px;">${window.decouvertePremiumBlockHtml(init.decouverte_premium.date_expiration, 'init-dp-block')}</div>` : ''}
+      <!-- Le bloc Découverte Premium disait exactement ce que le badge à côté du titre dit
+           déjà (« Découverte Premium · 27 j restants »), en occupant une centaine de pixels
+           au sommet de la page. Il ne concerne d'ailleurs que le propriétaire : un visiteur
+           n'a rien à faire de ce décompte. Il est donc réservé au propriétaire et rendu
+           compact — l'échéance détaillée reste dans son tableau de bord. -->
+      ${(isOwner && !init.accreditations?.includes('initiative_abonne') && init.decouverte_premium) ? `
+        <div style="padding:8px 24px 0;">
+          <a href="dashboard-initiative.html#premium" style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:9px;font-size:12.5px;color:#92400E;text-decoration:none;font-weight:600;">
+            🏅 Découverte Premium — voir l'échéance et renouveler →
+          </a>
+        </div>` : ''}
 
       <!-- ===== BOTTOM STRIP ===== -->
       <div class="init-strip">
@@ -480,6 +520,39 @@ const DOMAIN_GRAD = {
   bindBtn('btn-suivre');
   bindBtn('btn-suivre-2');
 
+  /* ---- Bannière et logo modifiables en place (propriétaire) ----
+     Ces deux images n'étaient modifiables nulle part depuis la page : la bannière
+     seulement depuis l'annuaire, le logo jamais. On remplace l'image affichée sans
+     recharger la page, pour que le résultat soit visible immédiatement. */
+  const btnBanniere = document.getElementById('btn-edit-banniere');
+  if (btnBanniere) btnBanniere.addEventListener('click', () => {
+    window.annuaireEditInitiativeCover(init.id, url => {
+      init.vitrine_banniere_url = url;
+      const banniere = document.querySelector('.init-banner');
+      let img = banniere.querySelector('.init-banner-img');
+      if (!img) {
+        img = document.createElement('img');
+        img.className = 'init-banner-img';
+        img.alt = '';
+        banniere.prepend(img);
+      }
+      img.src = url;
+    });
+  });
+
+  const btnLogo = document.getElementById('btn-edit-logo');
+  if (btnLogo) btnLogo.addEventListener('click', () => {
+    window.annuaireEditInitiativeLogo(init.id, url => {
+      init.logo_url = url;
+      const cadre = document.querySelector('.init-profile-logo');
+      cadre.textContent = '';
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Logo de ' + init.nom;   // propriété DOM : pas d'échappement à faire
+      cadre.appendChild(img);
+    });
+  });
+
   /* ---- Trust Score widget ---- */
   const twEl = document.getElementById('init-trust-widget');
   if (twEl && init.owner_user_id && window.TrustWidget) {
@@ -535,7 +608,7 @@ const DOMAIN_GRAD = {
   /* ══════════════════════════════════════════════════════════
      COLONNES GAUCHE / DROITE — PROFIL ENRICHI
      ══════════════════════════════════════════════════════════ */
-  const isOwner = me && init.owner_user_id && Number(me.id) === Number(init.owner_user_id);
+  /* isOwner est désormais déclaré près de `init`, en amont de l'en-tête. */
   const esc2 = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   /* Masquage/démasquage d'un numéro de téléphone affiché publiquement (👁 afficher / masquer) */
   window._iniPhoneN = 0;
@@ -661,7 +734,7 @@ const DOMAIN_GRAD = {
         ${Object.entries(rs).filter(([,v]) => v).map(([k,v]) => `<div class="side-list-item"><span>${RS_ICONS[k]||'🔗'}</span><a href="${esc2(v)}" target="_blank" style="color:#2563EB;">${esc2(k.charAt(0).toUpperCase()+k.slice(1))}</a></div>`).join('')}
       </div>` : ''}
       <div class="side-card">
-        <h4><span>📞 Informations pratiques</span> ${isOwner ? '<a href="dashboard-initiative.html#parametres-vitrine" style="font-size:12px;text-decoration:none;" title="Modifier dans Paramètres Vitrine">⚙️</a>' : ''}</h4>
+        <h4><span>📞 Informations pratiques</span> ${editBtn('contact')}</h4>
         ${infos.length ? infos.map(([ic,val]) => `<div class="side-list-item"><span>${ic}</span><span style="flex:1;word-break:break-word;">${val}</span></div>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
       </div>
       ${mapSrc ? `<div class="side-card" style="padding:0;overflow:hidden;">
@@ -815,6 +888,46 @@ const DOMAIN_GRAD = {
           nationalite1: ov.querySelector('#eo-n1').value.trim(),
           nationalite2: ov.querySelector('#eo-n2').value.trim(),
         }));
+    } else if (section === 'contact') {
+      /* Le propriétaire devait auparavant quitter la page pour « Paramètres Vitrine ».
+         Les coordonnées se modifient désormais sur place, comme les autres rubriques.
+         Le numéro reste celui de la VITRINE : le téléphone du compte n'est jamais touché
+         ici, et sa publication demeure un choix explicite (case à cocher ci-dessous). */
+      const champ = (id, lbl, val, ph, type) => `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">${lbl}</label>
+        <input type="${type || 'text'}" id="${id}" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${esc2(val || '')}" placeholder="${ph}">`;
+      openEditModal('📞 Informations pratiques',
+        champ('ec-horaires', 'Horaires', init.vitrine_horaires, 'Ex : Lun–Ven, 9h–17h')
+        + champ('ec-tel', 'Téléphone de la vitrine', init.vitrine_tel_pro, '+33 1 23 45 67 89', 'tel')
+        + `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 2px;font-size:12.5px;cursor:pointer;">
+             <input type="checkbox" id="ec-tel-visible" ${init.vitrine_tel_visible ? 'checked' : ''} style="width:16px;height:16px;">
+             <span>Afficher ce numéro publiquement</span>
+           </label>
+           <p style="font-size:11.5px;color:var(--muted);margin:0 0 4px;">Décoché, le numéro reste masqué aux visiteurs. Le téléphone de votre compte n'est jamais publié.</p>`
+        + champ('ec-wa', 'WhatsApp (optionnel)', init.vitrine_whatsapp, '+33 6 12 34 56 78', 'tel')
+        + champ('ec-email', 'E-mail de la vitrine', init.vitrine_email_pro, 'contact@exemple.org', 'email')
+        + champ('ec-web', 'Site web', init.site_web, 'https://exemple.org', 'url')
+        + champ('ec-adresse', 'Adresse', init.adresse, '12 rue des Diasporas')
+        + champ('ec-ville', 'Ville', init.vitrine_ville || init.ville, 'Paris'),
+        async ov => {
+          const v = id => ov.querySelector('#' + id).value.trim();
+          /* Deux routes distinctes, et c'est voulu : le numéro de vitrine et sa visibilité
+             passent par contact-vitrine, qui en tient l'historique (§5 de la spécification). */
+          await api('PUT', `/initiatives/${init.id}/contact-vitrine`, {
+            tel: v('ec-tel'),
+            whatsapp: v('ec-wa'),
+            visible: ov.querySelector('#ec-tel-visible').checked,
+          });
+          await api('PUT', `/initiatives/${init.id}/vitrine`, {
+            vitrine_horaires: v('ec-horaires'),
+            vitrine_email_pro: v('ec-email'),
+            site_web: v('ec-web'),
+            adresse: v('ec-adresse'),
+            vitrine_ville: v('ec-ville'),
+          });
+          const r = await api('GET', `/initiatives/${init.id}`);
+          Object.assign(init, r.initiative);
+          renderColLeft(); renderColRight();
+        });
     } else if (section === 'publics') {
       openEditModal('🎯 Public concerné', pillsHtml(PUBLICS_PRESETS, init.publics || [], 'ep-pub'),
         ov => saveProfil({ publics: readPills(ov, 'ep-pub') }));

@@ -153,7 +153,7 @@ window.annuaireEditCover = annuaireEditCover;
 
 /* Idem pour une carte Initiative — mêmes recadreur/upload, mais persiste sur
    initiatives.vitrine_banniere_url (même route que "Changer la bannière" de la vitrine). */
-async function annuaireEditInitiativeCover(initiativeId) {
+async function annuaireEditInitiativeCover(initiativeId, apres) {
   if (!window.openImageCropper || !window.uploadMedia) {
     alert("Le module de recadrage n'est pas disponible sur cette page.");
     return;
@@ -169,7 +169,8 @@ async function annuaireEditInitiativeCover(initiativeId) {
       if (!cropped) return;
       const url = await uploadMedia(cropped, "banner");
       await api("PUT", `/initiatives/${initiativeId}/vitrine`, { vitrine_banniere_url: url });
-      if (window.annuaireRefresh) window.annuaireRefresh();
+      if (typeof apres === "function") apres(url);
+      else if (window.annuaireRefresh) window.annuaireRefresh();
     } catch (err) {
       alert("Erreur lors du chargement de la couverture : " + err.message);
     }
@@ -177,6 +178,35 @@ async function annuaireEditInitiativeCover(initiativeId) {
   input.click();
 }
 window.annuaireEditInitiativeCover = annuaireEditInitiativeCover;
+
+/* Logo d'une initiative — même mécanique, mais recadrage circulaire et persistance
+   sur initiatives.logo_url. La colonne existait et la route l'acceptait déjà ;
+   il manquait simplement un moyen, pour le propriétaire, de la renseigner. */
+async function annuaireEditInitiativeLogo(initiativeId, apres) {
+  if (!window.openImageCropper || !window.uploadMedia) {
+    alert("Le module de recadrage n'est pas disponible sur cette page.");
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/jpeg,image/png,image/webp";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const cropped = await openImageCropper(file, { shape: "circle", aspect: 1, outW: 512, outH: 512 });
+      if (!cropped) return;
+      const url = await uploadMedia(cropped, "logo");
+      await api("PUT", `/initiatives/${initiativeId}/vitrine`, { logo_url: url });
+      if (typeof apres === "function") apres(url);
+      else if (window.annuaireRefresh) window.annuaireRefresh();
+    } catch (err) {
+      alert("Erreur lors du chargement du logo : " + err.message);
+    }
+  };
+  input.click();
+}
+window.annuaireEditInitiativeLogo = annuaireEditInitiativeLogo;
 
 /* Badge de messages non lus dans la topbar */
 function updateTopbarBadge(count) {
