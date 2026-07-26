@@ -3766,6 +3766,40 @@ async function getInitiativeByIdOrSlug(idOrSlug, columns = "*") {
 
 /* ===== Recherche par mots-clés — Annuaire ===== */
 const ANNUAIRE_NORMALISE = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/* Le sélecteur de pays (assets/geo.js) demande une liste traduite en français à une API
+   externe ; quand celle-ci échoue, il se rabat SILENCIEUSEMENT sur une liste en anglais
+   (countriesnow.space). Sans cet alias, chercher "Ivory Coast" ne trouve jamais les fiches
+   qui déclarent "Côte d'Ivoire" — la langue du filtre et celle des données divergent sans
+   qu'aucun signal ne le montre à l'écran. Couvre les cas les plus probables ; à défaut de
+   correspondance, le repli normal (sous-chaîne normalisée) continue de s'appliquer. */
+const ANNUAIRE_ALIAS_PAYS_EN_FR = {
+  'ivory coast': "cote d'ivoire",
+  "cote d ivoire": "cote d'ivoire",
+  'democratic republic of the congo': 'congo',
+  'republic of the congo': 'congo',
+  'guinea': 'guinee',
+  'guinea-bissau': 'guinee-bissau',
+  'equatorial guinea': 'guinee equatoriale',
+  'morocco': 'maroc',
+  'senegal': 'senegal',
+  'cameroon': 'cameroun',
+  'mali': 'mali',
+  'chad': 'tchad',
+  'niger': 'niger',
+  'benin': 'benin',
+  'togo': 'togo',
+  'gabon': 'gabon',
+  'burkina faso': 'burkina faso',
+  'algeria': 'algerie',
+  'tunisia': 'tunisie',
+  'egypt': 'egypte',
+  'south africa': 'afrique du sud',
+};
+function annuaireNormOrigine(s) {
+  const n = ANNUAIRE_NORMALISE(s);
+  return ANNUAIRE_ALIAS_PAYS_EN_FR[n] || n;
+}
 const ANNUAIRE_STEM = w => w.replace(/(aux|eux|ies)$/,'al').replace(/s$/,''); // pluriel simplifié
 const ANNUAIRE_SYNONYMES = {
   livraison: ['livreur','livrer','logistique','transport de colis','coursier'],
@@ -3886,6 +3920,19 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
+
+  /* Filtre « Pays d'origine » — jusqu'ici totalement inopérant : le paramètre n'était ni
+     envoyé par le client ni lu par cette route. Les champs testés sont exactement ceux que
+     daOrigine() (assets/app.js) affiche sur les cartouches, dans le même ordre de priorité,
+     afin qu'une fiche affichant « Origine : Côte d'Ivoire » soit bien celle que ce filtre
+     retrouve — et pas une autre, ni l'inverse. */
+  if (query.origine) {
+    const cible = annuaireNormOrigine(query.origine);
+    const correspond = (...valeurs) => valeurs.some(v => v && annuaireNormOrigine(v).includes(cible));
+    initiatives = initiatives.filter(r => correspond(r.origine1, r.origine2, r.pays_origine, r.owner_origine1, r.owner_origine2, r.nationalite1, r.nationalite2));
+    utilisateurs = utilisateurs.filter(r => correspond(r.origine1, r.origine2, r.nationalite1, r.nationalite2));
+    organismes   = organismes.filter(r => correspond(r.origine1, r.origine2, r.pays_origine_institution, r.nationalite1, r.nationalite2));
+  }
 
   // Produits vitrine (élargit "produits proposés") — rattachés par initiative_id
   const initIds = initiatives.map(i => i.id);

@@ -1055,6 +1055,20 @@ async function initAnnuaire(){
   /* Normalisation */
   const norm = s => (s||"").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g,"");
 
+  /* Le sélecteur de pays d'origine se rabat parfois en anglais (voir server/index.js,
+     ANNUAIRE_ALIAS_PAYS_EN_FR) quand l'API de traduction externe échoue. Ce petit alias,
+     miroir de celui du serveur, évite qu'une recherche déclenchée depuis CETTE branche
+     (type "Utilisateurs" sans mot-clé, qui ne repasse pas par le serveur) échoue
+     silencieusement pour la même raison que le bug d'origine. */
+  const ALIAS_PAYS_EN_FR = {
+    'ivory coast': "cote d'ivoire", 'cote d ivoire': "cote d'ivoire",
+    'democratic republic of the congo': 'congo', 'republic of the congo': 'congo',
+    'guinea': 'guinee', 'guinea-bissau': 'guinee-bissau', 'equatorial guinea': 'guinee equatoriale',
+    'morocco': 'maroc', 'cameroon': 'cameroun', 'chad': 'tchad', 'benin': 'benin',
+    'algeria': 'algerie', 'tunisia': 'tunisie', 'egypt': 'egypte', 'south africa': 'afrique du sud',
+  };
+  const normOrigine = s => { const n = norm(s); return ALIAS_PAYS_EN_FR[n] || n; };
+
   function annCardCoverHtml(id, name, bannerUrl, photoUrl, badgeHtml, isOwn) {
     const bg = bannerUrl
       ? `background-image:url('${bannerUrl}');background-size:cover;background-position:center;`
@@ -1150,6 +1164,10 @@ async function initAnnuaire(){
     if (state.typeOrg) params.set("type", state.typeOrg);
     if (state.ville) params.set("ville", state.ville);
     if (state.paysRes) params.set("pays", state.paysRes);
+    /* state.paysOrig n'était jamais transmis : choisir un pays d'origine ne changeait
+       strictement rien à la requête envoyée, et la vue par défaut (tout, non filtré)
+       s'affichait quel que soit le choix. */
+    if (state.paysOrig) params.set("origine", state.paysOrig);
     let r;
     try { r = await api("GET", "/annuaire/recherche?" + params); }
     catch (e) { list.innerHTML = `<div class="empty">Erreur de recherche.</div>`; return; }
@@ -1187,6 +1205,15 @@ async function initAnnuaire(){
         if (state.nom && !norm(u.nom||"").includes(norm(state.nom))) return false;
         if (state.prenom && !norm(u.prenom||"").includes(norm(state.prenom))) return false;
         if (state.ville && !norm(u.ville||"").includes(norm(state.ville))) return false;
+        /* Cette branche (type "Utilisateurs" sans mot-clé) court-circuite la recherche
+           serveur qui gère normalement le filtre d'origine — sans ce test, choisir un
+           pays d'origine ici n'avait strictement aucun effet, comme pour toutes les
+           autres entrées de l'annuaire avant ce correctif. */
+        if (state.paysOrig) {
+          const cible = normOrigine(state.paysOrig);
+          const champs = [u.origine1, u.origine2, u.nationalite1, u.nationalite2];
+          if (!champs.some(v => v && normOrigine(v).includes(cible))) return false;
+        }
         return true;
       });
       filtered_count = filtered.length;
@@ -1202,33 +1229,12 @@ async function initAnnuaire(){
       return;
     }
 
-    const filtered = ALL.filter(it => {
-      const villeParts = (it.ville||"").split(",");
-      const itVille    = norm(villeParts[0]);
-      const itPaysRes  = norm(villeParts.length > 1 ? villeParts[villeParts.length-1] : "");
-      const itPaysOrig = norm(it.pays||"") || norm(it.nationalite1||"");
-
-      if (state.typeOrg && norm(it.type||"") !== norm(state.typeOrg)) return false;
-      if (state.paysRes && !itPaysRes.includes(norm(state.paysRes))) return false;
-      if (state.paysOrig && !itPaysOrig.includes(norm(state.paysOrig))
-          && !norm(it.nationalite2||"").includes(norm(state.paysOrig))
-          && !norm(it.origine1||"").includes(norm(state.paysOrig))
-          && !norm(it.origine2||"").includes(norm(state.paysOrig))) return false;
-      if (state.ville && !itVille.includes(norm(state.ville))) return false;
-      if (state.nom && !norm(it.nom||"").includes(norm(state.nom))) return false;
-      return true;
-    });
-
-    filtered_count = filtered.length;
-    document.getElementById("result-count").textContent = filtered.length;
-    list.innerHTML = filtered.length
-      ? filtered.map(renderInitiativeCard).join("")
-      : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
-          <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
-          <p style="font-weight:700;margin-bottom:6px;">Aucune initiative trouvée</p>
-          <p style="font-size:.88rem;">Essayez avec d'autres filtres ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
-        </div>`;
-    renderChips();
+    /* Toute autre combinaison de filtres (Initiatives, Collectivités, ou aucun type précis)
+       passe systématiquement par applyRechercheMotCle() ci-dessus, qui interroge le serveur
+       et lui seul applique désormais les filtres (dont l'origine). Un bloc de filtrage
+       purement local existait ici auparavant ; il n'était JAMAIS atteint (la condition de
+       tête de fonction intercepte tous les cas avant d'y arriver) et faisait donc croire,
+       à la lecture, qu'un filtrage local existait alors qu'il n'avait aucun effet. */
   }
 
   /* ── Rafraîchit l'affichage courant sans réinitialiser les filtres (ex: après modif de couverture) ── */
