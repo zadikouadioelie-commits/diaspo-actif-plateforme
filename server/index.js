@@ -3634,7 +3634,11 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   let meVillePays = { ville: null, pays: null };
   if (cu) { const r = await db.prepare("SELECT ville, pays FROM users WHERE id=?").get(cu.id); meVillePays = { ville: r?.ville || null, pays: r?.pays || null }; }
 
-  let initiatives = await db.prepare("SELECT i.* FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
+  let initiatives = await db.prepare(/* L'origine du PROPRIÉTAIRE accompagne chaque initiative : beaucoup de structures n'ont
+   pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
+   repli, la cartouche retombait sur la nationalité et affichait « France » pour une
+   initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
   if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
   if (query.type) initiatives = initiatives.filter(r => r.type === query.type);
@@ -3648,8 +3652,12 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
 
   // Collectivités et Diaspo'Actif (Administrateur) — organismes institutionnels, absents de la table initiatives
   let organismes = (query.type && !['Collectivités','Institutions'].includes(query.type)) ? [] : await db.prepare(
+    /* origine1/2 et pays_origine_institution accompagnent chaque organisme : sans eux, la
+       cartouche ne pouvait afficher aucune origine pour les collectivités, alors qu'elle
+       est obligatoire et validée à leur accréditation. */
     `SELECT id, nom, nom_institution, type_organisme, ville, pays, photo_url, banner_url, bio, role,
-       nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique
+       nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
+       origine1, origine2, pays_origine_institution, nationalite1, nationalite2
      FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
@@ -3774,7 +3782,11 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
 });
 
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
-  let rows = await db.prepare("SELECT i.* FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
+  let rows = await db.prepare(/* L'origine du PROPRIÉTAIRE accompagne chaque initiative : beaucoup de structures n'ont
+   pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
+   repli, la cartouche retombait sur la nationalité et affichait « France » pour une
+   initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
   const q = (query.q || "").toLowerCase();
   if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q));
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
@@ -3863,6 +3875,13 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
          il n'apparaît que si le propriétaire l'a explicitement autorisé. */
       if (Number(row.vitrine_tel_visible) !== 1) { row.vitrine_tel_pro = null; row.vitrine_whatsapp = null; }
     }
+  }
+  /* Origine du propriétaire, comme dans la liste : une structure sans origine propre en
+     base doit tout de même afficher celle que son responsable a déclarée. */
+  if (row.owner_user_id) {
+    const prop = await db.prepare("SELECT origine1, origine2 FROM users WHERE id=?").get(row.owner_user_id);
+    row.owner_origine1 = prop ? prop.origine1 : null;
+    row.owner_origine2 = prop ? prop.origine2 : null;
   }
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;

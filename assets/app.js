@@ -776,6 +776,16 @@ function daOrigine(o) {
   const dir = [o.origine1, o.origine2].filter(Boolean);
   if (dir.length) return { pays: dir.join(' · '), source: 'origine' };
   if (o.pays_origine) return { pays: o.pays_origine, source: 'origine' };
+  /* Les collectivités déclarent leur rattachement dans un champ institutionnel dédié :
+     l'ignorer aurait laissé sans origine précisément les comptes pour qui elle est
+     obligatoire et validée à l'accréditation. */
+  if (o.pays_origine_institution) return { pays: o.pays_origine_institution, source: 'origine' };
+  /* Origine du propriétaire : une structure n'a souvent pas d'origine propre en base alors
+     que son responsable a déclaré la sienne. C'est bien une origine déclarée — pas une
+     déduction — donc elle est traitée comme telle. Sans ce niveau, la cartouche retombait
+     sur la nationalité et affichait « France » pour une initiative ivoirienne. */
+  const prop = [o.owner_origine1, o.owner_origine2].filter(Boolean);
+  if (prop.length) return { pays: prop.join(' · '), source: 'origine' };
   const nat = [o.nationalite1, o.nationalite2].filter(Boolean).map(x => {
     const n = _daNorm(x);
     if (DA_NAT_PAYS[n]) return DA_NAT_PAYS[n];
@@ -784,6 +794,16 @@ function daOrigine(o) {
   }).filter(Boolean);
   if (nat.length) return { pays: [...new Set(nat)].join(' · '), source: 'nationalite' };
   return null;
+}
+
+/* Origine DÉCLARÉE uniquement, sans repli sur la nationalité. Sert à la ligne « Origine »
+   des cartouches : y afficher une origine déduite d'une nationalité contredirait la ligne
+   « Nationalités » juste en dessous, et ferait passer une déduction pour une déclaration.
+   Une seule fonction pour tous les types de comptes — initiative, membre, organisme — afin
+   que la règle reste la même partout, aujourd'hui et pour les comptes à venir. */
+function daOrigineDeclaree(o) {
+  const r = daOrigine(o);
+  return r && r.source === 'origine' ? r.pays : '';
 }
 
 /* Pastille posée sur l'image de la carte : c'est la zone que l'œil balaie en premier. */
@@ -810,7 +830,7 @@ function renderInitiativeCard(it){
   const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && CURRENT_USER.id === it.owner_user_id);
   const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
   const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
-  const origs   = [it.origine1, it.origine2].filter(Boolean).join(' • ') || it.pays_origine || '';
+  const origs   = daOrigineDeclaree(it);
   const ray     = it.rayonnement || '';
   const rayHtml = ray ? `<span class="ann-ray-badge ann-ray-${ray}">${RAY_ICON[ray]||'🌐'} ${RAY_LABEL[ray]||ray}</span>` : '';
   const desc    = it.description || it.mission || '';
@@ -992,7 +1012,7 @@ async function initAnnuaire(){
     // toujours affichees ensemble avec le lieu (meme convention que les cartes initiative) :
     // nationalite avec repli "-", origine seulement si l'information existe reellement.
     const nats  = [u.nationalite1, u.nationalite2].filter(Boolean).join(' • ') || '—';
-    const origs = [u.origine1, u.origine2].filter(Boolean).join(' • ');
+    const origs = daOrigineDeclaree(u);
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
       ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u)}`, isOwn)}
@@ -1024,6 +1044,7 @@ async function initAnnuaire(){
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nomAffiche}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
+        ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">🌍 <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
         ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
         <div class="ann-card-foot">
