@@ -86,6 +86,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/signalement.js"></script>
 <script src="assets/back-to-dashboard.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/posts.js"></script>
@@ -153,6 +154,7 @@ function applyPcTheme(name) {
         ${profil.is_owner ? `<button class="pc-btn pc-btn-outline" id="pc-btn-edit">✏️ Modifier mon profil</button>` : `<button class="pc-btn pc-btn-primary" id="pc-btn-abonner">${profil.abonne ? '✅ Abonné' : '🔔 S\'abonner'}</button>`}
         ${profil.site_web ? `<a class="pc-btn pc-btn-outline" href="${esc(profil.site_web)}" target="_blank" rel="noopener">🌐 Site officiel</a>` : ''}
         ${CU && CU.id !== profil.id ? `<a class="pc-btn pc-btn-outline" href="messagerie.html?user=${profil.id}">✉️ Contacter</a>` : ''}
+        ${CU && CU.id !== profil.id ? `<button class="pc-btn pc-btn-outline" style="color:#fca5a5;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g, "\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : ''}
         ${profil.is_owner ? `
           <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
             <span style="font-size:11px;color:rgba(255,255,255,.7);">🎨 Thème</span>
