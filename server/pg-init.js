@@ -1152,6 +1152,33 @@ async function migratePg(pool) {
     }
   } catch (e) { console.error('[pg-init migration] seed initiative_abonne:', e.message); }
 
+  /* ── Accréditation "Mon Associé" — même bug racine que les autres : le seed dans db.js
+     (seedMonAssocie) ne s'exécute que via better-sqlite3, jamais contre Postgres.
+     Sur demande, validée par un admin (validation_admin=1), gratuite. Idempotent via
+     ON CONFLICT (type). */
+  try {
+    const { rows: insRowsAssocie } = await pool.query(
+      `INSERT INTO accred_definitions
+        (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (type) DO NOTHING RETURNING id`,
+      [
+        'mon_associe', 'Mon Associé', '💎',
+        "Accès au module Mon Associé : publier des annonces de recherche de collaborations (associés, partenaires, bénévoles, investisseurs...) et candidater aux annonces publiées.",
+        JSON.stringify(['Publier des annonces','Candidater aux annonces','Messagerie et coffre de documents dédiés']),
+        '#2E74E0', '#EEF4FF', '#2E74E0', '#0F2A50', 'mon_associe', 1,
+      ]
+    );
+    if (insRowsAssocie[0]) {
+      const defId = insRowsAssocie[0].id;
+      await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'utilisateur','sur_demande')", [defId]);
+      await pool.query("INSERT INTO accred_regles (accred_id,role,mode) VALUES ($1,'initiative','sur_demande')", [defId]);
+      await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,'utilisateur','gratuit',0,'EUR',1)", [defId]);
+      await pool.query("INSERT INTO accred_tarifs (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES ($1,'initiative','gratuit',0,'EUR',1)", [defId]);
+      console.log('[pg-init] Accréditation "mon_associe" seedée (id=' + defId + ').');
+    }
+  } catch (e) { console.error('[pg-init migration] seed mon_associe:', e.message); }
+
   /* Fix-up idempotent (Postgres) : même correction que db.js si le premier déploiement
      avait tourné avec le bug mode='payant' / double INSERT accred_tarifs. */
   try {

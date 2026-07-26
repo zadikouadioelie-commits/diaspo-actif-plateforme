@@ -3750,6 +3750,30 @@ db.exec(`
   insT.run(id,'initiative','mensuel',12.99,'EUR',0,15);
 })();
 
+/* Accréditation "Mon Associé" : donne accès au module de recherche de collaborations
+   (publier une annonce, candidater). Consultation des annonces libre sans accréditation
+   (mode SAS visiteur, gérée côté frontend/route publique) - seule l'interaction est gatée.
+   Sur demande, validée par un admin (pas d'auto-activation), gratuite pour l'instant. */
+;(function seedMonAssocie() {
+  const exists = db.prepare("SELECT id FROM accred_definitions WHERE type='mon_associe'").get();
+  if (exists) return;
+  const insD = db.prepare(`INSERT OR IGNORE INTO accred_definitions
+    (type,label,emoji,description,droits,couleur,couleur_bg,couleur_border,couleur_text,module,ordre)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
+  const insR = db.prepare(`INSERT OR IGNORE INTO accred_regles (accred_id,role,mode) VALUES (?,?,?)`);
+  const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
+    (accred_id,role,type_tarif,montant,devise,validation_admin) VALUES (?,?,?,?,?,?)`);
+  insD.run('mon_associe','Mon Associé','💎',
+    "Accès au module Mon Associé : publier des annonces de recherche de collaborations (associés, partenaires, bénévoles, investisseurs...) et candidater aux annonces publiées.",
+    JSON.stringify(['Publier des annonces','Candidater aux annonces','Messagerie et coffre de documents dédiés']),
+    '#2E74E0','#EEF4FF','#2E74E0','#0F2A50','mon_associe', 1);
+  const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='mon_associe'").get();
+  insR.run(id,'utilisateur','sur_demande');
+  insR.run(id,'initiative','sur_demande');
+  insT.run(id,'utilisateur','gratuit',0,'EUR',1);
+  insT.run(id,'initiative','gratuit',0,'EUR',1);
+})();
+
 /* ===== MOTEUR ACCRÉDITATIONS v2 : audit + champs étendus + packs ===== */
 
 /* Extension de accred_definitions */
@@ -4873,6 +4897,72 @@ db.exec(`
       statut              TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','terminee','archivee')),
       created_at          TEXT DEFAULT (datetime('now')),
       FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+    );
+  `);
+
+  /* ===== MODULE MON ASSOCIE =====
+     Marketplace de recherche de collaborations (associes, partenaires, benevoles,
+     investisseurs, mentors...). Independant de la table collaborations existante
+     (autre fonctionnalite, en usage ailleurs) - pas de fusion. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS associe_annonces (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      auteur_id        INTEGER NOT NULL,
+      type_recherche   TEXT NOT NULL,
+      domaine          TEXT,
+      titre            TEXT NOT NULL,
+      description      TEXT,
+      localisation     TEXT,
+      pays             TEXT,
+      duree_mission    TEXT,
+      budget           TEXT,
+      competences_json TEXT DEFAULT '[]',
+      validite_jours   INTEGER DEFAULT 30,
+      statut           TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','cloturee')),
+      vues             INTEGER DEFAULT 0,
+      created_at       TEXT DEFAULT (datetime('now')),
+      updated_at       TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(auteur_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_associe_annonces_auteur ON associe_annonces(auteur_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_associe_annonces_statut ON associe_annonces(statut, created_at);
+
+    CREATE TABLE IF NOT EXISTS associe_candidatures (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      annonce_id   INTEGER NOT NULL,
+      candidat_id  INTEGER NOT NULL,
+      message      TEXT,
+      cv_url       TEXT,
+      statut       TEXT NOT NULL DEFAULT 'nouveau' CHECK(statut IN ('nouveau','retenu','refuse')),
+      created_at   TEXT DEFAULT (datetime('now')),
+      UNIQUE(annonce_id, candidat_id),
+      FOREIGN KEY(annonce_id) REFERENCES associe_annonces(id),
+      FOREIGN KEY(candidat_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_associe_candidatures_annonce ON associe_candidatures(annonce_id, statut);
+
+    CREATE TABLE IF NOT EXISTS associe_documents (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL,
+      nom          TEXT NOT NULL,
+      kind         TEXT,
+      taille       INTEGER,
+      url_bunny    TEXT,
+      contenu_b64  TEXT,
+      visibilite   TEXT NOT NULL DEFAULT 'prive' CHECK(visibilite IN ('prive','sur_demande')),
+      created_at   TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_associe_documents_user ON associe_documents(user_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS associe_favoris (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER NOT NULL,
+      annonce_id   INTEGER NOT NULL,
+      created_at   TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, annonce_id),
+      FOREIGN KEY(user_id) REFERENCES users(id),
+      FOREIGN KEY(annonce_id) REFERENCES associe_annonces(id)
     );
   `);
 

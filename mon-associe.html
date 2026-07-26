@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Mon Associé</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#081120">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<style>
+:root{
+  --ma-bg:#081120; --ma-text:#EAF1FB; --ma-muted:#93A4BF; --ma-muted2:#7E90AC;
+  --ma-accent:#2E74E0; --ma-teal:#2DD4BF; --ma-violet:#7C5CFC; --ma-red:#E5484D; --ma-green:#5FD37A; --ma-gold:#F7B733;
+  --ma-card:#0F2038; --ma-card2:#0B1728; --ma-border:rgba(148,164,191,.13);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(46,116,224,.20), transparent 60%),
+    radial-gradient(900px 560px at 92% 4%, rgba(45,212,191,.13), transparent 58%), var(--ma-bg);
+  color:var(--ma-text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh;
+}
+h1,h2,h3,.ma-brand{font-family:'Archivo',sans-serif}
+a{color:inherit}
+.ma-page{max-width:1200px;margin:0 auto;padding:0 20px 60px}
+.ma-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--ma-border);flex-wrap:wrap}
+.ma-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px;text-decoration:none}
+.ma-brand img{height:26px}
+.ma-back{color:var(--ma-muted);font-size:13px;text-decoration:none;font-weight:600}
+.ma-back:hover{color:var(--ma-text)}
+.ma-top-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ma-btn{cursor:pointer;border:1px solid var(--ma-border);background:var(--ma-card);color:var(--ma-text);font-weight:700;font-size:13px;padding:9px 16px;border-radius:12px;font-family:inherit;transition:.15s}
+.ma-btn:hover{border-color:var(--ma-accent)}
+.ma-btn-primary{background:linear-gradient(135deg,var(--ma-accent),#1d4ed8);border:none;color:#fff}
+.ma-btn-primary:hover{filter:brightness(1.1)}
+.ma-btn-ghost{background:none;border:1px solid var(--ma-border);color:var(--ma-muted)}
+.ma-btn-sm{padding:6px 12px;font-size:12px;border-radius:9px}
+.ma-btn:disabled{opacity:.5;cursor:not-allowed}
+.ma-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--ma-accent),var(--ma-violet));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;overflow:hidden}
+.ma-avatar img{width:100%;height:100%;object-fit:cover}
+
+.ma-hero{padding:44px 0 24px;text-align:center}
+.ma-hero.connected{text-align:left;padding:28px 0 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.ma-hero h1{font-size:clamp(24px,4vw,38px);font-weight:900;margin:0 0 10px;letter-spacing:-.5px}
+.ma-hero p{color:var(--ma-muted);font-size:14.5px;max-width:560px;margin:0 auto 22px;line-height:1.6}
+.ma-hero.connected p{margin:0}
+
+.ma-hero-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:36px;align-items:start;padding:44px 0 24px;text-align:left}
+@media (max-width:860px){.ma-hero-grid{grid-template-columns:1fr}}
+.ma-hero-grid h1{font-size:clamp(26px,4vw,42px);font-weight:900;margin:14px 0 10px;letter-spacing:-.5px}
+.ma-hero-grid p.ma-hero-txt{color:var(--ma-muted);font-size:15px;max-width:520px;margin:0 0 20px;line-height:1.6}
+.ma-hero-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 13px;border-radius:99px;background:rgba(45,212,191,.1);border:1px solid rgba(45,212,191,.28);font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--ma-teal);text-transform:uppercase}
+.ma-side-panel{border-radius:22px;padding:24px;background:linear-gradient(180deg,rgba(20,38,64,.95),rgba(11,22,39,.95));border:1px solid var(--ma-border);box-shadow:0 20px 50px rgba(4,9,20,.4)}
+.ma-side-panel .kicker{font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--ma-muted2);text-transform:uppercase}
+.ma-side-panel h3{font-size:19px;margin:10px 0 8px;font-weight:700}
+.ma-side-panel p{color:var(--ma-muted);font-size:13px;line-height:1.55;margin:0 0 16px}
+.ma-side-check{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.ma-side-check div{display:flex;align-items:center;gap:9px;font-size:13px;color:#C7D3E6}
+.ma-side-check span{color:var(--ma-green)}
+.ma-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:8px 0 18px;padding-bottom:16px;border-bottom:1px solid var(--ma-border)}
+.ma-toolbar h2{font-size:19px;margin:0;font-weight:800;display:inline}
+.ma-toolbar .count{color:var(--ma-muted2);font-size:13px;font-weight:600;margin-left:8px}
+.ma-toolbar .statut{display:flex;align-items:center;gap:8px;color:var(--ma-muted);font-size:12.5px}
+.ma-toolbar .dot{width:8px;height:8px;border-radius:99px;background:var(--ma-green);box-shadow:0 0 8px var(--ma-green)}
+
+.ma-search-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:14px}
+.ma-search-row input[type=text]{flex:1;min-width:220px;max-width:420px;background:var(--ma-card);border:1px solid var(--ma-border);border-radius:12px;color:var(--ma-text);padding:11px 16px;font-size:14px;font-family:inherit}
+.ma-search-row input::placeholder{color:var(--ma-muted2)}
+.ma-chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
+.ma-chip{cursor:pointer;user-select:none;font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:99px;border:1px solid var(--ma-border);background:var(--ma-card);color:var(--ma-muted)}
+.ma-chip.active{background:var(--ma-accent);border-color:var(--ma-accent);color:#fff}
+
+.ma-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.ma-select{background:var(--ma-card);border:1px solid var(--ma-border);color:var(--ma-text);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit}
+.ma-country-box{position:relative;min-width:200px}
+.ma-country-box input{width:100%;background:var(--ma-card);border:1px solid var(--ma-border);color:var(--ma-text);border-radius:10px;padding:8px 10px;font-size:13px;font-family:inherit}
+.ma-country-dd{display:none;position:absolute;z-index:30;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;background:var(--ma-card2);border:1px solid var(--ma-border);border-radius:10px;margin-top:4px;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.ma-country-dd div{padding:8px 12px;font-size:13px;cursor:pointer}
+.ma-country-dd div:hover{background:rgba(255,255,255,.05)}
+
+.ma-tabs{display:flex;gap:6px;border-bottom:1px solid var(--ma-border);margin-bottom:20px;flex-wrap:wrap}
+.ma-tab{cursor:pointer;padding:11px 16px;font-weight:700;font-size:13.5px;color:var(--ma-muted);border-bottom:2px solid transparent;position:relative}
+.ma-tab.active{color:var(--ma-text);border-color:var(--ma-accent)}
+.ma-tab .badge{background:var(--ma-red);color:#fff;font-size:10px;font-weight:800;border-radius:99px;padding:1px 6px;margin-left:6px}
+
+.ma-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.ma-card{background:linear-gradient(180deg,var(--ma-card),var(--ma-card2));border:1px solid var(--ma-border);border-radius:20px;padding:18px}
+.ma-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;margin-bottom:10px}
+.ma-card h3{font-size:15px;margin:0 0 6px;font-weight:800}
+.ma-card p{font-size:12.5px;color:var(--ma-muted);line-height:1.5;margin:0 0 10px}
+.ma-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ma-tag{background:rgba(255,255,255,.06);border-radius:99px;padding:3px 10px;font-size:11px;color:var(--ma-muted)}
+.ma-card-foot{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--ma-muted2);margin-bottom:12px}
+.ma-card-actions{display:flex;gap:8px}
+.ma-empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--ma-muted)}
+
+.ma-layout2{display:grid;grid-template-columns:1fr 1.3fr;gap:20px;align-items:start}
+@media (max-width:860px){.ma-layout2{grid-template-columns:1fr}}
+.ma-list-item{background:var(--ma-card);border:1px solid var(--ma-border);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer}
+.ma-list-item.active{border-color:var(--ma-accent)}
+.ma-list-item .row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ma-muted);margin-top:6px}
+.ma-statut-active{color:var(--ma-green)}
+.ma-statut-cloturee{color:var(--ma-muted2)}
+
+.ma-resp-tabs{display:flex;gap:6px;margin-bottom:14px}
+.ma-resp-item{display:flex;gap:12px;background:var(--ma-card);border:1px solid var(--ma-border);border-radius:14px;padding:14px;margin-bottom:10px}
+.ma-resp-item .match{margin-left:auto;font-weight:800;color:var(--ma-teal);font-size:12px}
+
+.ma-doc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.ma-doc-card{background:var(--ma-card);border:1px solid var(--ma-border);border-radius:16px;padding:16px}
+.ma-doc-icon{font-size:26px;margin-bottom:8px}
+
+.ma-modal-bg{display:none;position:fixed;inset:0;background:rgba(4,9,20,.75);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center;padding:20px}
+.ma-modal-bg.open{display:flex}
+.ma-modal{background:linear-gradient(180deg,#132743,#0B1728);border:1px solid var(--ma-border);border-radius:22px;padding:28px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto}
+.ma-modal h3{margin:0 0 14px}
+.ma-field{margin-bottom:12px}
+.ma-field label{display:block;font-size:12px;font-weight:700;color:var(--ma-muted);margin-bottom:5px}
+.ma-field input,.ma-field textarea,.ma-field select{width:100%;background:var(--ma-card2);border:1px solid var(--ma-border);color:var(--ma-text);border-radius:10px;padding:9px 12px;font-size:13.5px;font-family:inherit}
+.ma-error{color:#FF9A9C;font-size:12.5px;margin-top:8px;display:none}
+
+.ma-msg-overlay{display:none;position:fixed;inset:0;background:var(--ma-bg);z-index:150}
+.ma-msg-overlay.open{display:flex}
+.ma-msg-layout{display:flex;width:100%;height:100%}
+.ma-conv-list{width:300px;border-right:1px solid var(--ma-border);overflow-y:auto;flex-shrink:0}
+.ma-conv-item{padding:14px 16px;border-bottom:1px solid var(--ma-border);cursor:pointer;display:flex;gap:10px}
+.ma-conv-item.active{background:rgba(46,116,224,.12)}
+.ma-thread{flex:1;display:flex;flex-direction:column}
+.ma-thread-head{padding:14px 18px;border-bottom:1px solid var(--ma-border);display:flex;align-items:center;gap:10px}
+.ma-thread-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px}
+.ma-bubble{max-width:60%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.4}
+.ma-bubble.mine{align-self:flex-end;background:var(--ma-accent);color:#fff}
+.ma-bubble.them{align-self:flex-start;background:var(--ma-card)}
+.ma-thread-input{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--ma-border)}
+.ma-thread-input input{flex:1;background:var(--ma-card2);border:1px solid var(--ma-border);color:var(--ma-text);border-radius:12px;padding:10px 14px;font-family:inherit}
+.ma-close-x{position:absolute;top:16px;right:20px;cursor:pointer;font-size:20px;color:var(--ma-muted)}
+
+.ma-accred-banner{background:linear-gradient(135deg,rgba(46,116,224,.15),rgba(45,212,191,.1));border:1px solid var(--ma-border);border-radius:16px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.ma-accred-banner p{margin:0;font-size:13px;color:var(--ma-muted)}
+</style>
+</head>
+<body>
+<div class="ma-page">
+
+  <header class="ma-topbar">
+    <a class="ma-brand" href="index.html"><img src="assets/logo.png" alt=""> 💎 Mon Associé</a>
+    <div class="ma-top-right">
+      <a class="ma-back" href="index.html">← Retour à Diaspo'Actif</a>
+      <div id="ma-auth-zone"></div>
+    </div>
+  </header>
+
+  <section id="ma-hero"></section>
+
+  <div id="ma-accred-banner" class="ma-accred-banner" style="display:none">
+    <p id="ma-accred-banner-txt"></p>
+    <button class="ma-btn ma-btn-primary ma-btn-sm" id="ma-accred-btn">Demander l'accréditation</button>
+  </div>
+
+  <nav id="ma-tabs" class="ma-tabs" style="display:none">
+    <div class="ma-tab active" data-tab="decouvrir">Découvrir les annonces</div>
+    <div class="ma-tab" data-tab="mesannonces">Mes annonces &amp; réponses <span class="badge" id="ma-badge-nouvelles" style="display:none"></span></div>
+    <div class="ma-tab" data-tab="documents">🗂 Mes dossiers</div>
+  </nav>
+
+  <section id="ma-view-decouvrir">
+    <div class="ma-search-row">
+      <input type="text" id="ma-q" placeholder="Rechercher un titre, une compétence, une ville...">
+      <button class="ma-btn ma-btn-primary" id="ma-btn-publier">+ Publier une annonce</button>
+    </div>
+    <div class="ma-chips" id="ma-chips-type"></div>
+    <div class="ma-filters">
+      <select class="ma-select" id="ma-f-domaine"><option value="">Tous domaines</option></select>
+      <div class="ma-country-box">
+        <input type="text" id="ma-f-pays" placeholder="Pays de réalisation...">
+        <div class="ma-country-dd" id="ma-f-pays-dd"></div>
+      </div>
+      <button class="ma-btn ma-btn-ghost ma-btn-sm" id="ma-clear-filters">Réinitialiser</button>
+    </div>
+    <div class="ma-toolbar">
+      <div><h2>Annonces &amp; profils</h2><span class="count" id="ma-result-count"></span></div>
+      <div class="statut" id="ma-toolbar-statut" style="display:none"><span class="dot"></span> Consultation libre — connexion requise pour interagir</div>
+    </div>
+    <div class="ma-grid" id="ma-grid"></div>
+  </section>
+
+  <section id="ma-view-mesannonces" style="display:none">
+    <div class="ma-layout2">
+      <div>
+        <button class="ma-btn ma-btn-primary ma-btn-sm" style="margin-bottom:14px;width:100%" id="ma-btn-publier-2">+ Créer une nouvelle annonce</button>
+        <div id="ma-mesannonces-list"></div>
+      </div>
+      <div>
+        <div class="ma-resp-tabs" id="ma-resp-tabs">
+          <div class="ma-chip active" data-statut="">Toutes</div>
+          <div class="ma-chip" data-statut="nouveau">Nouvelles</div>
+          <div class="ma-chip" data-statut="retenu">Retenues</div>
+          <div class="ma-chip" data-statut="refuse">Écartées</div>
+        </div>
+        <div id="ma-resp-list"><p style="color:var(--ma-muted);font-size:13px">Sélectionnez une annonce pour voir ses candidatures.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ma-view-documents" style="display:none">
+    <input type="file" id="ma-doc-file" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp">
+    <button class="ma-btn ma-btn-primary ma-btn-sm" id="ma-doc-add" style="margin-bottom:16px">＋ Ajouter un document</button>
+    <div class="ma-doc-list" id="ma-doc-list"></div>
+  </section>
+
+</div>
+
+<!-- Messagerie plein écran -->
+<div class="ma-msg-overlay" id="ma-msg-overlay">
+  <div class="ma-msg-layout">
+    <div class="ma-conv-list" id="ma-conv-list"></div>
+    <div class="ma-thread" id="ma-thread">
+      <div style="margin:auto;color:var(--ma-muted);font-size:13px">Sélectionnez une conversation.</div>
+    </div>
+  </div>
+  <span class="ma-close-x" id="ma-msg-close" style="position:fixed">✕</span>
+</div>
+
+<!-- Modale connexion DS-ID -->
+<div class="ma-modal-bg" id="ma-modal-login">
+  <div class="ma-modal">
+    <h3>🔐 Code de Sécurité Diaspo'Actif</h3>
+    <p style="font-size:12.5px;color:var(--ma-muted);margin-top:-8px">Votre signature numérique personnelle et confidentielle — la même que celle utilisée ailleurs sur Diaspo'Actif pour signer des accords sécurisés.</p>
+    <div class="ma-field"><label>Code de sécurité (DS-ID)</label><input type="text" id="ma-login-code" maxlength="10" placeholder="Votre code"></div>
+    <div class="ma-error" id="ma-login-error"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="ma-btn ma-btn-ghost" id="ma-login-cancel">Annuler</button>
+      <button class="ma-btn ma-btn-primary" id="ma-login-submit">Vérifier et accéder</button>
+    </div>
+    <p style="font-size:12px;color:var(--ma-muted);margin-top:16px">Pas encore de compte ou de code ? <a href="#" id="ma-login-signupinfo" style="color:var(--ma-accent)">En savoir plus</a></p>
+  </div>
+</div>
+
+<!-- Modale info création de compte / accréditation -->
+<div class="ma-modal-bg" id="ma-modal-signupinfo">
+  <div class="ma-modal">
+    <h3>Rejoindre Mon Associé</h3>
+    <p style="font-size:13px;color:var(--ma-muted);line-height:1.6">
+      1. Créez gratuitement un compte sur Diaspo'Actif.<br>
+      2. Demandez l'accréditation « Mon Associé » depuis ce module.<br>
+      3. Accès immédiat une fois votre demande validée par un administrateur.
+    </p>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <a href="inscription.html" class="ma-btn ma-btn-primary" style="text-decoration:none;flex:1;text-align:center">➡️ Créer mon compte Diaspo'Actif</a>
+    </div>
+    <div style="text-align:right;margin-top:14px"><button class="ma-btn ma-btn-ghost ma-btn-sm" id="ma-signupinfo-close">Fermer</button></div>
+  </div>
+</div>
+
+<!-- Modale demande d'authentification requise -->
+<div class="ma-modal-bg" id="ma-modal-auth">
+  <div class="ma-modal" style="text-align:center">
+    <h3 id="ma-auth-modal-txt">Connexion requise</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+      <button class="ma-btn ma-btn-primary" id="ma-auth-login-btn">Se connecter avec mon DS-ID</button>
+      <button class="ma-btn ma-btn-ghost" id="ma-auth-signup-btn">Créer un compte gratuit</button>
+      <button class="ma-btn ma-btn-ghost" id="ma-auth-close-btn">Continuer à explorer en visiteur</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale publication d'annonce -->
+<div class="ma-modal-bg" id="ma-modal-compose">
+  <div class="ma-modal" style="max-width:600px">
+    <h3>Publier une annonce</h3>
+    <div class="ma-field"><label>Type de recherche</label><select id="c-type"></select></div>
+    <div class="ma-field"><label>Domaine</label><select id="c-domaine"></select></div>
+    <div class="ma-field"><label>Titre *</label><input type="text" id="c-titre" placeholder="Ex : Cherche associé technique pour startup agritech"></div>
+    <div class="ma-field"><label>Description *</label><textarea id="c-desc" rows="4" placeholder="Décrivez votre besoin en détail..."></textarea></div>
+    <div class="ma-field"><label>Localisation</label><input type="text" id="c-loc" placeholder="Ville, région..."></div>
+    <div class="ma-field"><label>Pays de réalisation</label><input type="text" id="c-pays" placeholder="Pays"></div>
+    <div class="ma-field"><label>Durée de la mission (optionnel)</label><input type="text" id="c-duree" placeholder="Ex : 6 mois"></div>
+    <div class="ma-field"><label>Budget / rémunération (optionnel)</label><input type="text" id="c-budget" placeholder="Ex : À négocier, 500 000 FCFA..."></div>
+    <div class="ma-field"><label>Compétences / profils recherchés (séparés par virgule)</label><input type="text" id="c-comp" placeholder="développeur, designer, comptable..."></div>
+    <div class="ma-field"><label>Durée de validité de l'annonce</label>
+      <div class="ma-chips" id="c-validite" style="justify-content:flex-start">
+        <div class="ma-chip active" data-v="15">15 jours</div><div class="ma-chip" data-v="30">30 jours</div>
+        <div class="ma-chip" data-v="60">60 jours</div><div class="ma-chip" data-v="90">90 jours</div>
+      </div>
+    </div>
+    <div class="ma-error" id="c-error"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="ma-btn ma-btn-ghost" id="c-cancel">Annuler</button>
+      <button class="ma-btn ma-btn-primary" id="c-save">Publier</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale candidature -->
+<div class="ma-modal-bg" id="ma-modal-candidature">
+  <div class="ma-modal">
+    <h3>Postuler</h3>
+    <p id="cand-titre" style="font-size:13px;color:var(--ma-muted)"></p>
+    <div class="ma-field"><label>Message de candidature (optionnel)</label><textarea id="cand-msg" rows="4" placeholder="Présentez-vous et expliquez votre intérêt..."></textarea></div>
+    <div class="ma-field"><label>CV / présentation (optionnel)</label><input type="file" id="cand-cv" accept=".pdf,.doc,.docx"></div>
+    <div class="ma-error" id="cand-error"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+      <button class="ma-btn ma-btn-ghost" id="cand-cancel">Annuler</button>
+      <button class="ma-btn ma-btn-primary" id="cand-send">Envoyer ma candidature</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale transmission de document -->
+<div class="ma-modal-bg" id="ma-modal-transmettre">
+  <div class="ma-modal">
+    <h3>Transmettre ce document</h3>
+    <p style="font-size:12.5px;color:var(--ma-muted)">Choisissez une conversation existante :</p>
+    <div id="ma-transmettre-list"></div>
+    <div style="text-align:right;margin-top:14px"><button class="ma-btn ma-btn-ghost ma-btn-sm" id="ma-transmettre-cancel">Fermer</button></div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/upload-media.js"></script>
+<script>
+const MA_TYPES = [
+  ['recrutement','Recrutement'],['associe','Associé'],['partenaire','Partenaire'],['benevole','Bénévole'],
+  ['financeur','Financeur'],['investisseur','Investisseur'],['sponsor','Sponsor'],['prestataire','Prestataire'],
+  ['expert','Expert'],['formateur','Formateur'],['mentor','Mentor'],['competences','Compétences'],['autre','Autre'],
+];
+const MA_DOMAINES = [
+  ['tech','Tech'],['agriculture','Agriculture'],['sante','Santé'],['energie','Énergie'],
+  ['education','Éducation'],['culture','Culture'],['collectivites','Collectivités'],
+];
+function maLabel(list, key){ const f = list.find(x => x[0] === key); return f ? f[1] : key; }
+function escH(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+function maNorm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+
+const MA = {
+  connected: false, accredite: false, accredStatut: null,
+  view: 'decouvrir', filtreType: '', pollTimer: null, activeConvId: null, msgPollTimer: null,
+  annoncesMineCache: [], candidatureContext: null, transmettreDocId: null,
+};
+
+function ouvrirModal(id){ document.getElementById(id).classList.add('open'); }
+function fermerModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function exigerConnexion(texte){
+  if (MA.connected) return true;
+  document.getElementById('ma-auth-modal-txt').textContent = texte || 'Connexion requise pour continuer';
+  ouvrirModal('ma-modal-auth');
+  return false;
+}
+
+/* ── En-tête / état de connexion ── */
+function renderAuthZone(){
+  const el = document.getElementById('ma-auth-zone');
+  if (MA.connected) {
+    el.innerHTML = `<div class="ma-avatar">${CURRENT_USER.photo_url ? `<img src="${CURRENT_USER.photo_url}">` : escH((CURRENT_USER.nom||'?')[0])}</div>`;
+  } else {
+    el.innerHTML = `<button class="ma-btn ma-btn-sm" id="ma-btn-msg-visiteur" title="Messagerie">💬</button>
+      <button class="ma-btn ma-btn-sm" id="ma-btn-connexion">Se connecter</button>
+      <button class="ma-btn ma-btn-primary ma-btn-sm" id="ma-btn-creer-compte">Créer un compte</button>`;
+    document.getElementById('ma-btn-msg-visiteur').addEventListener('click', () => exigerConnexion('Connectez-vous pour accéder à la messagerie'));
+    document.getElementById('ma-btn-connexion').addEventListener('click', () => ouvrirModal('ma-modal-login'));
+    document.getElementById('ma-btn-creer-compte').addEventListener('click', () => ouvrirModal('ma-modal-signupinfo'));
+  }
+}
+
+function renderHero(){
+  const hero = document.getElementById('ma-hero');
+  hero.className = '';
+  if (MA.connected) {
+    hero.innerHTML = `
+      <div class="ma-hero-grid">
+        <div>
+          <span class="ma-hero-eyebrow">💎 Mon Associé</span>
+          <h1>Bonjour ${escH(CURRENT_USER.nom||'')}</h1>
+          <p class="ma-hero-txt">Votre espace de travail — découvrez les annonces, gérez vos candidatures et votre coffre de documents.</p>
+          <button class="ma-btn ma-btn-primary" onclick="window.open('mes-projets.html','_self')">🗂 Mes business plans</button>
+        </div>
+        <div class="ma-side-panel">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="kicker">Espace de travail · votre profil</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
+            <div class="ma-avatar" style="width:52px;height:52px;font-size:18px">${CURRENT_USER.photo_url ? `<img src="${CURRENT_USER.photo_url}">` : escH((CURRENT_USER.nom||'?')[0])}</div>
+            <div><div style="font-weight:700;font-size:16px">${escH(CURRENT_USER.nom||'')}</div>
+            <div style="color:var(--ma-muted);font-size:12.5px">${[CURRENT_USER.ville, CURRENT_USER.pays].filter(Boolean).map(escH).join(', ')}</div></div>
+          </div>
+          <div style="margin-top:16px;padding:12px 14px;border-radius:13px;background:rgba(46,116,224,.1);border:1px solid rgba(46,116,224,.24);font-size:12.5px;color:#B9CDEC">Votre profil Diaspo'Actif est réutilisé automatiquement quand vous répondez ou publiez.</div>
+        </div>
+      </div>`;
+  } else {
+    hero.innerHTML = `
+      <div class="ma-hero-grid">
+        <div>
+          <span class="ma-hero-eyebrow">💎 Mon Associé</span>
+          <h1>Trouvez la perle rare de votre projet</h1>
+          <p class="ma-hero-txt">Talents, opportunités, associés, recrutement, partenaires et bénévoles — un espace ouvert pour découvrir les meilleures rencontres de la diaspora, sans quitter l'écosystème Diaspo'Actif.</p>
+        </div>
+        <div class="ma-side-panel">
+          <span class="kicker">SAS — accès visiteur</span>
+          <h3>Créez votre compte pour passer à l'action</h3>
+          <p>La consultation est libre. Pour interagir, un compte accrédité suffit.</p>
+          <div class="ma-side-check">
+            <div><span>✓</span> Répondre &amp; candidater aux annonces</div>
+            <div><span>✓</span> Contacter recruteurs &amp; porteurs de projet</div>
+            <div><span>✓</span> Publier vos propres annonces</div>
+            <div><span>✓</span> Messagerie et coffre de documents dédiés</div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="ma-btn ma-btn-primary" style="flex:1" id="ma-side-signup">Créer un compte gratuit</button>
+            <button class="ma-btn ma-btn-ghost" id="ma-side-login">Connexion</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('ma-side-signup').addEventListener('click', () => ouvrirModal('ma-modal-signupinfo'));
+    document.getElementById('ma-side-login').addEventListener('click', () => ouvrirModal('ma-modal-login'));
+  }
+}
+
+async function checkAccreditation(){
+  if (!MA.connected) return;
+  try {
+    const r = await api('GET', '/accreditations/mes');
+    const a = (r.accreditations||[]).find(x => x.type === 'mon_associe' && x.statut === 'active');
+    MA.accredite = !!a;
+  } catch(e) { MA.accredite = false; }
+  const banner = document.getElementById('ma-accred-banner');
+  if (MA.accredite) { banner.style.display = 'none'; return; }
+  banner.style.display = 'flex';
+  let demandeEnCours = false;
+  try {
+    const rd = await api('GET', '/accreditations/demandes');
+    demandeEnCours = (rd.demandes||[]).some(d => d.type === 'mon_associe' && ['en_attente','deposee','en_cours_analyse'].includes(d.statut));
+  } catch(e) {}
+  document.getElementById('ma-accred-banner-txt').textContent = demandeEnCours
+    ? "Votre demande d'accréditation « Mon Associé » est en cours d'examen par un administrateur."
+    : "Publier une annonce ou candidater nécessite l'accréditation « Mon Associé » (gratuite, validée par un administrateur).";
+  document.getElementById('ma-accred-btn').style.display = demandeEnCours ? 'none' : 'inline-flex';
+}
+document.getElementById('ma-accred-btn').addEventListener('click', async () => {
+  try { await api('POST', '/accreditations/demande', { type: 'mon_associe' }); await checkAccreditation(); }
+  catch(e) { alert(e.message || 'Erreur.'); }
+});
+
+/* ── Onglets (espace de travail) ── */
+document.querySelectorAll('.ma-tab').forEach(t => t.addEventListener('click', () => maSwitchTab(t.dataset.tab)));
+function maSwitchTab(tab){
+  MA.view = tab;
+  document.querySelectorAll('.ma-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('ma-view-decouvrir').style.display = tab === 'decouvrir' ? '' : 'none';
+  document.getElementById('ma-view-mesannonces').style.display = tab === 'mesannonces' ? '' : 'none';
+  document.getElementById('ma-view-documents').style.display = tab === 'documents' ? '' : 'none';
+  if (tab === 'mesannonces') loadMesAnnonces();
+  if (tab === 'documents') loadDocuments();
+}
+
+/* ── Découvrir : filtres ── */
+document.getElementById('ma-chips-type').innerHTML = `<div class="ma-chip active" data-t="">Tout</div>` +
+  MA_TYPES.map(([k,l]) => `<div class="ma-chip" data-t="${k}">${escH(l)}</div>`).join('');
+document.getElementById('ma-chips-type').addEventListener('click', (e) => {
+  const chip = e.target.closest('.ma-chip'); if (!chip) return;
+  document.querySelectorAll('#ma-chips-type .ma-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  MA.filtreType = chip.dataset.t || '';
+  loadAnnonces();
+});
+const domSel = document.getElementById('ma-f-domaine');
+MA_DOMAINES.forEach(([k,l]) => { const o = document.createElement('option'); o.value = k; o.textContent = l; domSel.appendChild(o); });
+domSel.addEventListener('change', loadAnnonces);
+
+const paysInput = document.getElementById('ma-f-pays');
+const paysDD = document.getElementById('ma-f-pays-dd');
+paysInput.addEventListener('input', () => {
+  const q = maNorm(paysInput.value.trim());
+  if (!q) { paysDD.style.display = 'none'; return; }
+  const list = (typeof PAYS_DU_MONDE !== 'undefined' ? PAYS_DU_MONDE : []).filter(p => maNorm(p).includes(q)).slice(0, 20);
+  paysDD.innerHTML = list.map(p => `<div onmousedown="maChoisirPays('${escH(p).replace(/'/g,"\\'")}')">${escH(p)}</div>`).join('') || '<div style="color:var(--ma-muted)">Aucun résultat</div>';
+  paysDD.style.display = 'block';
+});
+paysInput.addEventListener('blur', () => setTimeout(() => paysDD.style.display = 'none', 150));
+function maChoisirPays(p){ paysInput.value = p; paysDD.style.display = 'none'; loadAnnonces(); }
+document.getElementById('ma-q').addEventListener('input', () => { clearTimeout(window._maQT); window._maQT = setTimeout(loadAnnonces, 300); });
+document.getElementById('ma-clear-filters').addEventListener('click', () => {
+  document.getElementById('ma-q').value = ''; paysInput.value = ''; domSel.value = ''; MA.filtreType = '';
+  document.querySelectorAll('#ma-chips-type .ma-chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  loadAnnonces();
+});
+
+function typeCouleur(t){
+  const map = { associe:'#2E74E0', partenaire:'#2DD4BF', investisseur:'#F7B733', financeur:'#F7B733', benevole:'#5FD37A', mentor:'#7C5CFC' };
+  return map[t] || '#7E90AC';
+}
+
+async function loadAnnonces(){
+  const params = new URLSearchParams();
+  const q = document.getElementById('ma-q').value.trim();
+  if (q) params.set('q', q);
+  if (MA.filtreType) params.set('type', MA.filtreType);
+  if (domSel.value) params.set('domaine', domSel.value);
+  if (paysInput.value.trim()) params.set('pays', paysInput.value.trim());
+  const grid = document.getElementById('ma-grid');
+  document.getElementById('ma-toolbar-statut').style.display = MA.connected ? 'none' : 'flex';
+  try {
+    const r = await api('GET', '/mon-associe/annonces?' + params.toString());
+    const list = r.annonces || [];
+    document.getElementById('ma-result-count').textContent = list.length + ' résultat' + (list.length !== 1 ? 's' : '');
+    if (!list.length) { grid.innerHTML = '<div class="ma-empty">Aucune annonce ne correspond à ces critères.<br><button class="ma-btn ma-btn-sm" style="margin-top:12px" onclick="document.getElementById(\'ma-clear-filters\').click()">Réinitialiser les filtres</button></div>'; return; }
+    grid.innerHTML = list.map(a => `
+      <div class="ma-card">
+        <span class="ma-badge" style="background:${typeCouleur(a.type_recherche)}22;color:${typeCouleur(a.type_recherche)}">${escH(maLabel(MA_TYPES, a.type_recherche))}</span>
+        <h3>${escH(a.titre)}</h3>
+        <p>${escH((a.description||'').slice(0,120))}${(a.description||'').length>120?'…':''}</p>
+        ${a.competences && a.competences.length ? `<div class="ma-tags">${a.competences.map(c=>`<span class="ma-tag">${escH(c)}</span>`).join('')}</div>` : ''}
+        <div class="ma-card-foot"><span>Par ${escH(a.auteur_nom||'?')}${a.localisation?' · '+escH(a.localisation):''}</span><span>${a.nb_candidatures||0} candidature${a.nb_candidatures!==1?'s':''}</span></div>
+        <div class="ma-card-actions">
+          <button class="ma-btn ma-btn-primary ma-btn-sm" style="flex:1" onclick="ouvrirCandidature(${a.id}, ${JSON.stringify(a.titre).replace(/"/g,'&quot;')})">Candidater</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { grid.innerHTML = '<div class="ma-empty">Erreur de chargement.</div>'; }
+}
+
+/* ── Publication ── */
+const typeSel = document.getElementById('c-type'); MA_TYPES.forEach(([k,l]) => { const o=document.createElement('option'); o.value=k; o.textContent=l; typeSel.appendChild(o); });
+const domSel2 = document.getElementById('c-domaine'); domSel2.innerHTML = '<option value="">Aucun domaine spécifique</option>'; MA_DOMAINES.forEach(([k,l]) => { const o=document.createElement('option'); o.value=k; o.textContent=l; domSel2.appendChild(o); });
+let cValidite = 30;
+document.getElementById('c-validite').addEventListener('click', (e) => {
+  const chip = e.target.closest('.ma-chip'); if (!chip) return;
+  document.querySelectorAll('#c-validite .ma-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active'); cValidite = Number(chip.dataset.v);
+});
+
+function ouvrirPublication(){
+  if (!exigerConnexion('Connectez-vous pour publier une annonce')) return;
+  if (!MA.accredite) { fermerModal('ma-modal-auth'); document.getElementById('ma-accred-banner').scrollIntoView({behavior:'smooth'}); return; }
+  ['c-titre','c-desc','c-loc','c-pays','c-duree','c-budget','c-comp'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('c-error').style.display = 'none';
+  ouvrirModal('ma-modal-compose');
+}
+document.getElementById('ma-btn-publier').addEventListener('click', ouvrirPublication);
+document.getElementById('ma-btn-publier-2').addEventListener('click', ouvrirPublication);
+document.getElementById('c-cancel').addEventListener('click', () => fermerModal('ma-modal-compose'));
+document.getElementById('c-save').addEventListener('click', async () => {
+  const errEl = document.getElementById('c-error'); errEl.style.display = 'none';
+  const titre = document.getElementById('c-titre').value.trim();
+  const description = document.getElementById('c-desc').value.trim();
+  if (!titre || !description) { errEl.textContent = 'Titre et description requis.'; errEl.style.display = 'block'; return; }
+  try {
+    await api('POST', '/mon-associe/annonces', {
+      type_recherche: typeSel.value, domaine: domSel2.value || null, titre, description,
+      localisation: document.getElementById('c-loc').value.trim() || null,
+      pays: document.getElementById('c-pays').value.trim() || null,
+      duree_mission: document.getElementById('c-duree').value.trim() || null,
+      budget: document.getElementById('c-budget').value.trim() || null,
+      competences: document.getElementById('c-comp').value.split(',').map(s=>s.trim()).filter(Boolean),
+      validite_jours: cValidite,
+    });
+    fermerModal('ma-modal-compose');
+    maSwitchTab('mesannonces');
+    document.querySelectorAll('.ma-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'mesannonces'));
+  } catch(e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+});
+
+/* ── Candidature ── */
+let candAnnonceId = null;
+function ouvrirCandidature(id, titre){
+  if (!exigerConnexion('Connectez-vous pour candidater à cette annonce')) return;
+  if (!MA.accredite) { fermerModal('ma-modal-auth'); document.getElementById('ma-accred-banner').scrollIntoView({behavior:'smooth'}); return; }
+  candAnnonceId = id;
+  document.getElementById('cand-titre').textContent = 'Pour : ' + titre;
+  document.getElementById('cand-msg').value = '';
+  document.getElementById('cand-cv').value = '';
+  document.getElementById('cand-error').style.display = 'none';
+  ouvrirModal('ma-modal-candidature');
+}
+document.getElementById('cand-cancel').addEventListener('click', () => fermerModal('ma-modal-candidature'));
+document.getElementById('cand-send').addEventListener('click', async () => {
+  const errEl = document.getElementById('cand-error'); errEl.style.display = 'none';
+  const btn = document.getElementById('cand-send'); btn.disabled = true; btn.textContent = 'Envoi...';
+  try {
+    let cv_url = null;
+    const file = document.getElementById('cand-cv').files[0];
+    if (file) cv_url = await uploadMedia(file, 'document');
+    await api('POST', `/mon-associe/annonces/${candAnnonceId}/candidater`, { message: document.getElementById('cand-msg').value.trim(), cv_url });
+    fermerModal('ma-modal-candidature');
+    alert('Votre candidature a été envoyée !');
+    loadAnnonces();
+  } catch(e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+  finally { btn.disabled = false; btn.textContent = 'Envoyer ma candidature'; }
+});
+
+/* ── Mes annonces & réponses ── */
+async function loadMesAnnonces(){
+  try {
+    const r = await api('GET', '/mon-associe/mes-annonces');
+    MA.annoncesMineCache = r.annonces || [];
+    const el = document.getElementById('ma-mesannonces-list');
+    if (!MA.annoncesMineCache.length) { el.innerHTML = '<p style="color:var(--ma-muted);font-size:13px">Vous n\'avez publié aucune annonce.</p>'; return; }
+    let totalNouvelles = 0;
+    el.innerHTML = MA.annoncesMineCache.map(a => {
+      totalNouvelles += a.nb_nouvelles || 0;
+      return `<div class="ma-list-item" data-id="${a.id}">
+        <div style="font-weight:700;font-size:13.5px">${escH(a.titre)}</div>
+        <div class="row">
+          <span class="ma-statut-${a.statut}">${a.statut === 'active' ? '● En ligne' : '● Clôturée'}</span>
+          <span>${a.nb_candidatures} rép. ${a.nb_nouvelles ? `· ${a.nb_nouvelles} nouvelle(s)` : ''}</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          ${a.statut === 'active' ? `<button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="event.stopPropagation();maCloturerAnnonce(${a.id})">Clôturer</button>` : ''}
+          <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="event.stopPropagation();maSupprimerAnnonce(${a.id})">Supprimer</button>
+        </div>
+      </div>`;
+    }).join('');
+    const badge = document.getElementById('ma-badge-nouvelles');
+    if (totalNouvelles) { badge.style.display = 'inline'; badge.textContent = totalNouvelles; } else badge.style.display = 'none';
+    document.querySelectorAll('#ma-mesannonces-list .ma-list-item').forEach(item => item.addEventListener('click', () => maSelectAnnonce(Number(item.dataset.id))));
+    if (MA.selectedAnnonceId) maSelectAnnonce(MA.selectedAnnonceId);
+  } catch(e) {}
+}
+async function maCloturerAnnonce(id){ await api('PATCH', `/mon-associe/annonces/${id}/cloturer`); loadMesAnnonces(); }
+async function maSupprimerAnnonce(id){ if (!confirm('Supprimer définitivement cette annonce ?')) return; await api('DELETE', `/mon-associe/annonces/${id}`); MA.selectedAnnonceId = null; loadMesAnnonces(); }
+
+let maRespStatut = '';
+document.getElementById('ma-resp-tabs').addEventListener('click', (e) => {
+  const chip = e.target.closest('.ma-chip'); if (!chip) return;
+  document.querySelectorAll('#ma-resp-tabs .ma-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active'); maRespStatut = chip.dataset.statut || '';
+  if (MA.selectedAnnonceId) maSelectAnnonce(MA.selectedAnnonceId);
+});
+function maSelectAnnonce(id){
+  MA.selectedAnnonceId = id;
+  document.querySelectorAll('#ma-mesannonces-list .ma-list-item').forEach(it => it.classList.toggle('active', Number(it.dataset.id) === id));
+  loadCandidatures(id);
+}
+async function loadCandidatures(id){
+  const el = document.getElementById('ma-resp-list');
+  try {
+    const r = await api('GET', `/mon-associe/annonces/${id}/candidatures` + (maRespStatut ? `?statut=${maRespStatut}` : ''));
+    const list = r.candidatures || [];
+    if (!list.length) { el.innerHTML = '<p style="color:var(--ma-muted);font-size:13px">Aucune candidature pour ce filtre.</p>'; return; }
+    el.innerHTML = list.map(c => `
+      <div class="ma-resp-item">
+        <div class="ma-avatar" style="flex-shrink:0">${escH((c.nom||'?')[0])}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:13.5px">${escH(c.nom)} ${c.ville?'· '+escH(c.ville):''}</div>
+          ${c.message ? `<p style="font-size:12.5px;color:var(--ma-muted);margin:6px 0">${escH(c.message)}</p>` : ''}
+          ${c.cv_url ? `<a href="${escH(c.cv_url)}" target="_blank" style="font-size:12px;color:var(--ma-accent)">📎 Voir le CV</a>` : ''}
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="maRepondreCandidature(${c.id})">💬 Répondre</button>
+            ${c.statut === 'nouveau' ? `<button class="ma-btn ma-btn-primary ma-btn-sm" onclick="maStatutCandidature(${c.id},'retenu')">✓ Retenir</button>
+            <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="maStatutCandidature(${c.id},'refuse')">Écarter</button>` : `<span style="font-size:11.5px;color:var(--ma-muted)">${c.statut === 'retenu' ? '✓ Retenue' : 'Écartée'}</span>`}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { el.innerHTML = '<p style="color:var(--ma-muted);font-size:13px">Erreur de chargement.</p>'; }
+}
+async function maStatutCandidature(id, statut){ await api('PATCH', `/mon-associe/candidatures/${id}/statut`, { statut }); loadCandidatures(MA.selectedAnnonceId); loadMesAnnonces(); }
+async function maRepondreCandidature(id){
+  const msg = prompt('Votre message :'); if (!msg || !msg.trim()) return;
+  const r = await api('POST', `/mon-associe/candidatures/${id}/repondre`, { message: msg.trim() });
+  ouvrirMessagerie(r.conversation_id);
+}
+
+/* ── Mes dossiers (coffre) ── */
+async function loadDocuments(){
+  const el = document.getElementById('ma-doc-list');
+  try {
+    const r = await api('GET', '/mon-associe/documents');
+    const list = r.documents || [];
+    if (!list.length) { el.innerHTML = '<p style="color:var(--ma-muted);font-size:13px;grid-column:1/-1">Aucun document. Ajoutez vos business plans, pitchs et dossiers.</p>'; return; }
+    const ICONES = { 'Business plan':'📄', Word:'📝', Excel:'📊', PowerPoint:'📈', Document:'📄' };
+    el.innerHTML = list.map(d => `
+      <div class="ma-doc-card">
+        <div class="ma-doc-icon">${ICONES[d.kind]||'📄'}</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px">${escH(d.nom)}</div>
+        <div style="font-size:11.5px;color:var(--ma-muted);margin-bottom:10px">${escH(d.kind)} · ${d.taille ? Math.round(d.taille/1024)+' Ko' : ''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="maToggleVisibilite(${d.id}, '${d.visibilite === 'prive' ? 'sur_demande' : 'prive'}')">${d.visibilite === 'prive' ? '🔒 Privé' : '🔓 Sur demande'}</button>
+          <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="ouvrirTransmission(${d.id})">Transmettre</button>
+          <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="maSupprimerDoc(${d.id})">Supprimer</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { el.innerHTML = '<p style="color:var(--ma-muted);font-size:13px">Erreur de chargement.</p>'; }
+}
+document.getElementById('ma-doc-add').addEventListener('click', () => {
+  if (!exigerConnexion('Connectez-vous pour accéder à votre coffre de documents')) return;
+  document.getElementById('ma-doc-file').click();
+});
+document.getElementById('ma-doc-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const url = await uploadMedia(file, 'document');
+    await api('POST', '/mon-associe/documents', { nom: file.name, url, taille: file.size });
+    loadDocuments();
+  } catch(err) { alert(err.message || 'Erreur upload.'); }
+  e.target.value = '';
+});
+async function maToggleVisibilite(id, v){ await api('PATCH', `/mon-associe/documents/${id}/visibilite`, { visibilite: v }); loadDocuments(); }
+async function maSupprimerDoc(id){ if (!confirm('Supprimer ce document ?')) return; await api('DELETE', `/mon-associe/documents/${id}`); loadDocuments(); }
+async function ouvrirTransmission(docId){
+  MA.transmettreDocId = docId;
+  const el = document.getElementById('ma-transmettre-list');
+  try {
+    const r = await api('GET', '/mon-associe/conversations');
+    const list = r.conversations || [];
+    el.innerHTML = list.length ? list.map(c => `<div class="ma-list-item" onclick="maTransmettreVers(${c.id})">${escH(c.avec_nom)}</div>`).join('')
+      : '<p style="color:var(--ma-muted);font-size:13px">Aucune conversation. Répondez d\'abord à une candidature pour en créer une.</p>';
+  } catch(e) { el.innerHTML = ''; }
+  ouvrirModal('ma-modal-transmettre');
+}
+async function maTransmettreVers(convId){
+  try { await api('POST', `/mon-associe/documents/${MA.transmettreDocId}/transmettre`, { conversation_id: convId }); fermerModal('ma-modal-transmettre'); alert('Document transmis.'); }
+  catch(e) { alert(e.message || 'Erreur.'); }
+}
+document.getElementById('ma-transmettre-cancel').addEventListener('click', () => fermerModal('ma-modal-transmettre'));
+
+/* ── Messagerie ── */
+function ouvrirMessagerie(convId){
+  document.getElementById('ma-msg-overlay').classList.add('open');
+  loadConversations(convId);
+  clearInterval(MA.pollTimer);
+  MA.pollTimer = setInterval(() => loadConversations(MA.activeConvId), 10000);
+}
+document.getElementById('ma-msg-close').addEventListener('click', () => {
+  document.getElementById('ma-msg-overlay').classList.remove('open');
+  clearInterval(MA.pollTimer); clearInterval(MA.msgPollTimer);
+});
+async function loadConversations(selectId){
+  try {
+    const r = await api('GET', '/mon-associe/conversations');
+    const list = r.conversations || [];
+    const el = document.getElementById('ma-conv-list');
+    el.innerHTML = list.length ? list.map(c => `
+      <div class="ma-conv-item ${c.id === MA.activeConvId ? 'active' : ''}" data-id="${c.id}">
+        <div class="ma-avatar">${c.avec_photo ? `<img src="${c.avec_photo}">` : escH((c.avec_nom||'?')[0])}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px">${escH(c.avec_nom)} ${c.non_lus ? `<span style="color:var(--ma-red)">●</span>`:''}</div>
+          <div style="font-size:12px;color:var(--ma-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(c.derniere||'')}</div>
+        </div>
+      </div>
+    `).join('') : '<p style="padding:16px;color:var(--ma-muted);font-size:13px">Aucune conversation pour l\'instant.</p>';
+    document.querySelectorAll('.ma-conv-item').forEach(it => it.addEventListener('click', () => openThread(Number(it.dataset.id))));
+    if (selectId) openThread(selectId);
+  } catch(e) {}
+}
+async function openThread(convId){
+  MA.activeConvId = convId;
+  document.querySelectorAll('.ma-conv-item').forEach(it => it.classList.toggle('active', Number(it.dataset.id) === convId));
+  await renderThread();
+  clearInterval(MA.msgPollTimer);
+  MA.msgPollTimer = setInterval(renderThread, 10000);
+}
+async function renderThread(){
+  if (!MA.activeConvId) return;
+  try {
+    const r = await api('GET', `/mon-associe/conversations/${MA.activeConvId}/messages`);
+    const el = document.getElementById('ma-thread');
+    el.innerHTML = `
+      <div class="ma-thread-head"><div class="ma-avatar">${escH((r.autre?.nom||'?')[0])}</div><div style="font-weight:700">${escH(r.autre?.nom||'')}</div></div>
+      <div class="ma-thread-body" id="ma-thread-body">${(r.messages||[]).map(m => `
+        <div class="ma-bubble ${m.sender_id === CURRENT_USER.id ? 'mine':'them'}">${m.type === 'file' || m.type === 'image' ? `📎 <a href="${escH(JSON.parse(m.fichier_json||'{}').url||'#')}" target="_blank" style="color:inherit">${escH(m.contenu)}</a>` : escH(m.contenu)}</div>
+      `).join('')}</div>
+      <div class="ma-thread-input">
+        <input type="file" id="ma-thread-file" style="display:none">
+        <button class="ma-btn ma-btn-ghost ma-btn-sm" id="ma-thread-attach">📎</button>
+        <button class="ma-btn ma-btn-ghost ma-btn-sm" id="ma-thread-voice">🎙</button>
+        <input type="text" id="ma-thread-draft" placeholder="Votre message...">
+        <button class="ma-btn ma-btn-primary ma-btn-sm" id="ma-thread-send">Envoyer</button>
+      </div>`;
+    const body = document.getElementById('ma-thread-body'); body.scrollTop = body.scrollHeight;
+    document.getElementById('ma-thread-send').addEventListener('click', sendThreadMessage);
+    document.getElementById('ma-thread-draft').addEventListener('keydown', e => { if (e.key === 'Enter') sendThreadMessage(); });
+    document.getElementById('ma-thread-attach').addEventListener('click', () => document.getElementById('ma-thread-file').click());
+    document.getElementById('ma-thread-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const url = await uploadMedia(file, 'document');
+        await api('POST', `/mon-associe/conversations/${MA.activeConvId}/messages`, { fichier: { nom: file.name, url, isImage: /image\//.test(file.type) } });
+        renderThread();
+      } catch(err) { alert(err.message || 'Erreur upload.'); }
+      e.target.value = '';
+    });
+    const voiceBtn = document.getElementById('ma-thread-voice');
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) voiceBtn.style.display = 'none';
+    else voiceBtn.addEventListener('click', () => {
+      const rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = true;
+      voiceBtn.style.background = 'var(--ma-red)';
+      rec.onresult = (ev) => { document.getElementById('ma-thread-draft').value = Array.from(ev.results).map(r => r[0].transcript).join(''); };
+      rec.onend = () => { voiceBtn.style.background = ''; };
+      rec.start();
+    });
+  } catch(e) {}
+}
+async function sendThreadMessage(){
+  const input = document.getElementById('ma-thread-draft');
+  const contenu = input.value.trim(); if (!contenu) return;
+  input.value = '';
+  await api('POST', `/mon-associe/conversations/${MA.activeConvId}/messages`, { contenu });
+  renderThread();
+}
+
+/* ── Modale « connexion requise » ── */
+document.getElementById('ma-auth-login-btn').addEventListener('click', () => { fermerModal('ma-modal-auth'); ouvrirModal('ma-modal-login'); });
+document.getElementById('ma-auth-signup-btn').addEventListener('click', () => { fermerModal('ma-modal-auth'); ouvrirModal('ma-modal-signupinfo'); });
+document.getElementById('ma-auth-close-btn').addEventListener('click', () => fermerModal('ma-modal-auth'));
+
+/* ── Connexion DS-ID ── */
+document.getElementById('ma-login-cancel').addEventListener('click', () => fermerModal('ma-modal-login'));
+document.getElementById('ma-login-signupinfo').addEventListener('click', (e) => { e.preventDefault(); fermerModal('ma-modal-login'); ouvrirModal('ma-modal-signupinfo'); });
+document.getElementById('ma-signupinfo-close').addEventListener('click', () => fermerModal('ma-modal-signupinfo'));
+document.getElementById('ma-login-code').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('ma-login-submit').click(); });
+document.getElementById('ma-login-submit').addEventListener('click', async () => {
+  const errEl = document.getElementById('ma-login-error'); errEl.style.display = 'none';
+  const code = document.getElementById('ma-login-code').value.trim();
+  if (code.length < 6) { errEl.textContent = 'Le code de sécurité comporte au moins 6 caractères.'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('ma-login-submit'); btn.disabled = true; btn.textContent = 'Vérification...';
+  try {
+    await api('POST', '/mon-associe/connexion', { ds_id: code });
+    localStorage.setItem('ma_dsid_ok', '1');
+    window.location.reload();
+  } catch(e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+  finally { btn.disabled = false; btn.textContent = 'Vérifier et accéder'; }
+});
+
+/* ── Initialisation ──
+   Avoir une session Diaspo'Actif active (ouverte ailleurs sur le site) ne suffit PAS à
+   entrer dans l'espace de travail : ce module exige explicitement le DS-ID à chaque
+   nouvelle machine/navigateur — 'ma_dsid_ok' n'est posé qu'après une connexion réussie
+   via /api/mon-associe/connexion. Sans lui, on reste en mode SAS visiteur même connecté
+   au reste de la plateforme. */
+(async () => {
+  if (localStorage.getItem('ma_dsid_ok') === '1') {
+    await fetchCurrentUser();
+    MA.connected = !!CURRENT_USER;
+    if (!MA.connected) localStorage.removeItem('ma_dsid_ok');
+  }
+  renderAuthZone();
+  renderHero();
+  document.getElementById('ma-tabs').style.display = MA.connected ? 'flex' : 'none';
+  if (MA.connected) await checkAccreditation();
+  loadAnnonces();
+})();
+</script>
+</body>
+</html>

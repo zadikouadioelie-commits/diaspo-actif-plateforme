@@ -5320,6 +5320,375 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
   sendJSON(res, 200, { history });
 });
 
+/* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══
+   Choix assumé avec l'utilisateur malgré l'affaiblissement de sécurité que cela représente
+   par rapport au DS-ID « signature seule » ci-dessus (toute personne ayant vu le code une
+   fois pourrait l'utiliser pour se connecter) — en compensation : rate-limit strict par IP
+   ET par code (clé hachée, jamais le code en clair, y compris dans auth_tentatives), et
+   toute connexion réussie est journalisée dans ds_id_history/ds_id_validations. */
+route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const saisie = String(body?.ds_id || "").trim().toUpperCase();
+  const dsIdHash = crypto.createHash('sha256').update(saisie).digest('hex');
+
+  const ipLimit = SEC.rateLimit(`associe_dsid:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) {
+    SEC.logSecurity("associe_dsid_ratelimited", { ip, scope: "ip_memoire" });
+    return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  }
+  const codeLimit = SEC.rateLimit(`associe_dsid:code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeLimit.allowed) {
+    SEC.logSecurity("associe_dsid_ratelimited", { ip, scope: "code_memoire" });
+    return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeLimit.retryAfter}s.` });
+  }
+  const ipGuard = await dbLoginGuard(`associe_dsid_ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipGuard.allowed) {
+    SEC.logSecurity("associe_dsid_ratelimited", { ip, scope: "ip_persistant" });
+    return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipGuard.retryAfter}s.` });
+  }
+  const codeGuard = await dbLoginGuard(`associe_dsid_code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeGuard.allowed) {
+    SEC.logSecurity("associe_dsid_ratelimited", { ip, scope: "code_persistant" });
+    return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeGuard.retryAfter}s.` });
+  }
+
+  if (saisie.length < 6 || saisie.length > 10) {
+    return sendJSON(res, 400, { error: "Le code de sécurité comporte entre 6 et 10 caractères." });
+  }
+
+  const user = await db.prepare("SELECT * FROM users WHERE ds_id = ?").get(saisie);
+  if (!user) {
+    SEC.logSecurity("associe_dsid_failed", { ip });
+    dbLoginRecord(`associe_dsid_ip:${ip}`, false);
+    dbLoginRecord(`associe_dsid_code:${dsIdHash}`, false);
+    return sendJSON(res, 401, { error: "Code de Sécurité invalide." });
+  }
+  dbLoginRecord(`associe_dsid_ip:${ip}`, true);
+  dbLoginRecord(`associe_dsid_code:${dsIdHash}`, true);
+
+  if (user.suspendu_definitif) {
+    return sendJSON(res, 403, { error: "Ce compte a été suspendu définitivement suite à une décision administrative." });
+  }
+  if (user.suspendu_jusqu_au && new Date(user.suspendu_jusqu_au) > new Date()) {
+    return sendJSON(res, 403, {
+      error: `Ce compte est suspendu jusqu'au ${new Date(user.suspendu_jusqu_au).toLocaleDateString('fr-FR')} suite à une décision administrative.`
+    });
+  }
+
+  /* Pas d'écriture dans ds_id_history : son CHECK(action IN ...) est scopé au vocabulaire
+     de la carte DS-ID (creation/consultation/copie/regeneration/signature/echec_validation)
+     et ne connaît pas ce nouveau cas d'usage. ds_id_validations (action_type en TEXT libre,
+     déjà utilisé par verifyVoteDsId) journalise cette connexion sans y toucher. */
+  await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'connexion_module', 'mon_associe', 1, ip, req.headers['user-agent'] || null);
+
+  await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
+  const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
+  const token = createSession(user.id);
+  const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  SEC.logSecurity("associe_dsid_success", { ip, uid: Number(user.id) });
+  const sf = cookieSecureFlag(req);
+  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
+});
+
+/* ══ Mon Associé — garde d'accréditation ══
+   Consultation des annonces (GET) toujours libre, y compris en mode visiteur (SAS) : seule
+   l'interaction (publier, candidater) exige l'accréditation 'mon_associe', calquée sur le
+   pattern exigerPremium/hasAccreditation déjà en place pour les autres modules gatés. */
+async function exigerAccredAssocie(user, res) {
+  if (user.role === 'administrateur') return true;
+  const ok = await hasAccreditation(user.id, 'mon_associe');
+  if (ok) return true;
+  sendJSON(res, 403, {
+    error: "Cette action nécessite l'accréditation « Mon Associé ». Demandez-la depuis le module.",
+    accred_type: 'mon_associe',
+  });
+  return false;
+}
+
+/* ══ Mon Associé — Annonces ══ */
+route("GET", "/api/mon-associe/annonces", async (req, res, params, body, query) => {
+  const q = (query.q || "").trim();
+  const type = (query.type || "").trim();
+  const domaine = (query.domaine || "").trim();
+  const pays = (query.pays || "").trim();
+  const conditions = ["a.statut='active'"];
+  const args = [];
+  if (type) { conditions.push("a.type_recherche = ?"); args.push(type); }
+  if (domaine) { conditions.push("a.domaine = ?"); args.push(domaine); }
+  if (pays) { conditions.push("a.pays = ?"); args.push(pays); }
+  if (q) { conditions.push("(a.titre LIKE ? OR a.description LIKE ? OR a.localisation LIKE ?)"); const like = `%${q}%`; args.push(like, like, like); }
+  const rows = await db.prepare(`
+    SELECT a.*, u.nom AS auteur_nom, u.photo_url AS auteur_photo, u.role AS auteur_role,
+           (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id) AS nb_candidatures
+    FROM associe_annonces a JOIN users u ON u.id=a.auteur_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY a.created_at DESC LIMIT 100
+  `).all(...args);
+  sendJSON(res, 200, { annonces: rows.map(r => ({ ...r, competences: JSON.parse(r.competences_json || '[]') })) });
+});
+
+route("GET", "/api/mon-associe/mes-annonces", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT a.*,
+           (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id) AS nb_candidatures,
+           (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id AND c.statut='nouveau') AS nb_nouvelles
+    FROM associe_annonces a WHERE a.auteur_id=? ORDER BY a.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { annonces: rows.map(r => ({ ...r, competences: JSON.parse(r.competences_json || '[]') })) });
+});
+
+route("POST", "/api/mon-associe/annonces", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!(await exigerAccredAssocie(user, res))) return;
+  const { type_recherche, domaine, titre, description, localisation, pays, duree_mission, budget, competences, validite_jours } = body || {};
+  if (!titre?.trim() || !description?.trim()) return sendJSON(res, 400, { error: "Titre et description requis." });
+  const r = await db.prepare(`
+    INSERT INTO associe_annonces (auteur_id,type_recherche,domaine,titre,description,localisation,pays,duree_mission,budget,competences_json,validite_jours)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  `).run(user.id, type_recherche || 'autre', domaine || null, titre.trim(), description.trim(), localisation || null, pays || null,
+         duree_mission || null, budget || null, JSON.stringify(Array.isArray(competences) ? competences : []), Number(validite_jours) || 30);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PATCH", "/api/mon-associe/annonces/:id/cloturer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const annonce = await db.prepare("SELECT auteur_id FROM associe_annonces WHERE id=?").get(params.id);
+  if (!annonce) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  if (annonce.auteur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Action réservée à l'auteur de l'annonce." });
+  await db.prepare("UPDATE associe_annonces SET statut='cloturee', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/mon-associe/annonces/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const annonce = await db.prepare("SELECT auteur_id FROM associe_annonces WHERE id=?").get(params.id);
+  if (!annonce) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  if (annonce.auteur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Action réservée à l'auteur de l'annonce." });
+  await db.prepare("DELETE FROM associe_candidatures WHERE annonce_id=?").run(params.id);
+  await db.prepare("DELETE FROM associe_favoris WHERE annonce_id=?").run(params.id);
+  await db.prepare("DELETE FROM associe_annonces WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Mon Associé — Candidatures ══ */
+route("POST", "/api/mon-associe/annonces/:id/candidater", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!(await exigerAccredAssocie(user, res))) return;
+  const annonce = await db.prepare("SELECT * FROM associe_annonces WHERE id=?").get(params.id);
+  if (!annonce) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  if (annonce.statut !== 'active') return sendJSON(res, 400, { error: "Cette annonce n'accepte plus de candidatures." });
+  if (annonce.auteur_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas candidater à votre propre annonce." });
+  const existe = await db.prepare("SELECT id FROM associe_candidatures WHERE annonce_id=? AND candidat_id=?").get(params.id, user.id);
+  if (existe) return sendJSON(res, 409, { error: "Vous avez déjà candidaté à cette annonce." });
+  const { message, cv_url } = body || {};
+  await db.prepare("INSERT INTO associe_candidatures (annonce_id,candidat_id,message,cv_url) VALUES (?,?,?,?)").run(params.id, user.id, message || null, cv_url || null);
+  creerNotif(annonce.auteur_id, "associe_candidature", "Nouvelle candidature « Mon Associé »",
+    `${user.nom} a répondu à votre annonce « ${annonce.titre} ».`, { annonce_id: Number(params.id), candidat_id: user.id });
+  sendJSON(res, 201, { ok: true });
+});
+
+route("GET", "/api/mon-associe/annonces/:id/candidatures", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const annonce = await db.prepare("SELECT auteur_id FROM associe_annonces WHERE id=?").get(params.id);
+  if (!annonce) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  if (annonce.auteur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Action réservée à l'auteur de l'annonce." });
+  const statut = (query.statut || "").trim();
+  const conditions = ["c.annonce_id=?"]; const args = [params.id];
+  if (statut) { conditions.push("c.statut=?"); args.push(statut); }
+  const rows = await db.prepare(`
+    SELECT c.*, u.nom, u.photo_url, u.role, u.ville, u.titre_pro
+    FROM associe_candidatures c JOIN users u ON u.id=c.candidat_id
+    WHERE ${conditions.join(' AND ')} ORDER BY c.created_at DESC
+  `).all(...args);
+  sendJSON(res, 200, { candidatures: rows });
+});
+
+route("PATCH", "/api/mon-associe/candidatures/:id/statut", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { statut } = body || {};
+  if (!['retenu', 'refuse', 'nouveau'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const cand = await db.prepare(`
+    SELECT c.*, a.auteur_id, a.titre FROM associe_candidatures c JOIN associe_annonces a ON a.id=c.annonce_id WHERE c.id=?
+  `).get(params.id);
+  if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable." });
+  if (cand.auteur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Action réservée à l'auteur de l'annonce." });
+  await db.prepare("UPDATE associe_candidatures SET statut=? WHERE id=?").run(statut, params.id);
+  if (statut !== 'nouveau') {
+    creerNotif(cand.candidat_id, "associe_candidature_statut",
+      statut === 'retenu' ? "Candidature retenue !" : "Candidature non retenue",
+      `Votre candidature à « ${cand.titre} » a été ${statut === 'retenu' ? 'retenue' : 'écartée'}.`,
+      { annonce_id: cand.annonce_id });
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Mon Associé — Favoris ══ */
+route("POST", "/api/mon-associe/annonces/:id/favori", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("INSERT OR IGNORE INTO associe_favoris (user_id,annonce_id) VALUES (?,?)").run(user.id, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/mon-associe/annonces/:id/favori", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM associe_favoris WHERE user_id=? AND annonce_id=?").run(user.id, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("GET", "/api/mon-associe/mes-favoris", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT annonce_id FROM associe_favoris WHERE user_id=?").all(user.id);
+  sendJSON(res, 200, { favoris: rows.map(r => r.annonce_id) });
+});
+
+/* ══ Mon Associé — Coffre de documents ══
+   L'upload lui-même passe par la route générique /api/upload/document (Bunny CDN,
+   validation magic-bytes, 15 Mo max) — ces routes ne font que persister la référence. */
+route("POST", "/api/mon-associe/documents", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { nom, url, taille } = body || {};
+  if (!nom?.trim() || !url?.trim()) return sendJSON(res, 400, { error: "Nom et URL du document requis." });
+  const ext = (nom.split('.').pop() || '').toLowerCase();
+  const KIND_MAP = { pdf: 'Business plan', doc: 'Word', docx: 'Word', xls: 'Excel', xlsx: 'Excel', ppt: 'PowerPoint', pptx: 'PowerPoint' };
+  const kind = KIND_MAP[ext] || 'Document';
+  const r = await db.prepare("INSERT INTO associe_documents (user_id,nom,kind,taille,url_bunny) VALUES (?,?,?,?,?)").run(user.id, nom.trim(), kind, Number(taille) || null, url.trim());
+  sendJSON(res, 201, { id: r.lastInsertRowid, kind });
+});
+
+route("GET", "/api/mon-associe/documents", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT * FROM associe_documents WHERE user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { documents: rows });
+});
+
+route("PATCH", "/api/mon-associe/documents/:id/visibilite", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { visibilite } = body || {};
+  if (!['prive', 'sur_demande'].includes(visibilite)) return sendJSON(res, 400, { error: "Visibilité invalide." });
+  const doc = await db.prepare("SELECT user_id FROM associe_documents WHERE id=?").get(params.id);
+  if (!doc || doc.user_id !== user.id) return sendJSON(res, 404, { error: "Document introuvable." });
+  await db.prepare("UPDATE associe_documents SET visibilite=? WHERE id=?").run(visibilite, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/mon-associe/documents/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const doc = await db.prepare("SELECT user_id FROM associe_documents WHERE id=?").get(params.id);
+  if (!doc || doc.user_id !== user.id) return sendJSON(res, 404, { error: "Document introuvable." });
+  await db.prepare("DELETE FROM associe_documents WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Mon Associé — Messagerie exclusive au module (contexte='mon_associe') ══
+   Volontairement INDÉPENDANTE de la messagerie générale (/api/conversations) : ce canal
+   n'est ouvert qu'entre un auteur d'annonce et un candidat (relation déjà établie par la
+   candidature), jamais soumis à la règle "contact requis" de la messagerie générale — la
+   candidature EST la mise en contact. Ne touche à aucune table/route de la messagerie
+   générale, qui reste totalement indépendante (aucune conversation contexte='mon_associe'
+   n'apparaît dans messagerie.html, et inversement). */
+async function trouverOuCreerConvAssocie(userIdA, userIdB) {
+  let conv = await db.prepare(
+    "SELECT * FROM conversations WHERE contexte='mon_associe' AND ((user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?))"
+  ).get(userIdA, userIdB, userIdB, userIdA);
+  if (conv) {
+    if (conv.user1_id === userIdA && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
+    if (conv.user2_id === userIdA && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
+    return conv.id;
+  }
+  const id = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, contexte) VALUES (?,?,'mon_associe')").run(userIdA, userIdB)).lastInsertRowid;
+  return id;
+}
+
+route("GET", "/api/mon-associe/conversations", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT c.*,
+      u.nom AS avec_nom, u.role AS avec_role, u.photo_url AS avec_photo,
+      (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere,
+      (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_date,
+      (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND lu = 0) AS non_lus
+    FROM conversations c
+    JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
+    WHERE c.contexte='mon_associe' AND (c.user1_id = ? OR c.user2_id = ?)
+      AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
+    ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC
+  `).all(user.id, user.id, user.id, user.id, user.id);
+  sendJSON(res, 200, { conversations: rows });
+});
+
+route("GET", "/api/mon-associe/conversations/:id/messages", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const conv = await db.prepare("SELECT * FROM conversations WHERE id=? AND contexte='mon_associe'").get(params.id);
+  if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
+  await db.prepare("UPDATE messages SET lu=1 WHERE conversation_id=? AND sender_id!=? AND lu=0").run(params.id, user.id);
+  const messages = await db.prepare("SELECT m.*, u.nom AS sender_nom FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.conversation_id=? ORDER BY m.created_at ASC").all(params.id);
+  const autre = await db.prepare("SELECT id, nom, role, photo_url FROM users WHERE id=?").get(conv.user1_id === user.id ? conv.user2_id : conv.user1_id);
+  sendJSON(res, 200, { messages, autre });
+});
+
+route("POST", "/api/mon-associe/conversations/:id/messages", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const conv = await db.prepare("SELECT * FROM conversations WHERE id=? AND contexte='mon_associe'").get(params.id);
+  if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
+  const contenu = (body?.contenu || "").trim();
+  const fichier = body?.fichier || null;
+  if (!contenu && !fichier) return sendJSON(res, 400, { error: "Message vide." });
+  const type = fichier ? (fichier.isImage ? 'image' : 'file') : 'text';
+  const r = await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json) VALUES (?,?,?,?,?)")
+    .run(params.id, user.id, contenu || (fichier?.nom || ''), type, fichier ? JSON.stringify(fichier) : null);
+  const autreId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
+  creerNotif(autreId, "associe_message", "Nouveau message « Mon Associé »", `${user.nom} vous a envoyé un message.`, { conversation_id: Number(params.id) });
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("POST", "/api/mon-associe/candidatures/:id/repondre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cand = await db.prepare(`
+    SELECT c.*, a.auteur_id, a.titre FROM associe_candidatures c JOIN associe_annonces a ON a.id=c.annonce_id WHERE c.id=?
+  `).get(params.id);
+  if (!cand) return sendJSON(res, 404, { error: "Candidature introuvable." });
+  if (cand.auteur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Action réservée à l'auteur de l'annonce." });
+  const convId = await trouverOuCreerConvAssocie(user.id, cand.candidat_id);
+  const contenu = (body?.message || "").trim();
+  if (contenu) {
+    await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?,?,?,'text')").run(convId, user.id, contenu);
+    creerNotif(cand.candidat_id, "associe_message", "Nouveau message « Mon Associé »", `${user.nom} vous a répondu au sujet de « ${cand.titre} ».`, { conversation_id: convId });
+  }
+  sendJSON(res, 200, { conversation_id: convId });
+});
+
+route("POST", "/api/mon-associe/documents/:id/transmettre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const doc = await db.prepare("SELECT * FROM associe_documents WHERE id=?").get(params.id);
+  if (!doc || doc.user_id !== user.id) return sendJSON(res, 404, { error: "Document introuvable." });
+  const conv = await db.prepare("SELECT * FROM conversations WHERE id=? AND contexte='mon_associe'").get(body?.conversation_id);
+  if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Conversation invalide." });
+  const fichier = { nom: doc.nom, url: doc.url_bunny, isImage: /\.(jpe?g|png|gif|webp)$/i.test(doc.nom) };
+  await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json) VALUES (?,?,?,?,?)")
+    .run(conv.id, user.id, doc.nom, fichier.isImage ? 'image' : 'file', JSON.stringify(fichier));
+  const autreId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
+  creerNotif(autreId, "associe_message", "Document reçu « Mon Associé »", `${user.nom} vous a transmis « ${doc.nom} ».`, { conversation_id: conv.id });
+  sendJSON(res, 200, { ok: true });
+});
+
 /* ---------- Recherche utilisateurs (pour ajout membres) ---------- */
 route("GET", "/api/users/search", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
@@ -6286,6 +6655,7 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
     WHERE (c.user1_id = ? OR c.user2_id = ?)
       AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
+      AND (c.contexte IS NULL OR c.contexte != 'mon_associe')
     ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC
   `).all(user.id, user.id, user.id, user.id, user.id);
 
