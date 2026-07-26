@@ -5230,8 +5230,24 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
     await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'echec_validation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
     return sendJSON(res, 403, { error: 'Mot de passe incorrect.' });
   }
+
+  /* Aucune route de signup n'a jamais écrit ds_id, et le seul rattrapage existant
+     (backfillDsIds dans server/db.js) est une IIFE SQLite-only : elle ne s'exécute
+     jamais contre la base PostgreSQL de production. Tout compte créé en production
+     a donc un ds_id NULL pour toujours, tant que le titulaire ne clique pas sur
+     "Régénérer" sans savoir que c'est nécessaire — l'écran de révélation affichait
+     un encart vide, sans code, sans aucune explication. On génère ici, à la volée,
+     dès le premier "Afficher" reussi : le titulaire n'a jamais besoin de savoir
+     que ce rattrapage existe. */
+  let dsId = row.ds_id;
+  if (!dsId) {
+    dsId = generateDsId();
+    await db.prepare('UPDATE users SET ds_id=? WHERE id=?').run(dsId, user.id);
+    await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'creation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
+  }
+
   await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'consultation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-  sendJSON(res, 200, { ds_id: row.ds_id });
+  sendJSON(res, 200, { ds_id: dsId });
 });
 
 /* ══ DS-ID — Log copie ══ */
