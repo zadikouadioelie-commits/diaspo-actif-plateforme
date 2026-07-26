@@ -360,6 +360,12 @@ async function pgInit() {
 /* Liste unique des colonnes attendues — partagee entre la migration et le controle
    post-deploiement, pour qu'elles ne puissent jamais diverger. */
 const COLONNES_MIGRATION = [
+    /* Rencontres Diaspo'Actif — miroir de l'ALTER ajouté dans db.js. Sans cette ligne,
+       la colonne n'existerait qu'en local et toute non-validation ferait échouer la
+       route en production. */
+    ['rencontres_diaspoactif', 'date_reouverture', 'TEXT'],
+    ['rencontres_diaspoactif', 'pieces_json', "TEXT DEFAULT '[]'"],
+
     // Billetterie V1 — early-bird + attributs enrichis par type de billet
     ['ticket_types', 'avantages', 'TEXT'],
     ['ticket_types', 'devise', "TEXT DEFAULT 'EUR'"],

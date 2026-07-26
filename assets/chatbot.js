@@ -205,7 +205,7 @@
       tips.push({ text: '💡 Conseil : Utilisez les filtres "Pays de résidence" et "Domaine" ensemble pour des résultats plus précis.', qr: ['Comment filtrer ?', 'Trouver un expert'] });
     }
     if (page.module === 'profil' && level >= 1) {
-      tips.push({ text: '💡 Un profil complet augmente votre score de confiance et votre visibilité dans les recommandations du chatbot.', qr: ['Améliorer mon score', 'Les accréditations'] });
+      tips.push({ text: '💡 Un profil complet augmente votre indice de fiabilité et votre visibilité dans les recommandations du chatbot.', qr: ['Améliorer mon score', 'Les accréditations'] });
     }
     if (page.module === 'dashboard_user' && level === 1) {
       tips.push({ text: '💡 Pensez à demander une accréditation pour accéder aux opportunités réservées aux membres vérifiés.', qr: ['Les accréditations', 'Demander la vérification'] });
@@ -1086,9 +1086,13 @@
       ],
     },
 
-    /* ── SCORE DE CONFIANCE ────────────────────────────────────── */
+    /* ── INDICE DE FIABILITÉ ────────────────────────────────────── */
     trust_score: {
-      text: "🔒 Le Score de Confiance est un indicateur de 0 à 100% qui mesure la fiabilité d'un profil.\n\nIl est calculé automatiquement à partir de :\n• Ancienneté sur la plateforme (+1 pt/mois, max 15)\n• Identité vérifiée (+15 pts)\n• Documents vérifiés (+10 pts)\n• Diplômes vérifiés (+10 pts)\n• Entreprise vérifiée (+8 pts)\n• Accréditations Diaspo'Actif (+10 pts chacune, max 20)\n• Initiative immatriculée (+8 pts)\n• Activité sur la plateforme (max +10 pts)\n• Profil complet (max +6 pts)\n• Absence de signalements (+5 pts)\n\n✅ Score ≥ 90 = Excellent · ≥ 75 = Élevé · ≥ 50 = Moyen",
+      /* Barème mis à jour le 2026-07-26 : les critères « documents », « diplômes » et
+         « entreprise » ont été retirés faute de parcours pour les obtenir, le total
+         tombe désormais juste sur 100, et le pourcentage est calculé sur les seuls
+         critères qui concernent le compte (87 pour un particulier, 100 pour une structure). */
+      text: "🔒 L'Indice de Fiabilité est un indicateur de 0 à 100 % qui mesure la fiabilité d'un profil.\n\nIl se compose de :\n• 🪪 Identité vérifiée (20 pts)\n• 👤 Profil complet (15 pts)\n• 🕐 Ancienneté (1 pt/mois, jusqu'à 12)\n• 🏅 Accréditations Diaspo'Actif (6 pts chacune, jusqu'à 12)\n• 📊 Activité sur la plateforme (jusqu'à 12)\n• 🤝 Rencontre Diaspo'Actif validée (10 pts)\n• 🛡️ Aucun signalement confirmé (6 pts)\n• 🏢 Organisation vérifiée (8 pts, comptes structure)\n• 🏛️ Immatriculation renseignée (5 pts, comptes structure)\n\nLes deux derniers ne concernent que les structures : un particulier est noté sur 87, une structure sur 100, pour que chacun puisse atteindre 100 %.\n\n🟣 91-100 % Exemplaire · 🟢 61-90 % Reconnu · 🔵 31-60 % Établi · ⚪ 0-30 % Découverte",
       quickReplies: [
         { label: "Comment améliorer mon score ?", intent: "ameliorer_score" },
         { label: "Les accréditations", intent: "accreditations" },
@@ -1097,11 +1101,15 @@
     },
 
     ameliorer_score: {
-      text: "📈 Pour améliorer votre Score de Confiance rapidement :\n\n1. ✅ Faites vérifier votre identité (+15 pts) → Mon Profil → Vérification\n2. 📄 Soumettez vos documents justificatifs (+10 pts)\n3. 🎓 Faites vérifier vos diplômes (+10 pts)\n4. 🏅 Demandez une accréditation DA (+10 pts)\n5. 👤 Complétez votre profil à 100% (photo, bio, compétences)\n6. 📊 Soyez actif : publiez, collaborez, participez aux événements",
+      /* Cette réponse promettait un dépôt de documents et de diplômes qui n'a jamais
+         existé — ni formulaire, ni écran de validation — et renvoyait vers une page
+         « Mon Profil → Vérification » introuvable. Elle ne liste plus que des actions
+         réellement possibles, avec les points réels du barème. */
+      text: "📈 Pour améliorer votre Indice de Fiabilité :\n\n1. 🪪 Faites vérifier votre identité (+20 pts) — contrôle en ligne, quelques minutes\n2. 👤 Complétez votre profil (+15 pts) : photo, biographie, titre, 3 compétences, ville\n3. 🏅 Demandez une accréditation Diaspo'Actif (+6 pts chacune, 12 au total)\n4. 📊 Soyez actif (+12 pts) : publiez, collaborez, gagnez des abonnés\n5. 🤝 Demandez une rencontre Diaspo'Actif (+10 pts) — en personne ou en visio\n6. 🕐 L'ancienneté ajoute 1 point par mois, jusqu'à 12\n\n📍 Tout se pilote depuis votre tableau de bord, module « Mon indice de fiabilité ».",
       quickReplies: [
         { label: "Demander une accréditation", intent: "nav_accred" },
         { label: "Modifier mon profil", intent: "nav_profil" },
-        { label: "Le score de confiance", intent: "trust_score" },
+        { label: "L'indice de fiabilité", intent: "trust_score" },
       ],
     },
 
@@ -1109,7 +1117,7 @@
     reactivite: {
       text: "⭐ L'Indice de Réactivité est noté de 1 à 5 étoiles. Il mesure la rapidité avec laquelle vous répondez aux messages.\n\n• ⭐⭐⭐⭐⭐ : Répond en moins de 2h\n• ⭐⭐⭐⭐ : Répond sous 24h\n• ⭐⭐⭐ : Répond en 1 à 3 jours\n• ⭐⭐ : Réactivité moyenne\n• ⭐ : Répond rarement\n\nCet indice est calculé automatiquement sur vos 90 derniers jours d'activité messagerie.\n\n💡 Plus vous répondez vite, plus vous êtes visible dans les recommandations.",
       quickReplies: [
-        { label: "Le score de confiance", intent: "trust_score" },
+        { label: "L'indice de fiabilité", intent: "trust_score" },
         { label: "La messagerie", intent: "messagerie" },
       ],
     },
@@ -1188,7 +1196,7 @@
 
     /* ── PARTENARIATS ───────────────────────────────────────────── */
     nav_partenariat: {
-      text: "🤝 Pour chercher des partenariats sur Diaspo'Actif :\n\n1. Utilisez l'Annuaire → filtrez par domaine et pays\n2. Publiez une offre de type \"Partenariat\" depuis votre dashboard\n3. Utilisez la messagerie pour approcher directement les initiatives\n4. Participez aux événements de networking\n5. Activez les collaborations depuis votre profil\n\n💡 Les membres avec une accréditation et un score de confiance élevé sont prioritairement recommandés.",
+      text: "🤝 Pour chercher des partenariats sur Diaspo'Actif :\n\n1. Utilisez l'Annuaire → filtrez par domaine et pays\n2. Publiez une offre de type \"Partenariat\" depuis votre dashboard\n3. Utilisez la messagerie pour approcher directement les initiatives\n4. Participez aux événements de networking\n5. Activez les collaborations depuis votre profil\n\n💡 Les membres avec une accréditation et un indice de fiabilité élevé sont prioritairement recommandés.",
       quickReplies: [
         { label: "Publier une offre", intent: "nav_offre" },
         { label: "Explorer l'annuaire", action: "annuaire.html" },
@@ -1198,9 +1206,12 @@
 
     /* ── VÉRIFICATION ───────────────────────────────────────────── */
     verification: {
-      text: "✅ La vérification de compte garantit l'authenticité de votre présence sur Diaspo'Actif.\n\nNiveaux de vérification :\n• 🪪 Identité vérifiée : pièce d'identité officielle\n• 📄 Documents vérifiés : justificatifs d'activité\n• 🎓 Diplômes vérifiés : attestations académiques\n• 🏢 Entreprise vérifiée : extrait Kbis ou équivalent\n\nBénéfices :\n• Badge \"Compte vérifié\" sur votre profil\n• Score de confiance augmenté\n• Priorité dans les recommandations du chatbot\n• Accès aux fonctionnalités réservées\n\n📍 Pour demander : Mon Profil → Vérification",
+      /* Les dépôts de documents, diplômes et Kbis étaient annoncés ici alors qu'aucun
+         de ces parcours n'existe sur la plateforme. On n'annonce plus que ce qui est
+         réellement possible aujourd'hui. */
+      text: "✅ La vérification garantit l'authenticité de votre présence sur Diaspo'Actif.\n\nCe que vous pouvez faire vérifier :\n• 🪪 Votre identité — contrôle en ligne sécurisé, quelques minutes (+20 pts)\n• 🤝 Une rencontre avec un agent Diaspo'Actif, en personne ou en visioconférence (+10 pts)\n• 🏢 Votre organisation, lors de l'activation des paiements (+8 pts, comptes structure)\n\nBénéfices :\n• Badge « Compte vérifié » sur votre profil\n• Indice de fiabilité augmenté\n• Priorité dans les recommandations\n• Accès aux fonctionnalités réservées\n\n📍 Depuis votre tableau de bord, module « Mon indice de fiabilité ».",
       quickReplies: [
-        { label: "Le score de confiance", intent: "trust_score" },
+        { label: "L'indice de fiabilité", intent: "trust_score" },
         { label: "Les accréditations", intent: "accreditations" },
       ],
     },
@@ -1284,7 +1295,7 @@
     { intent: "quel_compte",   words: ["quel compte choisir","quel type de compte","je suis une asso","je suis une entreprise","je cherche un réseau","créer mon asso","je suis un professionnel"] },
 
     // ── Qualité & Réputation
-    { intent: "trust_score",   words: ["score de confiance","trust score","score confiance","indice de fiabilité","ma fiabilité","confiance"] },
+    { intent: "trust_score",   words: ["indice de fiabilité","trust score","score confiance","indice de fiabilité","ma fiabilité","confiance"] },
     { intent: "ameliorer_score", words: ["améliorer mon score","augmenter mon score","meilleur score","comment avoir un bon score"] },
     { intent: "reactivite",    words: ["réactivité","indice de réactivité","étoile","réactivité messagerie","délai de réponse","taux de réponse"] },
     { intent: "verification",  words: ["vérification","vérifier mon compte","compte vérifié","identité vérifiée","documents vérifiés","diplômes vérifiés"] },
@@ -1706,7 +1717,7 @@
       annuaire:      'Astuce : essayez de décrire un profil en langage naturel, ex : "Je cherche un médecin à Lyon".',
       evenements:    'Vous pouvez filtrer les événements par pays, domaine ou date depuis les filtres en haut de page.',
       messagerie:    'Saviez-vous que vous pouvez planifier une réunion vidéo directement depuis vos messages ?',
-      profil:        'Complétez toutes les sections de votre profil pour améliorer votre score de confiance.',
+      profil:        'Complétez toutes les sections de votre profil pour améliorer votre indice de fiabilité.',
       auth:          'La création de compte est gratuite et ne prend que 2 minutes.',
       dashboard_init: 'Depuis votre dashboard, vous pouvez créer des événements, publier des offres et générer votre QR code.',
     };

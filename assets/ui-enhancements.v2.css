@@ -473,11 +473,15 @@ input[type="checkbox"], input[type="radio"] {
 .da-pill:hover {
   border-color: var(--orange);
 }
+/* Fond volontairement plus sombre que l'orange de marque : sur #F26422, du texte blanc
+   n'atteint que 3,17:1, sous le minimum lisible de 4,5:1. Ce ton donne 4,6:1 tout en
+   restant dans la famille de la marque. C'est une couleur d'ÉTAT, propre à la pastille
+   sélectionnée — l'orange des boutons n'est pas touché. */
 .da-pill:has(input:checked) {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--orange-fonce, #CE4B14);
+  border-color: var(--orange-fonce, #CE4B14);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(255,107,0,.35);
+  box-shadow: 0 2px 8px rgba(206,75,20,.35);
 }
 .da-pill:has(input:focus-visible) {
   outline: 3px solid rgba(255,107,0,.4);
@@ -485,10 +489,10 @@ input[type="checkbox"], input[type="radio"] {
 }
 /* Fallback pour navigateurs sans :has() — bascule via classe JS .checked */
 .da-pill.checked {
-  background: var(--orange);
-  border-color: var(--orange);
+  background: var(--orange-fonce, #CE4B14);
+  border-color: var(--orange-fonce, #CE4B14);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(255,107,0,.35);
+  box-shadow: 0 2px 8px rgba(206,75,20,.35);
 }
 
 /* Variante "switch" (on/off unique, ex: activer/désactiver une option) */

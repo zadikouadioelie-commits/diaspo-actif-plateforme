@@ -56,6 +56,7 @@
       <div class="sb-group-lbl">01 — OUTILS</div>
       <a href="profil.html">👤 Mon profil public</a>
       <a href="accreditations.html">🎖 Accréditations DA</a>
+      <a href="#cockpit" onclick="document.getElementById('carte-indice-fiabilite')?.scrollIntoView({behavior:'smooth',block:'center'});">🛡️ Mon indice de fiabilité</a>
       <a href="#asso-accreditation" data-section="asso-accreditation" style="display:none;">🏅 Accréditation Asso</a>
       <a href="confidentialite.html">🔐 Confidentialité</a>
       <a href="programmation.html">⚙️ Programmation</a>
@@ -2917,6 +2918,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <span style="font-size:20px;">🌐</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Réseau Pro</div><div style="font-size:11px;color:#0f766e;opacity:.8;">Affiliations &amp; annuaire</div></div>
         </a>
       </div>
+      <!-- ═══ MON INDICE DE FIABILITÉ ═══
+           Les comptes Initiative disposent de deux critères que les particuliers n'ont pas
+           (immatriculation et organisation vérifiée) : ils sont donc notés sur 100, là où
+           un particulier l'est sur 87. -->
+      <div class="card" style="margin-top:16px;" id="carte-indice-fiabilite">
+        <div id="mon-indice-fiabilite"><div style="color:var(--muted);font-size:12px;">Chargement de l'indice…</div></div>
+      </div>
+
       <div class="card" style="margin-top:16px;">
         <h3 style="margin:0 0 12px;font-size:15px;">👁️ Visibilité de la vitrine</h3>
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
@@ -2957,6 +2966,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         });
       }
     } catch(e) {}
+
+    /* Mon indice de fiabilité — isMine:true fait apparaître les boutons d'action
+       (vérifier son identité, demander une rencontre, compléter son profil…). */
+    try {
+      const zoneIndice = document.getElementById('mon-indice-fiabilite');
+      const proprio = init.owner_user_id || (typeof me !== 'undefined' && me ? me.id : null);
+      if (zoneIndice && proprio && window.TrustWidget) {
+        TrustWidget.render(proprio, zoneIndice, { isMine: true, showReportBtn: false });
+      } else if (zoneIndice) {
+        zoneIndice.innerHTML = '<div style="color:var(--muted);font-size:12px;">Indice indisponible.</div>';
+      }
+    } catch(e) { console.error('indice de fiabilité', e); }
 
     renderVisibiliteVitrineStatut(init.vitrine_active);
 
@@ -6972,6 +6993,8 @@ initPremiumGates();
     <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Réseau</span></a>
   </nav>
 <script src="assets/profile-qr.js"></script>
+<!-- Requis par la carte « Mon indice de fiabilité » du cockpit. -->
+<script src="assets/trust-score.js"></script>
 <script src="assets/posts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>

@@ -130,12 +130,36 @@ html, body{overflow-x:clip !important;}
 .strip-val{font-size:13px;font-weight:600;color:var(--text);}
 
 /* Blue info band */
-.init-info-band{background:var(--navy);border-radius:var(--radius);color:#fff;display:grid;grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow);}
-.info-col{padding:22px 20px;position:relative;}
-.info-col:not(:last-child)::after{content:'';position:absolute;right:0;top:16px;bottom:16px;width:1px;background:rgba(255,255,255,.12);}
-.info-col-icon{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:12px;}
-.info-col-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.6);margin-bottom:8px;}
-.info-col-body{font-size:13px;line-height:1.6;color:rgba(255,255,255,.88);}
+/* ── Listes à choix multiple (Public concerné, Recherche actuellement, …) ──
+   La pastille elle-même vient du système de design de la plateforme
+   (.da-pill-group / .da-pill dans assets/ui-enhancements.v2.css) : remplissage orange
+   à la sélection, cible tactile de 44px, repli .checked pour les navigateurs sans :has().
+   Cette page ne la réutilisait pas — elle redessinait des pastilles à coups de styles
+   en ligne calculés une seule fois, à l'ouverture de la fenêtre, si bien que cliquer
+   ne changeait rien à l'écran. Seuls l'en-tête et le compteur sont ajoutés ici. */
+.da-pills-entete{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px;}
+.da-pills-aide{font-size:12px;color:var(--muted);}
+.da-pills-compte{font-size:11.5px;font-weight:800;color:#fff;background:var(--orange);border-radius:999px;padding:3px 10px;white-space:nowrap;}
+.da-pills-compte[data-vide="1"]{color:var(--muted);background:#EEF2F7;}
+/* Pas de compactage des pastilles dans la fenêtre : les 44px de hauteur du composant
+   sont la cible minimale confortable au doigt. Elles passent simplement à la ligne. */
+
+/* Trois RANGÉES horizontales, et non plus trois colonnes verticales.
+   En colonnes, la Présentation se réduisait à un ruban d'environ 20 caractères de large
+   qui descendait sur des centaines de pixels, pendant que les deux voisines, presque
+   vides, laissaient un grand blanc à leur droite. En rangées, chaque texte occupe toute
+   la largeur : la Présentation tient en quelques lignes et les rubriques courtes
+   n'occupent que la place qu'il leur faut. */
+.init-info-band{background:var(--navy);border-radius:var(--radius);color:#fff;margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow);}
+.info-col{display:grid;grid-template-columns:40px 150px 1fr auto;gap:16px;align-items:start;padding:18px 20px;}
+.info-col:not(:last-child){border-bottom:1px solid rgba(255,255,255,.12);}
+.info-col-icon{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:18px;}
+.info-col-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.6);padding-top:11px;}
+.info-col-body{font-size:13.5px;line-height:1.65;color:rgba(255,255,255,.88);padding-top:9px;min-width:0;}
+/* Bouton de modification propre à chaque rangée (propriétaire) */
+.info-col-edit{background:rgba(255,255,255,.12);border:0;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1;transition:background .18s;margin-top:6px;}
+.info-col-edit:hover{background:rgba(255,255,255,.26);}
+.info-col-edit:focus-visible{outline:3px solid #F26422;outline-offset:2px;}
 
 /* Content sections */
 .init-section{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px;box-shadow:var(--shadow);}
@@ -158,9 +182,12 @@ html, body{overflow-x:clip !important;}
 
 /* Responsive */
 @media(max-width:640px){
-  .init-info-band{grid-template-columns:1fr;}
-  .info-col:not(:last-child)::after{display:none;}
-  .info-col:not(:last-child){border-bottom:1px solid rgba(255,255,255,.12);}
+  /* Sur mobile, l'icône et le titre passent au-dessus du texte : 150px de colonne
+     de titre ne laisseraient plus rien au contenu. */
+  .info-col{grid-template-columns:40px 1fr auto;gap:10px 12px;}
+  .info-col-title{grid-column:2/4;padding-top:0;}
+  .info-col-body{grid-column:1/4;padding-top:0;}
+  .info-col-edit{grid-row:1;grid-column:3;}
   .init-strip{grid-template-columns:1fr;}
   .init-strip-item:not(:last-child){border-right:none;border-bottom:1px solid var(--border);}
   .init-profile-header{flex-direction:column;align-items:flex-start;}
@@ -388,24 +415,8 @@ const DOMAIN_GRAD = {
       </div>
     </div>
 
-    <!-- ===== BANDE BLEUE : 3 colonnes ===== -->
-    <div class="init-info-band">
-      <div class="info-col">
-        <div class="info-col-icon">🏢</div>
-        <div class="info-col-title">Présentation</div>
-        <div class="info-col-body">${init.description || '<em style="opacity:.6">Aucune description renseignée.</em>'}</div>
-      </div>
-      <div class="info-col">
-        <div class="info-col-icon">⚙️</div>
-        <div class="info-col-title">Nos Activités</div>
-        <div class="info-col-body">${init.mission || '<em style="opacity:.6">Mission non renseignée.</em>'}</div>
-      </div>
-      <div class="info-col">
-        <div class="info-col-icon">✅</div>
-        <div class="info-col-title">Nos Atouts</div>
-        <div class="info-col-body">${init.historique || (init.membres ? `Communauté de <strong>${init.membres} membres</strong> actifs.` : '<em style="opacity:.6">Historique non renseigné.</em>')}</div>
-      </div>
-    </div>
+    <!-- ===== BANDE BLEUE : 3 rangées horizontales ===== -->
+    <div class="init-info-band" id="init-info-band"></div>
 
     <!-- ===== NATIONALITÉS ===== -->
     ${nats.length ? `
@@ -419,7 +430,7 @@ const DOMAIN_GRAD = {
 
     <!-- ===== TRUST SCORE & SIGNALEMENT ===== -->
     <div class="init-section" id="init-trust-section">
-      <h3>🛡️ Score de confiance</h3>
+      <h3>🛡️ Indice de fiabilité</h3>
       <div id="init-trust-widget">Chargement…</div>
     </div>
 
@@ -822,6 +833,8 @@ const DOMAIN_GRAD = {
 
   renderColLeft();
   renderColRight();
+  /* renderBandeInfos() est appelée plus bas, après la déclaration de RANGEES_INFO :
+     l'appeler ici planterait sur un const pas encore initialisé. */
   /* La page se construit APRÈS le chargement du document : sans cet appel explicite, les
      emplacements [data-relation-user] resteraient vides — le composant ne se déclenche
      qu'au DOMContentLoaded, déjà passé à ce stade. */
@@ -851,19 +864,98 @@ const DOMAIN_GRAD = {
         <button class="btn btn-orange" id="edit-save">Enregistrer</button>
       </div></div>`;
     document.body.appendChild(ov);
+    /* Un seul écouteur, par délégation : toute liste à choix multiple ouverte dans cette
+       fenêtre réagit au clic, y compris celles qui seront ajoutées plus tard. */
+    ov.addEventListener('change', e => {
+      if (e.target.matches('.da-pill input[type=checkbox]')) synchroniserPastilles(ov);
+    });
+    synchroniserPastilles(ov);
     ov.querySelector('#edit-cancel').onclick = () => ov.remove();
     ov.querySelector('#edit-save').onclick = async () => {
       try { await onSave(ov); ov.remove(); } catch (e) { alert(e.message || 'Erreur.'); }
     };
   }
 
+  /* Bande d'information : trois rangées, chacune modifiable sur place par le propriétaire.
+     Elle est redessinée après enregistrement, comme les colonnes latérales. */
+  const RANGEES_INFO = [
+    { cle: 'description', icone: '🏢', titre: 'Présentation', vide: 'Aucune description renseignée.' },
+    { cle: 'mission',     icone: '⚙️', titre: 'Nos Activités', vide: 'Mission non renseignée.' },
+    { cle: 'historique',  icone: '✅', titre: 'Nos Atouts',    vide: 'Historique non renseigné.' },
+  ];
+
+  function renderBandeInfos() {
+    const bande = document.getElementById('init-info-band');
+    if (!bande) return;
+    bande.innerHTML = RANGEES_INFO.map(r => {
+      let corps = init[r.cle];
+      if (!corps && r.cle === 'historique' && init.membres) {
+        corps = `Communauté de <strong>${init.membres} membres</strong> actifs.`;
+      }
+      return `<div class="info-col">
+        <div class="info-col-icon">${r.icone}</div>
+        <div class="info-col-title">${r.titre}</div>
+        <div class="info-col-body">${corps ? esc2(corps).replace(/\n/g, '<br>') : `<em style="opacity:.6">${r.vide}</em>`}</div>
+        ${isOwner ? `<button type="button" class="info-col-edit" data-rangee="${r.cle}" title="Modifier ${r.titre}" aria-label="Modifier ${r.titre}">✏️</button>` : '<span></span>'}
+      </div>`;
+    }).join('');
+    bande.querySelectorAll('.info-col-edit').forEach(b =>
+      b.addEventListener('click', () => editerRangeeInfo(b.dataset.rangee)));
+  }
+
+  function editerRangeeInfo(cle) {
+    const r = RANGEES_INFO.find(x => x.cle === cle);
+    openEditModal(`${r.icone} ${r.titre}`,
+      `<textarea id="eb-texte" rows="8" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;line-height:1.6;" placeholder="${r.vide}">${esc2(init[cle] || '')}</textarea>`,
+      async ov => {
+        const texte = ov.querySelector('#eb-texte').value.trim();
+        /* description appartient à la vitrine ; mission et historique au profil public.
+           Deux routes distinctes, on envoie chaque champ à la sienne. */
+        if (cle === 'description') await api('PUT', `/initiatives/${init.id}/vitrine`, { description: texte });
+        else await api('PUT', `/initiatives/${init.id}/profil-public`, { [cle]: texte });
+        const rep = await api('GET', `/initiatives/${init.id}`);
+        Object.assign(init, rep.initiative);
+        renderBandeInfos();
+      });
+  }
+  renderBandeInfos();
+
+  /* La bordure et le fond étaient calculés UNE SEULE FOIS, à la construction du HTML,
+     puis figés dans l'attribut style. Cliquer une pastille cochait bien la case, mais
+     son apparence restait celle qu'elle avait à l'ouverture de la fenêtre : aucun retour
+     visuel, d'où l'impression que le choix multiple ne fonctionnait pas.
+     L'état est désormais porté par une classe CSS synchronisée à chaque clic, et rendu
+     franchement lisible (fond plein, coche, texte gras). */
   function pillsHtml(presets, selected, cls) {
-    return `<div style="display:flex;flex-wrap:wrap;gap:6px;">${presets.map(p =>
-      `<label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid ${selected.includes(p) ? '#2563EB' : 'var(--border)'};border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;${selected.includes(p) ? 'background:#eff6ff;font-weight:700;' : ''}">
-        <input type="checkbox" class="${cls}" value="${esc2(p)}" ${selected.includes(p) ? 'checked' : ''} style="accent-color:#2563EB;"> ${esc2(p)}
+    const dejaCoches = presets.filter(p => selected.includes(p)).length;
+    return `<div class="da-pills-entete">
+        <span class="da-pills-aide">Plusieurs choix possibles — touchez pour ajouter ou retirer.</span>
+        <span class="da-pills-compte" data-compte-pour="${cls}">${dejaCoches} sélectionné${dejaCoches > 1 ? 's' : ''}</span>
+      </div>
+      <div class="da-pill-group">${presets.map(p =>
+      `<label class="da-pill${selected.includes(p) ? ' checked' : ''}">
+        <input type="checkbox" class="${cls}" value="${esc2(p)}" ${selected.includes(p) ? 'checked' : ''}>
+        <span>${esc2(p)}</span>
       </label>`).join('')}</div>
       <input type="text" id="${cls}-autre" placeholder="Autres (séparés par des virgules)" style="width:100%;margin-top:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;"
         value="${esc2(selected.filter(s => !presets.includes(s)).join(', '))}">`;
+  }
+
+  /* Synchronise l'apparence des pastilles avec l'état réel des cases, et met à jour
+     le compteur. Appelée par délégation : fonctionne pour toutes les listes de la page,
+     présentes comme futures, sans avoir à recâbler chaque fenêtre. */
+  function synchroniserPastilles(racine) {
+    /* .checked est le repli prévu par le système de design pour les navigateurs
+       dépourvus de :has() ; on le tient à jour, les autres suivent tout seuls. */
+    racine.querySelectorAll('.da-pill').forEach(l => {
+      const c = l.querySelector('input[type=checkbox]');
+      if (c) l.classList.toggle('checked', c.checked);
+    });
+    racine.querySelectorAll('.da-pills-compte').forEach(el => {
+      const n = racine.querySelectorAll('.' + el.dataset.comptePour + ':checked').length;
+      el.textContent = n ? n + ' sélectionné' + (n > 1 ? 's' : '') : 'aucun choix';
+      el.dataset.vide = n ? '0' : '1';
+    });
   }
 
   function readPills(ov, cls) {

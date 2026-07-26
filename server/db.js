@@ -1899,6 +1899,43 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_contact_hist ON contact_historique(user_id, created_at);
 
+  /* ===== RENCONTRES DIASPO ACTIF =====
+     Echange reel entre un membre et un agent de la plateforme, en presentiel ou en
+     visioconference. C est le seul critere de l indice de fiabilite qui repose sur une
+     verification humaine.
+
+     Deux choses distinctes, et c est voulu : que le rendez vous ait EU LIEU, et que
+     Diaspo Actif le VALIDE. Un echange peut se tenir sans emporter la conviction de
+     l agent : les points ne tombent qu au statut validee, jamais automatiquement.
+
+     Parcours : demandee -> planifiee -> en_attente_validation -> validee | non_validee
+     refusee = la demande est ecartee AVANT tout rendez vous (hors sujet, doublon).
+     non_validee = le rendez vous a eu lieu mais n est pas retenu ; le motif est
+     obligatoire et transmis au membre, et date_reouverture fixe la date a partir de
+     laquelle il pourra redemander. */
+  CREATE TABLE IF NOT EXISTS rencontres_diaspoactif (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'demandee',
+    mode TEXT NOT NULL DEFAULT 'visio',
+    message TEXT,
+    disponibilites TEXT,        -- creneau propose par le membre (date + heure)
+    pieces_json TEXT DEFAULT '[]',  -- documents et images joints par le membre
+    date_prevue TEXT,
+    lieu_ou_lien TEXT,
+    date_rencontre TEXT,
+    agent_id INTEGER,
+    agent_nom TEXT,
+    compte_rendu TEXT,
+    motif_refus TEXT,
+    date_reouverture TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_rencontres_user ON rencontres_diaspoactif(user_id, statut);
+  CREATE INDEX IF NOT EXISTS idx_rencontres_statut ON rencontres_diaspoactif(statut, created_at);
+
   /* ===== SAUVEGARDES DE VITRINE =====
      Prise AVANT toute transformation liée à un changement de type. Sans elle, « Repartir
      à zéro » serait irréversible et une conversion ratée laisserait l'utilisateur devant
@@ -2248,7 +2285,7 @@ db.exec(`
     created_at            TEXT DEFAULT (datetime('now'))
   );
 
-  /* ── Cache du score de confiance ── */
+  /* ── Cache du indice de fiabilité ── */
   CREATE TABLE IF NOT EXISTS trust_cache (
     user_id     INTEGER PRIMARY KEY,
     score       REAL NOT NULL DEFAULT 0,
@@ -4518,6 +4555,13 @@ db.exec(`
     if (!avisCols.includes('reponse_texte'))  db.exec("ALTER TABLE vitrine_avis ADD COLUMN reponse_texte TEXT");
     if (!avisCols.includes('reponse_date'))   db.exec("ALTER TABLE vitrine_avis ADD COLUMN reponse_date TEXT");
   }
+  /* Rencontres Diaspo Actif : la colonne a ete ajoutee APRES la premiere creation de la
+     table. CREATE TABLE IF NOT EXISTS ne modifie jamais une table existante — sans cet
+     ALTER, la date de reouverture n existerait que sur les bases creees de zero. */
+  const rdvCols = db.prepare('PRAGMA table_info(rencontres_diaspoactif)').all().map(c=>c.name);
+  if (rdvCols.length && !rdvCols.includes('date_reouverture')) db.exec("ALTER TABLE rencontres_diaspoactif ADD COLUMN date_reouverture TEXT");
+  if (rdvCols.length && !rdvCols.includes('pieces_json'))      db.exec("ALTER TABLE rencontres_diaspoactif ADD COLUMN pieces_json TEXT DEFAULT '[]'");
+
   const initCols6 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
   if (!initCols6.includes('vitrine_services_categories_json')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_services_categories_json TEXT");
   if (!initCols6.includes('vitrine_ville'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_ville TEXT");

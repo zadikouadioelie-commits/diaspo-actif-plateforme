@@ -115,6 +115,14 @@
           </div>
         </div>
 
+        <!-- ═══ MON INDICE DE FIABILITÉ ═══
+             Le membre y voit non seulement sa note, mais surtout ce qui lui manque et le
+             bouton qui permet d'y remédier. Auparavant il ne lisait qu'un pourcentage
+             accompagné d'une étiquette rouge, sans aucun moyen d'agir. -->
+        <div class="card" style="margin-bottom:20px;">
+          <div id="mon-indice-fiabilite"><div style="color:var(--muted);font-size:12px;">Chargement de l'indice…</div></div>
+        </div>
+
         <!-- QR Code personnel -->
         <div class="card" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
           <div style="flex:1;min-width:200px;">
@@ -343,6 +351,14 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   // Titre
   const nom = [me.profil?.prenom, me.nom].filter(Boolean).join(' ') || me.nom;
   document.getElementById('dash-title').textContent = 'Bonjour, ' + nom + ' 👋';
+
+  // Mon indice de fiabilité — isMine:true fait apparaître les boutons d'action
+  const indiceEl = document.getElementById('mon-indice-fiabilite');
+  if (indiceEl && window.TrustWidget) {
+    TrustWidget.render(me.id, indiceEl, { isMine: true, showReportBtn: false });
+  } else if (indiceEl) {
+    indiceEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Indice indisponible.</div>';
+  }
 
   // QR Code personnel
   const qrEl = document.getElementById('u-qr-container');
@@ -899,6 +915,8 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     }
   </script>
 <script src="assets/profile-qr.js"></script>
+<!-- Requis par le module « Mon indice de fiabilité » ci-dessus. -->
+<script src="assets/trust-score.js"></script>
 <script src="assets/posts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>

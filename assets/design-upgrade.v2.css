@@ -666,8 +666,14 @@ footer, .footer {
 .notif-dropdown .notif-date { color: #8A94A6 !important; }
 .notif-dropdown .notif-dd-title { color: #0D1B2A !important; }
 
-/* ── Formulaires étendus ── */
-.form-label, label {
+/* ── Formulaires étendus ──
+   `label` sans restriction visait AUSSI les pastilles à choix multiple .da-pill, qui sont
+   des <label>. Avec !important, ce gris battait le blanc que .da-pill.checked applique sur
+   fond orange : toute pastille sélectionnée affichait du gris foncé sur orange, soit un
+   contraste d'environ 2,4:1, très en dessous du minimum lisible de 4,5:1. Le défaut
+   touchait toutes les pages utilisant ce composant, pas une seule.
+   La règle est donc restreinte aux libellés de formulaire ; la pastille garde la sienne. */
+.form-label, label:not(.da-pill) {
   font-size: 13px !important;
   font-weight: 700 !important;
   color: #374151 !important;

@@ -102,6 +102,8 @@
       <a href="confidentialite.html">🔐 Confidentialité</a>
       <a href="programmation.html">⚙️ Programmation</a>
 
+      <a href="#" onclick="document.getElementById('carte-indice-fiabilite')?.scrollIntoView({behavior:'smooth',block:'center'});return false;">🛡️ Mon indice de fiabilité</a>
+
       <div class="sb-group-lbl">02 — COCKPIT</div>
       <a href="#" class="active" data-section="cockpit">🟦 Tableau de bord</a>
 
@@ -166,6 +168,11 @@
             <span style="font-size:20px;">✍️</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Créer une publication</div><div style="font-size:11px;color:#4338CA;opacity:.8;">Sur votre profil public</div></div>
           </button>
         </div>
+        <!-- ═══ MON INDICE DE FIABILITÉ ═══ -->
+        <div class="card" id="carte-indice-fiabilite" style="margin-bottom:16px;">
+          <div id="mon-indice-fiabilite"><div style="color:var(--muted);font-size:12px;">Chargement de l'indice…</div></div>
+        </div>
+
         <div id="cockpit-perimetre" class="card">
           <h3 style="margin:0 0 12px;font-size:15px;">Périmètre d'accréditation</h3>
           <div id="perimetre-content-ck"></div>
@@ -1936,6 +1943,14 @@ async function loadPartenariats() {
 
   loadResponsable();
 
+  /* Mon indice de fiabilité — isMine:true fait apparaître les boutons d'action. */
+  const zoneIndice = document.getElementById("mon-indice-fiabilite");
+  if (zoneIndice && window.TrustWidget) {
+    TrustWidget.render(ME.id, zoneIndice, { isMine: true, showReportBtn: false });
+  } else if (zoneIndice) {
+    zoneIndice.innerHTML = '<div style="color:var(--muted);font-size:12px;">Indice indisponible.</div>';
+  }
+
   document.getElementById("inst-nom").textContent = ME.nom;
   document.getElementById("inst-infos").textContent = [ME.ville, ME.pays].filter(Boolean).join(", ") + " · Compte Étatique";
 
@@ -2175,6 +2190,11 @@ async function loadPartenariats() {
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
+<!-- Requis par la carte « Mon indice de fiabilité » du cockpit.
+     upload-media.js sert aux pièces jointes de la demande de rencontre : sans lui, le
+     bouton « Ajouter un fichier » s'interrompt sur « module d'envoi indisponible ». -->
+<script src="/assets/upload-media.js"></script>
+<script src="assets/trust-score.js"></script>
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>

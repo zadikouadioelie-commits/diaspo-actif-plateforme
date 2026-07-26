@@ -67,6 +67,7 @@
       <a href="#billetterie" data-section="billetterie">🎟️ Billetterie</a>
       <a href="#accreditations" data-section="accreditations" style="display:flex;justify-content:space-between;align-items:center;">🏛️ Accréditations <span id="accred-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
+      <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
 
       <span class="sb-group-lbl">🟨 Territoires</span>
       <a href="#membres" data-section="membres">👥 Membres</a>
@@ -3167,6 +3168,24 @@
         </div>
       </section>
 
+      <!-- ═══════════ RENCONTRES DIASPO'ACTIF ═══════════
+           Le seul critère de l'indice de fiabilité validé par un être humain. Deux choses
+           distinctes, et c'est volontaire : que le rendez-vous ait EU LIEU, et que
+           Diaspo'Actif le VALIDE. Les 10 points ne tombent qu'au clic sur « Valider ». -->
+      <section id="section-rencontres" style="display:none;">
+        <div class="flex-between" style="margin-bottom:6px;">
+          <h2 style="margin:0;">🤝 Rencontres Diaspo'Actif</h2>
+        </div>
+        <p style="margin:0 0 16px;color:#64748B;font-size:13px;max-width:760px;">
+          Chaque rencontre vaut 10 points d'indice de fiabilité, et ces points ne sont
+          accordés que par vous. Qu'un rendez-vous se soit tenu ne suffit pas : c'est
+          « Valider » qui les attribue.
+        </p>
+
+        <div id="rdv-onglets" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        <div id="rdv-liste"><div style="color:#64748B;font-size:13px;">Chargement…</div></div>
+      </section>
+
       <!-- ACCRÉDITATIONS DA -->
       <section id="section-accreditations" style="display:none;">
         <div class="flex-between" style="margin-bottom:16px;">
@@ -6179,6 +6198,193 @@ function showAccredHub(id) {
   if (id === 'demandes') loadAccredDefDemandes();
 }
 
+/* ═══════════════ MODULE RENCONTRES DIASPO'ACTIF ═══════════════
+   Le seul critère de l'indice de fiabilité qui repose sur un jugement humain.
+   Un rendez-vous tenu ne vaut pas validation : seul le bouton « Valider » accorde
+   les 10 points, et la non-validation exige un motif, transmis au membre. */
+
+const RDV_ONGLETS = [
+  { cle:'demandee',              titre:'À traiter',       icone:'📥' },
+  { cle:'planifiee',             titre:'Rendez-vous fixé', icone:'📅' },
+  { cle:'en_attente_validation', titre:'À valider',       icone:'⏳' },
+  { cle:'validee',               titre:'Validées',        icone:'✅' },
+  { cle:'non_validee',           titre:'Non validées',    icone:'🚫' },
+  { cle:'refusee',               titre:'Demandes écartées', icone:'✖️' },
+];
+let rdvOngletActif = 'demandee';
+
+function rdvEsc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rdvDate(d){ return d ? String(d).slice(0,16).replace('T',' ') : '—'; }
+
+async function rdvCharger(cle) {
+  if (cle) rdvOngletActif = cle;
+  const zoneOnglets = document.getElementById('rdv-onglets');
+  const zoneListe   = document.getElementById('rdv-liste');
+  if (!zoneListe) return;
+
+  zoneOnglets.innerHTML = RDV_ONGLETS.map(o => `
+    <button type="button" onclick="rdvCharger('${o.cle}')"
+      style="padding:8px 14px;border-radius:999px;border:2px solid ${o.cle===rdvOngletActif?'#ff6b00':'#E2E8F0'};
+             background:${o.cle===rdvOngletActif?'#ff6b00':'#fff'};color:${o.cle===rdvOngletActif?'#fff':'#334155'};
+             font-size:13px;font-weight:700;cursor:pointer;">${o.icone} ${o.titre}
+      <span id="rdv-n-${o.cle}" style="opacity:.75;font-weight:600;"></span></button>`).join('');
+
+  zoneListe.innerHTML = '<div style="color:#64748B;font-size:13px;">Chargement…</div>';
+  let rencontres = [];
+  try {
+    const r = await fetch('/api/admin/rencontres?statut=' + encodeURIComponent(rdvOngletActif), { credentials:'include' });
+    if (!r.ok) throw new Error('Réponse ' + r.status);
+    rencontres = (await r.json()).rencontres || [];
+  } catch (e) {
+    zoneListe.innerHTML = `<div class="card" style="color:#B91C1C;">Impossible de charger les rencontres : ${rdvEsc(e.message)}</div>`;
+    return;
+  }
+
+  const n = document.getElementById('rdv-n-' + rdvOngletActif);
+  if (n) n.textContent = ' · ' + rencontres.length;
+  rdvMajBadge();
+
+  if (!rencontres.length) {
+    zoneListe.innerHTML = `<div class="card" style="text-align:center;color:#64748B;padding:28px;">Aucune rencontre dans cette rubrique.</div>`;
+    return;
+  }
+  zoneListe.innerHTML = rencontres.map(rdvCarte).join('');
+}
+
+/* Pièces jointes envoyées par le membre pour appuyer sa demande. Elles s'ouvrent dans un
+   nouvel onglet, avec rel="noopener" : sans lui, la page ouverte pourrait manipuler
+   l'onglet du tableau de bord. */
+function rdvPieces(json) {
+  let pieces = [];
+  try { pieces = typeof json === 'string' ? JSON.parse(json || '[]') : (json || []); } catch (e) { pieces = []; }
+  if (!Array.isArray(pieces) || !pieces.length) return '';
+  return `<div style="margin-top:8px;">
+    <strong style="font-size:12px;color:#64748B;">Pièces jointes (${pieces.length})</strong>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;">
+      ${pieces.map(p => `<a href="${rdvEsc(p.url)}" target="_blank" rel="noopener noreferrer"
+        style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:#EEF2F7;border-radius:8px;font-size:12.5px;color:#1D4ED8;text-decoration:none;max-width:260px;">
+        <span>${/\.(jpg|jpeg|png|gif|webp)$/i.test(p.url || '') ? '🖼️' : '📄'}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${rdvEsc(p.nom || 'Document')}</span>
+      </a>`).join('')}
+    </div>
+  </div>`;
+}
+
+function rdvCarte(r) {
+  const nom = `${r.membre_prenom || ''} ${r.membre_nom || ''}`.trim() || r.membre_email;
+  const mode = r.mode === 'presentiel' ? '📍 En présentiel' : '🎥 En visioconférence';
+  const l = (t, v) => v ? `<div style="margin-top:6px;"><strong style="font-size:12px;color:#64748B;">${t}</strong><br><span style="font-size:13px;">${rdvEsc(v)}</span></div>` : '';
+
+  let actions = '';
+  if (r.statut === 'demandee') {
+    /* Le champ est prérempli avec le créneau proposé par le membre : dans le cas courant
+       où il convient, l'agent n'a qu'un clic à faire. S'il ne convient pas, il le change. */
+    const propose = r.disponibilites ? String(r.disponibilites).slice(0, 16).replace(' ', 'T') : '';
+    actions = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+        <input type="datetime-local" id="rdv-date-${r.id}" value="${propose}" style="padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;">
+        <input type="text" id="rdv-lieu-${r.id}" placeholder="Lien de visio ou adresse" style="padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="rdvAction(${r.id},'planifier')">📅 Confirmer ce rendez-vous</button>
+        <button class="btn btn-outline" onclick="rdvAction(${r.id},'refuser')">✖️ Écarter la demande</button>
+      </div>
+      <p style="margin:6px 0 0;font-size:11.5px;color:#64748B;">Durée à prévoir : 30 à 45 minutes.</p>`;
+  } else if (r.statut === 'planifiee') {
+    actions = `
+      <p style="margin:10px 0 6px;font-size:12.5px;color:#64748B;">Après le rendez-vous :</p>
+      <textarea id="rdv-cr-${r.id}" rows="2" placeholder="Compte rendu de l'échange (facultatif)"
+        style="width:100%;padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="rdvAction(${r.id},'valider')">✅ Valider — accorde 10 points</button>
+        <button class="btn btn-outline" onclick="rdvAction(${r.id},'attente')">⏳ En attente de validation</button>
+        <button class="btn btn-outline" onclick="rdvAction(${r.id},'ne_pas_valider')">🚫 Ne pas valider</button>
+      </div>`;
+  } else if (r.statut === 'en_attente_validation') {
+    actions = `
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="rdvAction(${r.id},'valider')">✅ Valider — accorde 10 points</button>
+        <button class="btn btn-outline" onclick="rdvAction(${r.id},'ne_pas_valider')">🚫 Ne pas valider</button>
+      </div>`;
+  }
+
+  const COULEUR = { demandee:'#F59E0B', planifiee:'#3B82F6', en_attente_validation:'#8B5CF6',
+                    validee:'#22C55E', non_validee:'#EF4444', refusee:'#94A3B8' }[r.statut] || '#94A3B8';
+
+  return `<div class="card" style="border-left:4px solid ${COULEUR};margin-bottom:12px;">
+    <div class="flex-between" style="align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div style="min-width:0;">
+        <div style="font-weight:800;font-size:15px;">${rdvEsc(nom)}</div>
+        <div style="font-size:12.5px;color:#64748B;">${rdvEsc(r.membre_email)}${r.membre_ville ? ' · ' + rdvEsc(r.membre_ville) : ''} · ${rdvEsc(r.membre_role)}</div>
+      </div>
+      <div style="font-size:12.5px;color:#64748B;text-align:right;">${mode}<br>Demandé le ${rdvDate(r.created_at)}</div>
+    </div>
+    ${l('Message du membre', r.message)}
+    ${l('Créneau proposé par le membre', r.disponibilites ? rdvDate(r.disponibilites) : '')}
+    ${rdvPieces(r.pieces_json)}
+    ${l('Rendez-vous prévu', r.date_prevue ? rdvDate(r.date_prevue) + (r.lieu_ou_lien ? ' — ' + r.lieu_ou_lien : '') : '')}
+    ${l('Rencontre effectuée le', r.date_rencontre ? rdvDate(r.date_rencontre) : '')}
+    ${l('Compte rendu', r.compte_rendu)}
+    ${l('Motif communiqué au membre', r.motif_refus)}
+    ${l('Nouvelle demande possible à partir du', r.date_reouverture ? String(r.date_reouverture).slice(0,10) : '')}
+    ${l('Traité par', r.agent_nom)}
+    ${actions}
+  </div>`;
+}
+
+async function rdvAction(id, action) {
+  const corps = { action };
+
+  if (action === 'planifier') {
+    const d = document.getElementById('rdv-date-' + id)?.value;
+    if (!d) { alert("Indiquez la date et l'heure du rendez-vous."); return; }
+    corps.date_prevue   = d.replace('T', ' ');
+    corps.lieu_ou_lien  = document.getElementById('rdv-lieu-' + id)?.value || '';
+  }
+  if (action === 'valider' || action === 'attente') {
+    corps.compte_rendu = document.getElementById('rdv-cr-' + id)?.value || '';
+  }
+  if (action === 'ne_pas_valider') {
+    /* Le motif part au membre : il doit être écrit, et suffisamment explicite. */
+    const motif = prompt("Motif de la non-validation — il sera transmis au membre (10 caractères minimum) :");
+    if (motif === null) return;
+    if (motif.trim().length < 10) { alert("Le motif doit faire au moins 10 caractères."); return; }
+    corps.motif_refus = motif.trim();
+  }
+  if (action === 'refuser') {
+    const motif = prompt("Motif pour écarter cette demande (facultatif) :");
+    if (motif === null) return;
+    corps.motif_refus = motif.trim();
+  }
+  if (action === 'valider' && !confirm("Valider cette rencontre ? 10 points seront ajoutés à l'indice de fiabilité du membre.")) return;
+
+  try {
+    const r = await fetch('/api/admin/rencontres/' + id, {
+      method:'PATCH', credentials:'include',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(corps),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(j?.error || ('Réponse ' + r.status));
+    rdvCharger();
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* Pastille de la barre latérale : le nombre de demandes qui attendent une action.
+   Sans elle, une demande peut dormir des semaines dans un onglet que personne n'ouvre. */
+async function rdvMajBadge() {
+  const badge = document.getElementById('rdv-badge');
+  if (!badge) return;
+  try {
+    const [a, b] = await Promise.all([
+      fetch('/api/admin/rencontres?statut=demandee', { credentials:'include' }).then(r => r.json()),
+      fetch('/api/admin/rencontres?statut=en_attente_validation', { credentials:'include' }).then(r => r.json()),
+    ]);
+    const n = (a.rencontres || []).length + (b.rencontres || []).length;
+    badge.textContent = n;
+    badge.style.display = n ? '' : 'none';
+  } catch (e) { /* la pastille est un confort : son échec ne doit rien casser */ }
+}
+
 /* ── Navigation helper ── */
 function goSection(name){
   document.querySelectorAll('section[id^="section-"]').forEach(s=>s.style.display='none');
@@ -6638,6 +6844,7 @@ async function submitAccordDirect(){
     'error-logs': () => loadErrorLogs(),
     ads: () => loadAdsAdmin(),
     'social-sync': () => loadSocialSyncAdmin(),
+    rencontres:  () => rdvCharger(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {

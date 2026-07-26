@@ -1791,12 +1791,14 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
     if (!posts.length) throw new Error();
     const html = posts.map(p => {
       const icon = TYPE_ICON[p.type] || '📝';
-      const seed = encodeURIComponent(p.auteur_nom || 'anon');
       const ts   = p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR', {day:'numeric',month:'short'}) : '';
+      /* Avatar dessiné sur place (assets/app.js) : la photo réelle de l'auteur si elle
+         existe, sinon ses initiales — plus aucun appel à un service extérieur. */
+      const avatarSrc = p.auteur_photo || window.daAvatarLocal(p.auteur_nom || 'Membre', 'user');
       return `
       <div class="hp-feed-post">
         <div class="hp-feed-post-header">
-          <img loading="lazy" class="hp-feed-avatar" src="https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&backgroundColor=b6e3f4,ffd5dc,d1f4e0" alt="${p.auteur_nom||'Membre'}">
+          <img loading="lazy" class="hp-feed-avatar" src="${avatarSrc}" alt="${p.auteur_nom||'Membre'}">
           <div>
             <div class="hp-feed-author">${p.auteur_nom || 'Membre DiaspoActif'}</div>
             <div class="hp-feed-time">${icon} ${ts}</div>

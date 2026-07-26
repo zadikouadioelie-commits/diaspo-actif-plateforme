@@ -1546,6 +1546,230 @@ route("GET", "/api/initiatives/:id/contact-historique", async (req, res, params)
   sendJSON(res, 200, { historique });
 });
 
+/* ═══════════════ RENCONTRES DIASPO'ACTIF ═══════════════
+   Critère de l'indice de fiabilité validé par un être humain. Le membre demande,
+   un agent planifie, puis confirme que l'échange a bien eu lieu. Le membre ne peut
+   jamais se déclarer « rencontré » lui-même : ce serait vider le critère de son sens. */
+
+const RENCONTRE_MODES = ['visio', 'presentiel'];
+/* Délai avant de pouvoir redemander après une non-validation. Assez long pour que le
+   membre ait le temps de corriger ce qui posait problème, assez court pour ne pas
+   fermer définitivement la porte sur une seule appréciation. */
+const RENCONTRE_DELAI_MOIS = 3;
+/* Statuts qui interdisent une nouvelle demande : une rencontre est en cours de
+   traitement, ou déjà validée. */
+const RENCONTRE_STATUTS_BLOQUANTS = ['demandee', 'planifiee', 'en_attente_validation', 'validee'];
+
+/* GET /api/rencontres/moi — l'état de ma demande */
+route("GET", "/api/rencontres/moi", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rencontre = await db.prepare(
+    `SELECT id, statut, mode, message, disponibilites, date_prevue, lieu_ou_lien,
+            date_rencontre, agent_nom, motif_refus, created_at
+     FROM rencontres_diaspoactif WHERE user_id=? ORDER BY id DESC LIMIT 1`
+  ).get(user.id);
+  sendJSON(res, 200, { rencontre: rencontre || null });
+});
+
+/* POST /api/rencontres — demander une rencontre */
+route("POST", "/api/rencontres", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  /* Une seule demande vivante à la fois : sans ce garde-fou, un membre pourrait
+     empiler les demandes et saturer la file des agents. */
+  const enCours = await db.prepare(
+    `SELECT id, statut FROM rencontres_diaspoactif
+     WHERE user_id=? AND statut IN (${RENCONTRE_STATUTS_BLOQUANTS.map(() => '?').join(',')}) LIMIT 1`
+  ).get(user.id, ...RENCONTRE_STATUTS_BLOQUANTS);
+  if (enCours) {
+    return sendJSON(res, 409, {
+      error: enCours.statut === 'validee'
+        ? "Votre rencontre avec Diaspo'Actif est déjà validée."
+        : "Vous avez déjà une demande de rencontre en cours de traitement.",
+      statut: enCours.statut,
+    });
+  }
+
+  /* Après une non-validation, la porte se rouvre — mais pas immédiatement : sans ce
+     délai, un membre pourrait retenter jusqu'à tomber sur un agent plus conciliant. */
+  const bloquee = await db.prepare(
+    `SELECT date_reouverture FROM rencontres_diaspoactif
+     WHERE user_id=? AND statut='non_validee' AND date_reouverture > datetime('now')
+     ORDER BY id DESC LIMIT 1`
+  ).get(user.id);
+  if (bloquee) {
+    return sendJSON(res, 409, {
+      error: `Votre précédente rencontre n'a pas été validée. Vous pourrez faire une nouvelle demande à partir du ${String(bloquee.date_reouverture).slice(0, 10)}.`,
+      date_reouverture: bloquee.date_reouverture,
+    });
+  }
+
+  const mode = RENCONTRE_MODES.includes(body.mode) ? body.mode : 'visio';
+  const message = String(body.message || '').trim().slice(0, 1000) || null;
+
+  /* Le membre propose désormais un créneau précis, et non plus des disponibilités en
+     texte libre : l'agent peut l'accepter d'un clic. La colonne `disponibilites` le
+     conserve — inutile d'en migrer une nouvelle pour un changement de forme.
+     Une date passée est refusée ici aussi : le contrôle du navigateur ne protège que
+     l'utilisateur de bonne foi, pas un appel direct à la route. */
+  const creneau = String(body.creneau_souhaite || body.disponibilites || '').trim().slice(0, 40) || null;
+  if (!creneau) return sendJSON(res, 400, { error: "Proposez une date et une heure pour la rencontre." });
+  const quand = new Date(creneau.replace(' ', 'T'));
+  if (isNaN(quand.getTime())) return sendJSON(res, 400, { error: "Date de rencontre invalide." });
+  if (quand.getTime() < Date.now()) return sendJSON(res, 400, { error: "Le créneau proposé est déjà passé." });
+
+  /* Pièces jointes : documents et images qui aident le membre à présenter son profil.
+     Le téléversement a déjà eu lieu (route /api/upload/document, qui vérifie les octets
+     d'en-tête et plafonne à 15 Mo) ; on ne reçoit ici que des URL. On les filtre malgré
+     tout : n'accepter que des adresses de notre propre stockage évite qu'une URL
+     quelconque, pointant vers n'importe quoi, soit affichée aux agents. */
+  const HOTES_MEDIA = ['diaspoactif-media.b-cdn.net'];
+  const pieces = (Array.isArray(body.pieces) ? body.pieces : []).slice(0, 5).map(p => {
+    let hote = null;
+    try { hote = new URL(String(p?.url || '')).hostname; } catch (e) { return null; }
+    if (!HOTES_MEDIA.includes(hote)) return null;
+    return { url: String(p.url), nom: String(p?.nom || 'Document').trim().slice(0, 120) };
+  }).filter(Boolean);
+
+  const r = await db.prepare(
+    `INSERT INTO rencontres_diaspoactif (user_id, statut, mode, message, disponibilites, pieces_json)
+     VALUES (?, 'demandee', ?, ?, ?, ?)`
+  ).run(user.id, mode, message, creneau, JSON.stringify(pieces));
+  const id = Number(r?.lastInsertRowid ?? r?.rows?.[0]?.id ?? 0) || null;
+
+  /* L'indice est mis en cache 5 minutes. Sans cette purge, le membre venait de faire sa
+     demande et son propre écran continuait de lui proposer de la faire. */
+  try { await db.prepare("DELETE FROM trust_cache WHERE user_id=?").run(user.id); } catch (e) {}
+
+  /* Sans avertir les agents, la demande dormirait dans une table que personne ne regarde.
+     Un échec d'écriture ici est journalisé, jamais avalé en silence : une notification
+     perdue signifie un membre qui attend une réponse qui ne viendra pas. */
+  try {
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    for (const a of admins) {
+      await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+        a.id, 'rencontre_demande', "Nouvelle demande de rencontre",
+        `${(user.prenom || '') + ' ' + (user.nom || '')} demande une rencontre ${mode === 'visio' ? 'en visioconférence' : 'en présentiel'}.`,
+        JSON.stringify({ rencontre_id: id, user_id: user.id })
+      );
+    }
+  } catch (e) { logError(e, "notification demande de rencontre", req); }
+
+  sendJSON(res, 201, { ok: true, id, statut: 'demandee', mode });
+});
+
+/* DELETE /api/rencontres/:id — annuler ma demande, tant qu'elle n'a pas eu lieu */
+route("DELETE", "/api/rencontres/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const r = await db.prepare("SELECT id, user_id, statut FROM rencontres_diaspoactif WHERE id=?").get(params.id);
+  if (!r) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (Number(r.user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Ce n'est pas votre demande." });
+  if (r.statut === 'effectuee') return sendJSON(res, 409, { error: "Une rencontre déjà effectuée ne peut pas être annulée." });
+  await db.prepare("DELETE FROM rencontres_diaspoactif WHERE id=?").run(r.id);
+  try { await db.prepare("DELETE FROM trust_cache WHERE user_id=?").run(user.id); } catch (e) {}
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/rencontres — la file des demandes */
+route("GET", "/api/admin/rencontres", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const statut = query.statut || 'demandee';
+  const rows = await db.prepare(
+    `SELECT r.*, u.nom AS membre_nom, u.prenom AS membre_prenom, u.email AS membre_email,
+            u.role AS membre_role, u.ville AS membre_ville
+     FROM rencontres_diaspoactif r JOIN users u ON u.id=r.user_id
+     WHERE r.statut=? ORDER BY r.created_at ASC`
+  ).all(statut);
+  sendJSON(res, 200, { rencontres: rows });
+});
+
+/* PATCH /api/admin/rencontres/:id — planifier, confirmer ou refuser */
+route("PATCH", "/api/admin/rencontres/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const r = await db.prepare("SELECT * FROM rencontres_diaspoactif WHERE id=?").get(params.id);
+  if (!r) return sendJSON(res, 404, { error: "Demande introuvable." });
+
+  const agent = `${user.prenom || ''} ${user.nom || ''}`.trim() || 'Agent Diaspo\'Actif';
+  const action = body.action;
+
+  if (action === 'planifier') {
+    if (!body.date_prevue) return sendJSON(res, 400, { error: "Date de rencontre requise." });
+    await db.prepare(
+      `UPDATE rencontres_diaspoactif SET statut='planifiee', date_prevue=?, lieu_ou_lien=?,
+              agent_id=?, agent_nom=?, updated_at=datetime('now') WHERE id=?`
+    ).run(body.date_prevue, String(body.lieu_ou_lien || '').trim() || null, user.id, agent, r.id);
+
+  } else if (action === 'attente') {
+    /* Le rendez-vous a eu lieu, la décision n'est pas prise. État intermédiaire explicite :
+       sans lui, l'agent devrait laisser la demande en « planifiée » et plus personne ne
+       saurait si l'échange s'est tenu. Aucun point à ce stade. */
+    await db.prepare(
+      `UPDATE rencontres_diaspoactif SET statut='en_attente_validation',
+              date_rencontre=COALESCE(?, datetime('now')), compte_rendu=?,
+              agent_id=?, agent_nom=?, updated_at=datetime('now') WHERE id=?`
+    ).run(body.date_rencontre || null, String(body.compte_rendu || '').trim() || null, user.id, agent, r.id);
+
+  } else if (action === 'valider') {
+    /* Le seul geste qui accorde les 10 points. Il appartient à Diaspo'Actif, jamais au
+       membre : que le rendez-vous ait eu lieu ne vaut pas validation. */
+    await db.prepare(
+      `UPDATE rencontres_diaspoactif SET statut='validee', date_rencontre=COALESCE(date_rencontre, ?, datetime('now')),
+              compte_rendu=COALESCE(?, compte_rendu), agent_id=?, agent_nom=?, updated_at=datetime('now') WHERE id=?`
+    ).run(body.date_rencontre || null, String(body.compte_rendu || '').trim() || null, user.id, agent, r.id);
+
+  } else if (action === 'ne_pas_valider') {
+    /* Motif OBLIGATOIRE : un refus muet devient incompréhensible pour le membre et se
+       transforme en réclamation. Il lui est transmis tel quel. */
+    const motif = String(body.motif_refus || '').trim();
+    if (motif.length < 10) {
+      return sendJSON(res, 400, { error: "Un motif d'au moins 10 caractères est requis : il est transmis au membre." });
+    }
+    await db.prepare(
+      `UPDATE rencontres_diaspoactif SET statut='non_validee', motif_refus=?,
+              date_rencontre=COALESCE(date_rencontre, datetime('now')),
+              date_reouverture=datetime('now', '+${RENCONTRE_DELAI_MOIS} months'),
+              agent_id=?, agent_nom=?, updated_at=datetime('now') WHERE id=?`
+    ).run(motif, user.id, agent, r.id);
+
+  } else if (action === 'refuser') {
+    /* Refus de la DEMANDE, avant tout rendez-vous — à ne pas confondre avec la
+       non-validation, qui suppose un échange réellement tenu. */
+    await db.prepare(
+      `UPDATE rencontres_diaspoactif SET statut='refusee', motif_refus=?, agent_id=?, agent_nom=?,
+              updated_at=datetime('now') WHERE id=?`
+    ).run(String(body.motif_refus || '').trim() || null, user.id, agent, r.id);
+
+  } else {
+    return sendJSON(res, 400, { error: "Action inconnue (planifier, attente, valider, ne_pas_valider ou refuser)." });
+  }
+
+  /* L'indice est mis en cache 5 minutes : sans purge, le membre ne verrait ses points
+     qu'au bout d'un quart d'heure sans comprendre pourquoi. */
+  try { await db.prepare("DELETE FROM trust_cache WHERE user_id=?").run(r.user_id); } catch (e) {}
+
+  /* Le membre doit apprendre la décision autrement qu'en rechargeant la page au hasard. */
+  const AVIS = {
+    planifier:      ["Votre rencontre est planifiée", `Rendez-vous le ${body.date_prevue || ''}${body.lieu_ou_lien ? ' — ' + body.lieu_ou_lien : ''}.`],
+    attente:        ["Rencontre en cours de validation", "Merci pour cet échange. Diaspo'Actif étudie votre dossier et vous répondra prochainement."],
+    valider:        ["Rencontre validée", "Votre rencontre avec Diaspo'Actif est validée. Les points correspondants sont ajoutés à votre indice de fiabilité."],
+    ne_pas_valider: ["Rencontre non validée", `${String(body.motif_refus || '').trim()} — vous pourrez faire une nouvelle demande dans ${RENCONTRE_DELAI_MOIS} mois.`],
+    refuser:        ["Demande de rencontre non retenue", String(body.motif_refus || '').trim() || "Votre demande de rencontre n'a pas été retenue."],
+  }[action];
+  try {
+    await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+      r.user_id, 'rencontre_' + action, AVIS[0], AVIS[1], JSON.stringify({ rencontre_id: r.id })
+    );
+  } catch (e) { logError(e, "notification suivi de rencontre", req); }
+
+  const maj = await db.prepare("SELECT * FROM rencontres_diaspoactif WHERE id=?").get(r.id);
+  sendJSON(res, 200, { ok: true, rencontre: maj });
+});
+
 route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -4487,7 +4711,7 @@ route("GET", "/api/initiatives/:id/equipe", async (req, res, params) => {
   sendJSON(res, 200, { equipe });
 });
 
-/* ── Score d'activité : dynamisme calculé (complément du score de confiance) ── */
+/* ── Score d'activité : dynamisme calculé (complément du indice de fiabilité) ── */
 route("GET", "/api/initiatives/:id/score-activite", async (req, res, params) => {
   const init = await getInitiativeByIdOrSlug(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
@@ -4715,7 +4939,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     user.id)).lastInsertRowid;
   /* Inviter les membres optionnels (envoi de demandes d'affiliation) */
   if (Array.isArray(membres) && membres.length > 0) {
-    const notifStmt = db.prepare(`INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)`);
+    const notifStmt = db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)`);
     const memStmt = db.prepare(`INSERT OR IGNORE INTO initiative_membres (initiative_id, user_id, fonction, statut) VALUES (?, ?, ?, 'en_attente')`);
     for (const m of membres) {
       if (!m.userId) continue;
@@ -4905,7 +5129,7 @@ route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => 
     throw e;
   }
   try {
-    await db.prepare("INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)").run(
+    await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
       userId, 'affiliation_initiative',
       `Invitation à rejoindre une initiative`,
       `Vous avez été identifié comme membre de l'initiative « ${init.nom} ». Souhaitez-vous accepter cette affiliation ?`,
@@ -4930,7 +5154,7 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
     if (statut === 'refuse') {
       try {
         const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
-        await db.prepare("INSERT INTO notifications (user_id, type, titre, message, data) VALUES (?, ?, ?, ?, ?)").run(
+        await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
           init.owner_user_id, 'affiliation_refusee',
           `Affiliation refusée`,
           `${u?.prenom || ''} ${u?.nom || ''} a refusé de rejoindre « ${init.nom} ».`,
@@ -14407,17 +14631,22 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       /* ── VÉRIFICATION ── */
       { cat:'verification', types:'["tous"]',
         q:'Comment vérifier mon identité ?',
-        r:'<p>La vérification d\'identité se fait dans <strong>Mon Profil → Vérification → Identité</strong>. Soumettez une copie de votre pièce d\'identité officielle (passeport ou carte nationale d\'identité). La validation prend 24 à 72h.</p><p>Une fois validée, votre profil affiche le badge <strong>✅ Identité vérifiée</strong> et votre score de confiance augmente de <strong>+15 points</strong>.</p>',
+        /* Cette réponse décrivait un écran « Mon Profil → Vérification » qui n'existe pas,
+           un envoi de document qui n'a jamais été possible, et un délai de 24 à 72 h alors
+           que le contrôle est instantané. Elle décrit désormais le vrai parcours. */
+        r:'<p>La vérification d\'identité se lance depuis votre tableau de bord, module <strong>Mon indice de fiabilité</strong> → bouton <strong>Vérifier mon identité</strong>. Le contrôle est réalisé en ligne par notre prestataire et ne prend que quelques minutes.</p><p>Une fois validée, votre profil affiche le badge <strong>✅ Identité vérifiée</strong> et votre indice de fiabilité augmente de <strong>+20 points</strong>.</p>',
         syn:'["identité","pièce d\'identité","valider identité","KYC"]',
-        kw:'["vérification","identité","badge","score"]',
-        steps:'["Ouvrir Mon Profil","Cliquer sur Vérification","Choisir Identité","Soumettre votre document","Attendre la validation (24-72h)"]',
+        kw:'["vérification","identité","badge","indice"]',
+        steps:'["Ouvrir votre tableau de bord","Repérer le module Mon indice de fiabilité","Cliquer sur Vérifier mon identité","Suivre le contrôle en ligne"]',
         lien:'profil.html', lbl:'Aller à la vérification' },
       { cat:'verification', types:'["initiative","entreprise","association","organisation"]',
-        q:'Comment vérifier mon entreprise ou association ?',
-        r:'<p>La vérification d\'entreprise/association nécessite un document officiel (Kbis, récépissé de déclaration en préfecture, statuts…). Accédez à <strong>Mon Profil → Vérification → Entité</strong>. La validation est faite sous 48h par l\'équipe Diaspo\'Actif.</p>',
+        q:'Comment faire vérifier mon organisation ?',
+        /* L\'envoi d\'un Kbis à une équipe Diaspo\'Actif n\'a jamais existé : la vérification
+           d\'organisation passe par le contrôle effectué à l\'activation des paiements. */
+        r:'<p>La vérification d\'organisation est effectuée lors de l\'<strong>activation des paiements</strong>, depuis votre tableau de bord Initiative. Notre prestataire contrôle les informations légales de votre structure (raison sociale, immatriculation, représentant).</p><p>Une fois validée, votre indice de fiabilité augmente de <strong>+8 points</strong>. Vous pouvez aussi renseigner votre numéro d\'immatriculation (SIRET, RNA ou équivalent) pour <strong>+5 points</strong>.</p>',
         syn:'["vérifier asso","vérifier entreprise","justificatif","immatriculation"]',
-        kw:'["entreprise","association","vérification","kbis","statuts"]',
-        steps:'["Ouvrir Mon Profil","Cliquer sur Vérification","Choisir Entité","Soumettre le document officiel","Attendre la validation (48h)"]',
+        kw:'["entreprise","association","vérification","organisation","immatriculation"]',
+        steps:'["Ouvrir le tableau de bord Initiative","Aller dans Centre Financier","Cliquer sur Activer les paiements","Suivre le contrôle de votre structure"]',
         lien:'profil.html', lbl:'Aller à la vérification' },
 
       /* ── PUBLICATIONS ── */
@@ -14510,7 +14739,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       /* ── ACCRÉDITATIONS ── */
       { cat:'accreditations', types:'["tous"]',
         q:'À quoi servent les accréditations ?',
-        r:'<p>Les accréditations Diaspo\'Actif sont des badges officiels qui certifient le niveau d\'engagement et de fiabilité d\'un membre. Il en existe plusieurs niveaux :</p><ul><li>🌱 <strong>Engagé Diaspora</strong> — membre actif</li><li>🌟 <strong>Mobilisation Active</strong> — très impliqué</li><li>💎 <strong>Créateur d\'Opportunités</strong> — crée de la valeur pour la communauté</li><li>🏆 <strong>Ambassadeur Diaspora</strong> — niveau maximum</li></ul><p>Chaque accréditation augmente votre <strong>Score de Confiance de +10 points</strong> et vous rend prioritaire dans les recommandations du chatbot.</p>',
+        r:'<p>Les accréditations Diaspo\'Actif sont des badges officiels qui certifient le niveau d\'engagement et de fiabilité d\'un membre. Il en existe plusieurs niveaux :</p><ul><li>🌱 <strong>Engagé Diaspora</strong> — membre actif</li><li>🌟 <strong>Mobilisation Active</strong> — très impliqué</li><li>💎 <strong>Créateur d\'Opportunités</strong> — crée de la valeur pour la communauté</li><li>🏆 <strong>Ambassadeur Diaspora</strong> — niveau maximum</li></ul><p>Chaque accréditation augmente votre <strong>Indice de Fiabilité de +10 points</strong> et vous rend prioritaire dans les recommandations du chatbot.</p>',
         syn:'["badge","niveau","certification","label","tampon"]',
         kw:'["accréditation","badge","niveau","score","confiance"]',
         steps:'[]', lien:'accreditations.html', lbl:'Voir les accréditations' },
@@ -14666,11 +14895,11 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     const steps = {
       utilisateur: [
         { ordre:1, titre:"🌍 Bienvenue sur Diaspo'Actif !", contenu:"<p><strong>Diaspo'Actif</strong> est la plateforme mondiale qui connecte les diasporas, valorise les talents et accélère le développement des territoires.</p><p>Ce guide de 3 minutes vous présente les fonctionnalités essentielles de votre espace personnel.</p>", type:'info', illus:'🌍', nar:"Bienvenue sur Diaspo'Actif ! Je suis votre guide interactif. En quelques minutes, nous allons découvrir ensemble les fonctionnalités de votre espace personnel.", lien:null, lbl:null, sel:null, albl:null },
-        { ordre:2, titre:"👤 Complétez votre profil", contenu:"<p>Votre profil est votre carte de visite numérique. Un profil complet :</p><ul><li>📈 Améliore votre <strong>Score de Confiance</strong></li><li>🔍 Vous rend visible dans les recommandations</li><li>🤝 Facilite les contacts avec d'autres membres</li></ul><p>Ajoutez votre photo, votre biographie, vos compétences et vos expériences.</p>", type:'action', illus:'👤', nar:"Commençons par compléter votre profil. Un profil complet augmente votre visibilité et votre score de confiance.", lien:'dashboard-utilisateur.html', lbl:'Ouvrir mon profil', sel:null, albl:'Compléter mon profil' },
+        { ordre:2, titre:"👤 Complétez votre profil", contenu:"<p>Votre profil est votre carte de visite numérique. Un profil complet :</p><ul><li>📈 Améliore votre <strong>Indice de Fiabilité</strong></li><li>🔍 Vous rend visible dans les recommandations</li><li>🤝 Facilite les contacts avec d'autres membres</li></ul><p>Ajoutez votre photo, votre biographie, vos compétences et vos expériences.</p>", type:'action', illus:'👤', nar:"Commençons par compléter votre profil. Un profil complet augmente votre visibilité et votre indice de fiabilité.", lien:'dashboard-utilisateur.html', lbl:'Ouvrir mon profil', sel:null, albl:'Compléter mon profil' },
         { ordre:3, titre:"🔍 Explorez l'Annuaire", contenu:"<p>L'<strong>Annuaire</strong> regroupe tous les membres de Diaspo'Actif : professionnels, initiatives, associations, institutions.</p><p>Vous pouvez :</p><ul><li>🔎 Filtrer par pays, domaine, type de compte</li><li>✉️ Contacter directement par messagerie</li><li>🤖 Demander une recommandation au chatbot</li></ul>", type:'demo', illus:'🔍', nar:"L'annuaire est votre carnet d'adresses mondial. Filtrez par pays, domaine, ou décrivez ce que vous cherchez en langage naturel dans le chatbot.", lien:'annuaire.html', lbl:'Explorer l\'annuaire', sel:null, albl:null },
         { ordre:4, titre:"✉️ La Messagerie", contenu:"<p>Échangez en privé avec n'importe quel membre de la plateforme.</p><p>Depuis la messagerie, vous pouvez :</p><ul><li>💬 Envoyer des messages texte et fichiers</li><li>📹 Démarrer une <strong>réunion vidéo</strong> instantanée</li><li>📅 Planifier une réunion</li></ul><p>Votre indice de réactivité (⭐ à ⭐⭐⭐⭐⭐) est calculé sur vos délais de réponse.</p>", type:'demo', illus:'✉️', nar:"La messagerie vous permet d'échanger en privé et de lancer des visioconférences directement.", lien:'messagerie.html', lbl:'Ouvrir la messagerie', sel:null, albl:null },
         { ordre:5, titre:"📝 Le Fil d'actualité", contenu:"<p>Partagez vos actualités avec la communauté via le <strong>Fil d'actualité</strong>.</p><p>Publiez :</p><ul><li>📰 Articles et actualités</li><li>🎉 Annonces et opportunités</li><li>💡 Réflexions et idées</li></ul><p>Vos publications sont visibles par les membres qui vous suivent et dans les recommandations.</p>", type:'action', illus:'📝', nar:"Le fil d'actualité vous permet de partager vos nouvelles avec toute la communauté.", lien:'fil-actualite.html', lbl:'Voir le fil', sel:null, albl:'Publier maintenant' },
-        { ordre:6, titre:"🏅 Les Accréditations", contenu:"<p>Les accréditations Diaspo'Actif sont des badges officiels qui attestent votre engagement.</p><ul><li>🌱 <strong>Engagé Diaspora</strong></li><li>🌟 <strong>Mobilisation Active</strong></li><li>💎 <strong>Créateur d'Opportunités</strong></li><li>🏆 <strong>Ambassadeur Diaspora</strong></li></ul><p>Chaque accréditation augmente votre <strong>Score de Confiance de +10 points</strong>.</p>", type:'info', illus:'🏅', nar:"Les accréditations sont des badges officiels qui valorisent votre engagement. Chacune améliore votre score de confiance.", lien:'accreditations.html', lbl:'Découvrir les accréditations', sel:null, albl:null },
+        { ordre:6, titre:"🏅 Les Accréditations", contenu:"<p>Les accréditations Diaspo'Actif sont des badges officiels qui attestent votre engagement.</p><ul><li>🌱 <strong>Engagé Diaspora</strong></li><li>🌟 <strong>Mobilisation Active</strong></li><li>💎 <strong>Créateur d'Opportunités</strong></li><li>🏆 <strong>Ambassadeur Diaspora</strong></li></ul><p>Chaque accréditation augmente votre <strong>Indice de Fiabilité de +10 points</strong>.</p>", type:'info', illus:'🏅', nar:"Les accréditations sont des badges officiels qui valorisent votre engagement. Chacune améliore votre indice de fiabilité.", lien:'accreditations.html', lbl:'Découvrir les accréditations', sel:null, albl:null },
         { ordre:7, titre:"🤖 Votre Assistant IA", contenu:"<p>Le <strong>chatbot Diaspo'Actif</strong> est votre guide permanent.</p><p>Il peut :</p><ul><li>🔍 Trouver les meilleurs profils pour vous</li><li>❓ Répondre à toutes vos questions</li><li>📋 Vous guider étape par étape</li><li>📚 Accéder à la base de connaissances FAQ</li></ul><p>Cliquez sur le bouton 💬 en bas à droite pour l'ouvrir !</p>", type:'action', illus:'🤖', nar:"Votre assistant intelligent est disponible à tout moment via le bouton en bas à droite. N'hésitez pas à lui poser toutes vos questions.", lien:null, lbl:null, sel:'.cb-fab', albl:'Ouvrir le chatbot' },
       ],
       initiative: [
@@ -14680,7 +14909,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         { ordre:4, titre:"💼 Recrutement & Offres", contenu:"<p>Recrutez des profils qualifiés de la diaspora :</p><ul><li>👔 Offres d'emploi et stages</li><li>🤝 Missions bénévoles</li><li>💡 Appels à projet</li><li>💰 Recherche de financement</li></ul><p>Les candidatures arrivent directement dans votre tableau de bord.</p>", type:'action', illus:'💼', nar:"Publiez des offres d'emploi, de stage ou de bénévolat et recevez des candidatures directement dans votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Publier une offre', sel:null, albl:null },
         { ordre:5, titre:"📅 Créer un Événement", contenu:"<p>Organisez des événements présentiel ou en ligne :</p><ul><li>🎫 Billetterie intégrée (gratuite ou payante)</li><li>📷 Scanner QR pour valider les entrées</li><li>📹 Visioconférence intégrée</li><li>📊 Rapport de participation</li></ul>", type:'action', illus:'📅', nar:"Créez des événements avec billetterie intégrée, scanner QR et visioconférence. Tout est disponible depuis votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Créer un événement', sel:null, albl:null },
         { ordre:6, titre:"📹 Réunions & Visioconférences", contenu:"<p>Organisez des réunions sécurisées avec vos équipes et partenaires :</p><ul><li>🎥 Visioconférence peer-to-peer</li><li>📝 Notes de réunion intégrées</li><li>📋 Compte-rendu automatique</li><li>📅 Planification avec rappels</li></ul>", type:'demo', illus:'📹', nar:"Les réunions vidéo sont intégrées directement dans la plateforme. Planifiez, invitez et démarrez en quelques clics.", lien:'reunions.html', lbl:'Ouvrir Réunions', sel:null, albl:null },
-        { ordre:7, titre:"🎴 QR Code & Vérification", contenu:"<p>Chaque initiative dispose d'un <strong>QR Code unique</strong> :</p><ul><li>📥 Téléchargeable en PNG ou SVG</li><li>🖨️ Carte de visite imprimable</li><li>🔗 Lien direct vers votre profil</li></ul><p>Faites également vérifier votre initiative pour obtenir le badge <strong>✅ Vérifié</strong> et booster votre score de confiance.</p>", type:'info', illus:'🎴', nar:"Votre QR code unique vous permet de partager votre initiative instantanément. La vérification de compte renforce votre crédibilité.", lien:'dashboard-initiative.html', lbl:'Mon QR Code', sel:null, albl:null },
+        { ordre:7, titre:"🎴 QR Code & Vérification", contenu:"<p>Chaque initiative dispose d'un <strong>QR Code unique</strong> :</p><ul><li>📥 Téléchargeable en PNG ou SVG</li><li>🖨️ Carte de visite imprimable</li><li>🔗 Lien direct vers votre profil</li></ul><p>Faites également vérifier votre initiative pour obtenir le badge <strong>✅ Vérifié</strong> et booster votre indice de fiabilité.</p>", type:'info', illus:'🎴', nar:"Votre QR code unique vous permet de partager votre initiative instantanément. La vérification de compte renforce votre crédibilité.", lien:'dashboard-initiative.html', lbl:'Mon QR Code', sel:null, albl:null },
         { ordre:8, titre:"📈 Statistiques & Observatoire", contenu:"<p>Suivez l'impact de votre initiative en temps réel :</p><ul><li>👁️ Vues de profil et publications</li><li>👥 Évolution des abonnés</li><li>📊 Engagement et interactions</li><li>🌍 Répartition géographique</li></ul><p>Exportez vos données en CSV ou PDF.</p>", type:'demo', illus:'📈', nar:"Vos statistiques sont disponibles en temps réel depuis votre tableau de bord. Analysez votre impact et exportez vos données.", lien:'statistiques.html', lbl:'Voir l\'Observatoire', sel:null, albl:null },
       ],
       collectivite: [
@@ -14689,7 +14918,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         { ordre:3, titre:"🗳️ Consultations & Sondages", contenu:"<p>Lancez des consultations participatives auprès de votre diaspora :</p><ul><li>📋 Questionnaires en ligne</li><li>🗳️ Sondages avec résultats en temps réel</li><li>📊 Export des résultats</li><li>💬 Collecte d'avis et suggestions</li></ul>", type:'demo', illus:'🗳️', nar:"Les consultations vous permettent de recueillir l'avis de votre diaspora sur des projets de développement.", lien:'sondages.html', lbl:'Les consultations', sel:null, albl:null },
         { ordre:4, titre:"🌍 Observatoire Diaspora", contenu:"<p>Accédez à des données statistiques détaillées sur votre diaspora :</p><ul><li>🗺️ Répartition géographique mondiale</li><li>💼 Secteurs d'activité et compétences</li><li>📈 Évolution dans le temps</li><li>📥 Export CSV et PDF</li></ul>", type:'demo', illus:'🌍', nar:"L'observatoire mondial vous donne une vision précise de votre diaspora : où elle vit, ce qu'elle fait, comment elle évolue.", lien:'statistiques.html', lbl:'Ouvrir l\'Observatoire', sel:null, albl:null },
         { ordre:5, titre:"📅 Événements institutionnels", contenu:"<p>Organisez des événements officiels et invitez votre diaspora :</p><ul><li>🎫 Billetterie officielle</li><li>📹 Conférences en ligne</li><li>🏛️ Réunions institutionnelles</li><li>📊 Rapport de participation</li></ul>", type:'action', illus:'📅', nar:"Créez des événements officiels avec billetterie et visioconférence intégrées.", lien:'evenements.html', lbl:'Les événements', sel:null, albl:null },
-        { ordre:6, titre:"✅ Vérification & Accréditation", contenu:"<p>Renforcez la crédibilité de votre présence institutionnelle :</p><ul><li>✅ Vérification officielle de l'entité</li><li>🏅 Badge institutionnel</li><li>🔒 Score de confiance maximal</li><li>📋 Priorité dans les recommandations</li></ul>", type:'info', illus:'✅', nar:"La vérification institutionnelle renforce votre crédibilité et vous donne accès aux fonctionnalités avancées.", lien:'accreditations.html', lbl:'Demander la vérification', sel:null, albl:null },
+        { ordre:6, titre:"✅ Vérification & Accréditation", contenu:"<p>Renforcez la crédibilité de votre présence institutionnelle :</p><ul><li>✅ Vérification officielle de l'entité</li><li>🏅 Badge institutionnel</li><li>🔒 Indice de fiabilité maximal</li><li>📋 Priorité dans les recommandations</li></ul>", type:'info', illus:'✅', nar:"La vérification institutionnelle renforce votre crédibilité et vous donne accès aux fonctionnalités avancées.", lien:'accreditations.html', lbl:'Demander la vérification', sel:null, albl:null },
       ],
       administrateur: [
         { ordre:1, titre:"⚙️ Panneau Administrateur", contenu:"<p>Bienvenue dans votre espace d'administration. Vous avez accès à <strong>toutes les fonctionnalités</strong> de gestion de la plateforme.</p>", type:'info', illus:'⚙️', nar:"Bienvenue dans le panneau administrateur de Diaspo'Actif. Vous avez accès à toutes les fonctionnalités de gestion.", lien:null, lbl:null, sel:null, albl:null },
@@ -20229,75 +20458,181 @@ ${jsonLd}
     ============================================================ */
 
     /* ── Calcul du Trust Score (fonction partagée) ── */
+    /* ═══════════════ INDICE DE FIABILITÉ ═══════════════
+       Refonte du 2026-07-26. Trois défauts de fond corrigés :
+
+       1. 43 des 100 points étaient MATÉRIELLEMENT inatteignables : « documents vérifiés »,
+          « diplômes vérifiés » et « entreprise vérifiée » n'avaient ni formulaire de dépôt,
+          ni écran de validation côté administrateur — seulement une colonne en base. Ces
+          critères sont retirés du calcul ; ils reviendront le jour où le parcours existera.
+       2. Le barème comptait 117 points plafonnés à 100, et deux critères réservés aux
+          initiatives empêchaient tout particulier d'atteindre le niveau le plus haut. Le
+          total est désormais exactement 100, et le DÉNOMINATEUR s'adapte au type de compte :
+          chacun est noté sur les seuls critères qui le concernent.
+       3. detail[] ne contenait que les critères ACQUIS. Le membre lisait un verdict sans
+          savoir quoi faire. Tous les critères sont maintenant renvoyés, acquis ou non,
+          avec l'action qui permet de les obtenir. */
+
+    const NIVEAUX_FIABILITE = [
+      { min: 91, nom: 'Exemplaire', couleur: '#7C3AED', sens: "Le profil atteint le plus haut niveau de confiance et de qualité." },
+      { min: 61, nom: 'Reconnu',    couleur: '#22C55E', sens: "Le profil est complet et reconnu comme fiable par la plateforme." },
+      { min: 31, nom: 'Établi',     couleur: '#3B82F6', sens: "Le profil est bien renseigné et commence à inspirer confiance." },
+      { min: 0,  nom: 'Découverte', couleur: '#D1D5DB', sens: "Le profil est en cours de découverte et mérite d'être complété." },
+    ];
+    function niveauFiabilite(pct) {
+      return NIVEAUX_FIABILITE.find(n => pct >= n.min) || NIVEAUX_FIABILITE[NIVEAUX_FIABILITE.length - 1];
+    }
+
     async function computeTrustScore(userId) {
       const user = await db.prepare(`SELECT *,
         CAST((julianday('now') - julianday(COALESCE(created_at,datetime('now')))) / 30 AS INTEGER) AS months_old
         FROM users WHERE id=?`).get(userId);
-      if (!user) return { score: 0, detail: [], label: 'Inconnu' };
+      if (!user) return { score: 0, detail: [], label: 'Inconnu', sur: 0, couleur: '#D1D5DB' };
 
-      const detail = [];
-      let total = 0;
-
-      // Ancienneté max 15 pts (1 pt/mois)
-      const anciennete = Math.min(15, user.months_old || 0);
-      if (anciennete > 0) detail.push({ icon:'🕐', label:`Ancienneté : ${user.months_old} mois`, pts: anciennete, max: 15 });
-
-      // Vérifications identité
-      if (user.is_verified || user.identite_verifiee) { total += 15; detail.push({ icon:'✅', label:'Identité vérifiée', pts:15, max:15 }); }
-      if (user.documents_verifies)  { total += 10; detail.push({ icon:'📄', label:'Documents vérifiés', pts:10, max:10 }); }
-      if (user.diplomes_verifies)   { total += 10; detail.push({ icon:'🎓', label:'Diplômes vérifiés', pts:10, max:10 }); }
-      if (user.entreprise_verifiee) { total += 8;  detail.push({ icon:'🏢', label:'Entreprise vérifiée', pts:8, max:8 }); }
-      total += anciennete;
-
-      // Accréditations DA max 20 pts
-      const nbAccred = (await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId))?.n || 0;
-      const accredPts = Math.min(20, nbAccred * 10);
-      if (accredPts > 0) detail.push({ icon:'🏅', label:`${nbAccred} accréditation(s) Diaspo'Actif`, pts: accredPts, max:20 });
-      total += accredPts;
-
-      // Initiative immatriculée 8 pts
       const init = await db.prepare(`SELECT numero_immatriculation, organisation_verifiee FROM initiatives WHERE owner_user_id=?`).get(userId);
-      if (init?.numero_immatriculation) { total += 8; detail.push({ icon:'🏛️', label:'Initiative officiellement immatriculée', pts:8, max:8 }); }
+      /* Les deux critères de structure ne concernent que les comptes qui portent une
+         initiative. Un particulier ne les verra même pas : une ligne qu'on ne peut
+         jamais cocher décourage sans rien apprendre. */
+      const porteUneStructure = !!init || ['initiative', 'collectivite', 'institutionnel', 'officiel'].includes(user.role);
 
-      // Organisation vérifiée (KYB Stripe Connect) 10 pts
-      if (init?.organisation_verifiee) { total += 10; detail.push({ icon:'🏢', label:'Organisation vérifiée (Stripe)', pts:10, max:10 }); }
+      /* ── Ancienneté : 15 pts, 1 par mois ── */
+      const mois = Math.max(0, user.months_old || 0);
+      const ptsAnciennete = Math.min(12, mois);
 
-      // Activité plateforme max 10 pts
-      const nbPosts = (await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId))?.n || 0;
-      const nbCollabs = (await db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId))?.n || 0;
+      /* ── Accréditations : 15 pts, 8 par accréditation ──
+         Le calcul ne lisait que compte_accreditations (ancien système). Les accréditations
+         accordées par le catalogue actuel s'écrivent dans user_accreditations et ne
+         rapportaient donc RIEN. Les deux tables sont désormais lues. */
+      const nbAccredLegacy = (await db.prepare(`SELECT COUNT(*) n FROM compte_accreditations WHERE user_id=? AND statut='active'`).get(userId))?.n || 0;
+      let nbAccredCatalogue = 0;
+      try {
+        nbAccredCatalogue = (await db.prepare(`SELECT COUNT(*) n FROM user_accreditations WHERE user_id=? AND statut='active'`).get(userId))?.n || 0;
+      } catch (e) { /* table absente sur une base ancienne : on garde le décompte legacy */ }
+      const nbAccred = nbAccredLegacy + nbAccredCatalogue;
+      const ptsAccred = Math.min(12, nbAccred * 6);
+
+      /* ── Activité : 15 pts ── */
+      const nbPosts     = (await db.prepare(`SELECT COUNT(*) n FROM fil_posts WHERE auteur_id=?`).get(userId))?.n || 0;
+      const nbCollabs   = (await db.prepare(`SELECT COUNT(*) n FROM candidatures WHERE user_id=? AND statut IN ('retenu','accepte')`).get(userId))?.n || 0;
       const nbFollowers = (await db.prepare(`SELECT COUNT(*) n FROM user_follows WHERE followed_id=?`).get(userId))?.n || 0;
-      const activPts = Math.min(10, Math.floor(nbPosts/5) + nbCollabs * 2 + Math.floor(nbFollowers/10));
-      if (activPts > 0) detail.push({ icon:'📊', label:`Activité : ${nbPosts} publications, ${nbFollowers} abonnés`, pts: activPts, max:10 });
-      total += activPts;
+      const ptsActivite = Math.min(12, Math.floor(nbPosts / 5) + nbCollabs * 2 + Math.floor(nbFollowers / 10));
 
-      // Profil complet max 6 pts
-      let complete = 0;
-      if (user.photo_url)              complete++;
-      if (user.bio?.length > 60)       complete += 2;
-      if (user.titre_pro)              complete++;
-      if (user.competences?.length > 5) complete++;
-      if (user.ville)                  complete++;
-      const completePts = Math.min(6, complete);
-      if (completePts > 0) detail.push({ icon:'👤', label:'Profil complet', pts: completePts, max:6 });
-      total += completePts;
+      /* ── Profil complet : 15 pts, détaillés pour être actionnables ──
+         La ligne « compétences » comptait la LONGUEUR DU TEXTE json stocké ('[]' = 2
+         caractères), pas le nombre de compétences : une seule suffisait à décrocher le
+         point censé en récompenser cinq. On compte désormais les éléments. */
+      let nbCompetences = 0;
+      try {
+        const c = typeof user.competences === 'string' ? JSON.parse(user.competences || '[]') : user.competences;
+        nbCompetences = Array.isArray(c) ? c.length : 0;
+      } catch (e) { nbCompetences = 0; }
+      const morceauxProfil = [
+        { ok: !!user.photo_url,            pts: 3, quoi: 'photo de profil' },
+        { ok: (user.bio || '').length > 60, pts: 4, quoi: 'biographie détaillée' },
+        { ok: !!user.titre_pro,            pts: 3, quoi: 'titre professionnel' },
+        { ok: nbCompetences >= 3,          pts: 3, quoi: 'au moins 3 compétences' },
+        { ok: !!user.ville,                pts: 2, quoi: 'ville' },
+      ];
+      const ptsProfil = morceauxProfil.reduce((s, m) => s + (m.ok ? m.pts : 0), 0);
+      const manquantsProfil = morceauxProfil.filter(m => !m.ok).map(m => m.quoi);
 
-      // Absence de signalements 5 pts
       const nbSignal = user.signalements_confirmes || 0;
-      if (nbSignal === 0) { total += 5; detail.push({ icon:'✅', label:'Aucun signalement confirmé', pts:5, max:5 }); }
-      else                detail.push({ icon:'⚠️', label:`${nbSignal} signalement(s) confirmé(s)`, pts:0, max:5, warning:true });
+      const identiteOk = !!(user.is_verified || user.identite_verifiee);
 
-      const score = Math.min(100, Math.round(total));
-      const label = score >= 90 ? 'Excellent' : score >= 75 ? 'Élevé' : score >= 50 ? 'Moyen' : 'Faible';
-      const color = score >= 90 ? '#10b981' : score >= 75 ? '#f59e0b' : score >= 50 ? '#6366f1' : '#ef4444';
+      /* ── Rencontre Diaspo'Actif : 10 pts ──
+         Seul critère validé par un être humain : un agent a réellement rencontré le membre,
+         en présentiel ou en visioconférence. Les points ne tombent qu'au statut 'effectuee',
+         que le membre ne peut pas se donner lui-même. */
+      let rencontre = null;
+      try {
+        rencontre = await db.prepare(
+          `SELECT statut, mode, date_prevue, date_rencontre, motif_refus, date_reouverture
+           FROM rencontres_diaspoactif WHERE user_id=? ORDER BY
+             CASE statut WHEN 'validee' THEN 0 WHEN 'en_attente_validation' THEN 1
+                         WHEN 'planifiee' THEN 2 WHEN 'demandee' THEN 3 ELSE 4 END, id DESC LIMIT 1`
+        ).get(userId);
+      } catch (e) { /* table absente sur une base pas encore migrée */ }
+      const rencontreFaite = rencontre?.statut === 'validee';
+      const AIDE_RENCONTRE = {
+        validee:               'Rencontre validée par Diaspo’Actif.',
+        en_attente_validation: 'Rencontre effectuée — Diaspo’Actif étudie votre dossier.',
+        planifiee:             `Rendez-vous fixé${rencontre?.date_prevue ? ' le ' + String(rencontre.date_prevue).slice(0, 16) : ''} — les points dépendront de la validation.`,
+        demandee:              'Demande envoyée, un agent vous recontacte pour fixer une date.',
+        non_validee:           `Rencontre non validée : ${rencontre?.motif_refus || 'motif non précisé'}${rencontre?.date_reouverture ? ` — nouvelle demande possible à partir du ${String(rencontre.date_reouverture).slice(0, 10)}` : ''}.`,
+        refusee:               'Demande non retenue. Vous pouvez en formuler une nouvelle.',
+      };
+      /* Une demande refusée ou non validée ne doit pas bloquer le bouton : le membre doit
+         pouvoir redemander une fois le délai passé. */
+      const rencontreEnCours = ['demandee', 'planifiee', 'en_attente_validation'].includes(rencontre?.statut);
+      const rencontreEnDelai = rencontre?.statut === 'non_validee'
+        && rencontre?.date_reouverture && String(rencontre.date_reouverture) > new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-      // Mise en cache
+      /* Chaque critère porte son action : c'est ce qui transforme un verdict en marche à
+         suivre. `applicable:false` retire le critère du total ET du dénominateur. */
+      const criteres = [
+        { cle:'identite', icon:'🪪', label:'Identité vérifiée', pts: identiteOk ? 20 : 0, max:20, applicable:true,
+          aide: identiteOk ? 'Vérifiée' : "Contrôle en ligne, quelques minutes.",
+          action: identiteOk ? null : { texte:'Vérifier mon identité', href:'profil.html?verifier=identite' } },
+
+        { cle:'profil', icon:'👤', label:'Profil complet', pts: ptsProfil, max:15, applicable:true,
+          aide: manquantsProfil.length ? 'Il manque : ' + manquantsProfil.join(', ') + '.' : 'Profil entièrement renseigné.',
+          action: manquantsProfil.length ? { texte:'Compléter mon profil', href:'profil.html' } : null },
+
+        { cle:'anciennete', icon:'🕐', label:'Ancienneté sur la plateforme', pts: ptsAnciennete, max:12, applicable:true,
+          aide: `${mois} mois — 1 point par mois, jusqu'à 12.`, action:null },
+
+        { cle:'accreditations', icon:'🏅', label:'Accréditations Diaspo’Actif', pts: ptsAccred, max:12, applicable:true,
+          aide: nbAccred ? `${nbAccred} accréditation(s) active(s).` : 'Aucune accréditation. 6 points chacune.',
+          action: ptsAccred >= 12 ? null : { texte:'Demander une accréditation', href:'accreditations.html' } },
+
+        { cle:'activite', icon:'📊', label:'Activité sur la plateforme', pts: ptsActivite, max:12, applicable:true,
+          aide: `${nbPosts} publication(s), ${nbFollowers} abonné(s), ${nbCollabs} collaboration(s).`,
+          action: ptsActivite >= 12 ? null : { texte:'Publier sur le fil', href:'fil-actualite.html' } },
+
+        { cle:'rencontre', icon:'🤝', label:'Rencontre Diaspo’Actif', pts: rencontreFaite ? 10 : 0, max:10, applicable:true,
+          aide: AIDE_RENCONTRE[rencontre?.statut] || "Échangez avec un agent Diaspo’Actif, en personne ou en visioconférence.",
+          statutRencontre: rencontre?.statut || null,
+          enCours: rencontreEnCours,
+          alerte: rencontre?.statut === 'non_validee',
+          action: (rencontreFaite || rencontreEnCours || rencontreEnDelai) ? null
+                  : { texte:'Demander une rencontre', href:'#rencontre' } },
+
+        { cle:'signalements', icon: nbSignal ? '⚠️' : '🛡️',
+          label: nbSignal ? `${nbSignal} signalement(s) confirmé(s)` : 'Aucun signalement confirmé',
+          pts: nbSignal ? 0 : 6, max:6, applicable:true, alerte: nbSignal > 0,
+          aide: nbSignal ? "Contactez la modération si vous contestez ces signalements." : 'Aucun signalement à ce jour.',
+          action: nbSignal ? { texte:'Contacter la modération', href:'messagerie.html' } : null },
+
+        { cle:'organisation', icon:'🏢', label:'Organisation vérifiée', pts: init?.organisation_verifiee ? 8 : 0, max:8,
+          applicable: porteUneStructure,
+          aide: init?.organisation_verifiee ? 'Vérifiée.' : "Contrôle effectué à l'activation des paiements.",
+          action: init?.organisation_verifiee ? null : { texte:'Vérifier mon organisation', href:'dashboard-initiative.html#paiements' } },
+
+        { cle:'immatriculation', icon:'🏛️', label:'Immatriculation renseignée', pts: init?.numero_immatriculation ? 5 : 0, max:5,
+          applicable: porteUneStructure,
+          aide: init?.numero_immatriculation ? 'Renseignée.' : 'Numéro SIRET, RNA ou équivalent.',
+          action: init?.numero_immatriculation ? null : { texte:"Renseigner l'immatriculation", href:'reseau.html' } },
+      ];
+
+      const retenus = criteres.filter(c => c.applicable);
+      const total   = retenus.reduce((s, c) => s + c.pts, 0);
+      const sur     = retenus.reduce((s, c) => s + c.max, 0);   // 100 pour une structure, 87 pour un particulier
+      const score   = sur > 0 ? Math.min(100, Math.round((total / sur) * 100)) : 0;
+
+      const niveau = niveauFiabilite(score);
+      const resultat = {
+        score, detail: retenus, sur, points: total,
+        label: niveau.nom, couleur: niveau.couleur, sens: niveau.sens,
+        color: niveau.couleur,          // conservé : d'anciens appels lisent encore `color`
+      };
+
       try {
         await db.prepare(`INSERT OR REPLACE INTO trust_cache (user_id,score,detail_json,label,computed_at) VALUES (?,?,?,?,datetime('now'))`)
-          .run(userId, score, JSON.stringify(detail), label);
+          .run(userId, score, JSON.stringify(resultat), niveau.nom);
         await db.prepare(`UPDATE users SET trust_score=?, trust_computed_at=datetime('now') WHERE id=?`).run(score, userId);
       } catch(e){}
 
-      return { score, detail, label, color };
+      return resultat;
     }
 
     /* ── Calcul Réactivité (fonction partagée) ── */
@@ -20367,7 +20702,16 @@ ${jsonLd}
         // Check cache (5 minutes)
         const cached = await db.prepare(`SELECT * FROM trust_cache WHERE user_id=? AND computed_at >= datetime('now','-5 minutes')`).get(uid);
         if (cached) {
-          return sendJSON(res, 200, { score: cached.score, detail: JSON.parse(cached.detail_json||'[]'), label: cached.label });
+          /* detail_json contient désormais le résultat COMPLET (score, détail, dénominateur,
+             palier, couleur) et non plus le seul tableau de critères. Les lignes écrites par
+             l'ancienne version sont donc ignorées : on recalcule plutôt que de renvoyer une
+             réponse tronquée, que le widget ne saurait pas afficher. */
+          let payload = null;
+          try { payload = JSON.parse(cached.detail_json || 'null'); } catch (e) {}
+          if (payload && !Array.isArray(payload) && Array.isArray(payload.detail)) {
+            const reactivity = await computeReactivity(uid);
+            return sendJSON(res, 200, { ...payload, reactivity });
+          }
         }
         const result = await computeTrustScore(uid);
         const reactivity = await computeReactivity(uid);
@@ -21024,6 +21368,66 @@ ${jsonLd}
     }
 
     /* GET /api/reseau/me/stats — statistiques de mon réseau */
+    /* GET /api/reseau/me/personnes?q= — les gens que je peux inviter, et eux seuls.
+       Inviter quelqu'un à une réunion supposait jusqu'ici de fouiller l'annuaire entier,
+       où figurent des milliers d'inconnus. Cette route ne renvoie que MES relations :
+         • le réseau pro : titulaires des initiatives affiliées à la mienne, dans les deux sens
+         • mes contacts directs, issus du module « Établir contact »
+       Sans `q`, elle renvoie tout le réseau — de quoi présenter la liste dès l'ouverture. */
+    if (req.method === "GET" && pathname === "/api/reseau/me/personnes") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
+      const q = String(parsed.query.q || '').trim().toLowerCase();
+      const parId = new Map();
+
+      const ajouter = (u, source) => {
+        if (!u || Number(u.id) === Number(me.id)) return;   // ne pas se proposer soi-même
+        const existant = parId.get(Number(u.id));
+        if (existant) { if (!existant.sources.includes(source)) existant.sources.push(source); return; }
+        parId.set(Number(u.id), {
+          id: Number(u.id), nom: u.nom || '', prenom: u.prenom || '',
+          role: u.role || '', photo_url: u.photo_url || null,
+          organisation: u.organisation || null, sources: [source],
+        });
+      };
+
+      const myInit = await getMyInit(me.id);
+      if (myInit) {
+        /* Les deux sens comptent : ceux qui ont rejoint mon réseau, et ceux dont j'ai
+           rejoint le réseau. Ne prendre qu'un sens amputerait la liste de moitié. */
+        const lignes = await db.prepare(`
+          SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, i.nom AS organisation
+          FROM reseau_affiliations ra
+          JOIN initiatives i ON i.id = CASE WHEN ra.destinataire_id=? THEN ra.demandeur_id ELSE ra.destinataire_id END
+          JOIN users u ON u.id = i.owner_user_id
+          WHERE ra.statut='accepte' AND (ra.destinataire_id=? OR ra.demandeur_id=?)
+        `).all(myInit.id, myInit.id, myInit.id);
+        lignes.forEach(u => ajouter(u, 'reseau'));
+      }
+
+      try {
+        const contacts = await db.prepare(`
+          SELECT u.id, u.nom, u.prenom, u.role, u.photo_url
+          FROM demandes_contact dc
+          JOIN users u ON u.id = CASE WHEN dc.demandeur_id=? THEN dc.destinataire_id ELSE dc.demandeur_id END
+          WHERE dc.statut='acceptee' AND (dc.demandeur_id=? OR dc.destinataire_id=?)
+        `).all(me.id, me.id, me.id);
+        contacts.forEach(u => ajouter(u, 'contact'));
+      } catch (e) { logError(e, "reseau/me/personnes contacts", req); }
+
+      let personnes = [...parId.values()];
+      if (q) {
+        /* On cherche dans le prénom, le nom, le nom complet ET l'organisation : taper « a »
+           doit ramener aussi bien Aminata que Diallo Aïcha ou l'Association du Nord. */
+        personnes = personnes.filter(p =>
+          `${p.prenom} ${p.nom}`.toLowerCase().includes(q) ||
+          (p.prenom || '').toLowerCase().startsWith(q) ||
+          (p.nom || '').toLowerCase().startsWith(q) ||
+          (p.organisation || '').toLowerCase().includes(q));
+      }
+      personnes.sort((a, b) => (a.prenom || a.nom).localeCompare(b.prenom || b.nom, 'fr'));
+      return sendJSON(res, 200, { personnes });
+    }
+
     if (req.method === "GET" && pathname === "/api/reseau/me/stats") {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = await getMyInit(me.id);
@@ -22932,16 +23336,85 @@ ${jsonLd}
       const pid = parseInt(pathname.split('/')[4]);
       const check = await checkProjEvalOwner(req, pid);
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
-      const { nom_projet, categorie, secteur, pays, resume, description, objectifs, budget_estime, avancement, date_souhaitee, business_plan_id, lettre_accompagnement } = body;
-      await db.prepare(`UPDATE proj_eval_projets SET
-        nom_projet=COALESCE(?,nom_projet), categorie=COALESCE(?,categorie), secteur=COALESCE(?,secteur), pays=COALESCE(?,pays),
-        resume=COALESCE(?,resume), description=COALESCE(?,description), objectifs=COALESCE(?,objectifs),
-        budget_estime=COALESCE(?,budget_estime), avancement=COALESCE(?,avancement), date_souhaitee=COALESCE(?,date_souhaitee),
-        business_plan_id=COALESCE(?,business_plan_id), lettre_accompagnement=COALESCE(?,lettre_accompagnement), updated_at=datetime('now')
-        WHERE id=?`)
-        .run(nom_projet||null, categorie||null, secteur||null, pays||null, resume||null, description||null, objectifs||null,
-             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null, lettre_accompagnement||null, pid);
+      /* COALESCE(?, colonne) rendait tout champ VIDABLE impossible à vider : envoyer une
+         chaîne vide était traduit en null, donc en « garde l'ancienne valeur ». Le porteur
+         ne pouvait jamais effacer une description ou un budget saisi par erreur.
+         On distingue désormais « champ absent de la requête » (on garde) de « champ
+         présent mais vide » (on efface). */
+      const CHAMPS = ['nom_projet','categorie','secteur','pays','resume','description','objectifs',
+                      'budget_estime','avancement','date_souhaitee','business_plan_id','lettre_accompagnement'];
+      const aMettreAJour = CHAMPS.filter(c => body[c] !== undefined);
+      if (!aMettreAJour.length) return sendJSON(res, 400, { error: 'Aucun champ à modifier.' });
+      if (body.nom_projet !== undefined && !String(body.nom_projet).trim()) {
+        return sendJSON(res, 400, { error: 'Le nom du projet ne peut pas être vide.' });
+      }
+      const valeur = c => {
+        const v = body[c];
+        if (v === null || v === '') return null;
+        if (c === 'budget_estime') { const n = parseFloat(v); return isNaN(n) ? null : n; }
+        if (c === 'business_plan_id') { const n = parseInt(v); return isNaN(n) ? null : n; }
+        return String(v);
+      };
+      await db.prepare(
+        `UPDATE proj_eval_projets SET ${aMettreAJour.map(c => `${c}=?`).join(', ')}, updated_at=datetime('now') WHERE id=?`
+      ).run(...aMettreAJour.map(valeur), pid);
       return sendJSON(res, 200, { ok: true });
+    }
+
+    /* ── PATCH /api/proj-eval/projets/:id/archiver — ranger / sortir des archives ──
+       Le statut 'archive' existait dans le schéma depuis toujours mais aucune route ne
+       l'écrivait : le porteur ne pouvait ni ranger ses vieux projets ni les retrouver. */
+    if (req.method === 'PATCH' && /^\/api\/proj-eval\/projets\/\d+\/archiver$/.test(pathname)) {
+      const pid = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalOwner(req, pid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+
+      const archiver = body.archive !== false;
+      /* En sortant des archives, on rend au projet son état réel : « envoyé » s'il a des
+         destinataires, « brouillon » sinon. Le remettre systématiquement en brouillon
+         effacerait le fait qu'il a déjà été transmis. */
+      let nouveau = 'archive';
+      if (!archiver) {
+        const n = (await db.prepare(`SELECT COUNT(*) c FROM proj_eval_destinataires WHERE projet_id=?`).get(pid))?.c || 0;
+        nouveau = n > 0 ? 'envoye' : 'brouillon';
+      }
+      await db.prepare(`UPDATE proj_eval_projets SET statut_global=?, updated_at=datetime('now') WHERE id=?`).run(nouveau, pid);
+      return sendJSON(res, 200, { ok: true, statut_global: nouveau });
+    }
+
+    /* ── DELETE /api/proj-eval/projets/:id — suppression définitive ──
+       Un projet déjà transmis n'est pas qu'un document personnel : des destinataires
+       l'ont peut-être ouvert, annoté, commenté. Le supprimer efface AUSSI leur dossier.
+       La route refuse donc tant que l'appelant n'a pas explicitement confirmé, et le
+       nombre de destinataires concernés est renvoyé pour que l'avertissement soit exact. */
+    if (req.method === 'DELETE' && /^\/api\/proj-eval\/projets\/\d+$/.test(pathname)) {
+      const pid = parseInt(pathname.split('/')[4]);
+      const check = await checkProjEvalOwner(req, pid);
+      if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
+
+      const destinataires = await db.prepare(`SELECT id FROM proj_eval_destinataires WHERE projet_id=?`).all(pid);
+      if (destinataires.length && body.confirmer_destinataires !== true) {
+        return sendJSON(res, 409, {
+          error: `Ce projet a été transmis à ${destinataires.length} destinataire(s). Le supprimer effacera aussi leur dossier, leurs échanges et leurs documents.`,
+          nb_destinataires: destinataires.length,
+          confirmation_requise: true,
+        });
+      }
+
+      /* Suppression des tables liées AVANT le projet : les clés étrangères refuseraient
+         sinon d'effacer une ligne encore référencée. */
+      for (const d of destinataires) {
+        await db.prepare(`DELETE FROM proj_eval_messages WHERE destinataire_id=?`).run(d.id);
+        await db.prepare(`DELETE FROM proj_eval_documents WHERE destinataire_id=?`).run(d.id);
+        await db.prepare(`DELETE FROM proj_eval_demandes_documents WHERE destinataire_id=?`).run(d.id);
+        await db.prepare(`DELETE FROM proj_eval_historique WHERE destinataire_id=?`).run(d.id);
+        await db.prepare(`DELETE FROM proj_eval_rendezvous WHERE destinataire_id=?`).run(d.id);
+      }
+      await db.prepare(`DELETE FROM proj_eval_documents WHERE projet_id=?`).run(pid);
+      await db.prepare(`DELETE FROM proj_eval_destinataires WHERE projet_id=?`).run(pid);
+      await db.prepare(`DELETE FROM proj_eval_projets WHERE id=?`).run(pid);
+
+      return sendJSON(res, 200, { ok: true, destinataires_supprimes: destinataires.length });
     }
 
     /* ── GET /api/proj-eval/projets/:id — détail complet côté porteur ── */

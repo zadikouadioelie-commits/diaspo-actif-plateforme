@@ -884,20 +884,120 @@ document.getElementById('close-modal-resume').addEventListener('click',()=>docum
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 });
 
-// Recherche utilisateurs pour nouvelle réunion
-document.getElementById('r-search-users').addEventListener('input',async function(){
-  const q=this.value.trim();
-  if(q.length<2){document.getElementById('r-user-results').style.display='none';return;}
+/* ══ INVITATION DE PARTICIPANTS ══
+   Le champ cherchait dans l'annuaire entier, à partir de 2 caractères, et n'affichait
+   rien avant. Or on invite presque toujours des gens qu'on connaît déjà.
+   Désormais : le réseau professionnel et les contacts directs sont proposés en premier,
+   dès l'ouverture du champ et dès la première lettre ; le reste de la plateforme
+   n'apparaît qu'ensuite, clairement séparé. */
+let rMesPersonnes = null;   // chargé une fois, puis filtré côté navigateur
+
+async function rChargerMesPersonnes(){
+  if(rMesPersonnes) return rMesPersonnes;
   try{
-    const{users}=await api('GET',`/users/search?q=${encodeURIComponent(q)}&limit=6`);
-    const el=document.getElementById('r-user-results');
-    el.style.display='block';
-    el.innerHTML=users.map(u=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="addNewInvite(${u.id},'${escH(u.prenom||'')}','${escH(u.nom||'')}')">
-      ${avatarHTML(u,30)}<span style="font-size:.88rem;font-weight:700;">${escH(u.prenom||'')} ${escH(u.nom||'')}</span>
-      <span style="font-size:.75rem;color:var(--muted);">${escH(u.role||'')}</span>
-    </div>`).join('');
-  }catch(e){}
+    const r = await api('GET','/reseau/me/personnes');
+    rMesPersonnes = r.personnes || [];
+  }catch(e){ rMesPersonnes = []; }   // pas de réseau : on se rabat sur l'annuaire
+  return rMesPersonnes;
+}
+
+function rEtiquetteSource(sources){
+  if(sources?.includes('reseau') && sources?.includes('contact')) return 'Réseau pro · Contact';
+  if(sources?.includes('reseau'))  return 'Réseau pro';
+  if(sources?.includes('contact')) return 'Contact';
+  return '';
+}
+
+function rLignePersonne(u, source){
+  const nomComplet = `${u.prenom||''} ${u.nom||''}`.trim() || 'Membre';
+  const detail = source === 'reseau'
+    ? rEtiquetteSource(u.sources) + (u.organisation ? ' · ' + u.organisation : '')
+    : (u.role || '');
+  return `<div class="r-sugg" data-inviter="${u.id}" tabindex="0" role="option"
+    style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+    ${avatarHTML(u,30)}
+    <span style="flex:1;min-width:0;">
+      <span style="display:block;font-size:.88rem;font-weight:700;">${escH(nomComplet)}</span>
+      ${detail ? `<span style="display:block;font-size:.72rem;color:var(--muted);">${escH(detail)}</span>` : ''}
+    </span>
+  </div>`;
+}
+
+async function rAfficherSuggestions(q){
+  const el = document.getElementById('r-user-results');
+  const mien = await rChargerMesPersonnes();
+  const terme = q.toLowerCase();
+
+  /* startsWith d'abord : taper « a » doit remonter Aminata avant Diakité Awa. */
+  const corresp = p => {
+    if(!terme) return true;
+    const pr=(p.prenom||'').toLowerCase(), no=(p.nom||'').toLowerCase(), org=(p.organisation||'').toLowerCase();
+    return pr.startsWith(terme)||no.startsWith(terme)||`${pr} ${no}`.includes(terme)||org.includes(terme);
+  };
+  const rang = p => {
+    const pr=(p.prenom||'').toLowerCase(), no=(p.nom||'').toLowerCase();
+    return (pr.startsWith(terme)||no.startsWith(terme)) ? 0 : 1;
+  };
+  const dejaInvite = id => pendingNewInvites.some(i => Number(i.id) === Number(id));
+
+  const duReseau = mien.filter(corresp).filter(p => !dejaInvite(p.id))
+                       .sort((a,b) => rang(a)-rang(b)).slice(0,8);
+
+  let html = '';
+  if(duReseau.length){
+    html += `<div style="padding:6px 12px;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:#F8FAFC;">Mon réseau</div>`
+          + duReseau.map(u => rLignePersonne(u,'reseau')).join('');
+  }
+
+  /* L'annuaire général n'est interrogé qu'à partir de 2 caractères : au-dessous, il
+     renverrait des centaines de résultats sans rapport avec l'intention. */
+  if(q.length >= 2){
+    try{
+      const {users} = await api('GET',`/users/search?q=${encodeURIComponent(q)}&limit=6`);
+      const idsReseau = new Set(mien.map(p => Number(p.id)));
+      const autres = (users||[]).filter(u => !idsReseau.has(Number(u.id)) && !dejaInvite(u.id));
+      if(autres.length){
+        html += `<div style="padding:6px 12px;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:#F8FAFC;">Autres membres</div>`
+              + autres.map(u => rLignePersonne(u,'annuaire')).join('');
+      }
+    }catch(e){}
+  }
+
+  if(!html){
+    html = `<div style="padding:12px;font-size:.82rem;color:var(--muted);">${
+      q ? 'Aucun résultat.' : 'Votre réseau est vide — tapez au moins 2 lettres pour chercher dans l’annuaire.'}</div>`;
+  }
+  el.innerHTML = html;
+  el.style.display = 'block';
+
+  /* Écouteurs attachés ici, et non par attribut onclick : un nom contenant une
+     apostrophe — N'Guessan, N'Diaye — cassait l'attribut et rendait la ligne inerte. */
+  el.querySelectorAll('[data-inviter]').forEach(l => {
+    const id = Number(l.dataset.inviter);
+    const trouve = mien.find(p => Number(p.id) === id);
+    const nomAffiche = l.querySelector('span span')?.textContent || '';
+    const activer = () => {
+      const [prenom, ...reste] = nomAffiche.split(' ');
+      addNewInvite(id, trouve?.prenom ?? prenom, trouve?.nom ?? reste.join(' '));
+    };
+    l.addEventListener('click', activer);
+    l.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activer(); } });
+  });
+}
+
+const champInvites = document.getElementById('r-search-users');
+champInvites.placeholder = 'Rechercher dans mon réseau ou sur la plateforme…';
+champInvites.addEventListener('input', function(){ rAfficherSuggestions(this.value.trim()); });
+/* Au clic dans le champ, on montre déjà tout le réseau : c'est la liste demandée,
+   sans qu'il faille deviner par quelle lettre commencer. */
+champInvites.addEventListener('focus', function(){ rAfficherSuggestions(this.value.trim()); });
+document.addEventListener('click', e => {
+  if(!e.target.closest('#r-user-results') && e.target !== champInvites){
+    const el = document.getElementById('r-user-results');
+    if(el) el.style.display='none';
+  }
 });
+
 function addNewInvite(id,prenom,nom){
   if(pendingNewInvites.find(i=>i.id===id)) return;
   pendingNewInvites.push({id,prenom,nom});

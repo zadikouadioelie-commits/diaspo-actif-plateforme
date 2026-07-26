@@ -108,17 +108,51 @@ window.showCertifModal = function(niveau) {
 })();
 /* ========== FIN BADGE ========== */
 
-/* ---------- Avatars photo (DiceBear, ou vraie photo/logo si disponible) ---------- */
-function photoAvatar(name, size=48, type='user', photoUrl=null) {
-  if (photoUrl) {
-    return `<img src="${photoUrl}" alt="${name||'?'}" style="width:${size}px;height:${size}px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">`;
-  }
-  const seed = encodeURIComponent((name||'?').trim());
-  const url = type === 'initiative'
-    ? `https://api.dicebear.com/7.x/initials/svg?seed=${seed}&backgroundColor=1B3A6B,1565C0,24487E&fontColor=ffffff&fontSize=38`
-    : `https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&backgroundColor=E8F1FC,dde3ec`;
-  return `<img src="${url}" alt="${name||'?'}" style="width:${size}px;height:${size}px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">`;
+/* ---------- Avatars (vraie photo/logo si disponible, sinon initiales dessinées ici) ----------
+   Ces avatars venaient de api.dicebear.com. Deux raisons de ne plus en dépendre :
+   1. chaque affichage envoyait le NOM de la personne à un service tiers, et toute panne
+      de ce service vidait les avatars de la plateforme entière ;
+   2. pour les personnes, le style demandé ("lorelei") ne dessinait pas des initiales mais
+      un VISAGE de dessin animé — une image factice qui n'était celle de personne.
+   Le repli est désormais dessiné sur place, en SVG, sans aucune requête sortante. */
+
+const DA_AV_PALETTE_INITIATIVE = ['#1B3A6B', '#1565C0', '#24487E', '#0D2B4E', '#1E4B8F'];
+const DA_AV_PALETTE_PERSONNE   = ['#E8F1FC', '#DDE3EC', '#E4ECF7', '#EAF0F6', '#DFE8F3'];
+
+/* Même nom → toujours la même couleur, sur toutes les pages et d'une visite à l'autre. */
+function daAvatarTeinte(nom, palette) {
+  let h = 0;
+  const s = String(nom || '?');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
 }
+
+function daAvatarInitiales(nom) {
+  return String(nom || '?').trim().split(/[\s'’·.-]+/).filter(Boolean)
+    .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
+}
+
+/* SVG encodé en data: URI — reste un <img>, donc les 15 points d'appel existants
+   n'ont rien à changer (mise en cache, loading="lazy", object-fit inclus). */
+function daAvatarLocal(nom, type) {
+  const estInit = type === 'initiative';
+  const fond = daAvatarTeinte(nom, estInit ? DA_AV_PALETTE_INITIATIVE : DA_AV_PALETTE_PERSONNE);
+  const encre = estInit ? '#FFFFFF' : '#1B3A6B';
+  const txt = daAvatarInitiales(nom).replace(/[<>&]/g, '');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">`
+    + `<rect width="100" height="100" fill="${fond}"/>`
+    + `<text x="50" y="50" fill="${encre}" font-family="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif"`
+    + ` font-size="42" font-weight="700" text-anchor="middle" dominant-baseline="central">${txt}</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+function photoAvatar(name, size=48, type='user', photoUrl=null) {
+  const alt = String(name || '?').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const src = photoUrl || daAvatarLocal(name, type);
+  return `<img src="${src}" alt="${alt}" style="width:${size}px;height:${size}px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">`;
+}
+window.daAvatarLocal = daAvatarLocal;
+window.daAvatarInitiales = daAvatarInitiales;
 function avatarDiv(name, size=48, type='user', extraStyle='', photoUrl=null) {
   return `<div class="init-logo" style="width:${size}px;height:${size}px;${extraStyle}">${photoAvatar(name, size, type, photoUrl)}</div>`;
 }

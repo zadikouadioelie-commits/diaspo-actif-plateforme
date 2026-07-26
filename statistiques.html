@@ -448,7 +448,7 @@ function render() {
           </div>
         </div>
         <div class="st-card">
-          <h3>Score de confiance moyen</h3>
+          <h3>Indice de fiabilité moyen</h3>
           <div class="st-ring">
             ${ring(Math.round(parseFloat(confiance.score_moyen)||0), '#6366f1')}
             <div>
@@ -584,7 +584,7 @@ function exportPDF() {
     ['Messages échangés', fmt(STATS.activite.messages)],
     ['Événements organisés', fmt(STATS.activite.evenements)],
     ['Billets vendus', fmt(STATS.activite.billets_vendus)],
-    ['Score de confiance moyen', (STATS.confiance.score_moyen||0)+'%'],
+    ['Indice de fiabilité moyen', (STATS.confiance.score_moyen||0)+'%'],
     ['Actifs (30 jours)', fmt(STATS.confiance.actifs_30j)],
   ].map(r=>`<tr><td>${r[0]}</td><td><strong>${r[1]}</strong></td></tr>`).join('')}
   </table>

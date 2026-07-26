@@ -18,7 +18,15 @@
 .pe-stat-num{font-size:22px;font-weight:800;color:#2563EB;}
 .pe-stat-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
 .pe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
-.pe-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:box-shadow .15s;}
+/* La carte n'est plus cliquable dans son ensemble : elle porte désormais des boutons.
+   Sans ce changement, cliquer sur « Supprimer » aurait aussi ouvert le projet. */
+.pe-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;transition:box-shadow .15s;}
+/* Actions de carte : modifier, archiver, supprimer */
+.pe-act{padding:6px 11px;border:1.5px solid var(--border);background:#fff;border-radius:8px;font-size:12px;font-weight:700;color:#334155;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s;}
+.pe-act:hover{border-color:#94A3B8;background:#F8FAFC;}
+.pe-act:focus-visible{outline:3px solid #F26422;outline-offset:2px;}
+.pe-act-danger{color:#B91C1C;border-color:#FECACA;}
+.pe-act-danger:hover{background:#FEF2F2;border-color:#EF4444;}
 .pe-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);}
 .pe-card-title{font-size:15px;font-weight:800;margin:0 0 4px;}
 .pe-card-meta{font-size:12px;color:var(--muted);margin-bottom:8px;}
@@ -83,7 +91,7 @@
 <div class="pe-modal-bg" id="pe-modal-create-bg" onclick="if(event.target===this)peCloseMod('pe-modal-create-bg')">
   <div class="pe-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;">➕ Nouveau projet</h3>
+      <h3 style="margin:0;" id="pe-modal-create-titre">➕ Nouveau projet</h3>
       <button onclick="peCloseMod('pe-modal-create-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
     </div>
     <div class="pe-field"><label>Nom du projet *</label><input id="pe-c-nom"></div>
@@ -111,7 +119,7 @@
     </div>
     <div style="text-align:right;margin-top:16px;">
       <button class="btn btn-outline" onclick="peCloseMod('pe-modal-create-bg')">Annuler</button>
-      <button class="btn btn-orange" onclick="peSaveProjet()">Enregistrer le brouillon</button>
+      <button class="btn btn-orange" id="pe-modal-create-btn" onclick="peSaveProjet()">Enregistrer le brouillon</button>
     </div>
   </div>
 </div>
@@ -197,35 +205,143 @@ function peSwitchTab(name) {
   if (name === 'a-evaluer') { peLoadStats(); peLoadRecus(); }
 }
 
-/* ══ MES PROJETS ══ */
+/* ══ MES PROJETS ══
+   Les projets archivés sont masqués par défaut : c'est tout l'intérêt d'archiver.
+   Un compteur permet de les retrouver sans quitter la page. */
+let peVoirArchives = false;
+/* Les noms sont gardés ici plutôt que passés dans l'attribut onclick : un nom contenant
+   une apostrophe ou un guillemet refermait l'attribut et cassait silencieusement le
+   bouton — constaté sur « École numérique Bouaké » lors des essais. */
+const peNomsProjets = {};
+
 async function peLoadMesProjets() {
   const el = document.getElementById('pe-mes-projets-list');
   try {
     const r = await api('GET', '/proj-eval/mes-projets');
-    const projets = r.projets || [];
-    if (!projets.length) { el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Aucun projet créé pour le moment.</div>'; return; }
-    el.innerHTML = `<div class="pe-grid">` + projets.map(p => `
-      <div class="pe-card" onclick="peOpenProjet(${p.id})">
-        <div class="pe-card-title">${escH(p.nom_projet)}</div>
-        <div class="pe-card-meta">${escH(p.categorie||'—')} · ${escH(p.pays||'—')}</div>
-        <span class="pe-pill pe-pill-${p.statut_global}">${STATUT_LABELS[p.statut_global]}</span>
-        ${p.destinataires.length ? `<div style="margin-top:10px;font-size:12px;">
-          ${p.destinataires.map(d=>`<div style="display:flex;justify-content:space-between;padding:2px 0;">
-            <span>${escH(d.destinataire_nom)}</span><span class="pe-pill pe-pill-${d.statut}" style="font-size:9px;">${STATUT_LABELS[d.statut]}</span>
-          </div>`).join('')}
-        </div>` : `<div style="margin-top:10px;font-size:12px;color:var(--muted);">Pas encore envoyé.</div>`}
+    const tous = r.projets || [];
+    tous.forEach(p => { peNomsProjets[p.id] = p.nom_projet; });
+    const archives = tous.filter(p => p.statut_global === 'archive');
+    const projets = peVoirArchives ? archives : tous.filter(p => p.statut_global !== 'archive');
+
+    /* Le bouton de retour s'affiche dès qu'on est DANS les archives, même si elles sont
+       vides : en le conditionnant au nombre d'archives, désarchiver le dernier projet
+       faisait disparaître le seul moyen de revenir en arrière. */
+    const bandeau = (archives.length || peVoirArchives) ? `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+        <button type="button" onclick="peBasculerArchives()"
+          style="padding:7px 14px;border:1.5px solid var(--border);background:${peVoirArchives ? '#EEF2F7' : '#fff'};border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;">
+          ${peVoirArchives ? '← Revenir aux projets actifs' : `🗄️ Voir les archives (${archives.length})`}
+        </button>
+      </div>` : '';
+
+    if (!projets.length) {
+      el.innerHTML = bandeau + `<div style="text-align:center;padding:40px;color:var(--muted);">${
+        peVoirArchives ? 'Aucun projet archivé.' : 'Aucun projet créé pour le moment.'}</div>`;
+      return;
+    }
+
+    el.innerHTML = bandeau + `<div class="pe-grid">` + projets.map(p => `
+      <div class="pe-card" style="position:relative;">
+        <div onclick="peOpenProjet(${p.id})" style="cursor:pointer;">
+          <div class="pe-card-title" style="padding-right:32px;">${escH(p.nom_projet)}</div>
+          <div class="pe-card-meta">${escH(p.categorie||'—')} · ${escH(p.pays||'—')}</div>
+          <span class="pe-pill pe-pill-${p.statut_global}">${STATUT_LABELS[p.statut_global] || p.statut_global}</span>
+          ${p.destinataires.length ? `<div style="margin-top:10px;font-size:12px;">
+            ${p.destinataires.map(d=>`<div style="display:flex;justify-content:space-between;padding:2px 0;">
+              <span>${escH(d.destinataire_nom)}</span><span class="pe-pill pe-pill-${d.statut}" style="font-size:9px;">${STATUT_LABELS[d.statut]}</span>
+            </div>`).join('')}
+          </div>` : `<div style="margin-top:10px;font-size:12px;color:var(--muted);">Pas encore envoyé.</div>`}
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;">
+          <button type="button" class="pe-act" onclick="peModifierProjet(${p.id})">✏️ Modifier</button>
+          <button type="button" class="pe-act" onclick="peArchiverProjet(${p.id}, ${p.statut_global === 'archive' ? 'false' : 'true'})">
+            ${p.statut_global === 'archive' ? '📤 Désarchiver' : '🗄️ Archiver'}
+          </button>
+          <button type="button" class="pe-act pe-act-danger" onclick="peSupprimerProjet(${p.id})">🗑️ Supprimer</button>
+        </div>
       </div>`).join('') + '</div>';
   } catch(e) { el.innerHTML = '<div class="notice">Erreur chargement.</div>'; }
 }
 
+function peBasculerArchives() { peVoirArchives = !peVoirArchives; peLoadMesProjets(); }
+
+/* Ranger un projet, ou le sortir des archives. */
+async function peArchiverProjet(id, archiver) {
+  try {
+    await api('PATCH', `/proj-eval/projets/${id}/archiver`, { archive: archiver });
+    peLoadMesProjets();
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* Suppression définitive. Le serveur refuse une première fois si le projet a été
+   transmis, en indiquant combien de destinataires perdraient leur dossier — on
+   répercute cet avertissement avant de confirmer. */
+async function peSupprimerProjet(id) {
+  const nom = peNomsProjets[id] || 'ce projet';
+  if (!confirm(`Supprimer définitivement « ${nom} » ?\n\nCette action est irréversible.`)) return;
+  try {
+    await api('DELETE', `/proj-eval/projets/${id}`);
+    peLoadMesProjets();
+  } catch (e) {
+    const m = String(e.message || '');
+    if (/destinataire/i.test(m)) {
+      if (!confirm(m + '\n\nSupprimer quand même ?')) return;
+      try {
+        await api('DELETE', `/proj-eval/projets/${id}`, { confirmer_destinataires: true });
+        peLoadMesProjets();
+      } catch (e2) { alert('Erreur : ' + e2.message); }
+    } else { alert('Erreur : ' + m); }
+  }
+}
+
+/* La même fenêtre sert à créer et à modifier : dupliquer un second formulaire de
+   douze champs aurait garanti qu'ils divergent au premier ajout de champ.
+   peEditId vaut null en création, l'identifiant du projet en modification. */
+let peEditId = null;
+const PE_CHAMPS = ['nom','categorie','secteur','pays','budget','avancement','date','resume','description','objectifs','lettre'];
+
 function peOpenCreate() {
-  ['nom','categorie','secteur','pays','budget','avancement','date','resume','description','objectifs','lettre'].forEach(f => {
-    const el = document.getElementById('pe-c-'+f); if (el) el.value = '';
-  });
+  peEditId = null;
+  PE_CHAMPS.forEach(f => { const el = document.getElementById('pe-c-'+f); if (el) el.value = ''; });
   peUploadedDocsBuffer = [];
   document.getElementById('pe-c-docs-list').innerHTML = '';
+  document.getElementById('pe-modal-create-titre').textContent = '➕ Nouveau projet';
+  document.getElementById('pe-modal-create-btn').textContent = 'Enregistrer le brouillon';
+  const zoneDocs = document.getElementById('pe-c-docs')?.closest('.pe-field');
+  if (zoneDocs) zoneDocs.style.display = '';
   peLoadBPSelect();
   document.getElementById('pe-modal-create-bg').classList.add('open');
+}
+
+async function peModifierProjet(pid) {
+  try {
+    const r = await api('GET', `/proj-eval/projets/${pid}`);
+    const p = r.projet || r;
+    peEditId = pid;
+    const set = (champ, valeur) => { const el = document.getElementById('pe-c-'+champ); if (el) el.value = valeur ?? ''; };
+    set('nom', p.nom_projet);           set('categorie', p.categorie);
+    set('secteur', p.secteur);          set('pays', p.pays);
+    set('budget', p.budget_estime);     set('avancement', p.avancement);
+    set('date', p.date_souhaitee);      set('resume', p.resume);
+    set('description', p.description);  set('objectifs', p.objectifs);
+    set('lettre', p.lettre_accompagnement);
+
+    peUploadedDocsBuffer = [];
+    document.getElementById('pe-c-docs-list').innerHTML = '';
+    /* Les documents s'ajoutent depuis la fiche du projet, pas ici : ce formulaire ne
+       gère que les informations. Laisser le champ visible laisserait croire qu'on peut
+       remplacer les pièces déjà déposées. */
+    const zoneDocs = document.getElementById('pe-c-docs')?.closest('.pe-field');
+    if (zoneDocs) zoneDocs.style.display = 'none';
+
+    await peLoadBPSelect();
+    const bp = document.getElementById('pe-c-bp');
+    if (bp) bp.value = p.business_plan_id || '';
+
+    document.getElementById('pe-modal-create-titre').textContent = '✏️ Modifier le projet';
+    document.getElementById('pe-modal-create-btn').textContent = 'Enregistrer les modifications';
+    document.getElementById('pe-modal-create-bg').classList.add('open');
+  } catch (e) { notify('Erreur : ' + e.message, 'error'); }
 }
 
 async function peLoadBPSelect() {
@@ -278,12 +394,19 @@ async function peSaveProjet() {
     business_plan_id: document.getElementById('pe-c-bp').value || null,
   };
   try {
-    const r = await api('POST', '/proj-eval/projets', data);
-    for (const doc of peUploadedDocsBuffer) {
-      await api('POST', '/proj-eval/upload', { projet_id: r.id, categorie: 'autre', ...doc });
+    if (peEditId) {
+      await api('PUT', `/proj-eval/projets/${peEditId}`, data);
+      peCloseMod('pe-modal-create-bg');
+      notify('Projet mis à jour.', 'success');
+    } else {
+      const r = await api('POST', '/proj-eval/projets', data);
+      for (const doc of peUploadedDocsBuffer) {
+        await api('POST', '/proj-eval/upload', { projet_id: r.id, categorie: 'autre', ...doc });
+      }
+      peCloseMod('pe-modal-create-bg');
+      notify('Projet enregistré en brouillon.', 'success');
     }
-    peCloseMod('pe-modal-create-bg');
-    notify('Projet enregistré en brouillon.', 'success');
+    peEditId = null;
     peLoadMesProjets();
   } catch(e) { notify('Erreur : '+e.message, 'error'); }
 }
