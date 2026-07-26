@@ -213,23 +213,20 @@
   zone.innerHTML = `
     <div class="codes-card">
       <h4>🔐 Code de Sécurité Diaspo'Actif (DS-ID)</h4>
-      <p class="codes-sub">Votre signature numérique personnelle · strictement confidentielle · jamais visible publiquement · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>.</p>
+      <p class="codes-sub">Votre signature numérique personnelle, permanente et non modifiable · jamais visible par un administrateur · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>. Consultable uniquement par vous, 10 secondes à la fois, une fois par heure.</p>
       <div id="ds-masked-view">
         <div class="ds-masked">••••••••••••••••••••</div>
         <div class="codes-btn-row">
-          <button class="codes-btn green" onclick="window._showDsIdForm('reveal')">👁 Afficher</button>
+          <button class="codes-btn green" id="ds-btn-afficher" onclick="window._showDsIdForm()">👁 Afficher mon DS-ID</button>
         </div>
+        <div id="ds-attente-msg" style="display:none;font-size:12px;color:var(--muted);margin-top:8px;"></div>
       </div>
       <div id="ds-revealed-view" style="display:none;">
         <div class="ds-revealed" id="ds-value"></div>
-        <div class="codes-btn-row">
-          <button class="codes-btn green" onclick="window._copyDsId()">📋 Copier</button>
-          <button class="codes-btn red" onclick="window._showDsIdForm('regen')">🔄 Régénérer</button>
-          <button class="codes-btn orange" onclick="window._hideDsId()">🙈 Masquer</button>
-        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">Masquage automatique dans <strong id="ds-compte-rebours">10</strong>s.</div>
       </div>
       <div class="ds-pwd-form" id="ds-pwd-form">
-        <div id="ds-pwd-title" style="font-size:13px;font-weight:700;margin-bottom:8px;">🔑 Entrez votre mot de passe pour continuer</div>
+        <div id="ds-pwd-title" style="font-size:13px;font-weight:700;margin-bottom:8px;">🔑 Entrez votre mot de passe pour afficher votre DS-ID</div>
         <div style="position:relative;">
           <input type="password" id="ds-pwd-input" placeholder="Votre mot de passe" autocomplete="current-password" style="padding-right:40px;">
           <button type="button" id="ds-pwd-toggle" aria-label="Afficher le mot de passe" title="Afficher le mot de passe"
@@ -248,13 +245,38 @@
     </div>
   `;
 
-  let _dsAction = 'reveal';
-  window._showDsIdForm = function(action) {
-    _dsAction = action;
+  /* Le bouton s'affiche déjà désactivé si le délai d'1h n'est pas écoulé, plutôt que
+     de laisser le titulaire cliquer pour essuyer un rejet — l'information existe déjà
+     côté serveur (GET /ds-id/status), autant la lui donner tout de suite. */
+  let _dsMinuteur = null;
+  function _dsAppliquerAttente(secondes) {
+    clearInterval(_dsMinuteur);
+    const btn = document.getElementById('ds-btn-afficher');
+    const msg = document.getElementById('ds-attente-msg');
+    if (secondes <= 0) {
+      btn.disabled = false;
+      msg.style.display = 'none';
+      return;
+    }
+    btn.disabled = true;
+    msg.style.display = 'block';
+    const fin = Date.now() + secondes * 1000;
+    const maj = () => {
+      const restant = Math.max(0, Math.round((fin - Date.now()) / 1000));
+      if (restant <= 0) { clearInterval(_dsMinuteur); btn.disabled = false; msg.style.display = 'none'; return; }
+      const h = Math.floor(restant / 3600), m = Math.floor((restant % 3600) / 60);
+      msg.textContent = `🔒 Nouvelle consultation possible dans ${h > 0 ? h + ' h ' : ''}${m} min.`;
+    };
+    maj();
+    _dsMinuteur = setInterval(maj, 1000);
+  }
+  try {
+    const statut = await api('GET', '/profil/ds-id/status');
+    _dsAppliquerAttente(statut.secondes_restantes || 0);
+  } catch (e) {}
+
+  window._showDsIdForm = function() {
     document.getElementById('ds-pwd-form').style.display = 'block';
-    document.getElementById('ds-pwd-title').textContent = action === 'regen'
-      ? '⚠️ Régénérer le DS-ID — entrez votre mot de passe (l\'ancien code sera invalidé)'
-      : '🔑 Entrez votre mot de passe pour afficher votre DS-ID';
     document.getElementById('ds-pwd-input').value = '';
     document.getElementById('ds-pwd-input').type = 'password';
     document.getElementById('ds-pwd-toggle').textContent = '👁';
@@ -273,35 +295,50 @@
     input.focus();
   });
   window._cancelDsId = function() { document.getElementById('ds-pwd-form').style.display = 'none'; };
-  window._hideDsId = function() {
-    document.getElementById('ds-revealed-view').style.display = 'none';
-    document.getElementById('ds-masked-view').style.display = '';
-    document.getElementById('ds-value').textContent = '';
-  };
-  window._copyDsId = async function() {
-    const val = document.getElementById('ds-value').textContent;
-    if (!val) return;
-    await navigator.clipboard.writeText(val);
-    await api('POST', '/profil/ds-id/log-copy', {});
-    showToast?.('📋 DS-ID copié !');
-  };
+
+  /* Affichage 10 secondes puis masquage automatique — "Aucune action supplémentaire
+     n'est nécessaire : le reverrouillage est automatique" (aucun bouton "Masquer"). */
+  function _dsAfficherPuisMasquer(code) {
+    document.getElementById('ds-value').textContent = code;
+    document.getElementById('ds-masked-view').style.display = 'none';
+    document.getElementById('ds-revealed-view').style.display = '';
+    let restant = 10;
+    const compteur = document.getElementById('ds-compte-rebours');
+    compteur.textContent = restant;
+    const tick = setInterval(() => {
+      restant--;
+      if (restant <= 0) {
+        clearInterval(tick);
+        document.getElementById('ds-revealed-view').style.display = 'none';
+        document.getElementById('ds-masked-view').style.display = '';
+        document.getElementById('ds-value').textContent = '';
+        _dsAppliquerAttente(3600);
+        return;
+      }
+      compteur.textContent = restant;
+    }, 1000);
+  }
+
   window._submitDsId = async function() {
     const pwd = document.getElementById('ds-pwd-input').value;
     const err = document.getElementById('ds-pwd-err');
     err.style.display = 'none';
     if (!pwd) { err.textContent = 'Mot de passe requis.'; err.style.display = 'block'; return; }
     try {
-      const endpoint = _dsAction === 'regen' ? '/profil/ds-id/regenerate' : '/profil/ds-id/reveal';
-      const r = await api('POST', endpoint, { password: pwd });
-      document.getElementById('ds-value').textContent = r.ds_id;
+      const r = await api('POST', '/profil/ds-id/reveal', { password: pwd });
       document.getElementById('ds-pwd-form').style.display = 'none';
-      document.getElementById('ds-masked-view').style.display = 'none';
-      document.getElementById('ds-revealed-view').style.display = '';
-      if (_dsAction === 'regen') showToast?.('✅ DS-ID régénéré avec succès.');
+      _dsAfficherPuisMasquer(r.ds_id);
       loadDsHistory();
     } catch(e) {
-      err.textContent = e.message || 'Erreur de validation.';
-      err.style.display = 'block';
+      /* 429 : le délai d'1h a expiré entre l'ouverture du formulaire et la validation
+         (onglet resté ouvert) — on l'affiche comme un délai, pas comme une erreur de saisie. */
+      if (e.data?.minutes_restantes !== undefined) {
+        document.getElementById('ds-pwd-form').style.display = 'none';
+        _dsAppliquerAttente(e.data.minutes_restantes * 60);
+      } else {
+        err.textContent = e.message || 'Erreur de validation.';
+        err.style.display = 'block';
+      }
     }
   };
   document.getElementById('ds-pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') window._submitDsId(); });

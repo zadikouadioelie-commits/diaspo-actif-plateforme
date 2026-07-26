@@ -5219,9 +5219,66 @@ route("GET", "/api/account/by-da-id/:daId", async (req, res, params) => {
 });
 
 /* ══ DS-ID — Révéler (vérification mot de passe requise) ══ */
+/* ═══════════════ DS-ID (Diaspo'Actif Security ID) ═══════════════
+   Refonte complete du 2026-07-26 : le DS-ID est desormais PERMANENT (jamais
+   regenerable, jamais modifiable), consultable par son seul proprietaire apres
+   verification du mot de passe, affiche 10 secondes puis masque automatiquement,
+   et limite a une consultation reussie par heure - meme avec le bon mot de passe.
+   Aucune route n'expose le code a un administrateur ; ds_id_history ne journalise
+   jamais la valeur elle-meme, seulement l'action, la date et le contexte. */
+
+const DS_ID_DELAI_MS = 60 * 60 * 1000; // 1 heure entre deux consultations reussies
+
+/* Dernier moment ou une consultation a reellement abouti, ou null si aucune. */
+async function derniereConsultationDsId(userId) {
+  const r = await db.prepare(
+    `SELECT created_at FROM ds_id_history WHERE user_id=? AND action='consultation' ORDER BY created_at DESC LIMIT 1`
+  ).get(userId);
+  if (!r || !r.created_at) return null;
+  /* SQLite renvoie une chaîne ("2026-07-26 14:31:08", en UTC via datetime('now')),
+     PostgreSQL un objet Date déjà correct. Le repli utilisé ailleurs dans ce fichier
+     (finPeriodeGratuite) fait new Date(str.replace(' ','T')) SANS suffixe de fuseau —
+     or une chaîne sans fuseau est interprétée par JS comme une heure LOCALE, pas UTC.
+     Vérifié en direct : sur cette machine (UTC+2), ça décale la mesure de 2 heures,
+     assez pour faire paraître un délai d'1 heure déjà écoulé immédiatement après une
+     consultation réussie — repéré par le test, pas par relecture. Le suffixe Z est
+     donc nécessaire ici, contrairement aux usages tolérants au jour près ailleurs. */
+  const d = (r.created_at instanceof Date) ? r.created_at : new Date(String(r.created_at).replace(' ', 'T') + 'Z');
+  return d.getTime();
+}
+
+/* ══ DS-ID — Statut : le bouton peut-il s'afficher actif, ou combien de temps reste-t-il ? ══
+   Sans cette route, l'interface ne pourrait savoir que le bouton est bloque qu'apres
+   avoir essuye un rejet - moins clair pour le titulaire que de le voir deja desactive. */
+route("GET", "/api/profil/ds-id/status", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const derniere = await derniereConsultationDsId(user.id);
+  const ecoule = derniere ? Date.now() - derniere : Infinity;
+  const disponible = ecoule >= DS_ID_DELAI_MS;
+  sendJSON(res, 200, {
+    disponible,
+    secondes_restantes: disponible ? 0 : Math.ceil((DS_ID_DELAI_MS - ecoule) / 1000),
+  });
+});
+
+/* ══ DS-ID — Consultation : mot de passe requis, 1 par heure, jamais plus ══ */
 route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+
+  /* Le delai s'applique AVANT toute verification de mot de passe : la specification
+     est explicite ("aucune nouvelle consultation n'est possible, meme avec le mot de
+     passe") - un mur absolu, pas conditionne a la qualite des identifiants fournis. */
+  const derniere = await derniereConsultationDsId(user.id);
+  if (derniere && (Date.now() - derniere) < DS_ID_DELAI_MS) {
+    const minutesRestantes = Math.ceil((DS_ID_DELAI_MS - (Date.now() - derniere)) / 60000);
+    return sendJSON(res, 429, {
+      error: `Pour des raisons de sécurité, votre Code de Sécurité Diaspo'Actif ne pourra être consulté de nouveau qu'après 1 heure.`,
+      minutes_restantes: minutesRestantes,
+    });
+  }
+
   const { password } = body;
   if (!password) return sendJSON(res, 400, { error: 'Mot de passe requis.' });
   const row = await db.prepare('SELECT password_hash, password_salt, ds_id FROM users WHERE id=?').get(user.id);
@@ -5231,52 +5288,31 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
     return sendJSON(res, 403, { error: 'Mot de passe incorrect.' });
   }
 
-  /* Aucune route de signup n'a jamais écrit ds_id, et le seul rattrapage existant
-     (backfillDsIds dans server/db.js) est une IIFE SQLite-only : elle ne s'exécute
-     jamais contre la base PostgreSQL de production. Tout compte créé en production
-     a donc un ds_id NULL pour toujours, tant que le titulaire ne clique pas sur
-     "Régénérer" sans savoir que c'est nécessaire — l'écran de révélation affichait
-     un encart vide, sans code, sans aucune explication. On génère ici, à la volée,
-     dès le premier "Afficher" reussi : le titulaire n'a jamais besoin de savoir
-     que ce rattrapage existe. */
+  /* Generation a la volee si absent : aucune route d'inscription n'a jamais ecrit
+     ds_id, et le seul rattrapage existant (backfillDsIds, server/db.js) est une IIFE
+     SQLite-only qui ne s'execute jamais contre PostgreSQL en production. Un compte
+     cree en production avait donc un ds_id NULL pour toujours avant ce correctif.
+     L'unicite est verifiee ici (db.prepare fonctionne de facon identique sur les
+     deux moteurs a cet endroit), avec une nouvelle tentative en cas de collision -
+     improbable sur 36^10 combinaisons, mais la specification le demande. */
   let dsId = row.ds_id;
   if (!dsId) {
-    dsId = generateDsId();
+    for (let essai = 0; essai < 5 && !dsId; essai++) {
+      const candidat = generateDsId();
+      const collision = await db.prepare('SELECT 1 FROM users WHERE ds_id=?').get(candidat);
+      if (!collision) dsId = candidat;
+    }
+    if (!dsId) dsId = generateDsId(); // improbable : on cede plutot que de bloquer le compte
     await db.prepare('UPDATE users SET ds_id=? WHERE id=?').run(dsId, user.id);
     await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'creation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
   }
 
   await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'consultation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-  sendJSON(res, 200, { ds_id: dsId });
+  sendJSON(res, 200, { ds_id: dsId, duree_affichage_secondes: 10 });
 });
 
-/* ══ DS-ID — Log copie ══ */
-route("POST", "/api/profil/ds-id/log-copy", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
-  await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'copie', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* ══ DS-ID — Régénérer ══ */
-route("POST", "/api/profil/ds-id/regenerate", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
-  const { password } = body;
-  if (!password) return sendJSON(res, 400, { error: 'Mot de passe requis.' });
-  const row = await db.prepare('SELECT password_hash, password_salt FROM users WHERE id=?').get(user.id);
-  if (!row) return sendJSON(res, 404, { error: 'Compte introuvable.' });
-  if (!verifyPassword(password, row.password_salt, row.password_hash)) {
-    await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'echec_validation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-    return sendJSON(res, 403, { error: 'Mot de passe incorrect.' });
-  }
-  const newDsId = generateDsId();
-  await db.prepare('UPDATE users SET ds_id=? WHERE id=?').run(newDsId, user.id);
-  await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'regeneration', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-  sendJSON(res, 200, { ds_id: newDsId });
-});
-
-/* ══ DS-ID — Historique ══ */
+/* ══ DS-ID — Historique ══
+   Ne renvoie jamais le code lui-meme : uniquement l'action, la date et le contexte. */
 route("GET", "/api/profil/ds-id/history", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });

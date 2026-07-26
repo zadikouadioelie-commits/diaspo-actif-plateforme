@@ -3,12 +3,33 @@
    En production (DATABASE_URL définie) : PostgreSQL via Neon
    En développement local : SQLite via node:sqlite
    =========================================================== */
+
+/* Génération du DS-ID — DÉFINIE UNE SEULE FOIS, partagée entre local et production.
+   Avant cette refonte, la production utilisait un repli séparé écrit ici même
+   (Math.random(), format "DS-XXXXXX" sur 9 caractères) tandis que le local utilisait
+   une fonction différente plus bas dans ce fichier (format "DAS-XXXX-XXXX-XXXX").
+   Deux implémentations divergentes pour la même donnée de sécurité critique — l'une
+   nettement plus faible que l'autre. Une seule fonction désormais, utilisée par les
+   deux environnements : 10 caractères, alphabet [A-Z0-9], generation cryptographique
+   (crypto.randomInt, pas Math.random() qui n'est pas un generateur sûr). L'unicité
+   est vérifiée au point d'appel réel (server/index.js, à la création à la volée),
+   via db.prepare(...) qui fonctionne déjà de façon identique sur les deux moteurs
+   à cet endroit du code — sauf pour le rattrapage local ci-dessous (backfillDsIds),
+   qui ne s'exécute jamais en production et embarque donc sa propre vérification. */
+const crypto = require('node:crypto');
+const DS_ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function sharedGenerateDsId() {
+  let out = '';
+  for (let i = 0; i < 10; i++) out += DS_ID_ALPHABET[crypto.randomInt(DS_ID_ALPHABET.length)];
+  return out;
+}
+
 if (process.env.DATABASE_URL) {
   const pg = require('./db-pg');
   module.exports = pg;
   module.exports.backfillOfficialFollow = () => {};
   module.exports.generateDaId = () => Math.random().toString(36).slice(2,10).toUpperCase();
-  module.exports.generateDsId = () => 'DS-' + Math.random().toString(36).slice(2,8).toUpperCase();
+  module.exports.generateDsId = sharedGenerateDsId;
   return;
 }
 
@@ -4380,10 +4401,21 @@ db.exec(`
   }
 }
 
-function generateDsId() {
-  const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0OI1 pour lisibilité
-  const seg = () => Array.from({length:4}, () => CHARS[Math.floor(Math.random()*CHARS.length)]).join('');
-  return `DAS-${seg()}-${seg()}-${seg()}`;
+/* Ancien format local (DAS-XXXX-XXXX-XXXX, Math.random) abandonné au profit de
+   sharedGenerateDsId — une seule implémentation, identique en local et en
+   production (10 caractères, crypto.randomInt). */
+function generateDsId() { return sharedGenerateDsId(); }
+
+/* Génère un DS-ID en vérifiant son unicité en base avant de l'accepter — la
+   collision est extrêmement improbable (36^10 combinaisons) mais la spécification
+   la demande explicitement, et une nouvelle tentative ne coûte rien. */
+function generateDsIdUnique() {
+  for (let essai = 0; essai < 5; essai++) {
+    const candidat = sharedGenerateDsId();
+    const existe = db.prepare('SELECT 1 FROM users WHERE ds_id=?').get(candidat);
+    if (!existe) return candidat;
+  }
+  return sharedGenerateDsId(); // improbable : on cède plutôt que de bloquer un compte
 }
 
 // Backfill DS-ID pour les comptes existants sans DS-ID
@@ -4391,7 +4423,7 @@ function generateDsId() {
   const without = db.prepare('SELECT id FROM users WHERE ds_id IS NULL ORDER BY id').all();
   const set = db.prepare('UPDATE users SET ds_id=? WHERE id=?');
   for (const u of without) {
-    try { set.run(generateDsId(), u.id); } catch(_) {}
+    try { set.run(generateDsIdUnique(), u.id); } catch(_) {}
   }
 })();
 
