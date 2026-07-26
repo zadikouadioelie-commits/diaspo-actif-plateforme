@@ -110,6 +110,24 @@
   backdrop-filter: blur(8px);
 }
 .hp-cta-secondary:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.4); }
+/* Variante fond clair : .hp-cta-secondary est conçue pour le hero (fond bleu marine, texte
+   blanc) — réutilisée telle quelle dans la section CTA finale (fond blanc), son texte blanc
+   devenait invisible, ne laissant apparaître que l'emoji. */
+.hp-cta-secondary-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #F8FAFF;
+  border: 1.5px solid var(--border);
+  color: #0D1B2A;
+  padding: 14px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background .2s, border-color .2s;
+}
+.hp-cta-secondary-light:hover { background: #EEF2FF; border-color: #2563EB; }
 .hp-hero-map {
   position: relative;
   height: 420px;
@@ -1329,8 +1347,8 @@
       <p>Que vous soyez entrepreneur, étudiant, expert, investisseur, association ou institution, DiaspoActif vous permet de transformer vos idées en actions et vos connexions en opportunités.</p>
       <div class="hp-final-ctas" style="justify-content:center;gap:16px;flex-wrap:wrap;">
         <a href="inscription.html" class="hp-cta-primary" style="font-size:15px;padding:16px 32px;">🚀 Créer un compte</a>
-        <a href="annuaire.html" class="hp-cta-secondary" style="font-size:15px;padding:16px 32px;">🌱 Découvrir les initiatives</a>
-        <a href="annuaire.html" class="hp-cta-secondary" style="font-size:15px;padding:16px 32px;">🔍 Explorer l'annuaire</a>
+        <a href="annuaire.html" class="hp-cta-secondary-light" style="font-size:15px;padding:16px 32px;">🌱 Découvrir les initiatives</a>
+        <a href="annuaire.html" class="hp-cta-secondary-light" style="font-size:15px;padding:16px 32px;">🔍 Explorer l'annuaire</a>
       </div>
     </div>
   </section>
