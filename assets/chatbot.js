@@ -1331,6 +1331,25 @@
     return null;
   }
 
+  /* Le message cite le libellé d'un module (assets/module-aide.js) — retourne
+     l'entrée correspondante, ou null. Choisit le libellé le plus long en cas
+     de plusieurs correspondances (évite qu'un nom court/générique masque un
+     nom plus précis, ex. "Messages" vs "Messages de la vitrine"). */
+  function matchModuleAide(text) {
+    if (!window.MODULE_AIDE) return null;
+    const norm = t => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const nt = norm(text);
+    const actifs = window._moduleAideActifs; // Set des slugs présents sur la page courante (module-aide-ui.js)
+    let best = null, bestLen = 0;
+    Object.entries(window.MODULE_AIDE).forEach(([slug, m]) => {
+      if (actifs && !actifs.has(slug)) return;
+      const label = m.titre.replace(/^\S+\s*/, "").trim();
+      const nl = norm(label);
+      if (nl.length >= 4 && nt.includes(nl) && nl.length > bestLen) { best = m; bestLen = nl.length; }
+    });
+    return best;
+  }
+
   /* ═══════════════════════════════════════════════════════════════
      CONTEXTE ENRICHI — mémoire admin + site diaspo-actif.com
      ═══════════════════════════════════════════════════════════════ */
@@ -1347,6 +1366,16 @@
         ...(d.siteContent || []).map(s => ({ titre: '', texte: s, priority: false })),
       ];
     } catch (e) { /* silencieux */ }
+    /* Descriptions des modules du dashboard (assets/module-aide.js), pour répondre
+       à "à quoi sert [module] ?" via le même moteur de recherche par mots-clés.
+       Restreint aux modules réellement présents sur cette page (module-aide-ui.js). */
+    if (window.MODULE_AIDE) {
+      const actifs = window._moduleAideActifs;
+      Object.entries(window.MODULE_AIDE).forEach(([slug, m]) => {
+        if (actifs && !actifs.has(slug)) return;
+        _ctx.push({ titre: m.titre, texte: m.texte, priority: true });
+      });
+    }
     _ctxLoaded = true;
   }
 
@@ -1570,6 +1599,19 @@
 
     // Mémoriser le message utilisateur
     _memory.add('user', text, null);
+
+    // 0. Le nom d'un module (assets/module-aide.js) est cité explicitement dans le
+    //    message → réponse directe. Prioritaire sur les intents génériques, car
+    //    "à quoi sert [module] ?" contient les mots-clés de l'intent "histoire".
+    const moduleHit = matchModuleAide(text);
+    if (moduleHit) {
+      setTimeout(() => {
+        const html = `<p><strong>${_esc(moduleHit.titre)}</strong></p><p>${_esc(moduleHit.texte)}</p>`;
+        appendBotMessage(html, filterQR([{ label: 'Autre question', intent: 'nav_aide' }], level));
+        _memory.add('bot', moduleHit.texte.slice(0, 80), 'module_aide');
+      }, 350);
+      return;
+    }
 
     // 1. Détecter les intents FAQ connus
     const intent = detectIntent(text);
@@ -2218,6 +2260,19 @@
       _memory.add('system', `Tutoriel d'accueil terminé (rôle: ${d.role}). L'utilisateur connaît les bases.`);
     }
   });
+
+  /* Ouvre O-Z et lui pose directement une question (utilisé par l'icône
+     "?" des modules, voir assets/module-aide-ui.js) — passe par le même
+     pipeline que si l'utilisateur l'avait tapée elle-même. */
+  window.ozAskModule = function (question) {
+    togglePanel(true);
+    setTimeout(() => {
+      const input = document.getElementById('cb-input');
+      if (!input) return;
+      input.value = question;
+      sendMessage();
+    }, 350);
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

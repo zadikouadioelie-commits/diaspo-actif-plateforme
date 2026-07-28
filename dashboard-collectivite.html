@@ -94,15 +94,15 @@
       <div class="brand" id="coll-brand">Compte Étatique</div>
 
       <div class="sb-group-lbl">01 — OUTILS</div>
-      <a href="reseau.html">🌐 Mon Réseau Pro</a>
-      <a href="reunions.html">📹 Visioconférence</a>
-      <a href="business-plan.html">📋 Business Plans</a>
-      <a href="projets-evaluation.html">📁 Évaluation de Projet</a>
+      <a href="reseau.html" data-aide="reseau_pro">🌐 Mon Réseau Pro</a>
+      <a href="reunions.html" data-aide="visioconference">📹 Visioconférence</a>
+      <a href="business-plan.html" data-aide="business_plans">📋 Business Plans</a>
+      <a href="projets-evaluation.html" data-aide="evaluation_projet">📁 Évaluation de Projet</a>
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
-      <a href="confidentialite.html">🔐 Confidentialité</a>
-      <a href="programmation.html">⚙️ Programmation</a>
+      <a href="confidentialite.html" data-aide="confidentialite">🔐 Confidentialité</a>
+      <a href="programmation.html" data-aide="programmation">⚙️ Programmation</a>
 
-      <a href="#" onclick="document.getElementById('carte-indice-fiabilite')?.scrollIntoView({behavior:'smooth',block:'center'});return false;">🛡️ Mon indice de fiabilité</a>
+      <a href="#" data-aide="indice_fiabilite" onclick="document.getElementById('carte-indice-fiabilite')?.scrollIntoView({behavior:'smooth',block:'center'});return false;">🛡️ Mon indice de fiabilité</a>
 
       <div class="sb-group-lbl">02 — COCKPIT</div>
       <a href="#" class="active" data-section="cockpit">🟦 Tableau de bord</a>
@@ -112,22 +112,22 @@
       <a href="#" data-section="initiatives-validees" style="display:none;">✅ Initiatives validées</a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
-      <a href="#" data-section="identite-territoriale">🔐 Identité Territoriale</a>
-      <a href="#" data-section="partenariats">🟨 Partenariats</a>
-      <a href="#" data-section="accreditations-da">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="#" data-section="identite-territoriale" data-aide="identite_territoriale">🔐 Identité Territoriale</a>
+      <a href="#" data-section="partenariats" data-aide="partenariats">🟨 Partenariats</a>
+      <a href="#" data-section="accreditations-da" data-aide="accreditations_da">🎖 Accréditations DA <span id="coll-accred-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
 
       <div class="sb-group-lbl">05 — INTELLIGENCE</div>
-      <a href="#" data-section="oz-collectivite">🧠 OZ Collectivité</a>
-      <a href="#" data-section="observatoire">🌍 Observatoire Mondial</a>
-      <a href="#" data-section="observatoire-territorial">🏛 Observatoire Territorial</a>
+      <a href="#" data-section="oz-collectivite" data-aide="oz_collectivite">🧠 OZ Collectivité</a>
+      <a href="#" data-section="observatoire" data-aide="observatoire_mondial">🌍 Observatoire Mondial</a>
+      <a href="#" data-section="observatoire-territorial" data-aide="observatoire_territorial">🏛 Observatoire Territorial</a>
       <a href="#" data-section="opportunites" style="display:none;">💡 Opportunités stratégiques</a>
-      <a href="#" data-section="offres-emploi">💼 Emplois & Stages</a>
+      <a href="#" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
 
       <div class="sb-group-lbl">06 — COMMUNICATION</div>
-      <a href="#" data-section="communications">🟥 Communications</a>
-      <a href="#" data-section="consultations">📋 Consultations</a>
-      <a href="#" data-section="publications">📢 Publications</a>
-      <a href="agenda.html">📅 Mon Agenda</a>
+      <a href="#" data-section="communications" data-aide="messagerie">🟥 Communications</a>
+      <a href="#" data-section="consultations" data-aide="consultations">📋 Consultations</a>
+      <a href="#" data-section="publications" data-aide="publications">📢 Publications</a>
+      <a href="agenda.html" data-aide="mon_agenda">📅 Mon Agenda</a>
 
       <style>.sb-group-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px;}</style>
     </aside>
@@ -2197,6 +2197,8 @@ async function loadPartenariats() {
 <script src="assets/signalement.js"></script>
 <script src="assets/trust-score.js"></script>
 <script src="assets/chatbot.js"></script>
+<script src="assets/module-aide.js"></script>
+<script src="assets/module-aide-ui.js"></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 </body>

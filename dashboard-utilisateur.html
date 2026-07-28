@@ -49,15 +49,15 @@
 
       <div class="sb-group-lbl">01 — OUTILS</div>
       <a href="profil.html" style="display:none;">👤 Mon profil public</a>
-      <a href="emplois-stages.html">💼 Recherche d'emploi & Stage</a>
+      <a href="emplois-stages.html" data-aide="emplois_stages">💼 Recherche d'emploi & Stage</a>
       <a href="reseau.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
-      <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 Business Plans</a>
-      <a href="#" data-usection="outils">📄 CV, Lettres, Candidatures</a>
-      <a href="mes-billets.html">🎟 Mes Billets</a>
-      <a href="mes-paiements.html">💳 Paiements</a>
+      <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné" data-aide="business_plans">👑 Business Plans</a>
+      <a href="#" data-usection="outils" data-aide="cv_lettres">📄 CV, Lettres, Candidatures</a>
+      <a href="mes-billets.html" data-aide="mes_billets">🎟 Mes Billets</a>
+      <a href="mes-paiements.html" data-aide="paiements_utilisateur">💳 Paiements</a>
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
-      <a href="confidentialite.html">🔐 Confidentialité</a>
-      <a href="programmation.html">⚙️ Programmation</a>
+      <a href="confidentialite.html" data-aide="confidentialite">🔐 Confidentialité</a>
+      <a href="programmation.html" data-aide="programmation">⚙️ Programmation</a>
       <a href="tutoriels.html" style="display:none;">📚 Centre des tutos</a>
       <a href="projets-evaluation.html" style="display:none;">📁 Évaluation de Projet</a>
 
@@ -69,12 +69,12 @@
       <a href="annuaire.html" style="display:none;">🔍 Parcourir les initiatives</a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
-      <a href="#" data-usection="territoires">🟨 Ma localisation</a>
+      <a href="#" data-usection="territoires" data-aide="ma_localisation">🟨 Ma localisation</a>
 
       <a href="#" data-usection="intelligence" style="display:none;">🟪 Mes statistiques</a>
 
       <div class="sb-group-lbl">05 — COMMUNICATION</div>
-      <a href="messagerie.html">🟥 Messagerie <span class="pill" id="u-msg-pill" style="display:none;"></span></a>
+      <a href="messagerie.html" data-aide="messagerie">🟥 Messagerie <span class="pill" id="u-msg-pill" style="display:none;"></span></a>
       <a href="agenda.html" style="display:none;">📅 Mon Agenda</a>
       <a href="reunions.html" style="display:none;">📹 Visioconférence</a>
 
@@ -926,6 +926,8 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
 <script src="assets/chatbot.js"></script>
+<script src="assets/module-aide.js"></script>
+<script src="assets/module-aide-ui.js"></script>
 
 <!-- OZ AI Assistant Widget -->
 <style>

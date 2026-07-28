@@ -318,7 +318,7 @@ async function loadMesAccreds(){
             <span class="status-pill status-active">${STAT_LBL[a.statut]||a.statut}</span>
             <p style="font-size:13px;margin:8px 0 0;">Accordée le ${fmtDate(a.date_attribution)}</p>
             ${a.date_expiration?`<p style="font-size:12px;color:var(--muted);">Expire le ${fmtDate(a.date_expiration)}</p>`:''}
-            ${def.module==='asso'?`<a href="dashboard-initiative.html#asso-cockpit" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`:''}
+            ${def.module==='asso'?`<a href="dashboard-initiative.html#asso-documents" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`:''}
           </div>`;
         }).join('')+'</div>'
       : '<p style="color:var(--muted);font-size:13px;">Aucune accréditation accordée pour le moment.</p>';
@@ -358,7 +358,7 @@ function renderCatalogueTab(catalogue, accreds, demandes){
     if(def.module==='asso'){
       if(acc && acc.statut==='active'){
         html+=`<div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#dcfce7;color:#16a34a;font-weight:700;font-size:13px;">✅ Accréditation active</div>
-          <a href="dashboard-initiative.html#asso-cockpit" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`;
+          <a href="dashboard-initiative.html#asso-documents" class="btn btn-orange btn-sm btn-demande" style="margin-top:8px;">Ouvrir mon espace association →</a>`;
       } else if(dem){
         html+=`<p style="font-size:13px;color:var(--muted);padding:8px 0;"><span class="status-pill status-attente" style="position:static;display:inline-block;margin-right:6px;">⏳ En attente</span>Votre demande est en cours d'examen.</p>`;
       } else {

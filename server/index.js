@@ -1372,8 +1372,16 @@ route("PATCH", "/api/initiatives/:id/catalogues/reorder", async (req, res, param
 /* GET /api/initiatives/:id/produits — public, catalogue trié */
 route("GET", "/api/initiatives/:id/produits", async (req, res, params) => {
   const me = await getCurrentUser(req);
-  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const init = await db.prepare("SELECT owner_user_id, vitrine_active FROM initiatives WHERE id=?").get(params.id);
   const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
+  const isAdmin = me && me.role === "administrateur";
+
+  /* Vitrine masquée (non Abonné ou volontairement masquée) : n'expose les produits
+     qu'à son propriétaire et aux admins — sinon un appel direct à cette route
+     contournerait le masquage appliqué côté page publique. */
+  if (init && Number(init.vitrine_active) !== 1 && !isOwner && !isAdmin) {
+    return sendJSON(res, 200, { produits: [], is_owner: false });
+  }
 
   let rows = await db.prepare("SELECT * FROM produits_vitrine WHERE initiative_id=? ORDER BY ordre ASC, id ASC").all(params.id);
   // Les produits "masqué" ne sont visibles que par le propriétaire
@@ -1395,7 +1403,13 @@ route("GET", "/api/initiatives/:id/produits", async (req, res, params) => {
 route("GET", "/api/produits/:id", async (req, res, params) => {
   const p = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
   if (!p) return sendJSON(res, 404, { error: "Produit introuvable." });
-  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
+  const init = await db.prepare("SELECT id, nom, owner_user_id, vitrine_active FROM initiatives WHERE id=?").get(p.initiative_id);
+  const me = await getCurrentUser(req);
+  const isOwner = init && me && Number(init.owner_user_id) === Number(me.id);
+  const isAdmin = me && me.role === "administrateur";
+  if (init && Number(init.vitrine_active) !== 1 && !isOwner && !isAdmin) {
+    return sendJSON(res, 404, { error: "Produit introuvable." });
+  }
   sendJSON(res, 200, { produit: {
     ...p, statut: p.statut || 'disponible', photos: safeParse(p.photos_json || "[]"),
     initiative_nom: init ? init.nom : null, owner_user_id: init ? Number(init.owner_user_id) : null
@@ -2030,6 +2044,57 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
+   MODULE EXPANSION — modules non-standard selon le type d'initiative
+   (Association/Entreprise/ONG), rangés hors de la sidebar principale et
+   activables individuellement par une initiative Abonné. Le socle
+   (toujours visible) n'a pas besoin d'être listé ici — cette table ne
+   couvre que les modules dont la visibilité VARIE selon le type. */
+const EXPANSION_MODULES_PAR_TYPE = {
+  Association: ["emplois_stages", "candidatures", "stats_impact", "visioconference", "evaluation_projet", "accreditations_da"],
+  Entreprise: ["zones_action", "stats_impact", "visioconference", "evaluation_projet", "centre_financier", "accreditations_da"],
+  ONG: ["candidatures", "visioconference", "evaluation_projet", "accreditations_da"],
+};
+
+/* GET /api/initiatives/:id/modules-actifs — owner only */
+route("GET", "/api/initiatives/:id/modules-actifs", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare("SELECT module_slug FROM initiative_modules_actifs WHERE initiative_id=?").all(params.id);
+  sendJSON(res, 200, { actifs: rows.map(r => r.module_slug) });
+});
+
+/* POST /api/initiatives/:id/modules-actifs — active un module Expansion, réservé aux Abonné */
+route("POST", "/api/initiatives/:id/modules-actifs", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const slug = String(body.module_slug || "");
+  const disponibles = EXPANSION_MODULES_PAR_TYPE[init.type] || [];
+  if (!disponibles.includes(slug)) return sendJSON(res, 400, { error: "Ce module n'est pas disponible en Expansion pour ce type d'initiative." });
+  if (!(await hasAccreditation(user.id, "initiative_abonne"))) {
+    return sendJSON(res, 402, { error: "L'activation des modules Expansion est réservée aux initiatives Abonné.", accred_type: "initiative_abonne" });
+  }
+  await db.prepare("INSERT OR IGNORE INTO initiative_modules_actifs (initiative_id, module_slug) VALUES (?,?)").run(params.id, slug);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/initiatives/:id/modules-actifs/:slug — désactive (toujours permis, sans lien avec Premium) */
+route("DELETE", "/api/initiatives/:id/modules-actifs/:slug", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("DELETE FROM initiative_modules_actifs WHERE initiative_id=? AND module_slug=?").run(params.id, params.slug);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
    MODULE "PARAMÈTRES VITRINE" v2 — registre de modules + modèles + toggles
    Une seule vitrine par Initiative, évolutive via modules activables/masquables.
    Masquer un module NE SUPPRIME JAMAIS ses données (voir getVitrineModulesState).
@@ -2461,6 +2526,11 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
 
   /* ── Produit payant : vraie session Stripe Checkout ── */
   if (prod.prix != null && Number(prod.prix) > 0) {
+    /* Vendre réellement (encaisser un paiement) est réservé aux initiatives Abonné —
+       configurer produits/prix reste libre, voir GET /api/initiatives/:id/produits. */
+    if (!(await hasAccreditation(init.owner_user_id, "initiative_abonne"))) {
+      return sendJSON(res, 402, { error: "Cette vitrine n'est pas encore ouverte à la vente (initiative non Abonné)." });
+    }
     const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
     if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
@@ -3154,8 +3224,8 @@ route("GET", "/api/adhesion/verify/:id", async (req, res, params) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════
-   MODULE VOTES SÉCURISÉS — indépendant du système asso_votes premium,
-   ouvert à toute Initiative. Anonymisation par séparation structurelle :
+   MODULE VOTES SÉCURISÉS — ouvert à toute Initiative.
+   Anonymisation par séparation structurelle :
    vote_bulletins n'a AUCUNE colonne d'identité ni FK vers vote_electeurs.
    ══════════════════════════════════════════════════════════════════════ */
 /* Authentification du bulletin par le Code de Sécurité Diaspo'Actif (DS-ID) — la signature numérique
@@ -25135,142 +25205,6 @@ route("GET", "/api/asso/demandes", async (req, res) => {
   sendJSON(res, 200, { demandes });
 });
 
-/* GET /api/asso/adherents */
-route("GET", "/api/asso/adherents", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
-  const { q, statut, limit: lim = 50, offset: off = 0 } = query;
-  let sql = `SELECT * FROM asso_adherents WHERE asso_user_id=?`;
-  const p = [user.id];
-  if (statut) { sql += ` AND statut=?`; p.push(statut); }
-  if (q) { sql += ` AND (prenom LIKE ? OR nom LIKE ? OR email LIKE ?)`; p.push(`%${q}%`,`%${q}%`,`%${q}%`); }
-  sql += ` ORDER BY nom,prenom LIMIT ? OFFSET ?`;
-  p.push(Number(lim), Number(off));
-  const total = (await db.prepare(`SELECT COUNT(*) AS n FROM asso_adherents WHERE asso_user_id=?`).get(user.id))?.n;
-  const adherents = await db.prepare(sql).all(...p);
-  sendJSON(res, 200, { adherents, total });
-});
-
-/* POST /api/asso/adherents */
-route("POST", "/api/asso/adherents", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module Gestion des Associations requis." });
-  const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, type_adhesion = "standard", date_expiration, notes } = body;
-  if (!prenom || !nom) return sendJSON(res, 400, { error: "Prénom et nom requis." });
-  const id = (await db.prepare(`INSERT INTO asso_adherents (asso_user_id,prenom,nom,email,telephone,adresse,pays,date_naissance,nationalite,type_adhesion,date_expiration,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, prenom, nom, email||null, telephone||null, adresse||null, pays||null, date_naissance||null, nationalite||null, type_adhesion, date_expiration||null, notes||null)).lastInsertRowid;
-  sendJSON(res, 201, { id, ok: true });
-});
-
-/* PUT /api/asso/adherents/:id */
-route("PUT", "/api/asso/adherents/:id", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const adh = await db.prepare(`SELECT * FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
-  if (!adh) return sendJSON(res, 404, { error: "Adhérent introuvable." });
-  const { prenom, nom, email, telephone, adresse, pays, date_naissance, nationalite, statut, type_adhesion, date_expiration, notes } = body;
-  await db.prepare(`UPDATE asso_adherents SET prenom=COALESCE(?,prenom),nom=COALESCE(?,nom),email=COALESCE(?,email),telephone=COALESCE(?,telephone),
-    adresse=COALESCE(?,adresse),pays=COALESCE(?,pays),date_naissance=COALESCE(?,date_naissance),nationalite=COALESCE(?,nationalite),
-    statut=COALESCE(?,statut),type_adhesion=COALESCE(?,type_adhesion),date_expiration=COALESCE(?,date_expiration),notes=COALESCE(?,notes),updated_at=datetime('now') WHERE id=?`)
-    .run(prenom||null,nom||null,email||null,telephone||null,adresse||null,pays||null,date_naissance||null,nationalite||null,statut||null,type_adhesion||null,date_expiration||null,notes||null,adh.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* DELETE /api/asso/adherents/:id */
-route("DELETE", "/api/asso/adherents/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const adh = await db.prepare(`SELECT id FROM asso_adherents WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
-  if (!adh) return sendJSON(res, 404, { error: "Adhérent introuvable." });
-  await db.prepare(`DELETE FROM asso_adherents WHERE id=?`).run(adh.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* GET /api/asso/cotisations */
-route("GET", "/api/asso/cotisations", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const { statut, limit: lim = 50, offset: off = 0 } = query;
-  let sql = `SELECT c.*, a.prenom||' '||a.nom AS adherent_nom FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id WHERE c.asso_user_id=?`;
-  const p = [user.id];
-  if (statut) { sql += ` AND c.statut=?`; p.push(statut); }
-  sql += ` ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
-  p.push(Number(lim), Number(off));
-  const cotisations = await db.prepare(sql).all(...p);
-  const stats = await db.prepare(`SELECT SUM(CASE WHEN statut='payee' THEN montant ELSE 0 END) AS total_percu, SUM(CASE WHEN statut='en_attente' THEN montant ELSE 0 END) AS total_attendu, COUNT(*) AS total, SUM(CASE WHEN statut='en_retard' THEN 1 ELSE 0 END) AS en_retard FROM asso_cotisations WHERE asso_user_id=?`).get(user.id);
-  sendJSON(res, 200, { cotisations, stats });
-});
-
-/* POST /api/asso/cotisations */
-route("POST", "/api/asso/cotisations", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const { adherent_id, intitule, montant, devise = "EUR", periodicite = "annuel", statut = "en_attente", date_echeance, date_paiement, mode_paiement, reference, notes } = body;
-  if (!intitule || montant == null) return sendJSON(res, 400, { error: "Intitulé et montant requis." });
-  const id = (await db.prepare(`INSERT INTO asso_cotisations (asso_user_id,adherent_id,intitule,montant,devise,periodicite,statut,date_echeance,date_paiement,mode_paiement,reference,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, adherent_id||null, intitule, Number(montant), devise, periodicite, statut, date_echeance||null, date_paiement||null, mode_paiement||null, reference||null, notes||null)).lastInsertRowid;
-  sendJSON(res, 201, { id, ok: true });
-});
-
-/* PUT /api/asso/cotisations/:id/statut */
-route("PUT", "/api/asso/cotisations/:id/statut", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const cot = await db.prepare(`SELECT id FROM asso_cotisations WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
-  if (!cot) return sendJSON(res, 404, { error: "Cotisation introuvable." });
-  const { statut, date_paiement, mode_paiement } = body;
-  await db.prepare(`UPDATE asso_cotisations SET statut=COALESCE(?,statut),date_paiement=COALESCE(?,date_paiement),mode_paiement=COALESCE(?,mode_paiement) WHERE id=?`)
-    .run(statut||null, date_paiement||null, mode_paiement||null, cot.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* GET /api/asso/finances */
-route("GET", "/api/asso/finances", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const { annee, limit: lim = 100, offset: off = 0 } = query;
-  let sql = `SELECT * FROM asso_finances WHERE asso_user_id=?`;
-  const p = [user.id];
-  if (annee) { sql += ` AND strftime('%Y',date_op)=?`; p.push(String(annee)); }
-  sql += ` ORDER BY date_op DESC LIMIT ? OFFSET ?`;
-  p.push(Number(lim), Number(off));
-  const mouvements = await db.prepare(sql).all(...p);
-  const bilan = await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) AS recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) AS depenses, SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) AS solde FROM asso_finances WHERE asso_user_id=?`).get(user.id);
-  sendJSON(res, 200, { mouvements, bilan });
-});
-
-/* POST /api/asso/finances */
-route("POST", "/api/asso/finances", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const { type, categorie, intitule, montant, devise = "EUR", date_op, mode_paiement, piece_justif, notes } = body;
-  if (!["recette","depense"].includes(type)) return sendJSON(res, 400, { error: "Type invalide." });
-  if (!intitule || montant == null) return sendJSON(res, 400, { error: "Intitulé et montant requis." });
-  const id = (await db.prepare(`INSERT INTO asso_finances (asso_user_id,type,categorie,intitule,montant,devise,date_op,mode_paiement,piece_justif,notes) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, type, categorie||null, intitule, Number(montant), devise, date_op||new Date().toISOString().slice(0,10), mode_paiement||null, piece_justif||null, notes||null)).lastInsertRowid;
-  sendJSON(res, 201, { id, ok: true });
-});
-
-/* DELETE /api/asso/finances/:id */
-route("DELETE", "/api/asso/finances/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const row = await db.prepare(`SELECT id FROM asso_finances WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
-  if (!row) return sendJSON(res, 404, { error: "Mouvement introuvable." });
-  await db.prepare(`DELETE FROM asso_finances WHERE id=?`).run(row.id);
-  sendJSON(res, 200, { ok: true });
-});
-
 /* GET /api/asso/documents */
 route("GET", "/api/asso/documents", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -25303,91 +25237,11 @@ route("DELETE", "/api/asso/documents/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* GET /api/asso/votes */
-route("GET", "/api/asso/votes", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const votes = await db.prepare(`SELECT * FROM asso_votes WHERE asso_user_id=? ORDER BY created_at DESC`).all(user.id);
-  sendJSON(res, 200, { votes });
-});
-
-/* POST /api/asso/votes */
-route("POST", "/api/asso/votes", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!getAssoAccred(user.id)) return sendJSON(res, 403, { error: "Module requis." });
-  const { titre, description, type = "resolution", options = [], anonyme = true, date_debut, date_fin, quorum = 0 } = body;
-  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-  if (!Array.isArray(options) || options.length < 2) return sendJSON(res, 400, { error: "Au moins 2 options requises." });
-  const id = (await db.prepare(`INSERT INTO asso_votes (asso_user_id,titre,description,type,options_json,anonyme,date_debut,date_fin,quorum,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)`)
-    .run(user.id, titre, description||null, type, JSON.stringify(options), anonyme?1:0, date_debut||null, date_fin||null, Number(quorum), user.id)).lastInsertRowid;
-  sendJSON(res, 201, { id, ok: true });
-});
-
-/* PUT /api/asso/votes/:id/ouvrir */
-route("PUT", "/api/asso/votes/:id/ouvrir", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const v = await db.prepare(`SELECT id FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
-  if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
-  await db.prepare(`UPDATE asso_votes SET statut='ouvert' WHERE id=?`).run(v.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* PUT /api/asso/votes/:id/clore */
-route("PUT", "/api/asso/votes/:id/clore", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const v = await db.prepare(`SELECT * FROM asso_votes WHERE id=? AND asso_user_id=?`).get(Number(params.id), user.id);
-  if (!v) return sendJSON(res, 404, { error: "Vote introuvable." });
-  const reponses = await db.prepare(`SELECT choix, COUNT(*) AS n FROM asso_votes_reponses WHERE vote_id=? GROUP BY choix`).all(v.id);
-  const resultat = {};
-  reponses.forEach(r => { resultat[r.choix] = r.n; });
-  await db.prepare(`UPDATE asso_votes SET statut='clos', resultat_json=? WHERE id=?`).run(JSON.stringify(resultat), v.id);
-  sendJSON(res, 200, { ok: true, resultat });
-});
-
-/* POST /api/asso/votes/:id/voter */
-route("POST", "/api/asso/votes/:id/voter", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const v = await db.prepare(`SELECT * FROM asso_votes WHERE id=? AND statut='ouvert'`).get(Number(params.id));
-  if (!v) return sendJSON(res, 404, { error: "Vote non disponible." });
-  const { adherent_id, choix } = body;
-  if (!choix) return sendJSON(res, 400, { error: "Choix requis." });
-  const options = JSON.parse(v.options_json || "[]");
-  if (!options.includes(choix)) return sendJSON(res, 400, { error: "Option invalide." });
-  try {
-    await db.prepare(`INSERT INTO asso_votes_reponses (vote_id,adherent_id,choix) VALUES (?,?,?)`)
-      .run(v.id, adherent_id||null, choix);
-    sendJSON(res, 201, { ok: true });
-  } catch(e) {
-    sendJSON(res, 409, { error: "Vous avez déjà voté." });
-  }
-});
-
 /* GET /api/asso/badge/:userId */
 route("GET", "/api/asso/badge/:userId", async (req, res, params) => {
   const accred = await db.prepare(`SELECT niveau, statut FROM asso_accreditations WHERE user_id=?`).get(Number(params.userId));
   if (!accred || accred.statut !== "active") return sendJSON(res, 200, { badge: null });
   sendJSON(res, 200, { badge: accred.niveau });
-});
-
-/* GET /api/asso/dashboard */
-route("GET", "/api/asso/dashboard", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const accred = getAssoAccred(user.id);
-  if (!accred) return sendJSON(res, 403, { error: "Module requis." });
-  const adherents = (await db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(user.id))?.n;
-  const adherentsTotal = (await db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=?`).get(user.id))?.n;
-  const cotisations = (await db.prepare(`SELECT SUM(montant) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(user.id))?.n || 0;
-  const en_retard = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(user.id))?.n;
-  const bilan = (await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE -montant END) solde FROM asso_finances WHERE asso_user_id=?`).get(user.id))?.solde || 0;
-  const votes_ouverts = (await db.prepare(`SELECT COUNT(*) n FROM asso_votes WHERE asso_user_id=? AND statut='ouvert'`).get(user.id))?.n;
-  const documents = (await db.prepare(`SELECT COUNT(*) n FROM asso_documents WHERE asso_user_id=?`).get(user.id))?.n;
-  sendJSON(res, 200, { accreditation: accred, stats: { adherents, adherentsTotal, cotisations, en_retard, bilan, votes_ouverts, documents } });
 });
 
 /* ADMIN routes */
@@ -25470,12 +25324,10 @@ route("GET", "/api/admin/asso/liste", async (req, res) => {
    ════════════════════════════════════════════════════════════════════ */
 
 /* Rôle DAA-Lang de l'utilisateur courant dans une association.
-   Le titulaire de l'accréditation est PRESIDENT ; sinon on lit
-   asso_membre_roles. */
+   Seul le titulaire de l'accréditation (assoGuard n'appelle cette fonction
+   qu'avec assoUserId===daUserId) accède aux routes restantes du module. */
 async function assoRole(assoUserId, daUserId) {
-  if (assoUserId === daUserId) return "PRESIDENT";
-  const r = await db.prepare(`SELECT role FROM asso_membre_roles WHERE asso_user_id=? AND da_user_id=?`).get(assoUserId, daUserId);
-  return r ? r.role : "GUEST";
+  return assoUserId === daUserId ? "PRESIDENT" : "GUEST";
 }
 
 /* Garde de permission unifiée : accréditation active + capacité DSL.
@@ -25504,174 +25356,6 @@ async function assoAudit(assoUserId, acteurId, action, entite, entiteId, details
 /* ── GET /api/asso/spec — expose la spécification DAA-Lang ────────────── */
 route("GET", "/api/asso/spec", async (req, res) => {
   sendJSON(res, 200, { spec: DAA.SPEC });
-});
-
-/* ════════ MODULE BANK_INFO (DSL CONTRIBUTIONS.BANK_INFO) ════════ */
-
-/* GET /api/asso/bank-info — accès restreint à ACCESS_ROLE du DSL */
-route("GET", "/api/asso/bank-info", async (req, res) => {
-  const g = assoGuard(req, res, "bank_info.read");
-  if (!g) return;
-  const info = await db.prepare(`SELECT * FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
-  sendJSON(res, 200, { bank_info: info || null });
-});
-
-/* PUT /api/asso/bank-info */
-route("PUT", "/api/asso/bank-info", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "bank_info.write");
-  if (!g) return;
-  const { holder_name, bank_name, iban, bic, devise = "EUR", reference_modele, display_to_members = 1, instructions } = body;
-  // Validation selon le DSL : IBAN + HOLDER_NAME = REQUIRED
-  if (!holder_name || !iban) return sendJSON(res, 400, { error: "Titulaire (HOLDER_NAME) et IBAN sont requis (DSL)." });
-  if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée par le DSL." });
-  const existing = await db.prepare(`SELECT id FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
-  if (existing) {
-    await db.prepare(`UPDATE asso_bank_info SET holder_name=?,bank_name=?,iban=?,bic=?,devise=?,reference_modele=COALESCE(?,reference_modele),display_to_members=?,instructions=?,updated_at=datetime('now') WHERE asso_user_id=?`)
-      .run(holder_name, bank_name||null, iban, bic||null, devise, reference_modele||null, display_to_members?1:0, instructions||null, g.user.id);
-  } else {
-    await db.prepare(`INSERT INTO asso_bank_info (asso_user_id,holder_name,bank_name,iban,bic,devise,reference_modele,display_to_members,instructions) VALUES (?,?,?,?,?,?,COALESCE(?,'COTISATION-{ANNEE}-{PRENOM}-{NOM}'),?,?)`)
-      .run(g.user.id, holder_name, bank_name||null, iban, bic||null, devise, reference_modele||null, display_to_members?1:0, instructions||null);
-  }
-  assoAudit(g.user.id, g.user.id, "bank_info.update", "bank_info", null, { iban: iban.slice(0,8)+"…" });
-  sendJSON(res, 200, { ok: true });
-});
-
-/* GET /api/asso/bank-info/virement/:cotisationId — instructions de virement
-   générées pour un membre (référence automatique selon le modèle DSL) */
-route("GET", "/api/asso/bank-info/virement/:cotisationId", async (req, res, params) => {
-  const g = assoGuard(req, res, "contributions.read");
-  if (!g) return;
-  const info = await db.prepare(`SELECT * FROM asso_bank_info WHERE asso_user_id=?`).get(g.user.id);
-  if (!info) return sendJSON(res, 404, { error: "Coordonnées bancaires non renseignées." });
-  const cot = await db.prepare(`SELECT c.*, a.prenom, a.nom FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id WHERE c.id=? AND c.asso_user_id=?`).get(Number(params.cotisationId), g.user.id);
-  if (!cot) return sendJSON(res, 404, { error: "Cotisation introuvable." });
-  const reference = (info.reference_modele || "COTISATION-{ANNEE}-{PRENOM}-{NOM}")
-    .replace("{ANNEE}", new Date().getFullYear())
-    .replace("{PRENOM}", (cot.prenom||"").toUpperCase())
-    .replace("{NOM}", (cot.nom||"").toUpperCase());
-  sendJSON(res, 200, { virement: {
-    holder_name: info.holder_name, bank_name: info.bank_name, iban: info.iban, bic: info.bic,
-    montant: cot.montant, devise: cot.devise, reference, instructions: info.instructions,
-  }});
-});
-
-/* ════════ MODULE NOTIFICATIONS — relances automatiques ════════ */
-
-/* POST /api/asso/relances/run — déclenche le moteur de relances.
-   Parcourt les cotisations impayées, calcule le retard, choisit le niveau
-   de gabarit (DSL TEMPLATE_LEVELS) selon REMINDER_SCHEDULE. */
-route("POST", "/api/asso/relances/run", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "notifications.send");
-  if (!g) return;
-  if (!DAA.NOTIFICATIONS.PAYMENT_REMINDERS) return sendJSON(res, 200, { ok: true, relances: 0 });
-  const canal = (body && body.canal && DAA.isValid("channel", body.canal)) ? String(body.canal).toUpperCase() : "APP";
-  const offsets = DAA.reminderOffsets(); // [0,7,15,30,60]
-  const impayees = await db.prepare(`SELECT c.*, a.prenom, a.nom, a.da_user_id FROM asso_cotisations c LEFT JOIN asso_adherents a ON a.id=c.adherent_id
-    WHERE c.asso_user_id=? AND c.statut IN ('en_attente','en_retard') AND c.date_echeance IS NOT NULL`).all(g.user.id);
-  const today = new Date();
-  let count = 0;
-  for (const cot of impayees) {
-    const ech = new Date(cot.date_echeance);
-    const daysLate = Math.floor((today - ech) / 86400000);
-    if (daysLate < 0) continue;
-    // Ne relancer qu'aux jalons définis par le DSL
-    if (!offsets.includes(daysLate)) continue;
-    // Éviter les doublons de relance pour ce jalon
-    const deja = await db.prepare(`SELECT id FROM asso_relances WHERE cotisation_id=? AND jours_retard=?`).get(cot.id, daysLate);
-    if (deja) continue;
-    const niveau = DAA.reminderLevelFor(daysLate);
-    const message = `Relance ${niveau} — cotisation « ${cot.intitule} » (${cot.montant} ${cot.devise}) en retard de ${daysLate} jour(s).`;
-    await db.prepare(`INSERT INTO asso_relances (asso_user_id,cotisation_id,adherent_id,niveau,canal,jours_retard,message) VALUES (?,?,?,?,?,?,?)`)
-      .run(g.user.id, cot.id, cot.adherent_id, niveau, canal, daysLate, message);
-    // Marque la cotisation en retard
-    if (cot.statut !== "en_retard") await db.prepare(`UPDATE asso_cotisations SET statut='en_retard' WHERE id=?`).run(cot.id);
-    // Canal APP → notification plateforme si le membre a un compte lié (confidentialité respectée)
-    if (canal === "APP" && cot.da_user_id) {
-      creerNotif(cot.da_user_id, niveau === "FINAL_NOTICE" ? "alerte" : "info", "Rappel de cotisation", message);
-    }
-    // DSL AUTO_SUSPENSION : suspension après le dernier jalon
-    if (DAA.CONTRIBUTIONS.AUTO_SUSPENSION && daysLate >= Math.max(...offsets) && cot.adherent_id) {
-      await db.prepare(`UPDATE asso_adherents SET statut='suspendu' WHERE id=? AND asso_user_id=?`).run(cot.adherent_id, g.user.id);
-    }
-    count++;
-  }
-  assoAudit(g.user.id, g.user.id, "relances.run", "relances", null, { generees: count, canal });
-  sendJSON(res, 200, { ok: true, relances: count });
-});
-
-/* GET /api/asso/relances */
-route("GET", "/api/asso/relances", async (req, res, params, body, query) => {
-  const g = assoGuard(req, res, "contributions.read");
-  if (!g) return;
-  const rows = await db.prepare(`SELECT r.*, a.prenom||' '||a.nom AS adherent_nom FROM asso_relances r LEFT JOIN asso_adherents a ON a.id=r.adherent_id WHERE r.asso_user_id=? ORDER BY r.created_at DESC LIMIT 200`).all(g.user.id);
-  sendJSON(res, 200, { relances: rows });
-});
-
-/* ════════ MODULE FINANCE — budgets & validation (DSL FINANCE) ════════ */
-
-/* GET /api/asso/budgets — budget prévu vs réel par catégorie */
-route("GET", "/api/asso/budgets", async (req, res, params, body, query) => {
-  const g = assoGuard(req, res, "finance.read");
-  if (!g) return;
-  const annee = Number(query.annee) || new Date().getFullYear();
-  const budgets = await db.prepare(`SELECT * FROM asso_budgets WHERE asso_user_id=? AND annee=? ORDER BY categorie`).all(g.user.id, annee);
-  // DSL AUTO_CALCULATIONS : rapproche chaque budget des dépenses réelles
-  const enriched = budgets.map(b => {
-    const reel = db.prepare(`SELECT COALESCE(SUM(montant),0) n FROM asso_finances WHERE asso_user_id=? AND type='depense' AND categorie=? AND strftime('%Y',date_op)=?`)
-      .get(g.user.id, b.categorie, String(annee)).n;
-    const ecart = b.montant_prevu - reel;
-    return { ...b, montant_reel: reel, ecart, depasse: reel > b.montant_prevu };
-  });
-  sendJSON(res, 200, { budgets: enriched, annee });
-});
-
-/* POST /api/asso/budgets */
-route("POST", "/api/asso/budgets", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "budgets.write");
-  if (!g) return;
-  const { categorie, montant_prevu, devise = "EUR", annee, notes } = body;
-  if (!categorie || montant_prevu == null) return sendJSON(res, 400, { error: "Catégorie et montant prévu requis." });
-  if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée par le DSL." });
-  const an = Number(annee) || new Date().getFullYear();
-  const id = (await db.prepare(`INSERT INTO asso_budgets (asso_user_id,categorie,montant_prevu,devise,annee,notes) VALUES (?,?,?,?,?,?)`)
-    .run(g.user.id, categorie, Number(montant_prevu), devise, an, notes||null)).lastInsertRowid;
-  assoAudit(g.user.id, g.user.id, "budget.create", "budget", Number(id), { categorie, montant_prevu });
-  sendJSON(res, 201, { id, ok: true });
-});
-
-/* DELETE /api/asso/budgets/:id */
-route("DELETE", "/api/asso/budgets/:id", async (req, res, params) => {
-  const g = assoGuard(req, res, "budgets.write");
-  if (!g) return;
-  const b = await db.prepare(`SELECT id FROM asso_budgets WHERE id=? AND asso_user_id=?`).get(Number(params.id), g.user.id);
-  if (!b) return sendJSON(res, 404, { error: "Budget introuvable." });
-  await db.prepare(`DELETE FROM asso_budgets WHERE id=?`).run(b.id);
-  assoAudit(g.user.id, g.user.id, "budget.delete", "budget", b.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* GET /api/asso/finance/rapport — rapports DSL (MONTHLY/QUARTERLY/YEARLY) */
-route("GET", "/api/asso/finance/rapport", async (req, res, params, body, query) => {
-  const g = assoGuard(req, res, "finance.read");
-  if (!g) return;
-  const annee = Number(query.annee) || new Date().getFullYear();
-  // Ventilation mensuelle (AUTO_CALCULATIONS)
-  const parMois = await db.prepare(`SELECT strftime('%m',date_op) mois,
-      SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes,
-      SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses
-    FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY mois ORDER BY mois`).all(g.user.id, String(annee));
-  const parCategorie = await db.prepare(`SELECT categorie, type, SUM(montant) total FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=? GROUP BY categorie,type`).all(g.user.id, String(annee));
-  const total = await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) recettes, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) depenses FROM asso_finances WHERE asso_user_id=? AND strftime('%Y',date_op)=?`).get(g.user.id, String(annee));
-  const resultat = (total.recettes||0) - (total.depenses||0);
-  sendJSON(res, 200, { annee, parMois, parCategorie, total, resultat, devises: DAA.FINANCE.CURRENCIES });
-});
-
-/* GET /api/asso/audit — DSL SECURITY.AUDIT_LOGS */
-route("GET", "/api/asso/audit", async (req, res, params, body, query) => {
-  const g = assoGuard(req, res, "audit.read");
-  if (!g) return;
-  const rows = await db.prepare(`SELECT * FROM asso_audit_log WHERE asso_user_id=? ORDER BY created_at DESC LIMIT 300`).all(g.user.id);
-  sendJSON(res, 200, { audit: rows });
 });
 
 /* ════════ MODULE DOCUMENTS — OCR / classification / anti-doublon ════════ */
@@ -25718,183 +25402,6 @@ route("GET", "/api/asso/documents/:id/meta", async (req, res, params) => {
   if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
   const meta = await db.prepare(`SELECT * FROM asso_doc_meta WHERE document_id=?`).get(doc.id);
   sendJSON(res, 200, { meta: meta || null });
-});
-
-/* ════════ MODULE GENERAL_ASSEMBLY (DSL) ════════ */
-
-/* GET /api/asso/assemblees */
-route("GET", "/api/asso/assemblees", async (req, res) => {
-  const g = assoGuard(req, res, "assembly.manage");
-  if (!g) return;
-  const rows = await db.prepare(`SELECT * FROM asso_assemblees WHERE asso_user_id=? ORDER BY date_prevue DESC, created_at DESC`).all(g.user.id);
-  sendJSON(res, 200, { assemblees: rows, features: DAA.GENERAL_ASSEMBLY.FEATURES });
-});
-
-/* POST /api/asso/assemblees — CREATION=ONE_CLICK : active toutes les
-   features du DSL par défaut, génère convocation + ordre du jour */
-route("POST", "/api/asso/assemblees", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "assembly.manage");
-  if (!g) return;
-  const { titre, type = "ordinaire", date_prevue, lieu, lien_visio, ordre_du_jour, quorum_requis } = body;
-  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-  // DSL AUTO_CONVOCATION + AGENDA_GENERATION_AI
-  const odj = ordre_du_jour || "1. Émargement et vérification du quorum\n2. Rapport moral du président\n3. Rapport financier du trésorier\n4. Approbation des comptes\n5. Questions diverses\n6. Clôture";
-  const convocation = `Convocation — ${titre}\n\nVous êtes convoqué(e) à l'assemblée générale ${type} qui se tiendra le ${date_prevue || "(date à définir)"}${lieu ? " à " + lieu : ""}${lien_visio ? " (visio : " + lien_visio + ")" : ""}.\n\nOrdre du jour :\n${odj}`;
-  const id = (await db.prepare(`INSERT INTO asso_assemblees (asso_user_id,titre,type,date_prevue,lieu,lien_visio,ordre_du_jour,convocation,quorum_requis,features_json,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(g.user.id, titre, type, date_prevue||null, lieu||null, lien_visio||null, odj, convocation, Number(quorum_requis)||0, JSON.stringify(DAA.GENERAL_ASSEMBLY.FEATURES), g.user.id)).lastInsertRowid;
-  assoAudit(g.user.id, g.user.id, "assemblee.create", "assemblee", Number(id), { titre });
-  sendJSON(res, 201, { id, ok: true, convocation, ordre_du_jour: odj });
-});
-
-/* PUT /api/asso/assemblees/:id — maj statut/présents/PV + contrôle quorum */
-route("PUT", "/api/asso/assemblees/:id", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "assembly.manage");
-  if (!g) return;
-  const ag = await db.prepare(`SELECT * FROM asso_assemblees WHERE id=? AND asso_user_id=?`).get(Number(params.id), g.user.id);
-  if (!ag) return sendJSON(res, 404, { error: "Assemblée introuvable." });
-  const { statut, presents, pv, ordre_du_jour, date_prevue } = body;
-  // DSL QUORUM_CHECK
-  let quorum_atteint = null;
-  if (presents != null && ag.quorum_requis > 0) quorum_atteint = Number(presents) >= ag.quorum_requis;
-  await db.prepare(`UPDATE asso_assemblees SET statut=COALESCE(?,statut),presents=COALESCE(?,presents),pv=COALESCE(?,pv),ordre_du_jour=COALESCE(?,ordre_du_jour),date_prevue=COALESCE(?,date_prevue) WHERE id=?`)
-    .run(statut||null, presents!=null?Number(presents):null, pv||null, ordre_du_jour||null, date_prevue||null, ag.id);
-  assoAudit(g.user.id, g.user.id, "assemblee.update", "assemblee", ag.id, { statut, quorum_atteint });
-  sendJSON(res, 200, { ok: true, quorum_atteint });
-});
-
-/* ════════ MODULE ANALYTICS — engagement (DSL ANALYTICS) ════════ */
-
-/* GET /api/asso/analytics — stats membres + indice d'engagement */
-route("GET", "/api/asso/analytics", async (req, res, params, body, query) => {
-  const g = assoGuard(req, res, "analytics.read");
-  if (!g) return;
-  const uid = g.user.id;
-  const membres = await db.prepare(`SELECT statut, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY statut`).all(uid);
-  const parPays = await db.prepare(`SELECT COALESCE(pays,'—') pays, COUNT(*) n FROM asso_adherents WHERE asso_user_id=? GROUP BY pays ORDER BY n DESC LIMIT 20`).all(uid);
-  const cotisations = await db.prepare(`SELECT statut, COUNT(*) n, COALESCE(SUM(montant),0) total FROM asso_cotisations WHERE asso_user_id=? GROUP BY statut`).all(uid);
-  const totalCot = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=?`).get(uid))?.n;
-  const payees = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid))?.n;
-  const tauxRecouvrement = totalCot ? Math.round((payees / totalCot) * 100) : 0;
-  // DSL ENGAGEMENT_SCORE par adhérent (TRACKING : paiements + votes)
-  const engagement = await db.prepare(`
-    SELECT a.id, a.prenom||' '||a.nom AS nom,
-      (SELECT COUNT(*) FROM asso_cotisations c WHERE c.adherent_id=a.id AND c.statut='payee') AS paiements,
-      (SELECT COUNT(*) FROM asso_votes_reponses vr WHERE vr.adherent_id=a.id) AS votes
-    FROM asso_adherents a WHERE a.asso_user_id=?`).all(uid)
-    .map(r => ({ ...r, score: Math.min(100, r.paiements * 20 + r.votes * 15) }))
-    .sort((x, y) => y.score - x.score).slice(0, 50);
-  // DSL AUTO_INSIGHTS
-  const insights = [];
-  if (tauxRecouvrement < 60) insights.push("Taux de recouvrement faible : lancez une campagne de relance.");
-  const enRetard = (await db.prepare(`SELECT COUNT(*) n FROM asso_cotisations WHERE asso_user_id=? AND statut='en_retard'`).get(uid))?.n;
-  if (enRetard > 0) insights.push(`${enRetard} cotisation(s) en retard à traiter.`);
-  if (!engagement.length) insights.push("Aucun adhérent enregistré : commencez par ajouter vos membres.");
-  sendJSON(res, 200, { membres, parPays, cotisations, tauxRecouvrement, engagement, insights });
-});
-
-/* ════════ MODULE AI_ASSISTANT (DSL) ════════ */
-
-/* POST /api/asso/ai — assistant : analyse finance, prédiction, rapports.
-   Implémentation déterministe (sans dépendance externe) basée sur les
-   données réelles ; respecte les capacités déclarées dans le DSL. */
-route("POST", "/api/asso/ai", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "analytics.read");
-  if (!g) return;
-  const uid = g.user.id;
-  const tache = String((body && body.tache) || "").toUpperCase();
-  const out = { tache };
-  if (tache === "FINANCE_ANALYSIS" && DAA.AI_ASSISTANT.FINANCE_ANALYSIS) {
-    const b = await db.prepare(`SELECT SUM(CASE WHEN type='recette' THEN montant ELSE 0 END) r, SUM(CASE WHEN type='depense' THEN montant ELSE 0 END) d FROM asso_finances WHERE asso_user_id=?`).get(uid);
-    const solde = (b.r||0) - (b.d||0);
-    out.resume = `Recettes ${b.r||0} / Dépenses ${b.d||0} → solde ${solde}. ${solde < 0 ? "Attention : trésorerie déficitaire." : "Trésorerie positive."}`;
-  } else if (tache === "ENGAGEMENT_PREDICTION" && DAA.AI_ASSISTANT.ENGAGEMENT_PREDICTION) {
-    const risque = await db.prepare(`SELECT a.prenom||' '||a.nom nom FROM asso_adherents a WHERE a.asso_user_id=? AND a.statut='actif'
-      AND NOT EXISTS (SELECT 1 FROM asso_cotisations c WHERE c.adherent_id=a.id AND c.statut='payee' AND c.date_paiement >= date('now','-1 year')) LIMIT 20`).all(uid);
-    out.a_risque = risque.map(x => x.nom);
-    out.resume = `${risque.length} membre(s) à risque de non-renouvellement (aucun paiement sur 12 mois).`;
-  } else if (tache === "AUTO_REPORTS" && DAA.AI_ASSISTANT.AUTO_REPORTS) {
-    const nb = (await db.prepare(`SELECT COUNT(*) n FROM asso_adherents WHERE asso_user_id=? AND statut='actif'`).get(uid))?.n;
-    const cot = await db.prepare(`SELECT COALESCE(SUM(montant),0) n FROM asso_cotisations WHERE asso_user_id=? AND statut='payee'`).get(uid).n;
-    out.rapport = `Rapport d'activité — ${nb} adhérent(s) actif(s), ${cot} encaissés en cotisations.`;
-  } else {
-    return sendJSON(res, 400, { error: "Tâche IA non reconnue ou non activée dans le DSL.", disponibles: Object.keys(DAA.AI_ASSISTANT).filter(k => DAA.AI_ASSISTANT[k] === true) });
-  }
-  assoAudit(uid, uid, "ai.run", "ai", null, { tache });
-  sendJSON(res, 200, out);
-});
-
-/* ════════ MODULE SUBSCRIPTION (DSL) ════════ */
-
-/* GET /api/asso/subscription */
-route("GET", "/api/asso/subscription", async (req, res) => {
-  const g = assoGuard(req, res, null);
-  if (!g) return;
-  let sub = await db.prepare(`SELECT * FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
-  if (!sub) {
-    await db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat) VALUES (?,?, 'TRIAL')`).run(g.user.id, "YEARLY");
-    sub = await db.prepare(`SELECT * FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
-  }
-  // DSL FREE_MODE / UNPAID_STATE : capacités selon l'état
-  const readOnly = sub.etat === "UNPAID" || sub.etat === "CANCELLED";
-  sendJSON(res, 200, { subscription: sub, mode: readOnly ? DAA.SUBSCRIPTION.UNPAID_STATE : "FULL", read_only: readOnly });
-});
-
-/* POST /api/asso/subscription/pay — enregistre un paiement d'abonnement.
-   DSL BADGE_GRANTED_ON_PAYMENT : active l'accréditation au paiement. */
-route("POST", "/api/asso/subscription/pay", async (req, res, params, body) => {
-  const g = assoGuard(req, res, null);
-  if (!g) return;
-  const { billing = "YEARLY", montant = 0, devise = "EUR" } = body;
-  if (!DAA.isValid("billing", billing)) return sendJSON(res, 400, { error: "Périodicité de facturation hors DSL." });
-  if (!DAA.isValid("currency", devise)) return sendJSON(res, 400, { error: "Devise non supportée." });
-  const echeance = new Date();
-  if (String(billing).toUpperCase() === "MONTHLY") echeance.setMonth(echeance.getMonth() + 1);
-  else echeance.setFullYear(echeance.getFullYear() + 1);
-  const ech = echeance.toISOString().slice(0, 10);
-  const existing = await db.prepare(`SELECT id FROM asso_subscription WHERE asso_user_id=?`).get(g.user.id);
-  if (existing) {
-    await db.prepare(`UPDATE asso_subscription SET billing=?,etat='ACTIVE',montant=?,devise=?,date_echeance=?,dernier_paiement=date('now'),updated_at=datetime('now') WHERE asso_user_id=?`)
-      .run(billing, Number(montant), devise, ech, g.user.id);
-  } else {
-    await db.prepare(`INSERT INTO asso_subscription (asso_user_id,billing,etat,montant,devise,date_echeance,dernier_paiement) VALUES (?,?, 'ACTIVE',?,?,?,date('now'))`)
-      .run(g.user.id, billing, Number(montant), devise, ech);
-  }
-  // BADGE_GRANTED_ON_PAYMENT : (ré)active l'accréditation
-  await db.prepare(`UPDATE asso_accreditations SET statut='active',date_fin=?,updated_at=datetime('now') WHERE user_id=?`).run(ech, g.user.id);
-  assoAudit(g.user.id, g.user.id, "subscription.pay", "subscription", null, { billing, montant, devise });
-  sendJSON(res, 200, { ok: true, date_echeance: ech });
-});
-
-/* ════════ MODULE MEMBERS — rôles & rattachement de comptes (DSL) ════════ */
-
-/* GET /api/asso/membre-roles */
-route("GET", "/api/asso/membre-roles", async (req, res) => {
-  const g = assoGuard(req, res, "members.read");
-  if (!g) return;
-  const rows = await db.prepare(`SELECT mr.*, u.nom AS user_nom FROM asso_membre_roles mr JOIN users u ON u.id=mr.da_user_id WHERE mr.asso_user_id=? ORDER BY mr.created_at DESC`).all(g.user.id);
-  sendJSON(res, 200, { roles: rows, roles_disponibles: DAA.MEMBERS.ROLES });
-});
-
-/* POST /api/asso/membre-roles — attribue un rôle DSL à un compte plateforme */
-route("POST", "/api/asso/membre-roles", async (req, res, params, body) => {
-  const g = assoGuard(req, res, "members.write");
-  if (!g) return;
-  const { da_user_id, role = "MEMBER", role_custom } = body;
-  if (!da_user_id) return sendJSON(res, 400, { error: "Compte plateforme (da_user_id) requis." });
-  const roleUp = String(role).toUpperCase();
-  // DSL : rôle prédéfini OU rôle personnalisé si CUSTOM_ROLES
-  if (!DAA.MEMBERS.ROLES.includes(roleUp) && !(DAA.MEMBERS.CUSTOM_ROLES && role_custom)) {
-    return sendJSON(res, 400, { error: "Rôle invalide selon le DSL.", roles: DAA.MEMBERS.ROLES });
-  }
-  const finalRole = DAA.MEMBERS.ROLES.includes(roleUp) ? roleUp : "MEMBER";
-  const existing = await db.prepare(`SELECT id FROM asso_membre_roles WHERE asso_user_id=? AND da_user_id=?`).get(g.user.id, Number(da_user_id));
-  if (existing) {
-    await db.prepare(`UPDATE asso_membre_roles SET role=?,role_custom=? WHERE id=?`).run(finalRole, role_custom||null, existing.id);
-  } else {
-    await db.prepare(`INSERT INTO asso_membre_roles (asso_user_id,da_user_id,role,role_custom) VALUES (?,?,?,?)`).run(g.user.id, Number(da_user_id), finalRole, role_custom||null);
-  }
-  assoAudit(g.user.id, g.user.id, "role.assign", "membre_role", Number(da_user_id), { role: finalRole, role_custom });
-  sendJSON(res, 200, { ok: true });
 });
 
 /* ═══════════════════════════════════════════════════════════════════

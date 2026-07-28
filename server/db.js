@@ -2941,9 +2941,12 @@ function backfillOfficialFollow() {
 })();
 
 /* ═══════════════════════════════════════════════════════════════════
-   MODULE GESTION DES ASSOCIATIONS
-   Art. 30-33 — Accréditation, abonnement, adhérents, cotisations,
-                finances, documents, votes électroniques
+   MODULE GESTION DES ASSOCIATIONS — Accréditation + Documents.
+   Le reste (adhérents, cotisations, finances, votes internes, DAA-Lang)
+   a été retiré : jamais provisionné en production (server/pg-init.js ne
+   créait aucune de ces tables) et intégralement doublé par des modules
+   Premium plus aboutis (Cotisations & Adhésions, Votes sécurisés,
+   Centre Financier).
    ═══════════════════════════════════════════════════════════════════ */
 db.exec(`
 
@@ -3000,69 +3003,6 @@ db.exec(`
     created_at    TEXT DEFAULT (datetime('now'))
   );
 
-  /* ── Adhérents ── */
-  CREATE TABLE IF NOT EXISTS asso_adherents (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    prenom        TEXT NOT NULL,
-    nom           TEXT NOT NULL,
-    email         TEXT,
-    telephone     TEXT,
-    adresse       TEXT,
-    pays          TEXT,
-    date_naissance TEXT,
-    nationalite   TEXT,
-    statut        TEXT DEFAULT 'actif'
-                  CHECK(statut IN ('actif','inactif','suspendu','radie')),
-    type_adhesion TEXT DEFAULT 'standard',
-    date_adhesion TEXT DEFAULT (date('now')),
-    date_expiration TEXT,
-    da_user_id    INTEGER,
-    notes         TEXT,
-    created_at    TEXT DEFAULT (datetime('now')),
-    updated_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id),
-    FOREIGN KEY(da_user_id)   REFERENCES users(id)
-  );
-
-  /* ── Cotisations ── */
-  CREATE TABLE IF NOT EXISTS asso_cotisations (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    adherent_id   INTEGER,
-    intitule      TEXT NOT NULL,
-    montant       REAL NOT NULL,
-    devise        TEXT DEFAULT 'EUR',
-    periodicite   TEXT DEFAULT 'annuel',
-    statut        TEXT DEFAULT 'en_attente'
-                  CHECK(statut IN ('en_attente','payee','partielle','en_retard','annulee')),
-    date_echeance TEXT,
-    date_paiement TEXT,
-    mode_paiement TEXT,
-    reference     TEXT,
-    notes         TEXT,
-    created_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id),
-    FOREIGN KEY(adherent_id)  REFERENCES asso_adherents(id)
-  );
-
-  /* ── Finances ── */
-  CREATE TABLE IF NOT EXISTS asso_finances (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    type          TEXT NOT NULL CHECK(type IN ('recette','depense')),
-    categorie     TEXT,
-    intitule      TEXT NOT NULL,
-    montant       REAL NOT NULL,
-    devise        TEXT DEFAULT 'EUR',
-    date_op       TEXT DEFAULT (date('now')),
-    mode_paiement TEXT,
-    piece_justif  TEXT,
-    notes         TEXT,
-    created_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id)
-  );
-
   /* ── Documents (GED) ── */
   CREATE TABLE IF NOT EXISTS asso_documents (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3076,39 +3016,6 @@ db.exec(`
     created_by    INTEGER,
     created_at    TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(asso_user_id) REFERENCES users(id)
-  );
-
-  /* ── Votes électroniques ── */
-  CREATE TABLE IF NOT EXISTS asso_votes (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    titre         TEXT NOT NULL,
-    description   TEXT,
-    type          TEXT DEFAULT 'resolution'
-                  CHECK(type IN ('resolution','election','consultation','budget')),
-    statut        TEXT DEFAULT 'brouillon'
-                  CHECK(statut IN ('brouillon','ouvert','clos','annule')),
-    options_json  TEXT DEFAULT '[]',
-    resultat_json TEXT DEFAULT '{}',
-    anonyme       INTEGER DEFAULT 1,
-    date_debut    TEXT,
-    date_fin      TEXT,
-    quorum        INTEGER DEFAULT 0,
-    created_by    INTEGER,
-    created_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id)
-  );
-
-  /* ── Réponses aux votes ── */
-  CREATE TABLE IF NOT EXISTS asso_votes_reponses (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    vote_id       INTEGER NOT NULL,
-    adherent_id   INTEGER,
-    choix         TEXT NOT NULL,
-    created_at    TEXT DEFAULT (datetime('now')),
-    UNIQUE(vote_id, adherent_id),
-    FOREIGN KEY(vote_id)     REFERENCES asso_votes(id),
-    FOREIGN KEY(adherent_id) REFERENCES asso_adherents(id)
   );
 
   /* ════════════════════════════════════════════════════════════════════
@@ -3127,65 +3034,6 @@ db.exec(`
     UNIQUE(initiative_id, user_id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
-  /* ── DSL MEMBERS.ROLES : rattachement compte plateforme ⇄ rôle asso ── */
-  CREATE TABLE IF NOT EXISTS asso_membre_roles (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    da_user_id    INTEGER NOT NULL,
-    role          TEXT NOT NULL DEFAULT 'MEMBER',
-    role_custom   TEXT,
-    created_at    TEXT DEFAULT (datetime('now')),
-    UNIQUE(asso_user_id, da_user_id),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id),
-    FOREIGN KEY(da_user_id)   REFERENCES users(id)
-  );
-
-  /* ── DSL CONTRIBUTIONS.BANK_INFO ── */
-  CREATE TABLE IF NOT EXISTS asso_bank_info (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id      INTEGER NOT NULL UNIQUE,
-    holder_name       TEXT NOT NULL,
-    bank_name         TEXT,
-    iban              TEXT NOT NULL,
-    bic               TEXT,
-    devise            TEXT DEFAULT 'EUR',
-    reference_modele  TEXT DEFAULT 'COTISATION-{ANNEE}-{PRENOM}-{NOM}',
-    display_to_members INTEGER DEFAULT 1,
-    instructions      TEXT,
-    updated_at        TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id)
-  );
-
-  /* ── DSL NOTIFICATIONS : relances automatiques (log + niveaux) ── */
-  CREATE TABLE IF NOT EXISTS asso_relances (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    cotisation_id INTEGER,
-    adherent_id   INTEGER,
-    niveau        TEXT NOT NULL DEFAULT 'INFO'
-                  CHECK(niveau IN ('INFO','WARNING','URGENT','FINAL_NOTICE')),
-    canal         TEXT NOT NULL DEFAULT 'APP'
-                  CHECK(canal IN ('APP','EMAIL','PUSH')),
-    jours_retard  INTEGER DEFAULT 0,
-    message       TEXT,
-    created_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id)  REFERENCES users(id),
-    FOREIGN KEY(cotisation_id) REFERENCES asso_cotisations(id)
-  );
-
-  /* ── DSL FINANCE.BUDGETS ── */
-  CREATE TABLE IF NOT EXISTS asso_budgets (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    categorie     TEXT NOT NULL,
-    montant_prevu REAL NOT NULL DEFAULT 0,
-    devise        TEXT DEFAULT 'EUR',
-    annee         INTEGER NOT NULL,
-    notes         TEXT,
-    created_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id)
   );
 
   /* ── DSL SECURITY.AUDIT_LOGS / FINANCE.AUDIT_TRAIL ── */
@@ -3219,46 +3067,23 @@ db.exec(`
     FOREIGN KEY(document_id) REFERENCES asso_documents(id)
   );
 
-  /* ── DSL GENERAL_ASSEMBLY ── */
-  CREATE TABLE IF NOT EXISTS asso_assemblees (
+`);
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULES EXPANSION — modules non-standard pour le type d'initiative
+   (Association/Entreprise/ONG), activables individuellement par une
+   initiative Abonné. La répartition socle/expansion par type vit
+   côté serveur (server/index.js), pas en base.
+   ═══════════════════════════════════════════════════════════════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS initiative_modules_actifs (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL,
-    titre         TEXT NOT NULL,
-    type          TEXT DEFAULT 'ordinaire'
-                  CHECK(type IN ('ordinaire','extraordinaire','constitutive')),
-    date_prevue   TEXT,
-    lieu          TEXT,
-    lien_visio    TEXT,
-    ordre_du_jour TEXT,
-    convocation   TEXT,
-    pv            TEXT,
-    quorum_requis INTEGER DEFAULT 0,
-    presents      INTEGER DEFAULT 0,
-    statut        TEXT DEFAULT 'planifiee'
-                  CHECK(statut IN ('planifiee','en_cours','close','archivee')),
-    features_json TEXT DEFAULT '[]',
-    created_by    INTEGER,
+    initiative_id INTEGER NOT NULL,
+    module_slug   TEXT NOT NULL,
     created_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id)
+    UNIQUE(initiative_id, module_slug),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
-
-  /* ── DSL SUBSCRIPTION : état d'abonnement de l'accréditation ── */
-  CREATE TABLE IF NOT EXISTS asso_subscription (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    asso_user_id  INTEGER NOT NULL UNIQUE,
-    billing       TEXT DEFAULT 'YEARLY'
-                  CHECK(billing IN ('MONTHLY','YEARLY')),
-    etat          TEXT DEFAULT 'TRIAL'
-                  CHECK(etat IN ('ACTIVE','TRIAL','UNPAID','CANCELLED')),
-    date_debut    TEXT DEFAULT (date('now')),
-    date_echeance TEXT,
-    montant       REAL DEFAULT 0,
-    devise        TEXT DEFAULT 'EUR',
-    dernier_paiement TEXT,
-    updated_at    TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(asso_user_id) REFERENCES users(id)
-  );
-
 `);
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -4982,8 +4807,8 @@ db.exec(`
     );
   `);
 
-  /* ── Module Votes sécurisés (indépendant du système asso_votes premium existant,
-     ouvert à toute Initiative — même logique d'ouverture que Cotisations & Adhésions).
+  /* ── Module Votes sécurisés (ouvert à toute Initiative — même logique
+     d'ouverture que Cotisations & Adhésions).
      Anonymisation par séparation structurelle : vote_bulletins n'a AUCUNE colonne
      d'identité ni FK vers vote_electeurs — garantie technique, pas juste applicative. ── */
   db.exec(`
