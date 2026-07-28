@@ -30,7 +30,7 @@
         <a href="annuaire.html">Annuaire</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
         <a href="formations.html">Formations</a>
-        <a href="actualites.html">Actualités</a>
+        <a href="actualites.html" style="display:none;">Actualités</a>
         <a href="evenements.html">Autres événements</a>
       </nav>
       <div class="topbar-right">
@@ -48,24 +48,25 @@
       <div class="brand" id="u-sidebar-brand">Mon espace</div>
 
       <div class="sb-group-lbl">01 — OUTILS</div>
-      <a href="profil.html">👤 Mon profil public</a>
+      <a href="profil.html" style="display:none;">👤 Mon profil public</a>
       <a href="emplois-stages.html">💼 Recherche d'emploi & Stage</a>
-      <a href="reseau.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
+      <a href="reseau.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
       <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné">👑 Business Plans</a>
       <a href="#" data-usection="outils">📄 CV, Lettres, Candidatures</a>
       <a href="mes-billets.html">🎟 Mes Billets</a>
+      <a href="mes-paiements.html">💳 Paiements</a>
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
       <a href="confidentialite.html">🔐 Confidentialité</a>
       <a href="programmation.html">⚙️ Programmation</a>
-      <a href="tutoriels.html">📚 Centre des tutos</a>
+      <a href="tutoriels.html" style="display:none;">📚 Centre des tutos</a>
       <a href="projets-evaluation.html" style="display:none;">📁 Évaluation de Projet</a>
 
-      <div class="sb-group-lbl">02 — COCKPIT</div>
-      <a class="active" href="#" data-usection="cockpit">🟦 Tableau de bord</a>
+      <div class="sb-group-lbl" style="display:none;">02 — COCKPIT</div>
+      <a class="active" href="#" data-usection="cockpit" style="display:none;">🟦 Tableau de bord</a>
 
-      <div class="sb-group-lbl">03 — INITIATIVES</div>
+      <div class="sb-group-lbl" style="display:none;">03 — INITIATIVES</div>
       <a href="#" data-usection="projets" class="sb-premium" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mes projets <span class="pill" id="u-projets-pill" style="display:none;"></span></a>
-      <a href="annuaire.html">🔍 Parcourir les initiatives</a>
+      <a href="annuaire.html" style="display:none;">🔍 Parcourir les initiatives</a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
       <a href="#" data-usection="territoires">🟨 Ma localisation</a>
@@ -74,29 +75,23 @@
 
       <div class="sb-group-lbl">05 — COMMUNICATION</div>
       <a href="messagerie.html">🟥 Messagerie <span class="pill" id="u-msg-pill" style="display:none;"></span></a>
-      <a href="agenda.html">📅 Mon Agenda</a>
-      <a href="reunions.html">📹 Visioconférence</a>
+      <a href="agenda.html" style="display:none;">📅 Mon Agenda</a>
+      <a href="reunions.html" style="display:none;">📹 Visioconférence</a>
 
-      <div class="sb-group-lbl">06 — PARAMÈTRES</div>
-      <a href="#" data-usection="apparence">🎨 Apparence</a>
+      <div class="sb-group-lbl" style="display:none;">06 — PARAMÈTRES</div>
+      <a href="#" data-usection="apparence" style="display:none;">🎨 Apparence</a>
     </aside>
 
     <main class="content">
       <!-- ── SECTION COCKPIT ── -->
       <section id="usec-cockpit">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-          <div>
-            <h1 style="margin:0;" id="dash-title">Tableau de bord</h1>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Votre cockpit personnel — actions, projets et activité en un coup d'œil</p>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-orange" onclick="uShowSection('projets');openNouveauProjet()">+ Nouveau projet</button>
-            <button class="btn btn-outline" onclick="uShowSection('projets')">Mes projets →</button>
-          </div>
-        </div>
+        <h1 id="dash-title" style="margin:0 0 16px;">Bonjour</h1>
 
-        <!-- KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
+        <!-- ═══ CARTE DIASPO'ACTIF — remplace le profil public pour le rôle utilisateur ═══ -->
+        <div id="cda-container" style="margin-bottom:20px;"></div>
+
+        <!-- KPIs — retirés à la demande de l'utilisateur (2026-07-27) -->
+        <div style="display:none;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;">
           <div class="card" style="text-align:center;padding:16px;">
             <div style="font-size:28px;font-weight:800;color:#2563EB;" id="u-kpi-projets">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:4px;">Projets actifs</div>
@@ -109,51 +104,63 @@
             <div style="font-size:28px;font-weight:800;color:#10b981;" id="u-kpi-msgs">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:4px;">Messages non lus</div>
           </div>
-          <div class="card" style="text-align:center;padding:16px;">
+          <div class="card" style="text-align:center;padding:16px;display:none;">
             <div style="font-size:28px;font-weight:800;color:#8b5cf6;" id="u-kpi-reputation">—</div>
             <div style="font-size:12px;color:var(--muted);margin-top:4px;">Score réputation</div>
           </div>
-        </div>
-
-        <!-- ═══ MON INDICE DE FIABILITÉ ═══
-             Le membre y voit non seulement sa note, mais surtout ce qui lui manque et le
-             bouton qui permet d'y remédier. Auparavant il ne lisait qu'un pourcentage
-             accompagné d'une étiquette rouge, sans aucun moyen d'agir. -->
-        <div class="card" style="margin-bottom:20px;">
-          <div id="mon-indice-fiabilite"><div style="color:var(--muted);font-size:12px;">Chargement de l'indice…</div></div>
-        </div>
-
-        <!-- QR Code personnel -->
-        <div class="card" style="margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
-          <div style="flex:1;min-width:200px;">
-            <h3 style="margin:0 0 8px;font-size:15px;">📷 Mon QR Code Diaspo'Actif</h3>
-            <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Votre identifiant numérique officiel. Partagez-le sur vos cartes de visite, badges ou affiches pour un accès instantané à votre profil public.</p>
-            <a href="profil.html" style="font-size:12px;color:#2563EB;text-decoration:none;font-weight:700;">Voir mon profil public →</a>
-          </div>
-          <div id="u-qr-container" style="flex-shrink:0;"></div>
         </div>
 
         <!-- Actions rapides -->
         <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 14px;font-size:15px;">⚡ Actions rapides</h3>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
-            <button class="btn btn-outline" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="justify-content:flex-start;gap:10px;padding:12px 16px;border-color:#4338CA;color:#4338CA;">
+            <button class="btn btn-outline" onclick="if(window.Posts){Posts.openModal();}else{location.href='fil-actualite.html';}" style="display:none;justify-content:flex-start;gap:10px;padding:12px 16px;border-color:#4338CA;color:#4338CA;">
               <span style="font-size:20px;">✍️</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Créer un post</div><div style="font-size:11px;color:#4338CA;opacity:.8;">Partager avec la communauté</div></div>
             </button>
             <a href="messagerie.html" class="btn btn-outline" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-decoration:none;">
               <span style="font-size:20px;">💬</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Messagerie</div><div style="font-size:11px;color:var(--muted);">Voir mes conversations</div></div>
             </a>
-            <a href="reunions.html" class="btn btn-outline" style="justify-content:flex-start;gap:10px;padding:12px 16px;text-decoration:none;border-color:#7c3aed;color:#7c3aed;">
+            <a href="reunions.html" class="btn btn-outline" style="display:none;justify-content:flex-start;gap:10px;padding:12px 16px;text-decoration:none;border-color:#7c3aed;color:#7c3aed;">
               <span style="font-size:20px;">📹</span><div style="text-align:left;"><div style="font-weight:700;font-size:13px;">Visioconférence</div><div style="font-size:11px;color:#7c3aed;opacity:.8;">Réunions collaboratives</div></div>
             </a>
           </div>
         </div>
 
         <!-- Activité récente -->
-        <div class="card">
+        <div class="card" style="margin-bottom:20px;">
           <h3 style="margin:0 0 12px;font-size:15px;">💬 Conversations récentes</h3>
           <div id="dv-conversations"><div style="color:var(--muted);font-size:13px;">Chargement…</div></div>
           <a href="messagerie.html" style="font-size:12px;color:#2563EB;text-decoration:none;display:block;margin-top:10px;">Ouvrir la messagerie →</a>
+        </div>
+
+        <!-- ═══ MODULE EXPANSION — « Bientôt disponible » ═══
+             Regroupe les fonctionnalités masquées côté rôle utilisateur (2026-07-26) en un
+             aperçu visible mais non cliquable, en vue d'une réactivation ultérieure par étapes.
+             Ne pas retirer les éléments masqués individuellement ci-dessous : ils restent la
+             source de vérité, ce bloc n'est qu'une vitrine. -->
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 4px;font-size:15px;">🚀 Bientôt disponible</h3>
+          <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">Ces fonctionnalités seront activées progressivement.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">👤 Mon profil public</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">👑 Mon Réseau Pro</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">📅 Mon Agenda</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">📹 Visioconférence</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">🎨 Apparence</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">📷 Mon QR Code Diaspo'Actif</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">✍️ Créer un post</span>
+            <span style="opacity:.55;cursor:not-allowed;user-select:none;background:#F1F5F9;border:1px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">👑 Passer à Premium</span>
+          </div>
+        </div>
+
+        <!-- QR Code personnel -->
+        <div class="card" style="margin-bottom:20px;display:none;flex-wrap:wrap;gap:20px;align-items:flex-start;">
+          <div style="flex:1;min-width:200px;">
+            <h3 style="margin:0 0 8px;font-size:15px;">📷 Mon QR Code Diaspo'Actif</h3>
+            <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Votre identifiant numérique officiel. Partagez-le sur vos cartes de visite, badges ou affiches pour un accès instantané à votre profil public.</p>
+            <a href="profil.html" style="font-size:12px;color:#2563EB;text-decoration:none;font-weight:700;">Voir mon profil public →</a>
+          </div>
+          <div id="u-qr-container" style="flex-shrink:0;"></div>
         </div>
       </section>
 
@@ -196,7 +203,7 @@
           <div id="dv-nationalites"></div>
           <button id="btn-add-nat" class="btn btn-outline btn-sm" style="margin-top:8px;">+ Ajouter un justificatif</button>
         </div>
-        <div class="card">
+        <div class="card" style="display:none;">
           <h3 style="margin:0 0 8px;">J'ai financé</h3>
           <p style="margin-bottom:8px;font-size:13px;color:var(--muted);">Historique de vos contributions aux projets de la diaspora.</p>
           <div id="dv-financements"></div>
@@ -333,7 +340,7 @@
 </div>
 
 <script src="assets/data.js"></script>
-<script src="assets/demo.js"></script>
+<script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js"></script>
 <script src="assets/subscription-required.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
@@ -352,13 +359,11 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   const nom = [me.profil?.prenom, me.nom].filter(Boolean).join(' ') || me.nom;
   document.getElementById('dash-title').textContent = 'Bonjour, ' + nom + ' 👋';
 
-  // Mon indice de fiabilité — isMine:true fait apparaître les boutons d'action
-  const indiceEl = document.getElementById('mon-indice-fiabilite');
-  if (indiceEl && window.TrustWidget) {
-    TrustWidget.render(me.id, indiceEl, { isMine: true, showReportBtn: false });
-  } else if (indiceEl) {
-    indiceEl.innerHTML = '<div style="color:var(--muted);font-size:12px;">Indice indisponible.</div>';
-  }
+  // Carte Diaspo'Actif — remplace le profil public pour ce rôle
+  try {
+    const { profil } = await api('GET', '/profil/' + me.id);
+    CarteDiaspoActif.render(document.getElementById('cda-container'), profil, { isOwner: true });
+  } catch (e) { /* silencieux */ }
 
   // QR Code personnel
   const qrEl = document.getElementById('u-qr-container');
@@ -915,9 +920,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     }
   </script>
 <script src="assets/profile-qr.js"></script>
-<!-- Requis par le module « Mon indice de fiabilité » ci-dessus. -->
 <script src="assets/signalement.js"></script>
-<script src="assets/trust-score.js"></script>
 <script src="assets/posts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
@@ -1026,6 +1029,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
 </script>
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="assets/carte-diaspoactif.js"></script>
   <script src="/assets/theme-manager.js"></script>
 </body>
 </html>

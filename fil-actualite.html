@@ -155,7 +155,7 @@
 <button class="posts-fab" id="posts-fab" onclick="Posts.openModal()" title="Créer un post" style="display:none;">✍️</button>
 
 <script src="assets/data.js"></script>
-<script src="assets/demo.js"></script>
+<script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js"></script>
 <script src="assets/posts.js"></script>
 
@@ -174,11 +174,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (r.user) {
       currentUser = r.user;
       Posts.init(currentUser.id);
-      // Afficher bouton créer
-      document.getElementById('btn-create-post').style.display = 'inline-flex';
-      document.getElementById('posts-fab').style.display = 'flex';
-      // Afficher le déclencheur inline
-      Posts.renderTrigger('feed-create-trigger');
+      // Créer un post retiré pour le rôle utilisateur (2026-07-26) — voir module "Bientôt disponible"
+      if (r.user.role !== 'utilisateur') {
+        document.getElementById('btn-create-post').style.display = 'inline-flex';
+        document.getElementById('posts-fab').style.display = 'flex';
+        Posts.renderTrigger('feed-create-trigger');
+      }
     } else {
       Posts.init(null);
     }

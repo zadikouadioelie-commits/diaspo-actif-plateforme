@@ -1,0 +1,9 @@
+<svg viewBox="0 0 1600 460" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="460" fill="#EAECEF"/>
+  <!-- bandes diagonales à droite -->
+  <polygon points="1330,0 1420,0 1230,460 1140,460" fill="#0D2B4E"/>
+  <polygon points="1450,0 1500,0 1310,460 1260,460" fill="#0D2B4E"/>
+  <polygon points="1370,0 1600,0 1600,460 1180,460" fill="#173F72"/>
+  <!-- ruban derrière le nom -->
+  <polygon points="330,150 1080,150 1010,300 330,300" fill="#0D2B4E"/>
+</svg>

@@ -1,0 +1,53 @@
+<svg viewBox="0 0 1600 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mapBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A1220"/>
+      <stop offset="55%" stop-color="#132038"/>
+      <stop offset="100%" stop-color="#1B2C4A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="460" fill="url(#mapBg)"/>
+
+  <!-- grille façon carte / méridiens -->
+  <g stroke="#4A6FA5" stroke-width="1" opacity="0.28">
+    <path d="M 0,60  Q 800,10  1600,60"/>
+    <path d="M 0,150 Q 800,110 1600,150"/>
+    <path d="M 0,240 Q 800,205 1600,240"/>
+    <path d="M 0,330 Q 800,300 1600,330"/>
+    <path d="M 0,420 Q 800,395 1600,420"/>
+    <path d="M 160,0  Q 210,230 160,460"/>
+    <path d="M 420,0  Q 460,230 420,460"/>
+    <path d="M 700,0  Q 720,230 700,460"/>
+    <path d="M 980,0  Q 1000,230 980,460"/>
+    <path d="M 1260,0 Q 1290,230 1260,460"/>
+    <path d="M 1520,0 Q 1550,230 1520,460"/>
+  </g>
+
+  <!-- anneaux concentriques décoratifs -->
+  <g fill="none" stroke="#EAF0FF">
+    <g opacity="0.5" transform="translate(120,90)">
+      <circle r="20"/><circle r="34"/><circle r="48"/><circle r="62"/><circle r="76"/>
+    </g>
+    <g opacity="0.35" transform="translate(1500,60)">
+      <circle r="16"/><circle r="28"/><circle r="40"/><circle r="52"/>
+    </g>
+    <g opacity="0.4" transform="translate(90,400)">
+      <circle r="18"/><circle r="30"/><circle r="42"/><circle r="54"/>
+    </g>
+  </g>
+
+  <!-- points de repère lumineux -->
+  <g fill="#8FB8FF">
+    <circle cx="360" cy="140" r="3" opacity="0.9"/>
+    <circle cx="620" cy="260" r="3" opacity="0.9"/>
+    <circle cx="900" cy="120" r="3" opacity="0.9"/>
+    <circle cx="1150" cy="300" r="3" opacity="0.9"/>
+    <circle cx="1380" cy="180" r="3" opacity="0.9"/>
+  </g>
+  <g stroke="#8FB8FF" stroke-width="1" opacity="0.4" fill="none">
+    <path d="M 360,140 Q 490,80 620,260"/>
+    <path d="M 620,260 Q 760,340 900,120"/>
+    <path d="M 900,120 Q 1020,60 1150,300"/>
+    <path d="M 1150,300 Q 1260,340 1380,180"/>
+  </g>
+</svg>

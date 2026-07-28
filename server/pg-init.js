@@ -360,6 +360,8 @@ async function pgInit() {
 /* Liste unique des colonnes attendues — partagee entre la migration et le controle
    post-deploiement, pour qu'elles ne puissent jamais diverger. */
 const COLONNES_MIGRATION = [
+    /* Module d'affiliation Initiative → Utilisateur (2026-07-27) — miroir de l'ALTER db.js. */
+    ['initiative_membres', 'message', 'TEXT'],
     /* Rencontres Diaspo'Actif — miroir de l'ALTER ajouté dans db.js. Sans cette ligne,
        la colonne n'existerait qu'en local et toute non-validation ferait échouer la
        route en production. */

@@ -1,0 +1,30 @@
+<svg viewBox="0 0 1600 460" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="460" fill="#E3B023"/>
+  <rect x="8" y="8" width="1584" height="444" fill="none" stroke="#fff" stroke-width="3" opacity="0.85"/>
+
+  <!-- diamants décoratifs bas-droite -->
+  <g transform="translate(1430,395) rotate(45)">
+    <rect x="-95" y="-95" width="190" height="190" fill="#FFE24D"/>
+  </g>
+  <g stroke="#2A2A2E" stroke-width="4" fill="none">
+    <g transform="translate(1430,395)">
+      <line x1="0" y1="-135" x2="135" y2="0"/>
+      <line x1="135" y1="0" x2="0" y2="135"/>
+      <line x1="0" y1="135" x2="-135" y2="0"/>
+      <line x1="-135" y1="0" x2="0" y2="-135"/>
+    </g>
+  </g>
+  <g transform="translate(1330,410) rotate(45)">
+    <rect x="-58" y="-58" width="116" height="116" fill="#2A2A2E"/>
+  </g>
+  <g stroke="#2A2A2E" stroke-width="2.5" opacity="0.8">
+    <line x1="1560" y1="240" x2="1450" y2="240"/>
+    <line x1="1575" y1="260" x2="1465" y2="260"/>
+    <line x1="1590" y1="280" x2="1480" y2="280"/>
+    <line x1="1560" y1="330" x2="1450" y2="330"/>
+    <line x1="1575" y1="350" x2="1465" y2="350"/>
+    <line x1="1590" y1="370" x2="1480" y2="370"/>
+  </g>
+  <circle cx="1580" cy="210" r="3" fill="#2A2A2E"/>
+  <circle cx="1590" cy="410" r="3" fill="#2A2A2E"/>
+</svg>

@@ -69,6 +69,9 @@
       <a href="#publications" data-section="publications">📰 Publications</a>
       <a href="#billetterie-init" data-section="billetterie-init">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
 
+      <div class="sb-group-lbl">AFFILIATION</div>
+      <a href="#affiliation" data-section="affiliation">🔗 Affiliation</a>
+
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
       <a href="#zones" data-section="zones" style="display:none;">🟨 Zones d'action</a>
 
@@ -108,7 +111,7 @@
 </div>
 
 <script src="assets/data.js"></script>
-<script src="assets/demo.js"></script>
+<script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
 <script src="/assets/upload-media.js"></script>
@@ -1596,6 +1599,50 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div id="asso-vote-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
+    <!-- ═══ SECTION AFFILIATION — identifier officiellement des membres (comptes utilisateur) ═══ -->
+    <div id="affiliation" style="display:none;">
+      <h2 style="margin:0 0 4px;">🔗 Affiliation</h2>
+      <p style="margin:0 0 20px;color:var(--muted);font-size:13px;">Identifiez officiellement les membres de votre organisation sur Diaspo'Actif.</p>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 12px;">Inviter un compte</h3>
+        <div style="position:relative;max-width:420px;">
+          <input type="text" id="aff-search-input" placeholder="Rechercher un membre par nom ou email…" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;">
+          <div id="aff-search-results" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 12px;">Membres affiliés</h3>
+        <div id="affiliation-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+      </div>
+    </div>
+
+    <!-- Modale : inviter un membre (poste + message) -->
+    <div id="aff-invite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+      <div style="background:var(--card);border-radius:16px;padding:24px;max-width:440px;width:92%;">
+        <h3 style="margin:0 0 4px;">Proposer une affiliation</h3>
+        <p id="aff-invite-nom" style="margin:0 0 16px;color:var(--muted);font-size:13px;"></p>
+        <label style="font-size:12.5px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Poste / fonction</label>
+        <select id="aff-invite-poste" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:12px;">
+          <option value="">— Choisir —</option>
+          <option>Président</option><option>Vice-président</option><option>Directeur</option>
+          <option>Responsable communication</option><option>Responsable financier</option>
+          <option>Coordinateur</option><option>Chef de projet</option><option>Consultant</option>
+          <option>Développeur</option><option>Membre</option><option>Bénévole</option>
+          <option>Partenaire</option><option>Ambassadeur</option><option value="__autre">Autre (préciser)…</option>
+        </select>
+        <input type="text" id="aff-invite-poste-autre" placeholder="Préciser le poste…" style="display:none;width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:12px;">
+        <label style="font-size:12.5px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Message (optionnel)</label>
+        <textarea id="aff-invite-message" rows="3" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;resize:vertical;"></textarea>
+        <div id="aff-invite-error" style="display:none;color:#EF4444;font-size:12.5px;margin-top:8px;"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('aff-invite-modal').style.display='none';">Annuler</button>
+          <button class="btn btn-orange btn-sm" id="aff-invite-send">Envoyer la demande</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modales Association -->
     <div id="asso-adh-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;overflow-y:auto;">
       <div style="background:var(--bg);border-radius:16px;max-width:560px;margin:40px auto;padding:24px;position:relative;">
@@ -3052,7 +3099,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-cockpit','asso-adherents','asso-cotisations','asso-finances','asso-documents','asso-votes','affiliation'];
   window.initShowSection = function(name) {
     if (name === 'parametres-vitrine' && !window._daPremiumInitiative && !window.daBypassActive?.('parametres_vitrine')) {
       window.openPremiumUpsell?.('parametres_vitrine');
@@ -3081,6 +3128,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'asso-finances') renderAssoFinances();
     if (name === 'asso-documents') renderAssoDocuments();
     if (name === 'asso-votes') renderAssoVotes();
+    if (name === 'affiliation') renderAffiliation();
     if (['evenements','publicites-init'].includes(name)) setTimeout(() => window.applyPremiumButtonStyles?.(), 50);
     window.scrollTo(0,0);
   };
@@ -6614,6 +6662,95 @@ async function supprimerAssoDoc(id) {
 }
 
 /* ── Section : votes ── */
+/* ══════════════════════════════════════════════════════════
+   MODULE AFFILIATION — identifier officiellement des membres
+   ══════════════════════════════════════════════════════════ */
+let affPendingUser = null;
+
+async function renderAffiliation() {
+  const el = document.getElementById('affiliation-list');
+  if (!window.__vitrineInitId) { el.innerHTML = '<div class="notice">Créez votre initiative pour utiliser ce module.</div>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { membres } = await api('GET', `/initiatives/${window.__vitrineInitId}/membres`);
+    if (!membres.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucun membre affilié pour l\'instant.</div>'; return; }
+    const STATUT_LABEL = { en_attente: '⏳ En attente', accepte: '✅ Actif', refuse: '🚫 Refusé' };
+    el.innerHTML = `<div style="display:grid;gap:10px;">${membres.map(m => `
+      <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:700;font-size:13.5px;">${assoEsc(m.prenom || '')} ${assoEsc(m.nom || '')}</div>
+          <div style="font-size:12px;color:var(--muted);">${assoEsc(m.email || '')} · ${STATUT_LABEL[m.statut] || m.statut}</div>
+        </div>
+        <div style="font-size:12.5px;font-weight:600;color:var(--navy,#0D2B4E);min-width:140px;">${assoEsc(m.fonction || '—')}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="affEditFonction(${m.user_id}, ${JSON.stringify(m.fonction||'')})">Modifier le poste</button>
+          <button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444;" onclick="affTerminer(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom))})">Mettre fin</button>
+        </div>
+      </div>`).join('')}</div>`;
+  } catch (e) { el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+}
+
+document.getElementById('aff-search-input')?.addEventListener('input', async function() {
+  const q = this.value.trim();
+  const box = document.getElementById('aff-search-results');
+  if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  try {
+    const { users } = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
+    const candidats = (users || []).filter(u => u.role === 'utilisateur');
+    box.innerHTML = candidats.length
+      ? candidats.map(u => `<div style="padding:9px 12px;font-size:13px;cursor:pointer;" onmousedown="affOuvrirInvite(${u.id}, ${JSON.stringify(assoEsc((u.prenom?u.prenom+' ':'')+u.nom))})">${assoEsc((u.prenom?u.prenom+' ':'')+u.nom)} <span style="color:var(--muted);font-size:11.5px;">${assoEsc(u.email)}</span></div>`).join('')
+      : '<div style="padding:9px 12px;font-size:12.5px;color:var(--muted);">Aucun compte utilisateur trouvé.</div>';
+    box.style.display = 'block';
+  } catch (e) { box.style.display = 'none'; }
+});
+document.getElementById('aff-search-input')?.addEventListener('blur', () => {
+  setTimeout(() => { const box = document.getElementById('aff-search-results'); if (box) box.style.display = 'none'; }, 150);
+});
+
+window.affOuvrirInvite = function(userId, nom) {
+  affPendingUser = userId;
+  document.getElementById('aff-invite-nom').textContent = 'Pour : ' + nom;
+  document.getElementById('aff-invite-poste').value = '';
+  document.getElementById('aff-invite-poste-autre').value = '';
+  document.getElementById('aff-invite-poste-autre').style.display = 'none';
+  document.getElementById('aff-invite-message').value = '';
+  document.getElementById('aff-invite-error').style.display = 'none';
+  document.getElementById('aff-search-input').value = '';
+  document.getElementById('aff-search-results').style.display = 'none';
+  document.getElementById('aff-invite-modal').style.display = 'flex';
+};
+document.getElementById('aff-invite-poste')?.addEventListener('change', function() {
+  document.getElementById('aff-invite-poste-autre').style.display = this.value === '__autre' ? '' : 'none';
+});
+document.getElementById('aff-invite-send')?.addEventListener('click', async () => {
+  const errEl = document.getElementById('aff-invite-error'); errEl.style.display = 'none';
+  const posteSel = document.getElementById('aff-invite-poste').value;
+  const fonction = posteSel === '__autre' ? document.getElementById('aff-invite-poste-autre').value.trim() : posteSel;
+  const message = document.getElementById('aff-invite-message').value.trim();
+  try {
+    await api('POST', `/initiatives/${window.__vitrineInitId}/membres`, { userId: affPendingUser, fonction: fonction || null, message: message || null });
+    document.getElementById('aff-invite-modal').style.display = 'none';
+    renderAffiliation();
+  } catch (e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+});
+
+window.affEditFonction = async function(userId, fonctionActuelle) {
+  const nouvelle = prompt('Nouveau poste :', fonctionActuelle || '');
+  if (nouvelle === null) return;
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/membres/${userId}`, { fonction: nouvelle.trim() });
+    renderAffiliation();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+};
+
+window.affTerminer = async function(userId, nom) {
+  if (!confirm(`Mettre fin à l'affiliation de ${nom} ?`)) return;
+  try {
+    await api('DELETE', `/initiatives/${window.__vitrineInitId}/membres/${userId}`);
+    renderAffiliation();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+};
+
 async function renderAssoVotes() {
   const el = document.getElementById('asso-vote-list');
   el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';

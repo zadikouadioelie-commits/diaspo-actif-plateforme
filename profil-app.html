@@ -1012,7 +1012,7 @@ html, body { overflow-x:clip; }
 
 <script src="assets/decouverte-premium.js"></script>
 <script src="assets/data.js"></script>
-<script src="assets/demo.js"></script>
+<script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/recherche-contacts.js"></script>
@@ -1075,7 +1075,11 @@ async function init() {
       history.replaceState(null, '', window.location.pathname + window.location.search + '#vitrine');
     }
     render();
-    try { await renderEnrichedColumns(); } catch(e) { console.warn('colonnes enrichies:', e); }
+    // Colonnes latérales enrichies (ancien profil) : plus utilisées pour le rôle utilisateur,
+    // remplacées par la carte Diaspo'Actif (2026-07-27).
+    if (profil.role !== 'utilisateur') {
+      try { await renderEnrichedColumns(); } catch(e) { console.warn('colonnes enrichies:', e); }
+    }
   } catch(e) {
     document.getElementById('p-sections').innerHTML =
       '<div class="p-section"><p style="color:red">Profil introuvable ou erreur serveur.</p></div>';
@@ -1590,6 +1594,13 @@ function render() {
   document.getElementById('p-board').style.display = 'none';
   document.getElementById('wb-toolbar-slot').style.display = 'none';
   document.getElementById('pvz-visitor').style.display = '';
+
+  // Carte Diaspo'Actif : remplace le profil public pour le rôle utilisateur uniquement
+  // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
+  if (profil.role === 'utilisateur' && window.CarteDiaspoActif) {
+    CarteDiaspoActif.render(document.getElementById('pvz-visitor'), profil, { isOwner: isOwn });
+    return;
+  }
   renderVisitorProfile();
 
   // Retour depuis Stripe Identity (?identity=retour) : faire défiler jusqu'au bloc Confidentialité et rafraîchir le statut
@@ -7506,6 +7517,7 @@ init();
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="assets/carte-diaspoactif.js"></script>
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
   <script src="/assets/theme-manager.js"></script>

@@ -1,0 +1,96 @@
+<svg viewBox="0 0 1600 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A2038"/>
+      <stop offset="45%" stop-color="#0D2B4E"/>
+      <stop offset="100%" stop-color="#1B4B8C"/>
+    </linearGradient>
+    <linearGradient id="skylineFade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#081729"/>
+      <stop offset="100%" stop-color="#0A2038"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7EC8FF" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#7EC8FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="460" fill="url(#bg)"/>
+
+  <!-- Horizon / silhouette de gratte-ciels -->
+  <g fill="url(#skylineFade)" opacity="0.85">
+    <rect x="0"    y="330" width="70"  height="130"/>
+    <rect x="80"   y="300" width="55"  height="160"/>
+    <rect x="145"  y="350" width="90"  height="110"/>
+    <rect x="245"  y="270" width="60"  height="190"/>
+    <rect x="315"  y="320" width="45"  height="140"/>
+    <rect x="370"  y="290" width="75"  height="170"/>
+    <rect x="455"  y="340" width="50"  height="120"/>
+    <rect x="515"  y="245" width="65"  height="215"/>
+    <rect x="590"  y="310" width="55"  height="150"/>
+    <rect x="655"  y="360" width="80"  height="100"/>
+    <rect x="745"  y="280" width="60"  height="180"/>
+    <rect x="815"  y="330" width="70"  height="130"/>
+    <rect x="895"  y="300" width="50"  height="160"/>
+    <rect x="955"  y="350" width="85"  height="110"/>
+    <rect x="1050" y="260" width="60"  height="200"/>
+    <rect x="1120" y="320" width="55"  height="140"/>
+    <rect x="1185" y="295" width="70"  height="165"/>
+    <rect x="1265" y="345" width="50"  height="115"/>
+    <rect x="1325" y="270" width="65"  height="190"/>
+    <rect x="1400" y="330" width="80"  height="130"/>
+    <rect x="1490" y="300" width="55"  height="160"/>
+    <rect x="1555" y="350" width="45"  height="110"/>
+  </g>
+  <!-- fenêtres allumées -->
+  <g fill="#FFD37A" opacity="0.55">
+    <circle cx="30"   cy="360" r="2"/><circle cx="50"  cy="390" r="2"/><circle cx="30"  cy="420" r="2"/>
+    <circle cx="100"  cy="330" r="2"/><circle cx="115" cy="360" r="2"/><circle cx="100" cy="400" r="2"/>
+    <circle cx="260"  cy="300" r="2"/><circle cx="280" cy="330" r="2"/><circle cx="260" cy="370" r="2"/><circle cx="280" cy="410" r="2"/>
+    <circle cx="535"  cy="280" r="2"/><circle cx="555" cy="310" r="2"/><circle cx="535" cy="350" r="2"/><circle cx="555" cy="390" r="2"/>
+    <circle cx="765"  cy="310" r="2"/><circle cx="785" cy="340" r="2"/><circle cx="765" cy="380" r="2"/>
+    <circle cx="1070" cy="290" r="2"/><circle cx="1090" cy="320" r="2"/><circle cx="1070" cy="360" r="2"/><circle cx="1090" cy="400" r="2"/>
+    <circle cx="1345" cy="300" r="2"/><circle cx="1365" cy="330" r="2"/><circle cx="1345" cy="370" r="2"/>
+    <circle cx="1420" cy="360" r="2"/><circle cx="1440" cy="390" r="2"/><circle cx="1460" cy="420" r="2"/>
+  </g>
+
+  <!-- Globe filaire translucide, décalé à droite -->
+  <g transform="translate(1160,190)" opacity="0.85">
+    <circle r="130" fill="url(#glow)" opacity="0.35"/>
+    <circle r="128" fill="none" stroke="#BFE0FF" stroke-width="1.5" opacity="0.75"/>
+    <ellipse rx="128" ry="40"  fill="none" stroke="#BFE0FF" stroke-width="1" opacity="0.45"/>
+    <ellipse rx="128" ry="80"  fill="none" stroke="#BFE0FF" stroke-width="1" opacity="0.45"/>
+    <ellipse rx="40"  ry="128" fill="none" stroke="#BFE0FF" stroke-width="1" opacity="0.45"/>
+    <ellipse rx="80"  ry="128" fill="none" stroke="#BFE0FF" stroke-width="1" opacity="0.45"/>
+    <line x1="-128" y1="0" x2="128" y2="0" stroke="#BFE0FF" stroke-width="1" opacity="0.4"/>
+
+    <!-- points de connexion + arcs -->
+    <g stroke="#9FD6FF" stroke-width="1.4" fill="none" opacity="0.8">
+      <path d="M -95,-40 Q 0,-140 110,-55"/>
+      <path d="M -60,70 Q 20,140 120,30"/>
+      <path d="M -110,10 Q -40,90 40,95"/>
+    </g>
+    <g fill="#EAF6FF">
+      <circle cx="-95"  cy="-40" r="4"/>
+      <circle cx="110"  cy="-55" r="4"/>
+      <circle cx="-60"  cy="70"  r="4"/>
+      <circle cx="120"  cy="30"  r="4"/>
+      <circle cx="-110" cy="10"  r="3.5"/>
+      <circle cx="40"   cy="95"  r="3.5"/>
+      <circle cx="10"   cy="-115" r="3"/>
+    </g>
+  </g>
+
+  <!-- Points de connexion épars au-dessus de la ville -->
+  <g fill="#EAF6FF" opacity="0.75">
+    <circle cx="230" cy="120" r="2.5"/>
+    <circle cx="470" cy="90"  r="2"/>
+    <circle cx="700" cy="140" r="2.5"/>
+    <circle cx="900" cy="100" r="2"/>
+  </g>
+  <g stroke="#9FD6FF" stroke-width="1" opacity="0.35" fill="none">
+    <path d="M 230,120 Q 350,60 470,90"/>
+    <path d="M 470,90 Q 590,50 700,140"/>
+    <path d="M 700,140 Q 800,80 900,100"/>
+  </g>
+</svg>

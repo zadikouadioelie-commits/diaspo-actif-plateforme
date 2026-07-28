@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Mes moyens de paiement</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .mp-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;max-width:620px;}
+  .mp-card h4{margin:0 0 6px;font-size:14px;font-weight:800;}
+  .mp-sub{font-size:12px;color:var(--muted);margin:0 0 16px;}
+  .mp-carte-row{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+  .mp-carte-info{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:700;}
+  .mp-carte-brand{font-size:20px;}
+  .mp-carte-exp{color:var(--muted);font-weight:500;font-size:12px;}
+  .mp-badge-defaut{background:#dcfce7;color:#166534;font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;}
+  .mp-carte-actions{display:flex;gap:6px;}
+  .mp-btn-sm{font-size:12px;padding:6px 12px;border-radius:7px;cursor:pointer;font-weight:700;border:1.5px solid;background:transparent;}
+  .mp-btn-sm.bleu{color:#2563EB;border-color:#2563EB;}
+  .mp-btn-sm.rouge{color:#dc2626;border-color:#dc2626;}
+  .mp-btn-add{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-size:13.5px;font-weight:800;cursor:pointer;}
+  .mp-empty{font-size:13px;color:var(--muted);padding:10px 0;}
+  .mp-flash{border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:16px;max-width:620px;}
+  .mp-flash.ok{background:#f0fdf4;border:1.5px solid #22c55e;color:#166534;}
+  .mp-flash.annule{background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <h2 style="margin:0 0 4px;">💳 Mes moyens de paiement</h2>
+    <p class="sub">Enregistrez une ou deux cartes bancaires pour accélérer vos achats dans la Vitrine et vos autres paiements sur Diaspo'Actif.</p>
+
+    <div id="mp-flash-zone"></div>
+
+    <div class="mp-card">
+      <h4>Cartes enregistrées</h4>
+      <p class="mp-sub">🔒 Diaspo'Actif ne stocke jamais vos coordonnées bancaires. Vos cartes sont conservées de façon sécurisée par Stripe, notre prestataire de paiement certifié.</p>
+      <div id="mp-liste"><p class="mp-empty">Chargement…</p></div>
+      <div style="margin-top:16px;">
+        <button class="mp-btn-add" id="mp-btn-ajouter" onclick="window._mpAjouterCarte()">+ Ajouter une carte</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script>
+(async function initMesPaiements(){
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) { location.href = 'index.html'; return; }
+  } catch(e) { location.href = 'index.html'; return; }
+
+  const BRAND_ICONS = { visa: '💳', mastercard: '💳', amex: '💳', discover: '💳' };
+  const BRAND_LABELS = { visa: 'Visa', mastercard: 'Mastercard', amex: 'American Express', discover: 'Discover' };
+
+  const flashZone = document.getElementById('mp-flash-zone');
+  const params = new URLSearchParams(location.search);
+  if (params.get('carte') === 'succes') {
+    flashZone.innerHTML = '<div class="mp-flash ok">✅ Carte enregistrée avec succès.</div>';
+    history.replaceState(null, '', location.pathname);
+  } else if (params.get('carte') === 'annule') {
+    flashZone.innerHTML = '<div class="mp-flash annule">Ajout de carte annulé.</div>';
+    history.replaceState(null, '', location.pathname);
+  }
+
+  async function chargerMoyens() {
+    const el = document.getElementById('mp-liste');
+    el.innerHTML = '<p class="mp-empty">Chargement…</p>';
+    let moyens = [];
+    try { const r = await api('GET', '/paiement/moyens'); moyens = r.moyens || []; }
+    catch(e) { el.innerHTML = `<p class="mp-empty">Erreur de chargement : ${e.message||''}</p>`; return; }
+
+    if (!moyens.length) {
+      el.innerHTML = '<p class="mp-empty">Aucune carte enregistrée pour l\'instant.</p>';
+      return;
+    }
+    el.innerHTML = moyens.map(m => `
+      <div class="mp-carte-row" id="mp-carte-${m.id}">
+        <div class="mp-carte-info">
+          <span class="mp-carte-brand">${BRAND_ICONS[m.brand] || '💳'}</span>
+          <span>${BRAND_LABELS[m.brand] || m.brand} •••• ${m.last4}</span>
+          <span class="mp-carte-exp">exp. ${String(m.exp_month).padStart(2,'0')}/${String(m.exp_year).slice(-2)}</span>
+          ${m.defaut ? '<span class="mp-badge-defaut">Par défaut</span>' : ''}
+        </div>
+        <div class="mp-carte-actions">
+          ${!m.defaut ? `<button class="mp-btn-sm bleu" onclick="window._mpDefinirDefaut('${m.id}')">Définir par défaut</button>` : ''}
+          <button class="mp-btn-sm rouge" onclick="window._mpSupprimer('${m.id}')">🗑️ Supprimer</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window._mpAjouterCarte = async function() {
+    const btn = document.getElementById('mp-btn-ajouter');
+    btn.disabled = true;
+    btn.textContent = 'Redirection…';
+    try {
+      const r = await api('POST', '/paiement/moyens/setup', {});
+      if (r.checkout_url) { location.href = r.checkout_url; return; }
+      throw new Error('Réponse invalide.');
+    } catch(e) {
+      alert('Erreur : ' + (e.message || "impossible d'ouvrir la page de paiement."));
+      btn.disabled = false;
+      btn.textContent = '+ Ajouter une carte';
+    }
+  };
+
+  window._mpDefinirDefaut = async function(id) {
+    try {
+      await api('POST', `/paiement/moyens/${id}/defaut`, {});
+      chargerMoyens();
+    } catch(e) { alert('Erreur : ' + (e.message || '')); }
+  };
+
+  window._mpSupprimer = async function(id) {
+    if (!confirm('Supprimer cette carte enregistrée ?')) return;
+    try {
+      await api('DELETE', `/paiement/moyens/${id}`);
+      chargerMoyens();
+    } catch(e) { alert('Erreur : ' + (e.message || '')); }
+  };
+
+  chargerMoyens();
+})();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

@@ -343,6 +343,11 @@ const NOTIF_ICONS = {
   demande_contact: "📩",
   demande_contact_acceptee: "🤝",
   demande_contact_refusee: "🚫",
+  affiliation_initiative: "🔗",
+  affiliation_acceptee: "🤝",
+  affiliation_refusee: "🚫",
+  affiliation_fonction_modifiee: "🔗",
+  affiliation_terminee: "🔗",
   responsable_a_revalider: "🪪",
   responsable_verifie: "✅",
   responsable_refuse: "⚠️",
@@ -358,6 +363,7 @@ function notifUrl(n) {
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
   if (d.reunion_id)       return `reunions.html?reunion=${d.reunion_id}`;
   if (d.follower_id)      return `profil.html?id=${d.follower_id}`;
+  if (d.initiative_id)    return `initiative.html?id=${d.initiative_id}`;
   return "#";
 }
 
@@ -367,6 +373,7 @@ function renderNotifItem(n) {
   const unread = !n.lue;
   const d = (typeof n.data === "object" ? n.data : null) || {};
   const showFollowBack = n.type === "nouveau_abonne" && unread && d.follower_id;
+  const showAffiliation = n.type === "affiliation_initiative" && unread && d.initiative_id;
   return `<div class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}">
     <a href="${url}" style="display:flex;gap:11px;padding:12px 16px;text-decoration:none;color:inherit;" onclick="markNotifRead(${n.id})">
       <div class="notif-icon ${n.type}">${icon}</div>
@@ -381,8 +388,39 @@ function renderNotifItem(n) {
       <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();acceptFollowBack(${n.id},${d.follower_id},this)">↩️ Suivre en retour</button>
       <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();declineFollowBack(${n.id},this)">Ignorer</button>
     </div>` : ""}
+    ${showAffiliation ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:0 16px 12px 65px;">
+      <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();acceptAffiliation(${n.id},${d.initiative_id},this)">✅ Accepter</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();refuseAffiliation(${n.id},${d.initiative_id},this)">Refuser</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();markNotifRead(${n.id});this.closest('.notif-followback-actions').remove();">Ignorer</button>
+    </div>` : ""}
   </div>`;
 }
+
+window.acceptAffiliation = async function(notifId, initiativeId, btnEl) {
+  try {
+    await api("PUT", `/initiatives/${initiativeId}/membres/${CURRENT_USER.id}`, { statut: "accepte" });
+  } catch(e) { alert("Erreur : " + (e.message || "")); return; }
+  try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+  if (item) {
+    item.classList.remove("unread");
+    item.querySelector(".notif-unread-dot")?.remove();
+    item.querySelector(".notif-followback-actions")?.remove();
+  }
+};
+
+window.refuseAffiliation = async function(notifId, initiativeId, btnEl) {
+  try {
+    await api("PUT", `/initiatives/${initiativeId}/membres/${CURRENT_USER.id}`, { statut: "refuse" });
+  } catch(e) { alert("Erreur : " + (e.message || "")); return; }
+  try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+  if (item) {
+    item.classList.remove("unread");
+    item.querySelector(".notif-unread-dot")?.remove();
+    item.querySelector(".notif-followback-actions")?.remove();
+  }
+};
 
 window.acceptFollowBack = async function(notifId, followerId, btnEl) {
   try {
@@ -700,9 +738,10 @@ async function applyAuthState() {
       try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
       window.location.href = "index.html";
     });
-    // Bouton "Passer à Premium" : visible seulement si pas déjà abonné
-    if (user.role === 'utilisateur' || user.role === 'initiative') {
-      const accredType = user.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
+    // Bouton "Passer à Premium" : visible seulement si pas déjà abonné — retiré pour le
+    // rôle utilisateur (2026-07-26, voir module "Bientôt disponible"), gardé pour initiative
+    if (user.role === 'initiative') {
+      const accredType = 'initiative_abonne';
       api("GET", "/accreditations/mes").then(r => {
         const dejaAbonne = (r.accreditations || []).some(a => a.type === accredType && a.statut === 'active');
         const btn = document.getElementById('premium-topbar-btn');
@@ -712,8 +751,9 @@ async function applyAuthState() {
         if (btn) btn.style.display = 'flex';
       });
     }
-    // Démo : vérifier si on doit déclencher le tour guidé
-    if (window.DADemo) DADemo.checkUser(user);
+    // Démo : vérifier si on doit déclencher le tour guidé — retiré pour le rôle utilisateur
+    // uniquement (bouton "Plus tard" signalé cassé), inchangé pour tous les autres rôles.
+    if (window.DADemo && user.role !== 'utilisateur') DADemo.checkUser(user);
     // Rappel de vérification d'identité : toutes les 5 connexions, tant que non vérifiée
     checkIdentityReminder(user);
     // Charger le nombre de messages non lus + notifications non lues
@@ -1539,8 +1579,8 @@ async function initDashboardUtilisateur(){
   try {
     const me = await fetchCurrentUser();
     if(me){
-      const titleEl = document.getElementById("dash-title");
-      if(titleEl) titleEl.textContent = `Tableau de bord de ${me.nom}`;
+      // Le message de bienvenue ("Bonjour, {nom}") est désormais posé par la page elle-même,
+      // au-dessus de la Carte Diaspo'Actif — ne plus l'écraser ici.
       const profilR = await api("GET", `/profil/${me.id}`);
       if(profilR.profil?.profil?.localisation) locData = profilR.profil.profil.localisation;
       if(profilR.profil?.profil?.nationalites) natsData = profilR.profil.profil.nationalites;
@@ -3957,9 +3997,13 @@ window.closeApercuAppareils = function () {
 
 window.openApercuAppareils = function () {
   window.closeApercuAppareils();
-  /* On repart de l'URL courante en y ajoutant le drapeau anti-récursion. */
+  /* On repart de l'URL courante en y ajoutant le drapeau anti-récursion, plus un
+     paramètre anti-cache : sans lui, l'iframe réutilisait la version déjà en cache
+     du navigateur et l'aperçu continuait de montrer d'anciens modules déjà retirés
+     de la page réelle. */
   var u = new URL(window.location.href);
   u.searchParams.set('apercu', '1');
+  u.searchParams.set('_apercu_ts', Date.now().toString());
 
   var boutons = APERCU_APPAREILS.map(function (a) {
     return '<button type="button" id="apercu-btn-' + a.id + '" onclick="apercuSetAppareil(\'' + a.id + '\')" '

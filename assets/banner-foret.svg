@@ -1,0 +1,40 @@
+<svg viewBox="0 0 1600 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="foretBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0E2213"/>
+      <stop offset="100%" stop-color="#1B3B22"/>
+    </linearGradient>
+    <radialGradient id="foretTexture" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#2F5A38" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#2F5A38" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="460" fill="url(#foretBg)"/>
+  <rect width="1600" height="460" fill="url(#foretTexture)"/>
+
+  <!-- canopée en pastilles -->
+  <g fill="#27502E">
+    <circle cx="80"  cy="70"  r="46"/><circle cx="180" cy="40"  r="58"/><circle cx="300" cy="90"  r="50"/>
+    <circle cx="420" cy="50"  r="62"/><circle cx="560" cy="100" r="48"/><circle cx="700" cy="60"  r="56"/>
+    <circle cx="850" cy="95"  r="50"/><circle cx="990" cy="45"  r="60"/><circle cx="1130" cy="85" r="52"/>
+    <circle cx="1270" cy="55" r="58"/><circle cx="1410" cy="90" r="50"/><circle cx="1540" cy="50" r="56"/>
+  </g>
+  <g fill="#1C3F23" opacity="0.85">
+    <circle cx="130" cy="140" r="56"/><circle cx="360" cy="150" r="60"/><circle cx="620" cy="145" r="58"/>
+    <circle cx="900" cy="150" r="62"/><circle cx="1180" cy="140" r="58"/><circle cx="1460" cy="150" r="56"/>
+  </g>
+
+  <!-- route sinueuse -->
+  <path d="M -20,340 C 300,300 500,420 800,360 C 1100,300 1300,400 1620,330" fill="none" stroke="#3A2A18" stroke-width="26" opacity="0.7"/>
+  <path d="M -20,340 C 300,300 500,420 800,360 C 1100,300 1300,400 1620,330" fill="none" stroke="#C98A3B" stroke-width="2" stroke-dasharray="14 10" opacity="0.8"/>
+
+  <!-- silhouette de sapins -->
+  <g fill="#F4F7F2" opacity="0.92" transform="translate(650,150)">
+    <polygon points="0,60 22,60 11,20"/>
+    <polygon points="30,60 56,60 43,10"/>
+    <polygon points="65,60 95,60 80,0"/>
+    <polygon points="105,60 131,60 118,10"/>
+    <polygon points="140,60 162,60 151,20"/>
+    <rect x="-10" y="58" width="182" height="8"/>
+  </g>
+</svg>

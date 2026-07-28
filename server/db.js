@@ -1153,6 +1153,8 @@ const MIGRATIONS = [
   ["users", "telephone TEXT"],
   ["users", "centres_interet TEXT DEFAULT '[]'"],
   ["users", "situation_pro TEXT"],
+  // Module d'affiliation Initiative → Utilisateur (2026-07-27)
+  ["initiative_membres", "message TEXT"],
   ["users", "type_institution TEXT"],
   ["users", "statut_verification TEXT DEFAULT 'auto'"],
   // Champs de base initiatives (peuvent manquer sur DB ancienne)
@@ -4877,6 +4879,20 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_origine_relances_user ON origine_relances(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_origine_relances_init ON origine_relances(initiative_id, created_at);
 
+    /* ===== CARTE DIASPO'ACTIF — Affiliations =====
+       Organisations qu'un membre déclare lui-même (nom + logo), affichées sur sa carte
+       de profil condensée. Libre-service, sans validation admin (choix volontaire :
+       simplicité d'abord, cf. carte Diaspo'Actif du 2026-07-27). */
+    CREATE TABLE IF NOT EXISTS user_affiliations (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL,
+      nom        TEXT NOT NULL,
+      logo_url   TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_affiliations_user ON user_affiliations(user_id, created_at);
+
     CREATE TABLE IF NOT EXISTS adhesion_relances (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       membre_id           INTEGER NOT NULL,
@@ -5083,6 +5099,18 @@ db.exec(`
     detail TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(collectivite_id) REFERENCES users(id)
+  )`);
+
+  /* Journal d'administration du module d'affiliation (2026-07-27) — même modèle que
+     collectivite_journal. Alimenté uniquement sur fin d'affiliation (seul cas demandé
+     par la spec pour un historique consultable par l'organisation). */
+  db.exec(`CREATE TABLE IF NOT EXISTS initiative_journal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   )`);
 
   // ── Catalogues (regroupement des articles de la Vitrine) ──

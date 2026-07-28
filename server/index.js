@@ -3049,14 +3049,42 @@ route("GET", "/api/paiement/moyens", async (req, res, params, body) => {
   const { stripe } = require("./stripe-client");
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
   try {
-    const list = await stripe.paymentMethods.list({ customer: row.stripe_customer_id, type: "card" });
+    const [list, customer] = await Promise.all([
+      stripe.paymentMethods.list({ customer: row.stripe_customer_id, type: "card" }),
+      stripe.customers.retrieve(row.stripe_customer_id),
+    ]);
+    const defautId = customer && !customer.deleted ? (customer.invoice_settings?.default_payment_method || null) : null;
     const moyens = list.data.map(pm => ({
       id: pm.id, brand: pm.card?.brand || "carte", last4: pm.card?.last4 || "????",
       exp_month: pm.card?.exp_month, exp_year: pm.card?.exp_year,
+      defaut: pm.id === defautId,
     }));
     sendJSON(res, 200, { moyens });
   } catch (e) {
     sendJSON(res, 500, SEC.safeError(e, "paiement-moyens-list"));
+  }
+});
+
+/* POST /api/paiement/moyens/setup — session Stripe Checkout en mode "setup" pour enregistrer
+   une nouvelle carte sans paiement immédiat (redirection hébergée, pas de formulaire Stripe.js). */
+route("POST", "/api/paiement/moyens/setup", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  try {
+    const origin = getOrigin(req);
+    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    const session = await stripe.checkout.sessions.create({
+      mode: "setup",
+      customer: stripeCustomerId,
+      payment_method_types: ["card"],
+      success_url: `${origin}/mes-paiements.html?carte=succes`,
+      cancel_url: `${origin}/mes-paiements.html?carte=annule`,
+    });
+    sendJSON(res, 200, { checkout_url: session.url });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "paiement-moyens-setup"));
   }
 });
 
@@ -3074,6 +3102,24 @@ route("DELETE", "/api/paiement/moyens/:id", async (req, res, params) => {
     sendJSON(res, 200, { ok: true });
   } catch (e) {
     sendJSON(res, 500, SEC.safeError(e, "paiement-moyens-delete"));
+  }
+});
+
+/* POST /api/paiement/moyens/:id/defaut — définit la carte utilisée par défaut sur les futurs paiements. */
+route("POST", "/api/paiement/moyens/:id/defaut", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare("SELECT stripe_customer_id FROM users WHERE id=?").get(user.id);
+  if (!row || !row.stripe_customer_id) return sendJSON(res, 404, { error: "Aucune carte enregistrée." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  try {
+    const pm = await stripe.paymentMethods.retrieve(params.id);
+    if (!pm.customer || pm.customer !== row.stripe_customer_id) return sendJSON(res, 403, { error: "Accès refusé." });
+    await stripe.customers.update(row.stripe_customer_id, { invoice_settings: { default_payment_method: params.id } });
+    sendJSON(res, 200, { ok: true });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "paiement-moyens-defaut"));
   }
 });
 
@@ -5717,9 +5763,12 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
 route("GET", "/api/initiatives/:id/membres", async (req, res, params) => {
   const init = await db.prepare("SELECT id, nom FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  /* u.avatar_url n'existe pas dans le schéma (colonne réelle : photo_url) — cette route
+     n'avait jamais été exercée jusqu'ici (jamais branchée à une interface), le bug était
+     invisible. Alias conservé pour ne pas changer la forme de la réponse. */
   const membres = await db.prepare(`
     SELECT im.id, im.user_id, im.fonction, im.statut, im.created_at,
-           u.nom, u.prenom, u.email, u.avatar_url, u.role
+           u.nom, u.prenom, u.email, u.photo_url AS avatar_url, u.role
     FROM initiative_membres im
     JOIN users u ON u.id = im.user_id
     WHERE im.initiative_id = ?
@@ -5734,12 +5783,12 @@ route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => 
   const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (init.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Seul le responsable peut inviter des membres." });
-  const { userId, fonction } = body;
+  const { userId, fonction, message } = body;
   if (!userId) return sendJSON(res, 400, { error: "userId requis." });
   const target = await db.prepare("SELECT id, nom, prenom FROM users WHERE id = ?").get(userId);
   if (!target) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
   try {
-    await db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, fonction, statut) VALUES (?, ?, ?, 'en_attente')").run(params.id, userId, fonction || null);
+    await db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, fonction, message, statut) VALUES (?, ?, ?, ?, 'en_attente')").run(params.id, userId, fonction || null, message || null);
   } catch(e) {
     if (e.message.includes("UNIQUE")) return sendJSON(res, 409, { error: "Ce membre a déjà été invité." });
     throw e;
@@ -5748,8 +5797,8 @@ route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => 
     await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
       userId, 'affiliation_initiative',
       `Invitation à rejoindre une initiative`,
-      `Vous avez été identifié comme membre de l'initiative « ${init.nom} ». Souhaitez-vous accepter cette affiliation ?`,
-      JSON.stringify({ initiative_id: params.id, nom: init.nom }));
+      `Vous avez été identifié comme membre de l'initiative « ${init.nom} »${fonction ? `, en tant que ${fonction}` : ''}. Souhaitez-vous accepter cette affiliation ?${message ? `\n« ${message} »` : ''}`,
+      JSON.stringify({ initiative_id: params.id, nom: init.nom, fonction: fonction || null }));
   } catch(_) {}
   sendJSON(res, 201, { ok: true });
 });
@@ -5766,21 +5815,36 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
   if (statut && ['accepte','refuse'].includes(statut)) {
     if (user.id !== parseInt(params.userId)) return sendJSON(res, 403, { error: "Vous ne pouvez modifier que votre propre affiliation." });
     await db.prepare("UPDATE initiative_membres SET statut = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(statut, params.id, params.userId);
-    /* Notifier le responsable si refus */
+    const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
     if (statut === 'refuse') {
       try {
-        const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
         await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
           init.owner_user_id, 'affiliation_refusee',
           `Affiliation refusée`,
           `${u?.prenom || ''} ${u?.nom || ''} a refusé de rejoindre « ${init.nom} ».`,
           JSON.stringify({ initiative_id: params.id }));
       } catch(_) {}
+    } else if (statut === 'accepte') {
+      try {
+        await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
+          init.owner_user_id, 'affiliation_acceptee',
+          `Affiliation acceptée`,
+          `${u?.prenom || ''} ${u?.nom || ''} a rejoint « ${init.nom} ».`,
+          JSON.stringify({ initiative_id: params.id, user_id: parseInt(params.userId) }));
+      } catch(_) {}
     }
   } else if (fonction !== undefined) {
     /* Modifier la fonction : seul le responsable */
     if (init.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Seul le responsable peut modifier les fonctions." });
+    const ancienneFonction = membre.fonction;
     await db.prepare("UPDATE initiative_membres SET fonction = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(fonction || null, params.id, params.userId);
+    try {
+      await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
+        params.userId, 'affiliation_fonction_modifiee',
+        `${init.nom} a modifié votre fonction`,
+        `Ancien poste : ${ancienneFonction || '—'}\nNouveau poste : ${fonction || '—'}`,
+        JSON.stringify({ initiative_id: params.id, nom: init.nom }));
+    } catch(_) {}
   }
   sendJSON(res, 200, { ok: true });
 });
@@ -5788,11 +5852,27 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
 route("DELETE", "/api/initiatives/:id/membres/:userId", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const init = await db.prepare("SELECT id, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
+  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (user.id !== parseInt(params.userId) && init.owner_user_id !== user.id && user.role !== 'administrateur')
     return sendJSON(res, 403, { error: "Action non autorisée." });
+  const membre = await db.prepare("SELECT statut FROM initiative_membres WHERE initiative_id = ? AND user_id = ?").get(params.id, params.userId);
   await db.prepare("DELETE FROM initiative_membres WHERE initiative_id = ? AND user_id = ?").run(params.id, params.userId);
+  /* Notifier l'autre partie (celle qui n'a pas initié la suppression) */
+  const estInitiePasResponsable = user.id === parseInt(params.userId);
+  const destinataireId = estInitiePasResponsable ? init.owner_user_id : parseInt(params.userId);
+  if (destinataireId && destinataireId !== user.id) {
+    try {
+      await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
+        destinataireId, 'affiliation_terminee',
+        `Affiliation terminée`,
+        estInitiePasResponsable
+          ? `Le membre a quitté « ${init.nom} ».`
+          : `Votre affiliation avec « ${init.nom} » a pris fin.`,
+        JSON.stringify({ initiative_id: params.id, nom: init.nom }));
+    } catch(_) {}
+  }
+  if (membre && membre.statut === 'accepte') journalInit(params.id, 'fin_affiliation', `Fin de l'affiliation avec le membre #${params.userId}`);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -6606,6 +6686,9 @@ function similariteChaine(a, b) {
    Ceux qui l'attendent ont la garantie que l'écriture a abouti. */
 async function journalColl(collId, action, detail) {
   try { await db.prepare("INSERT INTO collectivite_journal (collectivite_id,action,detail) VALUES (?,?,?)").run(collId, action, detail || null); } catch(e) {}
+}
+async function journalInit(initiativeId, action, detail) {
+  try { await db.prepare("INSERT INTO initiative_journal (initiative_id,action,detail) VALUES (?,?,?)").run(initiativeId, action, detail || null); } catch(e) {}
 }
 
 /* Portée d'une requête Observatoire selon le paramètre ?scope=
@@ -9485,6 +9568,16 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
     WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(u.id);
   const dmHistorique = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?`).get(u.id))?.n;
+  /* Affiliations officielles (module Initiative → Utilisateur, 2026-07-27) : uniquement les
+     affiliations ACCEPTÉES par le compte, issues d'organisations réellement enregistrées —
+     remplace l'ancien mécanisme libre-service (table user_affiliations, désormais inutilisée
+     par cet affichage). */
+  const affiliations = await db.prepare(`
+    SELECT im.id, im.fonction, i.nom, i.slug, i.logo_url, i.id AS initiative_id
+    FROM initiative_membres im JOIN initiatives i ON i.id = im.initiative_id
+    WHERE im.user_id = ? AND im.statut = 'accepte'
+    ORDER BY im.created_at ASC
+  `).all(u.id);
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
@@ -9533,7 +9626,43 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     nom_structure: nomStructure,
     responsable,
     type_organisme: u.type_organisme,
+    affiliations,
   }});
+});
+
+/* ══ Carte Diaspo'Actif — Statut professionnel ══
+   Champ modifiable directement sur la carte, comme la photo, la bannière, l'origine/résidence,
+   la biographie et le domaine (tous via PUT /api/profil, voir assets/carte-diaspoactif.js). */
+const STATUTS_PRO_VALIDES = ['en_poste', 'en_recherche', 'disponible', 'autre'];
+route("PATCH", "/api/profil/statut-professionnel", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { statut } = body || {};
+  if (!STATUTS_PRO_VALIDES.includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE users SET situation_pro=? WHERE id=?").run(statut, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Carte Diaspo'Actif — Affiliations (libre-service, sans validation admin) ══ */
+route("POST", "/api/profil/affiliations", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const nom = (body?.nom || "").trim();
+  if (!nom) return sendJSON(res, 400, { error: "Nom de l'organisation requis." });
+  if (nom.length > 80) return sendJSON(res, 400, { error: "Nom limité à 80 caractères." });
+  const nb = (await db.prepare("SELECT COUNT(*) n FROM user_affiliations WHERE user_id=?").get(user.id))?.n || 0;
+  if (nb >= 12) return sendJSON(res, 400, { error: "Maximum 12 affiliations." });
+  const r = await db.prepare("INSERT INTO user_affiliations (user_id,nom,logo_url) VALUES (?,?,?)").run(user.id, nom, body?.logo_url || null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("DELETE", "/api/profil/affiliations/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const aff = await db.prepare("SELECT user_id FROM user_affiliations WHERE id=?").get(params.id);
+  if (!aff || aff.user_id !== user.id) return sendJSON(res, 404, { error: "Affiliation introuvable." });
+  await db.prepare("DELETE FROM user_affiliations WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ── Score d'activité du compte personnel (miroir des initiatives) ── */

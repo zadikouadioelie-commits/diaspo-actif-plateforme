@@ -1,0 +1,24 @@
+<svg viewBox="0 0 1600 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bordeauxBg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#160810"/>
+      <stop offset="55%" stop-color="#3D0B22"/>
+      <stop offset="100%" stop-color="#7A1038"/>
+    </linearGradient>
+    <radialGradient id="bordeauxRing" cx="50%" cy="50%" r="50%">
+      <stop offset="70%" stop-color="#A11244" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#C21A54" stop-opacity="0.55"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="460" fill="url(#bordeauxBg)"/>
+
+  <!-- grands anneaux à droite -->
+  <circle cx="1420" cy="230" r="260" fill="url(#bordeauxRing)"/>
+  <circle cx="1420" cy="230" r="220" fill="none" stroke="#C21A54" stroke-width="2" opacity="0.7"/>
+  <circle cx="1420" cy="230" r="150" fill="none" stroke="#E63872" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- triangles diagonaux bas-gauche -->
+  <polygon points="0,460 0,300 260,460" fill="#8E1140" opacity="0.85"/>
+  <polygon points="0,460 220,460 60,300" fill="#C21A54" opacity="0.55"/>
+  <polygon points="0,180 0,60 130,180" fill="#5C0C29" opacity="0.6"/>
+</svg>
