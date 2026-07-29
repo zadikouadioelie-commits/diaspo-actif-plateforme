@@ -1052,15 +1052,25 @@ const DOMAIN_GRAD = {
     } else if (section === 'stats') {
       const s = init.stats_perso || {};
       const champs = [['projets','Projets réalisés'],['formations','Formations dispensées'],['pays_couverts','Pays couverts'],['partenaires','Partenaires'],['benevoles','Bénévoles actifs']];
+      /* Taille de l'organisation : nombre de membres (association/ONG/...) ou de salariés
+         (entreprise/startup) — sert de base au module de tarification Premium par palier. */
+      const TYPES_ENTREPRISE_INIT = ['Entreprise', 'Startup'];
+      const estEntreprise = TYPES_ENTREPRISE_INIT.includes(init.type);
       openEditModal('📈 Statistiques',
         champs.map(([k,l]) => `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">${l}</label>
           <input type="number" min="0" id="est-${k}" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${s[k] ?? ''}">`).join('') +
         `<label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">Année de création</label>
-         <input type="number" id="est-annee" min="1900" max="2100" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${init.annee_creation ?? ''}">`,
+         <input type="number" id="est-annee" min="1900" max="2100" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${init.annee_creation ?? ''}">
+         <label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">${estEntreprise ? 'Nombre de salariés' : 'Nombre de membres / adhérents'}</label>
+         <input type="number" id="est-taille" min="0" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${(estEntreprise ? init.nb_salaries : init.membres) ?? ''}">`,
         ov => {
           const stats = {};
           champs.forEach(([k]) => { const v = ov.querySelector('#est-' + k).value; if (v) stats[k] = parseInt(v); });
-          return saveProfil({ stats_perso: stats, annee_creation: ov.querySelector('#est-annee').value || undefined });
+          const taille = ov.querySelector('#est-taille').value;
+          return saveProfil({
+            stats_perso: stats, annee_creation: ov.querySelector('#est-annee').value || undefined,
+            [estEntreprise ? 'nb_salaries' : 'membres']: taille || undefined,
+          });
         });
     } else if (section === 'realisations') {
       const reals = init.realisations || [];

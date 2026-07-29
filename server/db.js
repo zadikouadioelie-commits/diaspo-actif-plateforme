@@ -415,20 +415,6 @@ db.exec(`
 
   /* ===== PLANS D'ABONNEMENT, TRANSACTIONS, PROMOS, PARAMÈTRES ===== */
 
-  CREATE TABLE IF NOT EXISTS plans_abonnement (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nom TEXT NOT NULL,
-    description TEXT,
-    prix_mensuel REAL DEFAULT 0,
-    prix_annuel REAL DEFAULT 0,
-    cible TEXT DEFAULT 'tous',
-    avantages TEXT DEFAULT '{}',
-    actif INTEGER DEFAULT 1,
-    ordre INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-  );
-
   CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -443,23 +429,6 @@ db.exec(`
     periode_fin TEXT,
     notes TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS codes_promo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nom TEXT NOT NULL,
-    code TEXT NOT NULL UNIQUE,
-    type TEXT NOT NULL DEFAULT 'pourcentage',
-    valeur REAL NOT NULL DEFAULT 0,
-    date_debut TEXT,
-    date_fin TEXT,
-    nb_max_utilisations INTEGER,
-    nb_utilisations INTEGER DEFAULT 0,
-    cible TEXT DEFAULT 'tous',
-    cible_pays TEXT DEFAULT '[]',
-    actif INTEGER DEFAULT 1,
-    created_by INTEGER,
-    created_at TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS parametres_plateforme (
@@ -1538,6 +1507,8 @@ const MIGRATIONS = [
   // Pénalité disciplinaire cumulée (0-100) issue des décisions de signalement avérées,
   // appliquée au score de confiance UNIQUEMENT après décision admin (jamais sur simple signalement)
   ["users", "penalite_disciplinaire INTEGER DEFAULT 0"],
+  // Module Premium — délai de grâce après échec de prélèvement (même pattern que pub_abonnements)
+  ["user_accreditations", "grace_until TEXT"],
 ];
 
 /* ===== COMPTES ÉTATIQUES : tables spécifiques ===== */
@@ -3716,7 +3687,131 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(pack_id) REFERENCES accred_packs(id)
   );
+
+  /* ===== TARIFICATION PREMIUM — module Gestion des abonnements ===== */
+
+  /* Étape 1 (catégorie) : override du tarif de base pour role='initiative' selon
+     initiatives.type regroupé en 'association' (Association/ONG/Fondation/...) ou
+     'entreprise' (Entreprise/Startup) — accred_tarifs (1 ligne/rôle) reste la base
+     Entreprise, cette table ne stocke que l'exception Association. */
+  CREATE TABLE IF NOT EXISTS accred_tarifs_categorie (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accred_id INTEGER NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','collectivite')),
+    categorie TEXT NOT NULL CHECK(categorie IN ('association','entreprise')),
+    montant REAL NOT NULL DEFAULT 0,
+    devise TEXT DEFAULT 'EUR',
+    reduction_annuelle_pct REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(accred_id, role, categorie),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id) ON DELETE CASCADE
+  );
+
+  /* Étape 2 : coefficient de modulation selon la taille de l'organisation (nombre de
+     membres pour une association, nombre de salariés pour une entreprise). */
+  CREATE TABLE IF NOT EXISTS accred_tarifs_paliers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accred_id INTEGER NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','collectivite')),
+    categorie TEXT CHECK(categorie IN ('association','entreprise')),
+    label TEXT NOT NULL,
+    seuil_min INTEGER NOT NULL DEFAULT 0,
+    seuil_max INTEGER,
+    coefficient REAL NOT NULL DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    actif INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id) ON DELETE CASCADE
+  );
+
+  /* Étape 3 : promotions temporaires (% ou montant fixe ou mois offerts). */
+  CREATE TABLE IF NOT EXISTS accred_promotions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    description TEXT,
+    date_debut TEXT NOT NULL,
+    date_fin TEXT NOT NULL,
+    reduction_pct REAL,
+    reduction_fixe REAL,
+    mois_offerts INTEGER DEFAULT 0,
+    roles_json TEXT DEFAULT '[]',
+    categories_json TEXT DEFAULT '[]',
+    cible TEXT NOT NULL DEFAULT 'tous' CHECK(cible IN ('tous','nouveaux','existants')),
+    actif INTEGER DEFAULT 1,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Étapes 4-5 : tarif personnalisé par compte, prioritaire sur tout le reste. */
+  CREATE TABLE IF NOT EXISTS accred_tarifs_personnalises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    accred_id INTEGER NOT NULL,
+    montant_mensuel REAL,
+    montant_annuel REAL,
+    date_debut TEXT NOT NULL,
+    date_fin TEXT,
+    motif TEXT NOT NULL,
+    actif INTEGER DEFAULT 1,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(accred_id) REFERENCES accred_definitions(id)
+  );
 `);
+
+/* Tarification Premium — tarif de base catégorie Association (initiative_abonne reste la
+   base Entreprise à 12,99€ dans accred_tarifs). */
+;(function seedTarifCategorieAssociation() {
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+  if (!def) return;
+  const exists = db.prepare("SELECT id FROM accred_tarifs_categorie WHERE accred_id=? AND role='initiative' AND categorie='association'").get(def.id);
+  if (exists) return;
+  db.prepare(`INSERT INTO accred_tarifs_categorie (accred_id,role,categorie,montant,devise,reduction_annuelle_pct) VALUES (?,?,?,?,?,?)`)
+    .run(def.id, 'initiative', 'association', 9.99, 'EUR', 15);
+})();
+
+/* Tarification Premium — ramène Utilisateur Abonné à 3,99€/mois (mise à jour de la grille
+   tarifaire) sans écraser une valeur déjà modifiée manuellement par un administrateur. */
+;(function fixTarifUtilisateurAbonne() {
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+  if (!def) return;
+  db.prepare("UPDATE accred_tarifs SET montant=3.99 WHERE accred_id=? AND role='utilisateur' AND montant=4.99").run(def.id);
+})();
+
+/* Tarification Premium — paliers de taille par défaut (entièrement ajustables ensuite
+   depuis le module d'administration). Les seuils entreprise reprennent exactement le
+   cahier des charges (nombre de salariés) ; les seuils association (nombre de membres)
+   couvrent les 3 premiers niveaux chiffrés du cahier des charges, Fédération et
+   Organisation internationale étant positionnées au-delà par défaut. */
+;(function seedPaliersTaille() {
+  const def = db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+  if (!def) return;
+  const exists = db.prepare("SELECT id FROM accred_tarifs_paliers WHERE accred_id=?").get(def.id);
+  if (exists) return;
+  const ins = db.prepare(`INSERT INTO accred_tarifs_paliers
+    (accred_id,role,categorie,label,seuil_min,seuil_max,coefficient,ordre) VALUES (?,'initiative',?,?,?,?,1,?)`);
+  const PALIERS_ASSOCIATION = [
+    ['Petite association', 0, 49],
+    ['Association moyenne', 50, 500],
+    ['Grande association', 501, 4999],
+    ['Fédération', 5000, 49999],
+    ['Organisation internationale', 50000, null],
+  ];
+  const PALIERS_ENTREPRISE = [
+    ['Micro-entreprise', 1, 9],
+    ['PME', 10, 49],
+    ['Entreprise moyenne', 50, 249],
+    ['Grande entreprise', 250, 999],
+    ['Grand groupe', 1000, null],
+  ];
+  PALIERS_ASSOCIATION.forEach(([label, min, max], i) => ins.run(def.id, 'association', label, min, max, i));
+  PALIERS_ENTREPRISE.forEach(([label, min, max], i) => ins.run(def.id, 'entreprise', label, min, max, i));
+})();
 
 /* ===== FEATURE ENGINE — OS applicatif Diaspo'Actif ===== */
 

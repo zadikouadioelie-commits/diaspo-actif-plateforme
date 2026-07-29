@@ -4165,11 +4165,33 @@ function afficherBandeauPremiumExpire(st) {
   cible.insertBefore(b, cible.firstChild);
 }
 
+/* Bandeau permanent pendant le délai de grâce après un prélèvement échoué (7 jours) —
+   l'accès Premium reste actif le temps de régulariser, contrairement à l'expiration. */
+function afficherBandeauPremiumImpaye(st) {
+  if (document.getElementById('premium-impaye-bandeau')) return;
+  const cible = document.querySelector('.content') || document.querySelector('main') || document.body;
+  const j = st.jours_restants;
+  const b = document.createElement('div');
+  b.id = 'premium-impaye-bandeau';
+  b.style.cssText = 'margin:0 0 18px;padding:14px 16px;background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:12px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;';
+  b.innerHTML =
+    '<div style="flex:1;min-width:200px;">'
+    + '<div style="font-weight:800;color:#92400E;font-size:13.5px;">⚠️ Le paiement de votre abonnement Premium a échoué</div>'
+    + '<div style="font-size:12.5px;color:#92400E;margin-top:4px;line-height:1.6;">'
+    +   'Régularisez sous <strong>' + (j !== null ? j : '7') + ' jour' + (j > 1 ? 's' : '') + '</strong> pour conserver votre accès Premium. '
+    +   'Vérifiez votre moyen de paiement.'
+    + '</div>'
+    + '</div>'
+    + '<a href="mes-paiements.html" style="flex:none;background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;font-size:12.5px;padding:9px 16px;border-radius:9px;text-decoration:none;white-space:nowrap;">Régulariser</a>';
+  cible.insertBefore(b, cible.firstChild);
+}
+
 /* Point d'entrée : appelé au chargement des espaces personnels. */
 window.initCyclePremium = async function () {
   const st = await premiumStatut();
   if (!st || !st.concerne) return;
   if (st.statut === 'expire') { afficherBandeauPremiumExpire(st); return; }
+  if (st.statut === 'impaye') { afficherBandeauPremiumImpaye(st); return; }
   if (st.statut === 'bientot_expire' && !premiumAlerteDejaVue(st)) afficherAlertePremium(st);
 };
 

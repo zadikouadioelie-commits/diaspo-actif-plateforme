@@ -293,6 +293,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     centres_interet, situation_pro,
     // initiative
     type_org, description, domaine, objectifs,
+    nombre_membres, nombre_salaries,
     origine1, origine2,
     nom_responsable, prenom_responsable, fonction_responsable, email_responsable, tel_responsable,
     site_web, reseaux_sociaux, pays_intervention,
@@ -419,10 +420,12 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     if (initRow) try { await db.prepare('UPDATE initiatives SET da_id=? WHERE id=?').run(generateDaId(), initRow.id); } catch(_) {}
     // Profil public enrichi : champs facultatifs du formulaire d'inscription
     if (initRow) try {
-      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=? WHERE id=?').run(
+      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=?, membres=?, nb_salaries=? WHERE id=?').run(
         Array.isArray(body.publics) && body.publics.length ? JSON.stringify(body.publics) : null,
         Array.isArray(body.besoins) && body.besoins.length ? JSON.stringify(body.besoins) : null,
         body.annee_creation ? parseInt(body.annee_creation) || null : null,
+        nombre_membres ? parseInt(nombre_membres) || null : null,
+        nombre_salaries ? parseInt(nombre_salaries) || null : null,
         initRow.id);
     } catch(_) {}
   }
@@ -5175,7 +5178,8 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
      qui souffraient du même enfermement. */
   const { publics, besoins, realisations, stats_perso, annee_creation, assistant_actif,
           pays_intervention, vitrine_services, vitrine_horaires, mission, historique,
-          origine1, origine2, nationalite1, nationalite2, pays_origine } = body;
+          origine1, origine2, nationalite1, nationalite2, pays_origine,
+          membres, nb_salaries } = body;
   await db.prepare(`UPDATE initiatives SET
       publics_json=COALESCE(?,publics_json), besoins_json=COALESCE(?,besoins_json),
       realisations_json=COALESCE(?,realisations_json), stats_perso_json=COALESCE(?,stats_perso_json),
@@ -5184,7 +5188,8 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
       vitrine_horaires=COALESCE(?,vitrine_horaires), mission=COALESCE(?,mission), historique=COALESCE(?,historique),
       origine1=COALESCE(?,origine1), origine2=COALESCE(?,origine2),
       nationalite1=COALESCE(?,nationalite1), nationalite2=COALESCE(?,nationalite2),
-      pays_origine=COALESCE(?,pays_origine)
+      pays_origine=COALESCE(?,pays_origine),
+      membres=COALESCE(?,membres), nb_salaries=COALESCE(?,nb_salaries)
     WHERE id=?`)
     .run(Array.isArray(publics) ? JSON.stringify(publics) : null,
          Array.isArray(besoins) ? JSON.stringify(besoins) : null,
@@ -5202,6 +5207,8 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
          nationalite1 !== undefined ? nationalite1 : null,
          nationalite2 !== undefined ? nationalite2 : null,
          pays_origine !== undefined ? pays_origine : null,
+         membres != null ? parseInt(membres) || null : null,
+         nb_salaries != null ? parseInt(nb_salaries) || null : null,
          params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -25468,6 +25475,337 @@ route("GET", "/api/accreditations/catalogue", async (req, res) => {
     return def;
   }))).filter(Boolean);
   sendJSON(res, 200, { catalogue: result });
+});
+
+/* ═══ MODULE PREMIUM — GESTION DES ABONNEMENTS (admin) ═══ */
+
+/* GET /api/admin/premium/dashboard — vue d'ensemble : abonnés par catégorie, actifs, expirés,
+   CA mensuel/annuel, promotions en cours, essais gratuits en cours, tarifs personnalisés actifs. */
+route("GET", "/api/admin/premium/dashboard", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const defUtil = await db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+  const defInit = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+
+  // Abonnés actifs par catégorie (utilisateur / association / entreprise) — un compte en
+  // essai gratuit "Découverte" a lui aussi statut='active' (type_tarif='decouverte',
+  // montant_paye=0) : il ne doit PAS compter comme abonné payant, sous peine de confondre les
+  // deux stats que le cahier des charges demande justement de distinguer.
+  const actifsUtil = defUtil ? (await db.prepare(
+    "SELECT COUNT(*) n, COALESCE(SUM(montant_paye),0) revenu FROM user_accreditations WHERE accred_id=? AND statut='active' AND type_tarif!='decouverte'"
+  ).get(defUtil.id)) : { n: 0, revenu: 0 };
+  let actifsAssociation = { n: 0, revenu: 0 }, actifsEntreprise = { n: 0, revenu: 0 };
+  if (defInit) {
+    const lignes = await db.prepare(`
+      SELECT ua.montant_paye, i.type FROM user_accreditations ua
+      JOIN initiatives i ON i.owner_user_id = ua.user_id
+      WHERE ua.accred_id=? AND ua.statut='active' AND ua.type_tarif!='decouverte'
+    `).all(defInit.id);
+    for (const l of lignes) {
+      const cible = categoriserInitiative(l.type) === 'entreprise' ? actifsEntreprise : actifsAssociation;
+      cible.n++; cible.revenu += Number(l.montant_paye || 0);
+    }
+  }
+
+  // Abonnements expirés / en impayé (délai de grâce)
+  const expiresUtil = defUtil ? (await db.prepare("SELECT COUNT(*) n FROM user_accreditations WHERE accred_id=? AND statut='expiree'").get(defUtil.id))?.n : 0;
+  const expiresInit = defInit ? (await db.prepare("SELECT COUNT(*) n FROM user_accreditations WHERE accred_id=? AND statut='expiree'").get(defInit.id))?.n : 0;
+  const impayes = await db.prepare(
+    "SELECT COUNT(*) n FROM user_accreditations WHERE statut='suspendue' AND accred_id IN (?,?)"
+  ).get(defUtil?.id || 0, defInit?.id || 0);
+
+  // CA mensuel/annuel simplifié : somme des montants payés actifs (proxy — pas de recalcul
+  // au prorata des dates de facturation, cohérent avec le reste de l'admin qui affiche déjà
+  // des totaux simulés plutôt qu'une compta exacte).
+  const mrr = (actifsUtil.revenu || 0) + (actifsAssociation.revenu || 0) + (actifsEntreprise.revenu || 0);
+
+  // Promotions en cours
+  const promosEnCours = (await db.prepare(
+    "SELECT COUNT(*) n FROM accred_promotions WHERE actif=1 AND date_debut<=datetime('now') AND date_fin>=datetime('now')"
+  ).get())?.n || 0;
+
+  // Tarifs personnalisés actifs
+  const tarifsPersoActifs = (await db.prepare(
+    "SELECT COUNT(*) n FROM accred_tarifs_personnalises WHERE actif=1 AND date_debut<=datetime('now') AND (date_fin IS NULL OR date_fin>=datetime('now'))"
+  ).get())?.n || 0;
+
+  // Essais gratuits en cours : un compte inscrit reçoit une ligne user_accreditations
+  // explicite (type_tarif='decouverte', montant_paye=0, date_expiration = +3 mois) dès la
+  // création — la trouver directement est donc fiable, pas besoin de recalculer la période
+  // via getPremiumStatut (source periode_gratuite_* n'intervient que pour les rares comptes
+  // sans cette ligne, ex. antérieurs à sa mise en place).
+  const essaisAvecLigne = await db.prepare(`
+    SELECT COUNT(*) n FROM user_accreditations
+    WHERE type_tarif='decouverte' AND statut='active' AND accred_id IN (?,?)
+      AND (date_expiration IS NULL OR date_expiration > datetime('now'))
+  `).get(defUtil?.id || 0, defInit?.id || 0);
+  const comptesSansLigne = await db.prepare(`
+    SELECT id, role FROM users WHERE role IN ('utilisateur','initiative')
+      AND id NOT IN (SELECT user_id FROM user_accreditations WHERE accred_id IN (?,?))
+  `).all(defUtil?.id || 0, defInit?.id || 0);
+  let essaisGratuits = essaisAvecLigne?.n || 0;
+  for (const c of comptesSansLigne) {
+    const st = await getPremiumStatut(c.id, c.role);
+    if (st.concerne && st.actif && (st.source || '').startsWith('periode_gratuite')) essaisGratuits++;
+  }
+
+  sendJSON(res, 200, {
+    abonnes: {
+      utilisateur: actifsUtil.n || 0,
+      association: actifsAssociation.n,
+      entreprise: actifsEntreprise.n,
+    },
+    expires: { utilisateur: expiresUtil || 0, initiative: expiresInit || 0 },
+    impayes_en_grace: impayes?.n || 0,
+    revenu_mensuel_estime: Math.round(mrr * 100) / 100,
+    revenu_annuel_estime: Math.round(mrr * 12 * 100) / 100,
+    promotions_en_cours: promosEnCours,
+    tarifs_personnalises_actifs: tarifsPersoActifs,
+    essais_gratuits_en_cours: essaisGratuits,
+  });
+});
+
+/* Trace une modification tarifaire dans le journal d'audit déjà utilisé par le moteur
+   d'accréditations (accred_audit_log) — même table, granularité élargie via le champ `champ`
+   ('palier_taille' / 'promotion' / 'tarif_personnalise' en plus de 'definition_complete'). */
+async function journalTarifaire(accredId, admin, champ, ancienneValeur, nouvelleValeur, motif) {
+  try {
+    await db.prepare(`
+      INSERT INTO accred_audit_log (accred_id,admin_id,admin_nom,champ,ancienne_valeur,nouvelle_valeur,motif)
+      VALUES (?,?,?,?,?,?,?)
+    `).run(accredId, admin.id, admin.nom || null, champ,
+      ancienneValeur != null ? JSON.stringify(ancienneValeur) : null,
+      nouvelleValeur != null ? JSON.stringify(nouvelleValeur) : null,
+      motif || null);
+  } catch (_) {}
+}
+
+/* GET /api/admin/accred/paliers?accred_id=X — liste des paliers de taille (les deux catégories) */
+route("GET", "/api/admin/accred/paliers", async (req, res, params, body, query) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const accredId = Number(query.accred_id) || (await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get())?.id;
+  if (!accredId) return sendJSON(res, 200, { paliers: [] });
+  const paliers = await db.prepare(
+    "SELECT * FROM accred_tarifs_paliers WHERE accred_id=? ORDER BY categorie, ordre"
+  ).all(accredId);
+  sendJSON(res, 200, { paliers });
+});
+
+/* PUT /api/admin/accred/paliers/:id — ajuster un palier (coefficient, seuils, libellé, actif) */
+route("PUT", "/api/admin/accred/paliers/:id", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM accred_tarifs_paliers WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Palier introuvable." });
+  const { label, seuil_min, seuil_max, coefficient, actif, motif } = body;
+  await db.prepare(`
+    UPDATE accred_tarifs_paliers SET
+      label=COALESCE(?,label), seuil_min=COALESCE(?,seuil_min), seuil_max=?,
+      coefficient=COALESCE(?,coefficient), actif=COALESCE(?,actif), updated_at=datetime('now')
+    WHERE id=?
+  `).run(label || null, seuil_min != null ? parseInt(seuil_min) : null,
+    seuil_max !== undefined ? (seuil_max === null || seuil_max === '' ? null : parseInt(seuil_max)) : avant.seuil_max,
+    coefficient != null ? Number(coefficient) : null,
+    actif != null ? (actif ? 1 : 0) : null, params.id);
+  const apres = await db.prepare("SELECT * FROM accred_tarifs_paliers WHERE id=?").get(params.id);
+  await journalTarifaire(avant.accred_id, admin, 'palier_taille', avant, apres, motif);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/admin/accred/tarif-categorie?accred_id=X — tarif de base par catégorie (initiative) */
+route("GET", "/api/admin/accred/tarif-categorie", async (req, res, params, body, query) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const accredId = Number(query.accred_id) || (await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get())?.id;
+  if (!accredId) return sendJSON(res, 200, { tarifs: [] });
+  const tarifs = await db.prepare("SELECT * FROM accred_tarifs_categorie WHERE accred_id=?").all(accredId);
+  sendJSON(res, 200, { tarifs });
+});
+
+/* PUT /api/admin/accred/tarif-categorie/:id — ajuster le tarif de base d'une catégorie */
+route("PUT", "/api/admin/accred/tarif-categorie/:id", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM accred_tarifs_categorie WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Tarif catégorie introuvable." });
+  const { montant, reduction_annuelle_pct, motif } = body;
+  await db.prepare(`
+    UPDATE accred_tarifs_categorie SET montant=COALESCE(?,montant),
+      reduction_annuelle_pct=COALESCE(?,reduction_annuelle_pct), updated_at=datetime('now')
+    WHERE id=?
+  `).run(montant != null ? Number(montant) : null, reduction_annuelle_pct != null ? Number(reduction_annuelle_pct) : null, params.id);
+  const apres = await db.prepare("SELECT * FROM accred_tarifs_categorie WHERE id=?").get(params.id);
+  await journalTarifaire(avant.accred_id, admin, 'tarif_categorie', avant, apres, motif);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Promotions ══ */
+route("GET", "/api/admin/accred/promotions", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  sendJSON(res, 200, { promotions: await db.prepare("SELECT * FROM accred_promotions ORDER BY date_debut DESC").all() });
+});
+
+route("POST", "/api/admin/accred/promotions", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { nom, description, date_debut, date_fin, reduction_pct, reduction_fixe, mois_offerts, roles, categories, cible } = body;
+  if (!nom || !date_debut || !date_fin) return sendJSON(res, 400, { error: "Nom et dates requis." });
+  const id = (await db.prepare(`
+    INSERT INTO accred_promotions (nom, description, date_debut, date_fin, reduction_pct, reduction_fixe, mois_offerts, roles_json, categories_json, cible, created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  `).run(nom, description || null, date_debut, date_fin, reduction_pct || null, reduction_fixe || null,
+    mois_offerts || 0, JSON.stringify(Array.isArray(roles) ? roles : []), JSON.stringify(Array.isArray(categories) ? categories : []),
+    cible || 'tous', admin.id)).lastInsertRowid;
+  const def = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+  await journalTarifaire(def?.id || 0, admin, 'promotion', null, { id, nom }, "Création promotion");
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/admin/accred/promotions/:id", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM accred_promotions WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Promotion introuvable." });
+  const { nom, description, date_debut, date_fin, reduction_pct, reduction_fixe, mois_offerts, roles, categories, cible, actif, motif } = body;
+  await db.prepare(`
+    UPDATE accred_promotions SET nom=COALESCE(?,nom), description=COALESCE(?,description),
+      date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin),
+      reduction_pct=?, reduction_fixe=?, mois_offerts=COALESCE(?,mois_offerts),
+      roles_json=COALESCE(?,roles_json), categories_json=COALESCE(?,categories_json),
+      cible=COALESCE(?,cible), actif=COALESCE(?,actif), updated_at=datetime('now')
+    WHERE id=?
+  `).run(nom || null, description || null, date_debut || null, date_fin || null,
+    reduction_pct !== undefined ? reduction_pct : avant.reduction_pct,
+    reduction_fixe !== undefined ? reduction_fixe : avant.reduction_fixe,
+    mois_offerts != null ? mois_offerts : null,
+    Array.isArray(roles) ? JSON.stringify(roles) : null,
+    Array.isArray(categories) ? JSON.stringify(categories) : null,
+    cible || null, actif != null ? (actif ? 1 : 0) : null, params.id);
+  const apres = await db.prepare("SELECT * FROM accred_promotions WHERE id=?").get(params.id);
+  const def = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+  await journalTarifaire(def?.id || 0, admin, 'promotion', avant, apres, motif);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/accred/promotions/:id", async (req, res, params) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM accred_promotions WHERE id=?").get(params.id);
+  await db.prepare("UPDATE accred_promotions SET actif=0, updated_at=datetime('now') WHERE id=?").run(params.id);
+  if (avant) {
+    const def = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+    await journalTarifaire(def?.id || 0, admin, 'promotion', avant, { ...avant, actif: 0 }, "Désactivation promotion");
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Tarifs personnalisés par compte ══ */
+route("GET", "/api/admin/accred/tarifs-personnalises", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(`
+    SELECT tp.*, u.nom AS user_nom, u.email AS user_email, ad.type AS accred_type, ad.label AS accred_label
+    FROM accred_tarifs_personnalises tp
+    JOIN users u ON u.id = tp.user_id
+    JOIN accred_definitions ad ON ad.id = tp.accred_id
+    ORDER BY tp.created_at DESC
+  `).all();
+  sendJSON(res, 200, { tarifs: rows });
+});
+
+route("POST", "/api/admin/accred/tarifs-personnalises", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const { user_id, accred_id, montant_mensuel, montant_annuel, date_debut, date_fin, motif } = body;
+  if (!user_id || !accred_id || !date_debut || !motif) return sendJSON(res, 400, { error: "Compte, accréditation, date de début et motif requis." });
+  const id = (await db.prepare(`
+    INSERT INTO accred_tarifs_personnalises (user_id, accred_id, montant_mensuel, montant_annuel, date_debut, date_fin, motif, created_by)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).run(user_id, accred_id, montant_mensuel != null ? Number(montant_mensuel) : null,
+    montant_annuel != null ? Number(montant_annuel) : null, date_debut, date_fin || null, motif, admin.id)).lastInsertRowid;
+  await journalTarifaire(accred_id, admin, 'tarif_personnalise', null, { id, user_id, montant_mensuel, montant_annuel }, motif);
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/admin/accred/tarifs-personnalises/:id", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM accred_tarifs_personnalises WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Tarif personnalisé introuvable." });
+  const { montant_mensuel, montant_annuel, date_fin, actif, motif } = body;
+  await db.prepare(`
+    UPDATE accred_tarifs_personnalises SET
+      montant_mensuel=?, montant_annuel=?, date_fin=?, actif=COALESCE(?,actif), updated_at=datetime('now')
+    WHERE id=?
+  `).run(montant_mensuel !== undefined ? montant_mensuel : avant.montant_mensuel,
+    montant_annuel !== undefined ? montant_annuel : avant.montant_annuel,
+    date_fin !== undefined ? date_fin : avant.date_fin,
+    actif != null ? (actif ? 1 : 0) : null, params.id);
+  const apres = await db.prepare("SELECT * FROM accred_tarifs_personnalises WHERE id=?").get(params.id);
+  await journalTarifaire(avant.accred_id, admin, 'tarif_personnalise', avant, apres, motif);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/accred/tarifs-personnalises/:id", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM accred_tarifs_personnalises WHERE id=?").get(params.id);
+  await db.prepare("UPDATE accred_tarifs_personnalises SET actif=0, updated_at=datetime('now') WHERE id=?").run(params.id);
+  if (avant) await journalTarifaire(avant.accred_id, admin, 'tarif_personnalise', avant, { ...avant, actif: 0 }, "Fin du tarif personnalisé");
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/admin/premium/simuler — impact d'une nouvelle grille tarifaire sur la distribution
+   RÉELLE actuelle des comptes, sans rien persister. Body : { base_utilisateur, base_association,
+   base_entreprise } (tarifs mensuels candidats — omis = valeur actuelle inchangée). */
+route("POST", "/api/admin/premium/simuler", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const defUtil = await db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+  const defInit = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
+
+  // Comme pour le tableau de bord : un essai gratuit "Découverte" a lui aussi statut='active'
+  // (type_tarif='decouverte') mais n'est pas un abonné payant — l'exclure pour que la
+  // simulation porte sur les VRAIS abonnés actuels, pas sur des comptes qui ne paient rien.
+  const comptesUtil = defUtil ? await db.prepare("SELECT user_id FROM user_accreditations WHERE accred_id=? AND statut='active' AND type_tarif!='decouverte'").all(defUtil.id) : [];
+  const comptesInit = defInit ? await db.prepare(`
+    SELECT ua.user_id, i.type FROM user_accreditations ua JOIN initiatives i ON i.owner_user_id = ua.user_id
+    WHERE ua.accred_id=? AND ua.statut='active' AND ua.type_tarif!='decouverte'
+  `).all(defInit.id) : [];
+
+  const baseUtil = body.base_utilisateur != null ? Number(body.base_utilisateur) : null;
+  const baseAsso = body.base_association != null ? Number(body.base_association) : null;
+  const baseEntr = body.base_entreprise != null ? Number(body.base_entreprise) : null;
+
+  let revenuMensuelActuel = 0, revenuMensuelSimule = 0;
+  const tarifActuelUtil = defUtil ? await db.prepare("SELECT montant FROM accred_tarifs WHERE accred_id=? AND role='utilisateur'").get(defUtil.id) : null;
+  for (const _ of comptesUtil) {
+    const actuel = Number(tarifActuelUtil?.montant || 0);
+    revenuMensuelActuel += actuel;
+    revenuMensuelSimule += baseUtil != null ? baseUtil : actuel;
+  }
+  const tarifActuelAsso = defInit ? await db.prepare("SELECT montant FROM accred_tarifs_categorie WHERE accred_id=? AND role='initiative' AND categorie='association'").get(defInit.id) : null;
+  const tarifActuelEntr = defInit ? await db.prepare("SELECT montant FROM accred_tarifs WHERE accred_id=? AND role='initiative'").get(defInit.id) : null;
+  for (const c of comptesInit) {
+    const estEntreprise = categoriserInitiative(c.type) === 'entreprise';
+    const actuel = Number((estEntreprise ? tarifActuelEntr?.montant : tarifActuelAsso?.montant) || 0);
+    revenuMensuelActuel += actuel;
+    const candidat = estEntreprise ? baseEntr : baseAsso;
+    revenuMensuelSimule += candidat != null ? candidat : actuel;
+  }
+
+  sendJSON(res, 200, {
+    comptes_utilisateur: comptesUtil.length,
+    comptes_association: comptesInit.filter(c => categoriserInitiative(c.type) !== 'entreprise').length,
+    comptes_entreprise: comptesInit.filter(c => categoriserInitiative(c.type) === 'entreprise').length,
+    revenu_mensuel_actuel: Math.round(revenuMensuelActuel * 100) / 100,
+    revenu_mensuel_simule: Math.round(revenuMensuelSimule * 100) / 100,
+    revenu_annuel_actuel: Math.round(revenuMensuelActuel * 12 * 100) / 100,
+    revenu_annuel_simule: Math.round(revenuMensuelSimule * 12 * 100) / 100,
+  });
 });
 
 /* ──── Routes Admin : gestion des définitions ──── */

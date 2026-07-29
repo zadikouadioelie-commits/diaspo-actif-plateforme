@@ -83,8 +83,6 @@
       <a href="#revenus-diaspora" data-section="revenus-diaspora">🗺️ Revenus par diaspora</a>
       <a href="#finances" data-section="finances">💰 Finances</a>
       <a href="#ventes" data-section="ventes">🛒 Ventes & Transactions</a>
-      <a href="#plans" data-section="plans">📋 Plans & Abonnements</a>
-      <a href="#promotions" data-section="promotions">🎯 Promotions</a>
 
       <span class="sb-group-lbl">🟥 Communication</span>
       <a href="#communication" data-section="communication">✉ Communication</a>
@@ -1424,53 +1422,6 @@
             <div id="fin-top-clients"></div>
           </div>
         </div>
-        <!-- Performance par plan -->
-        <div class="card">
-          <h3 style="margin:0 0 14px;font-size:14px;">📋 Performance par plan (30j)</h3>
-          <div id="fin-par-plan"></div>
-        </div>
-      </section>
-
-      <!-- PLANS & ABONNEMENTS -->
-      <section id="section-plans" style="display:none;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-          <div style="flex:1;"><h2 style="margin:0;">📋 Plans & Abonnements</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Créez et gérez les offres d'abonnement</p>
-          </div>
-          <button class="btn btn-orange" onclick="openPlanModal()">+ Nouveau plan</button>
-        </div>
-        <div id="plans-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:24px;"></div>
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-            <h3 style="margin:0;font-size:14px;">👥 Abonnés actifs</h3>
-            <div id="plans-renouv" style="font-size:12px;color:var(--muted);"></div>
-          </div>
-          <div id="plans-abonnes"></div>
-        </div>
-      </section>
-
-      <!-- PROMOTIONS -->
-      <section id="section-promotions" style="display:none;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-          <div style="flex:1;"><h2 style="margin:0;">🎯 Promotions & Codes promo</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Boostez l'acquisition avec des offres ciblées</p>
-          </div>
-          <button class="btn btn-orange" onclick="openPromoModal()">+ Nouveau code</button>
-        </div>
-        <div class="card" style="padding:0;overflow:hidden;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
-              <th style="padding:12px 16px;text-align:left;">Code / Nom</th>
-              <th style="padding:12px 8px;text-align:center;">Type</th>
-              <th style="padding:12px 8px;text-align:center;">Valeur</th>
-              <th style="padding:12px 8px;text-align:center;">Utilisations</th>
-              <th style="padding:12px 8px;text-align:center;">Validité</th>
-              <th style="padding:12px 8px;text-align:center;">Statut</th>
-              <th style="padding:12px 8px;text-align:center;">Actions</th>
-            </tr></thead>
-            <tbody id="promos-table"></tbody>
-          </table>
-        </div>
       </section>
 
       <!-- VENTES & TRANSACTIONS -->
@@ -1485,7 +1436,6 @@
             <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
               <th style="padding:12px 16px;text-align:left;">Référence</th>
               <th style="padding:12px 8px;text-align:left;">Utilisateur</th>
-              <th style="padding:12px 8px;text-align:center;">Plan</th>
               <th style="padding:12px 8px;text-align:center;">Type</th>
               <th style="padding:12px 8px;text-align:right;">Montant</th>
               <th style="padding:12px 8px;text-align:center;">Statut</th>
@@ -3241,6 +3191,11 @@
             <h3 style="margin:0 0 4px;">Institutions &amp; vérifications</h3>
             <p style="margin:0;font-size:12.5px;color:var(--muted);">Responsables de collectivités en attente, institutions accréditées.</p>
           </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid #c8960c;" onclick="showAccredHub('premium')">
+            <div style="font-size:28px;margin-bottom:8px;">💎</div>
+            <h3 style="margin:0 0 4px;">Gestion des abonnements Premium</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">Tarifs par catégorie, paliers de taille, promotions, tarifs personnalisés, simulateur.</p>
+          </div>
         </div>
 
         <button class="btn btn-sm btn-outline" id="accred-hub-back" style="display:none;margin-bottom:16px;" onclick="showAccredHub(null)">← Retour au menu Accréditations</button>
@@ -3295,6 +3250,106 @@
           </div>
         </div>
         </div><!-- /accred-hub-institutions -->
+
+        <!-- ════ GESTION DES ABONNEMENTS PREMIUM ════ -->
+        <div id="accred-hub-premium" style="display:none;">
+          <h2 style="margin:0 0 14px;">💎 Gestion des abonnements Premium</h2>
+          <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick="premiumAdminOuvrir('dashboard')" id="pa-tab-dashboard">📊 Tableau de bord</button>
+            <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('paliers')" id="pa-tab-paliers">📶 Paliers de taille</button>
+            <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('promotions')" id="pa-tab-promotions">🎯 Promotions</button>
+            <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('perso')" id="pa-tab-perso">🤝 Tarifs personnalisés</button>
+            <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('simulateur')" id="pa-tab-simulateur">🧮 Simulateur</button>
+          </div>
+
+          <div id="pa-panel-dashboard">
+            <div class="grid grid-4" style="gap:14px;margin-bottom:20px;">
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Abonnés Utilisateur</div><div id="pa-kpi-util" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Abonnés Association</div><div id="pa-kpi-asso" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Abonnés Entreprise</div><div id="pa-kpi-entr" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">En délai de grâce (impayé)</div><div id="pa-kpi-impaye" style="font-size:24px;font-weight:800;color:#b45309;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Expirés (Utilisateur)</div><div id="pa-kpi-exp-util" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Expirés (Initiative)</div><div id="pa-kpi-exp-init" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">CA mensuel estimé</div><div id="pa-kpi-mrr" style="font-size:24px;font-weight:800;color:#059669;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">CA annuel estimé</div><div id="pa-kpi-arr" style="font-size:24px;font-weight:800;color:#059669;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Promotions en cours</div><div id="pa-kpi-promos" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Tarifs personnalisés actifs</div><div id="pa-kpi-perso" style="font-size:24px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Essais gratuits en cours</div><div id="pa-kpi-essais" style="font-size:24px;font-weight:800;">—</div></div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 12px;font-size:14px;">Tarif de base — catégorie Association</h3>
+              <div id="pa-tarif-categorie"></div>
+            </div>
+          </div>
+
+          <div id="pa-panel-paliers" style="display:none;">
+            <div class="card" style="margin-bottom:16px;">
+              <h3 style="margin:0 0 4px;font-size:14px;">Associations — modulation selon le nombre de membres</h3>
+              <p style="margin:0 0 12px;font-size:12px;color:var(--muted);">Coefficient multiplicateur appliqué au tarif de base.</p>
+              <div id="pa-paliers-association"></div>
+            </div>
+            <div class="card">
+              <h3 style="margin:0 0 4px;font-size:14px;">Entreprises — modulation selon le nombre de salariés</h3>
+              <p style="margin:0 0 12px;font-size:12px;color:var(--muted);">Coefficient multiplicateur appliqué au tarif de base.</p>
+              <div id="pa-paliers-entreprise"></div>
+            </div>
+          </div>
+
+          <div id="pa-panel-promotions" style="display:none;">
+            <div class="flex-between" style="margin-bottom:14px;">
+              <div></div>
+              <button class="btn btn-orange" onclick="paOuvrirPromoModal()">+ Nouvelle promotion</button>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Nom</th>
+                  <th style="padding:10px 8px;text-align:center;">Réduction</th>
+                  <th style="padding:10px 8px;text-align:center;">Validité</th>
+                  <th style="padding:10px 8px;text-align:center;">Cible</th>
+                  <th style="padding:10px 8px;text-align:center;">Statut</th>
+                  <th style="padding:10px 8px;text-align:center;">Actions</th>
+                </tr></thead>
+                <tbody id="pa-promotions-table"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="pa-panel-perso" style="display:none;">
+            <div class="flex-between" style="margin-bottom:14px;">
+              <div></div>
+              <button class="btn btn-orange" onclick="paOuvrirPersoModal()">+ Nouveau tarif personnalisé</button>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Compte</th>
+                  <th style="padding:10px 8px;text-align:left;">Accréditation</th>
+                  <th style="padding:10px 8px;text-align:center;">Mensuel</th>
+                  <th style="padding:10px 8px;text-align:center;">Annuel</th>
+                  <th style="padding:10px 8px;text-align:center;">Validité</th>
+                  <th style="padding:10px 8px;text-align:left;">Motif</th>
+                  <th style="padding:10px 8px;text-align:center;">Actions</th>
+                </tr></thead>
+                <tbody id="pa-perso-table"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="pa-panel-simulateur" style="display:none;">
+            <div class="card" style="max-width:520px;">
+              <h3 style="margin:0 0 14px;font-size:14px;">🧮 Simuler une nouvelle grille tarifaire</h3>
+              <label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">Tarif Utilisateur (€/mois)</label>
+              <input type="number" step="0.01" id="pa-sim-util" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Laisser vide = inchangé">
+              <label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">Tarif Association (€/mois)</label>
+              <input type="number" step="0.01" id="pa-sim-asso" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Laisser vide = inchangé">
+              <label style="display:block;font-size:12px;font-weight:700;margin:8px 0 3px;">Tarif Entreprise (€/mois)</label>
+              <input type="number" step="0.01" id="pa-sim-entr" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Laisser vide = inchangé">
+              <button class="btn btn-orange" style="margin-top:14px;width:100%;" onclick="paSimuler()">Calculer l'impact</button>
+              <div id="pa-sim-resultat" style="margin-top:16px;"></div>
+            </div>
+          </div>
+        </div>
 
         <!-- ════ MOTEUR D'ACCRÉDITATIONS DYNAMIQUE ════ -->
         <div id="section-moteur-accred" style="display:none;margin-top:0;padding-top:0;">
@@ -6366,7 +6421,7 @@ document.querySelector('[data-section="accreditations"]')?.addEventListener('cli
 
 /* ── Hub Accréditations : navigation par boutons ── */
 function showAccredHub(id) {
-  const panels = { demandes: 'section-accred-demandes', legacy: 'section-accred-da', moteur: 'section-moteur-accred', packs: 'section-accred-packs', feature: 'section-feature-engine', institutions: 'accred-hub-institutions' };
+  const panels = { demandes: 'section-accred-demandes', legacy: 'section-accred-da', moteur: 'section-moteur-accred', packs: 'section-accred-packs', feature: 'section-feature-engine', institutions: 'accred-hub-institutions', premium: 'accred-hub-premium' };
   const menu = document.getElementById('accred-hub-menu');
   const back = document.getElementById('accred-hub-back');
   Object.values(panels).forEach(pid => { const el = document.getElementById(pid); if (el) el.style.display = 'none'; });
@@ -6380,6 +6435,213 @@ function showAccredHub(id) {
   const target = document.getElementById(panels[id]);
   if (target) target.style.display = '';
   if (id === 'demandes') loadAccredDefDemandes();
+  if (id === 'premium') premiumAdminOuvrir('dashboard');
+}
+
+/* ── Module Premium : gestion des abonnements ── */
+function premiumAdminOuvrir(tab) {
+  ['dashboard','paliers','promotions','perso','simulateur'].forEach(t => {
+    const panel = document.getElementById('pa-panel-' + t);
+    const btn = document.getElementById('pa-tab-' + t);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn) btn.className = t === tab ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  });
+  if (tab === 'dashboard') paLoadDashboard();
+  else if (tab === 'paliers') paLoadPaliers();
+  else if (tab === 'promotions') paLoadPromotions();
+  else if (tab === 'perso') paLoadPerso();
+}
+
+async function paLoadDashboard() {
+  const [d, cat] = await Promise.all([
+    api("GET", "/admin/premium/dashboard").catch(() => ({})),
+    api("GET", "/admin/accred/tarif-categorie").catch(() => ({})),
+  ]);
+  document.getElementById('pa-kpi-util').textContent = d.abonnes?.utilisateur ?? '—';
+  document.getElementById('pa-kpi-asso').textContent = d.abonnes?.association ?? '—';
+  document.getElementById('pa-kpi-entr').textContent = d.abonnes?.entreprise ?? '—';
+  document.getElementById('pa-kpi-impaye').textContent = d.impayes_en_grace ?? '—';
+  document.getElementById('pa-kpi-exp-util').textContent = d.expires?.utilisateur ?? '—';
+  document.getElementById('pa-kpi-exp-init').textContent = d.expires?.initiative ?? '—';
+  document.getElementById('pa-kpi-mrr').textContent = (d.revenu_mensuel_estime ?? 0).toFixed(2) + ' €';
+  document.getElementById('pa-kpi-arr').textContent = (d.revenu_annuel_estime ?? 0).toFixed(2) + ' €';
+  document.getElementById('pa-kpi-promos').textContent = d.promotions_en_cours ?? '—';
+  document.getElementById('pa-kpi-perso').textContent = d.tarifs_personnalises_actifs ?? '—';
+  document.getElementById('pa-kpi-essais').textContent = d.essais_gratuits_en_cours ?? '—';
+
+  const t = (cat.tarifs || [])[0];
+  const zone = document.getElementById('pa-tarif-categorie');
+  if (zone) zone.innerHTML = t ? `
+    <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+      <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:3px;">Tarif mensuel (€)</label>
+        <input type="number" step="0.01" id="pa-cat-montant" value="${t.montant}" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:140px;"></div>
+      <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:3px;">Réduction annuelle (%)</label>
+        <input type="number" step="0.1" id="pa-cat-reduc" value="${t.reduction_annuelle_pct}" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:120px;"></div>
+      <button class="btn btn-orange" onclick="paSaveTarifCategorie(${t.id})">Enregistrer</button>
+    </div>` : "<div class='notice'>Aucun tarif catégorie configuré.</div>";
+}
+
+async function paSaveTarifCategorie(id) {
+  const montant = parseFloat(document.getElementById('pa-cat-montant').value) || 0;
+  const reduction_annuelle_pct = parseFloat(document.getElementById('pa-cat-reduc').value) || 0;
+  const motif = prompt("Motif de la modification (pour l'historique) :");
+  if (!motif) return;
+  await api("PUT", `/admin/accred/tarif-categorie/${id}`, { montant, reduction_annuelle_pct, motif });
+  alert("Tarif mis à jour.");
+  paLoadDashboard();
+}
+
+function paRenderPaliers(list, zoneId) {
+  const zone = document.getElementById(zoneId);
+  if (!zone) return;
+  zone.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="border-bottom:2px solid var(--border);">
+      <th style="padding:6px 8px;text-align:left;">Niveau</th>
+      <th style="padding:6px 8px;text-align:center;">Seuil min</th>
+      <th style="padding:6px 8px;text-align:center;">Seuil max</th>
+      <th style="padding:6px 8px;text-align:center;">Coefficient</th>
+      <th style="padding:6px 8px;text-align:center;">Actions</th>
+    </tr></thead>
+    <tbody>${list.map(p => `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:6px 8px;font-weight:600;">${esc(p.label)}</td>
+        <td style="padding:6px 8px;text-align:center;">${p.seuil_min}</td>
+        <td style="padding:6px 8px;text-align:center;">${p.seuil_max ?? '∞'}</td>
+        <td style="padding:6px 8px;text-align:center;">
+          <input type="number" step="0.05" min="0" id="pa-palier-coef-${p.id}" value="${p.coefficient}" style="width:80px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;">
+        </td>
+        <td style="padding:6px 8px;text-align:center;">
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="paSavePalier(${p.id})">Enregistrer</button>
+        </td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function paLoadPaliers() {
+  const r = await api("GET", "/admin/accred/paliers").catch(() => ({}));
+  const paliers = r.paliers || [];
+  paRenderPaliers(paliers.filter(p => p.categorie === 'association'), 'pa-paliers-association');
+  paRenderPaliers(paliers.filter(p => p.categorie === 'entreprise'), 'pa-paliers-entreprise');
+}
+
+async function paSavePalier(id) {
+  const coefficient = parseFloat(document.getElementById('pa-palier-coef-' + id).value) || 1;
+  const motif = prompt("Motif de la modification (pour l'historique) :");
+  if (!motif) return;
+  await api("PUT", `/admin/accred/paliers/${id}`, { coefficient, motif });
+  alert("Palier mis à jour.");
+  paLoadPaliers();
+}
+
+/* ── Promotions ── */
+async function paLoadPromotions() {
+  const r = await api("GET", "/admin/accred/promotions").catch(() => ({}));
+  const tbody = document.getElementById('pa-promotions-table');
+  if (!tbody) return;
+  tbody.innerHTML = (r.promotions || []).map(p => {
+    const reduc = p.reduction_pct ? `-${p.reduction_pct}%` : p.reduction_fixe ? `-${p.reduction_fixe} €` : p.mois_offerts ? `${p.mois_offerts} mois offert(s)` : '—';
+    const validite = `${(p.date_debut||'').slice(0,10)} → ${(p.date_fin||'').slice(0,10)}`;
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px 14px;"><div style="font-weight:700;">${esc(p.nom)}</div>${p.description ? `<div style="font-size:11px;color:var(--muted);">${esc(p.description)}</div>` : ''}</td>
+      <td style="padding:8px;text-align:center;font-weight:700;color:#E87C3E;">${reduc}</td>
+      <td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">${validite}</td>
+      <td style="padding:8px;text-align:center;font-size:12px;">${p.cible}</td>
+      <td style="padding:8px;text-align:center;"><span style="background:${p.actif?'#d1fae5':'#f3f4f6'};color:${p.actif?'#065f46':'#6b7280'};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;">${p.actif?'Actif':'Inactif'}</span></td>
+      <td style="padding:8px;text-align:center;"><button class="btn" style="font-size:12px;padding:4px 10px;background:#fee2e2;color:#991b1b;" onclick="paSupprimerPromo(${p.id})">🗑</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);">Aucune promotion.</td></tr>`;
+}
+
+function paOuvrirPromoModal() {
+  const nom = prompt("Nom de la promotion :");
+  if (!nom) return;
+  const date_debut = prompt("Date de début (AAAA-MM-JJ) :", new Date().toISOString().slice(0,10));
+  const date_fin = prompt("Date de fin (AAAA-MM-JJ) :");
+  if (!date_debut || !date_fin) return;
+  const reduction_pct = prompt("Réduction en pourcentage (laisser vide si non concerné) :");
+  const mois_offerts = prompt("Nombre de mois offerts (laisser vide si non concerné) :");
+  const cible = prompt("Cible : tous / nouveaux / existants", "tous");
+  api("POST", "/admin/accred/promotions", {
+    nom, date_debut, date_fin,
+    reduction_pct: reduction_pct ? parseFloat(reduction_pct) : null,
+    mois_offerts: mois_offerts ? parseInt(mois_offerts) : 0,
+    cible: cible || 'tous',
+  }).then(() => paLoadPromotions()).catch(e => alert(e.message));
+}
+
+async function paSupprimerPromo(id) {
+  if (!confirm("Désactiver cette promotion ?")) return;
+  await api("DELETE", `/admin/accred/promotions/${id}`);
+  paLoadPromotions();
+}
+
+/* ── Tarifs personnalisés ── */
+async function paLoadPerso() {
+  const r = await api("GET", "/admin/accred/tarifs-personnalises").catch(() => ({}));
+  const tbody = document.getElementById('pa-perso-table');
+  if (!tbody) return;
+  tbody.innerHTML = (r.tarifs || []).map(t => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px 14px;"><div style="font-weight:700;">${esc(t.user_nom)}</div><div style="font-size:11px;color:var(--muted);">${esc(t.user_email)}</div></td>
+      <td style="padding:8px;font-size:12px;">${esc(t.accred_label)}</td>
+      <td style="padding:8px;text-align:center;">${t.montant_mensuel != null ? t.montant_mensuel + ' €' : '—'}</td>
+      <td style="padding:8px;text-align:center;">${t.montant_annuel != null ? t.montant_annuel + ' €' : '—'}</td>
+      <td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">${(t.date_debut||'').slice(0,10)}${t.date_fin ? ' → ' + t.date_fin.slice(0,10) : ' → illimité'}</td>
+      <td style="padding:8px;font-size:12px;">${esc(t.motif)}</td>
+      <td style="padding:8px;text-align:center;"><button class="btn" style="font-size:12px;padding:4px 10px;background:#fee2e2;color:#991b1b;" onclick="paSupprimerPerso(${t.id})">🗑</button></td>
+    </tr>`).join('') || `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted);">Aucun tarif personnalisé.</td></tr>`;
+}
+
+async function paOuvrirPersoModal() {
+  const email = prompt("Email du compte concerné :");
+  if (!email) return;
+  const r = await api("GET", `/users/search?q=${encodeURIComponent(email)}`).catch(() => ({}));
+  const compte = (r.users || []).find(u => (u.email||'').toLowerCase() === email.toLowerCase()) || (r.users || [])[0];
+  if (!compte) { alert("Compte introuvable."); return; }
+  const accredType = compte.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
+  const catalogue = await api("GET", "/admin/accred/definitions").catch(() => ({}));
+  const def = (catalogue.definitions || []).find(d => d.type === accredType);
+  if (!def) { alert("Accréditation Premium introuvable pour ce rôle."); return; }
+  const montant_mensuel = prompt("Tarif mensuel personnalisé (€, laisser vide si non concerné) :");
+  const montant_annuel = prompt("Tarif annuel personnalisé (€, laisser vide si non concerné) :");
+  const date_debut = prompt("Date de début (AAAA-MM-JJ) :", new Date().toISOString().slice(0,10));
+  const date_fin = prompt("Date de fin (laisser vide = illimité) :");
+  const motif = prompt("Motif (obligatoire — partenaire, sponsor, ambassadeur…) :");
+  if (!date_debut || !motif) { alert("Date de début et motif requis."); return; }
+  await api("POST", "/admin/accred/tarifs-personnalises", {
+    user_id: compte.id, accred_id: def.id,
+    montant_mensuel: montant_mensuel ? parseFloat(montant_mensuel) : null,
+    montant_annuel: montant_annuel ? parseFloat(montant_annuel) : null,
+    date_debut, date_fin: date_fin || null, motif,
+  }).catch(e => { alert(e.message); throw e; });
+  paLoadPerso();
+}
+
+async function paSupprimerPerso(id) {
+  if (!confirm("Mettre fin à ce tarif personnalisé ?")) return;
+  await api("DELETE", `/admin/accred/tarifs-personnalises/${id}`);
+  paLoadPerso();
+}
+
+/* ── Simulateur ── */
+async function paSimuler() {
+  const body = {};
+  const util = document.getElementById('pa-sim-util').value;
+  const asso = document.getElementById('pa-sim-asso').value;
+  const entr = document.getElementById('pa-sim-entr').value;
+  if (util) body.base_utilisateur = parseFloat(util);
+  if (asso) body.base_association = parseFloat(asso);
+  if (entr) body.base_entreprise = parseFloat(entr);
+  const r = await api("POST", "/admin/premium/simuler", body).catch(e => { alert(e.message); return null; });
+  if (!r) return;
+  const delta = r.revenu_mensuel_simule - r.revenu_mensuel_actuel;
+  document.getElementById('pa-sim-resultat').innerHTML = `
+    <div class="card" style="background:var(--surface);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span>Comptes concernés</span><strong>${r.comptes_utilisateur + r.comptes_association + r.comptes_entreprise}</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span>Revenu mensuel actuel</span><strong>${r.revenu_mensuel_actuel.toFixed(2)} €</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span>Revenu mensuel simulé</span><strong style="color:${delta>=0?'#059669':'#dc2626'};">${r.revenu_mensuel_simule.toFixed(2)} € (${delta>=0?'+':''}${delta.toFixed(2)} €)</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Revenu annuel simulé</span><strong>${r.revenu_annuel_simule.toFixed(2)} €</strong></div>
+    </div>`;
 }
 
 /* ═══════════════ MODULE RENCONTRES DIASPO'ACTIF ═══════════════
@@ -7084,8 +7346,6 @@ async function submitAccordDirect(){
     'obs-instit': () => loadObsInstit(),
     'revenus-diaspora': () => loadRevenusDiaspora(),
     finances:    () => loadFinances(),
-    plans:       () => loadPlans(),
-    promotions:  () => loadPromos(),
     ventes:      () => loadTransactions(),
     packages:    () => loadPackages(),
     'deals-admin':       () => loadAdminDeals(),
@@ -8796,225 +9056,7 @@ async function submitAccordDirect(){
           <div style="font-size:11px;color:var(--muted);">${c.pays||""} · ${c.nb_achats} achat${c.nb_achats>1?"s":""}</div></div>
         <div style="font-weight:700;font-size:13px;color:#059669;">${(c.total_depense||0).toFixed(0)} €</div>
       </div>`).join("") || "<div class='notice'>Aucun client.</div>";
-
-    const ppEl = document.getElementById("fin-par-plan");
-    if (ppEl) ppEl.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead><tr style="border-bottom:2px solid var(--border);">
-          <th style="padding:8px 12px;text-align:left;">Plan</th>
-          <th style="padding:8px 8px;text-align:center;">Prix / mois</th>
-          <th style="padding:8px 8px;text-align:center;">Prix / an</th>
-          <th style="padding:8px 8px;text-align:center;">Ventes (30j)</th>
-          <th style="padding:8px 8px;text-align:right;">Revenu (30j)</th>
-        </tr></thead>
-        <tbody>${(r.par_plan||[]).map(p => `
-          <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:8px 12px;font-weight:600;">${esc(p.nom)}</td>
-            <td style="padding:8px;text-align:center;color:var(--muted);">${p.prix_mensuel>0 ? p.prix_mensuel.toFixed(2)+" €" : "—"}</td>
-            <td style="padding:8px;text-align:center;color:var(--muted);">${p.prix_annuel>0 ? p.prix_annuel.toFixed(2)+" €" : "—"}</td>
-            <td style="padding:8px;text-align:center;font-weight:700;">${p.nb_ventes||0}</td>
-            <td style="padding:8px;text-align:right;font-weight:700;color:#059669;">${(p.revenu||0).toFixed(2)} €</td>
-          </tr>`).join("")}
-        </tbody>
-      </table>`;
   }
-
-  // ══ PLANS ══════════════════════════════════════════════════
-  const AV_LABELS = { badge:"🏅 Badge", annuaire_avance:"📋 Annuaire avancé", publication_illimitee:"♾️ Publications illimitées", mise_en_avant:"⭐ Mise en avant" };
-  async function loadPlans() {
-    const [rP, rA] = await Promise.all([
-      api("GET", "/admin/plans").catch(() => ({})),
-      api("GET", "/admin/abonnes").catch(() => ({}))
-    ]);
-    const grid = document.getElementById("plans-grid");
-    if (grid) grid.innerHTML = (rP.plans||[]).map(p => {
-      const avs = safeParse ? [] : [];
-      let avantages = {};
-      try { avantages = JSON.parse(p.avantages||"{}"); } catch {}
-      const avList = Object.entries(avantages).filter(([,v]) => v===true||v==="premium"||v==="renforcee").map(([k]) => AV_LABELS[k]||k);
-      return `<div class="card" style="border-top:4px solid ${p.actif?"#059669":"#6b7280"};position:relative;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-          <div>
-            <div style="font-weight:800;font-size:16px;">${esc(p.nom)}</div>
-            <div style="font-size:11px;padding:2px 8px;border-radius:20px;display:inline-block;margin-top:4px;background:${p.actif?"#d1fae5":"#f3f4f6"};color:${p.actif?"#065f46":"#6b7280"};font-weight:700;">${p.actif?"Actif":"Inactif"}</div>
-          </div>
-          <div style="text-align:right;">
-            ${p.prix_mensuel>0 ? `<div style="font-size:20px;font-weight:800;color:#059669;">${p.prix_mensuel.toFixed(2)} €<span style="font-size:11px;font-weight:400;">/mois</span></div>` : ""}
-            ${p.prix_annuel>0 ? `<div style="font-size:13px;color:#0891B2;font-weight:700;">${p.prix_annuel.toFixed(2)} €/an</div>` : ""}
-            ${!p.prix_mensuel && !p.prix_annuel ? `<div style="font-size:18px;font-weight:800;color:#6b7280;">Gratuit</div>` : ""}
-          </div>
-        </div>
-        ${p.description ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${esc(p.description)}</div>` : ""}
-        ${avList.length ? `<div style="font-size:12px;display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;">${avList.map(a=>`<span style="background:var(--surface);border:1px solid var(--border);padding:2px 8px;border-radius:20px;">${a}</span>`).join("")}</div>` : ""}
-        <div style="font-size:11px;color:var(--muted);">Cible : ${p.cible||"tous"}</div>
-        <div style="display:flex;gap:6px;margin-top:12px;">
-          <button class="btn" style="flex:1;font-size:12px;padding:5px;" onclick="openPlanModal(${p.id})">✏️ Modifier</button>
-          <button class="btn" style="font-size:12px;padding:5px 10px;background:#fee2e2;color:#991b1b;" onclick="deletePlan(${p.id})">🗑</button>
-        </div>
-      </div>`;
-    }).join("") || "<div class='notice'>Aucun plan créé.</div>";
-
-    const rnEl = document.getElementById("plans-renouv");
-    if (rnEl) rnEl.textContent = "Taux de renouvellement : " + (rA.taux_renouvellement||"0") + "%";
-    const abEl = document.getElementById("plans-abonnes");
-    if (abEl) abEl.innerHTML = (rA.abonnes||[]).map(a => `
-      <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
-        <div class="avatar" style="width:32px;height:32px;font-size:12px;flex-shrink:0;">${(a.nom||"?")[0]}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:13px;">${esc(a.nom||"—")}</div>
-          <div style="font-size:11px;color:var(--muted);">${a.email||""} · ${a.pays||""}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <span style="font-size:11px;background:${a.statut==="actif"?"#d1fae5":"#f3f4f6"};color:${a.statut==="actif"?"#065f46":"#6b7280"};padding:2px 8px;border-radius:20px;font-weight:700;">${a.statut||"—"}</span>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px;">expire ${a.date_fin?.slice(0,10)||"—"}</div>
-        </div>
-      </div>`).join("") || "<div class='notice'>Aucun abonné.</div>";
-  }
-
-  function openPlanModal(id) {
-    document.getElementById("plan-modal-title").textContent = id ? "Modifier le plan" : "Nouveau plan";
-    document.getElementById("plan-id").value = id || "";
-    if (!id) {
-      ["plan-nom","plan-desc","plan-prix-mois","plan-prix-an"].forEach(x => document.getElementById(x).value = "");
-      document.getElementById("plan-cible").value = "tous";
-      document.getElementById("plan-actif").value = "1";
-      ["av-badge","av-annuaire","av-pub-illim","av-mise-en-avant"].forEach(x => document.getElementById(x).checked = false);
-    } else {
-      api("GET", "/admin/plans").then(r => {
-        const p = r.plans?.find(x => x.id === id);
-        if (!p) return;
-        document.getElementById("plan-nom").value = p.nom||"";
-        document.getElementById("plan-desc").value = p.description||"";
-        document.getElementById("plan-prix-mois").value = p.prix_mensuel||"";
-        document.getElementById("plan-prix-an").value = p.prix_annuel||"";
-        document.getElementById("plan-cible").value = p.cible||"tous";
-        document.getElementById("plan-actif").value = String(p.actif??1);
-        let av = {}; try { av = JSON.parse(p.avantages||"{}"); } catch {}
-        document.getElementById("av-badge").checked = !!av.badge;
-        document.getElementById("av-annuaire").checked = !!av.annuaire_avance;
-        document.getElementById("av-pub-illim").checked = !!av.publication_illimitee;
-        document.getElementById("av-mise-en-avant").checked = !!av.mise_en_avant;
-      });
-    }
-    document.getElementById("plan-modal").style.display = "block";
-  }
-
-  async function savePlan() {
-    const id = document.getElementById("plan-id").value;
-    const body = {
-      nom: document.getElementById("plan-nom").value.trim(),
-      description: document.getElementById("plan-desc").value.trim(),
-      prix_mensuel: parseFloat(document.getElementById("plan-prix-mois").value) || 0,
-      prix_annuel: parseFloat(document.getElementById("plan-prix-an").value) || 0,
-      cible: document.getElementById("plan-cible").value,
-      actif: parseInt(document.getElementById("plan-actif").value),
-      avantages: {
-        badge: document.getElementById("av-badge").checked,
-        annuaire_avance: document.getElementById("av-annuaire").checked,
-        publication_illimitee: document.getElementById("av-pub-illim").checked,
-        mise_en_avant: document.getElementById("av-mise-en-avant").checked
-      }
-    };
-    if (!body.nom) { alert("Le nom est requis."); return; }
-    await api(id ? "PUT" : "POST", id ? `/admin/plans/${id}` : "/admin/plans", body);
-    document.getElementById("plan-modal").style.display = "none";
-    loadPlans();
-  }
-
-  async function deletePlan(id) {
-    if (!confirm("Désactiver ce plan ?")) return;
-    await api("DELETE", `/admin/plans/${id}`);
-    loadPlans();
-  }
-  window.openPlanModal = openPlanModal;
-  window.savePlan = savePlan;
-  window.deletePlan = deletePlan;
-
-  // ══ PROMOTIONS ═════════════════════════════════════════════
-  async function loadPromos() {
-    const r = await api("GET", "/admin/promos").catch(() => ({}));
-    const TYPE_PROMO = { pourcentage:"% réduction", prix_fixe:"Prix fixe", essai_gratuit:"Essai gratuit" };
-    const tbody = document.getElementById("promos-table");
-    if (!tbody) return;
-    tbody.innerHTML = (r.promos||[]).map(p => {
-      const valLabel = p.type === "pourcentage" ? `-${p.valeur}%` : p.type === "essai_gratuit" ? `${p.valeur}j gratuits` : `-${p.valeur} €`;
-      const validite = [p.date_debut?.slice(0,10), p.date_fin?.slice(0,10)].filter(Boolean).join(" → ") || "Toujours";
-      const util = p.nb_max_utilisations ? `${p.nb_utilisations}/${p.nb_max_utilisations}` : p.nb_utilisations;
-      return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:10px 16px;">
-          <div style="font-family:monospace;font-weight:700;font-size:13px;background:var(--surface);display:inline-block;padding:2px 8px;border-radius:6px;">${esc(p.code)}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(p.nom)}</div>
-        </td>
-        <td style="padding:8px;text-align:center;font-size:12px;">${TYPE_PROMO[p.type]||p.type}</td>
-        <td style="padding:8px;text-align:center;font-weight:700;color:#E87C3E;">${valLabel}</td>
-        <td style="padding:8px;text-align:center;">${util}</td>
-        <td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">${validite}</td>
-        <td style="padding:8px;text-align:center;">
-          <span style="background:${p.actif?"#d1fae5":"#f3f4f6"};color:${p.actif?"#065f46":"#6b7280"};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;">${p.actif?"Actif":"Inactif"}</span>
-        </td>
-        <td style="padding:8px;text-align:center;">
-          <div style="display:flex;gap:4px;justify-content:center;">
-            <button class="btn" style="padding:4px 10px;font-size:12px;" onclick="openPromoModal(${p.id})">✏️</button>
-            <button class="btn" style="padding:4px 10px;font-size:12px;background:#fee2e2;color:#991b1b;" onclick="deletePromo(${p.id})">🗑</button>
-          </div>
-        </td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Aucun code promo.</td></tr>`;
-  }
-
-  function openPromoModal(id) {
-    document.getElementById("promo-modal-title").textContent = id ? "Modifier le code" : "Nouveau code promo";
-    document.getElementById("promo-id").value = id || "";
-    if (!id) {
-      ["promo-nom","promo-code","promo-valeur","promo-max"].forEach(x => document.getElementById(x).value = "");
-      document.getElementById("promo-type").value = "pourcentage";
-      document.getElementById("promo-cible").value = "tous";
-      document.getElementById("promo-debut").value = "";
-      document.getElementById("promo-fin").value = "";
-    } else {
-      api("GET", "/admin/promos").then(r => {
-        const p = r.promos?.find(x => x.id === id);
-        if (!p) return;
-        document.getElementById("promo-nom").value = p.nom||"";
-        document.getElementById("promo-code").value = p.code||"";
-        document.getElementById("promo-type").value = p.type||"pourcentage";
-        document.getElementById("promo-valeur").value = p.valeur||"";
-        document.getElementById("promo-debut").value = p.date_debut?.slice(0,10)||"";
-        document.getElementById("promo-fin").value = p.date_fin?.slice(0,10)||"";
-        document.getElementById("promo-max").value = p.nb_max_utilisations||"";
-        document.getElementById("promo-cible").value = p.cible||"tous";
-      });
-    }
-    document.getElementById("promo-modal").style.display = "block";
-  }
-
-  async function savePromo() {
-    const id = document.getElementById("promo-id").value;
-    const body = {
-      nom:   document.getElementById("promo-nom").value.trim(),
-      code:  document.getElementById("promo-code").value.trim().toUpperCase(),
-      type:  document.getElementById("promo-type").value,
-      valeur: parseFloat(document.getElementById("promo-valeur").value)||0,
-      date_debut: document.getElementById("promo-debut").value||null,
-      date_fin:   document.getElementById("promo-fin").value||null,
-      nb_max_utilisations: parseInt(document.getElementById("promo-max").value)||null,
-      cible: document.getElementById("promo-cible").value,
-      actif: 1
-    };
-    if (!body.nom || !body.code) { alert("Nom et code requis."); return; }
-    await api(id ? "PUT" : "POST", id ? `/admin/promos/${id}` : "/admin/promos", body);
-    document.getElementById("promo-modal").style.display = "none";
-    loadPromos();
-  }
-
-  async function deletePromo(id) {
-    if (!confirm("Désactiver ce code promo ?")) return;
-    await api("DELETE", `/admin/promos/${id}`);
-    loadPromos();
-  }
-  window.openPromoModal = openPromoModal;
-  window.savePromo = savePromo;
-  window.deletePromo = deletePromo;
 
   // ══ TRANSACTIONS ═══════════════════════════════════════════
   async function loadTransactions() {
@@ -9027,7 +9069,6 @@ async function submitAccordDirect(){
       return `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:10px 16px;font-family:monospace;font-size:11px;color:var(--muted);">${t.reference||"—"}</td>
         <td style="padding:8px;font-size:13px;font-weight:600;">${esc(t.user_nom||"—")}</td>
-        <td style="padding:8px;text-align:center;font-size:12px;color:var(--muted);">${esc(t.plan_nom||"—")}</td>
         <td style="padding:8px;text-align:center;font-size:12px;">${t.type||"—"}</td>
         <td style="padding:8px;text-align:right;font-weight:700;">${(t.montant||0).toFixed(2)} €</td>
         <td style="padding:8px;text-align:center;">

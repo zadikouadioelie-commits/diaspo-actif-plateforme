@@ -648,53 +648,6 @@ function seed() {
     });
   }
 
-  /* ===== PLANS D'ABONNEMENT ===== */
-  const insPlan = db.prepare(`
-    INSERT OR IGNORE INTO plans_abonnement (nom, description, prix_mensuel, prix_annuel, cible, avantages, actif, ordre)
-    VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-  `);
-  insPlan.run("Essentiel", "Accès à toutes les fonctionnalités de base", 0, 0, "tous",
-    JSON.stringify({ badge: false, visibilite: "standard", annuaire_avance: false, publication_illimitee: false, mise_en_avant: false }), 0);
-  insPlan.run("Pro Mensuel", "Visibilité renforcée et accès annuaire avancé", 4.99, 0, "utilisateur",
-    JSON.stringify({ badge: true, visibilite: "renforcee", annuaire_avance: true, publication_illimitee: false, mise_en_avant: false }), 1);
-  insPlan.run("Premium Annuel", "Toutes les fonctionnalités premium — engagement annuel", 0, 49.90, "utilisateur",
-    JSON.stringify({ badge: true, visibilite: "premium", annuaire_avance: true, publication_illimitee: true, mise_en_avant: true }), 2);
-  insPlan.run("Initiative Pro", "Plan dédié aux initiatives — meilleure visibilité dans l'annuaire", 9.90, 99, "initiative",
-    JSON.stringify({ badge: true, visibilite: "premium", annuaire_avance: true, publication_illimitee: true, mise_en_avant: true }), 3);
-
-  /* ===== TRANSACTIONS SIMULÉES (30 jours) ===== */
-  const plans = db.prepare("SELECT id, prix_mensuel, prix_annuel FROM plans_abonnement WHERE prix_mensuel > 0 OR prix_annuel > 0").all();
-  const insTx = db.prepare(`
-    INSERT INTO transactions (user_id, plan_id, montant, type, statut, reference, date_transaction, periode_debut, periode_fin)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now', ? || ' days', ? || ' hours'), date('now', ? || ' days'), date('now', ? || ' days', '+30 days'))
-  `);
-  const txTypes = ["abonnement","abonnement","abonnement","abonnement","boost"];
-  const txStatuts = ["reussi","reussi","reussi","reussi","reussi","echoue","rembourse"];
-  let txCount = 0;
-  for (let d = 29; d >= 0; d--) {
-    const nbJour = Math.floor(Math.random() * 3); // 0–2 transactions/jour
-    for (let t = 0; t < nbJour; t++) {
-      const uid = allUsers[Math.floor(Math.random() * allUsers.length)];
-      const plan = plans[Math.floor(Math.random() * plans.length)];
-      const montant = plan.prix_mensuel || plan.prix_annuel;
-      const type = txTypes[Math.floor(Math.random() * txTypes.length)];
-      const statut = txStatuts[Math.floor(Math.random() * txStatuts.length)];
-      const ref = "TXN-" + Date.now().toString(36).toUpperCase() + "-" + txCount;
-      const h = -(Math.floor(Math.random() * 20) + 1);
-      insTx.run(uid, plan.id, montant, type, statut, ref, -d, h, -d, -d);
-      txCount++;
-    }
-  }
-  /* ===== CODES PROMO ===== */
-  const insPromo = db.prepare(`
-    INSERT OR IGNORE INTO codes_promo (nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, nb_utilisations, cible, actif, created_by)
-    VALUES (?, ?, ?, ?, date('now','-60 days'), date('now','+120 days'), ?, ?, ?, 1, ?)
-  `);
-  insPromo.run("Bienvenue Diaspora", "DIASPORA10", "pourcentage", 10, 200, 47, "tous", adminId);
-  insPromo.run("Offre Lancement -50%", "LAUNCH50", "pourcentage", 50, 50, 12, "nouveaux", adminId);
-  insPromo.run("Essai Gratuit 30j", "FREE30", "essai_gratuit", 30, 100, 38, "tous", adminId);
-  insPromo.run("Initiatives Solidaires", "INITIATIVE20", "pourcentage", 20, null, 5, "initiative", adminId);
-
   /* ===== PARAMÈTRES PLATEFORME ===== */
   const insParam = db.prepare(`
     INSERT OR IGNORE INTO parametres_plateforme (cle, valeur, type, description) VALUES (?, ?, ?, ?)

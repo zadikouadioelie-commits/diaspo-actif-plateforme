@@ -274,6 +274,12 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             </select>
           </div>
         </div>
+        <div id="i-taille-row" class="grid-2" style="margin-top:12px;display:none;">
+          <div id="i-nb-membres-box" style="display:none;"><label>Nombre de membres / adherents <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <input type="number" min="0" id="i-nb-membres" placeholder="Ex : 45"></div>
+          <div id="i-nb-salaries-box" style="display:none;"><label>Nombre de salaries <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <input type="number" min="0" id="i-nb-salaries" placeholder="Ex : 12"></div>
+        </div>
         <div style="margin-top:12px"><label>Domaine d'activite</label>
           <select id="i-domaine">
             <option value="">— Selectionner —</option>
@@ -834,10 +840,27 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       reseaux_sociaux:rs?{lien:rs}:{},
       publics:[...document.querySelectorAll('.i-public:checked')].map(c=>c.value),
       besoins:[...document.querySelectorAll('.i-besoin:checked')].map(c=>c.value),
-      annee_creation:document.getElementById("i-annee-creation").value||null
+      annee_creation:document.getElementById("i-annee-creation").value||null,
+      nombre_membres:document.getElementById("i-nb-membres").value||null,
+      nombre_salaries:document.getElementById("i-nb-salaries").value||null
     });
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
 });
+/* ===== Type d'organisation → taille (nombre de membres ou de salaries) ===== */
+const TYPES_ASSOCIATION = ['Association','ONG','Cooperative','Fondation','Projet collectif','Autre'];
+const TYPES_ENTREPRISE = ['Entreprise','Startup'];
+document.getElementById("i-type").addEventListener("change", function(){
+  const v = this.value;
+  const row = document.getElementById("i-taille-row");
+  const boxMembres = document.getElementById("i-nb-membres-box");
+  const boxSalaries = document.getElementById("i-nb-salaries-box");
+  const estAssociation = TYPES_ASSOCIATION.includes(v);
+  const estEntreprise = TYPES_ENTREPRISE.includes(v);
+  boxMembres.style.display = estAssociation ? "" : "none";
+  boxSalaries.style.display = estEntreprise ? "" : "none";
+  row.style.display = (estAssociation || estEntreprise) ? "" : "none";
+});
+
 /* ===== Rayonnement + territoires dynamiques ===== */
 function refreshRayPills(){
   document.querySelectorAll('input[name="i-ray"]').forEach(r=>{

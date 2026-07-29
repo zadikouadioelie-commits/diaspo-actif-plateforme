@@ -1013,6 +1013,8 @@ const COLONNES_MIGRATION = [
     ['users', 'suspendu_definitif', 'INTEGER DEFAULT 0'],
     ['signalements', 'origine_migration', 'TEXT'],
     ['users', 'penalite_disciplinaire', 'INTEGER DEFAULT 0'],
+    // Module Premium — délai de grâce après échec de prélèvement (même pattern que pub_abonnements)
+    ['user_accreditations', 'grace_until', 'TEXT'],
 ];
 
 async function migratePg(pool) {
@@ -1192,6 +1194,50 @@ async function migratePg(pool) {
       await pool.query("UPDATE accred_tarifs SET reduction_annuelle_pct=16.5 WHERE accred_id=$1 AND role='utilisateur' AND (reduction_annuelle_pct IS NULL OR reduction_annuelle_pct=0)", [uaId]);
     }
   } catch (e) { console.error('[pg-init migration] fixup utilisateur_abonne:', e.message); }
+
+  /* ── Module Premium : tarification par catégorie/taille — miroir des seeds db.js
+     (accred_tarifs_categorie / accred_tarifs_paliers), les tables elles-mêmes sont créées
+     automatiquement par createMissingTables() (parsing générique des CREATE TABLE de db.js). */
+  try {
+    const { rows: initAbo } = await pool.query("SELECT id FROM accred_definitions WHERE type='initiative_abonne'");
+    if (initAbo[0]) {
+      const initAboId = initAbo[0].id;
+      const { rows: catAsso } = await pool.query(
+        "SELECT id FROM accred_tarifs_categorie WHERE accred_id=$1 AND role='initiative' AND categorie='association'", [initAboId]);
+      if (!catAsso[0]) {
+        await pool.query(
+          "INSERT INTO accred_tarifs_categorie (accred_id,role,categorie,montant,devise,reduction_annuelle_pct) VALUES ($1,'initiative','association',9.99,'EUR',15)",
+          [initAboId]);
+        console.log('[pg-init] Tarif catégorie "association" seedé pour initiative_abonne.');
+      }
+      const { rows: paliers } = await pool.query("SELECT id FROM accred_tarifs_paliers WHERE accred_id=$1", [initAboId]);
+      if (!paliers.length) {
+        const PALIERS_ASSOCIATION = [
+          ['Petite association', 0, 49], ['Association moyenne', 50, 500],
+          ['Grande association', 501, 4999], ['Fédération', 5000, 49999],
+          ['Organisation internationale', 50000, null],
+        ];
+        const PALIERS_ENTREPRISE = [
+          ['Micro-entreprise', 1, 9], ['PME', 10, 49], ['Entreprise moyenne', 50, 249],
+          ['Grande entreprise', 250, 999], ['Grand groupe', 1000, null],
+        ];
+        for (const [categorie, liste] of [['association', PALIERS_ASSOCIATION], ['entreprise', PALIERS_ENTREPRISE]]) {
+          for (let i = 0; i < liste.length; i++) {
+            const [label, min, max] = liste[i];
+            await pool.query(
+              `INSERT INTO accred_tarifs_paliers (accred_id,role,categorie,label,seuil_min,seuil_max,coefficient,ordre)
+               VALUES ($1,'initiative',$2,$3,$4,$5,1,$6)`,
+              [initAboId, categorie, label, min, max, i]);
+          }
+        }
+        console.log('[pg-init] Paliers de taille seedés pour initiative_abonne.');
+      }
+    }
+    const { rows: utilAbo } = await pool.query("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'");
+    if (utilAbo[0]) {
+      await pool.query("UPDATE accred_tarifs SET montant=3.99 WHERE accred_id=$1 AND role='utilisateur' AND montant=4.99", [utilAbo[0].id]);
+    }
+  } catch (e) { console.error('[pg-init migration] tarification Premium (catégorie/paliers):', e.message); }
 
   /* ── Module Accréditations : élargissement des CHECK constraints ──
      Bug réel : compte_accreditations.type / demandes_accreditation.type limitaient les
