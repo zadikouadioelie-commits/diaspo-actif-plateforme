@@ -618,8 +618,16 @@ route("POST", "/api/auth/forgot-password", async (req, res, params, body) => {
   await db.prepare("UPDATE users SET reset_token=?, reset_expires=? WHERE id=?").run(token, expires, user.id);
   try {
     const { emailResetPassword } = require("./mailer");
-    await emailResetPassword({ email: user.email, token });
-  } catch(e) { console.error("[forgot-password] email error:", e.message); }
+    const resultat = await emailResetPassword({ email: user.email, token });
+    /* sendEmail() (mailer.js) n'échoue jamais par exception — clé absente, erreur Resend et
+       erreur réseau retournent tous {ok:false} au lieu de throw. Sans ce contrôle explicite,
+       un email de réinitialisation qui ne part jamais restait invisible : la réponse HTTP
+       200 ci-dessous est intentionnellement inchangée (ne pas révéler si l'email existe),
+       mais l'échec doit au moins apparaître dans error_logs pour être diagnosticable. */
+    if (!resultat || !resultat.ok) {
+      await logError(new Error(`Email de réinitialisation non envoyé : ${JSON.stringify(resultat && resultat.error || resultat && resultat.reason || "raison inconnue")}`), "forgot-password-email", req);
+    }
+  } catch(e) { await logError(e, "forgot-password-email", req); }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -20718,7 +20726,7 @@ ${jsonLd}
         try {
           const { sendEmail } = require('./mailer');
           const lien = `https://diaspoactif.com/vitrine-admin-reset-password.html?token=${token}`;
-          await sendEmail({
+          const resultat = await sendEmail({
             to: admin.email,
             subject: "Réinitialisation du mot de passe — Administration Diaspo'Actif",
             html: `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
@@ -20733,7 +20741,10 @@ ${jsonLd}
   </div>
 </body></html>`
           });
-        } catch (e) { console.error('[admin/forgot-password email]', e.message); }
+          if (!resultat || !resultat.ok) {
+            await logError(new Error(`Email admin non envoyé : ${JSON.stringify(resultat && resultat.error || resultat && resultat.reason || "raison inconnue")}`), "admin-forgot-password-email", req);
+          }
+        } catch (e) { await logError(e, "admin-forgot-password-email", req); }
       }
       return sendJSON(res, 200, { ok: true }); // toujours OK, ne révèle jamais si l'email existe
     }
