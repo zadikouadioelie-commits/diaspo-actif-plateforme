@@ -490,12 +490,15 @@ img[loading="lazy"].loaded { background: none; animation: none; }
 /* Lazy loading natif */
 img:not([loading]) { loading: auto; }
 
-/* Contenu en dehors du viewport : will-change pour GPU */
-.da-modal-backdrop, .da-sidebar, .sidebar {
+/* Contenu en dehors du viewport : will-change pour GPU
+   (.sidebar exclue : elle gère son propre transform pour le tiroir repliable,
+   voir assets/styles.v2.css — un translateZ(0) ici l'écrasait silencieusement) */
+.da-modal-backdrop, .da-sidebar {
   will-change: transform, opacity;
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+.sidebar { will-change: transform; }
 
 /* ─── TYPOGRAPHIE RESPONSIVE ─────────────────────────────────────── */
 @media (max-width: 768px) {

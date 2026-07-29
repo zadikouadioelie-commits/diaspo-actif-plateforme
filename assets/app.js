@@ -3494,40 +3494,51 @@ document.addEventListener("DOMContentLoaded", ()=>{
   renderAllAdSlots();
   applyTranslations();
 
-  // ── Sidebar mobile : hamburger toggle ──
+  // ── Sidebar repliable (tous formats) : bouton rond fixe + préférence mémorisée ──
   (function initSidebarMobile() {
     const toggle   = document.getElementById("sidebar-toggle");
     const close    = document.getElementById("sidebar-close");
     const backdrop = document.getElementById("sidebar-backdrop");
     const sidebar  = document.getElementById("sidebar");
     if (!toggle || !sidebar) return;
+    const LS_KEY = "da_sidebar_collapsed";
 
-    function openSidebar() {
+    function openSidebar(persist) {
       sidebar.classList.add("open");
-      backdrop.classList.add("open");
+      if (backdrop) backdrop.classList.add("open");
       document.body.style.overflow = "hidden";
+      toggle.textContent = "✕";
+      if (persist) localStorage.setItem(LS_KEY, "0");
     }
-    function closeSidebar() {
+    function closeSidebar(persist) {
       sidebar.classList.remove("open");
-      backdrop.classList.remove("open");
+      if (backdrop) backdrop.classList.remove("open");
       document.body.style.overflow = "";
+      toggle.textContent = "☰";
+      if (persist) localStorage.setItem(LS_KEY, "1");
     }
 
-    toggle.addEventListener("click", openSidebar);
-    if (close)    close.addEventListener("click", closeSidebar);
-    if (backdrop) backdrop.addEventListener("click", closeSidebar);
+    // Le bouton bascule : ouvre si repliée, replie si ouverte.
+    toggle.addEventListener("click", () => {
+      if (sidebar.classList.contains("open")) closeSidebar(true);
+      else openSidebar(true);
+    });
+    if (close)    close.addEventListener("click", () => closeSidebar(true));
+    if (backdrop) backdrop.addEventListener("click", () => closeSidebar(true));
 
-    // Fermer automatiquement quand on clique un lien dans la sidebar
+    // Se replie automatiquement dès qu'un module est sélectionné, sur tous les formats
     sidebar.querySelectorAll("a").forEach(a => {
-      a.addEventListener("click", () => {
-        if (window.innerWidth <= 768) closeSidebar();
-      });
+      a.addEventListener("click", () => closeSidebar(true));
     });
 
     // Fermer avec Échap
     document.addEventListener("keydown", e => {
-      if (e.key === "Escape") closeSidebar();
+      if (e.key === "Escape") closeSidebar(true);
     });
+
+    // Préférence mémorisée : ne rouvre au chargement que si l'utilisateur avait
+    // explicitement laissé la sidebar ouverte lors de sa dernière visite.
+    if (localStorage.getItem(LS_KEY) === "0") openSidebar(false);
   })();
 
   // ── Barre de recherche des modules (sidebar) : suggestions floues au fil de la frappe

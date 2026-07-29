@@ -174,12 +174,18 @@ button{font-family:inherit;cursor:pointer;}
 .modal-box{background:var(--card);border-radius:var(--radius);padding:28px;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);}
 
 /* ---------- Sidebar layout (dashboards) ---------- */
+/* Repliable sur tous les formats (ordinateur, tablette, téléphone) : masquée par défaut
+   (tiroir hors-écran via transform), rappelée par le petit bouton rond fixe à gauche.
+   Se replie automatiquement à la sélection d'un module (voir assets/app.js). */
 .with-sidebar{display:flex;flex:1;}
 .sidebar{
   width:280px;background:var(--navy);color:#cdd1dc;padding:22px 16px;flex:none;
-  position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto;overflow-x:hidden;
+  position:fixed;top:58px;left:0;height:calc(100vh - 58px);overflow-y:auto;overflow-x:hidden;
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent;
+  z-index:200;transform:translateX(-100%);box-shadow:none;
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
 }
+.sidebar.open{transform:translateX(0);box-shadow:6px 0 30px rgba(0,0,0,.3) !important;}
 .sidebar .brand{color:#fff;font-weight:800;margin-bottom:26px;padding:0 8px;font-size:16px;}
 .sidebar a{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;font-size:15.5px;font-weight:600;margin-bottom:4px;background:#fff;color:#0D2B4E;}
 .sidebar a.active{background:var(--navy-light);color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25);}
@@ -362,17 +368,28 @@ button{font-family:inherit;cursor:pointer;}
 
 /* ──────────────── RESPONSIVE MOBILE ──────────────── */
 
-/* Bouton hamburger (caché sur desktop) */
+/* Petit bouton rond fixe, toujours visible sur le bord gauche — rappelle la sidebar
+   repliée ou la referme si elle est ouverte, sur tous les formats. */
 .sidebar-toggle{
-  display:none;
-  background:none;border:none;padding:6px 8px;cursor:pointer;
-  font-size:22px;color:var(--navy);flex:none;margin-right:4px;
+  display:flex;align-items:center;justify-content:center;
+  position:fixed;left:12px;top:70px;z-index:210;
+  width:42px;height:42px;border-radius:50%;flex:none;
+  background:var(--navy);color:#fff;border:none;cursor:pointer;
+  font-size:19px;box-shadow:0 3px 12px rgba(0,0,0,.25);
+  transition:background .15s;
 }
+.sidebar-toggle:hover{background:var(--navy-light);}
 /* Fond sombre derrière le tiroir */
 .sidebar-backdrop{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:199;
 }
 .sidebar-backdrop.open{display:block;}
+/* Fermer le tiroir avec un × — toujours visible, en haut de la sidebar */
+.sidebar-close{
+  display:block;
+  color:#aeb3c2;font-size:22px;background:none;border:none;cursor:pointer;
+  position:absolute;top:12px;right:12px;padding:4px;line-height:1;
+}
 
 /* Groupe "Bandeau" de la sidebar : reprend les actions du bandeau du haut, masquées ou
    inaccessibles sur mobile faute de place (nav, langue, comptes test...). Inutile sur desktop
@@ -388,7 +405,6 @@ button{font-family:inherit;cursor:pointer;}
      Déconnexion reste visible sans avoir à défiler. */
   .logo{display:none;}
   .lang-select{display:none;}
-  .sidebar-toggle{display:block;}
   .topbar-right{
     gap:8px;flex-wrap:nowrap;min-width:0;overflow-x:auto;
     -webkit-overflow-scrolling:touch;
@@ -415,22 +431,10 @@ button{font-family:inherit;cursor:pointer;}
   .topbar-right .user-chip[href="messagerie.html"]{display:none;}
   .topbar-right>*{flex:none;}
 
-  /* Sidebar : tiroir hors-écran */
+  /* Sidebar : tiroir hors-écran (largeur réduite sur mobile — position/transition dans
+     la règle de base, identiques à tous les formats) */
   .with-sidebar{flex-direction:column;position:relative;}
-  .sidebar{
-    position:fixed;top:0;left:-260px;width:240px;height:100vh;
-    z-index:200;padding-top:14px;
-    transition:left .25s cubic-bezier(.4,0,.2,1);
-    box-shadow:none;
-  }
-  .sidebar.open{left:0;box-shadow:6px 0 30px rgba(0,0,0,.3);}
-
-  /* Fermer le tiroir avec un × */
-  .sidebar-close{
-    display:block;
-    color:#aeb3c2;font-size:22px;background:none;border:none;cursor:pointer;
-    position:absolute;top:12px;right:12px;padding:4px;line-height:1;
-  }
+  .sidebar{width:240px;}
 
   /* Zone de contenu pleine largeur */
   .content{padding:16px 14px;min-width:0;overflow-x:hidden;}
@@ -488,6 +492,3 @@ button{font-family:inherit;cursor:pointer;}
   .btn{padding:9px 14px;font-size:13px;}
   .sidebar-toggle{font-size:20px;}
 }
-
-/* Bouton × dans la sidebar (caché sur desktop) */
-.sidebar-close{display:none;}
