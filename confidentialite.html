@@ -66,6 +66,12 @@
     <div class="grid grid-3" id="conf-list"></div>
 
     <div class="notice" style="margin-top:24px;">🔐 Les données classées « Confidentiel » (nationalités, pièces d'identité, documents de vérification, coordonnées administratives, informations de paiement) ne sont accessibles qu'à Diaspo'Actif et aux institutions habilitées, dans un cadre strictement encadré.</div>
+
+    <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="color:#dc2626;font-size:14px;margin:0 0 6px;">⚠️ Zone de danger</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p>
+      <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeleteAccountModal()">🙈 Masquer mon compte</button>
+    </div>
   </main>
 
   <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
@@ -364,6 +370,44 @@
   }
   loadDsHistory();
 })();
+
+/* ---- Masquage de compte (zone de danger) ---- */
+function openDeleteAccountModal() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <h2 style="margin:0 0 10px;font-size:18px;color:#dc2626;">🙈 Masquer votre profil public ?</h2>
+      <p style="font-size:13px;color:#475569;line-height:1.6;margin:0 0 16px;">
+        Votre profil ne sera plus visible par les autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.
+      </p>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Confirmez avec votre mot de passe</label>
+      <input type="password" id="del-acc-pw" placeholder="Votre mot de passe" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:8px;">
+      <p id="del-acc-err" style="color:#dc2626;font-size:12px;margin:0 0 12px;display:none;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button id="del-acc-confirm" style="padding:9px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">Masquer mon compte</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('del-acc-confirm').onclick = async () => {
+    const pw = document.getElementById('del-acc-pw').value;
+    const err = document.getElementById('del-acc-err');
+    if (!pw) { err.textContent = 'Mot de passe requis.'; err.style.display = 'block'; return; }
+    try {
+      await fetch('/api/auth/account', {
+        method: 'DELETE', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+      }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Erreur'); });
+      window.location.href = 'index.html';
+    } catch (e) {
+      err.textContent = e.message || 'Mot de passe incorrect.';
+      err.style.display = 'block';
+    }
+  };
+}
 </script>
 <script src="assets/back-button.js"></script>
 </body>
