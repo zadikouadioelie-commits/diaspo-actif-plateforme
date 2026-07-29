@@ -6545,6 +6545,11 @@ const PREMIUM_UPSELL_CONTEXTS = {
   votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
   parametres_vitrine: { title:'Personnalisez votre vitrine', intro:"La configuration avancée de la vitrine (modèles, modules, apparence, aperçu en direct) est réservée aux comptes Premium." },
   expansion_module: { title:'Activez ce module', intro:"L'activation des modules Expansion est réservée aux comptes Abonné — l'abonnement inclut l'activation de tous les modules disponibles pour votre type d'initiative." },
+  messages_vitrine: { title:'Consultez les messages de votre vitrine', intro:"Les messages reçus via votre Vitrine sont réservés aux comptes Premium." },
+  billetterie: { title:'Vendez des billets', intro:"La billetterie est réservée aux comptes Premium." },
+  centre_financier: { title:'Gérez vos finances', intro:"Le Centre Financier (revenus, comptes de réception, retraits) est réservé aux comptes Premium." },
+  emplois_stages: { title:'Publiez vos offres', intro:"La publication d'offres d'emploi et de stage est réservée aux comptes Premium." },
+  candidatures: { title:'Consultez les candidatures', intro:"La gestion des candidatures reçues est réservée aux comptes Premium." },
 };
 /* 🛠 Bypass Premium (développement / tests uniquement) — visible seulement quand la variable
    serveur PREMIUM_DEMO_UNLOCK=1 est active (window._daDemoUnlock). Le contournement est
@@ -6609,16 +6614,36 @@ async function initPremiumGates() {
   if (window._daPremiumInitiative) return;
   applyPremiumButtonStyles();
 
-  /* Les 8 liens du groupe « ⭐ MODULES PREMIUM » (sidebar) — tous dorés, une seule fois chacun. */
-  const SIDEBAR_PREMIUM_LINKS = [
+  /* Modules dorés communs aux 3 types d'initiative. */
+  const SIDEBAR_PREMIUM_LINKS_TOUS = [
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
     { href: '#publicites-init', context: 'publicites' },
     { href: '#evenements', context: 'evenements' },
     { href: 'business-plan.html', context: 'business_plans', intercept: true },
-    { href: '#adhesions-init', context: 'adhesions', intercept: true },
-    { href: '#votes-init', context: 'votes', intercept: true },
+    { href: '#messages-vitrine', context: 'messages_vitrine', intercept: true },
+    { href: '#billetterie-init', context: 'billetterie', intercept: true },
   ];
+  /* Modules dorés spécifiques à certains types — absents (ni socle, ni premium, ni expansion)
+     pour les types non listés ici, donc masqués plutôt que simplement laissés non dorés. */
+  const SIDEBAR_PREMIUM_LINKS_PAR_TYPE = {
+    Association: [
+      { href: '#adhesions-init', context: 'adhesions', intercept: true },
+      { href: '#votes-init', context: 'votes', intercept: true },
+      { href: 'centre-financier.html', context: 'centre_financier', intercept: true },
+    ],
+    ONG: [
+      { href: '#adhesions-init', context: 'adhesions', intercept: true },
+      { href: '#votes-init', context: 'votes', intercept: true },
+      { href: 'centre-financier.html', context: 'centre_financier', intercept: true },
+    ],
+    Entreprise: [
+      { href: '#offres-emploi', context: 'emplois_stages', intercept: true },
+      { href: '#recrutement', context: 'candidatures', intercept: true },
+    ],
+  };
+  const typePourPremium = window.__vitrineInitType;
+  const SIDEBAR_PREMIUM_LINKS = [...SIDEBAR_PREMIUM_LINKS_TOUS, ...(SIDEBAR_PREMIUM_LINKS_PAR_TYPE[typePourPremium] || [])];
   SIDEBAR_PREMIUM_LINKS.forEach(({ href, context, intercept }) => {
     const link = document.querySelector(`.sidebar a[href="${href}"]`);
     if (!link || link.dataset.premiumStyled) return;
@@ -6628,6 +6653,15 @@ async function initPremiumGates() {
     link.innerHTML = '🔒 ' + link.innerHTML;
     if (intercept) link.addEventListener('click', (e) => { if (window.daBypassActive?.(context)) return; e.preventDefault(); openPremiumUpsell(context); });
   });
+  /* « Cotisations & Adhésions » et « Votes sécurisés » n'existent pour aucune colonne du
+     type Entreprise (ni socle, ni premium, ni expansion) — masqués entièrement plutôt que
+     dorés, à défaut d'être déjà couverts par la liste par type ci-dessus. */
+  if (typePourPremium && !SIDEBAR_PREMIUM_LINKS_PAR_TYPE[typePourPremium]?.some(l => l.href === '#adhesions-init')) {
+    ['#adhesions-init', '#votes-init'].forEach(href => {
+      const link = document.querySelector(`.sidebar a[href="${href}"]`);
+      if (link) link.style.display = 'none';
+    });
+  }
 
   /* Paiements boutique (Stripe Connect) — sauf Bypass Premium dev actif pour ce module */
   if (!window.daBypassActive('paiement_boutique')) {
