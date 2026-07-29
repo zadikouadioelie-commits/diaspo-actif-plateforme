@@ -372,13 +372,13 @@ button{font-family:inherit;cursor:pointer;}
    repliée ou la referme si elle est ouverte, sur tous les formats. */
 .sidebar-toggle{
   display:flex;align-items:center;justify-content:center;
-  position:fixed;left:12px;top:70px;z-index:210;
-  width:42px;height:42px;border-radius:50%;flex:none;
-  background:var(--navy);color:#fff;border:none;cursor:pointer;
-  font-size:19px;box-shadow:0 3px 12px rgba(0,0,0,.25);
-  transition:background .15s;
+  position:fixed;left:14px;top:74px;z-index:210;
+  width:50px;height:50px;border-radius:50%;flex:none;
+  background:var(--orange);color:#fff;border:3px solid #fff;cursor:pointer;
+  font-size:22px;box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 0 2px rgba(242,100,34,.25);
+  transition:background .15s,transform .15s;
 }
-.sidebar-toggle:hover{background:var(--navy-light);}
+.sidebar-toggle:hover{background:#d9551a;transform:scale(1.06);}
 /* Fond sombre derrière le tiroir */
 .sidebar-backdrop{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:199;
