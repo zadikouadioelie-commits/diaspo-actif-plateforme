@@ -37,6 +37,7 @@
     if (!sidebar || document.getElementById("st-sidebar-link")) return false;
     const a = document.createElement("a");
     a.id = "st-sidebar-link";
+    a.className = "sb-standalone";
     a.href = "#";
     a.innerHTML = "🛠️ Support technique";
     a.addEventListener("click", (e) => { e.preventDefault(); openModal(); });

@@ -6309,6 +6309,21 @@ const EXPANSION_MODULES_PAR_TYPE = {
 };
 const EXPANSION_MODULES_TOUS = ['zones_action','emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','centre_financier','accreditations_da'];
 
+/* Masque les libellés de rubrique (ex. "05 — INTELLIGENCE") dont tous les liens
+   sont actuellement cachés — évite les en-têtes de section vides quand aucun
+   module Expansion de cette rubrique n'est encore activé pour ce type d'initiative. */
+function hideEmptySidebarGroups() {
+  document.querySelectorAll('.sidebar .sb-group-lbl').forEach(label => {
+    let el = label.nextElementSibling;
+    let hasVisible = false;
+    while (el && !el.classList.contains('sb-group-lbl') && !el.classList.contains('sb-standalone')) {
+      if (el.tagName === 'A' && el.style.display !== 'none') { hasVisible = true; break; }
+      el = el.nextElementSibling;
+    }
+    label.style.display = hasVisible ? '' : 'none';
+  });
+}
+
 async function initExpansionModules() {
   const type = window.__vitrineInitType;
   const listeExpansion = EXPANSION_MODULES_PAR_TYPE[type] || [];
@@ -6327,6 +6342,7 @@ async function initExpansionModules() {
   });
 
   if (document.getElementById('expansion-catalogue-content')) renderExpansionCatalogue();
+  hideEmptySidebarGroups();
 }
 
 function renderExpansionCatalogue() {
@@ -6611,7 +6627,6 @@ async function initPremiumGates() {
   if (window._daDemoUnlock === undefined) {
     try { window._daDemoUnlock = (await api('GET', '/config/premium-demo-unlock')).enabled; } catch(_) { window._daDemoUnlock = false; }
   }
-  if (window._daPremiumInitiative) return;
   applyPremiumButtonStyles();
 
   /* Modules dorés communs aux 3 types d'initiative. */
@@ -6648,10 +6663,14 @@ async function initPremiumGates() {
     const link = document.querySelector(`.sidebar a[href="${href}"]`);
     if (!link || link.dataset.premiumStyled) return;
     link.dataset.premiumStyled = '1';
+    /* Le doré reste un badge permanent du module, activé ou non — seuls le
+       cadenas et le blocage au clic dépendent du statut Premium réel. */
     link.classList.add('premium-locked');
     link.style.margin = '0 8px';
-    link.innerHTML = '🔒 ' + link.innerHTML;
-    if (intercept) link.addEventListener('click', (e) => { if (window.daBypassActive?.(context)) return; e.preventDefault(); openPremiumUpsell(context); });
+    if (!window._daPremiumInitiative) {
+      link.innerHTML = '🔒 ' + link.innerHTML;
+      if (intercept) link.addEventListener('click', (e) => { if (window.daBypassActive?.(context)) return; e.preventDefault(); openPremiumUpsell(context); });
+    }
   });
   /* « Cotisations & Adhésions » et « Votes sécurisés » n'existent pour aucune colonne du
      type Entreprise (ni socle, ni premium, ni expansion) — masqués entièrement plutôt que
@@ -6662,6 +6681,8 @@ async function initPremiumGates() {
       if (link) link.style.display = 'none';
     });
   }
+  hideEmptySidebarGroups();
+  if (window._daPremiumInitiative) return;
 
   /* Paiements boutique (Stripe Connect) — sauf Bypass Premium dev actif pour ce module */
   if (!window.daBypassActive('paiement_boutique')) {
