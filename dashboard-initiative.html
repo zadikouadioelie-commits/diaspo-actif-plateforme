@@ -4247,6 +4247,15 @@ function renderPvInfosForm() {
         <div><label class="pv-lbl">Catégorie</label><select id="pv-f-domaine" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           <option value="">—</option>${PV_DOMAINES.map(d=>`<option value="${d}" ${init.domaine===d?'selected':''}>${d}</option>`).join('')}
         </select></div>
+        <div></div>
+        <div style="grid-column:1/-1;">
+          <label class="pv-lbl">Domaines secondaires (optionnel, jusqu'à 2 — améliore la recherche dans le catalogue)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${[0,1].map(i=>`<select id="pv-f-domaine${i+2}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">—</option>${PV_DOMAINES.map(d=>`<option value="${d}" ${(init.domaines_secondaires||[])[i]===d?'selected':''}>${d}</option>`).join('')}
+            </select>`).join('')}
+          </div>
+        </div>
         <div><label class="pv-lbl">Site web</label><input id="pv-f-siteweb" value="${_mvEsc(init.site_web||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Ville</label><input id="pv-f-ville" value="${_mvEsc(init.vitrine_ville||init.ville||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Pays</label><input id="pv-f-pays" value="${_mvEsc(init.vitrine_pays||init.pays||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
@@ -4291,10 +4300,14 @@ async function pvUploadLogo(input) {
 async function pvSaveInfos() {
   const rs = {};
   PV_RESEAUX_FIELDS.forEach(([k]) => { const v = document.getElementById('pv-f-rs-'+k).value.trim(); if (v) rs[k] = v; });
+  const domainePrincipal = document.getElementById('pv-f-domaine').value;
+  const domainesSecondaires = [...new Set([document.getElementById('pv-f-domaine2').value, document.getElementById('pv-f-domaine3').value])]
+    .filter(d => d && d !== domainePrincipal);
   const payload = {
     nom: document.getElementById('pv-f-nom').value.trim(),
     slogan: document.getElementById('pv-f-slogan').value.trim(),
-    domaine: document.getElementById('pv-f-domaine').value,
+    domaine: domainePrincipal,
+    domaines_secondaires: domainesSecondaires,
     site_web: document.getElementById('pv-f-siteweb').value.trim(),
     vitrine_ville: document.getElementById('pv-f-ville').value.trim(),
     vitrine_pays: document.getElementById('pv-f-pays').value.trim(),
@@ -6717,8 +6730,8 @@ initPremiumGates();
     <button class="mobile-bottom-nav__item" id="mobile-nav-menu-toggle" type="button"><span class="nav-icon">☰</span><span>Menu</span></button>
     <a class="mobile-bottom-nav__item" href="profil.html"><span class="nav-icon">🏢</span><span>Profil</span></a>
     <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
-    <a class="mobile-bottom-nav__item" href="agenda.html"><span class="nav-icon">📅</span><span>Agenda</span></a>
-    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Réseau</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item" href="vitrines.html"><span class="nav-icon">🏬</span><span>Vitrine</span></a>
   </nav>
 <script src="assets/profile-qr.js"></script>
 <!-- Requis par la carte « Mon indice de fiabilité » du cockpit. -->

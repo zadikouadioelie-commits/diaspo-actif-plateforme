@@ -1460,6 +1460,9 @@ function renderVitrineCard(v) {
   if (v.origine1) locs.push(`<span>${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
   if (v.pays) locs.push(`<span>${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
   const noteHtml = v.nb_avis > 0 ? `<div class="vit-card-note">⭐ ${v.note_moyenne} (${v.nb_avis} avis)</div>` : '';
+  const domainesSecondairesHtml = (v.domaines_secondaires||[]).length
+    ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 6px;">${(v.domaines_secondaires||[]).map(d=>`<span style="font-size:10.5px;font-weight:700;color:var(--muted);background:var(--bg);border-radius:20px;padding:2px 8px;">${escapeHtml(d)}</span>`).join('')}</div>`
+    : '';
 
   return `
   <div class="vit-card" onclick="window.location.href='${href}'">
@@ -1471,6 +1474,7 @@ function renderVitrineCard(v) {
     </div>
     <div class="vit-card-body">
       <div class="vit-card-title">${escapeHtml(v.nom)}</div>
+      ${domainesSecondairesHtml}
       ${locs.length ? `<div class="vit-card-locs">${locs.join('')}</div>` : ''}
       ${v.description ? `<div class="vit-card-desc">${escapeHtml(v.description)}</div>` : ''}
       ${noteHtml}

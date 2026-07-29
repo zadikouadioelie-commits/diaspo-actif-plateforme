@@ -101,6 +101,7 @@ db.exec(`
     origine2 TEXT,
     rayonnement TEXT DEFAULT 'locale',
     domaine TEXT,
+    domaines_secondaires_json TEXT DEFAULT '[]',
     type TEXT,
     membres INTEGER DEFAULT 0,
     vues INTEGER DEFAULT 0,
@@ -4688,6 +4689,10 @@ db.exec(`
   if (!initCols7.includes('vitrine_videos_json'))             db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_videos_json TEXT");
   if (!initCols7.includes('vitrine_portfolio_json'))          db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_portfolio_json TEXT");
   if (!initCols7.includes('vitrine_reservation_json'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_reservation_json TEXT");
+  // Domaines secondaires de la vitrine (0 à 2, en plus du domaine principal — catalogue Vitrines).
+  // Déjà déclarée dans le CREATE TABLE plus haut : self-healing automatique sur PostgreSQL
+  // (ajouterColonnesManquantes, pg-init.js) ; cette ligne ne sert qu'au SQLite local déjà créé.
+  if (!initCols7.includes('domaines_secondaires_json'))       db.exec("ALTER TABLE initiatives ADD COLUMN domaines_secondaires_json TEXT DEFAULT '[]'");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`

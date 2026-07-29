@@ -1972,7 +1972,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_expertise_json, vitrine_certifications_json, vitrine_devis_active, vitrine_partenariat_active,
     vitrine_style_json,
     // Informations générales (identité de la structure — éditables aussi depuis "Paramètres Vitrine")
-    nom, domaine, logo_url, reseaux_sociaux, slogan,
+    nom, domaine, domaines_secondaires, logo_url, reseaux_sociaux, slogan,
     // Modules "Galerie vidéos", "Portfolio", "Réservation"
     vitrine_videos_json, vitrine_portfolio_json, vitrine_reservation_json,
   } = body;
@@ -2048,6 +2048,11 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     ['vitrine_videos_json', vitrine_videos_json],
     ['vitrine_portfolio_json', vitrine_portfolio_json],
     ['vitrine_reservation_json', vitrine_reservation_json],
+    /* Domaines secondaires (0 à 2) — le domaine principal reste porté par la colonne
+       `domaine` existante ; jusqu'à 3 domaines au total pour une vitrine. */
+    ['domaines_secondaires_json', domaines_secondaires !== undefined
+      ? JSON.stringify((Array.isArray(domaines_secondaires) ? domaines_secondaires : []).filter(Boolean).slice(0, 2))
+      : undefined],
   ]) {
     if (valeur === undefined) continue;
     try { await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(valeur, params.id); }
@@ -4384,7 +4389,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
   const q = (query.q || "").toLowerCase();
   if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q) || (r.slogan || "").toLowerCase().includes(q));
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
-  if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
+  if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine || safeParseArray(r.domaines_secondaires_json).includes(query.domaine));
   if (query.type) rows = rows.filter(r => r.type === query.type);
   if (query.origine) {
     const o = query.origine;
@@ -4406,7 +4411,8 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
   if (query.limit) rows = rows.slice(0, parseInt(query.limit) || rows.length);
 
   rows = rows.map(r => ({
-    id: r.id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine, description: r.description,
+    id: r.id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
+    domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
     slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
     pays: r.pays, ville: r.ville,
     origine1: r.origine1 || r.owner_origine1 || null, origine2: r.origine2 || r.owner_origine2 || null,
@@ -4428,6 +4434,7 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   const row = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
   if (!row) return sendJSON(res, 200, { initiative: null });
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
+  row.domaines_secondaires = safeParseArray(row.domaines_secondaires_json);
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
   /* ?preview=draft : utilisé par le constructeur "Paramètres Vitrine" (aperçu dynamique) et son
