@@ -505,6 +505,11 @@ img:not([loading]) { loading: auto; }
   p, li, td { font-size: clamp(0.82rem, 3vw, 0.9rem); }
 }
 
+/* ─── APERÇU MULTI-APPAREILS — masqué sur téléphone (déjà redondant : on EST sur un téléphone) ─── */
+@media (max-width: 640px) {
+  #apercu-appareils-btn { display: none !important; }
+}
+
 /* ─── CARTES INIT MOBILE ─────────────────────────────────────────── */
 @media (max-width: 640px) {
   .init-card {
