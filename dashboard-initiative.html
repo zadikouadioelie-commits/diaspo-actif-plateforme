@@ -51,6 +51,11 @@
       <a href="business-plan.html" data-aide="business_plans">📋 Business Plans</a>
       <a href="#adhesions-init" data-section="adhesions-init" data-aide="cotisations_adhesions">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init" data-aide="votes_securises">🗳️ Votes sécurisés</a>
+      <a href="#billetterie-init" data-section="billetterie-init" data-aide="billetterie">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
+      <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
+      <a href="#offres-emploi" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
+      <a href="#recrutement" data-section="recrutement" data-aide="candidatures">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
+      <a href="centre-financier.html" data-aide="centre_financier">💰 Centre Financier</a>
       <a href="#parametres-vitrine" data-section="parametres-vitrine" data-aide="parametres_vitrine">⭐ Paramètres Vitrine</a>
 
       <div class="sb-group-lbl">01 — OUTILS</div>
@@ -67,7 +72,6 @@
       <div class="sb-group-lbl">03 — INITIATIVES</div>
       <a href="#presentation" data-section="presentation" style="display:none;">📋 Ma fiche initiative</a>
       <a href="#publications" data-section="publications" data-aide="publications">📰 Publications</a>
-      <a href="#billetterie-init" data-section="billetterie-init" data-aide="billetterie">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
 
       <div class="sb-group-lbl">AFFILIATION</div>
       <a href="#affiliation" data-section="affiliation" data-aide="affiliation">🔗 Affiliation</a>
@@ -80,15 +84,11 @@
 
       <div class="sb-group-lbl">06 — COMMUNICATION</div>
       <a href="messagerie.html" data-aide="messagerie">🟥 Messages <span class="pill" id="msg-count">—</span></a>
-      <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#partenaires-liste" data-section="partenaires-liste" data-aide="liste_partenaires">🤝 Liste des partenaires</a>
-      <a href="#offres-emploi" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
-      <a href="#recrutement" data-section="recrutement" data-aide="candidatures">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="agenda.html" data-aide="mon_agenda">📅 Mon Agenda</a>
       <a href="reseau.html" data-aide="reseau_pro">🌐 Mon Réseau Pro <span class="pill" id="reseau-badge" style="display:none;"></span></a>
       <a href="reunions.html" data-aide="visioconference">📹 Visioconférence</a>
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
-      <a href="centre-financier.html" data-aide="centre_financier">💰 Centre Financier</a>
 
       <div class="sb-group-lbl">07 — COLLABORATION</div>
       <a href="audiovisuel.html" style="display:none;">🎬 Atelier audiovisuel</a>
@@ -6638,6 +6638,9 @@ async function initPremiumGates() {
     { href: 'business-plan.html', context: 'business_plans', intercept: true },
     { href: '#messages-vitrine', context: 'messages_vitrine', intercept: true },
     { href: '#billetterie-init', context: 'billetterie', intercept: true },
+    /* Paramètres Vitrine reste accessible sans Premium (voir renderStatutVitrineSection,
+       bandeau d'avertissement) — badgeOnly : doré comme module premium, jamais verrouillé. */
+    { href: '#parametres-vitrine', context: 'parametres_vitrine', badgeOnly: true },
   ];
   /* Modules dorés spécifiques à certains types — absents (ni socle, ni premium, ni expansion)
      pour les types non listés ici, donc masqués plutôt que simplement laissés non dorés. */
@@ -6659,15 +6662,16 @@ async function initPremiumGates() {
   };
   const typePourPremium = window.__vitrineInitType;
   const SIDEBAR_PREMIUM_LINKS = [...SIDEBAR_PREMIUM_LINKS_TOUS, ...(SIDEBAR_PREMIUM_LINKS_PAR_TYPE[typePourPremium] || [])];
-  SIDEBAR_PREMIUM_LINKS.forEach(({ href, context, intercept }) => {
+  SIDEBAR_PREMIUM_LINKS.forEach(({ href, context, intercept, badgeOnly }) => {
     const link = document.querySelector(`.sidebar a[href="${href}"]`);
     if (!link || link.dataset.premiumStyled) return;
     link.dataset.premiumStyled = '1';
     /* Le doré reste un badge permanent du module, activé ou non — seuls le
-       cadenas et le blocage au clic dépendent du statut Premium réel. */
+       cadenas et le blocage au clic dépendent du statut Premium réel (sauf
+       badgeOnly : doré mais jamais verrouillé, l'accès étant volontairement ouvert). */
     link.classList.add('premium-locked');
     link.style.margin = '0 8px';
-    if (!window._daPremiumInitiative) {
+    if (!window._daPremiumInitiative && !badgeOnly) {
       link.innerHTML = '🔒 ' + link.innerHTML;
       if (intercept) link.addEventListener('click', (e) => { if (window.daBypassActive?.(context)) return; e.preventDefault(); openPremiumUpsell(context); });
     }
