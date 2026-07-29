@@ -1,5 +1,5 @@
 /* ── Mailer Diaspo'Actif — Resend API ── */
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.RESEND_KEY_PROD;
 const FROM = "Diaspo'Actif <noreply@diaspoactif.com>";
 
 async function sendEmail({ to, subject, html }) {
