@@ -3496,7 +3496,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
   // ── Sidebar repliable (tous formats) : bouton rond fixe + préférence mémorisée ──
   (function initSidebarMobile() {
-    const toggle   = document.getElementById("sidebar-toggle");
+    const toggle      = document.getElementById("sidebar-toggle");
+    const navToggle    = document.getElementById("mobile-nav-menu-toggle");
+    const navToggleIcon = navToggle ? navToggle.querySelector(".nav-icon") : null;
+    // Une page qui a son propre bouton menu dans la barre du bas (mobile) n'a pas besoin
+    // du bouton rond flottant en plus — doublon évité via cette classe (voir responsive.v2.css).
+    if (navToggle) toggle.classList.add("sidebar-toggle--has-mobile-nav-alt");
     const close    = document.getElementById("sidebar-close");
     const backdrop = document.getElementById("sidebar-backdrop");
     const sidebar  = document.getElementById("sidebar");
@@ -3508,6 +3513,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
       if (backdrop) backdrop.classList.add("open");
       document.body.style.overflow = "hidden";
       toggle.textContent = "✕";
+      if (navToggleIcon) navToggleIcon.textContent = "✕";
+      if (navToggle) navToggle.classList.add("active");
       if (persist) localStorage.setItem(LS_KEY, "0");
     }
     function closeSidebar(persist) {
@@ -3515,14 +3522,18 @@ document.addEventListener("DOMContentLoaded", ()=>{
       if (backdrop) backdrop.classList.remove("open");
       document.body.style.overflow = "";
       toggle.textContent = "☰";
+      if (navToggleIcon) navToggleIcon.textContent = "☰";
+      if (navToggle) navToggle.classList.remove("active");
       if (persist) localStorage.setItem(LS_KEY, "1");
     }
 
     // Le bouton bascule : ouvre si repliée, replie si ouverte.
-    toggle.addEventListener("click", () => {
+    function toggleSidebar() {
       if (sidebar.classList.contains("open")) closeSidebar(true);
       else openSidebar(true);
-    });
+    }
+    toggle.addEventListener("click", toggleSidebar);
+    if (navToggle) navToggle.addEventListener("click", toggleSidebar);
     if (close)    close.addEventListener("click", () => closeSidebar(true));
     if (backdrop) backdrop.addEventListener("click", () => closeSidebar(true));
 

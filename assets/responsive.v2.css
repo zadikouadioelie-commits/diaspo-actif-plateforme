@@ -415,6 +415,13 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .chat-list { width: 220px; }
 }
 
+/* Pages avec un bouton menu dédié dans la barre du bas (mobile) : pas besoin du
+   bouton rond flottant en plus tant que cette barre est visible (<1024px) — voir
+   assets/app.js (classe ajoutée uniquement si #mobile-nav-menu-toggle existe). */
+@media (max-width: 1023px) {
+  .sidebar-toggle.sidebar-toggle--has-mobile-nav-alt { display: none; }
+}
+
 /* ─── BREAKPOINT : DESKTOP (1024px - 1279px) ────────────────────── */
 @media (min-width: 1024px) {
   /* Sidebar toujours visible */
