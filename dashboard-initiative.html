@@ -24,6 +24,7 @@
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
         <a href="formations.html">Formations</a>
         <a href="actualites.html">Actualités</a>
@@ -193,7 +194,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       { num: 7, label: "Finalisation",   icon: "🤝" },
     ];
     const NB_STEPS = 7;
-    const DOMAINES = ["Action Sociale","Agriculture","Santé","Éducation","Technologie","Culture","Économie","Environnement","Sport","Autre"];
+    const DOMAINES = ["Agriculture","Artisanat","Assurance","Commerce","Construction","Consulting","Culture","Éducation","Emploi","Énergie","Entrepreneuriat","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Investissement","Numérique","Restauration","Santé","Soin santé / thérapie","Sport","Technologie","Tourisme","Transport","Autre"];
     const FORMES = [
       { val: "Entreprise",              icon: "🏢" },
       { val: "Association",             icon: "🤝" },
@@ -4223,7 +4224,7 @@ async function pvPublish() {
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
-const PV_DOMAINES = ['Environnement','Agriculture','Education','Sante','Action Sociale','Technologie','Culture','Entrepreneuriat','Finance','Droit'];
+const PV_DOMAINES = ["Agriculture","Artisanat","Assurance","Commerce","Construction","Consulting","Culture","Éducation","Emploi","Énergie","Entrepreneuriat","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Investissement","Numérique","Restauration","Santé","Soin santé / thérapie","Sport","Technologie","Tourisme","Transport","Autre"];
 const PV_RESEAUX_FIELDS = [
   ['facebook','Facebook'], ['instagram','Instagram'], ['linkedin','LinkedIn'],
   ['x','X / Twitter'], ['youtube','YouTube'], ['tiktok','TikTok'],

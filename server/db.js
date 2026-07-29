@@ -1509,7 +1509,14 @@ const MIGRATIONS = [
   ["users", "penalite_disciplinaire INTEGER DEFAULT 0"],
   // Module Premium — délai de grâce après échec de prélèvement (même pattern que pub_abonnements)
   ["user_accreditations", "grace_until TEXT"],
+  // Rubrique Vitrines — date de dernière modification publique de la vitrine (tri "Dernière mise à jour")
+  ["initiatives", "updated_at TEXT"],
 ];
+
+/* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
+   sans ce repli, elles resteraient NULL et disparaîtraient toujours en dernier du tri
+   "Dernière mise à jour" au lieu de refléter leur date de création. */
+try { db.exec("UPDATE initiatives SET updated_at=created_at WHERE updated_at IS NULL"); } catch (_) {}
 
 /* ===== COMPTES ÉTATIQUES : tables spécifiques ===== */
 db.exec(`

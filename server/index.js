@@ -1635,6 +1635,7 @@ route("PUT", "/api/initiatives/:id/contact-vitrine", async (req, res, params, bo
         Number(init.vitrine_tel_visible) === 1 ? "affiché" : "masqué", v === 1 ? "affiché" : "masqué");
     }
   }
+  await db.prepare("UPDATE initiatives SET updated_at=datetime('now') WHERE id=?").run(init.id);
   const maj = await db.prepare("SELECT vitrine_tel_pro, vitrine_whatsapp, vitrine_tel_visible FROM initiatives WHERE id=?").get(init.id);
   sendJSON(res, 200, { ok: true, ...maj, vitrine_tel_visible: Number(maj.vitrine_tel_visible) === 1 });
 });
@@ -1988,7 +1989,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       site_web=?, vitrine_google_maps_url=?, vitrine_rdv_active=?,
       vitrine_temoignages_json=?, vitrine_vision_objectifs=?, vitrine_resultats_impact_json=?,
       vitrine_expertise_json=?, vitrine_certifications_json=?, vitrine_devis_active=?, vitrine_partenariat_active=?,
-      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?
+      vitrine_style_json=?, nom=?, domaine=?, logo_url=?, reseaux_sociaux=?, slogan=?,
+      updated_at=datetime('now')
     WHERE id=?
   `).run(
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
@@ -4363,6 +4365,58 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   sendJSON(res, 200, { initiatives: rows });
 });
 
+/* GET /api/vitrines — catalogue public des vitrines d'initiatives (rubrique "Vitrines").
+   Distinct de /api/initiatives : ne montre que les vitrines réellement publiées et actives,
+   avec note moyenne et tri dédié — /api/initiatives reste utilisé par l'Annuaire tel quel. */
+route("GET", "/api/vitrines", async (req, res, params, body, query) => {
+  let rows = await db.prepare(`
+    SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2,
+      av.note_moyenne, av.nb_avis
+    FROM initiatives i
+    LEFT JOIN users u ON u.id = i.owner_user_id
+    LEFT JOIN (
+      SELECT initiative_id, AVG(note) note_moyenne, COUNT(*) nb_avis
+      FROM vitrine_avis GROUP BY initiative_id
+    ) av ON av.initiative_id = i.id
+    WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND i.vitrine_active=1
+  `).all();
+
+  const q = (query.q || "").toLowerCase();
+  if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q) || (r.slogan || "").toLowerCase().includes(q));
+  if (query.pays) rows = rows.filter(r => r.pays === query.pays);
+  if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
+  if (query.type) rows = rows.filter(r => r.type === query.type);
+  if (query.origine) {
+    const o = query.origine;
+    rows = rows.filter(r => r.origine1 === o || r.origine2 === o || r.pays_origine === o || r.owner_origine1 === o || r.owner_origine2 === o);
+  }
+
+  /* Exclusion des vitrines en maintenance Premium (abonnement expiré) — no-op tant que
+     PREMIUM_APPLICATION n'est pas activé, mais correct dès à présent (cf. estEnMaintenancePremium). */
+  const statutsMaintenance = await Promise.all(rows.map(r => estEnMaintenancePremium(r.owner_user_id)));
+  rows = rows.filter((_, i) => !(statutsMaintenance[i] && statutsMaintenance[i].actif));
+
+  const tri = query.tri || "recent";
+  if (tri === "populaire") rows.sort((a, b) => (b.vues || 0) - (a.vues || 0));
+  else if (tri === "note") rows.sort((a, b) => (b.note_moyenne || 0) - (a.note_moyenne || 0));
+  else if (tri === "alpha") rows.sort((a, b) => (a.nom || "").localeCompare(b.nom || ""));
+  else if (tri === "maj") rows.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+  else rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (query.limit) rows = rows.slice(0, parseInt(query.limit) || rows.length);
+
+  rows = rows.map(r => ({
+    id: r.id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine, description: r.description,
+    slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
+    pays: r.pays, ville: r.ville,
+    origine1: r.origine1 || r.owner_origine1 || null, origine2: r.origine2 || r.owner_origine2 || null,
+    vues: r.vues || 0, note_moyenne: r.note_moyenne ? Math.round(r.note_moyenne * 10) / 10 : null,
+    nb_avis: r.nb_avis || 0, created_at: r.created_at, updated_at: r.updated_at || r.created_at,
+  }));
+
+  sendJSON(res, 200, { vitrines: rows });
+});
+
 /* GET /api/mon-initiative — l'initiative du compte connecté, jamais filtrée par is_demo :
    contrairement à /api/initiatives (liste publique), un compte doit toujours pouvoir gérer/voir
    sa propre vitrine, même si ce compte est par ailleurs masqué du public (voir profil-app.html
@@ -4477,6 +4531,17 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
      aucune intervention ni risque d'oublier de la remettre en ligne.
      Les données ne sont ni supprimées ni modifiées : seul l'affichage change. */
   row.vitrine_maintenance = await estEnMaintenancePremium(row.owner_user_id);
+
+  /* Rubrique Vitrines — compteur de vues fiable : incrémenté à la vraie consultation de la
+     fiche (pas seulement sur un clic depuis le fil, cf. POST /api/fil/vitrine-clic), sauf
+     quand c'est le propriétaire qui consulte sa propre vitrine (ne doit pas gonfler ses
+     propres statistiques). Best-effort, ne bloque jamais l'affichage de la page. */
+  try {
+    const visiteur = await getCurrentUser(req).catch(() => null);
+    const estProprietaire = visiteur && row.owner_user_id && Number(visiteur.id) === Number(row.owner_user_id);
+    if (!estProprietaire) await db.prepare("UPDATE initiatives SET vues=vues+1 WHERE id=?").run(row.id);
+  } catch (_) {}
+
   sendJSON(res, 200, { initiative: row });
 });
 
@@ -4690,6 +4755,9 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
   const nouveauDraft = { ...draft, type: nouveau, modules: draft.modules || safeParse(init.vitrine_modules_json) || {} };
   for (const m of tpl.actifs || []) nouveauDraft.modules[m] = true;
   await db.prepare("UPDATE initiatives SET vitrine_draft_json=? WHERE id=?").run(JSON.stringify(nouveauDraft), init.id);
+  /* Le changement de type peut effacer/convertir du contenu public (mode "zero" ou adaptation) —
+     compte comme une modification de la vitrine pour le tri "Dernière mise à jour". */
+  await db.prepare("UPDATE initiatives SET updated_at=datetime('now') WHERE id=?").run(init.id);
 
   sendJSON(res, 200, { ok: true, mode, sauvegarde_id, journal, type: nouveau, draft: nouveauDraft });
 });
@@ -4720,6 +4788,7 @@ route("POST", "/api/initiatives/:id/vitrine/restaurer/:sauvegardeId", async (req
     try { await db.prepare("UPDATE initiatives SET " + champ + "=? WHERE id=?").run(valeur, init.id); restaures++; }
     catch (e) { /* champ disparu depuis la sauvegarde : on restaure ce qui existe encore */ }
   }
+  if (restaures > 0) await db.prepare("UPDATE initiatives SET updated_at=datetime('now') WHERE id=?").run(init.id);
   sendJSON(res, 200, { ok: true, champs_restaures: restaures, revenu_a: s.type_avant });
 });
 
@@ -4827,6 +4896,7 @@ route("POST", "/api/initiatives/:id/vitrine-publish", async (req, res, params) =
       publies++;
     } catch (e) { console.error('[vitrine-publish] colonne indisponible', champ, e.message); }
   }
+  await db.prepare("UPDATE initiatives SET updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true, champsPublies: publies });
 });
 
@@ -5197,7 +5267,8 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
       origine1=COALESCE(?,origine1), origine2=COALESCE(?,origine2),
       nationalite1=COALESCE(?,nationalite1), nationalite2=COALESCE(?,nationalite2),
       pays_origine=COALESCE(?,pays_origine),
-      membres=COALESCE(?,membres), nb_salaries=COALESCE(?,nb_salaries)
+      membres=COALESCE(?,membres), nb_salaries=COALESCE(?,nb_salaries),
+      updated_at=datetime('now')
     WHERE id=?`)
     .run(Array.isArray(publics) ? JSON.stringify(publics) : null,
          Array.isArray(besoins) ? JSON.stringify(besoins) : null,

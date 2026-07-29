@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Vitrines</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<style>
+/* ===== Hero vitrines — même pattern que l'Annuaire, sans image externe ===== */
+.vit-hero{
+  position:relative;height:320px;overflow:hidden;
+  background:
+    radial-gradient(120% 95% at 82% 8%, rgba(242,100,34,.45) 0%, rgba(242,100,34,0) 58%),
+    linear-gradient(135deg,#0F2A50 0%,#1B3A6B 60%,#1565C0 100%);
+}
+.vit-hero::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 2px, transparent 2px 24px);
+}
+.vit-hero-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(to bottom,rgba(10,30,60,.15) 0%,rgba(10,30,60,.6) 100%);
+}
+.vit-hero-content{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;}
+.vit-hero-text{max-width:1180px;margin:0 auto;width:100%;padding:0 24px 36px;}
+.vit-hero-text h1{font-size:42px;font-weight:900;color:#fff;margin:0 0 8px;letter-spacing:-.5px;text-transform:uppercase;}
+.vit-hero-text p{color:rgba(255,255,255,.85);font-size:15px;margin:0;max-width:460px;line-height:1.5;}
+
+.vit-stat-band{background:#1B3A6B;padding:0;}
+.vit-stat-band-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;}
+.vit-stat-chip{display:flex;align-items:center;gap:12px;padding:16px 32px;font-size:14px;font-weight:600;color:rgba(255,255,255,.9);border-right:1px solid rgba(255,255,255,.15);}
+.vit-stat-chip:last-child{border-right:none;}
+.vit-stat-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+
+.vit-filters{background:#fff;border-bottom:1px solid var(--border);padding:18px 0;}
+.vit-filters-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.vit-filter-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px;}
+.vit-filter-group label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.04em;}
+.vit-filter-group select,
+.vit-filter-group input[type=text]{
+  height:42px;padding:0 14px;border:1px solid var(--border);border-radius:8px;
+  font-size:13.5px;background:#fff;color:var(--text);width:100%;transition:border-color .15s;
+}
+.vit-filter-group select:focus,
+.vit-filter-group input[type=text]:focus{border-color:#2563EB;outline:none;}
+.vit-sugg-item{padding:9px 14px;font-size:13px;cursor:pointer;}
+.vit-sugg-item:hover{background:#F3F4F6;}
+.vit-filter-geo{height:42px;}
+.vit-btn-reset{
+  height:42px;padding:0 18px;background:#f3f4f6;color:#374151;
+  border:1px solid #e5e7eb;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;transition:background .15s;
+}
+.vit-btn-reset:hover{background:#e5e7eb;}
+
+.vit-section-head{max-width:1180px;margin:0 auto;padding:32px 24px 18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
+.vit-section-head h2{font-size:22px;font-weight:800;margin:0;position:relative;padding-bottom:10px;}
+.vit-section-head h2::after{content:'';position:absolute;left:0;bottom:0;width:36px;height:3px;background:linear-gradient(135deg,#F26422,#c2410c);border-radius:2px;}
+.vit-section-desc{font-size:13px;color:var(--muted);max-width:420px;line-height:1.55;}
+.vit-result-count{font-size:13px;color:var(--muted);margin-top:4px;}
+
+.vit-grid{
+  max-width:1180px;margin:0 auto;padding:0 24px 40px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:20px;
+}
+@media(max-width:1100px){.vit-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:780px){.vit-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:480px){.vit-grid{grid-template-columns:1fr;}}
+
+.vit-card{
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;text-decoration:none;color:inherit;
+  box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s;
+  display:flex;flex-direction:column;cursor:pointer;
+}
+.vit-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(27,58,107,.13);}
+.vit-card-photo{height:150px;position:relative;overflow:hidden;background:var(--bg);}
+.vit-card-photo img{position:relative;width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
+.vit-card-initiales{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:40px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,.92);
+  text-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.vit-card:hover .vit-card-photo img{transform:scale(1.04);}
+.vit-cat-badge{
+  position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:4px;
+  font-size:10px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase;
+}
+.vit-type-badge{
+  position:absolute;bottom:10px;right:10px;background:rgba(255,255,255,.88);color:#1B3A6B;
+  padding:3px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.04em;backdrop-filter:blur(4px);
+}
+.vit-card-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:6px;}
+.vit-card-title{font-size:14px;font-weight:700;margin:0;line-height:1.3;color:var(--text);}
+.vit-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;flex:1;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.vit-card-locs{font-size:12px;color:#1B3A6B;display:flex;flex-wrap:wrap;gap:8px;}
+.vit-card-note{font-size:12px;color:#b45309;display:flex;align-items:center;gap:4px;}
+.vit-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);gap:8px;}
+.vit-card-btn{font-size:11.5px;font-weight:700;padding:6px 14px;border-radius:20px;text-decoration:none;
+  background:var(--orange-light);color:#2563EB;white-space:nowrap;transition:opacity .15s;}
+.vit-card-btn:hover{opacity:.8;}
+
+.vit-cta{background:#1B3A6B;padding:40px 24px;text-align:center;margin-top:0;}
+.vit-cta-inner{max-width:600px;margin:0 auto;}
+.vit-cta-icon{width:52px;height:52px;background:rgba(255,255,255,.1);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px;}
+.vit-cta h3{color:#fff;font-size:20px;margin:0 0 8px;font-weight:800;}
+.vit-cta p{color:rgba(255,255,255,.75);font-size:14px;margin:0 0 22px;}
+.vit-cta-btn{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;
+  padding:12px 28px;border-radius:6px;font-weight:700;font-size:14px;text-decoration:none;border:none;cursor:pointer;}
+.vit-cta-btn:hover{background:#9a3412;}
+
+@media(max-width:680px){
+  .vit-filters-inner{flex-direction:column;}
+  .vit-filters-inner select,.vit-filters-inner input{min-width:100%;}
+  .vit-hero-text h1{font-size:28px;}
+  .vit-stat-band-inner{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .vit-stat-band-inner::-webkit-scrollbar{display:none;}
+  .vit-stat-chip{padding:12px 16px;font-size:12.5px;flex:none;}
+  .topbar-inner{justify-content:space-between;}
+  .logo{flex:1;justify-content:center;text-align:center;}
+}
+@media(min-width:681px){
+  #sidebar, #sidebar-backdrop, #sidebar-toggle{display:none!important;}
+}
+</style>
+  <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html" class="active">Vitrines</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="vitrines.html">🏪 Vitrines</a>
+    <a href="fil-actualite.html">📰 Fil d'actualité</a>
+    <a href="actualites.html">📢 Actualités</a>
+    <a href="evenements.html">📅 Événements</a>
+    <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+    <a href="premium.html">⭐ Passer Premium</a>
+    <div id="hb-account-section"></div>
+  </aside>
+
+  <!-- ===== HERO ===== -->
+  <div class="vit-hero">
+    <div class="vit-hero-overlay"></div>
+    <div class="vit-hero-content">
+      <div class="vit-hero-text">
+        <h1>Vitrines</h1>
+        <p>Découvrez les entreprises, associations, projets et services créés par la diaspora sur Diaspo'Actif.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== STAT CHIPS ===== -->
+  <div class="vit-stat-band">
+    <div class="vit-stat-band-inner">
+      <div class="vit-stat-chip"><div class="vit-stat-icon">🏪</div><span>Des vitrines à découvrir</span></div>
+      <div class="vit-stat-chip"><div class="vit-stat-icon">🛍️</div><span>Des produits et services</span></div>
+      <div class="vit-stat-chip"><div class="vit-stat-icon">🌍</div><span>Un impact local et global</span></div>
+    </div>
+  </div>
+
+  <!-- ===== RECHERCHE PAR MOT-CLÉ ===== -->
+  <div class="vit-filters" style="padding-bottom:0;">
+    <div class="vit-filters-inner" style="max-width:100%;">
+      <div class="vit-filter-group" style="flex:1;min-width:260px;position:relative;">
+        <label>🔍 Rechercher une vitrine</label>
+        <input type="text" id="v-motcle" placeholder="Nom, mot-clé, activité, produit ou service…" autocomplete="off">
+        <div id="v-motcle-suggestions" style="display:none;position:absolute;z-index:30;top:100%;left:0;right:0;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FILTRES ===== -->
+  <div class="vit-filters">
+    <div class="vit-filters-inner">
+
+      <div class="vit-filter-group">
+        <label>🏛 Type de vitrine</label>
+        <select id="v-type">
+          <option value="">Tous les types</option>
+          <option value="Association">Association</option>
+          <option value="ONG">ONG</option>
+          <option value="Cooperative">Coopérative</option>
+          <option value="Fondation">Fondation</option>
+          <option value="Entreprise">Entreprise</option>
+          <option value="Startup">Startup</option>
+          <option value="Projet collectif">Projet collectif</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+
+      <div class="vit-filter-group">
+        <label>💼 Domaine d'activité</label>
+        <select id="v-domaine">
+          <option value="">Tous les domaines</option>
+        </select>
+      </div>
+
+      <div class="vit-filter-group">
+        <label>📍 Pays de résidence</label>
+        <div id="v-pays-res" class="vit-filter-geo"></div>
+      </div>
+
+      <div class="vit-filter-group">
+        <label>🌍 Pays d'origine</label>
+        <div id="v-pays-orig" class="vit-filter-geo"></div>
+      </div>
+
+      <div class="vit-filter-group">
+        <label>↕️ Trier par</label>
+        <select id="v-tri">
+          <option value="recent">Plus récentes</option>
+          <option value="populaire">Plus consultées</option>
+          <option value="note">Mieux notées</option>
+          <option value="alpha">Ordre alphabétique</option>
+          <option value="maj">Dernière mise à jour</option>
+        </select>
+      </div>
+
+      <button class="vit-btn-reset" id="v-btn-reset">✕ Réinitialiser</button>
+    </div>
+  </div>
+
+  <!-- ===== CATALOGUE ===== -->
+  <div class="vit-section-head">
+    <div>
+      <h2>Toutes les vitrines</h2>
+      <div class="vit-result-count"><strong id="v-result-count">0</strong> vitrine(s) trouvée(s)</div>
+    </div>
+    <p class="vit-section-desc">Explorez les vitrines publiées par les comptes Initiative — entreprises, associations, coopératives et projets de la diaspora.</p>
+  </div>
+
+  <div class="vit-grid" id="vit-list">
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+  </div>
+
+  <!-- ===== CTA ===== -->
+  <div class="vit-cta">
+    <div class="vit-cta-inner">
+      <div class="vit-cta-icon">🏪</div>
+      <h3>Vous portez un projet ou une activité ?</h3>
+      <p>Créez votre compte Initiative et publiez votre propre vitrine sur Diaspo'Actif.</p>
+      <a href="inscription.html" class="vit-cta-btn">Créer ma vitrine →</a>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> ·
+    <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a>
+  </footer>
+</div>
+
+<script src="assets/decouverte-premium.js"></script>
+<script src="assets/data.js?v=7"></script>
+<script src="assets/geo.js?v=3"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=10"></script>
+<script src="assets/upload-media.js"></script>
+<script src="assets/image-cropper.js"></script>
+
+  <!-- ─── Mobile Bottom Navigation ─── -->
+  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item active" href="vitrines.html"><span class="nav-icon">🏪</span><span>Vitrines</span></a>
+    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+  </nav>
+  <script>
+  (function(){
+    function render(user){
+      var box = document.getElementById('hb-account-section');
+      var navLogin = document.getElementById('mob-nav-login');
+      if (!box) return;
+      if (user){
+        var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+        var dashHref = dash[user.role] || 'index.html';
+        box.innerHTML = '<a href="' + dashHref + '#apparence">⚙️ Paramètres</a><a href="#" id="hb-logout-link">🚪 Déconnexion</a>';
+        var out = document.getElementById('hb-logout-link');
+        if (out) out.addEventListener('click', function(e){
+          e.preventDefault();
+          fetch('/api/auth/logout', {method:'POST', credentials:'same-origin'}).finally(function(){ window.location.href = 'index.html'; });
+        });
+        if (navLogin) navLogin.href = dashHref;
+      } else {
+        box.innerHTML = '<a href="login.html">🔑 Se connecter</a><a href="inscription.html">✨ Créer un compte</a>';
+      }
+    }
+    fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
+      .then(function(d){ render(d && d.user ? d.user : null); }).catch(function(){ render(null); });
+  })();
+  </script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+  <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

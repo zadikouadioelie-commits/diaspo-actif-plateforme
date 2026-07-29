@@ -975,6 +975,7 @@
       <nav class="nav">
         <a href="index.html" class="active">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
         <a href="actualites.html">Actualités</a>
         <a href="evenements.html">Autres événements</a>
@@ -993,6 +994,7 @@
     <div class="brand">Diaspo'Actif</div>
     <a href="index.html">🏠 Accueil</a>
     <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="vitrines.html">🏪 Vitrines</a>
     <a href="fil-actualite.html">📰 Fil d'actualité</a>
     <a href="actualites.html">📢 Actualités</a>
     <a href="evenements.html">📅 Événements</a>
@@ -1150,17 +1152,93 @@
             <input type="text" id="hp-q" placeholder="Nom ou mot-clé…">
             <select id="hp-domaine">
               <option value="">Tous les domaines</option>
-              <option>Education</option>
-              <option>Sante</option>
-              <option>Technologie</option>
-              <option>Environnement</option>
-              <option>Entrepreneuriat</option>
+              <option>Agriculture</option>
+              <option>Artisanat</option>
+              <option>Assurance</option>
+              <option>Commerce</option>
+              <option>Construction</option>
+              <option>Consulting</option>
               <option>Culture</option>
-              <option>Action Sociale</option>
+              <option>Éducation</option>
+              <option>Emploi</option>
+              <option>Énergie</option>
+              <option>Entrepreneuriat</option>
+              <option>Environnement</option>
+              <option>Événementiel</option>
+              <option>Finance</option>
+              <option>Formation</option>
+              <option>Immobilier</option>
+              <option>Industrie</option>
+              <option>Institution</option>
+              <option>Investissement</option>
+              <option>Numérique</option>
+              <option>Restauration</option>
+              <option>Santé</option>
+              <option>Soin santé / thérapie</option>
+              <option>Sport</option>
+              <option>Technologie</option>
+              <option>Tourisme</option>
+              <option>Transport</option>
+              <option>Autre</option>
             </select>
             <button class="hp-search-go" id="hp-search-btn">Rechercher</button>
           </div>
           <div class="hp-annuaire-preview" id="hp-ann-preview">
+            <!-- rempli par JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 6b : WIDGET VITRINES ===== -->
+  <section class="hp-section hp-annuaire" style="padding: 64px 0;">
+    <div class="hp-section-inner">
+      <div class="hp-annuaire-grid">
+        <div class="hp-annuaire-text">
+          <div class="hp-section-eyebrow">Vitrines</div>
+          <h2>Découvrez les vitrines de la diaspora</h2>
+          <p>Entreprises, associations, coopératives et projets — parcourez les vitrines publiées sur Diaspo'Actif, sans passer par les profils.</p>
+          <a href="vitrines.html" class="hp-cta-primary" style="display:inline-flex;margin-top:8px;">Voir toutes les vitrines →</a>
+        </div>
+        <div class="hp-annuaire-quick">
+          <h4>Recherche rapide</h4>
+          <div class="hp-search-row">
+            <input type="text" id="hp-vit-q" placeholder="Nom ou mot-clé…">
+            <select id="hp-vit-domaine">
+              <option value="">Tous les domaines</option>
+              <option>Agriculture</option>
+              <option>Artisanat</option>
+              <option>Assurance</option>
+              <option>Commerce</option>
+              <option>Construction</option>
+              <option>Consulting</option>
+              <option>Culture</option>
+              <option>Éducation</option>
+              <option>Emploi</option>
+              <option>Énergie</option>
+              <option>Entrepreneuriat</option>
+              <option>Environnement</option>
+              <option>Événementiel</option>
+              <option>Finance</option>
+              <option>Formation</option>
+              <option>Immobilier</option>
+              <option>Industrie</option>
+              <option>Institution</option>
+              <option>Investissement</option>
+              <option>Numérique</option>
+              <option>Restauration</option>
+              <option>Santé</option>
+              <option>Soin santé / thérapie</option>
+              <option>Sport</option>
+              <option>Technologie</option>
+              <option>Tourisme</option>
+              <option>Transport</option>
+              <option>Autre</option>
+            </select>
+            <button class="hp-search-go" id="hp-vit-search-btn">Rechercher</button>
+          </div>
+          <div class="hp-annuaire-preview" id="hp-vit-preview">
             <!-- rempli par JS -->
           </div>
         </div>
@@ -1797,6 +1875,43 @@ document.getElementById('hp-q')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('hp-search-btn')?.click();
 });
 
+/* --- 5b. Aperçu vitrines (6 mini-cartes, les plus consultées) --- */
+(async function() {
+  const preview = document.getElementById('hp-vit-preview');
+  if (!preview) return;
+  try {
+    const r = await fetch('/api/vitrines?tri=populaire&limit=6');
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    const list = (data.vitrines || []).slice(0, 6);
+    const initiales = nom => String(nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
+      .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
+    preview.innerHTML = list.map(v => {
+      const vignette = v.logo_url || v.vitrine_banniere_url || '';
+      return `
+      <a class="hp-ann-mini" href="initiative.html?id=${encodeURIComponent(v.slug || v.id)}">
+        ${vignette
+          ? `<img src="${vignette}" alt="${v.nom}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'hp-ann-mini-ini',textContent:'${initiales(v.nom)}'}))">`
+          : `<span class="hp-ann-mini-ini">${initiales(v.nom)}</span>`}
+        <div>
+          <div class="hp-ann-mini-name">${v.nom}</div>
+          <div class="hp-ann-mini-loc">📍 ${v.pays || '—'}</div>
+        </div>
+      </a>`;
+    }).join('') || '<div style="grid-column:1/-1;color:var(--muted);font-size:13px;">Aucune vitrine publiée pour l\'instant.</div>';
+  } catch {}
+})();
+
+/* Bouton recherche rapide vitrines */
+document.getElementById('hp-vit-search-btn')?.addEventListener('click', () => {
+  const q = encodeURIComponent(document.getElementById('hp-vit-q')?.value || '');
+  const d = encodeURIComponent(document.getElementById('hp-vit-domaine')?.value || '');
+  window.location.href = `vitrines.html?q=${q}&domaine=${d}`;
+});
+document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('hp-vit-search-btn')?.click();
+});
+
 /* --- 6. Fil d'actualité (aperçu lecture seule) --- */
 (async function() {
   const grid = document.getElementById('hp-feed-grid');
@@ -2280,6 +2395,7 @@ document.getElementById('tm-never').addEventListener('click', async () => {
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
     <a class="mobile-bottom-nav__item active" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
     <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">👥</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item" href="vitrines.html"><span class="nav-icon">🏪</span><span>Vitrines</span></a>
     <a class="mobile-bottom-nav__item mobile-bottom-nav__item--publish" href="fil-actualite.html" id="mob-nav-publish"><span class="nav-icon">➕</span><span>Publier</span></a>
     <a class="mobile-bottom-nav__item" href="#" id="mob-nav-alertes" onclick="return typeof openNotifDropdown==='function' ? (openNotifDropdown(this), false) : true;"><span class="nav-icon">🔔</span><span>Alertes</span></a>
     <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Profil</span></a>

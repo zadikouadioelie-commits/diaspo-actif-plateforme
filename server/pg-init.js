@@ -1015,6 +1015,8 @@ const COLONNES_MIGRATION = [
     ['users', 'penalite_disciplinaire', 'INTEGER DEFAULT 0'],
     // Module Premium — délai de grâce après échec de prélèvement (même pattern que pub_abonnements)
     ['user_accreditations', 'grace_until', 'TEXT'],
+    // Rubrique Vitrines — date de dernière modification publique de la vitrine
+    ['initiatives', 'updated_at', 'TEXT'],
 ];
 
 async function migratePg(pool) {
@@ -1026,6 +1028,10 @@ async function migratePg(pool) {
       console.error(`[pg-init migration] ${table}.${col}:`, e.message);
     }
   }
+  // Rubrique Vitrines — initialise updated_at pour les initiatives déjà existantes (jamais
+  // modifiées depuis), sinon elles resteraient NULL et disparaîtraient toujours en dernier
+  // du tri "Dernière mise à jour" au lieu de refléter leur date de création.
+  try { await pool.query(`UPDATE initiatives SET updated_at=created_at WHERE updated_at IS NULL`); } catch(_) {}
   // Index unique da_id (comme en SQLite)
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_da_id ON users(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}
   try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_initiatives_da_id ON initiatives(da_id) WHERE da_id IS NOT NULL`); } catch(_) {}

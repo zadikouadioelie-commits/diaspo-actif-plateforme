@@ -1447,6 +1447,126 @@ async function initAnnuaire(){
 }
 
 /* ---------- Fiche initiative (branchée sur l'API) ---------- */
+/* ---------- Rubrique Vitrines (catalogue public des vitrines d'initiatives) ---------- */
+const DOMAINES_VITRINE = ["Agriculture","Artisanat","Assurance","Commerce","Construction","Consulting","Culture","Éducation","Emploi","Énergie","Entrepreneuriat","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Investissement","Numérique","Restauration","Santé","Soin santé / thérapie","Sport","Technologie","Tourisme","Transport","Autre"];
+
+function renderVitrineCard(v) {
+  const badge = DOMAIN_BADGE[v.domaine] || {bg:'#1B3A6B', label:(v.domaine||'VITRINE').toUpperCase()};
+  const photo = v.vitrine_banniere_url || v.logo_url || '';
+  const initiales = String(v.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
+    .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
+  const href = `initiative.html?id=${encodeURIComponent(v.slug || v.id)}`;
+  const locs = [];
+  if (v.origine1) locs.push(`<span>${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
+  if (v.pays) locs.push(`<span>${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
+  const noteHtml = v.nb_avis > 0 ? `<div class="vit-card-note">⭐ ${v.note_moyenne} (${v.nb_avis} avis)</div>` : '';
+
+  return `
+  <div class="vit-card" onclick="window.location.href='${href}'">
+    <div class="vit-card-photo" style="background:linear-gradient(135deg,${badge.bg},#0D1B2A);">
+      <span class="vit-card-initiales">${initiales}</span>
+      ${photo ? `<img src="${photo}" alt="${escapeHtml(v.nom)}" loading="lazy" onerror="this.remove()">` : ''}
+      <span class="vit-cat-badge" style="background:${badge.bg};">${badge.label}</span>
+      ${v.type ? `<span class="vit-type-badge">${escapeHtml(v.type)}</span>` : ''}
+    </div>
+    <div class="vit-card-body">
+      <div class="vit-card-title">${escapeHtml(v.nom)}</div>
+      ${locs.length ? `<div class="vit-card-locs">${locs.join('')}</div>` : ''}
+      ${v.description ? `<div class="vit-card-desc">${escapeHtml(v.description)}</div>` : ''}
+      ${noteHtml}
+      <div class="vit-card-foot">
+        <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function initVitrines(){
+  const list = document.getElementById("vit-list");
+  if (!list) return;
+
+  const domSel = document.getElementById("v-domaine");
+  if (domSel) DOMAINES_VITRINE.forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; domSel.appendChild(o); });
+
+  /* Pré-remplissage depuis l'URL — permet à la recherche rapide de la page d'accueil de
+     lier directement vers un résultat filtré (ex. vitrines.html?q=...&domaine=...). */
+  const urlParams = new URLSearchParams(window.location.search);
+  const state = {
+    q: urlParams.get("q") || "", type: urlParams.get("type") || "", domaine: urlParams.get("domaine") || "",
+    paysRes: "", paysOrig: "", tri: "recent",
+  };
+  const motCleUrlEl = document.getElementById("v-motcle");
+  if (state.q && motCleUrlEl) motCleUrlEl.value = state.q;
+  if (state.type) { const el = document.getElementById("v-type"); if (el) el.value = state.type; }
+  if (state.domaine) { const el = document.getElementById("v-domaine"); if (el) el.value = state.domaine; }
+
+  async function apply() {
+    list.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>`;
+    const qs = new URLSearchParams();
+    if (state.q) qs.set("q", state.q);
+    if (state.type) qs.set("type", state.type);
+    if (state.domaine) qs.set("domaine", state.domaine);
+    if (state.paysRes) qs.set("pays", state.paysRes);
+    if (state.paysOrig) qs.set("origine", state.paysOrig);
+    if (state.tri) qs.set("tri", state.tri);
+    let rows = [];
+    try {
+      const r = await api("GET", "/vitrines?" + qs.toString());
+      rows = r.vitrines || [];
+    } catch (e) {
+      list.innerHTML = `<div class="empty">Impossible de contacter le serveur Diaspo'Actif.</div>`;
+      return;
+    }
+    const countEl = document.getElementById("v-result-count");
+    if (countEl) countEl.textContent = rows.length;
+    list.innerHTML = rows.length
+      ? rows.map(renderVitrineCard).join("")
+      : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucune vitrine ne correspond à ces critères.</div>`;
+  }
+
+  /* Recherche temps réel — même pattern que l'Annuaire (debounce 350ms). */
+  let _motCleTimer;
+  const motCleEl = document.getElementById("v-motcle");
+  if (motCleEl) motCleEl.addEventListener("input", () => {
+    clearTimeout(_motCleTimer);
+    _motCleTimer = setTimeout(() => { state.q = motCleEl.value.trim(); apply(); }, 350);
+  });
+
+  ["v-type", "v-domaine", "v-tri"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", () => {
+      state.type = document.getElementById("v-type").value;
+      state.domaine = document.getElementById("v-domaine").value;
+      state.tri = document.getElementById("v-tri").value;
+      apply();
+    });
+  });
+
+  document.getElementById("v-btn-reset")?.addEventListener("click", () => {
+    state.q = ""; state.type = ""; state.domaine = ""; state.paysRes = ""; state.paysOrig = ""; state.tri = "recent";
+    if (motCleEl) motCleEl.value = "";
+    document.getElementById("v-type").value = "";
+    document.getElementById("v-domaine").value = "";
+    document.getElementById("v-tri").value = "recent";
+    apply();
+  });
+
+  if (typeof GeoAutocomplete !== "undefined") {
+    const prAnchor = document.getElementById("v-pays-res");
+    if (prAnchor) new GeoAutocomplete(prAnchor, {
+      id: "v-pays-res", placeholder: "Ex : France, Sénégal…",
+      getList: () => geoGetCountries(), onSelect: v => { state.paysRes = v; apply(); },
+    });
+    const poAnchor = document.getElementById("v-pays-orig");
+    if (poAnchor) new GeoAutocomplete(poAnchor, {
+      id: "v-pays-orig", placeholder: "Ex : Côte d'Ivoire…",
+      getList: () => geoGetCountries(), onSelect: v => { state.paysOrig = v; apply(); },
+    });
+  }
+
+  apply();
+}
+
 async function initFicheInitiative(){
   const box = document.getElementById("fiche-initiative");
   if(!box) return;
@@ -3478,6 +3598,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   applyAuthState();
   initLangSelector();
   initAnnuaire();
+  initVitrines();
   initFicheInitiative();
   initMessagerie();
   initDashboardUtilisateur();
