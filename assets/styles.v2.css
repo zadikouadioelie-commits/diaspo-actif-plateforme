@@ -379,6 +379,14 @@ button{font-family:inherit;cursor:pointer;}
   transition:background .15s,transform .15s;
 }
 .sidebar-toggle:hover{background:#d9551a;transform:scale(1.06);}
+/* Petit libellé sous le bouton — n'agrandit pas le cercle, juste un repère visuel. */
+.sidebar-toggle::after{
+  content:"Menu";
+  position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  margin-top:5px;font-size:10.5px;font-weight:800;color:var(--navy);
+  background:#fff;padding:1px 6px;border-radius:6px;white-space:nowrap;
+  box-shadow:0 1px 4px rgba(0,0,0,.15);
+}
 /* Fond sombre derrière le tiroir */
 .sidebar-backdrop{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:199;
