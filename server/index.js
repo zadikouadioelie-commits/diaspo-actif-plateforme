@@ -3052,24 +3052,17 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
   const def = await getAccredDef(params.type);
   if (!def) return sendJSON(res, 404, { error: "Accréditation introuvable." });
   const typeTarif = body.type_tarif === 'annuel' ? 'annuel' : 'mensuel';
-  // Une seule ligne accred_tarifs par rôle (UNIQUE(accred_id,role)) : elle peut être stockée
-  // en mensuel ou en annuel selon comment l'admin l'a configurée. On dérive le prix de
-  // l'autre période via reduction_annuelle_pct — même calcul que le panneau admin.
   const tarifRow = (def.tarifs || []).find(t => t.role === user.role);
   if (!tarifRow) return sendJSON(res, 400, { error: "Aucun tarif disponible pour votre type de compte." });
-  const reduc = Number(tarifRow.reduction_annuelle_pct) || 0;
-  let montant;
-  if (tarifRow.type_tarif === typeTarif) {
-    montant = Number(tarifRow.montant);
-  } else if (tarifRow.type_tarif === 'mensuel' && typeTarif === 'annuel') {
-    montant = Number(tarifRow.montant) * 12 * (1 - reduc / 100);
-  } else if (tarifRow.type_tarif === 'annuel' && typeTarif === 'mensuel') {
-    montant = (Number(tarifRow.montant) * (1 - reduc / 100)) / 12;
-  } else {
+  if (tarifRow.type_tarif !== 'mensuel' && tarifRow.type_tarif !== 'annuel') {
     return sendJSON(res, 400, { error: "Ce type de formule n'est pas disponible." });
   }
-  montant = Math.round(montant * 100) / 100;
-  const tarif = { montant, devise: tarifRow.devise || 'EUR' };
+  // Tarif calculé par le moteur de tarification Premium (catégorie/taille/promotion/tarif
+  // personnalisé) — jamais le tarif de base brut, cf. server/index.js:calculerTarifPremium.
+  const calcule = await calculerTarifPremium(def, user);
+  if (!calcule) return sendJSON(res, 400, { error: "Aucun tarif disponible pour votre type de compte." });
+  const montant = typeTarif === 'annuel' ? calcule.montant_annuel : calcule.montant_mensuel;
+  const tarif = { montant, devise: calcule.devise };
 
   const dejaActive = await hasAccreditation(user.id, def.type);
   if (dejaActive) return sendJSON(res, 400, { error: "Vous êtes déjà abonné." });
@@ -4163,7 +4156,9 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
 "SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
   if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
-  if (query.type) initiatives = initiatives.filter(r => r.type === query.type);
+  /* "Initiative" est un filtre générique (toutes les initiatives, quel que soit leur
+     type_org Association/Entreprise/ONG/...) — distinct d'un type_org précis. */
+  if (query.type && query.type !== 'Initiative') initiatives = initiatives.filter(r => r.type === query.type);
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
@@ -7765,10 +7760,26 @@ async function getPremiumStatut(userId, role) {
   if (isPremiumDemoUnlock()) return { ...base, concerne: true, actif: true, type: type || null, source: 'demo_unlock' };
 
   const def = type ? await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type) : null;
-  const nouv = def ? await db.prepare("SELECT date_expiration, type_tarif, montant_paye FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id) : null;
+  const nouv = def ? await db.prepare("SELECT date_expiration, type_tarif, montant_paye, statut, grace_until FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut IN ('active','suspendue') ORDER BY CASE statut WHEN 'active' THEN 0 ELSE 1 END LIMIT 1").get(userId, def.id) : null;
+  /* Prélèvement Premium échoué : accès conservé pendant le délai de grâce (7 jours, même
+     principe que pub_abonnements) pour laisser le temps de régulariser, avant que Stripe
+     n'annule réellement l'abonnement (customer.subscription.deleted → statut='expiree'). */
+  if (nouv && nouv.statut === 'suspendue') {
+    const graceMs = nouv.grace_until ? new Date(String(nouv.grace_until).replace(' ', 'T')).getTime() : null;
+    if (graceMs && graceMs > Date.now()) {
+      return {
+        ...base, concerne: true, actif: true, statut: 'impaye', type: type || null,
+        date_expiration: nouv.date_expiration || null,
+        jours_restants: Math.ceil((graceMs - Date.now()) / 86400000),
+        jours_depuis_expiration: 0, montant_paye: Number(nouv.montant_paye || 0),
+        conservation_illimitee: PREMIUM_CONSERVATION_ILLIMITEE, source: 'user_accreditations_impaye',
+      };
+    }
+  }
+  const nouvActif = nouv && nouv.statut === 'active' ? nouv : null;
   const ancien = type ? await db.prepare("SELECT date_expiration, frais_acces FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type) : null;
-  let ligne = nouv || ancien;
-  let source = nouv ? 'user_accreditations' : (ancien ? 'compte_accreditations' : null);
+  let ligne = nouvActif || ancien;
+  let source = nouvActif ? 'user_accreditations' : (ancien ? 'compte_accreditations' : null);
 
   /* Période gratuite calculée : 3 mois depuis la création du compte, jamais avant la date
      plancher de remise à zéro. Elle rend la règle universelle — Collectivité, qui n'a aucun
@@ -7782,7 +7793,7 @@ async function getPremiumStatut(userId, role) {
      les accréditations offertes ne portent pas toutes la mention "decouverte", et s'y fier
      excluait de vrais essais gratuits de la remise à zéro — constaté après déploiement, la
      date restait inchangée. Montant nul ou absent = période offerte, donc prolongeable. */
-  const montantPaye = nouv ? Number(nouv.montant_paye || 0) : Number((ancien && ancien.frais_acces) || 0);
+  const montantPaye = nouvActif ? Number(nouvActif.montant_paye || 0) : Number((ancien && ancien.frais_acces) || 0);
   const estEssaiGratuit = !!ligne && !(montantPaye > 0);
 
   if (!ligne) {
@@ -10942,7 +10953,7 @@ async function handleStripeWebhook(req, res) {
       /* Renouvellement de l'abonnement Utilisateur Abonné (hors 1ère facture) */
       const accredUA = await db.prepare("SELECT * FROM user_accreditations WHERE stripe_subscription_id=?").get(invoice.subscription);
       if (accredUA && invoice.billing_reason !== "subscription_create") {
-        await db.prepare(`UPDATE user_accreditations SET statut='active', updated_at=datetime('now') WHERE id=?`).run(accredUA.id);
+        await db.prepare(`UPDATE user_accreditations SET statut='active', grace_until=NULL, updated_at=datetime('now') WHERE id=?`).run(accredUA.id);
       }
     } else if (event.type === "invoice.payment_failed" && event.data.object.subscription) {
       const invoice = event.data.object;
@@ -10959,6 +10970,15 @@ async function handleStripeWebhook(req, res) {
           creerNotif(adhMembre.linked_user_id, "adhesion_paiement_echoue", "Paiement échoué — Adhésion",
             "Votre paiement de cotisation n'a pas pu être traité.", {});
         }
+      }
+      /* Module Premium : même traitement immédiat que pub_abonnements (statut + délai de
+         grâce de 7 jours + notification), inexistant jusqu'ici pour user_accreditations —
+         seul customer.subscription.deleted (après épuisement des tentatives Stripe) agissait. */
+      const accredUA = await db.prepare("SELECT * FROM user_accreditations WHERE stripe_subscription_id=?").get(invoice.subscription);
+      if (accredUA) {
+        await db.prepare(`UPDATE user_accreditations SET statut='suspendue', grace_until=datetime('now','+7 days'), updated_at=datetime('now') WHERE id=?`).run(accredUA.id);
+        creerNotif(accredUA.user_id, "accred_paiement_echoue", "Paiement échoué — Abonnement Premium",
+          "Votre paiement n'a pas pu être traité. Vous avez 7 jours pour régulariser avant suspension de votre Premium.", { accred_id: accredUA.accred_id });
       }
     } else if (event.type === "customer.subscription.deleted") {
       const sub = event.data.object;
@@ -12823,16 +12843,6 @@ route("GET", "/api/admin/finances", async (req, res) => {
     FROM transactions WHERE statut='reussi' AND date(date_transaction)=date('now')
   `).get();
 
-  // Plans — performance
-  const parPlan = await db.prepare(`
-    SELECT p.nom, p.prix_mensuel, p.prix_annuel,
-      COUNT(t.id) AS nb_ventes,
-      COALESCE(SUM(CASE WHEN t.statut='reussi' THEN t.montant ELSE 0 END),0) AS revenu
-    FROM plans_abonnement p
-    LEFT JOIN transactions t ON t.plan_id = p.id AND t.date_transaction >= datetime('now','-30 days')
-    GROUP BY p.id ORDER BY revenu DESC
-  `).all();
-
   sendJSON(res, 200, {
     simulation: true,
     abonnes_actifs: abonnesActifs,
@@ -12843,7 +12853,6 @@ route("GET", "/api/admin/finances", async (req, res) => {
     paiements_statuts: paiementsStatuts,
     top_clients: topClients,
     vente_jour: venteJour,
-    par_plan: parPlan
   });
 });
 
@@ -12960,86 +12969,6 @@ route("GET", "/api/admin/paiements/dashboard", async (req, res) => {
   });
 });
 
-/* ===== PLANS D'ABONNEMENT — CRUD ===== */
-
-route("GET", "/api/admin/plans", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  sendJSON(res, 200, { plans: await db.prepare("SELECT * FROM plans_abonnement ORDER BY ordre").all() });
-});
-
-route("POST", "/api/admin/plans", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const { nom, description, prix_mensuel, prix_annuel, cible, avantages } = body;
-  if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
-  const id = (await db.prepare(`
-    INSERT INTO plans_abonnement (nom, description, prix_mensuel, prix_annuel, cible, avantages)
-    VALUES (?,?,?,?,?,?)
-  `).run(nom, description||null, prix_mensuel||0, prix_annuel||0, cible||"tous",
-    JSON.stringify(avantages||{}))).lastInsertRowid;
-  sendJSON(res, 201, { id });
-});
-
-route("PUT", "/api/admin/plans/:id", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const { nom, description, prix_mensuel, prix_annuel, cible, avantages, actif } = body;
-  await db.prepare(`
-    UPDATE plans_abonnement SET nom=?,description=?,prix_mensuel=?,prix_annuel=?,cible=?,avantages=?,
-    actif=?,updated_at=datetime('now') WHERE id=?
-  `).run(nom, description||null, prix_mensuel||0, prix_annuel||0, cible||"tous",
-    JSON.stringify(avantages||{}), actif!=null?actif:1, params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-route("DELETE", "/api/admin/plans/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  await db.prepare("UPDATE plans_abonnement SET actif=0 WHERE id=?").run(params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* ===== CODES PROMO — CRUD ===== */
-
-route("GET", "/api/admin/promos", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  sendJSON(res, 200, { promos: await db.prepare("SELECT * FROM codes_promo ORDER BY created_at DESC").all() });
-});
-
-route("POST", "/api/admin/promos", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const { nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible } = body;
-  if (!nom || !code || !type) return sendJSON(res, 400, { error: "Nom, code et type requis." });
-  const id = (await db.prepare(`
-    INSERT INTO codes_promo (nom, code, type, valeur, date_debut, date_fin, nb_max_utilisations, cible, created_by)
-    VALUES (?,?,?,?,?,?,?,?,?)
-  `).run(nom, code.toUpperCase(), type, valeur||0, date_debut||null, date_fin||null,
-    nb_max_utilisations||null, cible||"tous", user.id)).lastInsertRowid;
-  sendJSON(res, 201, { id });
-});
-
-route("PUT", "/api/admin/promos/:id", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  const { nom, type, valeur, date_debut, date_fin, nb_max_utilisations, cible, actif } = body;
-  await db.prepare(`
-    UPDATE codes_promo SET nom=?,type=?,valeur=?,date_debut=?,date_fin=?,
-    nb_max_utilisations=?,cible=?,actif=? WHERE id=?
-  `).run(nom, type, valeur||0, date_debut||null, date_fin||null, nb_max_utilisations||null,
-    cible||"tous", actif!=null?actif:1, params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-route("DELETE", "/api/admin/promos/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
-  await db.prepare("UPDATE codes_promo SET actif=0 WHERE id=?").run(params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
 /* ===== PARAMÈTRES PLATEFORME ===== */
 
 route("GET", "/api/admin/parametres", async (req, res) => {
@@ -13090,10 +13019,9 @@ route("GET", "/api/admin/transactions", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const txs = await db.prepare(`
-    SELECT t.*, u.nom AS user_nom, p.nom AS plan_nom
+    SELECT t.*, u.nom AS user_nom
     FROM transactions t
     LEFT JOIN users u ON u.id = t.user_id
-    LEFT JOIN plans_abonnement p ON p.id = t.plan_id
     ORDER BY t.date_transaction DESC LIMIT 100
   `).all();
   sendJSON(res, 200, { transactions: txs });
@@ -25409,6 +25337,101 @@ route("GET", "/api/asso/documents/:id/meta", async (req, res, params) => {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Helper : récupère la définition complète (def + regles + tarifs) */
+/* Module Premium — regroupe les valeurs libres de initiatives.type (choisies à l'inscription)
+   en 2 catégories de tarification. "Autre" et les types non reconnus sont traités comme
+   'association' (tarif le plus bas) plutôt que sans catégorie, pour ne jamais appliquer par
+   défaut le tarif le plus élevé à un type ambigu. */
+const CATEGORIE_ENTREPRISE = ['entreprise', 'startup'];
+function categoriserInitiative(type) {
+  if (!type) return null;
+  return CATEGORIE_ENTREPRISE.includes(String(type).toLowerCase()) ? 'entreprise' : 'association';
+}
+
+/* Moteur de calcul du tarif Premium — ordre imposé par le cahier des charges :
+   1) tarif de base (accred_tarifs, override par catégorie pour role='initiative')
+   2) modulation selon la taille de l'organisation (coefficient de palier)
+   3) promotion active (réduction % / fixe)
+   4-5) tarif personnalisé par compte — remplace entièrement le résultat des étapes 1-3.
+   Retourne { montant_mensuel, montant_annuel, devise, categorie, personnalise, promo } ou null
+   si aucun tarif n'est configuré pour ce rôle. */
+async function calculerTarifPremium(def, user) {
+  const role = user.role;
+  const tarifBase = (def.tarifs || []).find(t => t.role === role);
+  if (!tarifBase) return null;
+
+  let montantMensuel, reduc = Number(tarifBase.reduction_annuelle_pct) || 0;
+  if (tarifBase.type_tarif === 'mensuel') montantMensuel = Number(tarifBase.montant);
+  else if (tarifBase.type_tarif === 'annuel') montantMensuel = Number(tarifBase.montant) / 12;
+  else montantMensuel = 0; // gratuit / paiement_unique : hors moteur d'abonnement récurrent
+
+  let categorie = null, init = null;
+  if (role === 'initiative') {
+    init = await db.prepare("SELECT type, membres, nb_salaries FROM initiatives WHERE owner_user_id=?").get(user.id);
+    categorie = categoriserInitiative(init?.type);
+    if (categorie) {
+      const catRow = await db.prepare(
+        "SELECT montant, reduction_annuelle_pct FROM accred_tarifs_categorie WHERE accred_id=? AND role=? AND categorie=?"
+      ).get(def.id, role, categorie);
+      if (catRow) { montantMensuel = Number(catRow.montant); reduc = Number(catRow.reduction_annuelle_pct) || reduc; }
+
+      const taille = categorie === 'association' ? init?.membres : init?.nb_salaries;
+      if (taille != null) {
+        const palier = await db.prepare(`
+          SELECT coefficient FROM accred_tarifs_paliers
+          WHERE accred_id=? AND role=? AND categorie=? AND actif=1
+            AND seuil_min<=? AND (seuil_max IS NULL OR seuil_max>=?)
+          ORDER BY seuil_min DESC LIMIT 1
+        `).get(def.id, role, categorie, taille, taille);
+        if (palier) montantMensuel *= Number(palier.coefficient);
+      }
+    }
+  }
+
+  let montantAnnuel = montantMensuel * 12 * (1 - reduc / 100);
+
+  const promos = await db.prepare(
+    "SELECT * FROM accred_promotions WHERE actif=1 AND date_debut<=datetime('now') AND date_fin>=datetime('now')"
+  ).all();
+  const promo = promos.find(p => {
+    const roles = safeParse(p.roles_json) || [];
+    const cats = safeParse(p.categories_json) || [];
+    if (roles.length && !roles.includes(role)) return false;
+    if (cats.length && (!categorie || !cats.includes(categorie))) return false;
+    return true;
+  });
+  if (promo) {
+    if (promo.reduction_pct) {
+      montantMensuel *= (1 - promo.reduction_pct / 100);
+      montantAnnuel *= (1 - promo.reduction_pct / 100);
+    }
+    if (promo.reduction_fixe) {
+      montantMensuel = Math.max(0, montantMensuel - promo.reduction_fixe);
+      montantAnnuel = Math.max(0, montantAnnuel - promo.reduction_fixe * 12);
+    }
+  }
+  montantMensuel = Math.round(montantMensuel * 100) / 100;
+  montantAnnuel = Math.round(montantAnnuel * 100) / 100;
+
+  const perso = await db.prepare(`
+    SELECT * FROM accred_tarifs_personnalises
+    WHERE user_id=? AND accred_id=? AND actif=1 AND date_debut<=datetime('now')
+      AND (date_fin IS NULL OR date_fin>=datetime('now'))
+    ORDER BY id DESC LIMIT 1
+  `).get(user.id, def.id);
+  if (perso) {
+    return {
+      montant_mensuel: perso.montant_mensuel != null ? Number(perso.montant_mensuel) : montantMensuel,
+      montant_annuel: perso.montant_annuel != null ? Number(perso.montant_annuel) : montantAnnuel,
+      devise: tarifBase.devise || 'EUR', categorie, personnalise: true, promo: null,
+    };
+  }
+  return {
+    montant_mensuel: montantMensuel, montant_annuel: montantAnnuel,
+    devise: tarifBase.devise || 'EUR', categorie, personnalise: false,
+    promo: promo ? { nom: promo.nom, mois_offerts: promo.mois_offerts || 0 } : null,
+  };
+}
+
 async function getAccredDef(idOrType) {
   /* En Postgres, les id numériques peuvent revenir en chaîne (piège BIGSERIAL déjà
      documenté ailleurs dans ce fichier) — un simple typeof==='number' route alors
@@ -25439,6 +25462,9 @@ route("GET", "/api/accreditations/catalogue", async (req, res) => {
     const def = await getAccredDef(d.id);
     if (!def) return null;
     if (role && !def.eligible.includes(role)) return null;
+    if (user && (def.tarifs || []).some(t => t.role === role && (t.type_tarif === 'mensuel' || t.type_tarif === 'annuel'))) {
+      def.tarif_calcule = await calculerTarifPremium(def, user);
+    }
     return def;
   }))).filter(Boolean);
   sendJSON(res, 200, { catalogue: result });
