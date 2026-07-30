@@ -6296,14 +6296,19 @@ route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
     WHERE c.post_id = ? AND (u.is_demo IS NULL OR u.is_demo = FALSE)
     ORDER BY c.created_at ASC
   `).all(params.id);
-  // Ajouter la certification pour les commentaires d'initiatives
+  // Ajouter la certification pour les commentaires d'initiatives, et afficher le nom de
+  // l'organisation plutôt que celui du responsable (même correctif que pour les publications).
   const enriched = await Promise.all(comms.map(async c => {
-    let certif = null;
+    let certif = null, auteur_nom = c.auteur_nom, photo_url = c.photo_url;
     if (c.role === "initiative" && c.auteur_id) {
-      const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(c.auteur_id);
-      if (init) certif = await getCertif(init.id);
+      const init = await db.prepare("SELECT id, nom, logo_url FROM initiatives WHERE owner_user_id=?").get(c.auteur_id);
+      if (init) {
+        certif = await getCertif(init.id);
+        auteur_nom = init.nom;
+        if (init.logo_url) photo_url = init.logo_url;
+      }
     }
-    return { ...c, certif };
+    return { ...c, auteur_nom, photo_url, certif };
   }));
   sendJSON(res, 200, { commentaires: enriched });
 });
@@ -6320,10 +6325,15 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
 
   const comm = await db.prepare(`
     SELECT c.id, c.contenu, c.created_at, c.auteur_id, c.auteur_nom,
-           u.photo_url, u.theme_couleur
+           u.photo_url, u.theme_couleur, u.role
     FROM fil_commentaires c LEFT JOIN users u ON u.id = c.auteur_id
     WHERE c.id = ?
   `).get(id);
+  // Nom de l'organisation plutôt que celui du responsable (même correctif que pour la lecture).
+  if (comm && comm.role === "initiative" && comm.auteur_id) {
+    const init = await db.prepare("SELECT nom, logo_url FROM initiatives WHERE owner_user_id=?").get(comm.auteur_id);
+    if (init) { comm.auteur_nom = init.nom; if (init.logo_url) comm.photo_url = init.logo_url; }
+  }
 
   // Notifier l'auteur du post
   const post = await db.prepare("SELECT auteur_id, contenu FROM fil_posts WHERE id=?").get(params.id);
@@ -12136,14 +12146,22 @@ async function enrichPost(p, cu) {
   const nb_commentaires = _nbComm ? _nbComm.n : 0;
   const user_a_aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
 
-  let auteur = {}, auteur_certif = null;
+  let auteur = {}, auteur_certif = null, auteur_nom = p.auteur_nom;
   if (p.auteur_id) {
     const u = await db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur,role FROM users WHERE id=?").get(p.auteur_id);
     if (u) {
       auteur = u;
       if (u.role === "initiative") {
-        const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(p.auteur_id);
-        if (init) auteur_certif = getCertif(init.id);
+        const init = await db.prepare("SELECT id, nom, logo_url FROM initiatives WHERE owner_user_id=?").get(p.auteur_id);
+        if (init) {
+          auteur_certif = getCertif(init.id);
+          /* Une publication d'un compte Initiative doit afficher le nom de l'ORGANISATION,
+             jamais celui du responsable qui l'a rédigée — auteur_nom stocké à l'écriture
+             valait déjà le nom du responsable (bug historique). On l'écrase ici, à la
+             lecture, plutôt que de migrer les publications déjà existantes. */
+          auteur_nom = init.nom;
+          if (init.logo_url) auteur.photo_url = init.logo_url;
+        }
       }
     }
   }
@@ -12162,20 +12180,26 @@ async function enrichPost(p, cu) {
   if ((p.type === "repost" || p.pub_type === "repost") && p.original_post_id) {
     const orig = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.original_post_id);
     if (orig) {
-      let orig_auteur = {};
+      let orig_auteur = {}, orig_auteur_nom = orig.auteur_nom;
       if (orig.auteur_id) {
-        const ou = await db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur FROM users WHERE id=?").get(orig.auteur_id);
-        if (ou) orig_auteur = ou;
+        const ou = await db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur,role FROM users WHERE id=?").get(orig.auteur_id);
+        if (ou) {
+          orig_auteur = ou;
+          if (ou.role === "initiative") {
+            const origInit = await db.prepare("SELECT nom, logo_url FROM initiatives WHERE owner_user_id=?").get(orig.auteur_id);
+            if (origInit) { orig_auteur_nom = origInit.nom; if (origInit.logo_url) orig_auteur.photo_url = origInit.logo_url; }
+          }
+        }
       }
       const orig_reactions = await db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
       const orig_counts = {}; orig_reactions.forEach(r => orig_counts[r.type] = r.n);
-      original_post = { ...orig, reactions: orig_counts, auteur_profil: orig_auteur };
+      original_post = { ...orig, auteur_nom: orig_auteur_nom, reactions: orig_counts, auteur_profil: orig_auteur };
     }
   }
   const auteur_accreditations = p.auteur_id
     ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(p.auteur_id)).map(a => a.type)
     : [];
-  return { ...p, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post };
+  return { ...p, auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post };
 }
 
 /* ---------- Fil intelligent ---------- */
