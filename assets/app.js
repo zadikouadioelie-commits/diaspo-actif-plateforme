@@ -1348,12 +1348,13 @@ async function initAnnuaire(){
       const wrap = document.getElementById(id);
       if (wrap) { const inp = wrap.querySelector("input"); if (inp) inp.value = ""; }
     });
+    syncQuickButtons();
     apply();
   };
 
   window.annRemoveFilter = function(key) {
     state[key] = "";
-    if (key === "typeOrg") { const el = document.getElementById("f-type-org"); if(el) el.value = ""; }
+    if (key === "typeOrg") { const el = document.getElementById("f-type-org"); if(el) el.value = ""; syncQuickButtons(); }
     if (key === "ville")   { const el = document.getElementById("f-ville-simple"); if(el) el.value = ""; }
     if (key === "nom")     { const el = document.getElementById("f-nom-simple"); if(el) el.value = ""; }
     if (key === "prenom")  { const el = document.getElementById("f-prenom-simple"); if(el) el.value = ""; }
@@ -1370,7 +1371,27 @@ async function initAnnuaire(){
 
   /* ── Type d'organisme ── */
   const typeEl = document.getElementById("f-type-org");
-  if (typeEl) typeEl.addEventListener("change", () => { state.typeOrg = typeEl.value; apply(); });
+  const btnQuickInit = document.getElementById("btn-quick-initiatives");
+  const btnQuickColl = document.getElementById("btn-quick-collectivites");
+  /* Reflète l'état courant sur les deux raccourcis, quel que soit le chemin qui a changé
+     state.typeOrg (menu déroulant, raccourci lui-même, réinitialisation, retrait de chip). */
+  function syncQuickButtons() {
+    if (btnQuickInit) btnQuickInit.classList.toggle("active", state.typeOrg === "Initiative");
+    if (btnQuickColl) btnQuickColl.classList.toggle("active", state.typeOrg === "Collectivité");
+  }
+  if (typeEl) typeEl.addEventListener("change", () => { state.typeOrg = typeEl.value; syncQuickButtons(); apply(); });
+  if (btnQuickInit) btnQuickInit.addEventListener("click", () => {
+    state.typeOrg = state.typeOrg === "Initiative" ? "" : "Initiative";
+    if (typeEl) typeEl.value = state.typeOrg;
+    syncQuickButtons();
+    apply();
+  });
+  if (btnQuickColl) btnQuickColl.addEventListener("click", () => {
+    state.typeOrg = state.typeOrg === "Collectivité" ? "" : "Collectivité";
+    if (typeEl) typeEl.value = state.typeOrg;
+    syncQuickButtons();
+    apply();
+  });
 
   /* ── Recherche par mot-clé (texte libre, debounce + suggestions) ── */
   let _motCleTimer, _suggTimer;

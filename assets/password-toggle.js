@@ -22,7 +22,7 @@
     btn.addEventListener('click', function () {
       const show = input.type === 'password';
       input.type = show ? 'text' : 'password';
-      btn.textContent = show ? '🙈' : '👁';
+      btn.textContent = '👁';
       btn.setAttribute('aria-label', show ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
       btn.style.opacity = show ? '1' : '.6';
       input.focus();

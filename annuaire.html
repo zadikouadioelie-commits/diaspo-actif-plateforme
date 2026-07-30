@@ -98,6 +98,18 @@
 }
 .ann-search-btn:hover{background:#0D47A1;}
 
+/* Raccourcis rapides : basculer d'un clic sur Initiatives / Collectivités */
+.ann-quick-row{background:#fff;border-bottom:1px solid var(--border);padding:14px 0;}
+.ann-quick-row-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:10px;flex-wrap:wrap;}
+.ann-quick-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 20px;border-radius:10px;border:1.5px solid var(--border);
+  background:#fff;color:var(--navy);font-weight:700;font-size:13.5px;cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.ann-quick-btn:hover{border-color:#2563EB;color:#2563EB;}
+.ann-quick-btn.active{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border-color:#2563EB;}
+
 /* Section heading */
 .ann-section-head{max-width:1180px;margin:0 auto;padding:32px 24px 18px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
 .ann-section-head h2{font-size:22px;font-weight:800;margin:0;position:relative;padding-bottom:10px;}
@@ -289,6 +301,14 @@
         <div class="ann-stat-icon">🌍</div>
         <span>Un impact durable</span>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== RACCOURCIS RAPIDES ===== -->
+  <div class="ann-quick-row">
+    <div class="ann-quick-row-inner">
+      <button type="button" class="ann-quick-btn" id="btn-quick-initiatives">🌱 Initiatives</button>
+      <button type="button" class="ann-quick-btn" id="btn-quick-collectivites">🏛 Collectivités</button>
     </div>
   </div>
 

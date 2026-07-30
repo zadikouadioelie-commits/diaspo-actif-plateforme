@@ -297,7 +297,7 @@
     const btn = document.getElementById('ds-pwd-toggle');
     const enClair = input.type === 'password';
     input.type = enClair ? 'text' : 'password';
-    btn.textContent = enClair ? '🙈' : '👁';
+    btn.textContent = '👁';
     const libelle = enClair ? 'Masquer le mot de passe' : 'Afficher le mot de passe';
     btn.title = libelle;
     btn.setAttribute('aria-label', libelle);
