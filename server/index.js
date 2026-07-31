@@ -4171,7 +4171,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
    repli, la cartouche retombait sur la nationalité et affichait « France » pour une
    initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
-"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
   if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
   /* "Initiative" est un filtre générique (toutes les initiatives, quel que soit leur
@@ -4334,7 +4334,7 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
    repli, la cartouche retombait sur la nationalité et affichait « France » pour une
    initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
-"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY i.created_at DESC").all();
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
   const q = (query.q || "").toLowerCase();
   if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q));
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
