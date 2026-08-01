@@ -3620,29 +3620,14 @@ async function initFormations() {
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{
-  applyAuthState();
-  initLangSelector();
-  initAnnuaire();
-  initVitrines();
-  initFicheInitiative();
-  initMessagerie();
-  initDashboardUtilisateur();
-  initActualites();
-  initEvenements();
-  initFilActualite();
-  initCampagnes();
-  initProjetsDiaspoActif();
-  initConfidentialite();
-  initObservatoire();
-  initApercuCiblage();
-  initProfilUtilisateur();
-  initFormations();
-  renderAllAdSlots();
-  applyTranslations();
-
   // ── Sidebar repliable (tous formats) : bouton rond fixe + préférence mémorisée ──
+  // Placé EN PREMIER et isolé : c'est le seul moyen de naviguer sur certaines pages
+  // (ex. dashboard-administrateur.html, sans barre du bas). Une exception non interceptée
+  // dans n'importe lequel des init* ci-dessous ne doit jamais pouvoir désactiver ce bouton.
   (function initSidebarMobile() {
-    const toggle      = document.getElementById("sidebar-toggle");
+    const toggle   = document.getElementById("sidebar-toggle");
+    const sidebar  = document.getElementById("sidebar");
+    if (!toggle || !sidebar) return;
     const navToggle    = document.getElementById("mobile-nav-menu-toggle");
     const navToggleIcon = navToggle ? navToggle.querySelector(".nav-icon") : null;
     // Une page qui a son propre bouton menu dans la barre du bas (mobile) n'a pas besoin
@@ -3650,8 +3635,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     if (navToggle) toggle.classList.add("sidebar-toggle--has-mobile-nav-alt");
     const close    = document.getElementById("sidebar-close");
     const backdrop = document.getElementById("sidebar-backdrop");
-    const sidebar  = document.getElementById("sidebar");
-    if (!toggle || !sidebar) return;
     const LS_KEY = "da_sidebar_collapsed";
 
     function openSidebar(persist) {
@@ -3697,6 +3680,26 @@ document.addEventListener("DOMContentLoaded", ()=>{
     // explicitement laissé la sidebar ouverte lors de sa dernière visite.
     if (localStorage.getItem(LS_KEY) === "0") openSidebar(false);
   })();
+
+  applyAuthState();
+  initLangSelector();
+  initAnnuaire();
+  initVitrines();
+  initFicheInitiative();
+  initMessagerie();
+  initDashboardUtilisateur();
+  initActualites();
+  initEvenements();
+  initFilActualite();
+  initCampagnes();
+  initProjetsDiaspoActif();
+  initConfidentialite();
+  initObservatoire();
+  initApercuCiblage();
+  initProfilUtilisateur();
+  initFormations();
+  renderAllAdSlots();
+  applyTranslations();
 
   // ── Barre de recherche des modules (sidebar) : suggestions floues au fil de la frappe
   (function initSidebarSearch() {
