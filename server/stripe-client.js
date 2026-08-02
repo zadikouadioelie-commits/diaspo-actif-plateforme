@@ -1,6 +1,6 @@
 /* ── Client Stripe Diaspo'Actif — Paiements marketplace (Connect) + Vérification d'identité (Identity) ──
-   Mode TEST uniquement tant que le code n'a pas été validé (voir project_diaspoactif memory : échéance
-   paiement réel 2026-09-02 max). Ne jamais utiliser STRIPE_SECRET_KEY en mode live sans validation explicite. */
+   Mode LIVE validé explicitement par l'utilisateur le 2026-08-02 (paiements et vérifications d'identité
+   réels, assumés). Ne pas revenir en TEST sans nouvelle confirmation explicite de l'utilisateur. */
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const IS_LIVE_KEY = STRIPE_SECRET_KEY ? STRIPE_SECRET_KEY.startsWith("sk_live_") : false;
 
@@ -8,11 +8,7 @@ let stripe = null;
 if (STRIPE_SECRET_KEY) {
   const Stripe = require("stripe");
   stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
-  if (IS_LIVE_KEY) {
-    console.warn("[Stripe] ⚠️ Clé LIVE détectée — vérifie que c'est bien intentionnel avant tout déploiement.");
-  } else {
-    console.log("[Stripe] Client initialisé en mode TEST.");
-  }
+  console.log(`[Stripe] Client initialisé en mode ${IS_LIVE_KEY ? "LIVE" : "TEST"}.`);
 } else {
   console.log("[Stripe] STRIPE_SECRET_KEY absent — module Stripe désactivé.");
 }
