@@ -332,6 +332,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const residenceDeclaree = role === "collectivite" ? (pays_exercice || pays_concerne || pays) : pays;
   if (!origineDeclaree) return sendJSON(res, 400, { error: "Le pays d'origine est obligatoire." });
   if (!residenceDeclaree) return sendJSON(res, 400, { error: "Le pays de résidence est obligatoire." });
+  /* Téléphone + e-mail du responsable obligatoires pour une Initiative : c'est le canal de
+     secours pour un appel de vérification si les documents d'organisation ne suffisent pas. */
+  if (role === "initiative" && !(tel_responsable || telephone)) {
+    return sendJSON(res, 400, { error: "Le numéro de téléphone est obligatoire pour un compte Initiative." });
+  }
   if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
   if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
 
