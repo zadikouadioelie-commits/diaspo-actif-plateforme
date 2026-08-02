@@ -2369,12 +2369,17 @@ db.exec(`
   /* ── Historique des suppressions directes par un admin (bouton "Suppr." de Gestion des membres),
      distinct du workflow RGPD "Demandes de suppression" (deletion_requests) initié par l'utilisateur ── */
   CREATE TABLE IF NOT EXISTS admin_suppressions_membres (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL,
-    role       TEXT,
-    admin_id   INTEGER,
-    admin_nom  TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id              INTEGER NOT NULL,
+    role                 TEXT,
+    nom                  TEXT,
+    prenom               TEXT,
+    email                TEXT,
+    date_creation_compte TEXT,
+    motif                TEXT,
+    admin_id             INTEGER,
+    admin_nom            TEXT,
+    created_at           TEXT DEFAULT (datetime('now'))
   );
 
   /* ── Demandes de suppression définitive de compte (RGPD, workflow admin) ── */
@@ -3967,6 +3972,14 @@ try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); }
 
 /* Extension user_accreditations : suivi de l'abonnement Stripe (accréditations payantes récurrentes) */
 try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_subscription_id TEXT"); } catch(_) {}
+
+/* Extension admin_suppressions_membres : informations du compte au moment de la suppression
+   (nom/prénom/email/date de création figés avant l'anonymisation, + motif de l'admin). */
+try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN nom TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN prenom TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN email TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN date_creation_compte TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN motif TEXT"); } catch(_) {}
 try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_customer_id TEXT"); } catch(_) {}
 
 /* Paiements d'accréditations payantes (Stripe Checkout) */

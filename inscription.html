@@ -133,7 +133,15 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
     <div class="card" style="padding:28px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
         <button class="btn" id="back-utilisateur" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
-        <div><strong>Compte Utilisateur</strong><br><span style="font-size:12px;color:var(--muted)">Personne physique</span></div>
+        <div style="flex:1;"><strong>Compte Utilisateur</strong><br><span style="font-size:12px;color:var(--muted)">Personne physique</span></div>
+        <button type="button" class="btn-brouillon" data-brouillon-save="u" style="border:1.5px solid #94A3B8;color:#475569;background:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 Mettre en brouillon</button>
+      </div>
+      <div id="u-brouillon-banner" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <span id="u-brouillon-banner-txt"></span>
+        <span style="display:flex;gap:8px;">
+          <button type="button" data-brouillon-restore="u" style="border:1px solid #2563EB;color:#2563EB;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Restaurer</button>
+          <button type="button" data-brouillon-discard="u" style="border:1px solid #94A3B8;color:#64748B;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Ignorer</button>
+        </span>
       </div>
       <div class="form-section"><h4>Identite</h4>
         <div class="grid-2">
@@ -279,7 +287,15 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
     <div class="card" style="padding:28px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
         <button class="btn" id="back-initiative" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
-        <div><strong>Compte Initiative</strong><br><span style="font-size:12px;color:var(--muted)">Association, ONG, entreprise, startup…</span></div>
+        <div style="flex:1;"><strong>Compte Initiative</strong><br><span style="font-size:12px;color:var(--muted)">Association, ONG, entreprise, startup…</span></div>
+        <button type="button" class="btn-brouillon" data-brouillon-save="i" style="border:1.5px solid #94A3B8;color:#475569;background:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 Mettre en brouillon</button>
+      </div>
+      <div id="i-brouillon-banner" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <span id="i-brouillon-banner-txt"></span>
+        <span style="display:flex;gap:8px;">
+          <button type="button" data-brouillon-restore="i" style="border:1px solid #2563EB;color:#2563EB;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Restaurer</button>
+          <button type="button" data-brouillon-discard="i" style="border:1px solid #94A3B8;color:#64748B;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Ignorer</button>
+        </span>
       </div>
       <div class="form-section"><h4>Statut de l'initiative <span style="color:#2563EB">*</span></h4>
         <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">
@@ -421,6 +437,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Jeunes"> Jeunes</label>
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Femmes"> Femmes</label>
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Agriculteurs"> Agriculteurs</label>
+          <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" id="i-public-autre-toggle"> Autres</label>
+        </div>
+        <div id="i-public-autre-box" style="display:none;margin:-6px 0 14px;">
+          <input type="text" id="i-public-autre" placeholder="Précisez, séparés par une virgule — ex : Retraités, Artistes">
         </div>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🤝 Vous recherchez actuellement</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
@@ -432,7 +452,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="membres"> Membres</label>
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="fournisseurs"> Fournisseurs</label>
         </div>
-        <div style="max-width:220px;"><label>Année de création</label><input type="number" id="i-annee-creation" min="1900" max="2100" placeholder="2020"></div>
+        <div id="i-annee-creation-box" style="display:none;max-width:220px;"><label>Année de création</label><input type="number" id="i-annee-creation" min="1900" max="2100" placeholder="2020"></div>
       </div>
       <div class="form-section"><h4>Localisation</h4>
         <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">
@@ -492,7 +512,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           </div>
         </div>
         <div style="margin-top:14px;">
-          <label style="font-size:12.5px;">Pas envie de televerser une banniere ? Choisissez une couleur de vitrine a la place <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></label>
+          <label style="font-size:12.5px;">Vous pouvez choisir une couleur de bannière <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></label>
           <div id="i-theme-swatches" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;"></div>
         </div>
       </div>
@@ -537,7 +557,15 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
       <div class="card" style="padding:22px 26px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
           <button class="btn" id="back-collectivite" style="padding:5px 12px;font-size:13px;">← Retour</button>
-          <div><strong>🏛 Compte Étatique</strong> — Section 1/4<br><span style="font-size:12px;color:var(--muted);">Informations sur l'institution</span></div>
+          <div style="flex:1;"><strong>🏛 Compte Étatique</strong> — Section 1/4<br><span style="font-size:12px;color:var(--muted);">Informations sur l'institution</span></div>
+          <button type="button" class="btn-brouillon" data-brouillon-save="ce" style="border:1.5px solid #94A3B8;color:#475569;background:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">💾 Mettre en brouillon</button>
+        </div>
+        <div id="ce-brouillon-banner" style="display:none;margin-bottom:16px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:8px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <span id="ce-brouillon-banner-txt"></span>
+          <span style="display:flex;gap:8px;">
+            <button type="button" data-brouillon-restore="ce" style="border:1px solid #2563EB;color:#2563EB;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Restaurer</button>
+            <button type="button" data-brouillon-discard="ce" style="border:1px solid #94A3B8;color:#64748B;background:none;border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">Ignorer</button>
+          </span>
         </div>
         <div class="grid-2" style="gap:14px;">
           <div><label>Nom officiel <span style="color:#2563EB">*</span></label><input id="ce-nom" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ambassade de Côte d'Ivoire en France"></div>
@@ -776,6 +804,12 @@ wirePillGroup(".u-public");
 wirePillGroup(".u-besoin");
 wirePillGroup(".i-public");
 wirePillGroup(".i-besoin");
+wirePillGroup("#i-public-autre-toggle");
+document.getElementById("i-public-autre-toggle")?.addEventListener("change", function(){
+  const box = document.getElementById("i-public-autre-box");
+  box.style.display = this.checked ? "" : "none";
+  if (!this.checked) document.getElementById("i-public-autre").value = "";
+});
 
 /* ── Auto-remplissage Région (+ Département si le champ existe) depuis Pays + Ville ──
    Se déclenche à la sortie du champ Ville (pas à chaque frappe, pour ne pas multiplier les
@@ -943,6 +977,81 @@ async function uploadPhotosApresInscription(){
   ]);
 }
 
+/* ── Brouillon d'inscription (localStorage) — permet de reprendre le formulaire plus tard sans
+   tout ressaisir si l'utilisateur doit partir en urgence. Ne sauvegarde jamais les mots de passe
+   ni les fichiers (photo/bannière), pour des raisons de sécurité — ils devront être ressaisis. */
+const BROUILLON_PANES = { u: 'pane-utilisateur', i: 'pane-initiative', ce: 'pane-collectivite' };
+function brouillonKey(prefix){ return 'di_brouillon_' + prefix; }
+function brouillonFieldKey(el){
+  if (el.id) return '#' + el.id;
+  if (el.name) return 'name:' + el.name + ':' + el.value;
+  const cls = (el.className || '').split(' ')[0];
+  if (cls) return 'class:' + cls + ':' + el.value;
+  return null;
+}
+function collecterBrouillon(prefix){
+  const root = document.getElementById(BROUILLON_PANES[prefix]);
+  const state = {};
+  root.querySelectorAll('input,select,textarea').forEach(el=>{
+    if (el.type === 'password' || el.type === 'file') return;
+    const key = brouillonFieldKey(el);
+    if (!key) return;
+    state[key] = (el.type === 'checkbox' || el.type === 'radio') ? el.checked : el.value;
+  });
+  return state;
+}
+function appliquerBrouillon(prefix, state){
+  const root = document.getElementById(BROUILLON_PANES[prefix]);
+  root.querySelectorAll('input,select,textarea').forEach(el=>{
+    if (el.type === 'password' || el.type === 'file') return;
+    const key = brouillonFieldKey(el);
+    if (!key || !(key in state)) return;
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = state[key];
+    else el.value = state[key];
+    el.dispatchEvent(new Event('change', {bubbles:true}));
+  });
+}
+function sauvegarderBrouillon(prefix){
+  localStorage.setItem(brouillonKey(prefix), JSON.stringify({ state: collecterBrouillon(prefix), ts: Date.now() }));
+  const btn = document.querySelector('[data-brouillon-save="'+prefix+'"]');
+  if (btn){ const orig = btn.textContent; btn.textContent = "✓ Brouillon enregistré"; setTimeout(()=>btn.textContent = orig, 2000); }
+}
+function effacerBrouillon(prefix){
+  localStorage.removeItem(brouillonKey(prefix));
+  const banner = document.getElementById(prefix+'-brouillon-banner');
+  if (banner) banner.style.display = 'none';
+}
+function verifierBrouillon(prefix){
+  const raw = localStorage.getItem(brouillonKey(prefix));
+  if (!raw) return;
+  let data; try { data = JSON.parse(raw); } catch(_) { return; }
+  if (!data || !data.state) return;
+  const banner = document.getElementById(prefix+'-brouillon-banner');
+  const txt = document.getElementById(prefix+'-brouillon-banner-txt');
+  if (!banner || !txt) return;
+  const d = new Date(data.ts);
+  const dateStr = d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  txt.textContent = "📝 Un brouillon a été trouvé (enregistré le " + dateStr + ").";
+  banner.style.display = 'flex';
+}
+document.querySelectorAll('[data-brouillon-save]').forEach(btn=>{
+  btn.addEventListener('click', ()=>sauvegarderBrouillon(btn.dataset.brouillonSave));
+});
+document.querySelectorAll('[data-brouillon-restore]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const prefix = btn.dataset.brouillonRestore;
+    const raw = localStorage.getItem(brouillonKey(prefix));
+    if (!raw) return;
+    try { const data = JSON.parse(raw); appliquerBrouillon(prefix, data.state); } catch(_) {}
+    const banner = document.getElementById(prefix+'-brouillon-banner');
+    if (banner) banner.style.display = 'none';
+  });
+});
+document.querySelectorAll('[data-brouillon-discard]').forEach(btn=>{
+  btn.addEventListener('click', ()=>effacerBrouillon(btn.dataset.brouillonDiscard));
+});
+Object.keys(BROUILLON_PANES).forEach(verifierBrouillon);
+
 async function submitForm(btnId,errId,body){
   const btn=document.getElementById(btnId),errBox=document.getElementById(errId);
   errBox.style.display="none";const orig=btn.textContent;
@@ -952,6 +1061,7 @@ async function submitForm(btnId,errId,body){
   try{
     const r=await api("POST","/auth/signup",body);
     await uploadPhotosApresInscription();
+    Object.keys(BROUILLON_PANES).forEach(effacerBrouillon);
     const role=r.user.role;
     const icons={utilisateur:"🎉",initiative:"📋",collectivite:"🏛️"};
     const titles={utilisateur:"Compte cree avec succes !",initiative:"Demande envoyee !",collectivite:"Demande officielle soumise !"};
@@ -1074,7 +1184,8 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       tel_responsable_3:document.getElementById("i-tel3").value.trim()||null,
       site_web:document.getElementById("i-site").value.trim()||null,
       reseaux_sociaux:rs?{lien:rs}:{},
-      publics:[...document.querySelectorAll('.i-public:checked')].map(c=>c.value),
+      publics:[...document.querySelectorAll('.i-public:checked')].map(c=>c.value)
+        .concat(document.getElementById("i-public-autre").value.split(",").map(s=>s.trim()).filter(Boolean)),
       besoins:[...document.querySelectorAll('.i-besoin:checked')].map(c=>c.value),
       annee_creation:document.getElementById("i-annee-creation").value||null,
       nombre_membres:document.getElementById("i-nb-membres").value||null,
@@ -1106,6 +1217,7 @@ document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
     document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
     document.getElementById("i-encreation-box").style.display = enCreation ? "" : "none";
     document.getElementById("i-admin-box").style.display = enCreation ? "none" : "";
+    document.getElementById("i-annee-creation-box").style.display = enCreation ? "none" : "";
   });
 });
 /* ===== Type d'organisation → taille (nombre de membres ou de salaries) ===== */

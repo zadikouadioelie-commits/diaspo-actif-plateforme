@@ -12092,19 +12092,24 @@ route("GET", "/api/admin/membres/historique-suppressions", async (req, res) => {
   sendJSON(res, 200, { historique: rows });
 });
 
-route("DELETE", "/api/admin/membres/:id", async (req, res, params) => {
+route("DELETE", "/api/admin/membres/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de supprimer votre propre compte." });
-  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(params.id);
+  const cible = await db.prepare("SELECT id, role, nom, prenom, email, created_at FROM users WHERE id=?").get(params.id);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  /* Capture des informations AVANT anonymisation — executerSuppressionCompte() efface nom/prenom/email,
+     donc c'est le seul moment où l'historique peut encore les enregistrer. */
+  const motif = (body?.motif || "").trim() || null;
   /* Anonymisation, pas suppression physique : la table users est référencée par 122 clés
      étrangères (moitié seulement en ON DELETE CASCADE) — un vrai DELETE FROM users échoue
      ou casse l'intégrité dès qu'un compte a la moindre activité. Même logique que
      l'auto-suppression RGPD (DELETE /api/auth/account), voir executerSuppressionCompte(). */
   await executerSuppressionCompte(params.id, null);
-  await db.prepare("INSERT INTO admin_suppressions_membres (user_id, role, admin_id, admin_nom) VALUES (?,?,?,?)")
-    .run(Number(params.id), cible.role, user.id, user.nom);
+  await db.prepare(`
+    INSERT INTO admin_suppressions_membres (user_id, role, nom, prenom, email, date_creation_compte, motif, admin_id, admin_nom)
+    VALUES (?,?,?,?,?,?,?,?,?)
+  `).run(Number(params.id), cible.role, cible.nom, cible.prenom, cible.email, cible.created_at, motif, user.id, user.nom);
   SEC.logSecurity("admin_membre_supprime", { admin_id: user.id, cible_id: Number(params.id) });
   sendJSON(res, 200, { ok: true });
 });

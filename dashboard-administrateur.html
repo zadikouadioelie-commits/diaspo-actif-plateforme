@@ -9308,7 +9308,8 @@ async function submitAccordDirect(){
 
   async function adminSupprimerMembre(id, nom) {
     if (!confirm(`Supprimer définitivement le compte de "${nom}" ?`)) return;
-    await api('DELETE', `/admin/membres/${id}`).catch(e => alert(e.message));
+    const motif = prompt(`Motif de la suppression de "${nom}" (facultatif) :`) || '';
+    await api('DELETE', `/admin/membres/${id}`, { motif }).catch(e => alert(e.message));
     loadAdminMembres();
   }
   window.adminValiderMembre = adminValiderMembre;
@@ -9346,16 +9347,26 @@ async function submitAccordDirect(){
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead><tr style="border-bottom:2px solid var(--border);">
               <th style="padding:8px;text-align:left;">Compte (id)</th>
+              <th style="padding:8px;text-align:left;">Nom</th>
+              <th style="padding:8px;text-align:left;">Prénom</th>
+              <th style="padding:8px;text-align:left;">E-mail</th>
               <th style="padding:8px;text-align:left;">Rôle</th>
+              <th style="padding:8px;text-align:left;">Créé le</th>
               <th style="padding:8px;text-align:left;">Supprimé par</th>
-              <th style="padding:8px;text-align:left;">Date</th>
+              <th style="padding:8px;text-align:left;">Date suppression</th>
+              <th style="padding:8px;text-align:left;">Motif</th>
             </tr></thead>
             <tbody>${historique.map(h => `
               <tr style="border-bottom:1px solid var(--border);">
                 <td style="padding:8px;font-weight:600;">#${h.user_id}</td>
+                <td style="padding:8px;">${esc(h.nom||'—')}</td>
+                <td style="padding:8px;">${esc(h.prenom||'—')}</td>
+                <td style="padding:8px;">${esc(h.email||'—')}</td>
                 <td style="padding:8px;">${esc(h.role||'—')}</td>
+                <td style="padding:8px;color:var(--muted);">${fmtDate(h.date_creation_compte)}</td>
                 <td style="padding:8px;">${esc(h.admin_nom||'—')}</td>
                 <td style="padding:8px;color:var(--muted);">${fmtDate(h.created_at)}</td>
+                <td style="padding:8px;color:var(--muted);">${esc(h.motif||'—')}</td>
               </tr>`).join('')}
             </tbody>
           </table>
