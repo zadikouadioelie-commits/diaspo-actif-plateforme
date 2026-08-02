@@ -581,18 +581,60 @@ function showOrigineBanner(user) {
   if (Date.now() - dismissedAt < 24 * 3600000) return;
   if (document.getElementById("origine-banner")) return;
 
+  /* Remplissable directement dans la bannière — plus besoin de changer de page. Le nombre
+     de champs dépend du type de compte : Utilisateur et Initiative déclarent jusqu'à DEUX
+     pays d'origine (origine1/origine2), une Collectivité/Institution/Officiel n'en déclare
+     qu'UN SEUL (pays_origine_institution) — on ne fait jamais semblant d'avoir un 2e champ
+     qui n'existe pas dans son modèle de données. */
+  const estInstitution = ['collectivite', 'institutionnel', 'officiel'].includes(user.role);
+  const champsHtml = estInstitution
+    ? `<input type="text" id="origine-o1" placeholder="Pays d'origine" style="padding:5px 10px;border-radius:6px;border:1px solid #93C5FD;font-size:12.5px;min-width:160px;">`
+    : `<input type="text" id="origine-o1" placeholder="Pays d'origine 1" style="padding:5px 10px;border-radius:6px;border:1px solid #93C5FD;font-size:12.5px;min-width:150px;">
+       <input type="text" id="origine-o2" placeholder="Pays d'origine 2 (optionnel)" style="padding:5px 10px;border-radius:6px;border:1px solid #93C5FD;font-size:12.5px;min-width:150px;">`;
+
   const bar = document.createElement("div");
   bar.id = "origine-banner";
-  bar.style.cssText = "position:sticky;top:0;z-index:900;background:#EFF6FF;color:#1E3A8A;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid #BFDBFE;";
+  bar.style.cssText = "position:sticky;top:0;z-index:900;background:#EFF6FF;color:#1E3A8A;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #BFDBFE;";
   bar.innerHTML = `
-    <span>🌍 Votre origine n'est pas renseignée — elle permet aux membres de votre diaspora de vous identifier et facilite les mises en relation.</span>
-    <a href="${user.origine_lien}" id="origine-fill-btn" style="background:#F26422;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;">Renseigner l'origine</a>
-    <button id="origine-dismiss-btn" type="button" style="background:none;border:1.5px solid #1E3A8A;color:#1E3A8A;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;">Ignorer pour le moment</button>`;
+    <span>🌍 Votre origine n'est pas renseignée :</span>
+    ${champsHtml}
+    <button id="origine-save-btn" type="button" style="background:#F26422;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;">Enregistrer</button>
+    <button id="origine-dismiss-btn" type="button" style="background:none;border:1.5px solid #1E3A8A;color:#1E3A8A;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;">Ignorer pour le moment</button>
+    <span id="origine-banner-err" style="display:none;color:#DC2626;font-weight:700;width:100%;text-align:center;font-size:12px;"></span>`;
   document.body.prepend(bar);
 
   document.getElementById("origine-dismiss-btn").onclick = () => {
     localStorage.setItem(dismissKey, String(Date.now()));
     bar.remove();
+  };
+
+  document.getElementById("origine-save-btn").onclick = async () => {
+    const errEl = document.getElementById("origine-banner-err");
+    errEl.style.display = "none";
+    const o1 = document.getElementById("origine-o1").value.trim();
+    if (!o1) { errEl.textContent = "Le pays d'origine est requis."; errEl.style.display = "block"; return; }
+    const btn = document.getElementById("origine-save-btn");
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      if (user.role === "utilisateur") {
+        const o2 = document.getElementById("origine-o2").value.trim();
+        await api("PUT", "/profil/informations-declarees", { origine1: o1, origine2: o2 });
+      } else if (estInstitution) {
+        await api("PUT", "/profil/origine-institution", { pays_origine_institution: o1 });
+      } else if (user.role === "initiative") {
+        if (!user.origine_initiative_id) throw new Error("Initiative introuvable.");
+        const o2 = document.getElementById("origine-o2").value.trim();
+        await api("PUT", `/initiatives/${user.origine_initiative_id}/profil-public`, { origine1: o1, origine2: o2 });
+      } else {
+        throw new Error("Type de compte non pris en charge.");
+      }
+      bar.remove();
+      if (window.recheckOrigineBanner) window.recheckOrigineBanner();
+    } catch (e) {
+      errEl.textContent = e.message || "Erreur lors de l'enregistrement.";
+      errEl.style.display = "block";
+      btn.disabled = false; btn.textContent = "Enregistrer";
+    }
   };
 }
 

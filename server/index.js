@@ -1065,6 +1065,14 @@ route("PUT", "/api/profil/origine-institution", async (req, res, params, body) =
   const pays = String(body.pays_origine_institution || '').trim();
   if (!pays) return sendJSON(res, 400, { error: "Le pays d'origine est obligatoire." });
 
+  /* Champs omis du corps de la requête = préservés tels quels (pas écrasés à NULL) : un
+     appel partiel (ex. bandeau "Complétez votre origine", qui n'envoie que le pays) ne doit
+     jamais effacer le ministère de tutelle ou l'administration de rattachement déjà
+     renseignés ailleurs par le formulaire complet de confidentialite.html. */
+  const current = await db.prepare(
+    "SELECT ministere_tutelle, administration_rattachement, region_origine FROM users WHERE id=?"
+  ).get(cu.id);
+
   await db.prepare(`
     UPDATE users SET
       pays_origine_institution=?,
@@ -1074,9 +1082,9 @@ route("PUT", "/api/profil/origine-institution", async (req, res, params, body) =
     WHERE id=?
   `).run(
     pays,
-    String(body.ministere_tutelle || '').trim() || null,
-    String(body.administration_rattachement || '').trim() || null,
-    String(body.region_origine || '').trim() || null,
+    body.ministere_tutelle !== undefined ? (String(body.ministere_tutelle).trim() || null) : current?.ministere_tutelle ?? null,
+    body.administration_rattachement !== undefined ? (String(body.administration_rattachement).trim() || null) : current?.administration_rattachement ?? null,
+    body.region_origine !== undefined ? (String(body.region_origine).trim() || null) : current?.region_origine ?? null,
     cu.id
   );
   sendJSON(res, 200, { ok: true });
@@ -1113,6 +1121,7 @@ route("GET", "/api/auth/me", async (req, res) => {
         ).get(user.id);
         pub.origine_manquante = !!ini && !(ini.origine1 || ini.origine2 || ini.pays_origine);
         pub.origine_lien = ini ? `initiative.html?id=${ini.slug || ini.id}&completer=origine` : null;
+        pub.origine_initiative_id = ini ? ini.id : null;
       } else {
         pub.origine_manquante = false;
       }
