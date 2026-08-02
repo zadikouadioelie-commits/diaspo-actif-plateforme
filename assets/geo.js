@@ -46,6 +46,17 @@
     return d.cities || [];
   };
 
+  /* Auto-remplissage Région/Département depuis Pays+Ville (formulaires d'inscription).
+     Renvoie { region, departement } — l'un ou l'autre peut être null si la source ne
+     couvre pas ce niveau pour ce pays/cette ville ; ne jamais écraser à l'aveugle. */
+  window.geoLookupAdmin = async function (pays, ville) {
+    if (!pays || !ville) return { region: null, departement: null };
+    const lang = _lang();
+    const path = '/geo/admin-lookup?lang=' + lang + '&pays=' + encodeURIComponent(pays) + '&ville=' + encodeURIComponent(ville);
+    const d = await geoFetch(path);
+    return { region: d.region || null, departement: d.departement || null };
+  };
+
   /*
    * GeoAutocomplete — composant réutilisable
    *

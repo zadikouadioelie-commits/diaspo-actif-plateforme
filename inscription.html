@@ -711,6 +711,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 </div>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
+<script src="assets/geo.js"></script>
 <script src="assets/app.js"></script>
 <script>
 const PAGE_LOAD_TS = Date.now(); // sert au calcul du délai anti-bot côté serveur
@@ -775,6 +776,28 @@ wirePillGroup(".u-public");
 wirePillGroup(".u-besoin");
 wirePillGroup(".i-public");
 wirePillGroup(".i-besoin");
+
+/* ── Auto-remplissage Région (+ Département si le champ existe) depuis Pays + Ville ──
+   Se déclenche à la sortie du champ Ville (pas à chaque frappe, pour ne pas multiplier les
+   appels). Remplit uniquement ce que la source connaît pour ce pays précis — un champ reste
+   vide si la donnée n'existe pas — et reste modifiable ensuite normalement par l'utilisateur. */
+function wireVilleAutoRegion(paysId, villeId, regionId, deptId){
+  const villeEl = document.getElementById(villeId);
+  if (!villeEl) return;
+  villeEl.addEventListener('blur', async () => {
+    const pays = document.getElementById(paysId)?.value.trim();
+    const ville = villeEl.value.trim();
+    if (!pays || !ville || typeof window.geoLookupAdmin !== 'function') return;
+    try {
+      const { region, departement } = await window.geoLookupAdmin(pays, ville);
+      if (region) { const el = document.getElementById(regionId); if (el) el.value = region; }
+      if (departement && deptId) { const el = document.getElementById(deptId); if (el) el.value = departement; }
+    } catch(_) {}
+  });
+}
+wireVilleAutoRegion('u-pays', 'u-ville', 'u-region', 'u-dept');
+wireVilleAutoRegion('i-pays', 'i-ville', 'i-region', null);
+wireVilleAutoRegion('ce-pays-exercice', 'ce-ville', 'ce-region-exercice', 'ce-dept-exercice');
 
 /* Bouton "Tout sélectionner" du Public concerné — bascule en "Tout désélectionner"
    une fois toutes les pastilles cochées, et inversement. */

@@ -15488,6 +15488,50 @@ route("GET", "/api/geo/cities", async (req, res, params, body, query) => {
   }
 });
 
+/* ── Auto-remplissage Région/Département depuis Pays+Ville (GeoNames) ──
+   Source distincte de CountriesNow ci-dessus : CountriesNow ne connaît que 2 niveaux
+   (pays→état→ville), pas le niveau département/comté. GeoNames couvre les deux niveaux
+   pour le monde entier, d'où le recours à un second fournisseur juste pour cet usage. */
+let _geonamesCountryMap = null; // { "cote d ivoire": "CI", ... } — normalisé, tous pays, en français
+async function _geonamesResolveCountryCode(nomPays) {
+  if (!nomPays) return null;
+  if (!_geonamesCountryMap) {
+    try {
+      const r = await fetch(`http://api.geonames.org/countryInfoJSON?lang=fr&username=${encodeURIComponent(process.env.GEONAMES_USERNAME || "")}`);
+      const d = await r.json();
+      const map = {};
+      for (const c of (d.geonames || [])) {
+        if (c.countryName && c.countryCode) map[normaliserTexte(c.countryName)] = c.countryCode;
+      }
+      _geonamesCountryMap = map;
+    } catch (e) { return null; }
+  }
+  return _geonamesCountryMap[normaliserTexte(nomPays)] || null;
+}
+const _geonamesAdminCache = {};
+route("GET", "/api/geo/admin-lookup", async (req, res, params, body, query) => {
+  const pays = (query.pays || "").trim();
+  const ville = (query.ville || "").trim();
+  const lang = (query.lang || "fr").slice(0, 5).toLowerCase();
+  if (!pays || !ville) return sendJSON(res, 400, { error: "Paramètres pays et ville requis." });
+  if (!process.env.GEONAMES_USERNAME) return sendJSON(res, 200, { region: null, departement: null });
+  const cacheKey = normaliserTexte(pays) + "|" + normaliserTexte(ville) + "|" + lang;
+  if (_geonamesAdminCache[cacheKey]) return sendJSON(res, 200, _geonamesAdminCache[cacheKey]);
+  try {
+    const countryCode = await _geonamesResolveCountryCode(pays);
+    if (!countryCode) return sendJSON(res, 200, { region: null, departement: null });
+    const url = `http://api.geonames.org/searchJSON?q=${encodeURIComponent(ville)}&country=${countryCode}&featureClass=P&maxRows=1&style=FULL&lang=${lang}&username=${encodeURIComponent(process.env.GEONAMES_USERNAME)}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const g = (d.geonames || [])[0];
+    const result = { region: g?.adminName1 || null, departement: g?.adminName2 || null };
+    _geonamesAdminCache[cacheKey] = result;
+    sendJSON(res, 200, result);
+  } catch (e) {
+    sendJSON(res, 200, { region: null, departement: null });
+  }
+});
+
 /* ══════════════════════════════════════════════════════════════
    CHATBOT — Mémoire admin + contenu site diaspo-actif.com
    ══════════════════════════════════════════════════════════════ */
