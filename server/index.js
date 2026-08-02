@@ -295,6 +295,9 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     type_org, description, domaine, objectifs,
     nombre_membres, nombre_salaries,
     origine1, origine2,
+    // initiative — statut de création et informations administratives
+    statut_creation, denomination_officielle, numero_immatriculation,
+    forme_juridique, date_creation_structure, numero_fiscal,
     nom_responsable, prenom_responsable, fonction_responsable, email_responsable, tel_responsable,
     site_web, reseaux_sociaux, pays_intervention,
     // collectivite (legacy)
@@ -336,6 +339,15 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
      secours pour un appel de vérification si les documents d'organisation ne suffisent pas. */
   if (role === "initiative" && !(tel_responsable || telephone)) {
     return sendJSON(res, 400, { error: "Le numéro de téléphone est obligatoire pour un compte Initiative." });
+  }
+  /* Statut de l'initiative — "en_creation" : le porteur de projet peut créer son compte
+     immédiatement, les informations administratives restent facultatives. "existante" :
+     la structure est déjà officiellement créée, ces informations deviennent obligatoires
+     (revalidé ici, pas seulement côté formulaire — voir la règle équivalente plus haut). */
+  if (role === "initiative" && statut_creation === "existante") {
+    if (!denomination_officielle || !numero_immatriculation || !forme_juridique || !date_creation_structure) {
+      return sendJSON(res, 400, { error: "Pour une initiative déjà créée, la dénomination officielle, le numéro d'immatriculation, la forme juridique et la date de création sont obligatoires." });
+    }
   }
   if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
   if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit comporter au moins 8 caractères." });
@@ -406,8 +418,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
         pays, region, ville, adresse, code_postal, site_web, reseaux_sociaux,
         nationalite1, nationalite2, origine1, origine2,
         pays_intervention, nom_responsable, prenom_responsable, fonction_responsable,
-        email_responsable, tel_responsable, owner_user_id, abonnement_actif)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        email_responsable, tel_responsable, owner_user_id, abonnement_actif,
+        statut_creation, denomination_officielle, numero_immatriculation,
+        forme_juridique, date_creation_structure, numero_fiscal)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
     `).run(
       slug, nom_institution || nom, type_org || null, description || null, domaine || null, objectifs || null,
       pays || null, region || null, ville || null, adresse || null, code_postal || null,
@@ -418,7 +432,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       nom_responsable || nom || null, prenom_responsable || prenom || null,
       fonction_responsable || null, email_responsable || email,
       tel_responsable || telephone || null,
-      id
+      id,
+      statut_creation === "en_creation" ? "en_creation" : "existante",
+      denomination_officielle || null, numero_immatriculation || null,
+      forme_juridique || null, date_creation_structure || null, numero_fiscal || null
     );
     // Assigner DA-ID à l'initiative aussi
     const initRow = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=? ORDER BY id DESC LIMIT 1').get(id);
@@ -5337,7 +5354,8 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     adresse, code_postal, numero_immatriculation,
     comment_entendu, attentes, autorisation_temoignage,
     nb_salaries, linkedin, twitter, youtube, forme_autre,
-    site_web, membres } = body;
+    site_web, membres,
+    statut_creation, denomination_officielle, forme_juridique, date_creation_structure, numero_fiscal } = body;
   if (!nom) return sendJSON(res, 400, { error: "Le nom de l'initiative est requis." });
   const slug = nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now();
   const id = (await db.prepare(`
@@ -5349,8 +5367,9 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
       adresse, code_postal, numero_immatriculation,
       comment_entendu, attentes, autorisation_temoignage,
       nb_salaries, site_web, linkedin, twitter, youtube, forme_autre,
-      owner_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      owner_user_id, statut_creation, denomination_officielle, forme_juridique,
+      date_creation_structure, numero_fiscal)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(slug, nom, sigle || null, pays || null, pays_origine || null,
     region || null, ville || null, commune || null, departement || null, zone || null,
     nationalite1 || null, nationalite2 || null,
@@ -5363,7 +5382,9 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     comment_entendu || null, attentes || null, autorisation_temoignage ? 1 : 0,
     nb_salaries != null ? parseInt(nb_salaries) || 0 : 0,
     site_web || null, linkedin || null, twitter || null, youtube || null, forme_autre || null,
-    user.id)).lastInsertRowid;
+    user.id, statut_creation === "en_creation" ? "en_creation" : "existante",
+    denomination_officielle || null, forme_juridique || null,
+    date_creation_structure || null, numero_fiscal || null)).lastInsertRowid;
   /* Inviter les membres optionnels (envoi de demandes d'affiliation) */
   if (Array.isArray(membres) && membres.length > 0) {
     const notifStmt = db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)`);
@@ -9452,6 +9473,8 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
   const messagesNonLusRow = await db.prepare(`SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.sender_id!=? AND m.lu=0 AND (c.user1_id=? OR c.user2_id=?)`).get(user.id, user.id, user.id);
   const messagesNonLus = messagesNonLusRow.n;
   const publications = await db.prepare("SELECT * FROM fil_posts WHERE auteur_id = ? ORDER BY created_at DESC LIMIT 5").all(user.id);
+  /* Pour la carte "État de votre initiative" (checklist de progression du Cockpit). */
+  const aBusinessPlan = !!(await db.prepare("SELECT id FROM business_plans WHERE user_id=? LIMIT 1").get(user.id));
 
   sendJSON(res, 200, {
     initiative: initiative ? {
@@ -9460,6 +9483,7 @@ route("GET", "/api/dashboard/initiative", async (req, res) => {
       nationalite_unique: !!initiative.nationalite_unique,
       abonnement_actif: !!initiative.abonnement_actif,
       vitrine_modules_state: getVitrineModulesState(initiative),
+      a_business_plan: aBusinessPlan,
     } : null,
     messages_non_lus: messagesNonLus,
     publications_recentes: publications

@@ -263,6 +263,33 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         <button class="btn" id="back-initiative" style="padding:6px 12px;font-size:13px">&larr; Retour</button>
         <div><strong>Compte Initiative</strong><br><span style="font-size:12px;color:var(--muted)">Association, ONG, entreprise, startup…</span></div>
       </div>
+      <div class="form-section"><h4>Statut de l'initiative <span style="color:#2563EB">*</span></h4>
+        <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">
+          &#128161; Votre projet n'a pas encore de structure officielle ? Pas de souci — créez votre
+          compte dès maintenant et complétez les informations administratives une fois la structure créée.
+        </div>
+        <div class="radio-grid" id="i-statut-creation-group">
+          <label><input type="radio" name="i-statut-creation" value="en_creation"> &#128993; En création</label>
+          <label><input type="radio" name="i-statut-creation" value="existante"> &#128994; Initiative existante</label>
+        </div>
+        <div id="i-statut-creation-banner" style="display:none;margin-top:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:10px 14px;font-size:12.5px;">
+          Votre initiative sera enregistrée comme « En création ». Certaines fonctionnalités
+          nécessitant une vérification seront disponibles dès que votre structure sera
+          officiellement créée et que les informations administratives auront été complétées.
+        </div>
+        <div id="i-admin-box" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Informations administratives</div>
+          <div class="grid-2">
+            <div><label>Dénomination officielle <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-denomination" placeholder="Association Solidarité Diaspora"></div>
+            <div><label>Numéro d'immatriculation (RCCM, SIREN, IFU, n° d'association…) <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-immat" placeholder="Ex : RCCM CI-ABJ-2024-B-1234"></div>
+          </div>
+          <div class="grid-2" style="margin-top:12px">
+            <div><label>Forme juridique <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-forme-juridique" placeholder="Association loi 1901, SARL, ONG…"></div>
+            <div><label>Date de création de la structure <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="date" id="i-date-creation-structure"></div>
+          </div>
+          <div style="margin-top:12px;max-width:280px;"><label>Numéro fiscal <span style="font-size:11px;color:#64748B;">(si applicable)</span></label><input type="text" id="i-numero-fiscal" placeholder="Facultatif"></div>
+        </div>
+      </div>
       <div class="form-section"><h4>Organisation</h4>
         <div class="grid-2">
           <div><label>Nom de l'organisation <span style="color:#2563EB">*</span></label><input type="text" id="i-nom" placeholder="Association Solidarite Diaspora"></div>
@@ -817,11 +844,21 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     const pwd2=document.getElementById("i-pwd2").value;
     const nat1i=document.getElementById("i-nat1").value.trim();
     const orig1=document.getElementById("i-orig1").value.trim();
+    const statutCreation=document.querySelector('input[name="i-statut-creation"]:checked')?.value;
+    const denomination=document.getElementById("i-denomination").value.trim();
+    const immat=document.getElementById("i-immat").value.trim();
+    const formeJuridique=document.getElementById("i-forme-juridique").value.trim();
+    const dateCreationStructure=document.getElementById("i-date-creation-structure").value;
     /* Nationalite devenue facultative : c'est le couple origine / implantation qui porte
        l'identite territoriale de l'organisation. */
     req(nom,"Nom organisation");req(typeOrg,"Type");req(orig1,"Pays d'origine");req(desc,"Description");
     req(pays,"Pays");req(ville,"Ville");req(rnom,"Nom responsable");
     req(rprenom,"Prenom responsable");req(email,"Email");req(tel,"Telephone");req(pwd,"Mot de passe");
+    req(statutCreation,"Statut de l'initiative");
+    if(statutCreation==="existante"){
+      req(denomination,"Dénomination officielle");req(immat,"Numéro d'immatriculation");
+      req(formeJuridique,"Forme juridique");req(dateCreationStructure,"Date de création de la structure");
+    }
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
     if(pwd.length<8)throw new Error("Le mot de passe doit comporter au moins 8 caracteres.");
     if(!document.getElementById("i-charte").checked)throw new Error("Vous devez lire et accepter la Charte Institutionnelle pour créer un compte.");
@@ -850,9 +887,23 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       besoins:[...document.querySelectorAll('.i-besoin:checked')].map(c=>c.value),
       annee_creation:document.getElementById("i-annee-creation").value||null,
       nombre_membres:document.getElementById("i-nb-membres").value||null,
-      nombre_salaries:document.getElementById("i-nb-salaries").value||null
+      nombre_salaries:document.getElementById("i-nb-salaries").value||null,
+      statut_creation:statutCreation,
+      denomination_officielle:denomination||null,
+      numero_immatriculation:immat||null,
+      forme_juridique:formeJuridique||null,
+      date_creation_structure:dateCreationStructure||null,
+      numero_fiscal:document.getElementById("i-numero-fiscal").value.trim()||null
     });
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
+});
+/* ===== Statut de l'initiative → bannière + champs administratifs conditionnels ===== */
+document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
+  r.addEventListener('change', function(){
+    const enCreation = this.value === "en_creation";
+    document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
+    document.getElementById("i-admin-box").style.display = enCreation ? "none" : "";
+  });
 });
 /* ===== Type d'organisation → taille (nombre de membres ou de salaries) ===== */
 const TYPES_ASSOCIATION = ['Association','ONG','Cooperative','Fondation','Projet collectif','Autre'];

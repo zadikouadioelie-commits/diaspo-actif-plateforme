@@ -103,6 +103,14 @@ db.exec(`
     domaine TEXT,
     domaines_secondaires_json TEXT DEFAULT '[]',
     type TEXT,
+    /* Statut de création (voir "Statut de l'initiative") : 'en_creation' tant que la structure
+       n'est pas officiellement créée (infos administratives facultatives, compte utilisable
+       immédiatement), 'existante' une fois la structure officiellement créée. */
+    statut_creation TEXT DEFAULT 'existante',
+    denomination_officielle TEXT,
+    forme_juridique TEXT,
+    date_creation_structure TEXT,
+    numero_fiscal TEXT,
     membres INTEGER DEFAULT 0,
     vues INTEGER DEFAULT 0,
     abonnes INTEGER DEFAULT 0,
@@ -4717,6 +4725,13 @@ db.exec(`
   // Déjà déclarée dans le CREATE TABLE plus haut : self-healing automatique sur PostgreSQL
   // (ajouterColonnesManquantes, pg-init.js) ; cette ligne ne sert qu'au SQLite local déjà créé.
   if (!initCols7.includes('domaines_secondaires_json'))       db.exec("ALTER TABLE initiatives ADD COLUMN domaines_secondaires_json TEXT DEFAULT '[]'");
+  // Statut de l'initiative (en_creation / existante) — même remarque : déjà dans le CREATE TABLE,
+  // ces lignes ne servent qu'au SQLite local déjà créé (self-healing auto sur PostgreSQL).
+  if (!initCols7.includes('statut_creation'))                  db.exec("ALTER TABLE initiatives ADD COLUMN statut_creation TEXT DEFAULT 'existante'");
+  if (!initCols7.includes('denomination_officielle'))          db.exec("ALTER TABLE initiatives ADD COLUMN denomination_officielle TEXT");
+  if (!initCols7.includes('forme_juridique'))                  db.exec("ALTER TABLE initiatives ADD COLUMN forme_juridique TEXT");
+  if (!initCols7.includes('date_creation_structure'))          db.exec("ALTER TABLE initiatives ADD COLUMN date_creation_structure TEXT");
+  if (!initCols7.includes('numero_fiscal'))                    db.exec("ALTER TABLE initiatives ADD COLUMN numero_fiscal TEXT");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
