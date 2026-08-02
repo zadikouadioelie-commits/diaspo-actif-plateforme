@@ -970,15 +970,31 @@ route("PATCH", "/api/admin/deletion-requests/:id", async (req, res, params, body
     .run(params.id, me.id, me.nom, "statut:" + statut, justification || null);
 
   if (statut === 'validee') {
+    /* Délai de grâce de 5 jours : le compte est masqué immédiatement (réversible), mais les données
+       ne sont anonymisées définitivement qu'à l'expiration du délai (cron finaliserSuppressionsComptes),
+       sauf si le propriétaire annule via le lien de restauration envoyé par e-mail ci-dessous. */
     const userAvant = await db.prepare("SELECT email, prenom, nom FROM users WHERE id=?").get(dr.user_id);
-    await executerSuppressionCompte(dr.user_id, dr.id);
-    await db.prepare("UPDATE deletion_requests SET statut='compte_supprime', deleted_at=datetime('now') WHERE id=?").run(params.id);
+    await db.prepare("UPDATE users SET compte_masque=1 WHERE id=?").run(dr.user_id);
+    const token = crypto.randomBytes(32).toString("hex");
+    const dateSuppressionDefinitive = new Date(Date.now() + 5 * 86400000);
+    /* Format "YYYY-MM-DD HH:MM:SS" (pas toISOString()) pour rester comparable en chaîne avec
+       datetime('now') — SQLite ET PostgreSQL (via toPg()) produisent tous deux ce format sans
+       'T' ni millisecondes ; un format ISO mélangé aux deux casserait la comparaison <= du cron
+       le jour même de l'échéance (le séparateur 'T' est lexicographiquement après l'espace). */
+    const suppressionDefinitiveSql = dateSuppressionDefinitive.toISOString().slice(0, 19).replace('T', ' ');
+    await db.prepare("UPDATE deletion_requests SET suppression_definitive_le=?, restauration_token=? WHERE id=?")
+      .run(suppressionDefinitiveSql, token, params.id);
     await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
-      .run(params.id, me.id, me.nom, "statut:compte_supprime", null);
+      .run(params.id, me.id, me.nom, "delai_de_grace_debut", `Suppression définitive prévue le ${dateSuppressionDefinitive.toLocaleDateString('fr-FR')}`);
     try {
-      const { emailDeletionConfirmee } = require("./mailer");
+      const { emailSuppressionProgrammee } = require("./mailer");
       if (userAvant?.email) {
-        await emailDeletionConfirmee({ email: userAvant.email, prenom: userAvant.prenom || userAvant.nom, numeroDossier: dr.numero_dossier, dateSuppression: new Date().toLocaleDateString('fr-FR') });
+        await emailSuppressionProgrammee({
+          email: userAvant.email, prenom: userAvant.prenom || userAvant.nom,
+          numeroDossier: dr.numero_dossier,
+          dateSuppressionDefinitive: dateSuppressionDefinitive.toLocaleDateString('fr-FR'),
+          lienRestauration: `${getOrigin(req)}/restaurer-compte.html?token=${token}`
+        });
       }
     } catch (e) { console.error("[deletion-email]", e.message); }
   } else {
@@ -986,6 +1002,40 @@ route("PATCH", "/api/admin/deletion-requests/:id", async (req, res, params, body
       statut === 'refusee' ? `Votre demande a été refusée. Motif : ${justification}` : `Statut mis à jour : ${statut}`,
       { deletion_request_id: dr.id });
   }
+
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/deletion-requests/restaurer — restaure un compte pendant le délai de grâce de 5 jours.
+   Route publique (pas d'authentification) : le compte est masqué, l'utilisateur ne peut pas se
+   connecter normalement — c'est le lien reçu par e-mail qui prouve son identité (token à usage unique). */
+route("POST", "/api/deletion-requests/restaurer", async (req, res, params, body) => {
+  const token = (body?.token || "").trim();
+  if (!token) return sendJSON(res, 400, { error: "Lien de restauration invalide." });
+
+  const dr = await db.prepare("SELECT * FROM deletion_requests WHERE restauration_token=?").get(token);
+  if (!dr) return sendJSON(res, 404, { error: "Lien de restauration invalide ou déjà utilisé." });
+  if (dr.restauree_le) return sendJSON(res, 400, { error: "Ce compte a déjà été restauré." });
+  if (dr.statut === 'compte_supprime') return sendJSON(res, 400, { error: "La suppression définitive a déjà eu lieu — restauration impossible." });
+  /* suppression_definitive_le est stocké sans 'Z' (format "YYYY-MM-DD HH:MM:SS", pour rester
+     comparable en chaîne avec datetime('now') en SQL) mais représente bien un instant UTC —
+     il faut donc le reconstruire explicitement en UTC ici plutôt que laisser new Date() le
+     traiter comme une heure locale du serveur. */
+  if (dr.suppression_definitive_le && new Date(dr.suppression_definitive_le.replace(' ', 'T') + 'Z') <= new Date()) {
+    return sendJSON(res, 400, { error: "Le délai de 5 jours est dépassé — restauration impossible." });
+  }
+
+  const u = await db.prepare("SELECT email, prenom, nom FROM users WHERE id=?").get(dr.user_id);
+  await db.prepare("UPDATE users SET compte_masque=0 WHERE id=?").run(dr.user_id);
+  await db.prepare("UPDATE deletion_requests SET restauree_le=datetime('now'), restauration_token=NULL WHERE id=?").run(dr.id);
+  await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,action,note) VALUES (?,?,?)`)
+    .run(dr.id, "restauree_par_utilisateur", null);
+  SEC.logSecurity("compte_restaure_delai_grace", { uid: dr.user_id, deletion_request_id: dr.id });
+
+  try {
+    const { emailCompteRestaure } = require("./mailer");
+    if (u?.email) await emailCompteRestaure({ email: u.email, prenom: u.prenom || u.nom });
+  } catch (e) { console.error("[restauration-email]", e.message); }
 
   sendJSON(res, 200, { ok: true });
 });
@@ -17503,6 +17553,42 @@ async function handleRequest(req, res) {
     } catch (e) {
       console.error('[origine-relances]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
+    }
+    return;
+  }
+
+  /* ── Finalisation des suppressions de compte après le délai de grâce de 5 jours (Vercel Cron, quotidien) ──
+     Anonymise définitivement les comptes dont le délai est dépassé et qui n'ont pas été restaurés
+     entre-temps par leur propriétaire (voir POST /api/deletion-requests/restaurer). */
+  if (pathname === '/api/cron/finaliser-suppressions-comptes') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const aExpirer = await db.prepare(
+        "SELECT * FROM deletion_requests WHERE statut='validee' AND restauree_le IS NULL AND suppression_definitive_le IS NOT NULL AND suppression_definitive_le <= datetime('now')"
+      ).all();
+      let suppressionsFinalisees = 0;
+      for (const dr of aExpirer) {
+        const userAvant = await db.prepare("SELECT email, prenom, nom FROM users WHERE id=?").get(dr.user_id);
+        await executerSuppressionCompte(dr.user_id, dr.id);
+        await db.prepare("UPDATE deletion_requests SET statut='compte_supprime', deleted_at=datetime('now'), restauration_token=NULL WHERE id=?").run(dr.id);
+        await db.prepare(`INSERT INTO deletion_request_history (deletion_request_id,action,note) VALUES (?,?,?)`)
+          .run(dr.id, "statut:compte_supprime", "Délai de grâce de 5 jours écoulé sans restauration.");
+        try {
+          const { emailDeletionConfirmee } = require("./mailer");
+          if (userAvant?.email) {
+            await emailDeletionConfirmee({ email: userAvant.email, prenom: userAvant.prenom || userAvant.nom, numeroDossier: dr.numero_dossier, dateSuppression: new Date().toLocaleDateString('fr-FR') });
+          }
+        } catch (e) { console.error('[finaliser-suppressions-email]', e.message); }
+        suppressionsFinalisees++;
+      }
+      sendJSON(res, 200, { ok: true, suppressions_finalisees: suppressionsFinalisees });
+    } catch (e) {
+      console.error('[finaliser-suppressions-comptes]', e.stack || e.message);
+      sendJSON(res, 500, { error: 'Cron failed', detail: e.message });
     }
     return;
   }

@@ -371,6 +371,80 @@ function emailDeletionConfirmee({ email, prenom, numeroDossier, dateSuppression 
   });
 }
 
+function emailSuppressionProgrammee({ email, prenom, numeroDossier, dateSuppressionDefinitive, lienRestauration }) {
+  return sendEmail({
+    to: email,
+    subject: `Votre compte sera supprimé dans 5 jours — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:900;color:#0D1B2A;">
+        ${prenom ? `Bonjour ${prenom},` : "Bonjour,"}<br>votre demande de suppression a été validée
+      </h1>
+      <p style="color:#475569;line-height:1.7;">
+        Votre compte est désormais masqué. Conformément à votre demande, vos données personnelles seront
+        <strong>définitivement supprimées le ${dateSuppressionDefinitive}</strong>, sauf si vous annulez cette
+        suppression avant cette date.
+      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${lienRestauration}" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 16px rgba(37,99,235,.3);">
+          Annuler la suppression et restaurer mon compte →
+        </a>
+      </div>
+      <p style="color:#475569;line-height:1.7;">
+        Numéro de dossier : <strong>${numeroDossier}</strong>
+      </p>
+      <p style="color:#94A3B8;font-size:12px;line-height:1.6;margin-top:24px;">
+        Passé ce délai de 5 jours, la suppression sera définitive et irréversible. Si vous n'êtes pas
+        à l'origine de cette demande, utilisez le lien ci-dessus dès que possible.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+function emailCompteRestaure({ email, prenom }) {
+  return sendEmail({
+    to: email,
+    subject: `Votre compte a été restauré — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:900;color:#0D1B2A;">
+        ${prenom ? `Bonjour ${prenom},` : "Bonjour,"}<br>votre compte a été restauré ✅
+      </h1>
+      <p style="color:#475569;line-height:1.7;">
+        La suppression de votre compte a été annulée. Votre compte est de nouveau actif et visible,
+        avec toutes vos données intactes.
+      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="https://diaspoactif.com/login.html" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 16px rgba(37,99,235,.3);">
+          Me reconnecter →
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
 function emailConfirmationBillets({ email, prenom, eventTitre, dateEvenement, lieu, billets, montantTotal }) {
   const lignes = billets.map(b => `
     <tr>
@@ -421,4 +495,4 @@ function emailConfirmationBillets({ email, prenom, eventTitre, dateEvenement, li
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailConfirmationBillets };
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets };

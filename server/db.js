@@ -2398,6 +2398,14 @@ db.exec(`
     created_at        TEXT DEFAULT (datetime('now')),
     updated_at        TEXT DEFAULT (datetime('now')),
     deleted_at        TEXT,
+    /* Délai de grâce de 5 jours avant suppression définitive : le compte est masqué (compte_masque=1)
+       dès la validation admin (statut reste 'validee'), mais les données ne sont anonymisées qu'à
+       l'expiration du délai (cron, qui passe alors statut='compte_supprime'), sauf restauration par
+       le propriétaire via le lien envoyé par e-mail (restauration_token) — auquel cas restauree_le
+       est renseigné et le compte redevient visible, sans jamais toucher au CHECK existant sur statut. */
+    suppression_definitive_le TEXT,
+    restauration_token         TEXT,
+    restauree_le                TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(admin_id) REFERENCES users(id)
   );
@@ -3980,6 +3988,11 @@ try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN prenom TEXT"); 
 try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN email TEXT"); } catch(_) {}
 try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN date_creation_compte TEXT"); } catch(_) {}
 try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN motif TEXT"); } catch(_) {}
+
+/* Extension deletion_requests : délai de grâce de 5 jours avant suppression définitive */
+try { db.exec("ALTER TABLE deletion_requests ADD COLUMN suppression_definitive_le TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE deletion_requests ADD COLUMN restauration_token TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE deletion_requests ADD COLUMN restauree_le TEXT"); } catch(_) {}
 try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_customer_id TEXT"); } catch(_) {}
 
 /* Paiements d'accréditations payantes (Stripe Checkout) */

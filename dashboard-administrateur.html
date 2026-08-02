@@ -5079,6 +5079,22 @@ const DELREQ_STATUT_LABELS = {
   demande_recue: '🟡 Demande reçue', en_discussion: '🔵 En discussion', en_cours_analyse: '🟠 En cours d\'analyse',
   validee: '🟢 Validée', refusee: '🔴 Refusée', compte_supprime: '⚫ Compte supprimé',
 };
+/* suppression_definitive_le est stocké sans 'Z' ("YYYY-MM-DD HH:MM:SS") mais représente un instant
+   UTC — le reconstruire explicitement en UTC plutôt que laisser le navigateur le lire en heure locale. */
+function parseUtc(s) { return s ? new Date(s.replace(' ', 'T') + 'Z') : null; }
+/* statut='validee' recouvre 3 réalités distinctes selon restauree_le / suppression_definitive_le
+   (le délai de grâce de 5 jours) — ce libellé dynamique les distingue dans l'affichage admin. */
+function delReqStatutLabel(dr) {
+  if (dr.statut !== 'validee') return DELREQ_STATUT_LABELS[dr.statut] || dr.statut;
+  if (dr.restauree_le) return '🔵 Restauré par l\'utilisateur';
+  if (dr.suppression_definitive_le) {
+    const echeance = parseUtc(dr.suppression_definitive_le);
+    if (echeance <= new Date()) return '🟠 Délai écoulé (en attente du cron)';
+    const jours = Math.ceil((echeance - new Date()) / 86400000);
+    return `🟡 Délai de grâce — ${jours} j restant${jours > 1 ? 's' : ''}`;
+  }
+  return DELREQ_STATUT_LABELS.validee;
+}
 function setDelReqFilter(kind, val) {
   if (kind === 'type') _delReqFilterType = val; else _delReqFilterStatut = val;
   document.querySelectorAll(`[data-delf="${kind}"]`).forEach(b => b.classList.toggle('btn-orange', b.dataset.val === val) || b.classList.toggle('btn-outline', b.dataset.val !== val));
@@ -5105,7 +5121,7 @@ async function loadDelReqList() {
         <td style="padding:8px;">${x.user_nom||'—'}</td>
         <td style="padding:8px;">${x.type_compte}</td>
         <td style="padding:8px;">${new Date(x.created_at).toLocaleDateString('fr-FR')}</td>
-        <td style="padding:8px;">${DELREQ_STATUT_LABELS[x.statut]||x.statut}</td>
+        <td style="padding:8px;">${delReqStatutLabel(x)}</td>
         <td style="padding:8px;">${x.dernier_echange ? new Date(x.dernier_echange).toLocaleDateString('fr-FR') : '—'}</td>
         <td style="padding:8px;">${x.admin_nom||'—'}</td>
         <td style="padding:8px;"><button class="btn btn-sm btn-outline" onclick="openDelReqDossier(${x.id})">📂 Ouvrir</button></td>
@@ -5120,11 +5136,12 @@ async function openDelReqDossier(id) {
   try {
     const r = await api('GET', `/admin/deletion-requests/${id}`);
     const dr = r.request;
-    const terminal = ['refusee','compte_supprime'].includes(dr.statut);
+    const terminal = ['refusee','compte_supprime','validee'].includes(dr.statut);
     panel.innerHTML = `
       <div class="card">
         <h3 style="margin:0 0 8px;">Dossier ${dr.numero_dossier} — ${dr.user_nom} (${dr.user_role})</h3>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">Email : ${dr.user_email||'—'} · Statut : ${DELREQ_STATUT_LABELS[dr.statut]||dr.statut}</p>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">Email : ${dr.user_email||'—'} · Statut : ${delReqStatutLabel(dr)}</p>
+        ${dr.statut === 'validee' && dr.suppression_definitive_le && !dr.restauree_le ? `<p style="font-size:12px;color:#b45309;margin:0 0 4px;">Suppression définitive automatique prévue le ${parseUtc(dr.suppression_definitive_le).toLocaleDateString('fr-FR')} (sauf restauration par l'utilisateur).</p>` : ''}
         ${dr.motif ? `<p style="font-size:13px;margin:0 0 4px;">Motif initial : ${dr.motif}</p>` : ''}
         ${dr.admin_justification ? `<p style="font-size:13px;color:#dc2626;margin:0 0 8px;">Justification : ${dr.admin_justification}</p>` : ''}
 
@@ -5167,7 +5184,7 @@ async function patchDelReqStatut(id, statut, justification) {
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 function confirmerValidationDelReq(id) {
-  if (!confirm('Valider la suppression définitive ? Cette action est irréversible : les données personnelles seront anonymisées immédiatement.')) return;
+  if (!confirm("Valider la suppression ? Le compte sera masqué immédiatement et son propriétaire recevra un e-mail avec un délai de 5 jours pour l'annuler. Passé ce délai, les données seront anonymisées automatiquement et définitivement.")) return;
   patchDelReqStatut(id, 'validee');
 }
 function refuserDelReq(id) {
