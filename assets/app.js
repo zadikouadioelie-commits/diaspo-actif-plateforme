@@ -1546,7 +1546,7 @@ async function initAnnuaire(){
 
 /* ---------- Fiche initiative (branchée sur l'API) ---------- */
 /* ---------- Rubrique Vitrines (catalogue public des vitrines d'initiatives) ---------- */
-const DOMAINES_VITRINE = ["Agriculture","Agroalimentaire","Artisanat","Assurance","Commerce","Communication & Médias","Construction & BTP","Consulting & Conseil","Culture & Arts","Éducation","Énergie","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Numérique & Technologies","Restauration","Santé, Soins & Thérapies","Services","Tourisme","Transport & Logistique","Autres"];
+const DOMAINES_VITRINE = ["Agriculture","Agroalimentaire","Agropastoral","Artisanat","Assurance","Commerce","Communication & Médias","Construction & BTP","Consulting & Conseil","Culture & Arts","Éducation","Énergie","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Numérique & Technologies","Restauration","Santé, Soins & Thérapies","Services","Tourisme","Transport & Logistique","Autres"];
 
 function renderVitrineCard(v) {
   const badge = DOMAIN_BADGE[v.domaine] || {bg:'#1B3A6B', label:(v.domaine||'VITRINE').toUpperCase()};

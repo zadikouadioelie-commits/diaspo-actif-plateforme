@@ -292,13 +292,14 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     pays, region, departement, ville, adresse, code_postal, telephone,
     centres_interet, situation_pro,
     // initiative
-    type_org, description, domaine, objectifs,
+    type_org, description, domaine, domaine_secondaire, objectifs,
     nombre_membres, nombre_salaries,
     origine1, origine2,
     // initiative — statut de création et informations administratives
     statut_creation, denomination_officielle, numero_immatriculation,
-    forme_juridique, date_creation_structure, numero_fiscal,
-    nom_responsable, prenom_responsable, fonction_responsable, email_responsable, tel_responsable,
+    forme_juridique, date_creation_structure, numero_fiscal, date_debut_creation,
+    nom_responsable, prenom_responsable, genre_responsable, fonction_responsable, email_responsable, tel_responsable,
+    tel_responsable_2, tel_responsable_3,
     site_web, reseaux_sociaux, pays_intervention,
     // collectivite (legacy)
     type_institution, nom_institution, pays_concerne, telephone_pro, site_officiel,
@@ -408,6 +409,12 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   try {
     if (Array.isArray(body.publics) && body.publics.length) await db.prepare('UPDATE users SET publics_json=? WHERE id=?').run(JSON.stringify(body.publics), id);
     if (Array.isArray(body.besoins) && body.besoins.length) await db.prepare('UPDATE users SET besoins_json=? WHERE id=?').run(JSON.stringify(body.besoins), id);
+    /* Thème de bannière choisi à l'inscription (repli visuel si aucune image de bannière
+       n'est téléversée — voir THEMES dans profil-app.html, même liste de 7 thèmes). */
+    const THEMES_BANNIERE_UTILISATEUR = ['ocean', 'foret', 'soleil', 'violet', 'terre', 'nuit', 'rose'];
+    if (body.theme_couleur && THEMES_BANNIERE_UTILISATEUR.includes(body.theme_couleur)) {
+      await db.prepare('UPDATE users SET theme_couleur=? WHERE id=?').run(body.theme_couleur, id);
+    }
   } catch (_) {}
 
   // Pour un compte Initiative : créer l'enregistrement d'initiative associé
@@ -442,12 +449,23 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     if (initRow) try { await db.prepare('UPDATE initiatives SET da_id=? WHERE id=?').run(generateDaId(), initRow.id); } catch(_) {}
     // Profil public enrichi : champs facultatifs du formulaire d'inscription
     if (initRow) try {
-      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=?, membres=?, nb_salaries=? WHERE id=?').run(
+      const THEMES_VITRINE_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
+      const vitrineThemeChoisi = THEMES_VITRINE_VALIDES.includes(body.vitrine_theme) ? body.vitrine_theme : null;
+      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=?, membres=?, nb_salaries=?, domaines_secondaires_json=?, date_debut_creation=?, genre_responsable=?, tel_responsable_2=?, tel_responsable_3=?, vitrine_theme=COALESCE(?,vitrine_theme) WHERE id=?').run(
         Array.isArray(body.publics) && body.publics.length ? JSON.stringify(body.publics) : null,
         Array.isArray(body.besoins) && body.besoins.length ? JSON.stringify(body.besoins) : null,
         body.annee_creation ? parseInt(body.annee_creation) || null : null,
         nombre_membres ? parseInt(nombre_membres) || null : null,
         nombre_salaries ? parseInt(nombre_salaries) || null : null,
+        /* Un seul domaine secondaire à l'inscription (2 domaines au total, principal + secondaire) —
+           le champ JSON accepte un tableau plus large côté édition de vitrine (jusqu'à 2 domaines
+           SECONDAIRES en plus du principal), mais le formulaire d'inscription reste volontairement
+           simple : 2 domaines maximum au total. */
+        (domaine_secondaire && domaine_secondaire !== domaine) ? JSON.stringify([domaine_secondaire]) : '[]',
+        /* Uniquement pertinent pour statut_creation='en_creation' — laissé null sinon. */
+        statut_creation === 'en_creation' ? (date_debut_creation || null) : null,
+        genre_responsable || null, tel_responsable_2 || null, tel_responsable_3 || null,
+        vitrineThemeChoisi,
         initRow.id);
     } catch(_) {}
   }

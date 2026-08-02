@@ -234,6 +234,24 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="u-besoin" value="du mentorat"> Du mentorat</label>
         </div>
       </div>
+      <div class="form-section"><h4>Photo de profil et banniere <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif — evite de le refaire apres l'inscription)</span></h4>
+        <div class="grid-2">
+          <div>
+            <label>Photo de profil</label>
+            <input type="file" id="u-photo" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'u-photo-apercu')">
+            <img id="u-photo-apercu" style="display:none;margin-top:8px;width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+          </div>
+          <div>
+            <label>Banniere</label>
+            <input type="file" id="u-banniere" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'u-banniere-apercu')">
+            <img id="u-banniere-apercu" style="display:none;margin-top:8px;max-width:100%;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <label style="font-size:12.5px;">Pas envie de televerser une banniere ? Choisissez une couleur a la place <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></label>
+          <div id="u-theme-swatches" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;"></div>
+        </div>
+      </div>
       <div class="form-section"><h4>Securite</h4>
         <div class="grid-2">
           <div>
@@ -277,6 +295,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           nécessitant une vérification seront disponibles dès que votre structure sera
           officiellement créée et que les informations administratives auront été complétées.
         </div>
+        <div id="i-encreation-box" style="display:none;margin-top:14px;max-width:280px;">
+          <label>Début de la création <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+          <input type="date" id="i-date-debut-creation">
+        </div>
         <div id="i-admin-box" style="display:none;margin-top:16px;">
           <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Informations administratives</div>
           <div class="grid-2">
@@ -308,25 +330,44 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div id="i-nb-salaries-box" style="display:none;"><label>Nombre de salaries <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
             <input type="number" min="0" id="i-nb-salaries" placeholder="Ex : 12"></div>
         </div>
-        <div style="margin-top:12px"><label>Domaine d'activite</label>
-          <select id="i-domaine">
-            <option value="">— Selectionner —</option>
-            <option>Agriculture</option><option>Artisanat</option><option>Assurance</option>
-            <option>Commerce</option><option>Construction</option><option>Consulting</option>
-            <option>Culture</option><option>Éducation</option><option>Emploi</option>
-            <option>Énergie</option><option>Entrepreneuriat</option><option>Environnement</option>
-            <option>Événementiel</option><option>Finance</option><option>Formation</option>
-            <option>Immobilier</option><option>Industrie</option><option>Institution</option>
-            <option>Investissement</option><option>Numérique</option><option>Restauration</option>
-            <option>Santé</option><option>Soin santé / thérapie</option><option>Sport</option>
-            <option>Technologie</option><option>Tourisme</option><option>Transport</option>
-            <option>Autre</option>
-          </select>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Domaine d'activite principal</label>
+            <select id="i-domaine">
+              <option value="">— Selectionner —</option>
+              <option>Agriculture</option><option>Agropastoral</option><option>Artisanat</option><option>Assurance</option>
+              <option>Commerce</option><option>Construction</option><option>Consulting</option>
+              <option>Culture</option><option>Éducation</option><option>Emploi</option>
+              <option>Énergie</option><option>Entrepreneuriat</option><option>Environnement</option>
+              <option>Événementiel</option><option>Finance</option><option>Formation</option>
+              <option>Immobilier</option><option>Industrie</option><option>Institution</option>
+              <option>Investissement</option><option>Numérique</option><option>Restauration</option>
+              <option>Santé</option><option>Soin santé / thérapie</option><option>Sport</option>
+              <option>Technologie</option><option>Tourisme</option><option>Transport</option>
+              <option>Autre</option>
+            </select>
+          </div>
+          <div><label>Domaine d'activite secondaire <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <select id="i-domaine2">
+              <option value="">— Selectionner —</option>
+              <option>Agriculture</option><option>Agropastoral</option><option>Artisanat</option><option>Assurance</option>
+              <option>Commerce</option><option>Construction</option><option>Consulting</option>
+              <option>Culture</option><option>Éducation</option><option>Emploi</option>
+              <option>Énergie</option><option>Entrepreneuriat</option><option>Environnement</option>
+              <option>Événementiel</option><option>Finance</option><option>Formation</option>
+              <option>Immobilier</option><option>Industrie</option><option>Institution</option>
+              <option>Investissement</option><option>Numérique</option><option>Restauration</option>
+              <option>Santé</option><option>Soin santé / thérapie</option><option>Sport</option>
+              <option>Technologie</option><option>Tourisme</option><option>Transport</option>
+              <option>Autre</option>
+            </select>
+          </div>
         </div>
         <div style="margin-top:12px"><label>Description <span style="color:#2563EB">*</span></label>
           <textarea id="i-desc" rows="3" placeholder="Presentez votre initiative…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
         </div>
-        <div style="margin-top:12px"><label>Objectifs</label>
+        <div style="margin-top:12px"><label>Objectifs
+            <span title="Les buts concrets que votre initiative cherche a atteindre, pas ce qu'elle fait au quotidien (ca, c'est la Description). Exemple : « Faciliter l'acces aux soins de sante pour 500 familles d'ici 2027 » ou « Creer 20 emplois dans le secteur agropastoral en 3 ans »." style="cursor:help;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#E2E8F0;color:#475569;font-size:11px;font-weight:700;margin-left:4px;">?</span>
+          </label>
           <textarea id="i-objectifs" rows="2" placeholder="Vos principaux objectifs…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
         </div>
       </div>
@@ -367,7 +408,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         </div>
       </div>
       <div class="form-section"><h4>Profil public (facultatif)</h4>
-        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🎯 Public concerné — à qui s'adresse votre initiative ?</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>🎯 Public concerné — à qui s'adresse votre initiative ?</span>
+          <button type="button" id="i-public-toutcocher" style="border:1.5px solid #2563EB;color:#2563EB;background:none;border-radius:18px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;">Tout sélectionner</button>
+        </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Diaspora"> Diaspora</label>
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-public" value="Entrepreneurs"> Entrepreneurs</label>
@@ -406,7 +450,14 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         </div>
       </div>
       <div class="form-section"><h4>Responsable principal</h4>
-        <div class="grid-3">
+        <div style="display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:14px">
+          <div><label>Genre</label>
+            <select id="i-rgenre">
+              <option value="">—</option>
+              <option value="M">M</option>
+              <option value="Mme">Mme</option>
+            </select>
+          </div>
           <div><label>Nom <span style="color:#2563EB">*</span></label><input type="text" id="i-rnom" placeholder="Diallo"></div>
           <div><label>Prenom <span style="color:#2563EB">*</span></label><input type="text" id="i-rprenom" placeholder="Aminata"></div>
           <div><label>Fonction</label><input type="text" id="i-rfct" placeholder="Presidente"></div>
@@ -415,11 +466,34 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div><label>Email <span style="color:#2563EB">*</span></label><input type="email" id="i-email" placeholder="contact@initiative.org"></div>
           <div><label>Telephone <span style="color:#2563EB">*</span></label><input type="tel" id="i-tel" placeholder="+33 5 00 00 00 00"></div>
         </div>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Telephone 2 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label><input type="tel" id="i-tel2" placeholder="+33 5 00 00 00 00"></div>
+          <div><label>Telephone 3 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label><input type="tel" id="i-tel3" placeholder="+33 5 00 00 00 00"></div>
+        </div>
       </div>
+      <style>@media(max-width:580px){[style*="90px 1fr 1fr 1fr"]{grid-template-columns:1fr!important}}</style>
       <div class="form-section"><h4>Presence en ligne (facultatif)</h4>
         <div class="grid-2">
           <div><label>Site internet</label><input type="url" id="i-site" placeholder="https://mon-initiative.org"></div>
           <div><label>Reseau social principal</label><input type="url" id="i-rs" placeholder="https://facebook.com/..."></div>
+        </div>
+      </div>
+      <div class="form-section"><h4>Photo de profil et banniere <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif — evite de le refaire apres l'inscription)</span></h4>
+        <div class="grid-2">
+          <div>
+            <label>Logo / photo de profil</label>
+            <input type="file" id="i-photo" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'i-photo-apercu')">
+            <img id="i-photo-apercu" style="display:none;margin-top:8px;width:64px;height:64px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">
+          </div>
+          <div>
+            <label>Banniere</label>
+            <input type="file" id="i-banniere" accept="image/png,image/jpeg,image/gif,image/webp" onchange="apercuImage(this,'i-banniere-apercu')">
+            <img id="i-banniere-apercu" style="display:none;margin-top:8px;max-width:100%;height:64px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <label style="font-size:12.5px;">Pas envie de televerser une banniere ? Choisissez une couleur de vitrine a la place <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></label>
+          <div id="i-theme-swatches" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;"></div>
         </div>
       </div>
       <div class="validation-notice">
@@ -702,6 +776,23 @@ wirePillGroup(".u-besoin");
 wirePillGroup(".i-public");
 wirePillGroup(".i-besoin");
 
+/* Bouton "Tout sélectionner" du Public concerné — bascule en "Tout désélectionner"
+   une fois toutes les pastilles cochées, et inversement. */
+(function(){
+  const btn = document.getElementById("i-public-toutcocher");
+  const boxes = [...document.querySelectorAll(".i-public")];
+  if (!btn || !boxes.length) return;
+  function syncBtnLabel(){
+    btn.textContent = boxes.every(b => b.checked) ? "Tout désélectionner" : "Tout sélectionner";
+  }
+  btn.addEventListener("click", () => {
+    const toutCoche = boxes.every(b => b.checked);
+    boxes.forEach(b => { b.checked = !toutCoche; b.dispatchEvent(new Event("change")); });
+    syncBtnLabel();
+  });
+  boxes.forEach(b => b.addEventListener("change", syncBtnLabel));
+})();
+
 /* ── Proposition de vérification d'identité juste après l'inscription ──
    Réutilise le module Stripe Identity existant (déjà comparé aux nationalités
    déclarées côté serveur) ; ici on l'expose au bon moment plutôt que de le
@@ -758,6 +849,77 @@ function updateStrength(input,barId,hintId){
   bar.style.background=colors[Math.min(s,4)];
   document.getElementById(hintId).textContent=s?labels[Math.min(s-1,4)]:"";
 }
+/* Themes de repli pour la banniere quand aucune image n'est televersee — memes listes que
+   THEMES (profil-app.html, comptes Utilisateur) et THEMES_VITRINE_VALIDES (vitrine des
+   Initiatives, deja utilisees ailleurs sur le site : on ne cree rien de nouveau, on propose
+   juste ces memes choix des l'inscription pour eviter d'avoir a y revenir plus tard). */
+const THEMES_BANNIERE_U=[
+  {id:'ocean',gradient:'linear-gradient(135deg,#0D47A1 0%,#1976D2 100%)',label:'Ocean'},
+  {id:'foret',gradient:'linear-gradient(135deg,#1B5E20 0%,#388E3C 100%)',label:'Foret'},
+  {id:'soleil',gradient:'linear-gradient(135deg,#BF360C 0%,#F4511E 100%)',label:'Soleil'},
+  {id:'violet',gradient:'linear-gradient(135deg,#4A148C 0%,#7B1FA2 100%)',label:'Violet'},
+  {id:'terre',gradient:'linear-gradient(135deg,#3E2723 0%,#6D4C41 100%)',label:'Terre'},
+  {id:'nuit',gradient:'linear-gradient(135deg,#0D1B2A 0%,#1A237E 100%)',label:'Nuit'},
+  {id:'rose',gradient:'linear-gradient(135deg,#880E4F 0%,#D81B60 100%)',label:'Rose'},
+];
+const THEMES_VITRINE_I=[
+  {id:'bordeaux',gradient:'#8E1B2E',label:'Bordeaux'},{id:'ocean',gradient:'#1B4F8E',label:'Ocean'},
+  {id:'emeraude',gradient:'#1F6B4A',label:'Emeraude'},{id:'prune',gradient:'#4A2E6B',label:'Prune'},
+  {id:'or',gradient:'#8A5E1A',label:'Or'},
+];
+let THEME_CHOISI_U=null, THEME_CHOISI_I=null;
+function renderThemeSwatches(boxId,themes){
+  const box=document.getElementById(boxId);
+  if(!box)return;
+  function repaint(){
+    box.innerHTML=themes.map(t=>`
+      <button type="button" onclick="choisirTheme('${boxId}','${t.id}')" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;">
+        <span style="width:32px;height:32px;border-radius:50%;background:${t.gradient};display:block;border:3px solid ${(boxId==='u-theme-swatches'?THEME_CHOISI_U:THEME_CHOISI_I)===t.id?'#2563EB':'#fff'};box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
+        <span style="font-size:10.5px;color:var(--muted);">${t.label}</span>
+      </button>`).join('');
+  }
+  repaint();
+  box._repaint=repaint;
+}
+function choisirTheme(boxId,themeId){
+  if(boxId==='u-theme-swatches')THEME_CHOISI_U=(THEME_CHOISI_U===themeId?null:themeId);
+  else THEME_CHOISI_I=(THEME_CHOISI_I===themeId?null:themeId);
+  document.getElementById(boxId)._repaint();
+}
+renderThemeSwatches('u-theme-swatches',THEMES_BANNIERE_U);
+renderThemeSwatches('i-theme-swatches',THEMES_VITRINE_I);
+
+/* Apercu local du fichier choisi (photo de profil / banniere), avant meme la creation du compte. */
+function apercuImage(input,imgId){
+  const img=document.getElementById(imgId);
+  const file=input.files[0];
+  if(!file){img.style.display="none";return;}
+  const reader=new FileReader();
+  reader.onload=e=>{img.src=e.target.result;img.style.display="block";};
+  reader.readAsDataURL(file);
+}
+
+/* Televerse la photo de profil et/ou la banniere juste apres la creation du compte — la session
+   vient d'etre ouverte par /auth/signup, les routes d'upload (deja existantes, utilisees partout
+   ailleurs sur le site) s'en servent pour savoir a qui associer le fichier. Best-effort : un echec
+   d'upload ne doit jamais faire echouer l'inscription elle-meme, qui a deja reussi a ce stade. */
+async function uploadPhotosApresInscription(){
+  const photoInput=document.getElementById("u-photo")?.files.length?document.getElementById("u-photo"):document.getElementById("i-photo");
+  const banniereInput=document.getElementById("u-banniere")?.files.length?document.getElementById("u-banniere"):document.getElementById("i-banniere");
+  async function envoyer(input,champ,dossier){
+    if(!input||!input.files.length)return;
+    try{
+      const fd=new FormData();
+      fd.append(champ,input.files[0]);
+      await fetch("/api/upload/"+dossier,{method:"POST",credentials:"include",body:fd});
+    }catch(e){/* silencieux : l'inscription reste valide, la photo pourra etre ajoutee plus tard */}
+  }
+  await Promise.all([
+    envoyer(photoInput,"avatar","avatar"),
+    envoyer(banniereInput,"banner","banner"),
+  ]);
+}
+
 async function submitForm(btnId,errId,body){
   const btn=document.getElementById(btnId),errBox=document.getElementById(errId);
   errBox.style.display="none";const orig=btn.textContent;
@@ -766,6 +928,7 @@ async function submitForm(btnId,errId,body){
   body._form_ts = PAGE_LOAD_TS;
   try{
     const r=await api("POST","/auth/signup",body);
+    await uploadPhotosApresInscription();
     const role=r.user.role;
     const icons={utilisateur:"🎉",initiative:"📋",collectivite:"🏛️"};
     const titles={utilisateur:"Compte cree avec succes !",initiative:"Demande envoyee !",collectivite:"Demande officielle soumise !"};
@@ -825,7 +988,8 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
       telephone:document.getElementById("u-tel").value.trim()||null,
       centres_interet:interests,situation_pro:sitpro,
       publics:[...document.querySelectorAll('.u-public:checked')].map(c=>c.value),
-      besoins:[...document.querySelectorAll('.u-besoin:checked')].map(c=>c.value)
+      besoins:[...document.querySelectorAll('.u-besoin:checked')].map(c=>c.value),
+      theme_couleur:THEME_CHOISI_U
     });
   }catch(e){const eb=document.getElementById("u-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
 });
@@ -874,13 +1038,17 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       origine2:document.getElementById("i-orig2").value.trim()||null,
       rayonnement,pays_intervention,
       domaine:document.getElementById("i-domaine").value,
+      domaine_secondaire:document.getElementById("i-domaine2").value||null,
       description:desc,objectifs:document.getElementById("i-objectifs").value.trim()||null,
       pays,region:document.getElementById("i-region").value.trim()||null,
       ville,adresse:document.getElementById("i-adresse").value.trim()||null,
       code_postal:document.getElementById("i-cp").value.trim()||null,
       nom_responsable:rnom,prenom_responsable:rprenom,
+      genre_responsable:document.getElementById("i-rgenre").value||null,
       fonction_responsable:document.getElementById("i-rfct").value.trim()||null,
       email_responsable:email,tel_responsable:tel,
+      tel_responsable_2:document.getElementById("i-tel2").value.trim()||null,
+      tel_responsable_3:document.getElementById("i-tel3").value.trim()||null,
       site_web:document.getElementById("i-site").value.trim()||null,
       reseaux_sociaux:rs?{lien:rs}:{},
       publics:[...document.querySelectorAll('.i-public:checked')].map(c=>c.value),
@@ -893,7 +1061,9 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       numero_immatriculation:immat||null,
       forme_juridique:formeJuridique||null,
       date_creation_structure:dateCreationStructure||null,
-      numero_fiscal:document.getElementById("i-numero-fiscal").value.trim()||null
+      numero_fiscal:document.getElementById("i-numero-fiscal").value.trim()||null,
+      date_debut_creation:document.getElementById("i-date-debut-creation").value||null,
+      vitrine_theme:THEME_CHOISI_I
     });
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
 });
@@ -911,6 +1081,7 @@ document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
     refreshStatutCreationPills();
     const enCreation = this.value === "en_creation";
     document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
+    document.getElementById("i-encreation-box").style.display = enCreation ? "" : "none";
     document.getElementById("i-admin-box").style.display = enCreation ? "none" : "";
   });
 });
@@ -928,6 +1099,17 @@ document.getElementById("i-type").addEventListener("change", function(){
   boxSalaries.style.display = estEntreprise ? "" : "none";
   row.style.display = (estAssociation || estEntreprise) ? "" : "none";
 });
+
+/* Empeche de choisir 2 fois le meme domaine — desactive l'option deja prise dans l'autre liste. */
+(function(){
+  const d1 = document.getElementById("i-domaine"), d2 = document.getElementById("i-domaine2");
+  function sync(){
+    [...d2.options].forEach(o => o.disabled = !!o.value && o.value === d1.value);
+    [...d1.options].forEach(o => o.disabled = !!o.value && o.value === d2.value);
+  }
+  d1.addEventListener("change", sync);
+  d2.addEventListener("change", sync);
+})();
 
 /* ===== Rayonnement + territoires dynamiques ===== */
 function refreshRayPills(){

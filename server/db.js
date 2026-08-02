@@ -110,7 +110,13 @@ db.exec(`
     denomination_officielle TEXT,
     forme_juridique TEXT,
     date_creation_structure TEXT,
+    /* Uniquement pour statut_creation='en_creation' : quand le porteur a commencé les
+       démarches, distinct de date_creation_structure qui suppose une structure déjà créée. */
+    date_debut_creation TEXT,
     numero_fiscal TEXT,
+    genre_responsable TEXT,
+    tel_responsable_2 TEXT,
+    tel_responsable_3 TEXT,
     membres INTEGER DEFAULT 0,
     vues INTEGER DEFAULT 0,
     abonnes INTEGER DEFAULT 0,
@@ -4731,6 +4737,10 @@ db.exec(`
   if (!initCols7.includes('denomination_officielle'))          db.exec("ALTER TABLE initiatives ADD COLUMN denomination_officielle TEXT");
   if (!initCols7.includes('forme_juridique'))                  db.exec("ALTER TABLE initiatives ADD COLUMN forme_juridique TEXT");
   if (!initCols7.includes('date_creation_structure'))          db.exec("ALTER TABLE initiatives ADD COLUMN date_creation_structure TEXT");
+  if (!initCols7.includes('date_debut_creation'))               db.exec("ALTER TABLE initiatives ADD COLUMN date_debut_creation TEXT");
+  if (!initCols7.includes('genre_responsable'))                 db.exec("ALTER TABLE initiatives ADD COLUMN genre_responsable TEXT");
+  if (!initCols7.includes('tel_responsable_2'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_2 TEXT");
+  if (!initCols7.includes('tel_responsable_3'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_3 TEXT");
   if (!initCols7.includes('numero_fiscal'))                    db.exec("ALTER TABLE initiatives ADD COLUMN numero_fiscal TEXT");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
