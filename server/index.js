@@ -6496,7 +6496,8 @@ route("GET", "/api/fil/meilleures-ventes", async (req, res) => {
       COUNT(c.id) AS nb_ventes
     FROM produits_vitrine p JOIN commandes_vitrine c ON c.produit_id=p.id JOIN initiatives i ON i.id=p.initiative_id
     WHERE (p.statut IS NULL OR p.statut != 'masque') AND i.vitrine_active=1
-    GROUP BY p.id ORDER BY nb_ventes DESC LIMIT 10
+    GROUP BY p.id, p.nom, p.prix, p.devise, p.photos_json, i.id, i.owner_user_id, i.nom, i.vitrine_ville, i.vitrine_region, i.vitrine_pays
+    ORDER BY nb_ventes DESC LIMIT 10
   `).all();
   const produits = rows.map(r => ({ ...r, photo: (safeParse(r.photos_json||"[]"))[0] || null }));
   sendJSON(res, 200, { produits });
@@ -13135,7 +13136,7 @@ route("GET", "/api/admin/contenu", async (req, res) => {
       AVG(sub.score) AS score_moy
     FROM fil_posts p
     LEFT JOIN (
-      SELECT post_id,
+      SELECT pp.id AS post_id,
         COUNT(DISTINCT r.id)*2 + COUNT(DISTINCT c.id)*3 AS score
       FROM fil_posts pp
       LEFT JOIN fil_reactions r ON r.post_id = pp.id
@@ -13375,15 +13376,21 @@ route("PUT", "/api/admin/parametres", async (req, res, params, body) => {
 route("GET", "/api/admin/abonnes", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  /* NOTE : "abonnements" est la table "suit une initiative" (user_id, initiative_id) — elle n'a
+     jamais eu de colonnes plan/statut/date_debut/date_fin, contrairement à ce que supposait cette
+     requête (orpheline, aucune page ne l'appelle). Les vrais abonnements payants vivent désormais
+     dans user_accreditations depuis la refonte tarification Premium — c'est la source correcte. */
   const abonnes = await db.prepare(`
-    SELECT a.id, a.user_id, u.nom, u.email, u.role, u.pays,
-      a.plan, a.statut, a.date_debut, a.date_fin, a.created_at
-    FROM abonnements a LEFT JOIN users u ON u.id = a.user_id
-    ORDER BY a.created_at DESC LIMIT 50
+    SELECT ua.id, ua.user_id, u.nom, u.email, u.role, u.pays,
+      ad.type AS plan, ua.statut, ua.date_attribution AS date_debut, ua.date_expiration AS date_fin, ua.created_at
+    FROM user_accreditations ua
+    LEFT JOIN users u ON u.id = ua.user_id
+    LEFT JOIN accred_definitions ad ON ad.id = ua.accred_id
+    ORDER BY ua.created_at DESC LIMIT 50
   `).all();
   // Taux de renouvellement simulé
-  const totalExpires = (await db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='expire'").get())?.n;
-  const totalRenouveles = (await db.prepare("SELECT COUNT(*) n FROM abonnements WHERE statut='actif' AND date_debut > date('now','-60 days')").get())?.n;
+  const totalExpires = (await db.prepare("SELECT COUNT(*) n FROM user_accreditations WHERE statut='expiree'").get())?.n;
+  const totalRenouveles = (await db.prepare("SELECT COUNT(*) n FROM user_accreditations WHERE statut='active' AND date_attribution > date('now','-60 days')").get())?.n;
   const tauxRenouvellement = (totalExpires + totalRenouveles) > 0
     ? ((totalRenouveles / (totalExpires + totalRenouveles)) * 100).toFixed(1)
     : "0.0";
