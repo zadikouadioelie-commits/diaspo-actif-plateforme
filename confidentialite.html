@@ -59,6 +59,7 @@
   <main class="container" style="padding-top:30px;padding-bottom:40px;">
     <div id="mes-infos-zone"></div>
     <div id="origine-institution-zone"></div>
+    <div id="identite-verif-zone"></div>
     <div id="ds-id-zone"></div>
 
     <h2 style="margin:0 0 4px;">Niveau de confidentialité des données</h2>
@@ -210,6 +211,93 @@
       setTimeout(() => cible.classList.remove('origine-mise-en-avant'), 4000);
     }
   }
+})();
+
+/* Vérification d'identité (Stripe Identity) — comptes Utilisateur uniquement. Certains
+   membres n'ont pas pu/voulu la faire à l'inscription : cette carte permet de la lancer
+   (ou de la reprendre) à tout moment depuis la page Confidentialité, sans devoir la
+   retrouver dans les réglages du profil. */
+(async function initIdentiteVerifZone(){
+  let me;
+  try {
+    me = await api('GET', '/auth/me');
+    if (!me.user) return;
+  } catch(e) { return; }
+  if (me.user.role !== 'utilisateur') return;
+
+  const zone = document.getElementById('identite-verif-zone');
+  const fmtDateFr = iso => {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }); }
+    catch (e) { return iso; }
+  };
+
+  zone.innerHTML = `
+    <div class="codes-card" style="max-width:560px;">
+      <h4>🪪 Vérification d'identité</h4>
+      <div id="identite-verif-body"><p class="codes-sub" style="margin:0;">Chargement…</p></div>
+    </div>
+  `;
+
+  async function renderIdentiteVerif() {
+    const body = document.getElementById('identite-verif-body');
+    if (!body) return;
+    body.innerHTML = '<p class="codes-sub" style="margin:0;">Chargement…</p>';
+    try {
+      const r = await api('GET', '/identity/status');
+      if (r.verifie) {
+        body.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+            <span style="font-size:22px;">✔️</span>
+            <div>
+              <div style="font-weight:800;color:#166534;font-size:14px;">Identité vérifiée</div>
+              <div style="font-size:12px;color:#166534;">Identité vérifiée par Diaspo'Actif le ${fmtDateFr(r.verifie_le)}.</div>
+            </div>
+          </div>
+          <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.</p>
+          ${r.mismatch ? `
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-top:10px;">
+            <span style="font-size:20px;">⚠️</span>
+            <div>
+              <div style="font-weight:800;color:#92400e;font-size:13px;">Origine à confirmer</div>
+              <div style="font-size:12px;color:#92400e;">Le pays associé à votre document d'identité ne correspond pas à la nationalité déclarée sur votre profil. Vérifiez vos informations ci-dessus, ou contactez le support si c'est une erreur.</div>
+            </div>
+          </div>` : ''}`;
+      } else if (r.session_en_cours) {
+        body.innerHTML = `
+          <p class="codes-sub" style="margin:0 0 12px;">Une vérification est en cours de traitement chez Stripe. Cela peut prendre quelques minutes après l'envoi de vos documents.</p>
+          <div class="codes-btn-row">
+            <button class="codes-btn orange" onclick="window._renderIdentiteVerif()">↺ Actualiser le statut</button>
+            <button class="codes-btn green" onclick="window._startIdentiteVerif()">🔐 Reprendre / recommencer la vérification</button>
+          </div>`;
+      } else {
+        body.innerHTML = `
+          <p class="codes-sub" style="margin:0 0 12px;">Cette étape n'a pas été faite à l'inscription, ou vous souhaitez la refaire : vous pouvez la lancer à tout moment (pièce d'identité + selfie) pour obtenir le badge <strong>✔️ Identité vérifiée</strong> visible sur votre profil, valable 24 mois. Aucun document n'est conservé par Diaspo'Actif — la vérification est effectuée et hébergée par Stripe Identity.</p>
+          <div class="codes-btn-row">
+            <button class="codes-btn green" id="identite-verif-start-btn" onclick="window._startIdentiteVerif()">🔐 Vérifier mon identité</button>
+          </div>
+          <p id="identite-verif-err" class="ds-err" style="display:none;"></p>`;
+      }
+    } catch (e) {
+      body.innerHTML = '<p class="codes-sub" style="margin:0;">Statut de vérification indisponible pour le moment.</p>';
+    }
+  }
+
+  window._renderIdentiteVerif = renderIdentiteVerif;
+  window._startIdentiteVerif = async function() {
+    const btn = document.getElementById('identite-verif-start-btn');
+    const err = document.getElementById('identite-verif-err');
+    if (btn) btn.disabled = true;
+    try {
+      const r = await api('POST', '/identity/verify', {});
+      if (r.url) window.location.href = r.url;
+    } catch (e) {
+      if (err) { err.textContent = e.message || "Erreur lors du lancement de la vérification."; err.style.display = 'block'; }
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  renderIdentiteVerif();
 })();
 
 (async function initDsIdCard(){
