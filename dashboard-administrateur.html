@@ -67,6 +67,7 @@
       <a href="#billetterie" data-section="billetterie">🎟️ Billetterie</a>
       <a href="#accreditations" data-section="accreditations" style="display:flex;justify-content:space-between;align-items:center;">🏛️ Accréditations <span id="accred-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
+      <a href="#verifications-organisation" data-section="verifications-organisation" style="display:flex;justify-content:space-between;align-items:center;">🏢 Vérifications d'organisation <span id="vo-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#origines" data-section="origines">🌍 Origines manquantes</a>
 
@@ -2992,6 +2993,19 @@
       </section>
 
       <!-- CERTIFICATIONS -->
+      <section id="section-verifications-organisation" style="display:none;">
+        <div style="margin-bottom:20px;">
+          <h2 style="margin:0;">🏢 Vérifications d'organisation</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Dossiers documentaires (numéro + document) soumis par les Initiatives pour obtenir le badge « Organisation vérifiée ». Distinct du badge « Certifications » ci-dessous, attribué manuellement pour la qualité.</p>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <button class="btn btn-sm btn-orange" id="vo-admin-filtre-attente" onclick="loadVerificationsOrganisation('en_attente')">⏳ En attente</button>
+          <button class="btn btn-sm btn-outline" id="vo-admin-filtre-verifiee" onclick="loadVerificationsOrganisation('verifiee')">✅ Vérifiées</button>
+          <button class="btn btn-sm btn-outline" id="vo-admin-filtre-rejetee" onclick="loadVerificationsOrganisation('rejetee')">❌ Rejetées</button>
+        </div>
+        <div id="vo-admin-list"><p class="notice">Chargement…</p></div>
+      </section>
+
       <section id="section-certifications" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
           <div>
@@ -7234,6 +7248,67 @@ document.querySelectorAll(".sidebar a[data-section='diaspora-stats']").forEach(a
   a.addEventListener('click', () => setTimeout(() => loadDiasporaStats(), 80));
 });
 
+/* ── Vérifications d'organisation (dossiers documentaires par type déclaré) ── */
+let _voAdminFiltre = 'en_attente';
+function voEsc(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function loadVerificationsOrganisation(statut){
+  if (statut) _voAdminFiltre = statut;
+  const el = document.getElementById('vo-admin-list');
+  el.innerHTML = '<p class="notice">Chargement…</p>';
+  // Met à jour l'état visuel des boutons de filtre
+  [['vo-admin-filtre-attente','en_attente'],['vo-admin-filtre-verifiee','verifiee'],['vo-admin-filtre-rejetee','rejetee']].forEach(([id,val]) => {
+    const b = document.getElementById(id);
+    if (b) { b.classList.toggle('btn-orange', val === _voAdminFiltre); b.classList.toggle('btn-outline', val !== _voAdminFiltre); }
+  });
+  try {
+    const r = await api('GET', `/admin/verifications-organisation?statut=${_voAdminFiltre}`);
+    const demandes = r.demandes || [];
+    const badge = document.getElementById('vo-pending-badge');
+    if (_voAdminFiltre === 'en_attente' && badge) {
+      if (demandes.length > 0) { badge.textContent = demandes.length; badge.style.display = 'inline-block'; }
+      else badge.style.display = 'none';
+    }
+    if (!demandes.length) { el.innerHTML = '<p class="notice">Aucun dossier dans cette catégorie.</p>'; return; }
+    el.innerHTML = demandes.map(d => `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;">${voEsc(d.initiative_nom)} <span style="font-size:11px;font-weight:600;color:var(--muted);">— ${voEsc(d.type_compte)}</span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Numéro déclaré : ${d.numero ? voEsc(d.numero) : '—'}</div>
+            <div style="font-size:12px;color:var(--muted);">Soumis le ${new Date((d.created_at||'').replace(' ','T')+'Z').toLocaleString('fr-FR')}</div>
+            ${d.motif_alerte ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:6px 10px;margin-top:6px;">⚠️ ${voEsc(d.motif_alerte)}</div>` : ''}
+            ${d.statut === 'rejetee' && d.motif_rejet ? `<div style="font-size:12px;color:#991b1b;margin-top:6px;">Motif du rejet : ${voEsc(d.motif_rejet)}</div>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+            <a href="${voEsc(d.document_url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline">📄 Voir le document</a>
+            ${d.statut === 'en_attente' ? `
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="voAdminDecider(${d.id},'verifiee')">✅ Valider</button>
+                <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="voAdminRejeterPrompt(${d.id})">❌ Rejeter</button>
+              </div>` : ''}
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<p class="notice" style="color:#dc2626;">Erreur : ${voEsc(e.message)}</p>`;
+  }
+}
+
+async function voAdminDecider(id, decision, motif_rejet){
+  try {
+    await api('PUT', `/admin/verifications-organisation/${id}`, { decision, motif_rejet });
+    loadVerificationsOrganisation();
+  } catch(e) { alert(e.message || 'Erreur.'); }
+}
+
+function voAdminRejeterPrompt(id){
+  const motif = prompt("Motif du rejet (visible par l'initiative) :", "");
+  if (motif === null) return;
+  if (!motif.trim()) { alert('Un motif est requis.'); return; }
+  voAdminDecider(id, 'rejetee', motif.trim());
+}
+
 /* ── Widget stats accréditations DA (vue d'ensemble) ── */
 async function loadDAWidgetStats(){
   try{
@@ -7380,6 +7455,7 @@ async function submitAccordDirect(){
     'social-sync': () => loadSocialSyncAdmin(),
     rencontres:  () => rdvCharger(),
     origines:    () => origCharger(),
+    'verifications-organisation': () => loadVerificationsOrganisation(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -7444,6 +7520,12 @@ async function submitAccordDirect(){
     const H = 100;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
+    /* Fixe la taille CSS d'AFFICHAGE indépendamment du buffer de dessin (mis à l'échelle pour
+       les écrans Retina) : sans ça, offsetWidth relit à chaque appel la largeur déjà gonflée
+       par l'appel précédent, et le canevas grossit sans limite à chaque rafraîchissement
+       (constaté : ~10000px après quelques rechargements sur écran haute densité). */
+    canvas.style.width  = W + "px";
+    canvas.style.height = H + "px";
     ctx.scale(dpr, dpr);
     const vals = points.map(p => p.n);
     const max = Math.max(...vals, 1);
@@ -7586,6 +7668,10 @@ async function submitAccordDirect(){
     const H = 110;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
+    /* Voir drawSparkline() ci-dessus : sans fixer la taille CSS d'affichage, offsetWidth
+       relit à chaque appel la largeur déjà gonflée par l'appel précédent. */
+    canvas.style.width  = W + "px";
+    canvas.style.height = H + "px";
     ctx.scale(dpr, dpr);
     const vals1 = points.map(p => p[key1] || 0);
     const vals2 = points.map(p => p[key2] || 0);
@@ -7721,6 +7807,8 @@ async function submitAccordDirect(){
 
   // Charger widget accréditations DA au démarrage
   loadDAWidgetStats();
+  // Badge sidebar "Vérifications d'organisation" (nombre en attente)
+  loadVerificationsOrganisation('en_attente');
 
   // ══ OBSERVATOIRE ÉCONOMIQUE GLOBAL ══════════════════════════
   let _oegData = null;

@@ -684,6 +684,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div id="paiement-marketplace-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:20px;" id="verification-organisation">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🏢 Vérification de l'organisation</h3>
+        <button class="btn btn-sm btn-outline" onclick="renderVerificationOrganisation()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites vérifier votre organisation pour obtenir le badge <strong>🏢 Organisation vérifiée</strong>, visible dans l'Annuaire et les Vitrines. Les documents demandés dépendent du type déclaré à l'inscription.</p>
+      <div id="verification-organisation-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
     <div class="card" style="margin-bottom:20px;" id="paiement">
       <h3>Module de paiement — billetterie &amp; cotisations</h3>
       <p>Activez un module de paiement pour vos événements : vente de billets, cotisations, inscriptions, collectes de fonds, dons.</p>
@@ -2936,7 +2945,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'partenaires-liste') renderPartenairesListe();
     if (name === 'adhesions-init') adhSwitchTab('formules');
     if (name === 'votes-init') voSwitchTab('scrutins');
-    if (name === 'paiement') renderPaiementMarketplace();
+    if (name === 'paiement') { renderPaiementMarketplace(); renderVerificationOrganisation(); }
     if (name === 'offres-emploi') renderOffresEmploiInit();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-documents') renderAssoDocuments();
@@ -5007,6 +5016,109 @@ async function startConnectOnboarding(){
   }
 }
 
+/* ══════════════════════════════════════════════
+   VÉRIFICATION DE L'ORGANISATION — indexée sur le type déclaré
+   ══════════════════════════════════════════════ */
+let VO_PENDING_DOCUMENT = null;
+
+async function renderVerificationOrganisation(){
+  const body = document.getElementById('verification-organisation-body');
+  const initId = window.__vitrineInitId;
+  if (!body) return;
+  if (!initId) { body.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
+  body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const r = await api('GET', `/initiatives/${initId}/verification-organisation`);
+    if (r.organisation_verifiee) {
+      body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:14px 16px;">
+          <span style="font-size:22px;">🏢</span>
+          <div>
+            <div style="font-weight:800;color:#166534;font-size:14px;">Organisation vérifiée</div>
+            <div style="font-size:12px;color:#166534;">Vérifiée le ${new Date(r.organisation_verifiee_le).toLocaleDateString('fr-FR')}.</div>
+          </div>
+        </div>`;
+      return;
+    }
+    if (!r.exigences) {
+      body.innerHTML = `<p style="font-size:13px;color:var(--muted);margin:0;">Ce type de compte (Projet collectif) n'a pas de structure juridique à vérifier. Pensez plutôt à vérifier <a href="confidentialite.html">votre identité de responsable</a> pour obtenir le badge 🪪 Responsable identifié.</p>`;
+      return;
+    }
+    const derniere = r.derniere_demande;
+    if (derniere && derniere.statut === 'en_attente') {
+      body.innerHTML = `
+        <p style="font-size:13px;color:var(--muted);margin:0 0 8px;">📤 Dossier envoyé le ${new Date((derniere.created_at||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR')}, en cours d'examen par un administrateur.</p>
+        <p style="font-size:12px;color:var(--muted);margin:0;">Numéro fourni : ${derniere.numero ? escVO(derniere.numero) : '—'}</p>`;
+      return;
+    }
+    const rejet = derniere && derniere.statut === 'rejetee'
+      ? `<div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+           <div style="font-weight:800;color:#991b1b;font-size:13px;">Demande précédente refusée</div>
+           <div style="font-size:12px;color:#991b1b;margin-top:2px;">${escVO(derniere.motif_rejet||'')}</div>
+         </div>` : '';
+    body.innerHTML = `
+      ${rejet}
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:12px;font-weight:700;">${escVO(r.exigences.numero_label)}</label>
+          <input id="vo-numero" class="input-field" style="width:100%;margin-top:4px;" placeholder="${escVO(r.exigences.numero_label)}">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;">${escVO(r.exigences.document_label)}</label>
+          <input type="file" id="vo-fichier" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="margin-top:4px;" onchange="voUploadDocument(this)">
+          <div id="vo-fichier-statut" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+      </div>
+      <p id="vo-err" style="color:#dc2626;font-size:12px;margin:10px 0 0;display:none;"></p>
+      <div class="codes-btn-row" style="margin-top:12px;">
+        <button class="btn btn-orange" id="vo-submit-btn" onclick="voSoumettre(${initId})">📤 Soumettre pour vérification</button>
+      </div>`;
+    VO_PENDING_DOCUMENT = null;
+  } catch(e) {
+    body.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur : ${e.message||'chargement impossible'}</p>`;
+  }
+}
+
+function escVO(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function voUploadDocument(input){
+  const file = input.files[0];
+  const statutEl = document.getElementById('vo-fichier-statut');
+  if (!file) return;
+  statutEl.textContent = 'Envoi en cours…';
+  try {
+    const fd = new FormData();
+    fd.append('document', file);
+    const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Échec de l'envoi du document.");
+    VO_PENDING_DOCUMENT = { url: data.url, type: file.type || file.name.split('.').pop() };
+    statutEl.textContent = '✅ ' + file.name;
+  } catch(e) {
+    statutEl.textContent = '';
+    const err = document.getElementById('vo-err');
+    if (err) { err.textContent = e.message; err.style.display = 'block'; }
+  }
+}
+
+async function voSoumettre(initId){
+  const err = document.getElementById('vo-err');
+  const btn = document.getElementById('vo-submit-btn');
+  err.style.display = 'none';
+  if (!VO_PENDING_DOCUMENT) { err.textContent = 'Veuillez téléverser le document demandé.'; err.style.display = 'block'; return; }
+  const numero = document.getElementById('vo-numero').value.trim();
+  btn.disabled = true;
+  try {
+    await api('POST', `/initiatives/${initId}/verification-organisation`, {
+      numero: numero || null, document_url: VO_PENDING_DOCUMENT.url, document_type: VO_PENDING_DOCUMENT.type,
+    });
+    if (typeof showToast === 'function') showToast('✅ Dossier envoyé, en cours d\'examen.');
+    renderVerificationOrganisation();
+  } catch(e) {
+    err.textContent = e.message || 'Erreur lors de la soumission.'; err.style.display = 'block';
+    btn.disabled = false;
+  }
+}
 
 /* ══════════════════════════════════════════════
    MODULE COTISATIONS & ADHÉSIONS — JS

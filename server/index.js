@@ -4032,6 +4032,16 @@ async function getCertif(initiativeId) {
   return await db.prepare("SELECT niveau, statut, date_attribution FROM certifications WHERE initiative_id=? AND statut='actif'").get(initiativeId) || null;
 }
 
+/* Badge "Responsable identifié" : identité personnelle (Stripe Identity) du propriétaire du
+   compte, distinct du badge "Organisation vérifiée" (initiatives.organisation_verifiee) qui
+   porte sur la structure elle-même — les deux répondent à des questions différentes et ne
+   se substituent jamais l'un à l'autre. */
+async function ownerIdentiteVerifiee(ownerUserId) {
+  if (!ownerUserId) return false;
+  const u = await db.prepare("SELECT identite_verifiee, identite_expire_le FROM users WHERE id=?").get(ownerUserId);
+  return !!(u?.identite_verifiee && u.identite_expire_le && new Date(u.identite_expire_le) > new Date());
+}
+
 /* Helper : recherche une initiative par id numerique OU par slug (utilise par les liens annuaire,
    qui privilegient toujours le slug). "WHERE id=? OR slug=?" plante en Postgres des que idOrSlug
    n'est pas purement numerique (comparaison entier/texte refusee au niveau du type de colonne,
@@ -4370,7 +4380,7 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
       tel_responsable: null, email_responsable: null,
       ...(Number(r.vitrine_tel_visible) === 1 ? {} : { vitrine_tel_pro: null, vitrine_whatsapp: null }),
     };
-    return { ...r, ...contacts, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds, decouverte_premium };
+    return { ...r, ...contacts, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds, decouverte_premium, owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id) };
   }));
   sendJSON(res, 200, { initiatives: rows });
 });
@@ -4415,7 +4425,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
 
   if (query.limit) rows = rows.slice(0, parseInt(query.limit) || rows.length);
 
-  rows = rows.map(r => ({
+  rows = await Promise.all(rows.map(async r => ({
     id: r.id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
     domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
     slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
@@ -4423,7 +4433,10 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
     origine1: r.origine1 || r.owner_origine1 || null, origine2: r.origine2 || r.owner_origine2 || null,
     vues: r.vues || 0, note_moyenne: r.note_moyenne ? Math.round(r.note_moyenne * 10) / 10 : null,
     nb_avis: r.nb_avis || 0, created_at: r.created_at, updated_at: r.updated_at || r.created_at,
-  }));
+    certif: await getCertif(r.id),
+    organisation_verifiee: !!r.organisation_verifiee, organisation_verifiee_le: r.organisation_verifiee_le || null,
+    owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id),
+  })));
 
   sendJSON(res, 200, { vitrines: rows });
 });
@@ -4493,11 +4506,12 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
-  row.certif = getCertif(row.id);
+  row.certif = await getCertif(row.id);
   row.accreditations = row.owner_user_id
     ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(row.owner_user_id)).map(a => a.type)
     : [];
   row.decouverte_premium = row.owner_user_id ? await getDecouvertePremium(row.owner_user_id) : null;
+  row.owner_identite_verifiee = await ownerIdentiteVerifiee(row.owner_user_id);
   /* Profil public enrichi : champs JSON parsés pour les colonnes gauche/droite d'initiative.html */
   row.publics = safeParseArray(row.publics_json);
   row.besoins = safeParseArray(row.besoins_json);
@@ -11608,6 +11622,137 @@ route("GET", "/api/initiatives/:id/connect/status", async (req, res, params) => 
     organisation_verifiee_le: init.organisation_verifiee_le || null,
     organisation_expire_le: init.organisation_expire_le || null,
   });
+});
+
+/* ═══════════ Vérification documentaire de l'organisation (indexée sur le type) ═══════════
+   Chemin manuel/documentaire pour obtenir le badge "Organisation vérifiée", en complément
+   du chemin automatique existant (Stripe Connect, ci-dessus). "Projet collectif" est exempté
+   : pas de structure juridique, seule la vérification d'identité du responsable (badge
+   distinct "Responsable identifié") a un sens pour ce type. */
+const VERIF_ORG_EXIGENCES = {
+  'Entreprise':       { numero_label: 'Numéro SIRET / registre du commerce', document_label: "Extrait Kbis (ou équivalent local)" },
+  'Startup':          { numero_label: 'Numéro SIRET / registre du commerce', document_label: "Extrait Kbis (ou équivalent local)" },
+  'Association':      { numero_label: 'Numéro RNA / récépissé', document_label: 'Récépissé de déclaration en préfecture ou statuts' },
+  'ONG':              { numero_label: "Numéro d'agrément", document_label: 'Agrément ou récépissé de déclaration' },
+  'Cooperative':      { numero_label: 'Numéro SIRET / registre du commerce', document_label: 'Extrait Kbis ou statuts coopératifs' },
+  'Fondation':        { numero_label: 'Numéro RNA / décret de reconnaissance', document_label: 'Décret ou statuts de fondation' },
+  'Autre':            { numero_label: "Numéro d'identification (le cas échéant)", document_label: 'Document justificatif de l\'existence de la structure' },
+};
+
+/* GET /api/initiatives/:id/verification-organisation — statut courant + exigences selon le type déclaré */
+route("GET", "/api/initiatives/:id/verification-organisation", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, type, organisation_verifiee, organisation_verifiee_le FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+  }
+  const derniere = await db.prepare(
+    "SELECT * FROM verifications_organisation WHERE initiative_id=? ORDER BY created_at DESC LIMIT 1"
+  ).get(params.id);
+  sendJSON(res, 200, {
+    organisation_verifiee: !!init.organisation_verifiee,
+    organisation_verifiee_le: init.organisation_verifiee_le || null,
+    exigences: VERIF_ORG_EXIGENCES[init.type] || null, // null = type "Projet collectif" (ou inconnu) : dispensé
+    derniere_demande: derniere || null,
+  });
+});
+
+/* POST /api/initiatives/:id/verification-organisation — soumission (numéro + document déjà téléversé) */
+route("POST", "/api/initiatives/:id/verification-organisation", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, type, nom, organisation_verifiee FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+  if (init.organisation_verifiee) return sendJSON(res, 400, { error: "Cette organisation est déjà vérifiée." });
+  const exigences = VERIF_ORG_EXIGENCES[init.type];
+  if (!exigences) return sendJSON(res, 400, { error: "Ce type de compte (Projet collectif) n'est pas soumis à cette vérification." });
+
+  const enAttente = await db.prepare("SELECT id FROM verifications_organisation WHERE initiative_id=? AND statut='en_attente'").get(params.id);
+  if (enAttente) return sendJSON(res, 409, { error: "Une demande est déjà en cours de traitement." });
+
+  const { numero, document_url, document_type } = body;
+  if (!document_url) return sendJSON(res, 400, { error: "Le document est requis." });
+
+  /* Détection automatique de doublon : un numéro déjà utilisé par une autre initiative
+     déjà vérifiée est un signal fort à faire vérifier par un administrateur plutôt que
+     d'accorder le badge automatiquement. */
+  let motifAlerte = null;
+  if (numero) {
+    const doublon = await db.prepare(
+      `SELECT vo.id FROM verifications_organisation vo
+       WHERE vo.numero = ? AND vo.statut = 'verifiee' AND vo.initiative_id != ?`
+    ).get(numero, params.id);
+    if (doublon) motifAlerte = "Numéro déjà utilisé par une autre initiative vérifiée sur la plateforme.";
+  } else if (init.type !== 'Autre') {
+    motifAlerte = "Aucun numéro renseigné.";
+  }
+
+  const id = (await db.prepare(`
+    INSERT INTO verifications_organisation (initiative_id, type_compte, numero, document_url, document_type, statut, methode, motif_alerte)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).run(params.id, init.type, numero || null, document_url, document_type || null, 'en_attente', 'manuelle', motifAlerte)).lastInsertRowid;
+
+  const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  admins.forEach(a => creerNotif(a.id, "verification_organisation",
+    motifAlerte ? `⚠️ Vérification d'organisation à examiner` : `🏢 Nouvelle demande de vérification d'organisation`,
+    `« ${init.nom} » (${init.type}) a soumis un dossier de vérification.${motifAlerte ? ' Motif : ' + motifAlerte : ''}`,
+    { verification_id: Number(id), initiative_id: Number(params.id) }));
+
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* GET /api/admin/verifications-organisation — file d'attente admin (en_attente par défaut) */
+route("GET", "/api/admin/verifications-organisation", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const statut = query.statut || "en_attente";
+  const rows = await db.prepare(`
+    SELECT vo.*, i.nom AS initiative_nom, i.slug AS initiative_slug
+    FROM verifications_organisation vo
+    JOIN initiatives i ON i.id = vo.initiative_id
+    WHERE vo.statut = ?
+    ORDER BY vo.created_at ASC
+  `).all(statut);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* PUT /api/admin/verifications-organisation/:id — approuver ou rejeter, avec motif si rejet */
+route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const demande = await db.prepare("SELECT * FROM verifications_organisation WHERE id=?").get(params.id);
+  if (!demande) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (demande.statut !== "en_attente") return sendJSON(res, 400, { error: "Cette demande a déjà été traitée." });
+
+  const { decision, motif_rejet } = body;
+  if (!["verifiee", "rejetee"].includes(decision)) return sendJSON(res, 400, { error: "Décision invalide." });
+  if (decision === "rejetee" && !(motif_rejet || "").trim()) return sendJSON(res, 400, { error: "Motif de rejet requis." });
+
+  await db.prepare(
+    "UPDATE verifications_organisation SET statut=?, motif_rejet=?, admin_id=?, admin_nom=?, traite_le=datetime('now') WHERE id=?"
+  ).run(decision, decision === "rejetee" ? motif_rejet.trim() : null, user.id, user.nom, params.id);
+
+  const init = await db.prepare("SELECT owner_user_id, nom FROM initiatives WHERE id=?").get(demande.initiative_id);
+
+  if (decision === "verifiee") {
+    const now = new Date().toISOString();
+    await db.prepare(
+      "UPDATE initiatives SET organisation_verifiee=1, organisation_verifiee_le=?, organisation_expire_le=? WHERE id=?"
+    ).run(now, addMonths(now, IDENTITY_VALIDITY_MONTHS), demande.initiative_id);
+    if (init?.owner_user_id) {
+      creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation vérifiée 🏢",
+        `« ${init.nom} » a obtenu le badge Organisation vérifiée.`, { initiative_id: demande.initiative_id });
+    }
+  } else if (init?.owner_user_id) {
+    creerNotif(init.owner_user_id, "verification_organisation_rejetee", "Vérification d'organisation refusée",
+      `Votre demande pour « ${init.nom} » a été refusée. Motif : ${motif_rejet.trim()}. Vous pouvez soumettre un nouveau dossier.`,
+      { initiative_id: demande.initiative_id });
+  }
+
+  sendJSON(res, 200, { ok: true });
 });
 
 route("GET", "/api/notifications", async (req, res, params, body, query) => {

@@ -59,6 +59,40 @@ function badgeCertif(certif, opts = {}) {
   return `<button class="certif-badge ${n.cls} ${size}" onclick="event.stopPropagation();showCertifModal('${certif.niveau}')" title="${n.label} Diaspo'Actif">${n.icon} ${n.label} <span class="certif-da">Diaspo'Actif</span></button>`;
 }
 
+/* ========== BADGES ORGANISATION VÉRIFIÉE / RESPONSABLE IDENTIFIÉ ==========
+   Deux badges distincts, jamais fusionnés : "Organisation vérifiée" porte sur la structure
+   elle-même (Stripe Connect ou futur dossier documentaire), "Responsable identifié" porte
+   sur la personne physique derrière le compte (vérification d'identité Stripe Identity,
+   la même que dans confidentialite.html). Un compte peut avoir l'un, l'autre, les deux ou
+   aucun — ce ne sont pas des niveaux d'un même badge. */
+function badgeVerifications(it, opts = {}) {
+  const size = opts.small ? "da-verif-badge-sm" : "";
+  const org = it && it.organisation_verifiee
+    ? `<span class="da-verif-badge da-verif-org ${size}" title="Organisation vérifiée${it.organisation_verifiee_le ? ' le ' + new Date(it.organisation_verifiee_le).toLocaleDateString('fr-FR') : ''}">🏢 Organisation vérifiée</span>` : "";
+  const resp = it && it.owner_identite_verifiee
+    ? `<span class="da-verif-badge da-verif-resp ${size}" title="Identité du responsable vérifiée par Diaspo'Actif">🪪 Responsable identifié</span>` : "";
+  if (!org && !resp) return "";
+  return `<div class="da-verif-row">${org}${resp}</div>`;
+}
+
+/* Injection CSS des badges de vérification */
+(function injectVerifCSS() {
+  const s = document.createElement("style");
+  s.textContent = `
+    .da-verif-row { display:flex;flex-wrap:wrap;gap:5px;margin:4px 0; }
+    .da-verif-badge {
+      display:inline-flex;align-items:center;gap:4px;border:none;
+      border-radius:20px;font-size:11px;font-weight:700;
+      padding:3px 9px;white-space:nowrap;line-height:1.4;cursor:default;
+    }
+    .da-verif-org  { background:#EFF6FF;color:#1D4ED8; }
+    .da-verif-resp { background:#F5F3FF;color:#6D28D9; }
+    .da-verif-badge-sm { font-size:10px;padding:2px 7px; }
+  `;
+  document.head.appendChild(s);
+})();
+/* ========== FIN BADGES VÉRIFICATION ========== */
+
 /* Modale d'information du badge */
 window.showCertifModal = function(niveau) {
   const n = CERTIF_NIVEAUX[niveau] || CERTIF_NIVEAUX.verifie;
@@ -1020,6 +1054,7 @@ function renderInitiativeCard(it){
     </div>
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
+      ${badgeVerifications(it, { small: true })}
       ${(!(it.accreditations||[]).includes('initiative_abonne') && it.decouverte_premium && window.decouvertePremiumBadgeHtml) ? `<div>${window.decouvertePremiumBadgeHtml(it.decouverte_premium.date_expiration, { showDate: true })}</div>` : ''}
       <div class="ann-card-meta-row">
         <span class="ann-card-loc">📍 ${loc}</span>
@@ -1495,6 +1530,7 @@ function renderVitrineCard(v) {
     </div>
     <div class="vit-card-body">
       <div class="vit-card-title">${escapeHtml(v.nom)}</div>
+      ${badgeVerifications(v, { small: true })}
       ${domainesSecondairesHtml}
       ${locs.length ? `<div class="vit-card-locs">${locs.join('')}</div>` : ''}
       ${v.description ? `<div class="vit-card-desc">${escapeHtml(v.description)}</div>` : ''}

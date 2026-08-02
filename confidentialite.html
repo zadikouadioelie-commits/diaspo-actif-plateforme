@@ -213,17 +213,20 @@
   }
 })();
 
-/* Vérification d'identité (Stripe Identity) — comptes Utilisateur uniquement. Certains
-   membres n'ont pas pu/voulu la faire à l'inscription : cette carte permet de la lancer
-   (ou de la reprendre) à tout moment depuis la page Confidentialité, sans devoir la
-   retrouver dans les réglages du profil. */
+/* Vérification d'identité (Stripe Identity) — comptes Utilisateur ET responsables d'Initiative.
+   Certains membres n'ont pas pu/voulu la faire à l'inscription : cette carte permet de la
+   lancer (ou de la reprendre) à tout moment depuis la page Confidentialité. Pour une
+   Initiative, ceci vérifie la PERSONNE (badge "Responsable identifié"), pas la structure
+   elle-même (badge distinct "Organisation vérifiée", obtenu via Stripe Connect ou le futur
+   dossier documentaire) — les deux ne se substituent jamais l'un à l'autre. */
 (async function initIdentiteVerifZone(){
   let me;
   try {
     me = await api('GET', '/auth/me');
     if (!me.user) return;
   } catch(e) { return; }
-  if (me.user.role !== 'utilisateur') return;
+  if (!['utilisateur', 'initiative'].includes(me.user.role)) return;
+  const estInitiative = me.user.role === 'initiative';
 
   const zone = document.getElementById('identite-verif-zone');
   const fmtDateFr = iso => {
@@ -234,7 +237,7 @@
 
   zone.innerHTML = `
     <div class="codes-card" style="max-width:560px;">
-      <h4>🪪 Vérification d'identité</h4>
+      <h4>🪪 ${estInitiative ? 'Vérification d\'identité du responsable' : 'Vérification d\'identité'}</h4>
       <div id="identite-verif-body"><p class="codes-sub" style="margin:0;">Chargement…</p></div>
     </div>
   `;
@@ -248,13 +251,13 @@
       if (r.verifie) {
         body.innerHTML = `
           <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-            <span style="font-size:22px;">✔️</span>
+            <span style="font-size:22px;">🪪</span>
             <div>
-              <div style="font-weight:800;color:#166534;font-size:14px;">Identité vérifiée</div>
-              <div style="font-size:12px;color:#166534;">Identité vérifiée par Diaspo'Actif le ${fmtDateFr(r.verifie_le)}.</div>
+              <div style="font-weight:800;color:#166534;font-size:14px;">${estInitiative ? 'Responsable identifié' : 'Identité vérifiée'}</div>
+              <div style="font-size:12px;color:#166534;">${estInitiative ? 'Identité du responsable' : 'Identité'} vérifiée par Diaspo'Actif le ${fmtDateFr(r.verifie_le)}.</div>
             </div>
           </div>
-          <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.</p>
+          <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.${estInitiative ? ' Ce badge ne remplace pas « Organisation vérifiée », qui porte sur la structure elle-même.' : ''}</p>
           ${r.mismatch ? `
           <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-top:10px;">
             <span style="font-size:20px;">⚠️</span>
@@ -272,9 +275,9 @@
           </div>`;
       } else {
         body.innerHTML = `
-          <p class="codes-sub" style="margin:0 0 12px;">Cette étape n'a pas été faite à l'inscription, ou vous souhaitez la refaire : vous pouvez la lancer à tout moment (pièce d'identité + selfie) pour obtenir le badge <strong>✔️ Identité vérifiée</strong> visible sur votre profil, valable 24 mois. Aucun document n'est conservé par Diaspo'Actif — la vérification est effectuée et hébergée par Stripe Identity.</p>
+          <p class="codes-sub" style="margin:0 0 12px;">Cette étape n'a pas été faite à l'inscription, ou vous souhaitez la refaire : vous pouvez la lancer à tout moment (pièce d'identité + selfie) pour obtenir le badge <strong>🪪 ${estInitiative ? 'Responsable identifié' : 'Identité vérifiée'}</strong> visible sur ${estInitiative ? "la fiche de l'initiative" : 'votre profil'}, valable 24 mois. Aucun document n'est conservé par Diaspo'Actif — la vérification est effectuée et hébergée par Stripe Identity.${estInitiative ? ' Cette vérification porte sur vous, pas sur votre organisation.' : ''}</p>
           <div class="codes-btn-row">
-            <button class="codes-btn green" id="identite-verif-start-btn" onclick="window._startIdentiteVerif()">🔐 Vérifier mon identité</button>
+            <button class="codes-btn green" id="identite-verif-start-btn" onclick="window._startIdentiteVerif()">🔐 Vérifier ${estInitiative ? 'mon identité de responsable' : 'mon identité'}</button>
           </div>
           <p id="identite-verif-err" class="ds-err" style="display:none;"></p>`;
       }

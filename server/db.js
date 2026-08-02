@@ -728,6 +728,30 @@ db.exec(`
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
 
+  /* Vérification documentaire de l'organisation, indexée sur le type d'initiative déclaré
+     (Entreprise → SIRET, Association → RNA, etc.). Distincte de "certifications" ci-dessus
+     (badge qualité attribué manuellement par l'équipe) : ici on vérifie que la structure
+     existe légalement. Une soumission par ligne — plusieurs lignes possibles par initiative
+     en cas de rejet + nouvelle tentative (historique conservé). */
+  CREATE TABLE IF NOT EXISTS verifications_organisation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    type_compte TEXT NOT NULL,
+    numero TEXT,
+    document_url TEXT NOT NULL,
+    document_type TEXT,
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','verifiee','rejetee')),
+    methode TEXT DEFAULT 'manuelle' CHECK(methode IN ('auto_stripe','manuelle')),
+    motif_alerte TEXT,
+    motif_rejet TEXT,
+    admin_id INTEGER,
+    admin_nom TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    traite_le TEXT,
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
   /* Fiche d'évaluation interne par initiative */
   CREATE TABLE IF NOT EXISTS certification_evaluations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
