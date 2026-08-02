@@ -897,9 +897,18 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     });
   }catch(e){const eb=document.getElementById("i-error");eb.textContent=e.message;eb.style.display="block";eb.scrollIntoView({block:"center"});}
 });
-/* ===== Statut de l'initiative → bannière + champs administratifs conditionnels ===== */
+/* ===== Statut de l'initiative → pastille sélectionnée + bannière + champs conditionnels =====
+   Le retour visuel (.pill-on) doit être réévalué sur TOUT le groupe à chaque changement
+   (comme refreshRayPills ci-dessous) : un radio qui se décoche ne déclenche pas lui-même
+   d'événement "change", donc le basculer un par un laisserait l'ancienne pastille allumée. */
+function refreshStatutCreationPills(){
+  document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
+    r.closest('label')?.classList.toggle('pill-on', r.checked);
+  });
+}
 document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
   r.addEventListener('change', function(){
+    refreshStatutCreationPills();
     const enCreation = this.value === "en_creation";
     document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
     document.getElementById("i-admin-box").style.display = enCreation ? "none" : "";
