@@ -10678,7 +10678,11 @@ route("POST", "/api/identity/verify", async (req, res) => {
     // Erreurs Stripe (StripeInvalidRequestError, etc.) portent le détail utile dans e.raw / e.type / e.code,
     // que safeError() n'expose pas au client — on les journalise ici pour diagnostiquer sans exposer de données.
     if (e && e.type) {
-      console.error(`[identity-verify] Stripe ${e.type} (code=${e.code || "?"}): ${e.raw?.message || e.message}`);
+      const detail = `Stripe ${e.type} (code=${e.code || "?"}): ${e.raw?.message || e.message}`;
+      console.error(`[identity-verify] ${detail}`);
+      await logError(new Error(detail), "identity-verify", req);
+    } else {
+      await logError(e, "identity-verify", req);
     }
     sendJSON(res, 500, SEC.safeError(e, "identity-verify"));
   }
