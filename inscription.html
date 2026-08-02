@@ -959,22 +959,49 @@ function apercuImage(input,imgId){
 /* Televerse la photo de profil et/ou la banniere juste apres la creation du compte — la session
    vient d'etre ouverte par /auth/signup, les routes d'upload (deja existantes, utilisees partout
    ailleurs sur le site) s'en servent pour savoir a qui associer le fichier. Best-effort : un echec
-   d'upload ne doit jamais faire echouer l'inscription elle-meme, qui a deja reussi a ce stade. */
+   d'upload ne doit jamais faire echouer l'inscription elle-meme, qui a deja reussi a ce stade.
+   Compte Initiative : /api/upload/logo et /api/upload/banner ne font QUE renvoyer l'URL Bunny —
+   contrairement a /api/upload/avatar (role Utilisateur), ils n'ecrivent rien en base. Il faut donc
+   recuperer l'id de l'initiative (GET /api/mon-initiative) puis persister logo_url/vitrine_banniere_url
+   via PUT /api/initiatives/:id/vitrine, sans quoi la vitrine reste sur ses initiales par defaut. */
 async function uploadPhotosApresInscription(){
-  const photoInput=document.getElementById("u-photo")?.files.length?document.getElementById("u-photo"):document.getElementById("i-photo");
-  const banniereInput=document.getElementById("u-banniere")?.files.length?document.getElementById("u-banniere"):document.getElementById("i-banniere");
+  const estInitiative = !!(document.getElementById("i-photo")?.files.length || document.getElementById("i-banniere")?.files.length);
+  const photoInput = estInitiative ? document.getElementById("i-photo") : document.getElementById("u-photo");
+  const banniereInput = estInitiative ? document.getElementById("i-banniere") : document.getElementById("u-banniere");
+
   async function envoyer(input,champ,dossier){
-    if(!input||!input.files.length)return;
+    if(!input||!input.files.length)return null;
     try{
       const fd=new FormData();
       fd.append(champ,input.files[0]);
-      await fetch("/api/upload/"+dossier,{method:"POST",credentials:"include",body:fd});
-    }catch(e){/* silencieux : l'inscription reste valide, la photo pourra etre ajoutee plus tard */}
+      const r=await fetch("/api/upload/"+dossier,{method:"POST",credentials:"include",body:fd});
+      const d=await r.json();
+      return d.url||null;
+    }catch(e){return null;} /* silencieux : l'inscription reste valide, la photo pourra etre ajoutee plus tard */
   }
-  await Promise.all([
-    envoyer(photoInput,"avatar","avatar"),
-    envoyer(banniereInput,"banner","banner"),
-  ]);
+
+  if (estInitiative) {
+    const [logoUrl, banniereUrl] = await Promise.all([
+      envoyer(photoInput,"logo","logo"),
+      envoyer(banniereInput,"banner","banner"),
+    ]);
+    if (!logoUrl && !banniereUrl) return;
+    try{
+      const r=await fetch("/api/mon-initiative",{credentials:"include"});
+      const d=await r.json();
+      const initId=d?.initiative?.id;
+      if(!initId)return;
+      const payload={};
+      if(logoUrl)payload.logo_url=logoUrl;
+      if(banniereUrl)payload.vitrine_banniere_url=banniereUrl;
+      await fetch("/api/initiatives/"+initId+"/vitrine",{method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    }catch(e){}
+  } else {
+    await Promise.all([
+      envoyer(photoInput,"avatar","avatar"),
+      envoyer(banniereInput,"banner","banner"),
+    ]);
+  }
 }
 
 /* ── Brouillon d'inscription (localStorage) — permet de reprendre le formulaire plus tard sans
