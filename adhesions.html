@@ -145,6 +145,7 @@ async function ouvrirPaiement(formuleId){
     if (!me.user) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
   } catch(e) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
   const formule = FORMULES.find(f=>f.id===formuleId);
+  if (!formule) { showToast?.('Cette formule n\'est plus disponible. Contactez l\'association.', 'warning'); return; }
   let montant = null;
   if (formule.montant_type !== 'fixe') {
     const suggestion = formule.montant_type === 'minimum' ? formule.montant_min : (formule.montant_min || 10);
@@ -195,16 +196,9 @@ async function afficherMaCarte(){
   zone.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement de votre carte…</div>';
   zone.scrollIntoView({ behavior: 'smooth' });
   try {
-    /* Trouve la fiche membre de l'utilisateur connecté pour cette initiative (via le registre des formules) */
-    const me = await api('GET', '/auth/me');
-    let membreId = null;
-    for (const f of FORMULES) {
-      try {
-        const r = await api('GET', `/initiatives/${INIT_ID}/adhesion-membres`);
-        const m = (r.membres||[]).find(x => x.linked_user_id === me.user.id);
-        if (m) { membreId = m.id; break; }
-      } catch(e) { break; }
-    }
+    /* Trouve la fiche membre de l'utilisateur connecté pour cette initiative (self-service, ne
+       dépend pas d'être propriétaire — cf. GET /initiatives/:id/mon-adhesion-membre). */
+    const { membre_id: membreId } = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`);
     if (!membreId) { zone.innerHTML = '<div class="notice">Vous n\'avez pas encore d\'adhésion pour cette initiative.</div>'; return; }
     const carte = await api('GET', `/adhesion-membres/${membreId}/carte`);
     zone.innerHTML = `
@@ -220,6 +214,9 @@ async function afficherMaCarte(){
           <span>N° ${carte.numero_adherent}</span>
           <span>${carte.date_expiration ? 'Valide jusqu\'au ' + new Date(carte.date_expiration).toLocaleDateString('fr-FR') : 'Sans expiration'}</span>
         </div>
+        ${carte.renouvelable ? `<div style="margin-top:12px;text-align:center;">
+          <button class="btn btn-orange" onclick="ouvrirPaiement(${carte.formule_id})">🔄 Renouveler mon adhésion</button>
+        </div>` : ''}
       </div>`;
     if (window.ProfileQR) {
       ProfileQR.render(document.getElementById('cm-qr-box'), {

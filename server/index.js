@@ -3416,12 +3416,18 @@ route("GET", "/api/adhesion-membres/:id/carte", async (req, res, params) => {
   const estOwner = Number(m.owner_user_id) === Number(user.id);
   const estMembre = m.linked_user_id && Number(m.linked_user_id) === Number(user.id);
   if (!estOwner && !estMembre) return sendJSON(res, 403, { error: "Accès refusé." });
-  const formule = await db.prepare("SELECT nom FROM adhesion_formules WHERE id=?").get(m.formule_id);
+  const formule = await db.prepare("SELECT nom, type_contribution FROM adhesion_formules WHERE id=?").get(m.formule_id);
+  /* Renouvellement manuel (tâche #68) : uniquement pertinent pour les formules non récurrentes
+     (adhesion_unique, dons, etc.) — les cotisations périodiques se renouvellent déjà automatiquement
+     via l'abonnement Stripe (invoice.payment_succeeded, cf. webhook). */
+  const renouvelable = !!m.linked_user_id && !ADHESION_RECURRING[formule?.type_contribution]
+    && !!adhesionExpirationMonths(formule?.type_contribution);
   sendJSON(res, 200, {
     nom: m.nom, prenom: m.prenom, photo_url: m.photo_url,
     initiative: m.init_nom, initiative_logo: m.init_logo,
-    formule: formule?.nom, numero_adherent: `ADH-${m.initiative_id}-${m.id}`,
+    formule: formule?.nom, formule_id: m.formule_id, numero_adherent: `ADH-${m.initiative_id}-${m.id}`,
     statut: computeAdhesionStatut(m), date_expiration: m.date_expiration,
+    renouvelable,
     verify_url: `/api/adhesion/verify/${m.id}`,
   });
 });
@@ -8019,6 +8025,18 @@ route("GET", "/api/initiatives/:id/demande-adhesion", async (req, res, params) =
   }
   const d = await db.prepare("SELECT statut FROM initiative_adhesion_demandes WHERE initiative_id=? AND user_id=?").get(params.id, user.id);
   sendJSON(res, 200, { statut: d ? d.statut : null });
+});
+
+/* GET /api/initiatives/:id/mon-adhesion-membre — retrouve la fiche adhesion_membres de l'utilisateur
+   connecté pour cette initiative (self-service, sans passer par la route registre réservée au
+   propriétaire). Corrige un bug pré-existant : "Ma carte de membre" (adhesions.html) appelait
+   GET /initiatives/:id/adhesion-membres, réservée au propriétaire, et échouait donc pour tout
+   adhérent réel consultant sa propre carte. */
+route("GET", "/api/initiatives/:id/mon-adhesion-membre", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare("SELECT id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, user.id);
+  sendJSON(res, 200, { membre_id: m ? m.id : null });
 });
 
 /* GET /api/initiatives/:id/adhesion-demandes — liste des demandes reçues (propriétaire uniquement) */
