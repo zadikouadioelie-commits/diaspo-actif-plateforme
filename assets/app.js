@@ -1112,6 +1112,7 @@ function renderInitiativeCard(it){
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
+        ${['Association','ONG'].includes(it.type) ? `<button type="button" class="ann-card-btn" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer</button>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 S'inscrire à un événement</button>` : ''}
       </div>
     </div>
@@ -1187,6 +1188,27 @@ async function annInscrire(id, btn){
     alert(e.message || 'Erreur lors de l\'inscription.');
   }
 }
+
+/* ── Bouton "Adhérer" (Associations/ONG) — cartouches Annuaire/Vitrines + profil public.
+   Version simple : envoie une demande d'adhésion, sans choix de formule ni paiement (viendra
+   dans une étape suivante). Le bouton passe en état "Demande envoyée" une fois la demande créée. */
+async function demanderAdhesion(initiativeId, btn){
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await api('POST', `/initiatives/${initiativeId}/demande-adhesion`);
+    if (btn) {
+      const dejaTexte = r.statut === 'acceptee' ? '✓ Membre' : '⏳ Demande envoyée';
+      btn.textContent = dejaTexte;
+      btn.style.opacity = '.8';
+    }
+    if (typeof showToast === 'function') showToast(r.statut === 'acceptee' ? '✅ Vous êtes déjà membre.' : '✅ Demande d\'adhésion envoyée !');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🤝 Adhérer'; }
+    alert(e.message || "Erreur lors de l'envoi de la demande.");
+  }
+}
+window.demanderAdhesion = demanderAdhesion;
 
 function populateSelect(id, values){
   const sel = document.getElementById(id);
@@ -1579,6 +1601,7 @@ function renderVitrineCard(v) {
       ${noteHtml}
       <div class="vit-card-foot">
         <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>
+        ${['Association','ONG'].includes(v.type) ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer</button>` : ''}
       </div>
     </div>
   </div>`;

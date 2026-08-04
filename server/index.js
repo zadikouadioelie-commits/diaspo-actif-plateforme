@@ -7866,6 +7866,84 @@ route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
   sendJSON(res, 200, { ok: true, abonne: false });
 });
 
+/* ── Bouton "Adhérer" self-service (Associations/ONG uniquement) ──
+   Version simple : crée une demande "en attente", que le propriétaire valide/refuse ensuite
+   depuis son tableau de bord (voir GET/PATCH /api/initiatives/:id/adhesion-demandes). Distinct
+   du module "Adhésions" payant (adhesion_formules/adhesion_membres) — pourra s'y brancher plus
+   tard, mais fonctionne dès maintenant sans configuration préalable côté association. */
+route("POST", "/api/initiatives/:id/demande-adhesion", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, nom, type, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (!['Association', 'ONG'].includes(init.type)) {
+    return sendJSON(res, 400, { error: "L'adhésion n'est proposée que pour les Associations et ONG." });
+  }
+  if (Number(init.owner_user_id) === Number(user.id)) {
+    return sendJSON(res, 400, { error: "Vous ne pouvez pas adhérer à votre propre structure." });
+  }
+  const existante = await db.prepare(
+    "SELECT id, statut FROM initiative_adhesion_demandes WHERE initiative_id=? AND user_id=?"
+  ).get(params.id, user.id);
+  if (existante && existante.statut !== 'refusee') {
+    return sendJSON(res, 200, { ok: true, statut: existante.statut, deja_existante: true });
+  }
+  if (existante) {
+    // Une demande refusée peut être retentée : on la remet simplement "en_attente".
+    await db.prepare("UPDATE initiative_adhesion_demandes SET statut='en_attente', updated_at=datetime('now') WHERE id=?").run(existante.id);
+  } else {
+    await db.prepare("INSERT INTO initiative_adhesion_demandes (initiative_id, user_id) VALUES (?,?)").run(params.id, user.id);
+  }
+  if (init.owner_user_id) {
+    creerNotif(init.owner_user_id, "demande_adhesion", `Nouvelle demande d'adhésion — ${init.nom}`,
+      `${user.nom}${user.prenom ? ' ' + user.prenom : ''} souhaite adhérer à ${init.nom}.`,
+      { initiative_id: Number(params.id) });
+  }
+  sendJSON(res, 201, { ok: true, statut: 'en_attente' });
+});
+
+/* GET /api/initiatives/:id/demande-adhesion — statut de la demande de l'utilisateur connecté (pour l'état du bouton) */
+route("GET", "/api/initiatives/:id/demande-adhesion", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 200, { statut: null });
+  const d = await db.prepare("SELECT statut FROM initiative_adhesion_demandes WHERE initiative_id=? AND user_id=?").get(params.id, user.id);
+  sendJSON(res, 200, { statut: d ? d.statut : null });
+});
+
+/* GET /api/initiatives/:id/adhesion-demandes — liste des demandes reçues (propriétaire uniquement) */
+route("GET", "/api/initiatives/:id/adhesion-demandes", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare(`
+    SELECT d.*, u.nom, u.prenom, u.email, u.photo_url, u.ville, u.pays
+    FROM initiative_adhesion_demandes d JOIN users u ON u.id = d.user_id
+    WHERE d.initiative_id=? ORDER BY d.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* PATCH /api/adhesion-demandes/:id — accepter/refuser une demande (propriétaire uniquement) */
+route("PATCH", "/api/adhesion-demandes/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const d = await db.prepare(`
+    SELECT dm.*, i.owner_user_id, i.nom AS initiative_nom FROM initiative_adhesion_demandes dm
+    JOIN initiatives i ON i.id = dm.initiative_id WHERE dm.id=?
+  `).get(params.id);
+  if (!d) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (Number(d.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const { statut } = body;
+  if (!['acceptee', 'refusee'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE initiative_adhesion_demandes SET statut=?, updated_at=datetime('now') WHERE id=?").run(statut, params.id);
+  creerNotif(d.user_id, "demande_adhesion",
+    statut === 'acceptee' ? `Adhésion acceptée — ${d.initiative_nom}` : `Adhésion refusée — ${d.initiative_nom}`,
+    statut === 'acceptee' ? `Votre demande d'adhésion à ${d.initiative_nom} a été acceptée.` : `Votre demande d'adhésion à ${d.initiative_nom} a été refusée.`,
+    { initiative_id: d.initiative_id });
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/mes-suivis", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -12017,6 +12095,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   }
   sendJSON(res, 201, { id });
 });
+
 
 route("GET", "/api/evenements/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);

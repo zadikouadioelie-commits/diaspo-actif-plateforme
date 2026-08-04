@@ -282,6 +282,14 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
     } catch(e) {}
   }
 
+  /* Bouton "Adhérer" (Associations/ONG uniquement) — statut de la demande de l'utilisateur
+     connecté, récupéré avant le rendu pour afficher directement le bon état du bouton. */
+  const estAssociationOuOng = ['Association', 'ONG'].includes(init.type);
+  let statutAdhesion = null;
+  if (estAssociationOuOng && me && !isOwner) {
+    try { statutAdhesion = (await api("GET", `/initiatives/${init.id}/demande-adhesion`)).statut; } catch(e) {}
+  }
+
   const coverGrad = THEME_VITRINE_COULEURS[init.vitrine_theme] || DOMAIN_GRAD[init.domaine] || 'linear-gradient(135deg,#0F2A50 0%,#1B3A6B 50%,#1565C0 100%)';
   /* Le logo venait d'un service extérieur (api.dicebear.com) qui fabriquait des initiales,
      en ignorant le logo réellement chargé par l'initiative — celui que la cartouche de
@@ -375,6 +383,11 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
               🔔 ${estAbonne ? 'Abonné' : "S'abonner"}
             </button>
           ` : me ? '' : `<a href="login.html" class="btn btn-orange">🔔 S'abonner</a>`}
+          ${estAssociationOuOng && !isOwner ? (
+            statutAdhesion === 'acceptee' ? `<button class="btn btn-outline" disabled style="gap:6px;">✓ Membre</button>`
+            : statutAdhesion === 'en_attente' ? `<button class="btn btn-outline" disabled style="gap:6px;">⏳ Demande envoyée</button>`
+            : `<button id="btn-adherer" class="btn btn-orange" style="gap:6px;" onclick="demanderAdhesion(${init.id}, this)">🤝 Adhérer</button>`
+          ) : ''}
           ${init.owner_user_id
             /* Le serveur décide de l'action possible et le bouton la reflète : « Message »
                si l'échange est ouvert, « Demande de liaison » avec son message imposé sinon.

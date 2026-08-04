@@ -164,6 +164,23 @@ db.exec(`
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
   );
 
+  /* Demande d'adhésion self-service (bouton "Adhérer", réservé aux Associations/ONG) — version
+     volontairement simple : une demande en attente que le propriétaire valide/refuse depuis son
+     tableau de bord. Distincte du module "Adhésions" (adhesion_formules/adhesion_membres, Premium,
+     avec cotisation et paiement) : ce module-ci pourra brancher dessus plus tard, mais fonctionne
+     dès maintenant même pour une association qui n'a rien configuré côté paiement. */
+  CREATE TABLE IF NOT EXISTS initiative_adhesion_demandes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id       INTEGER NOT NULL,
+    statut        TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee')),
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
   /* ===== ABONNEMENTS AUX PROFILS PUBLICS COLLECTIVITÉ ===== */
   CREATE TABLE IF NOT EXISTS abonnements_collectivite (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
