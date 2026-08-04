@@ -25,10 +25,19 @@
 .cg-stats{display:flex;gap:22px;margin-top:14px;flex-wrap:wrap;}
 .cg-stat{font-size:13px;color:var(--muted);}
 .cg-stat strong{display:block;font-size:18px;color:var(--navy);}
-.cg-participer{width:100%;margin-top:18px;padding:14px;border-radius:10px;border:none;font-weight:800;font-size:15px;cursor:not-allowed;background:#e5e7eb;color:#9ca3af;}
+.cg-participer{width:100%;margin-top:18px;padding:14px;border-radius:10px;border:none;font-weight:800;font-size:15px;cursor:pointer;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;}
+.cg-participer:disabled{cursor:not-allowed;background:#e5e7eb;color:#9ca3af;}
 .cg-participer-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:8px;}
 .cg-desc{font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;}
 .cg-empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.cg-banner{border-radius:10px;padding:12px 16px;font-size:13.5px;margin-bottom:16px;}
+.cg-banner-ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;}
+.cg-banner-annule{background:#fffbeb;color:#92400e;border:1px solid #fde68a;}
+.cg-contrib-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.cg-contrib-item:last-child{border-bottom:none;}
+.cg-montants-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0;}
+.cg-montant-pill{padding:10px;border:1.5px solid var(--border);border-radius:8px;text-align:center;font-weight:700;cursor:pointer;background:#fff;}
+.cg-montant-pill.actif{border-color:#F26422;background:#fff7ed;color:#c2410c;}
 @media(min-width:681px){#sidebar,#sidebar-backdrop,#sidebar-toggle{display:none!important;}}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -87,7 +96,93 @@
     terminee:{label:'✅ Cagnotte terminée'}, expiree:{label:'⌛ Cagnotte expirée'},
   };
   const slug = new URLSearchParams(location.search).get('slug');
+  const participationResult = new URLSearchParams(location.search).get('participation');
   const el = document.getElementById('cg-content');
+  let _cagnotte = null;
+  let _montantChoisi = null;
+
+  function bannerHtml(){
+    if (participationResult === 'succes') return `<div class="cg-banner cg-banner-ok">✅ Merci ! Votre participation a bien été enregistrée.</div>`;
+    if (participationResult === 'annule') return `<div class="cg-banner cg-banner-annule">Le paiement a été annulé — vous pouvez réessayer quand vous le souhaitez.</div>`;
+    return '';
+  }
+
+  function ouvrirParticipation(){
+    fetch('/api/auth/me', {credentials:'include'}).then(r=>r.json()).then(({user}) => {
+      if (!user) { if (confirm('Vous devez être connecté(e) pour participer. Aller à la connexion ?')) location.href = 'login.html?retour=' + encodeURIComponent(location.href); return; }
+      renderModalParticipation();
+    });
+  }
+
+  function renderModalParticipation(){
+    fetch('/api/cagnottes/montants-predefinis').then(r=>r.json()).then(({ montants }) => {
+      let modal = document.getElementById('cg-part-modal');
+      if (!modal) { modal = document.createElement('div'); modal.id = 'cg-part-modal'; modal.className = 'modal-overlay'; document.body.appendChild(modal); }
+      _montantChoisi = montants[1] || montants[0];
+      modal.innerHTML = `<div class="modal-box" style="max-width:420px;text-align:left;">
+        <h3 style="margin:0 0 4px;">💛 Participer à « ${escH(_cagnotte.titre)} »</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Choisissez un montant, ou saisissez le vôtre.</p>
+        <div class="cg-montants-grid" id="cg-part-montants">
+          ${montants.map(m => `<div class="cg-montant-pill${m===_montantChoisi?' actif':''}" data-montant="${m}">${m} ${_cagnotte.devise}</div>`).join('')}
+        </div>
+        <input id="cg-part-libre" type="number" min="1" step="1" placeholder="Autre montant (${_cagnotte.devise})" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;">
+          <input type="checkbox" id="cg-part-anonyme"> Participer anonymement (mon nom ne sera pas affiché publiquement)
+        </label>
+        <textarea id="cg-part-message" rows="2" placeholder="Message (optionnel)" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;margin-bottom:10px;"></textarea>
+        <div id="cg-part-error" class="auth-error" style="display:none;margin-bottom:10px;"></div>
+        <button class="cg-participer" id="cg-part-submit">💳 Continuer vers le paiement</button>
+        <div style="text-align:center;margin-top:10px;">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('cg-part-modal').remove()">Annuler</button>
+        </div>
+      </div>`;
+      modal.querySelectorAll('.cg-montant-pill').forEach(p => p.addEventListener('click', () => {
+        _montantChoisi = Number(p.dataset.montant);
+        document.getElementById('cg-part-libre').value = '';
+        modal.querySelectorAll('.cg-montant-pill').forEach(x => x.classList.toggle('actif', x === p));
+      }));
+      document.getElementById('cg-part-libre').addEventListener('input', function(){
+        if (this.value) { _montantChoisi = null; modal.querySelectorAll('.cg-montant-pill').forEach(x => x.classList.remove('actif')); }
+      });
+      document.getElementById('cg-part-submit').addEventListener('click', soumettreParticipation);
+    });
+  }
+
+  function soumettreParticipation(){
+    const errBox = document.getElementById('cg-part-error');
+    errBox.style.display = 'none';
+    const libre = Number(document.getElementById('cg-part-libre').value);
+    const montant = libre > 0 ? libre : _montantChoisi;
+    if (!montant || montant < 1) { errBox.textContent = 'Choisissez ou saisissez un montant valide.'; errBox.style.display = 'block'; return; }
+    const btn = document.getElementById('cg-part-submit');
+    btn.disabled = true; btn.textContent = 'Redirection…';
+    fetch('/api/cagnottes/' + _cagnotte.id + '/participer', {
+      method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        montant,
+        anonyme: document.getElementById('cg-part-anonyme').checked,
+        message: document.getElementById('cg-part-message').value.trim() || undefined,
+      })
+    }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; })
+      .then(({ checkout_url }) => { location.href = checkout_url; })
+      .catch(err => { errBox.textContent = err.error || 'Erreur lors de la préparation du paiement.'; errBox.style.display = 'block'; btn.disabled = false; btn.textContent = '💳 Continuer vers le paiement'; });
+  }
+  window.cgOuvrirParticipation = ouvrirParticipation;
+
+  function renderContributeurs(slug, afficherParticipants){
+    if (!afficherParticipants) return;
+    fetch('/api/cagnottes/public/' + encodeURIComponent(slug) + '/contributeurs').then(r=>r.json()).then(({ contributeurs }) => {
+      if (!contributeurs || !contributeurs.length) return;
+      const box = document.createElement('div');
+      box.className = 'cg-card';
+      box.innerHTML = `<h3 style="margin:0 0 10px;font-size:15px;">🙌 ${contributeurs.length} contributeur(s)</h3>` +
+        contributeurs.map(p => `<div class="cg-contrib-item">
+          <span>${escH(p.contributeur_nom)}${p.message ? ` — <span style="color:var(--muted);">${escH(p.message)}</span>` : ''}</span>
+          ${p.montant != null ? `<strong>${Number(p.montant).toLocaleString('fr-FR')}</strong>` : ''}
+        </div>`).join('');
+      el.appendChild(box);
+    }).catch(()=>{});
+  }
 
   if (!slug) {
     el.innerHTML = `<div class="cg-empty">Aucune cagnotte demandée.</div>`;
@@ -95,13 +190,16 @@
     fetch('/api/cagnottes/public/' + encodeURIComponent(slug), { credentials:'include' })
       .then(async r => { if (!r.ok) throw await r.json().catch(()=>({error:'Introuvable.'})); return r.json(); })
       .then(({ cagnotte:c }) => {
+        _cagnotte = c;
         document.title = `${c.titre} — Diaspo'Actif Cagnottes`;
         const objectifTxt = c.objectif_montant
           ? `${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} sur ${Number(c.objectif_montant).toLocaleString('fr-FR')} ${c.devise} — ${c.pourcentage}%`
           : `${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} collectés (objectif libre)`;
         const barre = c.objectif_montant ? `<div class="cg-bar"><div class="cg-bar-fill" style="width:${c.pourcentage}%;"></div></div>` : '';
+        const peutParticiper = c.statut === 'active';
         el.innerHTML = `
           <a class="cg-back" href="cagnottes.html">← Toutes les cagnottes</a>
+          ${bannerHtml()}
           ${c.image_url ? `<img class="cg-photo" src="${escH(c.image_url)}" alt="">` : `<div class="cg-photo">🪙</div>`}
           ${c.categorie ? `<span class="cg-cat">${escH(c.categorie)}</span>` : ''}
           <h1 class="cg-title">${escH(c.titre)}</h1>
@@ -114,12 +212,14 @@
               <div class="cg-stat"><strong>${c.nb_contributeurs||0}</strong>contributeur(s)</div>
               ${c.date_fin ? `<div class="cg-stat"><strong>${new Date(c.date_fin).toLocaleDateString('fr-FR')}</strong>date de fin</div>` : ''}
             </div>
-            <button class="cg-participer" disabled>💛 Participer (bientôt disponible)</button>
-            <div class="cg-participer-note">Le paiement en ligne sera activé dans une prochaine mise à jour.</div>
+            <button class="cg-participer" id="cg-btn-participer" ${peutParticiper ? '' : 'disabled'}>💛 ${peutParticiper ? 'Participer' : 'Participation indisponible'}</button>
+            ${peutParticiper ? '' : `<div class="cg-participer-note">Cette cagnotte n'accepte plus de contributions pour le moment.</div>`}
           </div>
 
           ${c.description ? `<div class="cg-card"><h3 style="margin:0 0 10px;font-size:15px;">À propos</h3><div class="cg-desc">${escH(c.description)}</div></div>` : ''}
         `;
+        if (peutParticiper) document.getElementById('cg-btn-participer').addEventListener('click', ouvrirParticipation);
+        renderContributeurs(slug, !!c.afficher_participants);
       })
       .catch(err => {
         el.innerHTML = `<div class="cg-empty">🔒 ${escH(err.error || 'Cette cagnotte est introuvable ou n\'est plus accessible.')}</div>`;

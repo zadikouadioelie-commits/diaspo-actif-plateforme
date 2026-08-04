@@ -11293,6 +11293,29 @@ async function handleStripeWebhook(req, res) {
         creerNotif(accredUA.user_id, "accred_paiement_echoue", "Paiement échoué — Abonnement Premium",
           "Votre paiement n'a pas pu être traité. Vous avez 7 jours pour régulariser avant suspension de votre Premium.", { accred_id: accredUA.accred_id });
       }
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
+      /* Contribution à une cagnotte confirmée. Aucune commission plateforme pour l'instant
+         (non spécifiée au cahier des charges) : le montant collecté sert uniquement d'affichage
+         de progression — la mécanique de reversement au créateur viendra dans une phase ultérieure. */
+      const contribId = Number(event.data.object.metadata.diaspoactif_cagnotte_contribution_id);
+      const contrib = await db.prepare("SELECT * FROM cagnotte_contributions WHERE id=? AND statut='en_attente'").get(contribId);
+      if (contrib) {
+        await db.prepare("UPDATE cagnotte_contributions SET statut='paye' WHERE id=?").run(contribId);
+        await db.prepare("UPDATE cagnottes SET montant_collecte = montant_collecte + ?, nb_contributeurs = nb_contributeurs + 1, updated_at=datetime('now') WHERE id=?")
+          .run(contrib.montant, contrib.cagnotte_id);
+        const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
+        if (c) {
+          creerNotif(c.owner_user_id, "cagnotte_contribution", "Nouvelle contribution 🪙",
+            `Une contribution de ${contrib.montant} ${contrib.devise} a été reçue pour « ${c.titre} ».`, { cagnotte_id: contrib.cagnotte_id });
+          if (c.objectif_montant && Number(c.montant_collecte) >= Number(c.objectif_montant)) {
+            creerNotif(c.owner_user_id, "cagnotte_objectif_atteint", "Objectif atteint 🎉",
+              `Votre cagnotte « ${c.titre} » a atteint son objectif !`, { cagnotte_id: contrib.cagnotte_id });
+          }
+        }
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
+      const contribId = Number(event.data.object.metadata.diaspoactif_cagnotte_contribution_id);
+      await db.prepare("UPDATE cagnotte_contributions SET statut='echoue' WHERE id=? AND statut='en_attente'").run(contribId);
     } else if (event.type === "customer.subscription.deleted") {
       const sub = event.data.object;
       await db.prepare(`UPDATE pub_abonnements SET statut='canceled', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
@@ -12168,6 +12191,32 @@ route("GET", "/api/cagnottes/public/:slug", async (req, res, params) => {
   sendJSON(res, 200, { cagnotte: { ...cagnotteAvecStatut(c), organisateur_nom: owner?.nom || null, organisateur_photo: owner?.photo_url || null } });
 });
 
+/* Montants prédéfinis proposés au participant, en plus du montant libre (cahier des charges).
+   ⚠️ Doit rester enregistré AVANT /api/cagnottes/:id (sinon le routeur, qui matche dans l'ordre
+   d'enregistrement, prend :id="montants-predefinis" et renvoie 404 "Cagnotte introuvable"). */
+const CAGNOTTE_MONTANTS_PREDEFINIS = [10, 20, 30, 50, 100];
+route("GET", "/api/cagnottes/montants-predefinis", async (req, res) => {
+  sendJSON(res, 200, { montants: CAGNOTTE_MONTANTS_PREDEFINIS });
+});
+
+/* GET /api/cagnottes/public/:slug/contributeurs — liste publique des contributeurs non-anonymes
+   (respecte le choix individuel ET la préférence globale d'affichage du créateur).
+   ⚠️ Doit rester enregistré AVANT /api/cagnottes/public/:slug (même piège de shadowing). */
+route("GET", "/api/cagnottes/public/:slug/contributeurs", async (req, res, params) => {
+  const c = await db.prepare("SELECT id, afficher_participants, afficher_montants FROM cagnottes WHERE slug=?").get(params.slug);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!c.afficher_participants) return sendJSON(res, 200, { contributeurs: [] });
+  const rows = await db.prepare(`
+    SELECT co.montant, co.message, co.created_at, u.nom AS contributeur_nom
+    FROM cagnotte_contributions co JOIN users u ON u.id=co.user_id
+    WHERE co.cagnotte_id=? AND co.statut='paye' AND co.anonyme=0 ORDER BY co.created_at DESC LIMIT 50
+  `).all(c.id);
+  sendJSON(res, 200, {
+    contributeurs: rows.map(r => ({ ...r, montant: c.afficher_montants ? r.montant : null })),
+    afficher_montants: !!c.afficher_montants,
+  });
+});
+
 route("GET", "/api/cagnottes/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -12184,7 +12233,7 @@ route("POST", "/api/cagnottes", async (req, res, params, body) => {
   if (!user || !["initiative","administrateur"].includes(user.role)) {
     return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
   }
-  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite } = body;
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (date_debut && date_fin && new Date(date_fin) <= new Date(date_debut)) {
     return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
@@ -12192,13 +12241,15 @@ route("POST", "/api/cagnottes", async (req, res, params, body) => {
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = (titre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "cagnotte") + "-" + Date.now().toString(36);
   const id = (await db.prepare(`
-    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     slug, user.id, init ? init.id : null, titre, description || null, categorie || null, image_url || null,
     objectif_montant != null && objectif_montant !== "" ? Number(objectif_montant) : null,
     devise || "EUR", date_debut || null, date_fin || null,
-    visibilite === "privee" ? "privee" : "publique"
+    visibilite === "privee" ? "privee" : "publique",
+    afficher_participants === false ? 0 : 1,
+    afficher_montants === false ? 0 : 1
   )).lastInsertRowid;
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(id);
   sendJSON(res, 201, { cagnotte: cagnotteAvecStatut(row) });
@@ -12210,7 +12261,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
   const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
-  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite } = body;
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants } = body;
   const dDebut = date_debut !== undefined ? date_debut : c.date_debut;
   const dFin = date_fin !== undefined ? date_fin : c.date_fin;
   if (dDebut && dFin && new Date(dFin) <= new Date(dDebut)) {
@@ -12219,7 +12270,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
   await db.prepare(`
     UPDATE cagnottes SET
       titre=?, description=?, categorie=?, image_url=?, objectif_montant=?, devise=?,
-      date_debut=?, date_fin=?, visibilite=?, updated_at=datetime('now')
+      date_debut=?, date_fin=?, visibilite=?, afficher_participants=?, afficher_montants=?, updated_at=datetime('now')
     WHERE id=?
   `).run(
     titre !== undefined && titre !== "" ? titre : c.titre,
@@ -12230,6 +12281,8 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
     devise !== undefined ? devise : c.devise,
     dDebut, dFin,
     visibilite !== undefined ? (visibilite === "privee" ? "privee" : "publique") : c.visibilite,
+    afficher_participants !== undefined ? (afficher_participants ? 1 : 0) : c.afficher_participants,
+    afficher_montants !== undefined ? (afficher_montants ? 1 : 0) : c.afficher_montants,
     params.id
   );
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
@@ -12314,6 +12367,76 @@ route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params)
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   await db.prepare("DELETE FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").run(params.pid, params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* ── Participation + paiement (Phase 1 — dernier increment) ── */
+/* (montants-predefinis + public/:slug/contributeurs sont enregistrées plus haut, avant /:id) */
+
+/* POST /api/cagnottes/:id/participer — crée la contribution (en_attente) + la session Stripe Checkout. */
+route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  const statutActuel = calculerStatutCagnotte(c);
+  if (statutActuel !== "active") return sendJSON(res, 400, { error: "Cette cagnotte n'accepte plus de contributions pour le moment." });
+  if (c.visibilite === "privee") {
+    const estProprietaire = Number(c.owner_user_id) === Number(user.id);
+    const estAutorise = !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
+    if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
+  }
+  const montant = Number(body?.montant);
+  if (!montant || montant < 1) return sendJSON(res, 400, { error: "Montant invalide." });
+  const anonyme = body?.anonyme ? 1 : 0;
+  const message = body?.message ? String(body.message).slice(0, 500) : null;
+
+  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
+  const contribId = (await db.prepare(`
+    INSERT INTO cagnotte_contributions (cagnotte_id, user_id, montant, devise, anonyme, message, statut)
+    VALUES (?,?,?,?,?,?,'en_attente')
+  `).run(c.id, user.id, montant, c.devise || "EUR", anonyme, message)).lastInsertRowid;
+
+  const origin = getOrigin(req);
+  try {
+    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer: stripeCustomerId,
+      line_items: [{
+        price_data: {
+          currency: (c.devise || "EUR").toLowerCase(),
+          unit_amount: Math.round(montant * 100),
+          product_data: { name: `Cagnotte — ${c.titre}` },
+        },
+        quantity: 1,
+      }],
+      metadata: { diaspoactif_cagnotte_contribution_id: String(contribId) },
+      success_url: `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}&participation=succes`,
+      cancel_url: `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}&participation=annule`,
+    });
+    await db.prepare("UPDATE cagnotte_contributions SET stripe_session_id=? WHERE id=?").run(session.id, contribId);
+    sendJSON(res, 201, { id: contribId, checkout_url: session.url });
+  } catch (e) {
+    await db.prepare("UPDATE cagnotte_contributions SET statut='echoue' WHERE id=?").run(contribId);
+    sendJSON(res, 500, SEC.safeError(e, "cagnotte-participer"));
+  }
+});
+
+/* GET /api/cagnottes/:id/contributions — historique des contributions (créateur uniquement). */
+route("GET", "/api/cagnottes/:id/contributions", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const rows = await db.prepare(`
+    SELECT co.id, co.montant, co.devise, co.anonyme, co.message, co.statut, co.created_at, u.nom AS contributeur_nom
+    FROM cagnotte_contributions co JOIN users u ON u.id=co.user_id
+    WHERE co.cagnotte_id=? AND co.statut='paye' ORDER BY co.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { contributions: rows });
 });
 
 route("GET", "/api/evenements/:id", async (req, res, params) => {

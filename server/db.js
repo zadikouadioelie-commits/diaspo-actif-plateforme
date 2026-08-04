@@ -290,6 +290,10 @@ db.exec(`
     visibilite TEXT DEFAULT 'publique' CHECK(visibilite IN ('publique','privee')),
     montant_collecte REAL DEFAULT 0,
     nb_contributeurs INTEGER DEFAULT 0,
+    /* Préférences d'affichage public du créateur — indépendantes du choix individuel de chaque
+       participant (anonyme ou non) : un participant anonyme n'est jamais nommé, quoi qu'il arrive. */
+    afficher_participants INTEGER DEFAULT 1,
+    afficher_montants INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
@@ -302,6 +306,22 @@ db.exec(`
     cagnotte_id INTEGER NOT NULL,
     user_id INTEGER,
     email TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Contributions (paiements) à une cagnotte — Phase 1 "Participation + paiement". */
+  CREATE TABLE IF NOT EXISTS cagnotte_contributions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cagnotte_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    montant REAL NOT NULL,
+    devise TEXT DEFAULT 'EUR',
+    anonyme INTEGER DEFAULT 0,
+    message TEXT,
+    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','paye','echoue','rembourse')),
+    stripe_session_id TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
@@ -4824,6 +4844,12 @@ db.exec(`
   if (!initCols7.includes('tel_responsable_2'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_2 TEXT");
   if (!initCols7.includes('tel_responsable_3'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_3 TEXT");
   if (!initCols7.includes('numero_fiscal'))                    db.exec("ALTER TABLE initiatives ADD COLUMN numero_fiscal TEXT");
+
+  // Préférences d'affichage public des cagnottes — déjà dans le CREATE TABLE cagnottes plus haut,
+  // ces lignes ne servent qu'au SQLite local déjà créé (self-healing auto sur PostgreSQL).
+  const cagCols1 = db.prepare('PRAGMA table_info(cagnottes)').all().map(c=>c.name);
+  if (!cagCols1.includes('afficher_participants'))              db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_participants INTEGER DEFAULT 1");
+  if (!cagCols1.includes('afficher_montants'))                  db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_montants INTEGER DEFAULT 1");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`

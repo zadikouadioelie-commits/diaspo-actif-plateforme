@@ -4124,6 +4124,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         if (c.visibilite === 'privee') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenParticipants(${c.id})">👥 Participants autorisés</button>`);
         }
+        if (c.statut !== 'brouillon') {
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenContributions(${c.id})">📊 Contributions</button>`);
+        }
         return `<div class="card" style="margin-bottom:12px;padding:16px 18px;">
           <div style="display:flex;gap:14px;flex-wrap:wrap;">
             ${c.image_url ? `<img src="${c.image_url}" alt="" style="width:88px;height:88px;border-radius:10px;object-fit:cover;flex:none;">` : `<div style="width:88px;height:88px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:28px;flex:none;">🪙</div>`}
@@ -4210,6 +4213,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <label class="pv-lbl">Date de fin</label>
             <input id="cag-f-date-fin" type="date" value="${(c.date_fin||'').slice(0,10)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           </div>
+          <div style="grid-column:1/-1;">
+            <label class="pv-lbl">Affichage public des contributions</label>
+            <div style="display:flex;gap:16px;margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="cag-f-afficher-participants" ${c.afficher_participants!==0?'checked':''}> Afficher les noms des contributeurs</label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="cag-f-afficher-montants" ${c.afficher_montants!==0?'checked':''}> Afficher les montants</label>
+            </div>
+          </div>
         </div>
         <div id="cag-form-error" class="auth-error" style="display:none;margin-top:10px;"></div>
         <div style="display:flex;gap:10px;margin-top:16px;">
@@ -4254,6 +4264,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       visibilite: document.querySelector('input[name="cag-f-visibilite"]:checked')?.value || 'publique',
       date_debut: document.getElementById('cag-f-date-debut').value || null,
       date_fin: document.getElementById('cag-f-date-fin').value || null,
+      afficher_participants: document.getElementById('cag-f-afficher-participants').checked,
+      afficher_montants: document.getElementById('cag-f-afficher-montants').checked,
     };
     try {
       if (_cagEditId) await api('PUT', '/cagnottes/'+_cagEditId, payload);
@@ -4326,6 +4338,46 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.cagRetirerParticipant = async function(id, pid) {
     try { await api('DELETE', '/cagnottes/'+id+'/participants/'+pid); cagRenderParticipants(id); }
     catch(e) { alert('Erreur : '+e.message); }
+  };
+
+  /* ── Tableau de bord créateur : historique des contributions ── */
+  window.cagOpenContributions = async function(id) {
+    let modal = document.getElementById('cag-contrib-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cag-contrib-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:480px;text-align:left;">
+      <h3 style="margin:0 0 4px;">📊 Contributions</h3>
+      <div id="cag-contrib-liste" style="max-height:340px;overflow-y:auto;margin-top:10px;">Chargement…</div>
+      <div style="text-align:right;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-contrib-modal').remove()">Fermer</button>
+      </div>
+    </div>`;
+    try {
+      const { contributions } = await api('GET', '/cagnottes/'+id+'/contributions');
+      const wrap = document.getElementById('cag-contrib-liste');
+      if (!contributions.length) {
+        wrap.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucune contribution reçue pour l'instant.</p>`;
+        return;
+      }
+      const total = contributions.reduce((s,c)=>s+Number(c.montant),0);
+      wrap.innerHTML = `
+        <div style="display:flex;gap:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
+          <div><div style="font-size:20px;font-weight:800;">${total.toLocaleString('fr-FR')} ${contributions[0].devise}</div><div style="font-size:11px;color:var(--muted);">Total récolté</div></div>
+          <div><div style="font-size:20px;font-weight:800;">${contributions.length}</div><div style="font-size:11px;color:var(--muted);">Contribution(s)</div></div>
+        </div>
+        ${contributions.map(c => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+            <span>${c.anonyme ? '🙈 Anonyme' : escH(c.contributeur_nom)}${c.message ? ` — <span style="color:var(--muted);">${escH(c.message)}</span>` : ''}<br><span style="font-size:11px;color:var(--muted);">${fmtDateInit(c.created_at)}</span></span>
+            <strong>${Number(c.montant).toLocaleString('fr-FR')} ${c.devise}</strong>
+          </div>`).join('')}
+      `;
+    } catch(e) {
+      document.getElementById('cag-contrib-liste').innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
+    }
   };
 
   document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
