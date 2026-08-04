@@ -2901,6 +2901,22 @@ route("GET", "/api/initiatives/:id/adhesion-membres", async (req, res, params, b
   const formuleFiltre = query?.formule_id;
   if (statutFiltre) rows = rows.filter(m => m.statut === statutFiltre);
   if (formuleFiltre) rows = rows.filter(m => Number(m.formule_id) === Number(formuleFiltre));
+  /* Filtres combinables supplémentaires (cahier des charges 2026-08-04, points 9-10) : origine
+     (compte Diaspo'Actif vs externe), période d'adhésion, gratuit/payant, et recherche libre
+     (nom/prénom/email/téléphone/numéro d'adhérent). Tous cumulables avec statut/formule ci-dessus. */
+  if (query?.origine === 'diaspoactif') rows = rows.filter(m => !!m.linked_user_id);
+  else if (query?.origine === 'externe') rows = rows.filter(m => !m.linked_user_id);
+  if (query?.periode_debut) rows = rows.filter(m => m.date_adhesion && m.date_adhesion >= query.periode_debut);
+  if (query?.periode_fin) rows = rows.filter(m => m.date_adhesion && m.date_adhesion <= query.periode_fin);
+  if (query?.paiement === 'gratuit') rows = rows.filter(m => !m.montant_paye);
+  else if (query?.paiement === 'payant') rows = rows.filter(m => !!m.montant_paye);
+  if (query?.q) {
+    const q = query.q.toLowerCase();
+    rows = rows.filter(m =>
+      (m.nom || '').toLowerCase().includes(q) || (m.prenom || '').toLowerCase().includes(q) ||
+      (m.email || '').toLowerCase().includes(q) || (m.telephone || '').toLowerCase().includes(q) ||
+      `adh-${params.id}-${m.id}`.toLowerCase().includes(q));
+  }
   sendJSON(res, 200, { membres: rows });
 });
 

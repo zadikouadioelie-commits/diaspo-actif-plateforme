@@ -5764,6 +5764,38 @@ async function adhSupprimerFormule(id, nom){
   catch(e){ showToast(e.message, 'danger'); }
 }
 
+/* Rendu des lignes du registre, séparé du fetch pour permettre un filtrage instantané
+   côté client (adhFiltrerRegistre) sans re-solliciter le serveur à chaque frappe. */
+function adhRenderMembresLignes(liste){
+  return liste.map(m => {
+    const formule = ADH_FORMULES.find(f=>f.id===m.formule_id);
+    let badges = []; try{ badges = JSON.parse(m.badges_json||'[]'); }catch(e){}
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px;">${escH(m.prenom||'')} ${escH(m.nom)}</td>
+      <td style="padding:8px;">${m.linked_user_id ? '<span style="color:#16a34a;font-weight:700;white-space:nowrap;">🟢 Diaspo\'Actif</span>' : '<span style="color:var(--muted);white-space:nowrap;">⚪ Externe</span>'}</td>
+      <td style="padding:8px;">${escH(formule?.nom||'')}</td>
+      <td style="padding:8px;">${ADH_STATUT_LABELS[m.statut]||m.statut}</td>
+      <td style="padding:8px;">${m.date_expiration ? new Date(m.date_expiration).toLocaleDateString('fr-FR') : '—'}</td>
+      <td style="padding:8px;">${m.montant_paye ? m.montant_paye+' '+(formule?.devise||'EUR') : '—'}</td>
+      <td style="padding:8px;font-size:11px;">${badges.join(', ')||'—'}</td>
+      <td style="padding:8px;white-space:nowrap;">
+        ${m.statut!=='a_jour'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
+        <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function adhFiltrerRegistre(terme){
+  const tbody = document.getElementById('adh-registre-tbody');
+  if (!tbody) return;
+  const q = (terme||'').trim().toLowerCase();
+  const filtres = !q ? ADH_MEMBRES : ADH_MEMBRES.filter(m =>
+    (m.nom||'').toLowerCase().includes(q) || (m.prenom||'').toLowerCase().includes(q) ||
+    (m.email||'').toLowerCase().includes(q) || (m.telephone||'').toLowerCase().includes(q) ||
+    `adh-${window.__vitrineInitId}-${m.id}`.toLowerCase().includes(q));
+  tbody.innerHTML = adhRenderMembresLignes(filtres) || `<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--muted);">Aucun résultat.</td></tr>`;
+}
+
 async function adhRenderRegistre(){
   const el = document.getElementById('adhesions-init-content');
   const initId = window.__vitrineInitId;
@@ -5780,33 +5812,21 @@ async function adhRenderRegistre(){
       return;
     }
     el.innerHTML = `
-      <div style="margin-bottom:12px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
-        <button class="btn btn-sm btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent</button>
-        <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export" target="_blank">⬇️ Export CSV</a>
+      <div style="margin-bottom:12px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;">
+        <input type="text" id="adh-registre-recherche" placeholder="🔎 Rechercher (nom, email, téléphone, n° adhérent)…" style="flex:1;min-width:220px;padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;" oninput="adhFiltrerRegistre(this.value)">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent</button>
+          <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export" target="_blank">⬇️ Export CSV</a>
+        </div>
       </div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
-          <th style="padding:8px;">Nom</th><th style="padding:8px;">Formule</th><th style="padding:8px;">Statut</th>
+          <th style="padding:8px;">Nom</th><th style="padding:8px;">Origine</th><th style="padding:8px;">Formule</th><th style="padding:8px;">Statut</th>
           <th style="padding:8px;">Expiration</th><th style="padding:8px;">Montant</th><th style="padding:8px;">Badges</th><th style="padding:8px;"></th>
         </tr></thead>
-        <tbody>
-        ${ADH_MEMBRES.map(m => {
-          const formule = ADH_FORMULES.find(f=>f.id===m.formule_id);
-          let badges = []; try{ badges = JSON.parse(m.badges_json||'[]'); }catch(e){}
-          return `<tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:8px;">${escH(m.prenom||'')} ${escH(m.nom)}</td>
-            <td style="padding:8px;">${escH(formule?.nom||'')}</td>
-            <td style="padding:8px;">${ADH_STATUT_LABELS[m.statut]||m.statut}</td>
-            <td style="padding:8px;">${m.date_expiration ? new Date(m.date_expiration).toLocaleDateString('fr-FR') : '—'}</td>
-            <td style="padding:8px;">${m.montant_paye ? m.montant_paye+' '+(formule?.devise||'EUR') : '—'}</td>
-            <td style="padding:8px;font-size:11px;">${badges.join(', ')||'—'}</td>
-            <td style="padding:8px;white-space:nowrap;">
-              ${m.statut!=='a_jour'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
-              <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
-            </td>
-          </tr>`;
-        }).join('')}
+        <tbody id="adh-registre-tbody">
+        ${adhRenderMembresLignes(ADH_MEMBRES)}
         </tbody>
       </table>
       </div>`;
