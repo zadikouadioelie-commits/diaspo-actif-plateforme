@@ -1194,6 +1194,17 @@ async function annInscrire(id, btn){
    dans une étape suivante). Le bouton passe en état "Demande envoyée" une fois la demande créée. */
 async function demanderAdhesion(initiativeId, btn){
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+  /* Si l'association a configuré des formules de cotisation (module "Adhésions", payant ou
+     gratuit), on redirige vers la page dédiée qui gère déjà tout le reste : choix de la
+     formule, paiement Stripe, reçu, carte de membre. Sinon, simple demande sans paiement. */
+  try {
+    const f = await api('GET', `/initiatives/${initiativeId}/adhesion-formules`);
+    if (f.formules && f.formules.length) {
+      window.location.href = `adhesions.html?initiative=${initiativeId}`;
+      return;
+    }
+  } catch (e) { /* pas de formules accessibles : on retombe sur la demande simple */ }
+
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     const r = await api('POST', `/initiatives/${initiativeId}/demande-adhesion`);

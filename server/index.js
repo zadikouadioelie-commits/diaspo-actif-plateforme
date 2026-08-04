@@ -7906,6 +7906,13 @@ route("POST", "/api/initiatives/:id/demande-adhesion", async (req, res, params) 
 route("GET", "/api/initiatives/:id/demande-adhesion", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 200, { statut: null });
+  /* Une adhésion payante (module Adhésions, adhesion_membres.linked_user_id) est prioritaire
+     sur une simple demande : si l'utilisateur est déjà membre à jour via une formule payée,
+     le bouton doit refléter ça plutôt qu'une demande "en attente" qui n'aurait plus de sens. */
+  const membre = await db.prepare("SELECT * FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, user.id);
+  if (membre && computeAdhesionStatut(membre) === 'a_jour') {
+    return sendJSON(res, 200, { statut: 'acceptee' });
+  }
   const d = await db.prepare("SELECT statut FROM initiative_adhesion_demandes WHERE initiative_id=? AND user_id=?").get(params.id, user.id);
   sendJSON(res, 200, { statut: d ? d.statut : null });
 });
