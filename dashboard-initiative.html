@@ -1115,6 +1115,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <button class="btn btn-sm btn-outline" id="adh-tab-registre" onclick="adhSwitchTab('registre')">Registre des membres</button>
         <button class="btn btn-sm btn-outline" id="adh-tab-stats" onclick="adhSwitchTab('stats')">Tableau de bord</button>
         <button class="btn btn-sm btn-outline" id="adh-tab-campagnes" onclick="adhSwitchTab('campagnes')">Campagnes</button>
+        <button class="btn btn-sm btn-outline" id="adh-tab-journal" onclick="adhSwitchTab('journal')">🕓 Journal d'audit</button>
       </div>
       <div id="adhesions-init-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
     </div>
@@ -4434,6 +4435,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Notez chaque critère sur 10 pour suivre la progression de la création de votre initiative. Le pourcentage global se calcule automatiquement. Ces informations restent privées.</p>
       </div>
       <div class="card" style="margin-bottom:20px;padding:18px 20px;" id="av-score-card">Chargement…</div>
+      <div class="card" style="margin-bottom:20px;padding:16px 18px;" id="av-dashboard">Chargement…</div>
       <div id="av-liste"><div class="notice">Chargement…</div></div>
     `;
     avRender();
@@ -4441,10 +4443,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   async function avRender() {
     const scoreCard = document.getElementById('av-score-card');
+    const dashCard = document.getElementById('av-dashboard');
     const wrap = document.getElementById('av-liste');
     if (!wrap) return;
     try {
-      const { criteres, pourcentage } = await api('GET', `/initiatives/${init.id}/avancement`);
+      const [{ criteres, pourcentage }, { historique }] = await Promise.all([
+        api('GET', `/initiatives/${init.id}/avancement`),
+        api('GET', `/initiatives/${init.id}/avancement/historique`),
+      ]);
       scoreCard.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <strong style="font-size:15px;">Avancement global</strong>
@@ -4453,6 +4459,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div style="height:10px;background:var(--bg);border-radius:99px;overflow:hidden;">
           <div style="height:100%;width:${pourcentage}%;background:var(--orange);transition:width .3s;"></div>
         </div>`;
+      avRenderDashboard(dashCard, criteres, historique);
       wrap.innerHTML = criteres.map(c => `
         <div class="card" style="margin-bottom:12px;padding:14px 18px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
@@ -4475,6 +4482,69 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     }
   }
 
+  /* Tableau de bord (cahier des charges point 10) : % global déjà affiché dans av-score-card ;
+     ici, la dernière mise à jour + les critères restant à améliorer / déjà finalisés. */
+  function avRenderDashboard(dashCard, criteres, historique) {
+    const aAmeliorer = criteres.filter(c => c.note < 10);
+    const finalises = criteres.filter(c => c.note >= 10);
+    const dernier = historique[0];
+    const delta = dernier ? dernier.nouvelle_note - dernier.ancienne_note : 0;
+    dashCard.innerHTML = `
+      ${dernier ? `<div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">
+        🕓 Dernière mise à jour : <strong style="color:var(--text);">${escH(dernier.critere_titre)}</strong>
+        noté ${dernier.ancienne_note} → ${dernier.nouvelle_note} (${delta > 0 ? '+' : ''}${delta} pt)
+        ${dernier.user_nom ? `par ${escH(dernier.user_nom)} ` : ''}le ${fmtDateInit(dernier.created_at)}
+      </div>` : `<div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">Aucune notation enregistrée pour l'instant.</div>`}
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <strong style="font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">🔧 À améliorer (${aAmeliorer.length})</strong>
+          <div style="font-size:12.5px;margin-top:4px;">${aAmeliorer.length ? escH(aAmeliorer.map(c=>c.titre).join(', ')) : 'Aucun 🎉'}</div>
+        </div>
+        <div style="flex:1;min-width:180px;">
+          <strong style="font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">✅ Finalisés (${finalises.length})</strong>
+          <div style="font-size:12.5px;margin-top:4px;">${finalises.length ? escH(finalises.map(c=>c.titre).join(', ')) : '—'}</div>
+        </div>
+      </div>
+      <div style="text-align:right;margin-top:10px;">
+        <button class="btn btn-sm btn-outline" onclick="avOuvrirHistorique()">📜 Historique complet</button>
+      </div>
+    `;
+  }
+
+  window.avOuvrirHistorique = async function() {
+    let modal = document.getElementById('av-hist-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'av-hist-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:520px;text-align:left;">
+      <h3 style="margin:0 0 4px;">📜 Historique des modifications</h3>
+      <div id="av-hist-liste" style="max-height:380px;overflow-y:auto;margin-top:10px;">Chargement…</div>
+      <div style="text-align:right;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('av-hist-modal').remove()">Fermer</button>
+      </div>
+    </div>`;
+    try {
+      const { historique } = await api('GET', `/initiatives/${init.id}/avancement/historique`);
+      const wrapEl = document.getElementById('av-hist-liste');
+      if (!historique.length) {
+        wrapEl.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucune modification enregistrée pour l'instant.</p>`;
+        return;
+      }
+      wrapEl.innerHTML = historique.map(h => {
+        const d = h.nouvelle_note - h.ancienne_note;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>${escH(h.critere_titre)}${h.user_nom ? ` — <span style="color:var(--muted);">${escH(h.user_nom)}</span>` : ''}<br><span style="font-size:11px;color:var(--muted);">${fmtDateInit(h.created_at)}</span></span>
+          <strong style="color:${d>0?'#16a34a':d<0?'#dc2626':'inherit'};">${h.ancienne_note} → ${h.nouvelle_note}</strong>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('av-hist-liste').innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
+    }
+  };
+
   window.avSauvegarder = async function(cle) {
     clearTimeout(avSaveTimers[cle]);
     avSaveTimers[cle] = setTimeout(async () => {
@@ -4483,11 +4553,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       try {
         await api('PUT', `/initiatives/${init.id}/avancement/${cle}`, { note, commentaire_prive });
         const scoreCard = document.getElementById('av-score-card');
-        const { pourcentage } = await api('GET', `/initiatives/${init.id}/avancement`);
+        const dashCard = document.getElementById('av-dashboard');
+        const [{ criteres, pourcentage }, { historique }] = await Promise.all([
+          api('GET', `/initiatives/${init.id}/avancement`),
+          api('GET', `/initiatives/${init.id}/avancement/historique`),
+        ]);
         if (scoreCard) {
           scoreCard.querySelector('span').textContent = pourcentage + '%';
           scoreCard.querySelector('div > div').style.width = pourcentage + '%';
         }
+        /* Seul le tableau de bord se rafraîchit ici (pas av-liste, pour ne pas perdre le
+           focus/curseur si l'utilisateur enchaîne sur un autre critère). */
+        if (dashCard) avRenderDashboard(dashCard, criteres, historique);
       } catch (e) { if (typeof showToast === 'function') showToast("Erreur d'enregistrement", 'error'); }
     }, 400);
   };
@@ -5619,7 +5696,7 @@ async function adhToggleOuvertes(checked){
 
 function adhSwitchTab(tab){
   ADH_TAB = tab;
-  ['formules','registre','stats','campagnes'].forEach(t => {
+  ['formules','registre','stats','campagnes','journal'].forEach(t => {
     const btn = document.getElementById('adh-tab-'+t);
     if (btn) btn.className = t === tab ? 'btn btn-sm' : 'btn btn-sm btn-outline';
   });
@@ -5627,6 +5704,7 @@ function adhSwitchTab(tab){
   else if (tab === 'registre') adhRenderRegistre();
   else if (tab === 'stats') adhRenderStats();
   else if (tab === 'campagnes') adhRenderCampagnes();
+  else if (tab === 'journal') adhRenderJournal();
 }
 
 async function adhRenderFormules(){
