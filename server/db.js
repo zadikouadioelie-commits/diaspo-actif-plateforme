@@ -3193,6 +3193,26 @@ db.exec(`
 `);
 
 /* ═══════════════════════════════════════════════════════════════════
+   MODULE "AVANCEMENT DE MON INITIATIVE" — increment 1 (fondations)
+   La grille de critères est statique côté serveur (AVANCEMENT_CRITERES
+   dans server/index.js) ; seules les notes/commentaires sont en base,
+   un critère n'a de ligne qu'une fois noté au moins une fois.
+   ═══════════════════════════════════════════════════════════════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS initiative_avancement_notes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id       INTEGER NOT NULL,
+    critere_cle         TEXT NOT NULL,
+    note                INTEGER NOT NULL DEFAULT 0,
+    commentaire_prive   TEXT,
+    updated_at          TEXT DEFAULT (datetime('now')),
+    updated_by_user_id  INTEGER,
+    UNIQUE(initiative_id, critere_cle),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+`);
+
+/* ═══════════════════════════════════════════════════════════════════
    MOTEUR D'ACCRÉDITATIONS DYNAMIQUE
    Remplace le tableau statique ACCREDITATIONS_DA de data.js
    ═══════════════════════════════════════════════════════════════════ */
