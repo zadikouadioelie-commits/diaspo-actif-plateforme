@@ -5694,6 +5694,37 @@ async function adhToggleOuvertes(checked){
   }
 }
 
+const ADH_JOURNAL_LABELS = {
+  creation: '🆕 Création', renouvellement: '🔄 Renouvellement', modification: '✏️ Modification',
+  suspension: '⛔ Suspension', changement_categorie: '🔀 Changement de catégorie',
+};
+async function adhRenderJournal(membreId){
+  const el = document.getElementById('adhesions-init-content');
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+  try{
+    const url = `/initiatives/${window.__vitrineInitId}/adhesion-audit-log` + (membreId ? `?membre_id=${membreId}` : '');
+    const r = await api('GET', url);
+    const entrees = r.entrees || [];
+    el.innerHTML = `
+      ${membreId ? `<div style="margin-bottom:12px;"><button class="btn btn-sm btn-outline" onclick="adhRenderJournal()">← Journal complet</button></div>` : ''}
+      ${entrees.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+          <th style="padding:8px;">Date</th><th style="padding:8px;">Action</th><th style="padding:8px;">Adhérent</th>
+          <th style="padding:8px;">Par</th><th style="padding:8px;">Détails</th>
+        </tr></thead>
+        <tbody>${entrees.map(e => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px;white-space:nowrap;">${new Date(e.created_at).toLocaleString('fr-FR')}</td>
+            <td style="padding:8px;white-space:nowrap;">${ADH_JOURNAL_LABELS[e.action] || e.action}</td>
+            <td style="padding:8px;">${escH(e.membre_prenom||'')} ${escH(e.membre_nom||'')}</td>
+            <td style="padding:8px;">${escH(e.acteur_nom||'Système (Stripe)')}</td>
+            <td style="padding:8px;color:var(--muted);">${escH(e.details||'')}</td>
+          </tr>`).join('')}</tbody>
+      </table>` : '<div style="text-align:center;padding:30px;color:var(--muted);">Aucun événement enregistré pour le moment.</div>'}
+    `;
+  } catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+
 function adhSwitchTab(tab){
   ADH_TAB = tab;
   ['formules','registre','stats','campagnes','journal'].forEach(t => {
@@ -5986,6 +6017,7 @@ function adhRenderMembresLignes(liste){
         ${m.linked_user_id?`<a class="btn btn-sm btn-outline" href="profil.html?id=${m.linked_user_id}" target="_blank">👁 Accéder au profil</a>`:''}
         ${m.statut!=='a_jour'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
+        <button class="btn btn-sm btn-outline" onclick="adhSwitchTab('journal'); setTimeout(()=>adhRenderJournal(${m.id}),0)" title="Historique de cette fiche">🕓</button>
       </td>
     </tr>`;
   }).join('');

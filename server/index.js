@@ -2807,6 +2807,19 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
    ouvert à toute Initiative (même logique d'ouverture que la Boutique).
    ══════════════════════════════════════════════════════════════════════ */
 
+/* Journal d'audit (tâche #70) : appelé à chaque mutation significative d'une fiche
+   adhérent. acteur=null pour une confirmation automatique (webhook Stripe) — details
+   reste une phrase lisible plutôt qu'un JSON, cohérent avec l'usage administrateur
+   (pas d'écran de diff technique prévu, juste un historique consultable). */
+async function journaliserAdhesion(initiativeId, membreId, action, acteur, details) {
+  try {
+    await db.prepare(`
+      INSERT INTO adhesion_audit_log (initiative_id, membre_id, action, acteur_id, acteur_nom, details)
+      VALUES (?,?,?,?,?,?)
+    `).run(initiativeId, membreId || null, action, acteur?.id || null, acteur ? `${acteur.prenom || ''} ${acteur.nom || ''}`.trim() : 'Système (Stripe)', details || null);
+  } catch (e) { console.error('[adhesion-audit-log]', e.message); }
+}
+
 /* Périodicités récurrentes gérées via Stripe subscription (mode "carte" + "prélèvement automatique").
    Les autres types (dons, adhésion unique, participation projet, contribution exceptionnelle) sont
    des paiements one-off (mode "payment"). */
@@ -3067,6 +3080,7 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
     VALUES (?,?,?,?,?,?,?,?,?,?,?,'en_attente')
   `).run(formule_id, params.id, linkedId, nom.trim(), prenom || null, email || null, telephone || null,
     adresse || null, pays || null, ville || null, observations || null)).lastInsertRowid;
+  journaliserAdhesion(params.id, id, 'creation', user, `Fiche créée manuellement par l'association — « ${formule.nom} ».`);
   sendJSON(res, 201, { id });
 });
 
@@ -3078,14 +3092,30 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
-  const { nom, prenom, email, telephone, adresse, pays, ville, observations, statut } = body;
+  const { nom, prenom, email, telephone, adresse, pays, ville, observations, statut, formule_id } = body;
+  /* Changement de catégorie (tâche #70) : la nouvelle formule doit appartenir à la même
+     initiative — sinon on ignore silencieusement plutôt que de rattacher un adhérent à
+     la formule d'une autre association. */
+  let nouvelleFormule = null;
+  if (formule_id && Number(formule_id) !== Number(m.formule_id)) {
+    nouvelleFormule = await db.prepare("SELECT id, nom FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, m.initiative_id);
+  }
   await db.prepare(`UPDATE adhesion_membres SET
       nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, adresse=?, pays=?, ville=?, observations=?,
-      statut=COALESCE(?,statut), updated_at=datetime('now')
+      statut=COALESCE(?,statut), formule_id=COALESCE(?,formule_id), updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, prenom ?? m.prenom, email ?? m.email, telephone ?? m.telephone,
       adresse ?? m.adresse, pays ?? m.pays, ville ?? m.ville, observations ?? m.observations,
-      statut || null, params.id);
+      statut || null, nouvelleFormule?.id || null, params.id);
+  if (statut && statut !== m.statut) {
+    journaliserAdhesion(m.initiative_id, m.id, statut === 'suspendu' ? 'suspension' : 'modification',
+      user, `Statut changé : ${m.statut} → ${statut}.`);
+  }
+  if (nouvelleFormule) {
+    const ancienneFormule = await db.prepare("SELECT nom FROM adhesion_formules WHERE id=?").get(m.formule_id);
+    journaliserAdhesion(m.initiative_id, m.id, 'changement_categorie', user,
+      `Catégorie changée : « ${ancienneFormule?.nom || '?'} » → « ${nouvelleFormule.nom} ».`);
+  }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -3123,6 +3153,8 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
       `Votre « ${formule?.nom || 'adhésion'} » a été enregistrée comme payée. Reçu ${numeroRecu}.`, { paiement_id: paiementId });
   }
   await ajouterAListeStockage(m.formule_id, m);
+  journaliserAdhesion(m.initiative_id, m.id, m.date_adhesion ? 'renouvellement' : 'creation', user,
+    `Paiement manuel enregistré (${modePaiement}) — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
   sendJSON(res, 200, { ok: true, numero_recu: numeroRecu });
 });
 
@@ -3483,6 +3515,32 @@ route("GET", "/api/adhesion-membres/:id/carte", async (req, res, params) => {
     renouvelable,
     verify_url: `/api/adhesion/verify/${m.id}`,
   });
+});
+
+/* ── Journal d'audit (tâche #70) — propriétaire uniquement. Filtrable par membre_id
+   pour l'historique d'une fiche précise (?membre_id=...), sinon journal complet
+   de l'initiative, le plus récent en premier. ── */
+route("GET", "/api/initiatives/:id/adhesion-audit-log", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  let rows;
+  if (query?.membre_id) {
+    rows = await db.prepare(`
+      SELECT l.*, m.nom AS membre_nom, m.prenom AS membre_prenom FROM adhesion_audit_log l
+      LEFT JOIN adhesion_membres m ON m.id = l.membre_id
+      WHERE l.initiative_id=? AND l.membre_id=? ORDER BY l.created_at DESC LIMIT 200
+    `).all(params.id, query.membre_id);
+  } else {
+    rows = await db.prepare(`
+      SELECT l.*, m.nom AS membre_nom, m.prenom AS membre_prenom FROM adhesion_audit_log l
+      LEFT JOIN adhesion_membres m ON m.id = l.membre_id
+      WHERE l.initiative_id=? ORDER BY l.created_at DESC LIMIT 200
+    `).all(params.id);
+  }
+  sendJSON(res, 200, { entrees: rows });
 });
 
 /* ── Vérification publique rapide (scan QR) — pas de données sensibles ── */
@@ -11378,6 +11436,8 @@ async function handleStripeWebhook(req, res) {
         creerNotif(init.owner_user_id, "adhesion_recue", "Nouvelle adhésion 🎫",
           `« ${formule?.nom || ''} » réglée par ${membre.prenom || ''} ${membre.nom} (+${organizer_amount}€).`, { paiement_id: paiementId });
         await ajouterAListeStockage(pay.formule_id, membre);
+        journaliserAdhesion(pay.initiative_id, pay.membre_id, membre.date_adhesion ? 'renouvellement' : 'creation', null,
+          `Paiement Stripe confirmé — « ${formule?.nom || ''} », ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_adhesion_paiement_id) {
       const paiementId = Number(event.data.object.metadata.diaspoactif_adhesion_paiement_id);
@@ -11441,6 +11501,8 @@ async function handleStripeWebhook(req, res) {
           creerNotif(adhMembre.linked_user_id, "adhesion_renouvelee", "Adhésion renouvelée ✅",
             `Votre cotisation a été renouvelée. Reçu ${numeroRecu}.`, { membre_id: adhMembre.id });
         }
+        journaliserAdhesion(adhMembre.initiative_id, adhMembre.id, 'renouvellement', null,
+          `Renouvellement automatique de l'abonnement Stripe — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
       }
       /* Renouvellement de l'abonnement Utilisateur Abonné (hors 1ère facture) */
       const accredUA = await db.prepare("SELECT * FROM user_accreditations WHERE stripe_subscription_id=?").get(invoice.subscription);

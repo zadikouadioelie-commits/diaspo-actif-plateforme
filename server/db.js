@@ -3212,6 +3212,26 @@ db.exec(`
   );
 `);
 
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE ADHÉSIONS — journal d'audit (tâche #70)
+   Trace création/renouvellement/modification/suspension/changement de
+   catégorie sur une fiche adhérent. acteur_id est NULL pour les
+   confirmations automatiques (webhook Stripe) — acteur_nom garde alors
+   une trace lisible ("Stripe (paiement automatique)"). ═══════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS adhesion_audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id   INTEGER NOT NULL,
+    membre_id       INTEGER,
+    action          TEXT NOT NULL,
+    acteur_id       INTEGER,
+    acteur_nom      TEXT,
+    details         TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+`);
+
 /* Historique des modifications de notation (increment 2 — cahier des charges point 9) :
    une ligne par changement de note (pas les modifications de commentaire seul, pour éviter
    le bruit). Alimente aussi le "tableau de bord" (dernière mise à jour, point 10). */
