@@ -1112,7 +1112,7 @@ function renderInitiativeCard(it){
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
-        ${['Association','ONG'].includes(it.type) ? `<button type="button" class="ann-card-btn" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer</button>` : ''}
+        ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? `<button type="button" class="ann-card-btn" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer</button>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 S'inscrire à un événement</button>` : ''}
       </div>
     </div>
@@ -1612,7 +1612,7 @@ function renderVitrineCard(v) {
       ${noteHtml}
       <div class="vit-card-foot">
         <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>
-        ${['Association','ONG'].includes(v.type) ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer</button>` : ''}
+        ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer</button>` : ''}
       </div>
     </div>
   </div>`;

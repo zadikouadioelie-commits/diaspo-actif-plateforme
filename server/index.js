@@ -2859,6 +2859,20 @@ route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, 
   sendJSON(res, 200, { formules: rows });
 });
 
+/* ── Ouverture/fermeture globale des adhésions (tâche #69) — bascule visible/masquée du bouton
+   "Adhérer" partout sur la plateforme + bloque les nouvelles demandes/paiements côté serveur.
+   Les adhésions déjà actives ne sont jamais affectées. ── */
+route("PUT", "/api/initiatives/:id/adhesions-ouvertes", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const ouvertes = body?.ouvertes ? 1 : 0;
+  await db.prepare("UPDATE initiatives SET adhesions_ouvertes=? WHERE id=?").run(ouvertes, params.id);
+  sendJSON(res, 200, { ok: true, adhesions_ouvertes: !!ouvertes });
+});
+
 /* ── Créer une formule ── */
 route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -3223,6 +3237,12 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
   let membre = await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id=?").get(formule.id, user.id);
+  /* Fermeture des adhésions (tâche #69) : bloque uniquement les NOUVELLES adhésions — un membre
+     déjà enregistré doit toujours pouvoir renouveler (tâche #68) même si l'association a
+     temporairement fermé l'accès aux nouveaux venus. */
+  if (!membre && init.adhesions_ouvertes != null && !init.adhesions_ouvertes) {
+    return sendJSON(res, 400, { error: "Les adhésions sont actuellement fermées pour cette structure." });
+  }
   if (!membre) {
     const mid = (await db.prepare(`
       INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, statut)
@@ -4640,6 +4660,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
     certif: await getCertif(r.id),
     organisation_verifiee: !!r.organisation_verifiee, organisation_verifiee_le: r.organisation_verifiee_le || null,
     owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id),
+    adhesions_ouvertes: r.adhesions_ouvertes == null ? true : !!r.adhesions_ouvertes,
   })));
 
   sendJSON(res, 200, { vitrines: rows });
@@ -7984,10 +8005,13 @@ route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
 route("POST", "/api/initiatives/:id/demande-adhesion", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const init = await db.prepare("SELECT id, nom, type, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const init = await db.prepare("SELECT id, nom, type, owner_user_id, adhesions_ouvertes FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (!['Association', 'ONG'].includes(init.type)) {
     return sendJSON(res, 400, { error: "L'adhésion n'est proposée que pour les Associations et ONG." });
+  }
+  if (init.adhesions_ouvertes != null && !init.adhesions_ouvertes) {
+    return sendJSON(res, 400, { error: "Les adhésions sont actuellement fermées pour cette structure." });
   }
   if (Number(init.owner_user_id) === Number(user.id)) {
     return sendJSON(res, 400, { error: "Vous ne pouvez pas adhérer à votre propre structure." });

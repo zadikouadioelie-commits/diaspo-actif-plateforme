@@ -84,6 +84,7 @@ const ADH_TYPE_LABELS = {
 const params = new URLSearchParams(location.search);
 const INIT_ID = params.get('initiative');
 let FORMULES = [];
+let ADHESIONS_OUVERTES = true;
 
 async function init(){
   const paiement = params.get('paiement');
@@ -98,7 +99,12 @@ async function init(){
   }
   try {
     const init = await api('GET', `/initiatives/${INIT_ID}`);
-    document.getElementById('adh-init-nom').textContent = `${init.initiative?.nom || init.nom || ''} — choisissez une formule et adhérez en ligne.`;
+    const initData = init.initiative || init;
+    document.getElementById('adh-init-nom').textContent = `${initData.nom || ''} — choisissez une formule et adhérez en ligne.`;
+    ADHESIONS_OUVERTES = initData.adhesions_ouvertes !== false;
+    if (!ADHESIONS_OUVERTES) {
+      document.getElementById('adh-alert-zone').innerHTML += '<div class="notice">🔒 Les adhésions sont actuellement fermées pour cette structure. Si vous êtes déjà adhérent, vous pouvez toujours consulter votre carte et la renouveler ci-dessus.</div>';
+    }
   } catch(e){}
   try {
     const r = await api('GET', `/initiatives/${INIT_ID}/adhesion-formules`);
@@ -130,7 +136,9 @@ function renderFormules(){
           `À partir de ${f.montant_min} ${f.devise}`
         }</div>
         ${f.description?`<div class="adh-desc">${escHtml(f.description)}</div>`:''}
-        <button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">Adhérer / Contribuer</button>
+        ${ADHESIONS_OUVERTES
+          ? `<button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">Adhérer / Contribuer</button>`
+          : `<button class="btn btn-outline" style="width:100%;" disabled>🔒 Adhésions fermées</button>`}
       </div>`).join('')}
   </div>`;
 }

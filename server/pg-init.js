@@ -1017,6 +1017,8 @@ const COLONNES_MIGRATION = [
     ['user_accreditations', 'grace_until', 'TEXT'],
     // Rubrique Vitrines — date de dernière modification publique de la vitrine
     ['initiatives', 'updated_at', 'TEXT'],
+    // Module Adhésions — ouverture/fermeture globale (miroir de l'ALTER db.js)
+    ['initiatives', 'adhesions_ouvertes', 'INTEGER DEFAULT 1'],
 ];
 
 async function migratePg(pool) {

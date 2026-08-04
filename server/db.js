@@ -3212,6 +3212,22 @@ db.exec(`
   );
 `);
 
+/* Historique des modifications de notation (increment 2 — cahier des charges point 9) :
+   une ligne par changement de note (pas les modifications de commentaire seul, pour éviter
+   le bruit). Alimente aussi le "tableau de bord" (dernière mise à jour, point 10). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS initiative_avancement_historique (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id   INTEGER NOT NULL,
+    critere_cle     TEXT NOT NULL,
+    ancienne_note   INTEGER NOT NULL,
+    nouvelle_note   INTEGER NOT NULL,
+    user_id         INTEGER,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+`);
+
 /* ═══════════════════════════════════════════════════════════════════
    MOTEUR D'ACCRÉDITATIONS DYNAMIQUE
    Remplace le tableau statique ACCREDITATIONS_DA de data.js
@@ -4870,6 +4886,10 @@ db.exec(`
   if (!initCols7.includes('tel_responsable_2'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_2 TEXT");
   if (!initCols7.includes('tel_responsable_3'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_3 TEXT");
   if (!initCols7.includes('numero_fiscal'))                    db.exec("ALTER TABLE initiatives ADD COLUMN numero_fiscal TEXT");
+  /* Ouverture/fermeture des adhésions (tâche #69) : 1=ouvertes par défaut, réversible par
+     l'association. Fermer masque le bouton "Adhérer" partout et bloque les nouvelles demandes
+     et nouveaux paiements côté serveur — les adhésions déjà actives ne sont pas affectées. */
+  if (!initCols7.includes('adhesions_ouvertes'))                db.exec("ALTER TABLE initiatives ADD COLUMN adhesions_ouvertes INTEGER DEFAULT 1");
 
   // Préférences d'affichage public des cagnottes — déjà dans le CREATE TABLE cagnottes plus haut,
   // ces lignes ne servent qu'au SQLite local déjà créé (self-healing auto sur PostgreSQL).

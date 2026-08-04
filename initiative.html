@@ -386,6 +386,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
           ${estAssociationOuOng && !isOwner ? (
             statutAdhesion === 'acceptee' ? `<button class="btn btn-outline" disabled style="gap:6px;">✓ Membre</button>`
             : statutAdhesion === 'en_attente' ? `<button class="btn btn-outline" disabled style="gap:6px;">⏳ Demande envoyée</button>`
+            : init.adhesions_ouvertes === false ? ''
             : `<button id="btn-adherer" class="btn btn-orange" style="gap:6px;" onclick="demanderAdhesion(${init.id}, this)">🤝 Adhérer</button>`
           ) : ''}
           ${init.owner_user_id

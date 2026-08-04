@@ -1103,7 +1103,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <h2 style="margin:0;">🎫 Cotisations &amp; Adhésions</h2>
           <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">Créez des formules d'adhésion et encaissez réellement vos cotisations.</p>
         </div>
-        <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Vitrines, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
+            <input type="checkbox" id="adh-toggle-ouvertes" checked onchange="adhToggleOuvertes(this.checked)"> Adhésions ouvertes
+          </label>
+          <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <button class="btn btn-sm" id="adh-tab-formules" onclick="adhSwitchTab('formules')">Formules</button>
@@ -3005,7 +3010,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
-    if (name === 'adhesions-init') adhSwitchTab('formules');
+    if (name === 'adhesions-init') {
+      const togAdh = document.getElementById('adh-toggle-ouvertes');
+      if (togAdh) togAdh.checked = init ? init.adhesions_ouvertes !== false : true;
+      adhSwitchTab('formules');
+    }
     if (name === 'votes-init') voSwitchTab('scrutins');
     if (name === 'paiement') { renderPaiementMarketplace(); renderVerificationOrganisation(); }
     if (name === 'offres-emploi') renderOffresEmploiInit();
@@ -5593,6 +5602,20 @@ const ADH_TYPE_LABELS = {
   contribution_exceptionnelle: 'Contribution exceptionnelle', autre: 'Autre',
 };
 const ADH_STATUT_LABELS = { a_jour: '🟢 À jour', non_a_jour: '🔴 Non à jour', en_attente: '⚪ En attente', suspendu: '⛔ Suspendu' };
+
+async function adhToggleOuvertes(checked){
+  const initId = window.__vitrineInitId;
+  if (!initId) return;
+  const tog = document.getElementById('adh-toggle-ouvertes');
+  try{
+    const r = await api('PUT', `/initiatives/${initId}/adhesions-ouvertes`, { ouvertes: checked });
+    if (init) init.adhesions_ouvertes = r.adhesions_ouvertes;
+    showToast?.(checked ? '✅ Adhésions ouvertes — le bouton « Adhérer » est de nouveau visible.' : '🔒 Adhésions fermées — le bouton « Adhérer » a disparu partout (les membres existants gardent leur adhésion).');
+  } catch(e){
+    if (tog) tog.checked = !checked;
+    showToast?.('Erreur : ' + e.message, 'danger');
+  }
+}
 
 function adhSwitchTab(tab){
   ADH_TAB = tab;
