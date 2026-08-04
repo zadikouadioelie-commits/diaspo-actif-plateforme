@@ -4057,6 +4057,12 @@ try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); }
 /* Extension user_accreditations : suivi de l'abonnement Stripe (accréditations payantes récurrentes) */
 try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_subscription_id TEXT"); } catch(_) {}
 
+/* Extension adhesion_membres : fiche externe complète (adresse/pays/ville/observations) */
+try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN adresse TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN pays TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN ville TEXT"); } catch(_) {}
+try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN observations TEXT"); } catch(_) {}
+
 /* Extension admin_suppressions_membres : informations du compte au moment de la suppression
    (nom/prénom/email/date de création figés avant l'anonymisation, + motif de l'admin). */
 try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN nom TEXT"); } catch(_) {}
@@ -4914,6 +4920,13 @@ db.exec(`
       email               TEXT,
       telephone           TEXT,
       photo_url           TEXT,
+      /* Champs spécifiques aux membres externes (sans compte Diaspo'Actif) — cahier des charges
+         2026-08-04, point 9 : gérés exactement comme les autres pour cotisations/renouvellements/
+         historique/paiements, seule cette fiche d'identité diffère d'un membre lié à un compte. */
+      adresse             TEXT,
+      pays                TEXT,
+      ville               TEXT,
+      observations        TEXT,
       statut              TEXT NOT NULL DEFAULT 'en_attente'
                           CHECK(statut IN ('en_attente','a_jour','non_a_jour','suspendu')),
       date_adhesion       TEXT,

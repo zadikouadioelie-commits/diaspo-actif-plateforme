@@ -2927,14 +2927,26 @@ route("POST", "/api/initiatives/:id/adhesion-membres", async (req, res, params, 
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
-  const { formule_id, nom, prenom, email, telephone } = body;
+  const { formule_id, nom, prenom, email, telephone, adresse, pays, ville, observations, linked_user_id } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom requis." });
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND initiative_id=?").get(formule_id, params.id);
   if (!formule) return sendJSON(res, 400, { error: "Formule invalide." });
+  /* Rattachement à un compte Diaspo'Actif existant (cahier des charges 2026-08-04, point 8) —
+     un même utilisateur ne peut avoir qu'une seule fiche par initiative (contrainte naturelle,
+     évite les doublons si l'admin l'ajoute alors qu'il avait déjà adhéré en self-service). */
+  let linkedId = null;
+  if (linked_user_id) {
+    const u = await db.prepare("SELECT id FROM users WHERE id=?").get(linked_user_id);
+    if (!u) return sendJSON(res, 400, { error: "Compte Diaspo'Actif introuvable." });
+    const existant = await db.prepare("SELECT id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, linked_user_id);
+    if (existant) return sendJSON(res, 400, { error: "Ce compte a déjà une fiche adhérent pour cette initiative." });
+    linkedId = u.id;
+  }
   const id = (await db.prepare(`
-    INSERT INTO adhesion_membres (formule_id, initiative_id, nom, prenom, email, telephone, statut)
-    VALUES (?,?,?,?,?,?,'en_attente')
-  `).run(formule_id, params.id, nom.trim(), prenom || null, email || null, telephone || null)).lastInsertRowid;
+    INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, telephone, adresse, pays, ville, observations, statut)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,'en_attente')
+  `).run(formule_id, params.id, linkedId, nom.trim(), prenom || null, email || null, telephone || null,
+    adresse || null, pays || null, ville || null, observations || null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -2946,11 +2958,14 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
   if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
-  const { nom, prenom, email, telephone, statut } = body;
+  const { nom, prenom, email, telephone, adresse, pays, ville, observations, statut } = body;
   await db.prepare(`UPDATE adhesion_membres SET
-      nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, statut=COALESCE(?,statut), updated_at=datetime('now')
+      nom=COALESCE(?,nom), prenom=?, email=?, telephone=?, adresse=?, pays=?, ville=?, observations=?,
+      statut=COALESCE(?,statut), updated_at=datetime('now')
     WHERE id=?`)
-    .run(nom || null, prenom ?? m.prenom, email ?? m.email, telephone ?? m.telephone, statut || null, params.id);
+    .run(nom || null, prenom ?? m.prenom, email ?? m.email, telephone ?? m.telephone,
+      adresse ?? m.adresse, pays ?? m.pays, ville ?? m.ville, observations ?? m.observations,
+      statut || null, params.id);
   sendJSON(res, 200, { ok: true });
 });
 

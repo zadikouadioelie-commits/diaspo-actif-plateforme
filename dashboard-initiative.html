@@ -74,6 +74,7 @@
       <a href="#presentation" data-section="presentation" style="display:none;">📋 Ma fiche initiative</a>
       <a href="#publications" data-section="publications" data-aide="publications">📰 Publications</a>
       <a href="#cagnottes" data-section="cagnottes" data-aide="cagnottes">🪙 Mes Cagnottes</a>
+      <a href="#avancement" data-section="avancement" data-aide="avancement_initiative" id="sb-avancement" style="display:none;">📈 Avancement de mon initiative</a>
 
       <div class="sb-group-lbl">AFFILIATION</div>
       <a href="#affiliation" data-section="affiliation" data-aide="affiliation">🔗 Affiliation</a>
@@ -676,6 +677,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div id="evenements" style="display:none;"></div>
     <div id="billetterie-init" style="display:none;"></div>
     <div id="cagnottes" style="display:none;"></div>
+    <div id="avancement" style="display:none;"></div>
 
     <div class="card" style="margin-bottom:20px;" id="paiement-marketplace">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -1325,6 +1327,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <h3 style="margin:0 0 14px;">➕ Ajouter un adhérent</h3>
         <label style="font-size:12px;font-weight:700;">Formule</label>
         <select id="adh-m-formule" class="input" style="margin:4px 0 10px;width:100%;"></select>
+
+        <label style="font-size:12px;font-weight:700;">🔎 Rattacher à un compte Diaspo'Actif existant <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+        <input type="text" id="adh-m-recherche-user" class="input" placeholder="Rechercher par nom, prénom ou ville…" style="margin:4px 0 6px;width:100%;" oninput="adhRechercherUser(this.value)">
+        <div id="adh-m-user-resultats" style="margin-bottom:10px;"></div>
+        <div id="adh-m-user-selectionne" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;">
+          <span id="adh-m-user-selectionne-nom"></span>
+          <button type="button" class="btn btn-sm btn-outline" onclick="adhDeselectionnerUser()">Retirer</button>
+        </div>
+
         <label style="font-size:12px;font-weight:700;">Nom</label>
         <input type="text" id="adh-m-nom" class="input" style="margin:4px 0 10px;width:100%;">
         <label style="font-size:12px;font-weight:700;">Prénom</label>
@@ -1333,6 +1344,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <input type="email" id="adh-m-email" class="input" style="margin:4px 0 10px;width:100%;">
         <label style="font-size:12px;font-weight:700;">Téléphone</label>
         <input type="text" id="adh-m-telephone" class="input" style="margin:4px 0 14px;width:100%;">
+        <label style="font-size:12px;font-weight:700;">Adresse</label>
+        <input type="text" id="adh-m-adresse" class="input" style="margin:4px 0 10px;width:100%;">
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;"><label style="font-size:12px;font-weight:700;">Pays</label>
+            <input type="text" id="adh-m-pays" class="input" style="margin:4px 0 10px;width:100%;"></div>
+          <div style="flex:1;"><label style="font-size:12px;font-weight:700;">Ville</label>
+            <input type="text" id="adh-m-ville" class="input" style="margin:4px 0 10px;width:100%;"></div>
+        </div>
+        <label style="font-size:12px;font-weight:700;">Observations</label>
+        <textarea id="adh-m-observations" class="input" style="margin:4px 0 14px;width:100%;min-height:60px;"></textarea>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-outline" onclick="document.getElementById('modal-adh-membre').style.display='none'">Annuler</button>
           <button class="btn btn-orange" onclick="adhEnregistrerMembre()">Ajouter</button>
@@ -2761,6 +2782,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
        (voir "Statut de l'initiative"). Vérification toujours en attente : le workflow de
        demande/validation n'existe pas encore (phase à construire séparément). */
     const etatEnCreation = init.statut_creation === 'en_creation';
+    /* Module "Avancement de mon initiative" : réservé aux initiatives en création
+       (voir cahier des charges + précision utilisateur). */
+    const sbAvancement = document.getElementById('sb-avancement');
+    if (sbAvancement) sbAvancement.style.display = etatEnCreation ? '' : 'none';
     const etatChecklist = [
       { label: 'Présentation', done: !!init.description },
       { label: 'Porteur du projet', done: !!(init.nom_responsable && init.email_responsable && init.tel_responsable) },
@@ -2964,7 +2989,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','avancement','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2976,6 +3001,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'cagnottes') renderCagnottes();
+    if (name === 'avancement') renderAvancement();
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
@@ -4380,6 +4406,83 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     }
   };
 
+  /* ══ SECTION AVANCEMENT DE MON INITIATIVE — increment 1 (fondations) ══
+     Réservé aux initiatives en création : le module devient hors-sujet une fois la
+     structure existante (voir cahier des charges + précision utilisateur). Un débounce
+     léger évite un appel réseau à chaque frappe dans les commentaires privés. */
+  let avSaveTimers = {};
+  async function renderAvancement() {
+    const el = document.getElementById('avancement');
+    if (!init || init.statut_creation !== 'en_creation') {
+      el.innerHTML = `<div class="card empty" style="text-align:center;padding:30px;">
+        <p style="color:var(--muted);">Ce module concerne uniquement les initiatives en cours de création.</p>
+      </div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0;">📈 Avancement de mon initiative</h3>
+        <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Notez chaque critère sur 10 pour suivre la progression de la création de votre initiative. Le pourcentage global se calcule automatiquement. Ces informations restent privées.</p>
+      </div>
+      <div class="card" style="margin-bottom:20px;padding:18px 20px;" id="av-score-card">Chargement…</div>
+      <div id="av-liste"><div class="notice">Chargement…</div></div>
+    `;
+    avRender();
+  }
+
+  async function avRender() {
+    const scoreCard = document.getElementById('av-score-card');
+    const wrap = document.getElementById('av-liste');
+    if (!wrap) return;
+    try {
+      const { criteres, pourcentage } = await api('GET', `/initiatives/${init.id}/avancement`);
+      scoreCard.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <strong style="font-size:15px;">Avancement global</strong>
+          <span style="font-size:22px;font-weight:800;color:var(--orange);">${pourcentage}%</span>
+        </div>
+        <div style="height:10px;background:var(--bg);border-radius:99px;overflow:hidden;">
+          <div style="height:100%;width:${pourcentage}%;background:var(--orange);transition:width .3s;"></div>
+        </div>`;
+      wrap.innerHTML = criteres.map(c => `
+        <div class="card" style="margin-bottom:12px;padding:14px 18px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+            <div>
+              <strong style="font-size:14px;">${escH(c.titre)}</strong>
+              <p style="font-size:12.5px;color:var(--muted);margin:2px 0 0;">${escH(c.description)}</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex:none;">
+              <input type="range" min="0" max="10" step="1" value="${c.note}" id="av-note-${c.cle}"
+                oninput="document.getElementById('av-note-val-${c.cle}').textContent=this.value"
+                onchange="avSauvegarder('${c.cle}')" style="width:110px;">
+              <span id="av-note-val-${c.cle}" style="font-weight:700;font-size:13px;min-width:28px;text-align:right;">${c.note}</span><span style="font-size:12px;color:var(--muted);">/10</span>
+            </div>
+          </div>
+          <label style="font-size:11.5px;color:var(--muted);font-weight:700;">💬 Commentaire privé (visible par vous seul)</label>
+          <textarea id="av-comment-${c.cle}" placeholder="Actions à réaliser, prochaines étapes…" style="width:100%;box-sizing:border-box;min-height:44px;margin-top:4px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;" onchange="avSauvegarder('${c.cle}')">${escH(c.commentaire_prive || '')}</textarea>
+        </div>`).join('');
+    } catch (e) {
+      wrap.innerHTML = `<div class="empty">Impossible de charger l'avancement.</div>`;
+    }
+  }
+
+  window.avSauvegarder = async function(cle) {
+    clearTimeout(avSaveTimers[cle]);
+    avSaveTimers[cle] = setTimeout(async () => {
+      const note = Number(document.getElementById(`av-note-${cle}`)?.value || 0);
+      const commentaire_prive = document.getElementById(`av-comment-${cle}`)?.value || '';
+      try {
+        await api('PUT', `/initiatives/${init.id}/avancement/${cle}`, { note, commentaire_prive });
+        const scoreCard = document.getElementById('av-score-card');
+        const { pourcentage } = await api('GET', `/initiatives/${init.id}/avancement`);
+        if (scoreCard) {
+          scoreCard.querySelector('span').textContent = pourcentage + '%';
+          scoreCard.querySelector('div > div').style.width = pourcentage + '%';
+        }
+      } catch (e) { if (typeof showToast === 'function') showToast('Erreur d\\'enregistrement', 'error'); }
+    }, 400);
+  };
+
   document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
     a.addEventListener('click', e => {
       if(a.href && !a.href.endsWith('#'+a.dataset.section)) return;
@@ -5779,6 +5882,7 @@ function adhRenderMembresLignes(liste){
       <td style="padding:8px;">${m.montant_paye ? m.montant_paye+' '+(formule?.devise||'EUR') : '—'}</td>
       <td style="padding:8px;font-size:11px;">${badges.join(', ')||'—'}</td>
       <td style="padding:8px;white-space:nowrap;">
+        ${m.linked_user_id?`<a class="btn btn-sm btn-outline" href="profil.html?id=${m.linked_user_id}" target="_blank">👁 Accéder au profil</a>`:''}
         ${m.statut!=='a_jour'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
       </td>
@@ -5833,10 +5937,44 @@ async function adhRenderRegistre(){
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
 
+let ADH_M_USER_SELECTIONNE = null;
 function adhOuvrirAjoutMembre(){
   document.getElementById('adh-m-formule').innerHTML = ADH_FORMULES.map(f=>`<option value="${f.id}">${escH(f.nom)}</option>`).join('');
-  ['adh-m-nom','adh-m-prenom','adh-m-email','adh-m-telephone'].forEach(id=>document.getElementById(id).value='');
+  ['adh-m-nom','adh-m-prenom','adh-m-email','adh-m-telephone','adh-m-adresse','adh-m-pays','adh-m-ville','adh-m-observations','adh-m-recherche-user'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('adh-m-user-resultats').innerHTML = '';
+  adhDeselectionnerUser();
   document.getElementById('modal-adh-membre').style.display = 'flex';
+}
+let ADH_M_RECHERCHE_TIMER = null;
+function adhRechercherUser(terme){
+  clearTimeout(ADH_M_RECHERCHE_TIMER);
+  const zone = document.getElementById('adh-m-user-resultats');
+  if ((terme||'').trim().length < 2) { zone.innerHTML = ''; return; }
+  ADH_M_RECHERCHE_TIMER = setTimeout(async () => {
+    try {
+      const r = await api('GET', `/annuaire/utilisateurs?nom=${encodeURIComponent(terme)}`);
+      const rows = (r.users || []).slice(0, 6);
+      zone.innerHTML = !rows.length ? '<div style="font-size:12px;color:var(--muted);padding:4px 0;">Aucun résultat.</div>'
+        : rows.map(u => `<div onclick='adhSelectionnerUser(${JSON.stringify(u).replace(/'/g,"&#39;")})' style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12.5px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+            👤 ${escH(u.prenom||'')} ${escH(u.nom||'')} ${u.ville?'— '+escH(u.ville):''}
+          </div>`).join('');
+    } catch(e) { zone.innerHTML = ''; }
+  }, 300);
+}
+function adhSelectionnerUser(u){
+  ADH_M_USER_SELECTIONNE = u;
+  document.getElementById('adh-m-user-resultats').innerHTML = '';
+  document.getElementById('adh-m-recherche-user').value = '';
+  document.getElementById('adh-m-user-selectionne').style.display = 'flex';
+  document.getElementById('adh-m-user-selectionne-nom').textContent = `✅ ${u.prenom||''} ${u.nom||''}`;
+  document.getElementById('adh-m-nom').value = u.nom || '';
+  document.getElementById('adh-m-prenom').value = u.prenom || '';
+  document.getElementById('adh-m-ville').value = u.ville || '';
+  document.getElementById('adh-m-pays').value = u.pays || '';
+}
+function adhDeselectionnerUser(){
+  ADH_M_USER_SELECTIONNE = null;
+  document.getElementById('adh-m-user-selectionne').style.display = 'none';
 }
 async function adhEnregistrerMembre(){
   const nom = document.getElementById('adh-m-nom').value.trim();
@@ -5844,9 +5982,14 @@ async function adhEnregistrerMembre(){
   try{
     await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-membres`, {
       formule_id: Number(document.getElementById('adh-m-formule').value),
+      linked_user_id: ADH_M_USER_SELECTIONNE ? ADH_M_USER_SELECTIONNE.id : null,
       nom, prenom: document.getElementById('adh-m-prenom').value || null,
       email: document.getElementById('adh-m-email').value || null,
       telephone: document.getElementById('adh-m-telephone').value || null,
+      adresse: document.getElementById('adh-m-adresse').value || null,
+      pays: document.getElementById('adh-m-pays').value || null,
+      ville: document.getElementById('adh-m-ville').value || null,
+      observations: document.getElementById('adh-m-observations').value || null,
     });
     document.getElementById('modal-adh-membre').style.display = 'none';
     adhRenderRegistre();
