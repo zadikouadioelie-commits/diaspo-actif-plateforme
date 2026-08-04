@@ -4114,11 +4114,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagSupprimer(${c.id})">🗑️ Supprimer</button>`);
         } else if (c.statut === 'active') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
+          actions.push(`<a class="btn btn-sm btn-outline" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}" target="_blank">🔗 Voir la page publique</a>`);
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagAction(${c.id},'pause')">⏸️ Mettre en pause</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
         } else if (c.statut === 'en_pause') {
           actions.push(`<button class="btn btn-sm btn-orange" onclick="cagAction(${c.id},'reprendre')">▶️ Reprendre</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
+        }
+        if (c.visibilite === 'privee') {
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenParticipants(${c.id})">👥 Participants autorisés</button>`);
         }
         return `<div class="card" style="margin-bottom:12px;padding:16px 18px;">
           <div style="display:flex;gap:14px;flex-wrap:wrap;">
@@ -4272,6 +4276,58 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     try { await api('DELETE', '/cagnottes/'+id); cagRenderListe(); }
     catch(e) { alert('Erreur : '+e.message); }
   };
+
+  /* ── Cagnotte privée : gestion des participants autorisés ── */
+  window.cagOpenParticipants = async function(id) {
+    let modal = document.getElementById('cag-participants-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cag-participants-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:440px;text-align:left;">
+      <h3 style="margin:0 0 4px;">👥 Participants autorisés</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Seules ces personnes peuvent consulter cette cagnotte privée.</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input id="cag-part-email" type="email" placeholder="email@exemple.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+        <button class="btn btn-sm btn-orange" onclick="cagAjouterParticipant(${id})">+ Ajouter</button>
+      </div>
+      <div id="cag-part-error" class="auth-error" style="display:none;margin-bottom:10px;"></div>
+      <div id="cag-part-liste" style="max-height:260px;overflow-y:auto;">Chargement…</div>
+      <div style="text-align:right;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-participants-modal').remove()">Fermer</button>
+      </div>
+    </div>`;
+    cagRenderParticipants(id);
+  };
+  async function cagRenderParticipants(id) {
+    const wrap = document.getElementById('cag-part-liste');
+    if (!wrap) return;
+    try {
+      const { participants } = await api('GET', '/cagnottes/'+id+'/participants');
+      wrap.innerHTML = participants.length ? participants.map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>${escH(p.user_nom || p.email)}${p.user_nom ? ` <span style="color:var(--muted);">(${escH(p.email)})</span>` : ''}</span>
+          <button class="btn btn-sm" style="color:#dc2626;padding:2px 8px;" onclick="cagRetirerParticipant(${id},${p.id})">Retirer</button>
+        </div>`).join('') : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:14px 0;">Aucun participant autorisé pour l'instant.</p>`;
+    } catch(e) { wrap.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`; }
+  }
+  window.cagAjouterParticipant = async function(id) {
+    const errBox = document.getElementById('cag-part-error');
+    errBox.style.display = 'none';
+    const email = document.getElementById('cag-part-email').value.trim();
+    try {
+      await api('POST', '/cagnottes/'+id+'/participants', { email });
+      document.getElementById('cag-part-email').value = '';
+      cagRenderParticipants(id);
+    } catch(e) { errBox.textContent = e.message || 'Erreur.'; errBox.style.display = 'block'; }
+  };
+  window.cagRetirerParticipant = async function(id, pid) {
+    try { await api('DELETE', '/cagnottes/'+id+'/participants/'+pid); cagRenderParticipants(id); }
+    catch(e) { alert('Erreur : '+e.message); }
+  };
+
   document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
     a.addEventListener('click', e => {
       if(a.href && !a.href.endsWith('#'+a.dataset.section)) return;

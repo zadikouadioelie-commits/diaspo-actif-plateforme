@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Cagnottes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<style>
+/* ===== Hero cagnottes — même pattern que Vitrines/Annuaire ===== */
+.cag-hero{
+  position:relative;height:280px;overflow:hidden;
+  background:
+    radial-gradient(120% 95% at 82% 8%, rgba(242,100,34,.45) 0%, rgba(242,100,34,0) 58%),
+    linear-gradient(135deg,#0F2A50 0%,#1B3A6B 60%,#1565C0 100%);
+}
+.cag-hero::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(115deg, rgba(255,255,255,.05) 0 2px, transparent 2px 24px);
+}
+.cag-hero-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(10,30,60,.15) 0%,rgba(10,30,60,.6) 100%);}
+.cag-hero-content{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;}
+.cag-hero-text{max-width:1180px;margin:0 auto;width:100%;padding:0 24px 36px;}
+.cag-hero-text h1{font-size:38px;font-weight:900;color:#fff;margin:0 0 8px;letter-spacing:-.5px;text-transform:uppercase;}
+.cag-hero-text p{color:rgba(255,255,255,.85);font-size:15px;margin:0;max-width:480px;line-height:1.5;}
+
+.cag-filters{background:#fff;border-bottom:1px solid var(--border);padding:18px 0;}
+.cag-filters-inner{max-width:1180px;margin:0 auto;padding:0 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.cag-filter-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px;}
+.cag-filter-group label{font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.04em;}
+.cag-filter-group select,.cag-filter-group input[type=text]{
+  height:42px;padding:0 14px;border:1px solid var(--border);border-radius:8px;
+  font-size:13.5px;background:#fff;color:var(--text);width:100%;
+}
+
+.cag-section-head{max-width:1180px;margin:0 auto;padding:32px 24px 18px;}
+.cag-section-head h2{font-size:22px;font-weight:800;margin:0;position:relative;padding-bottom:10px;}
+.cag-section-head h2::after{content:'';position:absolute;left:0;bottom:0;width:36px;height:3px;background:linear-gradient(135deg,#F26422,#c2410c);border-radius:2px;}
+.cag-result-count{font-size:13px;color:var(--muted);margin-top:4px;}
+
+.cag-grid{max-width:1180px;margin:0 auto;padding:0 24px 40px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+@media(max-width:900px){.cag-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.cag-grid{grid-template-columns:1fr;}}
+
+.cag-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;text-decoration:none;color:inherit;box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column;cursor:pointer;}
+.cag-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(27,58,107,.13);}
+.cag-card-photo{height:150px;position:relative;overflow:hidden;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:40px;}
+.cag-card-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.cag-cat-badge{position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase;background:#F26422;}
+.cag-card-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:6px;}
+.cag-card-title{font-size:14px;font-weight:700;margin:0;line-height:1.3;color:var(--text);}
+.cag-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;flex:1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.cag-bar{height:6px;background:var(--bg);border-radius:99px;overflow:hidden;margin-top:4px;}
+.cag-bar-fill{height:100%;background:var(--orange);}
+.cag-card-montant{font-size:13px;font-weight:700;color:var(--navy);}
+
+.cag-empty{grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--muted);}
+@media(min-width:681px){#sidebar,#sidebar-backdrop,#sidebar-toggle{display:none!important;}}
+</style>
+  <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
+        <a href="cagnottes.html" class="active">Cagnottes</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="vitrines.html">🏪 Vitrines</a>
+    <a href="cagnottes.html">🪙 Cagnottes</a>
+    <a href="fil-actualite.html">📰 Fil d'actualité</a>
+    <div id="hb-account-section"></div>
+  </aside>
+
+  <div class="cag-hero">
+    <div class="cag-hero-overlay"></div>
+    <div class="cag-hero-content">
+      <div class="cag-hero-text">
+        <h1>Cagnottes</h1>
+        <p>Soutenez les projets et initiatives de la diaspora en contribuant à leurs collectes de fonds.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="cag-filters">
+    <div class="cag-filters-inner">
+      <div class="cag-filter-group" style="flex:2;min-width:220px;">
+        <label>🔍 Rechercher</label>
+        <input type="text" id="cg-q" placeholder="Titre, mot-clé…">
+      </div>
+      <div class="cag-filter-group">
+        <label>🏷️ Catégorie</label>
+        <select id="cg-categorie"><option value="">Toutes les catégories</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="cag-section-head">
+    <h2>Toutes les cagnottes</h2>
+    <div class="cag-result-count"><strong id="cg-result-count">0</strong> cagnotte(s) trouvée(s)</div>
+  </div>
+
+  <div class="cag-grid" id="cg-list">
+    <div class="cag-empty">Chargement…</div>
+  </div>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> ·
+    <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a>
+  </footer>
+</div>
+
+<script src="assets/data.js?v=7"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=10"></script>
+
+<script>
+(function(){
+  function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  let state = { q:'', categorie:'' };
+
+  async function loadCategories(){
+    try {
+      const { categories } = await fetch('/api/cagnottes/categories').then(r=>r.json());
+      const sel = document.getElementById('cg-categorie');
+      (categories||[]).forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+    } catch(_) {}
+  }
+
+  function renderCard(c){
+    const href = `cagnotte.html?slug=${encodeURIComponent(c.slug)}`;
+    const objectifTxt = c.objectif_montant
+      ? `${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} sur ${Number(c.objectif_montant).toLocaleString('fr-FR')} ${c.devise}`
+      : `${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} collectés`;
+    const barre = c.objectif_montant ? `<div class="cag-bar"><div class="cag-bar-fill" style="width:${c.pourcentage}%;"></div></div>` : '';
+    return `<a class="cag-card" href="${href}">
+      <div class="cag-card-photo">
+        ${c.image_url ? `<img src="${escH(c.image_url)}" alt="" loading="lazy">` : '🪙'}
+        ${c.categorie ? `<span class="cag-cat-badge">${escH(c.categorie)}</span>` : ''}
+      </div>
+      <div class="cag-card-body">
+        <div class="cag-card-title">${escH(c.titre)}</div>
+        ${c.description ? `<p class="cag-card-desc">${escH(c.description)}</p>` : ''}
+        <div class="cag-card-montant">${objectifTxt}</div>
+        ${barre}
+      </div>
+    </a>`;
+  }
+
+  async function apply(){
+    const list = document.getElementById('cg-list');
+    list.innerHTML = `<div class="cag-empty">Chargement…</div>`;
+    const qs = new URLSearchParams();
+    if (state.q) qs.set('q', state.q);
+    if (state.categorie) qs.set('categorie', state.categorie);
+    try {
+      const { cagnottes } = await fetch('/api/cagnottes/publiques?' + qs.toString()).then(r=>r.json());
+      document.getElementById('cg-result-count').textContent = cagnottes.length;
+      list.innerHTML = cagnottes.length ? cagnottes.map(renderCard).join('') : `<div class="cag-empty">Aucune cagnotte ne correspond à ces critères.</div>`;
+    } catch(e) {
+      list.innerHTML = `<div class="cag-empty">Impossible de contacter le serveur Diaspo'Actif.</div>`;
+    }
+  }
+
+  let _t;
+  document.getElementById('cg-q').addEventListener('input', function(){
+    clearTimeout(_t);
+    _t = setTimeout(() => { state.q = this.value.trim(); apply(); }, 350);
+  });
+  document.getElementById('cg-categorie').addEventListener('change', function(){ state.categorie = this.value; apply(); });
+
+  loadCategories();
+  apply();
+})();
+</script>
+
+  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item active" href="cagnottes.html"><span class="nav-icon">🪙</span><span>Cagnottes</span></a>
+    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+  </nav>
+  <script>
+  (function(){
+    function render(user){
+      var box = document.getElementById('hb-account-section');
+      var navLogin = document.getElementById('mob-nav-login');
+      if (!box) return;
+      if (user){
+        var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+        var dashHref = dash[user.role] || 'index.html';
+        box.innerHTML = '<a href="' + dashHref + '#apparence">⚙️ Paramètres</a><a href="#" id="hb-logout-link">🚪 Déconnexion</a>';
+        var out = document.getElementById('hb-logout-link');
+        if (out) out.addEventListener('click', function(e){
+          e.preventDefault();
+          fetch('/api/auth/logout', {method:'POST', credentials:'same-origin'}).finally(function(){ window.location.href = 'index.html'; });
+        });
+        if (navLogin) navLogin.href = dashHref;
+      } else {
+        box.innerHTML = '<a href="login.html">🔑 Se connecter</a><a href="inscription.html">✨ Créer un compte</a>';
+      }
+    }
+    fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
+      .then(function(d){ render(d && d.user ? d.user : null); }).catch(function(){ render(null); });
+  })();
+  </script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+  <script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

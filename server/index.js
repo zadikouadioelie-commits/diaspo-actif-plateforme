@@ -12142,6 +12142,32 @@ route("GET", "/api/cagnottes/mes", async (req, res) => {
   sendJSON(res, 200, { cagnottes: rows.map(cagnotteAvecStatut) });
 });
 
+/* GET /api/cagnottes/publiques — catalogue public (espace Cagnottes).
+   IMPORTANT : doit rester déclarée AVANT /api/cagnottes/:id ci-dessous — le routeur teste les
+   motifs dans l'ordre d'enregistrement, et ":id" (un seul segment) capturerait "publiques" en
+   premier sinon (constaté : /publiques renvoyait "Cagnotte introuvable" au lieu du catalogue). */
+route("GET", "/api/cagnottes/publiques", async (req, res, params, body, query) => {
+  let rows = await db.prepare("SELECT * FROM cagnottes WHERE est_publiee=1 AND visibilite='publique' AND (statut_manuel IS NULL OR statut_manuel != 'cloturee') ORDER BY created_at DESC").all();
+  if (query.categorie) rows = rows.filter(r => r.categorie === query.categorie);
+  if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+" "+(r.description||"")).toLowerCase().includes(q)); }
+  sendJSON(res, 200, { cagnottes: rows.map(cagnotteAvecStatut) });
+});
+
+/* GET /api/cagnottes/public/:slug — page publique d'une cagnotte (3 segments : jamais capturée
+   par :id, qui n'en a qu'un seul — pas de risque d'ordre ici, contrairement à /publiques). */
+route("GET", "/api/cagnottes/public/:slug", async (req, res, params) => {
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE slug=?").get(params.slug);
+  if (!c || !c.est_publiee) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (c.visibilite === "privee") {
+    const user = await getCurrentUser(req);
+    const estProprietaire = user && Number(c.owner_user_id) === Number(user.id);
+    const estAutorise = user && !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
+    if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
+  }
+  const owner = await db.prepare("SELECT nom, photo_url FROM users WHERE id=?").get(c.owner_user_id);
+  sendJSON(res, 200, { cagnotte: { ...cagnotteAvecStatut(c), organisateur_nom: owner?.nom || null, organisateur_photo: owner?.photo_url || null } });
+});
+
 route("GET", "/api/cagnottes/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -12243,6 +12269,50 @@ route("DELETE", "/api/cagnottes/:id", async (req, res, params) => {
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   if (c.est_publiee) return sendJSON(res, 400, { error: "Seul un brouillon peut être supprimé — clôturez la cagnotte à la place." });
   await db.prepare("DELETE FROM cagnottes WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/cagnottes/:id/participants — liste des participants autorisés (propriétaire uniquement). */
+route("GET", "/api/cagnottes/:id/participants", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const rows = await db.prepare(`
+    SELECT p.id, p.email, p.user_id, u.nom AS user_nom
+    FROM cagnotte_participants_autorises p LEFT JOIN users u ON u.id=p.user_id
+    WHERE p.cagnotte_id=? ORDER BY p.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { participants: rows });
+});
+
+/* POST /api/cagnottes/:id/participants — ajoute un participant autorisé par e-mail (compte existant ou non). */
+route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const email = String(body?.email || "").trim().toLowerCase();
+  if (!email || !email.includes("@")) return sendJSON(res, 400, { error: "E-mail invalide." });
+  const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
+  const dejaAutorise = await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(params.id, email);
+  if (dejaAutorise) return sendJSON(res, 400, { error: "Cette personne est déjà autorisée." });
+  const id = (await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email) VALUES (?,?,?)")
+    .run(params.id, compte ? compte.id : null, email)).lastInsertRowid;
+  if (compte) creerNotif(compte.id, "cagnotte_invitation", "Invitation à une cagnotte privée", "Vous avez été ajouté(e) comme participant autorisé à une cagnotte privée.", { cagnotte_id: Number(params.id) });
+  sendJSON(res, 201, { id });
+});
+
+/* DELETE /api/cagnottes/:id/participants/:pid — retire un participant autorisé. */
+route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  await db.prepare("DELETE FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").run(params.pid, params.id);
   sendJSON(res, 200, { ok: true });
 });
 
