@@ -2274,6 +2274,11 @@ route("PUT", "/api/initiatives/:id/avancement/:cle", async (req, res, params, bo
   if (!AVANCEMENT_CRITERES.some(c => c.cle === params.cle)) return sendJSON(res, 404, { error: "Critère inconnu." });
   const note = Math.max(0, Math.min(AVANCEMENT_NOTE_MAX, Math.round(Number(body?.note) || 0)));
   const commentaire = body?.commentaire_prive != null ? String(body.commentaire_prive).slice(0, 2000) : "";
+  /* Historique (cahier des charges point 9) : une ligne uniquement quand la note change
+     réellement — les modifications de commentaire seul ne sont pas journalisées, pour éviter
+     le bruit sur ce qui reste un espace de brouillon libre. */
+  const existant = await db.prepare("SELECT note FROM initiative_avancement_notes WHERE initiative_id=? AND critere_cle=?").get(params.id, params.cle);
+  const ancienneNote = existant ? Number(existant.note) : 0;
   await db.prepare(`
     INSERT INTO initiative_avancement_notes (initiative_id, critere_cle, note, commentaire_prive, updated_at, updated_by_user_id)
     VALUES (?,?,?,?,datetime('now'),?)
@@ -2281,7 +2286,35 @@ route("PUT", "/api/initiatives/:id/avancement/:cle", async (req, res, params, bo
       note=excluded.note, commentaire_prive=excluded.commentaire_prive,
       updated_at=datetime('now'), updated_by_user_id=excluded.updated_by_user_id
   `).run(params.id, params.cle, note, commentaire, user.id);
+  if (ancienneNote !== note) {
+    await db.prepare(`
+      INSERT INTO initiative_avancement_historique (initiative_id, critere_cle, ancienne_note, nouvelle_note, user_id)
+      VALUES (?,?,?,?,?)
+    `).run(params.id, params.cle, ancienneNote, note, user.id);
+  }
   sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/initiatives/:id/avancement/historique — journal complet des changements de note
+   (date, heure, auteur, ancienne/nouvelle valeur), le plus récent en premier. */
+route("GET", "/api/initiatives/:id/avancement/historique", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, statut_creation FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (init.statut_creation !== "en_creation") {
+    return sendJSON(res, 400, { error: "Ce module est réservé aux initiatives en création." });
+  }
+  const rows = await db.prepare(`
+    SELECT h.critere_cle, h.ancienne_note, h.nouvelle_note, h.created_at, u.nom AS user_nom
+    FROM initiative_avancement_historique h LEFT JOIN users u ON u.id = h.user_id
+    WHERE h.initiative_id=? ORDER BY h.created_at DESC, h.id DESC LIMIT 200
+  `).all(params.id);
+  const parCle = {};
+  AVANCEMENT_CRITERES.forEach(c => { parCle[c.cle] = c.titre; });
+  const historique = rows.map(r => ({ ...r, critere_titre: parCle[r.critere_cle] || r.critere_cle }));
+  sendJSON(res, 200, { historique });
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
