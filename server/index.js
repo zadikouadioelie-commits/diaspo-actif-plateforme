@@ -2212,6 +2212,79 @@ route("DELETE", "/api/initiatives/:id/modules-actifs/:slug", async (req, res, pa
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
+   MODULE "AVANCEMENT DE MON INITIATIVE" — increment 1 : fondations
+   (grille de critères + notation + calcul automatique du score)
+   Réservé aux initiatives statut_creation='en_creation' (cahier des charges +
+   précision utilisateur : une fois créée/existante, ce module n'a plus lieu
+   d'être — voir "Statut de l'initiative"). Confidentialité, affichage public
+   et historique détaillé des modifications : incréments suivants, pas encore
+   construits. La liste des critères est volontairement statique pour cet
+   increment (gestion des critères par l'admin plateforme = increment futur). */
+const AVANCEMENT_CRITERES = [
+  { cle: "production_offre",        titre: "Production / Offre",                     description: "Le produit, service ou activité proposé est défini et prêt à être présenté." },
+  { cle: "immatriculation",         titre: "Immatriculation de la structure",         description: "Les démarches administratives de création officielle de la structure." },
+  { cle: "implantation_geo",        titre: "Implantation géographique",               description: "Le ou les lieux d'implantation de l'initiative sont identifiés." },
+  { cle: "business_plan",           titre: "Business plan",                           description: "Le plan d'affaires (marché, stratégie, prévisionnel) est rédigé." },
+  { cle: "financement",             titre: "Financement",                             description: "Le financement du projet est identifié et/ou sécurisé." },
+  { cle: "equipe",                  titre: "Équipe",                                  description: "L'équipe fondatrice ou opérationnelle est constituée." },
+  { cle: "partenariats",            titre: "Partenariats",                            description: "Des partenariats utiles au projet sont noués ou en discussion." },
+  { cle: "juridique_administratif", titre: "Aspects juridiques et administratifs",    description: "Statuts, autorisations, assurances et obligations légales." },
+  { cle: "communication_visibilite",titre: "Communication et visibilité",             description: "Présence en ligne, supports de communication, notoriété naissante." },
+  { cle: "premiers_clients",        titre: "Premiers clients ou bénéficiaires",       description: "Les premiers retours concrets du terrain (clients, usagers, bénéficiaires)." },
+];
+const AVANCEMENT_NOTE_MAX = 10;
+
+/* GET /api/initiatives/:id/avancement — grille complète (critères + notes + commentaires
+   privés + % global), réservé au propriétaire de l'initiative. */
+route("GET", "/api/initiatives/:id/avancement", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, statut_creation FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (init.statut_creation !== "en_creation") {
+    return sendJSON(res, 400, { error: "Ce module est réservé aux initiatives en création." });
+  }
+  const rows = await db.prepare("SELECT critere_cle, note, commentaire_prive, updated_at FROM initiative_avancement_notes WHERE initiative_id=?").all(params.id);
+  const parNote = {};
+  rows.forEach(r => { parNote[r.critere_cle] = r; });
+  const criteres = AVANCEMENT_CRITERES.map(c => ({
+    ...c,
+    note: parNote[c.cle] ? Number(parNote[c.cle].note) : 0,
+    commentaire_prive: parNote[c.cle]?.commentaire_prive || "",
+    updated_at: parNote[c.cle]?.updated_at || null,
+  }));
+  const totalObtenu = criteres.reduce((s, c) => s + c.note, 0);
+  const totalPossible = criteres.length * AVANCEMENT_NOTE_MAX;
+  const pourcentage = totalPossible ? Math.round((totalObtenu / totalPossible) * 100) : 0;
+  sendJSON(res, 200, { criteres, pourcentage, totalObtenu, totalPossible });
+});
+
+/* PUT /api/initiatives/:id/avancement/:cle — met à jour la note (0-10) et/ou le commentaire
+   privé d'un critère. Upsert : la ligne n'existe qu'une fois qu'un critère a été noté. */
+route("PUT", "/api/initiatives/:id/avancement/:cle", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, statut_creation FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (init.statut_creation !== "en_creation") {
+    return sendJSON(res, 400, { error: "Ce module est réservé aux initiatives en création." });
+  }
+  if (!AVANCEMENT_CRITERES.some(c => c.cle === params.cle)) return sendJSON(res, 404, { error: "Critère inconnu." });
+  const note = Math.max(0, Math.min(AVANCEMENT_NOTE_MAX, Math.round(Number(body?.note) || 0)));
+  const commentaire = body?.commentaire_prive != null ? String(body.commentaire_prive).slice(0, 2000) : "";
+  await db.prepare(`
+    INSERT INTO initiative_avancement_notes (initiative_id, critere_cle, note, commentaire_prive, updated_at, updated_by_user_id)
+    VALUES (?,?,?,?,datetime('now'),?)
+    ON CONFLICT(initiative_id, critere_cle) DO UPDATE SET
+      note=excluded.note, commentaire_prive=excluded.commentaire_prive,
+      updated_at=datetime('now'), updated_by_user_id=excluded.updated_by_user_id
+  `).run(params.id, params.cle, note, commentaire, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
    MODULE "PARAMÈTRES VITRINE" v2 — registre de modules + modèles + toggles
    Une seule vitrine par Initiative, évolutive via modules activables/masquables.
    Masquer un module NE SUPPRIME JAMAIS ses données (voir getVitrineModulesState).
