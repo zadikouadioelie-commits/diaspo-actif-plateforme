@@ -73,6 +73,7 @@
       <div class="sb-group-lbl">03 — INITIATIVES</div>
       <a href="#presentation" data-section="presentation" style="display:none;">📋 Ma fiche initiative</a>
       <a href="#publications" data-section="publications" data-aide="publications">📰 Publications</a>
+      <a href="#cagnottes" data-section="cagnottes" data-aide="cagnottes">🪙 Mes Cagnottes</a>
 
       <div class="sb-group-lbl">AFFILIATION</div>
       <a href="#affiliation" data-section="affiliation" data-aide="affiliation">🔗 Affiliation</a>
@@ -674,6 +675,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <!-- ═══ SECTION ÉVÉNEMENTS & BILLETTERIE ═══ -->
     <div id="evenements" style="display:none;"></div>
     <div id="billetterie-init" style="display:none;"></div>
+    <div id="cagnottes" style="display:none;"></div>
 
     <div class="card" style="margin-bottom:20px;" id="paiement-marketplace">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -2962,7 +2964,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -2973,6 +2975,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     });
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
+    if (name === 'cagnottes') renderCagnottes();
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
@@ -4055,6 +4058,219 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if(!confirm('Fermer les ventes pour cet événement ?')) return;
     try { await api('PUT','/events/'+id,{statut:'ferme'}); renderInitBilletterie(); }
     catch(e){alert('Erreur : '+e.message);}
+  };
+
+  /* ══ SECTION CAGNOTTES — Phase 1 (création + gestion de base) ══ */
+  const CAG_STATUT_LABELS = {
+    brouillon:  { label:'📝 Brouillon',   color:'#6b7280', bg:'#f3f4f6' },
+    active:     { label:'🟢 Active',      color:'#16a34a', bg:'#f0fdf4' },
+    en_pause:   { label:'⏸️ En pause',    color:'#b45309', bg:'#fffbeb' },
+    terminee:   { label:'✅ Terminée',    color:'#1d4ed8', bg:'#eff6ff' },
+    expiree:    { label:'⌛ Expirée',     color:'#dc2626', bg:'#fef2f2' },
+  };
+  let _cagCategories = null;
+  let _cagEditId = null;
+
+  async function renderCagnottes() {
+    const el = document.getElementById('cagnottes');
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h3 style="margin:0;">🪙 Mes Cagnottes</h3>
+            <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Collectez des fonds pour votre initiative — publique ou réservée à des participants invités.</p>
+          </div>
+          <button class="btn btn-orange btn-sm" onclick="cagOpenForm()">+ Créer une cagnotte</button>
+        </div>
+      </div>
+      <div id="cag-form-wrap" style="display:none;"></div>
+      <div id="cag-liste"><div class="notice">Chargement…</div></div>
+    `;
+    cagRenderListe();
+  }
+
+  async function cagRenderListe() {
+    const wrap = document.getElementById('cag-liste');
+    if (!wrap) return;
+    try {
+      const { cagnottes } = await api('GET', '/cagnottes/mes');
+      if (!cagnottes.length) {
+        wrap.innerHTML = `<div class="card empty" style="text-align:center;padding:30px;">
+          <div style="font-size:32px;margin-bottom:8px;">🪙</div>
+          <p style="color:var(--muted);">Aucune cagnotte pour le moment.</p>
+        </div>`;
+        return;
+      }
+      wrap.innerHTML = cagnottes.map(c => {
+        const st = CAG_STATUT_LABELS[c.statut] || CAG_STATUT_LABELS.brouillon;
+        const objectifTxt = c.objectif_montant
+          ? `${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} sur ${Number(c.objectif_montant).toLocaleString('fr-FR')} ${c.devise} (${c.pourcentage}%)`
+          : `${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} collectés (objectif libre)`;
+        const barre = c.objectif_montant ? `<div style="height:6px;background:var(--bg);border-radius:99px;overflow:hidden;margin:8px 0;"><div style="height:100%;width:${c.pourcentage}%;background:var(--orange);"></div></div>` : '';
+        const actions = [];
+        if (c.statut === 'brouillon') {
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
+          actions.push(`<button class="btn btn-sm btn-orange" onclick="cagAction(${c.id},'publier')">🚀 Publier</button>`);
+          actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagSupprimer(${c.id})">🗑️ Supprimer</button>`);
+        } else if (c.statut === 'active') {
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagAction(${c.id},'pause')">⏸️ Mettre en pause</button>`);
+          actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
+        } else if (c.statut === 'en_pause') {
+          actions.push(`<button class="btn btn-sm btn-orange" onclick="cagAction(${c.id},'reprendre')">▶️ Reprendre</button>`);
+          actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
+        }
+        return `<div class="card" style="margin-bottom:12px;padding:16px 18px;">
+          <div style="display:flex;gap:14px;flex-wrap:wrap;">
+            ${c.image_url ? `<img src="${c.image_url}" alt="" style="width:88px;height:88px;border-radius:10px;object-fit:cover;flex:none;">` : `<div style="width:88px;height:88px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:28px;flex:none;">🪙</div>`}
+            <div style="flex:1;min-width:200px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                <strong style="font-size:15px;">${escH(c.titre)}</strong>
+                <span style="font-size:11px;font-weight:700;color:${st.color};background:${st.bg};border-radius:20px;padding:2px 10px;">${st.label}</span>
+                ${c.visibilite === 'privee' ? `<span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--bg);border-radius:20px;padding:2px 10px;">🔒 Privée</span>` : ''}
+              </div>
+              ${c.categorie ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escH(c.categorie)}</div>` : ''}
+              <div style="font-size:13px;font-weight:700;">${objectifTxt}</div>
+              ${barre}
+              <div style="font-size:11.5px;color:var(--muted);">${c.date_debut ? fmtDateInit(c.date_debut) : '—'} → ${c.date_fin ? fmtDateInit(c.date_fin) : '—'}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${actions.join('')}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      wrap.innerHTML = `<div class="empty">Impossible de charger vos cagnottes.</div>`;
+    }
+  }
+
+  window.cagOpenForm = async function(id) {
+    _cagEditId = id || null;
+    if (!_cagCategories) { try { _cagCategories = (await api('GET','/cagnottes/categories')).categories; } catch(_) { _cagCategories = []; } }
+    let c = { titre:'', description:'', categorie:'', image_url:'', objectif_montant:null, devise:'EUR', date_debut:'', date_fin:'', visibilite:'publique' };
+    if (id) {
+      try { c = (await api('GET', '/cagnottes/'+id)).cagnotte; } catch(e) { alert('Erreur : '+e.message); return; }
+    }
+    const wrap = document.getElementById('cag-form-wrap');
+    wrap.style.display = '';
+    wrap.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 14px;">${id ? '✏️ Modifier la cagnotte' : '🪙 Nouvelle cagnotte'}</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="grid-column:1/-1;">
+            <label class="pv-lbl">Titre *</label>
+            <input id="cag-f-titre" value="${_mvEsc(c.titre||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label class="pv-lbl">Description</label>
+            <textarea id="cag-f-description" rows="4" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;">${_mvEsc(c.description||'')}</textarea>
+          </div>
+          <div>
+            <label class="pv-lbl">Catégorie</label>
+            <select id="cag-f-categorie" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">—</option>${_cagCategories.map(cat=>`<option value="${cat}" ${c.categorie===cat?'selected':''}>${cat}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="pv-lbl">Devise</label>
+            <select id="cag-f-devise" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+              ${['EUR','USD','XOF','XAF','CAD','GBP'].map(d=>`<option value="${d}" ${c.devise===d?'selected':''}>${d}</option>`).join('')}
+            </select>
+          </div>
+          <div style="grid-column:1/-1;">
+            <label class="pv-lbl">Image principale</label><br>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+              ${c.image_url ? `<img id="cag-f-image-preview" src="${c.image_url}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;">` : `<div id="cag-f-image-preview" style="width:60px;height:60px;border-radius:8px;background:var(--bg);"></div>`}
+              <input type="hidden" id="cag-f-image-url" value="${_mvEsc(c.image_url||'')}">
+              <button type="button" class="btn btn-sm btn-outline" onclick="cagPickImage()">📷 Choisir une image</button>
+            </div>
+          </div>
+          <div>
+            <label class="pv-lbl">Objectif financier</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="radio" name="cag-f-objectif-type" value="defini" ${c.objectif_montant?'checked':''}> Défini</label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="radio" name="cag-f-objectif-type" value="libre" ${!c.objectif_montant?'checked':''}> Libre</label>
+            </div>
+            <input id="cag-f-objectif-montant" type="number" min="1" step="1" placeholder="Ex. 10000" value="${c.objectif_montant||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;${c.objectif_montant?'':'display:none;'}">
+          </div>
+          <div>
+            <label class="pv-lbl">Visibilité</label><br>
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;margin-top:8px;"><input type="radio" name="cag-f-visibilite" value="publique" ${c.visibilite!=='privee'?'checked':''}> 🌍 Publique</label>
+            &nbsp;&nbsp;
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="radio" name="cag-f-visibilite" value="privee" ${c.visibilite==='privee'?'checked':''}> 🔒 Privée</label>
+          </div>
+          <div>
+            <label class="pv-lbl">Date de début</label>
+            <input id="cag-f-date-debut" type="date" value="${(c.date_debut||'').slice(0,10)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+          </div>
+          <div>
+            <label class="pv-lbl">Date de fin</label>
+            <input id="cag-f-date-fin" type="date" value="${(c.date_fin||'').slice(0,10)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+          </div>
+        </div>
+        <div id="cag-form-error" class="auth-error" style="display:none;margin-top:10px;"></div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+          <button class="btn btn-orange" onclick="cagSaveForm()">💾 Enregistrer</button>
+          <button class="btn btn-outline" onclick="cagCloseForm()">Annuler</button>
+        </div>
+      </div>
+    `;
+    document.querySelectorAll('input[name="cag-f-objectif-type"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const estDefini = document.querySelector('input[name="cag-f-objectif-type"]:checked')?.value === 'defini';
+        document.getElementById('cag-f-objectif-montant').style.display = estDefini ? '' : 'none';
+      });
+    });
+    wrap.scrollIntoView({behavior:'smooth', block:'start'});
+  };
+  window.cagPickImage = async function() {
+    const url = await window.pickAndUpload('cagnotte', {maxW:1200, maxH:1200});
+    if (!url) return;
+    document.getElementById('cag-f-image-url').value = url;
+    document.getElementById('cag-f-image-preview').outerHTML = `<img id="cag-f-image-preview" src="${url}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;">`;
+  };
+  window.cagCloseForm = function() {
+    _cagEditId = null;
+    const wrap = document.getElementById('cag-form-wrap');
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+  };
+  window.cagSaveForm = async function() {
+    const errBox = document.getElementById('cag-form-error');
+    errBox.style.display = 'none';
+    const titre = document.getElementById('cag-f-titre').value.trim();
+    if (!titre) { errBox.textContent = 'Le titre est requis.'; errBox.style.display = 'block'; return; }
+    const objectifType = document.querySelector('input[name="cag-f-objectif-type"]:checked')?.value;
+    const payload = {
+      titre,
+      description: document.getElementById('cag-f-description').value.trim(),
+      categorie: document.getElementById('cag-f-categorie').value,
+      image_url: document.getElementById('cag-f-image-url').value || null,
+      devise: document.getElementById('cag-f-devise').value,
+      objectif_montant: objectifType === 'defini' ? (document.getElementById('cag-f-objectif-montant').value || null) : null,
+      visibilite: document.querySelector('input[name="cag-f-visibilite"]:checked')?.value || 'publique',
+      date_debut: document.getElementById('cag-f-date-debut').value || null,
+      date_fin: document.getElementById('cag-f-date-fin').value || null,
+    };
+    try {
+      if (_cagEditId) await api('PUT', '/cagnottes/'+_cagEditId, payload);
+      else await api('POST', '/cagnottes', payload);
+      cagCloseForm();
+      cagRenderListe();
+    } catch (e) {
+      errBox.textContent = e.message || 'Erreur lors de l\'enregistrement.';
+      errBox.style.display = 'block';
+    }
+  };
+  window.cagAction = async function(id, action) {
+    const confirms = { pause:'Mettre cette cagnotte en pause ?', cloturer:'Clôturer définitivement cette cagnotte ?' };
+    if (confirms[action] && !confirm(confirms[action])) return;
+    try { await api('PATCH', '/cagnottes/'+id+'/statut', { action }); cagRenderListe(); }
+    catch(e) { alert('Erreur : '+e.message); }
+  };
+  window.cagSupprimer = async function(id) {
+    if (!confirm('Supprimer définitivement ce brouillon de cagnotte ?')) return;
+    try { await api('DELETE', '/cagnottes/'+id); cagRenderListe(); }
+    catch(e) { alert('Erreur : '+e.message); }
   };
   document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
     a.addEventListener('click', e => {

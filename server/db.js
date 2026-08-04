@@ -268,6 +268,45 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  /* ===== MODULE CAGNOTTE — Phase 1 (socle) =====
+     statut_manuel : NULL (rien de particulier) | 'pausee' | 'cloturee' — override manuel du
+     créateur, prioritaire sur le statut calculé depuis les dates (voir calculerStatutCagnotte
+     côté serveur). est_publiee distingue le brouillon (jamais montré publiquement) du reste. */
+  CREATE TABLE IF NOT EXISTS cagnottes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE,
+    owner_user_id INTEGER NOT NULL,
+    initiative_id INTEGER,
+    titre TEXT NOT NULL,
+    description TEXT,
+    categorie TEXT,
+    image_url TEXT,
+    objectif_montant REAL,
+    devise TEXT DEFAULT 'EUR',
+    date_debut TEXT,
+    date_fin TEXT,
+    est_publiee INTEGER DEFAULT 0,
+    statut_manuel TEXT,
+    visibilite TEXT DEFAULT 'publique' CHECK(visibilite IN ('publique','privee')),
+    montant_collecte REAL DEFAULT 0,
+    nb_contributeurs INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(owner_user_id) REFERENCES users(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  /* Participants autorisés d'une cagnotte privée — ajout manuel (Phase 1). */
+  CREATE TABLE IF NOT EXISTS cagnotte_participants_autorises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cagnotte_id INTEGER NOT NULL,
+    user_id INTEGER,
+    email TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user1_id INTEGER NOT NULL,

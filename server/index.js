@@ -12097,6 +12097,148 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
 });
 
 
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE CAGNOTTE — Phase 1 (socle : création + gestion de base)
+   Pas encore de paiement réel (montant_collecte reste à 0, alimenté en Phase
+   ultérieure) ni de page publique — uniquement le créateur peut lire/gérer
+   ses cagnottes pour l'instant.
+   ═══════════════════════════════════════════════════════════════════ */
+const CAGNOTTE_CATEGORIES = ["Solidarité","Santé","Éducation","Urgence humanitaire","Projet communautaire","Culture & événement","Sport","Autre"];
+
+/* Statut affiché, dérivé des dates + de l'éventuel override manuel du créateur —
+   jamais stocké tel quel, pour ne jamais désynchroniser d'une horloge à réviser. */
+function calculerStatutCagnotte(c) {
+  if (!c.est_publiee) return "brouillon";
+  if (c.statut_manuel === "pausee") return "en_pause";
+  if (c.statut_manuel === "cloturee") return "terminee";
+  const now = Date.now();
+  const fin = c.date_fin ? new Date(c.date_fin).getTime() : null;
+  if (fin && now > fin) {
+    const objectifAtteint = c.objectif_montant ? (Number(c.montant_collecte) >= Number(c.objectif_montant)) : true;
+    return objectifAtteint ? "terminee" : "expiree";
+  }
+  return "active";
+}
+function cagnotteAvecStatut(c) {
+  return { ...c, statut: calculerStatutCagnotte(c), pourcentage: c.objectif_montant ? Math.min(100, Math.round((Number(c.montant_collecte)/Number(c.objectif_montant))*100)) : null };
+}
+
+route("GET", "/api/cagnottes/categories", async (req, res) => {
+  sendJSON(res, 200, { categories: CAGNOTTE_CATEGORIES });
+});
+
+/* GET /api/cagnottes/mes — cagnottes du compte connecté, tous statuts confondus. */
+route("GET", "/api/cagnottes/mes", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare("SELECT * FROM cagnottes WHERE owner_user_id=? ORDER BY created_at DESC").all(user.id);
+  sendJSON(res, 200, { cagnottes: rows.map(cagnotteAvecStatut) });
+});
+
+route("GET", "/api/cagnottes/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(row.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  }
+  sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
+});
+
+route("POST", "/api/cagnottes", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || !["initiative","administrateur"].includes(user.role)) {
+    return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
+  }
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite } = body;
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  if (date_debut && date_fin && new Date(date_fin) <= new Date(date_debut)) {
+    return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
+  }
+  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  const slug = (titre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "cagnotte") + "-" + Date.now().toString(36);
+  const id = (await db.prepare(`
+    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    slug, user.id, init ? init.id : null, titre, description || null, categorie || null, image_url || null,
+    objectif_montant != null && objectif_montant !== "" ? Number(objectif_montant) : null,
+    devise || "EUR", date_debut || null, date_fin || null,
+    visibilite === "privee" ? "privee" : "publique"
+  )).lastInsertRowid;
+  const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(id);
+  sendJSON(res, 201, { cagnotte: cagnotteAvecStatut(row) });
+});
+
+route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite } = body;
+  const dDebut = date_debut !== undefined ? date_debut : c.date_debut;
+  const dFin = date_fin !== undefined ? date_fin : c.date_fin;
+  if (dDebut && dFin && new Date(dFin) <= new Date(dDebut)) {
+    return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
+  }
+  await db.prepare(`
+    UPDATE cagnottes SET
+      titre=?, description=?, categorie=?, image_url=?, objectif_montant=?, devise=?,
+      date_debut=?, date_fin=?, visibilite=?, updated_at=datetime('now')
+    WHERE id=?
+  `).run(
+    titre !== undefined && titre !== "" ? titre : c.titre,
+    description !== undefined ? description : c.description,
+    categorie !== undefined ? categorie : c.categorie,
+    image_url !== undefined ? image_url : c.image_url,
+    objectif_montant !== undefined ? (objectif_montant !== "" && objectif_montant !== null ? Number(objectif_montant) : null) : c.objectif_montant,
+    devise !== undefined ? devise : c.devise,
+    dDebut, dFin,
+    visibilite !== undefined ? (visibilite === "privee" ? "privee" : "publique") : c.visibilite,
+    params.id
+  );
+  const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
+});
+
+/* PATCH /api/cagnottes/:id/statut — actions du créateur : publier / pause / reprendre / cloturer. */
+route("PATCH", "/api/cagnottes/:id/statut", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const action = body?.action;
+  if (!["publier","pause","reprendre","cloturer"].includes(action)) return sendJSON(res, 400, { error: "Action inconnue." });
+  if (action === "publier") {
+    await db.prepare("UPDATE cagnottes SET est_publiee=1, statut_manuel=NULL, updated_at=datetime('now') WHERE id=?").run(params.id);
+  } else if (action === "pause") {
+    if (!c.est_publiee) return sendJSON(res, 400, { error: "Cette cagnotte n'est pas encore publiée." });
+    await db.prepare("UPDATE cagnottes SET statut_manuel='pausee', updated_at=datetime('now') WHERE id=?").run(params.id);
+  } else if (action === "reprendre") {
+    await db.prepare("UPDATE cagnottes SET statut_manuel=NULL, updated_at=datetime('now') WHERE id=?").run(params.id);
+  } else if (action === "cloturer") {
+    await db.prepare("UPDATE cagnottes SET statut_manuel='cloturee', updated_at=datetime('now') WHERE id=?").run(params.id);
+  }
+  const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
+});
+
+/* DELETE /api/cagnottes/:id — uniquement un brouillon jamais publié (sécurité : une cagnotte
+   publiée peut avoir déjà reçu des contributions, elle se clôture, elle ne se supprime jamais). */
+route("DELETE", "/api/cagnottes/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (c.est_publiee) return sendJSON(res, 400, { error: "Seul un brouillon peut être supprimé — clôturez la cagnotte à la place." });
+  await db.prepare("DELETE FROM cagnottes WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/evenements/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
