@@ -6216,12 +6216,21 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
    intégration écosystème) viendront en incréments suivants.
    ═══════════════════════════════════════════════════════════════════════ */
 async function comptesLiesListe(groupeId) {
-  return db.prepare(`
+  const rows = await db.prepare(`
     SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, u.da_id,
+           u.suspendu_definitif, u.suspendu_jusqu_au,
            m.date_liaison, m.derniere_utilisation
     FROM comptes_lies_membres m JOIN users u ON u.id = m.user_id
     WHERE m.groupe_id = ? ORDER BY m.date_liaison ASC
   `).all(groupeId);
+  /* Statut calculé en JS plutôt qu'en SQL : même logique que partout ailleurs sur la
+     plateforme (comparaison new Date() en JS), pas de CASE SQL à faire passer par la
+     couche de traduction toPg pour un simple calcul dérivé. */
+  return rows.map(r => {
+    const statut = r.suspendu_definitif || (r.suspendu_jusqu_au && new Date(r.suspendu_jusqu_au) > new Date()) ? 'suspendu' : 'actif';
+    const { suspendu_definitif, suspendu_jusqu_au, ...safe } = r;
+    return { ...safe, statut };
+  });
 }
 
 route("GET", "/api/comptes-lies", async (req, res) => {
@@ -6341,6 +6350,40 @@ route("POST", "/api/comptes-lies/basculer", async (req, res, params, body) => {
   const authTok = signAuthToken({ uid: cible.id, role: cible.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   const sf = cookieSecureFlag(req);
   sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
+});
+
+/* Retirer une liaison (Étape 5). N'importe quel membre du groupe peut retirer n'importe
+   quel autre membre (y compris lui-même, pour quitter le groupe) : la spécification ne
+   prévoit pas de notion de « propriétaire » du groupe, et l'Étape 3 pose déjà que tous les
+   comptes liés sont censés être « accessibles entre eux » — la gestion suit la même
+   logique symétrique. Le groupe est nettoyé automatiquement s'il ne reste plus personne. */
+route("DELETE", "/api/comptes-lies/:userId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cibleId = Number(params.userId);
+  if (!cibleId) return sendJSON(res, 400, { error: "Compte cible manquant." });
+
+  const monMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+  if (!monMembre) return sendJSON(res, 403, { error: "Aucun groupe de comptes liés." });
+  const cibleMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(cibleId);
+  if (!cibleMembre || cibleMembre.groupe_id !== monMembre.groupe_id) {
+    return sendJSON(res, 403, { error: "Ce compte ne fait pas partie de votre groupe de comptes liés." });
+  }
+
+  const cible = await db.prepare("SELECT nom FROM users WHERE id=?").get(cibleId);
+  await db.prepare("DELETE FROM comptes_lies_membres WHERE user_id=?").run(cibleId);
+  await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(monMembre.groupe_id, user.id, cibleId, 'suppression_liaison', `Liaison retirée pour ${cible?.nom || cibleId}`);
+
+  const restants = await db.prepare("SELECT COUNT(*) AS n FROM comptes_lies_membres WHERE groupe_id=?").get(monMembre.groupe_id);
+  if (Number(restants.n) === 0) {
+    await db.prepare("DELETE FROM comptes_lies_groupes WHERE id=?").run(monMembre.groupe_id);
+  }
+
+  /* Si l'utilisateur vient de se retirer lui-même, il n'a plus de groupe à afficher. */
+  const monMembreApres = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+  if (!monMembreApres) return sendJSON(res, 200, { groupe_id: null, comptes: [] });
+  const comptes = await comptesLiesListe(monMembreApres.groupe_id);
+  sendJSON(res, 200, { groupe_id: monMembreApres.groupe_id, comptes });
 });
 
 /* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══

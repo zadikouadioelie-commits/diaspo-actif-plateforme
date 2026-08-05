@@ -26,6 +26,23 @@
   .cl-btn-basculer{flex:none;background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text);}
   .cl-btn-basculer:hover{border-color:#c8960c;color:#c8960c;}
   .cl-btn-basculer:disabled{opacity:.6;cursor:default;}
+  .cl-btn-actualiser{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:15px;cursor:pointer;line-height:1;}
+  .cl-btn-actualiser:hover{border-color:#c8960c;}
+  .cl-statut-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px;vertical-align:middle;}
+  .cl-statut-actif{background:rgba(21,128,61,.12);color:#15803d;}
+  .cl-statut-suspendu{background:rgba(220,38,38,.12);color:#dc2626;}
+  .cl-compte-actions{flex:none;display:flex;gap:6px;align-items:center;}
+  .cl-icon-btn{background:none;border:none;cursor:pointer;font-size:15px;padding:6px;border-radius:8px;color:var(--muted);}
+  .cl-icon-btn:hover{background:var(--bg);color:var(--text);}
+  .cl-icon-btn.cl-retirer:hover{color:#dc2626;}
+  .cl-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+  .cl-confirm-box{background:var(--card);border-radius:16px;padding:24px;max-width:380px;width:100%;}
+  .cl-confirm-box h3{margin:0 0 8px;font-size:16px;}
+  .cl-confirm-box p{margin:0 0 18px;font-size:13px;color:var(--muted);line-height:1.5;}
+  .cl-confirm-actions{display:flex;gap:10px;justify-content:flex-end;}
+  .cl-confirm-actions button{border-radius:10px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;border:none;}
+  .cl-confirm-cancel{background:var(--bg);color:var(--text);border:1.5px solid var(--border) !important;}
+  .cl-confirm-retirer{background:#dc2626;color:#fff;}
   .cl-empty{text-align:center;padding:40px 20px;color:var(--muted);max-width:680px;}
   .cl-liste-head{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:680px;margin-bottom:12px;}
   .cl-liste-head h2{margin:0;font-size:16px;}
@@ -85,7 +102,10 @@
         <h2>Vos comptes reliés</h2>
         <div class="cl-groupe-num" id="cl-groupe-num" style="display:none;"></div>
       </div>
-      <button type="button" class="cl-btn-lier" id="cl-btn-lier">➕ Lier un compte</button>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="cl-btn-actualiser" id="cl-btn-actualiser" title="Actualiser">🔄</button>
+        <button type="button" class="cl-btn-lier" id="cl-btn-lier">➕ Lier un compte</button>
+      </div>
     </div>
     <div class="cl-liste" id="cl-liste">
       <div class="notice">Chargement…</div>
@@ -101,6 +121,17 @@
       <div class="cl-modal-actions">
         <button type="button" class="cl-modal-cancel" id="cl-modal-cancel">Annuler</button>
         <button type="button" class="cl-modal-confirm" id="cl-modal-confirm">Relier ce compte</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cl-confirm-overlay" id="cl-confirm-overlay" style="display:none;">
+    <div class="cl-confirm-box">
+      <h3>Retirer cette liaison ?</h3>
+      <p id="cl-confirm-texte">Ce compte ne sera plus accessible depuis ce groupe. Vous pourrez le relier de nouveau plus tard avec son DS-ID.</p>
+      <div class="cl-confirm-actions">
+        <button type="button" class="cl-confirm-cancel" id="cl-confirm-cancel">Annuler</button>
+        <button type="button" class="cl-confirm-retirer" id="cl-confirm-retirer">Retirer la liaison</button>
       </div>
     </div>
   </div>
@@ -141,14 +172,21 @@
     }
     zone.innerHTML = comptes.map(c => {
       const estActuel = moi && c.id === moi.id;
+      const derniereUtil = c.derniere_utilisation ? new Date((c.derniere_utilisation||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR') : 'jamais';
+      const statutCls = c.statut === 'suspendu' ? 'cl-statut-suspendu' : 'cl-statut-actif';
+      const statutLabel = c.statut === 'suspendu' ? 'Suspendu' : 'Actif';
       return `
       <div class="cl-compte-card">
         ${c.photo_url ? `<img class="cl-compte-avatar" src="${esc(c.photo_url)}" alt="">` : `<div class="cl-compte-avatar">👤</div>`}
         <div class="cl-compte-info">
-          <div class="cl-compte-nom">${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}${estActuel ? ' <span class="cl-badge-actuel">● compte actuel</span>' : ''}</div>
-          <div class="cl-compte-meta">${esc(ROLE_LABELS[c.role] || c.role)} · relié le ${c.date_liaison ? new Date((c.date_liaison||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</div>
+          <div class="cl-compte-nom">${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}${estActuel ? ' <span class="cl-badge-actuel">● compte actuel</span>' : ''}<span class="cl-statut-badge ${statutCls}">${statutLabel}</span></div>
+          <div class="cl-compte-meta">${esc(ROLE_LABELS[c.role] || c.role)} · relié le ${c.date_liaison ? new Date((c.date_liaison||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'} · dernière utilisation : ${derniereUtil}</div>
         </div>
-        ${estActuel ? '' : `<button type="button" class="cl-btn-basculer" data-user-id="${c.id}">Basculer</button>`}
+        <div class="cl-compte-actions">
+          ${estActuel ? '' : `<button type="button" class="cl-btn-basculer" data-user-id="${c.id}">Basculer</button>`}
+          <a class="cl-icon-btn" href="profil.html?id=${c.id}" title="Voir le profil">👁️</a>
+          <button type="button" class="cl-icon-btn cl-retirer" data-user-id="${c.id}" data-nom="${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}" title="Retirer la liaison">🗑️</button>
+        </div>
       </div>`;
     }).join('');
   }
@@ -207,21 +245,57 @@
     }
   });
 
-  /* ── Bascule instantanée (Étape 4) ── */
+  /* ── Bascule instantanée (Étape 4) + Actions de gestion (Étape 5) ── */
   zone.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.cl-btn-basculer');
-    if (!btn) return;
-    const cibleId = Number(btn.dataset.userId);
-    btn.disabled = true;
-    btn.textContent = '…';
+    const btnBascule = e.target.closest('.cl-btn-basculer');
+    if (btnBascule) {
+      const cibleId = Number(btnBascule.dataset.userId);
+      btnBascule.disabled = true;
+      btnBascule.textContent = '…';
+      try {
+        const { user: nouveauCompte } = await api('POST', '/comptes-lies/basculer', { user_id: cibleId });
+        const dest = (typeof ROLE_DASHBOARD !== 'undefined' && ROLE_DASHBOARD[nouveauCompte.role]) || 'index.html';
+        location.href = dest;
+      } catch(e2) {
+        if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de basculer sur ce compte.', 'error');
+        btnBascule.disabled = false;
+        btnBascule.textContent = 'Basculer';
+      }
+      return;
+    }
+    const btnRetirer = e.target.closest('.cl-retirer');
+    if (btnRetirer) {
+      cibleARetirer = { id: Number(btnRetirer.dataset.userId), nom: btnRetirer.dataset.nom };
+      confirmTexte.textContent = `« ${cibleARetirer.nom} » ne sera plus accessible depuis ce groupe. Vous pourrez le relier de nouveau plus tard avec son DS-ID.`;
+      confirmOverlay.style.display = 'flex';
+    }
+  });
+
+  document.getElementById('cl-btn-actualiser').addEventListener('click', () => chargerListe());
+
+  /* ── Confirmation « Retirer la liaison » (Étape 5) ── */
+  let cibleARetirer = null;
+  const confirmOverlay = document.getElementById('cl-confirm-overlay');
+  const confirmTexte = document.getElementById('cl-confirm-texte');
+  const btnConfirmRetirer = document.getElementById('cl-confirm-retirer');
+  document.getElementById('cl-confirm-cancel').addEventListener('click', () => { confirmOverlay.style.display = 'none'; cibleARetirer = null; });
+  confirmOverlay.addEventListener('click', e => { if (e.target === confirmOverlay) { confirmOverlay.style.display = 'none'; cibleARetirer = null; } });
+
+  btnConfirmRetirer.addEventListener('click', async () => {
+    if (!cibleARetirer) return;
+    btnConfirmRetirer.disabled = true;
+    btnConfirmRetirer.textContent = 'Retrait…';
     try {
-      const { user: nouveauCompte } = await api('POST', '/comptes-lies/basculer', { user_id: cibleId });
-      const dest = (typeof ROLE_DASHBOARD !== 'undefined' && ROLE_DASHBOARD[nouveauCompte.role]) || 'index.html';
-      location.href = dest;
-    } catch(e2) {
-      if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de basculer sur ce compte.', 'error');
-      btn.disabled = false;
-      btn.textContent = 'Basculer';
+      const { comptes, groupe_id } = await api('DELETE', `/comptes-lies/${cibleARetirer.id}`);
+      renderListe(comptes, groupe_id);
+      confirmOverlay.style.display = 'none';
+      if (typeof showToast === 'function') showToast('Liaison retirée.', 'success');
+    } catch(e3) {
+      if (typeof showToast === 'function') showToast((e3 && e3.message) || 'Impossible de retirer cette liaison.', 'error');
+    } finally {
+      cibleARetirer = null;
+      btnConfirmRetirer.disabled = false;
+      btnConfirmRetirer.textContent = 'Retirer la liaison';
     }
   });
 })();
