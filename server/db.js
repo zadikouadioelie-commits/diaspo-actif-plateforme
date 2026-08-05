@@ -290,6 +290,9 @@ db.exec(`
     description TEXT,
     categorie TEXT,
     image_url TEXT,
+    /* Association avec un événement (Phase 2 point 2) — facultative, un événement peut avoir
+       plusieurs cagnottes liées. Affichée sur la page de l'événement avec un bouton participer. */
+    evenement_id INTEGER,
     objectif_montant REAL,
     devise TEXT DEFAULT 'EUR',
     date_debut TEXT,
@@ -5052,6 +5055,7 @@ db.exec(`
   if (!cagCols1.includes('afficher_montants'))                  db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_montants INTEGER DEFAULT 1");
   if (!cagCols1.includes('relance_fin_proche_le'))               db.exec("ALTER TABLE cagnottes ADD COLUMN relance_fin_proche_le TEXT");
   if (!cagCols1.includes('vues'))                                 db.exec("ALTER TABLE cagnottes ADD COLUMN vues INTEGER DEFAULT 0");
+  if (!cagCols1.includes('evenement_id'))                         db.exec("ALTER TABLE cagnottes ADD COLUMN evenement_id INTEGER");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
