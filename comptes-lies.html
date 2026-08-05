@@ -22,6 +22,10 @@
   .cl-compte-info{flex:1;min-width:0;}
   .cl-compte-nom{font-weight:700;font-size:14px;}
   .cl-compte-meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .cl-badge-actuel{color:#15803d;font-weight:600;font-size:11.5px;}
+  .cl-btn-basculer{flex:none;background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text);}
+  .cl-btn-basculer:hover{border-color:#c8960c;color:#c8960c;}
+  .cl-btn-basculer:disabled{opacity:.6;cursor:default;}
   .cl-empty{text-align:center;padding:40px 20px;color:var(--muted);max-width:680px;}
   .cl-liste-head{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:680px;margin-bottom:12px;}
   .cl-liste-head h2{margin:0;font-size:16px;}
@@ -135,14 +139,18 @@
       </div>`;
       return;
     }
-    zone.innerHTML = comptes.map(c => `
+    zone.innerHTML = comptes.map(c => {
+      const estActuel = moi && c.id === moi.id;
+      return `
       <div class="cl-compte-card">
         ${c.photo_url ? `<img class="cl-compte-avatar" src="${esc(c.photo_url)}" alt="">` : `<div class="cl-compte-avatar">👤</div>`}
         <div class="cl-compte-info">
-          <div class="cl-compte-nom">${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}${moi && c.id === moi.id ? ' <span style="color:var(--muted);font-weight:400;">(compte actuel)</span>' : ''}</div>
+          <div class="cl-compte-nom">${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}${estActuel ? ' <span class="cl-badge-actuel">● compte actuel</span>' : ''}</div>
           <div class="cl-compte-meta">${esc(ROLE_LABELS[c.role] || c.role)} · relié le ${c.date_liaison ? new Date((c.date_liaison||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</div>
         </div>
-      </div>`).join('');
+        ${estActuel ? '' : `<button type="button" class="cl-btn-basculer" data-user-id="${c.id}">Basculer</button>`}
+      </div>`;
+    }).join('');
   }
 
   try {
@@ -196,6 +204,24 @@
     } finally {
       btnConfirm.disabled = false;
       btnConfirm.textContent = 'Relier ce compte';
+    }
+  });
+
+  /* ── Bascule instantanée (Étape 4) ── */
+  zone.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.cl-btn-basculer');
+    if (!btn) return;
+    const cibleId = Number(btn.dataset.userId);
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const { user: nouveauCompte } = await api('POST', '/comptes-lies/basculer', { user_id: cibleId });
+      const dest = (typeof ROLE_DASHBOARD !== 'undefined' && ROLE_DASHBOARD[nouveauCompte.role]) || 'index.html';
+      location.href = dest;
+    } catch(e2) {
+      if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de basculer sur ce compte.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Basculer';
     }
   });
 })();

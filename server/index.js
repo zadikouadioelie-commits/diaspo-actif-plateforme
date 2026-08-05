@@ -6307,6 +6307,42 @@ route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
   sendJSON(res, 200, { groupe_id: groupeId, comptes });
 });
 
+/* Bascule instantanée entre comptes liés (Étape 4). Aucune saisie de mot de passe :
+   la liaison préalable (Étape 2, elle-même protégée par DS-ID) fait déjà foi. Le seul
+   garde-fou qui compte ici est que le compte cible appartienne AU MÊME GROUPE que le
+   compte actuellement connecté — sans quoi n'importe quel utilisateur connecté pourrait
+   prendre l'identité de n'importe quel autre en devinant un id. On ré-émet exactement les
+   mêmes cookies qu'à la connexion (sid + auth), ce qui préserve tout le reste du site
+   (aucune autre route n'a besoin de savoir que la session vient d'une bascule). */
+route("POST", "/api/comptes-lies/basculer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cibleId = Number(body?.user_id);
+  if (!cibleId) return sendJSON(res, 400, { error: "Compte cible manquant." });
+
+  const monMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+  if (!monMembre) return sendJSON(res, 403, { error: "Aucun groupe de comptes liés." });
+  const cibleMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(cibleId);
+  if (!cibleMembre || cibleMembre.groupe_id !== monMembre.groupe_id) {
+    await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(monMembre.groupe_id, user.id, cibleId, 'erreur_liaison', 'bascule_hors_groupe');
+    return sendJSON(res, 403, { error: "Ce compte ne fait pas partie de votre groupe de comptes liés." });
+  }
+
+  const cible = await db.prepare("SELECT * FROM users WHERE id=?").get(cibleId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  if (cible.suspendu_definitif || (cible.suspendu_jusqu_au && new Date(cible.suspendu_jusqu_au) > new Date())) {
+    return sendJSON(res, 403, { error: "Ce compte est suspendu et ne peut pas être activé." });
+  }
+
+  await db.prepare("UPDATE comptes_lies_membres SET derniere_utilisation=datetime('now') WHERE user_id=?").run(cibleId);
+  await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(monMembre.groupe_id, user.id, cibleId, 'changement_compte_actif', `Bascule vers ${cible.nom || cible.id}`);
+
+  const token = createSession(cible.id);
+  const authTok = signAuthToken({ uid: cible.id, role: cible.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const sf = cookieSecureFlag(req);
+  sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
+});
+
 /* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══
    Choix assumé avec l'utilisateur malgré l'affaiblissement de sécurité que cela représente
    par rapport au DS-ID « signature seule » ci-dessus (toute personne ayant vu le code une
