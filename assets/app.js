@@ -779,6 +779,81 @@ function showIdentityReminderModal() {
   });
 }
 
+/* ── Liaison de comptes — indicateur/bascule permanents (Étape 7) ──
+   Widget volontairement scopé aux 4 dashboards (décision actée avec l'utilisateur) : les
+   pages publiques n'affichent pas ce sélecteur. N'apparaît que si l'utilisateur a au moins
+   un autre compte relié — reste invisible (aucune requête réseau superflue au-delà du GET
+   initial) pour l'immense majorité des comptes qui n'ont rien lié. */
+function surDashboardLiaison() {
+  return Object.values(ROLE_DASHBOARD).some(p => location.pathname.endsWith(p));
+}
+function injectComptesLiesSwitcherStyles() {
+  if (document.getElementById("cl-switch-style")) return;
+  const st = document.createElement("style");
+  st.id = "cl-switch-style";
+  st.textContent = `
+.cl-switch-btn{background:none;border:none;cursor:pointer;color:inherit;font-size:12px;padding:4px 6px;margin-left:-6px;opacity:.7;}
+.cl-switch-btn:hover{opacity:1;}
+.cl-switch-dd{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;color:#111;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);min-width:220px;padding:8px;z-index:2000;}
+.cl-switch-dd.open{display:block;}
+.cl-switch-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;padding:8px;border-radius:8px;cursor:pointer;font-size:13px;}
+.cl-switch-item:hover:not(:disabled){background:#f3f4f6;}
+.cl-switch-item:disabled{cursor:default;opacity:.55;}
+.cl-switch-avatar{width:26px;height:26px;border-radius:50%;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;background:#e5e7eb;font-size:14px;}
+.cl-switch-avatar img{width:100%;height:100%;object-fit:cover;}
+.cl-switch-info{display:flex;flex-direction:column;line-height:1.3;}
+.cl-switch-nom{font-weight:700;}
+.cl-switch-role{font-size:10.5px;color:#6b7280;}
+.cl-switch-manage{display:block;text-align:center;font-size:11.5px;font-weight:600;color:var(--navy,#0D2B4E);text-decoration:none;padding:8px 4px 2px;margin-top:4px;border-top:1px solid #e5e7eb;}`;
+  document.head.appendChild(st);
+}
+async function initComptesLiesSwitcher(user) {
+  if (!surDashboardLiaison()) return;
+  let comptes;
+  try {
+    const r = await api('GET', '/comptes-lies');
+    comptes = r.comptes || [];
+  } catch (e) { return; }
+  if (comptes.length <= 1) return; // rien à afficher pour un compte non relié
+  const wrap = document.getElementById('cl-switch-wrap');
+  const btn = document.getElementById('cl-switch-btn');
+  const dd = document.getElementById('cl-switch-dd');
+  if (!wrap || !btn || !dd) return;
+  injectComptesLiesSwitcherStyles();
+  wrap.style.display = 'inline-flex';
+  const ROLE_LABELS_CL = { utilisateur:'Utilisateur', initiative:'Initiative', administrateur:'Administrateur', collectivite:'Collectivité' };
+  dd.innerHTML = comptes.map(c => {
+    const estActuel = c.id === user.id;
+    return `<button type="button" class="cl-switch-item" data-user-id="${c.id}" ${estActuel ? 'disabled' : ''}>
+      <span class="cl-switch-avatar">${c.photo_url ? `<img src="${c.photo_url}" alt="">` : '👤'}</span>
+      <span class="cl-switch-info"><span class="cl-switch-nom">${escH(c.nom)}${estActuel ? ' · actuel' : ''}</span><span class="cl-switch-role">${escH(ROLE_LABELS_CL[c.role] || c.role)}</span></span>
+    </button>`;
+  }).join('') + `<a href="comptes-lies.html" class="cl-switch-manage">🔗 Gérer mes comptes liés</a>`;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = dd.classList.contains('open');
+    document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
+    if (!open) dd.classList.add('open');
+  });
+  dd.addEventListener('click', async (e) => {
+    const item = e.target.closest('.cl-switch-item');
+    if (!item || item.disabled) return;
+    const cibleId = Number(item.dataset.userId);
+    item.disabled = true;
+    try {
+      const { user: nouveauCompte } = await api('POST', '/comptes-lies/basculer', { user_id: cibleId });
+      location.href = ROLE_DASHBOARD[nouveauCompte.role] || 'index.html';
+    } catch (err) {
+      item.disabled = false;
+    }
+  });
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.cl-switch-wrap')) {
+    document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
+  }
+});
+
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
   if (!el) return;
@@ -823,6 +898,10 @@ async function applyAuthState() {
       <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="user-chip" style="text-decoration:none;">
         <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div> ${user.nom}
       </a>
+      <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
+        <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte">▾</button>
+        <div class="cl-switch-dd" id="cl-switch-dd"></div>
+      </span>
       <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
       <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>
       <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
@@ -834,6 +913,7 @@ async function applyAuthState() {
       try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
       window.location.href = "index.html";
     });
+    initComptesLiesSwitcher(user);
     // Bouton "Passer à Premium" : visible seulement si pas déjà abonné — retiré pour le
     // rôle utilisateur (2026-07-26, voir module "Bientôt disponible"), gardé pour initiative
     if (user.role === 'initiative') {
