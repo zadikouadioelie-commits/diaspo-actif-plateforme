@@ -4686,6 +4686,47 @@ function generateDsIdUnique() {
   }
 })();
 
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE "LIAISON DE COMPTES" — cahier des charges 7 étapes (2026-08-05)
+   Un compte (ligne `users`, quel que soit son rôle) n'appartient qu'à UN
+   SEUL groupe à la fois (contrainte UNIQUE sur comptes_lies_membres.user_id,
+   voir étape 3 : "le système ne doit pas créer des liaisons deux à deux").
+   La clé de liaison réutilise le DS-ID existant (ds_id, voir plus haut) —
+   décision explicite de l'utilisateur, pour ne pas multiplier les identi-
+   fiants de sécurité de la plateforme.
+   ═══════════════════════════════════════════════════════════════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS comptes_lies_groupes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS comptes_lies_membres (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    groupe_id             INTEGER NOT NULL,
+    user_id               INTEGER NOT NULL UNIQUE,
+    ajoute_par_user_id    INTEGER,
+    date_liaison          TEXT DEFAULT (datetime('now')),
+    derniere_utilisation  TEXT,
+    FOREIGN KEY(groupe_id) REFERENCES comptes_lies_groupes(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Journal (étape 6) : création/suppression de liaison, changement de compte actif,
+     erreurs de liaison. compte_concerne_id peut différer de user_id (ex. l'auteur de
+     l'action retire un AUTRE compte du groupe). */
+  CREATE TABLE IF NOT EXISTS comptes_lies_journal (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    groupe_id           INTEGER,
+    user_id             INTEGER NOT NULL,
+    compte_concerne_id  INTEGER,
+    action              TEXT NOT NULL CHECK(action IN ('creation_liaison','suppression_liaison','changement_compte_actif','erreur_liaison')),
+    details             TEXT,
+    created_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
 /* =====================================================================
    MODULE OBSERVATIONS — Tables de suivi
    ===================================================================== */
