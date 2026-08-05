@@ -6110,12 +6110,24 @@ function adhRenderMembresLignes(liste){
       <td style="padding:8px;font-size:11px;">${badges.join(', ')||'—'}</td>
       <td style="padding:8px;white-space:nowrap;">
         ${m.linked_user_id?`<a class="btn btn-sm btn-outline" href="profil.html?id=${m.linked_user_id}" target="_blank">👁 Accéder au profil</a>`:''}
+        ${!m.linked_user_id && m.email?`<button class="btn btn-sm btn-outline" onclick="adhInviterMembre(${m.id},this)" title="Envoie un e-mail invitant ce membre à créer son compte Diaspo'Actif — sa fiche lui sera automatiquement proposée au rattachement.">✉️ Inviter</button>`:''}
         ${m.statut!=='a_jour'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
         <button class="btn btn-sm btn-outline" onclick="adhSwitchTab('journal'); setTimeout(()=>adhRenderJournal(${m.id}),0)" title="Historique de cette fiche">🕓</button>
       </td>
     </tr>`;
   }).join('');
+}
+async function adhInviterMembre(membreId, btn){
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try{
+    await api('POST', `/adhesion-membres/${membreId}/inviter`);
+    if (btn) { btn.textContent = '✅ Envoyée'; btn.style.opacity = '.7'; }
+    showToast?.('✅ Invitation envoyée.');
+  } catch(e){
+    if (btn) { btn.disabled = false; btn.textContent = '✉️ Inviter'; }
+    showToast?.('Erreur : ' + e.message, 'danger');
+  }
 }
 function adhFiltrerRegistre(terme){
   const tbody = document.getElementById('adh-registre-tbody');

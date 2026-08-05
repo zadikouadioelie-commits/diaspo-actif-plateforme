@@ -559,6 +559,23 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
   } catch (_) {}
 
+  /* Proposition de fusion (tâche #74) : si une ou plusieurs fiches d'adhérent externe
+     (sans compte lié) portent exactement cet e-mail, on propose le rattachement plutôt que
+     de le faire automatiquement — la fusion touche l'historique de paiement d'un tiers,
+     elle exige donc une confirmation explicite du titulaire du nouveau compte. */
+  try {
+    const fichesExternes = await db.prepare(`
+      SELECT m.id, m.initiative_id, i.nom AS init_nom FROM adhesion_membres m
+      JOIN initiatives i ON i.id = m.initiative_id
+      WHERE m.linked_user_id IS NULL AND LOWER(m.email) = ?
+    `).all(emailNorm);
+    for (const f of fichesExternes) {
+      creerNotif(id, "adhesion_fusion_proposee", "Fiche adhérent trouvée 🔗",
+        `Une fiche d'adhérent existe déjà pour votre adresse e-mail auprès de « ${f.init_nom} ». Voulez-vous la rattacher à votre nouveau compte ?`,
+        { membre_id: f.id, initiative_id: f.initiative_id, initiative_nom: f.init_nom });
+    }
+  } catch (e) { console.error('[fusion-adhesion-signup]', e.message); }
+
   { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
 
@@ -3191,6 +3208,54 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
     journaliserAdhesion(m.initiative_id, m.id, 'changement_categorie', user,
       `Catégorie changée : « ${ancienneFormule?.nom || '?'} » → « ${nouvelleFormule.nom} ».`);
   }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Fusion self-service (tâche #74) — le titulaire du compte connecté rattache à son propre
+   compte une fiche adhérent externe qui porte exactement son e-mail. Jamais automatique : la
+   vérification de l'e-mail (case-insensitive) est revalidée ici, indépendamment de la
+   proposition envoyée à l'inscription, pour rester sûre même si l'utilisateur change
+   d'e-mail entre-temps ou appelle la route directement. ── */
+route("POST", "/api/adhesion-membres/:id/fusionner", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Fiche adhérent introuvable." });
+  if (m.linked_user_id) return sendJSON(res, 400, { error: "Cette fiche est déjà rattachée à un compte." });
+  if (!m.email || m.email.toLowerCase() !== (user.email || '').toLowerCase()) {
+    return sendJSON(res, 403, { error: "Cette fiche ne correspond pas à votre adresse e-mail." });
+  }
+  await db.prepare("UPDATE adhesion_membres SET linked_user_id=?, updated_at=datetime('now') WHERE id=?").run(user.id, params.id);
+  journaliserAdhesion(m.initiative_id, m.id, 'modification', user,
+    `Fiche rattachée au compte ${user.prenom || ''} ${user.nom} suite à une proposition de fusion à l'inscription.`);
+  sendJSON(res, 200, { ok: true, initiative_nom: m.init_nom });
+});
+
+/* ── Invitation d'un membre externe à créer un compte Diaspo'Actif (tâche #74) — propriétaire
+   uniquement, nécessite un e-mail sur la fiche. Le lien d'inscription pré-remplit l'e-mail ;
+   la proposition de fusion se déclenchera ensuite automatiquement à la création du compte
+   (cf. POST /api/auth/signup) sans action supplémentaire côté association. ── */
+route("POST", "/api/adhesion-membres/:id/inviter", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const m = await db.prepare(`SELECT m.*, i.owner_user_id, i.nom AS init_nom FROM adhesion_membres m JOIN initiatives i ON i.id=m.initiative_id WHERE m.id=?`).get(params.id);
+  if (!m) return sendJSON(res, 404, { error: "Membre introuvable." });
+  if (Number(m.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  if (m.linked_user_id) return sendJSON(res, 400, { error: "Ce membre a déjà un compte Diaspo'Actif." });
+  if (!m.email) return sendJSON(res, 400, { error: "Aucun e-mail enregistré pour ce membre." });
+  try {
+    const { sendEmail } = require('./mailer');
+    const lienInscription = `${process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com'}/inscription.html?role=utilisateur&email=${encodeURIComponent(m.email)}`;
+    await sendEmail({
+      to: m.email,
+      subject: `${m.init_nom} vous invite à rejoindre Diaspo'Actif`,
+      html: `<p>Bonjour ${m.prenom || ''},</p>
+        <p>« ${m.init_nom} » vous invite à créer votre compte Diaspo'Actif. Une fois inscrit(e) avec cette même adresse e-mail, votre fiche d'adhérent (statut, historique) sera automatiquement proposée au rattachement à votre nouveau compte.</p>
+        <p><a href="${lienInscription}">Créer mon compte Diaspo'Actif</a></p>`,
+    });
+  } catch (e) { return sendJSON(res, 503, { error: "Envoi de l'invitation indisponible pour le moment." }); }
+  journaliserAdhesion(m.initiative_id, m.id, 'modification', user, `Invitation envoyée à ${m.email} pour créer un compte Diaspo'Actif.`);
   sendJSON(res, 200, { ok: true });
 });
 

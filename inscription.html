@@ -895,6 +895,21 @@ document.getElementById("btn-next-1").addEventListener("click",()=>{if(currentRo
 ["utilisateur","initiative","collectivite"].forEach(r=>{
   document.getElementById("back-"+r).addEventListener("click",()=>{currentRole=r;goToStep(1);});
 });
+/* Lien d'invitation depuis une fiche adhérent externe (tâche #74, POST /adhesion-membres/:id/inviter) :
+   ?email=...&role=utilisateur pré-remplit l'e-mail et saute directement à l'étape 2. La
+   proposition de rattachement se déclenche ensuite automatiquement côté serveur à la création
+   du compte (POST /api/auth/signup), sans rien à faire de plus ici. */
+(function preremplirDepuisInvitation(){
+  const p = new URLSearchParams(location.search);
+  const emailInvite = p.get('email');
+  const roleInvite = p.get('role');
+  if (!emailInvite || !['utilisateur','initiative','collectivite'].includes(roleInvite)) return;
+  const card = document.querySelector(`.type-card[data-role="${roleInvite}"]`);
+  if (card) card.click();
+  goToStep(2);
+  const champ = document.getElementById(roleInvite === 'utilisateur' ? 'u-email' : roleInvite === 'initiative' ? 'i-email' : 'ce-email-resp');
+  if (champ) champ.value = emailInvite;
+})();
 function updateStrength(input,barId,hintId){
   const v=input.value;let s=0;
   if(v.length>=8)s++;if(v.length>=12)s++;

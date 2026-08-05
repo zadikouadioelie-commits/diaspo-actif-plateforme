@@ -387,6 +387,7 @@ const NOTIF_ICONS = {
   responsable_refuse: "⚠️",
   support_reponse: "🛠️",
   support_statut: "🛠️",
+  adhesion_fusion_proposee: "🔗",
 };
 
 function notifUrl(n) {
@@ -408,6 +409,7 @@ function renderNotifItem(n) {
   const d = (typeof n.data === "object" ? n.data : null) || {};
   const showFollowBack = n.type === "nouveau_abonne" && unread && d.follower_id;
   const showAffiliation = n.type === "affiliation_initiative" && unread && d.initiative_id;
+  const showFusionAdhesion = n.type === "adhesion_fusion_proposee" && unread && d.membre_id;
   return `<div class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}">
     <a href="${url}" style="display:flex;gap:11px;padding:12px 16px;text-decoration:none;color:inherit;" onclick="markNotifRead(${n.id})">
       <div class="notif-icon ${n.type}">${icon}</div>
@@ -427,8 +429,26 @@ function renderNotifItem(n) {
       <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();refuseAffiliation(${n.id},${d.initiative_id},this)">Refuser</button>
       <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();markNotifRead(${n.id});this.closest('.notif-followback-actions').remove();">Ignorer</button>
     </div>` : ""}
+    ${showFusionAdhesion ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:0 16px 12px 65px;">
+      <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();acceptFusionAdhesion(${n.id},${d.membre_id},this)">🔗 Rattacher</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();markNotifRead(${n.id});this.closest('.notif-followback-actions').remove();">Ignorer</button>
+    </div>` : ""}
   </div>`;
 }
+
+window.acceptFusionAdhesion = async function(notifId, membreId, btnEl) {
+  try {
+    await api("POST", `/adhesion-membres/${membreId}/fusionner`);
+  } catch(e) { alert("Erreur : " + (e.message || "")); return; }
+  try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+  if (item) {
+    item.classList.remove("unread");
+    item.querySelector(".notif-unread-dot")?.remove();
+    item.querySelector(".notif-followback-actions")?.remove();
+  }
+  if (typeof showToast === "function") showToast("✅ Fiche adhérent rattachée à votre compte.");
+};
 
 window.acceptAffiliation = async function(notifId, initiativeId, btnEl) {
   try {
