@@ -12912,6 +12912,14 @@ route("GET", "/api/cagnottes/public/:slug", async (req, res, params) => {
     if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
   }
   const owner = await db.prepare("SELECT nom, photo_url FROM users WHERE id=?").get(c.owner_user_id);
+  /* Compteur de vues (Phase 2 point 7, statistiques) — jamais pour le propriétaire consultant
+     sa propre cagnotte, même principe que le compteur de vues des initiatives. Best-effort,
+     ne doit jamais faire échouer l'affichage de la page. */
+  try {
+    const visiteur = await getCurrentUser(req).catch(() => null);
+    const estProprietaire = visiteur && Number(c.owner_user_id) === Number(visiteur.id);
+    if (!estProprietaire) await db.prepare("UPDATE cagnottes SET vues=vues+1 WHERE id=?").run(c.id);
+  } catch (_) {}
   sendJSON(res, 200, { cagnotte: { ...cagnotteAvecStatut(c), organisateur_nom: owner?.nom || null, organisateur_photo: owner?.photo_url || null } });
 });
 
@@ -13225,6 +13233,67 @@ route("DELETE", "/api/cagnottes/:id/co-organisateurs/:coId", async (req, res, pa
   if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
   await db.prepare("DELETE FROM cagnotte_co_organisateurs WHERE id=? AND cagnotte_id=?").run(params.coId, params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* GET /api/cagnottes/:id/statistiques — Phase 2 point 7 : évolution journalière/mensuelle,
+   montant moyen, meilleurs jours de collecte, origine géographique des contributeurs, taux de
+   conversion (contributeurs distincts / vues de la page publique). */
+route("GET", "/api/cagnottes/:id/statistiques", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT vues FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+
+  const contributions = await db.prepare(
+    "SELECT montant, created_at, user_id FROM cagnotte_contributions WHERE cagnotte_id=? AND statut='paye'"
+  ).all(params.id);
+
+  const parJour = {}, parMois = {}, parJourSemaine = {};
+  const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+  contributions.forEach(ct => {
+    const iso = String(ct.created_at).replace(" ", "T") + "Z";
+    const d = new Date(iso);
+    const jour = String(ct.created_at).slice(0, 10);
+    const mois = String(ct.created_at).slice(0, 7);
+    parJour[jour] = (parJour[jour] || 0) + Number(ct.montant);
+    parMois[mois] = (parMois[mois] || 0) + Number(ct.montant);
+    const label = JOURS[d.getUTCDay()];
+    parJourSemaine[label] = (parJourSemaine[label] || 0) + Number(ct.montant);
+  });
+
+  const montantMoyen = contributions.length
+    ? Math.round((contributions.reduce((s, ct) => s + Number(ct.montant), 0) / contributions.length) * 100) / 100
+    : 0;
+
+  /* Origine géographique — se base sur le pays déclaré du compte, jamais publié nommément :
+     seuls des totaux agrégés par pays sortent de cette route. */
+  const userIds = [...new Set(contributions.map(ct => ct.user_id))];
+  const origineParPays = {};
+  if (userIds.length) {
+    const placeholders = userIds.map(() => "?").join(",");
+    const usersRows = await db.prepare(`SELECT id, pays FROM users WHERE id IN (${placeholders})`).all(...userIds);
+    const paysParUser = {};
+    usersRows.forEach(u => { paysParUser[u.id] = u.pays || "Non renseigné"; });
+    contributions.forEach(ct => {
+      const pays = paysParUser[ct.user_id] || "Non renseigné";
+      origineParPays[pays] = (origineParPays[pays] || 0) + 1;
+    });
+  }
+
+  const tauxConversion = c.vues
+    ? Math.round((new Set(contributions.map(ct => ct.user_id)).size / c.vues) * 1000) / 10
+    : null;
+
+  sendJSON(res, 200, {
+    vues: c.vues || 0,
+    taux_conversion: tauxConversion,
+    montant_moyen: montantMoyen,
+    evolution_journaliere: Object.entries(parJour).sort((a, b) => a[0].localeCompare(b[0])).map(([date, montant]) => ({ date, montant })),
+    evolution_mensuelle: Object.entries(parMois).sort((a, b) => a[0].localeCompare(b[0])).map(([mois, montant]) => ({ mois, montant })),
+    meilleurs_jours: Object.entries(parJourSemaine).sort((a, b) => b[1] - a[1]).map(([jour, montant]) => ({ jour, montant })),
+    origine_contributeurs: Object.entries(origineParPays).sort((a, b) => b[1] - a[1]).map(([pays, n]) => ({ pays, n })),
+  });
 });
 
 route("GET", "/api/evenements/:id", async (req, res, params) => {
