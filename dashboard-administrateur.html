@@ -69,6 +69,7 @@
       <a href="#accreditations" data-section="accreditations" style="display:flex;justify-content:space-between;align-items:center;">🏛️ Accréditations <span id="accred-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#certifications" data-section="certifications">🛡️ Certifications</a>
       <a href="#verifications-organisation" data-section="verifications-organisation" style="display:flex;justify-content:space-between;align-items:center;">🏢 Vérifications d'organisation <span id="vo-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
+      <a href="#demandes-passage" data-section="demandes-passage" style="display:flex;justify-content:space-between;align-items:center;">🚀 Passage « Existante » <span id="dp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#origines" data-section="origines">🌍 Origines manquantes</a>
 
@@ -3017,6 +3018,20 @@
           <button class="btn btn-sm btn-outline" id="vo-admin-filtre-rejetee" onclick="loadVerificationsOrganisation('rejetee')">❌ Rejetées</button>
         </div>
         <div id="vo-admin-list"><p class="notice">Chargement…</p></div>
+      </section>
+
+      <!-- STATUT DE L'INITIATIVE — demandes de passage En création → Existante -->
+      <section id="section-demandes-passage" style="display:none;">
+        <div style="margin-bottom:20px;">
+          <h2 style="margin:0;">🚀 Passage « Existante »</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Demandes des initiatives « En création » souhaitant passer au statut « Existante » (voir module Avancement pour le % joint à chaque demande).</p>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <button class="btn btn-sm btn-orange" id="dp-admin-filtre-attente" onclick="loadDemandesPassage('en_attente')">⏳ En attente</button>
+          <button class="btn btn-sm btn-outline" id="dp-admin-filtre-approuvee" onclick="loadDemandesPassage('approuvee')">✅ Approuvées</button>
+          <button class="btn btn-sm btn-outline" id="dp-admin-filtre-refusee" onclick="loadDemandesPassage('refusee')">❌ Refusées</button>
+        </div>
+        <div id="dp-admin-list"><p class="notice">Chargement…</p></div>
       </section>
 
       <section id="section-certifications" style="display:none;">
@@ -7339,6 +7354,61 @@ function voAdminRejeterPrompt(id){
   voAdminDecider(id, 'rejetee', motif.trim());
 }
 
+/* ── STATUT DE L'INITIATIVE — demandes de passage En création → Existante ── */
+let _dpAdminFiltre = 'en_attente';
+async function loadDemandesPassage(statut){
+  if (statut) _dpAdminFiltre = statut;
+  const el = document.getElementById('dp-admin-list');
+  el.innerHTML = '<p class="notice">Chargement…</p>';
+  [['dp-admin-filtre-attente','en_attente'],['dp-admin-filtre-approuvee','approuvee'],['dp-admin-filtre-refusee','refusee']].forEach(([id,val]) => {
+    const b = document.getElementById(id);
+    if (b) { b.classList.toggle('btn-orange', val === _dpAdminFiltre); b.classList.toggle('btn-outline', val !== _dpAdminFiltre); }
+  });
+  try {
+    const r = await api('GET', `/admin/demandes-passage?statut=${_dpAdminFiltre}`);
+    const demandes = r.demandes || [];
+    const badge = document.getElementById('dp-pending-badge');
+    if (_dpAdminFiltre === 'en_attente' && badge) {
+      if (demandes.length > 0) { badge.textContent = demandes.length; badge.style.display = 'inline-block'; }
+      else badge.style.display = 'none';
+    }
+    if (!demandes.length) { el.innerHTML = '<p class="notice">Aucune demande dans cette catégorie.</p>'; return; }
+    el.innerHTML = demandes.map(d => `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;">${esc(d.initiative_nom)} <span style="font-size:11px;font-weight:600;color:var(--muted);">— ${esc(d.initiative_type||'')}</span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Avancement au moment de la demande : <strong>${d.avancement_pourcentage_snapshot}%</strong></div>
+            <div style="font-size:12px;color:var(--muted);">Soumis le ${new Date((d.created_at||'').replace(' ','T')+'Z').toLocaleString('fr-FR')}</div>
+            ${d.message ? `<div style="font-size:12.5px;background:#f8fafc;border-radius:6px;padding:6px 10px;margin-top:6px;white-space:pre-wrap;">${esc(d.message)}</div>` : ''}
+            ${d.statut === 'refusee' && d.motif_refus ? `<div style="font-size:12px;color:#991b1b;margin-top:6px;">Motif du refus : ${esc(d.motif_refus)}</div>` : ''}
+          </div>
+          ${d.statut === 'en_attente' ? `
+            <div style="display:flex;gap:6px;flex:none;">
+              <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none;" onclick="dpAdminDecider(${d.id},'approuvee')">✅ Approuver</button>
+              <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="dpAdminRefuserPrompt(${d.id})">❌ Refuser</button>
+            </div>` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<p class="notice" style="color:#dc2626;">Erreur : ${esc(e.message)}</p>`;
+  }
+}
+
+async function dpAdminDecider(id, decision, motif_refus){
+  try {
+    await api('PUT', `/admin/demandes-passage/${id}`, { decision, motif_refus });
+    loadDemandesPassage();
+  } catch(e) { alert(e.message || 'Erreur.'); }
+}
+
+function dpAdminRefuserPrompt(id){
+  const motif = prompt("Motif du refus (visible par l'initiative) :", "");
+  if (motif === null) return;
+  if (!motif.trim()) { alert('Un motif est requis.'); return; }
+  dpAdminDecider(id, 'refusee', motif.trim());
+}
+
 /* ── Widget stats accréditations DA (vue d'ensemble) ── */
 async function loadDAWidgetStats(){
   try{
@@ -7487,6 +7557,7 @@ async function submitAccordDirect(){
     rencontres:  () => rdvCharger(),
     origines:    () => origCharger(),
     'verifications-organisation': () => loadVerificationsOrganisation(),
+    'demandes-passage': () => loadDemandesPassage(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -7840,6 +7911,8 @@ async function submitAccordDirect(){
   loadDAWidgetStats();
   // Badge sidebar "Vérifications d'organisation" (nombre en attente)
   loadVerificationsOrganisation('en_attente');
+  // Badge sidebar "Passage Existante" (nombre en attente)
+  loadDemandesPassage('en_attente');
 
   // ══ OBSERVATOIRE ÉCONOMIQUE GLOBAL ══════════════════════════
   let _oegData = null;
