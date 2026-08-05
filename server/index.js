@@ -19015,6 +19015,51 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Statut de l'initiative : rappel mensuel tant qu'une initiative reste "en création" ──
+     Simple nudge récurrent (pas d'échéance/expiration comme le Premium ci-dessus) : une seule
+     colonne de garde suffit, comparée au mois calendaire courant pour éviter les doublons si
+     le cron est rejoué plusieurs fois le même mois. */
+  if (pathname === '/api/cron/avancement-initiative-relances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const initiatives = await db.prepare(`
+        SELECT i.id, i.nom, i.owner_user_id, i.relance_avancement_mensuelle_le, u.nom AS user_nom, u.email AS user_email
+        FROM initiatives i JOIN users u ON u.id = i.owner_user_id
+        WHERE i.statut_creation='en_creation'
+      `).all();
+      const moisCourant = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+      let relancesEnvoyees = 0;
+      for (const init of initiatives) {
+        const dejaRelanceCeMois = init.relance_avancement_mensuelle_le && init.relance_avancement_mensuelle_le.slice(0, 7) === moisCourant;
+        if (dejaRelanceCeMois) continue;
+        const msg = `« ${init.nom} » est toujours enregistrée comme « En création ». Mettez à jour votre avancement ou demandez le passage à « Existante » dès que vous êtes prêt.`;
+        creerNotif(init.owner_user_id, 'rappel_avancement_initiative', '📈 Pensez à mettre à jour votre avancement', msg, { initiative_id: init.id, cta: 'avancement' });
+        /* L'e-mail ne doit jamais faire échouer la relance : la notification plateforme
+           reste le canal fiable, l'e-mail est un complément (même principe que Premium). */
+        if (init.user_email) {
+          try {
+            const { sendEmail } = require("./mailer");
+            await sendEmail({
+              to: init.user_email,
+              subject: `Rappel — « ${init.nom} » est toujours « En création »`,
+              html: `<p>Bonjour ${escH(init.user_nom || '')},</p><p>${escH(msg)}</p>`,
+            });
+          } catch (_) {}
+        }
+        await db.prepare("UPDATE initiatives SET relance_avancement_mensuelle_le=datetime('now') WHERE id=?").run(init.id);
+        relancesEnvoyees++;
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees, total: initiatives.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron avancement-initiative-relances"));
+    }
+    return;
+  }
+
   /* ── Gestion des candidatures : relances Emploi & Stage —
      offre bientôt expirée (≤3j), offre expirée (clôture auto), entretien imminent (≤24h). */
   if (pathname === '/api/cron/offres-relances') {
