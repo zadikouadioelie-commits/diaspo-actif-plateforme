@@ -1107,7 +1107,25 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Vitrines, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
             <input type="checkbox" id="adh-toggle-ouvertes" checked onchange="adhToggleOuvertes(this.checked)"> Adhésions ouvertes
           </label>
+          <button class="btn btn-outline" onclick="adhOuvrirRelancesConfig()" title="Choisissez à quel moment les rappels de renouvellement sont envoyés (avant et/ou après expiration).">⏰ Délais de relance</button>
           <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
+        </div>
+      </div>
+
+      <!-- Modal délais de relance personnalisables (tâche #71) -->
+      <div id="modal-adh-relances" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width:440px;">
+          <h3 style="margin:0 0 6px;">⏰ Délais de relance</h3>
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Un rappel (notification + email) est envoyé à chacun de ces décalages par rapport à la date d'expiration. Positif = avant, négatif = après. Un seul rappel par décalage et par cycle d'adhésion.</p>
+          <div id="adh-relances-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input type="number" id="adh-relances-nouveau" class="input" placeholder="ex. 14" style="flex:1;" min="-90" max="90">
+            <button class="btn btn-sm btn-outline" onclick="adhAjouterDelaiRelance()">➕ Ajouter</button>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="document.getElementById('modal-adh-relances').style.display='none'">Annuler</button>
+            <button class="btn btn-orange" onclick="adhEnregistrerRelancesConfig()">Enregistrer</button>
+          </div>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
@@ -3012,9 +3030,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
     if (name === 'adhesions-init') {
-      const togAdh = document.getElementById('adh-toggle-ouvertes');
-      if (togAdh) togAdh.checked = init ? init.adhesions_ouvertes !== false : true;
       adhSwitchTab('formules');
+      adhSyncToggleOuvertes();
     }
     if (name === 'votes-init') voSwitchTab('scrutins');
     if (name === 'paiement') { renderPaiementMarketplace(); renderVerificationOrganisation(); }
@@ -4432,7 +4449,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     el.innerHTML = `
       <div class="card" style="margin-bottom:20px;">
         <h3 style="margin:0;">📈 Avancement de mon initiative</h3>
-        <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Notez chaque critère sur 10 pour suivre la progression de la création de votre initiative. Le pourcentage global se calcule automatiquement. Ces informations restent privées.</p>
+        <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Notez chaque critère sur 10 pour suivre la progression de la création de votre initiative. Le pourcentage global se calcule automatiquement.</p>
+      </div>
+      <div class="card" style="margin-bottom:20px;padding:16px 20px;">
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🌍 Le pourcentage global est automatiquement visible sur votre fiche publique dès que votre initiative est « en création ». Le détail (critères, notes, descriptions) reste privé, sauf si vous l'activez ci-dessous — vos commentaires privés ne sont eux jamais publiés.</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="av-detail-public" ${init.avancement_detail_public ? 'checked' : ''} onchange="avToggleVisibilite(this.checked)">
+          Rendre le détail (critères + notes) public sur ma fiche
+        </label>
       </div>
       <div class="card" style="margin-bottom:20px;padding:18px 20px;" id="av-score-card">Chargement…</div>
       <div class="card" style="margin-bottom:20px;padding:16px 18px;" id="av-dashboard">Chargement…</div>
@@ -4510,6 +4534,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
     `;
   }
+
+  window.avToggleVisibilite = async function(checked) {
+    try {
+      await api('PATCH', `/initiatives/${init.id}/avancement-visibilite`, { public: checked });
+      init.avancement_detail_public = checked ? 1 : 0;
+      if (typeof showToast === 'function') showToast(checked ? 'Détail rendu public ✓' : 'Détail repassé en privé ✓', 'success');
+    } catch (e) {
+      document.getElementById('av-detail-public').checked = !checked;
+      if (typeof showToast === 'function') showToast("Erreur d'enregistrement", 'error');
+    }
+  };
 
   window.avOuvrirHistorique = async function() {
     let modal = document.getElementById('av-hist-modal');
@@ -5680,18 +5715,78 @@ const ADH_TYPE_LABELS = {
 };
 const ADH_STATUT_LABELS = { a_jour: '🟢 À jour', non_a_jour: '🔴 Non à jour', en_attente: '⚪ En attente', suspendu: '⛔ Suspendu' };
 
+/* Relit l'état réel côté serveur pour synchroniser le toggle à l'ouverture de la section —
+   ne dépend d'aucune variable globale mise en cache (cf. bug #71 : la variable `init` de la
+   fonction de chargement initiale n'est pas accessible ici). */
+async function adhSyncToggleOuvertes(){
+  const initId = window.__vitrineInitId;
+  const tog = document.getElementById('adh-toggle-ouvertes');
+  if (!initId || !tog) return;
+  try{
+    const r = await api('GET', `/initiatives/${initId}`);
+    const data = r.initiative || r;
+    tog.checked = data.adhesions_ouvertes !== false;
+  } catch(e){ /* garde l'état par défaut (coché) en cas d'erreur réseau */ }
+}
 async function adhToggleOuvertes(checked){
   const initId = window.__vitrineInitId;
   if (!initId) return;
   const tog = document.getElementById('adh-toggle-ouvertes');
   try{
-    const r = await api('PUT', `/initiatives/${initId}/adhesions-ouvertes`, { ouvertes: checked });
-    if (init) init.adhesions_ouvertes = r.adhesions_ouvertes;
+    await api('PUT', `/initiatives/${initId}/adhesions-ouvertes`, { ouvertes: checked });
     showToast?.(checked ? '✅ Adhésions ouvertes — le bouton « Adhérer » est de nouveau visible.' : '🔒 Adhésions fermées — le bouton « Adhérer » a disparu partout (les membres existants gardent leur adhésion).');
   } catch(e){
     if (tog) tog.checked = !checked;
     showToast?.('Erreur : ' + e.message, 'danger');
   }
+}
+
+let ADH_RELANCES_JOURS = [30, 7, 0, -1];
+function adhLibelleDelai(j){
+  if (j > 0) return `J-${j}`;
+  if (j === 0) return 'Jour J';
+  return `J+${-j}`;
+}
+function adhRenderRelancesChips(){
+  const zone = document.getElementById('adh-relances-chips');
+  zone.innerHTML = ADH_RELANCES_JOURS.slice().sort((a,b)=>b-a).map(j => `
+    <span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 6px 5px 12px;font-size:12.5px;font-weight:700;">
+      ${adhLibelleDelai(j)}
+      <button type="button" onclick="adhRetirerDelaiRelance(${j})" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 4px;">✕</button>
+    </span>`).join('') || '<span style="font-size:12.5px;color:var(--muted);">Aucun délai configuré.</span>';
+}
+async function adhOuvrirRelancesConfig(){
+  const initId = window.__vitrineInitId;
+  if (!initId) return;
+  ADH_RELANCES_JOURS = [30, 7, 0, -1];
+  try{
+    const r = await api('GET', `/initiatives/${initId}`);
+    const data = r.initiative || r;
+    if (data.adhesion_relances_jours) ADH_RELANCES_JOURS = JSON.parse(data.adhesion_relances_jours);
+  } catch(e){ /* garde la valeur par défaut */ }
+  adhRenderRelancesChips();
+  document.getElementById('modal-adh-relances').style.display = 'flex';
+}
+function adhAjouterDelaiRelance(){
+  const input = document.getElementById('adh-relances-nouveau');
+  const v = Math.round(Number(input.value));
+  if (!Number.isFinite(v) || v < -90 || v > 90) { showToast?.('Délai invalide (entre -90 et 90 jours).', 'warning'); return; }
+  if (!ADH_RELANCES_JOURS.includes(v)) ADH_RELANCES_JOURS.push(v);
+  input.value = '';
+  adhRenderRelancesChips();
+}
+function adhRetirerDelaiRelance(j){
+  ADH_RELANCES_JOURS = ADH_RELANCES_JOURS.filter(x => x !== j);
+  adhRenderRelancesChips();
+}
+async function adhEnregistrerRelancesConfig(){
+  const initId = window.__vitrineInitId;
+  if (!ADH_RELANCES_JOURS.length) { showToast?.('Ajoutez au moins un délai.', 'warning'); return; }
+  try{
+    await api('PUT', `/initiatives/${initId}/adhesion-relances-config`, { jours: ADH_RELANCES_JOURS });
+    document.getElementById('modal-adh-relances').style.display = 'none';
+    showToast?.('✅ Délais de relance enregistrés.');
+  } catch(e){ showToast?.('Erreur : ' + e.message, 'danger'); }
 }
 
 const ADH_JOURNAL_LABELS = {
