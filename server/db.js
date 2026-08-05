@@ -299,6 +299,10 @@ db.exec(`
     visibilite TEXT DEFAULT 'publique' CHECK(visibilite IN ('publique','privee')),
     montant_collecte REAL DEFAULT 0,
     nb_contributeurs INTEGER DEFAULT 0,
+    /* Compteur de vues de la page publique (Phase 2 point 7, statistiques : taux de
+       conversion = contributeurs distincts / vues). Incrémenté sur GET public/:slug,
+       jamais pour le propriétaire consultant sa propre cagnotte. */
+    vues INTEGER DEFAULT 0,
     /* Préférences d'affichage public du créateur — indépendantes du choix individuel de chaque
        participant (anonyme ou non) : un participant anonyme n'est jamais nommé, quoi qu'il arrive. */
     afficher_participants INTEGER DEFAULT 1,
@@ -5047,6 +5051,7 @@ db.exec(`
   if (!cagCols1.includes('afficher_participants'))              db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_participants INTEGER DEFAULT 1");
   if (!cagCols1.includes('afficher_montants'))                  db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_montants INTEGER DEFAULT 1");
   if (!cagCols1.includes('relance_fin_proche_le'))               db.exec("ALTER TABLE cagnottes ADD COLUMN relance_fin_proche_le TEXT");
+  if (!cagCols1.includes('vues'))                                 db.exec("ALTER TABLE cagnottes ADD COLUMN vues INTEGER DEFAULT 0");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
