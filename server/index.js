@@ -11889,17 +11889,32 @@ async function handleStripeWebhook(req, res) {
       const contribId = Number(event.data.object.metadata.diaspoactif_cagnotte_contribution_id);
       const contrib = await db.prepare("SELECT * FROM cagnotte_contributions WHERE id=? AND statut='en_attente'").get(contribId);
       if (contrib) {
+        /* Lu AVANT incrémentation : permet de distinguer "première participation" de
+           "nouveau contributeur" pour la notification au créateur (cahier des charges Phase 2,
+           point 4). */
+        const avant = await db.prepare("SELECT nb_contributeurs FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
+        const premierePartcipation = Number(avant?.nb_contributeurs || 0) === 0;
         await db.prepare("UPDATE cagnotte_contributions SET statut='paye' WHERE id=?").run(contribId);
         await db.prepare("UPDATE cagnottes SET montant_collecte = montant_collecte + ?, nb_contributeurs = nb_contributeurs + 1, updated_at=datetime('now') WHERE id=?")
           .run(contrib.montant, contrib.cagnotte_id);
         const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
         if (c) {
-          creerNotif(c.owner_user_id, "cagnotte_contribution", "Nouvelle contribution 🪙",
-            `Une contribution de ${contrib.montant} ${contrib.devise} a été reçue pour « ${c.titre} ».`, { cagnotte_id: contrib.cagnotte_id });
+          creerNotif(c.owner_user_id, "cagnotte_contribution",
+            premierePartcipation ? "Première participation 🎉" : "Nouvelle contribution 🪙",
+            premierePartcipation
+              ? `« ${c.titre} » vient de recevoir sa toute première contribution (${contrib.montant} ${contrib.devise}) !`
+              : `Une contribution de ${contrib.montant} ${contrib.devise} a été reçue pour « ${c.titre} ».`,
+            { cagnotte_id: contrib.cagnotte_id });
           if (c.objectif_montant && Number(c.montant_collecte) >= Number(c.objectif_montant)) {
             creerNotif(c.owner_user_id, "cagnotte_objectif_atteint", "Objectif atteint 🎉",
               `Votre cagnotte « ${c.titre} » a atteint son objectif !`, { cagnotte_id: contrib.cagnotte_id });
           }
+          /* Confirmation + remerciement au contributeur lui-même (cahier des charges point 4,
+             volet "participants") — canal in-app uniquement pour cet increment, l'e-mail de
+             remerciement personnalisé relève de la "communication" (Phase 2 point 8, hors scope). */
+          creerNotif(contrib.user_id, "cagnotte_confirmation", "Merci pour votre contribution 🙏",
+            `Votre contribution de ${contrib.montant} ${contrib.devise} à « ${c.titre} » est confirmée. Merci pour votre soutien !`,
+            { cagnotte_id: contrib.cagnotte_id });
         }
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
