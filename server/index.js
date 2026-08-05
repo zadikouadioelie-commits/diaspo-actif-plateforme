@@ -2212,27 +2212,26 @@ route("DELETE", "/api/initiatives/:id/modules-actifs/:slug", async (req, res, pa
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
-   MODULE "AVANCEMENT DE MON INITIATIVE" — increment 1 : fondations
+   MODULE "AVANCEMENT DE MON INITIATIVE"
    (grille de critères + notation + calcul automatique du score)
    Réservé aux initiatives statut_creation='en_creation' (cahier des charges +
    précision utilisateur : une fois créée/existante, ce module n'a plus lieu
-   d'être — voir "Statut de l'initiative"). Confidentialité, affichage public
-   et historique détaillé des modifications : incréments suivants, pas encore
-   construits. La liste des critères est volontairement statique pour cet
-   increment (gestion des critères par l'admin plateforme = increment futur). */
-const AVANCEMENT_CRITERES = [
-  { cle: "production_offre",        titre: "Production / Offre",                     description: "Le produit, service ou activité proposé est défini et prêt à être présenté." },
-  { cle: "immatriculation",         titre: "Immatriculation de la structure",         description: "Les démarches administratives de création officielle de la structure." },
-  { cle: "implantation_geo",        titre: "Implantation géographique",               description: "Le ou les lieux d'implantation de l'initiative sont identifiés." },
-  { cle: "business_plan",           titre: "Business plan",                           description: "Le plan d'affaires (marché, stratégie, prévisionnel) est rédigé." },
-  { cle: "financement",             titre: "Financement",                             description: "Le financement du projet est identifié et/ou sécurisé." },
-  { cle: "equipe",                  titre: "Équipe",                                  description: "L'équipe fondatrice ou opérationnelle est constituée." },
-  { cle: "partenariats",            titre: "Partenariats",                            description: "Des partenariats utiles au projet sont noués ou en discussion." },
-  { cle: "juridique_administratif", titre: "Aspects juridiques et administratifs",    description: "Statuts, autorisations, assurances et obligations légales." },
-  { cle: "communication_visibilite",titre: "Communication et visibilité",             description: "Présence en ligne, supports de communication, notoriété naissante." },
-  { cle: "premiers_clients",        titre: "Premiers clients ou bénéficiaires",       description: "Les premiers retours concrets du terrain (clients, usagers, bénéficiaires)." },
-];
+   d'être — voir "Statut de l'initiative"). Le catalogue de critères vit en
+   base (table avancement_criteres, gérable par un admin plateforme) plutôt
+   qu'en liste statique — voir getAvancementCriteres() et les routes
+   /api/admin/avancement-criteres plus bas. */
 const AVANCEMENT_NOTE_MAX = 10;
+/* Ne consulter que les critères actifs pour la notation/l'affichage courant ; un admin peut
+   archiver un critère (actif=0) sans jamais casser l'historique/les notes déjà enregistrés,
+   qui référencent `critere_cle` et restent lisibles même pour un critère retiré du catalogue. */
+async function getAvancementCriteres(includeInactifs = false) {
+  const rows = await db.prepare(
+    includeInactifs
+      ? "SELECT * FROM avancement_criteres ORDER BY ordre ASC, id ASC"
+      : "SELECT * FROM avancement_criteres WHERE actif=1 ORDER BY ordre ASC, id ASC"
+  ).all();
+  return rows.map(c => ({ cle: c.cle, titre: c.titre, description: c.description || "" }));
+}
 
 /* GET /api/initiatives/:id/avancement — grille complète (critères + notes + commentaires
    privés + % global), réservé au propriétaire de l'initiative. */
@@ -2248,7 +2247,8 @@ route("GET", "/api/initiatives/:id/avancement", async (req, res, params) => {
   const rows = await db.prepare("SELECT critere_cle, note, commentaire_prive, updated_at FROM initiative_avancement_notes WHERE initiative_id=?").all(params.id);
   const parNote = {};
   rows.forEach(r => { parNote[r.critere_cle] = r; });
-  const criteres = AVANCEMENT_CRITERES.map(c => ({
+  const criteresCatalogue = await getAvancementCriteres();
+  const criteres = criteresCatalogue.map(c => ({
     ...c,
     note: parNote[c.cle] ? Number(parNote[c.cle].note) : 0,
     commentaire_prive: parNote[c.cle]?.commentaire_prive || "",
@@ -2271,7 +2271,8 @@ route("PUT", "/api/initiatives/:id/avancement/:cle", async (req, res, params, bo
   if (init.statut_creation !== "en_creation") {
     return sendJSON(res, 400, { error: "Ce module est réservé aux initiatives en création." });
   }
-  if (!AVANCEMENT_CRITERES.some(c => c.cle === params.cle)) return sendJSON(res, 404, { error: "Critère inconnu." });
+  const critereValide = await db.prepare("SELECT id FROM avancement_criteres WHERE cle=? AND actif=1").get(params.cle);
+  if (!critereValide) return sendJSON(res, 404, { error: "Critère inconnu." });
   const note = Math.max(0, Math.min(AVANCEMENT_NOTE_MAX, Math.round(Number(body?.note) || 0)));
   const commentaire = body?.commentaire_prive != null ? String(body.commentaire_prive).slice(0, 2000) : "";
   /* Historique (cahier des charges point 9) : une ligne uniquement quand la note change
@@ -2311,10 +2312,67 @@ route("GET", "/api/initiatives/:id/avancement/historique", async (req, res, para
     FROM initiative_avancement_historique h LEFT JOIN users u ON u.id = h.user_id
     WHERE h.initiative_id=? ORDER BY h.created_at DESC, h.id DESC LIMIT 200
   `).all(params.id);
+  /* Tous les critères, y compris archivés : un historique doit rester lisible même pour un
+     critère retiré du catalogue depuis. */
   const parCle = {};
-  AVANCEMENT_CRITERES.forEach(c => { parCle[c.cle] = c.titre; });
+  (await getAvancementCriteres(true)).forEach(c => { parCle[c.cle] = c.titre; });
   const historique = rows.map(r => ({ ...r, critere_titre: parCle[r.critere_cle] || r.critere_cle }));
   sendJSON(res, 200, { historique });
+});
+
+/* ── Gestion des critères (admin plateforme) ──
+   Réservé à role==='administrateur'. DELETE = archivage (actif=0), jamais de suppression
+   physique : les notes/l'historique déjà enregistrés référencent `critere_cle` et doivent
+   rester lisibles. */
+route("GET", "/api/admin/avancement-criteres", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare("SELECT * FROM avancement_criteres ORDER BY ordre ASC, id ASC").all();
+  sendJSON(res, 200, { criteres: rows.map(c => ({ ...c, actif: !!c.actif })) });
+});
+
+route("POST", "/api/admin/avancement-criteres", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const cle = String(body?.cle || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  const titre = String(body?.titre || "").trim();
+  if (!cle || !titre) return sendJSON(res, 400, { error: "Clé et titre requis." });
+  const existant = await db.prepare("SELECT id FROM avancement_criteres WHERE cle=?").get(cle);
+  if (existant) return sendJSON(res, 400, { error: "Cette clé existe déjà." });
+  const maxOrdre = (await db.prepare("SELECT MAX(ordre) AS m FROM avancement_criteres").get())?.m;
+  const id = (await db.prepare(
+    "INSERT INTO avancement_criteres (cle, titre, description, ordre) VALUES (?,?,?,?)"
+  ).run(cle, titre, String(body?.description || "").trim() || null, (Number(maxOrdre) || 0) + 1)).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/admin/avancement-criteres/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare("SELECT * FROM avancement_criteres WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Critère introuvable." });
+  await db.prepare(`
+    UPDATE avancement_criteres SET
+      titre=?, description=?, ordre=?, actif=?, updated_at=datetime('now')
+    WHERE id=?
+  `).run(
+    body?.titre !== undefined && String(body.titre).trim() ? String(body.titre).trim() : c.titre,
+    body?.description !== undefined ? (String(body.description).trim() || null) : c.description,
+    body?.ordre !== undefined ? Math.round(Number(body.ordre) || 0) : c.ordre,
+    body?.actif !== undefined ? (body.actif ? 1 : 0) : c.actif,
+    params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE = archivage (voir commentaire plus haut), jamais de suppression physique. */
+route("DELETE", "/api/admin/avancement-criteres/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare("SELECT id FROM avancement_criteres WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Critère introuvable." });
+  await db.prepare("UPDATE avancement_criteres SET actif=0, updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -3319,21 +3377,65 @@ route("GET", "/api/adhesion-campagnes/:id/progression", async (req, res, params)
 });
 
 /* ── Export CSV du registre ── */
-route("GET", "/api/initiatives/:id/adhesion-export", async (req, res, params) => {
+/* Export du registre (tâche #73) — trois formats depuis la même requête :
+   - csv (existant) : brut, universel.
+   - excel : table HTML servie avec l'extension/Content-Type .xls — Excel l'ouvre nativement
+     avec en-têtes mis en forme, sans dépendance npm ni génération binaire .xlsx réelle.
+   - pdf : page HTML imprimable (mise en page A4, sans navigation) que le navigateur convertit
+     via son propre "Enregistrer en PDF" — même logique zéro dépendance, cohérente avec le
+     reste de la plateforme (aucune librairie PDF ailleurs dans le code). */
+route("GET", "/api/initiatives/:id/adhesion-export", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  const init = await db.prepare("SELECT owner_user_id, nom FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const rows = await db.prepare(`
     SELECT m.*, f.nom AS formule_nom FROM adhesion_membres m JOIN adhesion_formules f ON f.id=m.formule_id
     WHERE m.initiative_id=? ORDER BY m.nom
   `).all(params.id);
-  const csvRows = [['Nom','Prénom','Email','Téléphone','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu']];
-  for (const m of rows) {
-    csvRows.push([m.nom, m.prenom || '', m.email || '', m.telephone || '', m.formule_nom, computeAdhesionStatut(m),
-      m.date_adhesion || '', m.date_expiration || '', m.montant_paye ?? '', m.mode_paiement || '', m.numero_recu || '']);
+  const entetes = ['Nom','Prénom','Email','Téléphone','Formule','Statut','Date adhésion','Date expiration','Montant payé','Mode paiement','N° reçu'];
+  const STATUT_LABELS = { a_jour: 'À jour', non_a_jour: 'Non à jour', en_attente: 'En attente', suspendu: 'Suspendu' };
+  const lignes = rows.map(m => [m.nom, m.prenom || '', m.email || '', m.telephone || '', m.formule_nom,
+    STATUT_LABELS[computeAdhesionStatut(m)] || computeAdhesionStatut(m),
+    m.date_adhesion ? m.date_adhesion.slice(0,10) : '', m.date_expiration ? m.date_expiration.slice(0,10) : '',
+    m.montant_paye ?? '', m.mode_paiement || '', m.numero_recu || '']);
+
+  const format = ['excel', 'pdf'].includes(query?.format) ? query.format : 'csv';
+
+  if (format === 'excel') {
+    const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">
+      <style>table{border-collapse:collapse;font-family:Calibri,sans-serif;}
+      th{background:#1B3A6B;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #ccc;}
+      td{padding:5px 10px;border:1px solid #ddd;}</style></head><body>
+      <table><thead><tr>${entetes.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${lignes.map(l=>`<tr>${l.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      </body></html>`;
+    res.writeHead(200, { 'Content-Type': 'application/vnd.ms-excel; charset=utf-8', 'Content-Disposition': `attachment; filename="adherents-${params.id}.xls"` });
+    return res.end('﻿' + html);
   }
-  const csv = csvRows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+
+  if (format === 'pdf') {
+    const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Registre des adhérents — ${esc(init.nom)}</title>
+      <style>
+        @page { size: A4 landscape; margin: 14mm; }
+        body{font-family:Arial,sans-serif;color:#111;font-size:11px;}
+        h1{font-size:16px;margin:0 0 2px;} p{margin:0 0 14px;color:#555;font-size:11px;}
+        table{width:100%;border-collapse:collapse;} th{background:#1B3A6B;color:#fff;text-align:left;padding:6px 8px;font-size:10.5px;}
+        td{padding:5px 8px;border-bottom:1px solid #e5e7eb;font-size:10.5px;} tr:nth-child(even){background:#f8fafc;}
+      </style></head><body>
+      <h1>Registre des adhérents — ${esc(init.nom)}</h1>
+      <p>${rows.length} adhérent${rows.length>1?'s':''} — exporté le ${new Date().toLocaleDateString('fr-FR')}</p>
+      <table><thead><tr>${entetes.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${lignes.map(l=>`<tr>${l.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      <script>window.onload = () => window.print();</script>
+      </body></html>`;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(html);
+  }
+
+  const csv = [entetes, ...lignes].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="adherents-${params.id}.csv"` });
   res.end('﻿' + csv);
 });
@@ -4942,14 +5044,17 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
      Les commentaires privés ne sont jamais exposés ici, quel que soit le réglage. */
   row.avancement_detail_public = !!row.avancement_detail_public;
   if (row.statut_creation === "en_creation") {
-    const notesRows = await db.prepare("SELECT critere_cle, note FROM initiative_avancement_notes WHERE initiative_id=?").all(row.id);
+    const [notesRows, criteresActifs] = await Promise.all([
+      db.prepare("SELECT critere_cle, note FROM initiative_avancement_notes WHERE initiative_id=?").all(row.id),
+      getAvancementCriteres(),
+    ]);
     const parNote = {};
     notesRows.forEach(r => { parNote[r.critere_cle] = Number(r.note); });
-    const totalObtenu = AVANCEMENT_CRITERES.reduce((s, c) => s + (parNote[c.cle] || 0), 0);
-    const totalPossible = AVANCEMENT_CRITERES.length * AVANCEMENT_NOTE_MAX;
+    const totalObtenu = criteresActifs.reduce((s, c) => s + (parNote[c.cle] || 0), 0);
+    const totalPossible = criteresActifs.length * AVANCEMENT_NOTE_MAX;
     row.avancement_pourcentage = totalPossible ? Math.round((totalObtenu / totalPossible) * 100) : 0;
     if (row.avancement_detail_public) {
-      row.avancement_criteres_publics = AVANCEMENT_CRITERES.map(c => ({
+      row.avancement_criteres_publics = criteresActifs.map(c => ({
         titre: c.titre, description: c.description, note: parNote[c.cle] || 0,
       }));
     }
