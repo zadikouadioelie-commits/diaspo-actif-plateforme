@@ -12980,6 +12980,7 @@ route("POST", "/api/cagnottes", async (req, res, params, body) => {
   if (!user || !["initiative","administrateur"].includes(user.role)) {
     return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
   }
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (date_debut && date_fin && new Date(date_fin) <= new Date(date_debut)) {
@@ -13016,6 +13017,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
   const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id } = body;
   const dDebut = date_debut !== undefined ? date_debut : c.date_debut;
   const dFin = date_fin !== undefined ? date_fin : c.date_fin;
@@ -13098,6 +13100,7 @@ route("DELETE", "/api/cagnottes/:id", async (req, res, params) => {
   const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   if (c.est_publiee) return sendJSON(res, 400, { error: "Seul un brouillon peut être supprimé — clôturez la cagnotte à la place." });
   await db.prepare("DELETE FROM cagnottes WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
@@ -13125,6 +13128,7 @@ route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) 
   const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   const email = String(body?.email || "").trim().toLowerCase();
   if (!email || !email.includes("@")) return sendJSON(res, 400, { error: "E-mail invalide." });
   const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
@@ -13143,6 +13147,7 @@ route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params)
   const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   await db.prepare("DELETE FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").run(params.pid, params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -13252,6 +13257,7 @@ route("POST", "/api/cagnottes/:id/co-organisateurs", async (req, res, params, bo
   const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   const email = String(body?.email || "").trim().toLowerCase();
   const role = ["administrateur", "communication"].includes(body?.role) ? body.role : "communication";
   if (!email) return sendJSON(res, 400, { error: "E-mail requis." });
@@ -13277,6 +13283,7 @@ route("DELETE", "/api/cagnottes/:id/co-organisateurs/:coId", async (req, res, pa
   const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   await db.prepare("DELETE FROM cagnotte_co_organisateurs WHERE id=? AND cagnotte_id=?").run(params.coId, params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -13370,6 +13377,7 @@ route("POST", "/api/cagnottes/:id/actualites", async (req, res, params, body) =>
   const c = await db.prepare("SELECT id, titre FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (!(await cagnottePeutGerer(params.id, user.id, "publier"))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   const contenu = String(body?.contenu || "").trim();
   if (!contenu) return sendJSON(res, 400, { error: "Contenu requis." });
   const image_url = body?.image_url ? String(body.image_url) : null;
@@ -13396,6 +13404,7 @@ route("DELETE", "/api/cagnottes/:id/actualites/:actuId", async (req, res, params
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!(await cagnottePeutGerer(params.id, user.id, "publier"))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
   await db.prepare("DELETE FROM cagnotte_actualites WHERE id=? AND cagnotte_id=?").run(params.actuId, params.id);
   sendJSON(res, 200, { ok: true });
 });

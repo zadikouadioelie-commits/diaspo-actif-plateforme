@@ -4160,6 +4160,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   async function renderCagnottes() {
     const el = document.getElementById('cagnottes');
+    /* Module Premium (cf. initPremiumGates) — l'interception au clic sidebar couvre la
+       navigation normale, ce garde-fou couvre l'accès direct par hash d'URL (#cagnottes). */
+    if (!window._daPremiumInitiative && !window.daBypassActive?.('cagnottes')) {
+      el.innerHTML = premiumLockedCardHtml('cagnottes');
+      return;
+    }
     el.innerHTML = `
       <div class="card" style="margin-bottom:20px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -4311,10 +4317,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <input id="cag-f-objectif-montant" type="number" min="1" step="1" placeholder="Ex. 10000" value="${c.objectif_montant||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;${c.objectif_montant?'':'display:none;'}">
           </div>
           <div>
-            <label class="pv-lbl">Visibilité</label><br>
-            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;margin-top:8px;"><input type="radio" name="cag-f-visibilite" value="publique" ${c.visibilite!=='privee'?'checked':''}> 🌍 Publique</label>
-            &nbsp;&nbsp;
-            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="radio" name="cag-f-visibilite" value="privee" ${c.visibilite==='privee'?'checked':''}> 🔒 Privée</label>
+            <label class="pv-lbl">Visibilité</label>
+            <div class="da-pill-group" style="margin-top:8px;">
+              <label class="da-pill${c.visibilite!=='privee'?' checked':''}"><input type="radio" name="cag-f-visibilite" value="publique" ${c.visibilite!=='privee'?'checked':''} onchange="document.querySelectorAll('[name=\'cag-f-visibilite\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>🌍 Publique</span></label>
+              <label class="da-pill${c.visibilite==='privee'?' checked':''}"><input type="radio" name="cag-f-visibilite" value="privee" ${c.visibilite==='privee'?'checked':''} onchange="document.querySelectorAll('[name=\'cag-f-visibilite\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>🔒 Privée</span></label>
+            </div>
           </div>
           <div>
             <label class="pv-lbl">Date de début</label>
@@ -4333,9 +4340,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
           <div style="grid-column:1/-1;">
             <label class="pv-lbl">Affichage public des contributions</label>
-            <div style="display:flex;gap:16px;margin-top:6px;">
-              <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="cag-f-afficher-participants" ${c.afficher_participants!==0?'checked':''}> Afficher les noms des contributeurs</label>
-              <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="cag-f-afficher-montants" ${c.afficher_montants!==0?'checked':''}> Afficher les montants</label>
+            <div class="da-pill-group" style="margin-top:6px;">
+              <label class="da-pill${c.afficher_participants!==0?' checked':''}"><input type="checkbox" id="cag-f-afficher-participants" ${c.afficher_participants!==0?'checked':''} onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Afficher les noms des contributeurs</span></label>
+              <label class="da-pill${c.afficher_montants!==0?' checked':''}"><input type="checkbox" id="cag-f-afficher-montants" ${c.afficher_montants!==0?'checked':''} onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Afficher les montants</span></label>
             </div>
           </div>
         </div>
@@ -7858,6 +7865,7 @@ const PREMIUM_UPSELL_CONTEXTS = {
   paiement_billetterie: { title:'Activez le module de paiement', intro:"Le module de paiement billetterie & cotisations est réservé aux comptes Premium." },
   espace_formateur: { title:'Devenez créateur de formations', intro:"L'Espace Formateur (créer et vendre vos propres formations) est réservé aux comptes Premium." },
   adhesions: { title:'Gérez cotisations & adhésions', intro:"Le module Cotisations & Adhésions est réservé aux comptes Premium." },
+  cagnottes: { title:'Lancez vos cagnottes', intro:"La création et la gestion de cagnottes sont réservées aux comptes Premium." },
   votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
   parametres_vitrine: { title:'Personnalisez votre vitrine', intro:"La configuration avancée de la vitrine (modèles, modules, apparence, aperçu en direct) est réservée aux comptes Premium." },
   expansion_module: { title:'Activez ce module', intro:"L'activation des modules Expansion est réservée aux comptes Abonné — l'abonnement inclut l'activation de tous les modules disponibles pour votre type d'initiative." },
@@ -7909,7 +7917,7 @@ function premiumLockedCardHtml(context) {
 function applyPremiumButtonStyles() {
   if (window._daPremiumInitiative) return;
   /* Boutons dorés : Nouvelle publicité + Créer un événement (jamais les boutons Modifier). */
-  document.querySelectorAll('button[onclick="openAdModal()"], button[onclick="openInitEvtModal()"]').forEach(btn => {
+  document.querySelectorAll('button[onclick="openAdModal()"], button[onclick="openInitEvtModal()"], button[onclick="cagOpenForm()"]').forEach(btn => {
     btn.style.background = 'linear-gradient(135deg,#c8960c,#f2c94c)';
     btn.style.color = '#2a1e00';
     btn.style.border = 'none';
@@ -7932,6 +7940,7 @@ async function initPremiumGates() {
   /* Modules dorés communs aux 3 types d'initiative. */
   const SIDEBAR_PREMIUM_LINKS_TOUS = [
     { href: '#paiement', context: 'paiement_boutique' },
+    { href: '#cagnottes', context: 'cagnottes', intercept: true },
     { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
     { href: '#publicites-init', context: 'publicites' },
     { href: '#evenements', context: 'evenements' },
