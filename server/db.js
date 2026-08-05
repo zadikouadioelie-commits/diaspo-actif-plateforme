@@ -5379,6 +5379,13 @@ db.exec(`
     /* Liste de stockage des participants (module Réseau professionnel) : à chaque adhésion/cotisation
        validée, le participant est automatiquement ajouté à cette liste (registre officiel réutilisable). */
     if (!adhFCols.includes('liste_stockage_id'))     db.exec("ALTER TABLE adhesion_formules ADD COLUMN liste_stockage_id INTEGER REFERENCES listes_diffusion(id) ON DELETE SET NULL");
+    /* Mode de validité (tâche #76) : 'individuel' (défaut, comportement historique — la
+       validité de chaque adhérent part de sa propre date d'adhésion) ou 'collectif' (tous
+       les adhérents de cette formule partagent la même période, ex. "année scolaire
+       2026-2027", définie une fois par l'association). */
+    if (!adhFCols.includes('mode_validite'))         db.exec("ALTER TABLE adhesion_formules ADD COLUMN mode_validite TEXT DEFAULT 'individuel'");
+    if (!adhFCols.includes('periode_collective_debut')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN periode_collective_debut TEXT");
+    if (!adhFCols.includes('periode_collective_fin'))   db.exec("ALTER TABLE adhesion_formules ADD COLUMN periode_collective_fin TEXT");
   }
 }
 

@@ -2882,6 +2882,20 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
    ouvert à toute Initiative (même logique d'ouverture que la Boutique).
    ══════════════════════════════════════════════════════════════════════ */
 
+/* Mode de validité (tâche #76) : une formule 'collectif' fixe la même date d'expiration pour
+   tous ses adhérents (periode_collective_fin), quelle que soit leur date de paiement — sinon
+   (mode 'individuel', comportement historique) l'expiration part de maintenant + la durée du
+   type de contribution. Retourne une chaîne datetime SQLite ('YYYY-MM-DD HH:MM:SS') ou null. */
+function calculerDateExpirationAdhesion(formule, months) {
+  if (formule?.mode_validite === 'collectif' && formule.periode_collective_fin) {
+    return `${formule.periode_collective_fin} 23:59:59`.slice(0, 19);
+  }
+  if (!months) return null;
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 /* Journal d'audit (tâche #70) : appelé à chaque mutation significative d'une fiche
    adhérent. acteur=null pour une confirmation automatique (webhook Stripe) — details
    reste une phrase lisible plutôt qu'un JSON, cohérent avec l'usage administrateur
@@ -3063,7 +3077,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
-          media_type, media_url, media_duree_secondes, liste_stockage_id } = body;
+          media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de la formule requis." });
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
@@ -3074,15 +3088,28 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
     const liste = await db.prepare("SELECT id FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_stockage_id, user.id);
     if (!liste) return sendJSON(res, 400, { error: "Liste de stockage introuvable." });
   }
+  /* Mode de validité (tâche #76) : 'collectif' exige une période complète (début + fin,
+     fin après début) — sinon aucun adhérent de cette formule n'aurait de date d'expiration
+     calculable. */
+  const modeValidite = mode_validite === 'collectif' ? 'collectif' : 'individuel';
+  if (modeValidite === 'collectif') {
+    if (!periode_collective_debut || !periode_collective_fin) {
+      return sendJSON(res, 400, { error: "Le mode collectif exige une date de début et de fin de période." });
+    }
+    if (new Date(periode_collective_fin) <= new Date(periode_collective_debut)) {
+      return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
+    }
+  }
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(params.id)).m;
   const id = (await db.prepare(`
-    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(params.id, nom.trim(), description || null, couleur || '#f97316', icone || '🎫',
        type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
        devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
        media_type || null, media_type ? (media_url || null) : null, media_type === 'video' ? (Number(media_duree_secondes) || null) : null,
-       liste_stockage_id || null)).lastInsertRowid;
+       liste_stockage_id || null, modeValidite,
+       modeValidite === 'collectif' ? periode_collective_debut : null, modeValidite === 'collectif' ? periode_collective_fin : null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -3095,7 +3122,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
   if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
-          media_type, media_url, media_duree_secondes, liste_stockage_id } = body;
+          media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin } = body;
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
   if (media_type === 'video' && Number(media_duree_secondes) > ADHESION_MEDIA_MAX_DUREE) {
@@ -3105,12 +3132,30 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
     const liste = await db.prepare("SELECT id FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(liste_stockage_id, user.id);
     if (!liste) return sendJSON(res, 400, { error: "Liste de stockage introuvable." });
   }
+  /* Mode de validité (tâche #76) : mêmes règles qu'à la création, revalidées ici puisque le
+     mode peut être changé après coup. */
+  let nouveauMode, nouveauDebut, nouveauFin;
+  if (mode_validite !== undefined) {
+    nouveauMode = mode_validite === 'collectif' ? 'collectif' : 'individuel';
+    if (nouveauMode === 'collectif') {
+      const debut = periode_collective_debut || f.periode_collective_debut;
+      const fin = periode_collective_fin || f.periode_collective_fin;
+      if (!debut || !fin) return sendJSON(res, 400, { error: "Le mode collectif exige une date de début et de fin de période." });
+      if (new Date(fin) <= new Date(debut)) return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
+      nouveauDebut = debut; nouveauFin = fin;
+    } else { nouveauDebut = null; nouveauFin = null; }
+  } else {
+    nouveauMode = f.mode_validite || 'individuel';
+    nouveauDebut = periode_collective_debut ?? f.periode_collective_debut;
+    nouveauFin = periode_collective_fin ?? f.periode_collective_fin;
+  }
   await db.prepare(`UPDATE adhesion_formules SET
       nom=COALESCE(?,nom), description=?, couleur=COALESCE(?,couleur), icone=COALESCE(?,icone),
       type_contribution=COALESCE(?,type_contribution), montant_type=COALESCE(?,montant_type),
       montant_fixe=?, montant_min=?, montant_max=?, devise=COALESCE(?,devise),
       modes_paiement_json=COALESCE(?,modes_paiement_json),
-      media_type=?, media_url=?, media_duree_secondes=?, liste_stockage_id=COALESCE(?,liste_stockage_id), updated_at=datetime('now')
+      media_type=?, media_url=?, media_duree_secondes=?, liste_stockage_id=COALESCE(?,liste_stockage_id),
+      mode_validite=?, periode_collective_debut=?, periode_collective_fin=?, updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, description ?? f.description, couleur || null, icone || null, type_contribution || null, montant_type || null,
          montant_fixe ?? f.montant_fixe, montant_min ?? f.montant_min, montant_max ?? f.montant_max, devise || null,
@@ -3119,6 +3164,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          media_type !== undefined ? (media_type ? (media_url || null) : null) : f.media_url,
          media_type !== undefined ? (media_type === 'video' ? (Number(media_duree_secondes) || null) : null) : f.media_duree_secondes,
          liste_stockage_id || null,
+         nouveauMode, nouveauDebut, nouveauFin,
          params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -3328,9 +3374,9 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   const months = adhesionExpirationMonths(formule?.type_contribution);
   await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', mode_paiement=?, montant_paye=?, numero_recu=?,
       date_adhesion=COALESCE(date_adhesion, datetime('now')),
-      date_expiration=${months ? `datetime('now','+${months} months')` : 'NULL'},
+      date_expiration=?,
       updated_at=datetime('now') WHERE id=?`)
-    .run(modePaiement, montant, numeroRecu, m.id);
+    .run(modePaiement, montant, numeroRecu, calculerDateExpirationAdhesion(formule, months), m.id);
 
   if (m.linked_user_id) {
     creerNotif(m.linked_user_id, "adhesion_payee", "Adhésion confirmée ✅",
@@ -11719,9 +11765,9 @@ async function handleStripeWebhook(req, res) {
           .run(numeroRecu, session.subscription || null, paiementId);
         await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', mode_paiement='carte', montant_paye=?, numero_recu=?,
             date_adhesion=COALESCE(date_adhesion, datetime('now')),
-            date_expiration=${months ? `datetime('now','+${months} months')` : 'NULL'},
+            date_expiration=?,
             stripe_customer_id=?, stripe_subscription_id=?, updated_at=datetime('now') WHERE id=?`)
-          .run(montant, numeroRecu, session.customer || null, session.subscription || null, pay.membre_id);
+          .run(montant, numeroRecu, calculerDateExpirationAdhesion(formule, months), session.customer || null, session.subscription || null, pay.membre_id);
 
         await db.prepare(`INSERT INTO wallet_transactions (adhesion_paiement_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
           .run(paiementId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
@@ -11785,8 +11831,8 @@ async function handleStripeWebhook(req, res) {
         `).run(adhMembre.id, adhMembre.formule_id, adhMembre.initiative_id, montant, formule?.devise || 'EUR', 'carte', 'paye', invoice.subscription)).lastInsertRowid;
         const numeroRecu = `REC-${adhMembre.initiative_id}-${paiementId}`;
         await db.prepare(`UPDATE adhesion_paiements SET numero_recu=? WHERE id=?`).run(numeroRecu, paiementId);
-        await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', montant_paye=?, numero_recu=?, date_expiration=datetime('now','+${months} months'), updated_at=datetime('now') WHERE id=?`)
-          .run(montant, numeroRecu, adhMembre.id);
+        await db.prepare(`UPDATE adhesion_membres SET statut='a_jour', montant_paye=?, numero_recu=?, date_expiration=?, updated_at=datetime('now') WHERE id=?`)
+          .run(montant, numeroRecu, calculerDateExpirationAdhesion(formule, months), adhMembre.id);
 
         const COMMISSION_RATE = 0.05;
         const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));

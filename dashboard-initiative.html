@@ -1317,6 +1317,19 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label class="da-pill"><input type="checkbox" value="virement" class="adh-f-mode" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🏦 Virement</span></label>
         </div>
 
+        <label style="font-size:12px;font-weight:700;">Mode de validité</label>
+        <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Individuel : chaque adhérent est valable pour la durée de sa formule à partir de son propre paiement. Collectif : tous les adhérents de cette formule partagent la même période (ex. « année scolaire 2026-2027 »).</p>
+        <select id="adh-f-mode-validite" class="input" style="margin:4px 0 10px;width:100%;" onchange="document.getElementById('adh-f-periode-collective').style.display=this.value==='collectif'?'flex':'none';">
+          <option value="individuel">Individuel</option>
+          <option value="collectif">Collectif</option>
+        </select>
+        <div id="adh-f-periode-collective" style="display:none;gap:10px;margin-bottom:10px;">
+          <div style="flex:1;"><label style="font-size:11.5px;color:var(--muted);">Début de la période</label>
+            <input type="date" id="adh-f-periode-debut" class="input" style="width:100%;"></div>
+          <div style="flex:1;"><label style="font-size:11.5px;color:var(--muted);">Fin de la période</label>
+            <input type="date" id="adh-f-periode-fin" class="input" style="width:100%;"></div>
+        </div>
+
         <label style="font-size:12px;font-weight:700;">📋 Liste de stockage des participants</label>
         <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Chaque adhésion/cotisation validée y ajoute automatiquement le participant. Enregistrée dans le module Réseau professionnel, réutilisable pour vos campagnes, votes et convocations.</p>
         <div class="da-pill-group" style="margin:6px 0 10px;">
@@ -5905,6 +5918,7 @@ async function adhRenderFormules(){
             ${f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
           </div>
           ${f.description?`<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">${escH(f.description)}</p>`:''}
+          ${f.mode_validite==='collectif'?`<div style="font-size:11px;color:#7c3aed;background:#f5f3ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">👥 Collectif : ${f.periode_collective_debut?new Date(f.periode_collective_debut).toLocaleDateString('fr-FR'):'?'} → ${f.periode_collective_fin?new Date(f.periode_collective_fin).toLocaleDateString('fr-FR'):'?'}</div>`:''}
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="adhOuvrirEditionFormule(${f.id})">✏️ Modifier</button>
             <button class="btn btn-sm btn-outline" onclick="adhToggleActifFormule(${f.id})">${f.actif?'🙈 Désactiver':'👁️ Activer'}</button>
@@ -6025,6 +6039,10 @@ function adhOuvrirCreationFormule(){
   document.getElementById('adh-f-montant-min').value = '';
   document.getElementById('adh-f-montant-max').value = '';
   document.querySelectorAll('.adh-f-mode').forEach(cb => { cb.checked = cb.value === 'carte'; cb.closest('.da-pill').classList.toggle('checked', cb.checked); });
+  document.getElementById('adh-f-mode-validite').value = 'individuel';
+  document.getElementById('adh-f-periode-debut').value = '';
+  document.getElementById('adh-f-periode-fin').value = '';
+  document.getElementById('adh-f-periode-collective').style.display = 'none';
   document.getElementById('adh-f-photo-preview').style.display = 'none';
   document.getElementById('adh-f-video-thumb-wrap').style.display = 'none';
   document.getElementById('adh-f-video-status').textContent = '';
@@ -6051,6 +6069,10 @@ function adhOuvrirEditionFormule(id){
   document.getElementById('adh-f-montant-max').value = f.montant_max || '';
   let modes = []; try{ modes = JSON.parse(f.modes_paiement_json||'[]'); }catch(e){}
   document.querySelectorAll('.adh-f-mode').forEach(cb => { cb.checked = modes.includes(cb.value); cb.closest('.da-pill').classList.toggle('checked', cb.checked); });
+  document.getElementById('adh-f-mode-validite').value = f.mode_validite || 'individuel';
+  document.getElementById('adh-f-periode-debut').value = f.periode_collective_debut || '';
+  document.getElementById('adh-f-periode-fin').value = f.periode_collective_fin || '';
+  document.getElementById('adh-f-periode-collective').style.display = (f.mode_validite === 'collectif') ? 'flex' : 'none';
   document.getElementById('adh-f-photo-preview').style.display = 'none';
   document.getElementById('adh-f-video-thumb-wrap').style.display = 'none';
   document.getElementById('adh-f-video-status').textContent = '';
@@ -6088,6 +6110,10 @@ async function adhEnregistrerFormule(){
     return;
   }
   const modes = Array.from(document.querySelectorAll('.adh-f-mode:checked')).map(cb=>cb.value);
+  const modeValidite = document.getElementById('adh-f-mode-validite').value;
+  if (modeValidite === 'collectif' && !(document.getElementById('adh-f-periode-debut').value && document.getElementById('adh-f-periode-fin').value)) {
+    showToast('Le mode collectif exige une date de début et de fin de période.', 'warning'); return;
+  }
   const modeListe = document.querySelector('input[name="adh-f-liste-choice"]:checked')?.value || '';
   let listeStockageId = null;
   if (modeListe === 'lier') {
@@ -6114,6 +6140,9 @@ async function adhEnregistrerFormule(){
     media_url: ADH_F_MEDIA.url || null,
     media_duree_secondes: ADH_F_MEDIA.duree || null,
     liste_stockage_id: listeStockageId,
+    mode_validite: modeValidite,
+    periode_collective_debut: modeValidite === 'collectif' ? document.getElementById('adh-f-periode-debut').value : null,
+    periode_collective_fin: modeValidite === 'collectif' ? document.getElementById('adh-f-periode-fin').value : null,
   };
   try{
     if(ADH_EDIT_FORMULE_ID) await api('PUT', `/adhesion-formules/${ADH_EDIT_FORMULE_ID}`, payload);

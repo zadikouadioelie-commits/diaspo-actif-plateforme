@@ -1024,6 +1024,10 @@ const COLONNES_MIGRATION = [
     // Module Adhésions — modèles de texte personnalisables (miroir de l'ALTER db.js)
     ['initiatives', 'adhesion_modele_relance', 'TEXT'],
     ['initiatives', 'adhesion_modele_recu', 'TEXT'],
+    // Module Adhésions — mode de validité individuel/collectif (miroir de l'ALTER db.js)
+    ['adhesion_formules', 'mode_validite', "TEXT DEFAULT 'individuel'"],
+    ['adhesion_formules', 'periode_collective_debut', 'TEXT'],
+    ['adhesion_formules', 'periode_collective_fin', 'TEXT'],
 ];
 
 async function migratePg(pool) {
