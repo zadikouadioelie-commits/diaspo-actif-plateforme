@@ -1019,6 +1019,8 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'updated_at', 'TEXT'],
     // Module Adhésions — ouverture/fermeture globale (miroir de l'ALTER db.js)
     ['initiatives', 'adhesions_ouvertes', 'INTEGER DEFAULT 1'],
+    // Module Adhésions — délais de relance personnalisables (miroir de l'ALTER db.js)
+    ['initiatives', 'adhesion_relances_jours', "TEXT DEFAULT '[30,7,0,-1]'"],
 ];
 
 async function migratePg(pool) {
@@ -1261,6 +1263,9 @@ async function migratePg(pool) {
       addBack: "CHECK (statut IN ('brouillon','en_attente','deposee','en_cours_analyse','info_complementaire_demandee','approuvee','refusee'))" },
     { table: 'offres', constraint: 'offres_statut_check',
       addBack: "CHECK (statut IN ('brouillon','publiee','suspendue','cloturee','archivee'))" },
+    /* Module Adhésions — délais de relance personnalisables (tâche #71) : niveau était
+       limité à 4 valeurs fixes, désormais libre ("j14", "j-3"...). */
+    { table: 'adhesion_relances', constraint: 'adhesion_relances_niveau_check', addBack: null },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

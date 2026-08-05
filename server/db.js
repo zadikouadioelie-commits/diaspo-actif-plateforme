@@ -4920,6 +4920,30 @@ db.exec(`
      historique fixe (J-30/J-7/jour J/lendemain). */
   if (!initCols7.includes('adhesion_relances_jours'))           db.exec("ALTER TABLE initiatives ADD COLUMN adhesion_relances_jours TEXT DEFAULT '[30,7,0,-1]'");
 
+  /* Migration self-heal (tâche #71) : adhesion_relances.niveau était limité par un CHECK à
+     4 valeurs fixes ('avant_30j' etc.) — les délais étant désormais personnalisables, le
+     champ doit accepter n'importe quelle valeur ("j14", "j-3"...). SQLite ne permet pas de
+     retirer un CHECK via ALTER TABLE : on ne recrée la table QUE si l'ancienne contrainte
+     est détectée (ne touche jamais une base déjà migrée). Table purement journal
+     (déduplication des envois) : aucune perte fonctionnelle en la recréant vide au pire cas. */
+  try {
+    const ancienneTable = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='adhesion_relances'").get();
+    if (ancienneTable && /CHECK\(niveau IN/.test(ancienneTable.sql)) {
+      db.exec("ALTER TABLE adhesion_relances RENAME TO adhesion_relances_migration_tmp");
+      db.exec(`CREATE TABLE adhesion_relances (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        membre_id           INTEGER NOT NULL,
+        niveau              TEXT NOT NULL,
+        canal               TEXT NOT NULL DEFAULT 'app' CHECK(canal IN ('app','email')),
+        message             TEXT,
+        created_at          TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY(membre_id) REFERENCES adhesion_membres(id) ON DELETE CASCADE
+      )`);
+      db.exec("INSERT INTO adhesion_relances (id,membre_id,niveau,canal,message,created_at) SELECT id,membre_id,niveau,canal,message,created_at FROM adhesion_relances_migration_tmp");
+      db.exec("DROP TABLE adhesion_relances_migration_tmp");
+    }
+  } catch (e) { console.error('[migration adhesion_relances.niveau]', e.message); }
+
   // Préférences d'affichage public des cagnottes — déjà dans le CREATE TABLE cagnottes plus haut,
   // ces lignes ne servent qu'au SQLite local déjà créé (self-healing auto sur PostgreSQL).
   const cagCols1 = db.prepare('PRAGMA table_info(cagnottes)').all().map(c=>c.name);
@@ -5064,10 +5088,13 @@ db.exec(`
     );
     CREATE INDEX IF NOT EXISTS idx_user_affiliations_user ON user_affiliations(user_id, created_at);
 
+    /* niveau : libre depuis la tâche #71 (délais personnalisables, ex. "j14", "j-3") —
+       auparavant limité à 4 valeurs fixes par un CHECK, retiré (cf. migration self-heal
+       plus bas pour les bases déjà créées avec l'ancienne contrainte). */
     CREATE TABLE IF NOT EXISTS adhesion_relances (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       membre_id           INTEGER NOT NULL,
-      niveau              TEXT NOT NULL CHECK(niveau IN ('avant_30j','avant_7j','jour_j','apres_expiration')),
+      niveau              TEXT NOT NULL,
       canal               TEXT NOT NULL DEFAULT 'app' CHECK(canal IN ('app','email')),
       message             TEXT,
       created_at          TEXT DEFAULT (datetime('now')),
