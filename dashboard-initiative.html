@@ -2867,7 +2867,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="background:${etatEnCreation ? '#d97706' : '#16a34a'};height:100%;width:${etatProgression}%;"></div>
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Progression : ${etatProgression}%</div>
-        ${etatEnCreation ? `<div id="dp-widget" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Chargement…</div>` : ''}
+        ${etatEnCreation ? `
+        <div id="cockpit-avancement" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Chargement…</div>
+        <div id="dp-widget" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Chargement…</div>` : ''}
       </div>`;
     const cockpitHTML = `
     <div id="cockpit" style="margin-bottom:24px;">
@@ -2947,7 +2949,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     </div>`;
     content.insertAdjacentHTML('afterbegin', cockpitHTML);
     loadCockpitFinancierWidget();
-    if (etatEnCreation) loadPassageWidget();
+    if (etatEnCreation) { loadCockpitAvancement(); loadPassageWidget(); }
 
     // QR code vers la vitrine publique (profil.html?id=<owner>#vitrine)
     try {
@@ -4635,6 +4637,26 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       } catch (e) { if (typeof showToast === 'function') showToast("Erreur d'enregistrement", 'error'); }
     }, 400);
   };
+
+  /* ══ COCKPIT — % du module Avancement, greffé dans la carte "État de votre initiative"
+     pour en faire un vrai widget de progression unifié (checklist de profil + avancement
+     métier + statut de la demande de passage, voir loadPassageWidget juste après). */
+  async function loadCockpitAvancement() {
+    const el = document.getElementById('cockpit-avancement');
+    if (!el) return;
+    try {
+      const { pourcentage } = await api('GET', `/initiatives/${init.id}/avancement`);
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:12.5px;font-weight:700;">📈 Avancement métier</span>
+          <a href="#avancement" onclick="initShowSection('avancement')" style="font-size:11.5px;color:#2563EB;text-decoration:none;">Voir le détail →</a>
+        </div>
+        <div style="background:var(--bg);border-radius:20px;height:8px;overflow:hidden;">
+          <div style="background:var(--orange);height:100%;width:${pourcentage}%;"></div>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">${pourcentage}% — critères notés dans le module Avancement de mon initiative</div>`;
+    } catch (e) { el.innerHTML = ''; }
+  }
 
   /* ══ STATUT DE L'INITIATIVE — assistant de passage En création → Existante ══
      Widget dans la carte "État de votre initiative" (cockpit) — voir le placeholder
