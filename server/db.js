@@ -3252,6 +3252,44 @@ db.exec(`
   );
 `);
 
+/* Catalogue des critères du module "Avancement de mon initiative" (increment 3 — gestion par
+   l'admin plateforme). Remplace la liste statique AVANCEMENT_CRITERES de server/index.js.
+   `actif=0` = archivé plutôt que supprimé : les notes/historique déjà enregistrés référencent
+   `cle` et doivent rester lisibles même si un critère est retiré du catalogue. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS avancement_criteres (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    cle          TEXT UNIQUE NOT NULL,
+    titre        TEXT NOT NULL,
+    description  TEXT,
+    ordre        INTEGER DEFAULT 0,
+    actif        INTEGER DEFAULT 1,
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now'))
+  );
+`);
+/* Seed des 10 critères par défaut du cahier des charges — une seule fois (ON CONFLICT DO NOTHING
+   sur `cle`), pour ne jamais écraser une modification faite depuis par un admin. */
+(function seedAvancementCriteres() {
+  const defauts = [
+    { cle: "production_offre",         titre: "Production / Offre",                  description: "Le produit, service ou activité proposé est défini et prêt à être présenté." },
+    { cle: "immatriculation",          titre: "Immatriculation de la structure",     description: "Les démarches administratives de création officielle de la structure." },
+    { cle: "implantation_geo",         titre: "Implantation géographique",           description: "Le ou les lieux d'implantation de l'initiative sont identifiés." },
+    { cle: "business_plan",            titre: "Business plan",                       description: "Le plan d'affaires (marché, stratégie, prévisionnel) est rédigé." },
+    { cle: "financement",              titre: "Financement",                         description: "Le financement du projet est identifié et/ou sécurisé." },
+    { cle: "equipe",                   titre: "Équipe",                              description: "L'équipe fondatrice ou opérationnelle est constituée." },
+    { cle: "partenariats",             titre: "Partenariats",                        description: "Des partenariats utiles au projet sont noués ou en discussion." },
+    { cle: "juridique_administratif",  titre: "Aspects juridiques et administratifs", description: "Statuts, autorisations, assurances et obligations légales." },
+    { cle: "communication_visibilite", titre: "Communication et visibilité",         description: "Présence en ligne, supports de communication, notoriété naissante." },
+    { cle: "premiers_clients",         titre: "Premiers clients ou bénéficiaires",   description: "Les premiers retours concrets du terrain (clients, usagers, bénéficiaires)." },
+  ];
+  const stmt = db.prepare(`
+    INSERT INTO avancement_criteres (cle, titre, description, ordre) VALUES (?,?,?,?)
+    ON CONFLICT(cle) DO NOTHING
+  `);
+  defauts.forEach((c, i) => stmt.run(c.cle, c.titre, c.description, i));
+})();
+
 /* ═══════════════════════════════════════════════════════════════════
    MOTEUR D'ACCRÉDITATIONS DYNAMIQUE
    Remplace le tableau statique ACCREDITATIONS_DA de data.js

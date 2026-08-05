@@ -1277,6 +1277,32 @@ async function migratePg(pool) {
       }
     }
   }
+
+  /* ── Module "Avancement de mon initiative" — catalogue de critères ──
+     Le seed de db.js (seedAvancementCriteres) ne s'exécute que via node:sqlite, jamais contre
+     Postgres (même piège que les accréditations plus haut). Idempotent via ON CONFLICT (cle). */
+  try {
+    const DEFAUTS_AVANCEMENT = [
+      ['production_offre', 'Production / Offre', "Le produit, service ou activité proposé est défini et prêt à être présenté."],
+      ['immatriculation', 'Immatriculation de la structure', "Les démarches administratives de création officielle de la structure."],
+      ['implantation_geo', 'Implantation géographique', "Le ou les lieux d'implantation de l'initiative sont identifiés."],
+      ['business_plan', 'Business plan', "Le plan d'affaires (marché, stratégie, prévisionnel) est rédigé."],
+      ['financement', 'Financement', "Le financement du projet est identifié et/ou sécurisé."],
+      ['equipe', 'Équipe', "L'équipe fondatrice ou opérationnelle est constituée."],
+      ['partenariats', 'Partenariats', "Des partenariats utiles au projet sont noués ou en discussion."],
+      ['juridique_administratif', 'Aspects juridiques et administratifs', "Statuts, autorisations, assurances et obligations légales."],
+      ['communication_visibilite', 'Communication et visibilité', "Présence en ligne, supports de communication, notoriété naissante."],
+      ['premiers_clients', 'Premiers clients ou bénéficiaires', "Les premiers retours concrets du terrain (clients, usagers, bénéficiaires)."],
+    ];
+    for (let i = 0; i < DEFAUTS_AVANCEMENT.length; i++) {
+      const [cle, titre, description] = DEFAUTS_AVANCEMENT[i];
+      await pool.query(
+        `INSERT INTO avancement_criteres (cle, titre, description, ordre) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (cle) DO NOTHING`,
+        [cle, titre, description, i]
+      );
+    }
+  } catch (e) { console.error('[pg-init migration] seed avancement_criteres:', e.message); }
 }
 
 async function seedPg(pool) {
