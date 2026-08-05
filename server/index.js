@@ -11897,7 +11897,7 @@ async function handleStripeWebhook(req, res) {
         await db.prepare("UPDATE cagnotte_contributions SET statut='paye' WHERE id=?").run(contribId);
         await db.prepare("UPDATE cagnottes SET montant_collecte = montant_collecte + ?, nb_contributeurs = nb_contributeurs + 1, updated_at=datetime('now') WHERE id=?")
           .run(contrib.montant, contrib.cagnotte_id);
-        const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
+        const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte, visibilite, slug FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
         if (c) {
           creerNotif(c.owner_user_id, "cagnotte_contribution",
             premierePartcipation ? "Première participation 🎉" : "Nouvelle contribution 🪙",
@@ -11905,9 +11905,24 @@ async function handleStripeWebhook(req, res) {
               ? `« ${c.titre} » vient de recevoir sa toute première contribution (${contrib.montant} ${contrib.devise}) !`
               : `Une contribution de ${contrib.montant} ${contrib.devise} a été reçue pour « ${c.titre} ».`,
             { cagnotte_id: contrib.cagnotte_id });
-          if (c.objectif_montant && Number(c.montant_collecte) >= Number(c.objectif_montant)) {
+          /* Objectif atteint pour la première fois seulement : on compare AVANT/APRÈS pour ne
+             pas republier à chaque contribution supplémentaire une fois l'objectif dépassé. */
+          const avantMontant = Number(c.montant_collecte) - Number(contrib.montant);
+          const objectifVientDetreAtteint = c.objectif_montant
+            && avantMontant < Number(c.objectif_montant) && Number(c.montant_collecte) >= Number(c.objectif_montant);
+          if (objectifVientDetreAtteint) {
             creerNotif(c.owner_user_id, "cagnotte_objectif_atteint", "Objectif atteint 🎉",
               `Votre cagnotte « ${c.titre} » a atteint son objectif !`, { cagnotte_id: contrib.cagnotte_id });
+            /* Publication intelligente (Phase 2 point 3) — best-effort, ne doit jamais faire
+               échouer le traitement du paiement. */
+            if (c.visibilite === "publique") {
+              try {
+                const owner = await db.prepare("SELECT nom FROM users WHERE id=?").get(c.owner_user_id);
+                await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
+                  .run(c.owner_user_id, owner?.nom || "", "cagnotte", "objectif_atteint",
+                    `🎉 **Objectif atteint : ${c.titre}** !\n\n👉 diaspoactif.com/cagnotte.html?slug=${c.slug}`);
+              } catch (_) {}
+            }
           }
           /* Confirmation + remerciement au contributeur lui-même (cahier des charges point 4,
              volet "participants") — canal in-app uniquement pour cet increment, l'e-mail de
@@ -13049,6 +13064,14 @@ route("PATCH", "/api/cagnottes/:id/statut", async (req, res, params, body) => {
   if (!["publier","pause","reprendre","cloturer"].includes(action)) return sendJSON(res, 400, { error: "Action inconnue." });
   if (action === "publier") {
     await db.prepare("UPDATE cagnottes SET est_publiee=1, statut_manuel=NULL, updated_at=datetime('now') WHERE id=?").run(params.id);
+    /* Publication intelligente (Phase 2 point 3) : uniquement les cagnottes publiques —
+       une cagnotte privée n'a rien à faire sur un fil visible de tous. Best-effort. */
+    if (c.visibilite === "publique") {
+      try {
+        await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
+          .run(user.id, user.nom, "cagnotte", "creation", `🪙 **Nouvelle cagnotte : ${c.titre}**\n\n${c.description || ''}\n\n👉 diaspoactif.com/cagnotte.html?slug=${c.slug}`);
+      } catch (_) {}
+    }
   } else if (action === "pause") {
     if (!c.est_publiee) return sendJSON(res, 400, { error: "Cette cagnotte n'est pas encore publiée." });
     await db.prepare("UPDATE cagnottes SET statut_manuel='pausee', updated_at=datetime('now') WHERE id=?").run(params.id);
@@ -13056,6 +13079,12 @@ route("PATCH", "/api/cagnottes/:id/statut", async (req, res, params, body) => {
     await db.prepare("UPDATE cagnottes SET statut_manuel=NULL, updated_at=datetime('now') WHERE id=?").run(params.id);
   } else if (action === "cloturer") {
     await db.prepare("UPDATE cagnottes SET statut_manuel='cloturee', updated_at=datetime('now') WHERE id=?").run(params.id);
+    if (c.visibilite === "publique") {
+      try {
+        await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
+          .run(user.id, user.nom, "cagnotte", "cloture", `🔒 **Cagnotte clôturée : ${c.titre}**\n\n${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} récoltés. Merci à tous les contributeurs !`);
+      } catch (_) {}
+    }
   }
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
