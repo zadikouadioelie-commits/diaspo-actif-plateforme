@@ -2919,6 +2919,23 @@ route("PUT", "/api/initiatives/:id/adhesions-ouvertes", async (req, res, params,
   sendJSON(res, 200, { ok: true, adhesions_ouvertes: !!ouvertes });
 });
 
+/* ── Délais de relance personnalisables (tâche #71) — propriétaire uniquement.
+   Tableau de décalages en jours (positif = avant expiration, négatif = après),
+   ex. [30,7,0,-1]. Validation minimale : entiers entre -90 et 90, max 10 valeurs. ── */
+route("PUT", "/api/initiatives/:id/adhesion-relances-config", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const jours = Array.isArray(body?.jours)
+    ? [...new Set(body.jours.map(j => Math.round(Number(j))).filter(j => Number.isFinite(j) && j >= -90 && j <= 90))].sort((a, b) => b - a).slice(0, 10)
+    : [];
+  if (!jours.length) return sendJSON(res, 400, { error: "Au moins un délai valide requis (entre -90 et 90 jours)." });
+  await db.prepare("UPDATE initiatives SET adhesion_relances_jours=? WHERE id=?").run(JSON.stringify(jours), params.id);
+  sendJSON(res, 200, { ok: true, jours });
+});
+
 /* ── Créer une formule ── */
 route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -4884,7 +4901,40 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
     if (!estProprietaire) await db.prepare("UPDATE initiatives SET vues=vues+1 WHERE id=?").run(row.id);
   } catch (_) {}
 
+  /* Module "Avancement de mon initiative" — affichage public (cahier des charges points 7-8).
+     Le % global est toujours public dès que le module s'applique (en_creation) ; le détail
+     (critères/notes/descriptions) ne l'est que si le titulaire l'a explicitement activé.
+     Les commentaires privés ne sont jamais exposés ici, quel que soit le réglage. */
+  row.avancement_detail_public = !!row.avancement_detail_public;
+  if (row.statut_creation === "en_creation") {
+    const notesRows = await db.prepare("SELECT critere_cle, note FROM initiative_avancement_notes WHERE initiative_id=?").all(row.id);
+    const parNote = {};
+    notesRows.forEach(r => { parNote[r.critere_cle] = Number(r.note); });
+    const totalObtenu = AVANCEMENT_CRITERES.reduce((s, c) => s + (parNote[c.cle] || 0), 0);
+    const totalPossible = AVANCEMENT_CRITERES.length * AVANCEMENT_NOTE_MAX;
+    row.avancement_pourcentage = totalPossible ? Math.round((totalObtenu / totalPossible) * 100) : 0;
+    if (row.avancement_detail_public) {
+      row.avancement_criteres_publics = AVANCEMENT_CRITERES.map(c => ({
+        titre: c.titre, description: c.description, note: parNote[c.cle] || 0,
+      }));
+    }
+  } else {
+    row.avancement_pourcentage = null;
+  }
+
   sendJSON(res, 200, { initiative: row });
+});
+
+/* PATCH /api/initiatives/:id/avancement-visibilite — active/désactive la publication du détail
+   du cahier des charges d'avancement (le % global reste toujours public par ailleurs). */
+route("PATCH", "/api/initiatives/:id/avancement-visibilite", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  await db.prepare("UPDATE initiatives SET avancement_detail_public=? WHERE id=?").run(body?.public ? 1 : 0, params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* GET /api/vitrine-modules-registry — bibliothèque de modules + modèles de vitrine (public, statique) */
@@ -18017,7 +18067,8 @@ async function handleRequest(req, res) {
     try {
       const { sendEmail } = require('./mailer');
       const membres = await db.prepare(`
-        SELECT m.*, f.nom AS formule_nom, i.nom AS init_nom, u.email AS user_email
+        SELECT m.*, f.nom AS formule_nom, i.nom AS init_nom, u.email AS user_email,
+          i.adhesion_relances_jours AS relances_config_json
         FROM adhesion_membres m
         JOIN adhesion_formules f ON f.id = m.formule_id
         JOIN initiatives i ON i.id = m.initiative_id
@@ -18029,12 +18080,15 @@ async function handleRequest(req, res) {
       for (const m of membres) {
         const expiration = new Date(m.date_expiration);
         const joursRestants = Math.round((expiration - new Date()) / 86400000);
-        let niveau = null;
-        if (joursRestants === 30) niveau = 'avant_30j';
-        else if (joursRestants === 7) niveau = 'avant_7j';
-        else if (joursRestants === 0) niveau = 'jour_j';
-        else if (joursRestants < 0 && joursRestants >= -1) niveau = 'apres_expiration'; // fenêtre d'exécution quotidienne
-        if (!niveau) continue;
+        /* Délais personnalisables (tâche #71) : chaque association choisit ses propres
+           décalages (positif = jours avant expiration, négatif = jours après). Défaut =
+           comportement historique J-30/J-7/jour J/lendemain. */
+        let joursConfig;
+        try { joursConfig = JSON.parse(m.relances_config_json || '[30,7,0,-1]'); }
+        catch (e) { joursConfig = [30, 7, 0, -1]; }
+        if (!Array.isArray(joursConfig) || !joursConfig.length) continue;
+        if (!joursConfig.includes(joursRestants)) continue;
+        const niveau = `j${joursRestants}`;
 
         /* Une seule relance par niveau pour ce cycle d'expiration (le cycle change à chaque renouvellement,
            donc on ne compare qu'aux relances postérieures à la dernière mise à jour du membre) */
@@ -18043,13 +18097,11 @@ async function handleRequest(req, res) {
         `).get(m.id, niveau, m.updated_at);
         if (deja) continue;
 
-        const messages = {
-          avant_30j: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) arrive à expiration dans 30 jours.`,
-          avant_7j: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) arrive à expiration dans 7 jours.`,
-          jour_j: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) expire aujourd'hui.`,
-          apres_expiration: `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) est expirée. Renouvelez-la dès maintenant.`,
-        };
-        const message = messages[niveau];
+        const message = joursRestants > 0
+          ? `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) arrive à expiration dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''}.`
+          : joursRestants === 0
+          ? `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) expire aujourd'hui.`
+          : `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) est expirée depuis ${-joursRestants} jour${-joursRestants > 1 ? 's' : ''}. Renouvelez-la dès maintenant.`;
         const lienRenouvellement = `${process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app'}/adhesions.html?initiative=${m.initiative_id}&formule=${m.formule_id}`;
 
         await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
