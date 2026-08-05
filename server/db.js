@@ -323,6 +323,34 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
+  /* Co-organisateurs (Phase 2 point 6) — plusieurs gestionnaires par cagnotte, droits
+     différenciés. "administrateur" : modifier/publier/consulter les paiements, comme le
+     créateur. "communication" : publier des nouvelles uniquement (voir cagnotte_actualites). */
+  CREATE TABLE IF NOT EXISTS cagnotte_co_organisateurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cagnotte_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT NOT NULL DEFAULT 'communication' CHECK(role IN ('administrateur','communication')),
+    invite_par_user_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(cagnotte_id, user_id),
+    FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Actualités d'une cagnotte (Phase 2 point 8) — nouvelles publiées par le créateur ou un
+     co-organisateur "communication", visibles sur la page publique. */
+  CREATE TABLE IF NOT EXISTS cagnotte_actualites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cagnotte_id INTEGER NOT NULL,
+    auteur_user_id INTEGER,
+    contenu TEXT NOT NULL,
+    image_url TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+    FOREIGN KEY(auteur_user_id) REFERENCES users(id)
+  );
+
   /* Contributions (paiements) à une cagnotte — Phase 1 "Participation + paiement". */
   CREATE TABLE IF NOT EXISTS cagnotte_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
