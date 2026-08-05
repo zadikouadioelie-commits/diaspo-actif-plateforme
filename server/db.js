@@ -113,6 +113,10 @@ db.exec(`
     /* Uniquement pour statut_creation='en_creation' : quand le porteur a commencé les
        démarches, distinct de date_creation_structure qui suppose une structure déjà créée. */
     date_debut_creation TEXT,
+    /* Module "Avancement de mon initiative" — le % global est toujours public dès que le
+       module est utilisé (statut_creation='en_creation') ; ce booléen contrôle en plus la
+       publication du détail (critères/notes/descriptions), jamais des commentaires privés. */
+    avancement_detail_public INTEGER DEFAULT 0,
     numero_fiscal TEXT,
     genre_responsable TEXT,
     tel_responsable_2 TEXT,
@@ -4906,10 +4910,15 @@ db.exec(`
   if (!initCols7.includes('tel_responsable_2'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_2 TEXT");
   if (!initCols7.includes('tel_responsable_3'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_3 TEXT");
   if (!initCols7.includes('numero_fiscal'))                    db.exec("ALTER TABLE initiatives ADD COLUMN numero_fiscal TEXT");
+  if (!initCols7.includes('avancement_detail_public'))          db.exec("ALTER TABLE initiatives ADD COLUMN avancement_detail_public INTEGER DEFAULT 0");
   /* Ouverture/fermeture des adhésions (tâche #69) : 1=ouvertes par défaut, réversible par
      l'association. Fermer masque le bouton "Adhérer" partout et bloque les nouvelles demandes
      et nouveaux paiements côté serveur — les adhésions déjà actives ne sont pas affectées. */
   if (!initCols7.includes('adhesions_ouvertes'))                db.exec("ALTER TABLE initiatives ADD COLUMN adhesions_ouvertes INTEGER DEFAULT 1");
+  /* Délais de relance personnalisables (tâche #71) : tableau JSON de décalages en jours par
+     rapport à la date d'expiration (positif = avant, négatif = après). Défaut = comportement
+     historique fixe (J-30/J-7/jour J/lendemain). */
+  if (!initCols7.includes('adhesion_relances_jours'))           db.exec("ALTER TABLE initiatives ADD COLUMN adhesion_relances_jours TEXT DEFAULT '[30,7,0,-1]'");
 
   // Préférences d'affichage public des cagnottes — déjà dans le CREATE TABLE cagnottes plus haut,
   // ces lignes ne servent qu'au SQLite local déjà créé (self-healing auto sur PostgreSQL).
