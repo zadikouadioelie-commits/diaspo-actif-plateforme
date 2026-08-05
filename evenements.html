@@ -685,6 +685,9 @@ window.openDetail = async function(id) {
     if (typeof evt.galerie_photos === 'string') {
       try { evt.galerie_photos = JSON.parse(evt.galerie_photos); } catch(e) { evt.galerie_photos = []; }
     }
+    /* Cagnottes associées (Phase 2 point 2) — la route les renvoie en sibling de "evenement",
+       pas imbriquées dedans ; on les rattache ici pour que renderEventDetail les affiche. */
+    evt.cagnottes = r.cagnottes || [];
     document.getElementById('evt-detail-content').innerHTML = renderEventDetail(evt, false);
     initCarousel('detail-carousel');
   } catch(e) {
@@ -794,6 +797,21 @@ function renderEventDetail(evt, isPreview) {
         <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
       </div>
     </div>
+    ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
+    <div style="padding:16px 20px;">
+      <div class="section-divider">🪙 Cagnottes liées</div>
+      ${evt.cagnottes.map(c => `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <strong style="font-size:13.5px;">${esc(c.titre)}</strong>
+            <a class="btn btn-sm btn-orange" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}" target="_blank">Participer</a>
+          </div>
+          ${c.objectif_montant ? `
+          <div style="height:6px;background:var(--bg);border-radius:99px;overflow:hidden;margin:8px 0 4px;"><div style="height:100%;width:${c.pourcentage}%;background:#F26422;"></div></div>
+          <div style="font-size:11.5px;color:var(--muted);">${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} sur ${Number(c.objectif_montant).toLocaleString('fr-FR')} ${c.devise} (${c.pourcentage}%)</div>
+          ` : `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} collectés</div>`}
+        </div>`).join('')}
+    </div>` : ''}
     ${thumbsHTML}
     ${videosHTML}
     ${pdfHTML}

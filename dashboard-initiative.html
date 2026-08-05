@@ -4263,7 +4263,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.cagOpenForm = async function(id) {
     _cagEditId = id || null;
     if (!_cagCategories) { try { _cagCategories = (await api('GET','/cagnottes/categories')).categories; } catch(_) { _cagCategories = []; } }
-    let c = { titre:'', description:'', categorie:'', image_url:'', objectif_montant:null, devise:'EUR', date_debut:'', date_fin:'', visibilite:'publique' };
+    if (!window._cagMesEvenements) { try { window._cagMesEvenements = (await api('GET', '/evenements?owner='+me.id)).evenements; } catch(_) { window._cagMesEvenements = []; } }
+    let c = { titre:'', description:'', categorie:'', image_url:'', objectif_montant:null, devise:'EUR', date_debut:'', date_fin:'', visibilite:'publique', evenement_id:null };
     if (id) {
       try { c = (await api('GET', '/cagnottes/'+id)).cagnotte; } catch(e) { alert('Erreur : '+e.message); return; }
     }
@@ -4324,6 +4325,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <input id="cag-f-date-fin" type="date" value="${(c.date_fin||'').slice(0,10)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           </div>
           <div style="grid-column:1/-1;">
+            <label class="pv-lbl">Événement associé (facultatif)</label>
+            <select id="cag-f-evenement" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">— Aucun —</option>
+              ${(window._cagMesEvenements||[]).map(e=>`<option value="${e.id}" ${Number(c.evenement_id)===e.id?'selected':''}>${_mvEsc(e.titre)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="grid-column:1/-1;">
             <label class="pv-lbl">Affichage public des contributions</label>
             <div style="display:flex;gap:16px;margin-top:6px;">
               <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="cag-f-afficher-participants" ${c.afficher_participants!==0?'checked':''}> Afficher les noms des contributeurs</label>
@@ -4376,6 +4384,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       date_fin: document.getElementById('cag-f-date-fin').value || null,
       afficher_participants: document.getElementById('cag-f-afficher-participants').checked,
       afficher_montants: document.getElementById('cag-f-afficher-montants').checked,
+      evenement_id: document.getElementById('cag-f-evenement').value || null,
     };
     try {
       if (_cagEditId) await api('PUT', '/cagnottes/'+_cagEditId, payload);
