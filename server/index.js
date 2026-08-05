@@ -19075,6 +19075,45 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Cagnotte : rappel "fin proche" au créateur (Phase 2 point 4) — cagnottes actives
+     (calculerStatutCagnotte) dont la date de fin approche, une seule notification chacune. */
+  if (pathname === '/api/cron/cagnotte-fin-proche') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const cagnottes = await db.prepare(`
+        SELECT c.*, u.email AS owner_email, u.nom AS owner_nom
+        FROM cagnottes c JOIN users u ON u.id = c.owner_user_id
+        WHERE c.date_fin IS NOT NULL AND c.relance_fin_proche_le IS NULL
+      `).all();
+      let relancesEnvoyees = 0;
+      for (const c of cagnottes) {
+        if (calculerStatutCagnotte(c) !== "active") continue;
+        const joursRestants = (new Date(c.date_fin).getTime() - Date.now()) / 86400000;
+        if (joursRestants <= 3 && joursRestants > 0) {
+          const restant = Math.max(1, Math.ceil(joursRestants));
+          const msg = `Votre cagnotte « ${c.titre} » se termine dans ${restant} jour${restant > 1 ? 's' : ''}.`;
+          creerNotif(c.owner_user_id, "cagnotte_fin_proche", "⏰ Fin de cagnotte proche", msg, { cagnotte_id: c.id });
+          if (c.owner_email) {
+            try {
+              const { sendEmail } = require("./mailer");
+              await sendEmail({ to: c.owner_email, subject: `« ${c.titre} » se termine bientôt`, html: `<p>Bonjour ${escH(c.owner_nom || '')},</p><p>${escH(msg)}</p>` });
+            } catch (_) {}
+          }
+          await db.prepare("UPDATE cagnottes SET relance_fin_proche_le=datetime('now') WHERE id=?").run(c.id);
+          relancesEnvoyees++;
+        }
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees, total: cagnottes.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron cagnotte-fin-proche"));
+    }
+    return;
+  }
+
   /* ── Gestion des candidatures : relances Emploi & Stage —
      offre bientôt expirée (≤3j), offre expirée (clôture auto), entretien imminent (≤24h). */
   if (pathname === '/api/cron/offres-relances') {
