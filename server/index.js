@@ -12861,6 +12861,21 @@ function calculerStatutCagnotte(c) {
 function cagnotteAvecStatut(c) {
   return { ...c, statut: calculerStatutCagnotte(c), pourcentage: c.objectif_montant ? Math.min(100, Math.round((Number(c.montant_collecte)/Number(c.objectif_montant))*100)) : null };
 }
+/* Droits d'un utilisateur sur une cagnotte (Phase 2 point 6, co-organisateurs). Le propriétaire
+   a toujours tous les droits. Un co-organisateur "administrateur" a les mêmes droits que le
+   propriétaire (modifier/consulter les paiements) sauf publier/clôturer/supprimer, réservés au
+   propriétaire seul (voir cahier des charges : "Administrateur : modifier, publier, consulter
+   les paiements" — publier/clôturer restent malgré tout des actions structurantes qu'on garde
+   au seul créateur pour cet increment). "communication" ne peut que publier des nouvelles. */
+async function cagnottePeutGerer(cagnotteId, userId, droit = "gerer") {
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(cagnotteId);
+  if (!c) return false;
+  if (Number(c.owner_user_id) === Number(userId)) return true;
+  const co = await db.prepare("SELECT role FROM cagnotte_co_organisateurs WHERE cagnotte_id=? AND user_id=?").get(cagnotteId, userId);
+  if (!co) return false;
+  if (droit === "publier") return true;
+  return co.role === "administrateur";
+}
 
 route("GET", "/api/cagnottes/categories", async (req, res) => {
   sendJSON(res, 200, { categories: CAGNOTTE_CATEGORIES });
@@ -12969,7 +12984,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
-  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
   const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants } = body;
   const dDebut = date_debut !== undefined ? date_debut : c.date_debut;
   const dFin = date_fin !== undefined ? date_fin : c.date_fin;
@@ -13139,13 +13154,77 @@ route("GET", "/api/cagnottes/:id/contributions", async (req, res, params) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
-  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  /* Gestion des contributeurs avancée (Phase 2 point 5) : profil Diaspo'Actif (id/photo pour
+     un lien "accéder au profil") + nombre total de contributions de la personne sur TOUTES
+     les cagnottes de la plateforme (pas seulement celle-ci), utile au créateur pour repérer
+     un contributeur fidèle. Un contributeur anonyme reste anonyme malgré tout : on masque son
+     identité côté serveur plutôt que de compter sur le frontend pour le faire. */
   const rows = await db.prepare(`
-    SELECT co.id, co.montant, co.devise, co.anonyme, co.message, co.statut, co.created_at, u.nom AS contributeur_nom
+    SELECT co.id, co.montant, co.devise, co.anonyme, co.message, co.statut, co.created_at,
+           u.id AS contributeur_id, u.nom AS contributeur_nom, u.photo_url AS contributeur_photo
     FROM cagnotte_contributions co JOIN users u ON u.id=co.user_id
     WHERE co.cagnotte_id=? AND co.statut='paye' ORDER BY co.created_at DESC
   `).all(params.id);
-  sendJSON(res, 200, { contributions: rows });
+  const contributions = await Promise.all(rows.map(async r => {
+    if (r.anonyme) return { ...r, contributeur_id: null, contributeur_nom: null, contributeur_photo: null, contributeur_nb_total: null };
+    const total = await db.prepare("SELECT COUNT(*) AS n FROM cagnotte_contributions WHERE user_id=? AND statut='paye'").get(r.contributeur_id);
+    return { ...r, contributeur_nb_total: total?.n || 1 };
+  }));
+  sendJSON(res, 200, { contributions });
+});
+
+/* ── Co-organisateurs (Phase 2 point 6) ── */
+
+/* GET /api/cagnottes/:id/co-organisateurs — réservé au créateur ou à un co-organisateur. */
+route("GET", "/api/cagnottes/:id/co-organisateurs", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!(await cagnottePeutGerer(params.id, user.id, "publier"))) return sendJSON(res, 403, { error: "Accès réservé." });
+  const rows = await db.prepare(`
+    SELECT co.id, co.role, co.created_at, u.id AS user_id, u.nom, u.email, u.photo_url
+    FROM cagnotte_co_organisateurs co JOIN users u ON u.id=co.user_id
+    WHERE co.cagnotte_id=? ORDER BY co.created_at ASC
+  `).all(params.id);
+  sendJSON(res, 200, { co_organisateurs: rows });
+});
+
+/* POST /api/cagnottes/:id/co-organisateurs — ajout par email, réservé au créateur/administrateur. */
+route("POST", "/api/cagnottes/:id/co-organisateurs", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  const email = String(body?.email || "").trim().toLowerCase();
+  const role = ["administrateur", "communication"].includes(body?.role) ? body.role : "communication";
+  if (!email) return sendJSON(res, 400, { error: "E-mail requis." });
+  const cible = await db.prepare("SELECT id, nom FROM users WHERE LOWER(email)=?").get(email);
+  if (!cible) return sendJSON(res, 404, { error: "Aucun compte Diaspo'Actif avec cet e-mail." });
+  if (Number(cible.id) === Number(c.owner_user_id)) return sendJSON(res, 400, { error: "Le créateur n'a pas besoin d'être ajouté comme co-organisateur." });
+  const existant = await db.prepare("SELECT id FROM cagnotte_co_organisateurs WHERE cagnotte_id=? AND user_id=?").get(params.id, cible.id);
+  if (existant) return sendJSON(res, 400, { error: "Cette personne est déjà co-organisatrice." });
+  const id = (await db.prepare(
+    "INSERT INTO cagnotte_co_organisateurs (cagnotte_id, user_id, role, invite_par_user_id) VALUES (?,?,?,?)"
+  ).run(params.id, cible.id, role, user.id)).lastInsertRowid;
+  const cag = await db.prepare("SELECT titre FROM cagnottes WHERE id=?").get(params.id);
+  creerNotif(cible.id, "cagnotte_co_organisateur", "Vous êtes désormais co-organisateur 🪙",
+    `Vous avez été ajouté comme co-organisateur (${role === "administrateur" ? "administrateur" : "communication"}) de la cagnotte « ${cag?.titre || ""} ».`,
+    { cagnotte_id: Number(params.id) });
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* DELETE /api/cagnottes/:id/co-organisateurs/:coId — réservé au créateur/administrateur. */
+route("DELETE", "/api/cagnottes/:id/co-organisateurs/:coId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  await db.prepare("DELETE FROM cagnotte_co_organisateurs WHERE id=? AND cagnotte_id=?").run(params.coId, params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 route("GET", "/api/evenements/:id", async (req, res, params) => {
