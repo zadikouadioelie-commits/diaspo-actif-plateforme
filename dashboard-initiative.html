@@ -2867,6 +2867,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div style="background:${etatEnCreation ? '#d97706' : '#16a34a'};height:100%;width:${etatProgression}%;"></div>
         </div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Progression : ${etatProgression}%</div>
+        ${etatEnCreation ? `<div id="dp-widget" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">Chargement…</div>` : ''}
       </div>`;
     const cockpitHTML = `
     <div id="cockpit" style="margin-bottom:24px;">
@@ -2946,6 +2947,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     </div>`;
     content.insertAdjacentHTML('afterbegin', cockpitHTML);
     loadCockpitFinancierWidget();
+    if (etatEnCreation) loadPassageWidget();
 
     // QR code vers la vitrine publique (profil.html?id=<owner>#vitrine)
     try {
@@ -4632,6 +4634,58 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         if (dashCard) avRenderDashboard(dashCard, criteres, historique);
       } catch (e) { if (typeof showToast === 'function') showToast("Erreur d'enregistrement", 'error'); }
     }, 400);
+  };
+
+  /* ══ STATUT DE L'INITIATIVE — assistant de passage En création → Existante ══
+     Widget dans la carte "État de votre initiative" (cockpit) — voir le placeholder
+     #dp-widget inséré dans etatInitiativeHTML plus haut. */
+  async function loadPassageWidget() {
+    const el = document.getElementById('dp-widget');
+    if (!el) return;
+    try {
+      const { derniere_demande } = await api('GET', `/initiatives/${init.id}/demande-passage`);
+      if (!derniere_demande || derniere_demande.statut === 'refusee') {
+        el.innerHTML = `
+          ${derniere_demande?.statut === 'refusee' ? `<div style="font-size:12.5px;color:#991b1b;background:#fef2f2;border-radius:8px;padding:8px 10px;margin-bottom:8px;">Votre précédente demande a été refusée. Motif : ${escH(derniere_demande.motif_refus||'')}</div>` : ''}
+          <button class="btn btn-sm btn-orange" onclick="dpOuvrirModal()">🚀 Demander le passage à « Existante »</button>`;
+      } else if (derniere_demande.statut === 'en_attente') {
+        el.innerHTML = `<div style="font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;padding:8px 10px;">⏳ Votre demande de passage est en cours d'examen par l'équipe Diaspo'Actif.</div>`;
+      } else if (derniere_demande.statut === 'approuvee') {
+        el.innerHTML = `<div style="font-size:12.5px;color:#166534;background:#dcfce7;border-radius:8px;padding:8px 10px;">✅ Passage approuvé.</div>`;
+      }
+    } catch (e) { el.innerHTML = ''; }
+  }
+
+  window.dpOuvrirModal = function() {
+    let modal = document.getElementById('dp-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'dp-modal';
+      modal.className = 'modal-overlay';
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div class="modal-box" style="max-width:460px;width:94%;">
+        <h3 style="margin:0 0 4px;">🚀 Demander le passage à « Existante »</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin:4px 0 14px;">Un administrateur Diaspo'Actif examinera votre demande. Décrivez brièvement pourquoi votre structure est maintenant officiellement créée (facultatif).</p>
+        <textarea id="dp-f-message" class="input" placeholder="Ex : immatriculation obtenue le..." style="width:100%;box-sizing:border-box;min-height:80px;"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button class="btn btn-outline" onclick="document.getElementById('dp-modal').style.display='none'">Annuler</button>
+          <button class="btn btn-orange" onclick="dpSoumettre()">Envoyer la demande</button>
+        </div>
+      </div>`;
+    modal.style.display = 'flex';
+  };
+
+  window.dpSoumettre = async function() {
+    const message = document.getElementById('dp-f-message').value.trim();
+    try {
+      await api('POST', `/initiatives/${init.id}/demande-passage`, { message });
+      document.getElementById('dp-modal').style.display = 'none';
+      if (typeof showToast === 'function') showToast('Demande envoyée ✓', 'success');
+      loadPassageWidget();
+    } catch (e) { alert('Erreur : ' + (e.message || '')); }
   };
 
   document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
