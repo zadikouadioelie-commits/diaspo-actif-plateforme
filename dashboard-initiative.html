@@ -4171,20 +4171,40 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
       </div>
       <div id="cag-form-wrap" style="display:none;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-sm btn-orange" id="cag-tab-actives" onclick="cagSwitchTab('actives')">Actives</button>
+        <button class="btn btn-sm btn-outline" id="cag-tab-archivees" onclick="cagSwitchTab('archivees')">🗄️ Archivées</button>
+      </div>
       <div id="cag-liste"><div class="notice">Chargement…</div></div>
     `;
     cagRenderListe();
   }
 
+  /* ── Archivage complet (Phase 2 point 10) — rien n'est jamais supprimé (montants,
+     contributeurs, statistiques, actualités restent consultables) : cet onglet ne fait que
+     filtrer côté client la liste déjà exhaustive de /cagnottes/mes par statut terminal. */
+  let CAG_TAB_ACTIVE = 'actives';
+  window.cagSwitchTab = function(tab) {
+    CAG_TAB_ACTIVE = tab;
+    const btnActives = document.getElementById('cag-tab-actives');
+    const btnArchivees = document.getElementById('cag-tab-archivees');
+    if (btnActives) { btnActives.classList.toggle('btn-orange', tab==='actives'); btnActives.classList.toggle('btn-outline', tab!=='actives'); }
+    if (btnArchivees) { btnArchivees.classList.toggle('btn-orange', tab==='archivees'); btnArchivees.classList.toggle('btn-outline', tab!=='archivees'); }
+    cagRenderListe();
+  };
+
   async function cagRenderListe() {
     const wrap = document.getElementById('cag-liste');
     if (!wrap) return;
     try {
-      const { cagnottes } = await api('GET', '/cagnottes/mes');
+      const { cagnottes: toutes } = await api('GET', '/cagnottes/mes');
+      const cagnottes = toutes.filter(c => CAG_TAB_ACTIVE === 'archivees'
+        ? ['terminee','expiree'].includes(c.statut)
+        : !['terminee','expiree'].includes(c.statut));
       if (!cagnottes.length) {
         wrap.innerHTML = `<div class="card empty" style="text-align:center;padding:30px;">
           <div style="font-size:32px;margin-bottom:8px;">🪙</div>
-          <p style="color:var(--muted);">Aucune cagnotte pour le moment.</p>
+          <p style="color:var(--muted);">${CAG_TAB_ACTIVE === 'archivees' ? 'Aucune cagnotte archivée.' : 'Aucune cagnotte active pour le moment.'}</p>
         </div>`;
         return;
       }
