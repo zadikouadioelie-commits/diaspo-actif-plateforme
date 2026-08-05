@@ -303,6 +303,9 @@ db.exec(`
        participant (anonyme ou non) : un participant anonyme n'est jamais nommé, quoi qu'il arrive. */
     afficher_participants INTEGER DEFAULT 1,
     afficher_montants INTEGER DEFAULT 1,
+    /* Rappel "fin proche" au créateur (Phase 2 point 4, cron /api/cron/cagnotte-fin-proche) —
+       une seule notification par cagnotte, jamais renvoyée même si le cron est rejoué. */
+    relance_fin_proche_le TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
@@ -5015,6 +5018,7 @@ db.exec(`
   const cagCols1 = db.prepare('PRAGMA table_info(cagnottes)').all().map(c=>c.name);
   if (!cagCols1.includes('afficher_participants'))              db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_participants INTEGER DEFAULT 1");
   if (!cagCols1.includes('afficher_montants'))                  db.exec("ALTER TABLE cagnottes ADD COLUMN afficher_montants INTEGER DEFAULT 1");
+  if (!cagCols1.includes('relance_fin_proche_le'))               db.exec("ALTER TABLE cagnottes ADD COLUMN relance_fin_proche_le TEXT");
 
   // ── Module "Liste des partenaires" — table dédiée (remplace vitrine_partenaires_json, jamais réellement exploité) ──
   db.exec(`
