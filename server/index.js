@@ -6210,6 +6210,26 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
   sendJSON(res, 200, { history });
 });
 
+/* ══════════════════════════════════════════════════════════════════════
+   MODULE "LIAISON DE COMPTES" — étape 1 : socle. Étapes 2-7 (lier/délier,
+   bascule, journal, intégration écosystème) viendront en incréments
+   suivants. Cette route est volontairement en lecture seule pour l'instant :
+   elle renvoie un groupe vide tant que l'étape 2 n'existe pas.
+   ═══════════════════════════════════════════════════════════════════════ */
+route("GET", "/api/comptes-lies", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const membre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+  if (!membre) return sendJSON(res, 200, { groupe_id: null, comptes: [] });
+  const comptes = await db.prepare(`
+    SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, u.da_id,
+           m.date_liaison, m.derniere_utilisation
+    FROM comptes_lies_membres m JOIN users u ON u.id = m.user_id
+    WHERE m.groupe_id = ? ORDER BY m.date_liaison ASC
+  `).all(membre.groupe_id);
+  sendJSON(res, 200, { groupe_id: membre.groupe_id, comptes });
+});
+
 /* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══
    Choix assumé avec l'utilisateur malgré l'affaiblissement de sécurité que cela représente
    par rapport au DS-ID « signature seule » ci-dessus (toute personne ayant vu le code une
