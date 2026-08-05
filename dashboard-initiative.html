@@ -6148,7 +6148,9 @@ async function adhRenderRegistre(){
         <input type="text" id="adh-registre-recherche" placeholder="🔎 Rechercher (nom, email, téléphone, n° adhérent)…" style="flex:1;min-width:220px;padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;" oninput="adhFiltrerRegistre(this.value)">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent</button>
-          <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export" target="_blank">⬇️ Export CSV</a>
+          <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export" target="_blank">⬇️ CSV</a>
+          <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export?format=excel" target="_blank">📊 Excel</a>
+          <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export?format=pdf" target="_blank" title="Ouvre un aperçu imprimable — utilisez « Enregistrer en PDF » dans la boîte de dialogue d'impression du navigateur.">📄 PDF</a>
         </div>
       </div>
       <div style="overflow-x:auto;">
