@@ -12554,6 +12554,111 @@ route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, param
   sendJSON(res, 200, { ok: true });
 });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   STATUT DE L'INITIATIVE — assistant de passage « En création → Existante »
+   Le porteur demande le passage une fois prêt ; un administrateur valide ou
+   refuse. Même schéma que verifications-organisation ci-dessus : une ligne
+   par tentative, historique conservé en cas de refus + nouvel essai.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* GET /api/initiatives/:id/demande-passage — statut de la dernière demande (ou aucune) */
+route("GET", "/api/initiatives/:id/demande-passage", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, statut_creation FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+  }
+  const derniere = await db.prepare(
+    "SELECT * FROM initiative_passage_demandes WHERE initiative_id=? ORDER BY created_at DESC LIMIT 1"
+  ).get(params.id);
+  sendJSON(res, 200, { statut_creation: init.statut_creation, derniere_demande: derniere || null });
+});
+
+/* POST /api/initiatives/:id/demande-passage — soumission (une seule demande en_attente à la fois) */
+route("POST", "/api/initiatives/:id/demande-passage", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, nom, statut_creation FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire de cette initiative." });
+  if (init.statut_creation !== "en_creation") return sendJSON(res, 400, { error: "Cette initiative n'est pas « en création »." });
+  const enAttente = await db.prepare("SELECT id FROM initiative_passage_demandes WHERE initiative_id=? AND statut='en_attente'").get(params.id);
+  if (enAttente) return sendJSON(res, 409, { error: "Une demande est déjà en cours de traitement." });
+
+  /* % d'avancement joint en contexte à la demande (module Avancement), 0 si jamais renseigné. */
+  const [notesRows, criteresActifs] = await Promise.all([
+    db.prepare("SELECT critere_cle, note FROM initiative_avancement_notes WHERE initiative_id=?").all(params.id),
+    getAvancementCriteres(),
+  ]);
+  const totalObtenu = notesRows.reduce((s, r) => s + Number(r.note), 0);
+  const totalPossible = criteresActifs.length * AVANCEMENT_NOTE_MAX;
+  const pourcentage = totalPossible ? Math.round((totalObtenu / totalPossible) * 100) : 0;
+
+  const message = body?.message != null ? String(body.message).slice(0, 1000) : null;
+  const id = (await db.prepare(`
+    INSERT INTO initiative_passage_demandes (initiative_id, message, avancement_pourcentage_snapshot)
+    VALUES (?,?,?)
+  `).run(params.id, message, pourcentage)).lastInsertRowid;
+
+  const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  admins.forEach(a => creerNotif(a.id, "demande_passage_initiative",
+    "🏢 Nouvelle demande de passage « Existante »",
+    `« ${init.nom} » demande à passer d'« En création » à « Existante » (avancement : ${pourcentage}%).`,
+    { demande_id: Number(id), initiative_id: Number(params.id) }));
+
+  sendJSON(res, 201, { id, ok: true });
+});
+
+/* GET /api/admin/demandes-passage — file d'attente admin (en_attente par défaut) */
+route("GET", "/api/admin/demandes-passage", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const statut = query.statut || "en_attente";
+  const rows = await db.prepare(`
+    SELECT d.*, i.nom AS initiative_nom, i.slug AS initiative_slug, i.type AS initiative_type
+    FROM initiative_passage_demandes d
+    JOIN initiatives i ON i.id = d.initiative_id
+    WHERE d.statut = ?
+    ORDER BY d.created_at ASC
+  `).all(statut);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* PUT /api/admin/demandes-passage/:id — approuver (bascule statut_creation='existante') ou refuser */
+route("PUT", "/api/admin/demandes-passage/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const demande = await db.prepare("SELECT * FROM initiative_passage_demandes WHERE id=?").get(params.id);
+  if (!demande) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (demande.statut !== "en_attente") return sendJSON(res, 400, { error: "Cette demande a déjà été traitée." });
+
+  const { decision, motif_refus } = body;
+  if (!["approuvee", "refusee"].includes(decision)) return sendJSON(res, 400, { error: "Décision invalide." });
+  if (decision === "refusee" && !(motif_refus || "").trim()) return sendJSON(res, 400, { error: "Motif de refus requis." });
+
+  await db.prepare(
+    "UPDATE initiative_passage_demandes SET statut=?, motif_refus=?, admin_id=?, admin_nom=?, traite_le=datetime('now') WHERE id=?"
+  ).run(decision, decision === "refusee" ? motif_refus.trim() : null, user.id, user.nom, params.id);
+
+  const init = await db.prepare("SELECT owner_user_id, nom FROM initiatives WHERE id=?").get(demande.initiative_id);
+
+  if (decision === "approuvee") {
+    await db.prepare("UPDATE initiatives SET statut_creation='existante' WHERE id=?").run(demande.initiative_id);
+    if (init?.owner_user_id) {
+      creerNotif(init.owner_user_id, "passage_initiative_approuve", "Votre initiative est désormais « Existante » 🎉",
+        `Félicitations, « ${init.nom} » est passée au statut « Existante ».`, { initiative_id: demande.initiative_id });
+    }
+  } else if (init?.owner_user_id) {
+    creerNotif(init.owner_user_id, "passage_initiative_refuse", "Demande de passage refusée",
+      `Votre demande pour « ${init.nom} » a été refusée. Motif : ${motif_refus.trim()}. Vous pouvez soumettre une nouvelle demande.`,
+      { initiative_id: demande.initiative_id });
+  }
+
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/notifications", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
