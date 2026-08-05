@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Liaison de comptes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+  <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .cl-intro{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:24px;margin-bottom:24px;max-width:680px;}
+  .cl-intro h2{margin:0 0 8px;font-size:19px;}
+  .cl-intro p{font-size:13.5px;color:var(--muted);line-height:1.6;margin:0 0 14px;}
+  .cl-steps{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+  .cl-step{display:flex;gap:12px;align-items:flex-start;font-size:13px;}
+  .cl-step-num{flex:none;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:12.5px;}
+  .cl-liste{max-width:680px;}
+  .cl-compte-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;}
+  .cl-compte-avatar{width:44px;height:44px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;object-fit:cover;}
+  .cl-compte-info{flex:1;min-width:0;}
+  .cl-compte-nom{font-weight:700;font-size:14px;}
+  .cl-compte-meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .cl-empty{text-align:center;padding:40px 20px;color:var(--muted);max-width:680px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Actualités</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <h1 style="margin:0 0 4px;">🔗 Liaison de comptes</h1>
+    <p class="sub" style="margin:0 0 20px;">Gérez plusieurs comptes Diaspo'Actif (Utilisateur, Association, Entreprise, Initiative, Institution…) depuis une seule connexion.</p>
+
+    <div class="cl-intro">
+      <h2>Comment ça marche</h2>
+      <p>Chaque compte Diaspo'Actif reste totalement indépendant — ses publications, ses messages, ses abonnements et ses droits n'appartiennent qu'à lui. La liaison de comptes vous permet simplement de passer instantanément de l'un à l'autre, sans vous déconnecter ni ressaisir de mot de passe.</p>
+      <div class="cl-steps">
+        <div class="cl-step"><div class="cl-step-num">1</div><div>Reliez un compte grâce à son <strong>DS-ID</strong>, le code de sécurité personnel de Diaspo'Actif.</div></div>
+        <div class="cl-step"><div class="cl-step-num">2</div><div>Tous les comptes reliés rejoignent un même groupe — une seule liaison suffit à les rendre accessibles entre eux.</div></div>
+        <div class="cl-step"><div class="cl-step-num">3</div><div>Basculez d'un compte à l'autre en un clic, à tout moment.</div></div>
+      </div>
+    </div>
+
+    <div class="cl-liste" id="cl-liste">
+      <div class="notice">Chargement…</div>
+    </div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script>
+(async function initComptesLies(){
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ROLE_LABELS = { utilisateur:'Utilisateur', initiative:'Initiative', administrateur:'Administrateur', collectivite:'Collectivité' };
+  const zone = document.getElementById('cl-liste');
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) { location.href = 'login.html'; return; }
+  } catch(e) { location.href = 'login.html'; return; }
+
+  try {
+    const { comptes } = await api('GET', '/comptes-lies');
+    if (!comptes || !comptes.length) {
+      zone.innerHTML = `<div class="cl-empty">
+        <div style="font-size:34px;margin-bottom:10px;">🔗</div>
+        <p>Aucun compte lié pour l'instant.</p>
+      </div>`;
+      return;
+    }
+    zone.innerHTML = comptes.map(c => `
+      <div class="cl-compte-card">
+        ${c.photo_url ? `<img class="cl-compte-avatar" src="${esc(c.photo_url)}" alt="">` : `<div class="cl-compte-avatar">👤</div>`}
+        <div class="cl-compte-info">
+          <div class="cl-compte-nom">${esc(c.nom)}${c.prenom ? ' ' + esc(c.prenom) : ''}</div>
+          <div class="cl-compte-meta">${esc(ROLE_LABELS[c.role] || c.role)} · relié le ${c.date_liaison ? new Date((c.date_liaison||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    zone.innerHTML = `<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>`;
+  }
+})();
+</script>
+</body>
+</html>
