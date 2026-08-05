@@ -3214,6 +3214,41 @@ route("GET", "/api/initiatives/:id/adhesion-stats", async (req, res, params) => 
   });
 });
 
+/* ── Évolution filtrable par période (tâche #72) — série quotidienne : nouveaux adhérents
+   (1ère adhésion, jamais un renouvellement) + montant encaissé (tous paiements confondus,
+   Stripe et manuels). Complète les jours sans activité à 0 pour un tracé continu. ── */
+route("GET", "/api/initiatives/:id/adhesion-evolution", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const jours = [7, 30, 90, 365].includes(Number(query?.periode)) ? Number(query.periode) : 30;
+
+  const [nouveaux, paiements] = await Promise.all([
+    db.prepare(`
+      SELECT substr(date_adhesion,1,10) AS jour, COUNT(*) AS n FROM adhesion_membres
+      WHERE initiative_id=? AND date_adhesion IS NOT NULL AND date_adhesion >= datetime('now','-${jours} days')
+      GROUP BY jour
+    `).all(params.id),
+    db.prepare(`
+      SELECT substr(date_paiement,1,10) AS jour, COALESCE(SUM(montant),0) AS total FROM adhesion_paiements
+      WHERE initiative_id=? AND statut='paye' AND date_paiement >= datetime('now','-${jours} days')
+      GROUP BY jour
+    `).all(params.id),
+  ]);
+  const parJourNouveaux = Object.fromEntries(nouveaux.map(r => [r.jour, r.n]));
+  const parJourMontant = Object.fromEntries(paiements.map(r => [r.jour, r.total]));
+
+  const evolution = [];
+  for (let i = jours - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const jour = d.toISOString().slice(0, 10);
+    evolution.push({ jour, nouveaux: parJourNouveaux[jour] || 0, montant: parJourMontant[jour] || 0 });
+  }
+  sendJSON(res, 200, { evolution });
+});
+
 /* ── Campagnes : liste + création ── */
 /* ── Campagnes actives — lecture publique (section "Campagnes en cours" du profil) ── */
 route("GET", "/api/initiatives/:id/campagnes-actives", async (req, res, params) => {

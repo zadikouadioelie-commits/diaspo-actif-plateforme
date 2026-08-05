@@ -6374,12 +6374,58 @@ async function renderStatsImpact(initId){
   body.innerHTML = html;
 }
 
+/* Sparkline Canvas natif (tâche #72), même technique que dashboard-administrateur.html —
+   aucune librairie de graphiques, cohérent avec le reste de la plateforme. */
+function adhDrawSparkline(canvasId, points, valKey, color, fillColor, formatVal){
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 400, H = 100;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+  const vals = points.map(p => p[valKey]);
+  const max = Math.max(...vals, 1);
+  const step = W / Math.max(points.length - 1, 1);
+  const coords = points.map((p, i) => ({ x: i * step, y: H - 16 - ((p[valKey] / max) * (H - 30)) }));
+  ctx.beginPath(); ctx.moveTo(coords[0].x, H - 16);
+  coords.forEach(c => ctx.lineTo(c.x, c.y));
+  ctx.lineTo(coords[coords.length-1].x, H - 16); ctx.closePath();
+  ctx.fillStyle = fillColor; ctx.fill();
+  ctx.beginPath();
+  coords.forEach((c,i) => i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y));
+  ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
+  const labelStep = Math.max(1, Math.floor(points.length / 6));
+  points.forEach((p, i) => {
+    const c = coords[i];
+    ctx.beginPath(); ctx.arc(c.x, c.y, 3, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
+    if (i % labelStep === 0 || i === points.length - 1) {
+      ctx.fillStyle = '#6b7280'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(p.jour.slice(5), c.x, H - 4);
+      if (p[valKey] > 0) {
+        ctx.fillStyle = '#1f2937'; ctx.font = 'bold 11px system-ui';
+        ctx.fillText(formatVal ? formatVal(p[valKey]) : p[valKey], c.x, c.y - 8);
+      }
+    }
+  });
+}
+let ADH_STATS_PERIODE = 30;
+async function adhChangerPeriodeStats(jours){
+  ADH_STATS_PERIODE = jours;
+  document.querySelectorAll('.adh-periode-btn').forEach(b => b.className = Number(b.dataset.jours)===jours ? 'btn btn-sm adh-periode-btn' : 'btn btn-sm btn-outline adh-periode-btn');
+  try{
+    const r = await api('GET', `/initiatives/${window.__vitrineInitId}/adhesion-evolution?periode=${jours}`);
+    adhDrawSparkline('adh-chart-nouveaux', r.evolution, 'nouveaux', '#1B3A6B', 'rgba(27,58,107,.12)');
+    adhDrawSparkline('adh-chart-montant', r.evolution, 'montant', '#16a34a', 'rgba(22,163,74,.12)', v => v+'€');
+  } catch(e){ /* silencieux : les cartes KPI restent affichées même si le graphique échoue */ }
+}
 async function adhRenderStats(){
   const el = document.getElementById('adhesions-init-content');
   el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
   try{
     const r = await api('GET', `/initiatives/${window.__vitrineInitId}/adhesion-stats`);
-    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;">
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px;">
       ${[
         ['Adhérents', r.adherents, '👥'],
         ['À jour', r.a_jour, '🟢'],
@@ -6393,7 +6439,25 @@ async function adhRenderStats(){
           <div style="font-size:22px;font-weight:800;margin:6px 0;">${val}</div>
           <div style="font-size:12px;color:var(--muted);">${label}</div>
         </div>`).join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <strong style="font-size:14px;">📈 Évolution</strong>
+      <div style="display:flex;gap:6px;">
+        ${[[7,'7j'],[30,'30j'],[90,'3 mois'],[365,'1 an']].map(([j,label]) => `
+          <button class="btn btn-sm ${j===30?'':'btn-outline'} adh-periode-btn" data-jours="${j}" onclick="adhChangerPeriodeStats(${j})">${label}</button>`).join('')}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+      <div class="card" style="padding:14px;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px;">🆕 Nouvelles adhésions</div>
+        <canvas id="adh-chart-nouveaux" height="100"></canvas>
+      </div>
+      <div class="card" style="padding:14px;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px;">💰 Montant encaissé</div>
+        <canvas id="adh-chart-montant" height="100"></canvas>
+      </div>
     </div>`;
+    adhChangerPeriodeStats(30);
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
 
