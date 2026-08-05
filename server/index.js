@@ -12965,23 +12965,31 @@ route("POST", "/api/cagnottes", async (req, res, params, body) => {
   if (!user || !["initiative","administrateur"].includes(user.role)) {
     return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
   }
-  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants } = body;
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (date_debut && date_fin && new Date(date_fin) <= new Date(date_debut)) {
     return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
   }
+  /* Association événement (Phase 2 point 2) : uniquement l'un de ses propres événements, pour
+     éviter qu'un créateur associe sa cagnotte à l'événement de quelqu'un d'autre sans accord. */
+  let evenementIdValide = null;
+  if (evenement_id) {
+    const evt = await db.prepare("SELECT id FROM evenements WHERE id=? AND owner_user_id=?").get(evenement_id, user.id);
+    if (evt) evenementIdValide = evt.id;
+  }
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = (titre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "cagnotte") + "-" + Date.now().toString(36);
   const id = (await db.prepare(`
-    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     slug, user.id, init ? init.id : null, titre, description || null, categorie || null, image_url || null,
     objectif_montant != null && objectif_montant !== "" ? Number(objectif_montant) : null,
     devise || "EUR", date_debut || null, date_fin || null,
     visibilite === "privee" ? "privee" : "publique",
     afficher_participants === false ? 0 : 1,
-    afficher_montants === false ? 0 : 1
+    afficher_montants === false ? 0 : 1,
+    evenementIdValide
   )).lastInsertRowid;
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(id);
   sendJSON(res, 201, { cagnotte: cagnotteAvecStatut(row) });
@@ -12993,16 +13001,24 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
   const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
-  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants } = body;
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id } = body;
   const dDebut = date_debut !== undefined ? date_debut : c.date_debut;
   const dFin = date_fin !== undefined ? date_fin : c.date_fin;
   if (dDebut && dFin && new Date(dFin) <= new Date(dDebut)) {
     return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
   }
+  let evenementIdValide = c.evenement_id;
+  if (evenement_id !== undefined) {
+    evenementIdValide = null;
+    if (evenement_id) {
+      const evt = await db.prepare("SELECT id FROM evenements WHERE id=? AND owner_user_id=?").get(evenement_id, c.owner_user_id);
+      if (evt) evenementIdValide = evt.id;
+    }
+  }
   await db.prepare(`
     UPDATE cagnottes SET
       titre=?, description=?, categorie=?, image_url=?, objectif_montant=?, devise=?,
-      date_debut=?, date_fin=?, visibilite=?, afficher_participants=?, afficher_montants=?, updated_at=datetime('now')
+      date_debut=?, date_fin=?, visibilite=?, afficher_participants=?, afficher_montants=?, evenement_id=?, updated_at=datetime('now')
     WHERE id=?
   `).run(
     titre !== undefined && titre !== "" ? titre : c.titre,
@@ -13015,6 +13031,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
     visibilite !== undefined ? (visibilite === "privee" ? "privee" : "publique") : c.visibilite,
     afficher_participants !== undefined ? (afficher_participants ? 1 : 0) : c.afficher_participants,
     afficher_montants !== undefined ? (afficher_montants ? 1 : 0) : c.afficher_montants,
+    evenementIdValide,
     params.id
   );
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
@@ -13358,7 +13375,12 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
   const participants = await db.prepare("SELECT u.id,u.nom,u.ville FROM evenements_participants ep JOIN users u ON u.id=ep.user_id WHERE ep.evenement_id=?").all(params.id);
-  sendJSON(res, 200, { evenement: row, participants, nb_participants: participants.length });
+  /* Cagnottes associées (Phase 2 point 2) — uniquement publiques et publiées, pour ne jamais
+     exposer un brouillon ou une cagnotte privée sur une page événement publique. */
+  const cagnottesLiees = (await db.prepare(
+    "SELECT id, slug, titre, image_url, objectif_montant, montant_collecte, devise, statut_manuel, est_publiee, date_fin FROM cagnottes WHERE evenement_id=? AND est_publiee=1 AND visibilite='publique'"
+  ).all(params.id)).map(cagnotteAvecStatut);
+  sendJSON(res, 200, { evenement: row, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
 });
 
 route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) => {
