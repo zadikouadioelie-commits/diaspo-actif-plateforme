@@ -4213,6 +4213,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         }
         if (c.statut !== 'brouillon') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenContributions(${c.id})">📊 Contributions</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenCoOrganisateurs(${c.id})">👥 Co-organisateurs</button>`);
         }
         return `<div class="card" style="margin-bottom:12px;padding:16px 18px;">
           <div style="display:flex;gap:14px;flex-wrap:wrap;">
@@ -4458,13 +4459,79 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
         ${contributions.map(c => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
-            <span>${c.anonyme ? '🙈 Anonyme' : escH(c.contributeur_nom)}${c.message ? ` — <span style="color:var(--muted);">${escH(c.message)}</span>` : ''}<br><span style="font-size:11px;color:var(--muted);">${fmtDateInit(c.created_at)}</span></span>
+            <span>
+              ${c.anonyme
+                ? '🙈 Anonyme'
+                : `${escH(c.contributeur_nom)}${c.contributeur_id ? ` <a href="profil.html?id=${c.contributeur_id}" target="_blank" style="font-size:11px;color:#2563EB;text-decoration:none;">👁 profil</a>` : ''}${c.contributeur_nb_total > 1 ? ` <span style="font-size:11px;color:var(--muted);">(${c.contributeur_nb_total} contributions au total)</span>` : ''}`}
+              ${c.message ? ` — <span style="color:var(--muted);">${escH(c.message)}</span>` : ''}<br><span style="font-size:11px;color:var(--muted);">${fmtDateInit(c.created_at)}</span></span>
             <strong>${Number(c.montant).toLocaleString('fr-FR')} ${c.devise}</strong>
           </div>`).join('')}
       `;
     } catch(e) {
       document.getElementById('cag-contrib-liste').innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
     }
+  };
+
+  /* ── Co-organisateurs (Phase 2 point 6) ── */
+  const CAG_CO_ROLE_LABELS = { administrateur: '🛡️ Administrateur', communication: '📣 Communication' };
+  window.cagOpenCoOrganisateurs = async function(id) {
+    let modal = document.getElementById('cag-coorg-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cag-coorg-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:480px;text-align:left;">
+      <h3 style="margin:0 0 4px;">👥 Co-organisateurs</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Administrateur : mêmes droits que vous (modifier, consulter les paiements). Communication : peut uniquement publier des nouvelles.</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="email" id="cag-coorg-email" class="input" placeholder="E-mail d'un compte Diaspo'Actif" style="flex:1;">
+        <select id="cag-coorg-role" class="input" style="flex:none;width:150px;">
+          <option value="communication">Communication</option>
+          <option value="administrateur">Administrateur</option>
+        </select>
+        <button class="btn btn-orange btn-sm" onclick="cagAjouterCoOrganisateur(${id})">Ajouter</button>
+      </div>
+      <div id="cag-coorg-liste" style="max-height:260px;overflow-y:auto;">Chargement…</div>
+      <div style="text-align:right;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-coorg-modal').remove()">Fermer</button>
+      </div>
+    </div>`;
+    await cagRenderCoOrganisateurs(id);
+  };
+  window.cagRenderCoOrganisateurs = async function(id) {
+    const wrap = document.getElementById('cag-coorg-liste');
+    if (!wrap) return;
+    wrap.innerHTML = 'Chargement…';
+    try {
+      const { co_organisateurs } = await api('GET', '/cagnottes/'+id+'/co-organisateurs');
+      if (!co_organisateurs.length) {
+        wrap.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:14px 0;">Aucun co-organisateur pour l'instant.</p>`;
+        return;
+      }
+      wrap.innerHTML = co_organisateurs.map(co => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <span>${escH(co.nom)} <span style="font-size:11.5px;color:var(--muted);">— ${CAG_CO_ROLE_LABELS[co.role]||co.role}</span></span>
+          <button class="btn btn-sm" style="color:#dc2626;" onclick="cagRetirerCoOrganisateur(${id},${co.id})">Retirer</button>
+        </div>`).join('');
+    } catch(e) {
+      wrap.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
+    }
+  };
+  window.cagAjouterCoOrganisateur = async function(id) {
+    const email = document.getElementById('cag-coorg-email').value.trim();
+    const role = document.getElementById('cag-coorg-role').value;
+    if (!email) { alert('E-mail requis.'); return; }
+    try {
+      await api('POST', '/cagnottes/'+id+'/co-organisateurs', { email, role });
+      document.getElementById('cag-coorg-email').value = '';
+      cagRenderCoOrganisateurs(id);
+    } catch(e) { alert('Erreur : ' + (e.message||'')); }
+  };
+  window.cagRetirerCoOrganisateur = async function(id, coId) {
+    try { await api('DELETE', '/cagnottes/'+id+'/co-organisateurs/'+coId); cagRenderCoOrganisateurs(id); }
+    catch(e) { alert('Erreur : '+e.message); }
   };
 
   /* ══ SECTION AVANCEMENT DE MON INITIATIVE — increment 1 (fondations) ══
