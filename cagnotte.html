@@ -228,6 +228,23 @@
     }
   };
 
+  /* Communication autour de la cagnotte (Phase 2 point 8) — nouvelles publiées par le
+     créateur/co-organisateur, visibles publiquement. */
+  function renderActualites(cagnotteId){
+    if (!cagnotteId) return;
+    fetch('/api/cagnottes/' + cagnotteId + '/actualites', { credentials: 'include' }).then(r=>r.json()).then(({ actualites }) => {
+      if (!actualites || !actualites.length) return;
+      const box = document.createElement('div');
+      box.className = 'cg-card';
+      box.innerHTML = `<h3 style="margin:0 0 10px;font-size:15px;">📣 Actualités</h3>` +
+        actualites.map(a => `<div class="cg-contrib-item" style="display:block;">
+          <div>${escH(a.contenu)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">${escH(a.auteur_nom||'')} · ${new Date((a.created_at||'').replace(' ','T')+'Z').toLocaleDateString('fr-FR')}</div>
+        </div>`).join('');
+      el.appendChild(box);
+    }).catch(()=>{});
+  }
+
   function renderContributeurs(slug, afficherParticipants){
     if (!afficherParticipants) return;
     fetch('/api/cagnottes/public/' + encodeURIComponent(slug) + '/contributeurs').then(r=>r.json()).then(({ contributeurs }) => {
@@ -282,6 +299,7 @@
         `;
         if (peutParticiper) document.getElementById('cg-btn-participer').addEventListener('click', ouvrirParticipation);
         renderContributeurs(slug, !!c.afficher_participants);
+        renderActualites(c.id);
       })
       .catch(err => {
         el.innerHTML = `<div class="cg-empty">🔒 ${escH(err.error || 'Cette cagnotte est introuvable ou n\'est plus accessible.')}</div>`;

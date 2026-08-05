@@ -4215,6 +4215,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenContributions(${c.id})">📊 Contributions</button>`);
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenCoOrganisateurs(${c.id})">👥 Co-organisateurs</button>`);
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenStatistiques(${c.id})">📈 Statistiques</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenActualites(${c.id})">📣 Actualités</button>`);
         }
         return `<div class="card" style="margin-bottom:12px;padding:16px 18px;">
           <div style="display:flex;gap:14px;flex-wrap:wrap;">
@@ -4579,6 +4580,65 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     } catch(e) {
       body.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
     }
+  };
+
+  /* ── Communication / actualités (Phase 2 point 8) ── */
+  window.cagOpenActualites = async function(id) {
+    let modal = document.getElementById('cag-actu-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cag-actu-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `<div class="modal-box" style="max-width:480px;text-align:left;max-height:88vh;overflow-y:auto;">
+      <h3 style="margin:0 0 4px;">📣 Actualités</h3>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Chaque publication notifie tous les contributeurs.</p>
+      <textarea id="cag-actu-contenu" class="input" placeholder="Écrire une nouvelle…" style="width:100%;box-sizing:border-box;min-height:70px;margin-bottom:8px;"></textarea>
+      <div style="text-align:right;margin-bottom:14px;">
+        <button class="btn btn-orange btn-sm" onclick="cagPublierActualite(${id})">Publier</button>
+      </div>
+      <div id="cag-actu-liste">Chargement…</div>
+      <div style="text-align:right;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-actu-modal').remove()">Fermer</button>
+      </div>
+    </div>`;
+    await cagRenderActualites(id);
+  };
+  window.cagRenderActualites = async function(id) {
+    const wrap = document.getElementById('cag-actu-liste');
+    if (!wrap) return;
+    wrap.innerHTML = 'Chargement…';
+    try {
+      const { actualites } = await api('GET', '/cagnottes/'+id+'/actualites');
+      if (!actualites.length) {
+        wrap.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:14px 0;">Aucune actualité publiée pour l'instant.</p>`;
+        return;
+      }
+      wrap.innerHTML = actualites.map(a => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <div>${escH(a.contenu)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;display:flex;justify-content:space-between;">
+            <span>${escH(a.auteur_nom||'')} · ${fmtDateInit(a.created_at)}</span>
+            <button class="btn btn-sm" style="color:#dc2626;padding:2px 8px;" onclick="cagSupprimerActualite(${id},${a.id})">Supprimer</button>
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      wrap.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
+    }
+  };
+  window.cagPublierActualite = async function(id) {
+    const contenu = document.getElementById('cag-actu-contenu').value.trim();
+    if (!contenu) { alert('Écrivez un contenu.'); return; }
+    try {
+      await api('POST', '/cagnottes/'+id+'/actualites', { contenu });
+      document.getElementById('cag-actu-contenu').value = '';
+      cagRenderActualites(id);
+    } catch(e) { alert('Erreur : ' + (e.message||'')); }
+  };
+  window.cagSupprimerActualite = async function(id, actuId) {
+    try { await api('DELETE', '/cagnottes/'+id+'/actualites/'+actuId); cagRenderActualites(id); }
+    catch(e) { alert('Erreur : '+e.message); }
   };
 
   /* ══ SECTION AVANCEMENT DE MON INITIATIVE — increment 1 (fondations) ══
