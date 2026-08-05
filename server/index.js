@@ -6211,23 +6211,100 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════
-   MODULE "LIAISON DE COMPTES" — étape 1 : socle. Étapes 2-7 (lier/délier,
-   bascule, journal, intégration écosystème) viendront en incréments
-   suivants. Cette route est volontairement en lecture seule pour l'instant :
-   elle renvoie un groupe vide tant que l'étape 2 n'existe pas.
+   MODULE "LIAISON DE COMPTES" — étape 1 (socle) + étape 2 (liaison via
+   DS-ID). Étapes 3-7 (gestion du groupe, bascule, journal détaillé,
+   intégration écosystème) viendront en incréments suivants.
    ═══════════════════════════════════════════════════════════════════════ */
+async function comptesLiesListe(groupeId) {
+  return db.prepare(`
+    SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, u.da_id,
+           m.date_liaison, m.derniere_utilisation
+    FROM comptes_lies_membres m JOIN users u ON u.id = m.user_id
+    WHERE m.groupe_id = ? ORDER BY m.date_liaison ASC
+  `).all(groupeId);
+}
+
 route("GET", "/api/comptes-lies", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const membre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
   if (!membre) return sendJSON(res, 200, { groupe_id: null, comptes: [] });
-  const comptes = await db.prepare(`
-    SELECT u.id, u.nom, u.prenom, u.role, u.photo_url, u.da_id,
-           m.date_liaison, m.derniere_utilisation
-    FROM comptes_lies_membres m JOIN users u ON u.id = m.user_id
-    WHERE m.groupe_id = ? ORDER BY m.date_liaison ASC
-  `).all(membre.groupe_id);
+  const comptes = await comptesLiesListe(membre.groupe_id);
   sendJSON(res, 200, { groupe_id: membre.groupe_id, comptes });
+});
+
+/* Liaison d'un nouveau compte grâce à son DS-ID (Étape 2). Le DS-ID est déjà utilisé
+   ailleurs comme preuve de possession d'un compte (connexion Mon Associé, signature de
+   vote) — on reprend ici exactement le même modèle de sécurité : rate-limit strict par IP
+   ET par code (haché, jamais en clair), et chaque tentative journalisée dans
+   ds_id_validations. Aucun mot de passe du compte cible n'est demandé : connaître le DS-ID
+   du compte à relier fait foi, comme partout ailleurs sur la plateforme. */
+route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ip = SEC.clientIp(req);
+  const saisie = String(body?.ds_id || "").trim().toUpperCase();
+  const dsIdHash = crypto.createHash('sha256').update(saisie).digest('hex');
+
+  const ipLimit = SEC.rateLimit(`comptes_lies_dsid:ip:${ip}`, 15, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const codeLimit = SEC.rateLimit(`comptes_lies_dsid:code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeLimit.retryAfter}s.` });
+  const ipGuard = await dbLoginGuard(`comptes_lies_ip:${ip}`, 15, 15 * 60 * 1000);
+  if (!ipGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipGuard.retryAfter}s.` });
+  const codeGuard = await dbLoginGuard(`comptes_lies_code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeGuard.retryAfter}s.` });
+
+  const journaliserEchec = async (raison) => {
+    dbLoginRecord(`comptes_lies_ip:${ip}`, false);
+    dbLoginRecord(`comptes_lies_code:${dsIdHash}`, false);
+    try { await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'comptes_lies_liaison', raison, 0, ip, req.headers['user-agent'] || null); } catch(_) {}
+    try { await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (NULL,?,NULL,'erreur_liaison',?)`).run(user.id, raison); } catch(_) {}
+  };
+
+  if (saisie.length < 6 || saisie.length > 10) {
+    await journaliserEchec('format_invalide');
+    return sendJSON(res, 400, { error: "Le DS-ID doit comporter entre 6 et 10 caractères." });
+  }
+
+  const cible = await db.prepare("SELECT * FROM users WHERE ds_id = ?").get(saisie);
+  if (!cible) {
+    await journaliserEchec('ds_id_introuvable');
+    return sendJSON(res, 404, { error: "Aucun compte ne correspond à ce DS-ID." });
+  }
+  if (cible.id === user.id) {
+    await journaliserEchec('compte_actuel');
+    return sendJSON(res, 400, { error: "Ce DS-ID correspond au compte actuellement utilisé." });
+  }
+  if (cible.suspendu_definitif || (cible.suspendu_jusqu_au && new Date(cible.suspendu_jusqu_au) > new Date())) {
+    await journaliserEchec('compte_suspendu');
+    return sendJSON(res, 403, { error: "Ce compte est suspendu et ne peut pas être relié." });
+  }
+  const cibleDejaLiee = await db.prepare("SELECT 1 FROM comptes_lies_membres WHERE user_id=?").get(cible.id);
+  if (cibleDejaLiee) {
+    await journaliserEchec('deja_lie');
+    return sendJSON(res, 409, { error: "Ce compte est déjà relié à un autre groupe de comptes." });
+  }
+
+  dbLoginRecord(`comptes_lies_ip:${ip}`, true);
+  dbLoginRecord(`comptes_lies_code:${dsIdHash}`, true);
+
+  let monMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+  let groupeId;
+  if (monMembre) {
+    groupeId = monMembre.groupe_id;
+  } else {
+    const g = await db.prepare("INSERT INTO comptes_lies_groupes DEFAULT VALUES").run();
+    groupeId = Number(g.lastInsertRowid);
+    await db.prepare("INSERT INTO comptes_lies_membres (groupe_id, user_id, ajoute_par_user_id) VALUES (?,?,?)").run(groupeId, user.id, user.id);
+  }
+  await db.prepare("INSERT INTO comptes_lies_membres (groupe_id, user_id, ajoute_par_user_id) VALUES (?,?,?)").run(groupeId, cible.id, user.id);
+
+  await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'comptes_lies_liaison', 'succes', 1, ip, req.headers['user-agent'] || null);
+  await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(groupeId, user.id, cible.id, 'creation_liaison', `Compte ${cible.nom || cible.id} relié via DS-ID`);
+
+  const comptes = await comptesLiesListe(groupeId);
+  sendJSON(res, 200, { groupe_id: groupeId, comptes });
 });
 
 /* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══
