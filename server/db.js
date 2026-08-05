@@ -117,6 +117,11 @@ db.exec(`
        module est utilisé (statut_creation='en_creation') ; ce booléen contrôle en plus la
        publication du détail (critères/notes/descriptions), jamais des commentaires privés. */
     avancement_detail_public INTEGER DEFAULT 0,
+    /* Statut de l'initiative — rappel mensuel automatique tant que statut_creation='en_creation'
+       (cron /api/cron/avancement-initiative-relances). Une seule colonne suffit ici (pas de
+       paliers comme le Premium) : on compare juste au mois calendaire courant pour éviter les
+       doublons si le cron est rejoué. */
+    relance_avancement_mensuelle_le TEXT,
     numero_fiscal TEXT,
     genre_responsable TEXT,
     tel_responsable_2 TEXT,
@@ -4967,6 +4972,7 @@ db.exec(`
   if (!initCols7.includes('tel_responsable_3'))                 db.exec("ALTER TABLE initiatives ADD COLUMN tel_responsable_3 TEXT");
   if (!initCols7.includes('numero_fiscal'))                    db.exec("ALTER TABLE initiatives ADD COLUMN numero_fiscal TEXT");
   if (!initCols7.includes('avancement_detail_public'))          db.exec("ALTER TABLE initiatives ADD COLUMN avancement_detail_public INTEGER DEFAULT 0");
+  if (!initCols7.includes('relance_avancement_mensuelle_le'))   db.exec("ALTER TABLE initiatives ADD COLUMN relance_avancement_mensuelle_le TEXT");
   /* Ouverture/fermeture des adhésions (tâche #69) : 1=ouvertes par défaut, réversible par
      l'association. Fermer masque le bouton "Adhérer" partout et bloque les nouvelles demandes
      et nouveaux paiements côté serveur — les adhésions déjà actives ne sont pas affectées. */
