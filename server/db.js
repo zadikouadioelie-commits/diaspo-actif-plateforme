@@ -4957,6 +4957,10 @@ db.exec(`
      rapport à la date d'expiration (positif = avant, négatif = après). Défaut = comportement
      historique fixe (J-30/J-7/jour J/lendemain). */
   if (!initCols7.includes('adhesion_relances_jours'))           db.exec("ALTER TABLE initiatives ADD COLUMN adhesion_relances_jours TEXT DEFAULT '[30,7,0,-1]'");
+  /* Paramètres avancés (tâche #75) : modèles de texte personnalisables, NULL = texte par
+     défaut inchangé. Placeholders substitués côté serveur (voir remplacerPlaceholders). */
+  if (!initCols7.includes('adhesion_modele_relance'))            db.exec("ALTER TABLE initiatives ADD COLUMN adhesion_modele_relance TEXT");
+  if (!initCols7.includes('adhesion_modele_recu'))               db.exec("ALTER TABLE initiatives ADD COLUMN adhesion_modele_recu TEXT");
 
   /* Migration self-heal (tâche #71) : adhesion_relances.niveau était limité par un CHECK à
      4 valeurs fixes ('avant_30j' etc.) — les délais étant désormais personnalisables, le

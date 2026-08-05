@@ -1021,6 +1021,9 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'adhesions_ouvertes', 'INTEGER DEFAULT 1'],
     // Module Adhésions — délais de relance personnalisables (miroir de l'ALTER db.js)
     ['initiatives', 'adhesion_relances_jours', "TEXT DEFAULT '[30,7,0,-1]'"],
+    // Module Adhésions — modèles de texte personnalisables (miroir de l'ALTER db.js)
+    ['initiatives', 'adhesion_modele_relance', 'TEXT'],
+    ['initiatives', 'adhesion_modele_recu', 'TEXT'],
 ];
 
 async function migratePg(pool) {

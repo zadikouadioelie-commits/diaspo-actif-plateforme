@@ -1108,7 +1108,24 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <input type="checkbox" id="adh-toggle-ouvertes" checked onchange="adhToggleOuvertes(this.checked)"> Adhésions ouvertes
           </label>
           <button class="btn btn-outline" onclick="adhOuvrirRelancesConfig()" title="Choisissez à quel moment les rappels de renouvellement sont envoyés (avant et/ou après expiration).">⏰ Délais de relance</button>
+          <button class="btn btn-outline" onclick="adhOuvrirModelesConfig()" title="Personnalisez le texte des e-mails de relance et de reçu de paiement.">📝 Modèles de texte</button>
           <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
+        </div>
+      </div>
+
+      <!-- Modal modèles de texte personnalisables (tâche #75) -->
+      <div id="modal-adh-modeles" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="max-width:560px;">
+          <h3 style="margin:0 0 6px;">📝 Modèles de texte</h3>
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Laissez vide pour garder le texte par défaut. Insérez ces variables où vous voulez, elles seront remplacées automatiquement : <code>{prenom}</code> <code>{nom}</code> <code>{formule}</code> <code>{initiative}</code></p>
+          <label style="font-size:12.5px;font-weight:700;">Message de relance <span style="font-weight:400;color:var(--muted);">— variables en plus : <code>{delai}</code> <code>{lien}</code></span></label>
+          <textarea id="adh-modele-relance" class="input" style="width:100%;box-sizing:border-box;min-height:70px;margin:4px 0 14px;font-family:inherit;" placeholder="Votre adhésion « {formule} » ({initiative}) {delai}."></textarea>
+          <label style="font-size:12.5px;font-weight:700;">E-mail de reçu de paiement <span style="font-weight:400;color:var(--muted);">— variables en plus : <code>{montant}</code> <code>{devise}</code> <code>{numero_recu}</code></span></label>
+          <textarea id="adh-modele-recu" class="input" style="width:100%;box-sizing:border-box;min-height:90px;margin:4px 0 14px;font-family:inherit;" placeholder="Bonjour {prenom}, votre paiement de {montant} {devise} pour « {formule} » a bien été reçu. Reçu {numero_recu}."></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="document.getElementById('modal-adh-modeles').style.display='none'">Annuler</button>
+            <button class="btn btn-orange" onclick="adhEnregistrerModelesConfig()">Enregistrer</button>
+          </div>
         </div>
       </div>
 
@@ -5786,6 +5803,29 @@ async function adhEnregistrerRelancesConfig(){
     await api('PUT', `/initiatives/${initId}/adhesion-relances-config`, { jours: ADH_RELANCES_JOURS });
     document.getElementById('modal-adh-relances').style.display = 'none';
     showToast?.('✅ Délais de relance enregistrés.');
+  } catch(e){ showToast?.('Erreur : ' + e.message, 'danger'); }
+}
+
+async function adhOuvrirModelesConfig(){
+  const initId = window.__vitrineInitId;
+  if (!initId) return;
+  try{
+    const r = await api('GET', `/initiatives/${initId}`);
+    const data = r.initiative || r;
+    document.getElementById('adh-modele-relance').value = data.adhesion_modele_relance || '';
+    document.getElementById('adh-modele-recu').value = data.adhesion_modele_recu || '';
+  } catch(e){ /* modal s'ouvre quand même, champs vides */ }
+  document.getElementById('modal-adh-modeles').style.display = 'flex';
+}
+async function adhEnregistrerModelesConfig(){
+  const initId = window.__vitrineInitId;
+  try{
+    await api('PUT', `/initiatives/${initId}/adhesion-modeles`, {
+      modele_relance: document.getElementById('adh-modele-relance').value,
+      modele_recu: document.getElementById('adh-modele-recu').value,
+    });
+    document.getElementById('modal-adh-modeles').style.display = 'none';
+    showToast?.('✅ Modèles de texte enregistrés.');
   } catch(e){ showToast?.('Erreur : ' + e.message, 'danger'); }
 }
 

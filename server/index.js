@@ -2886,6 +2886,35 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
    adhérent. acteur=null pour une confirmation automatique (webhook Stripe) — details
    reste une phrase lisible plutôt qu'un JSON, cohérent avec l'usage administrateur
    (pas d'écran de diff technique prévu, juste un historique consultable). */
+/* Paramètres avancés (tâche #75) : substitue {placeholder} dans un modèle personnalisé.
+   Les valeurs manquantes deviennent une chaîne vide plutôt que de casser le message. */
+function remplacerPlaceholders(template, vars) {
+  return String(template).replace(/\{(\w+)\}/g, (_, cle) => (vars[cle] != null ? String(vars[cle]) : ''));
+}
+
+/* Paramètres avancés (tâche #75) : e-mail de reçu envoyé à chaque paiement confirmé (self-service
+   Stripe ou manuel) — comblait un vrai manque, seule une notification in-app existait jusqu'ici.
+   Modèle personnalisable par l'association (adhesion_modele_recu), sinon texte par défaut.
+   Best-effort : ne bloque jamais le traitement du paiement si l'envoi échoue. */
+async function envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu) {
+  if (!membre.email) return;
+  try {
+    const { sendEmail } = require('./mailer');
+    const vars = {
+      prenom: membre.prenom || '', nom: membre.nom, formule: formule?.nom || 'adhésion', initiative: init.nom,
+      montant, devise: formule?.devise || 'EUR', numero_recu: numeroRecu,
+    };
+    const corps = init.adhesion_modele_recu
+      ? remplacerPlaceholders(init.adhesion_modele_recu, vars)
+      : `Bonjour ${vars.prenom},\n\nVotre paiement pour « ${vars.formule} » (${vars.initiative}) a bien été enregistré : ${montant} ${vars.devise}.\nNuméro de reçu : ${numeroRecu}.\n\nMerci pour votre soutien !`;
+    await sendEmail({
+      to: membre.email,
+      subject: `Reçu de paiement — ${init.nom}`,
+      html: `<div style="white-space:pre-line;">${corps.replace(/</g,'&lt;')}</div>`,
+    });
+  } catch (e) { console.error('[recu-adhesion]', e.message); }
+}
+
 async function journaliserAdhesion(initiativeId, membreId, action, acteur, details) {
   try {
     await db.prepare(`
@@ -3009,6 +3038,21 @@ route("PUT", "/api/initiatives/:id/adhesion-relances-config", async (req, res, p
   if (!jours.length) return sendJSON(res, 400, { error: "Au moins un délai valide requis (entre -90 et 90 jours)." });
   await db.prepare("UPDATE initiatives SET adhesion_relances_jours=? WHERE id=?").run(JSON.stringify(jours), params.id);
   sendJSON(res, 200, { ok: true, jours });
+});
+
+/* ── Modèles de texte personnalisables (tâche #75) — propriétaire uniquement. Chaîne vide
+   ou absente = retour au texte par défaut. Longueur bornée par sécurité de base. ── */
+route("PUT", "/api/initiatives/:id/adhesion-modeles", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const modeleRelance = body?.modele_relance != null ? String(body.modele_relance).slice(0, 2000).trim() : '';
+  const modeleRecu = body?.modele_recu != null ? String(body.modele_recu).slice(0, 2000).trim() : '';
+  await db.prepare("UPDATE initiatives SET adhesion_modele_relance=?, adhesion_modele_recu=? WHERE id=?")
+    .run(modeleRelance || null, modeleRecu || null, params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ── Créer une formule ── */
@@ -3293,6 +3337,8 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
       `Votre « ${formule?.nom || 'adhésion'} » a été enregistrée comme payée. Reçu ${numeroRecu}.`, { paiement_id: paiementId });
   }
   await ajouterAListeStockage(m.formule_id, m);
+  { const initComplete = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(m.initiative_id);
+    await envoyerRecuAdhesion(initComplete, m, formule, montant, numeroRecu); }
   journaliserAdhesion(m.initiative_id, m.id, m.date_adhesion ? 'renouvellement' : 'creation', user,
     `Paiement manuel enregistré (${modePaiement}) — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
   sendJSON(res, 200, { ok: true, numero_recu: numeroRecu });
@@ -11691,6 +11737,7 @@ async function handleStripeWebhook(req, res) {
         creerNotif(init.owner_user_id, "adhesion_recue", "Nouvelle adhésion 🎫",
           `« ${formule?.nom || ''} » réglée par ${membre.prenom || ''} ${membre.nom} (+${organizer_amount}€).`, { paiement_id: paiementId });
         await ajouterAListeStockage(pay.formule_id, membre);
+        await envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu);
         journaliserAdhesion(pay.initiative_id, pay.membre_id, membre.date_adhesion ? 'renouvellement' : 'creation', null,
           `Paiement Stripe confirmé — « ${formule?.nom || ''} », ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
       }
@@ -18273,7 +18320,7 @@ async function handleRequest(req, res) {
       const { sendEmail } = require('./mailer');
       const membres = await db.prepare(`
         SELECT m.*, f.nom AS formule_nom, i.nom AS init_nom, u.email AS user_email,
-          i.adhesion_relances_jours AS relances_config_json
+          i.adhesion_relances_jours AS relances_config_json, i.adhesion_modele_relance AS modele_relance
         FROM adhesion_membres m
         JOIN adhesion_formules f ON f.id = m.formule_id
         JOIN initiatives i ON i.id = m.initiative_id
@@ -18302,12 +18349,21 @@ async function handleRequest(req, res) {
         `).get(m.id, niveau, m.updated_at);
         if (deja) continue;
 
-        const message = joursRestants > 0
-          ? `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) arrive à expiration dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''}.`
+        /* Phrase par défaut du décalage — sert de placeholder {delai} dans un modèle
+           personnalisé, ou de message complet si l'association n'en a pas défini. */
+        const delaiTexte = joursRestants > 0
+          ? `arrive à expiration dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''}`
           : joursRestants === 0
-          ? `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) expire aujourd'hui.`
-          : `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) est expirée depuis ${-joursRestants} jour${-joursRestants > 1 ? 's' : ''}. Renouvelez-la dès maintenant.`;
+          ? `expire aujourd'hui`
+          : `est expirée depuis ${-joursRestants} jour${-joursRestants > 1 ? 's' : ''}`;
         const lienRenouvellement = `${process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app'}/adhesions.html?initiative=${m.initiative_id}&formule=${m.formule_id}`;
+        /* Paramètres avancés (tâche #75) : modèle personnalisable, ou phrase par défaut sinon. */
+        const message = m.modele_relance
+          ? remplacerPlaceholders(m.modele_relance, {
+              prenom: m.prenom || '', nom: m.nom, formule: m.formule_nom, initiative: m.init_nom,
+              delai: delaiTexte, lien: lienRenouvellement,
+            })
+          : `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) ${delaiTexte}${joursRestants < 0 ? '. Renouvelez-la dès maintenant.' : '.'}`;
 
         await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
           .run(m.id, niveau, 'app', message);
