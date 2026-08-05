@@ -846,6 +846,24 @@ db.exec(`
     FOREIGN KEY(admin_id) REFERENCES users(id)
   );
 
+  /* Demande de passage "Statut de l'initiative" : En création → Existante, validée par un
+     administrateur (voir module Avancement pour le % d'avancement joint en contexte à la
+     demande). Une ligne par tentative — historique conservé en cas de refus + nouvel essai. */
+  CREATE TABLE IF NOT EXISTS initiative_passage_demandes (
+    id                              INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id                   INTEGER NOT NULL,
+    statut                          TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','approuvee','refusee')),
+    message                         TEXT,
+    avancement_pourcentage_snapshot INTEGER,
+    admin_id                        INTEGER,
+    admin_nom                       TEXT,
+    motif_refus                     TEXT,
+    created_at                      TEXT DEFAULT (datetime('now')),
+    traite_le                       TEXT,
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
   /* Fiche d'évaluation interne par initiative */
   CREATE TABLE IF NOT EXISTS certification_evaluations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
