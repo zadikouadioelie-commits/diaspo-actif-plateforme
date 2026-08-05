@@ -13296,6 +13296,64 @@ route("GET", "/api/cagnottes/:id/statistiques", async (req, res, params) => {
   });
 });
 
+/* ── Communication autour de la cagnotte (Phase 2 point 8) — nouvelles publiées par le créateur
+   ou un co-organisateur (les deux rôles peuvent publier, voir cagnottePeutGerer(..., 'publier')).
+   Chaque publication notifie tous les contributeurs payés (couvre "messages aux contributeurs"
+   et "évolution importante" du point 4) ; "remerciements automatiques" est déjà couvert par la
+   notification de confirmation envoyée à chaque contribution (voir webhook Stripe). */
+route("GET", "/api/cagnottes/:id/actualites", async (req, res, params) => {
+  const c = await db.prepare("SELECT id, est_publiee, owner_user_id, visibilite FROM cagnottes WHERE id=?").get(params.id);
+  if (!c || !c.est_publiee) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (c.visibilite === "privee") {
+    const user = await getCurrentUser(req).catch(() => null);
+    const estAutorise = user && (Number(c.owner_user_id) === Number(user.id)
+      || (await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id)));
+    if (!estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
+  }
+  const rows = await db.prepare(`
+    SELECT a.id, a.contenu, a.image_url, a.created_at, u.nom AS auteur_nom
+    FROM cagnotte_actualites a LEFT JOIN users u ON u.id=a.auteur_user_id
+    WHERE a.cagnotte_id=? ORDER BY a.created_at DESC
+  `).all(params.id);
+  sendJSON(res, 200, { actualites: rows });
+});
+
+route("POST", "/api/cagnottes/:id/actualites", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT id, titre FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!(await cagnottePeutGerer(params.id, user.id, "publier"))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur." });
+  const contenu = String(body?.contenu || "").trim();
+  if (!contenu) return sendJSON(res, 400, { error: "Contenu requis." });
+  const image_url = body?.image_url ? String(body.image_url) : null;
+  const id = (await db.prepare(
+    "INSERT INTO cagnotte_actualites (cagnotte_id, auteur_user_id, contenu, image_url) VALUES (?,?,?,?)"
+  ).run(params.id, user.id, contenu, image_url)).lastInsertRowid;
+  /* Notifie tous les contributeurs ayant payé (une fois par personne, même s'ils ont contribué
+     plusieurs fois). Best-effort : une erreur de notification individuelle ne doit jamais faire
+     échouer la publication elle-même. */
+  try {
+    const contributeurs = await db.prepare(
+      "SELECT DISTINCT user_id FROM cagnotte_contributions WHERE cagnotte_id=? AND statut='paye'"
+    ).all(params.id);
+    contributeurs.forEach(ct => {
+      if (Number(ct.user_id) === Number(user.id)) return;
+      creerNotif(ct.user_id, "cagnotte_actualite", `Nouvelle actualité — ${c.titre}`,
+        contenu.slice(0, 200), { cagnotte_id: Number(params.id) });
+    });
+  } catch (_) {}
+  sendJSON(res, 201, { id, ok: true });
+});
+
+route("DELETE", "/api/cagnottes/:id/actualites/:actuId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!(await cagnottePeutGerer(params.id, user.id, "publier"))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur." });
+  await db.prepare("DELETE FROM cagnotte_actualites WHERE id=? AND cagnotte_id=?").run(params.actuId, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/evenements/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
