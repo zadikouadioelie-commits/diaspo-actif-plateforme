@@ -6264,11 +6264,16 @@ route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
   const codeGuard = await dbLoginGuard(`comptes_lies_code:${dsIdHash}`, 8, 15 * 60 * 1000);
   if (!codeGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeGuard.retryAfter}s.` });
 
+  /* Groupe éventuel de l'appelant, récupéré une seule fois en tête de route : sert à
+     rattacher correctement les entrées d'échec au bon groupe (si l'appelant en a déjà
+     un) plutôt que de toujours les journaliser hors-groupe. */
+  const monMembreInitial = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+
   const journaliserEchec = async (raison) => {
     dbLoginRecord(`comptes_lies_ip:${ip}`, false);
     dbLoginRecord(`comptes_lies_code:${dsIdHash}`, false);
     try { await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'comptes_lies_liaison', raison, 0, ip, req.headers['user-agent'] || null); } catch(_) {}
-    try { await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (NULL,?,NULL,'erreur_liaison',?)`).run(user.id, raison); } catch(_) {}
+    try { await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,NULL,'erreur_liaison',?)`).run(monMembreInitial?.groupe_id ?? null, user.id, raison); } catch(_) {}
   };
 
   if (saisie.length < 6 || saisie.length > 10) {
@@ -6298,10 +6303,9 @@ route("POST", "/api/comptes-lies/lier", async (req, res, params, body) => {
   dbLoginRecord(`comptes_lies_ip:${ip}`, true);
   dbLoginRecord(`comptes_lies_code:${dsIdHash}`, true);
 
-  let monMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
   let groupeId;
-  if (monMembre) {
-    groupeId = monMembre.groupe_id;
+  if (monMembreInitial) {
+    groupeId = monMembreInitial.groupe_id;
   } else {
     const g = await db.prepare("INSERT INTO comptes_lies_groupes DEFAULT VALUES").run();
     groupeId = Number(g.lastInsertRowid);
@@ -6384,6 +6388,28 @@ route("DELETE", "/api/comptes-lies/:userId", async (req, res, params) => {
   if (!monMembreApres) return sendJSON(res, 200, { groupe_id: null, comptes: [] });
   const comptes = await comptesLiesListe(monMembreApres.groupe_id);
   sendJSON(res, 200, { groupe_id: monMembreApres.groupe_id, comptes });
+});
+
+/* Historique des actions du groupe (Étape 6). Le DS-ID lui-même n'apparaît jamais ici — le
+   journal ne stocke que des libellés d'action et de motif (jamais la valeur saisie), donc
+   rien à filtrer côté lecture. Visible par tout membre actuel du groupe ; inclut aussi les
+   tentatives échouées enregistrées avant qu'un groupe n'existe (groupe_id NULL, propres à
+   l'utilisateur courant), pour ne rien perdre de son propre historique. */
+route("GET", "/api/comptes-lies/journal", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const monMembre = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(user.id);
+  const entries = await db.prepare(`
+    SELECT j.action, j.details, j.created_at,
+           acteur.nom AS acteur_nom, acteur.prenom AS acteur_prenom,
+           cible.nom AS cible_nom, cible.prenom AS cible_prenom
+    FROM comptes_lies_journal j
+    JOIN users acteur ON acteur.id = j.user_id
+    LEFT JOIN users cible ON cible.id = j.compte_concerne_id
+    WHERE j.groupe_id = ? OR (j.groupe_id IS NULL AND j.user_id = ?)
+    ORDER BY j.created_at DESC LIMIT 100
+  `).all(monMembre?.groupe_id ?? -1, user.id);
+  sendJSON(res, 200, { entries });
 });
 
 /* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══
