@@ -68,6 +68,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <link rel="stylesheet" href="/assets/guided-tour.css">
 </head>
 <body>
 <div class="page">
@@ -112,16 +113,19 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <div class="tc-icon">&#128100;</div><h3>Utilisateur</h3>
           <p>Personne physique — particulier membre de la diaspora</p>
           <span class="badge">Gratuit</span>
+          <button type="button" class="gt-launch-btn" onclick="event.stopPropagation(); window.GuidedTour && GuidedTour.start('utilisateur');">🎥 Tutoriel</button>
         </div>
         <div class="type-card" data-role="initiative">
           <div class="tc-icon">&#127970;</div><h3>Initiative</h3>
           <p>Association, ONG, entreprise, cooperative, startup, projet collectif</p>
           <span class="badge">Gratuit</span>
+          <button type="button" class="gt-launch-btn" onclick="event.stopPropagation(); window.GuidedTour && GuidedTour.start('initiative');">🎥 Tutoriel</button>
         </div>
         <div class="type-card" data-role="collectivite">
           <div class="tc-icon">🏛</div><h3>Compte Étatique</h3>
           <p>Ambassade, consulat, mairie, préfecture, ministère, région, agence publique…</p>
           <span class="badge">Validation requise</span>
+          <button type="button" class="gt-launch-btn" onclick="event.stopPropagation(); window.GuidedTour && GuidedTour.start('collectivite');">🎥 Tutoriel</button>
         </div>
       </div>
       <div style="margin-top:24px;text-align:right"><button class="btn btn-orange" id="btn-next-1" disabled>Continuer &rarr;</button></div>
@@ -1509,6 +1513,8 @@ function collecterTerritoires(){
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/password-toggle.js"></script>
+<script src="/assets/guided-tour.js"></script>
+<script src="/assets/tours/tour-inscription.js"></script>
 </body>
 </html>
 
