@@ -1028,6 +1028,21 @@ const COLONNES_MIGRATION = [
     ['adhesion_formules', 'mode_validite', "TEXT DEFAULT 'individuel'"],
     ['adhesion_formules', 'periode_collective_debut', 'TEXT'],
     ['adhesion_formules', 'periode_collective_fin', 'TEXT'],
+    // Module Adhésions — incrément 1 (2026-08-07) : durée personnalisée, renouvellement auto
+    // de campagne, places limitées (miroir des ALTER db.js)
+    ['adhesion_formules', 'duree_valeur', 'INTEGER'],
+    ['adhesion_formules', 'duree_unite', "TEXT DEFAULT 'mois'"],
+    ['adhesion_formules', 'duree_illimitee', 'INTEGER DEFAULT 0'],
+    ['adhesion_formules', 'renouvellement_auto_collectif', 'INTEGER DEFAULT 0'],
+    ['adhesion_formules', 'max_adherents', 'INTEGER'],
+    // Module Adhésions — incrément 2 (2026-08-07) : formulaire personnalisable (miroir des ALTER db.js)
+    ['adhesion_formules', 'texte_intro', 'TEXT'],
+    ['adhesion_formules', 'conditions_adhesion', 'TEXT'],
+    ['adhesion_formules', 'reglement_pdf_url', 'TEXT'],
+    ['adhesion_formules', 'statuts_pdf_url', 'TEXT'],
+    ['adhesion_formules', 'champs_config_json', "TEXT DEFAULT '{}'"],
+    ['adhesion_formules', 'champs_custom_json', "TEXT DEFAULT '[]'"],
+    ['adhesion_membres', 'reponses_json', "TEXT DEFAULT '{}'"],
 ];
 
 async function migratePg(pool) {
@@ -1273,6 +1288,10 @@ async function migratePg(pool) {
     /* Module Adhésions — délais de relance personnalisables (tâche #71) : niveau était
        limité à 4 valeurs fixes, désormais libre ("j14", "j-3"...). */
     { table: 'adhesion_relances', constraint: 'adhesion_relances_niveau_check', addBack: null },
+    /* Module Adhésions — incrément 3 (2026-08-07) : statut "radié", fin définitive distincte
+       de "suspendu" (réversible). */
+    { table: 'adhesion_membres', constraint: 'adhesion_membres_statut_check',
+      addBack: "CHECK (statut IN ('en_attente','a_jour','non_a_jour','suspendu','radie'))" },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

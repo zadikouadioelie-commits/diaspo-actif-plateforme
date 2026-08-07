@@ -6443,6 +6443,55 @@ db.exec(`
   }
 })();
 
+/* Migration : adhesion_membres — statut 'radie' (module Adhésions, incrément 3, 2026-08-07 :
+   rebuild pour lever l'ancien CHECK, même pattern que la migration offres ci-dessus). Un
+   membre radié ne doit plus jamais réapparaître comme actif nulle part (relances, listes de
+   diffusion, quota de places) — traité comme une fin définitive, contrairement à "suspendu"
+   qui reste réversible. */
+;(function migrateAdhesionMembresRadie() {
+  const tblSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='adhesion_membres'").get();
+  if (!tblSql || !tblSql.sql || tblSql.sql.includes("'radie'")) return;
+  db.exec(`PRAGMA foreign_keys=OFF;`);
+  db.exec(`DROP TABLE IF EXISTS adhesion_membres_new;`);
+  db.exec(`
+    CREATE TABLE adhesion_membres_new (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      formule_id          INTEGER NOT NULL,
+      initiative_id       INTEGER NOT NULL,
+      linked_user_id      INTEGER,
+      nom                 TEXT NOT NULL,
+      prenom              TEXT,
+      email               TEXT,
+      telephone           TEXT,
+      photo_url           TEXT,
+      adresse             TEXT,
+      pays                TEXT,
+      ville               TEXT,
+      observations        TEXT,
+      statut              TEXT NOT NULL DEFAULT 'en_attente'
+                          CHECK(statut IN ('en_attente','a_jour','non_a_jour','suspendu','radie')),
+      date_adhesion       TEXT,
+      date_expiration     TEXT,
+      montant_paye        REAL,
+      mode_paiement       TEXT,
+      numero_recu         TEXT,
+      stripe_customer_id  TEXT,
+      stripe_subscription_id TEXT,
+      badges_json         TEXT DEFAULT '[]',
+      reponses_json       TEXT DEFAULT '{}',
+      created_at          TEXT DEFAULT (datetime('now')),
+      updated_at          TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(formule_id) REFERENCES adhesion_formules(id) ON DELETE CASCADE,
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+      FOREIGN KEY(linked_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+    INSERT INTO adhesion_membres_new SELECT id,formule_id,initiative_id,linked_user_id,nom,prenom,email,telephone,photo_url,adresse,pays,ville,observations,statut,date_adhesion,date_expiration,montant_paye,mode_paiement,numero_recu,stripe_customer_id,stripe_subscription_id,badges_json,reponses_json,created_at,updated_at FROM adhesion_membres;
+    DROP TABLE adhesion_membres;
+    ALTER TABLE adhesion_membres_new RENAME TO adhesion_membres;
+  `);
+  db.exec(`PRAGMA foreign_keys=ON;`);
+})();
+
 /* Complète conditions_obtention / documents_requis pour l'accréditation Formateur,
    restées vides depuis sa création initiale (colonnes ajoutées après coup). */
 ;(function completerAccredFormateur() {
