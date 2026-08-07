@@ -10712,12 +10712,18 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
 
   /* Comptes organisme (initiative/collectivité/administrateur) : le nom de la structure prime
      sur le nom personnel, qui n'apparaît plus qu'en information secondaire "responsable du compte". */
-  let nomStructure = null, responsable = null;
+  let nomStructure = null, responsable = null, initiativeId = null, initiativeType = null, adhesionsOuvertes = null;
   if (u.role === 'initiative') {
-    const initRow = await db.prepare("SELECT nom, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE owner_user_id=?").get(u.id);
+    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE owner_user_id=?").get(u.id);
     if (initRow) {
       nomStructure = initRow.nom;
       responsable = { prenom: initRow.prenom_responsable || u.prenom, nom: initRow.nom_responsable || u.nom, fonction: initRow.fonction_responsable };
+      /* Exposé pour le bouton "Adhérer" (Associations/ONG), affiché sur le profil personnel
+         du responsable en plus de la fiche initiative.html — même bouton, même route
+         /initiatives/:id/demande-adhesion, réutilisée telle quelle côté client. */
+      initiativeId = initRow.id;
+      initiativeType = initRow.type;
+      adhesionsOuvertes = initRow.adhesions_ouvertes;
     }
   } else if (u.role === 'collectivite' || u.role === 'administrateur') {
     if (u.nom_institution) {
@@ -10803,6 +10809,9 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     responsable,
     type_organisme: u.type_organisme,
     affiliations,
+    initiative_id: initiativeId,
+    initiative_type: initiativeType,
+    adhesions_ouvertes: adhesionsOuvertes,
   }});
 });
 

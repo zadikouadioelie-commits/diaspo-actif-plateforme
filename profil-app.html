@@ -1038,6 +1038,7 @@ const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov
 let profil = null;
 let isOwn  = false;
 let CU     = null; /* utilisateur connecté */
+let _statutAdhesion = null; /* Bouton "Adhérer" (Associations/ONG) — voir renderIdentity() */
 
 /* ---- init ---- */
 async function init() {
@@ -1074,6 +1075,11 @@ async function init() {
        détecte #vitrine et bascule dessus naturellement, sans risque d'être écrasé après coup. */
     if (new URLSearchParams(location.search).get('vitrine') === '1') {
       history.replaceState(null, '', window.location.pathname + window.location.search + '#vitrine');
+    }
+    /* Bouton "Adhérer" (Associations/ONG) — même route que initiative.html, statut récupéré
+       avant le rendu pour afficher directement le bon état (déjà membre / demande envoyée). */
+    if (!isOwn && profil.role === 'initiative' && profil.initiative_id && ['Association','ONG'].includes(profil.initiative_type)) {
+      try { _statutAdhesion = (await api('GET', `/initiatives/${profil.initiative_id}/demande-adhesion`)).statut; } catch(e) { _statutAdhesion = null; }
     }
     render();
     // Colonnes latérales enrichies (ancien profil) : plus utilisées pour le rôle utilisateur,
@@ -1693,6 +1699,13 @@ function renderVisitorProfile() {
      découvre une initiative ici doit passer par une demande de liaison ; s'il vient d'une
      vitrine, il a déjà pu écrire directement. L'emplacement est rempli par le composant
      partagé (assets/app.js), qui interroge le serveur — l'interface n'invente pas la règle. */
+  /* Bouton "Adhérer" (Associations/ONG) — même route/handler (demanderAdhesion, assets/app.js)
+     que initiative.html et les cartouches de l'annuaire, statut pré-chargé dans init(). */
+  const adhererBtn = (!isOwn && isInit && ['Association','ONG'].includes(profil.initiative_type))
+    ? (_statutAdhesion === 'acceptee' ? `<button class="pvz-btn" disabled>✓ Membre</button>`
+      : _statutAdhesion === 'en_attente' ? `<button class="pvz-btn" disabled>⏳ Demande envoyée</button>`
+      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn primary" onclick="demanderAdhesion(${profil.initiative_id}, this)">🤝 Adhérer</button>` : '')
+    : '';
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const reportBtn = CU ? `<button class="pvz-btn" style="color:#dc2626;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g,"\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : '';
@@ -1739,7 +1752,7 @@ function renderVisitorProfile() {
             ${responsableLine}
             ${chips.length ? `<div class="pvz-chips">${chips.join('')}</div>` : ''}
           </div>
-          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+msgBtn+shareBtn+reportBtn}</div>
+          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+adhererBtn+msgBtn+shareBtn+reportBtn}</div>
         </div>
       </div>
     </div>
