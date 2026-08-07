@@ -5492,6 +5492,17 @@ db.exec(`
     if (!adhFCols.includes('mode_validite'))         db.exec("ALTER TABLE adhesion_formules ADD COLUMN mode_validite TEXT DEFAULT 'individuel'");
     if (!adhFCols.includes('periode_collective_debut')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN periode_collective_debut TEXT");
     if (!adhFCols.includes('periode_collective_fin'))   db.exec("ALTER TABLE adhesion_formules ADD COLUMN periode_collective_fin TEXT");
+    /* Module Adhésions — cahier des charges 2026-08-06, incrément 1 : durée personnalisée en
+       mode "Durée glissante" (duree_valeur/duree_unite/duree_illimitee, prioritaires sur
+       l'ancienne durée déduite de type_contribution — NULL = comportement historique inchangé
+       pour les formules existantes), renouvellement automatique de la campagne en mode
+       "Calendrier fixe" (renouvellement_auto_collectif), et places limitées (max_adherents,
+       NULL = illimité). */
+    if (!adhFCols.includes('duree_valeur'))          db.exec("ALTER TABLE adhesion_formules ADD COLUMN duree_valeur INTEGER");
+    if (!adhFCols.includes('duree_unite'))           db.exec("ALTER TABLE adhesion_formules ADD COLUMN duree_unite TEXT DEFAULT 'mois'");
+    if (!adhFCols.includes('duree_illimitee'))       db.exec("ALTER TABLE adhesion_formules ADD COLUMN duree_illimitee INTEGER DEFAULT 0");
+    if (!adhFCols.includes('renouvellement_auto_collectif')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN renouvellement_auto_collectif INTEGER DEFAULT 0");
+    if (!adhFCols.includes('max_adherents'))         db.exec("ALTER TABLE adhesion_formules ADD COLUMN max_adherents INTEGER");
   }
 }
 

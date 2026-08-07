@@ -2890,6 +2890,22 @@ function calculerDateExpirationAdhesion(formule, months) {
   if (formule?.mode_validite === 'collectif' && formule.periode_collective_fin) {
     return `${formule.periode_collective_fin} 23:59:59`.slice(0, 19);
   }
+  /* Durée personnalisée (incrément 1, 2026-08-06) : prioritaire sur l'ancienne durée déduite
+     de type_contribution dès qu'elle est configurée sur la formule — les formules créées
+     avant cet incrément (duree_valeur NULL) gardent leur comportement historique via
+     `months`, calculé à partir de ADHESION_RECURRING/adhesionExpirationMonths(). */
+  if (formule?.duree_illimitee) return null;
+  if (formule?.duree_valeur) {
+    const d = new Date();
+    const v = Number(formule.duree_valeur);
+    switch (formule.duree_unite) {
+      case 'jours':    d.setDate(d.getDate() + v); break;
+      case 'semaines':  d.setDate(d.getDate() + v * 7); break;
+      case 'annees':    d.setFullYear(d.getFullYear() + v); break;
+      case 'mois': default: d.setMonth(d.getMonth() + v); break;
+    }
+    return d.toISOString().slice(0, 19).replace('T', ' ');
+  }
   if (!months) return null;
   const d = new Date();
   d.setMonth(d.getMonth() + months);
@@ -3010,6 +3026,17 @@ function resolveAdhesionMontant(formule, montantBody) {
 /* ── Formules : lecture publique (actives) ── */
 route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) => {
   const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? AND actif=1 ORDER BY ordre ASC, id ASC`).all(params.id);
+  /* Places restantes (incrément 1, 2026-08-06) : comptées sur les membres en_attente/a_jour
+     (un paiement en cours réserve déjà une place) — pas sur non_a_jour/suspendu, qui ont
+     libéré la leur. */
+  for (const f of rows) {
+    if (f.max_adherents) {
+      const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(f.id)).n;
+      f.places_restantes = Math.max(0, Number(f.max_adherents) - Number(n));
+    } else {
+      f.places_restantes = null;
+    }
+  }
   sendJSON(res, 200, { formules: rows });
 });
 
@@ -3020,6 +3047,11 @@ route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, 
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? ORDER BY ordre ASC, id ASC`).all(params.id);
+  for (const f of rows) {
+    const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(f.id)).n;
+    f.nb_adherents_actifs = Number(n);
+    f.places_restantes = f.max_adherents ? Math.max(0, Number(f.max_adherents) - Number(n)) : null;
+  }
   sendJSON(res, 200, { formules: rows });
 });
 
@@ -3077,7 +3109,8 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
-          media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin } = body;
+          media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin,
+          duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de la formule requis." });
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
@@ -3100,16 +3133,25 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
       return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
     }
   }
+  const dureeUnite = ['jours','semaines','mois','annees'].includes(duree_unite) ? duree_unite : 'mois';
+  if (!duree_illimitee && duree_valeur !== undefined && duree_valeur !== null && Number(duree_valeur) <= 0) {
+    return sendJSON(res, 400, { error: "La durée doit être un nombre positif." });
+  }
+  if (max_adherents !== undefined && max_adherents !== null && Number(max_adherents) <= 0) {
+    return sendJSON(res, 400, { error: "Le nombre maximum d'adhérents doit être positif." });
+  }
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(params.id)).m;
   const id = (await db.prepare(`
-    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(params.id, nom.trim(), description || null, couleur || '#f97316', icone || '🎫',
        type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
        devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
        media_type || null, media_type ? (media_url || null) : null, media_type === 'video' ? (Number(media_duree_secondes) || null) : null,
        liste_stockage_id || null, modeValidite,
-       modeValidite === 'collectif' ? periode_collective_debut : null, modeValidite === 'collectif' ? periode_collective_fin : null)).lastInsertRowid;
+       modeValidite === 'collectif' ? periode_collective_debut : null, modeValidite === 'collectif' ? periode_collective_fin : null,
+       duree_illimitee ? null : (duree_valeur ? Number(duree_valeur) : null), dureeUnite, duree_illimitee ? 1 : 0,
+       (modeValidite === 'collectif' && renouvellement_auto_collectif) ? 1 : 0, max_adherents ? Number(max_adherents) : null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -3122,7 +3164,8 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
   if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
-          media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin } = body;
+          media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin,
+          duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents } = body;
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
   if (media_type === 'video' && Number(media_duree_secondes) > ADHESION_MEDIA_MAX_DUREE) {
@@ -3149,13 +3192,26 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
     nouveauDebut = periode_collective_debut ?? f.periode_collective_debut;
     nouveauFin = periode_collective_fin ?? f.periode_collective_fin;
   }
+  if (duree_valeur !== undefined && !duree_illimitee && duree_valeur !== null && Number(duree_valeur) <= 0) {
+    return sendJSON(res, 400, { error: "La durée doit être un nombre positif." });
+  }
+  if (max_adherents !== undefined && max_adherents !== null && Number(max_adherents) <= 0) {
+    return sendJSON(res, 400, { error: "Le nombre maximum d'adhérents doit être positif." });
+  }
+  const nouvelleDureeUnite = duree_unite !== undefined ? (['jours','semaines','mois','annees'].includes(duree_unite) ? duree_unite : 'mois') : f.duree_unite;
+  const nouvelleDureeIllimitee = duree_illimitee !== undefined ? (duree_illimitee ? 1 : 0) : f.duree_illimitee;
+  const nouvelleDureeValeur = duree_illimitee ? null : (duree_valeur !== undefined ? (duree_valeur ? Number(duree_valeur) : null) : f.duree_valeur);
+  const nouveauMaxAdherents = max_adherents !== undefined ? (max_adherents ? Number(max_adherents) : null) : f.max_adherents;
+  const nouveauRenouvAuto = renouvellement_auto_collectif !== undefined ? (nouveauMode === 'collectif' && renouvellement_auto_collectif ? 1 : 0) : (nouveauMode === 'collectif' ? f.renouvellement_auto_collectif : 0);
   await db.prepare(`UPDATE adhesion_formules SET
       nom=COALESCE(?,nom), description=?, couleur=COALESCE(?,couleur), icone=COALESCE(?,icone),
       type_contribution=COALESCE(?,type_contribution), montant_type=COALESCE(?,montant_type),
       montant_fixe=?, montant_min=?, montant_max=?, devise=COALESCE(?,devise),
       modes_paiement_json=COALESCE(?,modes_paiement_json),
       media_type=?, media_url=?, media_duree_secondes=?, liste_stockage_id=COALESCE(?,liste_stockage_id),
-      mode_validite=?, periode_collective_debut=?, periode_collective_fin=?, updated_at=datetime('now')
+      mode_validite=?, periode_collective_debut=?, periode_collective_fin=?,
+      duree_valeur=?, duree_unite=?, duree_illimitee=?, renouvellement_auto_collectif=?, max_adherents=?,
+      updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, description ?? f.description, couleur || null, icone || null, type_contribution || null, montant_type || null,
          montant_fixe ?? f.montant_fixe, montant_min ?? f.montant_min, montant_max ?? f.montant_max, devise || null,
@@ -3165,6 +3221,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          media_type !== undefined ? (media_type === 'video' ? (Number(media_duree_secondes) || null) : null) : f.media_duree_secondes,
          liste_stockage_id || null,
          nouveauMode, nouveauDebut, nouveauFin,
+         nouvelleDureeValeur, nouvelleDureeUnite, nouvelleDureeIllimitee, nouveauRenouvAuto, nouveauMaxAdherents,
          params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -3179,6 +3236,28 @@ route("DELETE", "/api/adhesion-formules/:id", async (req, res, params) => {
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   await db.prepare(`DELETE FROM adhesion_formules WHERE id=?`).run(params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* ── Dupliquer une formule (incrément 1, 2026-08-06) — même pattern que
+   POST /api/listes-diffusion/:id/duplicate : copie tous les champs, place la copie en fin
+   d'ordre, désactivée par défaut (l'association doit relire/ajuster avant de la publier),
+   sans reprendre le lien vers une liste de diffusion (éviter d'y mélanger deux formules par
+   inadvertance) ni la période collective (une campagne dupliquée doit être redatée). ── */
+route("POST", "/api/adhesion-formules/:id/dupliquer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
+  if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(f.initiative_id)).m;
+  const id = (await db.prepare(`
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,actif,mode_validite,duree_valeur,duree_unite,duree_illimitee,max_adherents)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)
+  `).run(f.initiative_id, `${f.nom} (copie)`, f.description, f.couleur, f.icone, f.type_contribution, f.montant_type, f.montant_fixe, f.montant_min, f.montant_max,
+       f.devise, f.modes_paiement_json, maxOrdre + 1, f.mode_validite === 'collectif' ? 'individuel' : f.mode_validite,
+       f.duree_valeur, f.duree_unite, f.duree_illimitee, f.max_adherents)).lastInsertRowid;
+  sendJSON(res, 201, { id });
 });
 
 /* ── Activer/désactiver une formule ── */
@@ -3618,6 +3697,15 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
      temporairement fermé l'accès aux nouveaux venus. */
   if (!membre && init.adhesions_ouvertes != null && !init.adhesions_ouvertes) {
     return sendJSON(res, 400, { error: "Les adhésions sont actuellement fermées pour cette structure." });
+  }
+  /* Places limitées (incrément 1, 2026-08-06) : ne bloque que les NOUVEAUX adhérents — un
+     membre déjà enregistré (renouvellement) a déjà sa place, même si le quota est maintenant
+     atteint pour les nouveaux arrivants. */
+  if (!membre && formule.max_adherents) {
+    const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(formule.id)).n;
+    if (Number(n) >= Number(formule.max_adherents)) {
+      return sendJSON(res, 409, { error: "Cette formule a atteint son nombre maximum d'adhérents." });
+    }
   }
   if (!membre) {
     const mid = (await db.prepare(`
@@ -19027,7 +19115,32 @@ async function handleRequest(req, res) {
         }
         envoyees++;
       }
-      sendJSON(res, 200, { ok: true, relances_envoyees: envoyees });
+
+      /* Renouvellement automatique de campagne (incrément 1, 2026-08-06) : dès que la période
+         collective d'une formule "Calendrier fixe" est dépassée ET que l'association a coché
+         l'option, la campagne est redécalée d'un an pile (même jour/mois) pour l'année
+         suivante. Ne touche PAS les adhérents déjà enregistrés — ils restent liés à l'ancienne
+         période et devront renouveler individuellement via le système de relances ci-dessus ;
+         seule la fenêtre proposée aux FUTURS adhérents avance. */
+      const campagnesARenouveler = await db.prepare(`
+        SELECT id, periode_collective_debut, periode_collective_fin FROM adhesion_formules
+        WHERE mode_validite='collectif' AND renouvellement_auto_collectif=1
+          AND periode_collective_debut IS NOT NULL AND periode_collective_fin IS NOT NULL
+          AND periode_collective_fin < date('now')
+      `).all();
+      let campagnesRenouvelees = 0;
+      for (const f of campagnesARenouveler) {
+        const debut = new Date(f.periode_collective_debut);
+        const fin = new Date(f.periode_collective_fin);
+        if (isNaN(debut) || isNaN(fin)) continue;
+        debut.setFullYear(debut.getFullYear() + 1);
+        fin.setFullYear(fin.getFullYear() + 1);
+        await db.prepare(`UPDATE adhesion_formules SET periode_collective_debut=?, periode_collective_fin=?, updated_at=datetime('now') WHERE id=?`)
+          .run(debut.toISOString().slice(0, 10), fin.toISOString().slice(0, 10), f.id);
+        campagnesRenouvelees++;
+      }
+
+      sendJSON(res, 200, { ok: true, relances_envoyees: envoyees, campagnes_renouvelees: campagnesRenouvelees });
     } catch (e) {
       console.error('[adhesion-relances]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });

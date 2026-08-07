@@ -136,9 +136,12 @@ function renderFormules(){
           `À partir de ${f.montant_min} ${f.devise}`
         }</div>
         ${f.description?`<div class="adh-desc">${escHtml(f.description)}</div>`:''}
-        ${ADHESIONS_OUVERTES
-          ? `<button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">Adhérer / Contribuer</button>`
-          : `<button class="btn btn-outline" style="width:100%;" disabled>🔒 Adhésions fermées</button>`}
+        ${f.max_adherents ? `<div style="font-size:11.5px;color:${f.places_restantes<=0?'#dc2626':'var(--muted)'};margin:2px 0 8px;">${f.places_restantes<=0?'🚫 Complet':`👥 ${f.places_restantes} place${f.places_restantes>1?'s':''} restante${f.places_restantes>1?'s':''}`}</div>` : ''}
+        ${!ADHESIONS_OUVERTES
+          ? `<button class="btn btn-outline" style="width:100%;" disabled>🔒 Adhésions fermées</button>`
+          : f.max_adherents && f.places_restantes<=0
+          ? `<button class="btn btn-outline" style="width:100%;" disabled>🚫 Complet</button>`
+          : `<button class="btn btn-orange" style="width:100%;" onclick="ouvrirPaiement(${f.id})">Adhérer / Contribuer</button>`}
       </div>`).join('')}
   </div>`;
 }

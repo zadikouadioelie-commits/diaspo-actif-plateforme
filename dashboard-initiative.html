@@ -14,6 +14,7 @@
 <link rel="apple-touch-icon" href="assets/logo.png">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <link rel="stylesheet" href="/assets/guided-tour.css">
 </head>
 <body>
 <div class="page">
@@ -1318,18 +1319,52 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label class="da-pill"><input type="checkbox" value="virement" class="adh-f-mode" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>🏦 Virement</span></label>
         </div>
 
-        <label style="font-size:12px;font-weight:700;">Mode de validité</label>
-        <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Individuel : chaque adhérent est valable pour la durée de sa formule à partir de son propre paiement. Collectif : tous les adhérents de cette formule partagent la même période (ex. « année scolaire 2026-2027 »).</p>
-        <select id="adh-f-mode-validite" class="input" style="margin:4px 0 10px;width:100%;" onchange="document.getElementById('adh-f-periode-collective').style.display=this.value==='collectif'?'flex':'none';">
-          <option value="individuel">Individuel</option>
-          <option value="collectif">Collectif</option>
+        <label style="font-size:12px;font-weight:700;">Mode de calcul de la durée</label>
+        <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Durée glissante : chaque adhérent est valable pour la durée choisie à partir de son propre paiement. Calendrier fixe : tous les adhérents de cette formule partagent la même période (ex. « année scolaire 2026-2027 »).</p>
+        <select id="adh-f-mode-validite" class="input" style="margin:4px 0 10px;width:100%;" onchange="adhToggleModeValidite()">
+          <option value="individuel">Durée glissante (temps réel)</option>
+          <option value="collectif">Calendrier fixe (année scolaire / année associative)</option>
         </select>
-        <div id="adh-f-periode-collective" style="display:none;gap:10px;margin-bottom:10px;">
-          <div style="flex:1;"><label style="font-size:11.5px;color:var(--muted);">Début de la période</label>
-            <input type="date" id="adh-f-periode-debut" class="input" style="width:100%;"></div>
-          <div style="flex:1;"><label style="font-size:11.5px;color:var(--muted);">Fin de la période</label>
-            <input type="date" id="adh-f-periode-fin" class="input" style="width:100%;"></div>
+
+        <div id="adh-f-duree-glissante" style="display:none;margin-bottom:10px;">
+          <label style="font-size:11.5px;color:var(--muted);">Durée de l'adhésion</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px;">
+            <button type="button" class="btn btn-sm btn-outline" onclick="adhSetDureePreset(1,'mois')">1 mois</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="adhSetDureePreset(3,'mois')">3 mois</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="adhSetDureePreset(6,'mois')">6 mois</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="adhSetDureePreset(12,'mois')">12 mois</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="adhSetDureePreset(24,'mois')">24 mois</button>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:6px;">
+            <input type="checkbox" id="adh-f-duree-illimitee" onchange="document.getElementById('adh-f-duree-perso-row').style.display=this.checked?'none':'flex';">
+            Durée illimitée
+          </label>
+          <div id="adh-f-duree-perso-row" style="display:flex;gap:8px;">
+            <input type="number" id="adh-f-duree-valeur" class="input" min="1" value="12" placeholder="Nombre" style="flex:1;">
+            <select id="adh-f-duree-unite" class="input" style="flex:1;">
+              <option value="jours">Jours</option>
+              <option value="semaines">Semaines</option>
+              <option value="mois" selected>Mois</option>
+              <option value="annees">Années</option>
+            </select>
+          </div>
         </div>
+
+        <div id="adh-f-periode-collective" style="display:none;flex-direction:column;gap:10px;margin-bottom:10px;">
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;"><label style="font-size:11.5px;color:var(--muted);">Début de la période</label>
+              <input type="date" id="adh-f-periode-debut" class="input" style="width:100%;"></div>
+            <div style="flex:1;"><label style="font-size:11.5px;color:var(--muted);">Fin de la période</label>
+              <input type="date" id="adh-f-periode-fin" class="input" style="width:100%;"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11.5px;">
+            <input type="checkbox" id="adh-f-renouv-auto">
+            Renouveler automatiquement cette campagne pour l'année suivante à sa date de fin
+          </label>
+        </div>
+
+        <label style="font-size:12px;font-weight:700;">Nombre maximum d'adhérents <span style="color:var(--muted);font-weight:400;">(optionnel)</span></label>
+        <input type="number" id="adh-f-max-adherents" class="input" min="1" placeholder="Laisser vide = illimité" style="margin:4px 0 10px;width:100%;">
 
         <label style="font-size:12px;font-weight:700;">📋 Liste de stockage des participants</label>
         <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Chaque adhésion/cotisation validée y ajoute automatiquement le participant. Enregistrée dans le module Réseau professionnel, réutilisable pour vos campagnes, votes et convocations.</p>
@@ -3272,6 +3307,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">🎟️ Billetterie & Wallet</button>
               <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer un événement</button>
+              <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="if(window._daPremiumInitiative||window.daBypassActive?.('evenements')){window.GuidedTour&&GuidedTour.start('evenement-dashboard');}else{openPremiumUpsell('evenements');}">🎥 Tutoriel</button>
             </div>
           </div>
         </div>
@@ -6031,6 +6067,7 @@ const ADH_TYPE_LABELS = {
   contribution_exceptionnelle: 'Contribution exceptionnelle', autre: 'Autre',
 };
 const ADH_STATUT_LABELS = { a_jour: '🟢 À jour', non_a_jour: '🔴 Non à jour', en_attente: '⚪ En attente', suspendu: '⛔ Suspendu' };
+const ADH_DUREE_UNITE_LABELS = { jours: 'jour(s)', semaines: 'semaine(s)', mois: 'mois', annees: 'année(s)' };
 
 /* Relit l'état réel côté serveur pour synchroniser le toggle à l'ouverture de la section —
    ne dépend d'aucune variable globale mise en cache (cf. bug #71 : la variable `init` de la
@@ -6205,9 +6242,13 @@ async function adhRenderFormules(){
             ${f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
           </div>
           ${f.description?`<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">${escH(f.description)}</p>`:''}
-          ${f.mode_validite==='collectif'?`<div style="font-size:11px;color:#7c3aed;background:#f5f3ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">👥 Collectif : ${f.periode_collective_debut?new Date(f.periode_collective_debut).toLocaleDateString('fr-FR'):'?'} → ${f.periode_collective_fin?new Date(f.periode_collective_fin).toLocaleDateString('fr-FR'):'?'}</div>`:''}
+          ${f.mode_validite==='collectif'?`<div style="font-size:11px;color:#7c3aed;background:#f5f3ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">📅 Calendrier fixe : ${f.periode_collective_debut?new Date(f.periode_collective_debut).toLocaleDateString('fr-FR'):'?'} → ${f.periode_collective_fin?new Date(f.periode_collective_fin).toLocaleDateString('fr-FR'):'?'}${f.renouvellement_auto_collectif?' · 🔁 auto':''}</div>`
+            :(!f.duree_illimitee && f.duree_valeur)?`<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">⏳ ${f.duree_valeur} ${ADH_DUREE_UNITE_LABELS[f.duree_unite]||f.duree_unite}</div>`
+            :f.duree_illimitee?`<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">♾️ Durée illimitée</div>`:''}
+          ${f.max_adherents?`<div style="font-size:11px;color:${f.places_restantes<=0?'#dc2626':'#166534'};background:${f.places_restantes<=0?'#fef2f2':'#f0fdf4'};border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;margin-left:4px;">${f.places_restantes<=0?'🚫 Complet':`👥 ${f.places_restantes}/${f.max_adherents} places restantes`}</div>`:''}
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="adhOuvrirEditionFormule(${f.id})">✏️ Modifier</button>
+            <button class="btn btn-sm btn-outline" onclick="adhDupliquerFormule(${f.id})">📄 Dupliquer</button>
             <button class="btn btn-sm btn-outline" onclick="adhToggleActifFormule(${f.id})">${f.actif?'🙈 Désactiver':'👁️ Activer'}</button>
             <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhSupprimerFormule(${f.id},'${escH(f.nom).replace(/'/g,"\\'")}')">🗑️</button>
           </div>
@@ -6221,6 +6262,21 @@ function adhToggleMontantChamps(){
   const type = document.getElementById('adh-f-montant-type').value;
   document.getElementById('adh-f-montant-fixe-row').style.display = type === 'fixe' ? 'block' : 'none';
   document.getElementById('adh-f-montant-libre-row').style.display = type !== 'fixe' ? 'flex' : 'none';
+}
+
+/* Mode de calcul de la durée (incrément 1, 2026-08-06) : "Durée glissante" (individuel) affiche
+   le sélecteur de durée personnalisée, "Calendrier fixe" (collectif) affiche les dates de
+   campagne + le renouvellement automatique. */
+function adhToggleModeValidite(){
+  const collectif = document.getElementById('adh-f-mode-validite').value === 'collectif';
+  document.getElementById('adh-f-periode-collective').style.display = collectif ? 'flex' : 'none';
+  document.getElementById('adh-f-duree-glissante').style.display = collectif ? 'none' : 'block';
+}
+function adhSetDureePreset(valeur, unite){
+  document.getElementById('adh-f-duree-illimitee').checked = false;
+  document.getElementById('adh-f-duree-perso-row').style.display = 'flex';
+  document.getElementById('adh-f-duree-valeur').value = valeur;
+  document.getElementById('adh-f-duree-unite').value = unite;
 }
 
 let ADH_F_MEDIA = { type: null, url: null, duree: null };
@@ -6329,7 +6385,13 @@ function adhOuvrirCreationFormule(){
   document.getElementById('adh-f-mode-validite').value = 'individuel';
   document.getElementById('adh-f-periode-debut').value = '';
   document.getElementById('adh-f-periode-fin').value = '';
-  document.getElementById('adh-f-periode-collective').style.display = 'none';
+  document.getElementById('adh-f-renouv-auto').checked = false;
+  document.getElementById('adh-f-duree-illimitee').checked = false;
+  document.getElementById('adh-f-duree-valeur').value = '12';
+  document.getElementById('adh-f-duree-unite').value = 'mois';
+  document.getElementById('adh-f-duree-perso-row').style.display = 'flex';
+  document.getElementById('adh-f-max-adherents').value = '';
+  adhToggleModeValidite();
   document.getElementById('adh-f-photo-preview').style.display = 'none';
   document.getElementById('adh-f-video-thumb-wrap').style.display = 'none';
   document.getElementById('adh-f-video-status').textContent = '';
@@ -6359,7 +6421,13 @@ function adhOuvrirEditionFormule(id){
   document.getElementById('adh-f-mode-validite').value = f.mode_validite || 'individuel';
   document.getElementById('adh-f-periode-debut').value = f.periode_collective_debut || '';
   document.getElementById('adh-f-periode-fin').value = f.periode_collective_fin || '';
-  document.getElementById('adh-f-periode-collective').style.display = (f.mode_validite === 'collectif') ? 'flex' : 'none';
+  document.getElementById('adh-f-renouv-auto').checked = !!f.renouvellement_auto_collectif;
+  document.getElementById('adh-f-duree-illimitee').checked = !!f.duree_illimitee;
+  document.getElementById('adh-f-duree-valeur').value = f.duree_valeur || '12';
+  document.getElementById('adh-f-duree-unite').value = f.duree_unite || 'mois';
+  document.getElementById('adh-f-duree-perso-row').style.display = f.duree_illimitee ? 'none' : 'flex';
+  document.getElementById('adh-f-max-adherents').value = f.max_adherents || '';
+  adhToggleModeValidite();
   document.getElementById('adh-f-photo-preview').style.display = 'none';
   document.getElementById('adh-f-video-thumb-wrap').style.display = 'none';
   document.getElementById('adh-f-video-status').textContent = '';
@@ -6399,8 +6467,14 @@ async function adhEnregistrerFormule(){
   const modes = Array.from(document.querySelectorAll('.adh-f-mode:checked')).map(cb=>cb.value);
   const modeValidite = document.getElementById('adh-f-mode-validite').value;
   if (modeValidite === 'collectif' && !(document.getElementById('adh-f-periode-debut').value && document.getElementById('adh-f-periode-fin').value)) {
-    showToast('Le mode collectif exige une date de début et de fin de période.', 'warning'); return;
+    showToast('Le calendrier fixe exige une date de début et de fin de période.', 'warning'); return;
   }
+  const dureeIllimitee = document.getElementById('adh-f-duree-illimitee').checked;
+  const dureeValeur = document.getElementById('adh-f-duree-valeur').value;
+  if (modeValidite === 'individuel' && !dureeIllimitee && (!dureeValeur || Number(dureeValeur) <= 0)) {
+    showToast('Indiquez une durée valide (ou cochez « Durée illimitée »).', 'warning'); return;
+  }
+  const maxAdherents = document.getElementById('adh-f-max-adherents').value;
   const modeListe = document.querySelector('input[name="adh-f-liste-choice"]:checked')?.value || '';
   let listeStockageId = null;
   if (modeListe === 'lier') {
@@ -6430,6 +6504,11 @@ async function adhEnregistrerFormule(){
     mode_validite: modeValidite,
     periode_collective_debut: modeValidite === 'collectif' ? document.getElementById('adh-f-periode-debut').value : null,
     periode_collective_fin: modeValidite === 'collectif' ? document.getElementById('adh-f-periode-fin').value : null,
+    renouvellement_auto_collectif: modeValidite === 'collectif' ? document.getElementById('adh-f-renouv-auto').checked : false,
+    duree_illimitee: modeValidite === 'individuel' ? dureeIllimitee : false,
+    duree_valeur: (modeValidite === 'individuel' && !dureeIllimitee) ? Number(dureeValeur) : null,
+    duree_unite: document.getElementById('adh-f-duree-unite').value,
+    max_adherents: maxAdherents ? Number(maxAdherents) : null,
   };
   try{
     if(ADH_EDIT_FORMULE_ID) await api('PUT', `/adhesion-formules/${ADH_EDIT_FORMULE_ID}`, payload);
@@ -6442,6 +6521,10 @@ async function adhEnregistrerFormule(){
 
 async function adhToggleActifFormule(id){
   try{ await api('PUT', `/adhesion-formules/${id}/toggle-actif`, {}); adhRenderFormules(); }
+  catch(e){ showToast(e.message, 'danger'); }
+}
+async function adhDupliquerFormule(id){
+  try{ await api('POST', `/adhesion-formules/${id}/dupliquer`, {}); adhRenderFormules(); showToast('Formule dupliquée — désactivée par défaut, à relire avant de la publier.'); }
   catch(e){ showToast(e.message, 'danger'); }
 }
 async function adhSupprimerFormule(id, nom){
@@ -8052,6 +8135,8 @@ initPremiumGates();
   </div>
 </div>
   <script src="/assets/theme-manager.js"></script>
+<script src="/assets/guided-tour.js"></script>
+<script src="/assets/tours/tour-evenement-dashboard.js"></script>
 </body>
 </html>
 
