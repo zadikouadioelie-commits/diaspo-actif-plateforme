@@ -1304,6 +1304,17 @@ const MIGRATIONS = [
   ["users", "situation_pro TEXT"],
   // Module d'affiliation Initiative → Utilisateur (2026-07-27)
   ["initiative_membres", "message TEXT"],
+  // Sync module Adhésions → Affiliations (incrément 6, 2026-08-07) : une adhésion validée
+  // crée/tient à jour automatiquement l'affiliation correspondante (formule à l'origine,
+  // mode payant/gratuit, dates de validité, visibilité choisie par le membre lui-même).
+  ["initiative_membres", "formule_id INTEGER"],
+  ["initiative_membres", "mode_adhesion TEXT"],
+  ["initiative_membres", "date_debut TEXT"],
+  ["initiative_membres", "date_fin TEXT"],
+  ["initiative_membres", "visible_publiquement INTEGER DEFAULT 1"],
+  // Affichage public des membres, choisi par l'association (incrément 6) : 'tous' (défaut,
+  // comportement historique inchangé) / 'dirigeants' / 'nombre' / 'masque'.
+  ["initiatives", "affichage_membres TEXT DEFAULT 'tous'"],
   ["users", "type_institution TEXT"],
   ["users", "statut_verification TEXT DEFAULT 'auto'"],
   // Champs de base initiatives (peuvent manquer sur DB ancienne)
@@ -6441,6 +6452,43 @@ db.exec(`
     });
     db.exec(`PRAGMA foreign_keys=ON;`);
   }
+})();
+
+/* Migration : initiative_membres — statuts 'suspendu'/'radie'/'expire' (module Adhésions,
+   incrément 6, 2026-08-07 : sync avec le module Affiliations — rebuild pour lever l'ancien
+   CHECK, même pattern que les migrations offres/adhesion_membres ci-dessus). Le workflow de
+   demande simple garde en_attente/accepte/refuse ; ces 3 nouveaux statuts ne sont utilisés
+   que pour les affiliations synchronisées depuis une adhésion. */
+;(function migrateInitiativeMembresStatuts() {
+  const tblSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='initiative_membres'").get();
+  if (!tblSql || !tblSql.sql || tblSql.sql.includes("'radie'")) return;
+  db.exec(`PRAGMA foreign_keys=OFF;`);
+  db.exec(`DROP TABLE IF EXISTS initiative_membres_new;`);
+  db.exec(`
+    CREATE TABLE initiative_membres_new (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id         INTEGER NOT NULL,
+      user_id               INTEGER NOT NULL,
+      fonction              TEXT,
+      statut                TEXT NOT NULL DEFAULT 'en_attente'
+                            CHECK(statut IN ('en_attente','accepte','refuse','suspendu','radie','expire')),
+      created_at            TEXT DEFAULT (datetime('now')),
+      updated_at            TEXT DEFAULT (datetime('now')),
+      message               TEXT,
+      formule_id            INTEGER,
+      mode_adhesion         TEXT,
+      date_debut            TEXT,
+      date_fin              TEXT,
+      visible_publiquement  INTEGER DEFAULT 1,
+      UNIQUE(initiative_id, user_id),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    INSERT INTO initiative_membres_new SELECT id,initiative_id,user_id,fonction,statut,created_at,updated_at,message,formule_id,mode_adhesion,date_debut,date_fin,visible_publiquement FROM initiative_membres;
+    DROP TABLE initiative_membres;
+    ALTER TABLE initiative_membres_new RENAME TO initiative_membres;
+  `);
+  db.exec(`PRAGMA foreign_keys=ON;`);
 })();
 
 /* Migration : adhesion_membres — statut 'radie' (module Adhésions, incrément 3, 2026-08-07 :

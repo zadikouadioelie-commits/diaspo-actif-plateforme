@@ -1043,6 +1043,13 @@ const COLONNES_MIGRATION = [
     ['adhesion_formules', 'champs_config_json', "TEXT DEFAULT '{}'"],
     ['adhesion_formules', 'champs_custom_json', "TEXT DEFAULT '[]'"],
     ['adhesion_membres', 'reponses_json', "TEXT DEFAULT '{}'"],
+    // Module Adhésions — incrément 6 (2026-08-07) : sync avec le module Affiliations (miroir des ALTER db.js)
+    ['initiative_membres', 'formule_id', 'INTEGER'],
+    ['initiative_membres', 'mode_adhesion', 'TEXT'],
+    ['initiative_membres', 'date_debut', 'TEXT'],
+    ['initiative_membres', 'date_fin', 'TEXT'],
+    ['initiative_membres', 'visible_publiquement', 'INTEGER DEFAULT 1'],
+    ['initiatives', 'affichage_membres', "TEXT DEFAULT 'tous'"],
 ];
 
 async function migratePg(pool) {
@@ -1292,6 +1299,10 @@ async function migratePg(pool) {
        de "suspendu" (réversible). */
     { table: 'adhesion_membres', constraint: 'adhesion_membres_statut_check',
       addBack: "CHECK (statut IN ('en_attente','a_jour','non_a_jour','suspendu','radie'))" },
+    /* Module Adhésions — incrément 6 (2026-08-07) : sync Affiliations, 3 statuts en plus du
+       workflow de demande simple (en_attente/accepte/refuse). */
+    { table: 'initiative_membres', constraint: 'initiative_membres_statut_check',
+      addBack: "CHECK (statut IN ('en_attente','accepte','refuse','suspendu','radie','expire'))" },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

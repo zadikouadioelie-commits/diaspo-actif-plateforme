@@ -3078,6 +3078,32 @@ async function retirerDeListeStockage(formuleId, membre) {
   }
 }
 
+/* Sync module Adhésions → Affiliations (incrément 6, 2026-08-07) : une adhésion validée crée/
+   tient à jour automatiquement la fiche d'affiliation correspondante (initiative_membres).
+   Seuls les membres rattachés à un compte Diaspo'Actif peuvent avoir une affiliation
+   (initiative_membres.user_id est NOT NULL) — un membre externe sans compte n'en obtient
+   jamais une, cohérent avec le fonctionnement déjà en place du module Affiliations.
+   `statutAffiliation` : 'accepte' (actif) / 'suspendu' / 'radie' / 'expire'. */
+async function syncAffiliationDepuisAdhesion(membre, statutAffiliation) {
+  if (!membre.linked_user_id) return;
+  try {
+    const formule = membre.formule_id
+      ? await db.prepare("SELECT montant_type, montant_fixe FROM adhesion_formules WHERE id=?").get(membre.formule_id)
+      : null;
+    const modeAdhesion = (formule && (formule.montant_type !== 'fixe' || Number(formule.montant_fixe) > 0)) ? 'payante' : 'gratuite';
+    const existant = await db.prepare("SELECT id FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(membre.initiative_id, membre.linked_user_id);
+    if (existant) {
+      await db.prepare(`UPDATE initiative_membres SET
+          statut=?, formule_id=?, mode_adhesion=?, date_debut=COALESCE(date_debut,?), date_fin=?, updated_at=datetime('now')
+        WHERE id=?`)
+        .run(statutAffiliation, membre.formule_id || null, modeAdhesion, membre.date_adhesion || null, membre.date_expiration || null, existant.id);
+    } else {
+      await db.prepare(`INSERT INTO initiative_membres (initiative_id,user_id,fonction,statut,formule_id,mode_adhesion,date_debut,date_fin) VALUES (?,?,?,?,?,?,?,?)`)
+        .run(membre.initiative_id, membre.linked_user_id, 'Membre', statutAffiliation, membre.formule_id || null, modeAdhesion, membre.date_adhesion || null, membre.date_expiration || null);
+    }
+  } catch (e) { console.error('[sync-affiliation]', e.message); }
+}
+
 /* Résout le montant réel à facturer selon montant_type (fixe/libre/minimum). Retourne null si invalide. */
 function resolveAdhesionMontant(formule, montantBody) {
   if (formule.montant_type === "fixe") return Number(formule.montant_fixe) || 0;
@@ -3542,10 +3568,18 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
   const statutFinal = statut || m.statut;
   const formuleFinal = nouvelleFormule?.id || m.formule_id;
   if (nouvelleFormule) await retirerDeListeStockage(m.formule_id, m);
+  const mAffiliation = { ...m, formule_id: formuleFinal };
   if (statutFinal === 'a_jour') {
     await ajouterAListeStockage(formuleFinal, { ...m, email: email ?? m.email, nom: nom || m.nom, prenom: prenom ?? m.prenom });
+    await syncAffiliationDepuisAdhesion(mAffiliation, 'accepte');
   } else {
     await retirerDeListeStockage(formuleFinal, m);
+    /* Sync Affiliations (incrément 6) : suspendu/radié se répercutent tels quels ; les autres
+       statuts (en_attente, non_a_jour saisi manuellement) ne correspondent à aucun état
+       d'affiliation dédié et ne déclenchent donc pas de mise à jour ici. */
+    if (statutFinal === 'suspendu' || statutFinal === 'radie') {
+      await syncAffiliationDepuisAdhesion(mAffiliation, statutFinal);
+    }
   }
   sendJSON(res, 200, { ok: true });
 });
@@ -3634,7 +3668,8 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   await ajouterAListeStockage(m.formule_id, m);
   { const initComplete = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(m.initiative_id);
     const mAJour = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(m.id);
-    await envoyerRecuAdhesion(initComplete, mAJour, formule, montant, numeroRecu, paiementId); }
+    await envoyerRecuAdhesion(initComplete, mAJour, formule, montant, numeroRecu, paiementId);
+    await syncAffiliationDepuisAdhesion(mAJour, 'accepte'); }
   journaliserAdhesion(m.initiative_id, m.id, m.date_adhesion ? 'renouvellement' : 'creation', user,
     `Paiement manuel enregistré (${modePaiement}) — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
   sendJSON(res, 200, { ok: true, numero_recu: numeroRecu });
@@ -3922,13 +3957,43 @@ route("GET", "/api/mes-adhesions", async (req, res) => {
       SELECT id, montant, devise, statut, mode_paiement, numero_recu, date_paiement, created_at
       FROM adhesion_paiements WHERE membre_id=? AND statut='paye' ORDER BY created_at DESC
     `).all(m.id);
+    /* Affiliation liée (incrément 6, 2026-08-07) — sa visibilité publique est contrôlée par
+       le membre lui-même (voir PUT /api/mes-affiliations/:initiativeId/visibilite). */
+    const affiliation = await db.prepare("SELECT visible_publiquement FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(m.initiative_id, user.id);
     adhesions.push({
-      membre_id: m.id, initiative_nom: m.init_nom, initiative_slug: m.init_slug, formule_nom: m.formule_nom,
+      membre_id: m.id, initiative_id: m.initiative_id, initiative_nom: m.init_nom, initiative_slug: m.init_slug, formule_nom: m.formule_nom,
       statut: computeAdhesionStatut(m), date_adhesion: m.date_adhesion, date_expiration: m.date_expiration,
       numero_adherent: `ADH-${m.initiative_id}-${m.id}`, paiements,
+      affiliation_visible: affiliation ? !!affiliation.visible_publiquement : null,
     });
   }
   sendJSON(res, 200, { adhesions });
+});
+
+/* Confidentialité de l'affiliation (incrément 6, 2026-08-07) — le membre décide lui-même si
+   son affiliation à cette initiative apparaît sur son profil public, indépendamment de ce
+   que l'association affiche de son côté (affichage_membres). */
+route("PUT", "/api/mes-affiliations/:initiativeId/visibilite", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const membre = await db.prepare("SELECT id FROM initiative_membres WHERE initiative_id=? AND user_id=?").get(params.initiativeId, user.id);
+  if (!membre) return sendJSON(res, 404, { error: "Affiliation introuvable." });
+  const visible = body?.visible ? 1 : 0;
+  await db.prepare("UPDATE initiative_membres SET visible_publiquement=?, updated_at=datetime('now') WHERE id=?").run(visible, membre.id);
+  sendJSON(res, 200, { ok: true, visible: !!visible });
+});
+
+/* Préférence d'affichage public des membres, choisie par l'association (incrément 6,
+   2026-08-07) : 'tous' (défaut) / 'dirigeants' (seulement les affiliations avec fonction
+   renseignée) / 'nombre' (compteur uniquement) / 'masque' (rien). */
+route("PUT", "/api/initiatives/:id/affichage-membres", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const valeur = ['tous', 'dirigeants', 'nombre', 'masque'].includes(body?.affichage) ? body.affichage : 'tous';
+  await db.prepare("UPDATE initiatives SET affichage_membres=? WHERE id=?").run(valeur, params.id);
+  sendJSON(res, 200, { ok: true, affichage_membres: valeur });
 });
 
 /* ── Paiement d'une formule (public/connecté) — one-off ou subscription selon le type ── */
@@ -11125,11 +11190,14 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   /* Affiliations officielles (module Initiative → Utilisateur, 2026-07-27) : uniquement les
      affiliations ACCEPTÉES par le compte, issues d'organisations réellement enregistrées —
      remplace l'ancien mécanisme libre-service (table user_affiliations, désormais inutilisée
-     par cet affichage). */
+     par cet affichage). Confidentialité (incrément 6, 2026-08-07) : le titulaire du profil
+     voit toujours toutes ses affiliations (y compris masquées) ; un visiteur ne voit que
+     celles que le membre a choisi de rendre publiques (visible_publiquement). */
+  const estProprietaireProfil = me && Number(me.id) === Number(u.id);
   const affiliations = await db.prepare(`
-    SELECT im.id, im.fonction, i.nom, i.slug, i.logo_url, i.id AS initiative_id
+    SELECT im.id, im.fonction, im.visible_publiquement, i.nom, i.slug, i.logo_url, i.id AS initiative_id
     FROM initiative_membres im JOIN initiatives i ON i.id = im.initiative_id
-    WHERE im.user_id = ? AND im.statut = 'accepte'
+    WHERE im.user_id = ? AND im.statut = 'accepte' ${estProprietaireProfil ? '' : 'AND im.visible_publiquement = 1'}
     ORDER BY im.created_at ASC
   `).all(u.id);
   sendJSON(res, 200, { profil: {
@@ -12368,6 +12436,7 @@ async function handleStripeWebhook(req, res) {
         await ajouterAListeStockage(pay.formule_id, membre);
         const membreAJour = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(pay.membre_id);
         await envoyerRecuAdhesion(init, membreAJour, formule, montant, numeroRecu, paiementId);
+        await syncAffiliationDepuisAdhesion(membreAJour, 'accepte');
         journaliserAdhesion(pay.initiative_id, pay.membre_id, membre.date_adhesion ? 'renouvellement' : 'creation', null,
           `Paiement Stripe confirmé — « ${formule?.nom || ''} », ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
       }
@@ -19410,6 +19479,7 @@ async function handleRequest(req, res) {
       for (const m of membres) {
         if (computeAdhesionStatut(m) === 'non_a_jour') {
           await retirerDeListeStockage(m.formule_id, m);
+          await syncAffiliationDepuisAdhesion(m, 'expire');
           retiresListe++;
         }
       }
