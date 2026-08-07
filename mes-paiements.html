@@ -64,6 +64,12 @@
         <button class="mp-btn-add" id="mp-btn-ajouter" onclick="window._mpAjouterCarte()">+ Ajouter une carte</button>
       </div>
     </div>
+
+    <div class="mp-card" style="margin-top:20px;">
+      <h4>🎫 Mes adhésions</h4>
+      <p class="mp-sub">Vos adhésions aux associations et initiatives de Diaspo'Actif, avec l'historique de vos paiements et les reçus téléchargeables.</p>
+      <div id="mp-adhesions-liste"><p class="mp-empty">Chargement…</p></div>
+    </div>
   </main>
 
   <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span></footer>
@@ -154,6 +160,37 @@
       chargerMoyens();
     } catch(e) { alert('Erreur : ' + (e.message || '')); }
   };
+
+  /* Historique des adhésions (incrément 4, 2026-08-07) — toutes initiatives confondues,
+     avec accès direct au reçu PDF de chaque paiement confirmé. */
+  const ADH_STATUT_LABELS_MP = { a_jour: '🟢 À jour', non_a_jour: '🔴 Non à jour', en_attente: '⚪ En attente', suspendu: '⛔ Suspendu', radie: '🚫 Radié' };
+  async function chargerMesAdhesions() {
+    const el = document.getElementById('mp-adhesions-liste');
+    el.innerHTML = '<p class="mp-empty">Chargement…</p>';
+    let adhesions = [];
+    try { const r = await api('GET', '/mes-adhesions'); adhesions = r.adhesions || []; }
+    catch(e) { el.innerHTML = `<p class="mp-empty">Erreur de chargement : ${e.message||''}</p>`; return; }
+    if (!adhesions.length) { el.innerHTML = '<p class="mp-empty">Aucune adhésion pour l\'instant.</p>'; return; }
+    el.innerHTML = adhesions.map(a => `
+      <div class="mp-carte-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <strong>${escHtmlMP(a.initiative_nom)}</strong> — ${escHtmlMP(a.formule_nom)}
+            <div style="font-size:11.5px;color:var(--muted,#888);margin-top:2px;">${escHtmlMP(a.numero_adherent)} · ${ADH_STATUT_LABELS_MP[a.statut]||a.statut}${a.date_expiration ? ' · valide jusqu\'au '+new Date(a.date_expiration).toLocaleDateString('fr-FR') : ''}</div>
+          </div>
+          ${a.initiative_slug ? `<a href="initiative.html?id=${encodeURIComponent(a.initiative_slug)}" style="font-size:12px;color:#2563eb;">Voir la fiche →</a>` : ''}
+        </div>
+        ${a.paiements.length ? `<div style="border-top:1px solid var(--border,#eee);padding-top:8px;display:flex;flex-direction:column;gap:5px;">
+          ${a.paiements.map(p => `
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;">
+              <span>${p.date_paiement ? new Date(p.date_paiement).toLocaleDateString('fr-FR') : ''} — ${p.montant} ${escHtmlMP(p.devise||'EUR')} (${escHtmlMP(p.mode_paiement||'')})</span>
+              <a href="/api/adhesion-paiements/${p.id}/recu" target="_blank" style="color:#2563eb;">📄 Reçu</a>
+            </div>`).join('')}
+        </div>` : ''}
+      </div>`).join('');
+  }
+  function escHtmlMP(s){ const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+  chargerMesAdhesions();
 
   chargerMoyens();
 })();

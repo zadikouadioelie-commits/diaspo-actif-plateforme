@@ -2926,21 +2926,28 @@ function remplacerPlaceholders(template, vars) {
    Stripe ou manuel) — comblait un vrai manque, seule une notification in-app existait jusqu'ici.
    Modèle personnalisable par l'association (adhesion_modele_recu), sinon texte par défaut.
    Best-effort : ne bloque jamais le traitement du paiement si l'envoi échoue. */
-async function envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu) {
+async function envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu, paiementId) {
   if (!membre.email) return;
   try {
     const { sendEmail } = require('./mailer');
+    /* numéro d'adhérent et dates (incrément 4, 2026-08-07) : existaient déjà ailleurs (route
+       carte, format ADH-{initiative}-{membre}) mais n'avaient jamais été branchés sur cet
+       e-mail — un manque de câblage, pas de fondations manquantes. */
+    const dateDebut = membre.date_adhesion ? new Date(membre.date_adhesion).toLocaleDateString('fr-FR') : '';
+    const dateFin = membre.date_expiration ? new Date(membre.date_expiration).toLocaleDateString('fr-FR') : 'Sans expiration';
     const vars = {
       prenom: membre.prenom || '', nom: membre.nom, formule: formule?.nom || 'adhésion', initiative: init.nom,
       montant, devise: formule?.devise || 'EUR', numero_recu: numeroRecu,
+      numero_adherent: `ADH-${membre.initiative_id}-${membre.id}`, date_debut: dateDebut, date_fin: dateFin,
     };
     const corps = init.adhesion_modele_recu
       ? remplacerPlaceholders(init.adhesion_modele_recu, vars)
-      : `Bonjour ${vars.prenom},\n\nVotre paiement pour « ${vars.formule} » (${vars.initiative}) a bien été enregistré : ${montant} ${vars.devise}.\nNuméro de reçu : ${numeroRecu}.\n\nMerci pour votre soutien !`;
+      : `Bonjour ${vars.prenom},\n\nVotre paiement pour « ${vars.formule} » (${vars.initiative}) a bien été enregistré : ${montant} ${vars.devise}.\nNuméro de reçu : ${numeroRecu}.\nNuméro d'adhérent : ${vars.numero_adherent}.\n${dateDebut ? `Adhésion valable du ${dateDebut} au ${vars.date_fin}.` : `Validité : ${vars.date_fin}.`}\n\nMerci pour votre soutien !`;
+    const lienRecu = `${process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app'}/api/adhesion-paiements/${paiementId}/recu`;
     await sendEmail({
       to: membre.email,
       subject: `Reçu de paiement — ${init.nom}`,
-      html: `<div style="white-space:pre-line;">${corps.replace(/</g,'&lt;')}</div>`,
+      html: `<div style="white-space:pre-line;">${corps.replace(/</g,'&lt;')}</div><p style="margin-top:16px;"><a href="${lienRecu}">📄 Télécharger le reçu (PDF)</a></p>`,
     });
   } catch (e) { console.error('[recu-adhesion]', e.message); }
 }
@@ -3590,7 +3597,8 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   }
   await ajouterAListeStockage(m.formule_id, m);
   { const initComplete = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(m.initiative_id);
-    await envoyerRecuAdhesion(initComplete, m, formule, montant, numeroRecu); }
+    const mAJour = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(m.id);
+    await envoyerRecuAdhesion(initComplete, mAJour, formule, montant, numeroRecu, paiementId); }
   journaliserAdhesion(m.initiative_id, m.id, m.date_adhesion ? 'renouvellement' : 'creation', user,
     `Paiement manuel enregistré (${modePaiement}) — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
   sendJSON(res, 200, { ok: true, numero_recu: numeroRecu });
@@ -3801,6 +3809,90 @@ route("GET", "/api/initiatives/:id/adhesion-export", async (req, res, params, bo
   const csv = [entetes, ...lignes].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="adherents-${params.id}.csv"` });
   res.end('﻿' + csv);
+});
+
+/* ── Reçu individuel téléchargeable (incrément 4, 2026-08-07) — même pattern que l'export PDF
+   du registre (page imprimable, window.print() automatique ; pas de librairie PDF serveur).
+   Accessible par l'adhérent lui-même (compte lié) ou par l'association propriétaire — jamais
+   par un tiers, un reçu contient des informations personnelles et un montant payé. ── */
+route("GET", "/api/adhesion-paiements/:id/recu", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const pay = await db.prepare(`
+    SELECT p.*, m.nom AS m_nom, m.prenom AS m_prenom, m.linked_user_id, m.date_adhesion, m.date_expiration,
+           f.nom AS formule_nom, i.nom AS init_nom, i.owner_user_id
+    FROM adhesion_paiements p
+    JOIN adhesion_membres m ON m.id = p.membre_id
+    LEFT JOIN adhesion_formules f ON f.id = p.formule_id
+    JOIN initiatives i ON i.id = p.initiative_id
+    WHERE p.id = ?
+  `).get(params.id);
+  if (!pay) return sendJSON(res, 404, { error: "Reçu introuvable." });
+  const estAdherent = pay.linked_user_id && Number(pay.linked_user_id) === Number(user.id);
+  const estProprietaire = Number(pay.owner_user_id) === Number(user.id);
+  if (!estAdherent && !estProprietaire) return sendJSON(res, 403, { error: "Ce reçu ne vous appartient pas." });
+  if (pay.statut !== 'paye') return sendJSON(res, 404, { error: "Aucun reçu disponible pour ce paiement (non confirmé)." });
+
+  const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const numeroAdherent = `ADH-${pay.initiative_id}-${pay.membre_id}`;
+  const datePaiement = pay.date_paiement ? new Date(pay.date_paiement).toLocaleDateString('fr-FR') : new Date(pay.created_at).toLocaleDateString('fr-FR');
+  const dateDebut = pay.date_adhesion ? new Date(pay.date_adhesion).toLocaleDateString('fr-FR') : '—';
+  const dateFin = pay.date_expiration ? new Date(pay.date_expiration).toLocaleDateString('fr-FR') : 'Sans expiration';
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu ${esc(pay.numero_recu || pay.id)} — ${esc(pay.init_nom)}</title>
+    <style>
+      @page { size: A4; margin: 20mm; }
+      body{font-family:Arial,sans-serif;color:#111;font-size:13px;max-width:600px;margin:0 auto;}
+      h1{font-size:20px;margin:0 0 4px;color:#1B3A6B;} .sub{color:#666;margin:0 0 24px;font-size:12px;}
+      .ligne{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;}
+      .label{color:#666;} .montant{font-size:22px;font-weight:800;color:#1B3A6B;text-align:right;margin:20px 0;}
+      .footer{margin-top:30px;color:#94a3b8;font-size:11px;text-align:center;}
+    </style></head><body>
+    <h1>Reçu de paiement</h1>
+    <p class="sub">${esc(pay.init_nom)} — via Diaspo'Actif</p>
+    <div class="ligne"><span class="label">Adhérent</span><span>${esc(pay.m_prenom || '')} ${esc(pay.m_nom)}</span></div>
+    <div class="ligne"><span class="label">Numéro d'adhérent</span><span>${esc(numeroAdherent)}</span></div>
+    <div class="ligne"><span class="label">Formule</span><span>${esc(pay.formule_nom || '—')}</span></div>
+    <div class="ligne"><span class="label">Numéro de reçu</span><span>${esc(pay.numero_recu || pay.id)}</span></div>
+    <div class="ligne"><span class="label">Date de paiement</span><span>${datePaiement}</span></div>
+    <div class="ligne"><span class="label">Mode de paiement</span><span>${esc(pay.mode_paiement || '—')}</span></div>
+    <div class="ligne"><span class="label">Période de validité</span><span>${dateDebut} → ${dateFin}</span></div>
+    <div class="montant">${pay.montant} ${esc(pay.devise || 'EUR')}</div>
+    <div class="footer">Reçu généré automatiquement le ${new Date().toLocaleDateString('fr-FR')} — Diaspo'Actif</div>
+    <script>window.onload = () => window.print();</script>
+    </body></html>`;
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(html);
+});
+
+/* ── Historique des adhésions de l'utilisateur connecté (incrément 4, 2026-08-07) — toutes
+   initiatives confondues, avec accès direct à chaque reçu. Absent jusqu'ici : mes-paiements.html
+   ne couvrait que les cartes bancaires enregistrées, aucune route ne listait les paiements
+   d'adhésion d'un utilisateur (les requêtes existantes sur adhesion_paiements étaient toutes
+   scopées par initiative_id, réservées au propriétaire de l'association). ── */
+route("GET", "/api/mes-adhesions", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const membres = await db.prepare(`
+    SELECT m.*, f.nom AS formule_nom, i.nom AS init_nom, i.slug AS init_slug
+    FROM adhesion_membres m
+    JOIN adhesion_formules f ON f.id = m.formule_id
+    JOIN initiatives i ON i.id = m.initiative_id
+    WHERE m.linked_user_id = ?
+    ORDER BY m.created_at DESC
+  `).all(user.id);
+  const adhesions = [];
+  for (const m of membres) {
+    const paiements = await db.prepare(`
+      SELECT id, montant, devise, statut, mode_paiement, numero_recu, date_paiement, created_at
+      FROM adhesion_paiements WHERE membre_id=? AND statut='paye' ORDER BY created_at DESC
+    `).all(m.id);
+    adhesions.push({
+      membre_id: m.id, initiative_nom: m.init_nom, initiative_slug: m.init_slug, formule_nom: m.formule_nom,
+      statut: computeAdhesionStatut(m), date_adhesion: m.date_adhesion, date_expiration: m.date_expiration,
+      numero_adherent: `ADH-${m.initiative_id}-${m.id}`, paiements,
+    });
+  }
+  sendJSON(res, 200, { adhesions });
 });
 
 /* ── Paiement d'une formule (public/connecté) — one-off ou subscription selon le type ── */
@@ -12238,7 +12330,8 @@ async function handleStripeWebhook(req, res) {
         creerNotif(init.owner_user_id, "adhesion_recue", "Nouvelle adhésion 🎫",
           `« ${formule?.nom || ''} » réglée par ${membre.prenom || ''} ${membre.nom} (+${organizer_amount}€).`, { paiement_id: paiementId });
         await ajouterAListeStockage(pay.formule_id, membre);
-        await envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu);
+        const membreAJour = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(pay.membre_id);
+        await envoyerRecuAdhesion(init, membreAJour, formule, montant, numeroRecu, paiementId);
         journaliserAdhesion(pay.initiative_id, pay.membre_id, membre.date_adhesion ? 'renouvellement' : 'creation', null,
           `Paiement Stripe confirmé — « ${formule?.nom || ''} », ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
       }
