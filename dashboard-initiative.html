@@ -6167,7 +6167,7 @@ const ADH_TYPE_LABELS = {
   adhesion_unique: 'Adhésion unique', participation_projet: 'Participation à un projet',
   contribution_exceptionnelle: 'Contribution exceptionnelle', autre: 'Autre',
 };
-const ADH_STATUT_LABELS = { a_jour: '🟢 À jour', non_a_jour: '🔴 Non à jour', en_attente: '⚪ En attente', suspendu: '⛔ Suspendu' };
+const ADH_STATUT_LABELS = { a_jour: '🟢 À jour', non_a_jour: '🔴 Non à jour', en_attente: '⚪ En attente', suspendu: '⛔ Suspendu', radie: '🚫 Radié' };
 const ADH_DUREE_UNITE_LABELS = { jours: 'jour(s)', semaines: 'semaine(s)', mois: 'mois', annees: 'année(s)' };
 
 /* Relit l'état réel côté serveur pour synchroniser le toggle à l'ouverture de la section —
@@ -6677,8 +6677,10 @@ function adhRenderMembresLignes(liste){
       <td style="padding:8px;white-space:nowrap;">
         ${m.linked_user_id?`<a class="btn btn-sm btn-outline" href="profil.html?id=${m.linked_user_id}" target="_blank">👁 Accéder au profil</a>`:''}
         ${!m.linked_user_id && m.email?`<button class="btn btn-sm btn-outline" onclick="adhInviterMembre(${m.id},this)" title="Envoie un e-mail invitant ce membre à créer son compte Diaspo'Actif — sa fiche lui sera automatiquement proposée au rattachement.">✉️ Inviter</button>`:''}
-        ${m.statut!=='a_jour'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
+        ${m.statut!=='a_jour'&&m.statut!=='radie'?`<button class="btn btn-sm btn-outline" onclick="adhOuvrirPaiementManuel(${m.id})">💰 Marquer payé</button>`:''}
         <button class="btn btn-sm btn-outline" onclick="adhGererBadges(${m.id})">🏅</button>
+        ${m.statut==='suspendu'?`<button class="btn btn-sm btn-outline" onclick="adhChangerStatutMembre(${m.id},'a_jour',this)">▶️ Réactiver</button>`:m.statut!=='radie'?`<button class="btn btn-sm btn-outline" onclick="adhChangerStatutMembre(${m.id},'suspendu',this)">⛔ Suspendre</button>`:''}
+        ${m.statut!=='radie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhChangerStatutMembre(${m.id},'radie',this)" title="Fin définitive — irréversible depuis cet écran">🚫 Radier</button>`:'<span style="font-size:11px;color:var(--muted);">Radié</span>'}
         <button class="btn btn-sm btn-outline" onclick="adhSwitchTab('journal'); setTimeout(()=>adhRenderJournal(${m.id}),0)" title="Historique de cette fiche">🕓</button>
       </td>
     </tr>`;
@@ -6695,6 +6697,90 @@ async function adhInviterMembre(membreId, btn){
     showToast?.('Erreur : ' + e.message, 'danger');
   }
 }
+/* Emailing en masse (incrément 3, 2026-08-07) — cible exactement les destinataires visibles
+   à l'écran (filtres actuels appliqués via ADH_FILTRES), vrai envoi e-mail (mailer.js), pas
+   un message in-app comme le "message-groupe" du Réseau Pro. */
+function adhOuvrirEmailing(){
+  const nb = ADH_MEMBRES.filter(m=>m.email).length;
+  document.getElementById('modal-adh-emailing')?.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'modal-adh-emailing';
+  wrap.className = 'modal-back';
+  wrap.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;';
+  wrap.innerHTML = `
+    <div class="card" style="max-width:480px;width:100%;padding:20px;">
+      <h3 style="margin:0 0 6px;">✉️ Emailing en masse</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">${nb} destinataire${nb>1?'s':''} avec les filtres actuels du registre.</p>
+      <label style="font-size:12px;font-weight:700;">Sujet</label>
+      <input type="text" id="adh-em-sujet" class="input" style="margin:4px 0 10px;width:100%;" maxlength="200">
+      <label style="font-size:12px;font-weight:700;">Message</label>
+      <textarea id="adh-em-message" class="input" rows="6" style="margin:4px 0 10px;width:100%;" maxlength="5000" placeholder="Le message sera envoyé tel quel, avec une formule d'appel automatique et la signature de l'association."></textarea>
+      <div id="adh-em-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('modal-adh-emailing').remove()">Annuler</button>
+        <button class="btn btn-orange" id="adh-em-envoyer">📤 Envoyer</button>
+      </div>
+    </div>`;
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+  document.body.appendChild(wrap);
+  document.getElementById('adh-em-envoyer').onclick = async () => {
+    const sujet = document.getElementById('adh-em-sujet').value.trim();
+    const message = document.getElementById('adh-em-message').value.trim();
+    const err = document.getElementById('adh-em-err');
+    err.style.display = 'none';
+    if (!sujet || !message) { err.textContent = 'Sujet et message requis.'; err.style.display = 'block'; return; }
+    if (!confirm(`Envoyer cet e-mail à ${nb} destinataire${nb>1?'s':''} ?`)) return;
+    const btn = document.getElementById('adh-em-envoyer');
+    btn.disabled = true; btn.textContent = 'Envoi…';
+    try {
+      const r = await api('POST', `/initiatives/${window.__vitrineInitId}/adhesion-membres/emailing`, { sujet, message, ...ADH_FILTRES });
+      wrap.remove();
+      showToast(`✅ Envoyé à ${r.nb_envoyes}/${r.nb_destinataires} destinataire(s).`);
+    } catch(e) {
+      err.textContent = e.message || 'Erreur lors de l\'envoi.'; err.style.display = 'block';
+      btn.disabled = false; btn.textContent = '📤 Envoyer';
+    }
+  };
+}
+
+async function adhChangerStatutMembre(id, statut, btn){
+  const libelles = { suspendu:'suspendre', radie:'radier définitivement', a_jour:'réactiver' };
+  const confirmMsg = statut === 'radie'
+    ? "Radier cet adhérent ? C'est une fin définitive (contrairement à « Suspendre », réversible) — il ne recevra plus de rappels de renouvellement."
+    : `Confirmer : ${libelles[statut] || statut} cet adhérent ?`;
+  if (!confirm(confirmMsg)) return;
+  if (btn) { btn.disabled = true; }
+  try{
+    await api('PUT', `/adhesion-membres/${id}`, { statut });
+    await adhAppliquerFiltresServeur();
+    showToast('Statut mis à jour ✅');
+  }catch(e){ showToast('Erreur : '+e.message, 'danger'); if (btn) btn.disabled = false; }
+}
+
+/* Filtres serveur (incrément 3, 2026-08-07) — la recherche texte reste côté client
+   (adhFiltrerRegistre, sur ADH_MEMBRES déjà chargé) car instantanée à la frappe ; les autres
+   filtres repassent par l'API pour bénéficier des combinaisons déjà supportées côté serveur
+   (statut/formule/origine/paiement). */
+let ADH_FILTRES = {};
+async function adhAppliquerFiltresServeur(){
+  const initId = window.__vitrineInitId;
+  ADH_FILTRES = {
+    statut: document.getElementById('adh-filtre-statut')?.value || '',
+    formule_id: document.getElementById('adh-filtre-formule')?.value || '',
+    origine: document.getElementById('adh-filtre-origine')?.value || '',
+    paiement: document.getElementById('adh-filtre-paiement')?.value || '',
+  };
+  const qs = Object.entries(ADH_FILTRES).filter(([,v])=>v).map(([k,v])=>`${k}=${encodeURIComponent(v)}`).join('&');
+  try{
+    const r = await api('GET', `/initiatives/${initId}/adhesion-membres${qs?'?'+qs:''}`);
+    ADH_MEMBRES = r.membres || [];
+    const recherche = document.getElementById('adh-registre-recherche')?.value || '';
+    adhFiltrerRegistre(recherche);
+    const compteur = document.getElementById('adh-emailing-count');
+    if (compteur) compteur.textContent = ADH_MEMBRES.filter(m=>m.email).length;
+  }catch(e){ showToast('Erreur filtre : '+e.message, 'danger'); }
+}
+
 function adhFiltrerRegistre(terme){
   const tbody = document.getElementById('adh-registre-tbody');
   if (!tbody) return;
@@ -6722,7 +6808,7 @@ async function adhRenderRegistre(){
       return;
     }
     el.innerHTML = `
-      <div style="margin-bottom:12px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;">
+      <div style="margin-bottom:10px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;">
         <input type="text" id="adh-registre-recherche" placeholder="🔎 Rechercher (nom, email, téléphone, n° adhérent)…" style="flex:1;min-width:220px;padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;" oninput="adhFiltrerRegistre(this.value)">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-outline" onclick="adhOuvrirAjoutMembre()">➕ Ajouter un adhérent</button>
@@ -6730,6 +6816,23 @@ async function adhRenderRegistre(){
           <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export?format=excel" target="_blank">📊 Excel</a>
           <a class="btn btn-sm btn-outline" href="/api/initiatives/${initId}/adhesion-export?format=pdf" target="_blank" title="Ouvre un aperçu imprimable — utilisez « Enregistrer en PDF » dans la boîte de dialogue d'impression du navigateur.">📄 PDF</a>
         </div>
+      </div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="adh-filtre-statut" class="input" style="width:auto;font-size:12.5px;" onchange="adhAppliquerFiltresServeur()">
+          <option value="">Tous les statuts</option>
+          ${Object.entries(ADH_STATUT_LABELS).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}
+        </select>
+        <select id="adh-filtre-formule" class="input" style="width:auto;font-size:12.5px;" onchange="adhAppliquerFiltresServeur()">
+          <option value="">Toutes les formules</option>
+          ${ADH_FORMULES.map(f=>`<option value="${f.id}">${escH(f.nom)}</option>`).join('')}
+        </select>
+        <select id="adh-filtre-origine" class="input" style="width:auto;font-size:12.5px;" onchange="adhAppliquerFiltresServeur()">
+          <option value="">Toutes origines</option><option value="diaspoactif">🟢 Diaspo'Actif</option><option value="externe">⚪ Externe</option>
+        </select>
+        <select id="adh-filtre-paiement" class="input" style="width:auto;font-size:12.5px;" onchange="adhAppliquerFiltresServeur()">
+          <option value="">Gratuit / Payant</option><option value="gratuit">Gratuit</option><option value="payant">Payant</option>
+        </select>
+        <button class="btn btn-sm btn-orange" onclick="adhOuvrirEmailing()">✉️ Emailing (<span id="adh-emailing-count">${ADH_MEMBRES.filter(m=>m.email).length}</span>)</button>
       </div>
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">

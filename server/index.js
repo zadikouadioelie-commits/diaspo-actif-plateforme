@@ -3353,18 +3353,19 @@ route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params,
    vers 'a_jour' — seul un nouveau paiement réussi peut le faire. Seule la transition
    a_jour → non_a_jour est recalculée dynamiquement (détection d'expiration sans cron). */
 function computeAdhesionStatut(m) {
-  if (m.statut === 'en_attente' || m.statut === 'suspendu' || m.statut === 'non_a_jour') return m.statut;
+  /* 'radie' (incrément 3, 2026-08-07) : fin définitive, jamais recalculée — contrairement à
+     'suspendu' qui reste une pause réversible, un membre radié le reste tant que l'association
+     ne le réintègre pas explicitement (aucune action ne fait ça pour l'instant, par choix). */
+  if (m.statut === 'en_attente' || m.statut === 'suspendu' || m.statut === 'non_a_jour' || m.statut === 'radie') return m.statut;
   if (!m.date_expiration) return 'a_jour'; // dons/contributions sans échéance
   return new Date(m.date_expiration) >= new Date() ? 'a_jour' : 'non_a_jour';
 }
 
-/* ── Registre des membres (owner) ── */
-route("GET", "/api/initiatives/:id/adhesion-membres", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
-  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
-  let rows = await db.prepare(`SELECT * FROM adhesion_membres WHERE initiative_id=? ORDER BY created_at DESC`).all(params.id);
+/* Filtres combinables du registre des membres — factorisé (incrément 3, 2026-08-07) pour
+   être réutilisé tel quel par la route d'emailing en masse, qui doit cibler exactement les
+   mêmes destinataires que ce que l'association voit affiché à l'écran. */
+async function chargerEtFiltrerAdhesionMembres(initiativeId, query) {
+  let rows = await db.prepare(`SELECT * FROM adhesion_membres WHERE initiative_id=? ORDER BY created_at DESC`).all(initiativeId);
   rows = rows.map(m => ({ ...m, statut: computeAdhesionStatut(m), badges_json: JSON.parse(m.badges_json || '[]') }));
   const statutFiltre = query?.statut;
   const formuleFiltre = query?.formule_id;
@@ -3384,9 +3385,60 @@ route("GET", "/api/initiatives/:id/adhesion-membres", async (req, res, params, b
     rows = rows.filter(m =>
       (m.nom || '').toLowerCase().includes(q) || (m.prenom || '').toLowerCase().includes(q) ||
       (m.email || '').toLowerCase().includes(q) || (m.telephone || '').toLowerCase().includes(q) ||
-      `adh-${params.id}-${m.id}`.toLowerCase().includes(q));
+      `adh-${initiativeId}-${m.id}`.toLowerCase().includes(q));
   }
+  return rows;
+}
+
+/* ── Registre des membres (owner) ── */
+route("GET", "/api/initiatives/:id/adhesion-membres", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await chargerEtFiltrerAdhesionMembres(params.id, query);
   sendJSON(res, 200, { membres: rows });
+});
+
+/* ── Emailing en masse (incrément 3, 2026-08-07) — vrai envoi e-mail, distinct du
+   "message-groupe" du Réseau Pro (qui n'envoie que des messages in-app, uniquement aux
+   contacts ayant déjà une conversation ouverte). Cible exactement les destinataires que
+   l'association voit à l'écran (mêmes filtres que le registre), donc les query params sont
+   passés dans le BODY (POST, pas GET) pour rester cohérent avec un formulaire de sélection. */
+route("POST", "/api/initiatives/:id/adhesion-membres/emailing", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id, nom FROM initiatives WHERE id=?").get(params.id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const sujet = String(body?.sujet || '').trim().slice(0, 200);
+  const message = String(body?.message || '').trim().slice(0, 5000);
+  if (!sujet || !message) return sendJSON(res, 400, { error: "Sujet et message requis." });
+
+  const membres = await chargerEtFiltrerAdhesionMembres(params.id, body || {});
+  const destinataires = membres.filter(m => m.email);
+  /* Garde-fou simple : un envoi manuel depuis ce formulaire reste une action ponctuelle,
+     pas une plateforme d'emailing de masse — au-delà, orienter vers un export + outil dédié
+     plutôt que de risquer un envoi énorme accidentel (mauvais filtre = "tous" par erreur). */
+  if (destinataires.length > 500) {
+    return sendJSON(res, 400, { error: `${destinataires.length} destinataires — au-delà de 500, exportez la liste (CSV) et utilisez un outil d'emailing dédié.` });
+  }
+  if (!destinataires.length) return sendJSON(res, 400, { error: "Aucun destinataire avec adresse e-mail pour ces filtres." });
+
+  const { sendEmail } = require('./mailer');
+  let envoyes = 0, echecs = 0;
+  for (const m of destinataires) {
+    try {
+      await sendEmail({
+        to: m.email,
+        subject: sujet,
+        html: `<p>Bonjour ${escapeHtml(m.prenom || m.nom || '')},</p><p>${escapeHtml(message).replace(/\n/g, '<br>')}</p><p style="color:#94a3b8;font-size:12px;margin-top:20px;">— ${escapeHtml(init.nom)}, via Diaspo'Actif</p>`,
+      });
+      envoyes++;
+    } catch (e) { echecs++; }
+  }
+  journaliserAdhesion(params.id, null, 'emailing_masse', user, `Emailing envoyé à ${envoyes} destinataire(s) (${echecs} échec(s)) — sujet : « ${sujet} ».`);
+  sendJSON(res, 200, { ok: true, nb_destinataires: destinataires.length, nb_envoyes: envoyes, nb_echecs: echecs });
 });
 
 /* ── Ajouter un membre manuellement (sans compte plateforme) ── */
@@ -3444,8 +3496,8 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
       adresse ?? m.adresse, pays ?? m.pays, ville ?? m.ville, observations ?? m.observations,
       statut || null, nouvelleFormule?.id || null, params.id);
   if (statut && statut !== m.statut) {
-    journaliserAdhesion(m.initiative_id, m.id, statut === 'suspendu' ? 'suspension' : 'modification',
-      user, `Statut changé : ${m.statut} → ${statut}.`);
+    const action = statut === 'suspendu' ? 'suspension' : statut === 'radie' ? 'radiation' : 'modification';
+    journaliserAdhesion(m.initiative_id, m.id, action, user, `Statut changé : ${m.statut} → ${statut}.`);
   }
   if (nouvelleFormule) {
     const ancienneFormule = await db.prepare("SELECT nom FROM adhesion_formules WHERE id=?").get(m.formule_id);
@@ -19160,7 +19212,7 @@ async function handleRequest(req, res) {
         JOIN adhesion_formules f ON f.id = m.formule_id
         JOIN initiatives i ON i.id = m.initiative_id
         LEFT JOIN users u ON u.id = m.linked_user_id
-        WHERE m.date_expiration IS NOT NULL AND m.statut != 'suspendu'
+        WHERE m.date_expiration IS NOT NULL AND m.statut NOT IN ('suspendu','radie')
       `).all();
 
       let envoyees = 0;
