@@ -151,8 +151,9 @@ function escHtml(s){ const d = document.createElement('div'); d.textContent = s|
 const ADH_RECURRENTS = ['cotisation_mensuelle', 'cotisation_trimestrielle', 'cotisation_semestrielle', 'cotisation_annuelle'];
 
 async function ouvrirPaiement(formuleId){
+  let me;
   try {
-    const me = await api('GET', '/auth/me');
+    me = await api('GET', '/auth/me');
     if (!me.user) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
   } catch(e) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
   const formule = FORMULES.find(f=>f.id===formuleId);
@@ -165,8 +166,117 @@ async function ouvrirPaiement(formuleId){
     montant = Number(saisie);
     if (!montant || montant <= 0) { showToast?.('Montant invalide.', 'warning'); return; }
   }
+  ouvrirFormulaireAdhesion(formule, montant, me.user.id);
+}
+
+/* Formulaire personnalisable (incrément 2, 2026-08-07) — n'apparaît que si la formule a
+   réellement des champs à collecter (obligatoire/facultatif), pour ne pas ajouter d'étape
+   inutile aux formules qui n'en configurent aucun. Préremplit depuis le profil du compte
+   connecté (point 9 du cahier des charges) — l'association garde la main sur les champs à
+   rendre obligatoires, mais l'adhérent n'a rien à ressaisir de ce qu'il a déjà déclaré. */
+async function ouvrirFormulaireAdhesion(formule, montant, userId){
+  const champsConfig = formule.champs_config || {};
+  const champsCustom = formule.champs_custom || [];
+  const champsActifs = ADH_CHAMPS_CATALOGUE_PUB.filter(c => champsConfig[c.key] === 'obligatoire' || champsConfig[c.key] === 'facultatif');
+  if (!champsActifs.length && !champsCustom.length) return continuerPaiement(formule.id, montant);
+
+  let profil = {};
+  try { profil = (await api('GET', `/profil/${userId}`)).profil || {}; } catch(e) {}
+  const PREFILL = {
+    nom: profil.nom, prenom: profil.prenom, email: profil.email, telephone: profil.telephone,
+    ville: profil.ville, pays: profil.pays, nationalite: profil.nationalite1,
+    pays_origine: profil.origine1, pays_residence: profil.pays,
+  };
+
+  const overlay = document.createElement('div');
+  overlay.id = 'adh-form-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:460px;width:94%;max-height:85vh;overflow-y:auto;">
+      <h3 style="margin:0 0 6px;font-size:16px;">📝 ${escHtml(formule.nom)}</h3>
+      ${formule.texte_intro ? `<p style="font-size:12.5px;color:var(--muted,#888);margin:0 0 10px;white-space:pre-wrap;">${escHtml(formule.texte_intro)}</p>` : ''}
+      <div id="adh-form-champs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;"></div>
+      ${formule.conditions_adhesion ? `<div style="font-size:11.5px;color:var(--muted,#888);background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap;">${escHtml(formule.conditions_adhesion)}</div>` : ''}
+      ${(formule.reglement_pdf_url || formule.statuts_pdf_url) ? `<div style="font-size:12px;margin-bottom:12px;">
+        ${formule.reglement_pdf_url ? `<a href="${escHtml(formule.reglement_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Règlement intérieur</a>` : ''}
+        ${formule.reglement_pdf_url && formule.statuts_pdf_url ? ' · ' : ''}
+        ${formule.statuts_pdf_url ? `<a href="${escHtml(formule.statuts_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Statuts de l'association</a>` : ''}
+      </div>` : ''}
+      <div id="adh-form-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('adh-form-overlay').remove()">Annuler</button>
+        <button class="btn btn-orange" id="adh-form-continuer">Continuer →</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+
+  const zone = document.getElementById('adh-form-champs');
+  zone.innerHTML = champsActifs.map(c => {
+    const val = escHtml(PREFILL[c.key] || '');
+    const req = champsConfig[c.key] === 'obligatoire';
+    let input;
+    if (c.key === 'date_naissance') input = `<input type="date" class="input adh-champ-reponse" data-key="${c.key}" value="${val}" style="width:100%;">`;
+    else if (c.key === 'sexe') input = `<select class="input adh-champ-reponse" data-key="${c.key}" style="width:100%;"><option value="">—</option><option value="Femme" ${val==='Femme'?'selected':''}>Femme</option><option value="Homme" ${val==='Homme'?'selected':''}>Homme</option><option value="Autre" ${val==='Autre'?'selected':''}>Autre</option></select>`;
+    else if (c.key === 'pourquoi_adherer') input = `<textarea class="input adh-champ-reponse" data-key="${c.key}" rows="2" style="width:100%;">${val}</textarea>`;
+    else if (c.key === 'photo' || c.key === 'piece_identite') input = `<input type="file" class="adh-champ-reponse-file" data-key="${c.key}" accept="image/*,application/pdf" style="width:100%;font-size:12px;">`;
+    else input = `<input type="text" class="input adh-champ-reponse" data-key="${c.key}" value="${val}" style="width:100%;">`;
+    return `<div><label style="font-size:12px;font-weight:600;">${escHtml(c.label)}${req?' *':''}</label><div style="margin-top:3px;">${input}</div></div>`;
+  }).join('') + champsCustom.map(c => `
+    <div><label style="font-size:12px;font-weight:600;">${escHtml(c.label)}${c.mode==='obligatoire'?' *':''}</label>
+      <div style="margin-top:3px;"><input type="text" class="input adh-champ-reponse" data-key="${escHtml(c.id)}" style="width:100%;"></div>
+    </div>`).join('');
+
+  document.getElementById('adh-form-continuer').onclick = async () => {
+    const err = document.getElementById('adh-form-err');
+    err.style.display = 'none';
+    const reponses = {};
+    const manquants = [];
+    zone.querySelectorAll('.adh-champ-reponse').forEach(el => { reponses[el.dataset.key] = el.value.trim(); });
+    for (const c of champsActifs) {
+      if (champsConfig[c.key] === 'obligatoire' && !reponses[c.key]) manquants.push(c.label);
+    }
+    for (const c of champsCustom) {
+      if (c.mode === 'obligatoire' && !reponses[c.id]) manquants.push(c.label);
+    }
+    /* Champs de type fichier (photo/pièce d'identité) : téléversés séparément avant de
+       poursuivre, seule l'URL obtenue est envoyée dans les réponses. */
+    for (const fileInput of zone.querySelectorAll('.adh-champ-reponse-file')) {
+      const key = fileInput.dataset.key;
+      const champ = champsActifs.find(c => c.key === key);
+      if (fileInput.files[0]) {
+        try {
+          const fd = new FormData(); fd.append('document', fileInput.files[0]);
+          const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || 'Échec du téléversement.');
+          reponses[key] = d.url;
+        } catch(e) { manquants.push(`${champ?.label || key} (échec d'envoi)`); }
+      } else if (champ && champsConfig[key] === 'obligatoire') {
+        manquants.push(champ.label);
+      }
+    }
+    if (manquants.length) { err.textContent = `Champs obligatoires manquants : ${manquants.join(', ')}`; err.style.display = 'block'; return; }
+    overlay.remove();
+    continuerPaiement(formule.id, montant, reponses);
+  };
+}
+const ADH_CHAMPS_CATALOGUE_PUB = [
+  { key:'nom', label:'Nom' }, { key:'prenom', label:'Prénom' }, { key:'email', label:'Adresse e-mail' },
+  { key:'date_naissance', label:'Date de naissance' }, { key:'sexe', label:'Sexe' },
+  { key:'adresse', label:'Adresse' }, { key:'ville', label:'Ville' }, { key:'code_postal', label:'Code postal' },
+  { key:'pays', label:'Pays' }, { key:'telephone', label:'Numéro de téléphone' },
+  { key:'profession', label:'Profession' }, { key:'entreprise', label:'Entreprise' },
+  { key:'nationalite', label:'Nationalité' }, { key:'pays_origine', label:"Pays d'origine" }, { key:'pays_residence', label:'Pays de résidence' },
+  { key:'photo', label:'Photo' }, { key:'piece_identite', label:"Pièce d'identité" },
+  { key:'comment_connu', label:"Comment avez-vous connu l'association ?" }, { key:'pourquoi_adherer', label:'Pourquoi souhaitez-vous adhérer ?' },
+  { key:'competences', label:'Compétences' }, { key:'centres_interet', label:"Centres d'intérêt" },
+];
+
+function continuerPaiement(formuleId, montant, reponses){
+  const formule = FORMULES.find(f=>f.id===formuleId);
   const recurrent = ADH_RECURRENTS.includes(formule.type_contribution);
-  if (recurrent) return confirmerPaiementAdhesion(formuleId, montant, false);
+  if (recurrent) return confirmerPaiementAdhesion(formuleId, montant, false, reponses);
 
   const overlay = document.createElement('div');
   overlay.id = 'adh-pay-overlay';
@@ -188,13 +298,13 @@ async function ouvrirPaiement(formuleId){
   document.getElementById('adh-pay-confirm').onclick = () => {
     const saveCard = document.getElementById('adh-save-card').checked;
     overlay.remove();
-    confirmerPaiementAdhesion(formuleId, montant, saveCard);
+    confirmerPaiementAdhesion(formuleId, montant, saveCard, reponses);
   };
 }
 
-async function confirmerPaiementAdhesion(formuleId, montant, saveCard){
+async function confirmerPaiementAdhesion(formuleId, montant, saveCard, reponses){
   try {
-    const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, { ...(montant != null ? { montant } : {}), enregistrer_carte: saveCard });
+    const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, { ...(montant != null ? { montant } : {}), enregistrer_carte: saveCard, reponses: reponses || {} });
     if (r.checkout_url) { location.href = r.checkout_url; return; }
   } catch(e) {
     showToast?.('Erreur : ' + e.message, 'danger');

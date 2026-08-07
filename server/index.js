@@ -2979,6 +2979,57 @@ function sanitizeAdhesionModes(modes) {
 const ADHESION_MEDIA_TYPES = ['photo', 'video'];
 const ADHESION_MEDIA_MAX_DUREE = 60; // secondes
 
+/* ── Formulaire personnalisable (incrément 2, 2026-08-07) ──
+   Catalogue des champs standard proposables par une association, chacun réglable sur
+   'obligatoire'/'facultatif'/'desactive' (champs_config_json, clé = f.key). nom/prenom/email
+   sont TOUJOURS collectés (auto-remplis depuis le compte connecté) : ils restent dans le
+   catalogue pour que l'association les mette en avant (obligatoire/facultatif), mais ne
+   peuvent pas être 'desactive' — la fiche membre a besoin d'une identité minimale. */
+const ADHESION_CHAMPS_STANDARD = [
+  { key: 'nom', label: 'Nom', verrouille: true },
+  { key: 'prenom', label: 'Prénom', verrouille: true },
+  { key: 'email', label: 'Adresse e-mail', verrouille: true },
+  { key: 'date_naissance', label: 'Date de naissance', type: 'date' },
+  { key: 'sexe', label: 'Sexe', type: 'select', options: ['Femme', 'Homme', 'Autre'] },
+  { key: 'adresse', label: 'Adresse' },
+  { key: 'ville', label: 'Ville' },
+  { key: 'code_postal', label: 'Code postal' },
+  { key: 'pays', label: 'Pays' },
+  { key: 'telephone', label: 'Numéro de téléphone' },
+  { key: 'profession', label: 'Profession' },
+  { key: 'entreprise', label: 'Entreprise' },
+  { key: 'nationalite', label: 'Nationalité' },
+  { key: 'pays_origine', label: "Pays d'origine" },
+  { key: 'pays_residence', label: 'Pays de résidence' },
+  { key: 'photo', label: 'Photo', type: 'file' },
+  { key: 'piece_identite', label: "Pièce d'identité", type: 'file' },
+  { key: 'comment_connu', label: 'Comment avez-vous connu l\'association ?' },
+  { key: 'pourquoi_adherer', label: 'Pourquoi souhaitez-vous adhérer ?', type: 'textarea' },
+  { key: 'competences', label: 'Compétences' },
+  { key: 'centres_interet', label: "Centres d'intérêt" },
+];
+const ADHESION_CHAMPS_MODES = ['obligatoire', 'facultatif', 'desactive'];
+function sanitizeChampsConfig(raw) {
+  let obj; try { obj = typeof raw === 'object' && raw ? raw : JSON.parse(raw || '{}'); } catch (e) { obj = {}; }
+  const out = {};
+  for (const champ of ADHESION_CHAMPS_STANDARD) {
+    let mode = obj[champ.key];
+    if (!ADHESION_CHAMPS_MODES.includes(mode)) mode = champ.verrouille ? 'obligatoire' : 'desactive';
+    if (champ.verrouille && mode === 'desactive') mode = 'obligatoire';
+    out[champ.key] = mode;
+  }
+  return out;
+}
+function sanitizeChampsCustom(raw) {
+  let arr; try { arr = Array.isArray(raw) ? raw : JSON.parse(raw || '[]'); } catch (e) { arr = []; }
+  if (!Array.isArray(arr)) return [];
+  return arr.slice(0, 20).map((c, i) => ({
+    id: c.id || `custom_${i}`,
+    label: String(c.label || '').trim().slice(0, 120),
+    mode: ADHESION_CHAMPS_MODES.includes(c.mode) ? c.mode : 'facultatif',
+  })).filter(c => c.label);
+}
+
 /* Ajoute automatiquement un adhérent/cotisant validé à la « liste de stockage des participants »
    liée à sa formule (module Réseau professionnel) — registre officiel réutilisable pour campagnes,
    convocations, votes, etc. Dédoublonne par compte lié, sinon par email ; met à jour le nom si déjà présent. */
@@ -3024,6 +3075,16 @@ function resolveAdhesionMontant(formule, montantBody) {
 }
 
 /* ── Formules : lecture publique (actives) ── */
+/* Parse champs_config_json/champs_custom_json en objets exploitables côté client, et joint le
+   catalogue standard (label/type) pour que le front n'ait pas à le dupliquer. */
+function enrichirChampsFormule(f) {
+  f.champs_config = sanitizeChampsConfig(f.champs_config_json);
+  f.champs_custom = sanitizeChampsCustom(f.champs_custom_json);
+  delete f.champs_config_json;
+  delete f.champs_custom_json;
+  return f;
+}
+
 route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) => {
   const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? AND actif=1 ORDER BY ordre ASC, id ASC`).all(params.id);
   /* Places restantes (incrément 1, 2026-08-06) : comptées sur les membres en_attente/a_jour
@@ -3036,8 +3097,9 @@ route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) 
     } else {
       f.places_restantes = null;
     }
+    enrichirChampsFormule(f);
   }
-  sendJSON(res, 200, { formules: rows });
+  sendJSON(res, 200, { formules: rows, champs_catalogue: ADHESION_CHAMPS_STANDARD });
 });
 
 /* ── Formules : gestion complète (owner) ── */
@@ -3051,8 +3113,9 @@ route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, 
     const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(f.id)).n;
     f.nb_adherents_actifs = Number(n);
     f.places_restantes = f.max_adherents ? Math.max(0, Number(f.max_adherents) - Number(n)) : null;
+    enrichirChampsFormule(f);
   }
-  sendJSON(res, 200, { formules: rows });
+  sendJSON(res, 200, { formules: rows, champs_catalogue: ADHESION_CHAMPS_STANDARD });
 });
 
 /* ── Ouverture/fermeture globale des adhésions (tâche #69) — bascule visible/masquée du bouton
@@ -3110,7 +3173,8 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
           media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin,
-          duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents } = body;
+          duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents,
+          texte_intro, conditions_adhesion, reglement_pdf_url, statuts_pdf_url, champs_config, champs_custom } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de la formule requis." });
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
@@ -3142,8 +3206,8 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   }
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(params.id)).m;
   const id = (await db.prepare(`
-    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(params.id, nom.trim(), description || null, couleur || '#f97316', icone || '🎫',
        type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
        devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
@@ -3151,7 +3215,9 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
        liste_stockage_id || null, modeValidite,
        modeValidite === 'collectif' ? periode_collective_debut : null, modeValidite === 'collectif' ? periode_collective_fin : null,
        duree_illimitee ? null : (duree_valeur ? Number(duree_valeur) : null), dureeUnite, duree_illimitee ? 1 : 0,
-       (modeValidite === 'collectif' && renouvellement_auto_collectif) ? 1 : 0, max_adherents ? Number(max_adherents) : null)).lastInsertRowid;
+       (modeValidite === 'collectif' && renouvellement_auto_collectif) ? 1 : 0, max_adherents ? Number(max_adherents) : null,
+       texte_intro || null, conditions_adhesion || null, reglement_pdf_url || null, statuts_pdf_url || null,
+       JSON.stringify(sanitizeChampsConfig(champs_config)), JSON.stringify(sanitizeChampsCustom(champs_custom)))).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -3165,7 +3231,8 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
           media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin,
-          duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents } = body;
+          duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents,
+          texte_intro, conditions_adhesion, reglement_pdf_url, statuts_pdf_url, champs_config, champs_custom } = body;
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
   if (media_type === 'video' && Number(media_duree_secondes) > ADHESION_MEDIA_MAX_DUREE) {
@@ -3211,6 +3278,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
       media_type=?, media_url=?, media_duree_secondes=?, liste_stockage_id=COALESCE(?,liste_stockage_id),
       mode_validite=?, periode_collective_debut=?, periode_collective_fin=?,
       duree_valeur=?, duree_unite=?, duree_illimitee=?, renouvellement_auto_collectif=?, max_adherents=?,
+      texte_intro=?, conditions_adhesion=?, reglement_pdf_url=?, statuts_pdf_url=?, champs_config_json=?, champs_custom_json=?,
       updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, description ?? f.description, couleur || null, icone || null, type_contribution || null, montant_type || null,
@@ -3222,6 +3290,12 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          liste_stockage_id || null,
          nouveauMode, nouveauDebut, nouveauFin,
          nouvelleDureeValeur, nouvelleDureeUnite, nouvelleDureeIllimitee, nouveauRenouvAuto, nouveauMaxAdherents,
+         texte_intro !== undefined ? (texte_intro || null) : f.texte_intro,
+         conditions_adhesion !== undefined ? (conditions_adhesion || null) : f.conditions_adhesion,
+         reglement_pdf_url !== undefined ? (reglement_pdf_url || null) : f.reglement_pdf_url,
+         statuts_pdf_url !== undefined ? (statuts_pdf_url || null) : f.statuts_pdf_url,
+         champs_config !== undefined ? JSON.stringify(sanitizeChampsConfig(champs_config)) : f.champs_config_json,
+         champs_custom !== undefined ? JSON.stringify(sanitizeChampsCustom(champs_custom)) : f.champs_custom_json,
          params.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -3252,11 +3326,12 @@ route("POST", "/api/adhesion-formules/:id/dupliquer", async (req, res, params) =
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(f.initiative_id)).m;
   const id = (await db.prepare(`
-    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,actif,mode_validite,duree_valeur,duree_unite,duree_illimitee,max_adherents)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,actif,mode_validite,duree_valeur,duree_unite,duree_illimitee,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?,?)
   `).run(f.initiative_id, `${f.nom} (copie)`, f.description, f.couleur, f.icone, f.type_contribution, f.montant_type, f.montant_fixe, f.montant_min, f.montant_max,
        f.devise, f.modes_paiement_json, maxOrdre + 1, f.mode_validite === 'collectif' ? 'individuel' : f.mode_validite,
-       f.duree_valeur, f.duree_unite, f.duree_illimitee, f.max_adherents)).lastInsertRowid;
+       f.duree_valeur, f.duree_unite, f.duree_illimitee, f.max_adherents,
+       f.texte_intro, f.conditions_adhesion, f.reglement_pdf_url, f.statuts_pdf_url, f.champs_config_json, f.champs_custom_json)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -3707,12 +3782,41 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
       return sendJSON(res, 409, { error: "Cette formule a atteint son nombre maximum d'adhérents." });
     }
   }
+  /* Formulaire personnalisable (incrément 2, 2026-08-07) : valide que chaque champ
+     'obligatoire' (standard ou custom) a bien une réponse non vide avant d'accepter le
+     paiement — le préremplissage côté client depuis le compte connecté couvre nom/prénom/
+     email/etc. automatiquement, donc ça ne bloque en pratique que les champs vraiment
+     absents du profil (ex. "numéro de licence sportive"). */
+  const reponses = (body?.reponses && typeof body.reponses === 'object') ? body.reponses : {};
+  const champsConfig = sanitizeChampsConfig(formule.champs_config_json);
+  const champsCustom = sanitizeChampsCustom(formule.champs_custom_json);
+  /* nom/prenom/email sont "verrouillés obligatoire" dans le catalogue mais déjà connus du
+     compte connecté — ils comptent comme renseignés dès que le compte les a, sans exiger une
+     ressaisie dans `reponses` (le formulaire client les préremplit, mais l'API reste robuste
+     même appelée sans ce préremplissage, ex. un client tiers). */
+  const AUTO_COMPTE = { nom: user.nom, prenom: user.prenom, email: user.email };
+  const manquants = [];
+  for (const champ of ADHESION_CHAMPS_STANDARD) {
+    if (champsConfig[champ.key] !== 'obligatoire') continue;
+    const valeur = reponses[champ.key] ?? AUTO_COMPTE[champ.key];
+    if (!String(valeur ?? '').trim()) manquants.push(champ.label);
+  }
+  for (const champ of champsCustom) {
+    if (champ.mode === 'obligatoire' && !String(reponses[champ.id] ?? '').trim()) manquants.push(champ.label);
+  }
+  if (manquants.length) return sendJSON(res, 400, { error: `Champs obligatoires manquants : ${manquants.join(', ')}` });
+  const reponsesJson = JSON.stringify(reponses);
+
   if (!membre) {
     const mid = (await db.prepare(`
-      INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, statut)
-      VALUES (?,?,?,?,?,?,'en_attente')
-    `).run(formule.id, formule.initiative_id, user.id, user.nom || '', user.prenom || null, user.email || null)).lastInsertRowid;
+      INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, statut, reponses_json)
+      VALUES (?,?,?,?,?,?,'en_attente',?)
+    `).run(formule.id, formule.initiative_id, user.id, user.nom || '', user.prenom || null, user.email || null, reponsesJson)).lastInsertRowid;
     membre = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(mid);
+  } else {
+    /* Renouvellement : les réponses peuvent avoir changé (ex. nouvelle adresse) — on les
+       remplace pour rester à jour, plutôt que de garder celles du tout premier passage. */
+    await db.prepare("UPDATE adhesion_membres SET reponses_json=? WHERE id=?").run(reponsesJson, membre.id);
   }
 
   const paiementId = (await db.prepare(`

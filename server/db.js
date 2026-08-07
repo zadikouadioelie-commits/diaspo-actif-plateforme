@@ -4222,6 +4222,10 @@ try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN pays TEXT"); } catch(_) {
 try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN ville TEXT"); } catch(_) {}
 try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN observations TEXT"); } catch(_) {}
 
+/* Module Adhésions — incrément 2 (2026-08-07) : réponses au formulaire personnalisable
+   (champs standard + champs custom de la formule), format JSON libre { cle: valeur }. */
+try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN reponses_json TEXT DEFAULT '{}'"); } catch(_) {}
+
 /* Extension admin_suppressions_membres : informations du compte au moment de la suppression
    (nom/prénom/email/date de création figés avant l'anonymisation, + motif de l'admin). */
 try { db.exec("ALTER TABLE admin_suppressions_membres ADD COLUMN nom TEXT"); } catch(_) {}
@@ -5492,6 +5496,18 @@ db.exec(`
     if (!adhFCols.includes('mode_validite'))         db.exec("ALTER TABLE adhesion_formules ADD COLUMN mode_validite TEXT DEFAULT 'individuel'");
     if (!adhFCols.includes('periode_collective_debut')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN periode_collective_debut TEXT");
     if (!adhFCols.includes('periode_collective_fin'))   db.exec("ALTER TABLE adhesion_formules ADD COLUMN periode_collective_fin TEXT");
+    /* Module Adhésions — incrément 2 (2026-08-07) : formulaire personnalisable. texte_intro/
+       conditions_adhesion/reglement_pdf_url/statuts_pdf_url alimentent l'écran public avant
+       paiement ; champs_config_json = { cle_champ_standard: 'obligatoire'|'facultatif'|
+       'desactive' } pour le catalogue de champs prédéfini (ADHESION_CHAMPS_STANDARD,
+       server/index.js) ; champs_custom_json = [{ id, label, mode }] pour les champs propres
+       à l'association (ex. "Numéro de licence sportive"). */
+    if (!adhFCols.includes('texte_intro'))           db.exec("ALTER TABLE adhesion_formules ADD COLUMN texte_intro TEXT");
+    if (!adhFCols.includes('conditions_adhesion'))   db.exec("ALTER TABLE adhesion_formules ADD COLUMN conditions_adhesion TEXT");
+    if (!adhFCols.includes('reglement_pdf_url'))     db.exec("ALTER TABLE adhesion_formules ADD COLUMN reglement_pdf_url TEXT");
+    if (!adhFCols.includes('statuts_pdf_url'))       db.exec("ALTER TABLE adhesion_formules ADD COLUMN statuts_pdf_url TEXT");
+    if (!adhFCols.includes('champs_config_json'))    db.exec("ALTER TABLE adhesion_formules ADD COLUMN champs_config_json TEXT DEFAULT '{}'");
+    if (!adhFCols.includes('champs_custom_json'))    db.exec("ALTER TABLE adhesion_formules ADD COLUMN champs_custom_json TEXT DEFAULT '[]'");
     /* Module Adhésions — cahier des charges 2026-08-06, incrément 1 : durée personnalisée en
        mode "Durée glissante" (duree_valeur/duree_unite/duree_illimitee, prioritaires sur
        l'ancienne durée déduite de type_contribution — NULL = comportement historique inchangé
