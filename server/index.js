@@ -3064,6 +3064,20 @@ async function ajouterAListeStockage(formuleId, membre) {
   }
 }
 
+/* Contrepartie de ajouterAListeStockage (incrément 5, 2026-08-07) : retire un membre de la
+   liste de diffusion de sa formule — jusqu'ici la synchronisation n'allait que dans un sens
+   (ajout au paiement), un membre suspendu/radié/expiré restait indéfiniment dans la liste. */
+async function retirerDeListeStockage(formuleId, membre) {
+  const formule = await db.prepare("SELECT liste_stockage_id FROM adhesion_formules WHERE id=?").get(formuleId);
+  if (!formule?.liste_stockage_id) return;
+  const listeId = formule.liste_stockage_id;
+  if (membre.linked_user_id) {
+    await db.prepare("DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND user_id=?").run(listeId, membre.linked_user_id);
+  } else if (membre.email) {
+    await db.prepare("DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND email=?").run(listeId, membre.email);
+  }
+}
+
 /* Résout le montant réel à facturer selon montant_type (fixe/libre/minimum). Retourne null si invalide. */
 function resolveAdhesionMontant(formule, montantBody) {
   if (formule.montant_type === "fixe") return Number(formule.montant_fixe) || 0;
@@ -3211,6 +3225,17 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   if (max_adherents !== undefined && max_adherents !== null && Number(max_adherents) <= 0) {
     return sendJSON(res, 400, { error: "Le nombre maximum d'adhérents doit être positif." });
   }
+  /* Liste de diffusion automatique (incrément 5, 2026-08-07) : "chaque formulaire d'adhésion
+     génère automatiquement une liste de diffusion... sans aucune manipulation supplémentaire"
+     — jusqu'ici la liaison était optionnelle (lier/créer/aucune), l'association pouvait donc
+     se retrouver sans aucune liste. Si elle n'en a pas explicitement choisi une (via "lier"
+     ou "créer", qui fournissent déjà un id à ce stade), on en crée une automatiquement. */
+  let listeStockageId = liste_stockage_id || null;
+  if (!listeStockageId) {
+    listeStockageId = (await db.prepare(
+      `INSERT INTO listes_diffusion (proprietaire_id, nom, description, icone) VALUES (?,?,?,?)`
+    ).run(user.id, `Adhésion — ${nom.trim()}`, `Créée automatiquement pour la formule d'adhésion « ${nom.trim()} ».`, '🎫')).lastInsertRowid;
+  }
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(params.id)).m;
   const id = (await db.prepare(`
     INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json)
@@ -3219,7 +3244,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
        type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
        devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
        media_type || null, media_type ? (media_url || null) : null, media_type === 'video' ? (Number(media_duree_secondes) || null) : null,
-       liste_stockage_id || null, modeValidite,
+       listeStockageId, modeValidite,
        modeValidite === 'collectif' ? periode_collective_debut : null, modeValidite === 'collectif' ? periode_collective_fin : null,
        duree_illimitee ? null : (duree_valeur ? Number(duree_valeur) : null), dureeUnite, duree_illimitee ? 1 : 0,
        (modeValidite === 'collectif' && renouvellement_auto_collectif) ? 1 : 0, max_adherents ? Number(max_adherents) : null,
@@ -3510,6 +3535,17 @@ route("PUT", "/api/adhesion-membres/:id", async (req, res, params, body) => {
     const ancienneFormule = await db.prepare("SELECT nom FROM adhesion_formules WHERE id=?").get(m.formule_id);
     journaliserAdhesion(m.initiative_id, m.id, 'changement_categorie', user,
       `Catégorie changée : « ${ancienneFormule?.nom || '?'} » → « ${nouvelleFormule.nom} ».`);
+  }
+  /* Sync liste de diffusion (incrément 5, 2026-08-07) : un changement de statut ou de formule
+     ici doit se refléter dans la liste — un membre suspendu/radié/non à jour n'y a plus sa
+     place, un changement de formule le déplace vers la bonne liste. */
+  const statutFinal = statut || m.statut;
+  const formuleFinal = nouvelleFormule?.id || m.formule_id;
+  if (nouvelleFormule) await retirerDeListeStockage(m.formule_id, m);
+  if (statutFinal === 'a_jour') {
+    await ajouterAListeStockage(formuleFinal, { ...m, email: email ?? m.email, nom: nom || m.nom, prenom: prenom ?? m.prenom });
+  } else {
+    await retirerDeListeStockage(formuleFinal, m);
   }
   sendJSON(res, 200, { ok: true });
 });
@@ -19365,6 +19401,19 @@ async function handleRequest(req, res) {
         envoyees++;
       }
 
+      /* Retrait des listes de diffusion à l'expiration (incrément 5, 2026-08-07) : le statut
+         "non à jour" n'est jamais écrit en base (computeAdhesionStatut le déduit de
+         date_expiration à la lecture), donc c'est ici, dans le passage quotidien, qu'on
+         détecte le passage à expiré et qu'on retire le membre de la liste — idempotent,
+         sans effet s'il n'y était déjà plus. */
+      let retiresListe = 0;
+      for (const m of membres) {
+        if (computeAdhesionStatut(m) === 'non_a_jour') {
+          await retirerDeListeStockage(m.formule_id, m);
+          retiresListe++;
+        }
+      }
+
       /* Renouvellement automatique de campagne (incrément 1, 2026-08-06) : dès que la période
          collective d'une formule "Calendrier fixe" est dépassée ET que l'association a coché
          l'option, la campagne est redécalée d'un an pile (même jour/mois) pour l'année
@@ -19389,7 +19438,7 @@ async function handleRequest(req, res) {
         campagnesRenouvelees++;
       }
 
-      sendJSON(res, 200, { ok: true, relances_envoyees: envoyees, campagnes_renouvelees: campagnesRenouvelees });
+      sendJSON(res, 200, { ok: true, relances_envoyees: envoyees, campagnes_renouvelees: campagnesRenouvelees, retires_liste: retiresListe });
     } catch (e) {
       console.error('[adhesion-relances]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
