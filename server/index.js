@@ -3178,6 +3178,13 @@ route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) 
      (un paiement en cours réserve déjà une place) — pas sur non_a_jour/suspendu, qui ont
      libéré la leur. */
   for (const f of rows) {
+    /* Piège BIGSERIAL PostgreSQL (voir getCurrentUser/publicUser) : f.id revient en chaîne de
+       texte en production, jamais en local (SQLite) — les comparaisons strictes côté client
+       (ADH_FORMULES.find(x=>x.id===id) dans dashboard-initiative.html/adhesions.html, alimentées
+       par ces boutons dont l'onclick passe l'id en littéral numérique) échouaient silencieusement
+       en production : bouton "Modifier"/"Adhérer" cliquable mais sans aucun effet, sans erreur
+       console. Normalisé ici, à la source, une fois pour tous les appelants. */
+    f.id = Number(f.id);
     if (f.max_adherents) {
       const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(f.id)).n;
       f.places_restantes = Math.max(0, Number(f.max_adherents) - Number(n));
@@ -3197,6 +3204,8 @@ route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, 
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   const rows = await db.prepare(`SELECT * FROM adhesion_formules WHERE initiative_id=? ORDER BY ordre ASC, id ASC`).all(params.id);
   for (const f of rows) {
+    /* Piège BIGSERIAL PostgreSQL — voir la route publique ci-dessus pour le détail. */
+    f.id = Number(f.id);
     const n = (await db.prepare(`SELECT COUNT(*) AS n FROM adhesion_membres WHERE formule_id=? AND statut IN ('en_attente','a_jour')`).get(f.id)).n;
     f.nb_adherents_actifs = Number(n);
     f.places_restantes = f.max_adherents ? Math.max(0, Number(f.max_adherents) - Number(n)) : null;
