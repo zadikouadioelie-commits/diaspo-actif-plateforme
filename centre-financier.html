@@ -152,9 +152,10 @@ function cfRenderRevenus(el) {
   const d = CF_DATA;
   el.innerHTML = `
     <div class="cf-wallet-hero">
-      <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.05em;">Solde disponible</div>
-      <div style="font-size:38px;font-weight:800;margin-top:4px;">${cfMoney(d.balance)}</div>
+      <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.05em;">Solde retirable</div>
+      <div style="font-size:38px;font-weight:800;margin-top:4px;">${cfMoney(d.solde_disponible ?? d.balance)}</div>
       <div style="font-size:11.5px;opacity:.6;margin-top:4px;">Commission Diaspo'Actif : ${Math.round(d.commission_rate*100)}% — prélevée automatiquement</div>
+      ${d.solde_en_reserve > 0 ? `<div style="font-size:11.5px;opacity:.75;margin-top:6px;">+ ${cfMoney(d.solde_en_reserve)} en réserve de sécurité — devient retirable ${d.reserve_jours} jours après réception</div>` : ''}
       <div class="cf-kpi-grid">
         <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.aujourdhui)}</div><div class="l">Aujourd'hui</div></div>
         <div class="cf-kpi"><div class="n">${cfMoney(d.revenus.semaine)}</div><div class="l">Cette semaine</div></div>
@@ -232,17 +233,17 @@ function cfRenderRetrait(el) {
   el.innerHTML = `
     <div class="cf-card">
       <h3 style="margin-top:0;">Demander un retrait</h3>
-      <p style="font-size:12.5px;color:var(--muted);">Solde disponible : <strong>${cfMoney(d.balance)}</strong></p>
+      <p style="font-size:12.5px;color:var(--muted);">Solde retirable : <strong>${cfMoney(d.solde_disponible ?? d.balance)}</strong>${d.solde_en_reserve > 0 ? ` <span style="opacity:.75;">(+ ${cfMoney(d.solde_en_reserve)} en réserve de sécurité, ${d.reserve_jours}j)</span>` : ''}</p>
       ${!peutRetirer ? `<div class="cf-empty" style="padding:16px;">${!d.connect ? 'Connectez d\'abord une Initiative avec Stripe Connect (onglet "Comptes de réception").' : 'Votre compte Stripe Connect doit être entièrement activé (virements) avant de pouvoir retirer des fonds.'}</div>` : `
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
         <div>
           <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Montant à retirer (€)</label>
-          <input type="number" id="cf-withdraw-amount" min="0" max="${d.balance}" step="0.01" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;width:160px;">
+          <input type="number" id="cf-withdraw-amount" min="0" max="${d.solde_disponible ?? d.balance}" step="0.01" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;width:160px;">
         </div>
-        <button class="btn-primary" onclick="cfWithdrawAll()">Retirer tout le solde</button>
+        <button class="btn-primary" onclick="cfWithdrawAll()">Retirer le solde retirable</button>
         <button class="btn-outline" onclick="cfWithdraw()">Retirer ce montant</button>
       </div>
-      <p style="font-size:11.5px;color:var(--muted);margin-top:10px;">Virement Stripe réel (mode test) — délai estimé : 2 à 7 jours ouvrés selon le pays. Aucuns frais Diaspo'Actif supplémentaires sur le retrait.</p>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:10px;">Virement Stripe réel — délai estimé : 2 à 7 jours ouvrés selon le pays. Aucuns frais Diaspo'Actif supplémentaires sur le retrait.</p>
       `}
     </div>
     <div class="cf-card">
@@ -275,7 +276,7 @@ async function cfWithdraw() {
   if (!val || val <= 0) { cfToast('Indiquez un montant valide.', 'error'); return; }
   await cfDoWithdraw(val);
 }
-async function cfWithdrawAll() { await cfDoWithdraw(CF_DATA.balance); }
+async function cfWithdrawAll() { await cfDoWithdraw(CF_DATA.solde_disponible ?? CF_DATA.balance); }
 async function cfDoWithdraw(montant) {
   try {
     const r = await api('POST', '/wallet/withdraw', { montant });

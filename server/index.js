@@ -4136,7 +4136,9 @@ route("GET", "/api/adhesion-paiements/:id/recu", async (req, res, params) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const pay = await db.prepare(`
     SELECT p.*, m.nom AS m_nom, m.prenom AS m_prenom, m.linked_user_id, m.date_adhesion, m.date_expiration,
-           f.nom AS formule_nom, i.nom AS init_nom, i.owner_user_id
+           f.nom AS formule_nom, i.nom AS init_nom, i.owner_user_id,
+           i.denomination_officielle AS init_denomination, i.numero_immatriculation AS init_immat,
+           i.adresse AS init_adresse, i.code_postal AS init_cp, i.ville AS init_ville, i.pays AS init_pays
     FROM adhesion_paiements p
     JOIN adhesion_membres m ON m.id = p.membre_id
     LEFT JOIN adhesion_formules f ON f.id = p.formule_id
@@ -4154,17 +4156,30 @@ route("GET", "/api/adhesion-paiements/:id/recu", async (req, res, params) => {
   const datePaiement = pay.date_paiement ? new Date(pay.date_paiement).toLocaleDateString('fr-FR') : new Date(pay.created_at).toLocaleDateString('fr-FR');
   const dateDebut = pay.date_adhesion ? new Date(pay.date_adhesion).toLocaleDateString('fr-FR') : '—';
   const dateFin = pay.date_expiration ? new Date(pay.date_expiration).toLocaleDateString('fr-FR') : 'Sans expiration';
+  /* Identité légale de l'association (2026-08-08) : n'apparaît que si l'association a
+     renseigné ces informations elle-même (immatriculation/adresse facultatives à
+     l'inscription) — un reçu qui reste un simple justificatif de paiement, jamais un reçu
+     fiscal officiel (voir la note en bas de page). */
+  const adresseComplete = [pay.init_adresse, [pay.init_cp, pay.init_ville].filter(Boolean).join(' '), pay.init_pays].filter(Boolean).join(', ');
+  const identiteHtml = (pay.init_immat || adresseComplete) ? `
+    <div class="identite">
+      ${pay.init_immat ? `<div>N° d'immatriculation : ${esc(pay.init_immat)}</div>` : ''}
+      ${adresseComplete ? `<div>${esc(adresseComplete)}</div>` : ''}
+    </div>` : '';
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu ${esc(pay.numero_recu || pay.id)} — ${esc(pay.init_nom)}</title>
     <style>
       @page { size: A4; margin: 20mm; }
       body{font-family:Arial,sans-serif;color:#111;font-size:13px;max-width:600px;margin:0 auto;}
-      h1{font-size:20px;margin:0 0 4px;color:#1B3A6B;} .sub{color:#666;margin:0 0 24px;font-size:12px;}
+      h1{font-size:20px;margin:0 0 4px;color:#1B3A6B;} .sub{color:#666;margin:0 0 4px;font-size:12px;}
+      .identite{color:#888;font-size:11px;margin:0 0 24px;line-height:1.5;}
       .ligne{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;}
       .label{color:#666;} .montant{font-size:22px;font-weight:800;color:#1B3A6B;text-align:right;margin:20px 0;}
       .footer{margin-top:30px;color:#94a3b8;font-size:11px;text-align:center;}
+      .disclaimer{margin-top:14px;color:#94a3b8;font-size:10.5px;text-align:center;line-height:1.5;}
     </style></head><body>
     <h1>Reçu de paiement</h1>
-    <p class="sub">${esc(pay.init_nom)} — via Diaspo'Actif</p>
+    <p class="sub">${esc(pay.init_denomination || pay.init_nom)} — via Diaspo'Actif</p>
+    ${identiteHtml}
     <div class="ligne"><span class="label">Adhérent</span><span>${esc(pay.m_prenom || '')} ${esc(pay.m_nom)}</span></div>
     <div class="ligne"><span class="label">Numéro d'adhérent</span><span>${esc(numeroAdherent)}</span></div>
     <div class="ligne"><span class="label">Formule</span><span>${esc(pay.formule_nom || '—')}</span></div>
@@ -4174,6 +4189,7 @@ route("GET", "/api/adhesion-paiements/:id/recu", async (req, res, params) => {
     <div class="ligne"><span class="label">Période de validité</span><span>${dateDebut} → ${dateFin}</span></div>
     <div class="montant">${pay.montant} ${esc(pay.devise || 'EUR')}</div>
     <div class="footer">Reçu généré automatiquement le ${new Date().toLocaleDateString('fr-FR')} — Diaspo'Actif</div>
+    <p class="disclaimer">Ce document est un justificatif de paiement, pas un reçu fiscal officiel. Diaspo'Actif ne délivre pas de reçu fiscal (Cerfa) — si son organisation y est éligible, il revient à ${esc(pay.init_denomination || pay.init_nom)} de le délivrer elle-même.</p>
     <script>window.onload = () => window.print();</script>
     </body></html>`;
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -23374,6 +23390,20 @@ ${jsonLd}
       const user = await db.prepare(`SELECT wallet_balance FROM users WHERE id=?`).get(me.id);
       const balance = user?.wallet_balance || 0;
 
+      /* Réserve glissante — voir POST /api/wallet/withdraw pour le détail du calcul, même
+         logique reprise ici pour que l'association voie la distinction avant de tenter un
+         retrait, plutôt que de découvrir la limite au moment de l'erreur. */
+      const RESERVE_JOURS = 7;
+      const mûri = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
+        WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp <= datetime('now', ?)
+      `).get(me.id, `-${RESERVE_JOURS} days`))?.total || 0;
+      const dejaRetire = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM retraits WHERE user_id=? AND statut IN ('demande','traite')
+      `).get(me.id))?.total || 0;
+      const soldeDisponible = Math.max(0, mûri - dejaRetire);
+      const soldeEnReserve = Math.max(0, balance - soldeDisponible);
+
       const fenetre = async (sql) => (await db.prepare(sql).get(me.id))?.total || 0;
       const aujourdhui = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND date(timestamp)=date('now')`);
       const semaine   = await fenetre(`SELECT COALESCE(SUM(montant),0) total FROM wallet_transactions WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp>=datetime('now','-7 days')`);
@@ -23409,6 +23439,7 @@ ${jsonLd}
 
       return sendJSON(res, 200, {
         balance, commission_rate: 0.05,
+        solde_disponible: soldeDisponible, solde_en_reserve: soldeEnReserve, reserve_jours: RESERVE_JOURS,
         revenus: { aujourdhui, semaine, mois, annee, cumule },
         historique, connect,
         settings: settings || { devise_preferee: 'EUR', frequence_auto: 'manuel', seuil_auto: 0, notifications: 1 },
@@ -23447,6 +23478,30 @@ ${jsonLd}
       const solde = user?.wallet_balance || 0;
       if (montantDemande > solde) return sendJSON(res, 400, { error: `Montant supérieur au solde disponible (${solde.toFixed(2)}€).` });
 
+      /* Réserve glissante (2026-08-08) : une somme fraîchement encaissée ne devient retirable
+         qu'après RESERVE_JOURS — le temps que la fenêtre de contestation bancaire la plus
+         probable soit passée. Recommandation Stripe standard pour ce type de plateforme
+         (encaissement pour le compte d'un tiers) ; protège le solde de la plateforme contre
+         un retrait déjà effectué suivi d'un litige sur le paiement d'origine. Calculé sur les
+         crédits réellement "mûrs" moins tout retrait déjà demandé/traité (évite qu'une même
+         somme mûrie serve deux demandes de retrait concurrentes). */
+      const RESERVE_JOURS = 7;
+      const mûri = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
+        WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp <= datetime('now', ?)
+      `).get(me.id, `-${RESERVE_JOURS} days`))?.total || 0;
+      const dejaRetire = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM retraits WHERE user_id=? AND statut IN ('demande','traite')
+      `).get(me.id))?.total || 0;
+      const soldeDisponible = Math.max(0, mûri - dejaRetire);
+      if (montantDemande > soldeDisponible) {
+        return sendJSON(res, 400, {
+          error: soldeDisponible > 0
+            ? `Montant supérieur au solde réellement disponible au retrait (${soldeDisponible.toFixed(2)}€). Le reste est encore en réserve de sécurité (${RESERVE_JOURS} jours après réception) avant de devenir retirable.`
+            : `Aucun montant encore disponible au retrait — les sommes reçues restent en réserve de sécurité ${RESERVE_JOURS} jours après réception avant de devenir retirables.`,
+        });
+      }
+
       const initiative = await db.prepare(`SELECT id FROM initiatives WHERE owner_user_id=?`).get(me.id);
       if (!initiative) return sendJSON(res, 400, { error: "Aucun compte de réception : créez une Initiative et connectez Stripe Connect avant de retirer des fonds." });
       const acc = await db.prepare(`SELECT * FROM stripe_connect_accounts WHERE initiative_id=?`).get(initiative.id);
@@ -23484,7 +23539,79 @@ ${jsonLd}
       const nb_comptes_connectes = (await db.prepare(`SELECT COUNT(*) n FROM stripe_connect_accounts`).get())?.n || 0;
       const nb_retraits = (await db.prepare(`SELECT COUNT(*) n FROM retraits`).get())?.n || 0;
       const retraits_historique = await db.prepare(`SELECT r.*, u.nom AS user_nom FROM retraits r LEFT JOIN users u ON u.id=r.user_id ORDER BY r.created_at DESC LIMIT 50`).all();
-      return sendJSON(res, 200, { wallet: pw, par_event, par_pays, historique, nb_comptes_verifies, nb_comptes_connectes, nb_retraits, retraits_historique });
+
+      /* Solde de commission réellement retirable — même réserve glissante que pour les
+         associations (voir POST /api/wallet/withdraw) : une commission fraîchement perçue
+         reste en réserve RESERVE_JOURS avant de devenir retirable vers la banque de
+         Diaspo'Actif, le temps que la fenêtre de contestation bancaire la plus probable
+         soit passée sur le paiement d'origine. */
+      const RESERVE_JOURS = 7;
+      const commissionMûrie = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
+        WHERE type='platform_fee' AND timestamp <= datetime('now', ?)
+      `).get(`-${RESERVE_JOURS} days`))?.total || 0;
+      const commissionDejaRetiree = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM commission_retraits WHERE statut IN ('demande','traite')
+      `).get())?.total || 0;
+      const solde_commission_disponible = Math.max(0, commissionMûrie - commissionDejaRetiree);
+      const solde_commission_reserve = Math.max(0, (pw?.total_commissions || 0) - commissionDejaRetiree - solde_commission_disponible);
+      const commission_retraits = await db.prepare(`SELECT cr.*, u.nom AS admin_nom FROM commission_retraits cr LEFT JOIN users u ON u.id=cr.admin_user_id ORDER BY cr.created_at DESC LIMIT 50`).all();
+
+      return sendJSON(res, 200, {
+        wallet: pw, par_event, par_pays, historique, nb_comptes_verifies, nb_comptes_connectes, nb_retraits, retraits_historique,
+        solde_commission_disponible, solde_commission_reserve, reserve_jours: RESERVE_JOURS, commission_retraits,
+      });
+    }
+
+    /* ── POST /api/admin/wallet/withdraw — retrait de la commission Diaspo'Actif (Stripe Payout
+       direct vers la banque de la plateforme, jamais un Transfer — il n'y a pas de compte
+       Connect ici, c'est l'argent propre de Diaspo'Actif, déjà distinct de celui des
+       associations depuis l'origine du crédit, voir platform_wallet.total_commissions). ── */
+    if (req.method === 'POST' && pathname === '/api/admin/wallet/withdraw') {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const body = await readBody(req);
+      const montantDemande = parseFloat(body.montant);
+      if (!montantDemande || montantDemande <= 0) return sendJSON(res, 400, { error: 'Montant invalide.' });
+
+      const RESERVE_JOURS = 7;
+      const commissionMûrie = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
+        WHERE type='platform_fee' AND timestamp <= datetime('now', ?)
+      `).get(`-${RESERVE_JOURS} days`))?.total || 0;
+      const commissionDejaRetiree = (await db.prepare(`
+        SELECT COALESCE(SUM(montant),0) AS total FROM commission_retraits WHERE statut IN ('demande','traite')
+      `).get())?.total || 0;
+      const soldeDisponible = Math.max(0, commissionMûrie - commissionDejaRetiree);
+      if (montantDemande > soldeDisponible) {
+        return sendJSON(res, 400, {
+          error: soldeDisponible > 0
+            ? `Montant supérieur à la commission réellement disponible (${soldeDisponible.toFixed(2)}€). Le reste est encore en réserve de sécurité (${RESERVE_JOURS} jours après réception) ou déjà réservé par une demande de retrait en cours.`
+            : `Aucune commission encore disponible au retrait — les sommes perçues restent en réserve de sécurité ${RESERVE_JOURS} jours après réception avant de devenir retirables.`,
+        });
+      }
+
+      const r = await db.prepare(`INSERT INTO commission_retraits (montant, admin_user_id, statut) VALUES (?,?,'demande')`).run(montantDemande, me.id);
+      const retraitId = r.lastInsertRowid;
+
+      try {
+        const { stripe } = require('./stripe-client');
+        if (!stripe) throw new Error('Paiements momentanément indisponibles.');
+        /* stripe.payouts.create (et non transfers.create) : ce virement part directement du
+           solde de la plateforme vers SA PROPRE banque (celle configurée dans Stripe >
+           Paramètres > Comptes bancaires), pas vers un compte Connect tiers. */
+        const payout = await stripe.payouts.create({
+          amount: Math.round(montantDemande * 100),
+          currency: 'eur',
+          description: `Diaspo'Actif — retrait commission (#${retraitId})`,
+          metadata: { diaspoactif_commission_retrait_id: String(retraitId) },
+        });
+        await db.prepare(`UPDATE commission_retraits SET statut='traite', stripe_payout_id=?, traite_at=datetime('now') WHERE id=?`).run(payout.id, retraitId);
+        return sendJSON(res, 200, { ok: true, statut: 'traite', stripe_payout_id: payout.id });
+      } catch (e) {
+        await db.prepare(`UPDATE commission_retraits SET statut='echoue', erreur_msg=? WHERE id=?`).run(e.message || 'Erreur Stripe', retraitId);
+        return sendJSON(res, 502, { error: "Le virement Stripe a échoué : " + (e.message || 'erreur inconnue') });
+      }
     }
 
     /* ══════════════════════════════════════════════════════════════

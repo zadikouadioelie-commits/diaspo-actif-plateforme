@@ -1488,6 +1488,23 @@
             <h4 style="margin:0 0 10px;font-size:13px;">💸 Historique des retraits (Centre Financier)</h4>
             <div id="admin-wallet-retraits" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
           </div>
+          <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
+            <h4 style="margin:0 0 4px;font-size:13px;">🏦 Retirer la commission Diaspo'Actif</h4>
+            <p style="margin:0 0 10px;font-size:12px;color:var(--muted);">Argent propre à Diaspo'Actif — jamais celui des associations. Une somme fraîchement perçue reste en réserve de sécurité <span id="admin-commission-reserve-jours">7</span> jours avant de devenir retirable.</p>
+            <div id="admin-commission-solde" style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Chargement…</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+              <div>
+                <label style="display:block;font-size:12px;font-weight:700;color:#555;margin-bottom:4px;">Montant à retirer (€)</label>
+                <input type="number" id="admin-commission-amount" min="0" step="0.01" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;width:160px;">
+              </div>
+              <button class="btn btn-orange" onclick="adminWithdrawCommissionAll()">Retirer le solde disponible</button>
+              <button class="btn btn-outline" onclick="adminWithdrawCommission()">Retirer ce montant</button>
+            </div>
+            <div style="margin-top:16px;">
+              <h4 style="margin:0 0 10px;font-size:13px;">📋 Historique des retraits de commission</h4>
+              <div id="admin-commission-retraits" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+            </div>
+          </div>
         </div>
 
         <div id="admin-billet-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;"></div>
@@ -11586,6 +11603,28 @@ window.executeFusion      = executeFusion;
 window.useSrIa            = useSrIa;
 
 /* ═══ BILLETTERIE ADMIN ═══ */
+let ADMIN_COMMISSION_SOLDE = 0;
+async function adminWithdrawCommission() {
+  const val = parseFloat(document.getElementById('admin-commission-amount').value);
+  if (!val || val <= 0) { showToast?.('Indiquez un montant valide.', 'warning'); return; }
+  await adminDoWithdrawCommission(val);
+}
+async function adminWithdrawCommissionAll() { await adminDoWithdrawCommission(ADMIN_COMMISSION_SOLDE); }
+async function adminDoWithdrawCommission(montant) {
+  if (!montant || montant <= 0) { showToast?.('Aucun montant disponible.', 'warning'); return; }
+  if (!confirm(`Confirmer le retrait de ${montant.toFixed(2)} € vers la banque de Diaspo'Actif ?`)) return;
+  try {
+    const r = await api('POST', '/admin/wallet/withdraw', { montant });
+    showToast?.(r.statut === 'traite' ? '✅ Virement envoyé vers votre banque.' : 'Retrait enregistré.', 'success');
+    document.getElementById('admin-commission-amount').value = '';
+    await loadAdminBilletterie();
+  } catch (e) {
+    showToast?.(e.message || 'Erreur lors du retrait.', 'danger');
+  }
+}
+window.adminWithdrawCommission = adminWithdrawCommission;
+window.adminWithdrawCommissionAll = adminWithdrawCommissionAll;
+
 async function loadAdminBilletterie() {
   const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
   const fmtTs = s => { if(!s) return '—'; const d=new Date(s); return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; };
@@ -11638,6 +11677,28 @@ async function loadAdminBilletterie() {
             <span><strong>${(r.montant||0).toFixed(2)} €</strong> — <span style="color:${r.statut==='traite'?'#10b981':r.statut==='echoue'?'#ef4444':'#f59e0b'};">${r.statut}</span></span>
           </div>`).join('')
         : '<div style="color:var(--muted);font-size:12px;padding:8px;">Aucun retrait pour l\'instant.</div>';
+
+      /* Retrait de la commission Diaspo'Actif — voir POST /api/admin/wallet/withdraw. */
+      ADMIN_COMMISSION_SOLDE = rWallet.solde_commission_disponible || 0;
+      const commEl = document.getElementById('admin-commission-solde');
+      if (commEl) {
+        const reserve = rWallet.solde_commission_reserve || 0;
+        commEl.innerHTML = `Solde retirable : <strong>${ADMIN_COMMISSION_SOLDE.toFixed(2)} €</strong>` +
+          (reserve > 0 ? ` <span style="opacity:.8;">(+ ${reserve.toFixed(2)} € en réserve de sécurité)</span>` : '');
+      }
+      const reserveJoursEl = document.getElementById('admin-commission-reserve-jours');
+      if (reserveJoursEl) reserveJoursEl.textContent = rWallet.reserve_jours || 7;
+      const amountEl = document.getElementById('admin-commission-amount');
+      if (amountEl) amountEl.max = ADMIN_COMMISSION_SOLDE;
+
+      const commissionRetraits = rWallet.commission_retraits || [];
+      const elCommRetraits = document.getElementById('admin-commission-retraits');
+      if (elCommRetraits) elCommRetraits.innerHTML = commissionRetraits.length
+        ? commissionRetraits.map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px;">
+            <span>${r.admin_nom||'—'} · ${fmtTs(r.created_at)}</span>
+            <span><strong>${(r.montant||0).toFixed(2)} €</strong> — <span style="color:${r.statut==='traite'?'#10b981':r.statut==='echoue'?'#ef4444':'#f59e0b'};">${r.statut}</span></span>
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:12px;padding:8px;">Aucun retrait de commission pour l\'instant.</div>';
 
       const evts = rWallet.par_event || [];
       document.getElementById('admin-wallet-events').innerHTML = evts.length

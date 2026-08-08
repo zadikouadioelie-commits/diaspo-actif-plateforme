@@ -5836,6 +5836,24 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
+  -- Retraits de la commission plateforme (2026-08-08) — distinct de la table "retraits" (qui
+  -- sert aux associations, via Stripe Transfer vers leur compte Connect). Ici, il n'y a pas de
+  -- compte Connect : la commission Diaspo'Actif reste sur le solde Stripe principal de la
+  -- plateforme, et le retrait se fait par un vrai Stripe Payout direct vers la banque de
+  -- Diaspo'Actif (le compte configuré dans Paramètres > Comptes bancaires de Stripe).
+  CREATE TABLE IF NOT EXISTS commission_retraits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    montant REAL NOT NULL,
+    devise TEXT DEFAULT 'EUR',
+    statut TEXT DEFAULT 'demande' CHECK(statut IN ('demande','traite','echoue')),
+    stripe_payout_id TEXT,
+    erreur_msg TEXT,
+    admin_user_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    traite_at TEXT,
+    FOREIGN KEY(admin_user_id) REFERENCES users(id)
+  );
+
   -- Centre Financier : préférences de l'utilisateur
   CREATE TABLE IF NOT EXISTS wallet_settings (
     user_id INTEGER PRIMARY KEY,
