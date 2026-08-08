@@ -186,40 +186,47 @@ function normalizeBigInt(obj) {
   return obj;
 }
 
-/* Classe statement — équivalent de DatabaseSync.prepare() */
+/* Classe statement — équivalent de DatabaseSync.prepare()
+   `queryable` (2026-08-09) : par défaut le pool (comportement historique inchangé), mais
+   accepte aussi un client dédié — voir transaction() ci-dessous. Piège découvert en concevant
+   le transfert de gestionnaire : pool.query() peut piocher une connexion DIFFÉRENTE à chaque
+   appel, donc un simple db.exec('BEGIN') / db.exec('COMMIT') via deux appels pool.query()
+   séparés n'offre AUCUNE garantie d'atomicité en production — chaque requête intermédiaire
+   pouvait passer par une autre connexion, hors de la transaction. */
 class PgStatement {
-  constructor(sql) {
+  constructor(sql, queryable) {
     this._raw = sql;
     this._pragma = isPragmaInfo(sql);
     this._table = this._pragma ? pragmaToTable(sql) : null;
     this._sql = this._pragma ? null : toPg(sql);
+    this._queryable = queryable || pool;
   }
 
   /* Retourne une ligne ou null */
   async get(...args) {
     if (this._pragma) {
-      const r = await pool.query(
+      const r = await this._queryable.query(
         "SELECT column_name AS name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
         [this._table]
       );
       return r.rows[0] || null;
     }
     const params = args.flat();
-    const r = await pool.query(this._sql, params);
+    const r = await this._queryable.query(this._sql, params);
     return normalizeBigInt(r.rows[0]) || null;
   }
 
   /* Retourne toutes les lignes */
   async all(...args) {
     if (this._pragma) {
-      const r = await pool.query(
+      const r = await this._queryable.query(
         "SELECT column_name AS name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
         [this._table]
       );
       return r.rows;
     }
     const params = args.flat();
-    const r = await pool.query(this._sql, params);
+    const r = await this._queryable.query(this._sql, params);
     return normalizeBigInt(r.rows);
   }
 
@@ -228,13 +235,13 @@ class PgStatement {
     const params = args.flat();
     const sql = addReturningIfNeeded(this._sql, this._raw);
     try {
-      const r = await pool.query(sql, params);
+      const r = await this._queryable.query(sql, params);
       return { changes: r.rowCount || 0, lastInsertRowid: r.rows[0]?.id || null };
     } catch (e) {
       // La table n'a pas de colonne "id" — réessai sans RETURNING
       if (e.code === '42703' && e.message.includes('"id"')) {
         const sqlNoRet = sql.replace(/\s+RETURNING id\s*$/i, '');
-        const r = await pool.query(sqlNoRet, params);
+        const r = await this._queryable.query(sqlNoRet, params);
         return { changes: r.rowCount || 0, lastInsertRowid: null };
       }
       throw e;
@@ -242,8 +249,9 @@ class PgStatement {
   }
 }
 
-/* db.exec() — pour CREATE TABLE, etc. */
-async function exec(sql) {
+/* db.exec() — pour CREATE TABLE, etc. `queryable` : voir PgStatement ci-dessus. */
+async function exec(sql, queryable) {
+  const q = queryable || pool;
   // Découpe les instructions multiples séparées par ;
   const stmts = sql
     .split(/;\s*/)
@@ -253,7 +261,7 @@ async function exec(sql) {
   for (const stmt of stmts) {
     const pg = toPg(stmt);
     try {
-      await pool.query(pg);
+      await q.query(pg);
     } catch (e) {
       // Ignore "already exists" errors pour les migrations
       if (!e.message.includes("already exists") &&
@@ -268,6 +276,33 @@ function prepare(sql) {
   return new PgStatement(sql);
 }
 
+/* ── Transaction réelle (2026-08-09) ──
+   Acquiert UN client dédié du pool pour toute la durée du callback, garantissant que
+   BEGIN/COMMIT/ROLLBACK et toutes les requêtes intermédiaires passent par la MÊME connexion
+   — seule façon d'obtenir une vraie atomicité avec node-postgres (pool.query() seul ne
+   l'offre pas, voir commentaire sur PgStatement). `fn` reçoit un objet {prepare, exec} au
+   même contrat que le module db.js habituel, mais lié à cette transaction : à utiliser
+   exactement comme `db.prepare(...)`/`db.exec(...)` à l'intérieur du callback.
+   Rollback automatique si `fn` lève une exception ; le client est toujours relâché au pool. */
+async function transaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const txDb = {
+      prepare: (sql) => new PgStatement(sql, client),
+      exec: (sql) => exec(sql, client),
+    };
+    const resultat = await fn(txDb);
+    await client.query('COMMIT');
+    return resultat;
+  } catch (e) {
+    try { await client.query('ROLLBACK'); } catch (_) { /* connexion déjà rompue : rien à faire */ }
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 /* Migrations automatiques au démarrage */
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT").catch(() => {});
 pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires BIGINT").catch(() => {});
@@ -277,4 +312,4 @@ pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS nom_institution TEXT").ca
 
 /* toPg est exposé pour pg-init.js : les définitions de colonnes lues dans db.js doivent
    passer par le même traducteur que le reste du schéma avant d'être appliquées. */
-module.exports = { prepare, exec, pool, toPg };
+module.exports = { prepare, exec, pool, toPg, transaction };

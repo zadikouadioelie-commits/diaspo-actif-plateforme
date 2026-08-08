@@ -4671,12 +4671,104 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  /* ── Transfert de gestionnaire de compte (2026-08-08) ── Protocole sécurisé complet
+     (cahier des charges utilisateur) : machine d'état à verrous successifs, credential DS-ID
+     versionné par initiative (jamais par simple écrasement), transaction finale atomique.
+     Voir memory project_transfert_gestionnaire.md pour le détail des règles métier. */
+  CREATE TABLE IF NOT EXISTS account_credentials (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    version       INTEGER NOT NULL,
+    ds_id         TEXT NOT NULL,
+    status        TEXT NOT NULL CHECK(status IN ('pending','active','revoked')) DEFAULT 'active',
+    created_at    TEXT DEFAULT (datetime('now')),
+    activated_at  TEXT,
+    revoked_at    TEXT,
+    created_by    INTEGER,
+    revoked_by    INTEGER,
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS manager_transfer_requests (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id               INTEGER NOT NULL,
+    old_manager_user_id         INTEGER NOT NULL,
+    new_manager_user_id         INTEGER,
+    status                      TEXT NOT NULL DEFAULT 'NOT_STARTED' CHECK(status IN (
+      'NOT_STARTED','EMAIL_OLD_VERIFICATION_PENDING','OLD_EMAIL_VERIFIED',
+      'NEW_MANAGER_DATA_PENDING','NEW_EMAIL_VERIFICATION_PENDING','NEW_EMAIL_VERIFIED',
+      'IDENTITY_VERIFICATION_PENDING','IDENTITY_VERIFIED','FINAL_VALIDATION','COMPLETED',
+      'CANCELLED','EXPIRED','FAILED'
+    )),
+    old_email_code_hash         TEXT,
+    old_email_code_expires      TEXT,
+    old_email_code_tentatives   INTEGER DEFAULT 0,
+    old_email_verified_at       TEXT,
+    pending_manager_data_json   TEXT,
+    new_password_hash           TEXT,
+    new_password_salt           TEXT,
+    new_email_code_hash         TEXT,
+    new_email_code_expires      TEXT,
+    new_email_code_tentatives   INTEGER DEFAULT 0,
+    new_email_verified_at       TEXT,
+    stripe_identity_session_id  TEXT,
+    identity_verification_status TEXT CHECK(identity_verification_status IN ('PENDING','VERIFIED','FAILED','CANCELLED')),
+    identity_verified_at        TEXT,
+    old_credential_id           INTEGER,
+    new_credential_id           INTEGER,
+    expires_at                  TEXT NOT NULL,
+    completed_at                TEXT,
+    created_at                  TEXT DEFAULT (datetime('now')),
+    updated_at                  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS manager_transfer_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    transfer_id  INTEGER,
+    initiative_id INTEGER NOT NULL,
+    action       TEXT NOT NULL,
+    acteur_id    INTEGER,
+    details      TEXT,
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Quota mensuel alterné (règle utilisateur) : 1 ligne = 1 tentative RÉELLEMENT consommée
+     (dès la demande du 1er code, pas au simple clic sur le bouton). Le quota du mois se
+     calcule à la volée (voir quotaDuMois() côté serveur) — cette table ne fait que compter
+     les tentatives déjà consommées pour vérifier qu'on reste sous ce quota calculé. */
+  CREATE TABLE IF NOT EXISTS manager_transfer_attempts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id  INTEGER NOT NULL,
+    transfer_id    INTEGER,
+    attempt_number INTEGER NOT NULL,
+    calendar_month INTEGER NOT NULL,
+    calendar_year  INTEGER NOT NULL,
+    started_at     TEXT DEFAULT (datetime('now')),
+    completed_at   TEXT,
+    status         TEXT NOT NULL DEFAULT 'EN_COURS',
+    ip_hash        TEXT,
+    user_agent_hash TEXT,
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
+  );
 `);
 
 {
   const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
   if (!userCols.includes('ds_id')) {
     db.exec('ALTER TABLE users ADD COLUMN ds_id TEXT');
+  }
+}
+
+/* credential_version (2026-08-08) : compteur incrémenté à chaque révocation forcée de session
+   (transfert de gestionnaire) — embarqué dans le cookie 'auth' stateless (server/auth.js) et
+   revérifié à chaque requête, seul moyen d'invalider les tokens HMAC déjà émis puisqu'ils ne
+   dépendent d'aucun état serveur par défaut (DELETE FROM sessions ne les touche pas). */
+{
+  const userCols2 = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userCols2.includes('credential_version')) {
+    db.exec('ALTER TABLE users ADD COLUMN credential_version INTEGER NOT NULL DEFAULT 1');
   }
 }
 
@@ -6684,3 +6776,20 @@ module.exports = db;
 module.exports.backfillOfficialFollow = backfillOfficialFollow;
 module.exports.generateDaId = generateDaId;
 module.exports.generateDsId = generateDsId;
+
+/* Transaction réelle (2026-08-09) — équivalent SQLite de db-pg.js:transaction().
+   SQLite (une seule connexion persistante par processus, jamais de pool) n'a pas le piège de
+   db-pg.js : `db` lui-même sert directement de "txDb", ses prepare()/exec() étant déjà tous
+   sur la même connexion par construction. Même signature côté appelant dans les deux
+   environnements : `await db.transaction(async (tx) => { ... tx.prepare(...)... })`. */
+module.exports.transaction = async function transaction(fn) {
+  db.exec("BEGIN");
+  try {
+    const resultat = await fn(db);
+    db.exec("COMMIT");
+    return resultat;
+  } catch (e) {
+    try { db.exec("ROLLBACK"); } catch (_) { /* rien à faire si déjà rompue */ }
+    throw e;
+  }
+};

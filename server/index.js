@@ -12,6 +12,7 @@ const db = require("./db");
 const { generateDaId, generateDsId } = require("./db");
 const DAA = require("./daa-lang");
 const AvantagesPremium = require("./avantages-premium");
+const TG = require("./transfert-gestionnaire");
 
 const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
 async function signTicket(ticketId, eventId, ts) {
@@ -212,8 +213,17 @@ async function getCurrentUser(req) {
   if (authCookie) {
     const payload = verifyAuthToken(authCookie);
     if (payload?.uid) {
-      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(payload.uid);
-      if (user) { user.id = Number(user.id); return user; }
+      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version FROM users WHERE id = ?").get(payload.uid);
+      /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
+         stateless (aucun état serveur, survit à un DELETE FROM sessions) — c'est le SEUL
+         moyen de forcer son invalidation avant expiration naturelle. Un ancien gestionnaire
+         révoqué voit son compteur incrémenté ; tout token signé avant cet incrément porte
+         encore l'ancienne valeur en `cv` et est donc rejeté ici, sans attendre son expiration
+         (jusqu'à 7 jours sinon). Absence de `cv` dans le payload (tokens émis avant ce
+         correctif) = toléré, jamais bloquant rétroactivement. */
+      if (user && (payload.cv === undefined || Number(payload.cv) === Number(user.credential_version))) {
+        user.id = Number(user.id); return user;
+      }
     }
   }
   /* 2. Session DB classique (fallback) */
@@ -543,7 +553,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   const token = createSession(id);
   const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification, email_verifie FROM users WHERE id = ?").get(id);
-  const authTok = signAuthToken({ uid: id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: id, role: user.role, cv: 1, exp: Math.floor(Date.now()/1000) + TOKEN_TTL }); // nouveau compte : credential_version démarre toujours à 1
 
   // Email de bienvenue (non bloquant)
   try {
@@ -659,7 +669,7 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role });
   { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
@@ -7043,6 +7053,485 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════
+   TRANSFERT DE GESTIONNAIRE DE COMPTE (2026-08-08→09) — cahier des charges complet
+   fourni par l'utilisateur, construit en autonomie pendant la nuit. Voir memory
+   project_transfert_gestionnaire.md pour les décisions d'architecture prises et le détail
+   des règles métier. Réservé aux comptes organisationnels (initiative/collectivité — table
+   `initiatives`), pas aux comptes personnels `utilisateur`.
+
+   Modèle retenu : "compte" = initiatives.id (stable, jamais modifié). "Ancien gestionnaire"
+   = users.id actuellement référencé par initiatives.owner_user_id. "Nouveau gestionnaire" =
+   un NOUVEAU users row créé pendant la procédure ; à la transaction finale, owner_user_id
+   bascule atomiquement vers ce nouveau users.id — aucune donnée de l'initiative ne bouge.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const TG_CODE_TTL_MS = 10 * 60 * 1000;           // 10 min de validité par code e-mail
+const TG_CODE_MAX_TENTATIVES = 5;                 // au-delà : procédure verrouillée (FAILED)
+const TG_RENVOI_COOLDOWN_MS = 60 * 1000;          // anti-abus "renvoyer le code"
+const TG_PROCEDURE_TTL_MS = 48 * 60 * 60 * 1000;  // 48h pour boucler les 5 étapes
+
+/* "Maintenant" au même format que les colonnes datetime('now') de SQLite/Postgres (espace,
+   pas de 'T'/'Z') — comparer via new Date(chaîne_sans_Z) serait FAUX : une chaîne ISO sans
+   fuseau est réinterprétée comme heure LOCALE par JS, alors que ces colonnes contiennent du
+   UTC (bug réel rencontré et corrigé le 2026-08-09 en testant ce module — décalage de
+   plusieurs heures selon le fuseau du serveur). La comparaison lexicographique de deux
+   chaînes au même format zéro-paddé équivaut à la comparaison chronologique — c'est déjà la
+   convention utilisée ailleurs dans ce fichier pour ce type de colonne. */
+function tgMaintenant() { return new Date().toISOString().slice(0, 19).replace('T', ' '); }
+
+async function tgJournaliser(transferId, initiativeId, action, acteurId, details) {
+  try {
+    await db.prepare(`INSERT INTO manager_transfer_log (transfer_id, initiative_id, action, acteur_id, details) VALUES (?,?,?,?,?)`)
+      .run(transferId || null, initiativeId, action, acteurId || null, details || null);
+  } catch (e) { console.error('[transfert-gestionnaire] journal', e.message); }
+}
+
+/* Résout l'initiative gérée par l'utilisateur connecté — 404/400 explicites plutôt qu'un
+   comportement silencieux, réutilisé par toutes les routes de ce module. */
+async function tgResoudreInitiativeGeree(user, res) {
+  if (!['initiative', 'collectivite'].includes(user.role)) {
+    sendJSON(res, 400, { error: "Cette procédure concerne les comptes organisationnels (association, ONG, entreprise, collectivité)." });
+    return null;
+  }
+  const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
+  if (!init) { sendJSON(res, 404, { error: "Aucune structure associée à ce compte." }); return null; }
+  init.id = Number(init.id);
+  return init;
+}
+
+/* Charge une demande de transfert en vérifiant : appartenance au gestionnaire connecté,
+   expiration (48h glissantes depuis le démarrage — marquée EXPIRED au passage si dépassée,
+   jamais réactivable ensuite), et statut non terminal. Centralise ces trois contrôles pour
+   que chaque route n'ait qu'à vérifier le statut ATTENDU pour SON étape. */
+async function tgChargerTransfert(transferId, user, res) {
+  const t = await db.prepare("SELECT * FROM manager_transfer_requests WHERE id=?").get(transferId);
+  if (!t) { sendJSON(res, 404, { error: "Procédure de transfert introuvable." }); return null; }
+  t.id = Number(t.id); t.initiative_id = Number(t.initiative_id);
+  if (Number(t.old_manager_user_id) !== Number(user.id)) {
+    sendJSON(res, 403, { error: "Cette procédure ne vous appartient pas." }); return null;
+  }
+  const TERMINAUX = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
+  if (!TERMINAUX.includes(t.status) && t.expires_at < tgMaintenant()) {
+    await db.prepare("UPDATE manager_transfer_requests SET status='EXPIRED', updated_at=datetime('now') WHERE id=?").run(t.id);
+    await db.prepare("UPDATE manager_transfer_attempts SET status='EXPIRED', completed_at=datetime('now') WHERE transfer_id=? AND status='EN_COURS'").run(t.id);
+    await tgJournaliser(t.id, t.initiative_id, 'expiration', null, 'Délai de 48h dépassé — procédure expirée automatiquement.');
+    t.status = 'EXPIRED';
+  }
+  return t;
+}
+
+/* GET — statut courant : transfert actif éventuel (pour reprendre l'assistant là où il en
+   était) + quota du mois calculé à la volée (jamais stocké, toujours recalculé). */
+route("GET", "/api/transfert-gestionnaire/statut", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!['initiative', 'collectivite'].includes(user.role)) {
+    return sendJSON(res, 200, { applicable: false });
+  }
+  const init = await tgResoudreInitiativeGeree(user, res);
+  if (!init) return;
+
+  const q = TG.quotaDuMois();
+  const consommees = (await db.prepare(
+    "SELECT COUNT(*) AS n FROM manager_transfer_attempts WHERE initiative_id=? AND calendar_year=? AND calendar_month=?"
+  ).get(init.id, q.annee, q.mois)).n;
+
+  const actif = await db.prepare(`
+    SELECT * FROM manager_transfer_requests WHERE initiative_id=?
+      AND status NOT IN ('COMPLETED','CANCELLED','EXPIRED','FAILED')
+    ORDER BY id DESC LIMIT 1
+  `).get(init.id);
+
+  let delaiRestantMs = 0;
+  if (q.delaiEntreTentativesMs && Number(consommees) === 1) {
+    const derniere = await db.prepare(
+      "SELECT started_at FROM manager_transfer_attempts WHERE initiative_id=? AND calendar_year=? AND calendar_month=? ORDER BY started_at DESC LIMIT 1"
+    ).get(init.id, q.annee, q.mois);
+    if (derniere) {
+      const ecoule = Date.now() - new Date(derniere.started_at.replace(' ', 'T') + 'Z').getTime();
+      delaiRestantMs = Math.max(0, q.delaiEntreTentativesMs - ecoule);
+    }
+  }
+
+  sendJSON(res, 200, {
+    applicable: true,
+    quota_mois: q.quota,
+    tentatives_consommees: Number(consommees),
+    tentatives_restantes: Math.max(0, q.quota - Number(consommees)),
+    delai_restant_ms: delaiRestantMs,
+    delai_restant_texte: delaiRestantMs > 0 ? TG.formatDureeRestante(delaiRestantMs) : null,
+    transfert_actif: actif ? { id: Number(actif.id), status: actif.status } : null,
+  });
+});
+
+/* POST — Étape 0→1 : avertissement déjà validé côté client, ceci EST la consommation réelle
+   de la tentative mensuelle (règle §8 : jamais au simple clic sur le bouton). Vérifie qu'aucun
+   transfert n'est déjà actif (règle §15 : une seule procédure active par compte), applique le
+   quota mensuel alterné + le délai de 3h, crée la demande et envoie le 1er code. */
+route("POST", "/api/transfert-gestionnaire/demarrer", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await tgResoudreInitiativeGeree(user, res);
+  if (!init) return;
+
+  const dejaActif = await db.prepare(`
+    SELECT id FROM manager_transfer_requests WHERE initiative_id=?
+      AND status NOT IN ('COMPLETED','CANCELLED','EXPIRED','FAILED') LIMIT 1
+  `).get(init.id);
+  if (dejaActif) {
+    return sendJSON(res, 409, { error: "Une procédure de transfert est déjà en cours pour ce compte.", transfer_id: Number(dejaActif.id) });
+  }
+
+  const q = TG.quotaDuMois();
+  const consommeesRows = await db.prepare(
+    "SELECT started_at FROM manager_transfer_attempts WHERE initiative_id=? AND calendar_year=? AND calendar_month=? ORDER BY started_at ASC"
+  ).all(init.id, q.annee, q.mois);
+  if (consommeesRows.length >= q.quota) {
+    return sendJSON(res, 429, { error: `Limite mensuelle atteinte (${q.quota} procédure${q.quota > 1 ? 's' : ''} maximum ce mois-ci). Vous pourrez effectuer une nouvelle demande à partir du prochain mois.` });
+  }
+  if (q.delaiEntreTentativesMs && consommeesRows.length === 1) {
+    const ecoule = Date.now() - new Date(consommeesRows[0].started_at.replace(' ', 'T') + 'Z').getTime();
+    const restant = q.delaiEntreTentativesMs - ecoule;
+    if (restant > 0) {
+      return sendJSON(res, 429, {
+        error: `Nouvelle tentative temporairement indisponible. Prochaine tentative disponible dans : ${TG.formatDureeRestante(restant)}.`,
+        delai_restant_ms: restant,
+      });
+    }
+  }
+
+  const code = TG.genererCode();
+  const expiresAt = new Date(Date.now() + TG_PROCEDURE_TTL_MS).toISOString().slice(0, 19).replace('T', ' ');
+  const transferId = Number((await db.prepare(`
+    INSERT INTO manager_transfer_requests (initiative_id, old_manager_user_id, status, old_email_code_hash, old_email_code_expires, expires_at)
+    VALUES (?,?, 'EMAIL_OLD_VERIFICATION_PENDING', ?, ?, ?)
+  `).run(init.id, user.id, TG.hashCode(code), new Date(Date.now() + TG_CODE_TTL_MS).toISOString().slice(0, 19).replace('T', ' '), expiresAt)).lastInsertRowid);
+
+  const ip = SEC.clientIp(req);
+  await db.prepare(`
+    INSERT INTO manager_transfer_attempts (initiative_id, transfer_id, attempt_number, calendar_month, calendar_year, status, ip_hash, user_agent_hash)
+    VALUES (?,?,?,?,?, 'EN_COURS', ?, ?)
+  `).run(init.id, transferId, consommeesRows.length + 1, q.mois, q.annee, TG.hashIdentifiant(ip), TG.hashIdentifiant(req.headers['user-agent']));
+
+  await tgJournaliser(transferId, init.id, 'demarrage', user.id, `Tentative ${consommeesRows.length + 1}/${q.quota} du mois ${q.mois}/${q.annee}.`);
+
+  try {
+    const { sendEmail } = require('./mailer');
+    await sendEmail({
+      to: user.email,
+      subject: "Code de vérification — Changement de gestionnaire",
+      html: `<p>Bonjour,</p><p>Une procédure de <strong>changement de gestionnaire</strong> a été lancée pour le compte « ${(init.nom || '').replace(/</g,'&lt;')} » sur Diaspo'Actif.</p><p>Si vous êtes à l'origine de cette demande, voici votre code de vérification :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Ce code est valable 10 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail et contactez le support Diaspo'Actif — aucune information de votre compte n'est modifiée tant que la procédure complète n'est pas validée.</p>`,
+    });
+  } catch (e) { console.error('[transfert-gestionnaire] envoi code ancien', e.message); }
+
+  sendJSON(res, 201, { transfer_id: transferId, status: 'EMAIL_OLD_VERIFICATION_PENDING' });
+});
+
+route("POST", "/api/transfert-gestionnaire/:id/renvoyer-code-ancien", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  if (t.status !== 'EMAIL_OLD_VERIFICATION_PENDING') return sendJSON(res, 400, { error: "Cette étape n'est plus d'actualité pour cette procédure." });
+  const rl = SEC.rateLimit(`tg-renvoi-ancien:${t.id}`, 1, TG_RENVOI_COOLDOWN_MS);
+  if (!rl.allowed) return sendJSON(res, 429, { error: "Merci de patienter avant de redemander un code." });
+
+  const code = TG.genererCode();
+  await db.prepare("UPDATE manager_transfer_requests SET old_email_code_hash=?, old_email_code_expires=?, old_email_code_tentatives=0, updated_at=datetime('now') WHERE id=?")
+    .run(TG.hashCode(code), new Date(Date.now() + TG_CODE_TTL_MS).toISOString().slice(0, 19).replace('T', ' '), t.id);
+  try {
+    const { sendEmail } = require('./mailer');
+    await sendEmail({ to: user.email, subject: "Nouveau code de vérification — Changement de gestionnaire",
+      html: `<p>Voici votre nouveau code de vérification :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 10 minutes.</p>` });
+  } catch (e) { console.error('[transfert-gestionnaire] renvoi code ancien', e.message); }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Étape 1 : vérification du code envoyé à l'ANCIEN e-mail. */
+route("POST", "/api/transfert-gestionnaire/:id/verifier-email-ancien", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  if (t.status !== 'EMAIL_OLD_VERIFICATION_PENDING') return sendJSON(res, 400, { error: "Cette étape n'est plus d'actualité pour cette procédure." });
+
+  if (t.old_email_code_tentatives >= TG_CODE_MAX_TENTATIVES) {
+    await db.prepare("UPDATE manager_transfer_requests SET status='FAILED', updated_at=datetime('now') WHERE id=?").run(t.id);
+    await tgJournaliser(t.id, t.initiative_id, 'verrouillage', user.id, "Trop de tentatives de code (ancien e-mail).");
+    return sendJSON(res, 423, { error: "Trop de tentatives incorrectes — procédure verrouillée. Vous devrez en démarrer une nouvelle." });
+  }
+  const code = String(body?.code || '').trim();
+  if (!code || TG.hashCode(code) !== t.old_email_code_hash || t.old_email_code_expires < tgMaintenant()) {
+    await db.prepare("UPDATE manager_transfer_requests SET old_email_code_tentatives=old_email_code_tentatives+1, updated_at=datetime('now') WHERE id=?").run(t.id);
+    await tgJournaliser(t.id, t.initiative_id, 'echec_code_ancien', user.id, `Tentative ${t.old_email_code_tentatives + 1}/${TG_CODE_MAX_TENTATIVES}.`);
+    return sendJSON(res, 400, { error: "Code incorrect. Veuillez vérifier le code reçu et réessayer." });
+  }
+
+  await db.prepare("UPDATE manager_transfer_requests SET status='OLD_EMAIL_VERIFIED', old_email_verified_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(t.id);
+  await tgJournaliser(t.id, t.initiative_id, 'ancien_email_verifie', user.id, null);
+  sendJSON(res, 200, { ok: true, status: 'OLD_EMAIL_VERIFIED' });
+});
+
+/* Étape 2 : informations du nouveau gestionnaire — stockées en attente (pending_manager_data_json),
+   ne touchent JAMAIS les données réelles avant la transaction finale (règle §4). */
+route("POST", "/api/transfert-gestionnaire/:id/nouveau-gestionnaire", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  if (!['OLD_EMAIL_VERIFIED', 'NEW_MANAGER_DATA_PENDING'].includes(t.status)) {
+    return sendJSON(res, 400, { error: "Cette étape n'est plus d'actualité pour cette procédure." });
+  }
+  const nom = String(body?.nom || '').trim();
+  const prenom = String(body?.prenom || '').trim();
+  const email = String(body?.email || '').trim().toLowerCase();
+  const telephone = String(body?.telephone || '').trim();
+  const fonction = String(body?.fonction || '').trim();
+  if (!nom || !SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Nom et adresse e-mail valides requis." });
+  if (email === user.email.toLowerCase()) return sendJSON(res, 400, { error: "L'adresse du nouveau gestionnaire doit être différente de l'adresse actuelle." });
+  const dejaUtilisee = await db.prepare("SELECT id FROM users WHERE LOWER(email)=?").get(email);
+  if (dejaUtilisee) return sendJSON(res, 400, { error: "Cette adresse e-mail est déjà associée à un compte Diaspo'Actif." });
+
+  await db.prepare("UPDATE manager_transfer_requests SET status='NEW_MANAGER_DATA_PENDING', pending_manager_data_json=?, updated_at=datetime('now') WHERE id=?")
+    .run(JSON.stringify({ nom, prenom, email, telephone, fonction }), t.id);
+  await tgJournaliser(t.id, t.initiative_id, 'donnees_nouveau_gestionnaire', user.id, `Nouveau gestionnaire proposé : ${email}`);
+  sendJSON(res, 200, { ok: true, status: 'NEW_MANAGER_DATA_PENDING' });
+});
+
+/* Étape 3 : mot de passe du nouveau gestionnaire — jamais l'ancien mot de passe demandé
+   (règle §5, il n'a pas à être communiqué au nouveau gestionnaire). Déclenche directement
+   l'envoi du code de vérification au NOUVEL e-mail (étape 4), sans action intermédiaire. */
+route("POST", "/api/transfert-gestionnaire/:id/mot-de-passe", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  if (t.status !== 'NEW_MANAGER_DATA_PENDING' || !t.pending_manager_data_json) {
+    return sendJSON(res, 400, { error: "Renseignez d'abord les informations du nouveau gestionnaire." });
+  }
+  const { password, password_confirm } = body || {};
+  if (!password || password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit contenir au moins 8 caractères." });
+  if (password !== password_confirm) return sendJSON(res, 400, { error: "Les deux mots de passe ne correspondent pas." });
+
+  const { hash, salt } = hashPassword(password);
+  const pending = safeParse(t.pending_manager_data_json);
+  const code = TG.genererCode();
+  await db.prepare(`
+    UPDATE manager_transfer_requests SET
+      status='NEW_EMAIL_VERIFICATION_PENDING', new_password_hash=?, new_password_salt=?,
+      new_email_code_hash=?, new_email_code_expires=?, new_email_code_tentatives=0, updated_at=datetime('now')
+    WHERE id=?
+  `).run(hash, salt, TG.hashCode(code), new Date(Date.now() + TG_CODE_TTL_MS).toISOString().slice(0, 19).replace('T', ' '), t.id);
+  await tgJournaliser(t.id, t.initiative_id, 'mot_de_passe_defini', user.id, null);
+
+  try {
+    const { sendEmail } = require('./mailer');
+    await sendEmail({ to: pending.email, subject: "Code de confirmation — Vous devenez gestionnaire sur Diaspo'Actif",
+      html: `<p>Bonjour ${(pending.prenom || '').replace(/</g,'&lt;')},</p><p>Vous êtes en cours de désignation comme nouveau gestionnaire d'un compte Diaspo'Actif. Voici votre code de confirmation :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 10 minutes.</p>` });
+  } catch (e) { console.error('[transfert-gestionnaire] envoi code nouveau', e.message); }
+
+  sendJSON(res, 200, { ok: true, status: 'NEW_EMAIL_VERIFICATION_PENDING' });
+});
+
+route("POST", "/api/transfert-gestionnaire/:id/renvoyer-code-nouveau", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  if (t.status !== 'NEW_EMAIL_VERIFICATION_PENDING') return sendJSON(res, 400, { error: "Cette étape n'est plus d'actualité pour cette procédure." });
+  const rl = SEC.rateLimit(`tg-renvoi-nouveau:${t.id}`, 1, TG_RENVOI_COOLDOWN_MS);
+  if (!rl.allowed) return sendJSON(res, 429, { error: "Merci de patienter avant de redemander un code." });
+
+  const pending = safeParse(t.pending_manager_data_json);
+  const code = TG.genererCode();
+  await db.prepare("UPDATE manager_transfer_requests SET new_email_code_hash=?, new_email_code_expires=?, new_email_code_tentatives=0, updated_at=datetime('now') WHERE id=?")
+    .run(TG.hashCode(code), new Date(Date.now() + TG_CODE_TTL_MS).toISOString().slice(0, 19).replace('T', ' '), t.id);
+  try {
+    const { sendEmail } = require('./mailer');
+    await sendEmail({ to: pending.email, subject: "Nouveau code de confirmation — Diaspo'Actif",
+      html: `<p>Voici votre nouveau code de confirmation :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 10 minutes.</p>` });
+  } catch (e) { console.error('[transfert-gestionnaire] renvoi code nouveau', e.message); }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Étape 4 : vérification du code envoyé au NOUVEL e-mail. Sur succès, enchaîne directement
+   sur l'étape 5 (lancement Stripe Identity pour le nouveau gestionnaire) — adapté de
+   /api/identity/verify pour fonctionner SANS users.id existant : la session Stripe est
+   rattachée à `diaspoactif_transfer_id` plutôt qu'à `diaspoactif_user_id`. */
+route("POST", "/api/transfert-gestionnaire/:id/verifier-email-nouveau", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  if (t.status !== 'NEW_EMAIL_VERIFICATION_PENDING') return sendJSON(res, 400, { error: "Cette étape n'est plus d'actualité pour cette procédure." });
+
+  if (t.new_email_code_tentatives >= TG_CODE_MAX_TENTATIVES) {
+    await db.prepare("UPDATE manager_transfer_requests SET status='FAILED', updated_at=datetime('now') WHERE id=?").run(t.id);
+    await tgJournaliser(t.id, t.initiative_id, 'verrouillage', user.id, "Trop de tentatives de code (nouvel e-mail).");
+    return sendJSON(res, 423, { error: "Trop de tentatives incorrectes — procédure verrouillée. Vous devrez en démarrer une nouvelle." });
+  }
+  const code = String(body?.code || '').trim();
+  if (!code || TG.hashCode(code) !== t.new_email_code_hash || t.new_email_code_expires < tgMaintenant()) {
+    await db.prepare("UPDATE manager_transfer_requests SET new_email_code_tentatives=new_email_code_tentatives+1, updated_at=datetime('now') WHERE id=?").run(t.id);
+    await tgJournaliser(t.id, t.initiative_id, 'echec_code_nouveau', user.id, `Tentative ${t.new_email_code_tentatives + 1}/${TG_CODE_MAX_TENTATIVES}.`);
+    return sendJSON(res, 400, { error: "Code incorrect. Veuillez vérifier le code reçu et réessayer." });
+  }
+
+  await db.prepare("UPDATE manager_transfer_requests SET status='IDENTITY_VERIFICATION_PENDING', new_email_verified_at=datetime('now'), identity_verification_status='PENDING', updated_at=datetime('now') WHERE id=?").run(t.id);
+  await tgJournaliser(t.id, t.initiative_id, 'nouvel_email_verifie', user.id, null);
+
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 200, { ok: true, status: 'IDENTITY_VERIFICATION_PENDING', identity_url: null, avertissement: "Vérification d'identité momentanément indisponible — réessayez depuis l'assistant." });
+  try {
+    const origin = getOrigin(req);
+    const session = await stripe.identity.verificationSessions.create({
+      type: "document",
+      options: { document: { require_matching_selfie: true, require_id_number: true } },
+      metadata: { diaspoactif_transfer_id: String(t.id) },
+      return_url: `${origin}/confidentialite.html?transfert=retour&id=${t.id}`,
+    });
+    await db.prepare("UPDATE manager_transfer_requests SET stripe_identity_session_id=? WHERE id=?").run(session.id, t.id);
+    sendJSON(res, 200, { ok: true, status: 'IDENTITY_VERIFICATION_PENDING', identity_url: session.url });
+  } catch (e) {
+    console.error('[transfert-gestionnaire] identity session', e.message);
+    sendJSON(res, 200, { ok: true, status: 'IDENTITY_VERIFICATION_PENDING', identity_url: null, avertissement: "Impossible de lancer la vérification d'identité pour le moment — réessayez depuis l'assistant." });
+  }
+});
+
+/* GET — état de la vérification d'identité (poll côté front, le webhook Stripe met à jour
+   identity_verification_status de façon asynchrone). */
+route("GET", "/api/transfert-gestionnaire/:id/identite-statut", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  sendJSON(res, 200, { status: t.status, identity_verification_status: t.identity_verification_status });
+});
+
+/* Étape 6 — validation finale + étape 7 — transaction atomique. Toutes les conditions de la
+   règle §8 du cahier des charges sont revérifiées ici, côté serveur, indépendamment du statut
+   affiché : c'est la DERNIÈRE ligne de défense avant tout changement réel et irréversible. */
+route("POST", "/api/transfert-gestionnaire/:id/finaliser", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+
+  const conditions = {
+    ancien_email_verifie: !!t.old_email_verified_at,
+    nouvel_email_verifie: !!t.new_email_verified_at,
+    donnees_completes: !!t.pending_manager_data_json,
+    mot_de_passe_defini: !!t.new_password_hash,
+    identite_verifiee: t.identity_verification_status === 'VERIFIED',
+    demande_encore_valide: t.status !== 'EXPIRED' && t.status !== 'CANCELLED' && t.status !== 'FAILED',
+  };
+  if (!Object.values(conditions).every(Boolean)) {
+    return sendJSON(res, 400, { error: "Toutes les conditions ne sont pas encore réunies pour finaliser le transfert.", conditions });
+  }
+
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(t.initiative_id);
+  const ancienManager = await db.prepare("SELECT * FROM users WHERE id=?").get(t.old_manager_user_id);
+  const pending = safeParse(t.pending_manager_data_json);
+  if (!init || !ancienManager) return sendJSON(res, 409, { error: "Données introuvables — la procédure ne peut pas être finalisée." });
+
+  try {
+    const resultat = await db.transaction(async (tx) => {
+      // 9.4 — Créer le nouveau gestionnaire (même rôle que l'ancien : initiative/collectivite)
+      const dsIdNouveau = (function genererDsIdUniqueTx() {
+        // Vérification d'unicité synchrone impossible dans une transaction async générique :
+        // db.generateDsId() + vérif juste avant insertion, la contrainte UNIQUE(ds_id) — si
+        // elle existait — serait le vrai filet ; ici, collision quasi impossible (36^10).
+        return generateDsId();
+      })();
+      const nouveauUserId = Number((await tx.prepare(`
+        INSERT INTO users (nom, prenom, email, password_hash, password_salt, role, ds_id, email_verifie, credential_version, profil_json)
+        VALUES (?,?,?,?,?,?,?,1,1,'{}')
+      `).run(pending.nom, pending.prenom || null, pending.email, t.new_password_hash, t.new_password_salt, ancienManager.role, dsIdNouveau)).lastInsertRowid);
+
+      // 9.1/9.5 — Versionner le credential DS-ID de l'initiative : l'ancien code (celui de
+      // l'ancien gestionnaire au moment du transfert) est explicitement révoqué, le nouveau
+      // devient actif — jamais un simple écrasement de colonne.
+      const dernierCred = await tx.prepare("SELECT * FROM account_credentials WHERE initiative_id=? AND status='active' ORDER BY version DESC LIMIT 1").get(t.initiative_id);
+      const prochaineVersion = dernierCred ? Number(dernierCred.version) + 1 : 2;
+      let ancienCredentialId = dernierCred ? Number(dernierCred.id) : null;
+      if (dernierCred) {
+        await tx.prepare("UPDATE account_credentials SET status='revoked', revoked_at=datetime('now'), revoked_by=? WHERE id=?").run(user.id, dernierCred.id);
+      } else {
+        // Aucun historique encore : on capture explicitement l'ancien DS-ID (celui de
+        // l'ancien gestionnaire) comme version 1, déjà révoquée, pour que l'historique
+        // reflète honnêtement "il y avait un code avant, il est désormais invalide".
+        ancienCredentialId = Number((await tx.prepare(`
+          INSERT INTO account_credentials (initiative_id, version, ds_id, status, created_by, revoked_at, revoked_by)
+          VALUES (?,1,?,'revoked',?,datetime('now'),?)
+        `).run(t.initiative_id, ancienManager.ds_id || 'INCONNU', ancienManager.id, user.id)).lastInsertRowid);
+      }
+      const nouveauCredentialId = Number((await tx.prepare(`
+        INSERT INTO account_credentials (initiative_id, version, ds_id, status, created_by, activated_at)
+        VALUES (?,?,?,'active',?,datetime('now'))
+      `).run(t.initiative_id, prochaineVersion, dsIdNouveau, nouveauUserId)).lastInsertRowid);
+
+      // 9.4 (suite) — Bascule de l'initiative vers le nouveau gestionnaire, données de contact
+      // "responsable" mises à jour — AUCUNE autre donnée de l'initiative n'est touchée.
+      await tx.prepare(`
+        UPDATE initiatives SET owner_user_id=?, nom_responsable=?, prenom_responsable=?,
+          email_responsable=?, tel_responsable=?, fonction_responsable=?, updated_at=datetime('now')
+        WHERE id=?
+      `).run(nouveauUserId, pending.nom, pending.prenom || null, pending.email, pending.telephone || null, pending.fonction || null, t.initiative_id);
+
+      // 9.1/9.2 — Révocation de l'ancien gestionnaire : sessions DB + compteur d'invalidation
+      // des tokens 'auth' stateless (credential_version, voir getCurrentUser()).
+      await tx.prepare("DELETE FROM sessions WHERE user_id=?").run(ancienManager.id);
+      await tx.prepare("UPDATE users SET credential_version=credential_version+1 WHERE id=?").run(ancienManager.id);
+
+      // 9.7 — Finalisation de la demande + de la tentative associée.
+      await tx.prepare(`
+        UPDATE manager_transfer_requests SET status='COMPLETED', new_manager_user_id=?,
+          old_credential_id=?, new_credential_id=?, completed_at=datetime('now'), updated_at=datetime('now')
+        WHERE id=?
+      `).run(nouveauUserId, ancienCredentialId, nouveauCredentialId, t.id);
+      await tx.prepare("UPDATE manager_transfer_attempts SET status='COMPLETED', completed_at=datetime('now') WHERE transfer_id=?").run(t.id);
+
+      return { nouveauUserId };
+    });
+
+    await tgJournaliser(t.id, t.initiative_id, 'transfert_finalise', user.id,
+      `Ancien gestionnaire #${ancienManager.id} révoqué, nouveau gestionnaire #${resultat.nouveauUserId} actif.`);
+
+    // Notifications finales (règle §13) — jamais le nouveau code dans l'e-mail à l'ancien
+    // gestionnaire, jamais non plus dans celui au nouveau (consultable via le mécanisme
+    // sécurisé existant : /api/profil/ds-id/reveal, mot de passe + 1×/heure).
+    try {
+      const { sendEmail } = require('./mailer');
+      await sendEmail({ to: ancienManager.email, subject: "Changement de gestionnaire effectué",
+        html: `<p>Le gestionnaire du compte Diaspo'Actif « ${(init.nom||'').replace(/</g,'&lt;')} » a été remplacé.</p><p>Votre ancien accès gestionnaire a été révoqué et votre ancien code confidentiel est désormais définitivement inutilisable.</p>` });
+      await sendEmail({ to: pending.email, subject: "Vous êtes désormais gestionnaire sur Diaspo'Actif",
+        html: `<p>Bonjour ${(pending.prenom||'').replace(/</g,'&lt;')},</p><p>Votre identité a été vérifiée et votre accès gestionnaire du compte « ${(init.nom||'').replace(/</g,'&lt;')} » est maintenant actif.</p><p>Un nouveau code de sécurité (DS-ID) a été généré pour ce compte — connectez-vous puis consultez-le depuis Confidentialité &amp; Sécurité.</p><p><a href="${process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com'}/login.html">Se connecter</a></p>` });
+    } catch (e) { console.error('[transfert-gestionnaire] notifications finales', e.message); }
+
+    sendJSON(res, 200, { ok: true, status: 'COMPLETED' });
+  } catch (e) {
+    console.error('[transfert-gestionnaire] echec finalisation', e.message);
+    await tgJournaliser(t.id, t.initiative_id, 'echec_finalisation', user.id, e.message);
+    sendJSON(res, 500, SEC.safeError(e, "transfert-gestionnaire-finaliser"));
+  }
+});
+
+/* Annulation volontaire — la tentative reste consommée (règle §12), affiché clairement côté
+   front avant le lancement (règle §12/§15). */
+route("POST", "/api/transfert-gestionnaire/:id/annuler", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const t = await tgChargerTransfert(params.id, user, res);
+  if (!t) return;
+  const TERMINAUX = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED'];
+  if (TERMINAUX.includes(t.status)) return sendJSON(res, 400, { error: "Cette procédure est déjà terminée." });
+  await db.prepare("UPDATE manager_transfer_requests SET status='CANCELLED', updated_at=datetime('now') WHERE id=?").run(t.id);
+  await db.prepare("UPDATE manager_transfer_attempts SET status='CANCELLED', completed_at=datetime('now') WHERE transfer_id=? AND status='EN_COURS'").run(t.id);
+  await tgJournaliser(t.id, t.initiative_id, 'annulation', user.id, "Annulée volontairement par le gestionnaire.");
+  sendJSON(res, 200, { ok: true, status: 'CANCELLED' });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
    MODULE "LIAISON DE COMPTES" — étape 1 (socle) + étape 2 (liaison via
    DS-ID). Étapes 3-7 (gestion du groupe, bascule, journal détaillé,
    intégration écosystème) viendront en incréments suivants.
@@ -7183,7 +7672,7 @@ route("POST", "/api/comptes-lies/basculer", async (req, res, params, body) => {
   await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(monMembre.groupe_id, user.id, cibleId, 'changement_compte_actif', `Bascule vers ${cible.nom || cible.id}`);
 
   const token = createSession(cible.id);
-  const authTok = signAuthToken({ uid: cible.id, role: cible.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: cible.id, role: cible.role, cv: cible.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   const sf = cookieSecureFlag(req);
   sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
 });
@@ -7308,7 +7797,7 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   SEC.logSecurity("associe_dsid_success", { ip, uid: Number(user.id) });
   const sf = cookieSecureFlag(req);
   sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
@@ -12662,10 +13151,27 @@ async function handleStripeWebhook(req, res) {
           creerNotif(userId, "identite_mismatch", "Origine à confirmer",
             "Le pays associé à votre document d'identité ne correspond pas à la nationalité déclarée sur votre profil. Vérifiez vos informations dans Confidentialité, ou contactez le support si c'est une erreur.", {});
         }
+      } else {
+        /* Vérification d'identité du NOUVEAU gestionnaire (transfert de gestionnaire,
+           2026-08-09) — pas de users.id existant à ce stade : résultat stocké directement sur
+           la demande de transfert. Étape 5→6 du protocole : ne rend PAS le transfert effectif
+           (seule /finaliser le fait) — juste la condition "identité vérifiée" remplie. */
+        const transferId = Number(session.metadata?.diaspoactif_transfer_id);
+        if (transferId) {
+          await db.prepare("UPDATE manager_transfer_requests SET status='IDENTITY_VERIFIED', identity_verification_status='VERIFIED', identity_verified_at=datetime('now'), updated_at=datetime('now') WHERE id=? AND stripe_identity_session_id=?")
+            .run(transferId, session.id);
+          const t = await db.prepare("SELECT old_manager_user_id, initiative_id FROM manager_transfer_requests WHERE id=?").get(transferId);
+          if (t) {
+            await tgJournaliser(transferId, Number(t.initiative_id), 'identite_nouveau_gestionnaire_verifiee', null, null);
+            creerNotif(Number(t.old_manager_user_id), "transfert_identite_verifiee", "Identité du nouveau gestionnaire vérifiée ✔️",
+              "L'identité du nouveau gestionnaire a été vérifiée avec succès. Vous pouvez maintenant finaliser le transfert depuis Confidentialité & Sécurité.", { transfer_id: transferId });
+          }
+        }
       }
     } else if (event.type === "identity.verification_session.requires_input") {
       const session = event.data.object;
       const userId = Number(session.metadata?.diaspoactif_user_id);
+      const transferId = Number(session.metadata?.diaspoactif_transfer_id);
       if (userId) {
         await db.prepare(
           "INSERT INTO identity_verifications_log (user_id, stripe_session_id, type, statut) VALUES (?,?,?,?)"
@@ -12673,7 +13179,25 @@ async function handleStripeWebhook(req, res) {
         const reason = session.last_error?.reason || "Document non valide.";
         creerNotif(userId, "identite_echec", "Vérification d'identité incomplète",
           `La vérification n'a pas pu être finalisée : ${reason} Vous pouvez réessayer depuis votre profil.`, {});
+      } else if (transferId) {
+        /* Vérification d'identité du NOUVEAU gestionnaire (transfert de gestionnaire,
+           2026-08-09) — adaptée de la branche ci-dessus : pas de users.id existant, le
+           résultat est stocké directement sur manager_transfer_requests. Ne fait PAS
+           régresser le statut de la demande à une étape antérieure (le gestionnaire actuel
+           reste inchangé tant que /finaliser n'a pas tourné, quoi qu'il arrive ici) — le
+           statut IDENTITY_VERIFICATION_PENDING reste simplement en attente d'une nouvelle
+           tentative côté client, jamais marqué FAILED sur un premier essai raté (Stripe
+           permet souvent de reprendre la même session). */
+        await db.prepare("UPDATE manager_transfer_requests SET identity_verification_status='PENDING', updated_at=datetime('now') WHERE id=? AND stripe_identity_session_id=?")
+          .run(transferId, session.id);
+        await tgJournaliser(transferId, null, 'identite_requires_input', null, session.last_error?.reason || 'Document non valide.');
       }
+    } else if (event.type === "identity.verification_session.canceled" && Number(event.data.object.metadata?.diaspoactif_transfer_id)) {
+      const session = event.data.object;
+      const transferId = Number(session.metadata.diaspoactif_transfer_id);
+      await db.prepare("UPDATE manager_transfer_requests SET identity_verification_status='CANCELLED', updated_at=datetime('now') WHERE id=? AND stripe_identity_session_id=?")
+        .run(transferId, session.id);
+      await tgJournaliser(transferId, null, 'identite_annulee', null, null);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.pub_abonnement_user_id) {
       const session = event.data.object;
       const userId = Number(session.metadata.pub_abonnement_user_id);

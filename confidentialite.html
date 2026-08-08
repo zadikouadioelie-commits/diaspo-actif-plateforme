@@ -287,15 +287,6 @@
     }
   }
 
-  /* Bouton posé en attente de spécification (2026-08-08) — la logique de transfert du
-     gestionnaire de compte (qui, quelles vérifications, quel impact sur le DS-ID/l'historique)
-     sera construite dans un incrément dédié. Placeholder honnête plutôt que silencieux, pour
-     ne pas reproduire le piège d'un bouton qui semble cliquable mais ne fait rien. */
-  window._changerGestionnaireCompte = function() {
-    if (typeof showToast === 'function') showToast('🔧 Fonctionnalité à venir — le changement de gestionnaire de compte sera bientôt disponible.', 'info');
-    else alert('Fonctionnalité à venir — le changement de gestionnaire de compte sera bientôt disponible.');
-  };
-
   window._renderIdentiteVerif = renderIdentiteVerif;
   window._startIdentiteVerif = async function() {
     const btn = document.getElementById('identite-verif-start-btn');
@@ -474,6 +465,307 @@
     } catch(e) { el.innerHTML = '<p style="font-size:13px;color:var(--muted);">Historique indisponible.</p>'; }
   }
   loadDsHistory();
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
+   TRANSFERT DE GESTIONNAIRE DE COMPTE (2026-08-08→09) — assistant complet côté client.
+   Cahier des charges intégral fourni par l'utilisateur (protocole en 7 étapes verrouillées +
+   quota mensuel alterné). Voir server/index.js (routes /api/transfert-gestionnaire/*) pour la
+   logique serveur, seule autorité réelle — ce front ne fait qu'illustrer les statuts renvoyés,
+   il ne décide jamais rien lui-même (chaque étape peut être rejouée après un rechargement de
+   page grâce à GET /statut qui retrouve la procédure active). ══════════════════════════════ */
+(function initTransfertGestionnaire(){
+  let TG = { transferId: null, identityUrl: null, pollTimer: null };
+
+  function tgModal(html) {
+    let ov = document.getElementById('tg-overlay');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'tg-overlay';
+    ov.className = 'modal-overlay';
+    ov.style.zIndex = '10000';
+    ov.innerHTML = `<div class="modal-box" style="max-width:460px;width:94%;text-align:left;max-height:88vh;overflow-y:auto;">${html}</div>`;
+    document.body.appendChild(ov);
+    return ov;
+  }
+  function tgFermer() {
+    if (TG.pollTimer) { clearInterval(TG.pollTimer); TG.pollTimer = null; }
+    document.getElementById('tg-overlay')?.remove();
+  }
+  function tgErr(msg) {
+    const el = document.getElementById('tg-err');
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+  }
+  const btnStyle = 'padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;';
+  const btnPrimary = `${btnStyle}background:#2563EB;color:#fff;`;
+  const btnGhost = `${btnStyle}background:transparent;color:#6B7280;border:1.5px solid var(--border,#D6DEE8);`;
+  const btnDanger = `${btnStyle}background:#fff;color:#dc2626;border:1.5px solid #dc2626;`;
+
+  window._changerGestionnaireCompte = async function() {
+    let me;
+    try { me = await api('GET', '/auth/me'); } catch (e) { return; }
+    if (!me.user || !['initiative', 'collectivite'].includes(me.user.role)) {
+      tgModal(`
+        <h3 style="margin:0 0 10px;font-size:16px;">🔁 Changement de gestionnaire</h3>
+        <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Cette procédure concerne les comptes organisationnels (association, ONG, entreprise, collectivité) — elle ne s'applique pas aux comptes personnels.</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;"><button style="${btnGhost}" onclick="document.getElementById('tg-overlay').remove()">Fermer</button></div>`);
+      return;
+    }
+    let statut;
+    try { statut = await api('GET', '/transfert-gestionnaire/statut'); }
+    catch (e) { if (typeof showToast === 'function') showToast('Erreur : ' + (e.message||''), 'danger'); return; }
+
+    if (statut.transfert_actif) {
+      TG.transferId = statut.transfert_actif.id;
+      return tgReprendreEtape(statut.transfert_actif.status);
+    }
+    tgEtape0(statut);
+  };
+
+  /* Étape 0 — avertissement obligatoire avant toute consommation de tentative (règle §2/§15). */
+  function tgEtape0(statut) {
+    if (statut.tentatives_restantes <= 0) {
+      tgModal(`
+        <h3 style="margin:0 0 10px;font-size:16px;">⛔ Limite mensuelle atteinte</h3>
+        <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Le nombre maximal de procédures de changement de gestionnaire autorisées pour ce mois a été atteint (${statut.quota_mois} ce mois-ci). Vous pourrez effectuer une nouvelle demande à partir du prochain mois.</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;"><button style="${btnGhost}" onclick="document.getElementById('tg-overlay').remove()">Fermer</button></div>`);
+      return;
+    }
+    if (statut.delai_restant_ms > 0) {
+      tgModal(`
+        <h3 style="margin:0 0 10px;font-size:16px;">⏳ Nouvelle tentative temporairement indisponible</h3>
+        <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Pour des raisons de sécurité, vous devez attendre avant de pouvoir recommencer la procédure de changement de gestionnaire.</p>
+        <p style="font-size:14px;font-weight:800;margin-top:10px;">Prochaine tentative disponible dans : ${statut.delai_restant_texte}</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;"><button style="${btnGhost}" onclick="document.getElementById('tg-overlay').remove()">Fermer</button></div>`);
+      return;
+    }
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">⚠️ Changement de gestionnaire</h3>
+      <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Cette procédure permet de transférer définitivement la gestion de ce compte à une autre personne.</p>
+      <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Une fois la procédure finalisée :</p>
+      <ul style="font-size:13px;color:var(--muted,#6B7280);line-height:1.7;margin:0 0 10px;padding-left:20px;">
+        <li>l'ancien gestionnaire sera révoqué ;</li>
+        <li>son ancien code confidentiel sera définitivement invalidé ;</li>
+        <li>un nouveau code confidentiel sera généré ;</li>
+        <li>le nouveau gestionnaire deviendra responsable du compte.</li>
+      </ul>
+      <p style="font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;">Cette opération ne doit être effectuée que si vous êtes autorisé à transférer la gestion de ce compte.</p>
+      <p style="font-size:12.5px;color:var(--muted,#6B7280);margin-top:10px;">Tentatives disponibles ce mois-ci : <strong>${statut.tentatives_restantes} / ${statut.quota_mois}</strong>. Une fois la procédure commencée, la tentative ne pourra pas être récupérée si vous l'annulez ou si elle échoue.</p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button style="${btnGhost}" onclick="document.getElementById('tg-overlay').remove()">Annuler</button>
+        <button style="${btnPrimary}" id="tg-btn-commencer">Commencer la procédure</button>
+      </div>`);
+    document.getElementById('tg-btn-commencer').onclick = tgDemarrer;
+  }
+
+  async function tgDemarrer() {
+    const btn = document.getElementById('tg-btn-commencer');
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      const r = await api('POST', '/transfert-gestionnaire/demarrer', {});
+      TG.transferId = r.transfer_id;
+      tgEtape1();
+    } catch (e) {
+      if (typeof showToast === 'function') showToast('Erreur : ' + (e.message || ''), 'danger');
+      if (btn) { btn.disabled = false; btn.textContent = 'Commencer la procédure'; }
+    }
+  }
+
+  /* Reprise après rechargement de page — retrouve l'étape exacte où en était la procédure. */
+  function tgReprendreEtape(status) {
+    const map = {
+      NOT_STARTED: tgEtape1, EMAIL_OLD_VERIFICATION_PENDING: tgEtape1,
+      OLD_EMAIL_VERIFIED: tgEtape2, NEW_MANAGER_DATA_PENDING: tgEtape3,
+      NEW_EMAIL_VERIFICATION_PENDING: tgEtape4,
+      IDENTITY_VERIFICATION_PENDING: tgEtape5, IDENTITY_VERIFIED: tgEtape6,
+      FINAL_VALIDATION: tgEtape6,
+    };
+    (map[status] || tgEtape1)();
+  }
+
+  /* Étape 1 — code envoyé à l'ANCIEN e-mail. */
+  function tgEtape1() {
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">📧 Vérification de votre identité</h3>
+      <p style="font-size:13px;color:var(--muted,#6B7280);">Un code de vérification vient d'être envoyé à l'adresse e-mail actuellement associée à ce compte.</p>
+      <input type="text" id="tg-code-ancien" maxlength="6" inputmode="numeric" placeholder="_ _ _ _ _ _" style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;padding:12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;margin:10px 0;">
+      <p id="tg-err" style="display:none;color:#dc2626;font-size:12.5px;margin:4px 0;"></p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+        <button style="${btnGhost}" id="tg-btn-renvoyer-ancien" onclick="window._tgRenvoyerAncien()">Renvoyer le code</button>
+        <div style="display:flex;gap:10px;">
+          <button style="${btnDanger}" onclick="window._tgAnnuler()">Annuler la procédure</button>
+          <button style="${btnPrimary}" onclick="window._tgVerifierAncien()">Vérifier le code</button>
+        </div>
+      </div>`);
+    document.getElementById('tg-code-ancien')?.focus();
+  }
+  window._tgVerifierAncien = async function() {
+    const code = document.getElementById('tg-code-ancien').value.trim();
+    try {
+      await api('POST', `/transfert-gestionnaire/${TG.transferId}/verifier-email-ancien`, { code });
+      tgEtape2();
+    } catch (e) { tgErr(e.message || "Code incorrect."); }
+  };
+  window._tgRenvoyerAncien = async function() {
+    const btn = document.getElementById('tg-btn-renvoyer-ancien');
+    if (btn) btn.disabled = true;
+    try { await api('POST', `/transfert-gestionnaire/${TG.transferId}/renvoyer-code-ancien`, {}); if (typeof showToast === 'function') showToast('✅ Nouveau code envoyé.'); }
+    catch (e) { tgErr(e.message || "Erreur lors du renvoi."); }
+    finally { if (btn) btn.disabled = false; }
+  };
+  window._tgAnnuler = async function() {
+    if (!confirm("Une fois la procédure démarrée, elle est comptabilisée comme une tentative même si vous l'annulez. Confirmer l'annulation ?")) return;
+    try { await api('POST', `/transfert-gestionnaire/${TG.transferId}/annuler`, {}); } catch (e) {}
+    tgFermer();
+    if (typeof showToast === 'function') showToast('Procédure annulée.', 'info');
+  };
+
+  /* Étape 2 — informations du nouveau gestionnaire. */
+  function tgEtape2() {
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">👤 Nouveau gestionnaire</h3>
+      <p style="font-size:12.5px;color:var(--muted,#6B7280);">Ces informations remplaceront les informations du gestionnaire actuel après validation complète de la procédure.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0;">
+        <input type="text" id="tg-nom" placeholder="Nom *" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+        <input type="text" id="tg-prenom" placeholder="Prénom" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+        <input type="email" id="tg-email" placeholder="Adresse e-mail *" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+        <input type="tel" id="tg-telephone" placeholder="Numéro de téléphone" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+        <input type="text" id="tg-fonction" placeholder="Fonction / rôle" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+      </div>
+      <p id="tg-err" style="display:none;color:#dc2626;font-size:12.5px;margin:4px 0;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
+        <button style="${btnDanger}" onclick="window._tgAnnuler()">Annuler la procédure</button>
+        <button style="${btnPrimary}" onclick="window._tgSoumettreNouveauGestionnaire()">Continuer →</button>
+      </div>`);
+  }
+  window._tgSoumettreNouveauGestionnaire = async function() {
+    const body = {
+      nom: document.getElementById('tg-nom').value.trim(),
+      prenom: document.getElementById('tg-prenom').value.trim(),
+      email: document.getElementById('tg-email').value.trim(),
+      telephone: document.getElementById('tg-telephone').value.trim(),
+      fonction: document.getElementById('tg-fonction').value.trim(),
+    };
+    try {
+      await api('POST', `/transfert-gestionnaire/${TG.transferId}/nouveau-gestionnaire`, body);
+      tgEtape3();
+    } catch (e) { tgErr(e.message || "Erreur."); }
+  };
+
+  /* Étape 3 — mot de passe du nouveau gestionnaire (jamais l'ancien mot de passe demandé). */
+  function tgEtape3() {
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">🔑 Mot de passe du nouveau gestionnaire</h3>
+      <p style="font-size:12.5px;color:var(--muted,#6B7280);">Le nouveau gestionnaire choisit lui-même son mot de passe — il n'a jamais besoin de connaître l'ancien.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0;">
+        <input type="password" id="tg-pwd" placeholder="Nouveau mot de passe (8 caractères min.)" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+        <input type="password" id="tg-pwd-confirm" placeholder="Confirmation du mot de passe" style="padding:9px 12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;">
+      </div>
+      <p id="tg-err" style="display:none;color:#dc2626;font-size:12.5px;margin:4px 0;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
+        <button style="${btnDanger}" onclick="window._tgAnnuler()">Annuler la procédure</button>
+        <button style="${btnPrimary}" onclick="window._tgSoumettreMotDePasse()">Continuer →</button>
+      </div>`);
+  }
+  window._tgSoumettreMotDePasse = async function() {
+    const password = document.getElementById('tg-pwd').value;
+    const password_confirm = document.getElementById('tg-pwd-confirm').value;
+    try {
+      await api('POST', `/transfert-gestionnaire/${TG.transferId}/mot-de-passe`, { password, password_confirm });
+      tgEtape4();
+    } catch (e) { tgErr(e.message || "Erreur."); }
+  };
+
+  /* Étape 4 — code envoyé au NOUVEL e-mail (confirme que le futur gestionnaire le contrôle). */
+  function tgEtape4() {
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">📧 Confirmation de la nouvelle adresse</h3>
+      <p style="font-size:13px;color:var(--muted,#6B7280);">Un code de confirmation vient d'être envoyé à la nouvelle adresse e-mail.</p>
+      <input type="text" id="tg-code-nouveau" maxlength="6" inputmode="numeric" placeholder="_ _ _ _ _ _" style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;padding:12px;border:1.5px solid var(--border,#D6DEE8);border-radius:8px;margin:10px 0;">
+      <p id="tg-err" style="display:none;color:#dc2626;font-size:12.5px;margin:4px 0;"></p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+        <button style="${btnGhost}" id="tg-btn-renvoyer-nouveau" onclick="window._tgRenvoyerNouveau()">Renvoyer le code</button>
+        <div style="display:flex;gap:10px;">
+          <button style="${btnDanger}" onclick="window._tgAnnuler()">Annuler la procédure</button>
+          <button style="${btnPrimary}" onclick="window._tgVerifierNouveau()">Confirmer la nouvelle adresse e-mail</button>
+        </div>
+      </div>`);
+    document.getElementById('tg-code-nouveau')?.focus();
+  }
+  window._tgRenvoyerNouveau = async function() {
+    const btn = document.getElementById('tg-btn-renvoyer-nouveau');
+    if (btn) btn.disabled = true;
+    try { await api('POST', `/transfert-gestionnaire/${TG.transferId}/renvoyer-code-nouveau`, {}); if (typeof showToast === 'function') showToast('✅ Nouveau code envoyé.'); }
+    catch (e) { tgErr(e.message || "Erreur lors du renvoi."); }
+    finally { if (btn) btn.disabled = false; }
+  };
+  window._tgVerifierNouveau = async function() {
+    const code = document.getElementById('tg-code-nouveau').value.trim();
+    try {
+      const r = await api('POST', `/transfert-gestionnaire/${TG.transferId}/verifier-email-nouveau`, { code });
+      TG.identityUrl = r.identity_url || null;
+      tgEtape5();
+    } catch (e) { tgErr(e.message || "Code incorrect."); }
+  };
+
+  /* Étape 5 — vérification d'identité Stripe du nouveau gestionnaire. Poll le statut jusqu'à
+     VERIFIED : le webhook Stripe met à jour la demande de façon asynchrone (aucune garantie
+     que le retour sur cette page arrive avant le webhook, donc on interroge plutôt que de se
+     fier au seul retour de redirection). */
+  function tgEtape5() {
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">🪪 Vérification de l'identité du nouveau gestionnaire</h3>
+      <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Pour finaliser le transfert, l'identité du nouveau gestionnaire doit être vérifiée. Le nouveau gestionnaire effectue le parcours de vérification proposé par Stripe (document officiel + selfie).</p>
+      <p style="font-size:12px;color:var(--muted,#6B7280);">Diaspo'Actif ne stocke jamais les documents d'identité — ils sont traités directement par Stripe.</p>
+      <div id="tg-identity-zone" style="margin-top:14px;text-align:center;">
+        ${TG.identityUrl
+          ? `<a href="${TG.identityUrl}" target="_blank" rel="noopener" style="${btnPrimary}display:inline-block;text-decoration:none;">Lancer la vérification d'identité →</a>`
+          : `<p style="font-size:12.5px;color:#92400e;">Vérification momentanément indisponible — réessayez dans un instant.</p>`}
+        <p id="tg-identity-attente" style="font-size:12px;color:var(--muted,#6B7280);margin-top:10px;">⏳ En attente du résultat de la vérification…</p>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <button style="${btnDanger}" onclick="window._tgAnnuler()">Annuler la procédure</button>
+      </div>`);
+    if (TG.pollTimer) clearInterval(TG.pollTimer);
+    TG.pollTimer = setInterval(async () => {
+      try {
+        const r = await api('GET', `/transfert-gestionnaire/${TG.transferId}/identite-statut`);
+        if (r.status === 'IDENTITY_VERIFIED') { clearInterval(TG.pollTimer); TG.pollTimer = null; tgEtape6(); }
+      } catch (e) { /* silencieux : on continue simplement d'attendre */ }
+    }, 4000);
+  }
+
+  /* Étape 6 — validation finale : récapitulatif, puis transaction atomique côté serveur. */
+  function tgEtape6() {
+    tgModal(`
+      <h3 style="margin:0 0 10px;font-size:16px;">✅ Prêt à finaliser</h3>
+      <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Toutes les vérifications sont réunies. En confirmant :</p>
+      <ul style="font-size:13px;color:var(--muted,#6B7280);line-height:1.7;margin:0 0 10px;padding-left:20px;">
+        <li>votre accès gestionnaire sera révoqué immédiatement ;</li>
+        <li>votre code confidentiel actuel deviendra définitivement inutilisable ;</li>
+        <li>le nouveau gestionnaire recevra un nouveau code et deviendra responsable du compte.</li>
+      </ul>
+      <p style="font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;">Cette action est irréversible.</p>
+      <p id="tg-err" style="display:none;color:#dc2626;font-size:12.5px;margin:4px 0;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;">
+        <button style="${btnGhost}" onclick="document.getElementById('tg-overlay').remove()">Plus tard</button>
+        <button style="${btnDanger}" id="tg-btn-finaliser" onclick="window._tgFinaliser()">Finaliser le transfert</button>
+      </div>`);
+  }
+  window._tgFinaliser = async function() {
+    const btn = document.getElementById('tg-btn-finaliser');
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      await api('POST', `/transfert-gestionnaire/${TG.transferId}/finaliser`, {});
+      tgModal(`
+        <h3 style="margin:0 0 10px;font-size:16px;">🎉 Transfert effectué</h3>
+        <p style="font-size:13px;color:var(--muted,#6B7280);line-height:1.6;">Le gestionnaire de ce compte a été remplacé. Votre accès à ce compte est désormais révoqué.</p>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;"><button style="${btnPrimary}" onclick="window.location.href='login.html'">Se reconnecter</button></div>`);
+    } catch (e) {
+      tgErr(e.message || "Erreur lors de la finalisation.");
+      if (btn) { btn.disabled = false; btn.textContent = 'Finaliser le transfert'; }
+    }
+  };
 })();
 
 /* ---- Masquage de compte (zone de danger) ---- */

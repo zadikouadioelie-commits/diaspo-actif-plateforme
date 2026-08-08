@@ -1052,6 +1052,8 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'affichage_membres', "TEXT DEFAULT 'tous'"],
     // Liste générale "Tous les membres" (2026-08-08) : miroir de l'ALTER db.js
     ['initiatives', 'liste_membres_generale_id', 'INTEGER'],
+    // Transfert de gestionnaire (2026-08-08) : compteur d'invalidation des tokens 'auth' stateless
+    ['users', 'credential_version', 'INTEGER NOT NULL DEFAULT 1'],
 ];
 
 async function migratePg(pool) {
