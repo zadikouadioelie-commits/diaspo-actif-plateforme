@@ -703,11 +703,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <h3>Module de paiement — billetterie &amp; cotisations</h3>
       <p>Activez un module de paiement pour vos événements : vente de billets, cotisations, inscriptions, collectes de fonds, dons.</p>
       <p style="margin:14px 0 6px;font-weight:700;font-size:13px;">Type de tarification</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <label class="payment-option"><input type="radio" name="tarification" checked> Tarif unique</label>
-        <label class="payment-option"><input type="radio" name="tarification"> Plusieurs catégories</label>
-        <label class="payment-option"><input type="radio" name="tarification"> Accès gratuit</label>
-        <label class="payment-option"><input type="radio" name="tarification"> Participation libre</label>
+      <div class="da-pill-group">
+        <label class="da-pill checked"><input type="radio" name="tarification" checked onchange="document.querySelectorAll('[name=\'tarification\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>Tarif unique</span></label>
+        <label class="da-pill"><input type="radio" name="tarification" onchange="document.querySelectorAll('[name=\'tarification\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>Plusieurs catégories</span></label>
+        <label class="da-pill"><input type="radio" name="tarification" onchange="document.querySelectorAll('[name=\'tarification\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>Accès gratuit</span></label>
+        <label class="da-pill"><input type="radio" name="tarification" onchange="document.querySelectorAll('[name=\'tarification\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>Participation libre</span></label>
       </div>
       <p style="margin:16px 0 6px;font-weight:700;font-size:13px;">Moyens de paiement acceptés</p>
       <div class="payment-grid" id="moyens-paiement"></div>
@@ -1815,7 +1815,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Moyens de paiement */
   if (typeof MOYENS_PAIEMENT !== "undefined") {
     document.getElementById("moyens-paiement").innerHTML = MOYENS_PAIEMENT.map((m, i) =>
-      `<label class="payment-option"><input type="checkbox" ${i < 2 ? "checked" : ""}> ${m}</label>`
+      `<label class="da-pill${i < 2 ? " checked" : ""}"><input type="checkbox" ${i < 2 ? "checked" : ""} onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>${m}</span></label>`
     ).join("");
   }
 
