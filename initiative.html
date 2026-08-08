@@ -737,6 +737,34 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
     location.href = 'messagerie.html?init=' + init.id + '&sujet=' + encodeURIComponent(sujet);
   };
 
+  /* "Rejoindre l'initiative" (bénévole / partenaire) : envoie une notification directe au
+     propriétaire — jamais le circuit établir-contact/demande de mise en relation. Le
+     propriétaire peut répondre par message sans action préalable (voir
+     demandeRejoindreExiste() côté serveur). */
+  window.rejoindreInitiative = async (type, btn) => {
+    if (!me) {
+      if (confirm("Vous devez être connecté(e) pour envoyer cette demande. Aller à la connexion ?")) {
+        location.href = 'login.html?retour=' + encodeURIComponent(location.href);
+      }
+      return;
+    }
+    const libelle = type === 'benevole' ? 'bénévole' : 'partenaire';
+    const origLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Envoi…';
+    try {
+      const r = await api('POST', `/initiatives/${init.id}/rejoindre`, { type });
+      const msg = r.deja_envoyee
+        ? `Vous avez déjà envoyé une demande pour devenir ${libelle}.`
+        : `✅ Demande envoyée ! « ${init.nom} » va recevoir une notification et pourra vous répondre directement par message.`;
+      if (window.showToast) showToast(msg, r.deja_envoyee ? 'info' : 'success', 5000);
+      else alert(msg);
+      btn.textContent = '✅ Demande envoyée';
+    } catch (e) {
+      alert(e.message || "Impossible d'envoyer la demande.");
+      btn.disabled = false; btn.textContent = origLabel;
+    }
+  };
+
   let EQUIPE = [], SCOREACT = null, CAMPAGNES = [], AVIS = null, EVENTS = [], FORMULES = [];
   try {
     const [rEq, rSc, rCamp, rAvis, rEv, rForm] = await Promise.all([
@@ -858,8 +886,10 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
         <h4>🚀 Rejoindre l'initiative</h4>
         ${`
           ${FORMULES.length ? `<a class="rejoindre-btn primary" href="adhesions.html?init=${init.id}">🎫 Adhérer / Cotiser</a>` : ''}
-          <button class="rejoindre-btn" onclick="contacterBesoin('Je souhaite devenir bénévole')">🙋 Devenir bénévole</button>
-          <button class="rejoindre-btn" onclick="contacterBesoin('Proposition de partenariat')">🤝 Devenir partenaire</button>
+          ${!isOwner ? `
+            <button class="rejoindre-btn" id="btn-devenir-benevole" onclick="rejoindreInitiative('benevole', this)">🙋 Devenir bénévole</button>
+            <button class="rejoindre-btn" id="btn-devenir-partenaire" onclick="rejoindreInitiative('partenaire', this)">🤝 Devenir partenaire</button>
+          ` : ''}
           ${init.owner_user_id
             ? `<span data-relation-user="${init.owner_user_id}" data-relation-origine="profil" data-relation-classe="rejoindre-btn"></span>`
             : `<a class="rejoindre-btn" href="messagerie.html?init=${init.id}">✉️ Contacter</a>`}

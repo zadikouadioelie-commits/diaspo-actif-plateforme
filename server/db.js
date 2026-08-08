@@ -5366,6 +5366,27 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_da_audit_code ON da_codes_audit_log(code_id);
   `);
 
+  /* ===== REJOINDRE UNE INITIATIVE (benevole / partenaire) =====
+     Volontairement distinct de demandes_contact : pas d'acceptation prealable requise
+     pour repondre. La ligne elle-meme sert de justificatif legitimant la messagerie
+     directe entre le demandeur et le proprietaire de l'initiative (voir
+     peutEcrireDirectement dans index.js), sans passer par le circuit etablir-contact. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS initiative_rejoindre_demandes (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      initiative_id  INTEGER NOT NULL,
+      demandeur_id   INTEGER NOT NULL,
+      type           TEXT NOT NULL CHECK(type IN ('benevole','partenaire')),
+      message        TEXT,
+      statut         TEXT NOT NULL DEFAULT 'envoyee' CHECK(statut IN ('envoyee','lue','repondue')),
+      created_at     TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+      FOREIGN KEY(demandeur_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_rejoindre_init ON initiative_rejoindre_demandes(initiative_id);
+    CREATE INDEX IF NOT EXISTS idx_rejoindre_demandeur ON initiative_rejoindre_demandes(demandeur_id);
+  `);
+
   /* ===== MODULE MON ASSOCIE =====
      Marketplace de recherche de collaborations (associes, partenaires, benevoles,
      investisseurs, mentors...). Independant de la table collaborations existante

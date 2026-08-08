@@ -2731,6 +2731,44 @@ route("PATCH", "/api/initiatives/:id/arguments/reorder", async (req, res, params
   sendJSON(res, 200, { ok: true });
 });
 
+/* ══════════ Rejoindre l'initiative (bénévole / partenaire) ══════════
+   Volontairement PAS le circuit demandes_contact/établir-contact : une notification part
+   immédiatement vers le propriétaire, qui peut répondre par message directement — voir
+   demandeRejoindreExiste() et son usage dans peutEcrireDirectement(), plus haut. */
+route("POST", "/api/initiatives/:id/rejoindre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const type = body.type === 'partenaire' ? 'partenaire' : body.type === 'benevole' ? 'benevole' : null;
+  if (!type) return sendJSON(res, 400, { error: "Type de demande invalide." });
+
+  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) === Number(user.id)) {
+    return sendJSON(res, 400, { error: "Vous êtes déjà à l'origine de cette initiative." });
+  }
+
+  const dejaEnvoyee = await db.prepare(
+    "SELECT id FROM initiative_rejoindre_demandes WHERE initiative_id=? AND demandeur_id=? AND type=? AND statut='envoyee'"
+  ).get(init.id, user.id, type);
+  if (dejaEnvoyee) return sendJSON(res, 200, { ok: true, deja_envoyee: true });
+
+  const message = (body.message || '').trim().slice(0, 500) || null;
+  const demandeId = (await db.prepare(
+    "INSERT INTO initiative_rejoindre_demandes (initiative_id, demandeur_id, type, message) VALUES (?,?,?,?)"
+  ).run(init.id, user.id, type, message)).lastInsertRowid;
+
+  const nomDemandeur = [user.prenom, user.nom].filter(Boolean).join(' ') || user.nom || 'Un membre';
+  const titre = type === 'benevole' ? '🙋 Nouvelle proposition de bénévolat' : '🤝 Nouvelle proposition de partenariat';
+  const contenu = type === 'benevole'
+    ? `${nomDemandeur} souhaite devenir bénévole pour « ${init.nom} ».`
+    : `${nomDemandeur} propose un partenariat avec « ${init.nom} ».`;
+  creerNotif(init.owner_user_id, `initiative_devenir_${type}`, titre, contenu, {
+    with_user_id: user.id, initiative_id: init.id, rejoindre_demande_id: demandeId,
+  });
+
+  sendJSON(res, 201, { ok: true, id: demandeId });
+});
+
 /* ══════════ Promotions du mois (max 3 actives simultanément, expiration par date) ══════════ */
 route("GET", "/api/initiatives/:id/promotions", async (req, res, params) => {
   const me = await getCurrentUser(req).catch(() => null);
@@ -8732,6 +8770,21 @@ async function cibleMeSuit(cibleId, moiId) {
   return !!init;
 }
 
+/* Une demande "Rejoindre l'initiative" (bénévole/partenaire) existe-t-elle entre ces deux
+   comptes, dans un sens ou l'autre ? Contrairement à l'origine "vitrine" (une simple
+   affirmation du navigateur), c'est une ligne réellement en base — non falsifiable par
+   un paramètre d'URL — qui légitime la messagerie directe sans passer par le circuit
+   établir-contact, exactement ce que demande le cahier des charges pour ce module. */
+async function demandeRejoindreExiste(a, b) {
+  const r = await db.prepare(`
+    SELECT d.id FROM initiative_rejoindre_demandes d
+    JOIN initiatives i ON i.id = d.initiative_id
+    WHERE (d.demandeur_id=? AND i.owner_user_id=?) OR (d.demandeur_id=? AND i.owner_user_id=?)
+    LIMIT 1
+  `).get(a, b, b, a);
+  return !!r;
+}
+
 /* Peut-on ouvrir une conversation neuve sans passer par une demande ?
    `origine` indique l'espace d'où part le contact ("vitrine" pour la boutique publique).
 
@@ -8757,6 +8810,8 @@ async function peutEcrireDirectement(user, cibleId, origine) {
   /* Un compte officiel exige la demande quel que soit le point d'entrée : cette règle
      l'emporte sur l'exception vitrine, sans quoi elle serait contournable. */
   if (cible && cible.role === "collectivite" && regles.collectivite_toujours_demande) return false;
+
+  if (await demandeRejoindreExiste(user.id, cibleId)) return true;
 
   if (regles.vitrine_contact_direct && String(origine || "") === "vitrine") {
     const init = await db.prepare("SELECT vitrine_active FROM initiatives WHERE owner_user_id=?").get(cibleId);
