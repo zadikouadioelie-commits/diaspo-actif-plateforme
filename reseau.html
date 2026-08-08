@@ -1601,12 +1601,7 @@ async function confirmerAjoutListe(listeId){
   }catch(e){DA.toast(e.message,{type:'danger'});}
 }
 
-/* Sidebar toggle */
-(function(){
-  const toggle=document.getElementById('sidebar-toggle');
-  const sb=document.querySelector('.sidebar');
-  toggle?.addEventListener('click',()=>sb?.classList.toggle('open'));
-})();
+/* Sidebar toggle : géré par assets/app.js (initSidebarMobile), plus de doublon ici */
 
 init();
 </script>

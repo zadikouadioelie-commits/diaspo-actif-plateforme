@@ -853,24 +853,6 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   loadProjetsCockpit();
 })();
 </script>
-<script>
-(function(){
-  var toggle = document.getElementById('sidebar-toggle');
-  var close  = document.getElementById('sidebar-close');
-  var back   = document.getElementById('sidebar-backdrop');
-  var sb     = document.querySelector('.sidebar');
-  function openSidebar(){ sb && sb.classList.add('open'); back && back.classList.add('open'); document.body.style.overflow='hidden'; }
-  function closeSidebar(){ sb && sb.classList.remove('open'); back && back.classList.remove('open'); document.body.style.overflow=''; }
-  if(toggle) toggle.addEventListener('click', openSidebar);
-  if(close)  close.addEventListener('click', closeSidebar);
-  if(back)   back.addEventListener('click', closeSidebar);
-  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
-  /* Section switching quand la sidebar est ouverte en mobile */
-  document.querySelectorAll('.sidebar a[data-usection]').forEach(a=>{
-    a.addEventListener('click', () => closeSidebar());
-  });
-})();
-</script>
 
   <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
     <a class="mobile-bottom-nav__item active" href="dashboard-utilisateur.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>

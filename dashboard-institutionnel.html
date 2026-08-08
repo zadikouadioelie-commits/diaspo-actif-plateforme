@@ -10,20 +10,6 @@
 <body>
 <p>Redirection vers <a href="dashboard-collectivite.html">dashboard-collectivite.html</a>…</p>
 <script>window.location.replace("dashboard-collectivite.html");</script>
-<script>
-(function(){
-  var toggle = document.getElementById('sidebar-toggle');
-  var close  = document.getElementById('sidebar-close');
-  var back   = document.getElementById('sidebar-backdrop');
-  var sb     = document.querySelector('.sidebar');
-  function openSidebar(){ sb && sb.classList.add('open'); back && back.classList.add('open'); document.body.style.overflow='hidden'; }
-  function closeSidebar(){ sb && sb.classList.remove('open'); back && back.classList.remove('open'); document.body.style.overflow=''; }
-  if(toggle) toggle.addEventListener('click', openSidebar);
-  if(close)  close.addEventListener('click', closeSidebar);
-  if(back)   back.addEventListener('click', closeSidebar);
-  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
-})();
-</script>
 
   <nav class="mobile-bottom-nav">
     <a class="mobile-bottom-nav__item active" href="dashboard-institutionnel.html"><span class="nav-icon">🏛️</span><span>Tableau</span></a>

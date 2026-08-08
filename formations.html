@@ -2343,20 +2343,6 @@
   })();
 </script>
 <script>
-(function(){
-  var toggle = document.getElementById('sidebar-toggle');
-  var close  = document.getElementById('sidebar-close');
-  var back   = document.getElementById('sidebar-backdrop');
-  var sb     = document.querySelector('.sidebar');
-  function openSidebar(){ sb && sb.classList.add('open'); back && back.classList.add('open'); document.body.style.overflow='hidden'; }
-  function closeSidebar(){ sb && sb.classList.remove('open'); back && back.classList.remove('open'); document.body.style.overflow=''; }
-  if(toggle) toggle.addEventListener('click', openSidebar);
-  if(close)  close.addEventListener('click', closeSidebar);
-  if(back)   back.addEventListener('click', closeSidebar);
-  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSidebar(); });
-})();
-</script>
-<script>
 function showMsg(msg, type='info') {
   if (typeof DA !== 'undefined') { DA.toast(msg, {type}); return; }
   const el = document.createElement('div');

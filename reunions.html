@@ -1074,18 +1074,7 @@ document.getElementById('search-reunions').addEventListener('input',renderReunio
 document.getElementById('filter-statut').addEventListener('change',renderReunions);
 document.getElementById('filter-dec-statut').addEventListener('change',renderDecisions);
 
-// Sidebar toggle
-(function(){
-  var toggle=document.getElementById('sidebar-toggle');
-  var close=document.getElementById('sidebar-close');
-  var back=document.getElementById('sidebar-backdrop');
-  var sb=document.querySelector('.sidebar');
-  function openSidebar(){sb?.classList.add('open');back?.classList.add('open');document.body.style.overflow='hidden';}
-  function closeSidebar(){sb?.classList.remove('open');back?.classList.remove('open');document.body.style.overflow='';}
-  toggle?.addEventListener('click',openSidebar);
-  close?.addEventListener('click',closeSidebar);
-  back?.addEventListener('click',closeSidebar);
-})();
+// Sidebar toggle : géré par assets/app.js (initSidebarMobile), plus de doublon ici
 
 init();
 </script>
