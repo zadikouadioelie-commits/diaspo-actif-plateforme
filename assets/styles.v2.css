@@ -405,6 +405,18 @@ button{font-family:inherit;cursor:pointer;}
 .sb-bandeau-group{display:none;}
 
 @media(max-width:768px){
+  /* Repli du bouton menu (assets/app.js:initSidebarMobile) sur les pages sans tiroir #sidebar
+     dédié : affiche la nav existante du topbar comme un menu déroulant plutôt que de la
+     laisser purement invisible (.nav{display:none} ci-dessous). */
+  .nav.nav-mobile-open{
+    display:flex!important;flex-direction:column;gap:4px;
+    position:fixed;top:60px;left:0;right:0;z-index:209;
+    background:var(--card,#fff);border-bottom:1px solid var(--border,#e5e7eb);
+    padding:12px 16px;box-shadow:0 10px 26px -12px rgba(0,0,0,.25);
+    max-height:calc(100vh - 60px);overflow-y:auto;
+  }
+  .nav.nav-mobile-open a{padding:10px 4px;border-bottom:1px solid var(--border,#e5e7eb);}
+  .nav.nav-mobile-open a:last-child{border-bottom:none;}
   .sb-bandeau-group{display:block;}
   /* Topbar compact */
   .topbar-inner{padding:10px 14px;gap:10px;flex-wrap:nowrap;}

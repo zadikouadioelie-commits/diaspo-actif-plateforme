@@ -3872,9 +3872,32 @@ document.addEventListener("DOMContentLoaded", ()=>{
   // (ex. dashboard-administrateur.html, sans barre du bas). Une exception non interceptée
   // dans n'importe lequel des init* ci-dessous ne doit jamais pouvoir désactiver ce bouton.
   (function initSidebarMobile() {
-    const toggle   = document.getElementById("sidebar-toggle");
-    const sidebar  = document.getElementById("sidebar");
-    if (!toggle || !sidebar) return;
+    const toggle = document.getElementById("sidebar-toggle");
+    if (!toggle) return;
+    // Repli sur la classe .sidebar quand l'id manque (plusieurs pages ont le tiroir sans
+    // id="sidebar" — voir dashboard-utilisateur.html) : évite de dupliquer ce module en
+    // script inline par page, comme c'était fait jusqu'ici sur 6 pages différentes.
+    const sidebar = document.getElementById("sidebar") || document.querySelector(".sidebar");
+
+    // Aucun tiroir dédié sur cette page (le bouton existe seul, à côté de la nav du topbar) :
+    // on bascule alors l'affichage mobile de cette nav existante plutôt que d'exiger un
+    // tiroir dupliqué par page — la nav contient déjà les bons liens pour cette page précise.
+    if (!sidebar) {
+      const nav = document.querySelector(".topbar .nav");
+      if (!nav) return; // rien à ouvrir/fermer sur cette page
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.addEventListener("click", () => {
+        const isOpen = nav.classList.toggle("nav-mobile-open");
+        toggle.textContent = isOpen ? "✕" : "☰";
+        toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      });
+      nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
+        nav.classList.remove("nav-mobile-open");
+        toggle.textContent = "☰";
+        toggle.setAttribute("aria-expanded", "false");
+      }));
+      return;
+    }
     const navToggle    = document.getElementById("mobile-nav-menu-toggle");
     const navToggleIcon = navToggle ? navToggle.querySelector(".nav-icon") : null;
     // Une page qui a son propre bouton menu dans la barre du bas (mobile) n'a pas besoin
