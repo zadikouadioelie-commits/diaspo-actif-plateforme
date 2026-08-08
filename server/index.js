@@ -7065,7 +7065,7 @@ route("GET", "/api/profil/ds-id/history", async (req, res) => {
    bascule atomiquement vers ce nouveau users.id — aucune donnée de l'initiative ne bouge.
    ══════════════════════════════════════════════════════════════════════ */
 
-const TG_CODE_TTL_MS = 10 * 60 * 1000;           // 10 min de validité par code e-mail
+const TG_CODE_TTL_MS = 5 * 60 * 1000;             // 5 min de validité par code e-mail
 const TG_CODE_MAX_TENTATIVES = 5;                 // au-delà : procédure verrouillée (FAILED)
 const TG_RENVOI_COOLDOWN_MS = 60 * 1000;          // anti-abus "renvoyer le code"
 const TG_PROCEDURE_TTL_MS = 48 * 60 * 60 * 1000;  // 48h pour boucler les 5 étapes
@@ -7220,7 +7220,7 @@ route("POST", "/api/transfert-gestionnaire/demarrer", async (req, res) => {
     await sendEmail({
       to: user.email,
       subject: "Code de vérification — Changement de gestionnaire",
-      html: `<p>Bonjour,</p><p>Une procédure de <strong>changement de gestionnaire</strong> a été lancée pour le compte « ${(init.nom || '').replace(/</g,'&lt;')} » sur Diaspo'Actif.</p><p>Si vous êtes à l'origine de cette demande, voici votre code de vérification :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Ce code est valable 10 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail et contactez le support Diaspo'Actif — aucune information de votre compte n'est modifiée tant que la procédure complète n'est pas validée.</p>`,
+      html: `<p>Bonjour,</p><p>Une procédure de <strong>changement de gestionnaire</strong> a été lancée pour le compte « ${(init.nom || '').replace(/</g,'&lt;')} » sur Diaspo'Actif.</p><p>Si vous êtes à l'origine de cette demande, voici votre code de vérification :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Ce code est valable 5 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail et contactez le support Diaspo'Actif — aucune information de votre compte n'est modifiée tant que la procédure complète n'est pas validée.</p>`,
     });
   } catch (e) { console.error('[transfert-gestionnaire] envoi code ancien', e.message); }
 
@@ -7242,7 +7242,7 @@ route("POST", "/api/transfert-gestionnaire/:id/renvoyer-code-ancien", async (req
   try {
     const { sendEmail } = require('./mailer');
     await sendEmail({ to: user.email, subject: "Nouveau code de vérification — Changement de gestionnaire",
-      html: `<p>Voici votre nouveau code de vérification :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 10 minutes.</p>` });
+      html: `<p>Voici votre nouveau code de vérification :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 5 minutes.</p>` });
   } catch (e) { console.error('[transfert-gestionnaire] renvoi code ancien', e.message); }
   sendJSON(res, 200, { ok: true });
 });
@@ -7327,7 +7327,7 @@ route("POST", "/api/transfert-gestionnaire/:id/mot-de-passe", async (req, res, p
   try {
     const { sendEmail } = require('./mailer');
     await sendEmail({ to: pending.email, subject: "Code de confirmation — Vous devenez gestionnaire sur Diaspo'Actif",
-      html: `<p>Bonjour ${(pending.prenom || '').replace(/</g,'&lt;')},</p><p>Vous êtes en cours de désignation comme nouveau gestionnaire d'un compte Diaspo'Actif. Voici votre code de confirmation :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 10 minutes.</p>` });
+      html: `<p>Bonjour ${(pending.prenom || '').replace(/</g,'&lt;')},</p><p>Vous êtes en cours de désignation comme nouveau gestionnaire d'un compte Diaspo'Actif. Voici votre code de confirmation :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 5 minutes.</p>` });
   } catch (e) { console.error('[transfert-gestionnaire] envoi code nouveau', e.message); }
 
   sendJSON(res, 200, { ok: true, status: 'NEW_EMAIL_VERIFICATION_PENDING' });
@@ -7349,7 +7349,7 @@ route("POST", "/api/transfert-gestionnaire/:id/renvoyer-code-nouveau", async (re
   try {
     const { sendEmail } = require('./mailer');
     await sendEmail({ to: pending.email, subject: "Nouveau code de confirmation — Diaspo'Actif",
-      html: `<p>Voici votre nouveau code de confirmation :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 10 minutes.</p>` });
+      html: `<p>Voici votre nouveau code de confirmation :</p><p style="font-size:26px;font-weight:800;letter-spacing:4px;">${code}</p><p>Valable 5 minutes.</p>` });
   } catch (e) { console.error('[transfert-gestionnaire] renvoi code nouveau', e.message); }
   sendJSON(res, 200, { ok: true });
 });

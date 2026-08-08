@@ -550,7 +550,16 @@
         <li>le nouveau gestionnaire deviendra responsable du compte.</li>
       </ul>
       <p style="font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;">Cette opération ne doit être effectuée que si vous êtes autorisé à transférer la gestion de ce compte.</p>
-      <p style="font-size:12.5px;color:var(--muted,#6B7280);margin-top:10px;">Tentatives disponibles ce mois-ci : <strong>${statut.tentatives_restantes} / ${statut.quota_mois}</strong>. Une fois la procédure commencée, la tentative ne pourra pas être récupérée si vous l'annulez ou si elle échoue.</p>
+      <div style="font-size:12px;color:var(--muted,#6B7280);background:#f9fafb;border:1px solid var(--border,#D6DEE8);border-radius:8px;padding:10px 12px;margin-top:10px;line-height:1.7;">
+        <strong style="color:var(--text,#102A43);">Particularités à connaître avant de commencer :</strong>
+        <ul style="margin:6px 0 0;padding-left:18px;">
+          <li>Tentatives disponibles ce mois-ci : <strong>${statut.tentatives_restantes} / ${statut.quota_mois}</strong>. Le quota alterne chaque mois (2 tentatives certains mois, 1 seule les mois suivants) — ce n'est pas toujours le même nombre.</li>
+          <li>Les mois à 2 tentatives, un délai minimum de <strong>3 heures</strong> est obligatoire entre la 1ʳᵉ et la 2ᵉ tentative.</li>
+          <li>La tentative est consommée dès l'envoi du 1ᵉʳ code — <strong>même si vous annulez ou si la procédure échoue</strong>, elle ne pourra pas être récupérée.</li>
+          <li>Les codes de vérification envoyés par e-mail sont valables <strong>5 minutes</strong>.</li>
+          <li>Vous disposez de <strong>48 heures</strong> pour compléter l'ensemble des étapes ; passé ce délai, la procédure expire automatiquement.</li>
+        </ul>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
         <button style="${btnGhost}" onclick="document.getElementById('tg-overlay').remove()">Annuler</button>
         <button style="${btnPrimary}" id="tg-btn-commencer">Commencer la procédure</button>
