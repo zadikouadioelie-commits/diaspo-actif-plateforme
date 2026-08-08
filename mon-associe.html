@@ -138,8 +138,7 @@ a{color:inherit}
 .ma-thread-input input{flex:1;background:var(--ma-card2);border:1px solid var(--ma-border);color:var(--ma-text);border-radius:12px;padding:10px 14px;font-family:inherit}
 .ma-close-x{position:absolute;top:16px;right:20px;cursor:pointer;font-size:20px;color:var(--ma-muted)}
 
-.ma-accred-banner{background:linear-gradient(135deg,rgba(46,116,224,.15),rgba(45,212,191,.1));border:1px solid var(--ma-border);border-radius:16px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap}
-.ma-accred-banner p{margin:0;font-size:13px;color:var(--ma-muted)}
+.ma-premium-banner p{margin:4px 0 0;font-size:13px}
 </style>
 </head>
 <body>
@@ -155,9 +154,12 @@ a{color:inherit}
 
   <section id="ma-hero"></section>
 
-  <div id="ma-accred-banner" class="ma-accred-banner" style="display:none">
-    <p id="ma-accred-banner-txt"></p>
-    <button class="ma-btn ma-btn-primary ma-btn-sm" id="ma-accred-btn">Demander l'accréditation</button>
+  <div id="ma-premium-banner" class="ma-premium-banner" style="display:none;margin-bottom:20px;padding:16px 20px;border-radius:16px;background:linear-gradient(135deg,#fffbeb,#fff7e0);border:1.5px solid #f2c94c;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+    <div>
+      <strong style="font-size:14.5px;color:#92400e">🔒 Publiez et candidatez sur Mon Associé</strong>
+      <p style="color:#92400e">La publication d'annonces et les candidatures sont réservées aux comptes Initiative et Collectivité Premium. La consultation reste libre pour tous.</p>
+    </div>
+    <a href="premium.html" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;padding:10px 18px;border-radius:8px;text-decoration:none;white-space:nowrap">🎉 Passer à Premium</a>
   </div>
 
   <nav id="ma-tabs" class="ma-tabs" style="display:none">
@@ -229,13 +231,30 @@ a{color:inherit}
   <div class="ma-modal">
     <h3>🔐 Code de Sécurité Diaspo'Actif</h3>
     <p style="font-size:12.5px;color:var(--ma-muted);margin-top:-8px">Votre signature numérique personnelle et confidentielle — la même que celle utilisée ailleurs sur Diaspo'Actif pour signer des accords sécurisés.</p>
-    <div class="ma-field"><label>Code de sécurité (DS-ID)</label><input type="text" id="ma-login-code" maxlength="10" placeholder="Votre code"></div>
+    <div class="ma-field"><label>Code de sécurité (DS-ID)</label><input type="password" id="ma-login-code" maxlength="10" placeholder="Votre code" autocomplete="off"></div>
+    <div class="ma-field" style="display:flex;align-items:center;gap:8px;margin-top:4px">
+      <input type="checkbox" id="ma-login-remember" style="width:16px;height:16px;margin:0;flex:none">
+      <label for="ma-login-remember" style="font-size:12.5px;color:var(--ma-muted);margin:0;cursor:pointer">Se souvenir de moi sur cet appareil</label>
+    </div>
     <div class="ma-error" id="ma-login-error"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
       <button class="ma-btn ma-btn-ghost" id="ma-login-cancel">Annuler</button>
       <button class="ma-btn ma-btn-primary" id="ma-login-submit">Vérifier et accéder</button>
     </div>
     <p style="font-size:12px;color:var(--ma-muted);margin-top:16px">Pas encore de compte ou de code ? <a href="#" id="ma-login-signupinfo" style="color:var(--ma-accent)">En savoir plus</a></p>
+  </div>
+</div>
+
+<!-- Modale offre Premium requise -->
+<div class="ma-modal-bg" id="ma-modal-premium">
+  <div class="ma-modal" style="max-width:420px;text-align:center">
+    <div style="font-size:30px;margin-bottom:8px">🔒</div>
+    <h3 style="margin-bottom:6px">Fonctionnalité Premium</h3>
+    <p style="font-size:13.5px;color:var(--ma-muted);margin-bottom:18px">La publication d'annonces et les candidatures sur Mon Associé font partie de l'offre Premium, réservée aux comptes Initiative et Collectivité Premium. La consultation reste libre pour tous.</p>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="ma-btn ma-btn-ghost" id="ma-premium-cancel">Fermer</button>
+      <a class="ma-btn ma-btn-primary" href="premium.html" style="text-decoration:none">🎉 Passer à Premium</a>
+    </div>
   </div>
 </div>
 
@@ -337,11 +356,16 @@ function maLabel(list, key){ const f = list.find(x => x[0] === key); return f ? 
 function escH(s){ const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 function maNorm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
 
+/* Clé localStorage du DS-ID mémorisé (« se souvenir de moi »). Jamais lu dans un attribut
+   value d'input visible ni exposé par une fonction « copier » — uniquement republié via
+   l'appel API direct dans tentativeConnexionMemorisee(). */
+const MA_REMEMBER_KEY = 'ma_dsid_remember';
 const MA = {
-  connected: false, accredite: false, accredStatut: null,
+  connected: false, peutPublier: false,
   view: 'decouvrir', filtreType: '', pollTimer: null, activeConvId: null, msgPollTimer: null,
   annoncesMineCache: [], candidatureContext: null, transmettreDocId: null,
 };
+function ouvrirPremiumUpsell(){ ouvrirModal('ma-modal-premium'); }
 
 function ouvrirModal(id){ document.getElementById(id).classList.add('open'); }
 function fermerModal(id){ document.getElementById(id).classList.remove('open'); }
@@ -357,7 +381,13 @@ function exigerConnexion(texte){
 function renderAuthZone(){
   const el = document.getElementById('ma-auth-zone');
   if (MA.connected) {
-    el.innerHTML = `<div class="ma-avatar">${CURRENT_USER.photo_url ? `<img src="${CURRENT_USER.photo_url}">` : escH((CURRENT_USER.nom||'?')[0])}</div>`;
+    el.innerHTML = `<div class="ma-avatar" id="ma-avatar-btn" title="Se déconnecter de Mon Associé sur cet appareil" style="cursor:pointer">${CURRENT_USER.photo_url ? `<img src="${CURRENT_USER.photo_url}">` : escH((CURRENT_USER.nom||'?')[0])}</div>`;
+    document.getElementById('ma-avatar-btn').addEventListener('click', () => {
+      if (!confirm('Se déconnecter de Mon Associé sur cet appareil ? Le code de sécurité mémorisé sera oublié.')) return;
+      localStorage.removeItem('ma_dsid_ok');
+      localStorage.removeItem(MA_REMEMBER_KEY);
+      window.location.reload();
+    });
   } else {
     el.innerHTML = `<button class="ma-btn ma-btn-sm" id="ma-btn-msg-visiteur" title="Messagerie">💬</button>
       <button class="ma-btn ma-btn-sm" id="ma-btn-connexion">Se connecter</button>
@@ -421,30 +451,17 @@ function renderHero(){
   }
 }
 
-async function checkAccreditation(){
-  if (!MA.connected) return;
+async function checkAccesPublication(){
+  const banner = document.getElementById('ma-premium-banner');
+  if (!MA.connected) { MA.peutPublier = false; banner.style.display = 'none'; return; }
   try {
-    const r = await api('GET', '/accreditations/mes');
-    const a = (r.accreditations||[]).find(x => x.type === 'mon_associe' && x.statut === 'active');
-    MA.accredite = !!a;
-  } catch(e) { MA.accredite = false; }
-  const banner = document.getElementById('ma-accred-banner');
-  if (MA.accredite) { banner.style.display = 'none'; return; }
-  banner.style.display = 'flex';
-  let demandeEnCours = false;
-  try {
-    const rd = await api('GET', '/accreditations/demandes');
-    demandeEnCours = (rd.demandes||[]).some(d => d.type === 'mon_associe' && ['en_attente','deposee','en_cours_analyse'].includes(d.statut));
-  } catch(e) {}
-  document.getElementById('ma-accred-banner-txt').textContent = demandeEnCours
-    ? "Votre demande d'accréditation « Mon Associé » est en cours d'examen par un administrateur."
-    : "Publier une annonce ou candidater nécessite l'accréditation « Mon Associé » (gratuite, validée par un administrateur).";
-  document.getElementById('ma-accred-btn').style.display = demandeEnCours ? 'none' : 'inline-flex';
+    const r = await api('GET', '/mon-associe/mon-acces');
+    MA.peutPublier = !!r.peut_publier;
+  } catch(e) { MA.peutPublier = false; }
+  /* Le compte Utilisateur est en lecture seule par conception, pas par manque de Premium :
+     pas d'appel à l'achat pour lui, seuls Initiative/Collectivité voient le bandeau. */
+  banner.style.display = (!MA.peutPublier && CURRENT_USER?.role !== 'utilisateur') ? 'flex' : 'none';
 }
-document.getElementById('ma-accred-btn').addEventListener('click', async () => {
-  try { await api('POST', '/accreditations/demande', { type: 'mon_associe' }); await checkAccreditation(); }
-  catch(e) { alert(e.message || 'Erreur.'); }
-});
 
 /* ── Onglets (espace de travail) ── */
 document.querySelectorAll('.ma-tab').forEach(t => t.addEventListener('click', () => maSwitchTab(t.dataset.tab)));
@@ -536,7 +553,7 @@ document.getElementById('c-validite').addEventListener('click', (e) => {
 
 function ouvrirPublication(){
   if (!exigerConnexion('Connectez-vous pour publier une annonce')) return;
-  if (!MA.accredite) { fermerModal('ma-modal-auth'); document.getElementById('ma-accred-banner').scrollIntoView({behavior:'smooth'}); return; }
+  if (!MA.peutPublier) { fermerModal('ma-modal-auth'); ouvrirPremiumUpsell(); return; }
   ['c-titre','c-desc','c-loc','c-pays','c-duree','c-budget','c-comp'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('c-error').style.display = 'none';
   ouvrirModal('ma-modal-compose');
@@ -562,14 +579,17 @@ document.getElementById('c-save').addEventListener('click', async () => {
     fermerModal('ma-modal-compose');
     maSwitchTab('mesannonces');
     document.querySelectorAll('.ma-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'mesannonces'));
-  } catch(e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+  } catch(e) {
+    if (e.premium_requis) { fermerModal('ma-modal-compose'); ouvrirPremiumUpsell(); return; }
+    errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block';
+  }
 });
 
 /* ── Candidature ── */
 let candAnnonceId = null;
 function ouvrirCandidature(id, titre){
   if (!exigerConnexion('Connectez-vous pour candidater à cette annonce')) return;
-  if (!MA.accredite) { fermerModal('ma-modal-auth'); document.getElementById('ma-accred-banner').scrollIntoView({behavior:'smooth'}); return; }
+  if (!MA.peutPublier) { fermerModal('ma-modal-auth'); ouvrirPremiumUpsell(); return; }
   candAnnonceId = id;
   document.getElementById('cand-titre').textContent = 'Pour : ' + titre;
   document.getElementById('cand-msg').value = '';
@@ -589,7 +609,10 @@ document.getElementById('cand-send').addEventListener('click', async () => {
     fermerModal('ma-modal-candidature');
     alert('Votre candidature a été envoyée !');
     loadAnnonces();
-  } catch(e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+  } catch(e) {
+    if (e.premium_requis) { fermerModal('ma-modal-candidature'); ouvrirPremiumUpsell(); }
+    else { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
+  }
   finally { btn.disabled = false; btn.textContent = 'Envoyer ma candidature'; }
 });
 
@@ -609,6 +632,7 @@ async function loadMesAnnonces(){
           <span class="ma-statut-${a.statut}">${a.statut === 'active' ? '● En ligne' : '● Clôturée'}</span>
           <span>${a.nb_candidatures} rép. ${a.nb_nouvelles ? `· ${a.nb_nouvelles} nouvelle(s)` : ''}</span>
         </div>
+        ${a.masquee_non_premium && a.statut === 'active' ? `<div style="margin-top:6px;font-size:11.5px;color:#92400e;background:#fff7e0;border:1px solid #f2c94c;border-radius:6px;padding:4px 8px">🔒 Masquée aux autres — Premium requis pour redevenir visible</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px">
           ${a.statut === 'active' ? `<button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="event.stopPropagation();maCloturerAnnonce(${a.id})">Clôturer</button>` : ''}
           <button class="ma-btn ma-btn-ghost ma-btn-sm" onclick="event.stopPropagation();maSupprimerAnnonce(${a.id})">Supprimer</button>
@@ -819,11 +843,18 @@ document.getElementById('ma-login-code').addEventListener('keydown', e => { if (
 document.getElementById('ma-login-submit').addEventListener('click', async () => {
   const errEl = document.getElementById('ma-login-error'); errEl.style.display = 'none';
   const code = document.getElementById('ma-login-code').value.trim();
+  const seSouvenir = document.getElementById('ma-login-remember').checked;
   if (code.length < 6) { errEl.textContent = 'Le code de sécurité comporte au moins 6 caractères.'; errEl.style.display = 'block'; return; }
   const btn = document.getElementById('ma-login-submit'); btn.disabled = true; btn.textContent = 'Vérification...';
   try {
     await api('POST', '/mon-associe/connexion', { ds_id: code });
     localStorage.setItem('ma_dsid_ok', '1');
+    /* Décocher = oublier immédiatement, même si un code était déjà mémorisé avant cette
+       connexion (le choix de la case prime toujours sur l'état précédent). Le code n'est
+       jamais réaffiché ni recopiable nulle part ailleurs : il ne sert qu'à republier cette
+       même requête silencieusement lors d'une prochaine visite. */
+    if (seSouvenir) localStorage.setItem(MA_REMEMBER_KEY, code); else localStorage.removeItem(MA_REMEMBER_KEY);
+    document.getElementById('ma-login-code').value = '';
     window.location.reload();
   } catch(e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
   finally { btn.disabled = false; btn.textContent = 'Vérifier et accéder'; }
@@ -834,17 +865,38 @@ document.getElementById('ma-login-submit').addEventListener('click', async () =>
    entrer dans l'espace de travail : ce module exige explicitement le DS-ID à chaque
    nouvelle machine/navigateur — 'ma_dsid_ok' n'est posé qu'après une connexion réussie
    via /api/mon-associe/connexion. Sans lui, on reste en mode SAS visiteur même connecté
-   au reste de la plateforme. */
+   au reste de la plateforme.
+   « Se souvenir de moi » : si la case a été cochée à une connexion précédente, le code est
+   republié automatiquement ici (ma_dsid_remember), en dehors de tout champ visible — il
+   n'est jamais assigné à la valeur d'un input, donc jamais visible ni copiable à l'écran.
+   En cas d'échec (code révoqué/régénéré entre-temps), on oublie silencieusement et on
+   retombe en mode visiteur/connexion manuelle, case à cocher réaffichée à chaque tentative. */
+async function tentativeConnexionMemorisee(){
+  const code = localStorage.getItem(MA_REMEMBER_KEY);
+  if (!code) return false;
+  try {
+    await api('POST', '/mon-associe/connexion', { ds_id: code });
+    localStorage.setItem('ma_dsid_ok', '1');
+    return true;
+  } catch(e) {
+    localStorage.removeItem(MA_REMEMBER_KEY);
+    localStorage.removeItem('ma_dsid_ok');
+    return false;
+  }
+}
+document.getElementById('ma-premium-cancel').addEventListener('click', () => fermerModal('ma-modal-premium'));
 (async () => {
+  if (localStorage.getItem('ma_dsid_ok') !== '1') await tentativeConnexionMemorisee();
+  document.getElementById('ma-login-remember').checked = localStorage.getItem(MA_REMEMBER_KEY) !== null;
   if (localStorage.getItem('ma_dsid_ok') === '1') {
     await fetchCurrentUser();
     MA.connected = !!CURRENT_USER;
-    if (!MA.connected) localStorage.removeItem('ma_dsid_ok');
+    if (!MA.connected) { localStorage.removeItem('ma_dsid_ok'); localStorage.removeItem(MA_REMEMBER_KEY); }
   }
   renderAuthZone();
   renderHero();
   document.getElementById('ma-tabs').style.display = MA.connected ? 'flex' : 'none';
-  if (MA.connected) await checkAccreditation();
+  if (MA.connected) await checkAccesPublication();
   loadAnnonces();
 })();
 </script>

@@ -7314,20 +7314,47 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
   sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
 });
 
-/* ══ Mon Associé — garde d'accréditation ══
-   Consultation des annonces (GET) toujours libre, y compris en mode visiteur (SAS) : seule
-   l'interaction (publier, candidater) exige l'accréditation 'mon_associe', calquée sur le
-   pattern exigerPremium/hasAccreditation déjà en place pour les autres modules gatés. */
-async function exigerAccredAssocie(user, res) {
-  if (user.role === 'administrateur') return true;
-  const ok = await hasAccreditation(user.id, 'mon_associe');
-  if (ok) return true;
-  sendJSON(res, 403, {
-    error: "Cette action nécessite l'accréditation « Mon Associé ». Demandez-la depuis le module.",
-    accred_type: 'mon_associe',
-  });
-  return false;
+/* ══ Mon Associé — garde d'accès à la publication ══
+   Consultation des annonces (GET) toujours libre, y compris en mode visiteur (SAS).
+   L'ancien système d'accréditation admin ('mon_associe', sur demande) est remplacé par un
+   contrôle automatique : Utilisateur = toujours lecture seule ; Initiative/Collectivité =
+   publication autorisée uniquement si le compte est Premium actif. PREMIUM_TYPE_PAR_ROLE
+   (déclaré plus bas dans ce fichier, déjà initialisé à l'exécution de toute requête) n'a
+   aucune entrée 'collectivite' aujourd'hui — aucune offre Premium Collectivité n'existe
+   encore (chantier séparé, D6 du plan Codes Adhésion D'A) — donc estPremiumActifAssocie()
+   renvoie false pour ce rôle sans qu'aucun rôle ne soit jamais codé en dur ici : le jour où
+   l'offre existera, ce contrôle fonctionnera automatiquement, sans modification. */
+async function estPremiumActifAssocie(user) {
+  const type = PREMIUM_TYPE_PAR_ROLE[user.role];
+  if (!type) return false;
+  return hasAccreditation(user.id, type);
 }
+async function exigerAccesPublicationAssocie(user, res) {
+  if (user.role === 'administrateur') return true;
+  if (user.role === 'utilisateur') {
+    sendJSON(res, 403, {
+      error: "La publication d'annonces et les candidatures sur Mon Associé sont réservées aux comptes Initiative et Collectivité Premium. Votre compte Utilisateur conserve un accès en lecture illimité.",
+    });
+    return false;
+  }
+  if (!(await estPremiumActifAssocie(user))) {
+    sendJSON(res, 403, {
+      error: "Cette fonctionnalité fait partie de l'offre Premium. Passez Premium pour publier des annonces et candidater sur Mon Associé.",
+      premium_requis: true,
+    });
+    return false;
+  }
+  return true;
+}
+
+route("GET", "/api/mon-associe/mon-acces", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role === 'administrateur') return sendJSON(res, 200, { peut_publier: true });
+  if (user.role === 'utilisateur') return sendJSON(res, 200, { peut_publier: false, lecture_seule: true });
+  const premium = await estPremiumActifAssocie(user);
+  sendJSON(res, 200, { peut_publier: premium, premium_requis: !premium });
+});
 
 /* ══ Mon Associé — Annonces ══ */
 route("GET", "/api/mon-associe/annonces", async (req, res, params, body, query) => {
@@ -7342,31 +7369,49 @@ route("GET", "/api/mon-associe/annonces", async (req, res, params, body, query) 
   if (pays) { conditions.push("a.pays = ?"); args.push(pays); }
   if (q) { conditions.push("(a.titre LIKE ? OR a.description LIKE ? OR a.localisation LIKE ?)"); const like = `%${q}%`; args.push(like, like, like); }
   const rows = await db.prepare(`
-    SELECT a.*, u.nom AS auteur_nom, u.photo_url AS auteur_photo, u.role AS auteur_role,
-           (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id) AS nb_candidatures
+    SELECT a.*, u.nom AS auteur_nom, u.photo_url AS auteur_photo, u.role AS auteur_role
     FROM associe_annonces a JOIN users u ON u.id=a.auteur_id
     WHERE ${conditions.join(' AND ')}
-    ORDER BY a.created_at DESC LIMIT 100
+    ORDER BY a.created_at DESC LIMIT 150
   `).all(...args);
-  sendJSON(res, 200, { annonces: rows.map(r => ({ ...r, competences: JSON.parse(r.competences_json || '[]') })) });
+  /* Masquage live (pas de cron, jamais de flag figé) : une annonce Initiative/Collectivité
+     reste invisible pour les autres tant que son auteur n'est pas Premium en ce moment même
+     — dès qu'il redevient Premium, elle réapparaît automatiquement, sans purge ni tâche de
+     fond. Les annonces d'un auteur Utilisateur (ancien système, non re-gatées Premium) restent
+     visibles sans changement. */
+  const premiumCache = new Map();
+  const visibles = [];
+  for (const r of rows) {
+    if (r.auteur_role !== 'initiative' && r.auteur_role !== 'collectivite') { visibles.push(r); continue; }
+    if (!premiumCache.has(r.auteur_id)) {
+      premiumCache.set(r.auteur_id, await estPremiumActifAssocie({ id: r.auteur_id, role: r.auteur_role }));
+    }
+    if (premiumCache.get(r.auteur_id)) visibles.push(r);
+    if (visibles.length >= 100) break;
+  }
+  const ids = visibles.map(r => r.id);
+  const compteurs = ids.length ? await db.prepare(`SELECT annonce_id, COUNT(*) AS n FROM associe_candidatures WHERE annonce_id IN (${ids.map(()=>'?').join(',')}) GROUP BY annonce_id`).all(...ids) : [];
+  const compteurMap = new Map(compteurs.map(c => [c.annonce_id, c.n]));
+  sendJSON(res, 200, { annonces: visibles.map(r => ({ ...r, competences: JSON.parse(r.competences_json || '[]'), nb_candidatures: compteurMap.get(r.id) || 0 })) });
 });
 
 route("GET", "/api/mon-associe/mes-annonces", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const visible = user.role === 'administrateur' || user.role === 'utilisateur' ? true : await estPremiumActifAssocie(user);
   const rows = await db.prepare(`
     SELECT a.*,
            (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id) AS nb_candidatures,
            (SELECT COUNT(*) FROM associe_candidatures c WHERE c.annonce_id=a.id AND c.statut='nouveau') AS nb_nouvelles
     FROM associe_annonces a WHERE a.auteur_id=? ORDER BY a.created_at DESC
   `).all(user.id);
-  sendJSON(res, 200, { annonces: rows.map(r => ({ ...r, competences: JSON.parse(r.competences_json || '[]') })) });
+  sendJSON(res, 200, { annonces: rows.map(r => ({ ...r, competences: JSON.parse(r.competences_json || '[]'), masquee_non_premium: !visible })) });
 });
 
 route("POST", "/api/mon-associe/annonces", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!(await exigerAccredAssocie(user, res))) return;
+  if (!(await exigerAccesPublicationAssocie(user, res))) return;
   const { type_recherche, domaine, titre, description, localisation, pays, duree_mission, budget, competences, validite_jours } = body || {};
   if (!titre?.trim() || !description?.trim()) return sendJSON(res, 400, { error: "Titre et description requis." });
   const r = await db.prepare(`
@@ -7403,7 +7448,7 @@ route("DELETE", "/api/mon-associe/annonces/:id", async (req, res, params) => {
 route("POST", "/api/mon-associe/annonces/:id/candidater", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!(await exigerAccredAssocie(user, res))) return;
+  if (!(await exigerAccesPublicationAssocie(user, res))) return;
   const annonce = await db.prepare("SELECT * FROM associe_annonces WHERE id=?").get(params.id);
   if (!annonce) return sendJSON(res, 404, { error: "Annonce introuvable." });
   if (annonce.statut !== 'active') return sendJSON(res, 400, { error: "Cette annonce n'accepte plus de candidatures." });
