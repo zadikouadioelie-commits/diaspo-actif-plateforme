@@ -90,6 +90,19 @@ async function init(){
   const paiement = params.get('paiement');
   if (paiement === 'succes') {
     document.getElementById('adh-alert-zone').innerHTML = '<div class="notice">✅ Paiement confirmé ! Votre adhésion est en cours de traitement.</div>';
+    /* Proposition de compte pour les invités (option 2, 2026-08-08) : la fusion vers le
+       nouveau compte se déclenche automatiquement à l'inscription si l'e-mail correspond
+       (cf. POST /api/auth/signup côté serveur) — on se contente ici de proposer le lien. */
+    let meApresPaiement = { user: null };
+    try { meApresPaiement = await api('GET', '/auth/me'); } catch(e) {}
+    if (!meApresPaiement.user) {
+      let emailInvite = '';
+      try { emailInvite = sessionStorage.getItem('adh_invite_email') || ''; sessionStorage.removeItem('adh_invite_email'); } catch(e) {}
+      document.getElementById('adh-alert-zone').innerHTML += `<div class="notice" style="background:#eff6ff;border-color:#93c5fd;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <span>🔑 <strong>Créez votre compte Diaspo'Actif</strong> pour retrouver cette adhésion, votre reçu et vos rappels à tout moment.</span>
+        <a href="inscription.html?role=utilisateur${emailInvite ? '&email=' + encodeURIComponent(emailInvite) : ''}" class="btn btn-orange" style="padding:7px 16px;font-size:12.5px;">Créer mon compte</a>
+      </div>`;
+    }
   } else if (paiement === 'annule') {
     document.getElementById('adh-alert-zone').innerHTML = '<div class="notice">❌ Paiement annulé — aucune somme n\'a été débitée.</div>';
   }
@@ -151,11 +164,11 @@ function escHtml(s){ const d = document.createElement('div'); d.textContent = s|
 const ADH_RECURRENTS = ['cotisation_mensuelle', 'cotisation_trimestrielle', 'cotisation_semestrielle', 'cotisation_annuelle'];
 
 async function ouvrirPaiement(formuleId){
-  let me;
-  try {
-    me = await api('GET', '/auth/me');
-    if (!me.user) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
-  } catch(e) { location.href = `login.html?next=${encodeURIComponent(location.href)}`; return; }
+  /* Paiement invité (2026-08-08) : une personne sans compte Diaspo'Actif peut payer directement
+     — plus de redirection forcée vers la connexion. Le formulaire ci-dessous demande alors
+     nom/prénom/e-mail (déjà toujours obligatoires) directement au visiteur. */
+  let me = { user: null };
+  try { me = await api('GET', '/auth/me'); } catch(e) {}
   const formule = FORMULES.find(f=>f.id===formuleId);
   if (!formule) { showToast?.('Cette formule n\'est plus disponible. Contactez l\'association.', 'warning'); return; }
   let montant = null;
@@ -166,7 +179,7 @@ async function ouvrirPaiement(formuleId){
     montant = Number(saisie);
     if (!montant || montant <= 0) { showToast?.('Montant invalide.', 'warning'); return; }
   }
-  ouvrirFormulaireAdhesion(formule, montant, me.user.id);
+  ouvrirFormulaireAdhesion(formule, montant, me.user ? me.user.id : null);
 }
 
 /* Formulaire personnalisable (incrément 2, 2026-08-07) — n'apparaît que si la formule a
@@ -178,10 +191,14 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
   const champsConfig = formule.champs_config || {};
   const champsCustom = formule.champs_custom || [];
   const champsActifs = ADH_CHAMPS_CATALOGUE_PUB.filter(c => champsConfig[c.key] === 'obligatoire' || champsConfig[c.key] === 'facultatif');
+  /* nom/prénom/e-mail sont toujours "obligatoire" (verrouillés côté association), donc
+     champsActifs n'est jamais vide en pratique — ce court-circuit ne sert que de filet de
+     sécurité si jamais ça changeait un jour. */
   if (!champsActifs.length && !champsCustom.length) return continuerPaiement(formule.id, montant);
 
+  /* Invité (userId null) : pas de profil à préremplir, la personne saisit tout elle-même. */
   let profil = {};
-  try { profil = (await api('GET', `/profil/${userId}`)).profil || {}; } catch(e) {}
+  if (userId) { try { profil = (await api('GET', `/profil/${userId}`)).profil || {}; } catch(e) {} }
   const PREFILL = {
     nom: profil.nom, prenom: profil.prenom, email: profil.email, telephone: profil.telephone,
     ville: profil.ville, pays: profil.pays, nationalite: profil.nationalite1,
@@ -194,6 +211,7 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
   overlay.innerHTML = `
     <div class="modal-box" style="max-width:460px;width:94%;max-height:85vh;overflow-y:auto;">
       <h3 style="margin:0 0 6px;font-size:16px;">📝 ${escHtml(formule.nom)}</h3>
+      ${!userId ? `<p style="font-size:12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px 10px;margin:0 0 10px;">Vous adhérez sans compte Diaspo'Actif — renseignez simplement vos coordonnées ci-dessous. 🔑 <a href="login.html?next=${encodeURIComponent(location.href)}">Déjà un compte ? Connectez-vous</a> pour préremplir automatiquement.</p>` : ''}
       ${formule.texte_intro ? `<p style="font-size:12.5px;color:var(--muted,#888);margin:0 0 10px;white-space:pre-wrap;">${escHtml(formule.texte_intro)}</p>` : ''}
       <div id="adh-form-champs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;"></div>
       ${formule.conditions_adhesion ? `<div style="font-size:11.5px;color:var(--muted,#888);background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap;">${escHtml(formule.conditions_adhesion)}</div>` : ''}
@@ -217,6 +235,7 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
     const req = champsConfig[c.key] === 'obligatoire';
     let input;
     if (c.key === 'date_naissance') input = `<input type="date" class="input adh-champ-reponse" data-key="${c.key}" value="${val}" style="width:100%;">`;
+    else if (c.key === 'email') input = `<input type="email" class="input adh-champ-reponse" data-key="${c.key}" value="${val}" style="width:100%;">`;
     else if (c.key === 'sexe') input = `<select class="input adh-champ-reponse" data-key="${c.key}" style="width:100%;"><option value="">—</option><option value="Femme" ${val==='Femme'?'selected':''}>Femme</option><option value="Homme" ${val==='Homme'?'selected':''}>Homme</option><option value="Autre" ${val==='Autre'?'selected':''}>Autre</option></select>`;
     else if (c.key === 'pourquoi_adherer') input = `<textarea class="input adh-champ-reponse" data-key="${c.key}" rows="2" style="width:100%;">${val}</textarea>`;
     else if (c.key === 'photo' || c.key === 'piece_identite') input = `<input type="file" class="adh-champ-reponse-file" data-key="${c.key}" accept="image/*,application/pdf" style="width:100%;font-size:12px;">`;
@@ -305,7 +324,12 @@ function continuerPaiement(formuleId, montant, reponses){
 async function confirmerPaiementAdhesion(formuleId, montant, saveCard, reponses){
   try {
     const r = await api('POST', `/adhesion-formules/${formuleId}/payer`, { ...(montant != null ? { montant } : {}), enregistrer_carte: saveCard, reponses: reponses || {} });
-    if (r.checkout_url) { location.href = r.checkout_url; return; }
+    if (r.checkout_url) {
+      /* Mémorise l'e-mail saisi par l'invité pour préremplir la proposition de création de
+         compte au retour de Stripe (voir init() ci-dessus) — jamais transmis à un tiers. */
+      if (reponses?.email) { try { sessionStorage.setItem('adh_invite_email', reponses.email); } catch(e) {} }
+      location.href = r.checkout_url; return;
+    }
   } catch(e) {
     showToast?.('Erreur : ' + e.message, 'danger');
   }

@@ -2944,10 +2944,17 @@ async function envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu, p
       ? remplacerPlaceholders(init.adhesion_modele_recu, vars)
       : `Bonjour ${vars.prenom},\n\nVotre paiement pour « ${vars.formule} » (${vars.initiative}) a bien été enregistré : ${montant} ${vars.devise}.\nNuméro de reçu : ${numeroRecu}.\nNuméro d'adhérent : ${vars.numero_adherent}.\n${dateDebut ? `Adhésion valable du ${dateDebut} au ${vars.date_fin}.` : `Validité : ${vars.date_fin}.`}\n\nMerci pour votre soutien !`;
     const lienRecu = `${process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app'}/api/adhesion-paiements/${paiementId}/recu`;
+    /* Paiement invité (2026-08-08) : proposition de créer un compte, même lien que l'invitation
+       manuelle (POST /adhesion-membres/:id/inviter) — la fusion se déclenche automatiquement
+       à l'inscription si l'e-mail correspond (cf. POST /api/auth/signup), sans action
+       supplémentaire de l'association ni de l'adhérent au-delà de s'inscrire. */
+    const propositionCompte = !membre.linked_user_id
+      ? `<p style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb;">🔑 Pas encore de compte Diaspo'Actif ? <a href="${process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com'}/inscription.html?role=utilisateur&email=${encodeURIComponent(membre.email)}">Créez-en un</a> pour retrouver cette adhésion, vos reçus et vos rappels à tout moment.</p>`
+      : '';
     await sendEmail({
       to: membre.email,
       subject: `Reçu de paiement — ${init.nom}`,
-      html: `<div style="white-space:pre-line;">${corps.replace(/</g,'&lt;')}</div><p style="margin-top:16px;"><a href="${lienRecu}">📄 Télécharger le reçu (PDF)</a></p>`,
+      html: `<div style="white-space:pre-line;">${corps.replace(/</g,'&lt;')}</div><p style="margin-top:16px;"><a href="${lienRecu}">📄 Télécharger le reçu (PDF)</a></p>${propositionCompte}`,
     });
   } catch (e) { console.error('[recu-adhesion]', e.message); }
 }
@@ -4032,11 +4039,33 @@ route("PUT", "/api/initiatives/:id/affichage-membres", async (req, res, params, 
 /* ── Paiement d'une formule (public/connecté) — one-off ou subscription selon le type ── */
 route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const formule = await db.prepare("SELECT * FROM adhesion_formules WHERE id=? AND actif=1").get(params.id);
   if (!formule) return sendJSON(res, 404, { error: "Formule introuvable." });
   const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(formule.initiative_id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+
+  const reponses = (body?.reponses && typeof body.reponses === 'object') ? body.reponses : {};
+
+  /* ── Paiement invité (2026-08-08) ── permet à une personne sans compte Diaspo'Actif de payer
+     directement : son identité vient de `reponses` (nom/prénom/e-mail sont déjà toujours
+     obligatoires dans le formulaire, verrouillés dans le catalogue) plutôt que du compte
+     connecté. Le reste du pipeline (webhook, reçu, rappels par e-mail, Réseau Pro, proposition
+     de fusion automatique à l'inscription) tolère déjà linked_user_id=NULL — c'est exactement
+     le même modèle qu'une fiche ajoutée manuellement par l'association, juste ouvert en
+     libre-service. Limité par IP pour rester un point d'entrée public sûr. */
+  let invite = null;
+  if (!user) {
+    const ip = SEC.clientIp(req);
+    const rl = SEC.rateLimit(`adhesion-payer-invite:${ip}`, 10, 3600000);
+    if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+    const email = String(reponses.email || '').trim().toLowerCase();
+    const nom = String(reponses.nom || '').trim();
+    if (!nom || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return sendJSON(res, 400, { error: "Merci de renseigner votre nom et une adresse e-mail valide pour adhérer sans compte." });
+    }
+    invite = { nom, prenom: String(reponses.prenom || '').trim() || null, email };
+  }
+  const identite = user ? { nom: user.nom, prenom: user.prenom, email: user.email } : invite;
 
   const montant = resolveAdhesionMontant(formule, body.montant);
   if (montant == null) return sendJSON(res, 400, { error: "Montant invalide." });
@@ -4044,7 +4073,9 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
   const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
-  let membre = await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id=?").get(formule.id, user.id);
+  let membre = user
+    ? await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id=?").get(formule.id, user.id)
+    : await db.prepare("SELECT * FROM adhesion_membres WHERE formule_id=? AND linked_user_id IS NULL AND LOWER(email)=?").get(formule.id, invite.email);
   /* Fermeture des adhésions (tâche #69) : bloque uniquement les NOUVELLES adhésions — un membre
      déjà enregistré doit toujours pouvoir renouveler (tâche #68) même si l'association a
      temporairement fermé l'accès aux nouveaux venus. */
@@ -4065,14 +4096,13 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
      paiement — le préremplissage côté client depuis le compte connecté couvre nom/prénom/
      email/etc. automatiquement, donc ça ne bloque en pratique que les champs vraiment
      absents du profil (ex. "numéro de licence sportive"). */
-  const reponses = (body?.reponses && typeof body.reponses === 'object') ? body.reponses : {};
   const champsConfig = sanitizeChampsConfig(formule.champs_config_json);
   const champsCustom = sanitizeChampsCustom(formule.champs_custom_json);
   /* nom/prenom/email sont "verrouillés obligatoire" dans le catalogue mais déjà connus du
-     compte connecté — ils comptent comme renseignés dès que le compte les a, sans exiger une
-     ressaisie dans `reponses` (le formulaire client les préremplit, mais l'API reste robuste
-     même appelée sans ce préremplissage, ex. un client tiers). */
-  const AUTO_COMPTE = { nom: user.nom, prenom: user.prenom, email: user.email };
+     compte connecté (ou de l'identité invité ci-dessus) — ils comptent comme renseignés dès
+     que l'un ou l'autre les a, sans exiger une ressaisie dans `reponses` (le formulaire client
+     les préremplit, mais l'API reste robuste même appelée sans ce préremplissage). */
+  const AUTO_COMPTE = identite;
   const manquants = [];
   for (const champ of ADHESION_CHAMPS_STANDARD) {
     if (champsConfig[champ.key] !== 'obligatoire') continue;
@@ -4089,7 +4119,7 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
     const mid = (await db.prepare(`
       INSERT INTO adhesion_membres (formule_id, initiative_id, linked_user_id, nom, prenom, email, statut, reponses_json)
       VALUES (?,?,?,?,?,?,'en_attente',?)
-    `).run(formule.id, formule.initiative_id, user.id, user.nom || '', user.prenom || null, user.email || null, reponsesJson)).lastInsertRowid;
+    `).run(formule.id, formule.initiative_id, user ? user.id : null, identite.nom || '', identite.prenom || null, identite.email || null, reponsesJson)).lastInsertRowid;
     membre = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(mid);
   } else {
     /* Renouvellement : les réponses peuvent avoir changé (ex. nouvelle adresse) — on les
@@ -4111,15 +4141,17 @@ route("POST", "/api/adhesion-formules/:id/payer", async (req, res, params, body)
     product_data: productData,
   };
   try {
-    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    /* Invité : pas de compte Stripe persistant côté plateforme (rien à rattacher à un user_id
+       Diaspo'Actif) — `customer_email` suffit, Stripe crée son propre Customer pour la session. */
+    const stripeCustomerId = user ? await getOrCreateStripeCustomer(db, user) : null;
     const session = await stripe.checkout.sessions.create({
       mode: recurring ? "subscription" : "payment",
-      customer: stripeCustomerId,
+      ...(stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: identite.email }),
       line_items: [{
         price_data: recurring ? { ...priceData, recurring: { interval: recurring.interval, interval_count: recurring.interval_count } } : priceData,
         quantity: 1,
       }],
-      ...(!recurring && body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
+      ...(!recurring && user && body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
       metadata: { diaspoactif_adhesion_paiement_id: String(paiementId), diaspoactif_adhesion_membre_id: String(membre.id) },
       success_url: `${origin}/adhesions.html?initiative=${formule.initiative_id}&paiement=succes&paiement_id=${paiementId}`,
       cancel_url: `${origin}/adhesions.html?initiative=${formule.initiative_id}&paiement=annule&paiement_id=${paiementId}`,
