@@ -1212,8 +1212,12 @@ function renderInitiativeCard(it){
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
-        ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? `<button type="button" class="ann-card-btn" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer</button>` : ''}
-        ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 S'inscrire à un événement</button>` : ''}
+        ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
+          isOwnInit
+            ? `<a href="dashboard-initiative.html#adhesions-init" class="ann-card-btn ann-card-btn-adherer" onclick="event.stopPropagation()">Gérer les adhésions</a>`
+            : `<button type="button" class="ann-card-btn ann-card-btn-adherer" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">Adhérer</button>`
+        ) : ''}
+        ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 Voir les événements</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -1294,6 +1298,19 @@ async function annInscrire(id, btn){
    dans une étape suivante). Le bouton passe en état "Demande envoyée" une fois la demande créée. */
 async function demanderAdhesion(initiativeId, btn){
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+  /* Garde-fou (2026-08-08) : le propriétaire ne peut pas adhérer à sa propre structure — on le
+     redirige directement vers la gestion de ses formules plutôt que de le laisser buter sur
+     l'erreur serveur "Vous ne pouvez pas adhérer à votre propre structure.". Les cartouches
+     qui connaissent déjà la réponse (annuaire, profil public) évitent même d'appeler cette
+     fonction pour l'owner, mais ce filet couvre tout appelant, présent ou futur. */
+  try {
+    const init = await api('GET', `/initiatives/${initiativeId}`);
+    const initData = init.initiative || init;
+    if (initData.owner_user_id && Number(initData.owner_user_id) === Number(CURRENT_USER.id)) {
+      window.location.href = 'dashboard-initiative.html#adhesions-init';
+      return;
+    }
+  } catch (e) { /* vérification impossible : on continue normalement */ }
   /* Si l'association a configuré des formules de cotisation (module "Adhésions", payant ou
      gratuit), on redirige vers la page dédiée qui gère déjà tout le reste : choix de la
      formule, paiement Stripe, reçu, carte de membre. Sinon, simple demande sans paiement. */
@@ -1315,7 +1332,7 @@ async function demanderAdhesion(initiativeId, btn){
     }
     if (typeof showToast === 'function') showToast(r.statut === 'acceptee' ? '✅ Vous êtes déjà membre.' : '✅ Demande d\'adhésion envoyée !');
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = '🤝 Adhérer'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Adhérer'; }
     alert(e.message || "Erreur lors de l'envoi de la demande.");
   }
 }

@@ -1704,13 +1704,18 @@ function renderVisitorProfile() {
   const adhererBtn = (!isOwn && isInit && ['Association','ONG'].includes(profil.initiative_type))
     ? (_statutAdhesion === 'acceptee' ? `<button class="pvz-btn" disabled>✓ Membre</button>`
       : _statutAdhesion === 'en_attente' ? `<button class="pvz-btn" disabled>⏳ Demande envoyée</button>`
-      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn primary" onclick="demanderAdhesion(${profil.initiative_id}, this)">🤝 Adhérer</button>` : '')
+      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn primary" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer</button>` : '')
     : '';
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const reportBtn = CU ? `<button class="pvz-btn" style="color:#dc2626;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g,"\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : '';
   const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Vitrine…</button>` : '';
-  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button><button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${vitrineToggleBtn}${shareBtn}`;
+  /* Propriétaire d'une Association/ONG (2026-08-08) : accès direct à la gestion des formules
+     d'adhésion depuis son propre profil public, plutôt que rien — même destination que le
+     bouton "Adhérer" côté visiteur, mais vers la configuration au lieu du paiement. */
+  const gererAdhesionsBtn = (isInit && ['Association','ONG'].includes(profil.initiative_type))
+    ? `<a href="dashboard-initiative.html#adhesions-init" class="pvz-btn primary">Gérer les adhésions</a>` : '';
+  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${gererAdhesionsBtn}<button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${vitrineToggleBtn}${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
