@@ -11,6 +11,7 @@ const crypto = require("node:crypto");
 const db = require("./db");
 const { generateDaId, generateDsId } = require("./db");
 const DAA = require("./daa-lang");
+const AvantagesPremium = require("./avantages-premium");
 
 const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
 async function signTicket(ticketId, eventId, ts) {
@@ -2926,6 +2927,160 @@ function remplacerPlaceholders(template, vars) {
    Stripe ou manuel) — comblait un vrai manque, seule une notification in-app existait jusqu'ici.
    Modèle personnalisable par l'association (adhesion_modele_recu), sinon texte par défaut.
    Best-effort : ne bloque jamais le traitement du paiement si l'envoi échoue. */
+/* ═══════════════════════════════════════════════════════════════
+   CODES ADHÉSION D'A — génération automatique du droit à réduction Premium
+   accordé à tout adhérent officiel payant de l'initiative Diaspo'Actif
+   elle-même (pas une initiative quelconque). Voir plan increment 1/2.
+
+   RE-APPLIQUÉ le 2026-08-08 : ce bloc entier (avec ajouterMoisDA,
+   genererCodeUniqueDA, journaliserCodeDA, creerCodeDAPourAdherent) avait
+   disparu de server/index.js entre deux sauvegardes concurrentes sur ce
+   dépôt partagé, alors même que les routes admin/cron qui en dépendent
+   restaient présentes — un ReferenceError silencieux en production tant
+   que personne n'appelait ces routes. Reconstitué à l'identique.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Mémoïsé une fois résolu avec succès — un changement manuel de la clé
+   da_initiative_officielle_id via /api/admin/parametres nécessite un
+   redémarrage pour être repris (cas rarissime, valeur quasi permanente). */
+let _daInitiativeOfficielleIdCache = null;
+async function getInitiativeOfficielleId() {
+  const envOverride = parseInt(process.env.DA_INITIATIVE_OFFICIELLE_ID, 10);
+  if (!isNaN(envOverride)) return envOverride;
+  if (_daInitiativeOfficielleIdCache) return _daInitiativeOfficielleIdCache;
+  try {
+    const rowId = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle='da_initiative_officielle_id'").get();
+    const idConfigure = parseInt(rowId?.valeur, 10);
+    if (!isNaN(idConfigure)) { _daInitiativeOfficielleIdCache = idConfigure; return idConfigure; }
+
+    /* Résolution automatique une seule fois via l'email officiel, puis persistée
+       pour ne plus jamais refaire cette jointure. */
+    const rowEmail = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle='da_email_officiel'").get();
+    const email = (rowEmail?.valeur || 'diaspo.actif@gmail.com').toLowerCase();
+    const found = await db.prepare(`
+      SELECT i.id FROM initiatives i JOIN users u ON u.id = i.owner_user_id
+      WHERE LOWER(u.email) = ? LIMIT 1
+    `).get(email);
+    if (found?.id) {
+      _daInitiativeOfficielleIdCache = found.id;
+      try {
+        await db.prepare("UPDATE parametres_plateforme SET valeur=?, updated_at=datetime('now') WHERE cle='da_initiative_officielle_id'").run(String(found.id));
+      } catch (e) { /* pas grave : re-resolu au prochain appel */ }
+      return found.id;
+    }
+  } catch (e) { console.error('[codes-da] getInitiativeOfficielleId', e.message); }
+  return null; // fonctionnalité inerte tant que le compte officiel n'existe pas encore
+}
+
+/* Ajoute des mois à une date (chaîne "YYYY-MM-DD HH:MM:SS", UTC implicite) et renvoie le
+   même format — calcul TOUJOURS en JS, jamais en SQL (toPg() ne traduit pas les décalages
+   positifs de date, voir server/db-pg.js). */
+function ajouterMoisDA(dateBaseStr, mois) {
+  const d = dateBaseStr ? new Date(dateBaseStr.replace(' ', 'T') + 'Z') : new Date();
+  d.setMonth(d.getMonth() + Number(mois));
+  return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/* 1 lettre + 3 chiffres, alphabet sans I/O (confusion visuelle avec 1/0) : 24 lettres × 1000 = 24 000 combinaisons. */
+const DA_CODE_ALPHABET_LETTRES = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+async function genererCodeUniqueDA() {
+  for (let tentative = 0; tentative < 40; tentative++) {
+    const lettre = DA_CODE_ALPHABET_LETTRES[crypto.randomInt(DA_CODE_ALPHABET_LETTRES.length)];
+    const chiffres = String(crypto.randomInt(1000)).padStart(3, '0');
+    const code = lettre + chiffres;
+    const existe = await db.prepare("SELECT id FROM da_codes_adhesion WHERE code=?").get(code);
+    if (!existe) return code;
+  }
+  /* Secours si 40 tirages aléatoires échouent (espace presque épuisé) : balayage exhaustif. */
+  for (const lettre of DA_CODE_ALPHABET_LETTRES) {
+    for (let n = 0; n < 1000; n++) {
+      const code = lettre + String(n).padStart(3, '0');
+      const existe = await db.prepare("SELECT id FROM da_codes_adhesion WHERE code=?").get(code);
+      if (!existe) return code;
+    }
+  }
+  return null; // espace de 24 000 codes réellement épuisé
+}
+
+async function journaliserCodeDA(codeId, action, acteur, { utilisationId, avant, apres, details } = {}) {
+  try {
+    await db.prepare(`
+      INSERT INTO da_codes_audit_log (code_id, utilisation_id, action, acteur_id, acteur_nom, avant_json, apres_json, details)
+      VALUES (?,?,?,?,?,?,?,?)
+    `).run(
+      codeId, utilisationId || null, action,
+      acteur?.id || null, acteur ? `${acteur.prenom || ''} ${acteur.nom || ''}`.trim() : 'Système',
+      avant ? JSON.stringify(avant) : null, apres ? JSON.stringify(apres) : null, details || null
+    );
+  } catch (e) { console.error('[codes-da-audit-log]', e.message); }
+}
+
+/* Point d'entrée unique appelé par les deux chemins de paiement d'adhésion (webhook Stripe
+   et marquage manuel). Ne fait jamais échouer l'appelant : toute erreur est avalée ici. */
+async function creerCodeDAPourAdherent(membre, formule, acteur) {
+  try {
+    const initOfficielleId = await getInitiativeOfficielleId();
+    if (!initOfficielleId) return null; // pas encore configuré : fonctionnalité inerte
+    if (Number(membre.initiative_id) !== Number(initOfficielleId)) return null; // pas l'initiative officielle Diaspo'Actif
+
+    /* Idempotent : un adhérent ne reçoit jamais un second code, y compris au renouvellement. */
+    const existant = await db.prepare("SELECT * FROM da_codes_adhesion WHERE adhesion_membre_id=?").get(membre.id);
+    if (existant) {
+      journaliserCodeDA(existant.id, 'renouvellement', acteur, { details: `Adhésion renouvelée (statut=${membre.statut})` });
+      return existant;
+    }
+
+    if (['suspendu', 'radie'].includes(membre.statut)) return null; // pas de code pour une adhésion déjà invalide
+
+    const code = await genererCodeUniqueDA();
+    if (!code) { console.error('[codes-da] espace de codes épuisé (24 000 combinaisons)'); return null; }
+
+    const paramsDefaut = {};
+    for (const cle of ['da_code_reduction_pct_defaut', 'da_code_duree_mois_defaut', 'da_code_max_utilisations_defaut']) {
+      const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(cle);
+      paramsDefaut[cle] = row?.valeur;
+    }
+    const reductionPct = parseFloat(paramsDefaut.da_code_reduction_pct_defaut) || 20;
+    const dureeMois = parseInt(paramsDefaut.da_code_duree_mois_defaut, 10) || 12;
+    const maxUtilisations = parseInt(paramsDefaut.da_code_max_utilisations_defaut, 10) || 1;
+
+    const r = await db.prepare(`
+      INSERT INTO da_codes_adhesion (code, adhesion_membre_id, initiative_id, formule_id, reduction_pct, duree_mois, nb_max_utilisations, cree_par)
+      VALUES (?,?,?,?,?,?,?,?)
+    `).run(code, membre.id, membre.initiative_id, formule?.id || null, reductionPct, dureeMois, maxUtilisations, acteur ? 'admin' : 'systeme');
+    const codeId = Number(r.lastInsertRowid);
+    const nouveauCode = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(codeId);
+
+    journaliserCodeDA(codeId, 'creation', acteur, {
+      apres: nouveauCode,
+      details: `Généré automatiquement pour ${membre.prenom || ''} ${membre.nom} (adhérent D'A #${membre.id})`,
+    });
+
+    if (membre.linked_user_id) {
+      creerNotif(
+        membre.linked_user_id, 'code_adhesion_da', "🎟️ Votre code adhérent D'A",
+        `Félicitations, vous êtes officiellement adhérent Diaspo'Actif ! Votre code ${code} vous donne droit à ${reductionPct}% de réduction sur Premium, valable ${dureeMois} mois à partir de sa première utilisation.`,
+        { code_id: codeId, code }
+      );
+    }
+    if (membre.email) {
+      try {
+        const { sendEmail } = require('./mailer');
+        await sendEmail({
+          to: membre.email,
+          subject: "Votre code adhérent Diaspo'Actif",
+          html: `<p>Bonjour ${membre.prenom || ''},</p><p>Vous êtes désormais adhérent officiel de Diaspo'Actif. Voici votre code adhérent D'A :</p><p style="font-size:22px;font-weight:800;letter-spacing:2px;">${code}</p><p>Il vous donne droit à <strong>${reductionPct}%</strong> de réduction sur votre abonnement Premium, valable <strong>${dureeMois} mois</strong> à partir de sa première utilisation. Vous êtes libre de l'utiliser ou non, il reste disponible.</p>`,
+        });
+      } catch (e) { console.error('[codes-da] email code', e.message); }
+    }
+
+    return nouveauCode;
+  } catch (e) {
+    console.error('[codes-da] creerCodeDAPourAdherent', e.message);
+    return null;
+  }
+}
+
 async function envoyerRecuAdhesion(init, membre, formule, montant, numeroRecu, paiementId) {
   if (!membre.email) return;
   try {
@@ -3718,6 +3873,9 @@ route("POST", "/api/adhesion-membres/:id/marquer-paye", async (req, res, params,
   { const initComplete = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(m.initiative_id);
     const mAJour = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(m.id);
     await envoyerRecuAdhesion(initComplete, mAJour, formule, montant, numeroRecu, paiementId);
+    /* Second point d'accroche des Codes Adhésion D'A — un adhérent marqué payé à la main
+       (hors Stripe) doit recevoir son code exactement comme un paiement par carte. */
+    await creerCodeDAPourAdherent(mAJour, formule, user);
     await syncAffiliationDepuisAdhesion(mAJour, 'accepte'); }
   journaliserAdhesion(m.initiative_id, m.id, m.date_adhesion ? 'renouvellement' : 'creation', user,
     `Paiement manuel enregistré (${modePaiement}) — ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
@@ -4186,11 +4344,20 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     return sendJSON(res, 400, { error: "Ce type de formule n'est pas disponible." });
   }
   // Tarif calculé par le moteur de tarification Premium (catégorie/taille/promotion/tarif
-  // personnalisé) — jamais le tarif de base brut, cf. server/index.js:calculerTarifPremium.
-  const calcule = await calculerTarifPremium(def, user);
+  // personnalisé/avantage d'adhésion) — jamais le tarif de base brut, cf. calculerTarifPremium.
+  // code_da est une INDICATION cliente, jamais une source de confiance : revalidé ici.
+  const codeDA = (body.code_da || '').trim().toUpperCase() || null;
+  const calcule = await calculerTarifPremium(def, user, { code_da: codeDA });
   if (!calcule) return sendJSON(res, 400, { error: "Aucun tarif disponible pour votre type de compte." });
-  const montant = typeTarif === 'annuel' ? calcule.montant_annuel : calcule.montant_mensuel;
-  const tarif = { montant, devise: calcule.devise };
+
+  /* price_data.unit_amount reste TOUJOURS au prix plein : en mode "subscription", une
+     réduction bakée dans unit_amount deviendrait la mensualité permanente. La réduction
+     temporaire d'un Code Adhésion D'A passe par un Coupon Stripe attaché plus bas. */
+  const montantPlein = typeTarif === 'annuel'
+    ? (calcule.montant_annuel_avant ?? calcule.montant_annuel)
+    : (calcule.montant_mensuel_avant ?? calcule.montant_mensuel);
+  const montantReduit = typeTarif === 'annuel' ? calcule.montant_annuel : calcule.montant_mensuel;
+  const tarif = { montant: montantPlein, devise: calcule.devise };
 
   const dejaActive = await hasAccreditation(user.id, def.type);
   if (dejaActive) return sendJSON(res, 400, { error: "Vous êtes déjà abonné." });
@@ -4205,6 +4372,31 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
 
   const origin = getOrigin(req);
   const interval = typeTarif === 'annuel' ? 'year' : 'month';
+
+  // Réservation atomique de l'avantage D'A (si un code valide a été fourni) + coupon Stripe partagé.
+  let stripeCouponId = null;
+  let reservationDA = null;
+  if (calcule.avantage_da?.valide) {
+    reservationDA = await AvantagesPremium.consommerAvantage(db, calcule.avantage_da, user, {
+      type_tarif: typeTarif, montant_avant: montantPlein, montant_apres: montantReduit, accred_id: def.id,
+    });
+    if (reservationDA) {
+      try {
+        stripeCouponId = await AvantagesPremium.stripeDiscountPourAvantage(stripe, calcule.avantage_da, interval);
+        await db.prepare(`UPDATE da_codes_utilisations SET accred_paiement_id=?, stripe_coupon_id=? WHERE id=?`)
+          .run(paiementId, stripeCouponId, reservationDA.utilisationId);
+        journaliserCodeDA(calcule.avantage_da.code_id, 'redemption', user, {
+          utilisationId: reservationDA.utilisationId,
+          details: `Code ${calcule.avantage_da.code} appliqué au paiement #${paiementId} (${typeTarif}, -${calcule.avantage_da.reduction_pct}%)`,
+        });
+      } catch (e) {
+        console.error('[codes-da] coupon Stripe', e.message);
+        stripeCouponId = null; // le paiement continue au prix plein plutôt que d'échouer sur un souci de coupon
+      }
+    }
+    // reservationDA === null => course perdue sur le compteur : on continue au prix plein, sans bloquer le client.
+  }
+
   try {
     const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
     const session = await stripe.checkout.sessions.create({
@@ -4219,6 +4411,7 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
         },
         quantity: 1,
       }],
+      ...(stripeCouponId ? { discounts: [{ coupon: stripeCouponId }] } : {}),
       metadata: { diaspoactif_accred_paiement_id: String(paiementId), diaspoactif_accred_user_id: String(user.id), diaspoactif_accred_def_id: String(def.id) },
       success_url: `${origin}/dashboard-utilisateur.html?abonnement=succes&paiement_id=${paiementId}`,
       cancel_url: `${origin}/dashboard-utilisateur.html?abonnement=annule&paiement_id=${paiementId}`,
@@ -4227,8 +4420,82 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     return sendJSON(res, 201, { ok: true, id: paiementId, checkout_url: session.url });
   } catch (e) {
     await db.prepare(`UPDATE accred_paiements SET statut='echoue' WHERE id=?`).run(paiementId);
+    /* Action compensatoire : un paiement qui n'aboutit jamais en Checkout ne doit pas
+       consommer silencieusement le compteur du code — uniquement si CETTE tentative avait
+       vraiment incrémenté le compteur (pas une simple relecture d'une réservation existante). */
+    if (reservationDA?.fraichementReserve) {
+      try {
+        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(calcule.avantage_da.code_id);
+        await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
+      } catch (e2) { console.error('[codes-da] compensation echec paiement', e2.message); }
+    }
     return sendJSON(res, 500, SEC.safeError(e, "accred-payer"));
   }
+});
+
+/* ── Codes Adhésion D'A — vérification d'un code avant paiement ──
+   Lecture seule (resoudreAvantagesPremium n'a aucun effet de bord côté écriture) : ne crée
+   jamais de ligne d'utilisation ni de coupon Stripe. Réponse 200 avec valide:false plutôt
+   qu'une erreur HTTP, et jamais d'information sur le propriétaire du code — seule surface
+   d'énumération sur un espace de 24 000 combinaisons, protégée par une limitation de débit. */
+route("POST", "/api/premium/code-adhesion/verifier", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const limite = SEC.rateLimit(`codeda-verif:${user.id}`, 20, 3600000);
+  if (!limite.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${limite.retryAfter}s.` });
+
+  const code = (body.code || '').trim().toUpperCase();
+  if (!code) return sendJSON(res, 200, { valide: false, raison: 'inconnu' });
+
+  const accredType = body.accred_type || (user.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne');
+  const def = await getAccredDef(accredType);
+  if (!def) return sendJSON(res, 200, { valide: false, raison: 'inconnu' });
+
+  const calcule = await calculerTarifPremium(def, user, { code_da: code });
+  const avantage = calcule?.avantage_da;
+  if (!avantage) return sendJSON(res, 200, { valide: false, raison: 'inconnu' });
+  if (!avantage.valide) return sendJSON(res, 200, { valide: false, raison: avantage.raison, code });
+
+  return sendJSON(res, 200, {
+    valide: true,
+    code: avantage.code,
+    reduction_pct: avantage.reduction_pct,
+    duree_mois: avantage.duree_mois,
+    montant_mensuel: calcule.montant_mensuel,
+    montant_annuel: calcule.montant_annuel,
+    montant_mensuel_avant: calcule.montant_mensuel_avant ?? calcule.montant_mensuel,
+    montant_annuel_avant: calcule.montant_annuel_avant ?? calcule.montant_annuel,
+    date_fin_prevue: avantage.date_fin_avantage,
+    premiere_utilisation: !!avantage.date_premiere_utilisation,
+  });
+});
+
+/* ── Codes Adhésion D'A — mon propre code (l'adhérent, dans son tableau de bord) ── */
+route("GET", "/api/premium/mon-code-adhesion", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const membre = await db.prepare("SELECT id FROM adhesion_membres WHERE linked_user_id=? ORDER BY id DESC LIMIT 1").get(user.id);
+  if (!membre) return sendJSON(res, 404, { error: "Aucune adhésion officielle liée à ce compte." });
+
+  const code = await db.prepare("SELECT * FROM da_codes_adhesion WHERE adhesion_membre_id=?").get(membre.id);
+  if (!code) return sendJSON(res, 404, { error: "Aucun code adhérent D'A pour cette adhésion." });
+
+  const utilisations = await db.prepare(
+    "SELECT beneficiaire_da_id, beneficiaire_role, statut, date_activation, date_fin_avantage FROM da_codes_utilisations WHERE code_id=? ORDER BY id"
+  ).all(code.id);
+
+  return sendJSON(res, 200, {
+    code: code.code,
+    reduction_pct: code.reduction_pct,
+    duree_mois: code.duree_mois,
+    nb_utilisations: code.nb_utilisations,
+    nb_max_utilisations: code.nb_max_utilisations,
+    statut: code.statut,
+    date_fin_avantage: code.date_fin_avantage,
+    utilisations,
+  });
 });
 
 /* ── Moyens de paiement enregistrés (cartes Stripe réutilisables) ── */
@@ -12520,6 +12787,11 @@ async function handleStripeWebhook(req, res) {
         await ajouterAListeStockage(pay.formule_id, membre);
         const membreAJour = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(pay.membre_id);
         await envoyerRecuAdhesion(init, membreAJour, formule, montant, numeroRecu, paiementId);
+        /* creerCodeDAPourAdherent avale déjà toutes ses erreurs en interne (jamais de throw) —
+           await malgré tout : sur Vercel, le process peut être gelé juste après la réponse du
+           webhook, un simple "fire and forget" risquerait de perdre silencieusement la création
+           du code. */
+        await creerCodeDAPourAdherent(membreAJour, formule, null);
         await syncAffiliationDepuisAdhesion(membreAJour, 'accepte');
         journaliserAdhesion(pay.initiative_id, pay.membre_id, membre.date_adhesion ? 'renouvellement' : 'creation', null,
           `Paiement Stripe confirmé — « ${formule?.nom || ''} », ${montant} ${formule?.devise || 'EUR'}. Reçu ${numeroRecu}.`);
@@ -12544,10 +12816,70 @@ async function handleStripeWebhook(req, res) {
             stripe_subscription_id=excluded.stripe_subscription_id, updated_at=datetime('now')
         `).run(pay.user_id, pay.accred_id, pay.type_tarif, pay.montant, session.customer || null, session.subscription || null);
         creerNotif(pay.user_id, "accred_abonnement", "Abonnement activé ⭐", "Votre abonnement est actif : Réseau Pro, Business Plans et Mes projets sont débloqués.", { accred_id: pay.accred_id });
+
+        /* Codes Adhésion D'A — ancrage de la fenêtre à la PREMIÈRE utilisation confirmée
+           (jamais à la création du code, jamais au clic "Appliquer"). Un UPDATE conditionnel
+           protège contre deux activations concurrentes qui tenteraient de poser l'ancre en
+           même temps — la première gagne, la seconde relit la valeur déjà posée. */
+        const codeUtilisation = await db.prepare(
+          "SELECT * FROM da_codes_utilisations WHERE accred_paiement_id=? AND statut='en_attente'"
+        ).get(paiementId);
+        if (codeUtilisation) {
+          const codeRow = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(codeUtilisation.code_id);
+          if (codeRow) {
+            let dateFin = codeRow.date_fin_avantage;
+            if (!codeRow.date_premiere_utilisation) {
+              const maintenant = ajouterMoisDA(null, 0);
+              dateFin = ajouterMoisDA(maintenant, codeRow.duree_mois);
+              const rAncrage = await db.prepare(`
+                UPDATE da_codes_adhesion SET date_premiere_utilisation=?, date_fin_avantage=?, updated_at=datetime('now')
+                WHERE id=? AND date_premiere_utilisation IS NULL
+              `).run(maintenant, dateFin, codeRow.id);
+              if (rAncrage.changes === 0) {
+                const relu = await db.prepare("SELECT date_fin_avantage FROM da_codes_adhesion WHERE id=?").get(codeRow.id);
+                dateFin = relu?.date_fin_avantage || dateFin;
+              }
+            }
+            const codeApres = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(codeRow.id);
+            const nouveauStatutCode = codeApres.nb_utilisations >= codeApres.nb_max_utilisations ? 'epuise' : 'actif';
+            await db.prepare("UPDATE da_codes_adhesion SET statut=? WHERE id=? AND statut NOT IN ('suspendu','expire')")
+              .run(nouveauStatutCode, codeRow.id);
+
+            await db.prepare(`
+              UPDATE da_codes_utilisations SET statut='active', date_activation=datetime('now'),
+                stripe_subscription_id=?, date_fin_avantage=? WHERE id=?
+            `).run(session.subscription || null, dateFin, codeUtilisation.id);
+
+            journaliserCodeDA(codeRow.id, 'activation_premium', null, {
+              utilisationId: codeUtilisation.id,
+              details: `Premium activé pour le bénéficiaire ${codeUtilisation.beneficiaire_da_id} — valable jusqu'au ${dateFin}`,
+            });
+
+            const adherent = await db.prepare("SELECT * FROM adhesion_membres WHERE id=?").get(codeRow.adhesion_membre_id);
+            const dateFinLisible = new Date(dateFin.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR');
+            if (adherent?.linked_user_id) {
+              creerNotif(adherent.linked_user_id, 'code_adhesion_da_utilise', "🎟️ Votre code D'A a été utilisé",
+                `Votre code ${codeRow.code} a été utilisé pour activer un Premium (-${codeUtilisation.reduction_pct}%). ${codeApres.nb_utilisations}/${codeApres.nb_max_utilisations} utilisation(s).`,
+                { code_id: codeRow.id });
+            }
+            creerNotif(pay.user_id, 'code_adhesion_da_active', "✅ Réduction Adhésion D'A active",
+              `Votre réduction de ${codeUtilisation.reduction_pct}% est active jusqu'au ${dateFinLisible}.`,
+              { code_id: codeRow.id });
+          }
+        }
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_accred_paiement_id) {
       const paiementId = Number(event.data.object.metadata.diaspoactif_accred_paiement_id);
       await db.prepare(`UPDATE accred_paiements SET statut='echoue' WHERE id=? AND statut='en_attente'`).run(paiementId);
+      /* Compensation Codes Adhésion D'A : une session Checkout jamais finalisée ne doit pas
+         laisser une réservation fantôme sur le compteur du code. */
+      const utilisationAbandonnee = await db.prepare(
+        "SELECT * FROM da_codes_utilisations WHERE accred_paiement_id=? AND statut='en_attente'"
+      ).get(paiementId);
+      if (utilisationAbandonnee) {
+        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(utilisationAbandonnee.code_id);
+        await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(utilisationAbandonnee.id);
+      }
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -18340,6 +18672,33 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       .run(SCHEMA_MODULES_MARQUEUR, SCHEMA_MODULES_VERSION, 'texte', "Schéma Chatbot/FAQ/Onboarding/O-Z en place — évite de rejouer ces migrations à chaque démarrage à froid");
   } catch (e) {
     console.error('[schema-modules] non marqué (sera rejoué au prochain démarrage) :', e.message);
+  }
+})();
+
+/* ── Codes Adhésion D'A : paramètres standards, semés une seule fois ──
+   getInitiativeOfficielleId() (plus haut) lit ces clés à la volée à chaque appel —
+   ce bloc ne fait que garantir qu'elles existent avec une valeur par défaut sûre.
+   da_initiative_officielle_id reste vide ici : il est résolu et persisté automatiquement
+   au premier appel de getInitiativeOfficielleId() via da_email_officiel, jamais codé en dur. */
+(async function seedParametresCodesDA() {
+  const defauts = [
+    ['da_initiative_officielle_id', '', 'texte', "ID de l'initiative Diaspo'Actif officielle — résolu automatiquement via da_email_officiel si vide, override manuel possible"],
+    ['da_email_officiel', 'diaspo.actif@gmail.com', 'texte', "Email du compte officiel Diaspo'Actif — sert à résoudre da_initiative_officielle_id"],
+    ['da_code_reduction_pct_defaut', '20', 'texte', 'Réduction Premium par défaut appliquée à un nouveau code Adhésion D\'A'],
+    ['da_code_duree_mois_defaut', '12', 'texte', "Durée par défaut (en mois) de l'avantage, comptée à partir de la première utilisation"],
+    ['da_code_max_utilisations_defaut', '1', 'texte', "Nombre de comptes bénéficiaires autorisés par défaut sur un nouveau code"],
+    ['da_code_auto_utilisation_autorisee', '1', 'texte', "L'adhérent peut-il utiliser son propre code sur son propre compte (1) ou uniquement sur d'autres comptes (0)"],
+  ];
+  try {
+    for (const [cle, valeur, type, description] of defauts) {
+      const existe = await db.prepare("SELECT cle FROM parametres_plateforme WHERE cle=?").get(cle);
+      if (!existe) {
+        await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
+          .run(cle, valeur, type, description);
+      }
+    }
+  } catch (e) {
+    console.error('[codes-da] paramètres non semés (rejoué au prochain démarrage) :', e.message);
   }
 })();
 
@@ -28174,9 +28533,15 @@ function categoriserInitiative(type) {
    2) modulation selon la taille de l'organisation (coefficient de palier)
    3) promotion active (réduction % / fixe)
    4-5) tarif personnalisé par compte — remplace entièrement le résultat des étapes 1-3.
-   Retourne { montant_mensuel, montant_annuel, devise, categorie, personnalise, promo } ou null
-   si aucun tarif n'est configuré pour ce rôle. */
-async function calculerTarifPremium(def, user) {
+   6) avantage d'adhésion (ex. Codes Adhésion D'A, voir server/avantages-premium.js) — TOUJOURS
+      en dernier, y compris après un tarif personnalisé : c'est un bonus d'adhésion qui doit
+      s'appliquer même par-dessus un tarif négocié, jamais disparaître silencieusement pour
+      les comptes qui en ont le plus besoin.
+   Retourne { montant_mensuel, montant_annuel, devise, categorie, personnalise, promo, avantage_da }
+   ou null si aucun tarif n'est configuré pour ce rôle.
+   options.code_da : code saisi par l'utilisateur, non authentifié tant qu'il n'a pas été
+   validé ici — jamais de confiance dans un prix envoyé par le client. */
+async function calculerTarifPremium(def, user, options = {}) {
   const role = user.role;
   const tarifBase = (def.tarifs || []).find(t => t.role === role);
   if (!tarifBase) return null;
@@ -28240,17 +28605,26 @@ async function calculerTarifPremium(def, user) {
       AND (date_fin IS NULL OR date_fin>=datetime('now'))
     ORDER BY id DESC LIMIT 1
   `).get(user.id, def.id);
+
+  const avantageDA = await AvantagesPremium.resoudreAvantagesPremium(db, user, def, options);
+
   if (perso) {
-    return {
+    const montants = AvantagesPremium.appliquerAvantages({
       montant_mensuel: perso.montant_mensuel != null ? Number(perso.montant_mensuel) : montantMensuel,
       montant_annuel: perso.montant_annuel != null ? Number(perso.montant_annuel) : montantAnnuel,
+    }, avantageDA);
+    return {
+      ...montants,
       devise: tarifBase.devise || 'EUR', categorie, personnalise: true, promo: null,
+      avantage_da: avantageDA,
     };
   }
+  const montants = AvantagesPremium.appliquerAvantages({ montant_mensuel: montantMensuel, montant_annuel: montantAnnuel }, avantageDA);
   return {
-    montant_mensuel: montantMensuel, montant_annuel: montantAnnuel,
+    ...montants,
     devise: tarifBase.devise || 'EUR', categorie, personnalise: false,
     promo: promo ? { nom: promo.nom, mois_offerts: promo.mois_offerts || 0 } : null,
+    avantage_da: avantageDA,
   };
 }
 
@@ -28285,7 +28659,11 @@ route("GET", "/api/accreditations/catalogue", async (req, res) => {
     if (!def) return null;
     if (role && !def.eligible.includes(role)) return null;
     if (user && (def.tarifs || []).some(t => t.role === role && (t.type_tarif === 'mensuel' || t.type_tarif === 'annuel'))) {
-      def.tarif_calcule = await calculerTarifPremium(def, user);
+      // Aperçu en lecture seule : un code_da en query permet de prévisualiser la réduction
+      // avant paiement, sans jamais créer de ligne d'utilisation ni de coupon Stripe
+      // (resoudreAvantagesPremium() est garanti sans effet de bord côté écriture).
+      const codeDA = (req.query?.code_da || '').trim().toUpperCase() || null;
+      def.tarif_calcule = await calculerTarifPremium(def, user, { code_da: codeDA });
     }
     return def;
   }))).filter(Boolean);
