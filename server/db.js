@@ -5282,6 +5282,90 @@ db.exec(`
     );
   `);
 
+  /* ===== MODULE CODES ADHESION D'A =====
+     Droit a reduction Premium accorde automatiquement a tout adherent officiel payant
+     de l'initiative Diaspo'Actif elle-meme (pas une initiative quelconque - voir
+     getInitiativeOfficielleId dans index.js, qui pointe vers cette meme initiative
+     via parametres_plateforme). Le proprietaire d'un code est une ligne adhesion_membres
+     (les adherents externes sans compte plateforme, linked_user_id NULL, peuvent donc
+     posseder un code). Les beneficiaires (utilisations) sont forcement des comptes
+     plateforme, adresses par (da_id, source) car da_id est le seul identifiant partage
+     entre users et initiatives - une collectivite est une ligne users role=collectivite
+     et vaut donc source='user' sans schema dedie.
+     Duree ancree a la premiere utilisation, jamais a la creation - voir date_premiere_utilisation
+     et date_fin_avantage sur da_codes_adhesion, calcules en JS cote serveur (jamais en SQL,
+     toPg ne traduit pas les decalages positifs de date). */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS da_codes_adhesion (
+      id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+      code                      TEXT NOT NULL UNIQUE,
+      adhesion_membre_id        INTEGER NOT NULL,
+      initiative_id             INTEGER NOT NULL,
+      formule_id                INTEGER,
+      reduction_pct             REAL NOT NULL DEFAULT 0,
+      duree_mois                INTEGER NOT NULL DEFAULT 12,
+      nb_max_utilisations       INTEGER NOT NULL DEFAULT 1,
+      nb_utilisations           INTEGER NOT NULL DEFAULT 0,
+      statut                    TEXT NOT NULL DEFAULT 'cree' CHECK(statut IN ('cree','actif','epuise','expire','suspendu')),
+      date_premiere_utilisation TEXT,
+      date_fin_avantage         TEXT,
+      relance_3_mois_envoyee_le TEXT,
+      date_expiration_effective TEXT,
+      motif_suspension          TEXT,
+      cree_par                  TEXT DEFAULT 'systeme',
+      created_at                TEXT DEFAULT (datetime('now')),
+      updated_at                TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(adhesion_membre_id) REFERENCES adhesion_membres(id),
+      FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_da_codes_code ON da_codes_adhesion(code);
+    CREATE INDEX IF NOT EXISTS idx_da_codes_membre ON da_codes_adhesion(adhesion_membre_id);
+    CREATE INDEX IF NOT EXISTS idx_da_codes_statut ON da_codes_adhesion(statut);
+    CREATE INDEX IF NOT EXISTS idx_da_codes_fin ON da_codes_adhesion(date_fin_avantage);
+
+    CREATE TABLE IF NOT EXISTS da_codes_utilisations (
+      id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+      code_id                INTEGER NOT NULL,
+      beneficiaire_da_id     TEXT NOT NULL,
+      beneficiaire_source    TEXT NOT NULL CHECK(beneficiaire_source IN ('user','initiative')),
+      beneficiaire_user_id   INTEGER NOT NULL,
+      beneficiaire_role      TEXT,
+      accred_id              INTEGER,
+      accred_paiement_id     INTEGER,
+      type_tarif             TEXT,
+      montant_avant          REAL,
+      montant_apres          REAL,
+      reduction_pct          REAL,
+      stripe_coupon_id       TEXT,
+      stripe_subscription_id TEXT,
+      statut                 TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','active','expiree','annulee')),
+      date_redemption        TEXT DEFAULT (datetime('now')),
+      date_activation        TEXT,
+      date_fin_avantage      TEXT,
+      created_at              TEXT DEFAULT (datetime('now')),
+      updated_at              TEXT DEFAULT (datetime('now')),
+      UNIQUE(code_id, beneficiaire_da_id),
+      FOREIGN KEY(code_id) REFERENCES da_codes_adhesion(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_da_usages_code ON da_codes_utilisations(code_id);
+    CREATE INDEX IF NOT EXISTS idx_da_usages_user ON da_codes_utilisations(beneficiaire_user_id);
+
+    CREATE TABLE IF NOT EXISTS da_codes_audit_log (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      code_id        INTEGER NOT NULL,
+      utilisation_id INTEGER,
+      action         TEXT NOT NULL,
+      acteur_id      INTEGER,
+      acteur_nom     TEXT,
+      avant_json     TEXT,
+      apres_json     TEXT,
+      details        TEXT,
+      created_at     TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(code_id) REFERENCES da_codes_adhesion(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_da_audit_code ON da_codes_audit_log(code_id);
+  `);
+
   /* ===== MODULE MON ASSOCIE =====
      Marketplace de recherche de collaborations (associes, partenaires, benevoles,
      investisseurs, mentors...). Independant de la table collaborations existante

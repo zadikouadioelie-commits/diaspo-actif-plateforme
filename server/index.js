@@ -20117,6 +20117,94 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Codes Adhésion D'A : rappel 3 mois avant expiration de l'avantage ──
+     Borne calculée en JS (jamais en SQL, cf. règle §2 du plan) ; la colonne de garde
+     relance_3_mois_envoyee_le rend le cron idempotent, rejouable chaque jour sans risque
+     de doublon. Notifie le propriétaire du code ET chaque bénéficiaire encore actif. */
+  if (pathname === '/api/cron/da-codes-relance-expiration') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const borne3Mois = ajouterMoisDA(null, 3);
+      const codes = await db.prepare(`
+        SELECT c.*, m.nom AS adherent_nom, m.email AS adherent_email, m.linked_user_id
+        FROM da_codes_adhesion c JOIN adhesion_membres m ON m.id = c.adhesion_membre_id
+        WHERE c.statut IN ('actif','epuise') AND c.date_fin_avantage IS NOT NULL
+          AND c.date_fin_avantage <= ? AND c.relance_3_mois_envoyee_le IS NULL
+      `).all(borne3Mois);
+      let relancesEnvoyees = 0;
+      for (const code of codes) {
+        const dateFinTxt = new Date(code.date_fin_avantage.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR');
+        const msg = `Votre avantage Premium Diaspo'Actif (code ${code.code}, réduction ${code.reduction_pct}%) arrive bientôt à expiration, le ${dateFinTxt}. Pensez à renouveler votre adhésion officielle pour continuer à en profiter.`;
+        if (code.linked_user_id) {
+          creerNotif(code.linked_user_id, 'code_adhesion_da_relance_3mois', "⏳ Votre code D'A expire bientôt", msg, { code_id: code.id });
+        }
+        if (code.adherent_email) {
+          try {
+            const { sendEmail } = require("./mailer");
+            await sendEmail({ to: code.adherent_email, subject: "Votre avantage Premium Diaspo'Actif arrive bientôt à expiration", html: `<p>Bonjour ${escH(code.adherent_nom || '')},</p><p>${escH(msg)}</p>` });
+          } catch (_) {}
+        }
+        const beneficiaires = await db.prepare("SELECT * FROM da_codes_utilisations WHERE code_id=? AND statut='active'").all(code.id);
+        for (const u of beneficiaires) {
+          if (u.beneficiaire_user_id) {
+            creerNotif(u.beneficiaire_user_id, 'code_adhesion_da_relance_3mois', "⏳ Votre réduction Premium D'A expire bientôt",
+              `Votre réduction de ${u.reduction_pct}% (code ${code.code}) arrive bientôt à expiration, le ${dateFinTxt}.`, { code_id: code.id });
+          }
+        }
+        await db.prepare("UPDATE da_codes_adhesion SET relance_3_mois_envoyee_le=datetime('now') WHERE id=?").run(code.id);
+        journaliserCodeDA(code.id, 'relance_3_mois', null, { details: `Rappel envoyé — expiration prévue le ${dateFinTxt}` });
+        relancesEnvoyees++;
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees, total: codes.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron da-codes-relance-expiration"));
+    }
+    return;
+  }
+
+  /* ── Codes Adhésion D'A : expiration ──
+     Ne touche jamais Stripe : le coupon expire déjà tout seul côté Stripe via
+     duration_in_months (voir server/avantages-premium.js), ce cron est uniquement de la
+     tenue de registre — son éventuel échec ne coûte qu'une notification en retard, jamais
+     une facturation incorrecte. Ne supprime jamais rien (code ET historique conservés). */
+  if (pathname === '/api/cron/da-codes-expiration') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const maintenant = ajouterMoisDA(null, 0);
+      const codes = await db.prepare(`
+        SELECT c.*, m.nom AS adherent_nom, m.email AS adherent_email, m.linked_user_id
+        FROM da_codes_adhesion c JOIN adhesion_membres m ON m.id = c.adhesion_membre_id
+        WHERE c.statut NOT IN ('expire','suspendu') AND c.date_fin_avantage IS NOT NULL AND c.date_fin_avantage <= ?
+      `).all(maintenant);
+      let expires = 0;
+      for (const code of codes) {
+        await db.prepare("UPDATE da_codes_adhesion SET statut='expire', date_expiration_effective=datetime('now'), updated_at=datetime('now') WHERE id=?").run(code.id);
+        const beneficiaires = await db.prepare("SELECT * FROM da_codes_utilisations WHERE code_id=? AND statut='active'").all(code.id);
+        for (const u of beneficiaires) {
+          await db.prepare("UPDATE da_codes_utilisations SET statut='expiree', updated_at=datetime('now') WHERE id=?").run(u.id);
+          if (u.beneficiaire_user_id) {
+            creerNotif(u.beneficiaire_user_id, 'code_adhesion_da_expire', "Réduction Premium D'A expirée",
+              `Votre réduction du code ${code.code} a pris fin. Votre abonnement Premium continue au tarif normal.`, { code_id: code.id });
+          }
+        }
+        if (code.linked_user_id) {
+          creerNotif(code.linked_user_id, 'code_adhesion_da_expire', "Votre code D'A a expiré",
+            `Le code ${code.code} a atteint sa date d'expiration. Il reste consultable dans votre historique, mais n'accorde plus de réduction.`, { code_id: code.id });
+        }
+        journaliserCodeDA(code.id, 'expiration', null, { details: `Expiration effective au ${new Date().toISOString().slice(0, 19).replace('T', ' ')}` });
+        expires++;
+      }
+      sendJSON(res, 200, { ok: true, expires, total: codes.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron da-codes-expiration"));
+    }
+    return;
+  }
+
   /* ── Cagnotte : rappel "fin proche" au créateur (Phase 2 point 4) — cagnottes actives
      (calculerStatutCagnotte) dont la date de fin approche, une seule notification chacune. */
   if (pathname === '/api/cron/cagnotte-fin-proche') {
@@ -28426,6 +28514,183 @@ route("DELETE", "/api/admin/accred/promotions/:id", async (req, res, params) => 
     const def = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
     await journalTarifaire(def?.id || 0, admin, 'promotion', avant, { ...avant, actif: 0 }, "Désactivation promotion");
   }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ══ Codes Adhésion D'A — module admin ══
+   Réservé aux administrateurs (contrôle en 2 lignes, pattern répété partout dans ce fichier).
+   Le code lui-même n'est JAMAIS modifiable après génération, et aucune route DELETE n'existe :
+   le cahier des charges interdit la suppression, la suspension est l'action terminale. */
+route("GET", "/api/admin/da-codes", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const q = (req.query?.q || '').trim();
+  const statut = req.query?.statut || '';
+  const roleBeneficiaire = req.query?.role_beneficiaire || '';
+  const expireAvant3Mois = req.query?.expire_avant_3_mois === '1';
+  const page = Math.max(1, parseInt(req.query?.page, 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query?.limit, 10) || 50));
+  const offset = (page - 1) * limit;
+
+  const clauses = [];
+  const params = [];
+  if (q) {
+    clauses.push("(c.code LIKE ? OR m.nom LIKE ? OR m.prenom LIKE ? OR m.email LIKE ?)");
+    const like = `%${q}%`;
+    params.push(like, like, like, like);
+  }
+  if (statut) { clauses.push("c.statut = ?"); params.push(statut); }
+  if (roleBeneficiaire) {
+    clauses.push("EXISTS (SELECT 1 FROM da_codes_utilisations u WHERE u.code_id=c.id AND u.beneficiaire_role=?)");
+    params.push(roleBeneficiaire);
+  }
+  if (expireAvant3Mois) {
+    clauses.push("c.statut IN ('actif','epuise') AND c.date_fin_avantage IS NOT NULL AND c.date_fin_avantage <= ?");
+    params.push(ajouterMoisDA(null, 3));
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  const codes = await db.prepare(`
+    SELECT c.*, m.nom AS adherent_nom, m.prenom AS adherent_prenom, m.email AS adherent_email, m.statut AS adherent_statut
+    FROM da_codes_adhesion c
+    JOIN adhesion_membres m ON m.id = c.adhesion_membre_id
+    ${where}
+    ORDER BY c.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(...params, limit, offset);
+  const total = (await db.prepare(`
+    SELECT COUNT(*) n FROM da_codes_adhesion c JOIN adhesion_membres m ON m.id = c.adhesion_membre_id ${where}
+  `).get(...params))?.n || 0;
+
+  const totalCodes = (await db.prepare("SELECT COUNT(*) n FROM da_codes_adhesion").get())?.n || 0;
+  const parStatut = await db.prepare("SELECT statut, COUNT(*) n FROM da_codes_adhesion GROUP BY statut").all();
+  const kpis = { total: totalCodes, cree: 0, actif: 0, epuise: 0, expire: 0, suspendu: 0 };
+  for (const r of parStatut) kpis[r.statut] = r.n;
+  kpis.codes_restants = Math.max(0, 24000 - totalCodes); // 24 lettres (I/O exclus) × 1000, cf. genererCodeUniqueDA
+  kpis.expirent_dans_3_mois = (await db.prepare(`
+    SELECT COUNT(*) n FROM da_codes_adhesion
+    WHERE statut IN ('actif','epuise') AND date_fin_avantage IS NOT NULL AND date_fin_avantage <= ?
+  `).get(ajouterMoisDA(null, 3)))?.n || 0;
+
+  sendJSON(res, 200, { codes, total, page, limit, kpis });
+});
+
+route("GET", "/api/admin/da-codes/:id", async (req, res, params) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const code = await db.prepare(`
+    SELECT c.*, m.nom AS adherent_nom, m.prenom AS adherent_prenom, m.email AS adherent_email, m.statut AS adherent_statut
+    FROM da_codes_adhesion c JOIN adhesion_membres m ON m.id = c.adhesion_membre_id
+    WHERE c.id=?
+  `).get(params.id);
+  if (!code) return sendJSON(res, 404, { error: "Code introuvable." });
+  const utilisations = await db.prepare("SELECT * FROM da_codes_utilisations WHERE code_id=? ORDER BY id DESC").all(code.id);
+  const historique = await db.prepare("SELECT * FROM da_codes_audit_log WHERE code_id=? ORDER BY id DESC").all(code.id);
+  sendJSON(res, 200, { code, utilisations, historique });
+});
+
+route("PUT", "/api/admin/da-codes/:id", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Code introuvable." });
+
+  // Le code lui-même, le compteur d'utilisation et les dates d'ancrage ne sont jamais modifiables ici.
+  if (body.code !== undefined) return sendJSON(res, 400, { error: "Le code lui-même n'est pas modifiable." });
+
+  const { reduction_pct, duree_mois, nb_max_utilisations, statut, motif } = body;
+  if (!motif || !String(motif).trim()) return sendJSON(res, 400, { error: "Un motif est requis pour toute modification." });
+  if (reduction_pct != null && (reduction_pct < 0 || reduction_pct > 100)) return sendJSON(res, 400, { error: "Réduction invalide (0-100)." });
+  if (duree_mois != null && duree_mois < 1) return sendJSON(res, 400, { error: "Durée invalide (≥ 1 mois)." });
+  if (nb_max_utilisations != null) {
+    if (nb_max_utilisations < 1) return sendJSON(res, 400, { error: "Nombre de comptes autorisés invalide (≥ 1)." });
+    if (nb_max_utilisations < avant.nb_utilisations) {
+      return sendJSON(res, 400, { error: `Ne peut pas être inférieur au nombre d'utilisations déjà effectuées (${avant.nb_utilisations}).` });
+    }
+  }
+  const statutsAutorises = ['cree', 'actif', 'epuise', 'expire', 'suspendu'];
+  if (statut != null && !statutsAutorises.includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+
+  // Édition de la durée après la première utilisation : recalcule la fin depuis l'ANCRE existante,
+  // jamais depuis aujourd'hui (D3 du plan Codes Adhésion D'A).
+  let nouvelleDateFin = avant.date_fin_avantage;
+  if (duree_mois != null && avant.date_premiere_utilisation) {
+    nouvelleDateFin = ajouterMoisDA(avant.date_premiere_utilisation, duree_mois);
+  }
+
+  await db.prepare(`
+    UPDATE da_codes_adhesion SET
+      reduction_pct=COALESCE(?,reduction_pct), duree_mois=COALESCE(?,duree_mois),
+      nb_max_utilisations=COALESCE(?,nb_max_utilisations), statut=COALESCE(?,statut),
+      date_fin_avantage=?, updated_at=datetime('now')
+    WHERE id=?
+  `).run(reduction_pct ?? null, duree_mois ?? null, nb_max_utilisations ?? null, statut ?? null, nouvelleDateFin, params.id);
+
+  if (nouvelleDateFin !== avant.date_fin_avantage) {
+    await db.prepare("UPDATE da_codes_utilisations SET date_fin_avantage=? WHERE code_id=? AND statut='active'").run(nouvelleDateFin, params.id);
+  }
+
+  const apres = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(params.id);
+  journaliserCodeDA(params.id, 'modification', admin, { avant, apres, details: motif });
+  sendJSON(res, 200, { ok: true, code: apres });
+});
+
+route("POST", "/api/admin/da-codes/:id/suspendre", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Code introuvable." });
+  const motif = (body?.motif || '').trim();
+  if (!motif) return sendJSON(res, 400, { error: "Un motif est requis." });
+  await db.prepare("UPDATE da_codes_adhesion SET statut='suspendu', motif_suspension=?, updated_at=datetime('now') WHERE id=?").run(motif, params.id);
+  const apres = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(params.id);
+  journaliserCodeDA(params.id, 'suspension', admin, { avant, apres, details: motif });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/da-codes/:id/reactiver", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const avant = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(params.id);
+  if (!avant) return sendJSON(res, 404, { error: "Code introuvable." });
+  if (avant.statut !== 'suspendu') return sendJSON(res, 400, { error: "Ce code n'est pas suspendu." });
+  const motif = (body?.motif || '').trim();
+  // Statut restauré selon l'état réel du compteur/de l'ancre, jamais figé à 'actif' à l'aveugle.
+  let nouveauStatut = 'cree';
+  if (avant.date_premiere_utilisation) {
+    nouveauStatut = avant.nb_utilisations >= avant.nb_max_utilisations ? 'epuise' : 'actif';
+    if (avant.date_fin_avantage && new Date(avant.date_fin_avantage + 'Z') <= new Date()) nouveauStatut = 'expire';
+  }
+  await db.prepare("UPDATE da_codes_adhesion SET statut=?, motif_suspension=NULL, updated_at=datetime('now') WHERE id=?").run(nouveauStatut, params.id);
+  const apres = await db.prepare("SELECT * FROM da_codes_adhesion WHERE id=?").get(params.id);
+  journaliserCodeDA(params.id, 'reactivation', admin, { avant, apres, details: motif || null });
+  sendJSON(res, 200, { ok: true, code: apres });
+});
+
+const DA_CODES_PARAMS_CLES = [
+  'da_code_reduction_pct_defaut', 'da_code_duree_mois_defaut',
+  'da_code_max_utilisations_defaut', 'da_code_auto_utilisation_autorisee',
+  'da_initiative_officielle_id', 'da_email_officiel',
+];
+route("GET", "/api/admin/da-codes/parametres", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(`SELECT cle, valeur, description FROM parametres_plateforme WHERE cle IN (${DA_CODES_PARAMS_CLES.map(()=>'?').join(',')})`).all(...DA_CODES_PARAMS_CLES);
+  const parametres = {};
+  for (const r of rows) parametres[r.cle] = r.valeur;
+  sendJSON(res, 200, { parametres, descriptions: Object.fromEntries(rows.map(r => [r.cle, r.description])) });
+});
+
+route("PUT", "/api/admin/da-codes/parametres", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  for (const cle of DA_CODES_PARAMS_CLES) {
+    if (body[cle] === undefined) continue;
+    await db.prepare("UPDATE parametres_plateforme SET valeur=?, updated_at=datetime('now'), updated_by=? WHERE cle=?")
+      .run(String(body[cle]), admin.id, cle);
+  }
+  if (body.da_initiative_officielle_id !== undefined) _daInitiativeOfficielleIdCache = null; // force la relecture au prochain appel
   sendJSON(res, 200, { ok: true });
 });
 

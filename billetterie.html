@@ -85,6 +85,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <link rel="stylesheet" href="/assets/guided-tour.css">
 </head>
 <body>
 <div id="app">
@@ -1872,7 +1873,8 @@ function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,
     if (ME.role === 'initiative') {
       document.getElementById('tab-scanner').style.display = '';
       document.getElementById('tab-organisateur').style.display = '';
-      document.getElementById('top-actions').innerHTML = '<button class="btn btn-orange" onclick="switchTab(\'organisateur\');openCreateEvent()">＋ Créer un événement</button>';
+      document.getElementById('top-actions').innerHTML = '<button class="btn btn-orange" onclick="switchTab(\'organisateur\');openCreateEvent()">＋ Créer un événement</button>'
+        + '<button type="button" class="gt-launch-btn" style="margin-top:0;margin-left:8px;width:auto;display:inline-flex;" onclick="window.GuidedTour && GuidedTour.start(\'evenement\')">🎥 Tutoriel</button>';
       /* Charger événements de l'init pour le scanner */
       try {
         const r = await api('GET', '/events?organisateur_id='+ME.id+'&all=1');
@@ -1912,6 +1914,8 @@ function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<script src="/assets/guided-tour.js"></script>
+<script src="/assets/tours/tour-evenement.js"></script>
 </body>
 </html>
 

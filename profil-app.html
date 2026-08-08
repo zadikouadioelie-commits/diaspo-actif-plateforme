@@ -6104,6 +6104,13 @@ async function renderCodesPanel() {
       </div>
     </div>
 
+    <!-- Carte 3 : Code Adhésion D'A (affichée uniquement si ce compte est adhérent officiel) -->
+    <div class="codes-card" id="codes-cda-card" style="display:none;">
+      <h4>🎟️ Code Adhérent D'A</h4>
+      <p class="codes-sub">Réservé aux adhérents officiels de Diaspo'Actif · à saisir sur la page Premium pour obtenir votre réduction</p>
+      <div id="codes-cda-content"></div>
+    </div>
+
     <!-- Historique -->
     <div class="codes-card">
       <h4>📋 Historique de sécurité</h4>
@@ -6126,6 +6133,28 @@ async function renderCodesPanel() {
     a.href = canvas.toDataURL('image/png');
     a.click();
   };
+
+  // Carte Code Adhésion D'A — masquée silencieusement si ce compte n'est pas adhérent officiel.
+  (async () => {
+    try {
+      const r = await fetch('/api/premium/mon-code-adhesion', { credentials: 'include' });
+      if (!r.ok) return; // 404 = pas d'adhésion officielle liée à ce compte, rien à afficher
+      const d = await r.json();
+      const card = document.getElementById('codes-cda-card');
+      const content = document.getElementById('codes-cda-content');
+      if (!card || !content) return;
+      const STATUT_LABEL = { cree: '🆕 Disponible', actif: '✅ Actif', epuise: '⏹️ Utilisé au maximum', expire: '⌛ Expiré', suspendu: '⏸️ Suspendu' };
+      const fenetre = d.date_fin_avantage ? `jusqu'au ${new Date(d.date_fin_avantage.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR')}` : 'non démarrée — s\'active à la première utilisation';
+      content.innerHTML = `
+        <div class="da-badge" style="border-color:#2563EB;">${d.code}</div>
+        <p style="font-size:13px;margin:8px 0;">Réduction : <strong>${d.reduction_pct}%</strong> · Durée : <strong>${d.duree_mois} mois</strong> · Fenêtre : ${fenetre}</p>
+        <p style="font-size:13px;margin:8px 0;">Utilisations : <strong>${d.nb_utilisations} / ${d.nb_max_utilisations}</strong> · Statut : ${STATUT_LABEL[d.statut] || d.statut}</p>
+        <div class="codes-btn-row">
+          <button class="codes-btn orange" onclick="navigator.clipboard.writeText('${d.code}').then(()=>showToast?.('✅ Code copié !'))">📋 Copier le code</button>
+        </div>`;
+      card.style.display = '';
+    } catch (e) { /* silencieux : pas d'adhésion, pas de carte */ }
+  })();
 
   let _dsAction = 'reveal';
   window._showDsIdForm = function(action) {

@@ -14,7 +14,9 @@
     { "path": "/api/cron/origine-relances", "schedule": "0 13 * * *" },
     { "path": "/api/cron/finaliser-suppressions-comptes", "schedule": "0 5 * * *" },
     { "path": "/api/cron/avancement-initiative-relances", "schedule": "0 8 1 * *" },
-    { "path": "/api/cron/cagnotte-fin-proche", "schedule": "0 14 * * *" }
+    { "path": "/api/cron/cagnotte-fin-proche", "schedule": "0 14 * * *" },
+    { "path": "/api/cron/da-codes-relance-expiration", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/da-codes-expiration", "schedule": "0 16 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

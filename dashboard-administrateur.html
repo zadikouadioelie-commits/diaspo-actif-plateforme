@@ -3303,6 +3303,7 @@
             <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('promotions')" id="pa-tab-promotions">🎯 Promotions</button>
             <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('perso')" id="pa-tab-perso">🤝 Tarifs personnalisés</button>
             <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('simulateur')" id="pa-tab-simulateur">🧮 Simulateur</button>
+            <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('codesda')" id="pa-tab-codesda">🎟️ Codes Adhésion D'A</button>
           </div>
 
           <div id="pa-panel-dashboard">
@@ -3390,6 +3391,87 @@
               <input type="number" step="0.01" id="pa-sim-entr" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Laisser vide = inchangé">
               <button class="btn btn-orange" style="margin-top:14px;width:100%;" onclick="paSimuler()">Calculer l'impact</button>
               <div id="pa-sim-resultat" style="margin-top:16px;"></div>
+            </div>
+          </div>
+
+          <div id="pa-panel-codesda" style="display:none;">
+            <div class="grid grid-4" style="gap:14px;margin-bottom:18px;">
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Codes créés</div><div id="pa-cda-kpi-total" style="font-size:22px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Actifs</div><div id="pa-cda-kpi-actif" style="font-size:22px;font-weight:800;color:#059669;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Expirent sous 3 mois</div><div id="pa-cda-kpi-expire3" style="font-size:22px;font-weight:800;color:#b45309;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Codes restants</div><div id="pa-cda-kpi-restants" style="font-size:22px;font-weight:800;">—</div></div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+              <input id="pa-cda-search" type="text" placeholder="Rechercher un adhérent, un compte ou un code…" oninput="paFilterCodesDA()" style="flex:1;min-width:220px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+              <select id="pa-cda-statut" onchange="paFilterCodesDA()" style="padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+                <option value="">Tous les statuts</option>
+                <option value="cree">Disponible</option>
+                <option value="actif">Actif</option>
+                <option value="epuise">Épuisé</option>
+                <option value="expire">Expiré</option>
+                <option value="suspendu">Suspendu</option>
+              </select>
+              <select id="pa-cda-role" onchange="paFilterCodesDA()" style="padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+                <option value="">Tous les types de compte</option>
+              </select>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;">
+                <input type="checkbox" id="pa-cda-expire3" onchange="paFilterCodesDA()"> Expire sous 3 mois
+              </label>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Code</th>
+                  <th style="padding:10px 8px;text-align:left;">Adhérent</th>
+                  <th style="padding:10px 8px;text-align:center;">Réduction</th>
+                  <th style="padding:10px 8px;text-align:center;">Durée</th>
+                  <th style="padding:10px 8px;text-align:center;">Utilisations</th>
+                  <th style="padding:10px 8px;text-align:center;">Fenêtre</th>
+                  <th style="padding:10px 8px;text-align:center;">Statut</th>
+                  <th style="padding:10px 8px;text-align:center;">Actions</th>
+                </tr></thead>
+                <tbody id="pa-cda-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Codes Adhésion D'A : édition + historique -->
+        <div id="pa-modal-codeda" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;align-items:center;justify-content:center;padding:16px;">
+          <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+              <h3 style="margin:0;font-size:16px;">🎟️ Code Adhésion D'A</h3>
+              <button onclick="document.getElementById('pa-modal-codeda').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+            </div>
+            <input type="hidden" id="pa-cda-id">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Code (non modifiable)</label>
+            <input id="pa-cda-code" type="text" disabled style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:15px;font-weight:800;letter-spacing:2px;background:var(--surface);color:var(--muted);">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:12px;font-weight:700;color:var(--muted);">Réduction (%)</label>
+                <input id="pa-cda-pct" type="number" min="0" max="100" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;"></div>
+              <div><label style="font-size:12px;font-weight:700;color:var(--muted);">Durée (mois)</label>
+                <input id="pa-cda-duree" type="number" min="1" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;"></div>
+            </div>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Nombre de comptes autorisés</label>
+            <input id="pa-cda-max" type="number" min="1" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Statut</label>
+            <select id="pa-cda-statut-select" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;">
+              <option value="cree">Disponible</option>
+              <option value="actif">Actif</option>
+              <option value="epuise">Épuisé</option>
+              <option value="expire">Expiré</option>
+              <option value="suspendu">Suspendu</option>
+            </select>
+            <label style="font-size:12px;font-weight:700;color:var(--muted);">Motif de la modification (requis)</label>
+            <textarea id="pa-cda-motif" rows="2" placeholder="Pourquoi cette modification…" style="width:100%;box-sizing:border-box;margin:4px 0 12px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;resize:vertical;font-family:inherit;"></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+              <button onclick="document.getElementById('pa-modal-codeda').style.display='none'" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:none;cursor:pointer;">Annuler</button>
+              <button onclick="paSauverCodeDA()" style="padding:9px 18px;background:#1e3a8a;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">💾 Enregistrer</button>
+            </div>
+            <div id="pa-cda-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
+            <div id="pa-cda-historique" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+              <h4 style="margin:0 0 10px;font-size:13px;">Historique</h4>
+              <div id="pa-cda-historique-list" style="font-size:12px;display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;"></div>
             </div>
           </div>
         </div>
@@ -6512,7 +6594,7 @@ function showAccredHub(id) {
 
 /* ── Module Premium : gestion des abonnements ── */
 function premiumAdminOuvrir(tab) {
-  ['dashboard','paliers','promotions','perso','simulateur'].forEach(t => {
+  ['dashboard','paliers','promotions','perso','simulateur','codesda'].forEach(t => {
     const panel = document.getElementById('pa-panel-' + t);
     const btn = document.getElementById('pa-tab-' + t);
     if (panel) panel.style.display = t === tab ? '' : 'none';
@@ -6522,6 +6604,7 @@ function premiumAdminOuvrir(tab) {
   else if (tab === 'paliers') paLoadPaliers();
   else if (tab === 'promotions') paLoadPromotions();
   else if (tab === 'perso') paLoadPerso();
+  else if (tab === 'codesda') paLoadCodesDA();
 }
 
 async function paLoadDashboard() {
@@ -6714,6 +6797,157 @@ async function paSimuler() {
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span>Revenu mensuel simulé</span><strong style="color:${delta>=0?'#059669':'#dc2626'};">${r.revenu_mensuel_simule.toFixed(2)} € (${delta>=0?'+':''}${delta.toFixed(2)} €)</strong></div>
       <div style="display:flex;justify-content:space-between;"><span>Revenu annuel simulé</span><strong>${r.revenu_annuel_simule.toFixed(2)} €</strong></div>
     </div>`;
+}
+
+/* ═══════════════ CODES ADHÉSION D'A — Admin ═══════════════
+   Recherche + filtres + modale d'édition réelle (contrairement au module Promotions,
+   qui n'a que des prompt() en série) — le cahier des charges exige explicitement cette
+   combinaison. Le champ "type de compte bénéficiaire" se peuple depuis les données
+   reçues, jamais une liste figée (compatibilité Collectivité day one, cf. plan D6). */
+let _cdaAdminCache = [];
+
+async function paLoadCodesDA() {
+  try {
+    const r = await api("GET", "/admin/da-codes?limit=200");
+    _cdaAdminCache = r.codes || [];
+    paRenderCodesDA(_cdaAdminCache);
+    document.getElementById('pa-cda-kpi-total').textContent = r.kpis?.total ?? '—';
+    document.getElementById('pa-cda-kpi-actif').textContent = r.kpis?.actif ?? '—';
+    document.getElementById('pa-cda-kpi-expire3').textContent = r.kpis?.expirent_dans_3_mois ?? '—';
+    document.getElementById('pa-cda-kpi-restants').textContent = r.kpis?.codes_restants ?? '—';
+
+    // Filtre "type de compte bénéficiaire" : les 3 rôles plateforme concernés par cette
+    // fonctionnalité (users.role), pas une valeur figée liée à un seul cas d'usage —
+    // se peuple une seule fois, jamais en dur dans le HTML (cf. plan D6 : compatible
+    // Collectivité dès aujourd'hui, même si son offre Premium n'existe pas encore).
+    const selRole = document.getElementById('pa-cda-role');
+    if (selRole.options.length <= 1) {
+      ['utilisateur', 'initiative', 'collectivite'].forEach(r0 => {
+        const o = document.createElement('option'); o.value = r0; o.textContent = r0.charAt(0).toUpperCase() + r0.slice(1);
+        selRole.appendChild(o);
+      });
+    }
+
+    paFilterCodesDA();
+  } catch (e) {
+    const tbody = document.getElementById('pa-cda-table');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:#dc2626;">Erreur : ${esc(e.message)}</td></tr>`;
+  }
+}
+
+let _cdaFilterDebounce = null;
+function paFilterCodesDA() {
+  // Le rôle bénéficiaire n'est pas présent dans le cache liste (il vient d'une jointure sur
+  // les utilisations, coûteuse à répéter pour chaque ligne) : tous les filtres passent donc
+  // par le serveur, qui reste la source de vérité — pas de filtrage client partiel/incohérent.
+  clearTimeout(_cdaFilterDebounce);
+  _cdaFilterDebounce = setTimeout(async () => {
+    const q = document.getElementById('pa-cda-search')?.value || '';
+    const statut = document.getElementById('pa-cda-statut')?.value || '';
+    const role = document.getElementById('pa-cda-role')?.value || '';
+    const expire3 = document.getElementById('pa-cda-expire3')?.checked;
+    const qs = new URLSearchParams({ limit: '200' });
+    if (q) qs.set('q', q);
+    if (statut) qs.set('statut', statut);
+    if (role) qs.set('role_beneficiaire', role);
+    if (expire3) qs.set('expire_avant_3_mois', '1');
+    try {
+      const r = await api("GET", `/admin/da-codes?${qs.toString()}`);
+      _cdaAdminCache = r.codes || [];
+      paRenderCodesDA(_cdaAdminCache);
+    } catch (e) {
+      const tbody = document.getElementById('pa-cda-table');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:#dc2626;">Erreur : ${esc(e.message)}</td></tr>`;
+    }
+  }, 300);
+}
+
+const CDA_STATUT_LABEL = { cree: '🆕 Disponible', actif: '✅ Actif', epuise: '⏹️ Épuisé', expire: '⌛ Expiré', suspendu: '⏸️ Suspendu' };
+const CDA_STATUT_COLOR = { cree: '#64748b', actif: '#16a34a', epuise: '#b45309', expire: '#6b7280', suspendu: '#dc2626' };
+
+function paRenderCodesDA(list) {
+  const tbody = document.getElementById('pa-cda-table');
+  if (!tbody) return;
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted);">Aucun code trouvé.</td></tr>`; return; }
+  tbody.innerHTML = list.map(c => {
+    const adherent = [c.adherent_prenom, c.adherent_nom].filter(Boolean).join(' ') || '—';
+    const fenetre = c.date_premiere_utilisation
+      ? `${(c.date_premiere_utilisation || '').slice(0, 10)} → ${(c.date_fin_avantage || '').slice(0, 10)}`
+      : 'Non démarrée';
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:8px 14px;font-weight:800;letter-spacing:1px;">${esc(c.code)}</td>
+      <td style="padding:8px;"><div style="font-weight:700;">${esc(adherent)}</div><div style="font-size:11px;color:var(--muted);">${esc(c.adherent_email || '')}</div></td>
+      <td style="padding:8px;text-align:center;font-weight:700;color:#E87C3E;">${c.reduction_pct}%</td>
+      <td style="padding:8px;text-align:center;">${c.duree_mois} mois</td>
+      <td style="padding:8px;text-align:center;">${c.nb_utilisations} / ${c.nb_max_utilisations}</td>
+      <td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">${fenetre}</td>
+      <td style="padding:8px;text-align:center;"><span style="color:${CDA_STATUT_COLOR[c.statut] || '#64748b'};font-weight:700;font-size:12px;">${CDA_STATUT_LABEL[c.statut] || c.statut}</span></td>
+      <td style="padding:8px;text-align:center;white-space:nowrap;">
+        <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="paOuvrirCodeDAModal(${c.id})">✏️ Modifier</button>
+        ${c.statut === 'suspendu'
+          ? `<button class="btn" style="font-size:12px;padding:4px 10px;background:#d1fae5;color:#065f46;" onclick="paReactiverCodeDA(${c.id})">▶️</button>`
+          : `<button class="btn" style="font-size:12px;padding:4px 10px;background:#fee2e2;color:#991b1b;" onclick="paSuspendreCodeDA(${c.id})">⏸️</button>`}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function paOuvrirCodeDAModal(id) {
+  const r = await api("GET", `/admin/da-codes/${id}`).catch(e => { alert(e.message); return null; });
+  if (!r) return;
+  const c = r.code;
+  document.getElementById('pa-cda-id').value = c.id;
+  document.getElementById('pa-cda-code').value = c.code;
+  document.getElementById('pa-cda-pct').value = c.reduction_pct;
+  document.getElementById('pa-cda-duree').value = c.duree_mois;
+  document.getElementById('pa-cda-max').value = c.nb_max_utilisations;
+  document.getElementById('pa-cda-statut-select').value = c.statut;
+  document.getElementById('pa-cda-motif').value = '';
+  const msg = document.getElementById('pa-cda-msg'); msg.style.display = 'none'; msg.textContent = '';
+
+  const histEl = document.getElementById('pa-cda-historique-list');
+  const evenements = [
+    ...(r.utilisations || []).map(u => ({ date: u.date_redemption, texte: `Utilisation par ${esc(u.beneficiaire_da_id)} (${esc(u.beneficiaire_role || '—')}) — ${u.statut}` })),
+    ...(r.historique || []).map(h => ({ date: h.created_at, texte: `${esc(h.action)}${h.acteur_nom ? ' — ' + esc(h.acteur_nom) : ''}${h.details ? ' : ' + esc(h.details) : ''}` })),
+  ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  histEl.innerHTML = evenements.length
+    ? evenements.map(e => `<div style="border-left:2px solid var(--border);padding-left:8px;"><div style="color:var(--muted);font-size:10.5px;">${(e.date || '').slice(0, 16).replace('T', ' ')}</div>${e.texte}</div>`).join('')
+    : '<div style="color:var(--muted);">Aucun événement.</div>';
+
+  document.getElementById('pa-modal-codeda').style.display = 'flex';
+}
+
+async function paSauverCodeDA() {
+  const id = document.getElementById('pa-cda-id').value;
+  const motif = document.getElementById('pa-cda-motif').value.trim();
+  const msg = document.getElementById('pa-cda-msg');
+  if (!motif) { msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = '⚠️ Un motif est requis.'; return; }
+  try {
+    await api("PUT", `/admin/da-codes/${id}`, {
+      reduction_pct: parseFloat(document.getElementById('pa-cda-pct').value),
+      duree_mois: parseInt(document.getElementById('pa-cda-duree').value, 10),
+      nb_max_utilisations: parseInt(document.getElementById('pa-cda-max').value, 10),
+      statut: document.getElementById('pa-cda-statut-select').value,
+      motif,
+    });
+    msg.style.display = 'block'; msg.style.color = '#16a34a'; msg.textContent = '✅ Modifications enregistrées.';
+    setTimeout(() => { document.getElementById('pa-modal-codeda').style.display = 'none'; paLoadCodesDA(); }, 1200);
+  } catch (e) {
+    msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = `Erreur : ${e.message}`;
+  }
+}
+
+async function paSuspendreCodeDA(id) {
+  const motif = prompt("Motif de la suspension (obligatoire) :");
+  if (!motif) return;
+  await api("POST", `/admin/da-codes/${id}/suspendre`, { motif }).catch(e => alert(e.message));
+  paLoadCodesDA();
+}
+
+async function paReactiverCodeDA(id) {
+  const motif = prompt("Motif de la réactivation (optionnel) :") || '';
+  await api("POST", `/admin/da-codes/${id}/reactiver`, { motif }).catch(e => alert(e.message));
+  paLoadCodesDA();
 }
 
 /* ═══════════════ MODULE RENCONTRES DIASPO'ACTIF ═══════════════

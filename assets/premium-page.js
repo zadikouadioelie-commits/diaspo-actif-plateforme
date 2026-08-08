@@ -106,6 +106,23 @@
       if (!tarifRow) return { tarifs: [] };
       const reduc = Number(tarifRow.reduction_annuelle_pct) || 0;
       const devise = tarifRow.devise || 'EUR';
+
+      /* Préférer le tarif déjà calculé côté serveur (catégorie, palier de taille, promotion,
+         tarif personnalisé, avantage d'adhésion D'A) — jamais le recalcul brut ci-dessous, qui
+         ignorait jusqu'ici toute réduction et affichait donc un prix parfois faux à l'écran.
+         Repli sur le recalcul brut uniquement quand absent (visiteur non connecté : la route
+         catalogue ne renvoie tarif_calcule que pour un utilisateur authentifié). */
+      const tc = def.tarif_calcule;
+      if (tc) {
+        return {
+          tarifs: [
+            { type_tarif: 'mensuel', montant: tc.montant_mensuel, devise: tc.devise || devise },
+            { type_tarif: 'annuel', montant: tc.montant_annuel, devise: tc.devise || devise },
+          ],
+          reduc,
+        };
+      }
+
       let mensuel, annuel;
       if (tarifRow.type_tarif === 'mensuel') {
         mensuel = Number(tarifRow.montant);
@@ -118,12 +135,14 @@
     } catch (e) { return { tarifs: [] }; }
   }
 
-  async function souscrire(accredType, typeTarif, btn) {
+  async function souscrire(accredType, typeTarif, btn, codeDA) {
     if (btn) { btn.disabled = true; btn.textContent = 'Redirection…'; }
     try {
       const r = await fetch('/api/accreditations/' + accredType + '/payer', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type_tarif: typeTarif }),
+        // code_da n'est qu'une indication : le serveur recalcule et revalide systématiquement,
+        // jamais confiance dans un prix envoyé par le client.
+        body: JSON.stringify({ type_tarif: typeTarif, code_da: codeDA || undefined }),
       }).then(async res => {
         const d = await res.json();
         if (!res.ok) throw Object.assign(new Error(d.error || 'Erreur'), { data: d });
@@ -204,11 +223,21 @@
 
         <section class="prm-section prm-section-alt">
           <h2 class="prm-section-title">Tarifs</h2>
+
+          <div class="prm-code-da">
+            <label for="prm-code-da">Vous êtes adhérent officiel Diaspo'Actif ? Entrez votre code adhérent D'A pour bénéficier de votre réduction Premium.</label>
+            <div class="prm-code-da-row">
+              <input id="prm-code-da" maxlength="4" placeholder="A472" autocapitalize="characters" autocomplete="off">
+              <button type="button" class="btn btn-outline" id="prm-code-da-btn">Vérifier mon code</button>
+            </div>
+            <div id="prm-code-da-msg"></div>
+          </div>
+
           <div class="prm-tarifs-grid">
             <div class="prm-tarif-card">
               <div class="prm-tarif-icon">💳</div>
               <div class="prm-tarif-nom">Abonnement Mensuel</div>
-              <div class="prm-tarif-prix">${mensuel ? fmtPrix(mensuel.montant, mensuel.devise) : '—'}<span> / mois</span></div>
+              <div class="prm-tarif-prix" id="prm-prix-mensuel">${mensuel ? fmtPrix(mensuel.montant, mensuel.devise) : '—'}<span> / mois</span></div>
               <div class="prm-tarif-desc">Accès immédiat à toutes les fonctionnalités Premium du ${esc(cfg.titre)}.</div>
               <button class="btn prm-btn-gold" data-tarif="mensuel">Passer au Premium</button>
             </div>
@@ -216,7 +245,7 @@
               <div class="prm-tarif-badge">⭐ Le meilleur choix</div>
               <div class="prm-tarif-icon">⭐</div>
               <div class="prm-tarif-nom">Abonnement Annuel</div>
-              <div class="prm-tarif-prix">${annuel ? fmtPrix(annuel.montant, annuel.devise) : '—'}<span> / an</span></div>
+              <div class="prm-tarif-prix" id="prm-prix-annuel">${annuel ? fmtPrix(annuel.montant, annuel.devise) : '—'}<span> / an</span></div>
               <div class="prm-tarif-desc">🎁 Économisez ${reduc ? Math.round(reduc) : 15}&nbsp;% par rapport au paiement mensuel.</div>
               <button class="btn prm-btn-gold" data-tarif="annuel">Choisir l'offre annuelle</button>
             </div>
@@ -227,8 +256,8 @@
           <h2>${esc(cfg.banniereTitre)}</h2>
           <p>${esc(cfg.banniereTexte)}</p>
           <div class="prm-banniere-ctas">
-            <button class="btn prm-btn-navy" data-tarif="mensuel">🟦 Devenir Premium – ${mensuel ? fmtPrix(mensuel.montant, mensuel.devise) : '—'}/mois</button>
-            <button class="btn prm-btn-gold" data-tarif="annuel">⭐ Devenir Premium – ${annuel ? fmtPrix(annuel.montant, annuel.devise) : '—'}/an (Économisez ${reduc ? Math.round(reduc) : 15}%)</button>
+            <button class="btn prm-btn-navy" data-tarif="mensuel" id="prm-banniere-btn-mensuel">🟦 Devenir Premium – ${mensuel ? fmtPrix(mensuel.montant, mensuel.devise) : '—'}/mois</button>
+            <button class="btn prm-btn-gold" data-tarif="annuel" id="prm-banniere-btn-annuel">⭐ Devenir Premium – ${annuel ? fmtPrix(annuel.montant, annuel.devise) : '—'}/an (Économisez ${reduc ? Math.round(reduc) : 15}%)</button>
             <button class="btn btn-outline" id="prm-btn-retour-bottom" style="background:#fff;">⬅️ Retour à la plateforme</button>
           </div>
         </section>
@@ -241,9 +270,74 @@
     }
     el.querySelector('#prm-btn-retour-top').addEventListener('click', goRetour);
     el.querySelector('#prm-btn-retour-bottom').addEventListener('click', goRetour);
+
+    /* Code Adhésion D'A — lu depuis cette variable de fermeture par TOUS les boutons de
+       paiement, y compris la seconde paire dupliquée de la bannière basse (un seul
+       gestionnaire délégué wire les deux paires via [data-tarif]) : jamais depuis un
+       attribut par bouton, sinon la bannière facturerait le plein tarif en silence. */
+    let codeDAApplique = null;
     el.querySelectorAll('[data-tarif]').forEach(btn => {
       btn.dataset.origLabel = btn.textContent;
-      btn.addEventListener('click', () => souscrire(cfg.accredType, btn.dataset.tarif, btn));
+      btn.addEventListener('click', () => souscrire(cfg.accredType, btn.dataset.tarif, btn, codeDAApplique));
     });
+
+    const codeDaBtn = el.querySelector('#prm-code-da-btn');
+    const codeDaInput = el.querySelector('#prm-code-da');
+    const codeDaMsg = el.querySelector('#prm-code-da-msg');
+    const MESSAGES_CODE_DA = {
+      inconnu: "Ce code n'existe pas.",
+      suspendu: 'Ce code est actuellement suspendu.',
+      expire: 'Ce code a expiré.',
+      epuise: 'Ce code a déjà été utilisé par le nombre maximum de comptes autorisés.',
+      adhesion_non_a_jour: "L'adhésion associée à ce code n'est plus à jour.",
+      auto_utilisation_non_autorisee: 'Ce code ne peut pas être utilisé sur le compte qui l\'a reçu.',
+      compte_non_identifiable: 'Impossible d\'identifier votre compte pour appliquer ce code.',
+    };
+    if (codeDaBtn && codeDaInput) {
+      codeDaBtn.addEventListener('click', async () => {
+        const code = (codeDaInput.value || '').trim().toUpperCase();
+        if (!code) return;
+        codeDaBtn.disabled = true; codeDaBtn.textContent = 'Vérification…';
+        codeDaMsg.className = ''; codeDaMsg.textContent = '';
+        try {
+          const r = await fetch('/api/premium/code-adhesion/verifier', {
+            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, accred_type: cfg.accredType }),
+          }).then(res => res.json());
+
+          if (!r.valide) {
+            codeDaMsg.className = 'prm-code-da-msg prm-code-da-err';
+            codeDaMsg.textContent = '❌ ' + (MESSAGES_CODE_DA[r.raison] || "Ce code n'est pas valide.");
+            codeDAApplique = null;
+            codeDaBtn.disabled = false; codeDaBtn.textContent = 'Vérifier mon code';
+            return;
+          }
+
+          codeDAApplique = code;
+          const deviseAffichage = (mensuel && mensuel.devise) || (annuel && annuel.devise) || 'EUR';
+          const prixMensuelEl = el.querySelector('#prm-prix-mensuel');
+          const prixAnnuelEl = el.querySelector('#prm-prix-annuel');
+          if (prixMensuelEl) prixMensuelEl.innerHTML = `${fmtPrix(r.montant_mensuel, deviseAffichage)}<span> / mois</span>`;
+          if (prixAnnuelEl) prixAnnuelEl.innerHTML = `${fmtPrix(r.montant_annuel, deviseAffichage)}<span> / an</span>`;
+          const btnMensuel = el.querySelector('#prm-banniere-btn-mensuel');
+          const btnAnnuel = el.querySelector('#prm-banniere-btn-annuel');
+          if (btnMensuel) btnMensuel.textContent = `🟦 Devenir Premium – ${fmtPrix(r.montant_mensuel, deviseAffichage)}/mois`;
+          if (btnAnnuel) btnAnnuel.textContent = `⭐ Devenir Premium – ${fmtPrix(r.montant_annuel, deviseAffichage)}/an`;
+
+          const dateFinTxt = r.date_fin_prevue ? new Date(r.date_fin_prevue.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : null;
+          codeDaMsg.className = 'prm-code-da-msg prm-code-da-ok';
+          codeDaMsg.innerHTML = `✅ Code adhérent D'A validé<br>Vous bénéficiez de ${r.reduction_pct}% de réduction Premium. ` +
+            (r.premiere_utilisation
+              ? `Cet avantage est valable jusqu'au ${dateFinTxt}.`
+              : `Cet avantage sera valable ${r.duree_mois} mois à compter de son activation.`);
+          codeDaBtn.disabled = false; codeDaBtn.textContent = '✅ Code appliqué';
+          codeDaInput.disabled = true;
+        } catch (e) {
+          codeDaMsg.className = 'prm-code-da-msg prm-code-da-err';
+          codeDaMsg.textContent = '❌ Impossible de vérifier ce code pour le moment.';
+          codeDaBtn.disabled = false; codeDaBtn.textContent = 'Vérifier mon code';
+        }
+      });
+    }
   };
 })();
