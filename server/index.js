@@ -23394,10 +23394,16 @@ ${jsonLd}
          logique reprise ici pour que l'association voie la distinction avant de tenter un
          retrait, plutôt que de découvrir la limite au moment de l'erreur. */
       const RESERVE_JOURS = 7;
+      /* L'intervalle est écrit en dur dans le SQL (jamais en paramètre lié) : datetime('now', ?)
+         avec un ? résolu à l'exécution n'est pas traduit correctement vers Postgres en
+         production (le traducteur SQLite→Postgres ne peut interpréter un paramètre au moment
+         de la traduction du texte SQL) — 500 constaté en prod le 2026-08-08, corrigé ici.
+         RESERVE_JOURS est une constante interne, jamais une entrée utilisateur : aucun risque
+         d'injection à l'insérer directement dans le texte. */
       const mûri = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
-        WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp <= datetime('now', ?)
-      `).get(me.id, `-${RESERVE_JOURS} days`))?.total || 0;
+        WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp <= datetime('now', '-${RESERVE_JOURS} days')
+      `).get(me.id))?.total || 0;
       const dejaRetire = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM retraits WHERE user_id=? AND statut IN ('demande','traite')
       `).get(me.id))?.total || 0;
@@ -23486,10 +23492,12 @@ ${jsonLd}
          crédits réellement "mûrs" moins tout retrait déjà demandé/traité (évite qu'une même
          somme mûrie serve deux demandes de retrait concurrentes). */
       const RESERVE_JOURS = 7;
+      /* Intervalle en dur dans le SQL, jamais en paramètre lié — voir la note détaillée dans
+         GET /api/wallet/centre-financier plus haut (500 en prod corrigé le 2026-08-08). */
       const mûri = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
-        WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp <= datetime('now', ?)
-      `).get(me.id, `-${RESERVE_JOURS} days`))?.total || 0;
+        WHERE beneficiaire_id=? AND type='organizer_credit' AND timestamp <= datetime('now', '-${RESERVE_JOURS} days')
+      `).get(me.id))?.total || 0;
       const dejaRetire = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM retraits WHERE user_id=? AND statut IN ('demande','traite')
       `).get(me.id))?.total || 0;
@@ -23548,8 +23556,8 @@ ${jsonLd}
       const RESERVE_JOURS = 7;
       const commissionMûrie = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
-        WHERE type='platform_fee' AND timestamp <= datetime('now', ?)
-      `).get(`-${RESERVE_JOURS} days`))?.total || 0;
+        WHERE type='platform_fee' AND timestamp <= datetime('now', '-${RESERVE_JOURS} days')
+      `).get())?.total || 0;
       const commissionDejaRetiree = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM commission_retraits WHERE statut IN ('demande','traite')
       `).get())?.total || 0;
@@ -23577,8 +23585,8 @@ ${jsonLd}
       const RESERVE_JOURS = 7;
       const commissionMûrie = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM wallet_transactions
-        WHERE type='platform_fee' AND timestamp <= datetime('now', ?)
-      `).get(`-${RESERVE_JOURS} days`))?.total || 0;
+        WHERE type='platform_fee' AND timestamp <= datetime('now', '-${RESERVE_JOURS} days')
+      `).get())?.total || 0;
       const commissionDejaRetiree = (await db.prepare(`
         SELECT COALESCE(SUM(montant),0) AS total FROM commission_retraits WHERE statut IN ('demande','traite')
       `).get())?.total || 0;
