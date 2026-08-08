@@ -9,7 +9,13 @@
     const bar = document.createElement('div');
     bar.id = 'da-back-bar';
     bar.style.cssText = [
-      'position:sticky', 'top:0', 'z-index:9999', 'width:100%', 'box-sizing:border-box',
+      /* z-index:48, volontairement SOUS .topbar (50, assets/styles.v2.css) : à 9999 ce
+         bandeau (prepend() sur <body>, hors du contexte d'empilement du topbar) couvrait
+         entièrement le bouton menu mobile #sidebar-toggle — position:fixed mais piégé dans
+         le contexte d'empilement de son ancêtre .topbar (position:sticky + z-index), qui ne
+         peut donc jamais dépasser 50 face à un élément du contexte racine. Bug réel constaté :
+         bouton visible mais clic impossible sur toute page utilisant ce bouton retour. */
+      'position:sticky', 'top:0', 'z-index:48', 'width:100%', 'box-sizing:border-box',
       'padding:8px 14px', 'background:#ffffff', 'border-bottom:1px solid rgba(0,0,0,.06)'
     ].join(';');
     const btn = document.createElement('button');

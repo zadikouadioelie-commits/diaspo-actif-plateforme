@@ -581,7 +581,13 @@ function showEmailVerifBanner(user) {
 
   const bar = document.createElement("div");
   bar.id = "email-verif-banner";
-  bar.style.cssText = "position:sticky;top:0;z-index:900;background:#FEF3C7;color:#92400E;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;";
+  /* z-index:45, volontairement SOUS le .topbar (50) : ce bandeau est prepend() sur <body>,
+     donc hors du contexte d'empilement du topbar — à 900, il couvrait complètement le
+     bouton menu mobile #sidebar-toggle (position:fixed, piégé dans le contexte du topbar
+     malgré son propre z-index élevé, puisqu'un ancêtre position:sticky avec z-index crée
+     un contexte d'empilement que ses descendants fixed ne peuvent pas dépasser). Bug réel
+     constaté : bouton visible mais clic impossible dès qu'un compte a l'e-mail non vérifié. */
+  bar.style.cssText = "position:sticky;top:0;z-index:45;background:#FEF3C7;color:#92400E;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;";
   bar.innerHTML = `
     <span>✉️ Confirmez votre adresse e-mail pour sécuriser votre compte.</span>
     <button id="verif-resend-btn" style="background:#92400E;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;">Renvoyer l'e-mail</button>
@@ -632,7 +638,9 @@ function showOrigineBanner(user) {
 
   const bar = document.createElement("div");
   bar.id = "origine-banner";
-  bar.style.cssText = "position:sticky;top:0;z-index:900;background:#EFF6FF;color:#1E3A8A;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #BFDBFE;";
+  /* z-index:45 : même correctif et même raison que email-verif-banner ci-dessus — reste
+     sous le .topbar (50) pour ne jamais couvrir le bouton menu mobile #sidebar-toggle. */
+  bar.style.cssText = "position:sticky;top:0;z-index:45;background:#EFF6FF;color:#1E3A8A;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #BFDBFE;";
   bar.innerHTML = `
     <span>🌍 Votre origine n'est pas renseignée :</span>
     ${champsHtml}
