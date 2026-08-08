@@ -1315,6 +1315,11 @@ const MIGRATIONS = [
   // Affichage public des membres, choisi par l'association (incrément 6) : 'tous' (défaut,
   // comportement historique inchangé) / 'dirigeants' / 'nombre' / 'masque'.
   ["initiatives", "affichage_membres TEXT DEFAULT 'tous'"],
+  // Liste de diffusion générale "Tous les membres" (2026-08-08) : alimentée à la fois par le
+  // module Adhésions (formules payantes) et par la demande d'adhésion simple (sans formule),
+  // pour que les deux chemins nourrissent la même fiche Réseau Pro — jamais deux contacts
+  // séparés pour la même personne.
+  ["initiatives", "liste_membres_generale_id INTEGER"],
   ["users", "type_institution TEXT"],
   ["users", "statut_verification TEXT DEFAULT 'auto'"],
   // Champs de base initiatives (peuvent manquer sur DB ancienne)

@@ -3040,10 +3040,11 @@ function sanitizeChampsCustom(raw) {
 /* Ajoute automatiquement un adhérent/cotisant validé à la « liste de stockage des participants »
    liée à sa formule (module Réseau professionnel) — registre officiel réutilisable pour campagnes,
    convocations, votes, etc. Dédoublonne par compte lié, sinon par email ; met à jour le nom si déjà présent. */
-async function ajouterAListeStockage(formuleId, membre) {
-  const formule = await db.prepare("SELECT liste_stockage_id FROM adhesion_formules WHERE id=?").get(formuleId);
-  if (!formule?.liste_stockage_id) return;
-  const listeId = formule.liste_stockage_id;
+/* Ajoute/rafraîchit un contact dans une liste de diffusion donnée — déduplique par compte lié
+   (user_id) ou, à défaut, par e-mail : jamais deux lignes pour la même personne dans la même
+   liste, quel que soit le chemin (formule payante ou demande simple) qui l'y amène. */
+async function ajouterContactListe(listeId, membre) {
+  if (!listeId) return;
   const nomComplet = [membre.prenom, membre.nom].filter(Boolean).join(" ") || membre.nom;
   if (membre.linked_user_id) {
     const existe = await db.prepare("SELECT id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id=?").get(listeId, membre.linked_user_id);
@@ -3064,18 +3065,50 @@ async function ajouterAListeStockage(formuleId, membre) {
   }
 }
 
-/* Contrepartie de ajouterAListeStockage (incrément 5, 2026-08-07) : retire un membre de la
-   liste de diffusion de sa formule — jusqu'ici la synchronisation n'allait que dans un sens
-   (ajout au paiement), un membre suspendu/radié/expiré restait indéfiniment dans la liste. */
-async function retirerDeListeStockage(formuleId, membre) {
-  const formule = await db.prepare("SELECT liste_stockage_id FROM adhesion_formules WHERE id=?").get(formuleId);
-  if (!formule?.liste_stockage_id) return;
-  const listeId = formule.liste_stockage_id;
+/* Contrepartie — retire un contact d'une liste donnée. */
+async function retirerContactListe(listeId, membre) {
+  if (!listeId) return;
   if (membre.linked_user_id) {
     await db.prepare("DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND user_id=?").run(listeId, membre.linked_user_id);
   } else if (membre.email) {
     await db.prepare("DELETE FROM listes_diffusion_contacts WHERE liste_id=? AND email=?").run(listeId, membre.email);
   }
+}
+
+/* Liste générale "Tous les membres" (2026-08-08) — une seule par association, indépendante de
+   toute formule, créée à la demande. Contrairement aux listes par formule (qui reflètent le
+   statut ACTIF courant et perdent un membre suspendu/radié/expiré), c'est un registre de
+   présence à vie : on y entre dès la première adhésion validée (formule payante OU demande
+   simple acceptée) et on n'en sort jamais automatiquement — l'association la nettoie
+   elle-même si besoin, comme n'importe quelle autre liste du Réseau Pro. C'est ce qui garantit
+   qu'une même personne, quel que soit le chemin emprunté, finit dans LA MÊME fiche. */
+async function getOuCreerListeGenerale(initiativeId) {
+  const init = await db.prepare("SELECT liste_membres_generale_id, owner_user_id, nom FROM initiatives WHERE id=?").get(initiativeId);
+  if (!init) return null;
+  if (init.liste_membres_generale_id) return init.liste_membres_generale_id;
+  const id = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id, nom, description, icone) VALUES (?,?,?,?)`)
+    .run(init.owner_user_id, `Tous les membres`,
+      `Registre général des membres de « ${init.nom} » — alimenté automatiquement par toute adhésion validée (formule payante ou demande simple acceptée). Créée automatiquement.`,
+      '👥')).lastInsertRowid;
+  await db.prepare("UPDATE initiatives SET liste_membres_generale_id=? WHERE id=?").run(id, initiativeId);
+  return id;
+}
+
+async function ajouterAListeStockage(formuleId, membre) {
+  const formule = await db.prepare("SELECT liste_stockage_id, initiative_id FROM adhesion_formules WHERE id=?").get(formuleId);
+  if (!formule) return;
+  await ajouterContactListe(formule.liste_stockage_id, membre);
+  await ajouterContactListe(await getOuCreerListeGenerale(formule.initiative_id), membre);
+}
+
+/* Contrepartie de ajouterAListeStockage (incrément 5, 2026-08-07) : retire un membre de la
+   liste de diffusion DE SA FORMULE — jusqu'ici la synchronisation n'allait que dans un sens
+   (ajout au paiement), un membre suspendu/radié/expiré restait indéfiniment dans la liste.
+   Ne touche volontairement PAS à la liste générale (voir getOuCreerListeGenerale : registre
+   à vie, pas un reflet du statut actif). */
+async function retirerDeListeStockage(formuleId, membre) {
+  const formule = await db.prepare("SELECT liste_stockage_id FROM adhesion_formules WHERE id=?").get(formuleId);
+  await retirerContactListe(formule?.liste_stockage_id, membre);
 }
 
 /* Sync module Adhésions → Affiliations (incrément 6, 2026-08-07) : une adhésion validée crée/
@@ -9167,6 +9200,16 @@ route("PATCH", "/api/adhesion-demandes/:id", async (req, res, params, body) => {
   const { statut } = body;
   if (!['acceptee', 'refusee'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
   await db.prepare("UPDATE initiative_adhesion_demandes SET statut=?, updated_at=datetime('now') WHERE id=?").run(statut, params.id);
+  /* Divergence corrigée (2026-08-08) : ce chemin "demande simple" ne passait jamais par le
+     Réseau Pro contrairement au module Adhésions payant — une même personne pouvait donc finir
+     avec deux fiches distinctes selon le chemin emprunté. On l'alimente désormais dans la MÊME
+     liste générale que le module payant (getOuCreerListeGenerale, dédupliquée par user_id). */
+  if (statut === 'acceptee') {
+    const demandeur = await db.prepare("SELECT id, nom, prenom, email FROM users WHERE id=?").get(d.user_id);
+    if (demandeur) {
+      await ajouterContactListe(await getOuCreerListeGenerale(d.initiative_id), { linked_user_id: demandeur.id, nom: demandeur.nom, prenom: demandeur.prenom, email: demandeur.email });
+    }
+  }
   creerNotif(d.user_id, "demande_adhesion",
     statut === 'acceptee' ? `Adhésion acceptée — ${d.initiative_nom}` : `Adhésion refusée — ${d.initiative_nom}`,
     statut === 'acceptee' ? `Votre demande d'adhésion à ${d.initiative_nom} a été acceptée.` : `Votre demande d'adhésion à ${d.initiative_nom} a été refusée.`,

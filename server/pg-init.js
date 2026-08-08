@@ -1050,6 +1050,8 @@ const COLONNES_MIGRATION = [
     ['initiative_membres', 'date_fin', 'TEXT'],
     ['initiative_membres', 'visible_publiquement', 'INTEGER DEFAULT 1'],
     ['initiatives', 'affichage_membres', "TEXT DEFAULT 'tous'"],
+    // Liste générale "Tous les membres" (2026-08-08) : miroir de l'ALTER db.js
+    ['initiatives', 'liste_membres_generale_id', 'INTEGER'],
 ];
 
 async function migratePg(pool) {
