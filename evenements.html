@@ -382,7 +382,7 @@ function renderEvts() {
           ${visiBadge}
           ${evt.nb_participants ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
         </div>
-        ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+esc(evt.description.slice(0,120))+(evt.description.length>120?'…':'')+'</p>' : ''}
+        ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+mdBold(esc(evt.description.slice(0,120)))+(evt.description.length>120?'…':'')+'</p>' : ''}
         <div class="evt-actions">
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           ${inscrit
@@ -791,7 +791,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.pays ? `<span>🌍 ${esc(evt.pays)}</span>` : ''}
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
       </div>
-      ${evt.description ? `<p style="font-size:14px;line-height:1.65;color:#444;margin:0 0 12px;">${esc(evt.description)}</p>` : ''}
+      ${evt.description ? `<p style="font-size:14px;line-height:1.65;color:#444;margin:0 0 12px;">${mdBold(esc(evt.description))}</p>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
         ${!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>'}
         <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>

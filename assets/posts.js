@@ -80,6 +80,9 @@ function processContent(text) {
   t = t.replace(/#([\wÀ-ÿ]+)/g, '<a href="fil-actualite.html?hashtag=$1" class="post-hashtag">#$1</a>');
   t = t.replace(/[@*]\[([^\]]+)\]\(([uic]):(\d+)\)/g, (m, nom, type, id) =>
     `<a href="${MENTION_LINK[type]||MENTION_LINK.u}${id}" class="post-mention">@${nom}</a>`);
+  /* Après la résolution des mentions (qui consomme le * de "*[Nom](i:5)"), tout astérisque
+     restant est de la mise en forme volontaire — *texte* et **texte** deviennent du gras. */
+  if (typeof mdBold === 'function') t = mdBold(t);
   t = t.replace(/\n/g, '<br>');
   return t;
 }

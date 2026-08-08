@@ -44,6 +44,19 @@ const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", ad
 /* ---------- Utilitaires globaux ---------- */
 function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+/* Rendu markdown-léger : *texte* et **texte** deviennent tous les deux du gras (jamais de
+   l'italique — décision volontaire, pas la convention markdown standard). À appliquer
+   TOUJOURS après un échappement HTML (escH/esc/escHtml/...), jamais avant, sinon les
+   astérisques d'un texte hostile pourraient interagir avec les entités échappées. Les
+   doubles astérisques sont traités en premier pour ne pas laisser d'astérisques isolés
+   traîner après la première passe. */
+function mdBold(html){
+  return String(html || "")
+    .replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+?)\*/g, "<strong>$1</strong>");
+}
+window.mdBold = mdBold;
+
 /* ========== BADGE INITIATIVE VÉRIFIÉE ========== */
 const CERTIF_NIVEAUX = {
   verifie:    { icon: "🛡️", label: "Initiative Vérifiée", cls: "certif-verifie" },

@@ -295,7 +295,7 @@
             ${peutParticiper ? '' : `<div class="cg-participer-note">Cette cagnotte n'accepte plus de contributions pour le moment.</div>`}
           </div>
 
-          ${c.description ? `<div class="cg-card"><h3 style="margin:0 0 10px;font-size:15px;">À propos</h3><div class="cg-desc">${escH(c.description)}</div></div>` : ''}
+          ${c.description ? `<div class="cg-card"><h3 style="margin:0 0 10px;font-size:15px;">À propos</h3><div class="cg-desc">${mdBold(escH(c.description))}</div></div>` : ''}
         `;
         if (peutParticiper) document.getElementById('cg-btn-participer').addEventListener('click', ouvrirParticipation);
         renderContributeurs(slug, !!c.afficher_participants);

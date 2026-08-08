@@ -1370,10 +1370,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <summary style="cursor:pointer;font-size:12px;font-weight:700;">📝 Formulaire d'adhésion (texte, documents, champs)</summary>
           <div style="margin-top:12px;">
             <label style="font-size:12px;font-weight:700;">Texte d'introduction</label>
-            <textarea id="adh-f-texte-intro" class="input" rows="2" placeholder="Affiché en haut du formulaire, avant les tarifs." style="margin:4px 0 10px;width:100%;"></textarea>
+            <textarea id="adh-f-texte-intro" class="input" rows="8" placeholder="Affiché en haut du formulaire, avant les tarifs." style="margin:4px 0 10px;width:100%;resize:vertical;min-height:120px;"></textarea>
 
             <label style="font-size:12px;font-weight:700;">Conditions d'adhésion</label>
-            <textarea id="adh-f-conditions" class="input" rows="2" placeholder="Ex. engagement moral, durée d'engagement, etc." style="margin:4px 0 10px;width:100%;"></textarea>
+            <textarea id="adh-f-conditions" class="input" rows="10" placeholder="Ex. engagement moral, durée d'engagement, etc." style="margin:4px 0 10px;width:100%;resize:vertical;min-height:150px;"></textarea>
 
             <div style="display:flex;gap:10px;margin-bottom:10px;">
               <div style="flex:1;">
@@ -6342,7 +6342,7 @@ async function adhRenderFormules(){
           <div style="font-size:13px;font-weight:700;margin-bottom:6px;">
             ${f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
           </div>
-          ${f.description?`<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">${escH(f.description)}</p>`:''}
+          ${f.description?`<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">${mdBold(escH(f.description))}</p>`:''}
           ${f.mode_validite==='collectif'?`<div style="font-size:11px;color:#7c3aed;background:#f5f3ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">📅 Calendrier fixe : ${f.periode_collective_debut?new Date(f.periode_collective_debut).toLocaleDateString('fr-FR'):'?'} → ${f.periode_collective_fin?new Date(f.periode_collective_fin).toLocaleDateString('fr-FR'):'?'}${f.renouvellement_auto_collectif?' · 🔁 auto':''}</div>`
             :(!f.duree_illimitee && f.duree_valeur)?`<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">⏳ ${f.duree_valeur} ${ADH_DUREE_UNITE_LABELS[f.duree_unite]||f.duree_unite}</div>`
             :f.duree_illimitee?`<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block;">♾️ Durée illimitée</div>`:''}

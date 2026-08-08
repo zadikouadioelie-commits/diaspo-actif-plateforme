@@ -148,7 +148,7 @@ function renderFormules(){
           f.montant_type==='libre' ? `Montant libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` :
           `À partir de ${f.montant_min} ${f.devise}`
         }</div>
-        ${f.description?`<div class="adh-desc">${escHtml(f.description)}</div>`:''}
+        ${f.description?`<div class="adh-desc">${mdBold(escHtml(f.description))}</div>`:''}
         ${f.max_adherents ? `<div style="font-size:11.5px;color:${f.places_restantes<=0?'#dc2626':'var(--muted)'};margin:2px 0 8px;">${f.places_restantes<=0?'🚫 Complet':`👥 ${f.places_restantes} place${f.places_restantes>1?'s':''} restante${f.places_restantes>1?'s':''}`}</div>` : ''}
         ${!ADHESIONS_OUVERTES
           ? `<button class="btn btn-outline" style="width:100%;" disabled>🔒 Adhésions fermées</button>`
@@ -212,9 +212,9 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
     <div class="modal-box" style="max-width:460px;width:94%;max-height:85vh;overflow-y:auto;">
       <h3 style="margin:0 0 6px;font-size:16px;">📝 ${escHtml(formule.nom)}</h3>
       ${!userId ? `<p style="font-size:12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px 10px;margin:0 0 10px;">Vous adhérez sans compte Diaspo'Actif — renseignez simplement vos coordonnées ci-dessous. 🔑 <a href="login.html?next=${encodeURIComponent(location.href)}">Déjà un compte ? Connectez-vous</a> pour préremplir automatiquement.</p>` : ''}
-      ${formule.texte_intro ? `<p style="font-size:12.5px;color:var(--muted,#888);margin:0 0 10px;white-space:pre-wrap;">${escHtml(formule.texte_intro)}</p>` : ''}
+      ${formule.texte_intro ? `<p style="font-size:12.5px;color:var(--muted,#888);margin:0 0 10px;white-space:pre-wrap;">${mdBold(escHtml(formule.texte_intro))}</p>` : ''}
       <div id="adh-form-champs" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;"></div>
-      ${formule.conditions_adhesion ? `<div style="font-size:11.5px;color:var(--muted,#888);background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap;">${escHtml(formule.conditions_adhesion)}</div>` : ''}
+      ${formule.conditions_adhesion ? `<div style="font-size:11.5px;color:var(--muted,#888);background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:10px;white-space:pre-wrap;">${mdBold(escHtml(formule.conditions_adhesion))}</div>` : ''}
       ${(formule.reglement_pdf_url || formule.statuts_pdf_url) ? `<div style="font-size:12px;margin-bottom:12px;">
         ${formule.reglement_pdf_url ? `<a href="${escHtml(formule.reglement_pdf_url)}" target="_blank" rel="noopener" style="color:#2563eb;">📄 Règlement intérieur</a>` : ''}
         ${formule.reglement_pdf_url && formule.statuts_pdf_url ? ' · ' : ''}

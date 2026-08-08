@@ -1267,7 +1267,7 @@ async function renderEnrichedColumns() {
       </div>` : ''}
       <div class="pp-side-card">
         <h4><span>📝 À propos</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
-        ${profil.bio ? `<div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-line;">${esc2(profil.bio)}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
+        ${profil.bio ? `<div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-line;">${mdBold(esc2(profil.bio))}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
       </div>
       ${(ciRight.length || owner) ? `<div class="pp-side-card">
         <h4><span>🎯 Centres d'intérêt</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
@@ -1771,7 +1771,7 @@ function renderVisitorProfile() {
 
   // ── Colonne gauche ──
   const bio = profil.bio
-    ? esc(profil.bio).replace(/\n/g,'<br>')
+    ? mdBold(esc(profil.bio)).replace(/\n/g,'<br>')
     : `<span class="pvz-empty">Ce membre n'a pas encore ajouté de présentation.</span>`;
 
   const rs = profil.reseaux_sociaux || {};
@@ -5211,7 +5211,7 @@ function renderIdentity() {
     </div>`;
   if (profil.bio) {
     const long = profil.bio.length > 220;
-    html += `<div class="apropos-text${long?' collapsed':''}" id="apropos-text">${esc(profil.bio)}</div>
+    html += `<div class="apropos-text${long?' collapsed':''}" id="apropos-text">${mdBold(esc(profil.bio))}</div>
       ${long ? `<button class="apropos-more-btn" id="apropos-more" onclick="toggleApropos()">Lire la suite ▾</button>` : ''}`;
   } else if (isOwn) {
     html += `<button class="apropos-add-btn" onclick="openAproposEditor()" style="border:none;text-align:left;padding:4px 0;font-size:13px;color:var(--muted);background:none;cursor:pointer;">✏️ Ajoutez une présentation pour vous faire connaître…</button>`;
