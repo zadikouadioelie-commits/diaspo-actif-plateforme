@@ -41,6 +41,11 @@ html, body{overflow-x:clip !important;}
   .init-3col{grid-template-columns:1fr;}
   #col-left, #col-right{position:static;max-height:none;overflow:visible;}
   .init-card-header{position:static;}
+  /* Sur téléphone, la grille s'empile dans l'ordre du DOM (gauche, centre, droite) — ce qui
+     montrait la colonne "identité/pratique" avant le bandeau photo/cartouche de présentation
+     du centre. On remonte le centre en premier pour qu'un visiteur venant de l'Annuaire voie
+     d'abord qui est cette structure avant les informations secondaires. */
+  #col-center{order:-1;}
 }
 
 /* Cartes des colonnes latérales */
