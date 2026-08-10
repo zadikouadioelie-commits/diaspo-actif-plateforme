@@ -901,8 +901,12 @@ async function applyAuthState() {
       </a>` : '';
     /* Aperçu multi-appareils — outil de contrôle de mise en page (défini en fin de fichier).
        Masqué à l'intérieur de son propre cadre (?apercu=1), sinon l'outil se proposerait
-       récursivement dans sa propre prévisualisation. */
-    const apercuBtnHtml = ((!APERCU_ROLES || APERCU_ROLES.indexOf(user.role) !== -1) && !apercuEstDansLeCadre()) ? `
+       récursivement dans sa propre prévisualisation. Réservé à l'administrateur et au compte
+       diaspo.actif@gmail.com (compte officiel de test, role='initiative' donc pas couvert par
+       le seul contrôle de rôle) — demande explicite du 2026-08-10, ce bouton était visible à
+       tous les comptes connectés jusque-là. */
+    const apercuAutorise = user.role === 'administrateur' || user.email === 'diaspo.actif@gmail.com';
+    const apercuBtnHtml = (apercuAutorise && !apercuEstDansLeCadre()) ? `
       <button type="button" id="apercu-appareils-btn" onclick="openApercuAppareils()" title="Prévisualiser cette page en mobile, tablette et ordinateur" style="cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 12px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);">
         <span style="font-size:14px;">📱</span> Aperçu
       </button>` : '';
