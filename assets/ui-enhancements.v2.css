@@ -487,12 +487,15 @@ input[type="checkbox"], input[type="radio"] {
   outline: 3px solid rgba(255,107,0,.4);
   outline-offset: 2px;
 }
-/* Fallback pour navigateurs sans :has() — bascule via classe JS .checked */
+/* Fallback pour navigateurs sans :has() — bascule via classe JS .checked
+   Bleu (--navy-light) plutôt qu'orange : ces pastilles ne sont que des options de
+   formulaire cochées/décochées, pas des actions principales — l'orange (couleur des CTA
+   du site) les faisait ressortir bien plus que leur importance réelle ne le justifie. */
 .da-pill.checked {
-  background: var(--orange-fonce, #CE4B14);
-  border-color: var(--orange-fonce, #CE4B14);
+  background: var(--navy-light, #1E4F8A);
+  border-color: var(--navy-light, #1E4F8A);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(206,75,20,.35);
+  box-shadow: 0 2px 8px rgba(30,79,138,.35);
 }
 
 /* Variante "switch" (on/off unique, ex: activer/désactiver une option) */
