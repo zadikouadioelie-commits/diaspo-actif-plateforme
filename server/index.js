@@ -13107,8 +13107,13 @@ route("GET", "/api/identity/status", async (req, res) => {
    Appelé AVANT readBody() global (nécessite le corps BRUT pour vérifier la signature). */
 async function handleStripeWebhook(req, res) {
   const { stripe } = require("./stripe-client");
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!stripe || !webhookSecret) {
+  /* Deux destinations webhook distinctes existent côté Stripe (chacune avec sa propre clé de
+     signature) : STRIPE_WEBHOOK_SECRET pour les événements "Votre compte" (Identity, etc.),
+     STRIPE_WEBHOOK_SECRET_CONNECT pour les événements "Comptes connectés" (account.updated des
+     comptes Connect vendeurs) — ajoutée le 2026-08-09 pour que le statut Connect se synchronise
+     enfin en base. On essaie les deux secrets configurés, dans l'ordre, avant de rejeter. */
+  const webhookSecrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_WEBHOOK_SECRET_CONNECT].filter(Boolean);
+  if (!stripe || !webhookSecrets.length) {
     console.log("[Stripe webhook] Non configuré (clé ou secret webhook absent) — événement ignoré.");
     return sendJSON(res, 200, { received: false });
   }
@@ -13118,10 +13123,17 @@ async function handleStripeWebhook(req, res) {
   const rawBody = Buffer.concat(chunks);
 
   let event;
-  try {
-    event = stripe.webhooks.constructEvent(rawBody, req.headers["stripe-signature"], webhookSecret);
-  } catch (e) {
-    SEC.logSecurity("stripe_webhook_bad_signature", { error: e.message });
+  let lastError;
+  for (const secret of webhookSecrets) {
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, req.headers["stripe-signature"], secret);
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  if (!event) {
+    SEC.logSecurity("stripe_webhook_bad_signature", { error: lastError?.message });
     return sendJSON(res, 400, { error: "Signature invalide." });
   }
 
