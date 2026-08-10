@@ -1210,7 +1210,7 @@ function renderInitiativeCard(it){
     ? `<a href="${vitrineHref}" class="ann-card-btn ann-card-btn-vitrine" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>` : '';
 
   return `
-  <div class="ann-card" onclick="window.location.href='${initHref}'" style="cursor:pointer;">
+  <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
     <div class="ann-card-photo" style="position:relative;background:linear-gradient(135deg,${badge.bg},#0D1B2A);">
       <span class="ann-card-initiales">${initiales}</span>
       ${photo ? `<img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.remove()">` : ''}
