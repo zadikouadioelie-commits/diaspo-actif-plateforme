@@ -1270,6 +1270,10 @@ async function renderEnrichedColumns() {
         <h4><span>📝 À propos</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
         ${profil.bio ? `<div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-line;">${mdBold(esc2(profil.bio))}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
       </div>
+      <div class="pp-side-card">
+        <h4><span>🛡️ Indice de fiabilité</span> <span style="font-size:10px;color:var(--muted);font-weight:400;">(cliquer pour le détail)</span></h4>
+        <div id="pp-trust-widget"></div>
+      </div>
       ${(ciRight.length || owner) ? `<div class="pp-side-card">
         <h4><span>🎯 Centres d'intérêt</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
         ${ciRight.length ? ciRight.map(c => `<span class="pp-tag">${esc2(c)}</span>`).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Aucun centre d\'intérêt renseigné.</p>'}
@@ -1314,6 +1318,7 @@ async function renderEnrichedColumns() {
       </div>
     `;
     if (typeof loadProfileSuggestions === 'function') loadProfileSuggestions();
+    ppInitTrustWidget();
     /* Cette colonne est rendue séparément : sans cet appel, l'emplacement
        [data-relation-user] de la carte « Entrer en relation » resterait vide. */
     if (window.initBoutonsRelation) window.initBoutonsRelation(right);
@@ -1411,6 +1416,22 @@ async function renderEnrichedColumns() {
   window.ppToggleAssistant = async function (actif) {
     try { await api('PUT', `/profil/profil-public`, { assistant_actif: actif }); profil.assistant_actif = actif ? 1 : 0; ppRenderAssistant(); } catch (e) { alert(e.message); }
   };
+
+  /* Petite rubrique « Indice de fiabilité » (colonne de droite) : affiche seulement le score
+     et son libellé (mode compact de TrustWidget), le détail complet (critères acquis/manquants)
+     ne s'affiche qu'au clic — demande explicite du 2026-08-10, pour ne pas surcharger le profil
+     public d'entrée de jeu. */
+  function ppInitTrustWidget() {
+    const el = document.getElementById('pp-trust-widget');
+    if (!el || !window.TrustWidget) return;
+    el.style.cursor = 'pointer';
+    TrustWidget.render(profil.id, el, { isMine: owner, compact: true, showReportBtn: false });
+    el.onclick = () => {
+      el.onclick = null;
+      el.style.cursor = 'default';
+      TrustWidget.render(profil.id, el, { isMine: owner, compact: false, showReportBtn: !owner });
+    };
+  }
 
   /* ── Assistant IA du compte (règles/intents, données du profil) ── */
   function ppAssistantReponse(q) {
