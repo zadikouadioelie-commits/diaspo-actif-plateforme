@@ -681,24 +681,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div id="cagnottes" style="display:none;"></div>
     <div id="avancement" style="display:none;"></div>
 
-    <div class="card" style="margin-bottom:20px;" id="paiement-marketplace">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h3 style="margin:0;">💳 Paiements de la boutique (Stripe Connect)</h3>
-        <button class="btn btn-sm btn-outline" onclick="renderPaiementMarketplace()" style="font-size:12px;">↺ Actualiser</button>
-      </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez les paiements réels pour recevoir directement l'argent des ventes de votre boutique. La plateforme prélève une commission sur chaque vente. Vos documents d'entreprise sont vérifiés et hébergés par Stripe — Diaspo'Actif ne les stocke jamais.</p>
-      <div id="paiement-marketplace-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
-    </div>
-
-    <div class="card" style="margin-bottom:20px;" id="verification-organisation">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h3 style="margin:0;">🏢 Vérification de l'organisation</h3>
-        <button class="btn btn-sm btn-outline" onclick="renderVerificationOrganisation()" style="font-size:12px;">↺ Actualiser</button>
-      </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites vérifier votre organisation pour obtenir le badge <strong>🏢 Organisation vérifiée</strong>, visible dans l'Annuaire et les Vitrines. Les documents demandés dépendent du type déclaré à l'inscription.</p>
-      <div id="verification-organisation-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
-    </div>
-
     <div class="card" style="margin-bottom:20px;" id="paiement">
       <h3>Module de paiement — billetterie &amp; cotisations</h3>
       <p>Activez un module de paiement pour vos événements : vente de billets, cotisations, inscriptions, collectes de fonds, dons.</p>
@@ -1809,6 +1791,29 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <button class="btn btn-outline" onclick="document.getElementById('asso-demande-modal').style.display='none'">Annuler</button>
         </div>
       </div>
+    </div>
+
+    <!-- ═══ Blocs transverses (2026-08-09) — volontairement en toute dernière position du
+         conteneur : aucune section de module (display:none togglée par la barre latérale)
+         ne se trouve après eux dans le DOM, donc quel que soit le module actif, son contenu
+         s'affiche TOUJOURS en premier et ces deux cartes toujours-visibles n'apparaissent
+         qu'ensuite, jamais avant. Ne pas les redéplacer plus haut dans ce fichier. ═══ -->
+    <div class="card" style="margin-bottom:20px;" id="paiement-marketplace">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">💳 Paiements de la boutique (Stripe Connect)</h3>
+        <button class="btn btn-sm btn-outline" onclick="renderPaiementMarketplace()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez les paiements réels pour recevoir directement l'argent des ventes de votre boutique. La plateforme prélève une commission sur chaque vente. Vos documents d'entreprise sont vérifiés et hébergés par Stripe — Diaspo'Actif ne les stocke jamais.</p>
+      <div id="paiement-marketplace-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;" id="verification-organisation">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <h3 style="margin:0;">🏢 Vérification de l'organisation</h3>
+        <button class="btn btn-sm btn-outline" onclick="renderVerificationOrganisation()" style="font-size:12px;">↺ Actualiser</button>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites vérifier votre organisation pour obtenir le badge <strong>🏢 Organisation vérifiée</strong>, visible dans l'Annuaire et les Vitrines. Les documents demandés dépendent du type déclaré à l'inscription.</p>
+      <div id="verification-organisation-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
     </div>`;
@@ -3101,8 +3106,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>` : ''}
         </div>
       </div>`;
-    const cockpit = document.getElementById('cockpit');
-    if (cockpit) cockpit.after(qrCard);
+    /* En toute fin du conteneur (2026-08-09) — pas juste après cockpit : cockpit est togglé
+       (display:none quand un autre module est actif), mais cette carte QR ne l'était pas,
+       donc elle s'affichait avant le module réellement actif dès qu'on quittait le cockpit. */
+    content.appendChild(qrCard);
     ProfileQR.render(document.getElementById('init-qr-dash'), {
       initId: init.id,
       initNom: init.nom || 'Initiative',
@@ -3111,6 +3118,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       size: 160,
     });
   }
+
+  /* Cartes toujours-visibles repositionnées en tout dernier (2026-08-09) : 'zones',
+     'stats-impact' et la carte QR ci-dessus sont ajoutées APRÈS le rendu HTML initial — sans
+     ce réordonnancement, ces modules-là afficheraient encore "Paiements boutique"/"Vérification
+     organisation" avant leur propre contenu, alors que tous les autres modules (dans le HTML
+     statique) sont déjà correctement ordonnés par leur simple position dans le fichier. */
+  { const pm = document.getElementById('paiement-marketplace'), vo = document.getElementById('verification-organisation');
+    if (pm) content.appendChild(pm);
+    if (vo) content.appendChild(vo); }
 
   /* ══ ROUTER DE SECTIONS ══ */
   const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','avancement','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
