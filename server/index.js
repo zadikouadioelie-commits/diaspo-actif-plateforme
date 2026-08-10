@@ -17931,7 +17931,7 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   if (!TYPES_ACCRED_VALIDES.includes(type)) return sendJSON(res, 400, { error: "Type ou accréditation invalide." });
   const existing = await db.prepare("SELECT id,statut FROM demandes_accreditation WHERE user_id=? AND type=? ORDER BY created_at DESC LIMIT 1").get(user.id, type);
   if (existing && existing.statut === "en_attente") return sendJSON(res, 409, { error: "Une demande est déjà en cours pour ce type." });
-  if (hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
+  if (await hasAccred(user.id, type)) return sendJSON(res, 409, { error: "Vous possédez déjà cette accréditation." });
   /* Même défaut : sans les parenthèses, .lastInsertRowid est lu sur la promesse et vaut
      undefined — la demande d'accréditation était bien enregistrée, mais son identifiant
      ne revenait jamais au client. */
@@ -18060,7 +18060,7 @@ route("GET", "/api/sondages", async (req, res, params, body, query) => {
 route("POST", "/api/sondages", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!hasAccred(user.id, "mobilisation_active")) return sendJSON(res, 403, { error: "Accréditation « Mobilisation Active » requise." });
+  if (!(await hasAccred(user.id, "mobilisation_active"))) return sendJSON(res, 403, { error: "Accréditation « Mobilisation Active » requise." });
   const { titre, description, type, sous_type, anonyme, cible_roles, cible_pays, date_cloture, questions } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (!questions || !questions.length) return sendJSON(res, 400, { error: "Au moins une question requise." });

@@ -3893,6 +3893,11 @@ document.addEventListener("DOMContentLoaded", ()=>{
     if (!sidebar) {
       const nav = document.querySelector(".topbar .nav");
       if (!nav) return; // rien à ouvrir/fermer sur cette page
+      // Au-delà de 768px, .nav est déjà affichée en permanence dans le topbar (voir
+      // styles.v2.css) : basculer nav-mobile-open n'y a alors aucun effet visible, ce qui
+      // rendait ce bouton flottant silencieusement inopérant sur desktop pour les pages
+      // sans tiroir #sidebar (ex. comptes-lies.html). On le masque donc au-delà de ce seuil.
+      toggle.classList.add("sidebar-toggle--no-sidebar");
       toggle.setAttribute("aria-expanded", "false");
       toggle.addEventListener("click", () => {
         const isOpen = nav.classList.toggle("nav-mobile-open");

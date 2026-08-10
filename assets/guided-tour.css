@@ -182,11 +182,11 @@
   margin-top:12px; width:100%;
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
   font-family:inherit; font-size:12px; font-weight:700;
-  color:var(--gt-accent); background:#EFF6FF; border:1.5px solid #BFDBFE;
+  color:#fff; background:#16A34A; border:1.5px solid #15803D;
   border-radius:9px; padding:8px 10px; cursor:pointer;
   transition:background .15s, border-color .15s, transform .12s;
 }
-.gt-launch-btn:hover{ background:#DBEAFE; border-color:var(--gt-accent); }
+.gt-launch-btn:hover{ background:#15803D; border-color:#166534; }
 .gt-launch-btn:active{ transform:scale(.97); }
 
 /* ---------- Bandeau de reprise ---------- */

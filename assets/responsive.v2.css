@@ -422,6 +422,14 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .sidebar-toggle.sidebar-toggle--has-mobile-nav-alt { display: none; }
 }
 
+/* Pages sans tiroir #sidebar dédié (ex. comptes-lies.html) : au-delà de 768px, .nav est
+   déjà affichée en permanence dans le topbar (voir styles.v2.css), donc le bouton rond
+   n'a plus rien à ouvrir/fermer — le masquer évite un bouton qui semble ne "rien faire".
+   Voir assets/app.js:initSidebarMobile (classe ajoutée uniquement dans ce cas précis). */
+@media (min-width: 769px) {
+  .sidebar-toggle.sidebar-toggle--no-sidebar { display: none; }
+}
+
 /* ─── BREAKPOINT : DESKTOP (1024px - 1279px) ────────────────────── */
 @media (min-width: 1024px) {
   /* Sidebar toujours visible */
@@ -431,6 +439,14 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   /* Grilles 3 colonnes */
   .da-cards-grid { grid-template-columns: repeat(3, 1fr); }
   .da-stats-grid { grid-template-columns: repeat(4, 1fr); }
+
+  /* Le topbar (logo + nav + bloc compte) était plafonné à 1180px (styles.v2.css) quelle
+     que soit la largeur réelle de l'écran : sur un compte avec beaucoup d'éléments à
+     droite (Aperçu, chat, notifications, avatar, badge de rôle, Déconnexion, Mon Associé),
+     la nav n'avait plus assez de place et repassait en résumé sur deux lignes, chevauchant
+     le bouton rond flottant en bas à gauche. On laisse le topbar utiliser toute la largeur
+     disponible à partir du desktop pour que la nav ne se replie plus inutilement. */
+  .topbar-inner { max-width: 1500px; }
 }
 
 /* ─── BREAKPOINT : LARGE DESKTOP (1280px - 1535px) ──────────────── */
@@ -443,6 +459,7 @@ img[loading="lazy"].loaded { background: none; animation: none; }
 /* ─── BREAKPOINT : TRÈS GRAND ÉCRAN 2K (1536px - 2559px) ─────────  */
 @media (min-width: 1536px) {
   .container { max-width: 1400px; padding: 0 40px; }
+  .topbar-inner { max-width: 1800px; }
   .da-content { max-width: 1400px; }
   body { font-size: 15px; }
   .da-cards-grid { grid-template-columns: repeat(4, 1fr); }
