@@ -102,25 +102,6 @@
     <main class="content">
       <div id="dashboard-error" style="display:none;" class="notice" style="color:#D33;"></div>
 
-      <!-- ══ KPI BAR — toujours visible ══ -->
-      <div id="kpi-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;padding:16px 20px;background:var(--navy);border-radius:14px;color:#fff;">
-        <div style="text-align:center;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">💰 Revenus mensuels (MRR)</div>
-          <div id="kpi-mrr" style="font-size:28px;font-weight:800;">—</div>
-          <div id="kpi-mrr-arr" style="font-size:11px;opacity:.6;margin-top:2px;"></div>
-        </div>
-        <div style="text-align:center;border-left:1px solid rgba(255,255,255,.2);border-right:1px solid rgba(255,255,255,.2);">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">📈 Utilisateurs actifs (MAU)</div>
-          <div id="kpi-mau" style="font-size:28px;font-weight:800;">—</div>
-          <div id="kpi-mau-dau" style="font-size:11px;opacity:.6;margin-top:2px;"></div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🌍 Croissance internationale</div>
-          <div id="kpi-pays" style="font-size:28px;font-weight:800;">—</div>
-          <div id="kpi-pays-sub" style="font-size:11px;opacity:.6;margin-top:2px;"></div>
-        </div>
-      </div>
-
       <!-- VUE D'ENSEMBLE -->
       <section id="section-vue-ensemble">
         <div class="flex-between" style="margin-bottom:24px;">
@@ -4526,6 +4507,27 @@
           </div>
         </div>
       </section>
+
+      <!-- ══ KPI BAR — toujours visible (2026-08-09 : déplacée en toute fin, elle s'affichait
+           auparavant AVANT le contenu de chaque module puisqu'elle précédait toutes les
+           section id="section-..." dans le DOM sans jamais être togglée elle-même) ══ -->
+      <div id="kpi-bar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;padding:16px 20px;background:var(--navy);border-radius:14px;color:#fff;">
+        <div style="text-align:center;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">💰 Revenus mensuels (MRR)</div>
+          <div id="kpi-mrr" style="font-size:28px;font-weight:800;">—</div>
+          <div id="kpi-mrr-arr" style="font-size:11px;opacity:.6;margin-top:2px;"></div>
+        </div>
+        <div style="text-align:center;border-left:1px solid rgba(255,255,255,.2);border-right:1px solid rgba(255,255,255,.2);">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">📈 Utilisateurs actifs (MAU)</div>
+          <div id="kpi-mau" style="font-size:28px;font-weight:800;">—</div>
+          <div id="kpi-mau-dau" style="font-size:11px;opacity:.6;margin-top:2px;"></div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:4px;">🌍 Croissance internationale</div>
+          <div id="kpi-pays" style="font-size:28px;font-weight:800;">—</div>
+          <div id="kpi-pays-sub" style="font-size:11px;opacity:.6;margin-top:2px;"></div>
+        </div>
+      </div>
 
     </main>
   </div>
