@@ -1177,6 +1177,47 @@ function daBadgeOrigine(o, style) {
     <span style="font-size:14px;line-height:1;">${daDrapeau(premier)}</span>${escapeHtml(org.pays)}</span>`;
 }
 
+/* ── Abonnement à un compte Initiative/Collectivité/Institutionnel depuis une cartouche
+   (Annuaire, fiche) — un même bouton, routé vers le bon endpoint selon le type de compte.
+   `type` : 'initiative' (table abonnements) | 'collectivite' (table abonnements_collectivite,
+   toggle en un seul appel) | 'user' (table user_follows générique, Institutionnel/Officiel/
+   Diaspo'Actif). L'état affiché avant le premier clic n'est pas pré-chargé (l'annuaire ne
+   renvoie pas encore ce statut par compte) : un clic sur un compte déjà suivi le réaffirme
+   simplement, sans erreur visible, et le bouton devient ensuite correctement désabonnable. */
+async function daToggleSuivre(type, id, btn){
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+  const estAbonne = btn.dataset.abonne === '1';
+  btn.disabled = true;
+  try {
+    let abonne;
+    if (type === 'initiative') {
+      try {
+        await api(estAbonne ? 'DELETE' : 'POST', `/initiatives/${id}/suivre`);
+        abonne = !estAbonne;
+      } catch (e) {
+        /* 409 = déjà abonné : l'état visé est de toute façon atteint, pas une vraie erreur.
+           Toute autre erreur (403 auto-abonnement, 401, 404…) doit rester visible — la
+           confondre avec un succès afficherait "Abonné" alors que rien n'a été enregistré. */
+        if (e.status === 409) abonne = true; else throw e;
+      }
+    } else if (type === 'collectivite') {
+      const r = await api('POST', `/collectivites/${id}/abonnement`);
+      abonne = !!r.abonne;
+    } else {
+      await api(estAbonne ? 'DELETE' : 'POST', `/users/${id}/suivre`);
+      abonne = !estAbonne;
+    }
+    btn.dataset.abonne = abonne ? '1' : '0';
+    btn.textContent = abonne ? '✓ Abonné' : "🔔 S'abonner";
+    btn.classList.toggle('ann-card-btn-abonne', abonne);
+  } catch (e) {
+    alert(e.message || "Erreur lors de l'abonnement.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+window.daToggleSuivre = daToggleSuivre;
+
 function renderInitiativeCard(it){
   const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
   /* Seulement les visuels chargés par le compte lui-même. À défaut, ses initiales sur la
@@ -1242,6 +1283,7 @@ function renderInitiativeCard(it){
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
+        ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
             ? `<a href="dashboard-initiative.html#adhesions-init" class="ann-card-btn ann-card-btn-adherer" onclick="event.stopPropagation()">Gérer les adhésions</a>`
@@ -1455,8 +1497,11 @@ async function initAnnuaire(){
   function renderOrganismeCard(o) {
     const loc = [o.ville, o.pays].filter(Boolean).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(o.id)}`;
-    const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : 'COLLECTIVITÉ';
+    const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : (o.role === 'institutionnel' || o.role === 'officiel') ? 'INSTITUTION' : 'COLLECTIVITÉ';
     const isOwn = !!(ME && ME.id === o.id);
+    const abonnementType = o.role === 'collectivite' ? 'collectivite' : 'user';
+    const abonnerBtn = (!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER)
+      ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('${abonnementType}', ${o.id}, this)">🔔 S'abonner</button>` : '';
     // Le nom de l'organisme/institution prime sur le nom personnel du gestionnaire du compte,
     // qui n'apparait qu'en information secondaire discrete (cf. renderVisitorProfile, meme regle).
     const nomAffiche = o.nom_institution || o.nom;
@@ -1472,6 +1517,7 @@ async function initAnnuaire(){
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
         <div class="ann-card-foot">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
+          ${abonnerBtn}
         </div>
       </div>
     </div>`;
@@ -1880,7 +1926,7 @@ async function initFicheInitiative(){
               ${it.owner_user_id
                 ? `<a class="btn btn-orange" href="messagerie.html?with=${it.owner_user_id}">Contacter via la plateforme</a>`
                 : `<button class="btn btn-orange" disabled title="Aucun responsable assigné pour cette initiative démo">Contacter via la plateforme</button>`}
-              <button class="btn btn-outline">S'abonner</button>
+              <button class="btn btn-outline" data-abonne="0" onclick="daToggleSuivre('initiative', ${it.id}, this)">S'abonner</button>
             </div>
           </div>
         </div>

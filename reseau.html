@@ -213,6 +213,8 @@
     <div class="rtab-bar">
       <button class="rtab active" data-tab="annuaire">🔍 Annuaire</button>
       <button class="rtab" data-tab="mon-reseau" id="rtabbtn-mon-reseau">🏢 Mon Réseau</button>
+      <button class="rtab" data-tab="abonnes" id="rtabbtn-abonnes">❤️ Abonnés</button>
+      <button class="rtab" data-tab="abonnements" id="rtabbtn-abonnements">👥 Abonnements</button>
       <button class="rtab" data-tab="demandes" id="rtabbtn-demandes">📬 Demandes <span class="rtab-badge" id="badge-demandes" style="display:none;"></span></button>
       <button class="rtab" data-tab="listes" id="rtabbtn-listes">📋 Mes Listes</button>
       <button class="rtab" data-tab="stats">📊 Statistiques</button>
@@ -227,6 +229,16 @@
     <!-- TAB: MON RÉSEAU -->
     <div class="rtab-pane" id="tab-mon-reseau">
       <div id="mon-reseau-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: ABONNÉS (comptes abonnés à moi) -->
+    <div class="rtab-pane" id="tab-abonnes">
+      <div id="abonnes-content"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <!-- TAB: ABONNEMENTS (comptes auxquels je suis abonné) -->
+    <div class="rtab-pane" id="tab-abonnements">
+      <div id="abonnements-content"><div class="notice">Chargement…</div></div>
     </div>
 
     <!-- TAB: DEMANDES -->
@@ -839,9 +851,10 @@ async function loadMonReseauTab(){
         </div>
         <div class="init-card-footer">
           <div class="init-card-stat">👍 ${i.nb_recommandations||0} · ${escH(i.domaine||'—')}</div>
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="star-btn ${i.mise_en_avant?'on':''}" title="Mettre en avant" onclick="toggleMiseEnAvant(${i._aff_id||0},${!i.mise_en_avant},this)">⭐</button>
             <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
+            ${i.owner_user_id?`<a class="btn-contact" href="messagerie.html?with=${i.owner_user_id}" style="text-decoration:none;">💬 Contacter</a>`:''}
             <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="retirerDuReseau(${i.id},'${escH(i.nom||'')}')">Retirer</button>
           </div>
         </div>
@@ -864,7 +877,10 @@ async function loadMonReseauTab(){
         </div>
         <div class="init-card-footer">
           <div></div>
-          <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-contact" onclick="voirFiche(${i.id})">Voir</button>
+            ${i.owner_user_id?`<a class="btn-contact" href="messagerie.html?with=${i.owner_user_id}" style="text-decoration:none;">💬 Contacter</a>`:''}
+          </div>
         </div>
       </div>`).join('');
       html+='</div>';
@@ -872,6 +888,53 @@ async function loadMonReseauTab(){
     el.innerHTML=html;
   }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
 }
+
+/* ── ABONNÉS / ABONNEMENTS ──
+   Réutilise l'API déjà construite pour l'onglet équivalent du profil public
+   (GET /api/profil/:id/abonnes et /suivis), appliquée au compte connecté.
+   Distinct de « Mon Réseau » ci-dessus (affiliation mutuelle par acceptation) :
+   un abonnement est à sens unique, sans acceptation requise. */
+async function loadAbonnesEtAbonnementsCard(u){
+  const nom=[u.prenom,u.nom].filter(Boolean).join(' ')||u.nom_institution||'—';
+  const roleLabel={individu:'Membre',utilisateur:'Membre',initiative:'Initiative',collectivite:'Collectivité',institutionnel:'Institution',administrateur:"Diaspo'Actif"}[u.role]||u.role||'Membre';
+  return `<div class="init-net-card">
+    <div class="init-card-head">
+      <div class="init-logo-box">${u.photo_url?`<img src="${escH(u.photo_url)}" alt="">`:(nom||'?')[0]}</div>
+      <div class="init-card-meta">
+        <div class="init-card-nom">${escH(nom)}</div>
+        <div class="init-card-type">${escH(roleLabel)}</div>
+        <div class="init-card-loc">📍 ${escH([u.ville,u.pays].filter(Boolean).join(', ')||'—')}</div>
+      </div>
+    </div>
+    <div class="init-card-footer">
+      <div class="init-card-stat">${escH(u.titre_pro||'')}</div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-contact" onclick="window.location.href='profil.html?id=${u.id}'">Voir</button>
+        <a class="btn-contact" href="messagerie.html?with=${u.id}" style="text-decoration:none;">💬 Contacter</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadAbonnementsTab(type,contentId,titre,icone){
+  const el=document.getElementById(contentId);
+  if(!ME){el.innerHTML='<div class="notice">Connectez-vous pour accéder à cette rubrique.</div>';return;}
+  el.innerHTML='<div class="notice">Chargement…</div>';
+  try{
+    const data=await apiCall('GET',`/profil/${ME.id}/${type}?page=1`);
+    const list=data[type]||[];
+    if(!list.length){
+      el.innerHTML=`<div class="rnet-empty"><div class="e-icon">${icone}</div><div class="e-title">Aucun compte pour l'instant</div><div class="e-sub">${type==='abonnes'?"Les comptes qui s'abonnent à vous apparaîtront ici — vous pourrez leur écrire directement.":"Les comptes auxquels vous vous abonnez (Initiatives, Collectivités, Institutions…) apparaîtront ici."}</div></div>`;
+      return;
+    }
+    const cartes=await Promise.all(list.map(loadAbonnesEtAbonnementsCard));
+    el.innerHTML=`<div style="margin-bottom:16px;"><h2 style="margin:0;">${icone} ${titre} (${data.total||list.length})</h2>
+      <div style="font-size:.82rem;color:var(--muted);margin-top:4px;">${type==='abonnes'?"Un compte abonné à vous peut vous être contacté directement, sans demande préalable.":"Un compte que vous suivez sans qu'il vous suive en retour nécessite une demande de mise en contact."}</div></div>
+      <div class="init-net-grid">${cartes.join('')}</div>`;
+  }catch(e){el.innerHTML=`<div class="notice" style="color:#D33;">${escH(e.message)}</div>`;}
+}
+const loadAbonnesTabReseau=()=>loadAbonnementsTab('abonnes','abonnes-content','Abonnés','❤️');
+const loadAbonnementsTabReseau=()=>loadAbonnementsTab('suivis','abonnements-content','Abonnements','👥');
 
 /* ── DEMANDES ── */
 async function loadDemandesTab(){
@@ -1109,6 +1172,8 @@ document.querySelectorAll('.rtab').forEach(btn=>{
     const tab=btn.dataset.tab;
     document.getElementById('tab-'+tab).classList.add('active');
     if(tab==='mon-reseau') loadMonReseauTab();
+    else if(tab==='abonnes') loadAbonnesTabReseau();
+    else if(tab==='abonnements') loadAbonnementsTabReseau();
     else if(tab==='demandes') loadDemandesTab();
     else if(tab==='stats') loadStatsTab();
     else if(tab==='profil-reseau') loadProfilReseauTab();
