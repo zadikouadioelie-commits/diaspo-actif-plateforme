@@ -1015,6 +1015,10 @@ const COLONNES_MIGRATION = [
     ['users', 'penalite_disciplinaire', 'INTEGER DEFAULT 0'],
     // Module Premium — délai de grâce après échec de prélèvement (même pattern que pub_abonnements)
     ['user_accreditations', 'grace_until', 'TEXT'],
+    // Module Parrainage Initiative -50% — traçabilité générique multi-mécanisme, miroir des
+    // deux mêmes colonnes ajoutées côté SQLite via MIGRATIONS dans server/db.js.
+    ['accred_paiements', 'reduction_pct_appliquee', 'REAL DEFAULT 0'],
+    ['user_accreditations', 'reduction_pct_appliquee', 'REAL DEFAULT 0'],
     // Rubrique Vitrines — date de dernière modification publique de la vitrine
     ['initiatives', 'updated_at', 'TEXT'],
     // Module Adhésions — ouverture/fermeture globale (miroir de l'ALTER db.js)

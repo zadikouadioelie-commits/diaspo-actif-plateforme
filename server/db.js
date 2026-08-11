@@ -1705,6 +1705,12 @@ const MIGRATIONS = [
   ["users", "penalite_disciplinaire INTEGER DEFAULT 0"],
   // Module Premium — délai de grâce après échec de prélèvement (même pattern que pub_abonnements)
   ["user_accreditations", "grace_until TEXT"],
+  // Module Parrainage Initiative -50% — traçabilité générique multi-mécanisme (D'A +
+  // parrainage, et tout futur mécanisme) : "ce Premium a-t-il été payé à 100% ou réduit ?".
+  // accred_paiements.montant reste TOUJOURS le prix plein (cf. commentaire à sa création,
+  // POST /api/accreditations/:type/payer) donc inutilisable seul pour cette question.
+  ["accred_paiements", "reduction_pct_appliquee REAL DEFAULT 0"],
+  ["user_accreditations", "reduction_pct_appliquee REAL DEFAULT 0"],
   // Rubrique Vitrines — date de dernière modification publique de la vitrine (tri "Dernière mise à jour")
   ["initiatives", "updated_at TEXT"],
 ];
@@ -5456,6 +5462,64 @@ db.exec(`
       FOREIGN KEY(code_id) REFERENCES da_codes_adhesion(id)
     );
     CREATE INDEX IF NOT EXISTS idx_da_audit_code ON da_codes_audit_log(code_id);
+  `);
+
+  /* ===== PARRAINAGE INITIATIVE -50% =====
+     Un compte Initiative Premium actif ET payé a 100% (jamais lui-meme reduit - voir
+     user_accreditations.reduction_pct_appliquee, colonne generique ajoutee via MIGRATIONS
+     plus bas, valable pour ce mecanisme comme pour tout futur mecanisme d'avantage) sert de
+     reference pour un AUTRE compte du MEME proprietaire (meme comptes_lies_membres.groupe_id
+     - systeme deja existant, jamais un parrainage ouvert entre inconnus). Illimite en nombre
+     de beneficiaires par reference, contrairement aux Codes Adhesion D'A : la portee est deja
+     bornee par la taille du groupe de comptes lies du proprietaire, pas besoin d'un plafond
+     configurable supplementaire. Duree figee au moment de la reservation (consommer, cf.
+     server/avantages-premium.js), appliquee a partir de l'activation reelle (webhook) -
+     jamais recalculee si la reference se reabonne ensuite. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS parrainage_initiative_utilisations (
+      id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+      reference_user_id         INTEGER NOT NULL,
+      reference_da_id           TEXT NOT NULL,
+      reference_accred_id       INTEGER NOT NULL,
+      beneficiaire_da_id        TEXT NOT NULL,
+      beneficiaire_source       TEXT NOT NULL CHECK(beneficiaire_source IN ('user','initiative')),
+      beneficiaire_user_id      INTEGER NOT NULL,
+      beneficiaire_role         TEXT,
+      accred_id                 INTEGER,
+      accred_paiement_id        INTEGER,
+      type_tarif                TEXT,
+      montant_avant             REAL,
+      montant_apres             REAL,
+      reduction_pct             REAL NOT NULL DEFAULT 50,
+      duree_jours_reservee      INTEGER,
+      stripe_coupon_id          TEXT,
+      stripe_subscription_id    TEXT,
+      statut                    TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','active','expiree','annulee')),
+      relance_3_mois_envoyee_le TEXT,
+      date_redemption           TEXT DEFAULT (datetime('now')),
+      date_activation           TEXT,
+      date_fin_avantage         TEXT,
+      created_at                TEXT DEFAULT (datetime('now')),
+      updated_at                TEXT DEFAULT (datetime('now')),
+      UNIQUE(reference_user_id, beneficiaire_da_id),
+      FOREIGN KEY(reference_user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_parr_init_reference ON parrainage_initiative_utilisations(reference_user_id);
+    CREATE INDEX IF NOT EXISTS idx_parr_init_beneficiaire ON parrainage_initiative_utilisations(beneficiaire_user_id);
+    CREATE INDEX IF NOT EXISTS idx_parr_init_statut ON parrainage_initiative_utilisations(statut);
+    CREATE INDEX IF NOT EXISTS idx_parr_init_fin ON parrainage_initiative_utilisations(date_fin_avantage);
+
+    CREATE TABLE IF NOT EXISTS parrainage_initiative_journal (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      utilisation_id INTEGER NOT NULL,
+      action         TEXT NOT NULL,
+      acteur_id      INTEGER,
+      acteur_nom     TEXT,
+      details        TEXT,
+      created_at     TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(utilisation_id) REFERENCES parrainage_initiative_utilisations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_parr_init_journal ON parrainage_initiative_journal(utilisation_id);
   `);
 
   /* ===== REJOINDRE UNE INITIATIVE (benevole / partenaire) =====

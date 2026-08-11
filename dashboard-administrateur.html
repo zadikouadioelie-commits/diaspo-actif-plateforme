@@ -3302,6 +3302,7 @@
             <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('perso')" id="pa-tab-perso">🤝 Tarifs personnalisés</button>
             <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('simulateur')" id="pa-tab-simulateur">🧮 Simulateur</button>
             <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('codesda')" id="pa-tab-codesda">🎟️ Codes Adhésion D'A</button>
+            <button class="btn btn-sm btn-outline" onclick="premiumAdminOuvrir('parrainage')" id="pa-tab-parrainage">🤝 Parrainage Initiative</button>
           </div>
 
           <div id="pa-panel-dashboard">
@@ -3429,6 +3430,39 @@
                   <th style="padding:10px 8px;text-align:center;">Actions</th>
                 </tr></thead>
                 <tbody id="pa-cda-table"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="pa-panel-parrainage" style="display:none;">
+            <div class="grid grid-4" style="gap:14px;margin-bottom:18px;">
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Avantages accordés</div><div id="pa-parr-kpi-total" style="font-size:22px;font-weight:800;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Actifs</div><div id="pa-parr-kpi-actif" style="font-size:22px;font-weight:800;color:#059669;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Expirent sous 3 mois</div><div id="pa-parr-kpi-expire3" style="font-size:22px;font-weight:800;color:#b45309;">—</div></div>
+              <div class="card"><div style="font-size:12px;color:var(--muted);">Expirés</div><div id="pa-parr-kpi-expiree" style="font-size:22px;font-weight:800;">—</div></div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+              <input id="pa-parr-search" type="text" placeholder="Rechercher un bénéficiaire ou une référence…" oninput="paLoadParrainage()" style="flex:1;min-width:220px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+              <select id="pa-parr-statut" onchange="paLoadParrainage()" style="padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;">
+                <option value="">Tous les statuts</option>
+                <option value="en_attente">En attente</option>
+                <option value="active">Actif</option>
+                <option value="expiree">Expiré</option>
+                <option value="annulee">Annulé</option>
+              </select>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--surface);border-bottom:2px solid var(--border);">
+                  <th style="padding:10px 14px;text-align:left;">Bénéficiaire</th>
+                  <th style="padding:10px 8px;text-align:left;">Compte de référence</th>
+                  <th style="padding:10px 8px;text-align:center;">Réduction</th>
+                  <th style="padding:10px 8px;text-align:center;">Prix normal → réduit</th>
+                  <th style="padding:10px 8px;text-align:center;">Fenêtre</th>
+                  <th style="padding:10px 8px;text-align:center;">Statut</th>
+                  <th style="padding:10px 8px;text-align:center;">Transaction</th>
+                </tr></thead>
+                <tbody id="pa-parr-table"></tbody>
               </table>
             </div>
           </div>
@@ -6613,7 +6647,7 @@ function showAccredHub(id) {
 
 /* ── Module Premium : gestion des abonnements ── */
 function premiumAdminOuvrir(tab) {
-  ['dashboard','paliers','promotions','perso','simulateur','codesda'].forEach(t => {
+  ['dashboard','paliers','promotions','perso','simulateur','codesda','parrainage'].forEach(t => {
     const panel = document.getElementById('pa-panel-' + t);
     const btn = document.getElementById('pa-tab-' + t);
     if (panel) panel.style.display = t === tab ? '' : 'none';
@@ -6624,6 +6658,34 @@ function premiumAdminOuvrir(tab) {
   else if (tab === 'promotions') paLoadPromotions();
   else if (tab === 'perso') paLoadPerso();
   else if (tab === 'codesda') paLoadCodesDA();
+  else if (tab === 'parrainage') paLoadParrainage();
+}
+
+/* ── Parrainage Initiative -50% — consultation seule (pas d'édition, cf. cahier des
+   charges : les admins consultent, ils ne modifient pas une réduction déjà accordée). ── */
+async function paLoadParrainage() {
+  const q = (document.getElementById('pa-parr-search')?.value || '').trim();
+  const statut = document.getElementById('pa-parr-statut')?.value || '';
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (statut) params.set('statut', statut);
+  const r = await api("GET", "/admin/parrainage-initiative?" + params.toString()).catch(() => ({}));
+  const rows = r.utilisations || [];
+  document.getElementById('pa-parr-kpi-total').textContent = r.kpi?.total ?? '—';
+  document.getElementById('pa-parr-kpi-actif').textContent = r.kpi?.active ?? '—';
+  document.getElementById('pa-parr-kpi-expire3').textContent = r.kpi?.expire_sous_3_mois ?? '—';
+  document.getElementById('pa-parr-kpi-expiree').textContent = r.kpi?.expiree ?? '—';
+  const statutLabel = { en_attente: '⏳ En attente', active: '✅ Actif', expiree: '⏹️ Expiré', annulee: '❌ Annulé' };
+  document.getElementById('pa-parr-table').innerHTML = rows.length ? rows.map(u => `
+    <tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:9px 14px;">${esc(u.beneficiaire_nom || '—')}<br><span style="font-size:11px;color:var(--muted);">${esc(u.beneficiaire_email || '')}</span></td>
+      <td style="padding:9px 8px;">${esc(u.reference_nom || '—')}<br><span style="font-size:11px;color:var(--muted);">${esc(u.reference_email || '')}</span></td>
+      <td style="padding:9px 8px;text-align:center;">-${u.reduction_pct ?? 50}%</td>
+      <td style="padding:9px 8px;text-align:center;">${u.montant_avant != null ? Number(u.montant_avant).toFixed(2) + ' €' : '—'} → ${u.montant_apres != null ? Number(u.montant_apres).toFixed(2) + ' €' : '—'}</td>
+      <td style="padding:9px 8px;text-align:center;font-size:11.5px;">${u.date_activation ? new Date(u.date_activation.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'} → ${u.date_fin_avantage ? new Date(u.date_fin_avantage.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</td>
+      <td style="padding:9px 8px;text-align:center;">${statutLabel[u.statut] || u.statut}</td>
+      <td style="padding:9px 8px;text-align:center;font-size:11.5px;">#${u.accred_paiement_id || '—'}</td>
+    </tr>`).join('') : `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted);">Aucun avantage de parrainage.</td></tr>`;
 }
 
 async function paLoadDashboard() {

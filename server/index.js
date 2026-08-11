@@ -4408,10 +4408,18 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     return sendJSON(res, 400, { error: "Ce type de formule n'est pas disponible." });
   }
   // Tarif calculé par le moteur de tarification Premium (catégorie/taille/promotion/tarif
-  // personnalisé/avantage d'adhésion) — jamais le tarif de base brut, cf. calculerTarifPremium.
-  // code_da est une INDICATION cliente, jamais une source de confiance : revalidé ici.
+  // personnalisé/avantage d'adhésion/parrainage) — jamais le tarif de base brut, cf.
+  // calculerTarifPremium. code_da et parrainage_ds_id sont des INDICATIONS clientes, jamais
+  // une source de confiance : revalidées ici. stripe est requis avant le calcul (pas après,
+  // comme c'était le cas jusqu'ici) car le fournisseur de parrainage interroge Stripe pour
+  // connaître la durée restante réelle de l'abonnement de référence.
+  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
   const codeDA = (body.code_da || '').trim().toUpperCase() || null;
-  const calcule = await calculerTarifPremium(def, user, { code_da: codeDA });
+  const parrainageDsId = (body.parrainage_ds_id || '').trim().toUpperCase() || null;
+  const calcule = await calculerTarifPremium(def, user, {
+    code_da: codeDA, parrainage_ds_id: parrainageDsId, type_tarif: typeTarif, stripeClient: stripe,
+  });
   if (!calcule) return sendJSON(res, 400, { error: "Aucun tarif disponible pour votre type de compte." });
 
   /* price_data.unit_amount reste TOUJOURS au prix plein : en mode "subscription", une
@@ -4426,13 +4434,14 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
   const dejaActive = await hasAccreditation(user.id, def.type);
   if (dejaActive) return sendJSON(res, 400, { error: "Vous êtes déjà abonné." });
 
-  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
-  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
-
+  // reduction_pct_appliquee : traçabilité générique (D'A + parrainage + tout futur
+  // mécanisme) documentant qu'une réduction a été appliquée via coupon, même si tarif.montant
+  // reste le prix plein (cf. commentaire ci-dessus) — source de vérité de la règle anti-chaîne.
+  const reductionAppliquee = calcule.avantage_da?.valide ? Number(calcule.avantage_da.reduction_pct) : 0;
   const paiementId = (await db.prepare(`
-    INSERT INTO accred_paiements (user_id, accred_id, type_tarif, montant, devise, statut)
-    VALUES (?,?,?,?,?,'en_attente')
-  `).run(user.id, def.id, typeTarif, tarif.montant, tarif.devise || 'EUR')).lastInsertRowid;
+    INSERT INTO accred_paiements (user_id, accred_id, type_tarif, montant, devise, statut, reduction_pct_appliquee)
+    VALUES (?,?,?,?,?,'en_attente',?)
+  `).run(user.id, def.id, typeTarif, tarif.montant, tarif.devise || 'EUR', reductionAppliquee)).lastInsertRowid;
 
   const origin = getOrigin(req);
   const interval = typeTarif === 'annuel' ? 'year' : 'month';
@@ -4486,12 +4495,18 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     await db.prepare(`UPDATE accred_paiements SET statut='echoue' WHERE id=?`).run(paiementId);
     /* Action compensatoire : un paiement qui n'aboutit jamais en Checkout ne doit pas
        consommer silencieusement le compteur du code — uniquement si CETTE tentative avait
-       vraiment incrémenté le compteur (pas une simple relecture d'une réservation existante). */
+       vraiment incrémenté le compteur (pas une simple relecture d'une réservation existante).
+       Dispatch sur le fournisseur : le parrainage n'a pas de compteur à décrémenter
+       (illimité par construction), juste la ligne de réservation à annuler. */
     if (reservationDA?.fraichementReserve) {
       try {
-        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(calcule.avantage_da.code_id);
-        await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
-      } catch (e2) { console.error('[codes-da] compensation echec paiement', e2.message); }
+        if (calcule.avantage_da.fournisseur === 'code_adhesion_da') {
+          await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(calcule.avantage_da.code_id);
+          await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
+        } else if (calcule.avantage_da.fournisseur === 'parrainage_initiative') {
+          await db.prepare(`UPDATE parrainage_initiative_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
+        }
+      } catch (e2) { console.error('[avantages-premium] compensation echec paiement', e2.message); }
     }
     return sendJSON(res, 500, SEC.safeError(e, "accred-payer"));
   }
@@ -4532,6 +4547,58 @@ route("POST", "/api/premium/code-adhesion/verifier", async (req, res, params, bo
     montant_annuel_avant: calcule.montant_annuel_avant ?? calcule.montant_annuel,
     date_fin_prevue: avantage.date_fin_avantage,
     premiere_utilisation: !!avantage.date_premiere_utilisation,
+  });
+});
+
+/* ── Parrainage Initiative -50% — vérification d'un DS-ID de référence avant paiement ──
+   Authentifiée (contrairement à /code-adhesion/verifier) : la comparaison de propriété
+   commune (comptes_lies_membres.groupe_id) exige de connaître l'appelant. Rate-limitée en
+   double (IP + DS-ID haché, jamais en clair) comme POST /api/comptes-lies/lier — seule
+   surface d'énumération d'un DS-ID saisi par un tiers pour vérifier un statut Premium.
+   Réponse 200 même en cas d'échec, jamais d'information sur le propriétaire du DS-ID
+   au-delà de l'éligibilité. Purement en lecture (l'appel Stripe est un retrieve, jamais un
+   create) : resoudreAvantagesPremium n'a aucun effet de bord côté écriture. */
+route("POST", "/api/premium/parrainage/verifier", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ip = SEC.clientIp(req);
+  const dsId = String(body?.ds_id || '').trim().toUpperCase();
+  const dsIdHash = crypto.createHash('sha256').update(dsId).digest('hex');
+
+  const ipLimit = SEC.rateLimit(`parrainage_dsid:ip:${ip}`, 15, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const codeLimit = SEC.rateLimit(`parrainage_dsid:code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeLimit.retryAfter}s.` });
+  const ipGuard = await dbLoginGuard(`parrainage_ip:${ip}`, 15, 15 * 60 * 1000);
+  if (!ipGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipGuard.retryAfter}s.` });
+  const codeGuard = await dbLoginGuard(`parrainage_code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeGuard.retryAfter}s.` });
+
+  if (dsId.length !== 10) {
+    dbLoginRecord(`parrainage_ip:${ip}`, false);
+    return sendJSON(res, 200, { valide: false, raison: 'format_invalide' });
+  }
+
+  const accredType = user.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne';
+  const def = await getAccredDef(accredType);
+  if (!def) return sendJSON(res, 200, { valide: false, raison: 'offre_indisponible' });
+
+  const { stripe } = require("./stripe-client");
+  const calcule = await calculerTarifPremium(def, user, { parrainage_ds_id: dsId, type_tarif: 'annuel', stripeClient: stripe });
+  const avantage = calcule?.avantage_da;
+  dbLoginRecord(`parrainage_ip:${ip}`, !!avantage?.valide);
+  dbLoginRecord(`parrainage_code:${dsIdHash}`, !!avantage?.valide);
+
+  if (!avantage) return sendJSON(res, 200, { valide: false, raison: 'inconnu' });
+  if (!avantage.valide) return sendJSON(res, 200, { valide: false, raison: avantage.raison });
+
+  return sendJSON(res, 200, {
+    valide: true,
+    reduction_pct: avantage.reduction_pct,
+    duree_jours: avantage.duree_jours,
+    montant_annuel: calcule.montant_annuel,
+    montant_annuel_avant: calcule.montant_annuel_avant ?? calcule.montant_annuel,
+    devise: calcule.devise,
   });
 });
 
@@ -5668,7 +5735,10 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
-  // Collectivités et Diaspo'Actif (Administrateur) — organismes institutionnels, absents de la table initiatives
+  // Collectivités, comptes Institutionnel/Officiel et Diaspo'Actif (Administrateur) — organismes
+  // institutionnels, absents de la table initiatives. Les rôles 'institutionnel'/'officiel'
+  // manquaient ici : ces comptes existent (dashboard-institutionnel.html) mais n'apparaissaient
+  // jamais dans l'Annuaire, faute d'être inclus dans ce filtre de rôle.
   let organismes = (query.type && !['Collectivités','Institutions'].includes(query.type)) ? [] : await db.prepare(
     /* origine1/2 et pays_origine_institution accompagnent chaque organisme : sans eux, la
        cartouche ne pouvait afficher aucune origine pour les collectivités, alors qu'elle
@@ -5676,7 +5746,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     `SELECT id, nom, nom_institution, type_organisme, ville, pays, photo_url, banner_url, bio, role,
        nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
        origine1, origine2, pays_origine_institution, nationalite1, nationalite2
-     FROM users WHERE role IN ('collectivite','administrateur') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
+     FROM users WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -10000,9 +10070,15 @@ route("GET", "/api/messages/non-lus", async (req, res) => {
 route("POST", "/api/initiatives/:id/suivre", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (user.role !== "utilisateur") return sendJSON(res, 403, { error: "Seuls les comptes Utilisateur peuvent suivre une initiative." });
-  const init = await db.prepare("SELECT id, abonnes FROM initiatives WHERE id = ?").get(params.id);
+  const init = await db.prepare("SELECT id, abonnes, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  /* Ouvert à tous les types de comptes (Initiative, Collectivité, Institutionnel…) depuis le
+     2026-08-11 : le bouton "S'abonner" de l'Annuaire/profil public doit fonctionner quel que
+     soit le compte qui clique, pas seulement les comptes Utilisateur. Seul l'auto-abonnement
+     à sa propre initiative reste interdit. */
+  if (init.owner_user_id && Number(init.owner_user_id) === Number(user.id)) {
+    return sendJSON(res, 400, { error: "Vous ne pouvez pas vous abonner à votre propre initiative." });
+  }
   try {
     await db.prepare("INSERT INTO abonnements (user_id, initiative_id) VALUES (?, ?)").run(user.id, params.id);
     await db.prepare("UPDATE initiatives SET abonnes = abonnes + 1 WHERE id = ?").run(params.id);
@@ -13460,13 +13536,18 @@ async function handleStripeWebhook(req, res) {
       if (pay) {
         await db.prepare(`UPDATE accred_paiements SET statut='paye', stripe_subscription_id=?, updated_at=datetime('now') WHERE id=?`)
           .run(session.subscription || null, paiementId);
+        /* reduction_pct_appliquee se réécrit à CHAQUE activation (ON CONFLICT DO UPDATE) :
+           un compte réduit une fois puis réabonné au plein tarif redevient automatiquement
+           éligible comme référence de parrainage — comportement voulu, le statut "déjà
+           réduit" ne porte que sur le cycle payé le plus récent. */
         await db.prepare(`
-          INSERT INTO user_accreditations (user_id, accred_id, statut, type_tarif, montant_paye, stripe_customer_id, stripe_subscription_id)
-          VALUES (?,?,'active',?,?,?,?)
+          INSERT INTO user_accreditations (user_id, accred_id, statut, type_tarif, montant_paye, stripe_customer_id, stripe_subscription_id, reduction_pct_appliquee)
+          VALUES (?,?,'active',?,?,?,?,?)
           ON CONFLICT(user_id, accred_id) DO UPDATE SET statut='active', type_tarif=excluded.type_tarif,
             montant_paye=excluded.montant_paye, stripe_customer_id=excluded.stripe_customer_id,
-            stripe_subscription_id=excluded.stripe_subscription_id, updated_at=datetime('now')
-        `).run(pay.user_id, pay.accred_id, pay.type_tarif, pay.montant, session.customer || null, session.subscription || null);
+            stripe_subscription_id=excluded.stripe_subscription_id, reduction_pct_appliquee=excluded.reduction_pct_appliquee,
+            updated_at=datetime('now')
+        `).run(pay.user_id, pay.accred_id, pay.type_tarif, pay.montant, session.customer || null, session.subscription || null, pay.reduction_pct_appliquee || 0);
         creerNotif(pay.user_id, "accred_abonnement", "Abonnement activé ⭐", "Votre abonnement est actif : Réseau Pro, Business Plans et Mes projets sont débloqués.", { accred_id: pay.accred_id });
 
         /* Codes Adhésion D'A — ancrage de la fenêtre à la PREMIÈRE utilisation confirmée
@@ -13519,6 +13600,38 @@ async function handleStripeWebhook(req, res) {
               { code_id: codeRow.id });
           }
         }
+
+        /* Parrainage Initiative -50% — activation + ancrage de la durée FIGÉE au moment de
+           la réservation (duree_jours_reservee, capturée par consommer() via l'API Stripe
+           de la référence) : contrairement aux Codes D'A, aucun nouvel appel Stripe n'est
+           nécessaire ici, la durée est déjà connue et ne doit jamais être recalculée après
+           coup (même si la référence se réabonne entre-temps). WHERE statut='en_attente'
+           protège contre une double activation concurrente (relecture du même événement). */
+        const parrainageUtilisation = await db.prepare(
+          "SELECT * FROM parrainage_initiative_utilisations WHERE accred_paiement_id=? AND statut='en_attente'"
+        ).get(paiementId);
+        if (parrainageUtilisation) {
+          const maintenant = ajouterMoisDA(null, 0);
+          const dateFin = new Date(Date.now() + Number(parrainageUtilisation.duree_jours_reservee) * 86400000)
+            .toISOString().slice(0, 19).replace('T', ' ');
+          const rActivation = await db.prepare(`
+            UPDATE parrainage_initiative_utilisations SET statut='active', date_activation=?, date_fin_avantage=?,
+              stripe_subscription_id=?, updated_at=datetime('now') WHERE id=? AND statut='en_attente'
+          `).run(maintenant, dateFin, session.subscription || null, parrainageUtilisation.id);
+          if (rActivation.changes > 0) {
+            try {
+              await db.prepare(`INSERT INTO parrainage_initiative_journal (utilisation_id, action, details) VALUES (?,?,?)`)
+                .run(parrainageUtilisation.id, 'activation_premium', `Premium activé pour le bénéficiaire ${parrainageUtilisation.beneficiaire_da_id} — valable jusqu'au ${dateFin}`);
+            } catch (e) { /* le journal n'est jamais bloquant */ }
+            const dateFinLisible = new Date(dateFin.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR');
+            creerNotif(parrainageUtilisation.beneficiaire_user_id, 'parrainage_initiative_active', "✅ Réduction Parrainage active",
+              `Votre réduction de ${parrainageUtilisation.reduction_pct}% est active jusqu'au ${dateFinLisible}.`,
+              { utilisation_id: parrainageUtilisation.id });
+            creerNotif(parrainageUtilisation.reference_user_id, 'parrainage_initiative_utilise', "🤝 Votre compte a servi de référence",
+              `Un compte lié a bénéficié de -${parrainageUtilisation.reduction_pct}% grâce à votre abonnement Premium.`,
+              { utilisation_id: parrainageUtilisation.id });
+          }
+        }
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_accred_paiement_id) {
       const paiementId = Number(event.data.object.metadata.diaspoactif_accred_paiement_id);
@@ -13532,6 +13645,11 @@ async function handleStripeWebhook(req, res) {
         await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(utilisationAbandonnee.code_id);
         await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(utilisationAbandonnee.id);
       }
+      /* Compensation Parrainage Initiative : pas de compteur à restaurer (illimité), juste
+         annuler la ligne de réservation abandonnée. */
+      await db.prepare(
+        `UPDATE parrainage_initiative_utilisations SET statut='annulee' WHERE accred_paiement_id=? AND statut='en_attente'`
+      ).run(paiementId);
     } else if (event.type === "invoice.payment_succeeded" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -21212,6 +21330,72 @@ async function handleRequest(req, res) {
       sendJSON(res, 200, { ok: true, expires, total: codes.length });
     } catch (e) {
       sendJSON(res, 500, SEC.safeError(e, "cron da-codes-expiration"));
+    }
+    return;
+  }
+
+  /* ── Parrainage Initiative -50% : rappel 3 mois avant expiration ── */
+  if (pathname === '/api/cron/parrainage-relance-expiration') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const borne3Mois = ajouterMoisDA(null, 3);
+      const utilisations = await db.prepare(`
+        SELECT * FROM parrainage_initiative_utilisations
+        WHERE statut='active' AND date_fin_avantage IS NOT NULL
+          AND date_fin_avantage <= ? AND relance_3_mois_envoyee_le IS NULL
+      `).all(borne3Mois);
+      let relancesEnvoyees = 0;
+      for (const u of utilisations) {
+        const dateFinTxt = new Date(u.date_fin_avantage.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR');
+        creerNotif(u.beneficiaire_user_id, 'parrainage_initiative_relance_3mois', "⏳ Votre réduction Parrainage expire bientôt",
+          `Votre réduction de ${u.reduction_pct}% arrive bientôt à expiration, le ${dateFinTxt}. Votre abonnement continuera ensuite au tarif normal.`, { utilisation_id: u.id });
+        creerNotif(u.reference_user_id, 'parrainage_initiative_relance_3mois', "⏳ Un parrainage que vous avez accordé expire bientôt",
+          `L'avantage de -${u.reduction_pct}% accordé grâce à votre compte arrive bientôt à expiration, le ${dateFinTxt}.`, { utilisation_id: u.id });
+        await db.prepare("UPDATE parrainage_initiative_utilisations SET relance_3_mois_envoyee_le=datetime('now') WHERE id=?").run(u.id);
+        try {
+          await db.prepare(`INSERT INTO parrainage_initiative_journal (utilisation_id, action, details) VALUES (?,?,?)`)
+            .run(u.id, 'relance_3_mois', `Rappel envoyé — expiration prévue le ${dateFinTxt}`);
+        } catch (e) { /* le journal n'est jamais bloquant */ }
+        relancesEnvoyees++;
+      }
+      sendJSON(res, 200, { ok: true, relancesEnvoyees, total: utilisations.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron parrainage-relance-expiration"));
+    }
+    return;
+  }
+
+  /* ── Parrainage Initiative -50% : expiration ──
+     Ne touche jamais Stripe : le coupon (duration:'once') s'auto-consomme dès la première
+     facture, Stripe refacture seul le plein tarif au renouvellement suivant. Ce cron est
+     uniquement de la tenue de registre — son éventuel échec ne coûte qu'une notification en
+     retard, jamais une facturation incorrecte. Ne supprime jamais rien. */
+  if (pathname === '/api/cron/parrainage-expiration') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const maintenant = ajouterMoisDA(null, 0);
+      const utilisations = await db.prepare(`
+        SELECT * FROM parrainage_initiative_utilisations
+        WHERE statut='active' AND date_fin_avantage IS NOT NULL AND date_fin_avantage <= ?
+      `).all(maintenant);
+      let expirees = 0;
+      for (const u of utilisations) {
+        await db.prepare("UPDATE parrainage_initiative_utilisations SET statut='expiree', updated_at=datetime('now') WHERE id=?").run(u.id);
+        creerNotif(u.beneficiaire_user_id, 'parrainage_initiative_expire', "Réduction Parrainage expirée",
+          `Votre réduction de -${u.reduction_pct}% a pris fin. Votre abonnement Premium continue au tarif normal.`, { utilisation_id: u.id });
+        try {
+          await db.prepare(`INSERT INTO parrainage_initiative_journal (utilisation_id, action, details) VALUES (?,?,?)`)
+            .run(u.id, 'expiration', `Expiration effective au ${new Date().toISOString().slice(0, 19).replace('T', ' ')}`);
+        } catch (e) { /* le journal n'est jamais bloquant */ }
+        expirees++;
+      }
+      sendJSON(res, 200, { ok: true, expirees, total: utilisations.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron parrainage-expiration"));
     }
     return;
   }
@@ -29723,6 +29907,46 @@ route("GET", "/api/admin/da-codes", async (req, res) => {
   `).get(ajouterMoisDA(null, 3)))?.n || 0;
 
   sendJSON(res, 200, { codes, total, page, limit, kpis });
+});
+
+/* ── Parrainage Initiative -50% — consultation admin (lecture seule) ──
+   Le cahier des charges demande uniquement de CONSULTER (bénéficiaire, référence, tarifs,
+   dates, statut, transaction) — aucune édition n'est prévue, contrairement aux Codes D'A. */
+route("GET", "/api/admin/parrainage-initiative", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const q = (req.query?.q || '').trim();
+  const statut = req.query?.statut || '';
+  const clauses = [];
+  const params = [];
+  if (q) {
+    clauses.push("(ub.nom LIKE ? OR ub.email LIKE ? OR ur.nom LIKE ? OR ur.email LIKE ?)");
+    const like = `%${q}%`;
+    params.push(like, like, like, like);
+  }
+  if (statut) { clauses.push("p.statut = ?"); params.push(statut); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+  const utilisations = await db.prepare(`
+    SELECT p.*, ub.nom AS beneficiaire_nom, ub.email AS beneficiaire_email,
+           ur.nom AS reference_nom, ur.email AS reference_email
+    FROM parrainage_initiative_utilisations p
+    JOIN users ub ON ub.id = p.beneficiaire_user_id
+    JOIN users ur ON ur.id = p.reference_user_id
+    ${where}
+    ORDER BY p.created_at DESC LIMIT 200
+  `).all(...params);
+
+  const parStatut = await db.prepare("SELECT statut, COUNT(*) n FROM parrainage_initiative_utilisations GROUP BY statut").all();
+  const kpi = { total: 0, en_attente: 0, active: 0, expiree: 0, annulee: 0 };
+  for (const r of parStatut) { kpi[r.statut] = r.n; kpi.total += r.n; }
+  kpi.expire_sous_3_mois = (await db.prepare(`
+    SELECT COUNT(*) n FROM parrainage_initiative_utilisations
+    WHERE statut='active' AND date_fin_avantage IS NOT NULL AND date_fin_avantage <= ?
+  `).get(ajouterMoisDA(null, 3)))?.n || 0;
+
+  sendJSON(res, 200, { utilisations, kpi });
 });
 
 route("GET", "/api/admin/da-codes/:id", async (req, res, params) => {
