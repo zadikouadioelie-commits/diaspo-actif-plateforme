@@ -87,25 +87,15 @@ button, [role="button"], label[for], .card[onclick],
   transform: translateY(-2px);
 }
 
-/* ── Navigation topbar — hover amélioré ── */
+/* ── Navigation topbar — onglets segmentés ──
+   Le soulignement animé a laissé place à une pastille pleine sur l'onglet actif (cf.
+   styles.v2.css / design-upgrade.v2.css) : plus de ::after ni de couleur navy au survol,
+   qui redevenaient invisibles sur le fond sombre du nouveau rail. */
 .nav a {
   position: relative;
-  padding-bottom: 4px;
-  border-bottom: 2px solid transparent;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.nav a::after {
-  content: '';
-  position: absolute;
-  bottom: -2px; left: 0; right: 0;
-  height: 2px;
-  background: var(--orange);
-  transform: scaleX(0);
-  transition: transform var(--transition);
-  transform-origin: left;
-}
-.nav a:hover::after, .nav a.active::after { transform: scaleX(1); }
-.nav a:hover { color: var(--navy); }
+.nav a:hover:not(.active) { color: #fff; }
 
 /* ── Sidebar — liens plus lisibles ── */
 .sidebar a {

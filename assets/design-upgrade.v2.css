@@ -98,8 +98,10 @@ a.btn-deconnexion,
 }
 
 /* Tous les textes dans la topbar en blanc — SAUF le contenu du menu déroulant des
-   notifications (fond clair), qui doit garder ses propres couleurs sombres lisibles. */
-.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img):not(.notif-dropdown):not(.notif-item):not(.notif-titre):not(.notif-contenu):not(.notif-date):not(.notif-dd-title):not(.notif-empty) {
+   notifications (fond clair), qui doit garder ses propres couleurs sombres lisibles, ET
+   SAUF le lien de nav actif (.nav a.active) depuis la refonte "onglets segmentés" : ce
+   lien se détache sur un fond blanc plein, son texte doit rester en encre foncée. */
+.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img):not(.notif-dropdown):not(.notif-item):not(.notif-titre):not(.notif-contenu):not(.notif-date):not(.notif-dd-title):not(.notif-empty):not(.active) {
   color: #fff !important;
 }
 .topbar .notif-dropdown, .topbar .notif-dropdown * { color: #0D1B2A !important; }
@@ -136,17 +138,51 @@ a.btn-deconnexion,
   width: 36px !important;
   height: 36px !important;
 }
+/* ── Navigation en onglets segmentés ──
+   Rail arrondi sur fond légèrement éclairci, lien courant détaché en pastille pleine
+   blanche (posé en dur par page, <a class="active">, cf. annuaire.html — pas de JS ici).
+   flex-wrap:nowrap + overflow-x:auto : le rail défile horizontalement dans son propre
+   espace plutôt que de casser sur une 2e ligne ou de faire disparaître un lien, quelle que
+   soit la largeur (tablette comprise) — jamais de dépassement, jamais de suppression. La
+   bascule mobile (<=768px, .nav.nav-mobile-open en tiroir vertical) reste inchangée. */
+.nav {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  background: rgba(255,255,255,.08) !important;
+  border-radius: 12px !important;
+  padding: 4px !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+}
+.nav::-webkit-scrollbar { display: none !important; }
 .nav a {
   font-size: 13.5px !important;
   font-weight: 600 !important;
   color: rgba(255,255,255,.75) !important;
-  padding: 6px 2px !important;
-  border-bottom: 2px solid transparent !important;
-  transition: color .15s, border-color .15s !important;
+  padding: 8px 15px !important;
+  border-radius: 9px !important;
+  border-bottom: none !important;
+  white-space: nowrap !important;
+  flex: none !important;
+  transition: background .15s, color .15s !important;
 }
-.nav a.active, .nav a:hover {
+.nav a:hover {
   color: #fff !important;
-  border-bottom-color: #F26422 !important;
+  background: rgba(255,255,255,.08) !important;
+}
+.nav a.active {
+  background: #fff !important;
+  color: #0D2B4E !important;
+  font-weight: 700 !important;
+}
+.nav a.active:hover {
+  background: #fff !important;
+  color: #0D2B4E !important;
 }
 
 /* ── Boutons ── */
@@ -718,4 +754,9 @@ footer, .footer {
   .btn { padding: 10px 16px !important; font-size: 14px !important; }
   .card { padding: 16px !important; }
   .dash-kpi-grid { grid-template-columns: repeat(2, 1fr); margin: -16px 16px 16px; }
+  /* Le rail d'onglets segmentés (.nav{display:flex!important} ci-dessus) écraserait sinon
+     le masquage mobile existant (.nav{display:none}, sans !important, assets/styles.v2.css)
+     qui laisse place au tiroir #sidebar / à .nav.nav-mobile-open piloté par
+     initSidebarMobile() dans assets/app.js — jamais touché par cette refonte. */
+  .nav:not(.nav-mobile-open) { display: none !important; }
 }

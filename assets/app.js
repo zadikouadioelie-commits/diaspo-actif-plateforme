@@ -914,25 +914,30 @@ async function applyAuthState() {
       ${demoBtnHtml}
       ${premiumBtnHtml}
       ${apercuBtnHtml}
-      <a href="messagerie.html" class="user-chip" style="text-decoration:none;position:relative;" title="Messagerie">
+      <a href="messagerie.html" class="topbar-icon-btn" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
       </a>
       <div class="notif-bell-wrap">
-        <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications" onclick="openNotifDropdown(this)">
+        <button class="notif-bell-btn topbar-icon-btn" id="notif-bell-btn" title="Notifications" onclick="openNotifDropdown(this)">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notif-badge"></span>
         </button>
         <div class="notif-dropdown" id="notif-dropdown"></div>
       </div>
-      <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="user-chip" style="text-decoration:none;">
-        <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div> ${user.nom}
+      <!-- Identité fusionnée (refonte "onglets segmentés") : avatar + nom + rôle dans une
+           seule pastille cliquable vers le tableau de bord, au lieu de 3 éléments distincts. -->
+      <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="acc-chip">
+        <div class="avatar">${user.photo_url ? `<img src="${user.photo_url}" alt="${user.nom}" style="width:30px;height:30px;border-radius:50%;display:block;object-fit:cover;" loading="lazy">` : photoAvatar(user.nom, 30)}</div>
+        <span class="acc-chip-text">
+          <span class="acc-chip-name">${user.nom}</span>
+          <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
+        </span>
       </a>
       <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
         <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte">▾</button>
         <div class="cl-switch-dd" id="cl-switch-dd"></div>
       </span>
-      <span class="role-tag">${ROLE_LABEL_FR[user.role] || user.role}</span>
       <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>
       <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
         <span style="font-size:14px;">💎</span> Mon Associé

@@ -26,8 +26,9 @@ html,body{background:var(--bg)!important;}
 }
 .content{background:var(--bg)!important;}
 .topbar{background:var(--navy)!important; color:#fff!important;}
-.topbar .nav a,.topbar a{color:rgba(255,255,255,.85)!important;}
-.topbar .nav a:hover{color:#fff!important;}
+.topbar .nav a:not(.active),.topbar a:not(.active){color:rgba(255,255,255,.85)!important;}
+.topbar .nav a:hover:not(.active){color:#fff!important;}
+.topbar .nav a.active{color:var(--navy)!important;}
 input,select,textarea{background:#F8FAFD!important; border-color:var(--border)!important;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -58,9 +59,23 @@ button{font-family:inherit;cursor:pointer;}
 .logo .tree{width:32px;height:32px;border-radius:6px;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:16px;}
 .logo-img{width:40px;height:40px;flex:none;}
 .logo small{display:block;font-weight:400;font-size:10px;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;}
-.nav{display:flex;gap:20px;flex:1;flex-wrap:wrap;}
-.nav a{font-size:14px;font-weight:600;color:rgba(255,255,255,.8);padding:6px 0;border-bottom:2px solid transparent;}
-.nav a.active,.nav a:hover{color:#fff;border-bottom-color:var(--orange);}
+/* Rail en onglets segmentés — repris/surchargé en !important par design-upgrade.v2.css sur
+   les pages qui le chargent (l'ordre gagnant réel), ces règles servent de base cohérente
+   pour les quelques pages qui ne le chargeraient pas. flex-wrap:nowrap + overflow-x:auto :
+   le rail défile dans son propre espace plutôt que de casser sur une 2e ligne, quelle que
+   soit la largeur (desktop et tablette) — jamais de dépassement, jamais de lien supprimé. */
+.nav{
+  display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.08);border-radius:12px;
+  padding:4px;flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{display:none;}
+.nav a{
+  font-size:14px;font-weight:600;color:rgba(255,255,255,.8);padding:8px 15px;border-radius:9px;
+  border-bottom:none;white-space:nowrap;flex:none;
+}
+.nav a.active{background:#fff;color:var(--navy);font-weight:700;}
+.nav a:hover:not(.active){color:#fff;background:rgba(255,255,255,.08);}
 .topbar-right{display:flex;align-items:center;gap:12px;}
 .lang-select{border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:#000;background:rgba(255,255,255,.85);}
 .lang-select option{color:#000;}
@@ -70,6 +85,27 @@ button{font-family:inherit;cursor:pointer;}
 .user-chip{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#fff;}
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;overflow:hidden;}
 .avatar img,.init-logo img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+
+/* ── Topbar : boutons icône + pastille de compte (refonte "onglets segmentés") ──
+   Même langage visuel que le rail de nav : fond blanc translucide, bordure discrète,
+   coins arrondis. Messagerie/notifications restent des boutons icône seuls ; l'identité
+   (avatar + nom + rôle) fusionne en une seule pastille cliquable vers le tableau de bord. */
+.topbar-icon-btn{
+  width:34px;height:34px;border-radius:10px;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+  color:#fff;text-decoration:none;position:relative;
+}
+.topbar-icon-btn:hover{background:rgba(255,255,255,.16);}
+.acc-chip{
+  display:flex;align-items:center;gap:9px;flex:none;text-decoration:none;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+  border-radius:99px;padding:4px 6px 4px 4px;
+}
+.acc-chip:hover{background:rgba(255,255,255,.14);}
+.acc-chip-text{display:flex;flex-direction:column;align-items:flex-start;gap:1px;line-height:1.15;}
+.acc-chip-name{font-size:13px;font-weight:700;color:#fff;white-space:nowrap;}
+.acc-chip .role-tag{margin:0!important;}
 
 /* ---------- Buttons ---------- */
 .btn{
