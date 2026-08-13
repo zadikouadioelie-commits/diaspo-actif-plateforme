@@ -190,7 +190,11 @@ const ROLE_COLORS = {
   expert:'#3b82f6', recruteur:'#8b5cf6', investisseur:'#ec4899',
   porteur_projet:'#14b8a6', benevolat:'#f97316', consultant:'#64748b',
 };
-const ROLE_LABELS = {
+/* Nommée ST_ROLE_LABELS (pas ROLE_LABELS) : assets/data.js déclare déjà un ROLE_LABELS
+   global (dictionnaire multilingue, forme différente) — les deux <script> partagent la même
+   portée globale sur cette page, une redéclaration const y jetait un SyntaxError fatal qui
+   empêchait TOUT le script de cette page de s'exécuter (page bloquée sur "Chargement…"). */
+const ST_ROLE_LABELS = {
   utilisateur:'Membres', initiative:'Initiatives / Assos / ONG',
   collectivite:'Collectivités', expert:'Experts', recruteur:'Recruteurs',
   investisseur:'Investisseurs', porteur_projet:'Porteurs de projets',
@@ -318,7 +322,7 @@ function render() {
       <div class="st-card">
         ${Object.entries(general.byRole||{}).sort((a,b)=>b[1]-a[1]).map(([role,n])=>`
           <div class="st-bar-row">
-            <div class="st-bar-label">${ROLE_LABELS[role]||role}</div>
+            <div class="st-bar-label">${ST_ROLE_LABELS[role]||role}</div>
             <div class="st-bar-track"><div class="st-bar-fill" style="width:${pct(n,totalRole)}%;background:${ROLE_COLORS[role]||'#94a3b8'};"></div></div>
             <div class="st-bar-n">${fmt(n)}</div>
           </div>`).join('')}
@@ -596,8 +600,8 @@ function exportPDF() {
   <table><tr><th>Métier</th><th>Membres</th></tr>
   ${(STATS.competences.topTitres||[]).map(r=>`<tr><td>${r.titre_pro}</td><td>${r.n}</td></tr>`).join('')}
   </table>
-  <script src="/assets/cookies-banner.js"></script>
-  <script src="/assets/theme-manager.js"></script>
+  <script src="/assets/cookies-banner.js"><\/script>
+  <script src="/assets/theme-manager.js"><\/script>
 </body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 500);
