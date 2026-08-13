@@ -99,6 +99,29 @@ main.container {
   color: #0D1B2A;
 }
 .notice table td { font-size: 12px !important; }
+
+/* Cadenas discret — futur point d'entrée connexion administrateurs junior.
+   Volontairement transparent/quasi invisible pour le grand public ; seul le
+   comportement au clic sera branché plus tard (formulaire + logique à venir). */
+.auth-form-card { position: relative; }
+/* !important nécessaire : assets/gsap-animations.js pose un style inline
+   (position:relative;overflow:hidden) sur tous les <button> pour l'effet
+   ripple — un inline style gagne toujours sur une règle normale, seul
+   !important le bat. */
+#admin-junior-lock {
+  position: absolute !important;
+  top: 16px !important;
+  right: 18px !important;
+  font-size: 17px;
+  line-height: 1;
+  opacity: .18;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px;
+  transition: opacity .15s;
+}
+#admin-junior-lock:hover { opacity: .55; }
 footer.footer {
   background: transparent !important;
   color: rgba(255,255,255,.35) !important;
@@ -156,6 +179,7 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
 
   <main class="container">
     <div class="card auth-form-card">
+      <button type="button" id="admin-junior-lock" aria-label="Connexion administrateur junior">🔒</button>
       <h2 style="margin-top:0;">Connexion à Diaspo'Actif</h2>
       <p class="sub" style="margin-bottom:0;">Accédez à votre espace Utilisateur, Initiative, Officiel ou Institutionnel.</p>
 
