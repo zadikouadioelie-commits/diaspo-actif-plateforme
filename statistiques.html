@@ -302,7 +302,6 @@ function render() {
       <div class="st-section-title">📊 Chiffres clés</div>
       <div class="st-grid-6">
         ${kpiCard('👥', fmt(general.totalMembres), 'Membres total', '#6366f1')}
-        ${kpiCard('✅', fmt(confiance.verified), 'Comptes vérifiés', '#10b981')}
         ${kpiCard('🌍', fmt(geo.nbPays), 'Pays représentés', '#f59e0b')}
         ${kpiCard('🏙️', fmt(geo.nbVilles), 'Villes représentées', '#3b82f6')}
         ${kpiCard('🏛️', fmt(general.byRole?.initiative||0), 'Initiatives actives', '#ec4899')}
@@ -311,7 +310,6 @@ function render() {
         ${kpiCard('🎟️', fmt(activite.billets_vendus), 'Billets vendus', '#f97316')}
         ${kpiCard('📅', fmt(activite.evenements), 'Événements', '#0ea5e9')}
         ${kpiCard('📰', fmt(activite.posts), 'Publications', '#84cc16')}
-        ${kpiCard('🤝', fmt(activite.collaborations), 'Collaborations', '#f59e0b')}
         ${kpiCard('🏅', fmt(activite.accreditations), 'Accréditations DA', '#ef4444')}
       </div>
     </div>
@@ -438,20 +436,6 @@ function render() {
       <div class="st-section-title">🛡️ Indicateurs de confiance</div>
       <div class="st-grid-3">
         <div class="st-card">
-          <h3>Comptes vérifiés</h3>
-          <div class="st-ring">
-            ${ring(confiance.pct_verified||0, '#10b981')}
-            <div>
-              <div class="st-ring-label">${fmt(confiance.verified)} vérifiés</div>
-              <div class="st-ring-sub">sur ${fmt(general.totalMembres)} membres</div>
-            </div>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
-            <span class="st-tag green">✅ ${fmt(confiance.verified)} identités vérifiées</span>
-            <span class="st-tag green">📄 ${fmt(confiance.docs_verifies||0)} docs vérifiés</span>
-          </div>
-        </div>
-        <div class="st-card">
           <h3>Indice de fiabilité moyen</h3>
           <div class="st-ring">
             ${ring(Math.round(parseFloat(confiance.score_moyen)||0), '#6366f1')}
@@ -477,7 +461,6 @@ function render() {
       <div class="st-grid-3">
         ${actCard('📋','Offres d\'emploi',emploi.offres_emploi,'#3b82f6')}
         ${actCard('📬','Candidatures',emploi.candidatures,'#6366f1')}
-        ${actCard('🤝','Collaborations actives',emploi.collaborations,'#10b981')}
       </div>
     </div>
 
@@ -540,7 +523,6 @@ function exportCSV() {
   const rows = [['Indicateur','Valeur','Période']];
   const S = STATS;
   rows.push(['Membres total', S.general.totalMembres, S.meta.period]);
-  rows.push(['Comptes vérifiés', S.confiance.verified, S.meta.period]);
   rows.push(['Pays représentés', S.geo.nbPays, S.meta.period]);
   rows.push(['Villes représentées', S.geo.nbVilles, S.meta.period]);
   rows.push(['Messages échangés', S.activite.messages, S.meta.period]);
@@ -582,7 +564,6 @@ function exportPDF() {
   <table><tr><th>Indicateur</th><th>Valeur</th></tr>
   ${[
     ['Membres total', fmt(STATS.general.totalMembres)],
-    ['Comptes vérifiés', fmt(STATS.confiance.verified)],
     ['Pays représentés', STATS.geo.nbPays],
     ['Villes représentées', STATS.geo.nbVilles],
     ['Messages échangés', fmt(STATS.activite.messages)],
