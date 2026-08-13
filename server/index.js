@@ -5882,6 +5882,91 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
   sendJSON(res, 200, { users: rows });
 });
 
+/* GET /api/talents-diaspora — 4 vrais comptes mis en avant sur l'accueil ("Des profils qui
+   inspirent"), en remplacement des 4 profils fictifs auparavant codés en dur dans index.html.
+   Mélange Initiative/Utilisateur/Collectivité selon ce qui existe réellement (pas de quota
+   fixe par type — un pool commun, mélangé, puis les 4 premiers). Seuls les comptes publics
+   ET COMPLETS entrent dans le pool (photo/logo OU titre/domaine renseigné) : une carte vide
+   sur la page d'accueil serait pire qu'une absence.
+   Rotation toutes les 2h SANS cache ni cron : la sélection est un tirage déterministe basé
+   sur l'heure (bucket de 2h), donc rejouée à l'identique par tout visiteur dans la même
+   fenêtre, et change automatiquement à la fenêtre suivante — aucun état à stocker. */
+route("GET", "/api/talents-diaspora", async (req, res) => {
+  try {
+    const [utilisateurs, initiatives, collectivites] = await Promise.all([
+      db.prepare(
+        `SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, competences, nationalite1, origine1
+         FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé'
+         AND (is_demo IS NULL OR is_demo=FALSE)
+         AND ((photo_url IS NOT NULL AND photo_url!='') OR (titre_pro IS NOT NULL AND titre_pro!=''))
+         ORDER BY id ASC LIMIT 300`
+      ).all(),
+      db.prepare(
+        `SELECT i.id, i.nom, i.slug, i.ville, i.pays, i.logo_url, i.domaine, i.type, i.owner_user_id
+         FROM initiatives i JOIN users u ON u.id=i.owner_user_id
+         WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid')
+         AND ((i.logo_url IS NOT NULL AND i.logo_url!='') OR (i.domaine IS NOT NULL AND i.domaine!=''))
+         ORDER BY i.id ASC LIMIT 300`
+      ).all(),
+      db.prepare(
+        `SELECT id, nom, nom_institution, ville, pays, photo_url, type_organisme
+         FROM users WHERE role='collectivite' AND compte_masque=0 AND nom != 'Compte supprimé'
+         AND (is_demo IS NULL OR is_demo=FALSE)
+         AND ((photo_url IS NOT NULL AND photo_url!='') OR (type_organisme IS NOT NULL AND type_organisme!=''))
+         ORDER BY id ASC LIMIT 300`
+      ).all(),
+    ]);
+
+    const parseTags = (json) => { try { const a = JSON.parse(json); return Array.isArray(a) ? a.slice(0, 3) : []; } catch { return []; } };
+
+    const pool = [
+      ...utilisateurs.map(u => ({
+        cle: `u${u.id}`, type: 'utilisateur', id: u.id,
+        nom: [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom,
+        role: u.titre_pro || 'Membre Diaspo\'Actif',
+        ville: u.ville, pays: u.pays, origine: u.origine1 || u.nationalite1 || null,
+        photo_url: u.photo_url, tags: parseTags(u.competences),
+        href: `profil.html?id=${u.id}`,
+      })),
+      ...initiatives.map(i => ({
+        cle: `i${i.id}`, type: 'initiative', id: i.id,
+        nom: i.nom, role: i.domaine || i.type || 'Initiative',
+        ville: i.ville, pays: i.pays, origine: null,
+        photo_url: i.logo_url, tags: [i.type, i.domaine].filter(Boolean),
+        href: i.owner_user_id ? `profil.html?id=${i.owner_user_id}` : `initiative.html?id=${encodeURIComponent(i.slug || i.id)}`,
+      })),
+      ...collectivites.map(c => ({
+        cle: `c${c.id}`, type: 'collectivite', id: c.id,
+        nom: c.nom_institution || c.nom, role: c.type_organisme || 'Collectivité',
+        ville: c.ville, pays: c.pays, origine: null,
+        photo_url: c.photo_url, tags: ['Collectivité'],
+        href: `profil.html?id=${c.id}`,
+      })),
+    ];
+
+    /* Tirage déterministe : seed = fenêtre de 2h courante, mélange Fisher-Yates avec un
+       PRNG maison (mulberry32) — jamais Math.random(), qui donnerait un résultat différent
+       à chaque requête au lieu d'un résultat stable pendant toute la fenêtre de 2h. */
+    const bucket = Math.floor(Date.now() / (2 * 3600 * 1000));
+    let seed = bucket >>> 0;
+    function mulberry32() {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(mulberry32() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    const talents = pool.slice(0, 4);
+    sendJSON(res, 200, { talents });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "talents-diaspora"));
+  }
+});
+
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   let rows = await db.prepare(/* L'origine du PROPRIÉTAIRE accompagne chaque initiative : beaucoup de structures n'ont
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
@@ -26305,6 +26390,25 @@ ${jsonLd}
 
       const fPays = paysFilt ? `AND pays=?` : '';
       const fPaysArg = paysFilt ? [paysFilt] : [];
+
+      // L'Observatoire détaillé (statistiques.html) est réservé aux administrateurs.
+      // Le compteur public de la page d'accueil (index.html) n'a besoin que de 2 chiffres
+      // agrégés inoffensifs : on les renvoie à tout le monde, tout le reste est coupé ici
+      // plutôt qu'exposé puis masqué côté client (sinon un simple appel direct à l'API
+      // suffirait à contourner la restriction).
+      if (!me || me.role !== 'administrateur') {
+        try {
+          const totalMembresPublic = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
+          const nbPaysPublic = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!='' AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
+          return sendJSON(res, 200, {
+            general: { totalMembres: Number(totalMembresPublic || 0) },
+            geo: { nbPays: Number(nbPaysPublic || 0) },
+            meta: { period: p, generated_at: new Date().toISOString(), restricted: true }
+          });
+        } catch (e) {
+          return sendJSON(res, 500, SEC.safeError(e, "stats"));
+        }
+      }
 
       try {
         // ── Membres par rôle (comptes de démonstration exclus) ──
