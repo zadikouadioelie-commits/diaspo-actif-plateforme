@@ -52,8 +52,16 @@ button{font-family:inherit;cursor:pointer;}
   position:sticky;top:0;z-index:50;
 }
 .topbar-inner{
-  display:flex;align-items:center;gap:28px;
-  max-width:1180px;margin:0 auto;padding:14px 24px;
+  /* space-between : logo à gauche, compte à droite, rail de nav entre les deux — l'espace
+     libéré par l'élargissement de max-width (ci-dessous) va dans ces deux entrefers
+     plutôt que d'étirer le rail lui-même (qui garde flex:0, épouse son contenu). */
+  display:flex;align-items:center;justify-content:space-between;gap:28px;
+  /* Valeur de base (<1024px, où le plafond ne joue de toute façon aucun rôle : la largeur
+     réelle de l'écran reste toujours la vraie limite) + comble l'écart 1024-1279px, seule
+     tranche sans palier dédié dans assets/responsive.v2.css. Les écrans plus larges sont
+     élargis palier par palier là-bas — voir le correctif apporté au palier 1536-2559px,
+     qui laissait jusqu'ici un vide visible de part et d'autre du bandeau bleu. */
+  max-width:1400px;margin:0 auto;padding:14px 24px;
 }
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px;letter-spacing:.3px;color:#fff;}
 .logo .tree{width:32px;height:32px;border-radius:6px;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:16px;}
@@ -66,7 +74,11 @@ button{font-family:inherit;cursor:pointer;}
    soit la largeur (desktop et tablette) — jamais de dépassement, jamais de lien supprimé. */
 .nav{
   display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.08);border-radius:12px;
-  padding:4px;flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;
+  /* flex:0 (jamais grow) : le rail épouse son contenu plutôt que de s'étirer dans tout
+     l'espace flex disponible — sur .topbar-inner élargi, sinon la pastille arrondie
+     laissait un grand vide navy à droite des liens. Espace libéré redistribué par
+     .topbar-inner (justify-content:space-between, ci-dessous). */
+  padding:4px;flex:0 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;
   -webkit-overflow-scrolling:touch;scrollbar-width:none;
 }
 .nav::-webkit-scrollbar{display:none;}

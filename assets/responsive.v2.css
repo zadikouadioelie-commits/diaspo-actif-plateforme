@@ -459,14 +459,18 @@ img[loading="lazy"].loaded { background: none; animation: none; }
 /* ─── BREAKPOINT : TRÈS GRAND ÉCRAN 2K (1536px - 2559px) ─────────  */
 @media (min-width: 1536px) {
   .container { max-width: 1400px; padding: 0 40px; }
-  .topbar-inner { max-width: 1800px; }
+  /* Ce palier contenait DEUX déclarations .topbar-inner{max-width} contradictoires
+     (1800px puis, juste en dessous, 1400px qui l'écrasait silencieusement) — c'était la
+     cause du bandeau bleu qui restait visiblement plus étroit que l'écran sur cette
+     tranche de largeurs, malgré un fond bleu déjà pleine largeur. Fusionné en une seule
+     valeur, généreusement élargie (1400 -> 2000px) plutôt que simplement réparée. */
+  .topbar-inner { max-width: 2000px; padding: 14px 40px; }
   .da-content { max-width: 1400px; }
   body { font-size: 15px; }
   .da-cards-grid { grid-template-columns: repeat(4, 1fr); }
   .da-stats-grid { grid-template-columns: repeat(5, 1fr); }
   .sidebar { width: 300px; }
   .da-sidebar { width: 300px; }
-  .topbar-inner { max-width: 1400px; padding: 14px 40px; }
 }
 
 /* ─── BREAKPOINT : 4K ET ULTRA-WIDE (>= 2560px) ─────────────────── */
@@ -477,7 +481,7 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .da-cards-grid { grid-template-columns: repeat(5, 1fr); }
   .da-stats-grid { grid-template-columns: repeat(6, 1fr); }
   .da-sidebar { width: 300px; }
-  .topbar-inner { max-width: 1800px; padding: 18px 60px; }
+  .topbar-inner { max-width: 2400px; padding: 18px 60px; }
 }
 
 /* ─── ROTATION (ORIENTATION) ─────────────────────────────────────── */

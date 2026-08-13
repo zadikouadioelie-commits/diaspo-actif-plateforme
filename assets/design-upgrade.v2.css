@@ -152,7 +152,12 @@ a.btn-deconnexion,
   background: rgba(255,255,255,.08) !important;
   border-radius: 12px !important;
   padding: 4px !important;
-  flex: 1 1 auto !important;
+  /* flex:0 (jamais grow), pas flex:1 : le rail doit épouser son contenu, pas remplir tout
+     l'espace flex disponible — sinon, sur les paliers .topbar-inner élargis (voir
+     responsive.v2.css), la pastille arrondie s'étirait avec un grand vide navy vide à
+     droite des 6 liens. L'espace libéré revient à .topbar-inner (justify-content:
+     space-between, styles.v2.css) plutôt qu'au rail lui-même. */
+  flex: 0 1 auto !important;
   min-width: 0 !important;
   flex-wrap: nowrap !important;
   overflow-x: auto !important;
