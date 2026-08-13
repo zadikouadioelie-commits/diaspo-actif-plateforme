@@ -18,7 +18,8 @@
     { "path": "/api/cron/da-codes-relance-expiration", "schedule": "0 15 * * *" },
     { "path": "/api/cron/da-codes-expiration", "schedule": "0 16 * * *" },
     { "path": "/api/cron/parrainage-relance-expiration", "schedule": "0 17 * * *" },
-    { "path": "/api/cron/parrainage-expiration", "schedule": "0 18 * * *" }
+    { "path": "/api/cron/parrainage-expiration", "schedule": "0 18 * * *" },
+    { "path": "/api/cron/junior-admin-rotation", "schedule": "0 4 1 * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

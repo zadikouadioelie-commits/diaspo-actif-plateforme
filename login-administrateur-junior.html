@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Connexion Administrateur Junior</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1565C0">
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* Même habillage que login.html — page volontairement non référencée (pas de lien public,
+   uniquement accessible via le cadenas discret de login.html ou une URL directe connue). */
+body { background: #060e1a; }
+.page { min-height: 100vh; background: linear-gradient(135deg, #060e1a 0%, #0c1e38 50%, #0F2A50 100%); }
+.topbar { background: rgba(255,255,255,.04) !important; border-bottom: 1px solid rgba(255,255,255,.07) !important; }
+.topbar .logo, .topbar .nav a, .topbar .topbar-right { color: rgba(255,255,255,.8) !important; }
+main.container { max-width: 480px; margin: 0 auto; padding: 48px 24px 80px; }
+.auth-form-card { background: #fff; border-radius: 20px !important; padding: 40px !important; box-shadow: 0 32px 80px rgba(0,0,0,.4) !important; border: none !important; }
+.auth-form-card h2 { font-size: 24px !important; font-weight: 900 !important; color: #0D1B2A !important; margin-bottom: 6px !important; }
+.auth-form-card .sub { font-size: 14px !important; color: #64748b !important; margin-bottom: 28px !important; }
+.auth-form-card label { font-size: 13px; font-weight: 700; color: #374151; display: block; margin-bottom: 6px; margin-top: 16px; }
+.auth-form-card input { width: 100%; height: 48px; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0 16px; font-size: 15px; font-family: inherit; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; }
+.auth-form-card input:focus { outline: none; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.auth-form-card .btn-orange { height: 50px; font-size: 15px; font-weight: 800; border-radius: 12px !important; background: linear-gradient(135deg, #2563EB, #1d4ed8) !important; box-shadow: 0 4px 20px rgba(37,99,235,.35) !important; letter-spacing: .02em; }
+.auth-error { background: #FEF2F2 !important; border: 1.5px solid #FECACA !important; color: #dc2626 !important; border-radius: 10px !important; padding: 12px 16px !important; font-size: 13px !important; font-weight: 600 !important; margin-top: 12px !important; }
+footer.footer { background: transparent !important; color: rgba(255,255,255,.35) !important; text-align: center; padding: 20px; border-top: none !important; font-size: 12px; }
+</style>
+<link rel="apple-touch-icon" href="assets/logo.png">
+  <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav"></nav>
+      <div class="topbar-right"><div id="auth-area" class="auth-area"></div></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card auth-form-card">
+      <h2 style="margin-top:0;">🔒 Connexion Administrateur Junior</h2>
+      <p class="sub" style="margin-bottom:0;">Identifiant et mot de passe fournis par l'administrateur principal.</p>
+
+      <form id="login-form">
+        <label for="email">Identifiant</label>
+        <input type="text" id="email" required autocomplete="username" placeholder="xxxxxxxx@diaspoactif.admin">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" required autocomplete="current-password">
+        <button type="submit" class="btn btn-orange btn-block" style="margin-top:14px;">Se connecter</button>
+        <div class="auth-error" id="login-error"></div>
+      </form>
+
+      <p style="margin-top:18px;font-size:12px;color:var(--muted);">Ces identifiants sont générés et renouvelés automatiquement par l'administrateur principal — ils ne peuvent pas être choisis ni modifiés. En cas de perte, contactez l'administrateur principal pour un rafraîchissement.</p>
+    </div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span></footer>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+  document.getElementById("login-form").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const errBox = document.getElementById("login-error");
+    errBox.style.display = "none";
+    try {
+      const r = await api("POST", "/auth/login", { email, password });
+      const dest = ROLE_DASHBOARD[r.user.role] || "index.html";
+      window.location.href = dest;
+    } catch (err) {
+      errBox.textContent = err.message || "Connexion impossible.";
+      errBox.style.display = "block";
+    }
+  });
+</script>
+</body>
+</html>

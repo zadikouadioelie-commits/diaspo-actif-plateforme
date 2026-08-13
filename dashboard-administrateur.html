@@ -97,6 +97,9 @@
       <a href="audiovisuel.html" style="display:none;">🎬 Atelier audiovisuel</a>
       <a href="#ads" data-section="ads">📣 Publicités</a>
       <a href="#social-sync" data-section="social-sync">🔄 Synchronisation réseaux sociaux (vue admin)</a>
+
+      <span class="sb-group-lbl">⬛ Gouvernance</span>
+      <a href="#administrateurs-junior" data-section="administrateurs-junior">🧑‍💼 Administrateurs Junior</a>
     </aside>
 
     <main class="content">
@@ -4427,6 +4430,32 @@
         <div id="delreq-dossier" style="display:none;margin-top:16px;"></div>
       </section>
 
+      <!-- ADMINISTRATEURS JUNIOR -->
+      <section id="section-administrateurs-junior" style="display:none;">
+        <h2>🧑‍💼 Administrateurs Junior</h2>
+        <div class="notice" style="margin-bottom:16px;">Identifiants factices générés automatiquement (jamais choisis par l'administrateur junior), renouvelés chaque mois. Une révocation de droit ne prend effet qu'à la prochaine connexion du junior.</div>
+        <button class="btn btn-orange btn-sm" onclick="ajOuvrirCreation()" style="margin-bottom:16px;">➕ Nouvel administrateur junior</button>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div id="aj-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+
+        <!-- Panneau de création -->
+        <div id="aj-creation" class="card" style="display:none;margin-bottom:16px;">
+          <h3 style="margin-top:0;">Nouvel administrateur junior</h3>
+          <p style="font-size:13px;color:var(--muted);">Sélectionnez les droits à déléguer. L'identifiant et le mot de passe seront générés automatiquement.</p>
+          <div id="aj-catalogue-checkboxes"></div>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="btn btn-orange btn-sm" onclick="ajSoumettreCreation()">Créer</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('aj-creation').style.display='none';">Annuler</button>
+          </div>
+          <div id="aj-creation-resultat" style="display:none;margin-top:16px;"></div>
+        </div>
+
+        <!-- Fiche détail -->
+        <div id="aj-detail" style="display:none;"></div>
+      </section>
+
       <!-- JOURNAL D'ERREURS (monitoring maison) -->
       <section id="section-error-logs" style="display:none;">
         <h2>🩺 Journal d'erreurs serveur</h2>
@@ -4612,6 +4641,169 @@
 /* ===== Utilitaires globaux ===== */
 function esc(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ===== Administrateurs Junior ===== */
+let ajCatalogueCache = null;
+
+const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression' };
+
+async function ajChargerCatalogue() {
+  if (ajCatalogueCache) return ajCatalogueCache;
+  const data = await api("GET", "/admin/administrateurs-junior/catalogue");
+  ajCatalogueCache = data.catalogue || [];
+  return ajCatalogueCache;
+}
+
+async function loadAdminsJunior() {
+  const el = document.getElementById("aj-liste");
+  document.getElementById("aj-detail").style.display = "none";
+  try {
+    const data = await api("GET", "/admin/administrateurs-junior");
+    const rows = data.juniors || [];
+    if (!rows.length) { el.innerHTML = `<div class="notice">Aucun administrateur junior créé pour le moment.</div>`; return; }
+    el.innerHTML = `<table class="admin-table" style="width:100%;border-collapse:collapse;">
+      <thead><tr style="text-align:left;font-size:12px;color:var(--muted);">
+        <th style="padding:6px;">N°</th><th style="padding:6px;">Identifiant</th><th style="padding:6px;">Modules</th>
+        <th style="padding:6px;">Statut</th><th style="padding:6px;">Dernière rotation</th><th style="padding:6px;"></th>
+      </tr></thead>
+      <tbody>
+      ${rows.map(r => `
+        <tr style="border-top:1px solid var(--border,#eee);font-size:13px;">
+          <td style="padding:6px;">n°${r.sequence_number}</td>
+          <td style="padding:6px;font-family:monospace;">${esc(r.email)}</td>
+          <td style="padding:6px;">${(r.modules || []).map(m => AJ_LABELS_MODULE[m] || m).join(', ') || '<span style="color:var(--muted);">aucun</span>'}</td>
+          <td style="padding:6px;">${r.verrouille ? '🔴 Verrouillé' : '🟢 Actif'}</td>
+          <td style="padding:6px;">${r.derniere_rotation_at ? new Date(r.derniere_rotation_at.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</td>
+          <td style="padding:6px;"><button class="btn btn-sm btn-outline" onclick="ajVoirDetail(${r.id})">Détail</button></td>
+        </tr>
+      `).join('')}
+      </tbody></table>`;
+  } catch (e) {
+    el.innerHTML = `<div class="notice" style="color:#c00;">Erreur de chargement.</div>`;
+  }
+}
+
+async function ajOuvrirCreation() {
+  const catalogue = await ajChargerCatalogue();
+  const parModule = {};
+  catalogue.forEach(e => { (parModule[e.module] ||= []).push(e); });
+  const box = document.getElementById("aj-catalogue-checkboxes");
+  box.innerHTML = Object.entries(parModule).map(([mod, entries]) => `
+    <div style="margin-top:12px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;">${AJ_LABELS_MODULE[mod] || mod}</div>
+      ${entries.map(e => `
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;">
+          <input type="checkbox" value="${esc(e.id)}" class="aj-cb-catalogue">
+          <span>${esc(e.description)}</span>
+        </label>
+      `).join('')}
+    </div>
+  `).join('');
+  document.getElementById("aj-creation-resultat").style.display = "none";
+  document.getElementById("aj-creation").style.display = "";
+}
+
+async function ajSoumettreCreation() {
+  const ids = [...document.querySelectorAll(".aj-cb-catalogue:checked")].map(cb => cb.value);
+  try {
+    const junior = await api("POST", "/admin/administrateurs-junior", { catalogue_ids: ids });
+    const resEl = document.getElementById("aj-creation-resultat");
+    resEl.style.display = "";
+    resEl.innerHTML = `<div class="notice" style="border-color:#16a34a;">
+      <strong>Administrateur junior n°${junior.sequenceNumber} créé.</strong> Copiez et transmettez ces identifiants à la main — ils ne seront réaffichés qu'ici, dans sa fiche détail.<br><br>
+      Identifiant : <code>${esc(junior.email)}</code> <button class="btn btn-sm btn-outline" onclick="ajCopier('${esc(junior.email)}')">Copier</button><br>
+      Mot de passe : <code>${esc(junior.password)}</code> <button class="btn btn-sm btn-outline" onclick="ajCopier('${esc(junior.password)}')">Copier</button>
+    </div>`;
+    loadAdminsJunior();
+  } catch (e) {
+    alert("Création impossible : " + (e.message || "erreur inconnue"));
+  }
+}
+
+function ajCopier(texte) {
+  navigator.clipboard?.writeText(texte);
+}
+
+async function ajVoirDetail(id) {
+  document.getElementById("aj-creation").style.display = "none";
+  const detailEl = document.getElementById("aj-detail");
+  detailEl.style.display = "";
+  detailEl.innerHTML = `<p style="color:var(--muted);font-size:13px;">Chargement…</p>`;
+  const [fiche, catalogue, journalData] = await Promise.all([
+    api("GET", `/admin/administrateurs-junior/${id}`),
+    ajChargerCatalogue(),
+    api("GET", `/admin/administrateurs-junior/${id}/journal`),
+  ]);
+  const accordees = new Set((fiche.permissions || []).map(p => p.id));
+  const parModule = {};
+  catalogue.forEach(e => { (parModule[e.module] ||= []).push(e); });
+
+  detailEl.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('aj-detail').style.display='none';">← Retour</button>
+      <h3>Administrateur junior n°${fiche.sequence_number} ${fiche.verrouille ? '🔴 (verrouillé)' : ''}</h3>
+      <p>Identifiant courant : <code>${esc(fiche.email)}</code> <button class="btn btn-sm btn-outline" onclick="ajCopier('${esc(fiche.email)}')">Copier</button></p>
+      <p>Mot de passe courant : <code>${esc(fiche.password || '')}</code> <button class="btn btn-sm btn-outline" onclick="ajCopier('${esc(fiche.password || '')}')">Copier</button></p>
+      <p style="font-size:12px;color:var(--muted);">Dernière rotation : ${fiche.derniere_rotation_at ? new Date(fiche.derniere_rotation_at.replace(' ','T')+'Z').toLocaleString('fr-FR') : '—'}</p>
+      <button class="btn btn-sm btn-orange" onclick="ajRafraichir(${id})">🔄 Régénérer maintenant</button>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="margin-top:0;">Droits accordés</h3>
+      ${Object.entries(parModule).map(([mod, entries]) => `
+        <div style="margin-top:8px;">
+          <div style="font-weight:700;font-size:13px;">${AJ_LABELS_MODULE[mod] || mod}</div>
+          ${entries.map(e => `
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border,#eee);">
+              <span>${accordees.has(e.id) ? '✅' : '⬜'} Droit : ${esc(e.description)}</span>
+              ${accordees.has(e.id)
+                ? `<button class="btn btn-sm btn-outline" onclick="ajRevoquer(${id},'${esc(e.id)}')">Révoquer</button>`
+                : `<button class="btn btn-sm btn-outline" onclick="ajAccorder(${id},'${esc(e.id)}')">Accorder</button>`}
+            </div>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">Historique</h3>
+      ${(journalData.journal || []).length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tbody>
+        ${journalData.journal.map(j => `
+          <tr style="border-top:1px solid var(--border,#eee);">
+            <td style="padding:4px;color:var(--muted);white-space:nowrap;">${j.created_at ? new Date(j.created_at.replace(' ','T')+'Z').toLocaleString('fr-FR') : ''}</td>
+            <td style="padding:4px;">${esc(j.action)}</td>
+            <td style="padding:4px;">${esc(j.details || j.catalogue_description || '')}</td>
+          </tr>
+        `).join('')}
+        </tbody>
+      </table>` : `<p style="color:var(--muted);font-size:13px;">Aucune action enregistrée.</p>`}
+    </div>
+  `;
+}
+
+async function ajAccorder(id, catalogueId) {
+  await api("PATCH", `/admin/administrateurs-junior/${id}/permissions`, { grant: [catalogueId] });
+  ajVoirDetail(id);
+}
+
+async function ajRevoquer(id, catalogueId) {
+  if (!confirm("Révoquer ce droit ? L'effet ne s'appliquera qu'à la prochaine connexion de l'administrateur junior.")) return;
+  await api("PATCH", `/admin/administrateurs-junior/${id}/permissions`, { revoke: [catalogueId] });
+  ajVoirDetail(id);
+}
+
+async function ajRafraichir(id) {
+  if (!confirm("Régénérer l'identifiant et le mot de passe maintenant ? Les anciens cesseront immédiatement de fonctionner.")) return;
+  try {
+    const nouveaux = await api("POST", `/admin/administrateurs-junior/${id}/refresh`);
+    alert(`Nouveaux identifiants générés :\nIdentifiant : ${nouveaux.email}\nMot de passe : ${nouveaux.password}\n\nPensez à les transmettre à l'administrateur junior.`);
+    ajVoirDetail(id);
+    loadAdminsJunior();
+  } catch (e) {
+    alert("Régénération impossible.");
+  }
 }
 
 /* ===== Logique certifications ===== */
@@ -7874,6 +8066,7 @@ async function submitAccordDirect(){
     origines:    () => origCharger(),
     'verifications-organisation': () => loadVerificationsOrganisation(),
     'demandes-passage': () => loadDemandesPassage(),
+    'administrateurs-junior': () => loadAdminsJunior(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {

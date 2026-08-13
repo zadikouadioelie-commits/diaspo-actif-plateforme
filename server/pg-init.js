@@ -1311,6 +1311,15 @@ async function migratePg(pool) {
        workflow de demande simple (en_attente/accepte/refuse). */
     { table: 'initiative_membres', constraint: 'initiative_membres_statut_check',
       addBack: "CHECK (statut IN ('en_attente','accepte','refuse','suspendu','radie','expire'))" },
+    /* Module "Administrateurs Junior" (2026-08-13) : la contrainte existante sur
+       users.role ne liste pas 'administrateur_junior'. Vérifié en local (SQLite) que
+       le CHECK d'une table déjà créée bloque bel et bien l'insertion d'une valeur hors
+       liste — CREATE TABLE IF NOT EXISTS ne suffit pas ici, contrairement à ce qu'on
+       pourrait croire en observant 'officiel'/'institutionnel' (qui ne sont en réalité
+       jamais insérés dans users.role, juste comparés — donc le CHECK n'a jamais été
+       testé pour ces valeurs-là). Même traitement que les fixes ci-dessus. */
+    { table: 'users', constraint: 'users_role_check',
+      addBack: "CHECK (role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior'))" },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

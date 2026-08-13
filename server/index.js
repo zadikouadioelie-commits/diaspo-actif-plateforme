@@ -13,6 +13,7 @@ const { generateDaId, generateDsId } = require("./db");
 const DAA = require("./daa-lang");
 const AvantagesPremium = require("./avantages-premium");
 const TG = require("./transfert-gestionnaire");
+const AdminJunior = require("./admin-junior");
 
 const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
 async function signTicket(ticketId, eventId, ts) {
@@ -647,10 +648,23 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     SEC.logSecurity("login_failed", { ip, email });
     dbLoginRecord(`ip:${ip}`, false);
     dbLoginRecord(`email:${email}`, false);
+    /* Compteur de verrouillage propre aux administrateurs junior (3 échecs, permanent jusqu'à
+       rafraîchissement manuel ou renouvellement mensuel) — distinct et sans effet sur le
+       rate-limiting générique ci-dessus, qui continue de s'appliquer à tous les comptes. */
+    if (user && user.role === 'administrateur_junior') {
+      await AdminJunior.enregistrerEchecConnexionJunior(db, user.id);
+    }
     return sendJSON(res, 401, { error: "E-mail ou mot de passe incorrect." });
   }
   dbLoginRecord(`ip:${ip}`, true);
   dbLoginRecord(`email:${email}`, true);
+
+  /* Verrouillage administrateur junior : vérifié après le mot de passe (pour ne jamais révéler
+     l'existence du compte à un mot de passe incorrect) mais avant toute émission de session. */
+  if (user.role === 'administrateur_junior' && await AdminJunior.estVerrouille(db, user.id)) {
+    SEC.logSecurity("login_blocked_junior_lockout", { ip, uid: Number(user.id) });
+    return sendJSON(res, 403, { error: "Ce compte administrateur junior est verrouillé après plusieurs échecs de connexion. Contactez l'administrateur principal." });
+  }
 
   /* Compte suspendu (module Signalement de compte & Gestion des litiges) :
      bloque la connexion tant que la sanction est active. Une suspension temporaire
@@ -670,6 +684,14 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
   const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  if (user.role === 'administrateur_junior') {
+    /* Fige les droits actuels pour toute la session à venir — voir le commentaire sur
+       actualiserSnapshotPermissions() : c'est ce qui garantit qu'une révocation faite par
+       l'administrateur principal pendant que ce junior est déjà connecté n'a d'effet qu'à
+       SA PROCHAINE connexion, jamais en coupant l'accès en cours de session. */
+    await AdminJunior.actualiserSnapshotPermissions(db, user.id);
+    await AdminJunior.journaliserJunior(db, { juniorUserId: user.id, acteurId: user.id, acteurNom: fresh.nom, action: 'connexion_reussie' });
+  }
   SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role });
   { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
@@ -926,7 +948,7 @@ route("POST", "/api/deletion-requests/:id/messages", async (req, res, params, bo
   const dr = await db.prepare("SELECT * FROM deletion_requests WHERE id=?").get(params.id);
   if (!dr) return sendJSON(res, 404, { error: "Dossier introuvable." });
   const isOwner = Number(dr.user_id) === Number(user.id);
-  const isAdmin = user.role === "administrateur";
+  const isAdmin = user.role === "administrateur" || await AdminJunior.hasAdminPermission(user, 'suppression_comptes.repondre', db);
   if (!isOwner && !isAdmin) return sendJSON(res, 403, { error: "Accès refusé." });
 
   const contenu = (body.contenu || "").trim();
@@ -944,13 +966,14 @@ route("POST", "/api/deletion-requests/:id/messages", async (req, res, params, bo
     creerNotif(dr.admin_id, "demande_suppression", `💬 Nouveau message — ${dr.numero_dossier}`, contenu, { deletion_request_id: dr.id });
   }
 
+  await AdminJunior.journaliserActionSiJunior(db, user, 'suppression_comptes.repondre', `Message dans le dossier ${dr.numero_dossier || params.id}`);
   sendJSON(res, 201, { ok: true });
 });
 
 /* GET /api/admin/deletion-requests — liste filtrable (admin) */
 route("GET", "/api/admin/deletion-requests", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
-  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  if (!me || !(await AdminJunior.hasAdminPermission(me, 'suppression_comptes.consulter', db))) return sendJSON(res, 403, { error: "Réservé." });
   const rows = await db.prepare(`
     SELECT dr.*, u.nom AS user_nom, u.email AS user_email, a.nom AS admin_nom
     FROM deletion_requests dr
@@ -968,7 +991,7 @@ route("GET", "/api/admin/deletion-requests", async (req, res, params, body, quer
 /* GET /api/admin/deletion-requests/:id — dossier complet (admin) */
 route("GET", "/api/admin/deletion-requests/:id", async (req, res, params) => {
   const me = await getCurrentUser(req);
-  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  if (!me || !(await AdminJunior.hasAdminPermission(me, 'suppression_comptes.consulter', db))) return sendJSON(res, 403, { error: "Réservé." });
   const dr = await db.prepare(`
     SELECT dr.*, u.nom AS user_nom, u.email AS user_email, u.role AS user_role
     FROM deletion_requests dr LEFT JOIN users u ON u.id=dr.user_id WHERE dr.id=?
@@ -982,7 +1005,7 @@ route("GET", "/api/admin/deletion-requests/:id", async (req, res, params) => {
 /* PATCH /api/admin/deletion-requests/:id — change le statut (admin) */
 route("PATCH", "/api/admin/deletion-requests/:id", async (req, res, params, body) => {
   const me = await getCurrentUser(req);
-  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  if (!me || !(await AdminJunior.hasAdminPermission(me, 'suppression_comptes.traiter', db))) return sendJSON(res, 403, { error: "Réservé." });
   const dr = await db.prepare("SELECT * FROM deletion_requests WHERE id=?").get(params.id);
   if (!dr) return sendJSON(res, 404, { error: "Dossier introuvable." });
 
@@ -1031,6 +1054,7 @@ route("PATCH", "/api/admin/deletion-requests/:id", async (req, res, params, body
       { deletion_request_id: dr.id });
   }
 
+  await AdminJunior.journaliserActionSiJunior(db, me, 'suppression_comptes.traiter', `Dossier ${dr.numero_dossier || params.id} → statut ${statut}`);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -15496,7 +15520,7 @@ route("GET", "/api/admin/users", async (req, res, params, body, query) => {
 
 route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.comptes.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const statut = query.statut || "en_attente";
   const rows = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,statut_verification,created_at FROM users WHERE statut_verification=? ORDER BY created_at DESC").all(statut);
   sendJSON(res, 200, { comptes: rows });
@@ -15504,40 +15528,178 @@ route("GET", "/api/admin/comptes", async (req, res, params, body, query) => {
 
 route("PATCH", "/api/admin/comptes/:id/valider", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.comptes.valider', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   await db.prepare("UPDATE users SET statut_verification='valide' WHERE id=?").run(params.id);
   const cible = await db.prepare("SELECT nom FROM users WHERE id=?").get(params.id);
   if (cible) creerNotif(Number(params.id), "validation", "Compte validé !", "Votre compte a été validé par l'équipe Diaspo'Actif. Vous avez maintenant accès à toutes les fonctionnalités.", {});
+  await AdminJunior.journaliserActionSiJunior(db, user, 'moderation.comptes.valider', `Compte #${params.id} validé`);
   sendJSON(res, 200, { ok: true, statut: "valide" });
 });
 
 route("PATCH", "/api/admin/comptes/:id/rejeter", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.comptes.rejeter', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   await db.prepare("UPDATE users SET statut_verification='rejete' WHERE id=?").run(params.id);
   const motif = body.motif || "Documents insuffisants";
   creerNotif(Number(params.id), "validation", "Demande non retenue", `Votre demande n'a pas pu être validée : ${motif}. Contactez-nous pour plus d'informations.`, { motif });
+  await AdminJunior.journaliserActionSiJunior(db, user, 'moderation.comptes.rejeter', `Compte #${params.id} rejeté (${motif})`);
   sendJSON(res, 200, { ok: true, statut: "rejete" });
 });
 
 route("DELETE", "/api/admin/contenu/:type/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.contenus.supprimer', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const tables = { post: "fil_posts", formation: "formations", evenement: "evenements" };
   const table = tables[params.type];
   if (!table) return sendJSON(res, 400, { error: "Type de contenu invalide." });
   await db.prepare(`DELETE FROM ${table} WHERE id=?`).run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'moderation.contenus.supprimer', `Contenu ${params.type} #${params.id} supprimé`);
   sendJSON(res, 200, { ok: true });
 });
 
 route("GET", "/api/admin/contenus", async (req, res) => {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'moderation.contenus.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const posts = await db.prepare("SELECT p.*,u.nom AS auteur FROM fil_posts p LEFT JOIN users u ON u.id=p.auteur_id ORDER BY p.created_at DESC LIMIT 20").all();
   const formations = await db.prepare("SELECT f.*,u.nom AS auteur FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id ORDER BY f.created_at DESC LIMIT 20").all();
   const evenements = await db.prepare("SELECT e.*,u.nom AS auteur FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.created_at DESC LIMIT 20").all();
   sendJSON(res, 200, { posts, formations, evenements });
 });
+
+/* ========== ROUTES ADMINISTRATEURS JUNIOR ==========
+   Gestion réservée au vrai administrateur (role==='administrateur'), sauf les 2 routes
+   de "détail"/"journal" qui acceptent aussi le junior consultant sa propre fiche
+   (mon activité / mes droits, dans son propre tableau de bord). */
+
+route("GET", "/api/admin/administrateurs-junior", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const rows = await db.prepare(`
+    SELECT u.id, u.nom, u.email, m.sequence_number, m.created_by_admin_id, m.echecs_connexion,
+           m.derniere_rotation_at, m.created_at
+    FROM users u JOIN admin_junior_meta m ON m.user_id = u.id
+    WHERE u.role = 'administrateur_junior'
+    ORDER BY m.created_by_admin_id, m.sequence_number
+  `).all();
+  for (const r of rows) {
+    r.verrouille = Number(r.echecs_connexion || 0) >= AdminJunior.JUNIOR_LOCKOUT_SEUIL;
+    const perms = await db.prepare("SELECT catalogue_id FROM admin_junior_permissions WHERE junior_user_id=?").all(r.id);
+    r.modules = [...new Set(perms.map(p => AdminJunior.entreeCatalogue(p.catalogue_id)?.module).filter(Boolean))];
+    r.nb_droits = perms.length;
+  }
+  sendJSON(res, 200, { juniors: rows });
+});
+
+route("GET", "/api/admin/administrateurs-junior/catalogue", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  sendJSON(res, 200, { catalogue: AdminJunior.CATALOGUE_ADMIN_JUNIOR });
+});
+
+route("POST", "/api/admin/administrateurs-junior", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const catalogueIds = Array.isArray(body?.catalogue_ids) ? body.catalogue_ids : [];
+  try {
+    const junior = await AdminJunior.creerAdminJunior(db, { principalAdminId: me.id, catalogueIds });
+    sendJSON(res, 201, junior);
+  } catch (e) {
+    console.error("[admin-junior-creation]", e.message);
+    sendJSON(res, 500, { error: "Création impossible." });
+  }
+});
+
+route("GET", "/api/admin/administrateurs-junior/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  const estAdmin = me && me.role === "administrateur";
+  const estSoiMeme = me && me.role === "administrateur_junior" && Number(me.id) === Number(params.id);
+  if (!estAdmin && !estSoiMeme) return sendJSON(res, 403, { error: "Réservé." });
+
+  const u = await db.prepare("SELECT id, nom, email FROM users WHERE id=? AND role='administrateur_junior'").get(params.id);
+  if (!u) return sendJSON(res, 404, { error: "Administrateur junior introuvable." });
+  const meta = await db.prepare("SELECT * FROM admin_junior_meta WHERE user_id=?").get(params.id);
+  const permsRows = await db.prepare("SELECT catalogue_id, granted_at FROM admin_junior_permissions WHERE junior_user_id=?").all(params.id);
+  const permissions = permsRows.map(p => ({ ...AdminJunior.entreeCatalogue(p.catalogue_id), granted_at: p.granted_at })).filter(p => p.id);
+
+  const reponse = {
+    id: u.id, nom: u.nom, email: u.email,
+    sequence_number: meta?.sequence_number, derniere_rotation_at: meta?.derniere_rotation_at,
+    echecs_connexion: Number(meta?.echecs_connexion || 0),
+    verrouille: Number(meta?.echecs_connexion || 0) >= AdminJunior.JUNIOR_LOCKOUT_SEUIL,
+    permissions,
+  };
+  /* Le mot de passe en clair n'est jamais renvoyé au junior qui consulte sa propre fiche —
+     seul l'administrateur principal (qui l'a transmis lui-même à la création/rotation) peut
+     le reconsulter ici pour une éventuelle retransmission. */
+  if (estAdmin) reponse.password = meta?.password_plain_courant;
+
+  sendJSON(res, 200, reponse);
+});
+
+route("PATCH", "/api/admin/administrateurs-junior/:id/permissions", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND role='administrateur_junior'").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Administrateur junior introuvable." });
+
+  const grant = Array.isArray(body?.grant) ? body.grant.filter(id => AdminJunior.entreeCatalogue(id)) : [];
+  const revoke = Array.isArray(body?.revoke) ? body.revoke : [];
+
+  for (const catalogueId of grant) {
+    const entree = AdminJunior.entreeCatalogue(catalogueId);
+    try {
+      await db.prepare(`
+        INSERT INTO admin_junior_permissions (junior_user_id, catalogue_id, module_key, granted_by_admin_id)
+        VALUES (?,?,?,?)
+      `).run(params.id, catalogueId, entree.module, me.id);
+      await AdminJunior.journaliserJunior(db, {
+        juniorUserId: params.id, acteurId: me.id, action: 'permission_accordee', catalogueId,
+        details: `Droit accordé : ${entree.description}`,
+      });
+    } catch (e) { /* déjà accordé (UNIQUE) — idempotent, ignoré */ }
+  }
+  for (const catalogueId of revoke) {
+    const entree = AdminJunior.entreeCatalogue(catalogueId);
+    const res2 = await db.prepare("DELETE FROM admin_junior_permissions WHERE junior_user_id=? AND catalogue_id=?").run(params.id, catalogueId);
+    if (res2.changes > 0) {
+      await AdminJunior.journaliserJunior(db, {
+        juniorUserId: params.id, acteurId: me.id, action: 'permission_revoquee', catalogueId,
+        details: `Droit révoqué : ${entree?.description || catalogueId} (effet à la prochaine connexion)`,
+      });
+    }
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/administrateurs-junior/:id/refresh", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND role='administrateur_junior'").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Administrateur junior introuvable." });
+  try {
+    const nouveaux = await AdminJunior.regenererIdentifiantsJunior(db, { juniorUserId: params.id, acteurAdminId: me.id, motif: 'manuel' });
+    sendJSON(res, 200, nouveaux);
+  } catch (e) {
+    console.error("[admin-junior-refresh]", e.message);
+    sendJSON(res, 500, { error: "Régénération impossible." });
+  }
+});
+
+route("GET", "/api/admin/administrateurs-junior/:id/journal", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  const estAdmin = me && me.role === "administrateur";
+  const estSoiMeme = me && me.role === "administrateur_junior" && Number(me.id) === Number(params.id);
+  if (!estAdmin && !estSoiMeme) return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(
+    "SELECT action, catalogue_id, details, acteur_nom, created_at FROM admin_junior_journal WHERE junior_user_id=? ORDER BY id DESC LIMIT 200"
+  ).all(params.id);
+  for (const r of rows) {
+    if (r.catalogue_id) r.catalogue_description = AdminJunior.entreeCatalogue(r.catalogue_id)?.description || null;
+  }
+  sendJSON(res, 200, { journal: rows });
+});
+
+/* ========== FIN ROUTES ADMINISTRATEURS JUNIOR ========== */
 
 /* ========== ROUTES CERTIFICATION ========== */
 
@@ -21485,6 +21647,35 @@ async function handleRequest(req, res) {
     return;
   }
 
+  /* ── Administrateurs Junior : renouvellement mensuel des identifiants ──
+     Régénère email + mot de passe (8 car., sans I/O/0/1) pour CHAQUE administrateur junior,
+     inconditionnellement (même si rafraîchi manuellement récemment — comportement voulu,
+     conforme au cahier des charges "renouvelés chaque mois"). Les nouveaux identifiants
+     restent consultables dans le module Administrateurs Junior pour transmission manuelle —
+     aucun envoi automatique (l'adresse @diaspoactif.admin n'a pas de vraie boîte mail). */
+  if (pathname === '/api/cron/junior-admin-rotation') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      const juniors = await db.prepare('SELECT user_id FROM admin_junior_meta').all();
+      let regeneres = 0, echecs = 0;
+      for (const j of juniors) {
+        try {
+          await AdminJunior.regenererIdentifiantsJunior(db, { juniorUserId: j.user_id, acteurAdminId: null, motif: 'cron_mensuel' });
+          regeneres++;
+        } catch (e) {
+          console.error('[junior-admin-rotation]', 'user_id=' + j.user_id, e.message);
+          echecs++;
+        }
+      }
+      sendJSON(res, 200, { ok: true, regeneres, echecs, total: juniors.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron junior-admin-rotation"));
+    }
+    return;
+  }
+
   /* ── Cagnotte : rappel "fin proche" au créateur (Phase 2 point 4) — cagnottes actives
      (calculerStatutCagnotte) dont la date de fin approche, une seule notification chacune. */
   if (pathname === '/api/cron/cagnotte-fin-proche') {
@@ -25996,7 +26187,7 @@ ${jsonLd}
     /* ── GET /api/admin/dossiers-signalement — liste des dossiers (admin) ── */
     if (req.method === 'GET' && pathname === '/api/admin/dossiers-signalement') {
       const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      if (!me || !(await AdminJunior.hasAdminPermission(me, 'moderation.signalements.consulter', db))) return sendJSON(res, 403, { error: 'Réservé.' });
       const q = parsed.query || {};
       let sql = `
         SELECT s.*, u1.nom AS cible_nom, u2.nom AS reporter_nom, ua.nom AS admin_nom
@@ -26022,7 +26213,7 @@ ${jsonLd}
     /* ── GET /api/admin/dossiers-signalement/:id — fiche détaillée d'un dossier ── */
     if (req.method === 'GET' && /^\/api\/admin\/dossiers-signalement\/\d+$/.test(pathname)) {
       const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      if (!me || !(await AdminJunior.hasAdminPermission(me, 'moderation.signalements.consulter', db))) return sendJSON(res, 403, { error: 'Réservé.' });
       const id = parseInt(pathname.split('/')[4]);
       const dossier = await db.prepare(`
         SELECT s.*, u1.nom AS cible_nom, u1.email AS cible_email, u1.role AS cible_role, u1.created_at AS cible_created_at,
@@ -26055,7 +26246,7 @@ ${jsonLd}
     /* ── PATCH /api/admin/dossiers-signalement/:id — passer en analyse / fixer la gravité / assigner ── */
     if (req.method === 'PATCH' && /^\/api\/admin\/dossiers-signalement\/\d+$/.test(pathname)) {
       const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      if (!me || !(await AdminJunior.hasAdminPermission(me, 'moderation.signalements.instruire', db))) return sendJSON(res, 403, { error: 'Réservé.' });
       const id = parseInt(pathname.split('/')[4]);
       const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
       if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
@@ -26077,13 +26268,14 @@ ${jsonLd}
       await db.prepare(`UPDATE signalements SET ${sets.join(',')} WHERE id=?`).run(...vals);
       await db.prepare(`INSERT INTO signalement_historique (dossier_id,admin_id,admin_nom,action,note) VALUES (?,?,?,?,?)`)
         .run(id, me.id, me.nom, statut ? `statut:${statut}` : `gravite:${gravite}`, note || null);
+      await AdminJunior.journaliserActionSiJunior(db, me, 'moderation.signalements.instruire', `Dossier #${id} : ${statut ? `statut ${statut}` : `gravité ${gravite}`}`);
       return sendJSON(res, 200, { ok: true });
     }
 
     /* ── POST /api/admin/dossiers-signalement/:id/litige — ouvrir un litige (médiation) ── */
     if (req.method === 'POST' && /^\/api\/admin\/dossiers-signalement\/\d+\/litige$/.test(pathname)) {
       const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      if (!me || !(await AdminJunior.hasAdminPermission(me, 'moderation.signalements.litige', db))) return sendJSON(res, 403, { error: 'Réservé.' });
       const id = parseInt(pathname.split('/')[4]);
       const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
       if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
@@ -26102,6 +26294,7 @@ ${jsonLd}
         `Un signalement vous concernant fait l'objet d'un litige (motif : ${dossier.motif}). Merci de répondre depuis votre espace.`,
         { signalement_id: id });
 
+      await AdminJunior.journaliserActionSiJunior(db, me, 'moderation.signalements.litige', `Litige ${numeroLitige} ouvert sur le dossier #${id}`);
       return sendJSON(res, 201, { litige_id: litigeId, numero_litige: numeroLitige });
     }
 
@@ -26112,7 +26305,7 @@ ${jsonLd}
       const id = parseInt(pathname.split('/')[3]);
       const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
       if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
-      const isAdmin = me.role === 'administrateur';
+      const isAdmin = me.role === 'administrateur' || await AdminJunior.hasAdminPermission(me, 'moderation.signalements.repondre', db);
       const isCible = Number(me.id) === Number(dossier.cible_id);
       if (!isAdmin && !isCible) return sendJSON(res, 403, { error: 'Vous ne pouvez pas répondre à ce dossier.' });
 
@@ -26137,6 +26330,7 @@ ${jsonLd}
           }
         }
       }
+      await AdminJunior.journaliserActionSiJunior(db, me, 'moderation.signalements.repondre', `Message posté sur le dossier #${id}`);
       return sendJSON(res, 201, { ok: true });
     }
 
@@ -26147,7 +26341,7 @@ ${jsonLd}
       const id = parseInt(pathname.split('/')[3]);
       const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
       if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
-      const isAdmin = me.role === 'administrateur';
+      const isAdmin = me.role === 'administrateur' || await AdminJunior.hasAdminPermission(me, 'moderation.signalements.repondre', db);
       const isCible = Number(me.id) === Number(dossier.cible_id);
       const isReporter = Number(me.id) === Number(dossier.reporter_id);
       if (!isAdmin && !isCible && !isReporter) return sendJSON(res, 403, { error: 'Accès refusé.' });
@@ -26162,7 +26356,7 @@ ${jsonLd}
     /* ── POST /api/admin/dossiers-signalement/:id/decision — décision finale ── */
     if (req.method === 'POST' && /^\/api\/admin\/dossiers-signalement\/\d+\/decision$/.test(pathname)) {
       const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      if (!me || !(await AdminJunior.hasAdminPermission(me, 'moderation.signalements.decision', db))) return sendJSON(res, 403, { error: 'Réservé.' });
       const id = parseInt(pathname.split('/')[4]);
       const dossier = await db.prepare('SELECT * FROM signalements WHERE id=?').get(id);
       if (!dossier) return sendJSON(res, 404, { error: 'Dossier introuvable.' });
@@ -26234,6 +26428,7 @@ ${jsonLd}
           : `Votre compte a été suspendu suite au dossier ${dossier.numero_dossier}${dateFin ? " jusqu'au " + new Date(dateFin).toLocaleDateString('fr-FR') : ' de façon définitive'}.${note ? ' Motif : ' + note : ''}`;
       creerNotif(dossier.cible_id, 'decision_signalement', `📋 Décision — ${dossier.numero_dossier}`, messageDecision, { signalement_id: id });
 
+      await AdminJunior.journaliserActionSiJunior(db, me, 'moderation.signalements.decision', `Dossier #${id} : décision ${decision}`);
       return sendJSON(res, 200, { ok: true, statut: nouveauStatut });
     }
 
@@ -26241,7 +26436,7 @@ ${jsonLd}
        depuis account_reports/initiative_reports (anciennes tables conservées, non supprimées) ── */
     if (req.method === 'POST' && pathname === '/api/admin/dossiers-signalement/migrer-anciens') {
       const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      if (!me || !(await AdminJunior.hasAdminPermission(me, 'moderation.signalements.migrer', db))) return sendJSON(res, 403, { error: 'Réservé.' });
 
       let migres = 0, ignores = 0;
       const STATUT_ACCOUNT = { en_attente: 'nouveau', classe: 'classe_sans_suite', rappel_envoye: 'en_analyse', masque: 'suspendu', resolu: 'archive' };
@@ -26282,6 +26477,7 @@ ${jsonLd}
         migres++;
       }
 
+      await AdminJunior.journaliserActionSiJunior(db, me, 'moderation.signalements.migrer', `Migration : ${migres} importés, ${ignores} ignorés`);
       return sendJSON(res, 200, { ok: true, migres, ignores });
     }
 

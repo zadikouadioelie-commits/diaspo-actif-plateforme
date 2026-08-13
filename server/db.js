@@ -48,7 +48,10 @@ db.exec(`
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     password_salt TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','administrateur','collectivite')),
+    -- 'officiel'/'institutionnel' sont déjà utilisés en prod hors de cette liste (rôles consolidés
+    -- vers administrateur/collectivite) sans problème : CREATE TABLE IF NOT EXISTS ne touche jamais
+    -- une table existante, donc ce CHECK n'est vérifié qu'à la toute première création de la table.
+    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior')),
     ville TEXT,
     pays TEXT,
     adresse TEXT,
@@ -4843,6 +4846,68 @@ db.exec(`
     created_at          TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+`);
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE "ADMINISTRATEURS JUNIOR" — sous-comptes délégués (2026-08)
+   Identité = ligne users (role='administrateur_junior'), rien de plus sur users
+   lui-même. Tout le reste (verrouillage, mot de passe courant en clair pour
+   affichage/copie manuelle, permissions, journal) vit dans les 3 tables
+   satellites ci-dessous — même schéma que le module "Comptes liés" au-dessus.
+   password_plain_courant est volontairement en clair : le principe même de la
+   fonctionnalité est que l'administrateur principal doit pouvoir le consulter
+   et le copier à tout moment pour le transmettre à la main (décision actée
+   avec l'utilisateur). Jamais exposé via publicUser() — n'existe pas sur la
+   table users, uniquement lu par les routes /api/admin/administrateurs-junior/*.
+   ═══════════════════════════════════════════════════════════════════ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_junior_meta (
+    user_id                 INTEGER PRIMARY KEY,
+    created_by_admin_id     INTEGER NOT NULL,
+    sequence_number         INTEGER NOT NULL,
+    password_plain_courant  TEXT NOT NULL,
+    echecs_connexion        INTEGER NOT NULL DEFAULT 0,
+    -- Photo des catalogue_id accordés à la DERNIÈRE connexion réussie (JSON, tableau de
+    -- chaînes). hasAdminPermission() lit CETTE colonne, jamais admin_junior_permissions en
+    -- direct — c'est ce qui garantit qu'une révocation ne prend effet qu'à la prochaine
+    -- connexion (décision actée), au lieu de couper l'accès en cours de session. Mise à jour
+    -- uniquement par actualiserSnapshotPermissions(), appelée à la connexion réussie.
+    permissions_snapshot_json TEXT DEFAULT '[]',
+    derniere_rotation_at    TEXT DEFAULT (datetime('now')),
+    created_at              TEXT DEFAULT (datetime('now')),
+    UNIQUE(created_by_admin_id, sequence_number),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(created_by_admin_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS admin_junior_permissions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    junior_user_id      INTEGER NOT NULL,
+    catalogue_id        TEXT NOT NULL,
+    module_key          TEXT NOT NULL,
+    granted_by_admin_id INTEGER NOT NULL,
+    granted_at          TEXT DEFAULT (datetime('now')),
+    UNIQUE(junior_user_id, catalogue_id),
+    FOREIGN KEY(junior_user_id) REFERENCES users(id),
+    FOREIGN KEY(granted_by_admin_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_admin_junior_permissions_junior ON admin_junior_permissions(junior_user_id);
+
+  CREATE TABLE IF NOT EXISTS admin_junior_journal (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    junior_user_id  INTEGER NOT NULL,
+    acteur_id       INTEGER,
+    acteur_nom      TEXT,
+    action          TEXT NOT NULL CHECK(action IN (
+                      'permission_accordee','permission_revoquee','action_executee',
+                      'identifiants_regeneres_cron','identifiants_regeneres_manuel',
+                      'compte_verrouille','connexion_echouee','connexion_reussie')),
+    catalogue_id    TEXT,
+    details         TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(junior_user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_admin_junior_journal_junior ON admin_junior_journal(junior_user_id, created_at);
 `);
 
 /* =====================================================================

@@ -38,8 +38,8 @@ async function fetchCurrentUser() {
   }
 }
 
-const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html" };
-const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Super Administrateur", collectivite: "Collectivité" };
+const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html", administrateur_junior: "dashboard-administrateur-junior.html" };
+const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Super Administrateur", collectivite: "Collectivité", administrateur_junior: "Administrateur Junior" };
 
 /* ---------- Utilitaires globaux ---------- */
 function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
