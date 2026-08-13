@@ -157,6 +157,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:#0f172a
     <div class="st-loading"><div class="st-spinner"></div> Chargement des statistiques…</div>
   </div>
 
+  <!-- Accès refusé (non-administrateur) -->
+  <div id="st-access-denied" style="display:none;text-align:center;padding:60px 20px;">
+    <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+    <h2 style="font-size:18px;margin-bottom:6px;color:var(--navy);">Réservé aux administrateurs</h2>
+    <p style="color:var(--muted);font-size:14px;">L'Observatoire Mondial n'est accessible qu'aux comptes administrateurs de Diaspo'Actif.</p>
+  </div>
+
 </div>
 
 <script src="assets/data.js"></script>
@@ -610,10 +617,22 @@ function startAutoRefresh() {
 
 /* ── Init ── */
 (async function init() {
+  let me = null;
   if (typeof fetchCurrentUser === 'function') {
-    await fetchCurrentUser();
+    me = await fetchCurrentUser().catch(() => null);
     if (typeof applyAuthState === 'function') applyAuthState();
   }
+
+  /* L'Observatoire Mondial est réservé aux administrateurs — le blocage réel se fait
+     côté serveur (/api/stats renvoie une version réduite aux non-admins), ceci n'est
+     que le confort visuel pour ne pas laisser un visiteur devant une page à moitié vide. */
+  if (!me || me.role !== 'administrateur') {
+    document.getElementById('st-filters').style.display = 'none';
+    document.getElementById('st-content').style.display = 'none';
+    document.getElementById('st-access-denied').style.display = '';
+    return;
+  }
+
   await loadStats();
   startAutoRefresh();
 })();
