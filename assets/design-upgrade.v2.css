@@ -118,6 +118,11 @@ a.btn-deconnexion,
 .topbar #logout-link {
   color: #000 !important;
   background: #fff !important;
+  /* "Déconnexion" se coupait/repassait à la ligne, compressé entre les autres boutons
+     du bandeau — jamais rétréci, jamais de retour à la ligne du texte du bouton. */
+  white-space: nowrap !important;
+  flex: none !important;
+  padding: 7px 16px !important;
 }
 .topbar #lang-select,
 .topbar #lang-select option {
