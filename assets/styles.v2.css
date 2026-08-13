@@ -29,7 +29,13 @@ html,body{background:var(--bg)!important;}
 .topbar .nav a:not(.active),.topbar a:not(.active){color:rgba(255,255,255,.85)!important;}
 .topbar .nav a:hover:not(.active){color:#fff!important;}
 .topbar .nav a.active{color:var(--navy)!important;}
-input,select,textarea{background:#F8FAFD!important; border-color:var(--border)!important;}
+/* :not([type=checkbox]):not([type=radio]) — sans cette exclusion, la règle ci-dessous
+   (pensée pour les champs texte) s'appliquait aussi aux cases à cocher/radios natives :
+   fond quasi blanc + bordure très pâle (var(--border), ex. #DCE4EF) sans reset d'apparence,
+   ce qui les rend quasiment invisibles (cercles pâles) plutôt que des cases nettes. Trouvé
+   en vérifiant l'écran de création d'un administrateur junior (dashboard-administrateur.html),
+   mais la règle d'origine touchait TOUTES les cases à cocher du site. */
+input:not([type=checkbox]):not([type=radio]),select,textarea{background:#F8FAFD!important; border-color:var(--border)!important;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
 body{
