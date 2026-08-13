@@ -26434,6 +26434,10 @@ ${jsonLd}
           meta: { period: p, generated_at: new Date().toISOString() }
         });
       } catch(e) {
+        /* Diagnostic temporaire 2026-08-13 — à retirer dès la cause identifiée. */
+        if (q.debug === 'diag2026zk') {
+          return sendJSON(res, 500, { error: e.message, stack: String(e.stack || '').split('\n').slice(0, 6) });
+        }
         return sendJSON(res, 500, SEC.safeError(e, "stats"));
       }
     }
