@@ -26402,8 +26402,13 @@ ${jsonLd}
           verified,
           docs_verifies:    docsVerif,
           pct_verified:     totalMembres > 0 ? Math.round(verified * 100 / totalMembres) : 0,
-          score_moyen:      (await db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get())?.avg?.toFixed(1) ?? 0,
-          reactivity_moy:   (await db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get())?.avg?.toFixed(1) ?? 0,
+          /* Number(...) avant toFixed() : AVG() sur une colonne INTEGER (reactivity_stars)
+             renvoie un NUMERIC en PostgreSQL, que le driver pg restitue en CHAÎNE (pas en
+             nombre) pour éviter toute perte de précision — .toFixed() plantait alors la
+             route entière (500 sur /api/stats, jamais reproduit en local où SQLite renvoie
+             toujours un nombre JS). trust_score (colonne REAL) n'était pas affecté. */
+          score_moyen:      Number((await db.prepare(`SELECT AVG(trust_score) avg FROM users WHERE trust_score > 0`).get())?.avg ?? 0).toFixed(1),
+          reactivity_moy:   Number((await db.prepare(`SELECT AVG(reactivity_stars) avg FROM users WHERE reactivity_stars > 0`).get())?.avg ?? 0).toFixed(1),
           actifs_30j:       (await db.prepare(`SELECT COUNT(*) n FROM users WHERE last_active >= datetime('now','-30 days')`).get())?.n,
           absents:          (await db.prepare(`SELECT COUNT(*) n FROM user_absence WHERE fin IS NULL OR fin >= date('now')`).get())?.n,
           suspendus:        (await db.prepare(`SELECT COUNT(*) n FROM account_reports WHERE statut='masque'`).get())?.n,
@@ -26434,10 +26439,6 @@ ${jsonLd}
           meta: { period: p, generated_at: new Date().toISOString() }
         });
       } catch(e) {
-        /* Diagnostic temporaire 2026-08-13 — à retirer dès la cause identifiée. */
-        if (q.debug === 'diag2026zk') {
-          return sendJSON(res, 500, { error: e.message, stack: String(e.stack || '').split('\n').slice(0, 6) });
-        }
         return sendJSON(res, 500, SEC.safeError(e, "stats"));
       }
     }
