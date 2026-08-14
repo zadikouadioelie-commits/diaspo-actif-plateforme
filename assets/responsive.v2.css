@@ -422,6 +422,38 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .sidebar-toggle.sidebar-toggle--has-mobile-nav-alt { display: none; }
 }
 
+/* Dropdown Notifications (assets/app.js, #notif-dropdown) : ancré en position:absolute avec
+   right:0 par rapport au bouton cloche et une largeur fixe de 340px — sur mobile, ce bouton
+   est proche du bord gauche du topbar (peu d'espace après lui), donc le dropdown déborde très
+   largement hors de l'écran vers la gauche (jusqu'à -240px de x, entièrement invisible). Le
+   clic déclenchait bien l'ouverture (open:true) mais rien n'était visible à l'écran, d'où
+   l'impression d'un bouton "cassé". On repositionne en fixed, pleine largeur avec marges,
+   indépendant de la position du bouton déclencheur — signalé par un utilisateur sur mobile
+   le 2026-08-14. */
+@media (max-width: 767px) {
+  .notif-dropdown {
+    position: fixed !important;
+    top: 64px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+}
+
+/* Bandeau cookies (assets/cookies-banner.js, position:fixed;bottom:0;z-index:9999) : sur
+   mobile, ce z-index très élevé le fait passer AU-DESSUS de .mobile-bottom-nav (z-index:150,
+   également bottom:0) plutôt que d'être caché derrière — il recouvrait le bouton central
+   "Nouveau" (cercle surélevé, voir .mobile-bottom-nav__item--publish), le faisant apparaître
+   tronqué. On remonte le bandeau au-dessus de la barre du bas tant qu'elle est visible.
+   +16px de marge : le cercle du bouton "Nouveau" déborde d'environ 12px au-dessus du sommet
+   de la barre (margin-top:-22px sur son icône) — sans cette marge, son sommet restait couvert
+   par le bandeau même une fois celui-ci remonté à ras de la barre. */
+@media (max-width: 1023px) {
+  #da-cookie-banner { bottom: calc(60px + 16px + env(safe-area-inset-bottom)) !important; }
+}
+
 /* Pages sans tiroir #sidebar dédié (ex. comptes-lies.html) : au-delà de 768px, .nav est
    déjà affichée en permanence dans le topbar (voir styles.v2.css), donc le bouton rond
    n'a plus rien à ouvrir/fermer — le masquer évite un bouton qui semble ne "rien faire".
