@@ -165,7 +165,6 @@
     container.innerHTML = `
       <div class="cda-card">
         <div class="cda-banner" style="${bannerStyle}">
-          <div class="cda-banner-brand"><img src="assets/logo.png" alt=""><div><span>Diaspo'Actif</span><small>Actions locales, impact global</small></div></div>
         </div>
         <div class="cda-head">
           <div class="cda-avatar-wrap">

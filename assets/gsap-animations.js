@@ -20,9 +20,13 @@
   function animatePageEntrance() {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
 
-    // Topbar glisse vers le bas
+    // Fondu d'entrée du topbar (opacité seule, jamais de transform ici : un translateY sur
+    // .topbar crée un nouveau bloc de positionnement pour tous ses descendants en
+    // position:fixed — ex. le bouton rond #sidebar-toggle, qui se met alors à se positionner
+    // par rapport au topbar animé au lieu de l'écran, et atterrit sur le contenu en dessous
+    // pendant/après l'animation. Signalé par un utilisateur sur mobile le 2026-08-14.)
     tl.from('.topbar', {
-      y: -60, opacity: 0, duration: 0.5
+      opacity: 0, duration: 0.5
     });
 
     // Hero titre + sous-titre — uniquement sur les pages qui ont un .hero
