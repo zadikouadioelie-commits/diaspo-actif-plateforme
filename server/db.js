@@ -1716,6 +1716,9 @@ const MIGRATIONS = [
   ["user_accreditations", "reduction_pct_appliquee REAL DEFAULT 0"],
   // Rubrique Vitrines — date de dernière modification publique de la vitrine (tri "Dernière mise à jour")
   ["initiatives", "updated_at TEXT"],
+  // Module Administrateurs Junior — suspension manuelle (réversible), distincte du verrouillage
+  // automatique à 3 échecs (echecs_connexion) : action explicite de l'administrateur principal.
+  ["admin_junior_meta", "suspendu INTEGER DEFAULT 0"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -4761,6 +4764,56 @@ db.exec(`
     user_agent_hash TEXT,
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE
   );
+
+  /* ── Support Pilote (assistance à distance) — 2026-08-14 ──
+     Un membre en difficulté demande qu'un administrateur voie son écran en direct et agisse
+     à sa place, mais UNIQUEMENT sur les pages de Diaspo'Actif (jamais le reste de son
+     ordinateur) : mot de passe + motif obligatoires à la demande, acceptation explicite du
+     membre sous 10 min, session de visualisation/contrôle de 15 min max (+5 à +10 min
+     d'extension), tout tracé dans assistance_sessions_audit. Voir memory
+     project_transfert_gestionnaire.md pour le modèle de machine à états dont celle-ci
+     s'inspire directement (expiration paresseuse à la lecture, pas de cron dédié). */
+  CREATE TABLE IF NOT EXISTS assistance_sessions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    membre_id           INTEGER NOT NULL,
+    admin_id            INTEGER,
+    motif               TEXT NOT NULL,
+    statut              TEXT NOT NULL DEFAULT 'EN_ATTENTE'
+                           CHECK(statut IN ('EN_ATTENTE','NOTIFIE','ACTIVE','TERMINEE','EXPIREE','REFUSEE','ANNULEE')),
+    notif_expires_at    TEXT,
+    session_expires_at  TEXT,
+    extension_minutes   INTEGER NOT NULL DEFAULT 0,
+    snapshot_url        TEXT,
+    snapshot_html       TEXT,
+    snapshot_at         TEXT,
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now')),
+    terminee_le         TEXT,
+    FOREIGN KEY(membre_id) REFERENCES users(id),
+    FOREIGN KEY(admin_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS assistance_actions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  INTEGER NOT NULL,
+    type        TEXT NOT NULL CHECK(type IN ('click','input','submit','navigate')),
+    selecteur   TEXT,
+    valeur      TEXT,
+    executee    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(session_id) REFERENCES assistance_sessions(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS assistance_sessions_audit (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  INTEGER NOT NULL,
+    acteur_id   INTEGER,
+    acteur_role TEXT,
+    action      TEXT NOT NULL,
+    details     TEXT,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(session_id) REFERENCES assistance_sessions(id) ON DELETE CASCADE
+  );
 `);
 
 {
@@ -4867,6 +4920,10 @@ db.exec(`
     sequence_number         INTEGER NOT NULL,
     password_plain_courant  TEXT NOT NULL,
     echecs_connexion        INTEGER NOT NULL DEFAULT 0,
+    -- Suspension manuelle (réversible), distincte du verrouillage automatique à 3 échecs
+    -- ci-dessus : action explicite de l'administrateur principal, jamais déclenchée seule
+    -- par le système.
+    suspendu                INTEGER NOT NULL DEFAULT 0,
     -- Photo des catalogue_id accordés à la DERNIÈRE connexion réussie (JSON, tableau de
     -- chaînes). hasAdminPermission() lit CETTE colonne, jamais admin_junior_permissions en
     -- direct — c'est ce qui garantit qu'une révocation ne prend effet qu'à la prochaine
@@ -4901,7 +4958,8 @@ db.exec(`
     action          TEXT NOT NULL CHECK(action IN (
                       'permission_accordee','permission_revoquee','action_executee',
                       'identifiants_regeneres_cron','identifiants_regeneres_manuel',
-                      'compte_verrouille','connexion_echouee','connexion_reussie')),
+                      'compte_verrouille','connexion_echouee','connexion_reussie',
+                      'compte_suspendu','compte_reactive')),
     catalogue_id    TEXT,
     details         TEXT,
     created_at      TEXT DEFAULT (datetime('now')),

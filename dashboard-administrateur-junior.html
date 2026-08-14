@@ -40,6 +40,7 @@
       <span class="sb-group-lbl">🙋 Mon espace</span>
       <a href="#mes-droits" data-section="mes-droits">📋 Mes droits</a>
       <a href="#mon-activite" data-section="mon-activite">🕓 Mon activité</a>
+      <a href="#messagerie" data-section="messagerie">✉️ Messagerie</a>
     </aside>
 
     <main class="content">
@@ -157,6 +158,13 @@
         <div class="notice" style="margin-bottom:16px;">Historique de vos actions sur la plateforme, également visible par l'administrateur principal.</div>
         <div class="card"><div id="aj-mon-activite-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div></div>
       </section>
+
+      <!-- MESSAGERIE -->
+      <section id="section-messagerie" style="display:none;">
+        <h2>✉️ Messagerie</h2>
+        <div class="notice" style="margin-bottom:16px;">Échangez avec l'administrateur principal et les autres administrateurs junior. Messages, pièces jointes et vocaux se gèrent dans la messagerie habituelle de la plateforme.</div>
+        <div class="card"><div id="aj-messagerie-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div></div>
+      </section>
     </main>
   </div>
 </div>
@@ -209,6 +217,25 @@ async function loadMonActivite() {
   }
 }
 
+async function loadMessagerie() {
+  const el = document.getElementById('aj-messagerie-liste');
+  try {
+    const data = await api('GET', '/admin-junior/mes-collegues');
+    const lignes = [];
+    if (data.principal) lignes.push({ ...data.principal, role: 'Administrateur principal' });
+    (data.collegues || []).forEach(c => lignes.push({ ...c, role: `Administrateur junior n°${c.sequence_number}` }));
+    if (!lignes.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Personne à contacter pour le moment.</p>'; return; }
+    el.innerHTML = lignes.map(l => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#eee);">
+        <div><strong>${esc(l.nom)}</strong><br><span style="font-size:12px;color:var(--muted);">${esc(l.role)}</span></div>
+        <a class="btn btn-sm btn-orange" href="messagerie.html?with=${l.id}">✉️ Écrire</a>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = '<p style="color:red;font-size:13px;">Erreur de chargement.</p>';
+  }
+}
+
 (async () => {
   const me = await fetchCurrentUser();
   if (!me) { window.location.href = "login-administrateur-junior.html"; return; }
@@ -226,7 +253,7 @@ async function loadMonActivite() {
     ? `<span class="sb-group-lbl">🗂 Modules délégués</span>` + modulesAccordes.map(m => AJ_SIDEBAR_LINKS[m] || '').join('')
     : `<p style="padding:10px 16px;font-size:12px;color:rgba(255,255,255,.6);">Aucun module délégué pour le moment. Contactez l'administrateur principal.</p>`;
 
-  const SECTION_LOADERS = { 'mes-droits': loadMesDroits, 'mon-activite': loadMonActivite };
+  const SECTION_LOADERS = { 'mes-droits': loadMesDroits, 'mon-activite': loadMonActivite, 'messagerie': loadMessagerie };
   if (modulesAccordes.includes('moderation')) SECTION_LOADERS['moderation'] = () => switchModeTab('comptes');
   if (modulesAccordes.includes('suppression_comptes')) SECTION_LOADERS['suppression-comptes'] = () => loadDelReqList();
 

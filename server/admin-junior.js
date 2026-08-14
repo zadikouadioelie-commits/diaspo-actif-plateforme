@@ -243,11 +243,56 @@ async function estVerrouille(db, juniorUserId) {
   return Number(row?.echecs_connexion || 0) >= JUNIOR_LOCKOUT_SEUIL;
 }
 
+/* Suspension manuelle, réversible — distincte du verrouillage automatique à 3 échecs (au-dessus) :
+   celui-ci se lève par un rafraîchissement des identifiants, la suspension par reactiverAdminJunior()
+   uniquement. Les deux peuvent être actifs en même temps ; estVerrouille() et estSuspendu() sont
+   vérifiés séparément à la connexion (server/index.js), avec un message distinct pour chacun. */
+async function estSuspendu(db, juniorUserId) {
+  const row = await db.prepare('SELECT suspendu FROM admin_junior_meta WHERE user_id=?').get(juniorUserId);
+  return !!Number(row?.suspendu || 0);
+}
+
+async function suspendreAdminJunior(db, { juniorUserId, acteurAdminId }) {
+  await db.prepare('UPDATE admin_junior_meta SET suspendu=1 WHERE user_id=?').run(juniorUserId);
+  await journaliserJunior(db, { juniorUserId, acteurId: acteurAdminId || null, action: 'compte_suspendu', details: 'Suspendu par l\'administrateur principal.' });
+}
+
+async function reactiverAdminJunior(db, { juniorUserId, acteurAdminId }) {
+  await db.prepare('UPDATE admin_junior_meta SET suspendu=0 WHERE user_id=?').run(juniorUserId);
+  await journaliserJunior(db, { juniorUserId, acteurId: acteurAdminId || null, action: 'compte_reactive', details: 'Réactivé par l\'administrateur principal.' });
+}
+
+/* Suppression définitive et irréversible — synthétique (compte factice, aucune donnée personnelle
+   réelle à protéger façon RGPD, contrairement aux comptes utilisateurs), donc suppression directe
+   plutôt que le circuit délai-de-grâce des "Demandes de suppression". Nettoie explicitement chaque
+   table satellite AVANT la ligne users (contraintes FK) — mêmes tables que celles rencontrées lors
+   des tests manuels de ce module : permissions, journal, meta, sessions, activité. Trace la
+   suppression dans le journal d'audit GÉNÉRAL (audit_log) puisque admin_junior_journal disparaît
+   avec le reste — sinon aucune trace ne survivrait à l'action elle-même. */
+async function supprimerAdminJunior(db, { juniorUserId, acteurAdminId, acteurNom }) {
+  const user = await db.prepare('SELECT nom, email FROM users WHERE id=? AND role=\'administrateur_junior\'').get(juniorUserId);
+  if (!user) return false;
+  await db.prepare('DELETE FROM admin_junior_permissions WHERE junior_user_id=?').run(juniorUserId);
+  await db.prepare('DELETE FROM admin_junior_journal WHERE junior_user_id=?').run(juniorUserId);
+  await db.prepare('DELETE FROM admin_junior_meta WHERE user_id=?').run(juniorUserId);
+  try { await db.prepare('DELETE FROM sessions WHERE user_id=?').run(juniorUserId); } catch (_) {}
+  try { await db.prepare('DELETE FROM user_sessions WHERE user_id=?').run(juniorUserId); } catch (_) {}
+  try { await db.prepare('DELETE FROM user_activity WHERE user_id=?').run(juniorUserId); } catch (_) {}
+  await db.prepare('DELETE FROM users WHERE id=?').run(juniorUserId);
+  try {
+    await db.prepare('INSERT INTO audit_log (admin_id, action, cible_type, cible_id, detail) VALUES (?,?,?,?,?)')
+      .run(acteurAdminId, 'admin_junior_supprime', 'administrateur_junior', juniorUserId,
+        JSON.stringify({ email: user.email, nom: user.nom, acteur: acteurNom || null }));
+  } catch (e) { console.error('[admin-junior-audit-log]', e.message); }
+  return true;
+}
+
 module.exports = {
   JUNIOR_ALPHABET, JUNIOR_LONGUEUR, JUNIOR_LOCKOUT_SEUIL, DOMAINE_JUNIOR,
   CATALOGUE_ADMIN_JUNIOR, catalogueIdsPourCapacite, entreeCatalogue,
   hasAdminPermission, actualiserSnapshotPermissions, journaliserJunior, journaliserActionSiJunior,
   creerAdminJunior, regenererIdentifiantsJunior,
   enregistrerEchecConnexionJunior, estVerrouille,
+  estSuspendu, suspendreAdminJunior, reactiverAdminJunior, supprimerAdminJunior,
   genererEmailJuniorUnique, genererMotDePasseJunior, genererChaineJunior,
 };

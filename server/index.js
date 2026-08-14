@@ -665,6 +665,13 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     SEC.logSecurity("login_blocked_junior_lockout", { ip, uid: Number(user.id) });
     return sendJSON(res, 403, { error: "Ce compte administrateur junior est verrouillé après plusieurs échecs de connexion. Contactez l'administrateur principal." });
   }
+  /* Suspension manuelle — distincte du verrouillage ci-dessus, jamais levée automatiquement
+     (ni par rafraîchissement des identifiants, ni par expiration) : seul un administrateur
+     réactivant explicitement le compte y met fin. */
+  if (user.role === 'administrateur_junior' && await AdminJunior.estSuspendu(db, user.id)) {
+    SEC.logSecurity("login_blocked_junior_suspendu", { ip, uid: Number(user.id) });
+    return sendJSON(res, 403, { error: "Ce compte administrateur junior a été suspendu par l'administrateur principal." });
+  }
 
   /* Compte suspendu (module Signalement de compte & Gestion des litiges) :
      bloque la connexion tant que la sanction est active. Une suspension temporaire
@@ -7711,6 +7718,281 @@ route("POST", "/api/transfert-gestionnaire/:id/annuler", async (req, res, params
 });
 
 /* ══════════════════════════════════════════════════════════════════════
+   SUPPORT PILOTE (assistance à distance) — 2026-08-14
+   Un membre en difficulté demande qu'un administrateur ("technicien") voie son écran en
+   direct et agisse à sa place, UNIQUEMENT sur les pages de Diaspo'Actif (jamais le reste de
+   son ordinateur) : mot de passe + motif obligatoires à la demande, acceptation explicite du
+   membre sous 10 min, session de visualisation/contrôle de 15 min max (+5 à +10 min
+   d'extension), toute transition tracée dans assistance_sessions_audit. Machine à états et
+   expiration paresseuse à la lecture directement inspirées du module Transfert de
+   gestionnaire ci-dessus (voir tgChargerTransfert/tgMaintenant) — mêmes raisons : délais
+   courts (minutes), un cron dédié serait de toute façon trop grossier pour ces échéances. */
+
+const AS_NOTIF_TTL_MS = 10 * 60 * 1000;      // 10 min pour que le membre clique "Accepter"
+const AS_SESSION_DUREE_MS = 15 * 60 * 1000;  // 15 min de visualisation par défaut
+const AS_EXTENSION_MIN = 5, AS_EXTENSION_MAX = 10; // bornes de l'extension demandée par le membre
+const AS_SNAPSHOT_MAXLEN = 300000; // borne la taille du outerHTML stocké (anti-abus)
+
+// Même convention que tgMaintenant() : chaîne "YYYY-MM-DD HH:MM:SS" (espace, pas de 'T'/'Z'),
+// comparable lexicographiquement aux colonnes datetime('now') — voir commentaire de tgMaintenant.
+function asMaintenant() { return new Date().toISOString().slice(0, 19).replace('T', ' '); }
+function asPlusMs(ms) { return new Date(Date.now() + ms).toISOString().slice(0, 19).replace('T', ' '); }
+
+async function asJournaliser(sessionId, acteurId, acteurRole, action, details) {
+  try {
+    await db.prepare(`INSERT INTO assistance_sessions_audit (session_id, acteur_id, acteur_role, action, details) VALUES (?,?,?,?,?)`)
+      .run(sessionId, acteurId || null, acteurRole || null, action, details ? JSON.stringify(details) : null);
+  } catch (e) { console.error('[support-pilote] audit', e.message); }
+}
+
+/* Neutralise <script> et tout attribut on*= avant stockage — le miroir doit rester un rendu
+   inerte (affiché côté admin dans un iframe sandboxé sans allow-scripts, en défense en
+   profondeur : même si cette sanitisation avait une faille, le sandbox bloque l'exécution). */
+function asSanitizeSnapshot(html) {
+  if (typeof html !== 'string') return '';
+  let s = html.slice(0, AS_SNAPSHOT_MAXLEN);
+  s = s.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+  s = s.replace(/\son\w+\s*=\s*"(?:[^"\\]|\\.)*"/gi, '');
+  s = s.replace(/\son\w+\s*=\s*'(?:[^'\\]|\\.)*'/gi, '');
+  s = s.replace(/\son\w+\s*=\s*[^\s>]+/gi, '');
+  return s;
+}
+
+/* Charge une session en appliquant l'expiration paresseuse à la lecture (pas de cron dédié,
+   même choix que tgChargerTransfert) : NOTIFIE trop vieille -> EXPIREE, ACTIVE trop vieille ->
+   TERMINEE. Centralise ce contrôle pour que chaque route n'ait qu'à vérifier le statut
+   attendu pour SON étape. */
+async function asChargerSession(sessionId) {
+  const s = await db.prepare("SELECT * FROM assistance_sessions WHERE id=?").get(sessionId);
+  if (!s) return null;
+  s.id = Number(s.id); s.membre_id = Number(s.membre_id); if (s.admin_id != null) s.admin_id = Number(s.admin_id);
+  const now = asMaintenant();
+  if (s.statut === 'NOTIFIE' && s.notif_expires_at && s.notif_expires_at < now) {
+    await db.prepare("UPDATE assistance_sessions SET statut='EXPIREE', updated_at=datetime('now') WHERE id=?").run(s.id);
+    await asJournaliser(s.id, null, null, 'expiree', "Fenêtre d'acceptation de 10 min dépassée.");
+    s.statut = 'EXPIREE';
+  } else if (s.statut === 'ACTIVE' && s.session_expires_at && s.session_expires_at < now) {
+    await db.prepare("UPDATE assistance_sessions SET statut='TERMINEE', updated_at=datetime('now'), terminee_le=datetime('now') WHERE id=?").run(s.id);
+    await asJournaliser(s.id, null, null, 'terminee', "Durée de session écoulée.");
+    s.statut = 'TERMINEE';
+  }
+  return s;
+}
+
+/* ── Côté membre ── */
+
+route("POST", "/api/assistance/demande", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ip = SEC.clientIp(req);
+  const lim = SEC.rateLimit(`assistance:demande:${user.id}`, 3, 3600000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de demandes. Réessayez dans ${lim.retryAfter}s.` });
+
+  const motif = String(body?.motif || "").trim();
+  const password = body?.password || "";
+  if (!motif) return sendJSON(res, 400, { error: "Merci d'indiquer la raison de votre demande." });
+  if (!password) return sendJSON(res, 400, { error: "Mot de passe requis." });
+
+  const full = await db.prepare("SELECT password_hash, password_salt FROM users WHERE id=?").get(user.id);
+  if (!full || !verifyPassword(password, full.password_salt, full.password_hash)) {
+    SEC.logSecurity("assistance_demande_mdp_invalide", { uid: user.id, ip });
+    return sendJSON(res, 403, { error: "Mot de passe incorrect." });
+  }
+
+  // Une seule demande active à la fois par membre (évite le spam de sessions parallèles).
+  const active = await db.prepare(`SELECT id FROM assistance_sessions WHERE membre_id=? AND statut IN ('EN_ATTENTE','NOTIFIE','ACTIVE')`).get(user.id);
+  if (active) return sendJSON(res, 409, { error: "Vous avez déjà une demande d'assistance en cours." });
+
+  const r = await db.prepare(`INSERT INTO assistance_sessions (membre_id, motif) VALUES (?,?)`).run(user.id, motif.slice(0, 500));
+  const sessionId = Number(r.lastInsertRowid);
+  await asJournaliser(sessionId, user.id, user.role, 'demande_creee', { motif });
+  sendJSON(res, 200, { id: sessionId, statut: 'EN_ATTENTE' });
+});
+
+route("GET", "/api/assistance/mon-statut", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare(`SELECT id FROM assistance_sessions WHERE membre_id=? AND statut IN ('EN_ATTENTE','NOTIFIE','ACTIVE') ORDER BY id DESC LIMIT 1`).get(user.id);
+  if (!s) return sendJSON(res, 200, { session: null });
+  const fresh = await asChargerSession(Number(s.id));
+  if (!fresh || !['EN_ATTENTE', 'NOTIFIE', 'ACTIVE'].includes(fresh.statut)) return sendJSON(res, 200, { session: null });
+  sendJSON(res, 200, { session: {
+    id: fresh.id, statut: fresh.statut, motif: fresh.motif,
+    notif_expires_at: fresh.notif_expires_at, session_expires_at: fresh.session_expires_at,
+  }});
+});
+
+route("POST", "/api/assistance/:id/accepter", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (s.membre_id !== user.id) return sendJSON(res, 403, { error: "Cette session ne vous appartient pas." });
+  if (s.statut !== 'NOTIFIE') return sendJSON(res, 409, { error: "Cette demande n'est plus en attente d'acceptation." });
+  const expiresAt = asPlusMs(AS_SESSION_DUREE_MS);
+  await db.prepare("UPDATE assistance_sessions SET statut='ACTIVE', session_expires_at=?, updated_at=datetime('now') WHERE id=?").run(expiresAt, s.id);
+  await asJournaliser(s.id, user.id, user.role, 'membre_accepte', null);
+  await asJournaliser(s.id, user.id, user.role, 'session_active', { session_expires_at: expiresAt });
+  sendJSON(res, 200, { statut: 'ACTIVE', session_expires_at: expiresAt });
+});
+
+route("POST", "/api/assistance/:id/refuser", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (s.membre_id !== user.id) return sendJSON(res, 403, { error: "Cette session ne vous appartient pas." });
+  if (!['EN_ATTENTE', 'NOTIFIE'].includes(s.statut)) return sendJSON(res, 409, { error: "Cette demande ne peut plus être refusée." });
+  await db.prepare("UPDATE assistance_sessions SET statut='REFUSEE', updated_at=datetime('now') WHERE id=?").run(s.id);
+  await asJournaliser(s.id, user.id, user.role, 'refusee', null);
+  sendJSON(res, 200, { statut: 'REFUSEE' });
+});
+
+route("POST", "/api/assistance/:id/etendre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (s.membre_id !== user.id) return sendJSON(res, 403, { error: "Cette session ne vous appartient pas." });
+  if (s.statut !== 'ACTIVE') return sendJSON(res, 409, { error: "Aucune session active à prolonger." });
+  let minutes = Number(body?.minutes);
+  if (!Number.isFinite(minutes)) minutes = AS_EXTENSION_MIN;
+  minutes = Math.min(AS_EXTENSION_MAX, Math.max(AS_EXTENSION_MIN, Math.round(minutes)));
+  const base = s.session_expires_at && s.session_expires_at > asMaintenant() ? s.session_expires_at : asMaintenant();
+  const nouvelleEcheance = new Date(new Date(base.replace(' ', 'T') + 'Z').getTime() + minutes * 60000).toISOString().slice(0, 19).replace('T', ' ');
+  await db.prepare("UPDATE assistance_sessions SET session_expires_at=?, extension_minutes=extension_minutes+?, updated_at=datetime('now') WHERE id=?").run(nouvelleEcheance, minutes, s.id);
+  await asJournaliser(s.id, user.id, user.role, 'extension', { minutes, nouvelle_echeance: nouvelleEcheance });
+  sendJSON(res, 200, { statut: 'ACTIVE', session_expires_at: nouvelleEcheance });
+});
+
+// Le membre pousse un instantané de sa page courante toutes les ~2s pendant ACTIVE (mirroring).
+route("POST", "/api/assistance/:id/etat", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (s.membre_id !== user.id) return sendJSON(res, 403, { error: "Cette session ne vous appartient pas." });
+  if (s.statut !== 'ACTIVE') return sendJSON(res, 200, { statut: s.statut });
+  const html = asSanitizeSnapshot(body?.html || '');
+  const url = String(body?.url || '').slice(0, 500);
+  await db.prepare("UPDATE assistance_sessions SET snapshot_url=?, snapshot_html=?, snapshot_at=datetime('now') WHERE id=?").run(url, html, s.id);
+  sendJSON(res, 200, { statut: 'ACTIVE' });
+});
+
+// Le membre récupère les actions admin en attente et les exécute réellement dans son DOM.
+route("GET", "/api/assistance/:id/actions", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (s.membre_id !== user.id) return sendJSON(res, 403, { error: "Cette session ne vous appartient pas." });
+  if (s.statut !== 'ACTIVE') return sendJSON(res, 200, { statut: s.statut, actions: [] });
+  const actions = await db.prepare("SELECT id, type, selecteur, valeur FROM assistance_actions WHERE session_id=? AND executee=0 ORDER BY id ASC LIMIT 20").all(s.id);
+  sendJSON(res, 200, { statut: 'ACTIVE', actions });
+});
+
+route("POST", "/api/assistance/:id/actions/:actionId/ack", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await db.prepare("SELECT membre_id FROM assistance_sessions WHERE id=?").get(Number(params.id));
+  if (!s || Number(s.membre_id) !== user.id) return sendJSON(res, 403, { error: "Accès refusé." });
+  await db.prepare("UPDATE assistance_actions SET executee=1 WHERE id=? AND session_id=?").run(Number(params.actionId), Number(params.id));
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/assistance/:id/terminer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (s.membre_id !== user.id) return sendJSON(res, 403, { error: "Cette session ne vous appartient pas." });
+  if (!['EN_ATTENTE', 'NOTIFIE', 'ACTIVE'].includes(s.statut)) return sendJSON(res, 200, { statut: s.statut });
+  await db.prepare("UPDATE assistance_sessions SET statut='TERMINEE', updated_at=datetime('now'), terminee_le=datetime('now') WHERE id=?").run(s.id);
+  await asJournaliser(s.id, user.id, user.role, 'terminee', 'Arrêtée par le membre.');
+  sendJSON(res, 200, { statut: 'TERMINEE' });
+});
+
+/* ── Côté administrateur ("technicien") ── */
+
+route("GET", "/api/admin/assistance", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const enAttente = await db.prepare(`
+    SELECT s.id, s.motif, s.created_at, u.nom, u.prenom, u.email
+    FROM assistance_sessions s JOIN users u ON u.id = s.membre_id
+    WHERE s.statut='EN_ATTENTE' ORDER BY s.created_at ASC LIMIT 50
+  `).all();
+  const mesSessions = await db.prepare(`
+    SELECT s.id, s.statut, s.motif, s.session_expires_at, s.notif_expires_at, u.nom, u.prenom, u.email
+    FROM assistance_sessions s JOIN users u ON u.id = s.membre_id
+    WHERE s.admin_id=? AND s.statut IN ('NOTIFIE','ACTIVE') ORDER BY s.id DESC
+  `).all(me.id);
+  sendJSON(res, 200, { en_attente: enAttente, mes_sessions: mesSessions });
+});
+
+// Premier arrivé, premier servi — pas de système de disponibilité/planning des techniciens
+// en v1 (simplification actée avec l'utilisateur dans le plan de ce module).
+route("POST", "/api/admin/assistance/:id/accepter", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (s.statut !== 'EN_ATTENTE') return sendJSON(res, 409, { error: "Cette demande n'est plus disponible (déjà prise en charge ou expirée)." });
+  const notifExpiresAt = asPlusMs(AS_NOTIF_TTL_MS);
+  await db.prepare("UPDATE assistance_sessions SET statut='NOTIFIE', admin_id=?, notif_expires_at=?, updated_at=datetime('now') WHERE id=?").run(me.id, notifExpiresAt, s.id);
+  await asJournaliser(s.id, me.id, me.role, 'technicien_accepte', { notif_expires_at: notifExpiresAt });
+  sendJSON(res, 200, { statut: 'NOTIFIE', notif_expires_at: notifExpiresAt });
+});
+
+route("GET", "/api/admin/assistance/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (Number(s.admin_id) !== me.id) return sendJSON(res, 403, { error: "Cette session est prise en charge par un autre administrateur." });
+  sendJSON(res, 200, {
+    statut: s.statut, session_expires_at: s.session_expires_at,
+    snapshot_url: s.snapshot_url, snapshot_html: s.snapshot_html, snapshot_at: s.snapshot_at,
+  });
+});
+
+// L'admin relaie un clic/saisie effectué dans le miroir — insère dans la file d'actions que
+// le membre exécutera réellement dans son propre DOM (voir GET .../actions côté membre).
+route("POST", "/api/admin/assistance/:id/action", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (Number(s.admin_id) !== me.id) return sendJSON(res, 403, { error: "Accès refusé." });
+  if (s.statut !== 'ACTIVE') return sendJSON(res, 409, { error: "Session non active." });
+  const type = body?.type;
+  if (!['click', 'input', 'submit', 'navigate'].includes(type)) return sendJSON(res, 400, { error: "Type d'action invalide." });
+  let valeur = body?.valeur != null ? String(body.valeur).slice(0, 2000) : null;
+  if (type === 'navigate') {
+    // Sécurité : jamais de navigation hors du même site — seul un chemin relatif est autorisé.
+    if (!valeur || /^[a-z]+:\/\//i.test(valeur) || valeur.startsWith('//')) {
+      return sendJSON(res, 400, { error: "Navigation refusée (même origine uniquement)." });
+    }
+  }
+  const r = await db.prepare("INSERT INTO assistance_actions (session_id, type, selecteur, valeur) VALUES (?,?,?,?)")
+    .run(s.id, type, body?.selecteur ? String(body.selecteur).slice(0, 500) : null, valeur);
+  await asJournaliser(s.id, me.id, me.role, 'action_relayee', { type, selecteur: body?.selecteur });
+  sendJSON(res, 200, { id: Number(r.lastInsertRowid) });
+});
+
+route("POST", "/api/admin/assistance/:id/terminer", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const s = await asChargerSession(Number(params.id));
+  if (!s) return sendJSON(res, 404, { error: "Session introuvable." });
+  if (Number(s.admin_id) !== me.id) return sendJSON(res, 403, { error: "Accès refusé." });
+  if (!['NOTIFIE', 'ACTIVE'].includes(s.statut)) return sendJSON(res, 200, { statut: s.statut });
+  await db.prepare("UPDATE assistance_sessions SET statut='TERMINEE', updated_at=datetime('now'), terminee_le=datetime('now') WHERE id=?").run(s.id);
+  await asJournaliser(s.id, me.id, me.role, 'terminee', 'Arrêtée par le technicien.');
+  sendJSON(res, 200, { statut: 'TERMINEE' });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
    MODULE "LIAISON DE COMPTES" — étape 1 (socle) + étape 2 (liaison via
    DS-ID). Étapes 3-7 (gestion du groupe, bascule, journal détaillé,
    intégration écosystème) viendront en incréments suivants.
@@ -9081,7 +9363,11 @@ const PEUT_INITIER = {
   utilisateur:   ["utilisateur", "initiative", "collectivite", "administrateur"],
   initiative:    ["utilisateur", "initiative", "collectivite", "administrateur"],
   collectivite:  ["utilisateur", "initiative", "collectivite", "administrateur"],
-  administrateur:["utilisateur", "initiative", "collectivite", "administrateur"],
+  administrateur:["utilisateur", "initiative", "collectivite", "administrateur", "administrateur_junior"],
+  // Module Administrateurs Junior : n'écrivent PAS aux comptes normaux (utilisateur/initiative/
+  // collectivite), volontairement — seulement entre eux et avec l'administrateur principal qui
+  // les a créés (voir peutEcrireDirectement ci-dessous pour le filtre "même cercle").
+  administrateur_junior: ["administrateur", "administrateur_junior"],
 };
 const PEUT_CONTACTER = PEUT_INITIER;
 
@@ -9514,6 +9800,30 @@ async function demandeRejoindreExiste(a, b) {
   return !!r;
 }
 
+/* Module Administrateurs Junior : "même cercle" = même administrateur principal créateur.
+   Couvre les 3 combinaisons possibles entre user et la cible (l'appelant a déjà vérifié qu'au
+   moins l'un des deux est administrateur_junior avant d'appeler cette fonction) :
+   - junior → son propre administrateur principal (created_by_admin_id === cible.id)
+   - administrateur → un junior qu'il a lui-même créé (created_by_admin_id === user.id)
+   - junior → un autre junior du MÊME créateur (created_by_admin_id égaux des deux côtés) */
+async function junioradminMemeCercle(user, cibleId, cible) {
+  if (user.role === "administrateur_junior") {
+    const moi = await db.prepare("SELECT created_by_admin_id FROM admin_junior_meta WHERE user_id=?").get(user.id);
+    if (!moi) return false;
+    if (cible?.role === "administrateur") return Number(moi.created_by_admin_id) === Number(cibleId);
+    if (cible?.role === "administrateur_junior") {
+      const autre = await db.prepare("SELECT created_by_admin_id FROM admin_junior_meta WHERE user_id=?").get(cibleId);
+      return !!autre && Number(autre.created_by_admin_id) === Number(moi.created_by_admin_id);
+    }
+    return false;
+  }
+  if (user.role === "administrateur" && cible?.role === "administrateur_junior") {
+    const autre = await db.prepare("SELECT created_by_admin_id FROM admin_junior_meta WHERE user_id=?").get(cibleId);
+    return !!autre && Number(autre.created_by_admin_id) === Number(user.id);
+  }
+  return false;
+}
+
 /* Peut-on ouvrir une conversation neuve sans passer par une demande ?
    `origine` indique l'espace d'où part le contact ("vitrine" pour la boutique publique).
 
@@ -9523,6 +9833,15 @@ async function demandeRejoindreExiste(a, b) {
 async function peutEcrireDirectement(user, cibleId, origine) {
   const regles = await reglesContact();
   const cible = await db.prepare("SELECT role FROM users WHERE id=?").get(cibleId);
+
+  /* Administrateurs Junior : toujours en contact direct entre eux et avec l'administrateur
+     principal qui les a créés — jamais de demande de contact pour cette relation (cahier des
+     charges). Ne s'applique qu'au "même cercle" (même created_by_admin_id) — un junior d'un
+     autre administrateur principal reste soumis aux règles normales, si ce cas se présente un
+     jour. Indépendant du réglage administration_directe ci-dessous. */
+  if (user.role === "administrateur_junior" || (cible && cible.role === "administrateur_junior")) {
+    if (await junioradminMemeCercle(user, cibleId, cible)) return true;
+  }
 
   if (regles.administration_directe &&
       (user.role === "administrateur" || (cible && cible.role === "administrateur"))) return true;
@@ -15576,13 +15895,14 @@ route("GET", "/api/admin/administrateurs-junior", async (req, res) => {
   if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const rows = await db.prepare(`
     SELECT u.id, u.nom, u.email, m.sequence_number, m.created_by_admin_id, m.echecs_connexion,
-           m.derniere_rotation_at, m.created_at
+           m.suspendu, m.derniere_rotation_at, m.created_at
     FROM users u JOIN admin_junior_meta m ON m.user_id = u.id
     WHERE u.role = 'administrateur_junior'
     ORDER BY m.created_by_admin_id, m.sequence_number
   `).all();
   for (const r of rows) {
     r.verrouille = Number(r.echecs_connexion || 0) >= AdminJunior.JUNIOR_LOCKOUT_SEUIL;
+    r.suspendu = !!Number(r.suspendu || 0);
     const perms = await db.prepare("SELECT catalogue_id FROM admin_junior_permissions WHERE junior_user_id=?").all(r.id);
     r.modules = [...new Set(perms.map(p => AdminJunior.entreeCatalogue(p.catalogue_id)?.module).filter(Boolean))];
     r.nb_droits = perms.length;
@@ -15626,6 +15946,7 @@ route("GET", "/api/admin/administrateurs-junior/:id", async (req, res, params) =
     sequence_number: meta?.sequence_number, derniere_rotation_at: meta?.derniere_rotation_at,
     echecs_connexion: Number(meta?.echecs_connexion || 0),
     verrouille: Number(meta?.echecs_connexion || 0) >= AdminJunior.JUNIOR_LOCKOUT_SEUIL,
+    suspendu: !!Number(meta?.suspendu || 0),
     permissions,
   };
   /* Le mot de passe en clair n'est jamais renvoyé au junior qui consulte sa propre fiche —
@@ -15685,6 +16006,40 @@ route("POST", "/api/admin/administrateurs-junior/:id/refresh", async (req, res, 
   }
 });
 
+route("POST", "/api/admin/administrateurs-junior/:id/suspendre", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND role='administrateur_junior'").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Administrateur junior introuvable." });
+  await AdminJunior.suspendreAdminJunior(db, { juniorUserId: params.id, acteurAdminId: me.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/administrateurs-junior/:id/reactiver", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=? AND role='administrateur_junior'").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Administrateur junior introuvable." });
+  await AdminJunior.reactiverAdminJunior(db, { juniorUserId: params.id, acteurAdminId: me.id });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Suppression définitive — irréversible, voir le commentaire de supprimerAdminJunior()
+   (server/admin-junior.js) sur pourquoi un compte factice n'a pas besoin du circuit
+   délai-de-grâce des "Demandes de suppression" (comptes réels). */
+route("DELETE", "/api/admin/administrateurs-junior/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  try {
+    const ok = await AdminJunior.supprimerAdminJunior(db, { juniorUserId: params.id, acteurAdminId: me.id, acteurNom: me.nom });
+    if (!ok) return sendJSON(res, 404, { error: "Administrateur junior introuvable." });
+    sendJSON(res, 200, { ok: true });
+  } catch (e) {
+    console.error("[admin-junior-suppression]", e.message);
+    sendJSON(res, 500, { error: "Suppression impossible." });
+  }
+});
+
 route("GET", "/api/admin/administrateurs-junior/:id/journal", async (req, res, params) => {
   const me = await getCurrentUser(req);
   const estAdmin = me && me.role === "administrateur";
@@ -15697,6 +16052,30 @@ route("GET", "/api/admin/administrateurs-junior/:id/journal", async (req, res, p
     if (r.catalogue_id) r.catalogue_description = AdminJunior.entreeCatalogue(r.catalogue_id)?.description || null;
   }
   sendJSON(res, 200, { journal: rows });
+});
+
+/* GET /api/admin-junior/mes-collegues — liste "à qui écrire" pour un administrateur junior :
+   l'administrateur principal qui l'a créé + les autres administrateurs junior du même cercle
+   (même created_by_admin_id). Alimente l'espace Messagerie de dashboard-administrateur-junior.html ;
+   la messagerie elle-même (PJ, vocal) reste entièrement celle de messagerie.html, déjà existante —
+   voir junioradminMemeCercle() ci-dessus pour l'autorisation d'écrire réellement appliquée par
+   POST /api/conversations. */
+route("GET", "/api/admin-junior/mes-collegues", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur_junior") return sendJSON(res, 403, { error: "Réservé." });
+  const moi = await db.prepare("SELECT created_by_admin_id FROM admin_junior_meta WHERE user_id=?").get(me.id);
+  if (!moi) return sendJSON(res, 404, { error: "Fiche introuvable." });
+  const principal = await db.prepare("SELECT id, nom FROM users WHERE id=?").get(moi.created_by_admin_id);
+  const collegues = await db.prepare(`
+    SELECT u.id, u.nom, m.sequence_number
+    FROM users u JOIN admin_junior_meta m ON m.user_id = u.id
+    WHERE m.created_by_admin_id = ? AND u.id != ?
+    ORDER BY m.sequence_number
+  `).all(moi.created_by_admin_id, me.id);
+  sendJSON(res, 200, {
+    principal: principal ? { id: principal.id, nom: principal.nom } : null,
+    collegues,
+  });
 });
 
 /* ========== FIN ROUTES ADMINISTRATEURS JUNIOR ========== */

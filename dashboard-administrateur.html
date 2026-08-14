@@ -4673,9 +4673,12 @@ async function loadAdminsJunior() {
           <td style="padding:6px;">n°${r.sequence_number}</td>
           <td style="padding:6px;font-family:monospace;">${esc(r.email)}</td>
           <td style="padding:6px;">${(r.modules || []).map(m => AJ_LABELS_MODULE[m] || m).join(', ') || '<span style="color:var(--muted);">aucun</span>'}</td>
-          <td style="padding:6px;">${r.verrouille ? '🔴 Verrouillé' : '🟢 Actif'}</td>
+          <td style="padding:6px;">${r.suspendu ? '🟠 Suspendu' : r.verrouille ? '🔴 Verrouillé' : '🟢 Actif'}</td>
           <td style="padding:6px;">${r.derniere_rotation_at ? new Date(r.derniere_rotation_at.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</td>
-          <td style="padding:6px;"><button class="btn btn-sm btn-outline" onclick="ajVoirDetail(${r.id})">Détail</button></td>
+          <td style="padding:6px;white-space:nowrap;">
+            <button class="btn btn-sm btn-outline" onclick="ajVoirDetail(${r.id})">Détail</button>
+            <button class="btn btn-sm btn-outline" onclick="ajVoirDetail(${r.id}, true)">🕓 Activité</button>
+          </td>
         </tr>
       `).join('')}
       </tbody></table>`;
@@ -4727,7 +4730,7 @@ function ajCopier(texte) {
   navigator.clipboard?.writeText(texte);
 }
 
-async function ajVoirDetail(id) {
+async function ajVoirDetail(id, allerActivite) {
   document.getElementById("aj-creation").style.display = "none";
   const detailEl = document.getElementById("aj-detail");
   detailEl.style.display = "";
@@ -4740,15 +4743,23 @@ async function ajVoirDetail(id) {
   const accordees = new Set((fiche.permissions || []).map(p => p.id));
   const parModule = {};
   catalogue.forEach(e => { (parModule[e.module] ||= []).push(e); });
+  const statutLabel = fiche.suspendu ? '🟠 (suspendu)' : fiche.verrouille ? '🔴 (verrouillé)' : '';
 
   detailEl.innerHTML = `
     <div class="card" style="margin-bottom:16px;">
       <button class="btn btn-sm btn-outline" onclick="document.getElementById('aj-detail').style.display='none';">← Retour</button>
-      <h3>Administrateur junior n°${fiche.sequence_number} ${fiche.verrouille ? '🔴 (verrouillé)' : ''}</h3>
+      <h3>Administrateur junior n°${fiche.sequence_number} ${statutLabel}</h3>
       <p>Identifiant courant : <code>${esc(fiche.email)}</code> <button class="btn btn-sm btn-outline" onclick="ajCopier('${esc(fiche.email)}')">Copier</button></p>
       <p>Mot de passe courant : <code>${esc(fiche.password || '')}</code> <button class="btn btn-sm btn-outline" onclick="ajCopier('${esc(fiche.password || '')}')">Copier</button></p>
       <p style="font-size:12px;color:var(--muted);">Dernière rotation : ${fiche.derniere_rotation_at ? new Date(fiche.derniere_rotation_at.replace(' ','T')+'Z').toLocaleString('fr-FR') : '—'}</p>
-      <button class="btn btn-sm btn-orange" onclick="ajRafraichir(${id})">🔄 Régénérer maintenant</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <a class="btn btn-sm btn-outline" href="messagerie.html?with=${id}">✉️ Écrire</a>
+        <button class="btn btn-sm btn-orange" onclick="ajRafraichir(${id})">🔄 Régénérer maintenant</button>
+        ${fiche.suspendu
+          ? `<button class="btn btn-sm btn-outline" onclick="ajReactiver(${id})">▶️ Réactiver</button>`
+          : `<button class="btn btn-sm btn-outline" onclick="ajSuspendre(${id})">⏸️ Suspendre</button>`}
+        <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="ajSupprimer(${id})">🗑 Supprimer définitivement</button>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:16px;">
@@ -4768,8 +4779,8 @@ async function ajVoirDetail(id) {
       `).join('')}
     </div>
 
-    <div class="card">
-      <h3 style="margin-top:0;">Historique</h3>
+    <div class="card" id="aj-detail-journal">
+      <h3 style="margin-top:0;">🕓 Historique / Activité</h3>
       ${(journalData.journal || []).length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
         <tbody>
         ${journalData.journal.map(j => `
@@ -4783,6 +4794,32 @@ async function ajVoirDetail(id) {
       </table>` : `<p style="color:var(--muted);font-size:13px;">Aucune action enregistrée.</p>`}
     </div>
   `;
+  if (allerActivite) document.getElementById('aj-detail-journal').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function ajSuspendre(id) {
+  if (!confirm("Suspendre cet administrateur junior ? Il ne pourra plus se connecter tant qu'il n'aura pas été réactivé — ses droits et son historique sont conservés.")) return;
+  await api("POST", `/admin/administrateurs-junior/${id}/suspendre`);
+  ajVoirDetail(id);
+  loadAdminsJunior();
+}
+
+async function ajReactiver(id) {
+  await api("POST", `/admin/administrateurs-junior/${id}/reactiver`);
+  ajVoirDetail(id);
+  loadAdminsJunior();
+}
+
+async function ajSupprimer(id) {
+  if (!confirm("Supprimer DÉFINITIVEMENT cet administrateur junior ? Ses droits et son historique seront perdus. Cette action est irréversible.")) return;
+  if (!confirm("Confirmez une seconde fois : la suppression est immédiate et ne peut pas être annulée.")) return;
+  try {
+    await api("DELETE", `/admin/administrateurs-junior/${id}`);
+    document.getElementById('aj-detail').style.display = 'none';
+    loadAdminsJunior();
+  } catch (e) {
+    alert("Suppression impossible : " + (e.message || "erreur inconnue"));
+  }
 }
 
 async function ajAccorder(id, catalogueId) {

@@ -1058,6 +1058,8 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'liste_membres_generale_id', 'INTEGER'],
     // Transfert de gestionnaire (2026-08-08) : compteur d'invalidation des tokens 'auth' stateless
     ['users', 'credential_version', 'INTEGER NOT NULL DEFAULT 1'],
+    // Module Administrateurs Junior — suspension manuelle (miroir de l'ALTER db.js)
+    ['admin_junior_meta', 'suspendu', 'INTEGER DEFAULT 0'],
 ];
 
 async function migratePg(pool) {
@@ -1320,6 +1322,11 @@ async function migratePg(pool) {
        testé pour ces valeurs-là). Même traitement que les fixes ci-dessus. */
     { table: 'users', constraint: 'users_role_check',
       addBack: "CHECK (role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior'))" },
+    /* Module "Administrateurs Junior" — ajout de la suspension manuelle (2026-08-14) : le CHECK
+       sur admin_junior_journal.action, déjà en production avec 3 comptes réels créés, ne liste
+       pas encore 'compte_suspendu'/'compte_reactive'. Même traitement. */
+    { table: 'admin_junior_journal', constraint: 'admin_junior_journal_action_check',
+      addBack: "CHECK (action IN ('permission_accordee','permission_revoquee','action_executee','identifiants_regeneres_cron','identifiants_regeneres_manuel','compte_verrouille','connexion_echouee','connexion_reussie','compte_suspendu','compte_reactive'))" },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

@@ -31,9 +31,19 @@ function makeDb() {
       sequence_number         INTEGER NOT NULL,
       password_plain_courant  TEXT NOT NULL,
       echecs_connexion        INTEGER NOT NULL DEFAULT 0,
+      suspendu                INTEGER NOT NULL DEFAULT 0,
       permissions_snapshot_json TEXT DEFAULT '[]',
       derniere_rotation_at    TEXT DEFAULT (datetime('now')),
       UNIQUE(created_by_admin_id, sequence_number)
+    );
+    CREATE TABLE audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      cible_type TEXT,
+      cible_id INTEGER,
+      detail TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE admin_junior_permissions (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -209,6 +219,65 @@ test('hasAdminPermission — une révocation après connexion ne prend PAS effet
   // À la connexion SUIVANTE, la photo est réactualisée — l'accès est alors bien coupé.
   await AJ.actualiserSnapshotPermissions(db, junior.id);
   assert.equal(await AJ.hasAdminPermission(juniorUser, 'moderation.comptes.consulter', db), false, 'la révocation doit prendre effet à la connexion suivante');
+});
+
+test('suspension — suspendre bloque, réactiver débloque, journalisé dans les deux sens', async () => {
+  const db = makeDb();
+  const adminId = await creerAdmin(db);
+  const junior = await AJ.creerAdminJunior(db, { principalAdminId: adminId, catalogueIds: [] });
+
+  assert.equal(await AJ.estSuspendu(db, junior.id), false);
+  await AJ.suspendreAdminJunior(db, { juniorUserId: junior.id, acteurAdminId: adminId });
+  assert.equal(await AJ.estSuspendu(db, junior.id), true);
+  await AJ.reactiverAdminJunior(db, { juniorUserId: junior.id, acteurAdminId: adminId });
+  assert.equal(await AJ.estSuspendu(db, junior.id), false);
+
+  const journal = await db.prepare('SELECT action FROM admin_junior_journal WHERE junior_user_id=? ORDER BY id').all(junior.id);
+  const actions = journal.map(j => j.action);
+  assert.ok(actions.includes('compte_suspendu'));
+  assert.ok(actions.includes('compte_reactive'));
+});
+
+test('suspension — distincte du verrouillage (les deux peuvent être vrais en même temps)', async () => {
+  const db = makeDb();
+  const adminId = await creerAdmin(db);
+  const junior = await AJ.creerAdminJunior(db, { principalAdminId: adminId, catalogueIds: [] });
+  await AJ.enregistrerEchecConnexionJunior(db, junior.id);
+  await AJ.enregistrerEchecConnexionJunior(db, junior.id);
+  await AJ.enregistrerEchecConnexionJunior(db, junior.id);
+  await AJ.suspendreAdminJunior(db, { juniorUserId: junior.id, acteurAdminId: adminId });
+  assert.equal(await AJ.estVerrouille(db, junior.id), true);
+  assert.equal(await AJ.estSuspendu(db, junior.id), true);
+  // Réactiver ne lève pas le verrouillage, et inversement — deux mécanismes indépendants.
+  await AJ.reactiverAdminJunior(db, { juniorUserId: junior.id, acteurAdminId: adminId });
+  assert.equal(await AJ.estVerrouille(db, junior.id), true, 'réactiver ne doit pas lever le verrouillage');
+  assert.equal(await AJ.estSuspendu(db, junior.id), false);
+});
+
+test('supprimerAdminJunior — supprime le compte, ses tables satellites, et journalise dans audit_log', async () => {
+  const db = makeDb();
+  const adminId = await creerAdmin(db);
+  const junior = await AJ.creerAdminJunior(db, { principalAdminId: adminId, catalogueIds: ['moderation.comptes.consulter'] });
+
+  const ok = await AJ.supprimerAdminJunior(db, { juniorUserId: junior.id, acteurAdminId: adminId, acteurNom: 'Admin' });
+  assert.equal(ok, true);
+
+  const userRow = await db.prepare('SELECT id FROM users WHERE id=?').get(junior.id);
+  assert.equal(userRow, undefined, 'la ligne users doit avoir disparu');
+  const permsRow = await db.prepare('SELECT id FROM admin_junior_permissions WHERE junior_user_id=?').get(junior.id);
+  assert.equal(permsRow, undefined, 'les permissions doivent avoir disparu');
+  const metaRow = await db.prepare('SELECT user_id FROM admin_junior_meta WHERE user_id=?').get(junior.id);
+  assert.equal(metaRow, undefined, 'la ligne meta doit avoir disparu');
+
+  const audit = await db.prepare("SELECT * FROM audit_log WHERE cible_type='administrateur_junior' AND cible_id=?").get(junior.id);
+  assert.ok(audit, 'la suppression doit être tracée dans audit_log (le journal du junior disparaît avec lui)');
+  assert.equal(audit.action, 'admin_junior_supprime');
+});
+
+test('supprimerAdminJunior — id inexistant renvoie false sans lever d\'erreur', async () => {
+  const db = makeDb();
+  const ok = await AJ.supprimerAdminJunior(db, { juniorUserId: 999999, acteurAdminId: 1, acteurNom: 'Admin' });
+  assert.equal(ok, false);
 });
 
 test('catalogue — intégrité (id uniques, (module,numero) uniques, chaque capability résolue)', () => {
