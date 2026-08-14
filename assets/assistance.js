@@ -17,6 +17,7 @@
   window.__ASSISTANCE_LOADED = true;
 
   const AS = {
+    isAdmin: false,       // true = veille administrateur (alerte passive), false = veille membre
     sessionId: null,
     statut: null,
     idleTimer: null,     // veille : GET mon-statut toutes les ~25s
@@ -244,8 +245,45 @@
     clearInterval(AS.idleTimer);
     AS.idleTimer = setInterval(() => { if (!document.hidden) asRafraichir(); }, 25000);
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) asRafraichir(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    if (AS.isAdmin) asVeilleAdmin(); else asRafraichir();
+  });
   window.addEventListener("beforeunload", () => { clearInterval(AS.idleTimer); asStopFast(); });
+
+  /* ── Côté administrateur : alerte passive site-wide ──
+     Sans ceci, un admin ne voit une demande d'assistance QUE s'il pense à ouvrir lui-même
+     le module Support Pilote du dashboard — aucune notification ne le préviendrait jamais
+     autrement. Même principe que le badge support-technique (assets/app.js), mais visible
+     sur TOUTES les pages, pas seulement dans la sidebar admin. */
+  let aspAdminBannerVu = 0; // nombre de demandes déjà signalées, pour ne pas re-notifier en boucle silencieusement (le bandeau reste affiché tant qu'il y a des demandes, juste pas de nouveau "ding")
+  // Pas de garde document.hidden ici (contrairement au setInterval périodique) : le premier
+  // appel doit toujours s'exécuter au chargement de la page, même si l'onglet démarre en
+  // arrière-plan — sinon le badge resterait vide tant que l'onglet n'a pas été mis au premier
+  // plan au moins une fois. Même logique que asRafraichir() côté membre.
+  async function asVeilleAdmin() {
+    let data;
+    try { data = await api("GET", "/admin/assistance"); } catch (e) { return; }
+    const n = (data.en_attente || []).length;
+    const badge = document.getElementById("asp-pending-badge"); // présent uniquement si on est déjà sur dashboard-administrateur.html
+    if (badge) { badge.textContent = n; badge.style.display = n ? "" : "none"; }
+    if (n > 0) {
+      asShowBanner(`
+        <span>🔔 <strong>${n}</strong> demande${n > 1 ? "s" : ""} de Support Pilote en attente.</span>
+        <a href="dashboard-administrateur.html#support-pilote" style="background:#f59e0b;color:#1e1b0a;border-radius:6px;padding:5px 14px;font-size:12.5px;font-weight:800;text-decoration:none;">Voir</a>
+      `);
+      const b = document.getElementById("as-banner");
+      b.style.background = "#FEF3C7"; b.style.color = "#92400E";
+    } else if (aspAdminBannerVu > 0) {
+      asHideBanner();
+    }
+    aspAdminBannerVu = n;
+  }
+  function asDemarrerVeilleAdmin() {
+    clearInterval(AS.idleTimer);
+    asVeilleAdmin(); // premier appel : toujours exécuté, voir commentaire ci-dessus
+    AS.idleTimer = setInterval(() => { if (!document.hidden) asVeilleAdmin(); }, 30000);
+  }
 
   (async function init() {
     // CURRENT_USER est déclaré avec `let` au top-level de app.js — un script classique
@@ -256,6 +294,7 @@
     let me = (typeof CURRENT_USER !== "undefined") ? CURRENT_USER : null;
     if (!me && typeof fetchCurrentUser === "function") me = await fetchCurrentUser().catch(() => null);
     if (!me) return; // visiteur non connecté : rien à faire
+    if (me.role === "administrateur") { AS.isAdmin = true; asDemarrerVeilleAdmin(); return; }
     await asRafraichir();
     asDemarrerVeille();
   })();
