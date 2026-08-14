@@ -4680,6 +4680,9 @@ route("POST", "/api/partenaires/verifier-compte", async (req, res, params, body)
 
   const premiumType = PREMIUM_TYPE_PAR_ROLE[u.role];
   const premium = premiumType ? await hasAccreditation(u.id, premiumType) : false;
+  /* Permet au partenaire d'appliquer sa PROPRE règle anti-chaîne (un Premium déjà réduit ne
+     doit pas déclencher un second avantage croisé) sans dupliquer notre logique. */
+  const premiumPleinTarifVal = premium && premiumType ? await premiumPleinTarif(u.id, premiumType) : false;
 
   // Lien vitrine : uniquement pour les comptes Initiative avec une vitrine publiée.
   let vitrineUrl = null;
@@ -4691,6 +4694,7 @@ route("POST", "/api/partenaires/verifier-compte", async (req, res, params, body)
   return sendJSON(res, 200, {
     lie: true,
     premium,
+    premium_plein_tarif: premiumPleinTarifVal,
     type_compte: u.role,
     profil_url: `${getOrigin(req)}/profil.html?id=${u.id}`,
     vitrine_url: vitrineUrl,
@@ -10742,6 +10746,25 @@ async function hasAccreditation(userId, type) {
   if (!nouv) return false;
   if (nouv.date_expiration && new Date(nouv.date_expiration).getTime() < Date.now()) return false;
   return true;
+}
+
+/* Le Premium actif de ce compte a-t-il été payé à 100% du tarif (jamais lui-même réduit) ?
+   Même règle anti-chaîne que le Parrainage Initiative (server/avantages-premium.js,
+   reduction_pct_appliquee) — réutilisée ici pour l'exposer aux partenaires externes
+   (API /api/partenaires/verifier-compte), qui doivent pouvoir appliquer la même règle
+   pour leurs propres avantages croisés sans dupliquer la logique. Ancien système
+   (compte_accreditations) : aucune notion de réduction n'y a jamais existé, donc toujours
+   considéré plein tarif s'il est actif. */
+async function premiumPleinTarif(userId, type) {
+  if (isPremiumDemoUnlock()) return true;
+  const ancien = await db.prepare("SELECT id, date_expiration FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(userId, type);
+  if (ancien && !(ancien.date_expiration && new Date(ancien.date_expiration).getTime() < Date.now())) return true;
+  const def = await db.prepare("SELECT id FROM accred_definitions WHERE type=?").get(type);
+  if (!def) return false;
+  const nouv = await db.prepare("SELECT reduction_pct_appliquee, date_expiration FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(userId, def.id);
+  if (!nouv) return false;
+  if (nouv.date_expiration && new Date(nouv.date_expiration).getTime() < Date.now()) return false;
+  return Number(nouv.reduction_pct_appliquee || 0) === 0;
 }
 
 /* Type d'accréditation « abonnement » correspondant à chaque rôle. */
