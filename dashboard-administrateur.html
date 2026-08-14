@@ -2727,12 +2727,13 @@
         </div>
       </section>
 
-      <!-- ══════════ SECTION PARTENARIAT (incrément 2 : invitations à usage unique) ══════════
+      <!-- ══════════ SECTION PARTENARIAT ══════════
            Module "Partenariat" — distinct de "Partenaires Officiels" (partenaires-admin, un
-           badge sur un compte existant). Les cartouches de comptes Partenaire (nom, dates de
-           partenariat, statut, compteurs) arriveront à l'incrément 3. -->
+           badge sur un compte existant). Comptes Partenaire créés exclusivement par invitation
+           à usage unique (incrément 2) ; cartouches + notes privées + périodes historisées +
+           suppression sécurisée (incrément 3). -->
       <section id="section-partenariat-admin" style="display:none;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;" id="pn-liste-header">
           <div style="flex:1;"><h2 style="margin:0;">🤝 Partenariat</h2>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Comptes Partenaire créés exclusivement par invitation à usage unique — aucune inscription publique possible.</p>
           </div>
@@ -2750,8 +2751,20 @@
           <div style="font-size:12px;color:var(--muted);margin-top:8px;" id="pn-lien-expire"></div>
         </div>
 
-        <h3 style="font-size:14px;margin:0 0 10px;">Invitations</h3>
-        <div id="pn-invitations-list"><div class="notice">Chargement…</div></div>
+        <div id="pn-liste-view">
+          <h3 style="font-size:14px;margin:0 0 10px;">Comptes Partenaire</h3>
+          <div id="pn-comptes-list"><div class="notice">Chargement…</div></div>
+
+          <h3 style="font-size:14px;margin:24px 0 10px;">Invitations</h3>
+          <div id="pn-invitations-list"><div class="notice">Chargement…</div></div>
+        </div>
+
+        <!-- Vue détail d'un partenaire — notes admin strictement privées, gestion des
+             périodes, actions Renouveler/Désactiver/Réactiver/Supprimer. -->
+        <div id="pn-detail-view" style="display:none;">
+          <button class="btn btn-outline" style="margin-bottom:16px;" onclick="pnRetourListe()">← Retour</button>
+          <div id="pn-detail-content"></div>
+        </div>
       </section>
 
       <!-- ══════════ SECTION TÉMOIGNAGES ══════════ -->
@@ -5482,6 +5495,11 @@ function pnCopierLien() {
 }
 
 async function loadPartenariatAdmin() {
+  pnRetourListe();
+  await Promise.all([loadPartenariatComptes(), loadPartenariatInvitations()]);
+}
+
+async function loadPartenariatInvitations() {
   const el = document.getElementById('pn-invitations-list');
   try {
     const data = await api('GET', '/admin/partenariat/invitations');
@@ -5507,7 +5525,142 @@ async function pnAnnulerInvitation(id) {
   if (!confirm("Annuler cette invitation ? Le lien deviendra définitivement inutilisable.")) return;
   try {
     await api('POST', `/admin/partenariat/invitations/${id}/annuler`);
-    loadPartenariatAdmin();
+    loadPartenariatInvitations();
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+/* ── Comptes Partenaire : cartouches + fiche détail ── */
+const PN_STATUT_PERIODE_LABELS = {
+  active: '🟢 Partenariat actif', echeance_proche: '🟠 Échéance proche',
+  expiree: '🔴 Partenariat expiré', aucune_periode: '⚪ Aucune période définie',
+};
+const PN_COMPTE_STATUT_LABELS = { active: '✅ Actif', suspendue: '⏸️ Suspendu', supprimee: '🗑️ Supprimé' };
+
+async function loadPartenariatComptes() {
+  const el = document.getElementById('pn-comptes-list');
+  try {
+    const data = await api('GET', '/admin/partenariat/comptes');
+    if (!data.comptes.length) { el.innerHTML = '<div class="notice">Aucun compte partenaire pour le moment.</div>'; return; }
+    el.innerHTML = data.comptes.map(c => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;flex-wrap:wrap;cursor:pointer;" onclick="pnOuvrirDetail(${c.id})">
+        <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px;">
+          ${c.logo_url ? `<img src="${esc(c.logo_url)}" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">` : `<div style="width:44px;height:44px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--muted);">${esc((c.nom_organisation||'?')[0]||'?')}</div>`}
+          <div>
+            <div style="font-weight:800;">${esc(c.nom_organisation || '—')} <span style="font-size:11px;font-weight:700;color:var(--muted);">🤝 Partenaire</span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${esc(c.personne_responsable || '')} ${c.email_contact ? '· ' + esc(c.email_contact) : ''}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:11.5px;font-weight:700;">${PN_COMPTE_STATUT_LABELS[c.statut] || c.statut}</span>
+          <span style="font-size:11.5px;font-weight:700;">${PN_STATUT_PERIODE_LABELS[c.statut_periode] || c.statut_periode}</span>
+          <span style="font-size:11px;color:var(--muted);">📥 ${c.projets_recus} · ✅ ${c.projets_evalues} · 🤝 ${c.mises_en_relation} · 🏆 ${c.projets_aboutis}</span>
+        </div>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
+  }
+}
+
+let _pnDetailId = null;
+
+function pnRetourListe() {
+  _pnDetailId = null;
+  document.getElementById('pn-detail-view').style.display = 'none';
+  document.getElementById('pn-liste-view').style.display = '';
+  document.getElementById('pn-liste-header').style.display = '';
+}
+
+async function pnOuvrirDetail(id) {
+  _pnDetailId = id;
+  document.getElementById('pn-liste-view').style.display = 'none';
+  document.getElementById('pn-liste-header').style.display = 'none';
+  document.getElementById('pn-detail-view').style.display = '';
+  const contentEl = document.getElementById('pn-detail-content');
+  contentEl.innerHTML = '<div class="notice">Chargement…</div>';
+  try {
+    const { compte, periodes } = await api('GET', `/admin/partenariat/comptes/${id}`);
+    pnRenderDetail(compte, periodes);
+  } catch (e) {
+    contentEl.innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
+  }
+}
+
+function pnRenderDetail(c, periodes) {
+  const active = periodes.find(p => p.statut === 'active');
+  document.getElementById('pn-detail-content').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+      ${c.logo_url ? `<img src="${esc(c.logo_url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;">` : ''}
+      <div style="flex:1;">
+        <h2 style="margin:0;">${esc(c.nom_organisation || '—')}</h2>
+        <div style="font-size:13px;color:var(--muted);">${esc(c.personne_responsable || '')} · ${esc(c.email_contact || c.login_email || '')} ${c.telephone_contact ? '· ' + esc(c.telephone_contact) : ''}</div>
+      </div>
+      <span style="font-size:12px;font-weight:700;">${PN_COMPTE_STATUT_LABELS[c.statut] || c.statut}</span>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="font-size:14px;margin:0 0 12px;">📅 Période de partenariat</h3>
+      ${active ? `<div style="font-size:13px;margin-bottom:10px;">Du <strong>${new Date(active.date_debut.replace(' ','T')+'Z').toLocaleDateString('fr-FR')}</strong> au <strong>${active.date_fin ? new Date(active.date_fin.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'}</strong> (version ${active.version})</div>` : '<div class="notice" style="margin-bottom:10px;">Aucune période active définie.</div>'}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+        <div><label style="font-size:11px;font-weight:700;display:block;">Début</label><input type="date" id="pn-periode-debut" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);"></div>
+        <div><label style="font-size:11px;font-weight:700;display:block;">Fin</label><input type="date" id="pn-periode-fin" style="padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);"></div>
+        <button class="btn btn-sm btn-orange" onclick="pnRenouveler(${c.id})">🔄 Renouveler le partenariat</button>
+      </div>
+      ${periodes.length > 1 ? `<div style="margin-top:14px;font-size:12px;color:var(--muted);">
+        <strong>Historique :</strong>
+        ${periodes.map(p => `<div style="padding:4px 0;">v${p.version} — ${new Date(p.date_debut.replace(' ','T')+'Z').toLocaleDateString('fr-FR')} → ${p.date_fin ? new Date(p.date_fin.replace(' ','T')+'Z').toLocaleDateString('fr-FR') : '—'} (${p.statut})</div>`).join('')}
+      </div>` : ''}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;background:#FFFBEB;border-color:#FDE68A;">
+      <h3 style="font-size:14px;margin:0 0 8px;">📝 Notes administrateur <span style="font-size:11px;font-weight:700;color:#92400E;">(strictement privé, jamais visible par le partenaire)</span></h3>
+      <textarea id="pn-notes-admin" style="width:100%;min-height:90px;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;font-size:13px;box-sizing:border-box;">${esc(c.admin_notes || '')}</textarea>
+      <button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="pnEnregistrerNotes(${c.id})">Enregistrer les notes</button>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${c.statut === 'active'
+        ? `<button class="btn btn-outline" onclick="pnDesactiver(${c.id})">⏸️ Désactiver le partenaire</button>`
+        : c.statut === 'suspendue' ? `<button class="btn btn-outline" onclick="pnReactiver(${c.id})">▶️ Réactiver le partenaire</button>` : ''}
+      <button class="btn" style="background:#dc2626;color:#fff;" onclick="pnSupprimer(${c.id})">🗑️ Supprimer</button>
+    </div>
+  `;
+}
+
+async function pnEnregistrerNotes(id) {
+  const notes = document.getElementById('pn-notes-admin').value;
+  try {
+    await api('PUT', `/admin/partenariat/comptes/${id}/notes`, { admin_notes: notes });
+    if (typeof showToast === 'function') showToast('✅ Notes enregistrées.');
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+async function pnRenouveler(id) {
+  const debut = document.getElementById('pn-periode-debut').value;
+  const fin = document.getElementById('pn-periode-fin').value;
+  if (!debut) { alert('Merci de renseigner au moins une date de début.'); return; }
+  try {
+    await api('POST', `/admin/partenariat/comptes/${id}/periodes`, { date_debut: debut, date_fin: fin || null });
+    if (typeof showToast === 'function') showToast('✅ Partenariat renouvelé.');
+    pnOuvrirDetail(id);
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+async function pnDesactiver(id) {
+  if (!confirm("Désactiver ce partenaire ? Son compte ne sera plus actif mais son historique reste conservé.")) return;
+  try { await api('PUT', `/admin/partenariat/comptes/${id}/desactiver`); pnOuvrirDetail(id); } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+async function pnReactiver(id) {
+  try { await api('PUT', `/admin/partenariat/comptes/${id}/reactiver`); pnOuvrirDetail(id); } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+async function pnSupprimer(id) {
+  if (!confirm("La suppression de ce partenaire peut avoir des conséquences sur l'historique des projets, évaluations et mises en relation. Voulez-vous continuer ?")) return;
+  if (!confirm("Confirmez-vous définitivement la suppression de ce compte partenaire ?")) return;
+  try {
+    await api('DELETE', `/admin/partenariat/comptes/${id}?purge=1`);
+    pnRetourListe();
+    loadPartenariatComptes();
   } catch (e) { alert('Erreur : ' + (e.message || '')); }
 }
 

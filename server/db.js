@@ -5028,6 +5028,38 @@ db.exec(`
     FOREIGN KEY(cree_par) REFERENCES users(id),
     FOREIGN KEY(utilisee_par_user_id) REFERENCES users(id)
   );
+
+  /* Incrément 3 — historique des périodes de partenariat (cahier des charges Partie 4.3-4.5
+     + Partie 6 règle 10 : "les dates de partenariat doivent être historisées"). Modèle exact
+     de account_credentials (transfert de gestionnaire) : jamais d'UPDATE des dates d'une
+     ligne existante, toujours une nouvelle ligne (version+1) au renouvellement — l'ancienne
+     passe 'remplacee'. Le statut affiché (🟢 actif/🟠 échéance proche/🔴 expiré) est calculé
+     à la lecture depuis la ligne 'active' courante, jamais stocké. */
+  CREATE TABLE IF NOT EXISTS partenariat_periodes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    partenaire_user_id  INTEGER NOT NULL,
+    version             INTEGER NOT NULL,
+    date_debut          TEXT NOT NULL,
+    date_fin            TEXT,
+    statut              TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','remplacee','revoquee')),
+    cree_par            INTEGER,
+    created_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(partenaire_user_id) REFERENCES users(id),
+    FOREIGN KEY(cree_par) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_partenariat_periodes_partenaire ON partenariat_periodes(partenaire_user_id, statut);
+
+  /* Anti-doublon des alertes d'échéance (90/60/30/7 jours avant expiration, seuils
+     configurables) — une ligne = une alerte déjà envoyée pour cette période et ce délai,
+     pour que le cron quotidien ne relance jamais deux fois la même notification. */
+  CREATE TABLE IF NOT EXISTS partenariat_notifications_echeance (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    periode_id  INTEGER NOT NULL,
+    delai_jours INTEGER NOT NULL,
+    envoye_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(periode_id, delai_jours),
+    FOREIGN KEY(periode_id) REFERENCES partenariat_periodes(id)
+  );
 `);
 
 /* =====================================================================

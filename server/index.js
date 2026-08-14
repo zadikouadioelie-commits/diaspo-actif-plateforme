@@ -8208,6 +8208,162 @@ route("POST", "/api/partenariat/inscription/:token", async (req, res, params, bo
   sendJSON(res, 200, { ok: true, user_id: userId }, { "Set-Cookie": [`sid=${sessionToken}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
 });
 
+/* ── Incrément 3 : cartouches admin, notes privées, périodes historisées, suppression ──
+   Cahier des charges Partie 4 (cartouche + notes) et Partie 4.3-4.5 (périodes/renouvellement/
+   statut automatique). Le statut affiché (🟢 actif/🟠 échéance proche/🔴 expiré) est TOUJOURS
+   calculé à la lecture depuis la période 'active' courante, jamais stocké — voir
+   partenariatStatutPeriode ci-dessous. */
+
+async function partenariatSeuilsAlerteEcheance() {
+  const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle='partenariat_periode_alerte_jours'").get();
+  if (row) { try { const arr = JSON.parse(row.valeur); if (Array.isArray(arr) && arr.length) return arr.map(Number).filter(Number.isFinite); } catch (_) {} }
+  return [90, 60, 30, 7];
+}
+
+function partenariatStatutPeriode(periode, seuilEcheanceJours) {
+  if (!periode) return "aucune_periode";
+  if (!periode.date_fin) return "active"; // pas de date de fin définie = actif sans échéance
+  const finMs = new Date(periode.date_fin.replace(" ", "T") + "Z").getTime();
+  const restantMs = finMs - Date.now();
+  if (restantMs < 0) return "expiree";
+  if (restantMs <= seuilEcheanceJours * 86400000) return "echeance_proche";
+  return "active";
+}
+
+async function partenariatDernierePeriode(partenaireUserId) {
+  return db.prepare("SELECT * FROM partenariat_periodes WHERE partenaire_user_id=? AND statut='active' ORDER BY version DESC LIMIT 1").get(partenaireUserId);
+}
+
+route("GET", "/api/admin/partenariat/comptes", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(`
+    SELECT pc.id, pc.user_id, pc.nom_organisation, pc.logo_url, pc.personne_responsable,
+           pc.email_contact, pc.telephone_contact, pc.statut, pc.created_at, u.email AS login_email
+    FROM partenariat_comptes pc JOIN users u ON u.id = pc.user_id
+    ORDER BY pc.created_at DESC
+  `).all();
+  const seuil = (await partenariatSeuilsAlerteEcheance())[0] || 90; // le seuil le plus large sert d'alerte visuelle générale
+  const comptes = [];
+  for (const c of rows) {
+    const periode = await partenariatDernierePeriode(c.user_id);
+    // Compteurs projets reçus/évalués/mises en relation/aboutis : posés à 0 tant que les
+    // tables des incréments 5/6 (projets_orientations_partenaires, partenariat_evaluations)
+    // n'existent pas encore — la route reste fonctionnelle et sera complétée à l'incrément 7.
+    comptes.push({
+      ...c,
+      periode: periode ? { date_debut: periode.date_debut, date_fin: periode.date_fin, version: periode.version } : null,
+      statut_periode: partenariatStatutPeriode(periode, seuil),
+      projets_recus: 0, projets_evalues: 0, mises_en_relation: 0, projets_aboutis: 0,
+    });
+  }
+  sendJSON(res, 200, { comptes });
+});
+
+route("GET", "/api/admin/partenariat/comptes/:id", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare(`
+    SELECT pc.*, u.email AS login_email FROM partenariat_comptes pc JOIN users u ON u.id = pc.user_id WHERE pc.id=?
+  `).get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  c.secteurs = safeParse(c.secteurs || "[]");
+  const periodes = await db.prepare("SELECT * FROM partenariat_periodes WHERE partenaire_user_id=? ORDER BY version DESC").all(c.user_id);
+  sendJSON(res, 200, { compte: c, periodes });
+});
+
+route("PUT", "/api/admin/partenariat/comptes/:id", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare("SELECT id FROM partenariat_comptes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  await db.prepare(`
+    UPDATE partenariat_comptes SET nom_organisation=?, logo_url=?, personne_responsable=?, email_contact=?,
+      telephone_contact=?, description=?, secteurs=?, updated_at=datetime('now') WHERE id=?
+  `).run(
+    body?.nom_organisation ?? null, body?.logo_url ?? null, body?.personne_responsable ?? null,
+    body?.email_contact ?? null, body?.telephone_contact ?? null, body?.description ?? null,
+    JSON.stringify(body?.secteurs || []), params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+// Route DÉDIÉE et distincte de PUT ci-dessus — jamais mélangée à une route consultée par le
+// partenaire (voir GET /api/partenariat/moi, sélection explicite de colonnes sans admin_notes).
+route("PUT", "/api/admin/partenariat/comptes/:id/notes", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const r = await db.prepare("UPDATE partenariat_comptes SET admin_notes=?, updated_at=datetime('now') WHERE id=?").run(body?.admin_notes ?? null, params.id);
+  if (!r.changes) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  sendJSON(res, 200, { ok: true });
+});
+
+// Renouvellement : toujours une NOUVELLE ligne (jamais d'UPDATE des dates d'une ligne
+// existante) — bouton "🔄 Renouveler le partenariat" (cahier des charges Partie 4.5).
+route("POST", "/api/admin/partenariat/comptes/:id/periodes", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare("SELECT user_id FROM partenariat_comptes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  const dateDebut = String(body?.date_debut || "").trim();
+  const dateFin = body?.date_fin ? String(body.date_fin).trim() : null;
+  if (!dateDebut) return sendJSON(res, 400, { error: "Date de début requise." });
+
+  const derniere = await partenariatDernierePeriode(c.user_id);
+  const nouvelleVersion = derniere ? derniere.version + 1 : 1;
+  if (derniere) await db.prepare("UPDATE partenariat_periodes SET statut='remplacee' WHERE id=?").run(derniere.id);
+  await db.prepare(`
+    INSERT INTO partenariat_periodes (partenaire_user_id, version, date_debut, date_fin, cree_par) VALUES (?,?,?,?,?)
+  `).run(c.user_id, nouvelleVersion, dateDebut, dateFin, me.id);
+  sendJSON(res, 200, { ok: true, version: nouvelleVersion });
+});
+
+route("PUT", "/api/admin/partenariat/comptes/:id/desactiver", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const r = await db.prepare("UPDATE partenariat_comptes SET statut='suspendue', updated_at=datetime('now') WHERE id=?").run(params.id);
+  if (!r.changes) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  sendJSON(res, 200, { statut: "suspendue" });
+});
+
+route("PUT", "/api/admin/partenariat/comptes/:id/reactiver", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const r = await db.prepare("UPDATE partenariat_comptes SET statut='active', updated_at=datetime('now') WHERE id=?").run(params.id);
+  if (!r.changes) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  sendJSON(res, 200, { statut: "active" });
+});
+
+// Suppression sécurisée — modèle exact accred_definitions (server/index.js) : sans paramètre,
+// simple désactivation logique ; suppression physique seulement avec ?purge=1, bloquée par
+// défaut si des projets orientés existent (incréments 5/6) sauf &force=1 explicite.
+route("DELETE", "/api/admin/partenariat/comptes/:id", async (req, res, params, body, query) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare("SELECT user_id FROM partenariat_comptes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+
+  if (!(query && query.purge === "1")) {
+    await db.prepare("UPDATE partenariat_comptes SET statut='supprimee', updated_at=datetime('now') WHERE id=?").run(params.id);
+    return sendJSON(res, 200, { ok: true, purged: false });
+  }
+
+  // Table projets_orientations_partenaires n'existe pas encore (incrément 5) — la vérification
+  // de dépendances est déjà écrite ici, prête à s'activer dès que la table existera (COUNT sur
+  // une table absente échoue silencieusement en 0 grâce au try/catch, jamais bloquant à tort).
+  let nbOrientations = 0;
+  try { nbOrientations = (await db.prepare("SELECT COUNT(*) n FROM projets_orientations_partenaires WHERE partenaire_user_id=?").get(c.user_id))?.n || 0; } catch (_) {}
+  if (nbOrientations > 0 && query.force !== "1") {
+    return sendJSON(res, 400, { error: `Suppression impossible : ${nbOrientations} projet(s) orienté(s) référencent encore ce partenaire. Désactivez-le plutôt, ou ajoutez force=1 pour supprimer aussi ces liens.` });
+  }
+  // L'historique des périodes (partenariat_periodes) reste conservé comme archive — jamais de
+  // CASCADE dessus (cahier des charges Partie 5 : "l'historique doit autant que possible rester
+  // conservé sous forme d'archives"). Seule la fiche et le compte de connexion sont retirés.
+  await db.prepare("DELETE FROM partenariat_comptes WHERE id=?").run(params.id);
+  await db.prepare("UPDATE users SET compte_masque=1 WHERE id=?").run(c.user_id);
+  sendJSON(res, 200, { ok: true, purged: true });
+});
+
 /* ══════════════════════════════════════════════════════════════════════
    MODULE "LIAISON DE COMPTES" — étape 1 (socle) + étape 2 (liaison via
    DS-ID). Étapes 3-7 (gestion du groupe, bascule, journal détaillé,
@@ -22150,6 +22306,50 @@ async function handleRequest(req, res) {
       sendJSON(res, 200, { ok: true, relancesEnvoyees, total: codes.length });
     } catch (e) {
       sendJSON(res, 500, SEC.safeError(e, "cron da-codes-relance-expiration"));
+    }
+    return;
+  }
+
+  /* ── Module Partenariat (incrément 3) : alertes d'échéance de partenariat ──
+     90/60/30/7 jours avant expiration (seuils configurables via parametres_plateforme,
+     clé 'partenariat_periode_alerte_jours', JSON). Anti-doublon via
+     partenariat_notifications_echeance (UNIQUE(periode_id, delai_jours)). */
+  if (pathname === '/api/cron/partenariat-echeances') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try {
+      let seuils = [90, 60, 30, 7];
+      try {
+        const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle='partenariat_periode_alerte_jours'").get();
+        if (row) { const arr = JSON.parse(row.valeur); if (Array.isArray(arr) && arr.length) seuils = arr.map(Number).filter(Number.isFinite); }
+      } catch (_) {}
+      const periodes = await db.prepare(`
+        SELECT p.*, u.email, u.nom FROM partenariat_periodes p JOIN users u ON u.id = p.partenaire_user_id
+        WHERE p.statut='active' AND p.date_fin IS NOT NULL
+      `).all();
+      let alertesEnvoyees = 0;
+      for (const p of periodes) {
+        const restantJours = Math.ceil((new Date(p.date_fin.replace(' ', 'T') + 'Z').getTime() - Date.now()) / 86400000);
+        for (const seuil of seuils) {
+          if (restantJours > seuil) continue; // pas encore atteint ce seuil
+          const dejaEnvoyee = await db.prepare("SELECT id FROM partenariat_notifications_echeance WHERE periode_id=? AND delai_jours=?").get(p.id, seuil);
+          if (dejaEnvoyee) continue;
+          // Notifie tous les administrateurs (pas un seul destinataire fixe) — l'ensemble de
+          // l'équipe doit voir approcher l'échéance, pas uniquement celui qui a créé la période.
+          const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+          const dateFinTxt = new Date(p.date_fin.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR');
+          for (const a of admins) {
+            creerNotif(a.id, 'partenariat_echeance', '📅 Partenariat arrivant à échéance', `Le partenariat avec ${p.nom} se termine le ${dateFinTxt} (dans ${Math.max(0, restantJours)} jour(s)).`, { partenaire_user_id: p.partenaire_user_id, periode_id: p.id });
+          }
+          await db.prepare("INSERT INTO partenariat_notifications_echeance (periode_id, delai_jours) VALUES (?,?)").run(p.id, seuil);
+          alertesEnvoyees++;
+          break; // un seul seuil déclenché par exécution pour cette période — les seuils plus larges auront déjà été notifiés lors d'exécutions précédentes
+        }
+      }
+      sendJSON(res, 200, { ok: true, alertesEnvoyees, periodesExaminees: periodes.length });
+    } catch (e) {
+      sendJSON(res, 500, SEC.safeError(e, "cron partenariat-echeances"));
     }
     return;
   }
