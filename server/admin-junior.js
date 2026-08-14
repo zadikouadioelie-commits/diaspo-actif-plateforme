@@ -162,10 +162,18 @@ async function creerAdminJunior(db, { principalAdminId, catalogueIds }) {
   const passwordPlain = genererMotDePasseJunior();
   const { hash, salt } = hashPassword(passwordPlain);
 
+  /* Alias en minuscules (maxseq, pas maxSeq) : Postgres replie automatiquement tout alias non
+     protégé par des guillemets en minuscules — "AS maxSeq" est renvoyé sous la clé "maxseq" en
+     production, jamais "maxSeq". Avec l'alias camelCase, seqRow.maxSeq valait toujours undefined
+     en production (fonctionnait par coïncidence en local sur SQLite, qui préserve la casse) :
+     sequenceNumber recalculait donc systématiquement 1, provoquant une violation de la contrainte
+     UNIQUE(created_by_admin_id, sequence_number) dès le 2e administrateur junior créé par un même
+     admin — confirmé en production par l'utilisateur ("Création impossible : Création impossible."
+     sur la 2e création). */
   const seqRow = await db.prepare(
-    'SELECT COALESCE(MAX(sequence_number), 0) AS maxSeq FROM admin_junior_meta WHERE created_by_admin_id=?'
+    'SELECT COALESCE(MAX(sequence_number), 0) AS maxseq FROM admin_junior_meta WHERE created_by_admin_id=?'
   ).get(principalAdminId);
-  const sequenceNumber = Number(seqRow?.maxSeq || 0) + 1;
+  const sequenceNumber = Number(seqRow?.maxseq || 0) + 1;
 
   const userId = Number((await withLocalCheckConstraintBypass(db, () => db.prepare(`
     INSERT INTO users (nom, email, password_hash, password_salt, role)
