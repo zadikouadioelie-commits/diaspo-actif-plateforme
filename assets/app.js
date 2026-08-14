@@ -41,6 +41,21 @@ async function fetchCurrentUser() {
 const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html", administrateur_junior: "dashboard-administrateur-junior.html" };
 const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Super Administrateur", collectivite: "Collectivité", administrateur_junior: "Administrateur Junior" };
 
+/* Destination après CONNEXION (login, bascule entre comptes liés, compte démo) : le profil
+   public plutôt que le tableau de bord — décision produit actée avec l'utilisateur. Ne
+   remplace PAS ROLE_DASHBOARD, toujours utilisé ailleurs pour les liens "retour au tableau
+   de bord" (garde-fous de rôle, boutons retour) qui doivent rester inchangés.
+   Seuls utilisateur/initiative ont un profil public sur profil.html (id déduit du compte
+   connecté si omis) ; collectivite a sa propre page profil-collectivite.html qui exige l'id
+   en paramètre. administrateur/administrateur_junior n'ont pas de profil public : ils
+   atterrissent toujours sur leur tableau de bord. */
+function loginLandingUrl(user) {
+  if (!user) return "index.html";
+  if (user.role === "utilisateur" || user.role === "initiative") return "profil.html";
+  if (user.role === "collectivite") return "profil-collectivite.html?id=" + user.id;
+  return ROLE_DASHBOARD[user.role] || "index.html";
+}
+
 /* ---------- Utilitaires globaux ---------- */
 function escH(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
@@ -896,7 +911,7 @@ async function initComptesLiesSwitcher(user) {
     item.disabled = true;
     try {
       const { user: nouveauCompte } = await api('POST', '/comptes-lies/basculer', { user_id: cibleId });
-      location.href = ROLE_DASHBOARD[nouveauCompte.role] || 'index.html';
+      location.href = loginLandingUrl(nouveauCompte);
     } catch (err) {
       item.disabled = false;
     }
