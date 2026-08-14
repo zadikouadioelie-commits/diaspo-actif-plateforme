@@ -42,6 +42,7 @@
     scanner:         { label: 'Scanner QR',      url: '/scanner.html',                 icon: '📷' },
     reunions:        { label: 'Réunions',        url: '/reunions.html',                icon: '🤝' },
     collaborations:  { label: 'Collaborations',  url: '/collaborations.html',          icon: '🤝' },
+    support_pilote:  { label: 'Support Pilote',  url: '/support-pilote.html',          icon: '🖥️' },
   };
 
   // Raccourci pour construire un pattern "open" multi-verbes

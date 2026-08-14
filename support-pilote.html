@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Support Pilote</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.sp-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:560px;}
+.sp-card label{display:block;font-size:13px;font-weight:700;color:#374151;margin:16px 0 6px;}
+.sp-card input,.sp-card textarea{width:100%;border:1.5px solid #E2E8F0;border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;box-sizing:border-box;}
+.sp-card textarea{min-height:90px;resize:vertical;}
+.sp-guarantees{display:flex;flex-direction:column;gap:8px;margin-top:16px;font-size:12.5px;color:var(--muted);}
+.notice{padding:16px;color:var(--muted);}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:32px;padding-bottom:60px;">
+    <div style="margin-bottom:24px;">
+      <h1 style="margin:0;font-size:24px;">🖥️ Support Pilote</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;max-width:640px;">Besoin d'aide pour une manipulation sur Diaspo'Actif ? Un administrateur peut voir votre écran en direct et agir à votre place, uniquement sur les pages de la plateforme.</p>
+    </div>
+
+    <div id="sp-access-denied" style="display:none;" class="notice">Connectez-vous pour demander une assistance.</div>
+
+    <div id="sp-content" style="display:none;">
+      <!-- Formulaire de demande (visible s'il n'y a pas déjà une demande en cours) -->
+      <div id="sp-form-view" class="sp-card">
+        <h2 style="margin:0;font-size:16px;">Demander une assistance</h2>
+        <label for="sp-password">Votre mot de passe (pour confirmer que c'est bien vous)</label>
+        <input type="password" id="sp-password" autocomplete="current-password">
+        <label for="sp-motif">Raison de votre demande</label>
+        <textarea id="sp-motif" placeholder="Décrivez ce pour quoi vous avez besoin d'aide…"></textarea>
+        <div id="sp-form-error" style="display:none;color:#dc2626;font-size:12.5px;margin-top:10px;"></div>
+        <button class="btn btn-orange" style="margin-top:16px;" onclick="spEnvoyerDemande()">Envoyer la demande</button>
+        <div class="sp-guarantees">
+          <div>🔒 Un administrateur ne pourra agir qu'après votre acceptation explicite, et uniquement sur les pages de Diaspo'Actif.</div>
+          <div>⏱️ Vous pourrez arrêter la session à tout moment, en un clic.</div>
+          <div>📝 Chaque action est enregistrée pour votre sécurité.</div>
+        </div>
+      </div>
+
+      <!-- Affiché quand une demande/session est déjà en cours — la barre en haut de page
+           (assets/assistance.js) gère déjà les actions (Accepter/Refuser/Étendre/Arrêter) ;
+           ce panneau est juste un rappel visuel sur cette page précise. -->
+      <div id="sp-status-view" class="sp-card" style="display:none;">
+        <h2 style="margin:0;font-size:16px;">Votre demande en cours</h2>
+        <p id="sp-status-text" style="color:var(--muted);font-size:13.5px;margin:10px 0 0;"></p>
+        <p style="color:var(--muted);font-size:12.5px;margin-top:12px;">👆 Utilisez le bandeau en haut de l'écran pour accepter, refuser, prolonger ou arrêter la session.</p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js"></script>
+<script>
+async function spEnvoyerDemande() {
+  const password = document.getElementById('sp-password').value;
+  const motif = document.getElementById('sp-motif').value.trim();
+  const errBox = document.getElementById('sp-form-error');
+  errBox.style.display = 'none';
+  if (!motif) { errBox.textContent = "Merci d'indiquer la raison de votre demande."; errBox.style.display = 'block'; return; }
+  if (!password) { errBox.textContent = "Mot de passe requis."; errBox.style.display = 'block'; return; }
+  try {
+    await api('POST', '/assistance/demande', { password, motif });
+    document.getElementById('sp-password').value = '';
+    document.getElementById('sp-motif').value = '';
+    if (typeof showToast === 'function') showToast('✅ Demande envoyée — un administrateur va être notifié.');
+    spAfficherStatut();
+  } catch (e) {
+    errBox.textContent = e.message || "Impossible d'envoyer la demande.";
+    errBox.style.display = 'block';
+  }
+}
+
+const SP_LABELS = {
+  EN_ATTENTE: "En attente qu'un administrateur accepte votre demande.",
+  NOTIFIE: "Un administrateur a accepté — acceptez le partage d'écran depuis le bandeau en haut de la page.",
+  ACTIVE: "Session d'assistance en cours — un administrateur voit votre écran.",
+};
+
+async function spAfficherStatut() {
+  let data;
+  try { data = await api('GET', '/assistance/mon-statut'); } catch (e) { return; }
+  const formView = document.getElementById('sp-form-view');
+  const statusView = document.getElementById('sp-status-view');
+  if (data.session) {
+    formView.style.display = 'none';
+    statusView.style.display = '';
+    document.getElementById('sp-status-text').textContent = SP_LABELS[data.session.statut] || data.session.statut;
+  } else {
+    formView.style.display = '';
+    statusView.style.display = 'none';
+  }
+}
+
+async function initSupportPilote() {
+  const me = await fetchCurrentUser().catch(() => null);
+  if (!me) {
+    document.getElementById('sp-access-denied').style.display = '';
+    return;
+  }
+  document.getElementById('sp-content').style.display = '';
+  spAfficherStatut();
+  // Reflète les changements de statut décidés depuis le bandeau (Accepter/Refuser/Arrêter)
+  // sans que la personne ait besoin de recharger la page.
+  setInterval(() => { if (!document.hidden) spAfficherStatut(); }, 5000);
+}
+initSupportPilote();
+</script>
+
+  <!-- ─── Mobile Bottom Navigation ─── -->
+  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item" href="vitrines.html"><span class="nav-icon">🏪</span><span>Vitrines</span></a>
+    <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+    <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
+    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+  </nav>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/password-toggle.js"></script>
+</body>
+</html>

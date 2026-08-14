@@ -4289,6 +4289,17 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.body.appendChild(s);
 })();
 
+/* ── Support Pilote : veille des notifications d'assistance sur TOUTES les pages ──
+   Un membre peut être notifié qu'un administrateur a accepté sa demande pendant qu'il
+   navigue n'importe où sur le site (pas seulement sur support-pilote.html) : ce script doit
+   donc tourner partout, comme O-Z/support-technique ci-dessus. */
+(function loadAssistance(){
+  if (document.querySelector('script[src*="assistance.js"]')) return;
+  var s = document.createElement('script');
+  s.src = 'assets/assistance.js';
+  document.body.appendChild(s);
+})();
+
 /* ── Concentrateur d'assistance : fusionne Support technique + Chatbot + O-Z
    en un seul bouton flottant (badge = nombre d'assistants disponibles),
    pour ne pas encombrer l'écran de 3 icônes séparées sur mobile. Les 3

@@ -17,6 +17,7 @@ window.MODULE_AIDE = {
   messagerie: { titre: "💬 Messages", texte: "Votre messagerie privée pour échanger directement avec les autres membres de Diaspo'Actif." },
   publications: { titre: "📰 Publications", texte: "Publiez des actualités, annonces ou contenus qui apparaissent dans le fil d'actualité de la plateforme." },
   accreditations_da: { titre: "🎖 Accréditations DA", texte: "Demandez des accréditations officielles Diaspo'Actif qui débloquent des droits ou fonctionnalités spécifiques." },
+  support_pilote: { titre: "🖥️ Support Pilote", texte: "Demandez qu'un administrateur voie votre écran en direct et agisse à votre place pour une manipulation, uniquement sur les pages de Diaspo'Actif." },
 
   /* ── Dashboard Initiative — Premium ── */
   paiement_initiative: { titre: "💳 Module paiement", texte: "Configurez l'encaissement des paiements pour votre initiative (Vitrine, adhésions, billetterie)." },

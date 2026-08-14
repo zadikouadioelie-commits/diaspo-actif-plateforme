@@ -57,6 +57,7 @@
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
       <a href="paiements-admin.html">💳 Module Paiements</a>
       <a href="comptes-lies.html">🔗 Liaison de comptes</a>
+      <a href="#support-pilote" data-section="support-pilote" data-aide="support_pilote" style="display:flex;justify-content:space-between;align-items:center;">🖥️ Support Pilote <span id="asp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
 
       <span class="sb-group-lbl">🟦 Cockpit</span>
       <a href="#vue-ensemble" class="active" data-section="vue-ensemble">📊 Vue d'ensemble</a>
@@ -2687,6 +2688,44 @@
         </div>
       </section>
 
+      <!-- ══════════ SECTION SUPPORT PILOTE (assistance à distance) ══════════ -->
+      <section id="section-support-pilote" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;"><h2 style="margin:0;">🖥️ Support Pilote</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Assistance à distance sur les pages Diaspo'Actif — vue en direct de l'écran du membre, avec possibilité d'agir à sa place.</p>
+          </div>
+          <button class="btn btn-outline" onclick="loadSupportPilote()">↻ Actualiser</button>
+        </div>
+
+        <!-- Vue liste : demandes en attente + mes sessions en cours -->
+        <div id="asp-liste-view">
+          <h3 style="font-size:14px;margin:0 0 10px;">🕐 Demandes en attente</h3>
+          <div id="asp-en-attente"><div class="notice">Chargement…</div></div>
+
+          <h3 style="font-size:14px;margin:24px 0 10px;">📡 Mes sessions</h3>
+          <div id="asp-mes-sessions"><div class="notice">Aucune session en cours.</div></div>
+        </div>
+
+        <!-- Vue session active : miroir de l'écran du membre + contrôles -->
+        <div id="asp-session-view" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+            <div>
+              <strong id="asp-session-titre" style="font-size:14px;"></strong>
+              <span id="asp-session-statut" class="notice" style="display:inline-block;padding:2px 10px;margin-left:8px;font-size:11.5px;font-weight:700;"></span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="asp-countdown" style="font-variant-numeric:tabular-nums;font-weight:800;font-size:13px;"></span>
+              <button class="btn btn-outline" onclick="aspRetourListe()">← Retour</button>
+              <button class="btn" style="background:#dc2626;color:#fff;" onclick="aspTerminerSession()">⏹️ Terminer la session</button>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">🔒 Aperçu en lecture — les clics/saisies effectués ci-dessous sont relayés et exécutés réellement sur l'écran du membre, uniquement sur les pages Diaspo'Actif.</div>
+          <div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:#f8fafc;">
+            <iframe id="asp-mirror" sandbox="allow-same-origin" style="width:100%;height:560px;border:none;background:#fff;"></iframe>
+          </div>
+        </div>
+      </section>
+
       <!-- ══════════ SECTION TÉMOIGNAGES ══════════ -->
       <section id="section-temoignages-admin" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
@@ -5231,6 +5270,165 @@ async function migrerAnciensSignalements() {
     alert(`${r.migres} dossier(s) importé(s), ${r.ignores} déjà présent(s) ou ignoré(s).`);
     loadDossiersSignalement();
   } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+/* ===== Support Pilote (assistance à distance) — 2026-08-14 =====
+   Vue liste (demandes en attente + mes sessions) + vue miroir (iframe sandboxée reflétant
+   l'écran du membre, sans allow-scripts : aucun script du membre ne peut s'y exécuter, défense
+   en profondeur en plus de la sanitisation déjà faite côté serveur). Les clics/saisies DANS le
+   miroir sont relayés au serveur, qui les met en file pour exécution réelle côté membre (voir
+   assets/assistance.js) — ce module ne fait jamais rien directement sur le compte du membre. */
+let _aspSessionId = null;
+let _aspCountdownTimer = null;
+let _aspMirrorTimer = null;
+
+async function loadSupportPilote() {
+  aspRetourListe();
+  const enAttenteEl = document.getElementById('asp-en-attente');
+  const mesSessionsEl = document.getElementById('asp-mes-sessions');
+  try {
+    const data = await api('GET', '/admin/assistance');
+    const badge = document.getElementById('asp-pending-badge');
+    if (badge) { const n = data.en_attente.length; badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+
+    enAttenteEl.innerHTML = data.en_attente.length
+      ? data.en_attente.map(d => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <strong>${escH(d.prenom || '')} ${escH(d.nom || '')}</strong> <span style="color:var(--muted);font-size:12px;">(${escH(d.email || '')})</span>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">« ${escH(d.motif)} »</div>
+          </div>
+          <button class="btn btn-orange btn-sm" onclick="aspAccepter(${d.id})">✅ Accepter</button>
+        </div>`).join('')
+      : '<div class="notice">Aucune demande en attente.</div>';
+
+    mesSessionsEl.innerHTML = data.mes_sessions.length
+      ? data.mes_sessions.map(d => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <strong>${escH(d.prenom || '')} ${escH(d.nom || '')}</strong>
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:${d.statut === 'ACTIVE' ? '#FEE2E2' : '#FEF3C7'};color:${d.statut === 'ACTIVE' ? '#991B1B' : '#92400E'};margin-left:6px;">${d.statut === 'ACTIVE' ? '🔴 En cours' : '⏳ En attente du membre'}</span>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">« ${escH(d.motif)} »</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="aspOuvrirSession(${d.id})">Ouvrir</button>
+        </div>`).join('')
+      : '<div class="notice">Aucune session en cours.</div>';
+  } catch (e) {
+    enAttenteEl.innerHTML = `<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>`;
+  }
+}
+
+async function aspAccepter(id) {
+  try {
+    await api('POST', `/admin/assistance/${id}/accepter`);
+    if (typeof showToast === 'function') showToast('✅ Demande acceptée — en attente de la confirmation du membre.');
+    loadSupportPilote();
+  } catch (e) { alert(e.message || "Impossible d'accepter cette demande."); }
+}
+
+function aspRetourListe() {
+  clearInterval(_aspCountdownTimer); _aspCountdownTimer = null;
+  clearInterval(_aspMirrorTimer); _aspMirrorTimer = null;
+  _aspSessionId = null;
+  const sv = document.getElementById('asp-session-view'), lv = document.getElementById('asp-liste-view');
+  if (sv) sv.style.display = 'none';
+  if (lv) lv.style.display = '';
+}
+
+function aspOuvrirSession(id) {
+  _aspSessionId = id;
+  document.getElementById('asp-liste-view').style.display = 'none';
+  document.getElementById('asp-session-view').style.display = '';
+  aspRafraichirSession();
+  clearInterval(_aspMirrorTimer);
+  _aspMirrorTimer = setInterval(aspRafraichirSession, 2000);
+}
+
+// Colonnes *_at au format "YYYY-MM-DD HH:MM:SS" UTC sans indicateur de fuseau — même piège que
+// partout ailleurs sur ce projet (voir tgMaintenant côté serveur) : parser en UTC explicite,
+// jamais new Date(chaîne) directement (réinterprétée comme heure locale sinon).
+function aspRemainingSec(str) {
+  const d = new Date(String(str || '').replace(' ', 'T') + 'Z');
+  return Math.max(0, Math.round((d.getTime() - Date.now()) / 1000));
+}
+function aspFmtMmSs(sec) { const m = Math.floor(sec / 60), s = sec % 60; return `${m}:${String(s).padStart(2, '0')}`; }
+
+async function aspRafraichirSession() {
+  if (!_aspSessionId) return;
+  let data;
+  try { data = await api('GET', `/admin/assistance/${_aspSessionId}`); } catch (e) { return; }
+
+  const statutEl = document.getElementById('asp-session-statut');
+  if (statutEl) statutEl.textContent = data.statut === 'ACTIVE' ? '🔴 En cours' : data.statut;
+
+  if (data.statut !== 'ACTIVE') {
+    clearInterval(_aspMirrorTimer); _aspMirrorTimer = null;
+    clearInterval(_aspCountdownTimer); _aspCountdownTimer = null;
+    if (typeof showToast === 'function') showToast('La session est terminée.');
+    aspRetourListe();
+    loadSupportPilote();
+    return;
+  }
+
+  if (!_aspCountdownTimer) {
+    const tick = () => {
+      const el = document.getElementById('asp-countdown');
+      if (el) el.textContent = aspFmtMmSs(aspRemainingSec(data.session_expires_at));
+    };
+    tick();
+    _aspCountdownTimer = setInterval(tick, 1000);
+  }
+
+  const frame = document.getElementById('asp-mirror');
+  if (frame && data.snapshot_html) {
+    frame.onload = () => aspBrancherMiroir(frame);
+    frame.srcdoc = data.snapshot_html;
+  }
+}
+
+// Écoute les interactions DANS le miroir (iframe sandboxée sans allow-scripts) et les relaie
+// au serveur pour exécution réelle côté membre — ce code-ci n'agit jamais lui-même sur le
+// compte du membre, il ne fait que transmettre l'intention.
+function aspBrancherMiroir(frame) {
+  try {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    doc.addEventListener('click', e => {
+      const sel = aspSelecteur(e.target);
+      if (sel) aspEnvoyerAction('click', sel, null);
+    }, true);
+    doc.addEventListener('input', e => {
+      const sel = aspSelecteur(e.target);
+      if (sel) aspEnvoyerAction('input', sel, e.target.value);
+    }, true);
+    doc.addEventListener('submit', e => {
+      e.preventDefault(); // le miroir ne doit jamais soumettre localement, seulement relayer
+      const sel = aspSelecteur(e.target);
+      if (sel) aspEnvoyerAction('submit', sel, null);
+    }, true);
+  } catch (e) { /* iframe pas encore prête, réessaiera au prochain rafraîchissement */ }
+}
+
+// MVP volontairement simple : ne cible que les éléments avec id/name. Un élément sans l'un
+// des deux (bouton sans id, lien...) n'est pas cliquable via le miroir pour l'instant — limite
+// connue, à améliorer plus tard avec un générateur de chemin CSS complet si besoin.
+function aspSelecteur(el) {
+  if (!el || (!el.id && !el.name)) return null;
+  if (el.id) return '#' + el.id;
+  return `[name="${el.name}"]`;
+}
+
+async function aspEnvoyerAction(type, selecteur, valeur) {
+  if (!_aspSessionId) return;
+  try { await api('POST', `/admin/assistance/${_aspSessionId}/action`, { type, selecteur, valeur }); } catch (e) {}
+}
+
+async function aspTerminerSession() {
+  if (!_aspSessionId) return;
+  if (!confirm("Terminer cette session d'assistance ?")) return;
+  try { await api('POST', `/admin/assistance/${_aspSessionId}/terminer`); } catch (e) {}
+  aspRetourListe();
+  loadSupportPilote();
 }
 
 /* ===== Journal d'erreurs (monitoring maison) ===== */
@@ -8106,6 +8304,7 @@ async function submitAccordDirect(){
     'verifications-organisation': () => loadVerificationsOrganisation(),
     'demandes-passage': () => loadDemandesPassage(),
     'administrateurs-junior': () => loadAdminsJunior(),
+    'support-pilote': () => loadSupportPilote(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
