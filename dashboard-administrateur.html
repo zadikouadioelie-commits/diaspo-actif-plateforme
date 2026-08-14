@@ -4772,7 +4772,7 @@ async function ajVoirDetail(id, allerActivite) {
               <span>${accordees.has(e.id) ? '✅' : '⬜'} Droit : ${esc(e.description)}</span>
               ${accordees.has(e.id)
                 ? `<button class="btn btn-sm btn-outline" onclick="ajRevoquer(${id},'${esc(e.id)}')">Révoquer</button>`
-                : `<button class="btn btn-sm btn-outline" onclick="ajAccorder(${id},'${esc(e.id)}')">Accorder</button>`}
+                : `<button class="btn btn-sm" style="background:#1d4ed8;color:#fff;border:none;" onclick="ajAccorder(${id},'${esc(e.id)}')">Accorder</button>`}
             </div>
           `).join('')}
         </div>
