@@ -5009,6 +5009,25 @@ db.exec(`
     updated_at          TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  /* Incrément 2 — invitation à usage unique (cahier des charges Partie 3 + Partie 6
+     règles 1-4). Seul le hash SHA-256 du token est stocké — jamais le token en clair
+     (voir server/partenariat.js pour la génération/vérification). Statut "🟠 Expire
+     bientôt" n'est jamais stocké : calculé à la lecture selon un seuil configurable. */
+  CREATE TABLE IF NOT EXISTS partenariat_invitations (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash          TEXT NOT NULL UNIQUE,
+    cree_par            INTEGER NOT NULL,
+    statut              TEXT NOT NULL DEFAULT 'disponible' CHECK(statut IN ('disponible','utilisee','expiree','annulee')),
+    duree_validite_jours INTEGER NOT NULL DEFAULT 7,
+    expire_at           TEXT NOT NULL,
+    utilisee_par_user_id INTEGER,
+    utilisee_at         TEXT,
+    note_admin          TEXT,
+    created_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cree_par) REFERENCES users(id),
+    FOREIGN KEY(utilisee_par_user_id) REFERENCES users(id)
+  );
 `);
 
 /* =====================================================================

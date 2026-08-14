@@ -14,6 +14,7 @@ const DAA = require("./daa-lang");
 const AvantagesPremium = require("./avantages-premium");
 const TG = require("./transfert-gestionnaire");
 const AdminJunior = require("./admin-junior");
+const Partenariat = require("./partenariat");
 
 const TICKET_SECRET = process.env.TICKET_SECRET || "diaspoactif-qr-2026-secret";
 async function signTicket(ticketId, eventId, ts) {
@@ -8083,6 +8084,128 @@ route("GET", "/api/partenariat/moi", async (req, res) => {
   if (!fiche) return sendJSON(res, 404, { error: "Fiche partenaire introuvable." });
   fiche.secteurs = safeParse(fiche.secteurs || "[]");
   sendJSON(res, 200, fiche);
+});
+
+/* ── Incrément 2 : invitation à usage unique + inscription partenaire ──
+   Voir server/partenariat.js pour la génération/hash du token et l'expiration
+   paresseuse à la lecture. Statut "🟠 Expire bientôt" calculé ici (jamais stocké),
+   seuil configurable via parametres_plateforme (repli sur 2 jours si non réglé). */
+
+async function partenariatSeuilAlerteJours() {
+  const row = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle='partenariat_invitation_alerte_jours'").get();
+  const n = row ? parseInt(row.valeur, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 2;
+}
+function partenariatStatutAffiche(inv, seuilJours) {
+  if (inv.statut !== "disponible") return inv.statut; // utilisee/expiree/annulee : tel quel
+  const restantMs = new Date(inv.expire_at.replace(" ", "T") + "Z").getTime() - Date.now();
+  return restantMs <= seuilJours * 86400000 ? "expire_bientot" : "disponible";
+}
+
+route("POST", "/api/admin/partenariat/invitations", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const dureeJours = Number(body?.duree_validite_jours) > 0 ? Math.round(Number(body.duree_validite_jours)) : 7;
+  const token = Partenariat.genererToken();
+  const tokenHash = Partenariat.hashToken(token);
+  const expireAt = Partenariat.plusJours(dureeJours);
+  const r = await db.prepare(`
+    INSERT INTO partenariat_invitations (token_hash, cree_par, duree_validite_jours, expire_at, note_admin)
+    VALUES (?,?,?,?,?)
+  `).run(tokenHash, me.id, dureeJours, expireAt, body?.note_admin || null);
+  const id = Number(r.lastInsertRowid);
+  const origin = getOrigin(req);
+  // Le token en clair n'est renvoyé QU'ICI, une seule fois — jamais récupérable ensuite
+  // (seul le hash est en base). Voir dashboard-administrateur.html pour l'affichage
+  // "one-shot" + bouton copier (modèle ajCopier).
+  sendJSON(res, 200, { id, lien: `${origin}/inscription-partenaire.html?token=${token}`, expire_at: expireAt, duree_validite_jours: dureeJours });
+});
+
+route("GET", "/api/admin/partenariat/invitations", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const rows = await db.prepare(`
+    SELECT i.id, i.statut, i.duree_validite_jours, i.expire_at, i.utilisee_at, i.note_admin, i.created_at,
+           u.nom AS utilisee_par_nom, u.email AS utilisee_par_email
+    FROM partenariat_invitations i LEFT JOIN users u ON u.id = i.utilisee_par_user_id
+    ORDER BY i.created_at DESC
+  `).all();
+  const seuil = await partenariatSeuilAlerteJours();
+  const invitations = [];
+  for (const inv of rows) {
+    // Expiration paresseuse à la lecture (ne touche que les lignes réellement périmées).
+    if (inv.statut === "disponible" && inv.expire_at < Partenariat.maintenant()) {
+      await db.prepare("UPDATE partenariat_invitations SET statut='expiree' WHERE id=?").run(inv.id);
+      inv.statut = "expiree";
+    }
+    invitations.push({ ...inv, statut_affiche: partenariatStatutAffiche(inv, seuil) });
+  }
+  sendJSON(res, 200, { invitations });
+});
+
+route("POST", "/api/admin/partenariat/invitations/:id/annuler", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const inv = await Partenariat.chargerInvitation(db, Number(params.id));
+  if (!inv) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (inv.statut !== "disponible") return sendJSON(res, 409, { error: "Seule une invitation disponible peut être annulée." });
+  await db.prepare("UPDATE partenariat_invitations SET statut='annulee' WHERE id=?").run(inv.id);
+  sendJSON(res, 200, { statut: "annulee" });
+});
+
+// Publique, sans auth — ne renvoie jamais de donnée sensible, juste "peut-on s'inscrire ?".
+route("GET", "/api/partenariat/inscription/:token", async (req, res, params) => {
+  const inv = await Partenariat.chargerInvitationParToken(db, params.token);
+  const valide = !!inv && inv.statut === "disponible";
+  sendJSON(res, 200, { valide });
+});
+
+// Publique, sans auth — crée le compte. role='partenaire' codé EN DUR ci-dessous, jamais lu
+// du body (même règle que server/admin-junior.js:creerAdminJunior — cahier des charges Partie
+// 3.5/6 règle 4 : le type de compte n'est jamais un choix client).
+route("POST", "/api/partenariat/inscription/:token", async (req, res, params, body) => {
+  const inv = await Partenariat.chargerInvitationParToken(db, params.token);
+  if (!inv || inv.statut !== "disponible") return sendJSON(res, 400, { error: "Lien d'invitation invalide, déjà utilisé ou expiré." });
+
+  const nom = String(body?.nom || "").trim();
+  const email = String(body?.email || "").trim().toLowerCase();
+  const password = body?.password || "";
+  const nomOrganisation = String(body?.nom_organisation || "").trim();
+  if (!nom || !email || !password || !nomOrganisation) {
+    return sendJSON(res, 400, { error: "Nom, e-mail, mot de passe et nom d'organisation sont requis." });
+  }
+  if (password.length < 8) return sendJSON(res, 400, { error: "Le mot de passe doit contenir au moins 8 caractères." });
+  const dejaUtilise = await db.prepare("SELECT id FROM users WHERE email=?").get(email);
+  if (dejaUtilise) return sendJSON(res, 400, { error: "Cette adresse e-mail est déjà utilisée." });
+
+  const { hash, salt } = hashPassword(password);
+  const userId = Number((await AdminJunior.withLocalCheckConstraintBypass(db, () => db.prepare(
+    "INSERT INTO users (nom, email, password_hash, password_salt, role) VALUES (?,?,?,?,'partenaire')"
+  ).run(nom, email, hash, salt))).lastInsertRowid);
+
+  await db.prepare(`
+    INSERT INTO partenariat_comptes (user_id, nom_organisation, personne_responsable, email_contact, invitation_id)
+    VALUES (?,?,?,?,?)
+  `).run(userId, nomOrganisation, nom, email, inv.id);
+
+  // Consommation protégée contre un double-usage concurrent : l'UPDATE ne réussit que si le
+  // statut était encore 'disponible' au moment exact de l'écriture (deux requêtes simultanées
+  // sur le même token ne peuvent pas toutes les deux créer un compte).
+  const consomme = await db.prepare(
+    "UPDATE partenariat_invitations SET statut='utilisee', utilisee_par_user_id=?, utilisee_at=datetime('now') WHERE id=? AND statut='disponible'"
+  ).run(userId, inv.id);
+  if (!consomme.changes) {
+    // Quelqu'un d'autre a consommé le lien entre-temps : on annule la création pour éviter un
+    // compte partenaire "orphelin" créé via un lien déjà grillé.
+    await db.prepare("DELETE FROM partenariat_comptes WHERE user_id=?").run(userId);
+    await db.prepare("DELETE FROM users WHERE id=?").run(userId);
+    return sendJSON(res, 409, { error: "Ce lien d'invitation vient d'être utilisé. Demandez-en un nouveau." });
+  }
+
+  const sessionToken = createSession(userId);
+  const authTok = signAuthToken({ uid: userId, role: "partenaire", cv: 1, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
+  const sf = cookieSecureFlag(req);
+  sendJSON(res, 200, { ok: true, user_id: userId }, { "Set-Cookie": [`sid=${sessionToken}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
 });
 
 /* ══════════════════════════════════════════════════════════════════════

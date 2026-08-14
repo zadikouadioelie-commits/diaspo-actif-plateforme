@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Inscription Partenaire</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1565C0">
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* Page volontairement non référencée (aucun lien public) — accessible uniquement via un lien
+   d'invitation à usage unique généré par un administrateur (cahier des charges Partie 3.1). */
+body { background: #060e1a; }
+.page { min-height: 100vh; background: linear-gradient(135deg, #060e1a 0%, #0c1e38 50%, #0F2A50 100%); }
+main.container { max-width: 480px; margin: 0 auto; padding: 48px 24px 80px; }
+.auth-form-card { background: #fff; border-radius: 20px !important; padding: 40px !important; box-shadow: 0 32px 80px rgba(0,0,0,.4) !important; border: none !important; }
+.auth-form-card label { font-size: 13px; font-weight: 700; color: #374151; display: block; margin-bottom: 6px; margin-top: 16px; }
+.auth-form-card input, .auth-form-card textarea { width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0 16px; height: 48px; font-size: 15px; font-family: inherit; box-sizing: border-box; }
+.auth-form-card textarea { height: auto; padding: 12px 16px; min-height: 80px; }
+.auth-error { background: #FEF2F2 !important; border: 1.5px solid #FECACA !important; color: #dc2626 !important; border-radius: 10px !important; padding: 12px 16px !important; font-size: 13px !important; font-weight: 600 !important; margin-top: 12px !important; }
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="ip-verification" class="card auth-form-card" style="text-align:center;">
+      <p style="color:var(--muted);">Vérification du lien d'invitation…</p>
+    </div>
+
+    <div id="ip-invalide" class="card auth-form-card" style="display:none;text-align:center;">
+      <h2 style="margin-top:0;">🔒 Lien invalide</h2>
+      <p style="color:var(--muted);font-size:14px;">Ce lien d'invitation est invalide, déjà utilisé, ou a expiré. Contactez Diaspo'Actif pour obtenir un nouveau lien.</p>
+    </div>
+
+    <div id="ip-form-view" class="card auth-form-card" style="display:none;">
+      <h2 style="margin-top:0;">🤝 Devenir Partenaire Diaspo'Actif</h2>
+      <p class="sub" style="margin-bottom:0;color:var(--muted);font-size:14px;">Vous avez été invité(e) à créer un compte Partenaire.</p>
+
+      <form id="ip-form">
+        <label for="ip-nom-organisation">Nom de votre organisation</label>
+        <input type="text" id="ip-nom-organisation" required>
+        <label for="ip-nom">Votre nom</label>
+        <input type="text" id="ip-nom" required>
+        <label for="ip-email">Adresse e-mail</label>
+        <input type="email" id="ip-email" required autocomplete="username">
+        <label for="ip-password">Mot de passe</label>
+        <input type="password" id="ip-password" required minlength="8" autocomplete="new-password">
+        <div class="auth-error" id="ip-error"></div>
+        <button type="submit" class="btn btn-orange btn-block" style="margin-top:18px;">Créer mon compte Partenaire</button>
+      </form>
+    </div>
+  </main>
+
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+async function initInscriptionPartenaire() {
+  const token = new URLSearchParams(location.search).get("token");
+  const verifEl = document.getElementById("ip-verification");
+  const invalideEl = document.getElementById("ip-invalide");
+  const formEl = document.getElementById("ip-form-view");
+
+  if (!token) { verifEl.style.display = "none"; invalideEl.style.display = ""; return; }
+
+  try {
+    const r = await api("GET", `/partenariat/inscription/${encodeURIComponent(token)}`);
+    if (!r.valide) { verifEl.style.display = "none"; invalideEl.style.display = ""; return; }
+  } catch (e) {
+    verifEl.style.display = "none"; invalideEl.style.display = "";
+    return;
+  }
+  verifEl.style.display = "none";
+  formEl.style.display = "";
+
+  document.getElementById("ip-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errBox = document.getElementById("ip-error");
+    errBox.style.display = "none";
+    const body = {
+      nom_organisation: document.getElementById("ip-nom-organisation").value.trim(),
+      nom: document.getElementById("ip-nom").value.trim(),
+      email: document.getElementById("ip-email").value.trim(),
+      password: document.getElementById("ip-password").value,
+    };
+    try {
+      await api("POST", `/partenariat/inscription/${encodeURIComponent(token)}`, body);
+      window.location.href = "dashboard-partenaire.html";
+    } catch (err) {
+      errBox.textContent = err.message || "Impossible de créer le compte.";
+      errBox.style.display = "block";
+    }
+  });
+}
+initInscriptionPartenaire();
+</script>
+<script src="/assets/theme-manager.js"></script>
+</body>
+</html>

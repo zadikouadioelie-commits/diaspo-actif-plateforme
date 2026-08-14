@@ -58,6 +58,7 @@
       <a href="paiements-admin.html">💳 Module Paiements</a>
       <a href="comptes-lies.html">🔗 Liaison de comptes</a>
       <a href="#support-pilote" data-section="support-pilote" data-aide="support_pilote" style="display:flex;justify-content:space-between;align-items:center;">🖥️ Support Pilote <span id="asp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
+      <a href="#partenariat-admin" data-section="partenariat-admin">🤝 Partenariat</a>
 
       <span class="sb-group-lbl">🟦 Cockpit</span>
       <a href="#vue-ensemble" class="active" data-section="vue-ensemble">📊 Vue d'ensemble</a>
@@ -2724,6 +2725,33 @@
             <iframe id="asp-mirror" sandbox="allow-same-origin" style="width:100%;height:560px;border:none;background:#fff;"></iframe>
           </div>
         </div>
+      </section>
+
+      <!-- ══════════ SECTION PARTENARIAT (incrément 2 : invitations à usage unique) ══════════
+           Module "Partenariat" — distinct de "Partenaires Officiels" (partenaires-admin, un
+           badge sur un compte existant). Les cartouches de comptes Partenaire (nom, dates de
+           partenariat, statut, compteurs) arriveront à l'incrément 3. -->
+      <section id="section-partenariat-admin" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;"><h2 style="margin:0;">🤝 Partenariat</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Comptes Partenaire créés exclusivement par invitation à usage unique — aucune inscription publique possible.</p>
+          </div>
+          <button class="btn btn-orange" onclick="pnGenererInvitation()">➕ Générer un lien d'inscription partenaire</button>
+        </div>
+
+        <!-- Affichage "one-shot" du lien généré — jamais récupérable ensuite (seul le hash
+             est en base côté serveur). -->
+        <div id="pn-lien-genere" class="notice" style="display:none;margin-bottom:20px;background:#F0FDF4;border:1.5px solid #86EFAC;">
+          <strong>🔗 Lien généré — copiez-le maintenant, il ne sera plus jamais affiché :</strong>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+            <code id="pn-lien-texte" style="flex:1;min-width:220px;padding:8px 10px;background:#fff;border-radius:8px;font-size:12px;word-break:break-all;"></code>
+            <button class="btn btn-sm btn-orange" onclick="pnCopierLien()">📋 Copier</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px;" id="pn-lien-expire"></div>
+        </div>
+
+        <h3 style="font-size:14px;margin:0 0 10px;">Invitations</h3>
+        <div id="pn-invitations-list"><div class="notice">Chargement…</div></div>
       </section>
 
       <!-- ══════════ SECTION TÉMOIGNAGES ══════════ -->
@@ -5429,6 +5457,58 @@ async function aspTerminerSession() {
   try { await api('POST', `/admin/assistance/${_aspSessionId}/terminer`); } catch (e) {}
   aspRetourListe();
   loadSupportPilote();
+}
+
+/* ===== Partenariat (incrément 2 : invitations à usage unique) ===== */
+const PN_STATUT_LABELS = {
+  disponible: '🟢 Disponible', expire_bientot: '🟠 Expire bientôt',
+  utilisee: '⚫ Utilisée', expiree: '🔴 Expirée', annulee: '⚪ Annulée',
+};
+
+async function pnGenererInvitation() {
+  try {
+    const r = await api('POST', '/admin/partenariat/invitations', {});
+    document.getElementById('pn-lien-texte').textContent = r.lien;
+    document.getElementById('pn-lien-expire').textContent = `Valable ${r.duree_validite_jours} jours (expire le ${new Date(r.expire_at.replace(' ','T')+'Z').toLocaleDateString('fr-FR')}).`;
+    document.getElementById('pn-lien-genere').style.display = '';
+    loadPartenariatAdmin();
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+function pnCopierLien() {
+  const texte = document.getElementById('pn-lien-texte').textContent;
+  navigator.clipboard?.writeText(texte);
+  if (typeof showToast === 'function') showToast('✅ Lien copié.');
+}
+
+async function loadPartenariatAdmin() {
+  const el = document.getElementById('pn-invitations-list');
+  try {
+    const data = await api('GET', '/admin/partenariat/invitations');
+    if (!data.invitations.length) { el.innerHTML = '<div class="notice">Aucune invitation générée pour le moment.</div>'; return; }
+    el.innerHTML = data.invitations.map(inv => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:8px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <span style="font-weight:700;">${PN_STATUT_LABELS[inv.statut_affiche] || inv.statut_affiche}</span>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+            Créée le ${new Date(inv.created_at.replace(' ','T')+'Z').toLocaleDateString('fr-FR')} · valable ${inv.duree_validite_jours} j
+            ${inv.utilisee_par_nom ? ` · utilisée par ${esc(inv.utilisee_par_nom)} (${esc(inv.utilisee_par_email)})` : ''}
+          </div>
+          ${inv.note_admin ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;">📝 ${esc(inv.note_admin)}</div>` : ''}
+        </div>
+        ${inv.statut === 'disponible' ? `<button class="btn btn-sm btn-outline" onclick="pnAnnulerInvitation(${inv.id})">Annuler</button>` : ''}
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
+  }
+}
+
+async function pnAnnulerInvitation(id) {
+  if (!confirm("Annuler cette invitation ? Le lien deviendra définitivement inutilisable.")) return;
+  try {
+    await api('POST', `/admin/partenariat/invitations/${id}/annuler`);
+    loadPartenariatAdmin();
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
 }
 
 /* ===== Journal d'erreurs (monitoring maison) ===== */
@@ -8305,6 +8385,7 @@ async function submitAccordDirect(){
     'demandes-passage': () => loadDemandesPassage(),
     'administrateurs-junior': () => loadAdminsJunior(),
     'support-pilote': () => loadSupportPilote(),
+    'partenariat-admin': () => loadPartenariatAdmin(),
   };
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
