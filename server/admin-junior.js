@@ -295,4 +295,5 @@ module.exports = {
   enregistrerEchecConnexionJunior, estVerrouille,
   estSuspendu, suspendreAdminJunior, reactiverAdminJunior, supprimerAdminJunior,
   genererEmailJuniorUnique, genererMotDePasseJunior, genererChaineJunior,
+  withLocalCheckConstraintBypass, // réutilisé par server/partenariat.js (même piège CHECK local sur users.role)
 };

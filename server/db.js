@@ -51,7 +51,7 @@ db.exec(`
     -- 'officiel'/'institutionnel' sont déjà utilisés en prod hors de cette liste (rôles consolidés
     -- vers administrateur/collectivite) sans problème : CREATE TABLE IF NOT EXISTS ne touche jamais
     -- une table existante, donc ce CHECK n'est vérifié qu'à la toute première création de la table.
-    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior')),
+    role TEXT NOT NULL CHECK(role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior','partenaire')),
     ville TEXT,
     pays TEXT,
     adresse TEXT,
@@ -4979,6 +4979,36 @@ db.exec(`
     FOREIGN KEY(junior_user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_admin_junior_journal_junior ON admin_junior_journal(junior_user_id, created_at);
+`);
+
+/* =====================================================================
+   MODULE "PARTENARIAT" (2026-08-14) — Incrément 1 : fondations du rôle
+   "partenaire" (cahier des charges : soumission de projets à Diaspo'Actif
+   + orientation vers des partenaires externes créés exclusivement par
+   invitation à usage unique). Nommage "Partenariat" choisi délibérément
+   pour ne jamais être confondu avec le module "Partenaires Officiels"
+   déjà existant (partenaires_officiels/partenaires-admin) — celui-ci est
+   un badge attribué à un compte déjà existant, pas un rôle de compte.
+   ===================================================================== */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS partenariat_comptes (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id             INTEGER NOT NULL UNIQUE,
+    nom_organisation    TEXT,
+    logo_url            TEXT,
+    personne_responsable TEXT,
+    email_contact       TEXT,
+    telephone_contact   TEXT,
+    description         TEXT,
+    secteurs            TEXT DEFAULT '[]',
+    statut              TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','suspendue','supprimee')),
+    origine             TEXT DEFAULT 'Invitation Diaspo''Actif',
+    invitation_id       INTEGER,
+    admin_notes         TEXT,   -- STRICTEMENT privé : jamais renvoyé au partenaire (voir GET /api/partenariat/moi, sélection explicite de colonnes)
+    created_at          TEXT DEFAULT (datetime('now')),
+    updated_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
 `);
 
 /* =====================================================================

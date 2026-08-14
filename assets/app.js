@@ -38,8 +38,8 @@ async function fetchCurrentUser() {
   }
 }
 
-const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html", administrateur_junior: "dashboard-administrateur-junior.html" };
-const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Super Administrateur", collectivite: "Collectivité", administrateur_junior: "Administrateur Junior" };
+const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html", administrateur_junior: "dashboard-administrateur-junior.html", partenaire: "dashboard-partenaire.html" };
+const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Super Administrateur", collectivite: "Collectivité", administrateur_junior: "Administrateur Junior", partenaire: "Partenaire" };
 
 /* Destination après CONNEXION (login, bascule entre comptes liés, compte démo) : le profil
    public plutôt que le tableau de bord — décision produit actée avec l'utilisateur. Ne

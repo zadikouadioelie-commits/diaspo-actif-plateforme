@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Dashboard Partenaire</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav"></nav>
+      <div class="topbar-right">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">☰</button>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="with-sidebar">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <button class="sidebar-close" id="sidebar-close">×</button>
+      <div class="brand">🤝 Espace Partenaire</div>
+      <style>.sb-group-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);padding:12px 16px 4px;margin-top:4px;display:block;}</style>
+      <a href="#tableau-de-bord" data-section="tableau-de-bord" class="active">🏠 Tableau de bord</a>
+      <!-- Les modules "Projets transmis par Diaspo'Actif", "Évaluations" et "Suivi des mises en
+           relation" seront ajoutés en incrément 6 (voir plan). Ne pas les ajouter ici avant que
+           les routes/tables correspondantes existent. -->
+    </aside>
+
+    <main class="content">
+      <div id="dp-chargement" style="padding:40px;text-align:center;color:var(--muted);">Chargement…</div>
+
+      <!-- TABLEAU DE BORD -->
+      <section id="section-tableau-de-bord" style="display:none;">
+        <h2>🏠 Bienvenue, <span id="dp-nom-organisation">Partenaire</span></h2>
+        <div class="notice" style="margin-bottom:16px;">
+          📂 Projets : sur orientation de Diaspo'Actif. Les porteurs de projets ne vous transmettent jamais un dossier directement — c'est toujours Diaspo'Actif qui analyse une demande puis, le cas échéant, vous l'oriente.
+        </div>
+        <div class="card" id="dp-fiche-carte">
+          <p style="color:var(--muted);font-size:13px;">Chargement de votre fiche partenaire…</p>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function loadTableauDeBord() {
+  const el = document.getElementById('dp-fiche-carte');
+  try {
+    const fiche = await api('GET', '/partenariat/moi');
+    document.getElementById('dp-nom-organisation').textContent = fiche.nom_organisation || fiche.personne_responsable || 'Partenaire';
+    el.innerHTML = `
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        ${fiche.logo_url ? `<img src="${esc(fiche.logo_url)}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">` : ''}
+        <div>
+          <div style="font-weight:800;font-size:16px;">${esc(fiche.nom_organisation || '—')}</div>
+          <div style="font-size:13px;color:var(--muted);">${esc(fiche.personne_responsable || '')}</div>
+          <div style="font-size:13px;color:var(--muted);">${esc(fiche.email_contact || '')}</div>
+        </div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = '<p style="color:red;font-size:13px;">Erreur de chargement de votre fiche.</p>';
+  }
+}
+
+(async () => {
+  const me = await fetchCurrentUser();
+  if (!me) { window.location.href = "login.html"; return; }
+  if (me.role !== "partenaire") { window.location.href = (window.ROLE_DASHBOARD && ROLE_DASHBOARD[me.role]) || "index.html"; return; }
+
+  const SECTION_LOADERS = { 'tableau-de-bord': loadTableauDeBord };
+
+  const links = document.querySelectorAll(".sidebar a[data-section]");
+  links.forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    links.forEach(l => l.classList.remove("active"));
+    a.classList.add("active");
+    document.querySelectorAll("section[id^='section-']").forEach(s => s.style.display = "none");
+    const target = document.getElementById("section-" + a.dataset.section);
+    if (target) target.style.display = "";
+    if (SECTION_LOADERS[a.dataset.section]) SECTION_LOADERS[a.dataset.section]();
+  }));
+
+  document.getElementById('dp-chargement').style.display = 'none';
+  document.querySelector('.sidebar a[data-section="tableau-de-bord"]')?.click();
+})();
+</script>
+</body>
+</html>

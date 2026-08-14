@@ -1327,6 +1327,13 @@ async function migratePg(pool) {
        pas encore 'compte_suspendu'/'compte_reactive'. Même traitement. */
     { table: 'admin_junior_journal', constraint: 'admin_junior_journal_action_check',
       addBack: "CHECK (action IN ('permission_accordee','permission_revoquee','action_executee','identifiants_regeneres_cron','identifiants_regeneres_manuel','compte_verrouille','connexion_echouee','connexion_reussie','compte_suspendu','compte_reactive'))" },
+    /* Module "Partenariat" (2026-08-14) : nouveau type de compte 'partenaire' (cahier des
+       charges — soumission de projets à Diaspo'Actif + orientation vers des partenaires
+       externes créés exclusivement par invitation à usage unique). Même piège que
+       'administrateur_junior' ci-dessus : la contrainte déjà en production ne liste pas
+       'partenaire'. */
+    { table: 'users', constraint: 'users_role_check',
+      addBack: "CHECK (role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior','partenaire'))" },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

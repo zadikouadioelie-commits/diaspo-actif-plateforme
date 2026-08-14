@@ -8061,6 +8061,31 @@ route("POST", "/api/admin/assistance/:id/terminer", async (req, res, params) => 
 });
 
 /* ══════════════════════════════════════════════════════════════════════
+   MODULE "PARTENARIAT" (2026-08-14) — Incrément 1 : fondations du rôle "partenaire".
+   Cahier des charges complet (8 parties) : soumission de projets Premium à Diaspo'Actif,
+   analyse, puis orientation vers des comptes Partenaire externes créés exclusivement par
+   invitation à usage unique. Nommage "Partenariat" choisi délibérément pour ne jamais être
+   confondu avec le module "Partenaires Officiels" déjà existant (partenaires_officiels /
+   /api/admin/partenaires, un badge attribué à un compte déjà existant — PAS un rôle de
+   compte). Incréments suivants : 2 (invitation), 3 (module admin), 4-5 (soumission/
+   traitement des projets), 6 (espace Partenaire), 7 (stats). Voir memory pour le plan complet. */
+
+route("GET", "/api/partenariat/moi", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "partenaire") return sendJSON(res, 403, { error: "Réservé aux comptes Partenaire." });
+  // Sélection EXPLICITE de colonnes — jamais admin_notes ni invitation_id (strictement privé,
+  // voir server/db.js:partenariat_comptes). Ne jamais faire SELECT * / spread ici.
+  const fiche = await db.prepare(`
+    SELECT id, user_id, nom_organisation, logo_url, personne_responsable, email_contact,
+           telephone_contact, description, secteurs, statut, origine, created_at
+    FROM partenariat_comptes WHERE user_id=?
+  `).get(me.id);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche partenaire introuvable." });
+  fiche.secteurs = safeParse(fiche.secteurs || "[]");
+  sendJSON(res, 200, fiche);
+});
+
+/* ══════════════════════════════════════════════════════════════════════
    MODULE "LIAISON DE COMPTES" — étape 1 (socle) + étape 2 (liaison via
    DS-ID). Étapes 3-7 (gestion du groupe, bascule, journal détaillé,
    intégration écosystème) viendront en incréments suivants.
