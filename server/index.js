@@ -4633,6 +4633,70 @@ route("POST", "/api/premium/parrainage/verifier", async (req, res, params, body)
   });
 });
 
+/* ═══════════════ API PARTENAIRES — vérification d'un compte pour une application tierce ═══════════════
+   Premier partenaire : "Diaspo Sportif" (2026-08-13). Un sportif saisit son DS-ID dans CETTE
+   application tierce ; elle appelle cette route DEPUIS SON SERVEUR (jamais depuis un navigateur/
+   mobile — la clé API doit rester secrète côté serveur du partenaire) pour savoir si le compte
+   est bien lié à Diaspo'Actif, s'il est Premium (pour adapter son propre tarif d'abonnement), et
+   pour afficher un lien de retour vers le profil public / la vitrine — utilisé par le partenaire
+   comme publicité croisée pour Diaspo'Actif.
+
+   Sécurité : la clé API n'est jamais stockée en clair (hash SHA-256, table api_partenaires). Le
+   DS-ID est traité comme dans /api/premium/parrainage/verifier — jamais loggé en clair, rate-
+   limité en double (par IP ET par hash du DS-ID) pour empêcher un partenaire compromis ou
+   malveillant d'énumérer des DS-ID valides. Réponse minimale et neutre : aucune donnée
+   personnelle (nom, email, ville…) ne quitte jamais Diaspo'Actif via cette route. */
+route("POST", "/api/partenaires/verifier-compte", async (req, res, params, body) => {
+  const apiKey = String(req.headers['x-api-key'] || '').trim();
+  if (!apiKey) return sendJSON(res, 401, { error: "Clé API manquante (en-tête X-Api-Key)." });
+  const apiKeyHash = crypto.createHash('sha256').update(apiKey).digest('hex');
+  const partenaire = await db.prepare("SELECT id, nom, actif FROM api_partenaires WHERE api_key_hash=?").get(apiKeyHash);
+  if (!partenaire || Number(partenaire.actif) !== 1) return sendJSON(res, 401, { error: "Clé API invalide ou désactivée." });
+
+  const ip = SEC.clientIp(req);
+  const dsId = String(body?.ds_id || '').trim().toUpperCase();
+  const dsIdHash = crypto.createHash('sha256').update(dsId).digest('hex');
+
+  const ipLimit = SEC.rateLimit(`partenaire_verif:ip:${ip}`, 30, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const codeLimit = SEC.rateLimit(`partenaire_verif:code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeLimit.retryAfter}s.` });
+  const ipGuard = await dbLoginGuard(`partenaire_verif_ip:${ip}`, 30, 15 * 60 * 1000);
+  if (!ipGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipGuard.retryAfter}s.` });
+  const codeGuard = await dbLoginGuard(`partenaire_verif_code:${dsIdHash}`, 8, 15 * 60 * 1000);
+  if (!codeGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${codeGuard.retryAfter}s.` });
+
+  db.prepare("UPDATE api_partenaires SET dernier_appel_at=datetime('now') WHERE id=?").run(partenaire.id);
+
+  if (dsId.length !== 10) {
+    dbLoginRecord(`partenaire_verif_ip:${ip}`, false);
+    return sendJSON(res, 200, { lie: false });
+  }
+
+  const u = await db.prepare("SELECT id, role, nom FROM users WHERE ds_id=?").get(dsId);
+  dbLoginRecord(`partenaire_verif_ip:${ip}`, !!u);
+  dbLoginRecord(`partenaire_verif_code:${dsIdHash}`, !!u);
+  if (!u) return sendJSON(res, 200, { lie: false });
+
+  const premiumType = PREMIUM_TYPE_PAR_ROLE[u.role];
+  const premium = premiumType ? await hasAccreditation(u.id, premiumType) : false;
+
+  // Lien vitrine : uniquement pour les comptes Initiative avec une vitrine publiée.
+  let vitrineUrl = null;
+  if (u.role === 'initiative') {
+    const init = await db.prepare("SELECT vitrine_active FROM initiatives WHERE owner_user_id=?").get(u.id);
+    if (init && Number(init.vitrine_active) === 1) vitrineUrl = `${getOrigin(req)}/profil.html?id=${u.id}&vitrine=1`;
+  }
+
+  return sendJSON(res, 200, {
+    lie: true,
+    premium,
+    type_compte: u.role,
+    profil_url: `${getOrigin(req)}/profil.html?id=${u.id}`,
+    vitrine_url: vitrineUrl,
+  });
+});
+
 /* ── Codes Adhésion D'A — mon propre code (l'adhérent, dans son tableau de bord) ── */
 route("GET", "/api/premium/mon-code-adhesion", async (req, res) => {
   const user = await getCurrentUser(req);

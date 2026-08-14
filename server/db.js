@@ -1809,6 +1809,19 @@ db.exec(`
     FOREIGN KEY(admin_id) REFERENCES users(id)
   );
 
+  /* ===== API PARTENAIRES — applications tierces autorisées à vérifier un compte par DS-ID =====
+     Premier partenaire : application "Diaspo Sportif" (2026-08-13). La clé n'est jamais stockée
+     en clair (même principe que les mots de passe) — seul son hash SHA-256 est conservé, comparé
+     au hash de la clé reçue à chaque appel. */
+  CREATE TABLE IF NOT EXISTS api_partenaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    api_key_hash TEXT NOT NULL UNIQUE,
+    actif INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    dernier_appel_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS accreditations_da_historique (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
