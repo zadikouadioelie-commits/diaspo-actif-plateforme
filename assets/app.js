@@ -405,18 +405,29 @@ const NOTIF_ICONS = {
   initiative_devenir_partenaire: "🤝",
 };
 
+// Destinations pour les data.cta envoyés par certains types de notifications
+// (ex: decouverte_premium) quand aucune fiche/conversation précise n'existe.
+const NOTIF_CTA_URLS = { passer_premium: "premium.html", avancement: "dashboard-initiative.html" };
+
 function notifUrl(n) {
   const d = (typeof n.data === "object" ? n.data : null) || {};
+  // data.lien : URL déjà prête à l'emploi, fournie directement par le serveur
+  // (ex: origine_relance/origine_confirmee) — prioritaire sur tout le reste.
+  if (d.lien)              return d.lien;
   if (d.demande_id)       return `messagerie.html?demande=${d.demande_id}`;
   if (d.post_id)          return `fil-actualite.html#fp-${d.post_id}`;
   if (d.conversation_id)  return `messagerie.html?conv=${d.conversation_id}`;
+  // event_id : alias utilisé par evenement/billet_rembourse/billetterie_validation
+  // (evenement_id est le nom historique, les notifs billetterie utilisent event_id).
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
+  if (d.event_id)         return `evenements.html#evt-${d.event_id}`;
   if (d.reunion_id)       return `reunions.html?reunion=${d.reunion_id}`;
   // Priorité sur initiative_id : une notif "Rejoindre l'initiative" porte les deux clés,
   // et doit amener directement dans la conversation avec le demandeur, pas sur la fiche.
   if (d.with_user_id)     return `messagerie.html?with=${d.with_user_id}`;
   if (d.follower_id)      return `profil.html?id=${d.follower_id}`;
   if (d.initiative_id)    return `initiative.html?id=${d.initiative_id}`;
+  if (d.cta && NOTIF_CTA_URLS[d.cta]) return NOTIF_CTA_URLS[d.cta];
   return "#";
 }
 
@@ -518,7 +529,24 @@ window.declineFollowBack = async function(notifId, btnEl) {
 };
 
 function escapeHtml(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-function fmtDateGlobal(str){ try{ return new Date(str.replace(" ","T")+"Z").toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"}); } catch{ return str||""; } }
+function fmtDateGlobal(str){
+  try{
+    let s = String(str||"").trim();
+    // Certaines colonnes *_at, quand la table existait déjà avant la traduction datetime('now')
+    // → to_char(...) (voir server/db-pg.js), gardent un DEFAULT Postgres brut ("now()") : le texte
+    // stocké est alors "YYYY-MM-DD HH:MM:SS.ffffff+00" (microsecondes + décalage UTC), pas le format
+    // SQLite "YYYY-MM-DD HH:MM:SS" attendu ci-dessous. new Date() n'accepte que 3 décimales de
+    // milliseconde, et rajouter un "Z" à une chaîne qui porte déjà un décalage produit un Invalid
+    // Date silencieux (pas d'exception) — d'où "Invalid Date" affiché tel quel côté utilisateur.
+    s = s.replace(/(\.\d{3})\d+/, "$1");
+    // PostgreSQL écrit un décalage court "+00"/"-05" (2 chiffres, sans minutes) — new Date()
+    // exige le format complet ISO "±HH:MM", un décalage à 2 chiffres seul est rejeté (Invalid Date).
+    s = s.replace(/([+-]\d{2})$/, "$1:00");
+    const hasTz = /[zZ]$|[+-]\d{2}:\d{2}$/.test(s);
+    const iso = s.replace(" ", "T") + (hasTz ? "" : "Z");
+    return new Date(iso).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"});
+  } catch{ return str||""; }
+}
 
 window.markNotifRead = async function(id) {
   try { await api("PATCH", `/notifications/${id}/lire`); } catch{}

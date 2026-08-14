@@ -1332,6 +1332,18 @@ async function migratePg(pool) {
     }
   }
 
+  /* notifications.created_at — table créée avant que toPg() traduise datetime('now') en
+     to_char(...) (voir server/db-pg.js). CREATE TABLE IF NOT EXISTS ne réapplique jamais un
+     DEFAULT sur une table déjà existante, donc la colonne a gardé le DEFAULT Postgres brut
+     "now()" : les nouvelles notifications stockent "YYYY-MM-DD HH:MM:SS.ffffff+00"
+     (microsecondes + décalage UTC) au lieu du format texte SQLite attendu côté client
+     (assets/app.js:fmtDateGlobal), d'où "Invalid Date" affiché. Sans risque : ne touche
+     aucune ligne existante, seulement le DEFAULT appliqué aux futurs INSERT sans valeur
+     explicite. Idempotent (ALTER COLUMN SET DEFAULT peut être rejoué sans effet de bord). */
+  try {
+    await pool.query(`ALTER TABLE notifications ALTER COLUMN created_at SET DEFAULT to_char(NOW(),'YYYY-MM-DD HH24:MI:SS')`);
+  } catch (e) { console.error('[pg-init migration] notifications.created_at default:', e.message); }
+
   /* ── Module "Avancement de mon initiative" — catalogue de critères ──
      Le seed de db.js (seedAvancementCriteres) ne s'exécute que via node:sqlite, jamais contre
      Postgres (même piège que les accréditations plus haut). Idempotent via ON CONFLICT (cle). */
