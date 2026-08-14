@@ -69,6 +69,7 @@
 
       <div class="sb-group-lbl" style="display:none;">03 — INITIATIVES</div>
       <a href="#" data-usection="projets" class="sb-premium" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mes projets <span class="pill" id="u-projets-pill" style="display:none;"></span></a>
+      <a href="#" data-usection="soumission-da" data-aide="soumission_da">📤 Soumettre à Diaspo'Actif</a>
       <a href="annuaire.html" style="display:none;">🔍 Parcourir les initiatives</a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
@@ -190,6 +191,11 @@
           <button class="u-proj-filter" data-f="rejete">❌ Rejeté</button>
         </div>
         <div id="u-projets-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </section>
+
+      <!-- ── SECTION SOUMISSION À DIASPO'ACTIF ── -->
+      <section id="usec-soumission-da" style="display:none;">
+        <div id="da-sda-mount"></div>
       </section>
 
       <!-- ── SECTION TERRITOIRES ── -->
@@ -347,6 +353,7 @@
 <script src="assets/app.js"></script>
 <script src="assets/subscription-required.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
+<script src="assets/soumission-da.js"></script>
 <script>
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}catch(e){return d;}}
@@ -357,6 +364,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
   if(me.role!=='utilisateur'){window.location.href=ROLE_DASHBOARD[me.role]||'index.html';return;}
   await applyAuthState();
   if (window.Posts) Posts.init(me.id);
+  SoumissionDA.render(document.getElementById('da-sda-mount'), { accredType: 'utilisateur_abonne' });
 
   // Titre
   const nom = [me.profil?.prenom, me.nom].filter(Boolean).join(' ') || me.nom;
@@ -811,6 +819,7 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     });
     /* Module CV, Lettres & Candidatures : accès libre (plus de restriction Premium). */
     if(name==='projets') loadMesProjets();
+    if(name==='soumission-da') SoumissionDA.load();
     if(name==='apparence') renderThemeSelector();
   };
 

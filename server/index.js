@@ -23651,6 +23651,25 @@ ${jsonLd}
       rejete:       ['en_attente']
     };
 
+    /* Pipeline "soumission à Diaspo'Actif" (type='soumission_da' sur projets — cahier des
+       charges "Partenariat" Partie 1). Distinct du pipeline générique ci-dessus : ici,
+       Diaspo'Actif (administrateur) est le seul validateur, jamais collectivite. Les
+       transitions à partir de en_analyse/retenu/oriente_partenaire/mise_en_relation sont
+       normalement déclenchées par les routes dédiées de l'incrément 5 (retour, demande
+       d'infos, orientation partenaire), listées ici pour la validation du champ `statut`. */
+    const STATUTS_PROJETS_DA = ['brouillon','soumis','en_analyse','infos_demandees','retenu','oriente_partenaire','mise_en_relation','abouti','sans_suite'];
+    const STATUT_TRANSITIONS_DA = {
+      brouillon:           ['soumis'],
+      soumis:               ['en_analyse'],
+      en_analyse:           ['infos_demandees','retenu','sans_suite'],
+      infos_demandees:      ['en_analyse'],
+      retenu:               ['oriente_partenaire','sans_suite'],
+      oriente_partenaire:   ['mise_en_relation','sans_suite'],
+      mise_en_relation:     ['abouti','sans_suite'],
+      abouti:               [],
+      sans_suite:           []
+    };
+
     /* Gate abonnement — Mes projets réservé aux comptes Utilisateur Abonné (n'affecte pas
        collectivite/administrateur, qui utilisent ce module pour leur propre rôle). */
     if (pathname.startsWith('/api/projets')) {
@@ -23658,30 +23677,66 @@ ${jsonLd}
       if (gateUser && !(await requireUtilisateurAbonne(gateUser, res))) return;
     }
 
-    /* GET /api/projets — liste selon rôle */
+    /* GET /api/projets — liste selon rôle. Les dossiers "soumission à Diaspo'Actif"
+       (type='soumission_da') restent confidentiels entre leur porteur et l'administrateur :
+       une collectivité, bien que validatrice du module Projets générique, ne voit que
+       SES PROPRES soumissions DA, jamais celles des autres comptes. */
     if (req.method === 'GET' && pathname === '/api/projets') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const q = parsed.query;
       let rows;
-      if (me.role === 'administrateur' || me.role === 'collectivite') {
+      if (me.role === 'administrateur') {
         const statut = q.statut || null;
         const sql = statut
           ? `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.statut=? ORDER BY p.updated_at DESC`
           : `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id ORDER BY p.updated_at DESC`;
         rows = statut ? await db.prepare(sql).all(statut) : await db.prepare(sql).all();
+      } else if (me.role === 'collectivite') {
+        const statut = q.statut || null;
+        const sql = statut
+          ? `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.statut=? AND (p.type<>'soumission_da' OR p.createur_id=?) ORDER BY p.updated_at DESC`
+          : `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE (p.type<>'soumission_da' OR p.createur_id=?) ORDER BY p.updated_at DESC`;
+        rows = statut ? await db.prepare(sql).all(statut, me.id) : await db.prepare(sql).all(me.id);
       } else {
         rows = await db.prepare(`SELECT p.*, u.nom AS createur_nom FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.createur_id=? ORDER BY p.updated_at DESC`).all(me.id);
       }
       return sendJSON(res, 200, { projets: rows });
     }
 
-    /* POST /api/projets — créer */
+    /* POST /api/projets — créer. Pour type='soumission_da' (dossier "Soumettre un projet à
+       Diaspo'Actif", cahier des charges Partie 1) : réservé à utilisateur/initiative/collectivite,
+       Premium exigé pour utilisateur (gate global ci-dessus) et initiative (gate dédié ci-dessous,
+       même accréditation que le reste de la plateforme) ; aucune restriction Premium pour
+       collectivite pour l'instant (décision actée — un module Premium Collectivité viendra plus
+       tard, dans une tâche séparée). */
     if (req.method === 'POST' && pathname === '/api/projets') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
-      const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
+      const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags,
+              presentation, territoire_concerne, objectifs, public_concerne, niveau_avancement,
+              besoins, besoins_autres_precisions, infos_complementaires } = body;
       if (!titre) return sendJSON(res, 400, { error: 'Titre obligatoire' });
-      const r = await db.prepare(`INSERT INTO projets (titre,description,type,categorie,pays,region,ville,budget_estime,date_debut,date_fin,tags,createur_id,statut) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'brouillon')`)
-        .run(titre, description||null, type||'projet', categorie||'Général', pays||null, region||null, ville||null, budget_estime||null, date_debut||null, date_fin||null, JSON.stringify(tags||[]), me.id);
+      const isDA = type === 'soumission_da';
+      if (isDA) {
+        if (!['utilisateur','initiative','collectivite'].includes(me.role)) {
+          return sendJSON(res, 403, { error: "Ce type de dossier est réservé aux comptes Utilisateur, Initiative et Collectivité." });
+        }
+        if (me.role === 'initiative' && !(await hasAccreditation(me.id, 'initiative_abonne'))) {
+          return sendJSON(res, 402, { error: "La soumission d'un projet à Diaspo'Actif est réservée aux Initiatives Abonné.", accred_type: 'initiative_abonne' });
+        }
+      }
+      const r = await db.prepare(`INSERT INTO projets
+          (titre,description,type,categorie,pays,region,ville,budget_estime,date_debut,date_fin,tags,createur_id,statut,
+           presentation,territoire_concerne,objectifs,public_concerne,niveau_avancement,besoins,besoins_autres_precisions,infos_complementaires)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'brouillon',?,?,?,?,?,?,?,?)`)
+        .run(titre, description||null, type||'projet', categorie||'Général', pays||null, region||null, ville||null, budget_estime||null, date_debut||null, date_fin||null, JSON.stringify(tags||[]), me.id,
+          isDA ? (presentation||null) : null,
+          isDA ? (territoire_concerne||null) : null,
+          isDA ? (objectifs||null) : null,
+          isDA ? (public_concerne||null) : null,
+          isDA ? (niveau_avancement||null) : null,
+          isDA ? JSON.stringify(besoins||[]) : null,
+          isDA ? (besoins_autres_precisions||null) : null,
+          isDA ? (infos_complementaires||null) : null);
       return sendJSON(res, 201, { id: r.lastInsertRowid });
     }
 
@@ -23711,44 +23766,93 @@ ${jsonLd}
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT p.*, u.nom AS createur_nom FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
-      if (p.createur_id !== me.id && me.role !== 'administrateur' && me.role !== 'collectivite') return sendJSON(res, 403, { error: 'Accès refusé' });
+      const isDA = p.type === 'soumission_da';
+      const canView = p.createur_id === me.id || me.role === 'administrateur' || (me.role === 'collectivite' && !isDA);
+      if (!canView) return sendJSON(res, 403, { error: 'Accès refusé' });
       const commentaires = await db.prepare(`SELECT pc.*, u.nom AS auteur_nom FROM projets_commentaires pc JOIN users u ON u.id=pc.auteur_id WHERE pc.projet_id=? ORDER BY pc.created_at`).all(id);
-      return sendJSON(res, 200, { projet: p, commentaires });
+      let documents;
+      if (isDA) documents = await db.prepare(`SELECT id,projet_id,uploader_id,nom_fichier,type_mime,taille,categorie,url_bunny,created_at FROM projets_documents WHERE projet_id=? ORDER BY created_at`).all(id);
+      return sendJSON(res, 200, { projet: p, commentaires, documents: documents || [] });
     }
 
-    /* PUT /api/projets/:id — modifier */
+    /* PUT /api/projets/:id — modifier. Pour type='soumission_da', modification bloquée dès que
+       le dossier n'est plus au statut 'brouillon' ou 'soumis' (l'analyse a commencé côté
+       Diaspo'Actif — cahier des charges Partie 1). */
     if (req.method === 'PUT' && /^\/api\/projets\/\d+$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
       if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
-      const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags } = body;
-      await db.prepare(`UPDATE projets SET titre=?,description=?,type=?,categorie=?,pays=?,region=?,ville=?,budget_estime=?,date_debut=?,date_fin=?,tags=?,updated_at=datetime('now') WHERE id=?`)
-        .run(titre||p.titre, description??p.description, type||p.type, categorie||p.categorie, pays??p.pays, region??p.region, ville??p.ville, budget_estime??p.budget_estime, date_debut??p.date_debut, date_fin??p.date_fin, JSON.stringify(tags||JSON.parse(p.tags||'[]')), id);
+      const isDA = p.type === 'soumission_da';
+      if (isDA && me.role !== 'administrateur' && !['brouillon','soumis'].includes(p.statut)) {
+        return sendJSON(res, 409, { error: "Ce dossier est en cours d'analyse par Diaspo'Actif et ne peut plus être modifié." });
+      }
+      const { titre, description, type, categorie, pays, region, ville, budget_estime, date_debut, date_fin, tags,
+              presentation, territoire_concerne, objectifs, public_concerne, niveau_avancement,
+              besoins, besoins_autres_precisions, infos_complementaires } = body;
+      await db.prepare(`UPDATE projets SET titre=?,description=?,type=?,categorie=?,pays=?,region=?,ville=?,budget_estime=?,date_debut=?,date_fin=?,tags=?,
+          presentation=?,territoire_concerne=?,objectifs=?,public_concerne=?,niveau_avancement=?,besoins=?,besoins_autres_precisions=?,infos_complementaires=?,
+          updated_at=datetime('now') WHERE id=?`)
+        .run(titre||p.titre, description??p.description, type||p.type, categorie||p.categorie, pays??p.pays, region??p.region, ville??p.ville, budget_estime??p.budget_estime, date_debut??p.date_debut, date_fin??p.date_fin, JSON.stringify(tags||JSON.parse(p.tags||'[]')),
+          isDA ? (presentation ?? p.presentation) : p.presentation,
+          isDA ? (territoire_concerne ?? p.territoire_concerne) : p.territoire_concerne,
+          isDA ? (objectifs ?? p.objectifs) : p.objectifs,
+          isDA ? (public_concerne ?? p.public_concerne) : p.public_concerne,
+          isDA ? (niveau_avancement ?? p.niveau_avancement) : p.niveau_avancement,
+          isDA ? JSON.stringify(besoins || JSON.parse(p.besoins||'[]')) : p.besoins,
+          isDA ? (besoins_autres_precisions ?? p.besoins_autres_precisions) : p.besoins_autres_precisions,
+          isDA ? (infos_complementaires ?? p.infos_complementaires) : p.infos_complementaires,
+          id);
       return sendJSON(res, 200, { updated: true });
     }
 
-    /* PUT /api/projets/:id/statut — transition lifecycle */
+    /* PUT /api/projets/:id/statut — transition lifecycle. Pour type='soumission_da', bascule
+       vers une machine à états distincte (STATUTS_PROJETS_DA) où le seul validateur est
+       l'administrateur (collectivite n'est ici qu'un porteur possible, pas un revieweur —
+       contrairement au pipeline générique). Les transitions au-delà de brouillon→soumis et
+       soumis→en_analyse (retour, demande d'infos, orientation partenaire) sont pilotées par
+       des routes dédiées (incrément 5), qui pourront écrire directement le statut. */
     if (req.method === 'PUT' && /^\/api\/projets\/\d+\/statut$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
       const id = parseInt(pathname.split('/')[3]);
       const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(id);
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
       const { statut, commentaire, motif_rejet } = body;
-      if (!STATUTS_PROJETS.includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
-      const allowed = STATUT_TRANSITIONS[p.statut] || [];
+      const isDA = p.type === 'soumission_da';
+      const statutsValides = isDA ? STATUTS_PROJETS_DA : STATUTS_PROJETS;
+      const transitions = isDA ? STATUT_TRANSITIONS_DA : STATUT_TRANSITIONS;
+      if (!statutsValides.includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
+      const allowed = transitions[p.statut] || [];
       const isOwner = p.createur_id === me.id;
-      const isValidator = me.role === 'administrateur' || me.role === 'collectivite';
-      if (!isValidator && !(isOwner && statut === 'en_attente' && p.statut === 'brouillon')) {
+      const isValidator = isDA ? (me.role === 'administrateur') : (me.role === 'administrateur' || me.role === 'collectivite');
+      const soumissionParPorteur = isDA
+        ? (isOwner && statut === 'soumis' && p.statut === 'brouillon')
+        : (isOwner && statut === 'en_attente' && p.statut === 'brouillon');
+      if (!isValidator && !soumissionParPorteur) {
         if (!allowed.includes(statut)) return sendJSON(res, 403, { error: 'Transition non autorisée' });
         if (!isValidator) return sendJSON(res, 403, { error: 'Action réservée aux validateurs' });
       }
-      await db.prepare(`UPDATE projets SET statut=?,motif_rejet=?,validateur_id=?,date_validation=datetime('now'),updated_at=datetime('now') WHERE id=?`)
-        .run(statut, motif_rejet||null, isValidator ? me.id : null, id);
+      const champsDate = isDA ? `date_soumission_da=CASE WHEN ?='soumis' THEN datetime('now') ELSE date_soumission_da END,` : '';
+      await db.prepare(`UPDATE projets SET statut=?,motif_rejet=?,validateur_id=?,${champsDate}date_validation=datetime('now'),updated_at=datetime('now') WHERE id=?`)
+        .run(...(isDA ? [statut, motif_rejet||null, isValidator ? me.id : null, statut, id] : [statut, motif_rejet||null, isValidator ? me.id : null, id]));
       if (commentaire) {
         await db.prepare(`INSERT INTO projets_commentaires (projet_id,auteur_id,contenu,type) VALUES (?,?,?,?)`)
-          .run(id, me.id, commentaire, statut === 'rejete' ? 'rejet' : 'validation');
+          .run(id, me.id, commentaire, statut === 'rejete' || statut === 'sans_suite' ? 'rejet' : 'validation');
+      }
+      if (isDA) {
+        try {
+          if (isValidator && !isOwner) {
+            await creerNotif(p.createur_id, 'projet_da_statut', 'Votre dossier a évolué',
+              `Le statut de votre dossier "${p.titre}" est désormais : ${statut}.`, { projet_id: id, statut });
+          } else if (soumissionParPorteur) {
+            const admins = await db.prepare(`SELECT id FROM users WHERE role='administrateur'`).all();
+            for (const a of admins) {
+              await creerNotif(a.id, 'projet_da_soumis', 'Nouveau dossier soumis à Diaspo\'Actif',
+                `${p.titre} vient d'être soumis pour analyse.`, { projet_id: id });
+            }
+          }
+        } catch(e) {}
       }
       return sendJSON(res, 200, { updated: true, statut });
     }
@@ -23771,6 +23875,86 @@ ${jsonLd}
       if (!p) return sendJSON(res, 404, { error: 'Projet introuvable' });
       if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
       await db.prepare(`DELETE FROM projets WHERE id=?`).run(id);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
+    /* Limites configurables (Mo, nb fichiers) des pièces jointes d'un dossier de soumission à
+       Diaspo'Actif — table générique parametres_plateforme ; repli codé en dur tant que
+       l'admin n'a rien réglé. */
+    async function limitesUploadSoumissionDA() {
+      const cles = ['soumission_projet_upload_max_taille_mo', 'soumission_projet_upload_max_fichiers'];
+      const rows = await db.prepare(`SELECT cle, valeur FROM parametres_plateforme WHERE cle IN (${cles.map(()=>'?').join(',')})`).all(...cles);
+      const par = {}; rows.forEach(r => par[r.cle] = r.valeur);
+      return {
+        maxTailleMo: Number(par['soumission_projet_upload_max_taille_mo']) || 15,
+        maxFichiers: Number(par['soumission_projet_upload_max_fichiers']) || 10,
+      };
+    }
+
+    /* POST /api/projets/soumission-da/upload — document joint à un dossier de soumission à
+       Diaspo'Actif (multipart, validation stricte par signature — mêmes contrôles que
+       /api/upload/document, formats élargis aux vidéos). */
+    if (req.method === 'POST' && pathname === '/api/projets/soumission-da/upload') {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const contentType = req.headers['content-type'] || '';
+      const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+      if (!boundaryMatch) return sendJSON(res, 400, { error: 'Format invalide' });
+      const chunks = []; req.on('data', c => chunks.push(c));
+      await new Promise(r => req.on('end', r));
+      const raw = Buffer.concat(chunks);
+      const { uploadToBunny, parseMultipart } = require('./upload');
+      const { fields, files } = parseMultipart(raw, boundaryMatch[1]);
+      const projetId = parseInt(fields.projet_id);
+      if (!projetId) return sendJSON(res, 400, { error: 'projet_id requis' });
+      const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(projetId);
+      if (!p || p.type !== 'soumission_da') return sendJSON(res, 404, { error: 'Dossier introuvable' });
+      if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
+      if (me.role !== 'administrateur' && !['brouillon','soumis'].includes(p.statut)) {
+        return sendJSON(res, 409, { error: "Ce dossier est en cours d'analyse et ne peut plus recevoir de nouveaux documents." });
+      }
+      const file = files['document'] || files['file'] || files[Object.keys(files)[0]];
+      if (!file) return sendJSON(res, 400, { error: 'Aucun fichier reçu' });
+      const { maxTailleMo, maxFichiers } = await limitesUploadSoumissionDA();
+      const nbExistants = (await db.prepare(`SELECT COUNT(*) AS n FROM projets_documents WHERE projet_id=?`).get(projetId))?.n || 0;
+      if (nbExistants >= maxFichiers) return sendJSON(res, 400, { error: `Nombre maximum de fichiers atteint (${maxFichiers}).` });
+      if (file.buffer.length > maxTailleMo * 1024 * 1024) return sendJSON(res, 400, { error: `Fichier trop volumineux (max ${maxTailleMo} Mo).` });
+
+      const b = file.buffer;
+      const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+      const isZipBased = b.length > 4 && b[0] === 0x50 && b[1] === 0x4B && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07);
+      const isOle = b.length > 8 && b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0;
+      const vidType = SEC.isSafeVideo(b);
+      const ext = (file.filename || '').split('.').pop()?.toLowerCase();
+      const OFFICE_EXT = ['doc','docx','xls','xlsx','ppt','pptx'];
+      const validOffice = (isZipBased || isOle) && OFFICE_EXT.includes(ext);
+      if (!isPdf && !validOffice && !vidType) {
+        return sendJSON(res, 400, { error: 'Format non supporté (PDF, Word, Excel, PowerPoint ou vidéo requis).' });
+      }
+      try {
+        const realExt = isPdf ? 'pdf' : (vidType ? vidType.split('/')[1] : ext);
+        const filename = `soumission-da-${projetId}-${Date.now()}.${realExt}`;
+        const url = await uploadToBunny(b, filename, 'documents');
+        const categorie = fields.categorie === 'reponse_infos_complementaires' ? 'reponse_infos_complementaires' : 'dossier_initial';
+        const r = await db.prepare(`INSERT INTO projets_documents (projet_id,uploader_id,nom_fichier,type_mime,taille,categorie,url_bunny) VALUES (?,?,?,?,?,?,?)`)
+          .run(projetId, me.id, file.filename || filename, isPdf ? 'application/pdf' : (vidType || ext), b.length, categorie, url);
+        SEC.logSecurity('upload', { uid: Number(me.id), kind: 'projet_document', size: b.length });
+        return sendJSON(res, 200, { id: r.lastInsertRowid, url });
+      } catch (e) { return sendJSON(res, 500, SEC.safeError(e, 'upload document projet')); }
+    }
+
+    /* DELETE /api/projets/documents/:id */
+    if (req.method === 'DELETE' && /^\/api\/projets\/documents\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise' });
+      const docId = parseInt(pathname.split('/')[4]);
+      const doc = await db.prepare(`SELECT * FROM projets_documents WHERE id=?`).get(docId);
+      if (!doc) return sendJSON(res, 404, { error: 'Document introuvable' });
+      const p = await db.prepare(`SELECT * FROM projets WHERE id=?`).get(doc.projet_id);
+      if (!p) return sendJSON(res, 404, { error: 'Dossier introuvable' });
+      if (p.createur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé' });
+      if (me.role !== 'administrateur' && !['brouillon','soumis'].includes(p.statut)) {
+        return sendJSON(res, 409, { error: "Ce dossier est en cours d'analyse et ne peut plus être modifié." });
+      }
+      await db.prepare(`DELETE FROM projets_documents WHERE id=?`).run(docId);
       return sendJSON(res, 200, { deleted: true });
     }
 

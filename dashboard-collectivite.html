@@ -112,6 +112,7 @@
       <div class="sb-group-lbl">03 — INITIATIVES</div>
       <a href="#" data-section="initiatives-valider" style="display:none;">🟩 Initiatives à valider <span class="pill" id="coll-valid-badge" style="display:none;"></span></a>
       <a href="#" data-section="initiatives-validees" style="display:none;">✅ Initiatives validées</a>
+      <a href="#" data-section="soumission-da">📤 Soumettre à Diaspo'Actif</a>
 
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
       <a href="#" data-section="identite-territoriale" data-aide="identite_territoriale">🔐 Identité Territoriale</a>
@@ -237,6 +238,11 @@
       <section id="section-initiatives-validees" style="display:none;">
         <h2 style="margin:0 0 20px;">✅ Initiatives validées / en exécution</h2>
         <div id="coll-projets-validees"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </section>
+
+      <!-- ===================== SOUMISSION À DIASPO'ACTIF ===================== -->
+      <section id="section-soumission-da" style="display:none;">
+        <div id="da-sda-mount"></div>
       </section>
 
       <!-- ===================== ACCUEIL (legacy — redirigé vers cockpit) ===================== -->
@@ -850,6 +856,7 @@
 <script src="assets/app.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/posts.js"></script>
+<script src="assets/soumission-da.js"></script>
 <script>
 if (typeof ACCREDITATIONS_DA === 'undefined') {
   window.ACCREDITATIONS_DA = [
@@ -1316,6 +1323,7 @@ function showSection(name) {
   if(sec) sec.style.display = "";
   if (name === "cockpit") loadCockpit();
   if (name === "initiatives-valider" || name === "initiatives-validees") loadCollProjets();
+  if (name === "soumission-da") SoumissionDA.load();
   if (name === "observatoire") loadObservatoire();
   if (name === "identite-territoriale") loadIdentiteTerritoriale();
   if (name === "oz-collectivite") loadOzCollectivite();
@@ -1939,6 +1947,7 @@ async function loadPartenariats() {
   if (!ME) { window.location.href = "login.html"; return; }
   if (ME.role !== "collectivite") { window.location.href = ROLE_DASHBOARD[ME.role] || "index.html"; return; }
   if (window.Posts) Posts.init(ME.id);
+  SoumissionDA.render(document.getElementById('da-sda-mount'));
 
   const ckProfilLink = document.getElementById("ck-profil-public-link");
   if (ckProfilLink) ckProfilLink.href = "profil-collectivite.html?id=" + ME.id;

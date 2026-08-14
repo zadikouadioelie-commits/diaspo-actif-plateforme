@@ -78,6 +78,7 @@
       <a href="#presentation" data-section="presentation" style="display:none;">📋 Ma fiche initiative</a>
       <a href="#publications" data-section="publications" data-aide="publications">📰 Publications</a>
       <a href="#avancement" data-section="avancement" data-aide="avancement_initiative" id="sb-avancement" style="display:none;">📈 Avancement de mon initiative</a>
+      <a href="#soumission-da" data-section="soumission-da">📤 Soumettre à Diaspo'Actif</a>
 
       <div class="sb-group-lbl">AFFILIATION</div>
       <a href="#affiliation" data-section="affiliation" data-aide="affiliation">🔗 Affiliation</a>
@@ -118,6 +119,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
+<script src="assets/soumission-da.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script>
 /* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
@@ -681,6 +683,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div id="billetterie-init" style="display:none;"></div>
     <div id="cagnottes" style="display:none;"></div>
     <div id="avancement" style="display:none;"></div>
+    <div id="soumission-da" style="display:none;"><div id="da-sda-mount"></div></div>
 
     <div class="card" style="margin-bottom:20px;" id="paiement">
       <h3>Module de paiement — billetterie &amp; cotisations</h3>
@@ -3130,7 +3133,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (vo) content.appendChild(vo); }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','avancement','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -3143,6 +3146,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'cagnottes') renderCagnottes();
     if (name === 'avancement') renderAvancement();
+    if (name === 'soumission-da') SoumissionDA.load();
     if (name === 'messages-vitrine') renderMessagesVitrine();
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
@@ -5017,6 +5021,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (h && INIT_SECTIONS.includes(h)) initShowSection(h);
     else initShowSection('cockpit');
   }
+  SoumissionDA.render(document.getElementById('da-sda-mount'), { accredType: 'initiative_abonne' });
   openFromHash();
   window.addEventListener('hashchange', openFromHash);
   window.initPremiumGates && window.initPremiumGates();

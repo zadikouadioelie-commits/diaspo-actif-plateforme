@@ -979,6 +979,15 @@ db.exec(`
     date_validation TEXT,
     motif_rejet TEXT,
     nb_vues INTEGER DEFAULT 0,
+    presentation TEXT,
+    territoire_concerne TEXT,
+    objectifs TEXT,
+    public_concerne TEXT,
+    niveau_avancement TEXT,
+    besoins TEXT DEFAULT '[]',
+    besoins_autres_precisions TEXT,
+    infos_complementaires TEXT,
+    date_soumission_da TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(createur_id) REFERENCES users(id),
@@ -995,7 +1004,35 @@ db.exec(`
     FOREIGN KEY(projet_id) REFERENCES projets(id) ON DELETE CASCADE,
     FOREIGN KEY(auteur_id) REFERENCES users(id)
   );
+
+  /* Documents joints à un dossier de soumission à Diaspo'Actif (type='soumission_da' sur projets).
+     categorie distingue le dossier initial des pièces envoyées en réponse à une demande d'infos
+     complémentaires (incrément 5), pour ne jamais les mélanger dans l'affichage. */
+  CREATE TABLE IF NOT EXISTS projets_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id INTEGER NOT NULL,
+    uploader_id INTEGER NOT NULL,
+    nom_fichier TEXT NOT NULL,
+    type_mime TEXT,
+    taille INTEGER,
+    categorie TEXT NOT NULL DEFAULT 'dossier_initial' CHECK(categorie IN ('dossier_initial','reponse_infos_complementaires','autre')),
+    url_bunny TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES projets(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploader_id) REFERENCES users(id)
+  );
 `);
+
+/* Migration : colonnes "soumission à Diaspo'Actif" sur projets (table déjà créée par IF NOT EXISTS
+   sur les bases locales existantes, donc ajoutées à part — cahier des charges "Partenariat" incrément 4). */
+;(function migrateProjetsSoumissionDA() {
+  const cols = db.prepare("PRAGMA table_info(projets)").all().map(c => c.name);
+  [["presentation","TEXT"],["territoire_concerne","TEXT"],["objectifs","TEXT"],["public_concerne","TEXT"],
+   ["niveau_avancement","TEXT"],["besoins","TEXT DEFAULT '[]'"],["besoins_autres_precisions","TEXT"],
+   ["infos_complementaires","TEXT"],["date_soumission_da","TEXT"]].forEach(([col,type]) => {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE projets ADD COLUMN ${col} ${type}`);
+  });
+})();
 
 /* ══ MODULE BILLETTERIE / ÉVÉNEMENTS ══ */
 db.exec(`
