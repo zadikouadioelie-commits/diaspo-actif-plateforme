@@ -5097,6 +5097,47 @@ db.exec(`
     UNIQUE(periode_id, delai_jours),
     FOREIGN KEY(periode_id) REFERENCES partenariat_periodes(id)
   );
+
+  /* Lien entre un dossier "soumission à Diaspo'Actif" (projets.type='soumission_da') et un
+     partenaire vers lequel Diaspo'Actif l'a orienté — infrastructure partagée entre l'orientation
+     décidée par l'admin (incrément 5) et l'espace de consultation/évaluation du partenaire
+     (incrément 6). statut_relation reprend les 9 statuts de suivi du cahier des charges Partie 2.5. */
+  CREATE TABLE IF NOT EXISTS projets_orientations_partenaires (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id                  INTEGER NOT NULL,
+    partenaire_user_id         INTEGER NOT NULL,
+    oriente_par                INTEGER,
+    statut_relation            TEXT NOT NULL DEFAULT 'transmis' CHECK(statut_relation IN
+      ('transmis','consulte','favorable','defavorable','demande_infos','mise_en_relation','collaboration_active','abouti','sans_suite')),
+    date_premiere_consultation TEXT,
+    derniere_activite_le       TEXT,
+    resultat                   TEXT,
+    created_at                 TEXT DEFAULT (datetime('now')),
+    updated_at                 TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES projets(id),
+    FOREIGN KEY(partenaire_user_id) REFERENCES users(id),
+    FOREIGN KEY(oriente_par) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_projets_orient_partenaire ON projets_orientations_partenaires(partenaire_user_id, statut_relation);
+  CREATE INDEX IF NOT EXISTS idx_projets_orient_projet ON projets_orientations_partenaires(projet_id);
+
+  /* Évaluation d'un dossier orienté par le partenaire qui le reçoit (incrément 6, cahier des
+     charges Partie 2 : section "évaluation partenaire"). */
+  CREATE TABLE IF NOT EXISTS partenariat_evaluations (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    orientation_id      INTEGER NOT NULL,
+    partenaire_user_id  INTEGER NOT NULL,
+    avis                TEXT NOT NULL CHECK(avis IN ('favorable','defavorable','a_approfondir','demande_infos')),
+    commentaires        TEXT,
+    observations        TEXT,
+    recommandations     TEXT,
+    note                INTEGER,
+    besoins_identifies  TEXT DEFAULT '[]',
+    created_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(orientation_id) REFERENCES projets_orientations_partenaires(id),
+    FOREIGN KEY(partenaire_user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_partenariat_evaluations_orientation ON partenariat_evaluations(orientation_id);
 `);
 
 /* =====================================================================

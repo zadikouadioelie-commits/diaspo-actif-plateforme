@@ -8086,6 +8086,180 @@ route("GET", "/api/partenariat/moi", async (req, res) => {
   sendJSON(res, 200, fiche);
 });
 
+/* ── Incrément 6 : espace Partenaire — projets transmis, évaluation, suivi ──
+   Repose sur projets_orientations_partenaires (server/db.js), alimentée par le strict minimum
+   de l'action "orienter" de l'incrément 5 (voir POST /api/admin/projets/:id/orienter plus bas) :
+   sans elle, cet espace n'aurait jamais de données réelles à présenter. */
+function pnMaintenant() { return new Date().toISOString().slice(0, 19).replace("T", " "); }
+const STATUT_RELATION_TRANSITIONS = {
+  transmis: ["consulte"],
+  consulte: ["favorable", "defavorable", "demande_infos"],
+  demande_infos: ["favorable", "defavorable", "sans_suite"],
+  favorable: ["mise_en_relation", "sans_suite"],
+  defavorable: ["sans_suite"],
+  mise_en_relation: ["collaboration_active", "sans_suite"],
+  collaboration_active: ["abouti", "sans_suite"],
+  abouti: [],
+  sans_suite: [],
+};
+
+/* GET /api/partenariat/projets-transmis — liste des dossiers orientés vers CE partenaire.
+   Sélection explicite de colonnes projet : jamais les notes internes admin. */
+route("GET", "/api/partenariat/projets-transmis", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "partenaire") return sendJSON(res, 403, { error: "Réservé aux comptes Partenaire." });
+  const rows = await db.prepare(`
+    SELECT o.id AS orientation_id, o.statut_relation, o.date_premiere_consultation, o.derniere_activite_le,
+           o.created_at AS oriente_le,
+           p.id AS projet_id, p.titre, p.presentation, p.categorie, p.pays, p.ville,
+           p.territoire_concerne, p.niveau_avancement
+    FROM projets_orientations_partenaires o
+    JOIN projets p ON p.id = o.projet_id
+    WHERE o.partenaire_user_id = ?
+    ORDER BY o.created_at DESC
+  `).all(me.id);
+  sendJSON(res, 200, { projets_transmis: rows });
+});
+
+/* GET /api/partenariat/projets-transmis/:orientationId — détail complet ; marque la première
+   consultation (date + passage transmis→consulte) la première fois qu'il est lu. */
+route("GET", "/api/partenariat/projets-transmis/:orientationId", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "partenaire") return sendJSON(res, 403, { error: "Réservé aux comptes Partenaire." });
+  const o = await db.prepare("SELECT * FROM projets_orientations_partenaires WHERE id=?").get(params.orientationId);
+  if (!o || Number(o.partenaire_user_id) !== Number(me.id)) return sendJSON(res, 404, { error: "Dossier introuvable." });
+
+  const p = await db.prepare(`
+    SELECT id, titre, presentation, description, categorie, pays, region, ville, territoire_concerne,
+           objectifs, public_concerne, niveau_avancement, besoins, besoins_autres_precisions,
+           infos_complementaires, budget_estime, date_debut, date_fin
+    FROM projets WHERE id=?
+  `).get(o.projet_id);
+  const documents = await db.prepare(
+    "SELECT id, nom_fichier, type_mime, taille, categorie, url_bunny, created_at FROM projets_documents WHERE projet_id=? AND categorie<>'reponse_infos_complementaires'"
+  ).all(o.projet_id);
+  const evaluations = await db.prepare(
+    "SELECT id, avis, commentaires, observations, recommandations, note, besoins_identifies, created_at FROM partenariat_evaluations WHERE orientation_id=? ORDER BY created_at DESC"
+  ).all(o.id);
+
+  if (!o.date_premiere_consultation) {
+    const maintenant = pnMaintenant();
+    const nouveauStatut = o.statut_relation === "transmis" ? "consulte" : o.statut_relation;
+    await db.prepare("UPDATE projets_orientations_partenaires SET date_premiere_consultation=?, statut_relation=?, updated_at=datetime('now') WHERE id=?")
+      .run(maintenant, nouveauStatut, o.id);
+    o.date_premiere_consultation = maintenant;
+    o.statut_relation = nouveauStatut;
+  }
+
+  sendJSON(res, 200, { orientation: o, projet: p, documents, evaluations });
+});
+
+/* POST /api/partenariat/projets-transmis/:orientationId/evaluation — le partenaire donne son
+   avis (cahier des charges Partie 2 : "évaluation partenaire"). */
+route("POST", "/api/partenariat/projets-transmis/:orientationId/evaluation", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "partenaire") return sendJSON(res, 403, { error: "Réservé aux comptes Partenaire." });
+  const o = await db.prepare("SELECT * FROM projets_orientations_partenaires WHERE id=?").get(params.orientationId);
+  if (!o || Number(o.partenaire_user_id) !== Number(me.id)) return sendJSON(res, 404, { error: "Dossier introuvable." });
+
+  const { avis, commentaires, observations, recommandations, note, besoins_identifies } = body;
+  const AVIS_VALIDES = ["favorable", "defavorable", "a_approfondir", "demande_infos"];
+  if (!AVIS_VALIDES.includes(avis)) return sendJSON(res, 400, { error: "Avis invalide." });
+
+  const r = await db.prepare(`
+    INSERT INTO partenariat_evaluations (orientation_id, partenaire_user_id, avis, commentaires, observations, recommandations, note, besoins_identifies)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).run(o.id, me.id, avis, commentaires || null, observations || null, recommandations || null, note || null, JSON.stringify(besoins_identifies || []));
+
+  // L'avis fait progresser le statut de relation, sauf s'il est déjà engagé plus loin dans le
+  // parcours — une évaluation ne doit jamais faire régresser une relation déjà avancée.
+  const DEJA_AVANCE = ["mise_en_relation", "collaboration_active", "abouti", "sans_suite"];
+  const nouveauStatut = DEJA_AVANCE.includes(o.statut_relation) ? o.statut_relation : avis;
+  await db.prepare("UPDATE projets_orientations_partenaires SET statut_relation=?, derniere_activite_le=?, updated_at=datetime('now') WHERE id=?")
+    .run(nouveauStatut, pnMaintenant(), o.id);
+
+  // Règle de sécurité "Diaspo'Actif doit toujours pouvoir suivre" : notification systématique.
+  try {
+    const projet = await db.prepare("SELECT titre FROM projets WHERE id=?").get(o.projet_id);
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    for (const a of admins) {
+      await creerNotif(a.id, "partenariat_evaluation", "Évaluation reçue d'un partenaire",
+        `Un partenaire a évalué le dossier "${projet?.titre || ""}" : ${avis}.`, { orientation_id: o.id, projet_id: o.projet_id });
+    }
+  } catch (e) {}
+
+  sendJSON(res, 201, { id: r.lastInsertRowid, statut_relation: nouveauStatut });
+});
+
+/* PUT /api/partenariat/projets-transmis/:orientationId/statut-relation — le partenaire fait
+   progresser la relation parmi les 9 statuts de suivi. */
+route("PUT", "/api/partenariat/projets-transmis/:orientationId/statut-relation", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "partenaire") return sendJSON(res, 403, { error: "Réservé aux comptes Partenaire." });
+  const o = await db.prepare("SELECT * FROM projets_orientations_partenaires WHERE id=?").get(params.orientationId);
+  if (!o || Number(o.partenaire_user_id) !== Number(me.id)) return sendJSON(res, 404, { error: "Dossier introuvable." });
+
+  const { statut_relation, resultat, commentaire } = body;
+  const allowed = STATUT_RELATION_TRANSITIONS[o.statut_relation] || [];
+  if (!allowed.includes(statut_relation)) return sendJSON(res, 403, { error: "Transition non autorisée." });
+
+  await db.prepare("UPDATE projets_orientations_partenaires SET statut_relation=?, resultat=?, derniere_activite_le=?, updated_at=datetime('now') WHERE id=?")
+    .run(statut_relation, resultat ?? o.resultat, pnMaintenant(), o.id);
+
+  try {
+    const projet = await db.prepare("SELECT titre, createur_id FROM projets WHERE id=?").get(o.projet_id);
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    for (const a of admins) {
+      await creerNotif(a.id, "partenariat_relation_evolution", "Évolution d'une mise en relation",
+        `Le dossier "${projet?.titre || ""}" est passé au statut : ${statut_relation}.` + (commentaire ? ` (${commentaire})` : ""),
+        { orientation_id: o.id, projet_id: o.projet_id, statut_relation });
+    }
+    if (statut_relation === "abouti" && projet?.createur_id) {
+      await creerNotif(projet.createur_id, "projet_da_abouti", "Bonne nouvelle pour votre dossier !",
+        `Votre dossier "${projet.titre}" a abouti grâce à une mise en relation via Diaspo'Actif.`, { projet_id: o.projet_id });
+    }
+  } catch (e) {}
+
+  sendJSON(res, 200, { statut_relation });
+});
+
+/* POST /api/admin/projets/:id/orienter — orientation d'un dossier soumis vers un ou plusieurs
+   partenaires (action minimale de l'incrément 5, construite ici par nécessité : socle
+   indispensable pour que l'incrément 6 ait des données réelles à consulter/évaluer). Le
+   workflow complet — retour d'analyse, demande d'infos — reste à construire séparément. */
+route("POST", "/api/admin/projets/:id/orienter", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const p = await db.prepare("SELECT * FROM projets WHERE id=? AND type='soumission_da'").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Dossier introuvable." });
+  const partenaireIds = Array.isArray(body.partenaire_user_ids) ? body.partenaire_user_ids.map(Number).filter(Boolean) : [];
+  if (!partenaireIds.length) return sendJSON(res, 400, { error: "Sélectionnez au moins un partenaire." });
+
+  const crees = [];
+  for (const pid of partenaireIds) {
+    const partenaire = await db.prepare("SELECT user_id FROM partenariat_comptes WHERE user_id=? AND statut='active'").get(pid);
+    if (!partenaire) continue; // id invalide/partenaire inactif : ignoré plutôt que d'échouer tout l'appel
+    const r = await db.prepare("INSERT INTO projets_orientations_partenaires (projet_id, partenaire_user_id, oriente_par) VALUES (?,?,?)")
+      .run(p.id, pid, me.id);
+    crees.push(r.lastInsertRowid);
+    try {
+      await creerNotif(pid, "partenariat_projet_transmis", "Nouveau dossier transmis par Diaspo'Actif",
+        `Diaspo'Actif vous transmet le dossier "${p.titre}" pour évaluation.`, { orientation_id: r.lastInsertRowid, projet_id: p.id });
+    } catch (e) {}
+  }
+  if (!crees.length) return sendJSON(res, 400, { error: "Aucun partenaire actif valide sélectionné." });
+
+  if (["en_analyse", "retenu"].includes(p.statut)) {
+    await db.prepare("UPDATE projets SET statut='oriente_partenaire', updated_at=datetime('now') WHERE id=?").run(p.id);
+  }
+  try {
+    await creerNotif(p.createur_id, "projet_da_oriente", "Votre dossier a été orienté",
+      `Votre dossier "${p.titre}" a été orienté vers ${crees.length} partenaire(s) du réseau Diaspo'Actif.`, { projet_id: p.id });
+  } catch (e) {}
+
+  sendJSON(res, 201, { orientations_creees: crees });
+});
+
 /* ── Incrément 2 : invitation à usage unique + inscription partenaire ──
    Voir server/partenariat.js pour la génération/hash du token et l'expiration
    paresseuse à la lecture. Statut "🟠 Expire bientôt" calculé ici (jamais stocké),
@@ -8252,7 +8426,7 @@ async function partenariatStatsPartenaire(partenaireUserId) {
       WHERE o.partenaire_user_id=?
     `).get(partenaireUserId))?.n || 0;
     stats.mises_en_relation = (await db.prepare(
-      "SELECT COUNT(*) AS n FROM projets_orientations_partenaires WHERE partenaire_user_id=? AND statut_relation IN ('mise_en_relation','en_discussion','collaboration_active','abouti')"
+      "SELECT COUNT(*) AS n FROM projets_orientations_partenaires WHERE partenaire_user_id=? AND statut_relation IN ('mise_en_relation','collaboration_active','abouti')"
     ).get(partenaireUserId))?.n || 0;
     stats.projets_aboutis = (await db.prepare(
       "SELECT COUNT(*) AS n FROM projets_orientations_partenaires WHERE partenaire_user_id=? AND statut_relation='abouti'"
@@ -11912,9 +12086,11 @@ route("GET", "/api/mes-inscriptions", async (req, res) => {
 route("POST", "/api/formations", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  /* La création de formations est réservée aux comptes Initiative (Premium) et Administrateur.
+  /* La création de formations est réservée aux comptes Initiative (Premium), Partenaire et
+     Administrateur (incrément 6 du module Partenariat : un partenaire n'est pas soumis au
+     système Premium, réservé aux rôles utilisateur/initiative).
      Les comptes Utilisateur peuvent consulter le catalogue et s'inscrire, mais pas créer de formation. */
-  if (user.role !== 'administrateur') {
+  if (user.role !== 'administrateur' && user.role !== 'partenaire') {
     if (user.role !== 'initiative') {
       return sendJSON(res, 403, { error: "La création de formations est réservée aux comptes Initiative." });
     }
@@ -23774,10 +23950,13 @@ ${jsonLd}
       let rows;
       if (me.role === 'administrateur') {
         const statut = q.statut || null;
-        const sql = statut
-          ? `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.statut=? ORDER BY p.updated_at DESC`
-          : `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id ORDER BY p.updated_at DESC`;
-        rows = statut ? await db.prepare(sql).all(statut) : await db.prepare(sql).all();
+        const type = q.type || null;
+        const conds = []; const args = [];
+        if (statut) { conds.push('p.statut=?'); args.push(statut); }
+        if (type)   { conds.push('p.type=?');   args.push(type); }
+        const where = conds.length ? ' WHERE ' + conds.join(' AND ') : '';
+        const sql = `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id${where} ORDER BY p.updated_at DESC`;
+        rows = await db.prepare(sql).all(...args);
       } else if (me.role === 'collectivite') {
         const statut = q.statut || null;
         const sql = statut
@@ -24604,7 +24783,9 @@ ${jsonLd}
     /* ── POST /api/events — créer un événement ── */
     if (req.method === 'POST' && pathname === '/api/events') {
       const me = await getCurrentUser(req);
-      if (!me || !['initiative','administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux initiatives.' });
+      /* 'partenaire' ouvert à l'incrément 6 du module Partenariat — un partenaire peut organiser
+         ses propres événements sur la plateforme, comme une initiative. */
+      if (!me || !['initiative','administrateur','partenaire'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux initiatives.' });
       const {
         titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
         image_b64, ticket_types, statut: statutInit,

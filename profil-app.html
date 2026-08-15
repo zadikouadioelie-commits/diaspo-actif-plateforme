@@ -1784,10 +1784,12 @@ function renderVisitorProfile() {
               <h1 class="pvz-name">${esc(nom)}</h1>
               ${isPremium ? `<span class="pvz-premium-badge" title="Membre Premium">👑 Premium</span>` : ''}
               ${(!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBadgeHtml(profil._decouverte_premium.date_expiration) : ''}
+              ${profil.role === 'partenaire' ? `<span class="pvz-premium-badge" title="Compte Partenaire Diaspo'Actif" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);">🤝 Partenaire</span>` : ''}
               ${verified ? `<span class="pvz-verified"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
             </div>
             <div class="pvz-sub">${esc(sub)}</div>
             ${responsableLine}
+            ${profil.role === 'partenaire' ? `<div class="notice" style="margin:8px 0 0;font-size:12.5px;">📂 Projets : sur orientation de Diaspo'Actif. Les porteurs de projets ne contactent jamais un partenaire directement — c'est toujours Diaspo'Actif qui oriente un dossier après analyse.</div>` : ''}
             ${chips.length ? `<div class="pvz-chips">${chips.join('')}</div>` : ''}
           </div>
           <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+adhererBtn+msgBtn+shareBtn+reportBtn}</div>
