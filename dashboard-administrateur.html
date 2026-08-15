@@ -151,6 +151,26 @@
           </div>
         </div>
 
+        <!-- ── Bloc 1bis : Partenariat (incrément 7) ── -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">🤝 Partenariat</div>
+          <a href="#" onclick="document.querySelector('.sidebar a[data-section=partenariat-admin]')?.click();return false;" style="font-size:12px;color:#2563EB;text-decoration:none;">Voir le module →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;">
+          <div class="card stat-card" style="border-left:4px solid #2563EB;">
+            <div class="stat-number" id="stat-pn-soumissions-mois">—</div>
+            <div class="stat-label">Dossiers soumis (30j)</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #f59e0b;">
+            <div class="stat-number" id="stat-pn-soumissions-attente">—</div>
+            <div class="stat-label">En attente d'analyse</div>
+          </div>
+          <div class="card stat-card" style="border-left:4px solid #10b981;">
+            <div class="stat-number" id="stat-pn-partenaires-actifs">—</div>
+            <div class="stat-label">Partenaires actifs</div>
+          </div>
+        </div>
+
         <!-- ── Bloc 2 : Nouveaux inscrits ── -->
         <div style="margin-bottom:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);">Nouveaux inscrits</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
@@ -8575,6 +8595,12 @@ async function submitAccordDirect(){
   document.getElementById("stat-formations").textContent   = data.total_formations ?? "—";
   document.getElementById("stat-abonnements").textContent  = data.total_abonnements ?? "—";
 
+  // ── Partenariat (incrément 7)
+  const pn = data.partenariat || {};
+  document.getElementById("stat-pn-soumissions-mois").textContent    = pn.soumissions_da_mois ?? "0";
+  document.getElementById("stat-pn-soumissions-attente").textContent = pn.soumissions_da_en_attente ?? "0";
+  document.getElementById("stat-pn-partenaires-actifs").textContent  = pn.partenaires_actifs ?? "0";
+
   // ── Nouveaux inscrits
   document.getElementById("insc-jour").textContent    = data.inscrits_jour ?? "0";
   document.getElementById("insc-semaine").textContent = data.inscrits_semaine ?? "0";
@@ -10646,6 +10672,10 @@ async function submitAccordDirect(){
       document.getElementById("stat-publications").textContent = fresh.total_publications ?? "—";
       document.getElementById("stat-formations").textContent   = fresh.total_formations ?? "—";
       document.getElementById("stat-abonnements").textContent  = fresh.total_abonnements ?? "—";
+      { const pn = fresh.partenariat || {};
+        document.getElementById("stat-pn-soumissions-mois").textContent    = pn.soumissions_da_mois ?? "0";
+        document.getElementById("stat-pn-soumissions-attente").textContent = pn.soumissions_da_en_attente ?? "0";
+        document.getElementById("stat-pn-partenaires-actifs").textContent  = pn.partenaires_actifs ?? "0"; }
       document.getElementById("insc-jour").textContent         = fresh.inscrits_jour ?? "0";
       document.getElementById("insc-semaine").textContent      = fresh.inscrits_semaine ?? "0";
       document.getElementById("insc-mois").textContent         = fresh.inscrits_mois ?? "0";

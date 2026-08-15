@@ -8234,6 +8234,33 @@ async function partenariatDernierePeriode(partenaireUserId) {
   return db.prepare("SELECT * FROM partenariat_periodes WHERE partenaire_user_id=? AND statut='active' ORDER BY version DESC LIMIT 1").get(partenaireUserId);
 }
 
+/* Rendement d'un partenaire (incrément 7). Interroge projets_orientations_partenaires
+   (colonnes partenaire_user_id, statut_relation) et partenariat_evaluations (colonne
+   orientation_id) — tables de l'incrément 5/6, pas encore créées à ce stade du chantier.
+   Enveloppé pour rester silencieux (0 partout) tant qu'elles n'existent pas : cette fonction
+   commencera à répondre pour de vrai automatiquement dès leur création, sans autre changement
+   ici. ⚠️ Si les colonnes réelles de l'incrément 5/6 diffèrent de ces noms, adapter ICI. */
+async function partenariatStatsPartenaire(partenaireUserId) {
+  const stats = { projets_recus: 0, projets_evalues: 0, mises_en_relation: 0, projets_aboutis: 0 };
+  try {
+    stats.projets_recus = (await db.prepare(
+      "SELECT COUNT(*) AS n FROM projets_orientations_partenaires WHERE partenaire_user_id=?"
+    ).get(partenaireUserId))?.n || 0;
+    stats.projets_evalues = (await db.prepare(`
+      SELECT COUNT(DISTINCT o.id) AS n FROM projets_orientations_partenaires o
+      JOIN partenariat_evaluations e ON e.orientation_id = o.id
+      WHERE o.partenaire_user_id=?
+    `).get(partenaireUserId))?.n || 0;
+    stats.mises_en_relation = (await db.prepare(
+      "SELECT COUNT(*) AS n FROM projets_orientations_partenaires WHERE partenaire_user_id=? AND statut_relation IN ('mise_en_relation','en_discussion','collaboration_active','abouti')"
+    ).get(partenaireUserId))?.n || 0;
+    stats.projets_aboutis = (await db.prepare(
+      "SELECT COUNT(*) AS n FROM projets_orientations_partenaires WHERE partenaire_user_id=? AND statut_relation='abouti'"
+    ).get(partenaireUserId))?.n || 0;
+  } catch (_) { /* tables des incréments 5/6 pas encore créées : 0 partout, sans erreur */ }
+  return stats;
+}
+
 route("GET", "/api/admin/partenariat/comptes", async (req, res) => {
   const me = await getCurrentUser(req);
   if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
@@ -8247,14 +8274,12 @@ route("GET", "/api/admin/partenariat/comptes", async (req, res) => {
   const comptes = [];
   for (const c of rows) {
     const periode = await partenariatDernierePeriode(c.user_id);
-    // Compteurs projets reçus/évalués/mises en relation/aboutis : posés à 0 tant que les
-    // tables des incréments 5/6 (projets_orientations_partenaires, partenariat_evaluations)
-    // n'existent pas encore — la route reste fonctionnelle et sera complétée à l'incrément 7.
+    const stats = await partenariatStatsPartenaire(c.user_id);
     comptes.push({
       ...c,
       periode: periode ? { date_debut: periode.date_debut, date_fin: periode.date_fin, version: periode.version } : null,
       statut_periode: partenariatStatutPeriode(periode, seuil),
-      projets_recus: 0, projets_evalues: 0, mises_en_relation: 0, projets_aboutis: 0,
+      ...stats,
     });
   }
   sendJSON(res, 200, { comptes });
@@ -8362,6 +8387,50 @@ route("DELETE", "/api/admin/partenariat/comptes/:id", async (req, res, params, b
   await db.prepare("DELETE FROM partenariat_comptes WHERE id=?").run(params.id);
   await db.prepare("UPDATE users SET compte_masque=1 WHERE id=?").run(c.user_id);
   sendJSON(res, 200, { ok: true, purged: true });
+});
+
+/* GET /api/admin/partenariat/comptes/:id/stats — rendement détaillé d'un partenaire
+   (incrément 7). Complète les compteurs déjà exposés par la liste des cartouches. */
+route("GET", "/api/admin/partenariat/comptes/:id/stats", async (req, res, params) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const c = await db.prepare("SELECT user_id FROM partenariat_comptes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Compte partenaire introuvable." });
+  const stats = await partenariatStatsPartenaire(c.user_id);
+  sendJSON(res, 200, stats);
+});
+
+/* GET /api/admin/partenariat/stats — agrégats globaux du module Partenariat (incrément 7),
+   pour le Cockpit admin : répartition des comptes/invitations/soumissions par statut. Les
+   orientations/évaluations (incréments 5/6) renvoient des tableaux vides tant que leurs
+   tables n'existent pas, sans jamais faire échouer la route. */
+route("GET", "/api/admin/partenariat/stats", async (req, res) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+
+  const comptesParStatut = await db.prepare("SELECT statut, COUNT(*) AS n FROM partenariat_comptes GROUP BY statut").all();
+  const invitationsParStatut = await db.prepare("SELECT statut, COUNT(*) AS n FROM partenariat_invitations GROUP BY statut").all();
+  const soumissionsDaParStatut = await db.prepare("SELECT statut, COUNT(*) AS n FROM projets WHERE type='soumission_da' GROUP BY statut").all();
+
+  let orientationsParStatut = [];
+  try {
+    orientationsParStatut = await db.prepare(
+      "SELECT statut_relation AS statut, COUNT(*) AS n FROM projets_orientations_partenaires GROUP BY statut_relation"
+    ).all();
+  } catch (_) { orientationsParStatut = []; }
+
+  let evaluationsParAvis = [];
+  try {
+    evaluationsParAvis = await db.prepare("SELECT avis, COUNT(*) AS n FROM partenariat_evaluations GROUP BY avis").all();
+  } catch (_) { evaluationsParAvis = []; }
+
+  sendJSON(res, 200, {
+    comptes_par_statut: comptesParStatut,
+    invitations_par_statut: invitationsParStatut,
+    soumissions_da_par_statut: soumissionsDaParStatut,
+    orientations_par_statut: orientationsParStatut,
+    evaluations_par_avis: evaluationsParAvis,
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -12822,6 +12891,22 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     signalementsEnAttente = sa + si;
   } catch (_) { signalementsEnAttente = 0; }
 
+  /* Cockpit "Partenariat" — module Partenariat (incrément 7). soumissions_orientees_actives
+     nécessite la table projets_orientations_partenaires de l'incrément 5, pas encore construite :
+     volontairement absente ici plutôt que factice, à ajouter avec l'incrément 5. */
+  let partenariatCockpit = { soumissions_da_mois: 0, soumissions_da_en_attente: 0, partenaires_actifs: 0 };
+  try {
+    partenariatCockpit.soumissions_da_mois = (await db.prepare(
+      "SELECT COUNT(*) AS n FROM projets WHERE type='soumission_da' AND date_soumission_da >= datetime('now','-30 days')"
+    ).get())?.n || 0;
+    partenariatCockpit.soumissions_da_en_attente = (await db.prepare(
+      "SELECT COUNT(*) AS n FROM projets WHERE type='soumission_da' AND statut IN ('soumis','en_analyse','infos_demandees')"
+    ).get())?.n || 0;
+    partenariatCockpit.partenaires_actifs = (await db.prepare(
+      "SELECT COUNT(*) AS n FROM partenariat_comptes WHERE statut='active'"
+    ).get())?.n || 0;
+  } catch (_) { /* module Partenariat pas encore migré (base très ancienne) : compteurs à 0 */ }
+
   sendJSON(res, 200, {
     // Totaux
     total_utilisateurs: totalUtilisateurs,
@@ -12855,7 +12940,9 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
     top_posts:             topPosts,
     // Listes
     publications_recentes: publicationsRecentes,
-    derniers_inscrits:     derniersInscrits
+    derniers_inscrits:     derniersInscrits,
+    // Partenariat (incrément 7)
+    partenariat: partenariatCockpit,
   });
 });
 
