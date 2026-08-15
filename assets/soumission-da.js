@@ -71,6 +71,7 @@
           <button onclick="SoumissionDA.fermer()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
         </div>
         <p id="da-sda-lock-note" style="display:none;background:#fef3c7;color:#92400e;border-radius:8px;padding:10px;font-size:13px;margin:10px 0;"></p>
+        <div id="da-sda-suivi-section" style="display:none;"></div>
 
         <div style="margin:14px 0 12px;"><label class="form-label">Titre du projet <span style="color:#2563EB">*</span></label><input id="da-sda-titre" class="input-field" style="width:100%;" placeholder="Ex : Centre de formation numérique à Bouaké"></div>
         <div style="margin-bottom:12px;"><label class="form-label">Présentation générale</label><textarea id="da-sda-presentation" class="input-field" rows="2" style="width:100%;resize:vertical;" placeholder="Résumé en quelques phrases"></textarea></div>
@@ -285,6 +286,7 @@
     _current = null;
     viderFormulaire();
     document.getElementById('da-sda-docs-section').style.display = 'none';
+    document.getElementById('da-sda-suivi-section').style.display = 'none';
     document.getElementById('da-sda-btn-brouillon').style.display = '';
     document.getElementById('da-sda-btn-soumettre').style.display = '';
     document.getElementById('da-sda-modal-bg').style.display = 'flex';
@@ -307,9 +309,47 @@
       document.getElementById('da-sda-btn-soumettre').style.display = (modifiable && p.statut === 'brouillon') ? '' : 'none';
       document.getElementById('da-sda-docs-section').style.display = '';
       renderDocuments(r.documents || [], modifiable);
+      renderSuivi(r.retours || [], r.demandes_infos || []);
     } catch (e) {
       document.getElementById('da-sda-error').textContent = e.message || 'Dossier introuvable.';
       document.getElementById('da-sda-error').style.display = 'block';
+    }
+  }
+
+  /* Retours d'analyse + demandes d'informations complémentaires (incrément 5) — le porteur
+     répond directement ici ; la réponse remet automatiquement le dossier en analyse côté
+     administrateur. */
+  function renderSuivi(retours, demandesInfos) {
+    const el = document.getElementById('da-sda-suivi-section');
+    if (!retours.length && !demandesInfos.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    const demandeOuverte = demandesInfos.find(d => d.statut === 'en_attente');
+    el.innerHTML = `
+      ${retours.length ? `
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px;">
+        <strong style="font-size:13px;">💬 Retour de Diaspo'Actif</strong>
+        ${retours.map(r => `<div style="font-size:12.5px;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px;">${fmtDate(r.created_at)}${r.avis_general ? '<br><strong>Avis :</strong> ' + esc(r.avis_general) : ''}${r.commentaires ? '<br>' + esc(r.commentaires) : ''}</div>`).join('')}
+      </div>` : ''}
+      ${demandesInfos.length ? `
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px;">
+        <strong style="font-size:13px;">❓ Demandes d'informations complémentaires</strong>
+        ${demandesInfos.map(d => `<div style="font-size:12.5px;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px;">${esc(d.demande_texte)}${d.statut === 'repondu' ? `<br><strong>Votre réponse (${fmtDate(d.repondu_le)}) :</strong> ${esc(d.reponse_texte)}` : ''}</div>`).join('')}
+        ${demandeOuverte ? `
+        <textarea id="da-sda-reponse-infos" class="input-field" rows="2" style="width:100%;margin-top:8px;" placeholder="Votre réponse…"></textarea>
+        <button class="btn btn-orange btn-sm" style="margin-top:6px;" onclick="SoumissionDA.repondreDemandeInfos(${demandeOuverte.id})">Envoyer ma réponse</button>` : ''}
+      </div>` : ''}
+    `;
+  }
+
+  async function repondreDemandeInfos(demandeId) {
+    const reponse_texte = document.getElementById('da-sda-reponse-infos').value.trim();
+    if (!reponse_texte) return;
+    try {
+      await api('PUT', '/projets/demandes-infos/' + demandeId + '/reponse', { reponse_texte });
+      ouvrirEdition(_current);
+    } catch (e) {
+      const errEl = document.getElementById('da-sda-error');
+      errEl.textContent = e.message || "Impossible d'envoyer la réponse."; errEl.style.display = 'block';
     }
   }
 
@@ -427,6 +467,6 @@
   window.SoumissionDA = {
     render, load, ouvrirNouveau, ouvrirEdition, fermer,
     enregistrerBrouillon, soumettre, televerserDocument, supprimerDocument, supprimer,
-    majBesoinsAutres,
+    majBesoinsAutres, repondreDemandeInfos,
   };
 })();

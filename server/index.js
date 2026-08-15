@@ -8091,6 +8091,12 @@ route("GET", "/api/partenariat/moi", async (req, res) => {
    de l'action "orienter" de l'incrément 5 (voir POST /api/admin/projets/:id/orienter plus bas) :
    sans elle, cet espace n'aurait jamais de données réelles à présenter. */
 function pnMaintenant() { return new Date().toISOString().slice(0, 19).replace("T", " "); }
+async function pnLogHistorique(orientationId, evenement, details, acteurId) {
+  try {
+    await db.prepare("INSERT INTO projets_orientations_historique (orientation_id, evenement, details, acteur_id) VALUES (?,?,?,?)")
+      .run(orientationId, evenement, details || null, acteurId || null);
+  } catch (e) {}
+}
 const STATUT_RELATION_TRANSITIONS = {
   transmis: ["consulte"],
   consulte: ["favorable", "defavorable", "demande_infos"],
@@ -8149,6 +8155,7 @@ route("GET", "/api/partenariat/projets-transmis/:orientationId", async (req, res
       .run(maintenant, nouveauStatut, o.id);
     o.date_premiere_consultation = maintenant;
     o.statut_relation = nouveauStatut;
+    await pnLogHistorique(o.id, "premiere_consultation", null, me.id);
   }
 
   sendJSON(res, 200, { orientation: o, projet: p, documents, evaluations });
@@ -8177,6 +8184,7 @@ route("POST", "/api/partenariat/projets-transmis/:orientationId/evaluation", asy
   const nouveauStatut = DEJA_AVANCE.includes(o.statut_relation) ? o.statut_relation : avis;
   await db.prepare("UPDATE projets_orientations_partenaires SET statut_relation=?, derniere_activite_le=?, updated_at=datetime('now') WHERE id=?")
     .run(nouveauStatut, pnMaintenant(), o.id);
+  await pnLogHistorique(o.id, "evaluation", `avis=${avis}`, me.id);
 
   // Règle de sécurité "Diaspo'Actif doit toujours pouvoir suivre" : notification systématique.
   try {
@@ -8205,6 +8213,7 @@ route("PUT", "/api/partenariat/projets-transmis/:orientationId/statut-relation",
 
   await db.prepare("UPDATE projets_orientations_partenaires SET statut_relation=?, resultat=?, derniere_activite_le=?, updated_at=datetime('now') WHERE id=?")
     .run(statut_relation, resultat ?? o.resultat, pnMaintenant(), o.id);
+  await pnLogHistorique(o.id, "statut_relation", `${o.statut_relation}→${statut_relation}` + (commentaire ? ` (${commentaire})` : ""), me.id);
 
   try {
     const projet = await db.prepare("SELECT titre, createur_id FROM projets WHERE id=?").get(o.projet_id);
@@ -8242,6 +8251,7 @@ route("POST", "/api/admin/projets/:id/orienter", async (req, res, params, body) 
     const r = await db.prepare("INSERT INTO projets_orientations_partenaires (projet_id, partenaire_user_id, oriente_par) VALUES (?,?,?)")
       .run(p.id, pid, me.id);
     crees.push(r.lastInsertRowid);
+    await pnLogHistorique(r.lastInsertRowid, "orientation_creee", null, me.id);
     try {
       await creerNotif(pid, "partenariat_projet_transmis", "Nouveau dossier transmis par Diaspo'Actif",
         `Diaspo'Actif vous transmet le dossier "${p.titre}" pour évaluation.`, { orientation_id: r.lastInsertRowid, projet_id: p.id });
@@ -8258,6 +8268,86 @@ route("POST", "/api/admin/projets/:id/orienter", async (req, res, params, body) 
   } catch (e) {}
 
   sendJSON(res, 201, { orientations_creees: crees });
+});
+
+/* ── Incrément 5 : workflow admin de traitement des projets soumis ──
+   Retour d'analyse, demande d'informations complémentaires. L'action "orienter" fait déjà
+   partie du socle construit à l'incrément 6 (voir ci-dessus). */
+
+/* GET /api/admin/projets/soumissions-da — file d'attente dédiée, séparée de la liste générique
+   GET /api/projets (qui, pour l'administrateur, mélange tous les types de projets). */
+route("GET", "/api/admin/projets/soumissions-da", async (req, res, params, body, query) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const statut = query && query.statut;
+  const sql = statut
+    ? `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.type='soumission_da' AND p.statut=? ORDER BY p.updated_at DESC`
+    : `SELECT p.*, u.nom AS createur_nom, u.role AS createur_role FROM projets p JOIN users u ON u.id=p.createur_id WHERE p.type='soumission_da' ORDER BY p.updated_at DESC`;
+  const rows = statut ? await db.prepare(sql).all(statut) : await db.prepare(sql).all();
+  sendJSON(res, 200, { soumissions: rows });
+});
+
+/* POST /api/admin/projets/:id/retour-da — retour d'analyse formel (cahier des charges Partie 1,
+   section "Retour de Diaspo'Actif"). N'écrase jamais un retour précédent : chaque appel ajoute
+   une nouvelle ligne, l'historique complet reste visible au porteur. */
+route("POST", "/api/admin/projets/:id/retour-da", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const p = await db.prepare("SELECT * FROM projets WHERE id=? AND type='soumission_da'").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Dossier introuvable." });
+  const { avis_general, observations, points_forts, points_faibles, recommandations, infos_manquantes, modifications_demandees, niveau_maturite, avis_faisabilite, commentaires } = body;
+  const r = await db.prepare(`
+    INSERT INTO projets_retours_da (projet_id, redige_par, avis_general, observations, points_forts, points_faibles, recommandations, infos_manquantes, modifications_demandees, niveau_maturite, avis_faisabilite, commentaires)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(p.id, me.id, avis_general || null, observations || null, points_forts || null, points_faibles || null, recommandations || null, infos_manquantes || null, modifications_demandees || null, niveau_maturite || null, avis_faisabilite || null, commentaires || null);
+  try {
+    await creerNotif(p.createur_id, "projet_da_retour", "Retour de Diaspo'Actif reçu",
+      `Vous avez reçu un retour d'analyse sur votre dossier "${p.titre}".`, { projet_id: p.id, retour_id: r.lastInsertRowid });
+  } catch (e) {}
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* POST /api/admin/projets/:id/demande-infos — bascule le dossier en 'infos_demandees' (déjà
+   prévu dans STATUT_TRANSITIONS_DA), notifie le porteur. */
+route("POST", "/api/admin/projets/:id/demande-infos", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me || me.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const p = await db.prepare("SELECT * FROM projets WHERE id=? AND type='soumission_da'").get(params.id);
+  if (!p) return sendJSON(res, 404, { error: "Dossier introuvable." });
+  const demandeTexte = (body.demande_texte || "").trim();
+  if (!demandeTexte) return sendJSON(res, 400, { error: "Le texte de la demande est obligatoire." });
+  const r = await db.prepare("INSERT INTO projets_demandes_infos (projet_id, demande_par, demande_texte) VALUES (?,?,?)").run(p.id, me.id, demandeTexte);
+  await db.prepare("UPDATE projets SET statut='infos_demandees', updated_at=datetime('now') WHERE id=?").run(p.id);
+  try {
+    await creerNotif(p.createur_id, "projet_da_demande_infos", "Diaspo'Actif a besoin d'informations complémentaires",
+      `Une information complémentaire est demandée pour votre dossier "${p.titre}".`, { projet_id: p.id, demande_id: r.lastInsertRowid });
+  } catch (e) {}
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* PUT /api/projets/demandes-infos/:id/reponse — le porteur répond ; le dossier repasse
+   automatiquement en 'en_analyse' (transition déjà prévue dans STATUT_TRANSITIONS_DA) et
+   l'administration est notifiée pour reprendre l'examen. */
+route("PUT", "/api/projets/demandes-infos/:id/reponse", async (req, res, params, body) => {
+  const me = await getCurrentUser(req);
+  if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+  const d = await db.prepare("SELECT * FROM projets_demandes_infos WHERE id=?").get(params.id);
+  if (!d) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const p = await db.prepare("SELECT * FROM projets WHERE id=?").get(d.projet_id);
+  if (!p || Number(p.createur_id) !== Number(me.id)) return sendJSON(res, 403, { error: "Accès refusé." });
+  if (d.statut === "repondu") return sendJSON(res, 409, { error: "Cette demande a déjà reçu une réponse." });
+  const reponseTexte = (body.reponse_texte || "").trim();
+  if (!reponseTexte) return sendJSON(res, 400, { error: "La réponse ne peut pas être vide." });
+  await db.prepare("UPDATE projets_demandes_infos SET statut='repondu', reponse_texte=?, repondu_le=datetime('now') WHERE id=?").run(reponseTexte, d.id);
+  await db.prepare("UPDATE projets SET statut='en_analyse', updated_at=datetime('now') WHERE id=?").run(p.id);
+  try {
+    const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    for (const a of admins) {
+      await creerNotif(a.id, "projet_da_reponse_infos", "Réponse reçue à une demande d'infos",
+        `Le porteur du dossier "${p.titre}" a répondu à votre demande d'informations.`, { projet_id: p.id, demande_id: d.id });
+    }
+  } catch (e) {}
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ── Incrément 2 : invitation à usage unique + inscription partenaire ──
@@ -24036,9 +24126,13 @@ ${jsonLd}
       const canView = p.createur_id === me.id || me.role === 'administrateur' || (me.role === 'collectivite' && !isDA);
       if (!canView) return sendJSON(res, 403, { error: 'Accès refusé' });
       const commentaires = await db.prepare(`SELECT pc.*, u.nom AS auteur_nom FROM projets_commentaires pc JOIN users u ON u.id=pc.auteur_id WHERE pc.projet_id=? ORDER BY pc.created_at`).all(id);
-      let documents;
-      if (isDA) documents = await db.prepare(`SELECT id,projet_id,uploader_id,nom_fichier,type_mime,taille,categorie,url_bunny,created_at FROM projets_documents WHERE projet_id=? ORDER BY created_at`).all(id);
-      return sendJSON(res, 200, { projet: p, commentaires, documents: documents || [] });
+      let documents, retours, demandes_infos;
+      if (isDA) {
+        documents = await db.prepare(`SELECT id,projet_id,uploader_id,nom_fichier,type_mime,taille,categorie,url_bunny,created_at FROM projets_documents WHERE projet_id=? ORDER BY created_at`).all(id);
+        retours = await db.prepare(`SELECT id,avis_general,observations,points_forts,points_faibles,recommandations,infos_manquantes,modifications_demandees,niveau_maturite,avis_faisabilite,commentaires,created_at FROM projets_retours_da WHERE projet_id=? ORDER BY created_at DESC`).all(id);
+        demandes_infos = await db.prepare(`SELECT id,demande_texte,statut,reponse_texte,repondu_le,created_at FROM projets_demandes_infos WHERE projet_id=? ORDER BY created_at DESC`).all(id);
+      }
+      return sendJSON(res, 200, { projet: p, commentaires, documents: documents || [], retours: retours || [], demandes_infos: demandes_infos || [] });
     }
 
     /* PUT /api/projets/:id — modifier. Pour type='soumission_da', modification bloquée dès que

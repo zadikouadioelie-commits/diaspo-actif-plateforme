@@ -5138,6 +5138,61 @@ db.exec(`
     FOREIGN KEY(partenaire_user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_partenariat_evaluations_orientation ON partenariat_evaluations(orientation_id);
+
+  /* Retour d'analyse de Diaspo'Actif sur un dossier soumis (incrément 5, cahier des charges
+     Partie 1 : section "Retour de Diaspo'Actif"). Une ligne par retour envoyé — l'historique
+     complet reste visible au porteur, jamais écrasé. */
+  CREATE TABLE IF NOT EXISTS projets_retours_da (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id                INTEGER NOT NULL,
+    redige_par                INTEGER,
+    avis_general               TEXT,
+    observations               TEXT,
+    points_forts                TEXT,
+    points_faibles               TEXT,
+    recommandations              TEXT,
+    infos_manquantes             TEXT,
+    modifications_demandees      TEXT,
+    niveau_maturite              TEXT,
+    avis_faisabilite             TEXT,
+    commentaires                 TEXT,
+    created_at                   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES projets(id),
+    FOREIGN KEY(redige_par) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_projets_retours_da_projet ON projets_retours_da(projet_id);
+
+  /* Demande d'informations complémentaires (incrément 5) — le porteur répond via
+     PUT /api/projets/demandes-infos/:id/reponse ; les documents joints à la réponse passent
+     par projets_documents (categorie='reponse_infos_complementaires'). */
+  CREATE TABLE IF NOT EXISTS projets_demandes_infos (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    projet_id     INTEGER NOT NULL,
+    demande_par   INTEGER,
+    demande_texte TEXT NOT NULL,
+    statut        TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','repondu')),
+    reponse_texte TEXT,
+    repondu_le    TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(projet_id) REFERENCES projets(id),
+    FOREIGN KEY(demande_par) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_projets_demandes_infos_projet ON projets_demandes_infos(projet_id);
+
+  /* Historique/audit d'une orientation partenaire (incrément 5) — journalise chaque événement
+     (orientation créée, consultation, évaluation, changement de statut_relation) pour que
+     Diaspo'Actif puisse reconstituer le fil complet d'une mise en relation. */
+  CREATE TABLE IF NOT EXISTS projets_orientations_historique (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    orientation_id  INTEGER NOT NULL,
+    evenement       TEXT NOT NULL,
+    details         TEXT,
+    acteur_id       INTEGER,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(orientation_id) REFERENCES projets_orientations_partenaires(id),
+    FOREIGN KEY(acteur_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_projets_orient_historique ON projets_orientations_historique(orientation_id);
 `);
 
 /* =====================================================================

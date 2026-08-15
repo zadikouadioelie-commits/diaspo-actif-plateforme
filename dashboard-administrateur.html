@@ -2791,6 +2791,17 @@
         </div>
       </section>
 
+      <!-- Modal détail d'un dossier soumis à Diaspo'Actif (incrément 5) -->
+      <div id="pn-dossier-detail-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:680px;margin:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 id="pn-dossier-detail-titre" style="margin:0;">Dossier</h3>
+            <button onclick="pnFermerDossierDetail()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <div id="pn-dossier-detail-content"></div>
+        </div>
+      </div>
+
       <!-- Modal orientation d'un dossier vers un/des partenaires -->
       <div id="pn-orienter-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
         <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:480px;margin:auto;">
@@ -5538,18 +5549,87 @@ async function loadPartenariatAdmin() {
 /* ── Orientation vers un/des partenaires (socle minimal de l'incrément 5, indispensable à
    l'incrément 6) — file très simple des dossiers prêts à orienter, sans le workflow complet
    (retour d'analyse, demande d'infos) qui reste à construire séparément. ── */
+const PN_DA_STATUT_LABELS = {
+  brouillon: '📝 Brouillon', soumis: '📤 Soumis', en_analyse: '🔍 En analyse',
+  infos_demandees: "❓ Infos demandées", retenu: '✅ Retenu',
+  oriente_partenaire: '🤝 Orienté partenaire', mise_en_relation: '🔗 Mise en relation',
+  abouti: '🏆 Abouti', sans_suite: '⛔ Sans suite',
+};
+
 async function loadDossiersDA() {
   const el = document.getElementById('pn-dossiers-da-list');
   try {
-    const { projets } = await api('GET', '/projets?type=soumission_da');
-    const candidats = projets.filter(p => ['soumis', 'en_analyse', 'retenu'].includes(p.statut));
-    if (!candidats.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun dossier prêt à orienter pour l\'instant.</p>'; return; }
-    el.innerHTML = candidats.map(p => `
+    const { soumissions } = await api('GET', '/admin/projets/soumissions-da');
+    if (!soumissions.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun dossier soumis pour l\'instant.</p>'; return; }
+    el.innerHTML = soumissions.map(p => `
       <div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div><strong style="font-size:13px;">${esc(p.titre)}</strong> <span style="font-size:11px;color:var(--muted);">par ${esc(p.createur_nom || '—')} · ${esc(p.statut)}</span></div>
-        <button class="btn btn-outline btn-sm" onclick="pnOuvrirOrientation(${p.id})">🤝 Orienter</button>
+        <div><strong style="font-size:13px;">${esc(p.titre)}</strong> <span style="font-size:11px;color:var(--muted);">par ${esc(p.createur_nom || '—')} (${esc(p.createur_role || '')}) · ${PN_DA_STATUT_LABELS[p.statut] || esc(p.statut)}</span></div>
+        <button class="btn btn-outline btn-sm" onclick="pnOuvrirDossierDetail(${p.id})">👁️ Détail</button>
       </div>`).join('');
   } catch (e) { el.innerHTML = '<p style="color:red;font-size:13px;">Erreur de chargement.</p>'; }
+}
+
+let _pnDossierCourant = null;
+async function pnOuvrirDossierDetail(projetId) {
+  const modal = document.getElementById('pn-dossier-detail-modal-bg');
+  const content = document.getElementById('pn-dossier-detail-content');
+  content.innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px 0;">Chargement…</p>';
+  modal.style.display = 'flex';
+  try {
+    const data = await api('GET', '/projets/' + projetId);
+    _pnDossierCourant = data;
+    pnRenderDossierDetail(data);
+  } catch (e) { content.innerHTML = '<p style="color:red;">Impossible de charger ce dossier.</p>'; }
+}
+function pnFermerDossierDetail() { document.getElementById('pn-dossier-detail-modal-bg').style.display = 'none'; _pnDossierCourant = null; loadDossiersDA(); }
+
+function pnRenderDossierDetail(data) {
+  const p = data.projet;
+  document.getElementById('pn-dossier-detail-titre').textContent = p.titre;
+  const infosOuvertes = (data.demandes_infos || []).filter(d => d.statut === 'en_attente');
+  document.getElementById('pn-dossier-detail-content').innerHTML = `
+    <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#dbeafe;color:#1e40af;">${PN_DA_STATUT_LABELS[p.statut] || esc(p.statut)}</span> <span style="font-size:12px;color:var(--muted);">par ${esc(p.createur_nom || '—')}</span></div>
+    ${p.presentation ? `<p style="font-size:13.5px;">${esc(p.presentation)}</p>` : ''}
+    ${p.description ? `<p style="font-size:13px;color:var(--muted);">${esc(p.description)}</p>` : ''}
+    ${(data.documents || []).length ? `<div style="margin:10px 0;"><strong style="font-size:13px;">📎 Documents</strong>${data.documents.map(d => `<div style="font-size:13px;margin-top:4px;"><a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom_fichier)}</a></div>`).join('')}</div>` : ''}
+
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">
+      <strong style="font-size:13px;">💬 Retours d'analyse envoyés</strong>
+      ${(data.retours || []).length ? data.retours.map(r => `<div style="font-size:12.5px;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px;">${fmtDA(r.created_at)}${r.avis_general ? '<br><strong>Avis :</strong> ' + esc(r.avis_general) : ''}${r.commentaires ? '<br>' + esc(r.commentaires) : ''}</div>`).join('') : '<p style="font-size:12.5px;color:var(--muted);">Aucun retour envoyé.</p>'}
+      <textarea id="pn-retour-avis" class="input-field" rows="1" style="width:100%;margin-top:8px;" placeholder="Avis général…"></textarea>
+      <textarea id="pn-retour-commentaires" class="input-field" rows="2" style="width:100%;margin-top:6px;" placeholder="Commentaires détaillés…"></textarea>
+      <button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="pnEnvoyerRetourDA(${p.id})">Envoyer le retour</button>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">
+      <strong style="font-size:13px;">❓ Demandes d'informations complémentaires</strong>
+      ${(data.demandes_infos || []).length ? data.demandes_infos.map(d => `<div style="font-size:12.5px;margin-top:6px;padding:8px;background:var(--bg);border-radius:8px;">${esc(d.demande_texte)}${d.statut === 'repondu' ? `<br><strong>Réponse (${fmtDA(d.repondu_le)}) :</strong> ${esc(d.reponse_texte)}` : '<br><em style="color:#92400e;">En attente de réponse</em>'}</div>`).join('') : '<p style="font-size:12.5px;color:var(--muted);">Aucune demande envoyée.</p>'}
+      ${!infosOuvertes.length ? `
+      <textarea id="pn-demande-infos-texte" class="input-field" rows="2" style="width:100%;margin-top:8px;" placeholder="Précisez l'information manquante…"></textarea>
+      <button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="pnEnvoyerDemandeInfos(${p.id})">Envoyer la demande</button>` : `<p style="font-size:11.5px;color:var(--muted);margin-top:6px;">Une demande est déjà en attente de réponse.</p>`}
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">
+      <button class="btn btn-orange btn-sm" onclick="pnOuvrirOrientation(${p.id})">🤝 Orienter vers un/des partenaires</button>
+    </div>
+  `;
+}
+
+async function pnEnvoyerRetourDA(projetId) {
+  const avis_general = document.getElementById('pn-retour-avis').value.trim();
+  const commentaires = document.getElementById('pn-retour-commentaires').value.trim();
+  try {
+    await api('POST', '/admin/projets/' + projetId + '/retour-da', { avis_general, commentaires });
+    pnOuvrirDossierDetail(projetId);
+  } catch (e) { alert(e.message || "Erreur lors de l'envoi du retour."); }
+}
+async function pnEnvoyerDemandeInfos(projetId) {
+  const demande_texte = document.getElementById('pn-demande-infos-texte').value.trim();
+  if (!demande_texte) return alert('Précisez ce qui est demandé.');
+  try {
+    await api('POST', '/admin/projets/' + projetId + '/demande-infos', { demande_texte });
+    pnOuvrirDossierDetail(projetId);
+  } catch (e) { alert(e.message || "Erreur lors de l'envoi de la demande."); }
 }
 
 let _pnOrienterProjetId = null;
