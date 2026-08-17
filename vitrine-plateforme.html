@@ -242,7 +242,16 @@
     BG_PTS = BG_PTS_PCT.map(([xPct, yPct]) => [xPct / 100 * W, yPct / 100 * H]);
   }
   resize();
-  window.addEventListener('resize', resize);
+  /* ResizeObserver plutôt qu'un simple listener 'resize' de fenêtre : la taille CSS réelle du
+     canvas peut encore changer après ce premier appel (polices en cours de chargement,
+     conteneur parent pas encore stabilisé) sans le moindre redimensionnement de fenêtre — un
+     listener 'resize' seul ratait ce cas et laissait le canvas bloqué sur une taille
+     transitoire trop petite, avec la même déformation que le bug d'origine. */
+  if (window.ResizeObserver) {
+    new ResizeObserver(resize).observe(canvas);
+  } else {
+    window.addEventListener('resize', resize);
+  }
 
   function draw(ts) {
     ctx.clearRect(0, 0, W, H);
