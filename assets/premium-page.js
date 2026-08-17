@@ -165,8 +165,13 @@
        « comptes liés » déjà existant) — la vérification d'éligibilité compare le groupe du
        compte de référence à celui de l'appelant, donc exige d'être connecté AVANT de saisir
        un DS-ID. "Non" (ou visiteur non connecté qui renonce) → comportement actuel
-       inchangé, aucun bloc de parrainage n'est même affiché. */
-    renderGate();
+       inchangé, aucun bloc de parrainage n'est même affiché.
+       Réservé aux visiteurs PAS ENCORE connectés : la question « avez-vous déjà un compte » n'a
+       aucun sens pour quelqu'un déjà authentifié (il en a évidemment un, il l'utilise). Un
+       utilisateur connecté passe directement aux tarifs — signalé le 2026-08-17. */
+    let _mePremium = null;
+    try { _mePremium = (await fetch('/api/auth/me', { credentials: 'same-origin' }).then(r => r.json())).user; } catch (e) {}
+    if (_mePremium) renderTarifs(false); else renderGate();
 
     function renderGate() {
       el.innerHTML = `
