@@ -22224,14 +22224,26 @@ async function handleRequest(req, res) {
       const initIdsAvecHistorique = await db.prepare(
         `SELECT DISTINCT initiative_id FROM origine_relances WHERE initiative_id IS NOT NULL`
       ).all();
-      for (const { initiative_id } of initIdsAvecHistorique) {
+      for (const row of initIdsAvecHistorique) {
+        /* initiative_id référence users(id) → traduit en BIGINT côté PostgreSQL (voir
+           db-pg.js:toPg, règle "*_id INTEGER → BIGINT"), donc renvoyé en CHAÎNE par le
+           driver pg. Sans ce Number(), JSON.stringify({initiative_id}) produisait
+           {"initiative_id":"1722"} (guillemets) alors que la recherche de doublon ci-dessous
+           cherchait la forme non guillemettée : aucune correspondance possible, donc la
+           notification "Origine enregistrée" repartait chaque jour indéfiniment (signalé par
+           un utilisateur le 2026-08-17, ~3 semaines de renvoi quotidien confirmées en base). */
+        const initiative_id = Number(row.initiative_id);
         const ini = await db.prepare(`SELECT owner_user_id, origine1, origine2, pays_origine FROM initiatives WHERE id=?`).get(initiative_id);
         if (!ini || !ini.owner_user_id) continue;
         const complet = !!(ini.origine1 || ini.origine2 || ini.pays_origine);
         if (!complet) continue;
+        /* Les deux formes (avec/sans guillemets) sont recherchées : les notifications déjà
+           envoyées avant ce correctif ont l'ancienne forme guillemettée en base, ne pas les
+           ignorer renverrait un dernier doublon à chacune avant que le correctif ne prenne
+           effet. */
         const dejaConfirme = await db.prepare(
-          `SELECT 1 FROM notifications WHERE user_id=? AND type='origine_initiative_confirmee' AND data_json LIKE ? LIMIT 1`
-        ).get(ini.owner_user_id, `%"initiative_id":${initiative_id}%`);
+          `SELECT 1 FROM notifications WHERE user_id=? AND type='origine_initiative_confirmee' AND (data_json LIKE ? OR data_json LIKE ?) LIMIT 1`
+        ).get(ini.owner_user_id, `%"initiative_id":${initiative_id}%`, `%"initiative_id":"${initiative_id}"%`);
         if (dejaConfirme) continue;
         creerNotif(ini.owner_user_id, 'origine_initiative_confirmee', "Origine de l'initiative enregistrée",
           "Merci ! L'origine de votre initiative est maintenant enregistrée.", { initiative_id });
