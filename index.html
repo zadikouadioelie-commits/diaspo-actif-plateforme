@@ -1544,12 +1544,17 @@
     CITIES.forEach(c => { c.pos = proj(c.lat, c.lon); });
     BG_PTS = BG_PTS_PCT.map(([xPct, yPct]) => [xPct / 100 * W, yPct / 100 * H]);
   }
+  /* Constaté en production (2026-08-15) : un seul appel initial + ResizeObserver ne suffisaient
+     pas — le tout premier appel pouvait capturer une taille transitoire (chargement des
+     polices/feuilles de style pas encore terminé) et rien ne la corrigeait ensuite, y compris
+     avec l'observer en place. Filet de sécurité à plusieurs niveaux, chacun couvrant une cause
+     possible : immédiat, prochaine frame, chargement complet de la page, délai de secours —
+     puis l'observer prend le relais pour tout changement réel ultérieur. */
   resize();
-  /* ResizeObserver plutôt qu'un simple listener 'resize' de fenêtre : la taille CSS réelle du
-     canvas peut encore changer après ce premier appel (polices en cours de chargement,
-     conteneur flex parent pas encore stabilisé) sans le moindre redimensionnement de fenêtre —
-     un listener 'resize' seul ratait ce cas et laissait le canvas bloqué sur une taille
-     transitoire trop petite, avec la même déformation que le bug d'origine. */
+  requestAnimationFrame(resize);
+  if (document.readyState === 'complete') requestAnimationFrame(resize);
+  else window.addEventListener('load', () => requestAnimationFrame(resize), { once: true });
+  setTimeout(resize, 500);
   if (window.ResizeObserver) {
     new ResizeObserver(resize).observe(canvas);
   } else {
