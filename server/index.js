@@ -10404,7 +10404,15 @@ route("POST", "/api/conversations", async (req, res, params, body) => {
     /* Parenthèses indispensables : .run() renvoie une PROMESSE, et lire .lastInsertRowid
        dessus donne undefined — le client recevait une conversation sans identifiant et ne
        pouvait pas l'ouvrir. Il faut attendre le résultat AVANT de lire la propriété. */
-    const id = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet) VALUES (?, ?, ?)").run(user.id, otherId, body.sujet || null)).lastInsertRowid;
+    /* contexte='vitrine' posé DÈS LA CRÉATION quand la prise de contact vient de la vitrine —
+       auparavant, seul un message lié à un produit posait ce marqueur (voir POST
+       /conversations/:id/messages), donc une simple prise de contact générale depuis une
+       vitrine (sans produit précis) n'apparaissait jamais dans "Messages de la vitrine" côté
+       propriétaire, et retombait ensuite sous les règles de contact génériques dès que la
+       vitrine était désactivée entre-temps — alors que rien n'indiquait une rupture de
+       relation. Signalé le 2026-08-17. */
+    const contexte = String(body.origine || "") === "vitrine" ? "vitrine" : null;
+    const id = (await db.prepare("INSERT INTO conversations (user1_id, user2_id, sujet, contexte) VALUES (?, ?, ?, ?)").run(user.id, otherId, body.sujet || null, contexte)).lastInsertRowid;
     conv = { id };
   }
   sendJSON(res, 201, { conversation_id: conv.id });
@@ -11060,8 +11068,14 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
      contact conserve l'historique — les messages restent lisibles — mais referme
      l'échange tant qu'une nouvelle demande n'a pas été acceptée (§7). Les conversations
      Toute conversation est bilatérale (user1_id / user2_id), la règle s'applique donc
-     partout sans exception de forme. */
-  if (!(await peutEcrireDirectement(user, autreId))) {
+     partout sans exception de forme.
+     EXCEPTION : une conversation issue d'une vitrine (contexte='vitrine') reste ouverte
+     indéfiniment, dans les deux sens — c'est un canal de contact commercial public par
+     nature, pas une relation personnelle à reformaliser. Avant ce correctif, la permission
+     initiale ne tenait que le temps où la vitrine restait active ; la désactiver plus tard
+     (même après un échange réel et suivi) refermait l'échange sans qu'aucune des deux
+     parties n'ait rien fait pour ça. Signalé le 2026-08-17. */
+  if (conv.contexte !== "vitrine" && !(await peutEcrireDirectement(user, autreId))) {
     return sendJSON(res, 403, {
       code: "contact_requis",
       error: "Vous n'êtes plus en contact avec ce compte. Envoyez une nouvelle demande pour reprendre l'échange.",
