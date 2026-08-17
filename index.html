@@ -1433,11 +1433,19 @@
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  /* Projection Mercator sur viewport [-95°..60°lon, 72°..-42°lat] */
+  /* Projection équirectangulaire sur viewport [-95°..60°lon, 72°..-42°lat].
+     W/H = taille CSS réelle du canvas, recalculée à chaque redimensionnement (voir resize()
+     plus bas). Avant ce correctif, la projection utilisait la résolution interne fixe du
+     canvas (640×400, cf. attributs HTML) alors que le CSS l'affiche en 100%/100% d'une
+     bannière bien plus large : le navigateur ré-étirait ensuite l'image déjà dessinée,
+     déformant la carte et décalant les villes (ex. Kinshasa) visuellement vers l'est par
+     rapport à leurs coordonnées réelles. Dessiner directement à la taille CSS réelle
+     supprime cette double déformation. */
+  let W = canvas.clientWidth || 640, H = canvas.clientHeight || 400;
   const VP = { lonMin: -95, lonMax: 60, latMax: 72, latMin: -42 };
   function proj(lat, lon) {
-    const x = ((lon - VP.lonMin) / (VP.lonMax - VP.lonMin)) * canvas.width;
-    const y = ((VP.latMax - lat) / (VP.latMax - VP.latMin)) * canvas.height;
+    const x = ((lon - VP.lonMin) / (VP.lonMax - VP.lonMin)) * W;
+    const y = ((VP.latMax - lat) / (VP.latMax - VP.latMin)) * H;
     return [x, y];
   }
 
@@ -1468,7 +1476,6 @@
     { lat:12.4, lon:-1.5,  name:'Ouagadougou', type:'orig', r:5  },
     { lat:-1.3, lon:36.8,  name:'Nairobi',     type:'orig', r:6  },
   ];
-  CITIES.forEach(c => { c.pos = proj(c.lat, c.lon); });
 
   const CONNS = [
     {f:10,t:0,c:'#4A90D9'},{f:11,t:0,c:'#4A90D9'},{f:11,t:6,c:'#7B61FF'},
@@ -1487,8 +1494,9 @@
     trailRev: [],
   }));
 
-  /* Grille de fond (points terre simplifiés) */
-  const BG_PTS = [
+  /* Grille de fond (points terre simplifiés), en pourcentages — convertis en pixels dans
+     resize() (une seule fois par redimensionnement, pas à chaque frame). */
+  const BG_PTS_PCT = [
     /* Amérique du Nord */
     [16,26],[17,24],[18,26],[19,24],[20,25],[21,24],[22,25],[23,24],[22,27],[21,29],
     [18,28],[17,30],[19,29],[20,31],[16,32],[17,34],[21,32],[23,30],
@@ -1520,28 +1528,45 @@
     /* Moyen-Orient */
     [57,25],[58,27],[59,29],[60,27],[61,25],[62,27],[63,29],[64,27],
     [60,31],[61,29],[62,31],[63,33],[64,31],
-  ].map(([xPct,yPct]) => [xPct / 100 * canvas.width, yPct / 100 * canvas.height]);
+  ];
+  let BG_PTS = [];
+
+  /* Redimensionne le buffer du canvas à sa taille CSS réelle (× devicePixelRatio pour rester
+     net) et recalcule toutes les positions projetées. Appelé une fois au chargement, puis à
+     chaque redimensionnement de fenêtre. */
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    W = canvas.clientWidth || W;
+    H = canvas.clientHeight || H;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    CITIES.forEach(c => { c.pos = proj(c.lat, c.lon); });
+    BG_PTS = BG_PTS_PCT.map(([xPct, yPct]) => [xPct / 100 * W, yPct / 100 * H]);
+  }
+  resize();
+  window.addEventListener('resize', resize);
 
   function draw(ts) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, W, H);
 
     /* Fond dégradé */
-    const bg = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    const bg = ctx.createLinearGradient(0, 0, W, H);
     bg.addColorStop(0, '#060e1a');
     bg.addColorStop(1, '#0c2444');
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, W, H);
 
     /* Grille lat/lon */
     ctx.strokeStyle = 'rgba(74,144,217,0.05)';
     ctx.lineWidth = 0.5;
     for (let lat = VP.latMin; lat <= VP.latMax; lat += 15) {
       const [, y] = proj(lat, VP.lonMin);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
     for (let lon = VP.lonMin; lon <= VP.lonMax; lon += 15) {
       const [x] = proj(0, lon);
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
     }
 
     /* Points terrain (fond) */
