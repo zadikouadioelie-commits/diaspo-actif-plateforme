@@ -3080,51 +3080,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   }
 
-  /* ══ QR CODE INITIATIVE ══ */
-  if (init && window.ProfileQR) {
-    const qrCard = document.createElement('div');
-    qrCard.className = 'card';
-    qrCard.style.marginBottom = '20px';
-    qrCard.id = 'qr-initiative-card';
-    qrCard.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
-        <div style="flex:1;min-width:180px;">
-          <h3 style="margin:0 0 8px;font-size:15px;">📷 QR Code de l'initiative</h3>
-          <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">
-            Votre identifiant numérique officiel Diaspo'Actif. Imprimez-le sur vos cartes de visite,
-            badges, affiches ou supports de communication. Un scan suffit pour accéder à votre fiche publique.
-          </p>
-          <a href="initiative.html?id=${init.id}" target="_blank" style="font-size:12px;color:#2563EB;font-weight:700;text-decoration:none;">
-            Voir ma fiche publique →
-          </a>
-        </div>
-        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:10px;">
-          <div id="init-qr-dash"></div>
-          ${init.da_id ? `
-          <div style="text-align:center;">
-            <div id="init-da-id-badge" style="font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px;color:#2563EB;background:rgba(255,107,0,0.08);border:1.5px solid var(--orange);border-radius:8px;padding:6px 14px;margin-bottom:8px;">${init.da_id}</div>
-            <div style="display:flex;gap:8px;justify-content:center;">
-              <button onclick="navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid var(--orange);background:transparent;color:#2563EB;border-radius:6px;cursor:pointer;font-weight:600;">📋 Copier</button>
-              <button onclick="navigator.share ? navigator.share({title:'Mon identifiant Diaspo\\'Actif',text:'Retrouvez-moi sur Diaspo\\'Actif avec l\\'identifiant ${init.da_id}',url:window.location.origin+'/initiative.html?id=${init.id}'}).catch(()=>{}) : navigator.clipboard.writeText('${init.da_id}').then(()=>showToast('✅ Identifiant copié !'))" style="font-size:12px;padding:5px 12px;border:1.5px solid #6366f1;background:transparent;color:#6366f1;border-radius:6px;cursor:pointer;font-weight:600;">🔗 Partager</button>
-            </div>
-          </div>` : ''}
-        </div>
-      </div>`;
-    /* En toute fin du conteneur (2026-08-09) — pas juste après cockpit : cockpit est togglé
-       (display:none quand un autre module est actif), mais cette carte QR ne l'était pas,
-       donc elle s'affichait avant le module réellement actif dès qu'on quittait le cockpit. */
-    content.appendChild(qrCard);
-    ProfileQR.render(document.getElementById('init-qr-dash'), {
-      initId: init.id,
-      initNom: init.nom || 'Initiative',
-      userRole: init.type || 'Initiative',
-      userOrg: init.sigle || '',
-      size: 160,
-    });
-  }
+  /* La carte « QR Code de l'initiative » vivait ici (2026-08-09), ajoutée en fin de
+     conteneur sans être togglée par le système de sections — elle restait donc visible en
+     permanence, y compris sur des sections sans rapport (Cotisations & Adhésions, etc.),
+     source de confusion signalée le 2026-08-17. Déplacée dans confidentialite.html, carte
+     « 🌍 Identité publique », le seul emplacement dédié désormais. Ne pas la reconstruire ici. */
 
   /* Cartes toujours-visibles repositionnées en tout dernier (2026-08-09) : 'zones',
-     'stats-impact' et la carte QR ci-dessus sont ajoutées APRÈS le rendu HTML initial — sans
+     'stats-impact' sont ajoutées APRÈS le rendu HTML initial — sans
      ce réordonnancement, ces modules-là afficheraient encore "Paiements boutique"/"Vérification
      organisation" avant leur propre contenu, alors que tous les autres modules (dans le HTML
      statique) sont déjà correctement ordonnés par leur simple position dans le fichier. */
