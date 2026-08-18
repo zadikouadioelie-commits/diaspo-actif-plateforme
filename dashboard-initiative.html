@@ -4275,6 +4275,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         if (c.statut === 'brouillon') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
           actions.push(`<button class="btn btn-sm btn-orange" onclick="cagAction(${c.id},'publier')">🚀 Publier</button>`);
+          /* Décision utilisateur (2026-08-18) : le QR (URL basée sur le slug, stable dès la
+             création) est proposé dès la fin de la création, brouillon ou pas — même lien
+             qu'après publication, jamais régénéré. Le lien ne fonctionne qu'une fois publié
+             (cagnotte.html/GET /api/cagnottes/public/:slug renvoient 404 tant que
+             est_publiee=0) : cagOuvrirQR le signale clairement dans sa fenêtre pour un
+             brouillon, sans bloquer l'affichage du QR lui-même. */
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOuvrirQR('${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}',true)">📱 QR participation rapide</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagSupprimer(${c.id})">🗑️ Supprimer</button>`);
         } else if (c.statut === 'active') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
@@ -4631,7 +4638,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      platform-wide (assets/profile-qr.js) avec une URL personnalisée (option url:) pointant vers
      la cagnotte + ?participer=1, qui ouvre directement le formulaire de participation côté
      cagnotte.html sans clic supplémentaire. ── */
-  window.cagOuvrirQR = function(slug, titre) {
+  window.cagOuvrirQR = function(slug, titre, pasEncorePublie) {
     let modal = document.getElementById('cag-qr-modal');
     if (!modal) {
       modal = document.createElement('div');
@@ -4643,6 +4650,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     modal.innerHTML = `<div class="modal-box" style="max-width:340px;text-align:center;">
       <h3 style="margin:0 0 4px;">📱 QR participation rapide</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">« ${escH(titre)} » — un scan ouvre directement le formulaire de participation.</p>
+      ${pasEncorePublie ? `<div class="notice" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;padding:8px 10px;margin-bottom:12px;">⚠️ Ce QR est le lien définitif (il ne changera jamais, même après publication), mais il ne fonctionnera qu'une fois la cagnotte publiée via « 🚀 Publier ».</div>` : ''}
       <div id="cag-qr-holder" style="display:flex;justify-content:center;"></div>
       <div style="text-align:center;margin-top:14px;">
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-qr-modal').remove()">Fermer</button>
