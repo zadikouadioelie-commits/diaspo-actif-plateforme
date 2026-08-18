@@ -418,6 +418,28 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       await db.prepare("INSERT INTO listes_diffusion (proprietaire_id, nom, icone, ordre) VALUES (?,?,?,?)").run(id, nomListe, icone, i);
     }
   } catch (_) {}
+  /* Abonnement automatique au compte Diaspo'Actif officiel (2026-08-18, décision explicite de
+     l'utilisateur) — même table/mécanisme que "s'abonner à une initiative" (POST
+     /api/initiatives/:id/suivre, ligne ~11276), jamais un système parallèle. Deux effets, tous
+     deux déjà natifs à ce mécanisme, rien d'autre à construire :
+       1. Le nouveau compte reçoit les notifications des publications de l'officiel (comportement
+          standard d'un abonnement à une initiative).
+       2. L'officiel peut désormais écrire directement au nouveau compte sans demande de mise en
+          relation — peutEcrireDirectement() (ligne ~10615 dans la version d'origine) autorise déjà
+          l'écriture directe dès que le DESTINATAIRE est suivi par l'expéditeur (cibleMeSuit).
+     Sens inverse volontairement inchangé : un nouveau membre qui veut écrire à l'officiel passe
+     toujours par une demande de mise en relation classique — décision explicite de l'utilisateur.
+     Best-effort : ne doit jamais faire échouer l'inscription. */
+  try {
+    const officielleId = await getInitiativeOfficielleId();
+    if (officielleId) {
+      const officielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+      if (officielle && Number(officielle.owner_user_id) !== Number(id)) {
+        await db.prepare("INSERT INTO abonnements (user_id, initiative_id) VALUES (?, ?)").run(id, officielleId);
+        await db.prepare("UPDATE initiatives SET abonnes = abonnes + 1 WHERE id = ?").run(officielleId);
+      }
+    }
+  } catch (e) { console.error('[signup-abonnement-officiel]', e.message); }
   // Profil public enrichi : publics/besoins facultatifs du formulaire d'inscription
   try {
     if (Array.isArray(body.publics) && body.publics.length) await db.prepare('UPDATE users SET publics_json=? WHERE id=?').run(JSON.stringify(body.publics), id);
