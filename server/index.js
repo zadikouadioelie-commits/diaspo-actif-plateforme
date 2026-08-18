@@ -13435,9 +13435,9 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
 
   /* Comptes organisme (initiative/collectivité/administrateur) : le nom de la structure prime
      sur le nom personnel, qui n'apparaît plus qu'en information secondaire "responsable du compte". */
-  let nomStructure = null, responsable = null, initiativeId = null, initiativeType = null, adhesionsOuvertes = null;
+  let nomStructure = null, responsable = null, initiativeId = null, initiativeType = null, adhesionsOuvertes = null, photoFallbackInitiative = null;
   if (u.role === 'initiative') {
-    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable FROM initiatives WHERE owner_user_id=?").get(u.id);
+    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url FROM initiatives WHERE owner_user_id=?").get(u.id);
     if (initRow) {
       nomStructure = initRow.nom;
       responsable = { prenom: initRow.prenom_responsable || u.prenom, nom: initRow.nom_responsable || u.nom, fonction: initRow.fonction_responsable };
@@ -13447,6 +13447,13 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
       initiativeId = initRow.id;
       initiativeType = initRow.type;
       adhesionsOuvertes = initRow.adhesions_ouvertes;
+      /* Signalé le 2026-08-18 : un compte Initiative qui n'a téléversé qu'un logo/bannière
+         pendant l'inscription (jamais de photo de profil personnelle, users.photo_url reste
+         NULL) apparaissait sans photo sur son profil public alors que l'annuaire (assets/app.js,
+         renderInitiativeCard) affiche déjà vitrine_banniere_url || logo_url pour la même
+         initiative. Même règle de repli reprise ici pour que profil.html et l'annuaire
+         montrent la même image — jamais utilisée si l'utilisateur a sa propre photo_url. */
+      photoFallbackInitiative = initRow.vitrine_banniere_url || initRow.logo_url || null;
     }
   } else if (u.role === 'collectivite' || u.role === 'administrateur') {
     if (u.nom_institution) {
@@ -13488,7 +13495,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   `).all(u.id);
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
-    bio: u.bio, photo_url: u.photo_url, banner_url: u.banner_url,
+    bio: u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
     prenom: u.prenom, titre_pro: u.titre_pro,
     nationalite1: u.nationalite1, nationalite2: u.nationalite2,
     origine1: u.origine1, origine2: u.origine2,
