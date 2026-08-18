@@ -55,6 +55,10 @@
   padding:5px 12px; font-size:12px; cursor:pointer; display:none;
 }
 .is-own .p-banner-edit { display:block; }
+.p-theme-swatches-banner { display:none; align-items:center; gap:6px; background:rgba(0,0,0,.35); border-radius:20px; padding:5px 8px; }
+.is-own .p-theme-swatches-banner { display:flex; }
+.p-theme-swatches-banner .theme-swatch { width:18px; height:18px; border-width:2px; box-shadow:0 1px 3px rgba(0,0,0,.35); }
+.p-theme-swatches-banner .theme-swatch.active { border-color:#fff; }
 .banner-back-btn {
   position:absolute; top:12px; left:14px; z-index:10;
   background:rgba(0,0,0,.45); color:#fff; text-decoration:none;
@@ -922,7 +926,13 @@ html, body { overflow-x:clip; }
     <button class="banner-btn" id="banner-dl-btn" onclick="downloadBanner()" style="display:none">⬇️ Télécharger</button>
     <button class="banner-btn" onclick="removeBanner()" id="banner-del-btn" style="display:none">🗑️ Supprimer</button>
   </div>
-  <div style="position:absolute;bottom:10px;right:12px;">
+  <div style="position:absolute;bottom:10px;right:12px;display:flex;align-items:center;gap:8px;">
+    <!-- Couleurs de thème (2026-08-18) : mêmes 7 couleurs proposées à l'inscription
+         (inscription.html, THEMES_BANNIERE_UTILISATEUR) — colocalisées avec le bouton de
+         bannière puisqu'elles définissent le dégradé affiché quand aucune photo n'est
+         choisie (voir applyTheme/renderBanner). Remplace l'ancien bouton "🎨 Thème" caché
+         parmi les actions du profil, jamais très visible. -->
+    <div id="theme-swatches" class="p-theme-swatches-banner"></div>
     <button class="p-banner-edit" onclick="pickBannerFile()">📷 Modifier la bannière</button>
   </div>
 </div>
@@ -1521,15 +1531,6 @@ async function setTheme(name) {
   try { await api('PUT', '/profil', { theme_couleur: name }); } catch(e){}
 }
 
-function pvzToggleThemePicker() {
-  const el = document.getElementById('pvz-theme-picker');
-  if (!el) return;
-  const show = el.style.display === 'none';
-  el.style.display = show ? 'flex' : 'none';
-  if (show) renderThemeSwatches(profil.theme_couleur || 'ocean');
-}
-window.pvzToggleThemePicker = pvzToggleThemePicker;
-
 function renderThemeSwatches(active) {
   const el = document.getElementById('theme-swatches');
   el.innerHTML = Object.entries(THEMES).map(([k,t]) =>
@@ -1632,6 +1633,10 @@ function fmtDate(str) {
    ====================================================== */
 function render() {
   renderBanner();
+  /* Couleurs de thème, propriétaire uniquement (le conteneur est de toute façon masqué en
+     CSS pour un visiteur — voir .is-own .p-theme-swatches-banner — mais autant ne pas
+     construire son contenu inutilement). */
+  if (isOwn) renderThemeSwatches(profil.theme_couleur || 'ocean');
   // ---- Vue hi-fi unifiée (propriétaire ET visiteur) : le propriétaire voit le même
   // design que ses visiteurs, avec des contrôles de modification en plus. L'ancien
   // tableau de widgets déplaçables (#p-board) n'est plus utilisé pour l'affichage
@@ -1756,7 +1761,10 @@ function renderVisitorProfile() {
      bouton "Adhérer" côté visiteur, mais vers la configuration au lieu du paiement. */
   const gererAdhesionsBtn = (isInit && ['Association','ONG'].includes(profil.initiative_type))
     ? `<a href="dashboard-initiative.html#adhesions-init" class="pvz-btn primary">Gérer les adhésions</a>` : '';
-  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${gererAdhesionsBtn}<button class="pvz-btn" onclick="pvzToggleThemePicker()">🎨 Thème</button>${vitrineToggleBtn}${shareBtn}`;
+  /* Le bouton "🎨 Thème" vivait ici (2026-08-18) — retiré : les couleurs sont désormais
+     toujours visibles à droite de la bannière (voir #theme-swatches dans le bloc BANNIÈRE),
+     plus besoin d'un panneau à déplier pour les retrouver. */
+  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${gererAdhesionsBtn}${vitrineToggleBtn}${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
@@ -1805,10 +1813,6 @@ function renderVisitorProfile() {
       </div>
     </div>
     <div id="pvz-identity-edit-slot"></div>
-    ${isOwn ? `<div id="pvz-theme-picker" style="display:none;padding:12px 16px;border-top:1px solid var(--border);align-items:center;gap:10px;">
-      <span style="font-size:12.5px;font-weight:700;color:var(--muted);">🎨 Thème du profil :</span>
-      <div id="theme-swatches"></div>
-    </div>` : ''}
     <div class="pvz-tabrow">${seg}${stats}</div>
   </div>`;
 
