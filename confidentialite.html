@@ -419,7 +419,7 @@
   zone.innerHTML = `
     <div class="codes-card">
       <h4>🔐 Code de Sécurité Diaspo'Actif (DS-ID)</h4>
-      <p class="codes-sub">Votre signature numérique personnelle, permanente et non modifiable · jamais visible par un administrateur · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>. Consultable uniquement par vous, 10 secondes à la fois, une fois par heure.</p>
+      <p class="codes-sub">Votre signature numérique personnelle, permanente et non modifiable · jamais visible par un administrateur · utilisée pour signer des deals, partenariats et <strong>votes sécurisés</strong>. Consultable uniquement par vous, 30 secondes à la fois, une fois par heure.</p>
       <div id="ds-masked-view">
         <div class="ds-masked">••••••••••••••••••••</div>
         <div class="codes-btn-row">
@@ -505,13 +505,13 @@
   });
   window._cancelDsId = function() { document.getElementById('ds-pwd-form').style.display = 'none'; };
 
-  /* Affichage 10 secondes puis masquage automatique — "Aucune action supplémentaire
+  /* Affichage 30 secondes puis masquage automatique — "Aucune action supplémentaire
      n'est nécessaire : le reverrouillage est automatique" (aucun bouton "Masquer"). */
   function _dsAfficherPuisMasquer(code) {
     document.getElementById('ds-value').textContent = code;
     document.getElementById('ds-masked-view').style.display = 'none';
     document.getElementById('ds-revealed-view').style.display = '';
-    let restant = 10;
+    let restant = 30;
     const compteur = document.getElementById('ds-compte-rebours');
     compteur.textContent = restant;
     const tick = setInterval(() => {

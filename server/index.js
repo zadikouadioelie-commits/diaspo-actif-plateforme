@@ -7289,7 +7289,7 @@ route("GET", "/api/account/by-da-id/:daId", async (req, res, params) => {
 /* ═══════════════ DS-ID (Diaspo'Actif Security ID) ═══════════════
    Refonte complete du 2026-07-26 : le DS-ID est desormais PERMANENT (jamais
    regenerable, jamais modifiable), consultable par son seul proprietaire apres
-   verification du mot de passe, affiche 10 secondes puis masque automatiquement,
+   verification du mot de passe, affiche 30 secondes puis masque automatiquement,
    et limite a une consultation reussie par heure - meme avec le bon mot de passe.
    Aucune route n'expose le code a un administrateur ; ds_id_history ne journalise
    jamais la valeur elle-meme, seulement l'action, la date et le contexte. */
@@ -7375,7 +7375,7 @@ route("POST", "/api/profil/ds-id/reveal", async (req, res, params, body) => {
   }
 
   await db.prepare(`INSERT INTO ds_id_history (user_id, action, ip, user_agent) VALUES (?,?,?,?)`).run(user.id, 'consultation', req.socket?.remoteAddress || null, req.headers['user-agent'] || null);
-  sendJSON(res, 200, { ds_id: dsId, duree_affichage_secondes: 10 });
+  sendJSON(res, 200, { ds_id: dsId, duree_affichage_secondes: 30 });
 });
 
 /* ══ DS-ID — Historique ══
