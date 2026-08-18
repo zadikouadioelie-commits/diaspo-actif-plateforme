@@ -51,6 +51,7 @@ h1 { color: #fff; font-size: 20px; font-weight: 900; margin-bottom: 6px; }
 .badge-collectivite{ background: rgba(124,58,237,.2); color: #C084FC; }
 .badge-admin       { background: rgba(239,68,68,.2); color: #FCA5A5; }
 .badge-admin-junior{ background: rgba(234,179,8,.2); color: #FDE047; }
+.badge-partenaire  { background: rgba(16,185,129,.2); color: #34D399; }
 .card-nom { color: #fff; font-weight: 700; font-size: 15px; }
 
 .creds { background: rgba(0,0,0,.3); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
@@ -222,11 +223,37 @@ h1 { color: #fff; font-size: 20px; font-weight: 900; margin-bottom: 6px; }
       </button>
     </div>
 
+    <!-- Partenaire -->
+    <div class="card">
+      <div class="card-head">
+        <span class="badge badge-partenaire">Partenaire</span>
+        <span class="card-nom">Organisation Partenaire Test</span>
+      </div>
+      <div class="creds">
+        <div class="cred-row">
+          <span class="cred-label">Email</span>
+          <span class="cred-val" id="e-partenaire">test-partenaire@diaspoactif.com</span>
+          <button class="copy-btn" onclick="copy('e-partenaire')">📋</button>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Mot de passe</span>
+          <span class="cred-val" id="p-partenaire">TestPartenaire2024!</span>
+          <button class="copy-btn" onclick="copy('p-partenaire')">📋</button>
+        </div>
+      </div>
+      <button class="btn-login" onclick="login('test-partenaire@diaspoactif.com','TestPartenaire2024!',this)">
+        Se connecter en tant que Partenaire →
+      </button>
+    </div>
+
     <div class="note">
       <p>👁️ Ces comptes voient <strong>toutes les vraies données</strong> de la plateforme (fil, membres, annonces, initiatives). Ils sont simplement <strong>invisibles des autres membres</strong> — ils n'apparaissent pas dans les recherches ni les suggestions.</p>
     </div>
     <div class="note">
       <p>🔑 Le compte Administrateur Junior dispose des 14 permissions du catalogue actuel (Modération + Suppression de comptes) — accès complet à l'interface de ce rôle pour vérification.</p>
+    </div>
+    <div class="note">
+      <p>🤝 Le compte Partenaire est actif avec une période en cours (statut 🟢) — créé via une invitation à usage unique comme un vrai partenaire onboardé, mais aucun projet ne lui a encore été orienté (0 orientation en base).</p>
     </div>
   </div>
 </div>
@@ -285,7 +312,8 @@ async function login(email, password, btn) {
       initiative:             'dashboard-initiative.html',
       collectivite:           'dashboard-collectivite.html',
       administrateur:         'dashboard-administrateur.html',
-      administrateur_junior:  'dashboard-administrateur-junior.html'
+      administrateur_junior:  'dashboard-administrateur-junior.html',
+      partenaire:             'dashboard-partenaire.html'
     }[role] || 'index.html';
     window.location.href = dest;
   } catch(e) {
