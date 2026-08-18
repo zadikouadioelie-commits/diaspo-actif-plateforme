@@ -122,12 +122,21 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <span class="badge">Gratuit</span>
           <button type="button" class="gt-launch-btn" onclick="event.stopPropagation(); window.GuidedTour && GuidedTour.start('initiative');">🎥 Tutoriel</button>
         </div>
-        <div class="type-card" data-role="collectivite">
+        <!-- Inscription en ligne temporairement bloquée (2026-08-18, décision explicite de
+             l'utilisateur) : ce parcours n'est pas encore opérationnel. data-role retiré
+             volontairement pour qu'aucun clic ne puisse le sélectionner ; data-role-bloque le
+             remplace pour que le gestionnaire de clic sache afficher l'instruction de contact
+             au lieu de faire progresser l'inscription. -->
+        <div class="type-card type-card-bloquee" data-role-bloque="collectivite" style="opacity:.6;cursor:not-allowed;">
           <div class="tc-icon">🏛</div><h3>Compte Étatique</h3>
           <p>Ambassade, consulat, mairie, préfecture, ministère, région, agence publique…</p>
-          <span class="badge">Validation requise</span>
+          <span class="badge">Bientôt disponible</span>
           <button type="button" class="gt-launch-btn" onclick="event.stopPropagation(); window.GuidedTour && GuidedTour.start('collectivite');">🎥 Tutoriel</button>
         </div>
+      </div>
+      <div id="insc-etatique-bloque-notice" class="nat-notice" style="display:none;background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;margin-top:16px;">
+        🏛 <strong>L'inscription en ligne des comptes étatiques n'est pas encore ouverte.</strong>
+        En attendant, contactez-nous directement à <a href="mailto:contact@diaspoactif.com" style="color:#1E3A8A;font-weight:700;">contact@diaspoactif.com</a> pour créer votre compte.
       </div>
       <div style="margin-top:24px;text-align:right"><button class="btn btn-orange" id="btn-next-1" disabled>Continuer &rarr;</button></div>
     </div>
@@ -888,12 +897,25 @@ function goToStep(step){
   else if(step===2&&currentRole)document.getElementById("pane-"+currentRole).classList.add("active");
   else if(step===3)document.getElementById("pane-success").classList.add("active");
 }
-document.querySelectorAll(".type-card").forEach(card=>{
+document.querySelectorAll(".type-card[data-role]").forEach(card=>{
   card.addEventListener("click",()=>{
     document.querySelectorAll(".type-card").forEach(c=>c.classList.remove("selected"));
     card.classList.add("selected");
     currentRole=card.dataset.role;
     document.getElementById("btn-next-1").disabled=false;
+    const notice=document.getElementById("insc-etatique-bloque-notice");
+    if(notice) notice.style.display="none";
+  });
+});
+/* Carte "Compte Étatique" temporairement bloquée (2026-08-18) : affiche l'instruction de
+   contact au lieu de sélectionner un type et de faire progresser l'inscription. */
+document.querySelectorAll(".type-card[data-role-bloque]").forEach(card=>{
+  card.addEventListener("click",()=>{
+    document.querySelectorAll(".type-card").forEach(c=>c.classList.remove("selected"));
+    currentRole=null;
+    document.getElementById("btn-next-1").disabled=true;
+    const notice=document.getElementById("insc-etatique-bloque-notice");
+    if(notice){ notice.style.display=""; notice.scrollIntoView({behavior:"smooth",block:"nearest"}); }
   });
 });
 document.getElementById("btn-next-1").addEventListener("click",()=>{if(currentRole)goToStep(2);});
