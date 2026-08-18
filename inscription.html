@@ -331,8 +331,11 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         </div>
         <div id="i-admin-box" style="display:none;margin-top:16px;">
           <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Informations administratives</div>
+          <!-- La dénomination officielle était redemandée ici alors qu'elle est déjà saisie plus bas
+               sous "Nom de l'organisation" (i-nom) — les deux placeholders identiques trahissaient
+               qu'il s'agit de la même valeur. Source unique : i-nom sert désormais aussi de
+               dénomination officielle à la soumission (voir le handler i-submit). -->
           <div class="grid-2">
-            <div><label>Dénomination officielle <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-denomination" placeholder="Association Solidarité Diaspora"></div>
             <div><label>Numéro d'immatriculation (RCCM, SIREN, IFU, n° d'association…) <span class="i-admin-req" style="color:#2563EB">*</span></label><input type="text" id="i-immat" placeholder="Ex : RCCM CI-ABJ-2024-B-1234"></div>
           </div>
           <div class="grid-2" style="margin-top:12px">
@@ -401,13 +404,13 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <textarea id="i-objectifs" rows="2" placeholder="Vos principaux objectifs…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
         </div>
       </div>
-      <div class="form-section"><h4>Nationalites concernees <span style="font-weight:400;color:#64748B;font-size:12px;">— facultatif</span></h4>
-        <div class="nat-notice">&#127760; Appartenance juridique ou administrative de l'organisation — affichee dans l'annuaire. Facultative : ce sont le pays d'origine et le pays d'implantation qui portent l'identite territoriale.</div>
-        <div class="grid-2">
-          <div><label>Nationalite 1</label><input type="text" id="i-nat1" placeholder="Ivoirienne (facultatif)"></div>
-          <div><label>Nationalite 2 (facultatif)</label><input type="text" id="i-nat2" placeholder="Française"></div>
-        </div>
-      </div>
+      <!-- Ancienne section "Nationalités concernées" retirée (2026-08-18) : elle redemandait le
+           même pays que "Origines de l'initiative" juste en dessous, sous une autre forme
+           (adjectif de nationalité au lieu du nom du pays) — la notice l'admettait déjà elle-même
+           ("ce sont le pays d'origine et le pays d'implantation qui portent l'identité
+           territoriale"). Source unique désormais : origine1/origine2 alimentent aussi
+           nationalite1/nationalite2 à la soumission (voir le handler i-submit), colonnes
+           conservées côté serveur pour ne rien casser des usages existants (annuaire, filtres). -->
       <div class="form-section"><h4>Origines de l'initiative</h4>
         <!-- Le champ est deja obligatoire (asterisque + validation JS/serveur), mais le texte
              precedent ("racines culturelles... affichees dans l'annuaire") le presentait comme
@@ -466,7 +469,9 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="membres"> Membres</label>
           <label style="display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="i-besoin" value="fournisseurs"> Fournisseurs</label>
         </div>
-        <div id="i-annee-creation-box" style="display:none;max-width:220px;"><label>Année de création</label><input type="number" id="i-annee-creation" min="1900" max="2100" placeholder="2020"></div>
+        <!-- "Année de création" retirée (2026-08-18) : redemandait ce que "Date de création de la
+             structure" (section Statut de l'initiative, ci-dessus) donne déjà en entier — l'année
+             en est simplement extraite à la soumission (voir le handler i-submit). -->
       </div>
       <div class="form-section"><h4>Localisation</h4>
         <div class="nat-notice" style="background:#EFF6FF;border-color:#BFDBFE;color:#1E3A8A;">
@@ -1208,10 +1213,9 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     const tel=document.getElementById("i-tel").value.trim();
     const pwd=document.getElementById("i-pwd").value;
     const pwd2=document.getElementById("i-pwd2").value;
-    const nat1i=document.getElementById("i-nat1").value.trim();
+    const orig2i=document.getElementById("i-orig2").value.trim();
     const orig1=document.getElementById("i-orig1").value.trim();
     const statutCreation=document.querySelector('input[name="i-statut-creation"]:checked')?.value;
-    const denomination=document.getElementById("i-denomination").value.trim();
     const immat=document.getElementById("i-immat").value.trim();
     const formeJuridique=document.getElementById("i-forme-juridique").value.trim();
     const dateCreationStructure=document.getElementById("i-date-creation-structure").value;
@@ -1222,7 +1226,7 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     req(rprenom,"Prenom responsable");req(email,"Email");req(tel,"Telephone");req(pwd,"Mot de passe");
     req(statutCreation,"Statut de l'initiative");
     if(statutCreation==="existante"){
-      req(denomination,"Dénomination officielle");req(immat,"Numéro d'immatriculation");
+      req(immat,"Numéro d'immatriculation");
       req(formeJuridique,"Forme juridique");req(dateCreationStructure,"Date de création de la structure");
     }
     if(pwd!==pwd2)throw new Error("Les mots de passe ne correspondent pas.");
@@ -1234,10 +1238,12 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
     await submitForm("i-submit","i-error",{
       role:"initiative",nom:rnom,prenom:rprenom,email,password:pwd,
       nom_institution:nom,type_org:typeOrg,
-      nationalite1:nat1i,
-      nationalite2:document.getElementById("i-nat2").value.trim()||null,
+      /* Source unique : origine1/2 alimentent aussi nationalite1/2 — plus de champ séparé
+         redemandant le même pays (voir la suppression de "Nationalités concernées" ci-dessus). */
+      nationalite1:orig1||null,
+      nationalite2:orig2i||null,
       origine1:orig1,
-      origine2:document.getElementById("i-orig2").value.trim()||null,
+      origine2:orig2i||null,
       rayonnement,pays_intervention,
       domaine:document.getElementById("i-domaine").value,
       domaine_secondaire:document.getElementById("i-domaine2").value||null,
@@ -1256,11 +1262,14 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       publics:[...document.querySelectorAll('.i-public:checked')].map(c=>c.value)
         .concat(document.getElementById("i-public-autre").value.split(",").map(s=>s.trim()).filter(Boolean)),
       besoins:[...document.querySelectorAll('.i-besoin:checked')].map(c=>c.value),
-      annee_creation:document.getElementById("i-annee-creation").value||null,
+      /* "Année de création" retirée du formulaire — simple extraction de l'année depuis
+         "Date de création de la structure" (format YYYY-MM-DD d'un <input type="date">). */
+      annee_creation:dateCreationStructure?parseInt(dateCreationStructure.slice(0,4),10):null,
       nombre_membres:document.getElementById("i-nb-membres").value||null,
       nombre_salaries:document.getElementById("i-nb-salaries").value||null,
       statut_creation:statutCreation,
-      denomination_officielle:denomination||null,
+      /* "Dénomination officielle" retirée du formulaire — même valeur que "Nom de l'organisation". */
+      denomination_officielle:nom||null,
       numero_immatriculation:immat||null,
       forme_juridique:formeJuridique||null,
       date_creation_structure:dateCreationStructure||null,
@@ -1286,7 +1295,6 @@ document.querySelectorAll('input[name="i-statut-creation"]').forEach(r=>{
     document.getElementById("i-statut-creation-banner").style.display = enCreation ? "" : "none";
     document.getElementById("i-encreation-box").style.display = enCreation ? "" : "none";
     document.getElementById("i-admin-box").style.display = enCreation ? "none" : "";
-    document.getElementById("i-annee-creation-box").style.display = enCreation ? "none" : "";
   });
 });
 /* ===== Type d'organisation → taille (nombre de membres ou de salaries) ===== */
