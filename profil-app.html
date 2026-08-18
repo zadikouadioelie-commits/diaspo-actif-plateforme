@@ -691,6 +691,14 @@ html, body { overflow-x:clip; }
 .pvz-hero-top { display:flex; gap:22px; align-items:flex-start; }
 .pvz-avatar { width:132px; height:132px; flex:none; margin-top:-58px; border:5px solid #fff; border-radius:50%; box-shadow:0 0 0 3px var(--tp,#2F6BED), 0 8px 24px -10px rgba(18,32,56,.45); background:#EEF1F5 center/cover no-repeat; display:flex; align-items:center; justify-content:center; font-size:40px; font-weight:700; color:#8794A7; overflow:visible; position:relative; }
 .pvz-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+/* .pvz-avatar { margin-top:-58px } fait remonter le cercle pour chevaucher le bas de la
+   bannière de couverture, juste au-dessus de .pvz-hero-top — correct quand .pvz-hero-top
+   est le tout premier enfant de .pvz-hero. Quand le rappel "Ajoutez votre photo"
+   (.pvz-rappel-photo) s'intercale avant, ce même -58px remonte le cercle DANS le texte du
+   rappel au lieu de la bannière (bug signalé le 2026-08-18, capture à l'appui) : ce
+   modificateur neutralise le chevauchement dans ce seul cas précis, sans toucher au cas
+   normal (aucun rappel affiché). */
+.pvz-hero-top--sous-rappel .pvz-avatar { margin-top:10px; }
 .pvz-hero-info { flex:1; min-width:0; padding-top:20px; }
 .pvz-hero-row { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
 .pvz-name-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
@@ -1775,7 +1783,7 @@ function renderVisitorProfile() {
 
   const hero = `<div class="pvz-hero">
     ${rappelPhoto}
-    <div class="pvz-hero-top">
+    <div class="pvz-hero-top${rappelPhoto ? ' pvz-hero-top--sous-rappel' : ''}">
       <div class="pvz-avatar"${isOwn?' onclick="editAvatar()" style="cursor:pointer;" title="Changer la photo de profil"':''}>${avInner}${isOwn?'<span style="position:absolute;bottom:4px;right:4px;background:rgba(18,32,56,.75);color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;">📷</span>':''}</div>
       <div class="pvz-hero-info">
         <div class="pvz-hero-row">

@@ -15,22 +15,11 @@
     { v: 'autre',       label: 'Autre statut',                 couleur: '#6B7280' },
   ];
 
-  /* Styles de bannière au choix — visuels vectoriels maison (aucun risque de droits, nets à
-     toute résolution). L'un d'eux devient la valeur de banner_url au même titre qu'une photo
+  /* Styles de bannière au choix — définis dans assets/banner-presets.js (source unique,
+     chargé avant ce script), réutilisés tels quels par tout autre point d'édition de
+     bannière. L'un d'eux devient la valeur de banner_url au même titre qu'une photo
      personnelle uploadée : aucun champ ni route serveur supplémentaire nécessaire. */
-  const BANNIERES_PRESET = [
-    { id: 'assets/banner-default.svg', label: 'Ville & Réseau' },
-    { id: 'assets/banner-map.svg',     label: 'Carte du monde' },
-    { id: 'assets/banner-angles.svg',  label: 'Angles Marine' },
-    { id: 'assets/banner-circuit.svg', label: 'Circuit Tech' },
-    { id: 'assets/banner-moutarde.svg', label: 'Jaune Moutarde' },
-    { id: 'assets/banner-bordeaux.svg', label: 'Bordeaux Élégant' },
-    { id: 'assets/banner-damier.svg',   label: 'Damier Collage' },
-    { id: 'assets/banner-diagonale.svg', label: 'Diagonale Grise' },
-    { id: 'assets/banner-foret.svg',    label: 'Forêt' },
-    { id: 'assets/banner-tech-bleu.svg', label: 'Tech Bleu' },
-    { id: 'assets/banner-skyline-violet.svg', label: 'Skyline Violet' },
-  ];
+  const BANNIERES_PRESET = window.BANNIERES_PRESET || [];
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function drapeau(pays) { try { return window.daDrapeau ? window.daDrapeau(pays) : '🌍'; } catch (e) { return '🌍'; } }
