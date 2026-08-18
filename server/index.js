@@ -1456,6 +1456,37 @@ route("POST", "/api/upload/produit", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload produit")); }
 });
 
+/* POST /api/upload/cagnotte — image principale d'une cagnotte.
+   Route manquante jusqu'ici (2026-08-18) : assets/upload-media.js appelait déjà
+   pickAndUpload('cagnotte', ...), mais uploadMedia() n'avait pas d'entrée 'cagnotte' dans sa
+   table d'endpoints — elle retombait donc silencieusement sur /api/upload/avatar, qui écrit
+   EN PLUS dans users.photo_url. Résultat : uploader une photo de cagnotte écrasait la photo de
+   profil du compte. Cette route est un simple stockage Bunny sans aucun effet de bord, sur le
+   modèle de /api/upload/produit. */
+route("POST", "/api/upload/cagnotte", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["cagnotte"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "cagnottes");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "cagnotte", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload cagnotte")); }
+});
+
 /* POST /api/upload/document — document réel pour la vitrine (Téléchargements) :
    PDF, Office (doc/docx/xls/xlsx/ppt/pptx) ou image. Vérification par signature (magic bytes)
    pour PDF/images ; les formats Office modernes sont des archives ZIP (signature PK\x03\x04)
@@ -15984,12 +16015,12 @@ route("GET", "/api/cagnottes/publiques", async (req, res, params, body, query) =
 route("GET", "/api/cagnottes/public/:slug", async (req, res, params) => {
   const c = await db.prepare("SELECT * FROM cagnottes WHERE slug=?").get(params.slug);
   if (!c || !c.est_publiee) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
-  /* "Privée" (2026-08-18, décision explicite de l'utilisateur) = jamais listée dans le
-     parcours public (GET /api/cagnottes/publiques filtre déjà visibilite='publique'), mais
-     accessible à quiconque détient le lien/QR direct — même principe qu'un lien "non répertorié"
-     plutôt qu'une vraie liste fermée. "Participants autorisés" (cagnotte_participants_autorises)
-     reste utile pour le suivi/notifications côté créateur, mais ne bloque plus l'accès : le
-     lien seul suffit désormais, sans besoin de compte D'A ni d'autorisation explicite. */
+  if (c.visibilite === "privee") {
+    const user = await getCurrentUser(req);
+    const estProprietaire = user && Number(c.owner_user_id) === Number(user.id);
+    const estAutorise = user && !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
+    if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
+  }
   const owner = await db.prepare("SELECT nom, photo_url FROM users WHERE id=?").get(c.owner_user_id);
   /* Compteur de vues (Phase 2 point 7, statistiques) — jamais pour le propriétaire consultant
      sa propre cagnotte, même principe que le compteur de vues des initiatives. Best-effort,
@@ -16230,14 +16261,12 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
   /* ── Contribution invitée (2026-08-17) — même modèle que le paiement invité des adhésions
      (POST /api/adhesion-formules/:id/payer, 2026-08-08) : une personne sans compte Diaspo'Actif
      peut participer directement, son identité vient de nom/prenom/email plutôt que du compte.
-     Limité par IP pour rester un point d'entrée public sûr.
-     "Privée" (2026-08-18, décision explicite de l'utilisateur) : n'importe qui détenant le lien/QR
-     direct peut désormais participer, avec ou sans compte D'A, exactement comme pour une cagnotte
-     publique — la visibilité ne change plus le circuit de participation, seulement l'absence de
-     la cagnotte dans le parcours public (GET /api/cagnottes/publiques filtre déjà
-     visibilite='publique'). Voir aussi GET /api/cagnottes/public/:slug, même décision. */
+     Une cagnotte privée reste réservée aux comptes explicitement autorisés — un invité ne peut
+     donc participer qu'à une cagnotte publique. Limité par IP pour rester un point d'entrée
+     public sûr. */
   let invite = null;
   if (!user) {
+    if (c.visibilite === "privee") return sendJSON(res, 401, { error: "Connexion requise pour une cagnotte privée." });
     const ip = SEC.clientIp(req);
     const rl = SEC.rateLimit(`cagnotte-participer-invite:${ip}`, 10, 3600000);
     if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
@@ -16247,6 +16276,10 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
       return sendJSON(res, 400, { error: "Merci de renseigner votre nom et une adresse e-mail valide pour participer sans compte." });
     }
     invite = { nom, prenom: String(body?.prenom || "").trim() || null, email };
+  } else if (c.visibilite === "privee") {
+    const estProprietaire = Number(c.owner_user_id) === Number(user.id);
+    const estAutorise = !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
+    if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
   }
 
   const montant = Number(body?.montant);
