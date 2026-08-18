@@ -589,6 +589,21 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   } catch (e) { console.error('[fusion-adhesion-signup]', e.message); }
 
+  /* Même proposition de fusion pour les contributions invitées à une cagnotte (2026-08-17,
+     même logique que ci-dessus) — jamais automatique. */
+  try {
+    const contribsExternes = await db.prepare(`
+      SELECT co.id, co.cagnotte_id, c.titre AS cagnotte_titre FROM cagnotte_contributions co
+      JOIN cagnottes c ON c.id = co.cagnotte_id
+      WHERE co.user_id IS NULL AND co.statut='paye' AND LOWER(co.email) = ?
+    `).all(emailNorm);
+    for (const f of contribsExternes) {
+      creerNotif(id, "cagnotte_fusion_proposee", "Contribution trouvée 🔗",
+        `Une contribution existe déjà pour votre adresse e-mail sur la cagnotte « ${f.cagnotte_titre} ». Voulez-vous la rattacher à votre nouveau compte ?`,
+        { contribution_id: f.id, cagnotte_id: f.cagnotte_id, cagnotte_titre: f.cagnotte_titre });
+    }
+  } catch (e) { console.error('[fusion-cagnotte-signup]', e.message); }
+
   { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
 
@@ -14951,8 +14966,10 @@ async function handleStripeWebhook(req, res) {
           }
           /* Confirmation + remerciement au contributeur lui-même (cahier des charges point 4,
              volet "participants") — canal in-app uniquement pour cet increment, l'e-mail de
-             remerciement personnalisé relève de la "communication" (Phase 2 point 8, hors scope). */
-          creerNotif(contrib.user_id, "cagnotte_confirmation", "Merci pour votre contribution 🙏",
+             remerciement personnalisé relève de la "communication" (Phase 2 point 8, hors scope).
+             Contributeur invité (user_id NULL) : pas de boîte de notifications in-app à
+             remplir — le remerciement se limite à la page de confirmation Stripe. */
+          if (contrib.user_id) creerNotif(contrib.user_id, "cagnotte_confirmation", "Merci pour votre contribution 🙏",
             `Votre contribution de ${contrib.montant} ${contrib.devise} à « ${c.titre} » est confirmée. Merci pour votre soutien !`,
             { cagnotte_id: contrib.cagnotte_id });
         }
@@ -16183,16 +16200,35 @@ route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params)
 /* POST /api/cagnottes/:id/participer — crée la contribution (en_attente) + la session Stripe Checkout. */
 route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   const statutActuel = calculerStatutCagnotte(c);
   if (statutActuel !== "active") return sendJSON(res, 400, { error: "Cette cagnotte n'accepte plus de contributions pour le moment." });
-  if (c.visibilite === "privee") {
+
+  /* ── Contribution invitée (2026-08-17) — même modèle que le paiement invité des adhésions
+     (POST /api/adhesion-formules/:id/payer, 2026-08-08) : une personne sans compte Diaspo'Actif
+     peut participer directement, son identité vient de nom/prenom/email plutôt que du compte.
+     Une cagnotte privée reste réservée aux comptes explicitement autorisés — un invité ne peut
+     donc participer qu'à une cagnotte publique. Limité par IP pour rester un point d'entrée
+     public sûr. */
+  let invite = null;
+  if (!user) {
+    if (c.visibilite === "privee") return sendJSON(res, 401, { error: "Connexion requise pour une cagnotte privée." });
+    const ip = SEC.clientIp(req);
+    const rl = SEC.rateLimit(`cagnotte-participer-invite:${ip}`, 10, 3600000);
+    if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+    const email = String(body?.email || "").trim().toLowerCase();
+    const nom = String(body?.nom || "").trim();
+    if (!nom || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return sendJSON(res, 400, { error: "Merci de renseigner votre nom et une adresse e-mail valide pour participer sans compte." });
+    }
+    invite = { nom, prenom: String(body?.prenom || "").trim() || null, email };
+  } else if (c.visibilite === "privee") {
     const estProprietaire = Number(c.owner_user_id) === Number(user.id);
     const estAutorise = !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
     if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
   }
+
   const montant = Number(body?.montant);
   if (!montant || montant < 1) return sendJSON(res, 400, { error: "Montant invalide." });
   const anonyme = body?.anonyme ? 1 : 0;
@@ -16202,16 +16238,19 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
   const contribId = (await db.prepare(`
-    INSERT INTO cagnotte_contributions (cagnotte_id, user_id, montant, devise, anonyme, message, statut)
-    VALUES (?,?,?,?,?,?,'en_attente')
-  `).run(c.id, user.id, montant, c.devise || "EUR", anonyme, message)).lastInsertRowid;
+    INSERT INTO cagnotte_contributions (cagnotte_id, user_id, nom, prenom, email, montant, devise, anonyme, message, statut)
+    VALUES (?,?,?,?,?,?,?,?,?,'en_attente')
+  `).run(c.id, user ? user.id : null, invite ? invite.nom : null, invite ? invite.prenom : null, invite ? invite.email : null,
+         montant, c.devise || "EUR", anonyme, message)).lastInsertRowid;
 
   const origin = getOrigin(req);
   try {
-    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    /* Invité : pas de compte Stripe persistant côté plateforme — customer_email suffit, Stripe
+       crée son propre Customer pour la session (même pattern que l'adhésion invitée). */
+    const stripeCustomerId = user ? await getOrCreateStripeCustomer(db, user) : null;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      customer: stripeCustomerId,
+      ...(stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: invite.email }),
       line_items: [{
         price_data: {
           currency: (c.devise || "EUR").toLowerCase(),
@@ -16244,18 +16283,52 @@ route("GET", "/api/cagnottes/:id/contributions", async (req, res, params) => {
      les cagnottes de la plateforme (pas seulement celle-ci), utile au créateur pour repérer
      un contributeur fidèle. Un contributeur anonyme reste anonyme malgré tout : on masque son
      identité côté serveur plutôt que de compter sur le frontend pour le faire. */
+  /* LEFT JOIN indispensable depuis la contribution invitée (2026-08-17) : un INNER JOIN sur
+     users exclurait purement et simplement toutes les contributions sans compte (user_id NULL)
+     de cette liste — invisibles pour l'organisateur alors qu'elles ont bien été payées. Repli
+     sur nom/prenom/email de la contribution elle-même quand il n'y a pas de compte. */
   const rows = await db.prepare(`
     SELECT co.id, co.montant, co.devise, co.anonyme, co.message, co.statut, co.created_at,
+           co.user_id AS contrib_user_id, co.nom AS contrib_nom, co.prenom AS contrib_prenom, co.email AS contrib_email,
            u.id AS contributeur_id, u.nom AS contributeur_nom, u.photo_url AS contributeur_photo
-    FROM cagnotte_contributions co JOIN users u ON u.id=co.user_id
+    FROM cagnotte_contributions co LEFT JOIN users u ON u.id=co.user_id
     WHERE co.cagnotte_id=? AND co.statut='paye' ORDER BY co.created_at DESC
   `).all(params.id);
   const contributions = await Promise.all(rows.map(async r => {
-    if (r.anonyme) return { ...r, contributeur_id: null, contributeur_nom: null, contributeur_photo: null, contributeur_nb_total: null };
-    const total = await db.prepare("SELECT COUNT(*) AS n FROM cagnotte_contributions WHERE user_id=? AND statut='paye'").get(r.contributeur_id);
-    return { ...r, contributeur_nb_total: total?.n || 1 };
+    const estInvite = !r.contributeur_id;
+    const base = {
+      ...r,
+      contributeur_id: r.contributeur_id || null,
+      contributeur_nom: r.contributeur_id ? r.contributeur_nom : [r.contrib_prenom, r.contrib_nom].filter(Boolean).join(' ') || r.contrib_nom,
+      contributeur_photo: r.contributeur_id ? r.contributeur_photo : null,
+      contributeur_email: r.contrib_email || null,
+      invite: estInvite,
+    };
+    if (r.anonyme) return { ...base, contributeur_id: null, contributeur_nom: null, contributeur_photo: null, contributeur_email: null, contributeur_nb_total: null };
+    const total = estInvite
+      ? await db.prepare("SELECT COUNT(*) AS n FROM cagnotte_contributions WHERE user_id IS NULL AND LOWER(email)=? AND statut='paye'").get((r.contrib_email || '').toLowerCase())
+      : await db.prepare("SELECT COUNT(*) AS n FROM cagnotte_contributions WHERE user_id=? AND statut='paye'").get(r.contributeur_id);
+    return { ...base, contributeur_nb_total: total?.n || 1 };
   }));
   sendJSON(res, 200, { contributions });
+});
+
+/* POST /api/cagnotte-contributions/:id/fusionner — rattache une contribution invitée au compte
+   qui vient de se créer (proposition faite à l'inscription, voir POST /api/auth/signup) — jamais
+   automatique, la fusion touche l'historique de paiement d'un tiers et exige une confirmation
+   explicite du titulaire du nouveau compte. Même pattern que
+   POST /api/adhesion-membres/:id/fusionner. */
+route("POST", "/api/cagnotte-contributions/:id/fusionner", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const contrib = await db.prepare("SELECT co.*, c.titre AS cagnotte_titre FROM cagnotte_contributions co JOIN cagnottes c ON c.id=co.cagnotte_id WHERE co.id=?").get(params.id);
+  if (!contrib) return sendJSON(res, 404, { error: "Contribution introuvable." });
+  if (contrib.user_id) return sendJSON(res, 400, { error: "Cette contribution est déjà rattachée à un compte." });
+  if (!contrib.email || contrib.email.toLowerCase() !== (user.email || "").toLowerCase()) {
+    return sendJSON(res, 403, { error: "Cette contribution ne correspond pas à votre adresse e-mail." });
+  }
+  await db.prepare("UPDATE cagnotte_contributions SET user_id=? WHERE id=?").run(user.id, params.id);
+  sendJSON(res, 200, { ok: true, cagnotte_titre: contrib.cagnotte_titre });
 });
 
 /* ── Co-organisateurs (Phase 2 point 6) ── */

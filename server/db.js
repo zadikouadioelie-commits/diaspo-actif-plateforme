@@ -361,11 +361,18 @@ db.exec(`
     FOREIGN KEY(auteur_user_id) REFERENCES users(id)
   );
 
-  /* Contributions (paiements) à une cagnotte — Phase 1 "Participation + paiement". */
+  /* Contributions (paiements) à une cagnotte — Phase 1 "Participation + paiement".
+     user_id nullable + nom/prenom/email (incrément "contribution invitée", 2026-08-17) : une
+     personne sans compte Diaspo'Actif peut participer directement, son identité vient alors de
+     ces 3 colonnes plutôt que du compte — même modèle que adhesion_membres.linked_user_id NULL,
+     déjà en production depuis le 2026-08-08. */
   CREATE TABLE IF NOT EXISTS cagnotte_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cagnotte_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
+    user_id INTEGER,
+    nom TEXT,
+    prenom TEXT,
+    email TEXT,
     montant REAL NOT NULL,
     devise TEXT DEFAULT 'EUR',
     anonyme INTEGER DEFAULT 0,
@@ -7086,6 +7093,43 @@ db.exec(`
     });
     db.exec(`PRAGMA foreign_keys=ON;`);
   }
+})();
+
+/* Migration : cagnotte_contributions — contribution invitée (2026-08-17). user_id devient
+   nullable + colonnes nom/prenom/email ; rebuild pour lever l'ancien NOT NULL sur user_id
+   (SQLite ne sait pas faire un simple DROP NOT NULL), même pattern que les migrations
+   offres/adhesion_membres ci-dessus. */
+;(function migrateCagnotteContributionsInvite() {
+  const cols = db.prepare("PRAGMA table_info(cagnotte_contributions)").all();
+  const userIdCol = cols.find(c => c.name === "user_id");
+  const dejaNullable = userIdCol && userIdCol.notnull === 0;
+  if (dejaNullable) return;
+  db.exec(`PRAGMA foreign_keys=OFF;`);
+  db.exec(`DROP TABLE IF EXISTS cagnotte_contributions_new;`);
+  db.exec(`
+    CREATE TABLE cagnotte_contributions_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cagnotte_id INTEGER NOT NULL,
+      user_id INTEGER,
+      nom TEXT,
+      prenom TEXT,
+      email TEXT,
+      montant REAL NOT NULL,
+      devise TEXT DEFAULT 'EUR',
+      anonyme INTEGER DEFAULT 0,
+      message TEXT,
+      statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','paye','echoue','rembourse')),
+      stripe_session_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+    INSERT INTO cagnotte_contributions_new (id,cagnotte_id,user_id,montant,devise,anonyme,message,statut,stripe_session_id,created_at)
+      SELECT id,cagnotte_id,user_id,montant,devise,anonyme,message,statut,stripe_session_id,created_at FROM cagnotte_contributions;
+    DROP TABLE cagnotte_contributions;
+    ALTER TABLE cagnotte_contributions_new RENAME TO cagnotte_contributions;
+  `);
+  db.exec(`PRAGMA foreign_keys=ON;`);
 })();
 
 /* Migration : initiative_membres — statuts 'suspendu'/'radie'/'expire' (module Adhésions,

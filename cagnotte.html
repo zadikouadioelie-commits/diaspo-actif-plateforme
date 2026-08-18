@@ -119,14 +119,34 @@
     return '';
   }
 
+  /* Proposition de compte pour les invités (2026-08-17, même pattern que adhesions.html) —
+     affichée sous la bannière de confirmation, jamais bloquante. */
+  async function afficherPropositionCompte(){
+    if (participationResult !== 'succes') return;
+    let me = { user: null };
+    try { me = await (await fetch('/api/auth/me', {credentials:'include'})).json(); } catch(e) {}
+    if (me.user) return;
+    let emailInvite = '';
+    try { emailInvite = sessionStorage.getItem('cg_invite_email') || ''; sessionStorage.removeItem('cg_invite_email'); } catch(e) {}
+    const zone = document.createElement('div');
+    zone.className = 'cg-banner';
+    zone.style.cssText = 'background:#eff6ff;border:1px solid #93c5fd;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;';
+    zone.innerHTML = `<span>🔑 <strong>Créez votre compte Diaspo'Actif</strong> pour retrouver cette contribution et son reçu à tout moment.</span>
+      <a href="inscription.html?role=utilisateur${emailInvite ? '&email=' + encodeURIComponent(emailInvite) : ''}" class="btn btn-orange" style="padding:7px 16px;font-size:12.5px;">Créer mon compte</a>`;
+    const banniereOk = document.querySelector('.cg-banner-ok');
+    if (banniereOk) banniereOk.insertAdjacentElement('afterend', zone);
+  }
+
   function ouvrirParticipation(){
+    /* Participation invitée (2026-08-17) : plus de redirection forcée vers la connexion — le
+       formulaire ci-dessous demande nom/prénom/e-mail directement à la personne sans compte,
+       même pattern que l'adhésion invitée (POST /api/adhesion-formules/:id/payer, 2026-08-08). */
     fetch('/api/auth/me', {credentials:'include'}).then(r=>r.json()).then(({user}) => {
-      if (!user) { if (confirm('Vous devez être connecté(e) pour participer. Aller à la connexion ?')) location.href = 'login.html?retour=' + encodeURIComponent(location.href); return; }
-      renderModalParticipation();
+      renderModalParticipation(user || null);
     });
   }
 
-  function renderModalParticipation(){
+  function renderModalParticipation(user){
     fetch('/api/cagnottes/montants-predefinis').then(r=>r.json()).then(({ montants }) => {
       let modal = document.getElementById('cg-part-modal');
       if (!modal) { modal = document.createElement('div'); modal.id = 'cg-part-modal'; modal.className = 'modal-overlay'; document.body.appendChild(modal); }
@@ -138,6 +158,11 @@
           ${montants.map(m => `<div class="cg-montant-pill${m===_montantChoisi?' actif':''}" data-montant="${m}">${m} ${_cagnotte.devise}</div>`).join('')}
         </div>
         <input id="cg-part-libre" type="number" min="1" step="1" placeholder="Autre montant (${_cagnotte.devise})" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+        ${!user ? `
+        <p style="font-size:12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px 10px;margin:0 0 10px;">Vous participez sans compte Diaspo'Actif — renseignez simplement vos coordonnées ci-dessous. 🔑 <a href="login.html?retour=${encodeURIComponent(location.href)}">Déjà un compte ? Connectez-vous</a> pour préremplir automatiquement.</p>
+        <input id="cg-part-nom" type="text" placeholder="Nom *" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+        <input id="cg-part-prenom" type="text" placeholder="Prénom" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+        <input id="cg-part-email" type="email" placeholder="Adresse e-mail *" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;">` : ''}
         <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;">
           <input type="checkbox" id="cg-part-anonyme"> Participer anonymement (mon nom ne sera pas affiché publiquement)
         </label>
@@ -156,27 +181,42 @@
       document.getElementById('cg-part-libre').addEventListener('input', function(){
         if (this.value) { _montantChoisi = null; modal.querySelectorAll('.cg-montant-pill').forEach(x => x.classList.remove('actif')); }
       });
-      document.getElementById('cg-part-submit').addEventListener('click', soumettreParticipation);
+      document.getElementById('cg-part-submit').addEventListener('click', () => soumettreParticipation(!user));
     });
   }
 
-  function soumettreParticipation(){
+  function soumettreParticipation(invite){
     const errBox = document.getElementById('cg-part-error');
     errBox.style.display = 'none';
     const libre = Number(document.getElementById('cg-part-libre').value);
     const montant = libre > 0 ? libre : _montantChoisi;
     if (!montant || montant < 1) { errBox.textContent = 'Choisissez ou saisissez un montant valide.'; errBox.style.display = 'block'; return; }
+    let nom, prenom, email;
+    if (invite) {
+      nom = document.getElementById('cg-part-nom').value.trim();
+      prenom = document.getElementById('cg-part-prenom').value.trim();
+      email = document.getElementById('cg-part-email').value.trim();
+      if (!nom || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errBox.textContent = 'Merci de renseigner votre nom et une adresse e-mail valide.'; errBox.style.display = 'block'; return;
+      }
+    }
     const btn = document.getElementById('cg-part-submit');
     btn.disabled = true; btn.textContent = 'Redirection…';
     fetch('/api/cagnottes/' + _cagnotte.id + '/participer', {
       method:'POST', credentials:'include', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        montant,
+        montant, nom, prenom, email,
         anonyme: document.getElementById('cg-part-anonyme').checked,
         message: document.getElementById('cg-part-message').value.trim() || undefined,
       })
     }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; })
-      .then(({ checkout_url }) => { location.href = checkout_url; })
+      .then(({ checkout_url }) => {
+        /* Mémorise l'e-mail invité pour préremplir la proposition de création de compte au
+           retour de Stripe (voir afficherPropositionCompte ci-dessus) — jamais transmis à un
+           tiers. */
+        if (invite && email) { try { sessionStorage.setItem('cg_invite_email', email); } catch(e) {} }
+        location.href = checkout_url;
+      })
       .catch(err => { errBox.textContent = err.error || 'Erreur lors de la préparation du paiement.'; errBox.style.display = 'block'; btn.disabled = false; btn.textContent = '💳 Continuer vers le paiement'; });
   }
   window.cgOuvrirParticipation = ouvrirParticipation;
@@ -195,8 +235,12 @@
   }
   window.ouvrirPartage = async function(titre){
     /* Ne PAS tronquer la query string : ?slug=... est ce qui identifie la cagnotte, sans
-       lui le lien partagé retomberait sur une page "identifiant manquant". */
-    const url = location.href.split('#')[0];
+       lui le lien partagé retomberait sur une page "identifiant manquant". Le paramètre
+       participer=1 permet une participation rapide en un clic depuis le QR code (2026-08-17) :
+       la page cagnotte.html ouvre alors directement le formulaire au chargement. */
+    const shareUrl = new URL(location.href.split('#')[0]);
+    shareUrl.searchParams.set('participer', '1');
+    const url = shareUrl.toString();
     let modal = document.getElementById('cg-share-modal-bg');
     if (!modal) {
       modal = document.createElement('div');
@@ -300,6 +344,10 @@
         if (peutParticiper) document.getElementById('cg-btn-participer').addEventListener('click', ouvrirParticipation);
         renderContributeurs(slug, !!c.afficher_participants);
         renderActualites(c.id);
+        afficherPropositionCompte();
+        /* Participation rapide via QR code (2026-08-17) : ?participer=1 ouvre directement le
+           formulaire de participation au chargement, sans clic supplémentaire. */
+        if (peutParticiper && new URLSearchParams(location.search).get('participer') === '1') ouvrirParticipation();
       })
       .catch(err => {
         el.innerHTML = `<div class="cg-empty">🔒 ${escH(err.error || 'Cette cagnotte est introuvable ou n\'est plus accessible.')}</div>`;

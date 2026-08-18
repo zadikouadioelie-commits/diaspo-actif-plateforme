@@ -4316,6 +4316,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         } else if (c.statut === 'active') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
           actions.push(`<a class="btn btn-sm btn-outline" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}" target="_blank">🔗 Voir la page publique</a>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOuvrirQR('${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}')">📱 QR participation rapide</button>`);
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagAction(${c.id},'pause')">⏸️ Mettre en pause</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
         } else if (c.statut === 'en_pause') {
@@ -4662,6 +4663,35 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   /* ── Statistiques avancées (Phase 2 point 7) — barres simples en CSS, cohérent avec le
      reste de la plateforme (aucune librairie de graphiques ajoutée). ── */
+
+  /* ── QR "participation rapide" (2026-08-17) : réutilise le composant ProfileQR déjà chargé
+     platform-wide (assets/profile-qr.js) avec une URL personnalisée (option url:) pointant vers
+     la cagnotte + ?participer=1, qui ouvre directement le formulaire de participation côté
+     cagnotte.html sans clic supplémentaire. ── */
+  window.cagOuvrirQR = function(slug, titre) {
+    let modal = document.getElementById('cag-qr-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cag-qr-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    const url = window.location.origin + '/cagnotte.html?slug=' + encodeURIComponent(slug) + '&participer=1';
+    modal.innerHTML = `<div class="modal-box" style="max-width:340px;text-align:center;">
+      <h3 style="margin:0 0 4px;">📱 QR participation rapide</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">« ${escH(titre)} » — un scan ouvre directement le formulaire de participation.</p>
+      <div id="cag-qr-holder" style="display:flex;justify-content:center;"></div>
+      <div style="text-align:center;margin-top:14px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-qr-modal').remove()">Fermer</button>
+      </div>
+    </div>`;
+    if (window.ProfileQR) {
+      ProfileQR.render(document.getElementById('cag-qr-holder'), { url, size: 180, showActions: true });
+    } else {
+      document.getElementById('cag-qr-holder').innerHTML = '<span style="font-size:11px;color:var(--muted);">QR indisponible</span>';
+    }
+  };
+
   window.cagOpenStatistiques = async function(id) {
     let modal = document.getElementById('cag-stats-modal');
     if (!modal) {
@@ -7187,11 +7217,40 @@ async function adhRenderCampagnes(){
         <div style="background:var(--bg);border-radius:8px;height:10px;overflow:hidden;margin-bottom:8px;">
           <div style="background:var(--orange);height:100%;width:${Math.min(prog.pourcentage,100)}%;"></div>
         </div>
-        <div style="font-size:12px;color:var(--muted);">Objectif : ${c.objectif_membres} · Renouvelés : ${prog.renouveles} (${prog.pourcentage}%) · En attente : ${prog.en_attente} · Collecté : ${prog.montant_collecte} €</div>`;
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Objectif : ${c.objectif_membres} · Renouvelés : ${prog.renouveles} (${prog.pourcentage}%) · En attente : ${prog.en_attente} · Collecté : ${prog.montant_collecte} €</div>
+        <button class="btn btn-sm btn-outline" onclick="adhOuvrirQR('${escH(c.nom).replace(/'/g,"\\'")}')">📱 QR adhésion rapide</button>`;
       listEl.appendChild(div);
     }
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
+
+/* ── QR "adhésion rapide" (2026-08-17) : les campagnes d'adhésion n'ont pas de lien direct par
+   formule (une même campagne peut couvrir plusieurs formules) — le QR renvoie donc vers la page
+   d'adhésion générale de l'initiative, même URL que le bouton "Adhérer / Cotiser" public. ── */
+function adhOuvrirQR(nomCampagne){
+  let modal = document.getElementById('adh-qr-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'adh-qr-modal';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  const url = window.location.origin + '/adhesions.html?initiative=' + window.__vitrineInitId;
+  modal.innerHTML = `<div class="modal-box" style="max-width:340px;text-align:center;">
+    <h3 style="margin:0 0 4px;">📱 QR adhésion rapide</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">« ${escH(nomCampagne)} » — un scan ouvre directement la page d'adhésion.</p>
+    <div id="adh-qr-holder" style="display:flex;justify-content:center;"></div>
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('adh-qr-modal').remove()">Fermer</button>
+    </div>
+  </div>`;
+  if (window.ProfileQR) {
+    ProfileQR.render(document.getElementById('adh-qr-holder'), { url, size: 180, showActions: true });
+  } else {
+    document.getElementById('adh-qr-holder').innerHTML = '<span style="font-size:11px;color:var(--muted);">QR indisponible</span>';
+  }
+}
+window.adhOuvrirQR = adhOuvrirQR;
 
 async function adhCreerCampagne(){
   const nom = prompt('Nom de la campagne :'); if(!nom) return;

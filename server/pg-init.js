@@ -1358,6 +1358,15 @@ async function migratePg(pool) {
     await pool.query(`ALTER TABLE notifications ALTER COLUMN created_at SET DEFAULT to_char(NOW(),'YYYY-MM-DD HH24:MI:SS')`);
   } catch (e) { console.error('[pg-init migration] notifications.created_at default:', e.message); }
 
+  /* cagnotte_contributions.user_id — contribution invitée (2026-08-17) : une personne sans
+     compte peut désormais participer (identité dans nom/prenom/email, colonnes ajoutées par
+     ajouterColonnesManquantes ci-dessus). NOT NULL déjà en production sur les tables créées
+     avant ce correctif — CREATE TABLE IF NOT EXISTS ne le retire jamais tout seul. Idempotent :
+     DROP NOT NULL sur une colonne déjà nullable ne fait rien. */
+  try {
+    await pool.query(`ALTER TABLE cagnotte_contributions ALTER COLUMN user_id DROP NOT NULL`);
+  } catch (e) { console.error('[pg-init migration] cagnotte_contributions.user_id nullable:', e.message); }
+
   /* ── Module "Avancement de mon initiative" — catalogue de critères ──
      Le seed de db.js (seedAvancementCriteres) ne s'exécute que via node:sqlite, jamais contre
      Postgres (même piège que les accréditations plus haut). Idempotent via ON CONFLICT (cle). */
