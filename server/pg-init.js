@@ -483,6 +483,8 @@ const COLONNES_MIGRATION = [
     ['users', 'is_deal_master', 'INTEGER DEFAULT 0'],
     ['users', 'deal_master_edition_id', 'INTEGER'],
     ['users', 'nb_connexions', 'INTEGER DEFAULT 0'],
+    // Bannière "Installer l'app" (PWA) — 2026-08-18
+    ['users', 'pwa_prompt_dismiss', 'INTEGER DEFAULT 0'],
     ['users', 'temoignage_statut', "TEXT DEFAULT 'non_demande'"],
     ['users', 'temoignage_derniere_demande', 'TEXT'],
     ['users', 'demo_vue', 'INTEGER DEFAULT 0'],

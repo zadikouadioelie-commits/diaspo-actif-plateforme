@@ -81,6 +81,7 @@ db.exec(`
     is_deal_master      INTEGER DEFAULT 0,
     deal_master_edition_id INTEGER,
     nb_connexions       INTEGER DEFAULT 0,
+    pwa_prompt_dismiss  INTEGER DEFAULT 0,
     temoignage_statut   TEXT DEFAULT 'non_demande' CHECK(temoignage_statut IN ('non_demande','en_attente','fourni','refuse')),
     temoignage_derniere_demande TEXT,
     demo_vue                INTEGER DEFAULT 0,
@@ -1585,6 +1586,9 @@ const MIGRATIONS = [
   ["users", "is_deal_master INTEGER DEFAULT 0"],
   ["users", "deal_master_edition_id INTEGER"],
   ["users", "nb_connexions INTEGER DEFAULT 0"],
+  // ── Bannière "Installer l'app" (PWA) — 2026-08-18 : réglage "Ne plus afficher" lié au compte,
+  // réactivable depuis Confidentialité (voir buildPrivacyPanel() dans profil-app.html) ──
+  ["users", "pwa_prompt_dismiss INTEGER DEFAULT 0"],
   ["users", "temoignage_statut TEXT DEFAULT 'non_demande'"],
   ["users", "temoignage_derniere_demande TEXT"],
   ["users", "demo_vue INTEGER DEFAULT 0"],

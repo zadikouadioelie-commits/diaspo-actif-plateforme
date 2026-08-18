@@ -11,6 +11,47 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+/* ---------- PWA — balises manquantes pour iOS ----------
+   manifest.json existe déjà mais iOS/Safari ne le respecte pas complètement : sans ces
+   balises, "Sur l'écran d'accueil" donne une icône = capture d'écran de la page et ouvre
+   l'app avec la barre d'adresse Safari visible, au lieu d'un vrai plein écran façon
+   application. Injectées ici plutôt que dupliquées dans ~80 fichiers HTML — même logique
+   que l'enregistrement du service worker juste au-dessus. */
+(function injectPwaHeadTags() {
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const l = document.createElement('link'); l.rel = 'manifest'; l.href = '/manifest.json';
+    document.head.appendChild(l);
+  }
+  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+    const l = document.createElement('link'); l.rel = 'apple-touch-icon'; l.href = '/assets/logo.png';
+    document.head.appendChild(l);
+  }
+  [
+    ['apple-mobile-web-app-capable', 'yes'],
+    ['apple-mobile-web-app-title', "Diaspo'Actif"],
+    ['apple-mobile-web-app-status-bar-style', 'default'],
+  ].forEach(([name, content]) => {
+    if (document.querySelector(`meta[name="${name}"]`)) return;
+    const m = document.createElement('meta'); m.name = name; m.content = content;
+    document.head.appendChild(m);
+  });
+})();
+
+/* ---------- PWA — capture de l'invite d'installation Android/Chrome ----------
+   L'événement peut survenir à tout moment après le chargement (heuristiques propres à
+   chaque navigateur), y compris avant que /api/auth/me ait répondu : on le capture donc
+   sans condition ici, et on ne décide d'afficher la bannière (maybeShowPwaInstallBanner,
+   plus bas) qu'une fois l'utilisateur ET l'événement disponibles, quel que soit l'ordre
+   d'arrivée des deux. */
+let _pwaDeferredPrompt = null;
+let _pwaCurrentUser = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _pwaDeferredPrompt = e;
+  if (typeof maybeShowPwaInstallBanner === 'function') maybeShowPwaInstallBanner(_pwaCurrentUser);
+});
+window.addEventListener('appinstalled', () => { _pwaDeferredPrompt = null; });
+
 /* ---------- Client API ---------- */
 const API_BASE = "/api";
 async function api(method, path, body) {
@@ -742,6 +783,102 @@ async function recheckOrigineBanner() {
 }
 window.recheckOrigineBanner = recheckOrigineBanner;
 
+/* ---------- Bandeau "Installer l'app" (PWA) ----------
+   Déclenché aux connexions n°1, 4, 7, 10… (nb_connexions déjà en base, incrémenté à
+   chaque connexion réelle — aucun nouveau compteur nécessaire). Ne s'affiche jamais si
+   l'app est déjà installée sur cet appareil, ni si le compte a désactivé la proposition
+   (pwa_prompt_dismiss, réglage lié AU COMPTE — réactivable depuis Confidentialité,
+   voir buildPrivacyPanel() dans profil-app.html). Le bouton "Ne plus afficher" n'apparaît
+   qu'à partir de la 3e apparition (décision explicite de l'utilisateur, 2026-08-18) :
+   un premier refus est souvent réflexe, un refus répété trois fois est un choix éclairé. */
+function pwaIsStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function pwaIsIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function pwaIsIOSSafari() {
+  // Exclut Chrome/Firefox/Edge/Opera pour iOS ainsi que les navigateurs intégrés
+  // (Facebook, Instagram, Line…) : ces derniers n'exposent pas "Sur l'écran d'accueil"
+  // au même endroit, voire pas du tout — des instructions Safari y seraient inutiles.
+  return pwaIsIOS() && /Safari/.test(navigator.userAgent)
+    && !/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
+}
+function showPwaInstallBanner(user) {
+  _pwaCurrentUser = user;
+  maybeShowPwaInstallBanner(user);
+}
+function maybeShowPwaInstallBanner(user) {
+  if (!user || pwaIsStandalone() || user.pwa_prompt_dismiss) return;
+  const n = user.nb_connexions || 0;
+  if (n < 1 || (n - 1) % 3 !== 0) return; // occurrences : connexions 1, 4, 7, 10…
+  if (document.getElementById('pwa-install-banner')) return;
+  const flagKey = 'da_pwa_banner_shown_' + n;
+  if (sessionStorage.getItem(flagKey)) return;
+
+  const isIOS = pwaIsIOS();
+  const isIOSSafari = isIOS && pwaIsIOSSafari();
+  const canAndroidPrompt = !isIOS && !!_pwaDeferredPrompt;
+  if (!isIOS && !canAndroidPrompt) return; // rien à proposer sur cette plateforme/navigateur pour l'instant
+
+  let bodyHtml;
+  if (canAndroidPrompt) {
+    bodyHtml = `<span>📲 Installez Diaspo'Actif sur votre écran d'accueil pour y accéder en un clic.</span>
+      <button id="pwa-install-btn" type="button" style="background:#fff;color:#F26422;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;">Installer</button>`;
+  } else if (isIOSSafari) {
+    bodyHtml = `<span>📲 Installez Diaspo'Actif sur votre écran d'accueil : appuyez sur <strong>Partager</strong> <span style="font-size:15px;">📤</span> puis <strong>« Sur l'écran d'accueil »</strong>.</span>`;
+  } else {
+    // iOS mais pas Safari (Chrome/Firefox iOS, navigateur intégré…) : l'action décrite
+    // ci-dessus n'existerait pas dans ce navigateur, on ne montre que ce message-là.
+    bodyHtml = `<span>📲 Pour installer Diaspo'Actif sur votre écran d'accueil, ouvrez ce lien dans <strong>Safari</strong>.</span>`;
+  }
+
+  const occurrence = Math.floor((n - 1) / 3) + 1;
+  const showNeverBtn = occurrence >= 3;
+  sessionStorage.setItem(flagKey, '1');
+
+  const bar = document.createElement('div');
+  bar.id = 'pwa-install-banner';
+  // z-index:45 : même convention que email-verif-banner/origine-banner ci-dessus.
+  bar.style.cssText = "position:sticky;top:0;z-index:45;background:#F26422;color:#fff;padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;";
+  bar.innerHTML = `
+    ${bodyHtml}
+    ${showNeverBtn ? `<button id="pwa-never-btn" type="button" style="background:none;border:1.5px solid rgba(255,255,255,.7);color:#fff;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;">Ne plus afficher</button>` : ''}
+    <button id="pwa-dismiss-btn" type="button" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;line-height:1;">✕</button>`;
+  document.body.prepend(bar);
+
+  document.getElementById('pwa-dismiss-btn').onclick = () => bar.remove();
+
+  const installBtn = document.getElementById('pwa-install-btn');
+  if (installBtn) {
+    installBtn.onclick = async () => {
+      if (!_pwaDeferredPrompt) { bar.remove(); return; }
+      installBtn.disabled = true;
+      const prompt = _pwaDeferredPrompt;
+      _pwaDeferredPrompt = null;
+      prompt.prompt();
+      try { await prompt.userChoice; } catch (e) { /* ignoré */ }
+      bar.remove();
+    };
+  }
+
+  const neverBtn = document.getElementById('pwa-never-btn');
+  if (neverBtn) {
+    neverBtn.onclick = async () => {
+      neverBtn.disabled = true;
+      try {
+        await api('PATCH', '/auth/pwa-prompt-preference', { dismiss: true });
+        if (_pwaCurrentUser) _pwaCurrentUser.pwa_prompt_dismiss = true;
+        if (window.CURRENT_USER) window.CURRENT_USER.pwa_prompt_dismiss = true;
+        bar.innerHTML = `<span>✅ Cette proposition ne sera plus affichée. Si vous changez d'avis, vous la retrouverez dans <strong>Confidentialité</strong>.</span>`;
+        setTimeout(() => bar.remove(), 4500);
+      } catch (e) {
+        neverBtn.disabled = false;
+      }
+    };
+  }
+}
+
 /* ─── Comptes de test (démo) — réservé à l'administrateur ───
    Ouvre une fenêtre listant les comptes de démonstration et permet de s'y
    connecter en un clic (déconnexion admin → connexion démo → redirection). */
@@ -1025,6 +1162,7 @@ async function applyAuthState() {
     } catch (e) { /* silencieux */ }
     showEmailVerifBanner(user);
     showOrigineBanner(user);
+    showPwaInstallBanner(user);
   } else {
     el.innerHTML = `
       <a href="login.html" class="btn btn-sm btn-outline">Se connecter</a>

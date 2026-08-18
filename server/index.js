@@ -215,7 +215,7 @@ async function getCurrentUser(req) {
   if (authCookie) {
     const payload = verifyAuthToken(authCookie);
     if (payload?.uid) {
-      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version FROM users WHERE id = ?").get(payload.uid);
+      const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version FROM users WHERE id = ?").get(payload.uid);
       /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
          stateless (aucun état serveur, survit à un DELETE FROM sessions) — c'est le SEUL
          moyen de forcer son invalidation avant expiration naturelle. Un ancien gestionnaire
@@ -233,7 +233,7 @@ async function getCurrentUser(req) {
   if (!sid) return null;
   const session = getSession(sid);
   if (!session) return null;
-  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(session.userId);
+  const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(session.userId);
   if (user) user.id = Number(user.id);
   return user || null;
 }
@@ -242,7 +242,7 @@ function publicUser(u) {
   if (!u) return null;
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
     photo_url: u.photo_url || null,
-    nb_connexions: u.nb_connexions || 0, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
+    nb_connexions: u.nb_connexions || 0, pwa_prompt_dismiss: !!u.pwa_prompt_dismiss, temoignage_statut: u.temoignage_statut || 'non_demande', temoignage_derniere_demande: u.temoignage_derniere_demande || null,
     demo_vue: u.demo_vue || 0, da_id: u.da_id || null, email_verifie: !!u.email_verifie, identite_verifiee: !!u.identite_verifiee };
   // NOTE: ds_id est intentionnellement exclu — jamais exposé via cette fonction
 }
@@ -899,6 +899,18 @@ route("PUT", "/api/auth/account/demasquer", async (req, res) => {
   await db.prepare("UPDATE users SET compte_masque=0 WHERE id=?").run(user.id);
   SEC.logSecurity("account_unhidden", { uid: user.id });
   sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/auth/pwa-prompt-preference — bannière "Installer l'app" (PWA), 2026-08-18.
+   Réglage volontairement lié AU COMPTE (pas à l'appareil) : une fois désactivée, la
+   proposition ne réapparaît sur aucun appareil tant que l'utilisateur ne l'a pas
+   réactivée lui-même depuis Confidentialité (buildPrivacyPanel(), profil-app.html). */
+route("PATCH", "/api/auth/pwa-prompt-preference", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const dismiss = !!(body && body.dismiss);
+  await db.prepare("UPDATE users SET pwa_prompt_dismiss=? WHERE id=?").run(dismiss ? 1 : 0, user.id);
+  sendJSON(res, 200, { ok: true, pwa_prompt_dismiss: dismiss });
 });
 
 /* ═══════════ Demandes de suppression définitive de compte (RGPD, workflow admin) ═══════════ */

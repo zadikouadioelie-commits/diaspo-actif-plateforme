@@ -72,6 +72,12 @@
     <div class="notice" style="margin-top:24px;">🔐 Les données classées « Confidentiel » (nationalités, pièces d'identité, documents de vérification, coordonnées administratives, informations de paiement) ne sont accessibles qu'à Diaspo'Actif et aux institutions habilitées, dans un cadre strictement encadré.</div>
 
     <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="font-size:14px;margin:0 0 6px;">📲 Raccourci sur mon écran</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Diaspo'Actif peut vous proposer, de temps en temps, d'ajouter un raccourci sur l'écran d'accueil de votre téléphone pour y accéder en un clic.</p>
+      <div id="pwa-pref-zone"></div>
+    </div>
+
+    <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
       <h3 style="color:#dc2626;font-size:14px;margin:0 0 6px;">⚠️ Zone de danger</h3>
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p>
       <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeleteAccountModal()">🙈 Masquer mon compte</button>
@@ -214,6 +220,45 @@
       setTimeout(() => cible.classList.remove('origine-mise-en-avant'), 4000);
     }
   }
+})();
+
+/* ── Raccourci sur mon écran (bannière PWA, voir showPwaInstallBanner()/assets/app.js) ──
+   Réglage lié AU COMPTE (pas à l'appareil) : réactiver ici s'applique sur tous les
+   appareils, quel que soit celui utilisé au moment du changement d'avis. Page universelle
+   (liée depuis tous les tableaux de bord, quel que soit le rôle) : contrairement au panneau
+   Confidentialité de profil-app.html, inatteignable pour le rôle Utilisateur (Carte
+   Diaspo'Actif dédiée), c'est ici que le message affiché par la bannière renvoie vraiment. */
+(async function initPwaPrefZone(){
+  const zone = document.getElementById('pwa-pref-zone');
+  if (!zone) return;
+  let user;
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) return;
+    user = me.user;
+  } catch(e) { return; }
+
+  function render() {
+    const desactivee = !!user.pwa_prompt_dismiss;
+    zone.innerHTML = desactivee
+      ? `<p style="font-size:13px;color:#374151;margin:0 0 10px;">🔕 Cette proposition a été désactivée.</p>
+         <button class="btn-ico" id="pwa-pref-reactiver" style="padding:8px 16px;">🔔 Réactiver la proposition</button>`
+      : `<p style="font-size:13px;color:#374151;margin:0;">🔔 Cette proposition est active.</p>`;
+    const btn = document.getElementById('pwa-pref-reactiver');
+    if (btn) btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        await api('PATCH', '/auth/pwa-prompt-preference', { dismiss: false });
+        user.pwa_prompt_dismiss = false;
+        if (window.CURRENT_USER) window.CURRENT_USER.pwa_prompt_dismiss = false;
+        render();
+      } catch(e) {
+        alert(e.message || 'Erreur.');
+        btn.disabled = false; btn.textContent = '🔔 Réactiver la proposition';
+      }
+    };
+  }
+  render();
 })();
 
 /* Vérification d'identité (Stripe Identity) — comptes Utilisateur ET responsables d'Initiative.
