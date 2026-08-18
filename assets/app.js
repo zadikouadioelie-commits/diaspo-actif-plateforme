@@ -1066,6 +1066,17 @@ async function applyAuthState() {
   const user = await fetchCurrentUser();
   if (user) {
     injectNotifStyles();
+    /* Liens statiques "Mon profil public" / nav mobile "Profil" (sidebars, bottom-nav) — vus
+       sur plusieurs dashboards avec href="profil.html" sans ?id=, un raccourci qui ne
+       fonctionne QUE pendant que la session est active (profil.html retombe sur son propre
+       id si connecté). Une fois cliqué, l'URL affichée dans la barre d'adresse reste sans id
+       — copiée et partagée telle quelle (ex. Network Connect, 2026-08-18), elle redirige un
+       visiteur non connecté vers la connexion au lieu d'afficher le profil public. Complété
+       ici, une seule fois, pour que l'URL présente dans la barre d'adresse soit toujours la
+       bonne, partout où ce lien apparaît. */
+    if (user.role === 'utilisateur' || user.role === 'initiative') {
+      document.querySelectorAll('a[href="profil.html"]').forEach(a => a.setAttribute('href', 'profil.html?id=' + user.id));
+    }
     const premiumSousTitres = {
       utilisateur: '1 abonnement · 6 modules accessibles',
       initiative: '1 abonnement · tous les modules Initiative',
