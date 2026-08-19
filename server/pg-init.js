@@ -1321,15 +1321,6 @@ async function migratePg(pool) {
        workflow de demande simple (en_attente/accepte/refuse). */
     { table: 'initiative_membres', constraint: 'initiative_membres_statut_check',
       addBack: "CHECK (statut IN ('en_attente','accepte','refuse','suspendu','radie','expire'))" },
-    /* Module "Administrateurs Junior" (2026-08-13) : la contrainte existante sur
-       users.role ne liste pas 'administrateur_junior'. Vérifié en local (SQLite) que
-       le CHECK d'une table déjà créée bloque bel et bien l'insertion d'une valeur hors
-       liste — CREATE TABLE IF NOT EXISTS ne suffit pas ici, contrairement à ce qu'on
-       pourrait croire en observant 'officiel'/'institutionnel' (qui ne sont en réalité
-       jamais insérés dans users.role, juste comparés — donc le CHECK n'a jamais été
-       testé pour ces valeurs-là). Même traitement que les fixes ci-dessus. */
-    { table: 'users', constraint: 'users_role_check',
-      addBack: "CHECK (role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior'))" },
     /* Module "Administrateurs Junior" — ajout de la suspension manuelle (2026-08-14) : le CHECK
        sur admin_junior_journal.action, déjà en production avec 3 comptes réels créés, ne liste
        pas encore 'compte_suspendu'/'compte_reactive'. Même traitement. */
@@ -1337,9 +1328,18 @@ async function migratePg(pool) {
       addBack: "CHECK (action IN ('permission_accordee','permission_revoquee','action_executee','identifiants_regeneres_cron','identifiants_regeneres_manuel','compte_verrouille','connexion_echouee','connexion_reussie','compte_suspendu','compte_reactive'))" },
     /* Module "Partenariat" (2026-08-14) : nouveau type de compte 'partenaire' (cahier des
        charges — soumission de projets à Diaspo'Actif + orientation vers des partenaires
-       externes créés exclusivement par invitation à usage unique). Même piège que
-       'administrateur_junior' ci-dessus : la contrainte déjà en production ne liste pas
-       'partenaire'. */
+       externes créés exclusivement par invitation à usage unique). Même piège que rencontré
+       la veille avec 'administrateur_junior' (Module "Administrateurs Junior", 2026-08-13) :
+       la contrainte existante sur users.role ne liste pas la nouvelle valeur — vérifié en
+       local (SQLite) que le CHECK d'une table déjà créée bloque bel et bien l'insertion
+       d'une valeur hors liste, CREATE TABLE IF NOT EXISTS ne suffit pas ici, contrairement à
+       ce qu'on pourrait croire en observant 'officiel'/'institutionnel' (jamais réellement
+       insérés dans users.role, juste comparés — le CHECK n'a jamais été testé pour eux).
+       Fusionné en une seule entrée à jour (2026-08-19) : une première entrée ne listant que
+       'administrateur_junior' existait ici, devenue redondante dès l'ajout de 'partenaire' le
+       lendemain — elle échouait silencieusement (log d'erreur inoffensif mais bruyant) à
+       chaque reparerSchema() une fois un compte partenaire réel créé, cette entrée-ci la
+       remplaçant de toute façon immédiatement après dans la boucle. */
     { table: 'users', constraint: 'users_role_check',
       addBack: "CHECK (role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior','partenaire'))" },
   ];
