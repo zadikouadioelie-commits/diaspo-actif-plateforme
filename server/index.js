@@ -16333,7 +16333,8 @@ route("GET", "/api/formulaires-inscription", async (req, res) => {
   const withCounts = await Promise.all(rows.map(async f => {
     const inscrits = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut != 'annule'").get(f.id))?.n || 0;
     const presents = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut='present'").get(f.id))?.n || 0;
-    return { ...f, nb_inscrits: inscrits, nb_presents: presents };
+    const cagnotte = f.cagnotte_id ? await db.prepare("SELECT slug, montant_collecte, objectif_montant, nb_contributeurs FROM cagnottes WHERE id=?").get(f.cagnotte_id) : null;
+    return { ...f, nb_inscrits: inscrits, nb_presents: presents, cagnotte_slug: cagnotte?.slug || null, cagnotte_montant_collecte: cagnotte?.montant_collecte ?? null, cagnotte_nb_contributeurs: cagnotte?.nb_contributeurs ?? null };
   }));
   sendJSON(res, 200, { formulaires: withCounts });
 });
@@ -16354,6 +16355,47 @@ const FORMULAIRE_CHAMPS_MODIFIABLES = [
   "don_active","evenement_id","initiative_id","champs_custom_json",
   "visibilite_montant","visibilite_participants",
 ];
+
+/* ── "Faire un don" (priorités 13-14 v2) ────────────────────────────────────────────────────
+   Réutilise le système de cagnottes EXISTANT (règles #13-14 : jamais un second système de
+   paiement). Publiée immédiatement (est_publiee=1) : contrairement au parcours normal de
+   création d'une cagnotte (brouillon par défaut, l'utilisateur la publie ensuite lui-même),
+   l'administrateur ne doit faire AUCUNE étape supplémentaire pour que "Faire un don" soit
+   utilisable dès l'activation (règle #11 : "l'administrateur ne doit pas avoir à créer
+   manuellement une nouvelle cagnotte"). */
+async function creerCagnotteFormulaire(f, user, objectifMontant) {
+  const base = ("faire-un-don-" + String(f.nom || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")).slice(0, 80);
+  const slug = base + "-" + Date.now().toString(36);
+  const id = (await db.prepare(`
+    INSERT INTO cagnottes (
+      slug, owner_user_id, titre, description, image_url, objectif_montant,
+      visibilite, est_publiee, afficher_participants, afficher_montants
+    ) VALUES (?,?,?,?,?,?,?,1,?,?)
+  `).run(
+    slug, user.id, "Faire un don", `Soutenez « ${f.nom} ».`, f.affiche_url || null,
+    objectifMontant != null && objectifMontant !== "" ? Number(objectifMontant) : null,
+    "publique",
+    /* Réutilise les mêmes règles de visibilité que le formulaire lui-même (règles #15-19) —
+       cohérence : un admin qui masque les participants du formulaire ne veut pas non plus
+       qu'ils apparaissent sur la collecte associée. */
+    f.visibilite_participants === "visible" ? 1 : 0,
+    f.visibilite_montant === "masque" ? 0 : 1
+  )).lastInsertRowid;
+  return id;
+}
+
+/* Après avoir écrit/mis à jour un formulaire : si le don vient d'être activé et qu'aucune
+   collecte n'existe encore, la créer et la lier. Jamais l'inverse — désactiver le don ne
+   supprime ni ne dissocie jamais la collecte (règle #38 : "peut désactiver l'affichage public
+   de la collecte sans supprimer l'historique des dons"). */
+async function assurerCagnotteFormulaireSiActive(formulaireId, user, objectifMontant) {
+  const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(formulaireId);
+  if (!f || !f.don_active || f.cagnotte_id) return f;
+  const cagnotteId = await creerCagnotteFormulaire(f, user, objectifMontant);
+  await db.prepare("UPDATE formulaires_inscription SET cagnotte_id=? WHERE id=?").run(cagnotteId, formulaireId);
+  return db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(formulaireId);
+}
 
 route("POST", "/api/formulaires-inscription", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -16386,7 +16428,7 @@ route("POST", "/api/formulaires-inscription", async (req, res, params, body) => 
     body.visibilite_participants === "visible" ? "visible" : "masque"
   )).lastInsertRowid;
 
-  const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(id);
+  const row = await assurerCagnotteFormulaireSiActive(id, user, body.objectif_don);
   sendJSON(res, 201, { formulaire: row });
 });
 
@@ -16416,7 +16458,7 @@ route("PUT", "/api/formulaires-inscription/:id", async (req, res, params, body) 
   sets.push("updated_at=datetime('now')");
   args.push(params.id);
   await db.prepare(`UPDATE formulaires_inscription SET ${sets.join(", ")} WHERE id=?`).run(...args);
-  const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
+  const row = await assurerCagnotteFormulaireSiActive(params.id, user, body.objectif_don);
   sendJSON(res, 200, { formulaire: row });
 });
 
@@ -16506,6 +16548,22 @@ route("GET", "/api/formulaires-inscription/public/:slug", async (req, res, param
   ).get(f.id))?.n || 0;
   const etat = await formulaireInscriptionsOuvertes(f);
 
+  /* Aperçu de la collecte (règles §21-22) : jamais la page complète de don ici, juste de quoi
+     afficher un teaser avant redirection vers la vraie page /cagnotte.html?<slug>. Le montant
+     collecté respecte visibilite_montant (règle #15-16) — masqué au public si l'admin l'a
+     désactivé, même si la collecte elle-même l'affiche par défaut. */
+  let don = null;
+  if (f.don_active && f.cagnotte_id) {
+    const c = await db.prepare("SELECT slug, titre, description, image_url, objectif_montant, montant_collecte, devise FROM cagnottes WHERE id=?").get(f.cagnotte_id);
+    if (c) {
+      don = {
+        slug: c.slug, titre: c.titre, description: c.description, image_url: c.image_url, devise: c.devise,
+        objectif_montant: f.visibilite_montant === "masque" ? null : c.objectif_montant,
+        montant_collecte: f.visibilite_montant === "masque" ? null : c.montant_collecte,
+      };
+    }
+  }
+
   /* Liste blanche stricte : owner_user_id et toute donnée d'administration ne sortent jamais
      de cette route, même par erreur d'un futur champ ajouté à la table. */
   sendJSON(res, 200, {
@@ -16513,7 +16571,7 @@ route("GET", "/api/formulaires-inscription/public/:slug", async (req, res, param
       nom: f.nom, type: f.type, date_evt: f.date_evt, heure_debut: f.heure_debut, heure_fin: f.heure_fin,
       lieu: f.lieu, adresse: f.adresse, description: f.description, affiche_url: f.affiche_url,
       organisateur: f.organisateur, statut: f.statut, places_max: f.places_max,
-      autoriser_projet: !!f.autoriser_projet, don_active: !!f.don_active,
+      autoriser_projet: !!f.autoriser_projet, don_active: !!f.don_active, don,
       visibilite_montant: f.visibilite_montant, visibilite_participants: f.visibilite_participants,
       champs_custom: (() => { try { return JSON.parse(f.champs_custom_json || "[]"); } catch { return []; } })(),
       slug: f.slug,
@@ -16653,12 +16711,29 @@ route("GET", "/api/formulaires-inscription/inscriptions/:inscriptionId", async (
   const user = await getCurrentUser(req);
   if (!formulaireEstProteje(user, res)) return;
   const r = await db.prepare(`
-    SELECT fi.*, f.nom AS formulaire_nom, f.slug AS formulaire_slug, f.evenement_id
+    SELECT fi.*, f.nom AS formulaire_nom, f.slug AS formulaire_slug, f.evenement_id,
+           f.don_active, f.cagnotte_id
     FROM formulaire_inscriptions fi JOIN formulaires_inscription f ON f.id = fi.formulaire_id
     WHERE fi.id=?
   `).get(params.inscriptionId);
   if (!r) return sendJSON(res, 404, { error: "Inscription introuvable." });
-  sendJSON(res, 200, { inscription: r });
+
+  /* Don (§26) : accès à la collecte +, si un e-mail est renseigné sur l'inscription ET sur une
+     contribution, une correspondance "best effort" (une même personne peut très bien donner
+     sous un e-mail différent — ce n'est jamais garanti, juste une aide visuelle pour l'admin,
+     jamais une preuve). Inscription et don restent des enregistrements totalement distincts. */
+  let don = null;
+  if (r.don_active && r.cagnotte_id) {
+    const c = await db.prepare("SELECT id, slug, titre, montant_collecte, objectif_montant, nb_contributeurs FROM cagnottes WHERE id=?").get(r.cagnotte_id);
+    if (c) {
+      const contribution = r.email
+        ? await db.prepare("SELECT montant, created_at, statut FROM cagnotte_contributions WHERE cagnotte_id=? AND email=? AND statut='paye' ORDER BY created_at DESC LIMIT 1").get(c.id, r.email)
+        : null;
+      don = { cagnotte: c, contribution_probable: contribution || null };
+    }
+  }
+
+  sendJSON(res, 200, { inscription: { ...r, don } });
 });
 
 /* PATCH .../inscriptions/:inscriptionId/statut — Inscrit/Confirmé/Présent/Absent/Annulé (§27),

@@ -13524,7 +13524,7 @@ async function loadFormulairesInscription() {
       <td style="padding:10px 12px;text-align:center;">${f.nb_inscrits}</td>
       <td style="padding:10px 12px;text-align:center;">${f.places_max ?? '∞'}</td>
       <td style="padding:10px 12px;text-align:center;">${f.nb_presents}</td>
-      <td style="padding:10px 12px;text-align:center;">${f.don_active ? '💚' : '—'}</td>
+      <td style="padding:10px 12px;text-align:center;">${f.don_active && f.cagnotte_slug ? `<a href="cagnotte.html?slug=${esc(f.cagnotte_slug)}" target="_blank" title="${f.cagnotte_montant_collecte||0}€ collectés · ${f.cagnotte_nb_contributeurs||0} donateur(s)" style="color:#16a34a;font-weight:700;text-decoration:none;">💚 ${f.cagnotte_montant_collecte||0}€</a>` : (f.don_active ? '💚' : '—')}</td>
       <td style="padding:10px 12px;white-space:nowrap;">
         <button type="button" onclick="ouvrirFormulaireModal(${f.id})" title="Modifier" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">✏️</button>
         <button type="button" onclick="fiVoirInscriptions(${f.id}, '${esc(f.nom).replace(/'/g,"\\'")}')" title="Voir les inscriptions" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">👥</button>
@@ -13616,7 +13616,16 @@ function ouvrirFormulaireModal(id) {
         <label><input type="checkbox" id="fi-annulation" ${!f || f.annulation_autorisee ? 'checked' : ''}> Autoriser l'annulation par le participant</label>
         <label><input type="checkbox" id="fi-confirmation-auto" ${!f || f.confirmation_auto ? 'checked' : ''}> Envoyer une confirmation automatique</label>
         <label><input type="checkbox" id="fi-projet" ${f && f.autoriser_projet ? 'checked' : ''}> Autoriser la présentation d'un projet/initiative</label>
-        <label title="La collecte associée se construit dans une étape séparée, à venir."><input type="checkbox" id="fi-don" disabled ${f && f.don_active ? 'checked' : ''}> Activer « Faire un don » — bientôt disponible</label>
+        <label><input type="checkbox" id="fi-don" onchange="document.getElementById('fi-don-objectif-row').style.display=this.checked?'block':'none'" ${f && f.don_active ? 'checked' : ''}> Activer « Faire un don »</label>
+      </div>
+      <div id="fi-don-objectif-row" style="display:${f && f.don_active ? 'block' : 'none'};margin:-8px 0 16px;padding:10px 12px;background:#f8fafc;border-radius:8px;">
+        ${f && f.cagnotte_id ? `
+          <div style="font-size:12.5px;color:var(--muted);">💚 Collecte « Faire un don » déjà créée pour ce formulaire — <a href="cagnotte.html?slug=${esc(f.cagnotte_slug||'')}" target="_blank" style="color:#1B3A6B;font-weight:700;">voir la page publique</a> (les réglages détaillés — image, description — se modifient depuis le module Cagnottes).</div>
+        ` : `
+          <label style="font-size:12px;font-weight:700;">Objectif de la collecte en € (facultatif, modifiable ensuite)</label>
+          <input id="fi-don-objectif" type="number" min="0" step="1" placeholder="Ex. 10000" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;margin-top:4px;">
+          <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">La collecte est créée automatiquement à l'enregistrement — aucune cagnotte à créer manuellement.</div>
+        `}
       </div>
 
       <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Visibilité publique</h4>
@@ -13727,6 +13736,8 @@ async function fiEnregistrer(id) {
     annulation_autorisee: document.getElementById('fi-annulation').checked,
     confirmation_auto: document.getElementById('fi-confirmation-auto').checked,
     autoriser_projet: document.getElementById('fi-projet').checked,
+    don_active: document.getElementById('fi-don').checked,
+    objectif_don: document.getElementById('fi-don-objectif') ? document.getElementById('fi-don-objectif').value : undefined,
     visibilite_montant: document.getElementById('fi-visibilite-montant').value,
     visibilite_participants: document.getElementById('fi-visibilite-participants').value,
     champs_custom: _fiChampsCustomEnCours,
