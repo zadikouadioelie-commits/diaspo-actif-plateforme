@@ -16855,6 +16855,129 @@ route("PATCH", "/api/formulaires-inscription/inscriptions/:inscriptionId/statut"
   sendJSON(res, 200, { ok: true, statut });
 });
 
+/* ── Dashboard + statistiques (priorité 8 v2) ────────────────────────────────────────────────
+   Répartitions par type de participation et par statut (§ cahier des charges : "inscrits/
+   participants/intervenants/bénévoles/exposants/confirmés/présents/absents/annulés"), plus,
+   si "Faire un don" est activé, les chiffres de la collecte liée (donateurs/montant/objectif/
+   progression) — jamais recalculés ici : lus directement sur la cagnotte, seule source de
+   vérité pour l'argent. */
+route("GET", "/api/formulaires-inscription/:id/stats", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+
+  const rows = await db.prepare("SELECT type_participation, statut, presente_projet FROM formulaire_inscriptions WHERE formulaire_id=?").all(params.id);
+
+  const parType = { participant: 0, benevole: 0, intervenant: 0, exposant: 0 };
+  const parStatut = { inscrit: 0, confirme: 0, present: 0, absent: 0, annule: 0 };
+  let nbProjets = 0;
+  for (const r of rows) {
+    if (parType[r.type_participation] !== undefined) parType[r.type_participation]++;
+    if (parStatut[r.statut] !== undefined) parStatut[r.statut]++;
+    if (r.presente_projet) nbProjets++;
+  }
+  const totalInscrits = rows.length - parStatut.annule; // "inscrits" = hors annulés, cohérent avec la liste admin
+  const placesRestantes = f.places_max != null ? Math.max(0, f.places_max - totalInscrits) : null;
+
+  let don = null;
+  if (f.don_active && f.cagnotte_id) {
+    const c = await db.prepare("SELECT montant_collecte, objectif_montant, nb_contributeurs FROM cagnottes WHERE id=?").get(f.cagnotte_id);
+    if (c) {
+      don = {
+        // Respecte la même règle de visibilité que le formulaire (§15-16) : un montant masqué
+        // au public reste néanmoins visible ici pour l'admin qui consulte SON dashboard.
+        montant_collecte: c.montant_collecte, objectif_montant: c.objectif_montant,
+        nb_contributeurs: c.nb_contributeurs,
+        progression_pct: c.objectif_montant > 0 ? Math.min(100, Math.round((c.montant_collecte / c.objectif_montant) * 100)) : null,
+      };
+    }
+  }
+
+  sendJSON(res, 200, {
+    total_inscrits: totalInscrits,
+    total_places: f.places_max,
+    places_restantes: placesRestantes,
+    par_type: parType,
+    par_statut: parStatut,
+    nb_projets_presentes: nbProjets,
+    don,
+  });
+});
+
+/* ── Exports (priorité 10 v2) — CSV/Excel/PDF, listes par type + liste de présence imprimable.
+   Même pattern zéro-dépendance que GET /api/initiatives/:id/adhesion-export : CSV brut, Excel
+   via table HTML (xmlns:x=urn:schemas-microsoft-com:office:excel), PDF via page imprimable
+   A4 + window.print() côté client — aucune librairie serveur, aucun format binaire généré ici. */
+const FORMULAIRE_EXPORT_TYPES = new Set(["tous", "participant", "benevole", "intervenant", "exposant", "presence"]);
+const FORMULAIRE_STATUT_LABELS = { inscrit: "Inscrit", confirme: "Confirmé", present: "Présent", absent: "Absent", annule: "Annulé" };
+const FORMULAIRE_TYPE_LABELS = { participant: "Participant", benevole: "Bénévole", intervenant: "Intervenant", exposant: "Exposant" };
+
+route("GET", "/api/formulaires-inscription/:id/export", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const f = await db.prepare("SELECT id, nom FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+
+  const type = FORMULAIRE_EXPORT_TYPES.has(query?.type) ? query.type : "tous";
+  const format = ["excel", "pdf"].includes(query?.format) ? query.format : "csv";
+
+  let rows = await db.prepare("SELECT * FROM formulaire_inscriptions WHERE formulaire_id=? AND statut != 'annule' ORDER BY nom, prenom").all(params.id);
+  if (type !== "tous" && type !== "presence") rows = rows.filter(r => r.type_participation === type);
+
+  const estPresence = type === "presence";
+  const entetes = estPresence
+    ? ["Nom", "Prénom", "Type", "Référence", "Signature"]
+    : ["Référence", "Nom", "Prénom", "Type", "Profession", "Téléphone", "Email", "Statut", "Date inscription"];
+  const lignes = rows.map(r => estPresence
+    ? [r.nom, r.prenom, FORMULAIRE_TYPE_LABELS[r.type_participation] || r.type_participation, r.reference || "", ""]
+    : [r.reference || "", r.nom, r.prenom, FORMULAIRE_TYPE_LABELS[r.type_participation] || r.type_participation,
+       r.profession || "", r.telephone || "", r.email || "", FORMULAIRE_STATUT_LABELS[r.statut] || r.statut,
+       r.created_at ? r.created_at.slice(0, 10) : ""]
+  );
+
+  const suffixe = estPresence ? "presence" : type;
+  const titre = estPresence ? `Liste de présence — ${f.nom}` : `Inscriptions${type !== "tous" ? " — " + FORMULAIRE_TYPE_LABELS[type] : ""} — ${f.nom}`;
+
+  if (format === "excel") {
+    const esc = v => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">
+      <style>table{border-collapse:collapse;font-family:Calibri,sans-serif;}
+      th{background:#1B3A6B;color:#fff;font-weight:bold;padding:6px 10px;border:1px solid #ccc;}
+      td{padding:5px 10px;border:1px solid #ddd;}</style></head><body>
+      <table><thead><tr>${entetes.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+      <tbody>${lignes.map(l => `<tr>${l.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>
+      </body></html>`;
+    res.writeHead(200, { "Content-Type": "application/vnd.ms-excel; charset=utf-8", "Content-Disposition": `attachment; filename="${suffixe}-formulaire-${params.id}.xls"` });
+    return res.end("﻿" + html);
+  }
+
+  if (format === "pdf") {
+    const esc = v => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(titre)}</title>
+      <style>
+        @page { size: A4 ${estPresence ? "portrait" : "landscape"}; margin: 14mm; }
+        body{font-family:Arial,sans-serif;color:#111;font-size:11px;}
+        h1{font-size:16px;margin:0 0 2px;} p{margin:0 0 14px;color:#555;font-size:11px;}
+        table{width:100%;border-collapse:collapse;} th{background:#1B3A6B;color:#fff;text-align:left;padding:6px 8px;font-size:10.5px;}
+        td{padding:5px 8px;border-bottom:1px solid #e5e7eb;font-size:10.5px;} tr:nth-child(even){background:#f8fafc;}
+        ${estPresence ? "td:last-child{min-width:120px;border-bottom:1px solid #111;}" : ""}
+      </style></head><body>
+      <h1>${esc(titre)}</h1>
+      <p>${rows.length} ligne${rows.length > 1 ? "s" : ""} — exporté le ${new Date().toLocaleDateString("fr-FR")}</p>
+      <table><thead><tr>${entetes.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+      <tbody>${lignes.map(l => `<tr>${l.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>
+      <script>window.onload = () => window.print();</script>
+      </body></html>`;
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end(html);
+  }
+
+  const csv = [entetes, ...lignes].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${suffixe}-formulaire-${params.id}.csv"` });
+  res.end("﻿" + csv);
+});
+
 route("POST", "/api/cagnottes", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur"].includes(user.role)) {
