@@ -16685,8 +16685,15 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
   await db.prepare("UPDATE formulaire_inscriptions SET reference=? WHERE id=?").run(reference, insertId);
   dbLoginRecord(`formulaire_inscription_ip:${ip}`, true);
 
+  /* Priorité 15 (§4) : la proposition "Créer mon compte" ne doit s'afficher QUE si la personne
+     n'en a pas déjà un — sinon elle risquerait de recréer un doublon par email. `compte_existant`
+     ne révèle rien de plus qu'un booléen : ni le rôle, ni aucune autre donnée du compte trouvé. */
+  const compteExistant = !user && email
+    ? !!(await db.prepare("SELECT id FROM users WHERE email=? AND nom != 'Compte supprimé'").get(email))
+    : !!user;
+
   const row = await db.prepare("SELECT id, reference, statut, type_participation, created_at FROM formulaire_inscriptions WHERE id=?").get(insertId);
-  sendJSON(res, 201, { inscription: row });
+  sendJSON(res, 201, { inscription: row, compte_existant: compteExistant });
 });
 
 /* ═══ MÉDIAS DU PROJET/DE L'INITIATIVE (priorité 12 v2) ═══
