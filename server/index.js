@@ -16259,6 +16259,165 @@ route("GET", "/api/cagnottes/:id", async (req, res, params) => {
   sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
 });
 
+/* ═══════════════ FORMULAIRES D'INSCRIPTION (2026-08-15) ═══════════════
+   Constructeur générique de formulaires d'inscription (événement/rencontre/conférence/
+   formation/networking/forum/projet/initiative/autre), réservé à l'administration
+   (Administration → Outils → Formulaires d'inscription). Module INDÉPENDANT de
+   evenements_participants et event_inscriptions_securisees (décision actée avec
+   l'utilisateur) : aucune fusion, un simple lien optionnel via evenement_id/initiative_id.
+   Priorités 1-2 du cahier des charges : squelette + constructeur. Les routes publiques
+   d'inscription (formulaire public, fiches, QR) sont des chantiers séparés à venir. */
+
+function formulaireEstProteje(user, res) {
+  if (!user || user.role !== "administrateur") {
+    sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+    return false;
+  }
+  return true;
+}
+
+/* Même pattern que genererNumeroTicket()/numeroDossier ailleurs sur la plateforme :
+   INSERT d'abord pour obtenir l'id auto-incrémenté, puis on construit la référence. */
+function genererReferenceInscription(id) {
+  return `DA-${new Date().getFullYear()}-${String(id).padStart(6, "0")}`;
+}
+
+function slugFormulaire(nom) {
+  return (String(nom || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "formulaire") + "-" + Date.now().toString(36);
+}
+
+/* GET /api/formulaires-inscription — liste admin, avec compteurs d'inscriptions/présences. */
+route("GET", "/api/formulaires-inscription", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const rows = await db.prepare("SELECT * FROM formulaires_inscription ORDER BY created_at DESC").all();
+  const withCounts = await Promise.all(rows.map(async f => {
+    const inscrits = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut != 'annule'").get(f.id))?.n || 0;
+    const presents = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut='present'").get(f.id))?.n || 0;
+    return { ...f, nb_inscrits: inscrits, nb_presents: presents };
+  }));
+  sendJSON(res, 200, { formulaires: withCounts });
+});
+
+/* GET /api/formulaires-inscription/:id — détail admin (constructeur en édition). */
+route("GET", "/api/formulaires-inscription/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  sendJSON(res, 200, { formulaire: f });
+});
+
+const FORMULAIRE_CHAMPS_MODIFIABLES = [
+  "nom","type","date_evt","heure_debut","heure_fin","lieu","adresse","description","affiche_url",
+  "organisateur","date_ouverture_inscriptions","date_fermeture_inscriptions","places_max",
+  "validation_auto","annulation_autorisee","confirmation_auto","autoriser_projet",
+  "don_active","evenement_id","initiative_id","champs_custom_json",
+];
+
+route("POST", "/api/formulaires-inscription", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom du formulaire est requis." });
+
+  const champsCustom = Array.isArray(body.champs_custom) ? JSON.stringify(body.champs_custom.slice(0, 30)) : '[]';
+  const slug = slugFormulaire(body.nom);
+  const id = (await db.prepare(`
+    INSERT INTO formulaires_inscription (
+      owner_user_id, nom, type, date_evt, heure_debut, heure_fin, lieu, adresse, description,
+      affiche_url, organisateur, date_ouverture_inscriptions, date_fermeture_inscriptions,
+      places_max, validation_auto, annulation_autorisee, confirmation_auto, autoriser_projet,
+      don_active, evenement_id, initiative_id, champs_custom_json, slug
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    user.id, String(body.nom).trim(), body.type || null, body.date_evt || null,
+    body.heure_debut || null, body.heure_fin || null, body.lieu || null, body.adresse || null,
+    body.description || null, body.affiche_url || null, body.organisateur || null,
+    body.date_ouverture_inscriptions || null, body.date_fermeture_inscriptions || null,
+    body.places_max != null && body.places_max !== "" ? Number(body.places_max) : null,
+    body.validation_auto === false ? 0 : 1,
+    body.annulation_autorisee === false ? 0 : 1,
+    body.confirmation_auto === false ? 0 : 1,
+    body.autoriser_projet ? 1 : 0,
+    body.don_active ? 1 : 0,
+    body.evenement_id || null, body.initiative_id || null, champsCustom, slug
+  )).lastInsertRowid;
+
+  const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(id);
+  sendJSON(res, 201, { formulaire: row });
+});
+
+route("PUT", "/api/formulaires-inscription/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const f = await db.prepare("SELECT id FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+
+  /* Colonnes INTEGER stockant un booléen : node:sqlite refuse un JS boolean brut comme
+     paramètre lié ("Erreur serveur" 500, contrairement à better-sqlite3 qui coercerait) —
+     toujours convertir en 0/1 avant de binder. */
+  const CHAMPS_BOOLEENS = new Set(["validation_auto","annulation_autorisee","confirmation_auto","autoriser_projet","don_active"]);
+  const sets = [];
+  const args = [];
+  for (const champ of FORMULAIRE_CHAMPS_MODIFIABLES) {
+    if (!(champ in body)) continue;
+    if (champ === "champs_custom_json") continue; // traité séparément ci-dessous
+    sets.push(`${champ}=?`);
+    args.push(CHAMPS_BOOLEENS.has(champ) ? (body[champ] ? 1 : 0) : body[champ]);
+  }
+  if (Array.isArray(body.champs_custom)) {
+    sets.push("champs_custom_json=?");
+    args.push(JSON.stringify(body.champs_custom.slice(0, 30)));
+  }
+  if (!sets.length) return sendJSON(res, 400, { error: "Aucun champ à modifier." });
+  sets.push("updated_at=datetime('now')");
+  args.push(params.id);
+  await db.prepare(`UPDATE formulaires_inscription SET ${sets.join(", ")} WHERE id=?`).run(...args);
+  const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
+  sendJSON(res, 200, { formulaire: row });
+});
+
+/* PATCH .../statut — transitions Brouillon → Ouvert → Fermé → Archivé (l'admin peut aussi
+   revenir en arrière, ex. refermer un formulaire ouvert par erreur). */
+route("PATCH", "/api/formulaires-inscription/:id/statut", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const statut = body?.statut;
+  if (!["brouillon","ouvert","ferme","archive"].includes(statut)) {
+    return sendJSON(res, 400, { error: "Statut invalide." });
+  }
+  const info = await db.prepare("UPDATE formulaires_inscription SET statut=?, updated_at=datetime('now') WHERE id=?").run(statut, params.id);
+  if (!info.changes) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  sendJSON(res, 200, { ok: true, statut });
+});
+
+route("POST", "/api/formulaires-inscription/:id/dupliquer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  const slug = slugFormulaire(f.nom + "-copie");
+  const id = (await db.prepare(`
+    INSERT INTO formulaires_inscription (
+      owner_user_id, nom, type, date_evt, heure_debut, heure_fin, lieu, adresse, description,
+      affiche_url, organisateur, statut, date_ouverture_inscriptions, date_fermeture_inscriptions,
+      places_max, validation_auto, annulation_autorisee, confirmation_auto, autoriser_projet,
+      don_active, evenement_id, initiative_id, champs_custom_json, slug
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    user.id, f.nom + " (copie)", f.type, f.date_evt, f.heure_debut, f.heure_fin, f.lieu, f.adresse,
+    f.description, f.affiche_url, f.organisateur, 'brouillon', f.date_ouverture_inscriptions,
+    f.date_fermeture_inscriptions, f.places_max, f.validation_auto, f.annulation_autorisee,
+    f.confirmation_auto, f.autoriser_projet,
+    /* Le don n'est jamais dupliqué automatiquement : chaque formulaire doit avoir SA propre
+       collecte, jamais partager celle d'un autre — évite un double-comptage accidentel. */
+    0, f.evenement_id, f.initiative_id, f.champs_custom_json, slug
+  )).lastInsertRowid;
+  const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(id);
+  sendJSON(res, 201, { formulaire: row });
+});
+
 route("POST", "/api/cagnottes", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur"].includes(user.role)) {

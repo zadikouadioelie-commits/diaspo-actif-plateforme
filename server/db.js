@@ -385,6 +385,86 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
+  /* ===== FORMULAIRES D'INSCRIPTION (2026-08-15) =====
+     Constructeur générique de formulaires (événement/rencontre/conférence/formation/networking/
+     forum/projet/initiative/autre) — module INDÉPENDANT de evenements_participants (RSVP léger
+     réservé aux comptes) et de event_inscriptions_securisees (inscription liée à un compte D'A) :
+     décision actée avec l'utilisateur, aucune fusion, juste des liens optionnels ci-dessous.
+     L'option "Faire un don" LIE une cagnotte existante plutôt que de dupliquer le paiement. */
+  CREATE TABLE IF NOT EXISTS formulaires_inscription (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    type TEXT,
+    date_evt TEXT,
+    heure_debut TEXT,
+    heure_fin TEXT,
+    lieu TEXT,
+    adresse TEXT,
+    description TEXT,
+    affiche_url TEXT,
+    organisateur TEXT,
+    statut TEXT NOT NULL DEFAULT 'brouillon' CHECK(statut IN ('brouillon','ouvert','ferme','archive')),
+    date_ouverture_inscriptions TEXT,
+    date_fermeture_inscriptions TEXT,
+    places_max INTEGER,
+    validation_auto INTEGER NOT NULL DEFAULT 1,
+    annulation_autorisee INTEGER NOT NULL DEFAULT 1,
+    confirmation_auto INTEGER NOT NULL DEFAULT 1,
+    autoriser_projet INTEGER NOT NULL DEFAULT 0,
+    don_active INTEGER NOT NULL DEFAULT 0,
+    cagnotte_id INTEGER,
+    evenement_id INTEGER,
+    initiative_id INTEGER,
+    champs_custom_json TEXT DEFAULT '[]',
+    slug TEXT UNIQUE,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(owner_user_id) REFERENCES users(id),
+    FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_formulaires_owner ON formulaires_inscription(owner_user_id);
+  CREATE INDEX IF NOT EXISTS idx_formulaires_statut ON formulaires_inscription(statut);
+
+  /* Une inscription = un participant. user_id nullable : même pattern "invité" que les
+     adhésions/cagnottes (nom+email/téléphone de repli, fusion possible après création de
+     compte). reponses_json porte les champs conditionnels par type de participation + les
+     champs custom du formulaire (même format que adhesion_membres.reponses_json). */
+  CREATE TABLE IF NOT EXISTS formulaire_inscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    formulaire_id INTEGER NOT NULL,
+    reference TEXT UNIQUE,
+    user_id INTEGER,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    profession TEXT,
+    telephone TEXT,
+    email TEXT,
+    adresse TEXT,
+    observation TEXT,
+    type_participation TEXT NOT NULL DEFAULT 'participant' CHECK(type_participation IN ('participant','benevole','intervenant','exposant')),
+    reponses_json TEXT DEFAULT '{}',
+    presente_projet INTEGER NOT NULL DEFAULT 0,
+    projet_nom TEXT,
+    projet_description TEXT,
+    projet_objectifs TEXT,
+    projet_photos_json TEXT DEFAULT '[]',
+    projet_video_url TEXT,
+    projet_pdf_url TEXT,
+    statut TEXT NOT NULL DEFAULT 'inscrit' CHECK(statut IN ('inscrit','confirme','present','absent','annule')),
+    qr_payload TEXT,
+    ip_creation TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(formulaire_id) REFERENCES formulaires_inscription(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_form_insc_formulaire ON formulaire_inscriptions(formulaire_id);
+  CREATE INDEX IF NOT EXISTS idx_form_insc_reference ON formulaire_inscriptions(reference);
+  CREATE INDEX IF NOT EXISTS idx_form_insc_statut ON formulaire_inscriptions(statut);
+
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user1_id INTEGER NOT NULL,

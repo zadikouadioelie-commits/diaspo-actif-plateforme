@@ -54,6 +54,7 @@
       <a href="#partenaires-admin" data-section="partenaires-admin">🏅 Partenaires Officiels</a>
       <a href="#deal-master-admin" data-section="deal-master-admin">⭐ Deal Master</a>
       <a href="#temoignages-admin" data-section="temoignages-admin">💬 Témoignages</a>
+      <a href="#formulaires-inscription" data-section="formulaires-inscription">📝 Formulaires d'inscription</a>
       <a href="#parametres" data-section="parametres">⚙️ Paramètres</a>
       <a href="paiements-admin.html">💳 Module Paiements</a>
       <a href="comptes-lies.html">🔗 Liaison de comptes</a>
@@ -2834,6 +2835,34 @@
             </tr></thead>
             <tbody id="temoignages-admin-tbody"></tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- ══════════ SECTION FORMULAIRES D'INSCRIPTION ══════════ -->
+      <section id="section-formulaires-inscription" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;"><h2 style="margin:0;">📝 Formulaires d'inscription</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Événements, rencontres, conférences, formations, projets… un formulaire par dispositif, chacun avec ses propres inscriptions.</p>
+          </div>
+          <button type="button" onclick="ouvrirFormulaireModal()" style="background:#f97316;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">+ Créer un formulaire</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;white-space:nowrap;">Nom</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Type</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Date</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Lieu</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Statut</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Inscrits</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Places</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Présents</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Don</th>
+              <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;">Actions</th>
+            </tr></thead>
+            <tbody id="formulaires-inscription-tbody"></tbody>
+          </table>
+          <div id="formulaires-inscription-vide" style="display:none;text-align:center;padding:40px;color:var(--muted);">Aucun formulaire créé pour l'instant.</div>
         </div>
       </section>
 
@@ -8664,6 +8693,7 @@ async function submitAccordDirect(){
   // Navigation sections — lazy-load les modules à la demande
   const SECTION_LOADERS = {
     'regles-contact': () => { rcCharger(); adCharger(); },
+    'formulaires-inscription': () => loadFormulairesInscription(),
     reseau:      () => loadReseau(),
     contenu:     () => loadContenu(),
     retention:   () => loadRetention(),
@@ -13464,6 +13494,170 @@ async function savePoConfig() {
     setTimeout(()=>msg.style.display='none', 3000);
   } catch(e) {
     msg.style.display='block'; msg.style.color='#dc2626'; msg.textContent='Erreur : '+e.message;
+  }
+}
+
+/* ═══ FORMULAIRES D'INSCRIPTION (constructeur générique — priorités 1-2) ═══ */
+const FI_STATUT_LABEL = { brouillon:'📝 Brouillon', ouvert:'🟢 Ouvert', ferme:'🔴 Fermé', archive:'🗄 Archivé' };
+const FI_TYPE_LABEL = { evenement:'Événement', rencontre:'Rencontre', conference:'Conférence', formation:'Formation', networking:'Networking', forum:'Forum', projet:'Projet', initiative:'Initiative', autre:'Autre' };
+let _fiListe = [];
+
+async function loadFormulairesInscription() {
+  const tbody = document.getElementById('formulaires-inscription-tbody');
+  const vide = document.getElementById('formulaires-inscription-vide');
+  tbody.innerHTML = `<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--muted);">Chargement…</td></tr>`;
+  try {
+    const d = await api('GET', '/formulaires-inscription');
+    _fiListe = d.formulaires || [];
+    if (!_fiListe.length) {
+      tbody.innerHTML = '';
+      vide.style.display = 'block';
+      return;
+    }
+    vide.style.display = 'none';
+    tbody.innerHTML = _fiListe.map(f => `<tr style="border-bottom:1px solid #f1f5f9;">
+      <td style="padding:10px 12px;font-weight:700;">${esc(f.nom)}</td>
+      <td style="padding:10px 12px;">${esc(FI_TYPE_LABEL[f.type] || f.type || '—')}</td>
+      <td style="padding:10px 12px;">${f.date_evt ? esc(f.date_evt) : '—'}</td>
+      <td style="padding:10px 12px;">${f.lieu ? esc(f.lieu) : '—'}</td>
+      <td style="padding:10px 12px;">${FI_STATUT_LABEL[f.statut] || f.statut}</td>
+      <td style="padding:10px 12px;text-align:center;">${f.nb_inscrits}</td>
+      <td style="padding:10px 12px;text-align:center;">${f.places_max ?? '∞'}</td>
+      <td style="padding:10px 12px;text-align:center;">${f.nb_presents}</td>
+      <td style="padding:10px 12px;text-align:center;">${f.don_active ? '💚' : '—'}</td>
+      <td style="padding:10px 12px;white-space:nowrap;">
+        <button type="button" onclick="ouvrirFormulaireModal(${f.id})" title="Modifier" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">✏️</button>
+        <button type="button" onclick="fiDupliquer(${f.id})" title="Dupliquer" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">⧉</button>
+        <select onchange="fiChangerStatut(${f.id}, this.value)" title="Changer le statut" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:12px;">
+          ${Object.entries(FI_STATUT_LABEL).map(([v,l]) => `<option value="${v}" ${f.statut===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="10" style="padding:20px;text-align:center;color:#dc2626;">Erreur : ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function fiChangerStatut(id, statut) {
+  try {
+    await api('PATCH', `/formulaires-inscription/${id}/statut`, { statut });
+    loadFormulairesInscription();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function fiDupliquer(id) {
+  if (!confirm('Dupliquer ce formulaire ? La copie démarre en brouillon, sans don activé.')) return;
+  try {
+    await api('POST', `/formulaires-inscription/${id}/dupliquer`);
+    loadFormulairesInscription();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+function ouvrirFormulaireModal(id) {
+  const f = id ? _fiListe.find(x => x.id === id) : null;
+  let modal = document.getElementById('fi-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'fi-modal';
+    modal.className = 'modal-overlay';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  const v = (champ, def) => f ? (f[champ] ?? def ?? '') : (def ?? '');
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:640px;width:94%;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="margin:0;">${f ? '✏️ Modifier le formulaire' : '+ Créer un formulaire'}</h3>
+        <button type="button" onclick="document.getElementById('fi-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);">✕</button>
+      </div>
+
+      <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Informations générales</h4>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:12px;font-weight:700;">Nom du formulaire / événement *</label>
+          <input id="fi-nom" type="text" value="${esc(v('nom'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+        <div><label style="font-size:12px;font-weight:700;">Type</label>
+          <select id="fi-type" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">
+            ${Object.entries(FI_TYPE_LABEL).map(([val,lbl]) => `<option value="${val}" ${v('type')===val?'selected':''}>${lbl}</option>`).join('')}
+          </select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:12px;font-weight:700;">Date</label>
+          <input id="fi-date" type="date" value="${esc(v('date_evt'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+        <div><label style="font-size:12px;font-weight:700;">Heure de début</label>
+          <input id="fi-heure-debut" type="time" value="${esc(v('heure_debut'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+        <div><label style="font-size:12px;font-weight:700;">Heure de fin</label>
+          <input id="fi-heure-fin" type="time" value="${esc(v('heure_fin'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:12px;font-weight:700;">Lieu</label>
+          <input id="fi-lieu" type="text" value="${esc(v('lieu'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+        <div><label style="font-size:12px;font-weight:700;">Adresse</label>
+          <input id="fi-adresse" type="text" value="${esc(v('adresse'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+      </div>
+      <div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:700;">Description</label>
+        <textarea id="fi-description" rows="3" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">${esc(v('description'))}</textarea></div>
+      <div style="margin-bottom:16px;"><label style="font-size:12px;font-weight:700;">Organisateur</label>
+        <input id="fi-organisateur" type="text" value="${esc(v('organisateur'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+
+      <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Gestion des inscriptions</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label style="font-size:12px;font-weight:700;">Ouverture des inscriptions</label>
+          <input id="fi-ouverture" type="date" value="${esc(v('date_ouverture_inscriptions'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+        <div><label style="font-size:12px;font-weight:700;">Fermeture des inscriptions</label>
+          <input id="fi-fermeture" type="date" value="${esc(v('date_fermeture_inscriptions'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+      </div>
+      <div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:700;">Nombre maximum de participants (vide = illimité)</label>
+        <input id="fi-places" type="number" min="0" value="${f && f.places_max != null ? f.places_max : ''}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;font-size:13px;">
+        <label><input type="checkbox" id="fi-validation-auto" ${!f || f.validation_auto ? 'checked' : ''}> Validation automatique des inscriptions</label>
+        <label><input type="checkbox" id="fi-annulation" ${!f || f.annulation_autorisee ? 'checked' : ''}> Autoriser l'annulation par le participant</label>
+        <label><input type="checkbox" id="fi-confirmation-auto" ${!f || f.confirmation_auto ? 'checked' : ''}> Envoyer une confirmation automatique</label>
+        <label><input type="checkbox" id="fi-projet" ${f && f.autoriser_projet ? 'checked' : ''}> Autoriser la présentation d'un projet/initiative</label>
+        <label title="La collecte associée se construit dans une étape séparée, à venir."><input type="checkbox" id="fi-don" disabled ${f && f.don_active ? 'checked' : ''}> Activer « Faire un don » — bientôt disponible</label>
+      </div>
+
+      <div id="fi-modal-msg" style="display:none;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" onclick="document.getElementById('fi-modal').style.display='none'" style="background:none;border:1px solid #e2e8f0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">Annuler</button>
+        <button type="button" onclick="fiEnregistrer(${f ? f.id : 'null'})" style="background:#f97316;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">💾 ${f ? 'Enregistrer' : 'Créer le formulaire'}</button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+async function fiEnregistrer(id) {
+  const msg = document.getElementById('fi-modal-msg');
+  const nom = document.getElementById('fi-nom').value.trim();
+  if (!nom) {
+    msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = 'Le nom du formulaire est requis.';
+    return;
+  }
+  const placesVal = document.getElementById('fi-places').value;
+  const payload = {
+    nom,
+    type: document.getElementById('fi-type').value,
+    date_evt: document.getElementById('fi-date').value || null,
+    heure_debut: document.getElementById('fi-heure-debut').value || null,
+    heure_fin: document.getElementById('fi-heure-fin').value || null,
+    lieu: document.getElementById('fi-lieu').value.trim() || null,
+    adresse: document.getElementById('fi-adresse').value.trim() || null,
+    description: document.getElementById('fi-description').value.trim() || null,
+    organisateur: document.getElementById('fi-organisateur').value.trim() || null,
+    date_ouverture_inscriptions: document.getElementById('fi-ouverture').value || null,
+    date_fermeture_inscriptions: document.getElementById('fi-fermeture').value || null,
+    places_max: placesVal !== '' ? Number(placesVal) : null,
+    validation_auto: document.getElementById('fi-validation-auto').checked,
+    annulation_autorisee: document.getElementById('fi-annulation').checked,
+    confirmation_auto: document.getElementById('fi-confirmation-auto').checked,
+    autoriser_projet: document.getElementById('fi-projet').checked,
+  };
+  try {
+    if (id) await api('PUT', `/formulaires-inscription/${id}`, payload);
+    else await api('POST', '/formulaires-inscription', payload);
+    document.getElementById('fi-modal').style.display = 'none';
+    loadFormulairesInscription();
+  } catch(e) {
+    msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = 'Erreur : ' + e.message;
   }
 }
 
