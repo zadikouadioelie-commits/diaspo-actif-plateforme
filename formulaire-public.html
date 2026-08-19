@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Inscription</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<style>
+.fp-wrap{max-width:760px;margin:0 auto;padding:26px 20px 70px;}
+.fp-affiche{width:100%;max-height:300px;border-radius:var(--radius);object-fit:cover;display:block;background:var(--bg);}
+.fp-cat{display:inline-block;margin-top:16px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800;color:#fff;background:#F26422;letter-spacing:.04em;text-transform:uppercase;}
+.fp-title{font-size:26px;font-weight:900;margin:10px 0 4px;color:var(--navy);line-height:1.2;}
+.fp-orga{font-size:13px;color:var(--muted);margin-bottom:18px;}
+.fp-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px;margin-bottom:18px;}
+.fp-meta{display:flex;flex-wrap:wrap;gap:14px 26px;}
+.fp-meta div{font-size:13.5px;color:var(--muted);}
+.fp-meta strong{display:block;font-size:15px;color:var(--navy);font-weight:700;margin-top:2px;}
+.fp-desc{font-size:14.5px;line-height:1.65;color:var(--text);white-space:pre-wrap;}
+.fp-h2{font-size:17px;font-weight:800;color:var(--navy);margin:0 0 14px;}
+.fp-field{margin-bottom:15px;}
+.fp-label{display:block;font-size:13px;font-weight:700;color:var(--navy);margin-bottom:5px;}
+.fp-req{color:#dc2626;}
+.fp-hint{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45;}
+.fp-input,.fp-select,.fp-textarea{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:9px;font-size:15px;font-family:inherit;background:#fff;color:var(--text);}
+.fp-input:focus,.fp-select:focus,.fp-textarea:focus{outline:2px solid #F26422;outline-offset:1px;border-color:#F26422;}
+.fp-textarea{min-height:92px;resize:vertical;}
+.fp-check{display:flex;align-items:flex-start;gap:9px;font-size:14px;color:var(--text);margin-bottom:8px;cursor:pointer;line-height:1.45;}
+.fp-check input{margin-top:3px;width:17px;height:17px;flex-shrink:0;cursor:pointer;}
+.fp-submit{width:100%;padding:15px;border-radius:10px;border:none;font-weight:800;font-size:16px;cursor:pointer;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;}
+.fp-submit:disabled{cursor:not-allowed;background:#e5e7eb;color:#9ca3af;}
+.fp-error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:9px;padding:11px 13px;font-size:13.5px;margin-bottom:14px;line-height:1.5;}
+.fp-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:15px;}
+.fp-closed{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:var(--radius);padding:16px 18px;font-size:14.5px;font-weight:600;margin-bottom:18px;text-align:center;line-height:1.5;}
+.fp-don{background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;}
+.fp-don-img{width:100%;height:130px;object-fit:cover;border-radius:10px;margin-bottom:12px;}
+.fp-don-titre{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:5px;}
+.fp-don-desc{font-size:13.5px;color:var(--muted);line-height:1.55;margin-bottom:12px;}
+.fp-bar{height:9px;background:#fff;border-radius:99px;overflow:hidden;margin:9px 0 6px;}
+.fp-bar-fill{height:100%;background:linear-gradient(135deg,#F26422,#c2410c);}
+.fp-don-montant{font-size:19px;font-weight:900;color:var(--navy);}
+.fp-don-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+.fp-don-btn{display:block;width:100%;padding:13px;border-radius:10px;font-weight:800;font-size:15px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;}
+.fp-media{border:1px dashed var(--border);border-radius:10px;padding:13px;margin-bottom:9px;}
+.fp-media-list{font-size:12.5px;color:#059669;margin-top:7px;line-height:1.7;}
+.fp-ok-icon{font-size:52px;text-align:center;margin-bottom:8px;}
+.fp-ok-titre{font-size:22px;font-weight:900;color:var(--navy);text-align:center;margin-bottom:6px;}
+.fp-ok-sub{font-size:14px;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:20px;}
+.fp-ref{background:var(--bg);border-radius:10px;padding:14px;text-align:center;margin-bottom:18px;}
+.fp-ref-label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
+.fp-ref-val{font-size:22px;font-weight:900;color:var(--navy);letter-spacing:.04em;margin-top:3px;font-variant-numeric:tabular-nums;}
+.fp-qr{display:flex;justify-content:center;padding:16px;background:#fff;border-radius:10px;border:1px solid var(--border);}
+.fp-qr img,.fp-qr canvas{display:block;}
+@media(max-width:600px){
+  .fp-wrap{padding:18px 15px 80px;}
+  .fp-title{font-size:22px;}
+  .fp-card{padding:17px 16px;}
+  .fp-affiche{max-height:200px;}
+}
+</style>
+  <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+  <link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
+        <a href="cagnottes.html">Cagnottes</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="vitrines.html">🏪 Vitrines</a>
+    <a href="cagnottes.html">🪙 Cagnottes</a>
+    <div id="hb-account-section"></div>
+  </aside>
+
+  <div class="fp-wrap" id="fp-content">
+    <div class="fp-empty">Chargement…</div>
+  </div>
+
+  <footer class="footer">
+    <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> ·
+    <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a>
+  </footer>
+</div>
+
+<script src="assets/data.js?v=7"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=10"></script>
+
+<script>
+/* ══════════════ FORMULAIRE D'INSCRIPTION PUBLIC (priorité 4 du cahier des charges v2) ══════
+   Page 100 % publique : AUCUN compte n'est requis pour s'inscrire ni pour donner (règles #4/#6).
+   On appelle /api/auth/me uniquement pour préremplir les champs d'une personne déjà connectée —
+   jamais pour bloquer l'accès. Même convention que cagnotte.html. */
+(function(){
+  function escH(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  const slug = new URLSearchParams(location.search).get('slug');
+  const el = document.getElementById('fp-content');
+  let _f = null, _user = null;
+  /* Médias du projet déjà téléversés (URL de notre CDN renvoyées par .../public/upload). */
+  let _photos = [], _videoUrl = null, _pdfUrl = null;
+
+  const TYPE_LABELS = {
+    evenement:'Événement', rencontre:'Rencontre', conference:'Conférence', formation:'Formation',
+    networking:'Networking', forum:'Forum', projet:'Projet', initiative:'Initiative', autre:'Autre',
+  };
+  const PARTICIPATION_LABELS = {
+    participant:'Participant', benevole:'Bénévole', intervenant:'Intervenant', exposant:'Exposant',
+  };
+  const RAISON_LABELS = {
+    complet:'😔 Toutes les places ont été prises — les inscriptions sont closes.',
+    date_depassee:'⌛ La date limite d\'inscription est dépassée.',
+    pas_encore_ouvertes:'🕐 Les inscriptions ne sont pas encore ouvertes.',
+    fermees:'🔒 Les inscriptions sont fermées.',
+  };
+
+  function fmtDate(d){
+    if (!d) return null;
+    try { return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'}); }
+    catch(e){ return d; }
+  }
+
+  /* ── Champs personnalisés (priorité 3) : 13 types, rendus génériquement ─────────────────
+     Le serveur a déjà nettoyé/borné chaque champ (type whitelisté, options bornées) — on se
+     contente d'échapper à l'affichage. `fpc_` préfixe les name= pour ne jamais entrer en
+     collision avec les champs fixes du formulaire. */
+  function champHtml(c){
+    const req = c.obligatoire ? ' <span class="fp-req">*</span>' : '';
+    const nom = 'fpc_' + c.id;
+    const label = '<label class="fp-label" for="'+escH(nom)+'">'+escH(c.label)+req+'</label>';
+    const opts = Array.isArray(c.options) ? c.options : [];
+    let input = '';
+    switch (c.type) {
+      case 'texte_long':
+        input = '<textarea class="fp-textarea" id="'+escH(nom)+'" name="'+escH(nom)+'"'+(c.obligatoire?' required':'')+'></textarea>'; break;
+      case 'nombre':
+        input = '<input class="fp-input" type="number" id="'+escH(nom)+'" name="'+escH(nom)+'"'+(c.obligatoire?' required':'')+'>'; break;
+      case 'date':
+        input = '<input class="fp-input" type="date" id="'+escH(nom)+'" name="'+escH(nom)+'"'+(c.obligatoire?' required':'')+'>'; break;
+      case 'heure':
+        input = '<input class="fp-input" type="time" id="'+escH(nom)+'" name="'+escH(nom)+'"'+(c.obligatoire?' required':'')+'>'; break;
+      case 'liste_deroulante':
+        input = '<select class="fp-select" id="'+escH(nom)+'" name="'+escH(nom)+'"'+(c.obligatoire?' required':'')+'>'
+              + '<option value="">— Choisir —</option>'
+              + opts.map(function(o){ return '<option value="'+escH(o)+'">'+escH(o)+'</option>'; }).join('')
+              + '</select>'; break;
+      case 'choix_unique':
+        input = opts.map(function(o,i){
+          return '<label class="fp-check"><input type="radio" name="'+escH(nom)+'" value="'+escH(o)+'"'+(c.obligatoire&&i===0?' required':'')+'><span>'+escH(o)+'</span></label>';
+        }).join(''); break;
+      case 'choix_multiple':
+        input = opts.map(function(o){
+          return '<label class="fp-check"><input type="checkbox" name="'+escH(nom)+'" value="'+escH(o)+'"><span>'+escH(o)+'</span></label>';
+        }).join(''); break;
+      case 'consentement':
+        /* Le libellé porte déjà l'énoncé du consentement : on ne le répète pas au-dessus. */
+        return '<div class="fp-field"><label class="fp-check"><input type="checkbox" id="'+escH(nom)+'" name="'+escH(nom)+'" value="oui"'+(c.obligatoire?' required':'')+'><span>'+escH(c.label)+req+'</span></label></div>';
+      case 'signature':
+        input = '<input class="fp-input" type="text" id="'+escH(nom)+'" name="'+escH(nom)+'" placeholder="Tapez votre nom complet en guise de signature"'+(c.obligatoire?' required':'')+'>'
+              + '<div class="fp-hint">Votre nom saisi ici vaut signature électronique.</div>'; break;
+      case 'fichier': case 'photo': case 'video':
+        /* Ces types passent par l'espace « Présentation de projet » (upload vers notre CDN) —
+           ici on ne collecte qu'une indication écrite, jamais un fichier orphelin non contrôlé. */
+        input = '<input class="fp-input" type="text" id="'+escH(nom)+'" name="'+escH(nom)+'" placeholder="Décrivez le document — vous pourrez le joindre ci-dessous"'+(c.obligatoire?' required':'')+'>'; break;
+      default:
+        input = '<input class="fp-input" type="text" id="'+escH(nom)+'" name="'+escH(nom)+'"'+(c.obligatoire?' required':'')+'>';
+    }
+    return '<div class="fp-field">'+label+input+'</div>';
+  }
+
+  function lireChamps(champs){
+    const rep = {};
+    (champs||[]).forEach(function(c){
+      const nom = 'fpc_' + c.id;
+      if (c.type === 'choix_multiple') {
+        const vals = Array.prototype.slice.call(document.querySelectorAll('input[name="'+CSS.escape(nom)+'"]:checked')).map(function(i){ return i.value; });
+        if (vals.length) rep[c.id] = vals;
+      } else if (c.type === 'choix_unique') {
+        const sel = document.querySelector('input[name="'+CSS.escape(nom)+'"]:checked');
+        if (sel) rep[c.id] = sel.value;
+      } else if (c.type === 'consentement') {
+        const box = document.getElementById(nom);
+        if (box && box.checked) rep[c.id] = 'oui';
+      } else {
+        const inp = document.getElementById(nom);
+        if (inp && inp.value.trim()) rep[c.id] = inp.value.trim();
+      }
+    });
+    return rep;
+  }
+
+  /* ── Aperçu de la collecte (règle #5) : teaser seulement, jamais la page complète de don.
+     Le bouton redirige vers la vraie page de don Diaspo'Actif (cagnotte.html). ───────────── */
+  function donHtml(don){
+    if (!don) return '';
+    const aMontant = don.montant_collecte != null;   /* null si visibilite_montant = 'masque' */
+    const pct = (aMontant && don.objectif_montant) ? Math.min(100, Math.round(don.montant_collecte / don.objectif_montant * 100)) : null;
+    const dev = escH(don.devise || 'EUR');
+    return '<div class="fp-card fp-don">'
+      + (don.image_url ? '<img class="fp-don-img" src="'+escH(don.image_url)+'" alt="">' : '')
+      + '<div class="fp-don-titre">💚 '+escH(don.titre || 'Faire un don')+'</div>'
+      + (don.description ? '<div class="fp-don-desc">'+escH(String(don.description).slice(0,260))+'</div>' : '')
+      + (aMontant ? '<div class="fp-don-montant">'+Number(don.montant_collecte).toLocaleString('fr-FR')+' '+dev+'</div>' : '')
+      + (pct != null ? '<div class="fp-bar"><div class="fp-bar-fill" style="width:'+pct+'%"></div></div>' : '')
+      + (aMontant && don.objectif_montant ? '<div class="fp-don-sub">sur un objectif de '+Number(don.objectif_montant).toLocaleString('fr-FR')+' '+dev+'</div>' : '<div class="fp-don-sub">Chaque contribution compte, quel qu\'en soit le montant.</div>')
+      + '<a class="fp-don-btn" href="cagnotte.html?slug='+encodeURIComponent(don.slug)+'">FAIRE UN DON</a>'
+      + '<div class="fp-hint" style="text-align:center;margin-top:9px;">Le don est totalement facultatif et indépendant de votre inscription — aucun compte n\'est nécessaire.</div>'
+      + '</div>';
+  }
+
+  function render(f){
+    const ouvert = f.inscriptions_ouvertes;
+    const champs = Array.isArray(f.champs_custom) ? f.champs_custom : [];
+    const dateStr = fmtDate(f.date_evt);
+    const heure = [f.heure_debut, f.heure_fin].filter(Boolean).join(' — ');
+
+    let h = '';
+    if (f.affiche_url) h += '<img class="fp-affiche" src="'+escH(f.affiche_url)+'" alt="">';
+    h += '<span class="fp-cat">'+escH(TYPE_LABELS[f.type] || f.type || 'Inscription')+'</span>';
+    h += '<h1 class="fp-title">'+escH(f.nom)+'</h1>';
+    if (f.organisateur) h += '<div class="fp-orga">Organisé par '+escH(f.organisateur)+'</div>';
+
+    /* Bloc informations pratiques — n'affiche que ce qui est réellement renseigné. */
+    const metas = [];
+    if (dateStr) metas.push('<div>Date<strong>'+escH(dateStr)+'</strong></div>');
+    if (heure) metas.push('<div>Horaires<strong>'+escH(heure)+'</strong></div>');
+    if (f.lieu) metas.push('<div>Lieu<strong>'+escH(f.lieu)+'</strong></div>');
+    if (f.adresse) metas.push('<div>Adresse<strong>'+escH(f.adresse)+'</strong></div>');
+    if (f.places_max) metas.push('<div>Places<strong>'+escH(f.places_max)+'</strong></div>');
+    if (f.nb_inscrits != null) metas.push('<div>Déjà inscrits<strong>'+escH(f.nb_inscrits)+'</strong></div>');
+    if (metas.length) h += '<div class="fp-card"><div class="fp-meta">'+metas.join('')+'</div></div>';
+    if (f.description) h += '<div class="fp-card"><div class="fp-desc">'+escH(f.description)+'</div></div>';
+
+    h += donHtml(f.don);
+
+    if (!ouvert) {
+      h += '<div class="fp-closed">'+escH(RAISON_LABELS[f.raison_fermeture] || 'Les inscriptions sont actuellement fermées.')+'</div>';
+      el.innerHTML = h;
+      return;
+    }
+
+    h += '<form class="fp-card" id="fp-form" novalidate>'
+      + '<h2 class="fp-h2">S\'inscrire</h2>'
+      + '<div id="fp-error" style="display:none;"></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-type">Je participe en tant que</label>'
+      + '<select class="fp-select" id="fp-type">'
+      + Object.keys(PARTICIPATION_LABELS).map(function(k){ return '<option value="'+k+'">'+escH(PARTICIPATION_LABELS[k])+'</option>'; }).join('')
+      + '</select></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-nom">Nom <span class="fp-req">*</span></label><input class="fp-input" id="fp-nom" autocomplete="family-name" required></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-prenom">Prénom <span class="fp-req">*</span></label><input class="fp-input" id="fp-prenom" autocomplete="given-name" required></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-profession">Profession <span class="fp-req">*</span></label><input class="fp-input" id="fp-profession" required></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-tel">Téléphone</label><input class="fp-input" id="fp-tel" type="tel" autocomplete="tel" inputmode="tel"></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-email">Adresse e-mail</label><input class="fp-input" id="fp-email" type="email" autocomplete="email" inputmode="email">'
+      + '<div class="fp-hint">Renseignez au moins un téléphone <strong>ou</strong> un e-mail pour que l\'organisateur puisse vous joindre.</div></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-adresse">Adresse</label><input class="fp-input" id="fp-adresse" autocomplete="street-address"></div>'
+      + '<div class="fp-field"><label class="fp-label" for="fp-observation">Observation</label><textarea class="fp-textarea" id="fp-observation" placeholder="Une précision à transmettre à l\'organisateur ?"></textarea></div>';
+
+    if (champs.length) h += '<h2 class="fp-h2" style="margin-top:26px;">Informations complémentaires</h2>' + champs.map(champHtml).join('');
+
+    /* Présentation de projet (priorités 11-12) : repliée par défaut, jamais imposée. */
+    if (f.autoriser_projet) {
+      h += '<h2 class="fp-h2" style="margin-top:26px;">Présenter un projet ou une initiative</h2>'
+        + '<label class="fp-check"><input type="checkbox" id="fp-projet-actif"><span>Je souhaite présenter un projet ou une initiative lors de cette rencontre</span></label>'
+        + '<div id="fp-projet-bloc" style="display:none;margin-top:14px;">'
+        + '<div class="fp-field"><label class="fp-label" for="fp-projet-nom">Nom du projet</label><input class="fp-input" id="fp-projet-nom"></div>'
+        + '<div class="fp-field"><label class="fp-label" for="fp-projet-desc">Description</label><textarea class="fp-textarea" id="fp-projet-desc"></textarea></div>'
+        + '<div class="fp-field"><label class="fp-label" for="fp-projet-obj">Objectifs</label><textarea class="fp-textarea" id="fp-projet-obj"></textarea></div>'
+        + '<div class="fp-media"><label class="fp-label">Photos (3 maximum, 5 Mo chacune)</label>'
+        + '<input type="file" id="fp-up-photo" accept="image/*" multiple><div class="fp-media-list" id="fp-liste-photo"></div></div>'
+        + '<div class="fp-media"><label class="fp-label">Document PDF (10 Mo maximum)</label>'
+        + '<input type="file" id="fp-up-pdf" accept="application/pdf"><div class="fp-media-list" id="fp-liste-pdf"></div></div>'
+        + '<div class="fp-media"><label class="fp-label">Vidéo (2 minutes maximum, 60 Mo)</label>'
+        + '<input type="file" id="fp-up-video" accept="video/mp4,video/webm"><div class="fp-media-list" id="fp-liste-video"></div></div>'
+        + '</div>';
+    }
+
+    h += '<button type="submit" class="fp-submit" id="fp-submit" style="margin-top:22px;">Valider mon inscription</button>'
+      + '<div class="fp-hint" style="text-align:center;margin-top:10px;">Aucun compte n\'est nécessaire pour s\'inscrire.</div>'
+      + '</form>';
+
+    el.innerHTML = h;
+    brancherFormulaire(f, champs);
+  }
+
+  function brancherFormulaire(f, champs){
+    const form = document.getElementById('fp-form');
+    if (_user) {   /* préremplissage confort d'une personne déjà connectée — jamais bloquant */
+      if (_user.nom) document.getElementById('fp-nom').value = _user.nom;
+      if (_user.prenom) document.getElementById('fp-prenom').value = _user.prenom;
+      if (_user.email) document.getElementById('fp-email').value = _user.email;
+    }
+
+    const chk = document.getElementById('fp-projet-actif');
+    if (chk) chk.addEventListener('change', function(){
+      document.getElementById('fp-projet-bloc').style.display = chk.checked ? '' : 'none';
+    });
+
+    brancherUpload('fp-up-photo', 'photo', 'fp-liste-photo');
+    brancherUpload('fp-up-pdf', 'pdf', 'fp-liste-pdf');
+    brancherUpload('fp-up-video', 'video', 'fp-liste-video');
+
+    form.addEventListener('submit', function(e){ e.preventDefault(); soumettre(f, champs); });
+  }
+
+  function erreur(msg){
+    const box = document.getElementById('fp-error');
+    if (!box) return;
+    box.className = 'fp-error';
+    box.textContent = msg;
+    box.style.display = '';
+    box.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  /* Upload des médias vers NOTRE CDN via .../public/upload (aucun compte requis, rate-limité
+     par IP côté serveur, contrôlé par octets magiques + durée réelle pour la vidéo). */
+  function brancherUpload(inputId, type, listeId){
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const liste = document.getElementById(listeId);
+    input.addEventListener('change', async function(){
+      const fichiers = Array.prototype.slice.call(input.files || []);
+      if (!fichiers.length) return;
+      for (const fichier of fichiers) {
+        if (type === 'photo' && _photos.length >= 3) { liste.textContent = '3 photos maximum.'; break; }
+        liste.innerHTML += '<div>⏳ Envoi de ' + escH(fichier.name) + '…</div>';
+        try {
+          const fd = new FormData();
+          fd.append('type', type);
+          fd.append('fichier', fichier);
+          const r = await fetch('/api/formulaires-inscription/public/upload', { method:'POST', body: fd });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Envoi impossible.');
+          if (type === 'photo') _photos.push(data.url);
+          else if (type === 'pdf') _pdfUrl = data.url;
+          else _videoUrl = data.url;
+          rafraichirListe(type, liste);
+        } catch(err) {
+          liste.innerHTML = '<div style="color:#dc2626;">❌ ' + escH(err.message) + '</div>';
+        }
+      }
+      input.value = '';
+    });
+  }
+
+  function rafraichirListe(type, liste){
+    if (type === 'photo') liste.innerHTML = _photos.map(function(u,i){ return '<div>✅ Photo '+(i+1)+' envoyée</div>'; }).join('');
+    else if (type === 'pdf') liste.innerHTML = _pdfUrl ? '<div>✅ Document PDF envoyé</div>' : '';
+    else liste.innerHTML = _videoUrl ? '<div>✅ Vidéo envoyée</div>' : '';
+  }
+
+  async function soumettre(f, champs){
+    const btn = document.getElementById('fp-submit');
+    const val = function(id){ const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+    const projetActif = !!(document.getElementById('fp-projet-actif') || {}).checked;
+
+    /* Contrôles côté client en miroir du serveur : message immédiat, mais c'est bien le serveur
+       qui fait foi (il revalide tout, y compris les champs personnalisés obligatoires). */
+    if (!val('fp-nom') || !val('fp-prenom') || !val('fp-profession')) return erreur('Nom, prénom et profession sont obligatoires.');
+    if (!val('fp-tel') && !val('fp-email')) return erreur('Veuillez renseigner au moins un numéro de téléphone ou une adresse e-mail.');
+    for (const c of champs) {
+      if (!c.obligatoire) continue;
+      const rep = lireChamps([c])[c.id];
+      if (rep === undefined || rep === '' || (Array.isArray(rep) && !rep.length)) return erreur('Le champ « ' + c.label + ' » est obligatoire.');
+    }
+
+    btn.disabled = true; btn.textContent = 'Envoi en cours…';
+    try {
+      const r = await fetch('/api/formulaires-inscription/public/' + encodeURIComponent(slug) + '/inscriptions', {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+        body: JSON.stringify({
+          nom: val('fp-nom'), prenom: val('fp-prenom'), profession: val('fp-profession'),
+          telephone: val('fp-tel'), email: val('fp-email'), adresse: val('fp-adresse'),
+          observation: val('fp-observation'),
+          type_participation: (document.getElementById('fp-type')||{}).value || 'participant',
+          reponses: lireChamps(champs),
+          presente_projet: projetActif,
+          projet_nom: projetActif ? val('fp-projet-nom') : '',
+          projet_description: projetActif ? val('fp-projet-desc') : '',
+          projet_objectifs: projetActif ? val('fp-projet-obj') : '',
+          projet_photos: projetActif ? _photos : [],
+          projet_video_url: projetActif ? _videoUrl : null,
+          projet_pdf_url: projetActif ? _pdfUrl : null,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Inscription impossible.');
+      confirmation(f, data);
+    } catch(err) {
+      erreur(err.message);
+      btn.disabled = false; btn.textContent = 'Valider mon inscription';
+    }
+  }
+
+  /* ── Confirmation + QR individuel (priorité 7) ──────────────────────────────────────────
+     La personne n'a pas de compte : cet écran est sa SEULE occasion de récupérer son QR, d'où
+     l'invitation explicite à le conserver. Le QR est signé côté serveur (HMAC) — il ne contient
+     aucune donnée personnelle, juste une référence signée vérifiée au moment du check-in. */
+  function confirmation(f, data){
+    const insc = data.inscription || {};
+    let h = '<div class="fp-card">'
+      + '<div class="fp-ok-icon">🎉</div>'
+      + '<div class="fp-ok-titre">Inscription confirmée</div>'
+      + '<div class="fp-ok-sub">Merci ! Votre inscription à <strong>'+escH(f.nom)+'</strong> a bien été enregistrée.</div>'
+      + '<div class="fp-ref"><div class="fp-ref-label">Votre référence</div><div class="fp-ref-val">'+escH(insc.reference||'')+'</div></div>';
+
+    if (insc.qr_payload) {
+      h += '<div class="fp-label" style="text-align:center;">Votre billet d\'entrée</div>'
+        + '<div class="fp-qr" id="fp-qr"></div>'
+        + '<div class="fp-hint" style="text-align:center;margin-top:9px;">📸 <strong>Conservez cette page</strong> (capture d\'écran ou impression) : ce QR code sera scanné à l\'entrée. En cas de perte, votre référence ci-dessus suffit.</div>';
+    }
+    h += '</div>';
+
+    h += donHtml(f.don);
+
+    /* Règle #4 : proposition de compte facultative, JAMAIS bloquante, et uniquement à qui n'en
+       a pas déjà un (sinon on l'inciterait à créer un doublon au lieu de se connecter). */
+    if (!data.compte_existant) {
+      h += '<div class="fp-card" style="text-align:center;">'
+        + '<div class="fp-don-titre">Créer votre compte Diaspo\'Actif ?</div>'
+        + '<div class="fp-don-desc">Facultatif — votre inscription est déjà enregistrée. Un compte vous permet de retrouver vos inscriptions et de rejoindre la communauté.</div>'
+        + '<a class="fp-don-btn" href="inscription.html">Créer mon compte</a></div>';
+    }
+    h += '<div style="text-align:center;"><a href="index.html" class="footer-link">← Retour à l\'accueil</a></div>';
+
+    el.innerHTML = h;
+    window.scrollTo({top:0, behavior:'smooth'});
+
+    if (insc.qr_payload) {
+      /* qrcodejs est chargé en `defer` (CDN) : au premier rendu il peut ne pas être prêt, et il
+         peut aussi ne jamais arriver (réseau filtré, hors-ligne). On réessaie un temps borné,
+         puis on assume l'absence de QR — la référence affichée au-dessus suffit à l'accueil,
+         donc on ne laisse JAMAIS un cadre vide sans explication. */
+      var essais = 0;
+      const dessiner = function(){
+        const box = document.getElementById('fp-qr');
+        if (!box) return;
+        if (typeof QRCode === 'undefined') {
+          if (++essais > 40) {   /* ~6 s */
+            box.innerHTML = '<div class="fp-hint" style="text-align:center;">Le QR code n\'a pas pu être affiché sur cet appareil. Présentez simplement votre référence <strong>'+escH(insc.reference||'')+'</strong> à l\'accueil.</div>';
+            return;
+          }
+          return setTimeout(dessiner, 150);
+        }
+        new QRCode(box, { text: insc.qr_payload, width: 210, height: 210, colorDark:'#0D2B4E', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.H });
+      };
+      dessiner();
+    }
+  }
+
+  /* ── Chargement ────────────────────────────────────────────────────────────────────────── */
+  if (!slug) {
+    el.innerHTML = '<div class="fp-empty">🔒 Lien incomplet — aucun formulaire indiqué.</div>';
+    return;
+  }
+  fetch('/api/auth/me', {credentials:'same-origin'})
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ _user = d && d.user ? d.user : null; })
+    .catch(function(){ _user = null; })
+    .finally(function(){
+      fetch('/api/formulaires-inscription/public/' + encodeURIComponent(slug), {credentials:'same-origin'})
+        .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw j; return j; }); })
+        .then(function(d){ _f = d.formulaire; render(_f); })
+        .catch(function(err){
+          el.innerHTML = '<div class="fp-empty">🔒 ' + escH((err && err.error) || 'Ce formulaire est introuvable ou n\'est plus disponible.') + '</div>';
+        });
+    });
+})();
+</script>
+
+  <nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+    <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+    <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+    <a class="mobile-bottom-nav__item" href="cagnottes.html"><span class="nav-icon">🪙</span><span>Cagnottes</span></a>
+    <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
+  </nav>
+  <script>
+  (function(){
+    function render(user){
+      var box = document.getElementById('hb-account-section');
+      var navLogin = document.getElementById('mob-nav-login');
+      if (!box) return;
+      if (user){
+        var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+        var dashHref = dash[user.role] || 'index.html';
+        box.innerHTML = '<a href="' + dashHref + '#apparence">⚙️ Paramètres</a><a href="#" id="hb-logout-link">🚪 Déconnexion</a>';
+        var out = document.getElementById('hb-logout-link');
+        if (out) out.addEventListener('click', function(e){
+          e.preventDefault();
+          fetch('/api/auth/logout', {method:'POST', credentials:'same-origin'}).finally(function(){ window.location.href = 'index.html'; });
+        });
+        if (navLogin) navLogin.href = dashHref;
+      } else {
+        box.innerHTML = '<a href="login.html">🔑 Se connecter</a><a href="inscription.html">✨ Créer un compte</a>';
+      }
+    }
+    fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
+      .then(function(d){ render(d && d.user); }).catch(function(){ render(null); });
+  })();
+  </script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

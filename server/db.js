@@ -1852,6 +1852,8 @@ const MIGRATIONS = [
   // défaut. Deux colonnes séparées (pas un seul JSON) pour rester filtrable en SQL simplement.
   ["formulaires_inscription", "visibilite_montant TEXT DEFAULT 'visible'"],
   ["formulaires_inscription", "visibilite_participants TEXT DEFAULT 'masque'"],
+  ["formulaire_inscriptions", "checkin_at TEXT"],
+  ["formulaire_inscriptions", "checkin_par INTEGER"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

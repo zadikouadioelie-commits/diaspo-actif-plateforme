@@ -16287,6 +16287,26 @@ function slugFormulaire(nom) {
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "formulaire") + "-" + Date.now().toString(36);
 }
 
+/* ── QR codes + check-in (priorités 7 et 9 du cahier des charges v2) ──────────────────────
+   Reprend EXACTEMENT le pattern déjà en production sur la billetterie (signTicket ligne 20 +
+   /api/scanner/validate) : signature HMAC-SHA256 tronquée, payload JSON encodé en base64,
+   décodé et resigné côté serveur au moment du scan. On ne fait jamais confiance au contenu du
+   QR : la signature est recalculée à partir des valeurs lues EN BASE, donc un QR fabriqué à la
+   main (ou modifié pour pointer une autre inscription) ne peut pas passer.
+   Le champ `type` discrimine ce payload de ceux de la billetterie, comme 'inscription_da'. */
+function signerQrInscription(formulaireId, inscriptionId, reference) {
+  return crypto.createHmac("sha256", TICKET_SECRET)
+    .update(`formulaire:${formulaireId}:${inscriptionId}:${reference}`).digest("hex").slice(0, 40);
+}
+
+function construireQrInscription(formulaireId, inscriptionId, reference) {
+  return Buffer.from(JSON.stringify({
+    type: "formulaire_inscription",
+    fid: Number(formulaireId), iid: Number(inscriptionId), ref: reference,
+    sig: signerQrInscription(formulaireId, inscriptionId, reference),
+  })).toString("base64");
+}
+
 /* ── Champs dynamiques (priorité 3 du cahier des charges v2) ──────────────────────────────
    Généralise le principe déjà éprouvé de ADHESION_CHAMPS_STANDARD/sanitizeChampsCustom
    (module Adhésions) à un catalogue de TYPES plus riche, extensible sans toucher au schéma DB
@@ -16682,7 +16702,12 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
   )).lastInsertRowid;
 
   const reference = genererReferenceInscription(insertId);
-  await db.prepare("UPDATE formulaire_inscriptions SET reference=? WHERE id=?").run(reference, insertId);
+  /* Le QR individuel (priorité 7) est généré ici, à l'inscription, et renvoyé immédiatement :
+     la personne n'a pas de compte, elle ne pourra donc jamais "revenir le chercher" dans un
+     espace personnel — c'est sa seule occasion de l'enregistrer (capture d'écran/impression). */
+  const qrPayload = construireQrInscription(f.id, insertId, reference);
+  await db.prepare("UPDATE formulaire_inscriptions SET reference=?, qr_payload=? WHERE id=?")
+    .run(reference, qrPayload, insertId);
   dbLoginRecord(`formulaire_inscription_ip:${ip}`, true);
 
   /* Priorité 15 (§4) : la proposition "Créer mon compte" ne doit s'afficher QUE si la personne
@@ -16692,7 +16717,7 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
     ? !!(await db.prepare("SELECT id FROM users WHERE email=? AND nom != 'Compte supprimé'").get(email))
     : !!user;
 
-  const row = await db.prepare("SELECT id, reference, statut, type_participation, created_at FROM formulaire_inscriptions WHERE id=?").get(insertId);
+  const row = await db.prepare("SELECT id, reference, statut, type_participation, qr_payload, created_at FROM formulaire_inscriptions WHERE id=?").get(insertId);
   sendJSON(res, 201, { inscription: row, compte_existant: compteExistant });
 });
 
@@ -16821,6 +16846,14 @@ route("GET", "/api/formulaires-inscription/inscriptions/:inscriptionId", async (
     WHERE fi.id=?
   `).get(params.inscriptionId);
   if (!r) return sendJSON(res, 404, { error: "Inscription introuvable." });
+
+  /* Rattrapage : les inscriptions enregistrées AVANT la priorité 7 n'ont pas de QR. On le génère
+     à la première consultation de leur fiche plutôt que par une migration de masse — même
+     signature, donc un QR régénéré reste valable indéfiniment. */
+  if (!r.qr_payload && r.reference) {
+    r.qr_payload = construireQrInscription(r.formulaire_id, r.id, r.reference);
+    await db.prepare("UPDATE formulaire_inscriptions SET qr_payload=? WHERE id=?").run(r.qr_payload, r.id);
+  }
 
   /* Don (§26) : accès à la collecte +, si un e-mail est renseigné sur l'inscription ET sur une
      contribution, une correspondance "best effort" (une même personne peut très bien donner
@@ -16976,6 +17009,66 @@ route("GET", "/api/formulaires-inscription/:id/export", async (req, res, params,
   const csv = [entetes, ...lignes].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
   res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${suffixe}-formulaire-${params.id}.csv"` });
   res.end("﻿" + csv);
+});
+
+/* ═══ CHECK-IN LE JOUR J (priorité 9 v2) ═══
+   Accepte soit un QR scanné (`qr_payload`), soit une saisie manuelle de la référence
+   (`reference`) — un QR peut être illisible, une personne peut avoir perdu son téléphone, et le
+   cahier des charges impose que rien ne bloque l'accueil le jour J.
+   Ne renvoie JAMAIS 404/403 sur un QR refusé : toujours 200 avec `valide:false` + un motif
+   lisible, comme /api/scanner/validate — l'accueil doit voir pourquoi, pas une erreur brute. */
+route("POST", "/api/formulaires-inscription/checkin", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+
+  const refus = (motif) => sendJSON(res, 200, { valide: false, motif });
+  let insc = null;
+
+  if (body?.qr_payload) {
+    let p;
+    try { p = JSON.parse(Buffer.from(String(body.qr_payload), "base64").toString()); }
+    catch (_) { return refus("QR code illisible."); }
+    if (p?.type !== "formulaire_inscription") return refus("Ce QR code n'est pas un billet d'inscription Diaspo'Actif.");
+    insc = await db.prepare("SELECT * FROM formulaire_inscriptions WHERE id=?").get(p.iid);
+    if (!insc) return refus("Inscription introuvable.");
+    /* La signature est recalculée à partir des valeurs EN BASE, jamais de celles du QR : un QR
+       modifié pour pointer une autre inscription produit une signature qui ne correspond pas. */
+    if (p.sig !== signerQrInscription(insc.formulaire_id, insc.id, insc.reference)) {
+      return refus("Signature invalide — billet falsifié ou périmé.");
+    }
+    if (Number(p.fid) !== Number(insc.formulaire_id)) return refus("Billet incohérent — formulaire non concordant.");
+  } else if (body?.reference) {
+    insc = await db.prepare("SELECT * FROM formulaire_inscriptions WHERE reference=?").get(String(body.reference).trim().toUpperCase());
+    if (!insc) return refus("Aucune inscription ne porte cette référence.");
+  } else {
+    return sendJSON(res, 400, { error: "qr_payload ou reference requis." });
+  }
+
+  /* Restriction optionnelle au formulaire ouvert dans l'écran de check-in : évite de valider par
+     erreur le billet d'un AUTRE événement quand deux se déroulent le même jour. */
+  if (body?.formulaire_id && Number(body.formulaire_id) !== Number(insc.formulaire_id)) {
+    return refus("Ce billet appartient à un autre formulaire.");
+  }
+  if (insc.statut === "annule") return refus("Inscription annulée.");
+
+  const f = await db.prepare("SELECT id, nom, slug FROM formulaires_inscription WHERE id=?").get(insc.formulaire_id);
+  const dejaPresent = insc.statut === "present";
+  if (!dejaPresent) {
+    await db.prepare("UPDATE formulaire_inscriptions SET statut='present', checkin_at=datetime('now'), checkin_par=?, updated_at=datetime('now') WHERE id=?")
+      .run(user.id, insc.id);
+  }
+
+  sendJSON(res, 200, {
+    valide: true,
+    deja_presente: dejaPresent,          /* seconde présentation du même billet : on accepte, on signale */
+    checkin_at: dejaPresent ? insc.checkin_at : new Date().toISOString(),
+    inscription: {
+      id: insc.id, reference: insc.reference, nom: insc.nom, prenom: insc.prenom,
+      profession: insc.profession, type_participation: insc.type_participation,
+      presente_projet: !!insc.presente_projet, projet_nom: insc.projet_nom || null,
+    },
+    formulaire: f ? { id: f.id, nom: f.nom } : null,
+  });
 });
 
 route("POST", "/api/cagnottes", async (req, res, params, body) => {
