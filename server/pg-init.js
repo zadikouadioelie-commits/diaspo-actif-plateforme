@@ -1024,6 +1024,9 @@ const COLONNES_MIGRATION = [
     // deux mêmes colonnes ajoutées côté SQLite via MIGRATIONS dans server/db.js.
     ['accred_paiements', 'reduction_pct_appliquee', 'REAL DEFAULT 0'],
     ['user_accreditations', 'reduction_pct_appliquee', 'REAL DEFAULT 0'],
+    // Formulaires d'inscription v2 — visibilité configurable par formulaire, miroir de l'ALTER db.js
+    ['formulaires_inscription', 'visibilite_montant', "TEXT DEFAULT 'visible'"],
+    ['formulaires_inscription', 'visibilite_participants', "TEXT DEFAULT 'masque'"],
     // Rubrique Vitrines — date de dernière modification publique de la vitrine
     ['initiatives', 'updated_at', 'TEXT'],
     // Module Adhésions — ouverture/fermeture globale (miroir de l'ALTER db.js)

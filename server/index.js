@@ -16287,6 +16287,44 @@ function slugFormulaire(nom) {
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "formulaire") + "-" + Date.now().toString(36);
 }
 
+/* ── Champs dynamiques (priorité 3 du cahier des charges v2) ──────────────────────────────
+   Généralise le principe déjà éprouvé de ADHESION_CHAMPS_STANDARD/sanitizeChampsCustom
+   (module Adhésions) à un catalogue de TYPES plus riche, extensible sans toucher au schéma DB
+   (tout vit dans formulaires_inscription.champs_custom_json). Chaque champ personnalisé
+   s'ajoute aux champs fixes du formulaire public (nom/prénom/profession/téléphone/email/
+   adresse/observation) et aux champs conditionnels par type de participation. */
+const FORMULAIRE_TYPES_CHAMPS = new Set([
+  "texte_court", "texte_long", "nombre", "date", "heure",
+  "choix_unique", "choix_multiple", "liste_deroulante",
+  "fichier", "photo", "video", "consentement", "signature",
+]);
+
+/* Jamais confiance dans le JSON brut envoyé par le client : chaque champ est reconstruit
+   proprement (id stable, label borné, type whitelisté, options bornées pour les champs à
+   choix) — un type inconnu ou un champ mal formé est silencieusement ignoré plutôt que de
+   faire échouer toute la sauvegarde du formulaire. Plafond de 30 champs, comme les champs
+   custom d'Adhésions. */
+function sanitizeFormulaireChampsCustom(raw) {
+  if (!Array.isArray(raw)) return [];
+  const vus = new Set();
+  return raw.slice(0, 30).map((c, i) => {
+    if (!c || typeof c !== "object") return null;
+    const type = FORMULAIRE_TYPES_CHAMPS.has(c.type) ? c.type : "texte_court";
+    const label = String(c.label || "").trim().slice(0, 120);
+    if (!label) return null;
+    let id = String(c.id || "").trim().slice(0, 60).replace(/[^a-zA-Z0-9_-]/g, "");
+    if (!id || vus.has(id)) id = `champ_${i}_${Date.now().toString(36)}`;
+    vus.add(id);
+    const champ = { id, label, type, obligatoire: !!c.obligatoire };
+    if (["choix_unique", "choix_multiple", "liste_deroulante"].includes(type)) {
+      champ.options = Array.isArray(c.options)
+        ? c.options.map(o => String(o || "").trim().slice(0, 80)).filter(Boolean).slice(0, 20)
+        : [];
+    }
+    return champ;
+  }).filter(Boolean);
+}
+
 /* GET /api/formulaires-inscription — liste admin, avec compteurs d'inscriptions/présences. */
 route("GET", "/api/formulaires-inscription", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -16314,6 +16352,7 @@ const FORMULAIRE_CHAMPS_MODIFIABLES = [
   "organisateur","date_ouverture_inscriptions","date_fermeture_inscriptions","places_max",
   "validation_auto","annulation_autorisee","confirmation_auto","autoriser_projet",
   "don_active","evenement_id","initiative_id","champs_custom_json",
+  "visibilite_montant","visibilite_participants",
 ];
 
 route("POST", "/api/formulaires-inscription", async (req, res, params, body) => {
@@ -16321,15 +16360,16 @@ route("POST", "/api/formulaires-inscription", async (req, res, params, body) => 
   if (!formulaireEstProteje(user, res)) return;
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom du formulaire est requis." });
 
-  const champsCustom = Array.isArray(body.champs_custom) ? JSON.stringify(body.champs_custom.slice(0, 30)) : '[]';
+  const champsCustom = JSON.stringify(sanitizeFormulaireChampsCustom(body.champs_custom));
   const slug = slugFormulaire(body.nom);
   const id = (await db.prepare(`
     INSERT INTO formulaires_inscription (
       owner_user_id, nom, type, date_evt, heure_debut, heure_fin, lieu, adresse, description,
       affiche_url, organisateur, date_ouverture_inscriptions, date_fermeture_inscriptions,
       places_max, validation_auto, annulation_autorisee, confirmation_auto, autoriser_projet,
-      don_active, evenement_id, initiative_id, champs_custom_json, slug
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      don_active, evenement_id, initiative_id, champs_custom_json, slug,
+      visibilite_montant, visibilite_participants
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     user.id, String(body.nom).trim(), body.type || null, body.date_evt || null,
     body.heure_debut || null, body.heure_fin || null, body.lieu || null, body.adresse || null,
@@ -16341,7 +16381,9 @@ route("POST", "/api/formulaires-inscription", async (req, res, params, body) => 
     body.confirmation_auto === false ? 0 : 1,
     body.autoriser_projet ? 1 : 0,
     body.don_active ? 1 : 0,
-    body.evenement_id || null, body.initiative_id || null, champsCustom, slug
+    body.evenement_id || null, body.initiative_id || null, champsCustom, slug,
+    body.visibilite_montant === "masque" ? "masque" : "visible",
+    body.visibilite_participants === "visible" ? "visible" : "masque"
   )).lastInsertRowid;
 
   const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(id);
@@ -16368,7 +16410,7 @@ route("PUT", "/api/formulaires-inscription/:id", async (req, res, params, body) 
   }
   if (Array.isArray(body.champs_custom)) {
     sets.push("champs_custom_json=?");
-    args.push(JSON.stringify(body.champs_custom.slice(0, 30)));
+    args.push(JSON.stringify(sanitizeFormulaireChampsCustom(body.champs_custom)));
   }
   if (!sets.length) return sendJSON(res, 400, { error: "Aucun champ à modifier." });
   sets.push("updated_at=datetime('now')");
@@ -16403,8 +16445,9 @@ route("POST", "/api/formulaires-inscription/:id/dupliquer", async (req, res, par
       owner_user_id, nom, type, date_evt, heure_debut, heure_fin, lieu, adresse, description,
       affiche_url, organisateur, statut, date_ouverture_inscriptions, date_fermeture_inscriptions,
       places_max, validation_auto, annulation_autorisee, confirmation_auto, autoriser_projet,
-      don_active, evenement_id, initiative_id, champs_custom_json, slug
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      don_active, evenement_id, initiative_id, champs_custom_json, slug,
+      visibilite_montant, visibilite_participants
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     user.id, f.nom + " (copie)", f.type, f.date_evt, f.heure_debut, f.heure_fin, f.lieu, f.adresse,
     f.description, f.affiche_url, f.organisateur, 'brouillon', f.date_ouverture_inscriptions,
@@ -16412,7 +16455,8 @@ route("POST", "/api/formulaires-inscription/:id/dupliquer", async (req, res, par
     f.confirmation_auto, f.autoriser_projet,
     /* Le don n'est jamais dupliqué automatiquement : chaque formulaire doit avoir SA propre
        collecte, jamais partager celle d'un autre — évite un double-comptage accidentel. */
-    0, f.evenement_id, f.initiative_id, f.champs_custom_json, slug
+    0, f.evenement_id, f.initiative_id, f.champs_custom_json, slug,
+    f.visibilite_montant, f.visibilite_participants
   )).lastInsertRowid;
   const row = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(id);
   sendJSON(res, 201, { formulaire: row });

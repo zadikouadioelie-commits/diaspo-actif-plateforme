@@ -1847,6 +1847,11 @@ const MIGRATIONS = [
   // Module Administrateurs Junior — suspension manuelle (réversible), distincte du verrouillage
   // automatique à 3 échecs (echecs_connexion) : action explicite de l'administrateur principal.
   ["admin_junior_meta", "suspendu INTEGER DEFAULT 0"],
+  // Formulaires d'inscription v2 — visibilité configurable par formulaire (cahier des charges
+  // 2026-08-19, règles #15-19) : montant collecté visible par défaut, participants masqués par
+  // défaut. Deux colonnes séparées (pas un seul JSON) pour rester filtrable en SQL simplement.
+  ["formulaires_inscription", "visibilite_montant TEXT DEFAULT 'visible'"],
+  ["formulaires_inscription", "visibilite_participants TEXT DEFAULT 'masque'"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

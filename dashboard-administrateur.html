@@ -13564,6 +13564,8 @@ function ouvrirFormulaireModal(id) {
     document.body.appendChild(modal);
   }
   const v = (champ, def) => f ? (f[champ] ?? def ?? '') : (def ?? '');
+  try { _fiChampsCustomEnCours = f && f.champs_custom_json ? JSON.parse(f.champs_custom_json) : []; }
+  catch { _fiChampsCustomEnCours = []; }
   modal.innerHTML = `
     <div class="modal-box" style="max-width:640px;width:94%;max-height:90vh;overflow:auto;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -13616,6 +13618,25 @@ function ouvrirFormulaireModal(id) {
         <label title="La collecte associée se construit dans une étape séparée, à venir."><input type="checkbox" id="fi-don" disabled ${f && f.don_active ? 'checked' : ''}> Activer « Faire un don » — bientôt disponible</label>
       </div>
 
+      <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Visibilité publique</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div><label style="font-size:12px;font-weight:700;">Montant collecté (si don activé)</label>
+          <select id="fi-visibilite-montant" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">
+            <option value="visible" ${v('visibilite_montant','visible')==='visible'?'selected':''}>Visible au public</option>
+            <option value="masque" ${v('visibilite_montant','visible')==='masque'?'selected':''}>Masqué au public</option>
+          </select></div>
+        <div><label style="font-size:12px;font-weight:700;">Liste des participants</label>
+          <select id="fi-visibilite-participants" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">
+            <option value="masque" ${v('visibilite_participants','masque')==='masque'?'selected':''}>Masquée au public</option>
+            <option value="visible" ${v('visibilite_participants','masque')==='visible'?'selected':''}>Visible au public (jamais téléphone/email/adresse)</option>
+          </select></div>
+      </div>
+
+      <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Champs personnalisés</h4>
+      <p style="margin:0 0 8px;font-size:12px;color:var(--muted);">S'ajoutent aux champs fixes du formulaire public (nom, prénom, profession, téléphone, e-mail, adresse, observation).</p>
+      <div id="fi-champs-list" style="margin-bottom:8px;"></div>
+      <button type="button" onclick="fiAjouterChamp()" style="background:none;border:1.5px dashed #cbd5e1;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;color:#475569;margin-bottom:16px;">+ Ajouter un champ</button>
+
       <div id="fi-modal-msg" style="display:none;font-size:12.5px;margin-bottom:10px;"></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;">
         <button type="button" onclick="document.getElementById('fi-modal').style.display='none'" style="background:none;border:1px solid #e2e8f0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">Annuler</button>
@@ -13623,6 +13644,61 @@ function ouvrirFormulaireModal(id) {
       </div>
     </div>`;
   modal.style.display = 'flex';
+  fiRenderChampsList();
+}
+
+/* ── Constructeur de champs dynamiques (priorité 3 v2) ──
+   État local pendant l'édition, envoyé en bloc à fiEnregistrer(). Le serveur revalide/nettoie
+   tout (sanitizeFormulaireChampsCustom) — cette liste locale n'est qu'une commodité d'UI. */
+let _fiChampsCustomEnCours = [];
+const FI_TYPES_CHAMPS_LABEL = {
+  texte_court: 'Texte court', texte_long: 'Texte long', nombre: 'Nombre',
+  date: 'Date', heure: 'Heure', choix_unique: 'Choix unique', choix_multiple: 'Choix multiple',
+  liste_deroulante: 'Liste déroulante', fichier: 'Fichier', photo: 'Photo', video: 'Vidéo',
+  consentement: 'Consentement (case à cocher)', signature: 'Signature',
+};
+
+function fiAjouterChamp() {
+  _fiChampsCustomEnCours.push({ id: `champ_${Date.now().toString(36)}`, label: '', type: 'texte_court', obligatoire: false, options: [] });
+  fiRenderChampsList();
+}
+
+function fiSupprimerChamp(index) {
+  _fiChampsCustomEnCours.splice(index, 1);
+  fiRenderChampsList();
+}
+
+function fiMettreAJourChamp(index, cle, valeur) {
+  if (!_fiChampsCustomEnCours[index]) return;
+  _fiChampsCustomEnCours[index][cle] = valeur;
+  if (cle === 'type') fiRenderChampsList(); // affiche/masque le bloc options selon le type choisi
+}
+
+function fiRenderChampsList() {
+  const el = document.getElementById('fi-champs-list');
+  if (!el) return;
+  if (!_fiChampsCustomEnCours.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Aucun champ personnalisé pour l\'instant.</div>';
+    return;
+  }
+  el.innerHTML = _fiChampsCustomEnCours.map((c, i) => {
+    const avecOptions = ['choix_unique', 'choix_multiple', 'liste_deroulante'].includes(c.type);
+    return `
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div style="display:grid;grid-template-columns:2fr 1.3fr auto auto;gap:8px;align-items:center;">
+        <input type="text" placeholder="Libellé du champ" value="${esc(c.label)}" oninput="fiMettreAJourChamp(${i},'label',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12.5px;">
+        <select onchange="fiMettreAJourChamp(${i},'type',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12.5px;">
+          ${Object.entries(FI_TYPES_CHAMPS_LABEL).map(([val,lbl]) => `<option value="${val}" ${c.type===val?'selected':''}>${lbl}</option>`).join('')}
+        </select>
+        <label style="font-size:11.5px;white-space:nowrap;"><input type="checkbox" ${c.obligatoire?'checked':''} onchange="fiMettreAJourChamp(${i},'obligatoire',this.checked)"> Obligatoire</label>
+        <button type="button" onclick="fiSupprimerChamp(${i})" title="Retirer" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:15px;">✕</button>
+      </div>
+      ${avecOptions ? `<div style="margin-top:6px;">
+        <input type="text" placeholder="Options séparées par des virgules" value="${esc((c.options||[]).join(', '))}"
+          oninput="fiMettreAJourChamp(${i},'options', this.value.split(',').map(s=>s.trim()).filter(Boolean))"
+          style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;font-size:12.5px;"></div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 async function fiEnregistrer(id) {
@@ -13650,6 +13726,9 @@ async function fiEnregistrer(id) {
     annulation_autorisee: document.getElementById('fi-annulation').checked,
     confirmation_auto: document.getElementById('fi-confirmation-auto').checked,
     autoriser_projet: document.getElementById('fi-projet').checked,
+    visibilite_montant: document.getElementById('fi-visibilite-montant').value,
+    visibilite_participants: document.getElementById('fi-visibilite-participants').value,
+    champs_custom: _fiChampsCustomEnCours,
   };
   try {
     if (id) await api('PUT', `/formulaires-inscription/${id}`, payload);
