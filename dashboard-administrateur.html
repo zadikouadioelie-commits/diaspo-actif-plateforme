@@ -14020,7 +14020,8 @@ async function fiChargerInscriptions() {
       <td style="padding:8px 10px;">${i.telephone?esc(i.telephone)+'<br>':''}${i.email?esc(i.email):''}</td>
       <td style="padding:8px 10px;">${esc(i.type_participation)}</td>
       <td style="padding:8px 10px;">${(i.created_at||'').slice(0,16).replace('T',' ')}</td>
-      <td style="padding:8px 10px;">
+      <td style="padding:8px 10px;white-space:nowrap;">
+        <button type="button" onclick="fiVoirFiche(${i.id})" title="Ouvrir la fiche complète" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;margin-right:5px;">🔍</button>
         <select onchange="fiChangerStatutInscription(${i.id}, this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:12px;">
           ${Object.entries(FI_INSC_STATUT_LABEL).map(([v,l]) => `<option value="${v}" ${i.statut===v?'selected':''}>${l}</option>`).join('')}
         </select>
@@ -14028,6 +14029,121 @@ async function fiChargerInscriptions() {
     </tr>`).join('');
   } catch(e) {
     tbody.innerHTML = `<tr><td colspan="6" style="padding:16px;text-align:center;color:#dc2626;">Erreur : ${esc(e.message)}</td></tr>`;
+  }
+}
+
+/* ══ Fiche individuelle d'un inscrit (priorités 6 et 11 v2) ═════════════════════════════════
+   Seul endroit où l'organisateur voit ce que la personne a RÉELLEMENT envoyé : réponses aux
+   champs personnalisés, adresse/observation, présentation de projet avec ses médias, billet QR
+   et rapprochement éventuel avec un don. Sans cet écran, ces données étaient collectées et
+   stockées mais jamais consultables. */
+function fiLigneFiche(libelle, valeur) {
+  if (valeur === null || valeur === undefined || valeur === '') return '';
+  return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;">
+    <div style="flex:0 0 40%;font-size:12.5px;color:#64748b;">${esc(libelle)}</div>
+    <div style="flex:1;font-size:13.5px;color:#0f172a;white-space:pre-wrap;">${esc(valeur)}</div></div>`;
+}
+
+async function fiVoirFiche(inscriptionId) {
+  let modal = document.getElementById('fi-fiche-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'fi-fiche-modal';
+    modal.className = 'modal-overlay';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="modal-box" style="max-width:660px;width:96%;"><div style="padding:30px;text-align:center;color:#64748b;">Chargement…</div></div>`;
+  modal.style.display = 'flex';
+
+  try {
+    const d = await api('GET', `/formulaires-inscription/inscriptions/${inscriptionId}`);
+    const i = d.inscription;
+
+    /* Réponses aux champs personnalisés : on parcourt la DÉFINITION du formulaire (et non les
+       réponses) pour conserver l'ordre voulu par l'organisateur et afficher les libellés. Un
+       champ laissé vide est signalé plutôt qu'omis — l'absence de réponse est une information. */
+    const champs = Array.isArray(i.champs_custom) ? i.champs_custom : [];
+    const reponses = i.reponses || {};
+    const champsHtml = champs.length ? champs.map(c => {
+      let v = reponses[c.id];
+      if (Array.isArray(v)) v = v.join(', ');
+      return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;">
+        <div style="flex:0 0 40%;font-size:12.5px;color:#64748b;">${esc(c.label)}</div>
+        <div style="flex:1;font-size:13.5px;color:${v ? '#0f172a' : '#94a3b8'};">${v ? esc(v) : '— non renseigné'}</div></div>`;
+    }).join('') : '<div style="font-size:12.5px;color:#94a3b8;padding:7px 0;">Aucun champ personnalisé sur ce formulaire.</div>';
+
+    const photos = Array.isArray(i.projet_photos) ? i.projet_photos : [];
+    const projetHtml = i.presente_projet ? `
+      <h4 style="margin:22px 0 10px;font-size:14px;color:#1B3A6B;">📋 Projet présenté</h4>
+      ${fiLigneFiche('Nom du projet', i.projet_nom)}
+      ${fiLigneFiche('Description', i.projet_description)}
+      ${fiLigneFiche('Objectifs', i.projet_objectifs)}
+      ${photos.length ? `<div style="padding:10px 0;"><div style="font-size:12.5px;color:#64748b;margin-bottom:7px;">Photos (${photos.length})</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${photos.map(u => `<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" style="width:92px;height:92px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"></a>`).join('')}</div></div>` : ''}
+      ${i.projet_pdf_url ? `<div style="padding:8px 0;"><a href="${esc(i.projet_pdf_url)}" target="_blank" style="font-size:13px;color:#1B3A6B;font-weight:700;">📄 Ouvrir le document PDF ↗</a></div>` : ''}
+      ${i.projet_video_url ? `<div style="padding:8px 0;"><video src="${esc(i.projet_video_url)}" controls style="width:100%;max-height:250px;border-radius:8px;background:#000;"></video></div>` : ''}
+    ` : '';
+
+    const don = d.inscription.don;
+    const donHtml = don ? `
+      <h4 style="margin:22px 0 10px;font-size:14px;color:#1B3A6B;">💚 Collecte associée</h4>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;">
+        <a href="cagnotte.html?slug=${esc(don.cagnotte.slug)}" target="_blank" style="font-weight:700;color:#166534;font-size:13.5px;">${esc(don.cagnotte.titre)} ↗</a>
+        <div style="font-size:12.5px;color:#15803d;margin-top:4px;">${don.cagnotte.montant_collecte||0}€ collectés · ${don.cagnotte.nb_contributeurs||0} donateur(s)</div>
+        ${don.contribution_probable
+          ? `<div style="font-size:12px;color:#166534;margin-top:8px;padding-top:8px;border-top:1px solid #bbf7d0;">Un don de <strong>${don.contribution_probable.montant}€</strong> a été enregistré avec la même adresse e-mail le ${(don.contribution_probable.created_at||'').slice(0,10)}.<br><em style="color:#65a30d;">Rapprochement indicatif par e-mail — ce n'est pas une preuve que c'est bien cette personne.</em></div>`
+          : `<div style="font-size:12px;color:#65a30d;margin-top:8px;">Aucun don retrouvé avec cette adresse e-mail.</div>`}
+      </div>` : '';
+
+    modal.innerHTML = `
+      <div class="modal-box" style="max-width:660px;width:96%;max-height:92vh;overflow:auto;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+          <div>
+            <h3 style="margin:0;">${esc(i.prenom || '')} ${esc(i.nom)}</h3>
+            <div style="font-size:12.5px;color:#64748b;margin-top:2px;">${esc(i.reference || '')} · ${esc(i.formulaire_nom || '')}</div>
+          </div>
+          <button type="button" onclick="document.getElementById('fi-fiche-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);">✕</button>
+        </div>
+        <div style="margin:12px 0 18px;">
+          <span style="display:inline-block;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;background:#eef2ff;color:#3730a3;">${esc(FI_INSC_STATUT_LABEL[i.statut] || i.statut)}</span>
+          <span style="display:inline-block;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;background:#f1f5f9;color:#334155;margin-left:5px;">${esc(FI_TYPE_PARTICIPATION_LABEL[i.type_participation] || i.type_participation)}</span>
+          ${i.checkin_at ? `<span style="display:inline-block;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;background:#dcfce7;color:#166534;margin-left:5px;">Pointé le ${esc(String(i.checkin_at).slice(0,16).replace('T',' '))}</span>` : ''}
+        </div>
+
+        <h4 style="margin:0 0 10px;font-size:14px;color:#1B3A6B;">Coordonnées</h4>
+        ${fiLigneFiche('Profession', i.profession)}
+        ${fiLigneFiche('Téléphone', i.telephone)}
+        ${fiLigneFiche('E-mail', i.email)}
+        ${fiLigneFiche('Adresse', i.adresse)}
+        ${fiLigneFiche('Observation', i.observation)}
+        ${fiLigneFiche('Inscrit le', (i.created_at || '').slice(0,16).replace('T',' '))}
+        ${i.user_id ? fiLigneFiche('Compte Diaspo\'Actif', 'Oui — inscription faite depuis un compte') : fiLigneFiche('Compte Diaspo\'Actif', 'Non — inscription sans compte')}
+
+        <h4 style="margin:22px 0 10px;font-size:14px;color:#1B3A6B;">Réponses au formulaire</h4>
+        ${champsHtml}
+        ${projetHtml}
+        ${donHtml}
+
+        ${i.qr_payload ? `<h4 style="margin:22px 0 10px;font-size:14px;color:#1B3A6B;">🎟️ Billet</h4>
+          <div id="fi-fiche-qr" style="display:flex;justify-content:center;padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;">Chargement du QR…</div>
+          <div style="font-size:11.5px;color:#64748b;margin-top:7px;text-align:center;">Réimprimable si la personne a perdu son billet.</div>` : ''}
+      </div>`;
+
+    if (i.qr_payload) {
+      const box = document.getElementById('fi-fiche-qr');
+      try {
+        await fiChargerLib('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js', () => typeof QRCode !== 'undefined');
+        box.innerHTML = '';
+        new QRCode(box, { text: i.qr_payload, width: 170, height: 170, colorDark:'#0D2B4E', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.H });
+      } catch(e) {
+        box.innerHTML = `<div style="font-size:12.5px;color:#dc2626;">QR indisponible — la référence ${esc(i.reference||'')} suffit au contrôle d'entrée.</div>`;
+      }
+    }
+  } catch(e) {
+    modal.innerHTML = `<div class="modal-box" style="max-width:660px;width:96%;">
+      <div style="padding:26px;text-align:center;color:#dc2626;">Erreur : ${esc(e.message)}</div>
+      <div style="text-align:center;padding-bottom:20px;"><button type="button" onclick="document.getElementById('fi-fiche-modal').style.display='none'" style="padding:9px 18px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;">Fermer</button></div></div>`;
   }
 }
 

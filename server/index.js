@@ -16841,11 +16841,19 @@ route("GET", "/api/formulaires-inscription/inscriptions/:inscriptionId", async (
   if (!formulaireEstProteje(user, res)) return;
   const r = await db.prepare(`
     SELECT fi.*, f.nom AS formulaire_nom, f.slug AS formulaire_slug, f.evenement_id,
-           f.don_active, f.cagnotte_id
+           f.don_active, f.cagnotte_id, f.champs_custom_json
     FROM formulaire_inscriptions fi JOIN formulaires_inscription f ON f.id = fi.formulaire_id
     WHERE fi.id=?
   `).get(params.inscriptionId);
   if (!r) return sendJSON(res, 404, { error: "Inscription introuvable." });
+
+  /* La définition des champs personnalisés accompagne la fiche : sans elle, l'interface ne
+     pourrait afficher que des identifiants bruts (« repas ») au lieu des libellés voulus par
+     l'organisateur (« Régime alimentaire »). Les réponses seules ne se suffisent pas. */
+  r.champs_custom = (() => { try { return JSON.parse(r.champs_custom_json || "[]"); } catch { return []; } })();
+  delete r.champs_custom_json;
+  r.reponses = (() => { try { return JSON.parse(r.reponses_json || "{}"); } catch { return {}; } })();
+  r.projet_photos = (() => { try { return JSON.parse(r.projet_photos_json || "[]"); } catch { return []; } })();
 
   /* Rattrapage : les inscriptions enregistrées AVANT la priorité 7 n'ont pas de QR. On le génère
      à la première consultation de leur fiche plutôt que par une migration de masse — même
