@@ -16648,13 +16648,27 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
   const presenteProjet = !!(f.autoriser_projet && body?.presente_projet);
   const user = await getCurrentUser(req).catch(() => null); // jamais obligatoire (règle #6), juste rattaché si déjà connecté
 
+  /* Médias du projet (§16, priorité 12) : facultatifs, déjà uploadés au préalable via
+     POST .../public/upload (le client envoie les URLs Bunny CDN obtenues, jamais le fichier
+     ici) — 3 photos max, 1 vidéo, PDF. Simple liste blanche de format (https, longueur
+     raisonnable) : la vraie vérification de contenu a déjà eu lieu à l'upload. */
+  /* Restreint volontairement à NOTRE CDN (celui que POST .../public/upload alimente) — accepter
+     n'importe quelle URL https:// externe permettrait d'injecter un lien de tracking/phishing
+     affiché tel quel dans le panneau admin. */
+  const CDN_BASE = (process.env.BUNNY_CDN_URL || "https://diaspoactif-media.b-cdn.net") + "/";
+  const urlValide = (u) => typeof u === "string" && u.length < 500 && u.startsWith(CDN_BASE);
+  const projetPhotos = presenteProjet && Array.isArray(body?.projet_photos)
+    ? body.projet_photos.filter(urlValide).slice(0, 3) : [];
+  const projetVideo = presenteProjet && urlValide(body?.projet_video_url) ? body.projet_video_url : null;
+  const projetPdf = presenteProjet && urlValide(body?.projet_pdf_url) ? body.projet_pdf_url : null;
+
   const statutInitial = f.validation_auto ? "confirme" : "inscrit";
   const insertId = (await db.prepare(`
     INSERT INTO formulaire_inscriptions (
       formulaire_id, user_id, nom, prenom, profession, telephone, email, adresse, observation,
       type_participation, reponses_json, presente_projet, projet_nom, projet_description,
-      projet_objectifs, statut, ip_creation
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      projet_objectifs, projet_photos_json, projet_video_url, projet_pdf_url, statut, ip_creation
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     f.id, user ? user.id : null, nom, prenom, profession, telephone, email,
     String(body?.adresse || "").trim().slice(0, 300) || null,
@@ -16663,6 +16677,7 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
     presenteProjet ? String(body?.projet_nom || "").trim().slice(0, 200) || null : null,
     presenteProjet ? String(body?.projet_description || "").trim().slice(0, 3000) || null : null,
     presenteProjet ? String(body?.projet_objectifs || "").trim().slice(0, 3000) || null : null,
+    JSON.stringify(projetPhotos), projetVideo, projetPdf,
     statutInitial, ip
   )).lastInsertRowid;
 
@@ -16672,6 +16687,88 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
 
   const row = await db.prepare("SELECT id, reference, statut, type_participation, created_at FROM formulaire_inscriptions WHERE id=?").get(insertId);
   sendJSON(res, 201, { inscription: row });
+});
+
+/* ═══ MÉDIAS DU PROJET/DE L'INITIATIVE (priorité 12 v2) ═══
+   Upload SANS COMPTE (règle #6/#7 : jamais de compte obligatoire, y compris pour joindre des
+   médias à une présentation de projet). Toutes les autres routes /api/upload/* exigent
+   getCurrentUser — celle-ci est délibérément différente : rate-limit IP en garde-fou à la place
+   d'un compte. Réutilise server/upload.js (Bunny CDN) et le contrôle par octets magiques déjà
+   éprouvé sur /api/upload/document, jamais une nouvelle logique de stockage. */
+route("POST", "/api/formulaires-inscription/public/upload", async (req, res) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`formulaire_upload:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide." });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { fields, files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["fichier"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu." });
+
+  /* type déclaré par le client (photo|video|pdf) — jamais cru sur parole, seulement utilisé
+     pour choisir QUELLE vérification appliquer ; le contenu réel tranche toujours. */
+  const typeDeclare = ["photo", "video", "pdf"].includes(fields.type) ? fields.type : "photo";
+  const b = file.buffer;
+
+  if (typeDeclare === "photo") {
+    const MAX = 5 * 1024 * 1024;
+    if (b.length > MAX) return sendJSON(res, 400, { error: "Photo trop volumineuse (max 5 Mo)." });
+    const imgType = SEC.isSafeRasterImage(b);
+    if (!imgType) return sendJSON(res, 400, { error: "Format d'image non supporté." });
+    try {
+      const url = await uploadToBunny(b, `formulaire-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${imgType.split("/")[1].replace("jpeg","jpg")}`, "formulaires");
+      SEC.logSecurity("upload", { kind: "formulaire_photo", ip, size: b.length });
+      return sendJSON(res, 200, { url });
+    } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "upload formulaire photo")); }
+  }
+
+  if (typeDeclare === "pdf") {
+    const MAX = 10 * 1024 * 1024;
+    if (b.length > MAX) return sendJSON(res, 400, { error: "Document trop volumineux (max 10 Mo)." });
+    const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; // %PDF
+    if (!isPdf) return sendJSON(res, 400, { error: "Seuls les documents PDF sont acceptés." });
+    try {
+      const url = await uploadToBunny(b, `formulaire-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`, "formulaires");
+      SEC.logSecurity("upload", { kind: "formulaire_pdf", ip, size: b.length });
+      return sendJSON(res, 200, { url });
+    } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "upload formulaire pdf")); }
+  }
+
+  // typeDeclare === "video"
+  const MAX_VIDEO = 60 * 1024 * 1024;
+  if (b.length > MAX_VIDEO) return sendJSON(res, 400, { error: "Vidéo trop volumineuse (max 60 Mo)." });
+  const isMp4 = b.length > 12 && b.slice(4, 8).toString("ascii") === "ftyp";
+  const isWebm = b.length > 4 && b[0] === 0x1A && b[1] === 0x45 && b[2] === 0xDF && b[3] === 0xA3;
+  if (!isMp4 && !isWebm) return sendJSON(res, 400, { error: "Format vidéo non supporté (MP4 ou WebM requis)." });
+
+  /* Limite de 2 minutes (règle #22-23) : vérifiée réellement via ffprobe si disponible sur cet
+     environnement — jamais une simple estimation par taille de fichier, trop peu fiable (le
+     débit varie énormément selon la compression). Si ffprobe est indisponible, on refuse
+     plutôt que d'accepter une vidéo dont la durée n'a pas pu être vérifiée. */
+  const atelier = require("./atelier");
+  if (!atelier.ffmpegAvailable()) {
+    return sendJSON(res, 503, { error: "Vérification vidéo temporairement indisponible. Réessayez plus tard." });
+  }
+  const tmpPath = atelier.outPath(isMp4 ? "mp4" : "webm");
+  try {
+    require("fs").writeFileSync(tmpPath, b);
+    const duree = await atelier.probeDuration(tmpPath);
+    if (duree == null) return sendJSON(res, 400, { error: "Impossible de lire cette vidéo." });
+    if (duree > 120) return sendJSON(res, 400, { error: `Vidéo trop longue (${Math.round(duree)}s) — 2 minutes maximum.` });
+    const url = await uploadToBunny(b, `formulaire-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${isMp4 ? "mp4" : "webm"}`, "formulaires");
+    SEC.logSecurity("upload", { kind: "formulaire_video", ip, size: b.length, duree_s: Math.round(duree) });
+    sendJSON(res, 200, { url });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "upload formulaire video"));
+  } finally {
+    try { require("fs").unlinkSync(tmpPath); } catch {} // jamais laisser un fichier temporaire orphelin, même en cas d'échec
+  }
 });
 
 /* ═══ GESTION ADMIN DES INSCRIPTIONS (priorités 5-6 v2) ═══
