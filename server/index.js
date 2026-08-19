@@ -16462,6 +16462,160 @@ route("POST", "/api/formulaires-inscription/:id/dupliquer", async (req, res, par
   sendJSON(res, 201, { formulaire: row });
 });
 
+/* ═══ FORMULAIRE PUBLIC (priorités 4-5 du cahier des charges v2) ═══
+   Accessible SANS compte Diaspo'Actif (règle #6/#7 : ni pour l'inscription, ni pour le don).
+   Deux routes : lecture publique par slug (jamais par id — le slug est l'identifiant public
+   voulu, l'id interne n'est jamais exposé côté public) et soumission d'une inscription. */
+
+/* Un formulaire brouillon ou archivé n'est jamais accessible publiquement — seul "ouvert" ou
+   "fermé" (inscriptions closes mais la page reste consultable, ex. pour afficher "complet"). */
+function formulairePubliePeutEtreVu(f) {
+  return !!f && ["ouvert", "ferme"].includes(f.statut);
+}
+
+/* Une même logique sert à la fois à décider si on ACCEPTE une nouvelle inscription et à
+   informer le public pourquoi ce n'est plus possible — un seul calcul, jamais deux versions
+   divergentes entre lecture et écriture. */
+async function formulaireInscriptionsOuvertes(f) {
+  if (f.statut !== "ouvert") return { ouvert: false, raison: "fermees" };
+  const maintenant = Date.now();
+  if (f.date_ouverture_inscriptions && new Date(f.date_ouverture_inscriptions).getTime() > maintenant) {
+    return { ouvert: false, raison: "pas_encore_ouvertes" };
+  }
+  if (f.date_fermeture_inscriptions && new Date(f.date_fermeture_inscriptions).getTime() < maintenant) {
+    return { ouvert: false, raison: "date_depassee" };
+  }
+  if (f.places_max != null) {
+    const occupees = (await db.prepare(
+      "SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut IN ('inscrit','confirme','present')"
+    ).get(f.id))?.n || 0;
+    if (occupees >= f.places_max) return { ouvert: false, raison: "complet" };
+  }
+  return { ouvert: true, raison: null };
+}
+
+route("GET", "/api/formulaires-inscription/public/:slug", async (req, res, params) => {
+  const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE slug=?").get(params.slug);
+  if (!formulairePubliePeutEtreVu(f)) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+
+  const nbInscrits = (await db.prepare(
+    "SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut != 'annule'"
+  ).get(f.id))?.n || 0;
+  const nbPresents = (await db.prepare(
+    "SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut='present'"
+  ).get(f.id))?.n || 0;
+  const etat = await formulaireInscriptionsOuvertes(f);
+
+  /* Liste blanche stricte : owner_user_id et toute donnée d'administration ne sortent jamais
+     de cette route, même par erreur d'un futur champ ajouté à la table. */
+  sendJSON(res, 200, {
+    formulaire: {
+      nom: f.nom, type: f.type, date_evt: f.date_evt, heure_debut: f.heure_debut, heure_fin: f.heure_fin,
+      lieu: f.lieu, adresse: f.adresse, description: f.description, affiche_url: f.affiche_url,
+      organisateur: f.organisateur, statut: f.statut, places_max: f.places_max,
+      autoriser_projet: !!f.autoriser_projet, don_active: !!f.don_active,
+      visibilite_montant: f.visibilite_montant, visibilite_participants: f.visibilite_participants,
+      champs_custom: (() => { try { return JSON.parse(f.champs_custom_json || "[]"); } catch { return []; } })(),
+      slug: f.slug,
+      nb_inscrits: f.visibilite_participants === "visible" ? nbInscrits : null,
+      nb_presents: nbPresents,
+      inscriptions_ouvertes: etat.ouvert,
+      raison_fermeture: etat.raison,
+    },
+  });
+});
+
+const FORMULAIRE_TYPES_PARTICIPATION = new Set(["participant", "benevole", "intervenant", "exposant"]);
+
+route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  /* Pattern invité déjà éprouvé sur cagnottes/adhésions : rate-limit IP en double (en mémoire +
+     persistant), jamais de compte exigé. */
+  const ipLimit = SEC.rateLimit(`formulaire_inscription:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const ipGuard = await dbLoginGuard(`formulaire_inscription_ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipGuard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipGuard.retryAfter}s.` });
+
+  const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE slug=?").get(params.slug);
+  if (!formulairePubliePeutEtreVu(f)) { dbLoginRecord(`formulaire_inscription_ip:${ip}`, false); return sendJSON(res, 404, { error: "Formulaire introuvable." }); }
+
+  const etat = await formulaireInscriptionsOuvertes(f);
+  if (!etat.ouvert) {
+    dbLoginRecord(`formulaire_inscription_ip:${ip}`, false);
+    const messages = { complet: "Le nombre maximum de participants est atteint.", date_depassee: "Les inscriptions sont closes.", pas_encore_ouvertes: "Les inscriptions ne sont pas encore ouvertes.", fermees: "Les inscriptions sont fermées." };
+    return sendJSON(res, 409, { error: messages[etat.raison] || "Inscriptions fermées." });
+  }
+
+  const nom = String(body?.nom || "").trim().slice(0, 120);
+  const prenom = String(body?.prenom || "").trim().slice(0, 120);
+  const profession = String(body?.profession || "").trim().slice(0, 160);
+  if (!nom || !prenom || !profession) {
+    dbLoginRecord(`formulaire_inscription_ip:${ip}`, false);
+    return sendJSON(res, 400, { error: "Nom, prénom et profession sont obligatoires." });
+  }
+
+  /* Règle #8 du cahier des charges : téléphone OU e-mail, jamais aucun des deux, les deux
+     acceptés si fournis. */
+  const telephone = String(body?.telephone || "").trim().slice(0, 40) || null;
+  const email = String(body?.email || "").trim().slice(0, 254) || null;
+  if (!telephone && !email) {
+    dbLoginRecord(`formulaire_inscription_ip:${ip}`, false);
+    return sendJSON(res, 400, { error: "Veuillez renseigner au moins un numéro de téléphone ou une adresse e-mail." });
+  }
+  if (telephone && !SEC.isValidPhone(telephone)) return sendJSON(res, 400, { error: "Numéro de téléphone invalide." });
+  if (email && !SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+
+  const typeParticipation = FORMULAIRE_TYPES_PARTICIPATION.has(body?.type_participation) ? body.type_participation : "participant";
+
+  /* Champs conditionnels par type de participation (§12-14) + champs personnalisés (§ champs
+     dynamiques) : tout vit dans reponses_json, jamais en colonnes dédiées — cohérent avec
+     l'architecture extensible voulue (règle #32). Les champs personnalisés obligatoires sont
+     vérifiés ; les champs conditionnels par type ne sont pas marqués obligatoires par le cahier
+     des charges (seuls nom/prénom/profession et le contact le sont), donc simplement acceptés
+     tels quels après un nettoyage minimal. */
+  const reponsesBrutes = (body?.reponses && typeof body.reponses === "object") ? body.reponses : {};
+  const reponses = {};
+  for (const [cle, val] of Object.entries(reponsesBrutes)) {
+    if (typeof cle !== "string" || cle.length > 60) continue;
+    reponses[cle] = typeof val === "string" ? val.slice(0, 2000) : (Array.isArray(val) ? val.slice(0, 20).map(v => String(v).slice(0, 200)) : val);
+  }
+  const champsCustom = (() => { try { return JSON.parse(f.champs_custom_json || "[]"); } catch { return []; } })();
+  for (const champ of champsCustom) {
+    if (champ.obligatoire && (reponses[champ.id] === undefined || reponses[champ.id] === "" || reponses[champ.id] === null)) {
+      dbLoginRecord(`formulaire_inscription_ip:${ip}`, false);
+      return sendJSON(res, 400, { error: `Le champ « ${champ.label} » est obligatoire.` });
+    }
+  }
+
+  const presenteProjet = !!(f.autoriser_projet && body?.presente_projet);
+  const user = await getCurrentUser(req).catch(() => null); // jamais obligatoire (règle #6), juste rattaché si déjà connecté
+
+  const statutInitial = f.validation_auto ? "confirme" : "inscrit";
+  const insertId = (await db.prepare(`
+    INSERT INTO formulaire_inscriptions (
+      formulaire_id, user_id, nom, prenom, profession, telephone, email, adresse, observation,
+      type_participation, reponses_json, presente_projet, projet_nom, projet_description,
+      projet_objectifs, statut, ip_creation
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    f.id, user ? user.id : null, nom, prenom, profession, telephone, email,
+    String(body?.adresse || "").trim().slice(0, 300) || null,
+    String(body?.observation || "").trim().slice(0, 2000) || null,
+    typeParticipation, JSON.stringify(reponses), presenteProjet ? 1 : 0,
+    presenteProjet ? String(body?.projet_nom || "").trim().slice(0, 200) || null : null,
+    presenteProjet ? String(body?.projet_description || "").trim().slice(0, 3000) || null : null,
+    presenteProjet ? String(body?.projet_objectifs || "").trim().slice(0, 3000) || null : null,
+    statutInitial, ip
+  )).lastInsertRowid;
+
+  const reference = genererReferenceInscription(insertId);
+  await db.prepare("UPDATE formulaire_inscriptions SET reference=? WHERE id=?").run(reference, insertId);
+  dbLoginRecord(`formulaire_inscription_ip:${ip}`, true);
+
+  const row = await db.prepare("SELECT id, reference, statut, type_participation, created_at FROM formulaire_inscriptions WHERE id=?").get(insertId);
+  sendJSON(res, 201, { inscription: row });
+});
+
 route("POST", "/api/cagnottes", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur"].includes(user.role)) {
