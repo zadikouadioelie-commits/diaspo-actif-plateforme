@@ -16616,6 +16616,66 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
   sendJSON(res, 201, { inscription: row });
 });
 
+/* ═══ GESTION ADMIN DES INSCRIPTIONS (priorités 5-6 v2) ═══
+   "Gestion des inscriptions" (fin priorité 5) + "Fiches individuelles" (priorité 6) : liste
+   filtrable/recherchable par formulaire, fiche détaillée, changement de statut. */
+
+/* GET /api/formulaires-inscription/:id/inscriptions — liste admin, recherche + filtres (§33-34).
+   Placée AVANT /api/formulaires-inscription/inscriptions/:inscriptionId dans le routeur pour que
+   "inscriptions" au 2e segment ne soit jamais confondu avec un :id numérique — même principe que
+   les autres routeurs à segments fixes de ce fichier. */
+route("GET", "/api/formulaires-inscription/:id/inscriptions", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const f = await db.prepare("SELECT id FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+
+  let rows = await db.prepare("SELECT * FROM formulaire_inscriptions WHERE formulaire_id=? ORDER BY created_at DESC").all(params.id);
+
+  const q = (query?.q || "").trim().toLowerCase();
+  if (q) {
+    rows = rows.filter(r =>
+      (r.nom || "").toLowerCase().includes(q) || (r.prenom || "").toLowerCase().includes(q) ||
+      (r.telephone || "").toLowerCase().includes(q) || (r.email || "").toLowerCase().includes(q) ||
+      (r.profession || "").toLowerCase().includes(q) || (r.reference || "").toLowerCase().includes(q)
+    );
+  }
+  if (query?.type && FORMULAIRE_TYPES_PARTICIPATION.has(query.type)) rows = rows.filter(r => r.type_participation === query.type);
+  if (query?.statut && ["inscrit","confirme","present","absent","annule"].includes(query.statut)) rows = rows.filter(r => r.statut === query.statut);
+  if (query?.date_min) rows = rows.filter(r => r.created_at >= query.date_min);
+  if (query?.date_max) rows = rows.filter(r => r.created_at <= query.date_max);
+
+  sendJSON(res, 200, { inscriptions: rows, total: rows.length });
+});
+
+/* GET /api/formulaires-inscription/inscriptions/:inscriptionId — fiche individuelle détaillée. */
+route("GET", "/api/formulaires-inscription/inscriptions/:inscriptionId", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const r = await db.prepare(`
+    SELECT fi.*, f.nom AS formulaire_nom, f.slug AS formulaire_slug, f.evenement_id
+    FROM formulaire_inscriptions fi JOIN formulaires_inscription f ON f.id = fi.formulaire_id
+    WHERE fi.id=?
+  `).get(params.inscriptionId);
+  if (!r) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  sendJSON(res, 200, { inscription: r });
+});
+
+/* PATCH .../inscriptions/:inscriptionId/statut — Inscrit/Confirmé/Présent/Absent/Annulé (§27),
+   modifiable manuellement par l'admin quel que soit validation_auto (qui ne fixe que le statut
+   INITIAL à la soumission publique). */
+route("PATCH", "/api/formulaires-inscription/inscriptions/:inscriptionId/statut", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!formulaireEstProteje(user, res)) return;
+  const statut = body?.statut;
+  if (!["inscrit","confirme","present","absent","annule"].includes(statut)) {
+    return sendJSON(res, 400, { error: "Statut invalide." });
+  }
+  const info = await db.prepare("UPDATE formulaire_inscriptions SET statut=?, updated_at=datetime('now') WHERE id=?").run(statut, params.inscriptionId);
+  if (!info.changes) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  sendJSON(res, 200, { ok: true, statut });
+});
+
 route("POST", "/api/cagnottes", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur"].includes(user.role)) {

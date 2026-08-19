@@ -13527,6 +13527,7 @@ async function loadFormulairesInscription() {
       <td style="padding:10px 12px;text-align:center;">${f.don_active ? '💚' : '—'}</td>
       <td style="padding:10px 12px;white-space:nowrap;">
         <button type="button" onclick="ouvrirFormulaireModal(${f.id})" title="Modifier" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">✏️</button>
+        <button type="button" onclick="fiVoirInscriptions(${f.id}, '${esc(f.nom).replace(/'/g,"\\'")}')" title="Voir les inscriptions" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">👥</button>
         <button type="button" onclick="fiDupliquer(${f.id})" title="Dupliquer" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">⧉</button>
         <select onchange="fiChangerStatut(${f.id}, this.value)" title="Changer le statut" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:12px;">
           ${Object.entries(FI_STATUT_LABEL).map(([v,l]) => `<option value="${v}" ${f.statut===v?'selected':''}>${l}</option>`).join('')}
@@ -13738,6 +13739,99 @@ async function fiEnregistrer(id) {
   } catch(e) {
     msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = 'Erreur : ' + e.message;
   }
+}
+
+/* ═══ GESTION DES INSCRIPTIONS / FICHES INDIVIDUELLES (priorités 5-6 v2) ═══ */
+const FI_INSC_STATUT_LABEL = { inscrit:'📝 Inscrit', confirme:'✅ Confirmé', present:'🟢 Présent', absent:'⚪ Absent', annule:'❌ Annulé' };
+let _fiInscFormulaireId = null, _fiInscFormulaireNom = '';
+
+function fiVoirInscriptions(formulaireId, nom) {
+  _fiInscFormulaireId = formulaireId;
+  _fiInscFormulaireNom = nom;
+  let modal = document.getElementById('fi-insc-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'fi-insc-modal';
+    modal.className = 'modal-overlay';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:900px;width:96%;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h3 style="margin:0;">👥 Inscriptions — ${esc(nom)}</h3>
+        <button type="button" onclick="document.getElementById('fi-insc-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <input id="fi-insc-q" type="text" placeholder="Rechercher (nom, téléphone, e-mail, référence…)" oninput="fiChargerInscriptions()" style="flex:1;min-width:200px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">
+        <select id="fi-insc-type" onchange="fiChargerInscriptions()" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">
+          <option value="">Tous types</option>
+          <option value="participant">Participant</option><option value="benevole">Bénévole</option>
+          <option value="intervenant">Intervenant</option><option value="exposant">Exposant</option>
+        </select>
+        <select id="fi-insc-statut" onchange="fiChargerInscriptions()" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;">
+          <option value="">Tous statuts</option>
+          ${Object.entries(FI_INSC_STATUT_LABEL).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Référence</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Nom</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Contact</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Type</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Inscrit le</th>
+            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Statut</th>
+          </tr></thead>
+          <tbody id="fi-insc-tbody"></tbody>
+        </table>
+        <div id="fi-insc-vide" style="display:none;text-align:center;padding:30px;color:var(--muted);">Aucune inscription pour l'instant.</div>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+  fiChargerInscriptions();
+}
+
+async function fiChargerInscriptions() {
+  const tbody = document.getElementById('fi-insc-tbody');
+  const vide = document.getElementById('fi-insc-vide');
+  tbody.innerHTML = `<tr><td colspan="6" style="padding:16px;text-align:center;color:var(--muted);">Chargement…</td></tr>`;
+  try {
+    const params = new URLSearchParams();
+    const q = document.getElementById('fi-insc-q').value.trim();
+    const type = document.getElementById('fi-insc-type').value;
+    const statut = document.getElementById('fi-insc-statut').value;
+    if (q) params.set('q', q);
+    if (type) params.set('type', type);
+    if (statut) params.set('statut', statut);
+    const d = await api('GET', `/formulaires-inscription/${_fiInscFormulaireId}/inscriptions?${params}`);
+    const list = d.inscriptions || [];
+    if (!list.length) { tbody.innerHTML = ''; vide.style.display = 'block'; return; }
+    vide.style.display = 'none';
+    tbody.innerHTML = list.map(i => `<tr style="border-bottom:1px solid #f1f5f9;">
+      <td style="padding:8px 10px;font-weight:700;">${esc(i.reference || '—')}</td>
+      <td style="padding:8px 10px;">${esc(i.prenom)} ${esc(i.nom)}<div style="color:var(--muted);font-size:11px;">${esc(i.profession||'')}</div></td>
+      <td style="padding:8px 10px;">${i.telephone?esc(i.telephone)+'<br>':''}${i.email?esc(i.email):''}</td>
+      <td style="padding:8px 10px;">${esc(i.type_participation)}</td>
+      <td style="padding:8px 10px;">${(i.created_at||'').slice(0,16).replace('T',' ')}</td>
+      <td style="padding:8px 10px;">
+        <select onchange="fiChangerStatutInscription(${i.id}, this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:12px;">
+          ${Object.entries(FI_INSC_STATUT_LABEL).map(([v,l]) => `<option value="${v}" ${i.statut===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </td>
+    </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:16px;text-align:center;color:#dc2626;">Erreur : ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function fiChangerStatutInscription(inscriptionId, statut) {
+  try {
+    await api('PATCH', `/formulaires-inscription/inscriptions/${inscriptionId}/statut`, { statut });
+    fiChargerInscriptions();
+    loadFormulairesInscription(); // rafraîchit les compteurs inscrits/présents de la liste principale
+  } catch(e) { alert('Erreur : ' + e.message); }
 }
 
 /* ═══ TÉMOIGNAGES ADMIN ═══ */
