@@ -13500,6 +13500,9 @@ async function savePoConfig() {
 /* ═══ FORMULAIRES D'INSCRIPTION (constructeur générique — priorités 1-2) ═══ */
 const FI_STATUT_LABEL = { brouillon:'📝 Brouillon', ouvert:'🟢 Ouvert', ferme:'🔴 Fermé', archive:'🗄 Archivé' };
 const FI_TYPE_LABEL = { evenement:'Événement', rencontre:'Rencontre', conference:'Conférence', formation:'Formation', networking:'Networking', forum:'Forum', projet:'Projet', initiative:'Initiative', autre:'Autre' };
+/* Au singulier : sert à désigner UNE personne au check-in (FI_STATS_TYPE_LABEL, au pluriel,
+   est réservé aux compteurs de statistiques). */
+const FI_TYPE_PARTICIPATION_LABEL = { participant:'Participant', benevole:'Bénévole', intervenant:'Intervenant', exposant:'Exposant' };
 let _fiListe = [];
 
 async function loadFormulairesInscription() {
@@ -13529,6 +13532,8 @@ async function loadFormulairesInscription() {
         <button type="button" onclick="ouvrirFormulaireModal(${f.id})" title="Modifier" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">✏️</button>
         <button type="button" onclick="fiVoirInscriptions(${f.id}, '${esc(f.nom).replace(/'/g,"\\'")}')" title="Voir les inscriptions" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">👥</button>
         <button type="button" onclick="fiVoirStats(${f.id}, '${esc(f.nom).replace(/'/g,"\\'")}')" title="Voir les statistiques" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">📊</button>
+        <button type="button" onclick="fiPartager(${f.id})" title="Lien public & QR code d'affiche" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">🔗</button>
+        <button type="button" onclick="fiCheckin(${f.id}, '${esc(f.nom).replace(/'/g,"\\'")}')" title="Check-in le jour J" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">✅</button>
         <button type="button" onclick="fiDupliquer(${f.id})" title="Dupliquer" style="background:none;border:1px solid #e2e8f0;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;margin-right:4px;">⧉</button>
         <select onchange="fiChangerStatut(${f.id}, this.value)" title="Changer le statut" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:12px;">
           ${Object.entries(FI_STATUT_LABEL).map(([v,l]) => `<option value="${v}" ${f.statut===v?'selected':''}>${l}</option>`).join('')}
@@ -13545,6 +13550,194 @@ async function fiChangerStatut(id, statut) {
     await api('PATCH', `/formulaires-inscription/${id}/statut`, { statut });
     loadFormulairesInscription();
   } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+/* ══ QR codes & check-in (priorités 7 et 9 v2) ══════════════════════════════════════════════
+   Les deux bibliothèques QR (affichage + lecture caméra) ne sont chargées qu'à l'ouverture de
+   ces écrans : ce tableau de bord est déjà lourd, inutile de les imposer à chaque visite. */
+function fiChargerLib(src, testeur) {
+  return new Promise((resolve, reject) => {
+    if (testeur()) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => testeur() ? resolve() : reject(new Error('Bibliothèque indisponible.'));
+    s.onerror = () => reject(new Error('Bibliothèque inaccessible (connexion ?).'));
+    document.head.appendChild(s);
+  });
+}
+
+/* ── Partage : lien public + QR d'affiche (priorité 7, volet « QR du formulaire ») ──────────
+   Ce QR-ci n'est PAS un billet : il encode simplement l'URL publique du formulaire, pour être
+   imprimé sur une affiche/flyer. Le QR individuel, lui, est signé et remis à chaque inscrit. */
+async function fiPartager(id) {
+  const f = _fiListe.find(x => x.id === id);
+  if (!f) return;
+  const url = location.origin + '/formulaire-public.html?slug=' + encodeURIComponent(f.slug);
+  let modal = document.getElementById('fi-share-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'fi-share-modal';
+    modal.className = 'modal-overlay';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:480px;width:94%;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="margin:0;">🔗 Partager — ${esc(f.nom)}</h3>
+        <button type="button" onclick="document.getElementById('fi-share-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);">✕</button>
+      </div>
+      ${f.statut === 'brouillon' ? '<div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;">⚠️ Ce formulaire est en <strong>brouillon</strong> : le lien ne fonctionnera pour le public qu\'une fois le statut passé à « Ouvert ».</div>' : ''}
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">Lien public</label>
+      <div style="display:flex;gap:7px;margin-bottom:16px;">
+        <input id="fi-share-url" readonly value="${esc(url)}" style="flex:1;padding:9px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12.5px;background:#f8fafc;">
+        <button type="button" onclick="fiCopierLien()" style="padding:9px 14px;border:none;border-radius:8px;background:#1B3A6B;color:#fff;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;">Copier</button>
+      </div>
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">QR code à imprimer sur vos affiches</label>
+      <div id="fi-share-qr" style="display:flex;justify-content:center;padding:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;">Chargement…</div>
+      <div style="font-size:11.5px;color:#64748b;margin-top:9px;line-height:1.5;">Ce QR mène à la page d'inscription. Il est différent du QR individuel remis à chaque inscrit, qui sert lui au contrôle d'entrée.</div>
+      <div style="text-align:center;margin-top:14px;"><a href="${esc(url)}" target="_blank" style="font-size:13px;color:#1B3A6B;font-weight:700;">Ouvrir la page publique ↗</a></div>
+    </div>`;
+  modal.style.display = 'flex';
+
+  const box = document.getElementById('fi-share-qr');
+  try {
+    await fiChargerLib('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js', () => typeof QRCode !== 'undefined');
+    box.innerHTML = '';
+    new QRCode(box, { text: url, width: 200, height: 200, colorDark:'#0D2B4E', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.H });
+  } catch(e) {
+    box.innerHTML = `<div style="font-size:12.5px;color:#dc2626;text-align:center;">QR indisponible (${esc(e.message)}) — le lien ci-dessus reste utilisable.</div>`;
+  }
+}
+
+function fiCopierLien() {
+  const inp = document.getElementById('fi-share-url');
+  if (!inp) return;
+  inp.select();
+  navigator.clipboard.writeText(inp.value)
+    .then(() => { const b = inp.nextElementSibling; const t = b.textContent; b.textContent = '✓ Copié'; setTimeout(() => { b.textContent = t; }, 1600); })
+    .catch(() => { try { document.execCommand('copy'); } catch(_) { alert('Copie impossible — sélectionnez le lien manuellement.'); } });
+}
+
+/* ── Check-in le jour J (priorité 9) ────────────────────────────────────────────────────────
+   Scanner caméra (jsQR, même bibliothèque que scanner.html déjà en production) AVEC saisie
+   manuelle de la référence en repli permanent : un téléphone sans caméra, un QR abîmé ou une
+   personne qui a perdu son billet ne doivent jamais bloquer l'accueil. */
+let _fiScanFlux = null, _fiScanTimer = null, _fiScanDernier = 0, _fiScanStats = { ok: 0, refus: 0 };
+
+function fiCheckin(formulaireId, nom) {
+  _fiScanStats = { ok: 0, refus: 0 };
+  let modal = document.getElementById('fi-checkin-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'fi-checkin-modal';
+    modal.className = 'modal-overlay';
+    modal.addEventListener('click', (e) => { if (e.target === modal) fiCheckinFermer(); });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal-box" style="max-width:560px;width:96%;max-height:92vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h3 style="margin:0;">✅ Check-in — ${esc(nom)}</h3>
+        <button type="button" onclick="fiCheckinFermer()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted,#888);">✕</button>
+      </div>
+      <div id="fi-scan-resultat" style="min-height:64px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:14px;color:#64748b;text-align:center;margin-bottom:12px;">Scannez un QR code ou saisissez une référence.</div>
+      <div style="display:flex;gap:14px;font-size:12.5px;color:#64748b;margin-bottom:14px;justify-content:center;">
+        <span>✅ Acceptés : <strong id="fi-scan-ok" style="color:#16a34a;">0</strong></span>
+        <span>⛔ Refusés : <strong id="fi-scan-refus" style="color:#dc2626;">0</strong></span>
+      </div>
+      <div style="position:relative;background:#000;border-radius:10px;overflow:hidden;margin-bottom:10px;">
+        <video id="fi-scan-video" autoplay playsinline muted style="width:100%;display:block;max-height:280px;object-fit:cover;"></video>
+        <canvas id="fi-scan-canvas" style="display:none;"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button type="button" id="fi-scan-start" onclick="fiScanDemarrer(${formulaireId})" style="flex:1;padding:11px;border:none;border-radius:8px;background:#1B3A6B;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;">▶ Démarrer la caméra</button>
+        <button type="button" id="fi-scan-stop" onclick="fiScanArreter()" style="flex:1;padding:11px;border:none;border-radius:8px;background:#dc2626;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;display:none;">⏹ Arrêter</button>
+      </div>
+      <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:5px;">Saisie manuelle (QR illisible, billet perdu…)</label>
+      <div style="display:flex;gap:7px;">
+        <input id="fi-scan-ref" placeholder="DA-2026-000123" style="flex:1;padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;text-transform:uppercase;">
+        <button type="button" onclick="fiCheckinValider(${formulaireId}, null, document.getElementById('fi-scan-ref').value)" style="padding:10px 16px;border:none;border-radius:8px;background:#16a34a;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;">Valider</button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+  const ref = document.getElementById('fi-scan-ref');
+  ref.addEventListener('keydown', (e) => { if (e.key === 'Enter') fiCheckinValider(formulaireId, null, ref.value); });
+}
+
+function fiCheckinFermer() {
+  fiScanArreter();
+  const m = document.getElementById('fi-checkin-modal');
+  if (m) m.style.display = 'none';
+  loadFormulairesInscription();   /* les compteurs Présents de la liste doivent refléter les scans */
+}
+
+async function fiScanDemarrer(formulaireId) {
+  const zone = document.getElementById('fi-scan-resultat');
+  try {
+    await fiChargerLib('https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js', () => typeof jsQR !== 'undefined');
+    _fiScanFlux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = document.getElementById('fi-scan-video');
+    video.srcObject = _fiScanFlux;
+    await video.play();
+    document.getElementById('fi-scan-start').style.display = 'none';
+    document.getElementById('fi-scan-stop').style.display = '';
+    zone.textContent = 'Recherche d\'un QR code…';
+    const canvas = document.getElementById('fi-scan-canvas');
+    const ctx = canvas.getContext('2d');
+    _fiScanTimer = setInterval(() => {
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+      if (Date.now() - _fiScanDernier < 2500) return;   /* anti-doublon : même billet lu 5×/s */
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code && code.data) { _fiScanDernier = Date.now(); fiCheckinValider(formulaireId, code.data, null); }
+    }, 200);
+  } catch(e) {
+    zone.innerHTML = `<span style="color:#dc2626;">Caméra indisponible : ${esc(e.message)} — utilisez la saisie manuelle ci-dessous.</span>`;
+  }
+}
+
+function fiScanArreter() {
+  if (_fiScanFlux) { _fiScanFlux.getTracks().forEach(t => t.stop()); _fiScanFlux = null; }
+  if (_fiScanTimer) { clearInterval(_fiScanTimer); _fiScanTimer = null; }
+  const v = document.getElementById('fi-scan-video'); if (v) v.srcObject = null;
+  const s = document.getElementById('fi-scan-start'); if (s) s.style.display = '';
+  const st = document.getElementById('fi-scan-stop'); if (st) st.style.display = 'none';
+}
+
+async function fiCheckinValider(formulaireId, qrPayload, reference) {
+  const zone = document.getElementById('fi-scan-resultat');
+  if (!zone) return;
+  if (!qrPayload && !(reference || '').trim()) return;
+  zone.innerHTML = '⏳ Vérification…';
+  try {
+    const r = await api('POST', '/formulaires-inscription/checkin',
+      qrPayload ? { qr_payload: qrPayload, formulaire_id: formulaireId }
+                : { reference: (reference || '').trim(), formulaire_id: formulaireId });
+    if (r.valide) {
+      _fiScanStats.ok++;
+      const i = r.inscription;
+      zone.style.background = '#f0fdf4'; zone.style.borderColor = '#bbf7d0';
+      zone.innerHTML = `<div><div style="font-size:26px;">${r.deja_presente ? '⚠️' : '✅'}</div>
+        <div style="font-size:17px;font-weight:800;color:#166534;">${esc(i.prenom || '')} ${esc(i.nom)}</div>
+        <div style="font-size:12.5px;color:#15803d;">${esc(FI_TYPE_PARTICIPATION_LABEL[i.type_participation] || i.type_participation)} · ${esc(i.reference || '')}${i.profession ? ' · ' + esc(i.profession) : ''}</div>
+        ${i.presente_projet ? `<div style="font-size:12px;color:#0f766e;margin-top:3px;">📋 Présente un projet${i.projet_nom ? ' : ' + esc(i.projet_nom) : ''}</div>` : ''}
+        ${r.deja_presente ? '<div style="font-size:12px;color:#b45309;margin-top:4px;font-weight:700;">Déjà pointé précédemment — entrée tout de même autorisée.</div>' : ''}</div>`;
+      const champ = document.getElementById('fi-scan-ref'); if (champ) champ.value = '';
+    } else {
+      _fiScanStats.refus++;
+      zone.style.background = '#fef2f2'; zone.style.borderColor = '#fecaca';
+      zone.innerHTML = `<div><div style="font-size:26px;">⛔</div><div style="font-size:14.5px;font-weight:700;color:#991b1b;">${esc(r.motif || 'Refusé')}</div></div>`;
+    }
+  } catch(e) {
+    _fiScanStats.refus++;
+    zone.style.background = '#fef2f2'; zone.style.borderColor = '#fecaca';
+    zone.innerHTML = `<div style="color:#991b1b;font-weight:700;">Erreur : ${esc(e.message)}</div>`;
+  }
+  document.getElementById('fi-scan-ok').textContent = _fiScanStats.ok;
+  document.getElementById('fi-scan-refus').textContent = _fiScanStats.refus;
 }
 
 async function fiDupliquer(id) {
