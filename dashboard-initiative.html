@@ -5146,6 +5146,7 @@ const PV_CATEGORIE_LABELS = {
 let __pvRegistry = null;
 let __pvModulesState = null;
 let __pvVitrineType = null;
+let __pvVitrineTypes = [];
 let __pvInit = null;
 let __pvDraftPending = false;
 
@@ -5165,6 +5166,7 @@ async function loadParametresVitrineFull() {
     __pvInit = init;
     __pvModulesState = init.vitrine_modules_state || {};
     __pvVitrineType = init.vitrine_type || null;
+    __pvVitrineTypes = Array.isArray(init.vitrine_types) ? init.vitrine_types : (init.vitrine_type ? [init.vitrine_type] : []);
     __pvDraftPending = !!init.vitrine_draft_pending;
     window.__pvInitTheme = init.vitrine_theme || 'bordeaux';
     let styleObj = {};
@@ -5530,6 +5532,7 @@ async function pvAnnulerConfig() {
       const r = await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine-draft-complet`, { draft: ctx.instantane });
       __pvModulesState = (r.draft && r.draft.modules) || __pvModulesState;
       __pvVitrineType = r.draft ? r.draft.type : __pvVitrineType;
+      __pvVitrineTypes = (r.draft && Array.isArray(r.draft.types)) ? r.draft.types : __pvVitrineTypes;
       if (r.draft && r.draft.style && r.draft.style.preset) window.__pvStylePreset = r.draft.style.preset;
     } catch (e) { alert('Annulation impossible : ' + (e.message || '')); }
   } else if (ctx && ctx.activeParNous) {
@@ -5573,22 +5576,26 @@ function pvJumpToModule(key) {
   if (row) { row.style.transition = 'background .3s'; row.style.background = '#FFF7ED'; setTimeout(() => row.style.background = '', 1500); }
 }
 
-/* ── Étape 1 : la fonction de la vitrine (quels modules s'activent). Une carte par type,
-   qui annonce explicitement ce que le choix declenche. Le style graphique ne se decide
-   plus ici : c'est l'etape 2 (renderPvStylePresets). ── */
+/* ── Étape 1 : la fonction de la vitrine (quels modules s'activent). Sélection MULTIPLE
+   (2026-08-19, demande explicite) : une case à cocher par type, cumulables — ex. Formation +
+   Projet/Impact activent l'union de leurs modules. Le style graphique ne se decide pas ici :
+   c'est l'etape 2 (renderPvStylePresets). ── */
 function renderPvTemplates() {
   const grid = document.getElementById('pv-templates-grid');
   if (!grid || !__pvRegistry) return;
   grid.innerHTML = Object.entries(__pvRegistry.templates).map(([key, t]) => {
-    const actif = __pvVitrineType === key;
+    const actif = __pvVitrineTypes.includes(key);
     /* On ne compte que les modules reellement disponibles : annoncer des modules
        "🔜 Bientot" gonflerait un chiffre que la vitrine ne pourrait pas tenir. */
     const dispo = (t.actifs || []).filter(m => __pvRegistry.modules[m] && __pvRegistry.modules[m].implemente);
     const apercu = dispo.slice(0, 4).map(m => __pvRegistry.modules[m].label);
     const reste = dispo.length - apercu.length;
-    return `<div onclick="pvChoisirType('${key}')" role="button" tabindex="0"
-      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pvChoisirType('${key}');}"
+    return `<div onclick="pvToggleType('${key}')" role="checkbox" aria-checked="${actif}" tabindex="0"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();pvToggleType('${key}');}"
       style="cursor:pointer;border:2px solid ${actif?'var(--orange)':'var(--border)'};border-radius:12px;padding:14px 16px;${actif?'background:#FFF7ED;':''}display:flex;align-items:flex-start;gap:12px;">
+      <div style="flex:none;padding-top:2px;">
+        <div style="width:20px;height:20px;border-radius:5px;border:2px solid ${actif?'var(--orange)':'#94A3B8'};background:${actif?'var(--orange)':'#fff'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:900;">${actif?'✓':''}</div>
+      </div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:14.5px;font-weight:800;color:${actif?'var(--orange)':'var(--text)'};">${_mvEsc(t.label)}</div>
         <div style="font-size:12.5px;color:#475569;margin-top:3px;line-height:1.5;">${_mvEsc(t.pour)}</div>
@@ -5597,108 +5604,114 @@ function renderPvTemplates() {
         </div>
       </div>
       <div style="flex:none;font-size:11.5px;font-weight:800;${actif?'color:var(--orange);':'color:var(--muted);'}white-space:nowrap;padding-top:2px;">
-        ${actif ? '✓ Sélectionné' : 'Choisir →'}
+        ${actif ? '✓ Sélectionné' : 'Cocher'}
       </div>
     </div>`;
   }).join('');
 }
 
-/* Changer de type désactive des modules. Le contenu reste en base mais devient invisible :
-   l'utilisateur croit avoir perdu son travail sans savoir qu'il dort quelque part. On lui
-   montre donc AVANT de confirmer ce qui est conservé, ce qui sera converti, et ce qui
-   n'aura plus de place — puis on le laisse choisir. */
-async function pvChoisirType(type) {
+/* Cocher/décocher une carte. Cocher est toujours SANS RISQUE (union de modules, rien n'est
+   jamais retiré) → appliqué directement, pas de confirmation. Décocher PEUT rendre des
+   modules/outils inutilisables (sauf s'ils restent couverts par un autre type encore coché)
+   → on analyse et on prévient AVANT d'agir, comme l'ancien changement de type exclusif. */
+function pvToggleType(type) {
   if (!__pvRegistry) return;
+  if (__pvVitrineTypes.includes(type)) pvOuvrirRetraitModal(type);
+  else pvAjouterType(type);
+}
+
+async function pvAjouterType(type) {
+  const initId = window.__vitrineInitId;
+  if (!initId) return;
+  try {
+    const r = await api('POST', `/initiatives/${initId}/vitrine/type/ajouter`, { type });
+    __pvVitrineTypes = r.types;
+    __pvVitrineType = r.types[0] || null;
+    __pvModulesState = r.draft.modules;
+    renderPvTemplates(); renderPvModulesLib(); renderPvOrderList();
+    pvRefreshPreview();
+  } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+/* Décocher un type désactive des modules qui ne sont plus couverts par aucun type restant.
+   Le contenu reste en base mais devient invisible : l'utilisateur croit avoir perdu son
+   travail sans savoir qu'il dort quelque part. On lui montre donc AVANT de confirmer ce qui
+   est conservé, ce qui sera converti, et quels OUTILS (pas seulement des contenus) deviennent
+   inutilisables — demande explicite de l'utilisateur (2026-08-19). */
+async function pvOuvrirRetraitModal(type) {
   const t = __pvRegistry.templates[type];
   if (!t) return;
   const initId = window.__vitrineInitId;
   document.getElementById('pv-confirm-modal')?.remove();
 
   let a = null;
-  if (initId) { try { a = await api('GET', `/initiatives/${initId}/vitrine/analyser-type?type=${encodeURIComponent(type)}`); } catch (e) {} }
+  if (initId) { try { a = await api('GET', `/initiatives/${initId}/vitrine/analyser-retrait?type=${encodeURIComponent(type)}`); } catch (e) {} }
 
   const orphelins = (a && a.orphelins) || [];
-  const conserves = (a && a.conserves) || [];
+  const outilsPerdus = (a && a.outils_perdus) || [];
   const adaptables = orphelins.filter(o => o.adaptation);
   const sansPlace = orphelins.filter(o => !o.adaptation);
-  const memeType = a && a.type_actuel === type;
-
-  const liste = (items, rendu) => items.map(rendu).join('');
+  const typesRestants = (a && a.types_restants) || __pvVitrineTypes.filter(x => x !== type);
+  const rienDautre = typesRestants.length === 0;
 
   const overlay = document.createElement('div');
   overlay.id = 'pv-confirm-modal';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:26px;max-height:90vh;overflow:auto;">
-    <h2 style="margin:0 0 10px;font-size:17px;">Passer à « ${_mvEsc(t.label)} » ?</h2>
+    <h2 style="margin:0 0 10px;font-size:17px;">Retirer « ${_mvEsc(t.label)} » ?</h2>
 
-    ${orphelins.length ? `
-      <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 14px;">
-        Vous êtes sur le point de modifier le type de votre vitrine. Certains éléments actuels
-        peuvent ne pas correspondre au nouveau format.<br><br>
-        <strong>Souhaitez-vous conserver vos contenus existants et les adapter automatiquement ?</strong>
-      </p>` : `
-      <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 14px;">
-        Les modules adaptés à ce type seront activés dans votre brouillon.
-        <strong>Aucun de vos contenus ne perd sa place</strong>${memeType ? '' : ' avec ce changement'}.<br><br>
-        L'apparence ne change pas — elle se choisit à l'étape 2. Rien n'est public tant que
-        vous n'avez pas cliqué sur « Publier ma vitrine ».
-      </p>`}
+    <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 14px;">
+      ${rienDautre
+        ? "C'est le dernier type sélectionné : votre vitrine n'aura plus aucun module actif tant que vous n'en choisissez pas un autre."
+        : `Les modules encore couverts par ${typesRestants.length > 1 ? 'vos autres types sélectionnés' : `« ${_mvEsc(__pvRegistry.templates[typesRestants[0]]?.label || typesRestants[0])} »`} restent inchangés.`}
+    </p>
 
-    ${conserves.length ? `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:800;color:#166534;margin-bottom:4px;">✅ Conservés tels quels</div>
-      <div style="font-size:12.5px;color:#166534;line-height:1.6;">${liste(conserves, c => _mvEsc(c.label)).split('').length ? conserves.map(c => _mvEsc(c.label)).join(' · ') : ''}</div>
+    ${outilsPerdus.length ? `<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:800;color:#991B1B;margin-bottom:4px;">🛠️ Outils qui deviendront inutilisables</div>
+      <div style="font-size:12.5px;color:#991B1B;line-height:1.6;">${outilsPerdus.map(o => _mvEsc(o.label)).join(' · ')}</div>
     </div>` : ''}
 
     ${adaptables.length ? `<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
       <div style="font-size:12px;font-weight:800;color:#1E40AF;margin-bottom:5px;">🔄 Adaptés automatiquement</div>
-      ${liste(adaptables, o => `<div style="font-size:12.5px;color:#1E3A8A;line-height:1.6;margin-bottom:3px;"><strong>${_mvEsc(o.label)}</strong> — ${_mvEsc(o.adaptation.quoi)}</div>`)}
+      ${adaptables.map(o => `<div style="font-size:12.5px;color:#1E3A8A;line-height:1.6;margin-bottom:3px;"><strong>${_mvEsc(o.label)}</strong> — ${_mvEsc(o.adaptation.quoi)}</div>`).join('')}
     </div>` : ''}
 
     ${sansPlace.length ? `<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:800;color:#92400E;margin-bottom:4px;">⚠️ Sans emplacement dans ce type</div>
+      <div style="font-size:12px;font-weight:800;color:#92400E;margin-bottom:4px;">⚠️ Sans emplacement dans vos types restants</div>
       <div style="font-size:12.5px;color:#92400E;line-height:1.6;">
         ${sansPlace.map(o => _mvEsc(o.label)).join(' · ')}<br>
-        <span style="font-size:11.5px;">Ces contenus restent enregistrés et réapparaîtront si vous revenez à un type qui les affiche.</span>
+        <span style="font-size:11.5px;">Ces contenus restent enregistrés et réapparaîtront si vous recochez ce type.</span>
       </div>
     </div>` : ''}
 
+    ${!outilsPerdus.length && !orphelins.length ? `<p style="font-size:12.5px;color:#166534;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px 12px;">✅ Rien à perdre : tout ce que ce type activait reste couvert par un autre type coché.</p>` : ''}
+
     <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;">
       <button onclick="document.getElementById('pv-confirm-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
-      ${orphelins.length ? `<button onclick="pvAppliquerType('${type}','zero')" style="padding:9px 16px;border-radius:8px;border:1.5px solid #FCA5A5;background:#fff;color:#DC2626;font-weight:700;cursor:pointer;">Repartir à zéro</button>` : ''}
-      <button onclick="pvAppliquerType('${type}','adapter')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">${orphelins.length ? 'Conserver et adapter' : 'Activer ces modules'}</button>
+      ${orphelins.length ? `<button onclick="pvRetirerTypeAppliquer('${type}','zero')" style="padding:9px 16px;border-radius:8px;border:1.5px solid #FCA5A5;background:#fff;color:#DC2626;font-weight:700;cursor:pointer;">Repartir à zéro</button>` : ''}
+      <button onclick="pvRetirerTypeAppliquer('${type}','adapter')" style="padding:9px 16px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;cursor:pointer;">${orphelins.length ? 'Conserver et adapter' : 'Retirer ce type'}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-async function pvAppliquerType(type, mode) {
+async function pvRetirerTypeAppliquer(type, mode) {
   const initId = window.__vitrineInitId;
   /* « Repartir à zéro » supprime des contenus : la confirmation doit être explicite et
      nommer la conséquence, pas se contenter d'un « êtes-vous sûr ». */
   if (mode === 'zero' && !confirm(
-      "Attention : cette action supprimera les contenus actuels de votre vitrine qui n'ont pas leur place dans le nouveau type.\n\n" +
+      "Attention : cette action supprimera les contenus actuels de votre vitrine qui n'ont pas leur place dans vos types restants.\n\n" +
       "Une sauvegarde est prise automatiquement et vous pourrez revenir en arrière depuis « Sauvegardes ».\n\n" +
       "Confirmer ?")) return;
   try {
-    let r;
-    if (initId && mode) {
-      /* Route dédiée : elle sauvegarde, convertit puis applique le type. Le simple patch
-         du brouillon ne suffirait pas — il laisserait les contenus orphelins en l'état. */
-      r = await api('POST', `/initiatives/${initId}/vitrine/changer-type`, { type, mode });
-      __pvVitrineType = r.type;
-      __pvModulesState = r.draft.modules;
-      if (Array.isArray(r.journal) && r.journal.length) {
-        alert("Vitrine adaptée :\n\n• " + r.journal.join("\n• ") +
-              "\n\nVérifiez l'aperçu, ajustez si besoin, puis publiez.");
-      }
-    } else {
-      /* On ne patche QUE le type. Le style visuel releve de l'etape 2 et ne doit jamais
-         etre ecrase par un changement de fonction : c'est precisement la confusion que
-         l'ancienne grille type+style creait. */
-      const p = await pvDraftPatch({ type });
-      __pvVitrineType = p.draft.type;
-      __pvModulesState = p.draft.modules;
+    const r = await api('POST', `/initiatives/${initId}/vitrine/type/retirer`, { type, mode });
+    __pvVitrineTypes = r.types;
+    __pvVitrineType = r.types[0] || null;
+    __pvModulesState = r.draft.modules;
+    if (Array.isArray(r.journal) && r.journal.length) {
+      alert("Vitrine mise à jour :\n\n• " + r.journal.join("\n• ") +
+            "\n\nVérifiez l'aperçu, ajustez si besoin, puis publiez.");
     }
     document.getElementById('pv-confirm-modal')?.remove();
     renderPvTemplates(); renderPvModulesLib(); renderPvOrderList();

@@ -825,6 +825,9 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'assistant_actif', 'INTEGER DEFAULT 1'],
     // Module "Paramètres Vitrine" v2 : type de vitrine (modèle) + registre des modules actif/masqué/ordre
     ['initiatives', 'vitrine_type', 'TEXT'],
+    // Sélection multiple de types de vitrine (2026-08-19) — source de vérité, vitrine_type
+    // ci-dessus reste synchronisé sur le premier type pour compat affichage.
+    ['initiatives', 'vitrine_types_json', "TEXT DEFAULT '[]'"],
     ['initiatives', 'vitrine_modules_json', "TEXT DEFAULT '{}'"],
     ['initiatives', 'vitrine_temoignages_json', 'TEXT'],
     ['initiatives', 'vitrine_vision_objectifs', 'TEXT'],

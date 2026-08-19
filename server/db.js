@@ -5494,6 +5494,10 @@ db.exec(`
   // ses données (aucune colonne n'est jamais vidée par ce système) ; seul son affichage public change.
   const initCols7 = db.prepare('PRAGMA table_info(initiatives)').all().map(c=>c.name);
   if (!initCols7.includes('vitrine_type'))                    db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_type TEXT");
+  // Sélection multiple de types de vitrine (2026-08-19) : vitrine_type reste synchronisé sur
+  // le premier type choisi (compat affichage), vitrine_types_json (tableau) est désormais la
+  // source de vérité pour savoir quels modèles sont actifs — voir getVitrineTypesActifs().
+  if (!initCols7.includes('vitrine_types_json'))              db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_types_json TEXT DEFAULT '[]'");
   if (!initCols7.includes('vitrine_modules_json'))            db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_modules_json TEXT DEFAULT '{}'");
   if (!initCols7.includes('vitrine_temoignages_json'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_temoignages_json TEXT");
   if (!initCols7.includes('vitrine_vision_objectifs'))        db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_vision_objectifs TEXT");

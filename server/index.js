@@ -2648,6 +2648,31 @@ const VITRINE_TEMPLATES = {
   },
 };
 
+/* Sélection MULTIPLE de types (2026-08-19, demande explicite de l'utilisateur) : une vitrine
+   peut désormais cumuler plusieurs modèles (ex. Formation + Projet/Impact), pas un seul —
+   cohérent avec l'intention déjà notée plus haut ("Portfolio -> +Boutique -> +Formation sans
+   jamais recréer/écraser la vitrine"). vitrine_types_json est la source de vérité ; vitrine_type
+   reste synchronisé sur le premier type de la liste pour tout code qui ne lirait encore que le
+   singulier (aucun trouvé côté affichage public à ce jour, mais coûte peu de le garder cohérent).
+   Repli : une vitrine créée avant ce système n'a qu'un vitrine_type — jamais perdre ce choix. */
+function getVitrineTypesActifs(init, draft) {
+  const d = draft || {};
+  const brut = d.types !== undefined ? d.types : safeParse(init.vitrine_types_json);
+  if (Array.isArray(brut) && brut.length) return brut.filter(t => VITRINE_TEMPLATES[t]);
+  const legacy = d.type !== undefined ? d.type : init.vitrine_type;
+  return legacy && VITRINE_TEMPLATES[legacy] ? [legacy] : [];
+}
+function unionModulesTypes(types) {
+  const s = new Set();
+  for (const t of types) {
+    const tpl = VITRINE_TEMPLATES[t];
+    if (!tpl) continue;
+    (tpl.actifs || []).forEach(m => s.add(m));
+    (tpl.optionnels || []).forEach(m => s.add(m));
+  }
+  return s;
+}
+
 /* Champs de contenu autorisés dans le brouillon de vitrine (liste blanche stricte).
    Édités depuis l'aperçu, ils transitent par vitrine_draft_json et ne touchent la vitrine
    publique qu'à la publication — c'est ce qui rend « Annuler » possible.
@@ -2681,9 +2706,10 @@ function getVitrineConfig(init, { draft = false } = {}) {
   const d = draft ? resolveVitrineDraft(init) : {};
   const modulesState = getVitrineModulesState(init, { draft });
   const type = draft && d.type !== undefined ? d.type : init.vitrine_type;
+  const types = getVitrineTypesActifs(init, draft ? d : null);
   const style = draft && d.style ? d.style : (safeParse(init.vitrine_style_json) || {});
   const theme = draft && d.theme ? d.theme : (init.vitrine_theme || 'bordeaux');
-  return { modulesState, type, style, theme };
+  return { modulesState, type, types, style, theme };
 }
 
 function getVitrineModulesState(init, { draft = false } = {}) {
@@ -6268,6 +6294,7 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   row.vitrine_modules_state = cfg.modulesState;
   if (useDraft) {
     row.vitrine_type = cfg.type;
+    row.vitrine_types = cfg.types;
     row.vitrine_style_json = JSON.stringify(cfg.style || {});
     row.vitrine_theme = cfg.theme;
     /* Contenus du brouillon : même principe, superposés au passage pour que l'aperçu
@@ -6276,6 +6303,8 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
     Object.keys(c).forEach((champ) => {
       if (VITRINE_CHAMPS_BROUILLON.includes(champ)) row[champ] = c[champ];
     });
+  } else {
+    row.vitrine_types = getVitrineTypesActifs(row, null);
   }
   row.vitrine_draft_pending = JSON.stringify(resolveVitrineDraft(row)) !== '{}';
   sendJSON(res, 200, { initiative: row });
@@ -6500,6 +6529,7 @@ async function sauvegarderVitrine(init, typeAvant, typeApres, mode) {
     for (const champ of def.champs || []) contenu[champ] = init[champ] === undefined ? null : init[champ];
   }
   contenu.vitrine_type = init.vitrine_type;
+  contenu.vitrine_types_json = init.vitrine_types_json;
   contenu.vitrine_modules_json = init.vitrine_modules_json;
   contenu.vitrine_draft_json = init.vitrine_draft_json;
   const id = (await db.prepare(
@@ -6507,6 +6537,146 @@ async function sauvegarderVitrine(init, typeAvant, typeApres, mode) {
   ).run(init.id, JSON.stringify(contenu), typeAvant || null, typeApres || null, mode)).lastInsertRowid;
   return id;
 }
+
+/* ── Sélection MULTIPLE de types (2026-08-19) ──
+   Ajouter un type est toujours SANS RISQUE : ça n'active que des modules en plus, rien
+   n'est jamais retiré — donc pas d'analyse ni de confirmation nécessaires, contrairement à
+   POST .../changer-type (remplacement) ci-dessus. */
+route("POST", "/api/initiatives/:id/vitrine/type/ajouter", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const type = String(body?.type || "");
+  const tpl = VITRINE_TEMPLATES[type];
+  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+
+  const draft = safeParse(init.vitrine_draft_json) || {};
+  const typesActuels = getVitrineTypesActifs(init, draft);
+  if (typesActuels.includes(type)) {
+    return sendJSON(res, 200, { ok: true, types: typesActuels, draft });
+  }
+  const nouveauxTypes = [...typesActuels, type];
+
+  /* Le type ne s'applique qu'au BROUILLON, comme changer-type — la vitrine publique ne
+     change qu'à la publication. */
+  const nouveauDraft = {
+    ...draft, types: nouveauxTypes, type: nouveauxTypes[0],
+    modules: draft.modules || safeParse(init.vitrine_modules_json) || {},
+  };
+  for (const m of tpl.actifs || []) nouveauDraft.modules[m] = true;
+  await db.prepare("UPDATE initiatives SET vitrine_draft_json=?, updated_at=datetime('now') WHERE id=?")
+    .run(JSON.stringify(nouveauDraft), init.id);
+
+  sendJSON(res, 200, { ok: true, types: nouveauxTypes, draft: nouveauDraft });
+});
+
+/* GET .../analyser-retrait?type= — miroir de analyser-type, mais pour RETIRER un type d'une
+   sélection existante : seuls les modules qui ne sont plus couverts par AUCUN type restant
+   sont concernés (un module encore fourni par un autre type coché ne bouge pas). Certains
+   modules (contact, équipe, actualités, demande de devis, événements, formations, demande de
+   partenariat, financement participatif, réseaux sociaux) n'ont pas de contenu propre suivi
+   ici (VITRINE_CONTENU_MODULE) — ce sont des outils alimentés par d'autres tables ; on les
+   signale quand même comme "outils qui deviennent inutilisables" (§ demande explicite de
+   l'utilisateur), sans proposer d'adaptation puisqu'il n'y a rien à convertir. */
+route("GET", "/api/initiatives/:id/vitrine/analyser-retrait", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const type = String(query.type || "");
+  const tpl = VITRINE_TEMPLATES[type];
+  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+
+  const draft = safeParse(init.vitrine_draft_json) || {};
+  const typesActuels = getVitrineTypesActifs(init, draft);
+  if (!typesActuels.includes(type)) return sendJSON(res, 400, { error: "Ce type n'est pas actuellement sélectionné." });
+  const typesRestants = typesActuels.filter(t => t !== type);
+
+  const modulesDuType = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
+  const modulesRestants = unionModulesTypes(typesRestants);
+  const perdus = [...modulesDuType].filter(cle => !modulesRestants.has(cle));
+
+  const conserves = [], orphelins = [], vides = [], outilsPerdus = [];
+  for (const cle of perdus) {
+    const def = VITRINE_CONTENU_MODULE[cle];
+    const label = (VITRINE_MODULES_REGISTRY[cle] || {}).label || cle;
+    if (!def) { outilsPerdus.push({ cle, label }); continue; }
+    const aDuContenu = await moduleAContenu(init, cle);
+    if (!aDuContenu) { vides.push({ cle, label: def.label }); continue; }
+    const pistes = (VITRINE_ADAPTATIONS[cle] || []).filter(a => modulesRestants.has(a.vers));
+    orphelins.push({ cle, label: def.label, adaptation: pistes[0] || null });
+  }
+
+  sendJSON(res, 200, {
+    type_retire: type, libelle_retire: tpl.label,
+    types_restants: typesRestants,
+    conserves, orphelins, vides, outils_perdus: outilsPerdus,
+    adaptables: orphelins.filter(o => o.adaptation).length,
+    sans_destination: orphelins.filter(o => !o.adaptation).length,
+  });
+});
+
+route("POST", "/api/initiatives/:id/vitrine/type/retirer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const type = String(body?.type || "");
+  const tpl = VITRINE_TEMPLATES[type];
+  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  const mode = body?.mode === "zero" ? "zero" : "adapter";
+
+  const draft = safeParse(init.vitrine_draft_json) || {};
+  const typesActuels = getVitrineTypesActifs(init, draft);
+  if (!typesActuels.includes(type)) return sendJSON(res, 400, { error: "Ce type n'est pas actuellement sélectionné." });
+  const typesRestants = typesActuels.filter(t => t !== type);
+
+  const sauvegarde_id = await sauvegarderVitrine(init, typesActuels.join(", "), typesRestants.join(", ") || "aucun", mode);
+
+  const modulesDuType = new Set([...(tpl.actifs || []), ...(tpl.optionnels || [])]);
+  const modulesRestants = unionModulesTypes(typesRestants);
+  const perdus = [...modulesDuType].filter(cle => !modulesRestants.has(cle));
+  const journal = [];
+
+  if (mode === "zero") {
+    for (const cle of perdus) {
+      const def = VITRINE_CONTENU_MODULE[cle];
+      if (!def) continue;
+      for (const champ of def.champs || []) {
+        const vide = /_json$/.test(champ) ? "[]" : "";
+        try { await db.prepare("UPDATE initiatives SET " + champ + "=? WHERE id=?").run(vide, init.id); } catch (e) {}
+      }
+    }
+    journal.push("Contenus des modules retirés effacés.");
+  } else {
+    for (const cle of perdus) {
+      const def = VITRINE_CONTENU_MODULE[cle];
+      if (!def) continue;
+      if (!(await moduleAContenu(init, cle))) continue;
+      const piste = (VITRINE_ADAPTATIONS[cle] || []).find(a => modulesRestants.has(a.vers));
+      if (!piste) { journal.push("« " + def.label + " » conservé en base, sans emplacement dans les types restants."); continue; }
+      const fait = await convertirContenu(init, cle, piste.vers);
+      journal.push(fait ? "« " + def.label + " » → " + fait : "« " + def.label + " » conservé en base.");
+    }
+  }
+
+  const nouveauDraft = {
+    ...draft, types: typesRestants, type: typesRestants[0] || null,
+    modules: draft.modules || safeParse(init.vitrine_modules_json) || {},
+  };
+  for (const m of perdus) nouveauDraft.modules[m] = false;
+  await db.prepare("UPDATE initiatives SET vitrine_draft_json=?, updated_at=datetime('now') WHERE id=?")
+    .run(JSON.stringify(nouveauDraft), init.id);
+
+  sendJSON(res, 200, { ok: true, mode, sauvegarde_id, journal, types: typesRestants, draft: nouveauDraft });
+});
 
 /* Conversions réelles. Chaque fonction renvoie un texte décrivant ce qu'elle a fait,
    pour que l'utilisateur lise la transformation au lieu de la deviner. */
