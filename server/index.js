@@ -1499,6 +1499,34 @@ route("POST", "/api/upload/cagnotte", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload cagnotte")); }
 });
 
+/* POST /api/upload/formulaire-affiche — visuel d'un formulaire d'inscription (réservé aux
+   administrateurs, contrairement à .../formulaires-inscription/public/upload qui est
+   volontairement ouvert aux participants sans compte). Même mécanique que les 7 autres routes
+   d'upload de la plateforme : contrôle par octets magiques puis dépôt sur le CDN Bunny. */
+route("POST", "/api/upload/formulaire-affiche", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!(await formulaireEstProteje(user, res))) return;
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["affiche"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Image trop lourde (5 Mo maximum)." });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "formulaires");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "formulaire_affiche", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload affiche formulaire")); }
+});
+
 /* POST /api/upload/document — document réel pour la vitrine (Téléchargements) :
    PDF, Office (doc/docx/xls/xlsx/ppt/pptx) ou image. Vérification par signature (magic bytes)
    pour PDF/images ; les formats Office modernes sont des archives ZIP (signature PK\x03\x04)
@@ -16268,12 +16296,94 @@ route("GET", "/api/cagnottes/:id", async (req, res, params) => {
    Priorités 1-2 du cahier des charges : squelette + constructeur. Les routes publiques
    d'inscription (formulaire public, fiches, QR) sont des chantiers séparés à venir. */
 
-function formulaireEstProteje(user, res) {
-  if (!user || user.role !== "administrateur") {
-    sendJSON(res, 403, { error: "Réservé aux administrateurs." });
-    return false;
+/* Qui a le droit d'utiliser le module : l'administration de la plateforme, ET le SEUL compte
+   Initiative officiel de Diaspo'Actif (décision de l'utilisateur : pas ouvert aux autres
+   associations pour l'instant). On réutilise le mécanisme d'initiative officielle déjà en place
+   (parametres_plateforme.da_initiative_officielle_id) plutôt que d'inventer un second marqueur.
+   ATTENTION : ce contrôle ne dit QUE « ce compte a le droit d'utiliser le module » — il ne dit
+   rien sur QUEL formulaire. Chaque route agissant sur un formulaire précis doit en plus appeler
+   formulairePeutGerer(). */
+let _formulaireProprietaireOfficielCache = null;
+
+async function estProprietaireInitiativeOfficielle(user) {
+  if (!user || user.role !== "initiative") return false;
+  if (_formulaireProprietaireOfficielCache == null) {
+    try {
+      const idInitiative = await getInitiativeOfficielleId();
+      if (!idInitiative) return false;
+      const row = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(idInitiative);
+      if (!row?.owner_user_id) return false;
+      _formulaireProprietaireOfficielCache = Number(row.owner_user_id);
+    } catch (e) { return false; }
   }
-  return true;
+  return Number(user.id) === _formulaireProprietaireOfficielCache;
+}
+
+async function formulaireEstProteje(user, res) {
+  if (user && user.role === "administrateur") return true;
+  if (await estProprietaireInitiativeOfficielle(user)) return true;
+  sendJSON(res, 403, { error: "Réservé à l'administration et au compte Diaspo'Actif Officiel." });
+  return false;
+}
+
+/* Cloisonnement : l'administration voit tout, un compte Initiative uniquement SES formulaires.
+   Renvoie 404 plutôt que 403 pour un formulaire d'autrui — un 403 confirmerait son existence. */
+function formulairePeutGerer(f, user, res) {
+  if (!f) { sendJSON(res, 404, { error: "Formulaire introuvable." }); return false; }
+  if (user && user.role === "administrateur") return true;
+  if (user && Number(f.owner_user_id) === Number(user.id)) return true;
+  sendJSON(res, 404, { error: "Formulaire introuvable." });
+  return false;
+}
+
+/* ── Accès organisateur par code (cadenas de la page publique) ────────────────────────────────
+   Permet à l'organisateur présent sur le terrain d'ouvrir la vue complète sans compte ni
+   connexion : il saisit le code du formulaire, le serveur le vérifie et délivre un JETON SIGNÉ
+   valable 12 h, lié à CE formulaire et à lui seul. Le code lui-même ne circule plus ensuite.
+   Le jeton ne donne jamais accès à la liste de tous les formulaires ni à la création : il ouvre
+   uniquement le formulaire dont on a fourni le code. */
+const FORMULAIRE_ACCES_DUREE_MS = 12 * 60 * 60 * 1000;
+
+function signerAccesFormulaire(formulaireId, expiration) {
+  return crypto.createHmac("sha256", TICKET_SECRET)
+    .update(`acces-formulaire:${formulaireId}:${expiration}`).digest("hex").slice(0, 40);
+}
+
+function construireJetonAcces(formulaireId) {
+  const exp = Date.now() + FORMULAIRE_ACCES_DUREE_MS;
+  return Buffer.from(JSON.stringify({ fid: Number(formulaireId), exp, sig: signerAccesFormulaire(formulaireId, exp) })).toString("base64");
+}
+
+function jetonAccesValide(jeton, formulaireId) {
+  if (!jeton || !formulaireId) return false;
+  let p;
+  try { p = JSON.parse(Buffer.from(String(jeton), "base64").toString()); } catch (_) { return false; }
+  if (Number(p?.fid) !== Number(formulaireId)) return false;
+  if (!p.exp || Date.now() > Number(p.exp)) return false;
+  return p.sig === signerAccesFormulaire(p.fid, p.exp);
+}
+
+/* Comparaison à durée constante : une comparaison naïve (===) laisse fuiter, par le temps de
+   réponse, combien de caractères du code sont corrects. */
+function codeAccesCorrect(saisi, attendu) {
+  if (!attendu || !saisi) return false;
+  const a = Buffer.from(String(saisi));
+  const b = Buffer.from(String(attendu));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+/* Autorisation unique des routes agissant sur UN formulaire précis : soit une session habilitée
+   (administration ou compte Diaspo'Actif Officiel propriétaire), soit un jeton d'accès valide
+   pour ce formulaire. Remplace le couple formulaireEstProteje + formulairePeutGerer sur ces
+   routes — ne JAMAIS l'employer pour la liste globale ni pour la création. */
+async function formulaireAcces(req, res, f, user) {
+  if (!f) { sendJSON(res, 404, { error: "Formulaire introuvable." }); return false; }
+  if (jetonAccesValide(req.headers["x-formulaire-acces"], f.id ?? f.formulaire_id)) return true;
+  if (user && user.role === "administrateur") return true;
+  if (user && Number(f.owner_user_id) === Number(user.id) && await estProprietaireInitiativeOfficielle(user)) return true;
+  sendJSON(res, 404, { error: "Formulaire introuvable." });
+  return false;
 }
 
 /* Même pattern que genererNumeroTicket()/numeroDossier ailleurs sur la plateforme :
@@ -16348,8 +16458,10 @@ function sanitizeFormulaireChampsCustom(raw) {
 /* GET /api/formulaires-inscription — liste admin, avec compteurs d'inscriptions/présences. */
 route("GET", "/api/formulaires-inscription", async (req, res) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
-  const rows = await db.prepare("SELECT * FROM formulaires_inscription ORDER BY created_at DESC").all();
+  if (!(await formulaireEstProteje(user, res))) return;
+  const rows = user.role === "administrateur"
+    ? await db.prepare("SELECT * FROM formulaires_inscription ORDER BY created_at DESC").all()
+    : await db.prepare("SELECT * FROM formulaires_inscription WHERE owner_user_id=? ORDER BY created_at DESC").all(user.id);
   const withCounts = await Promise.all(rows.map(async f => {
     const inscrits = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut != 'annule'").get(f.id))?.n || 0;
     const presents = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=? AND statut='present'").get(f.id))?.n || 0;
@@ -16362,9 +16474,8 @@ route("GET", "/api/formulaires-inscription", async (req, res) => {
 /* GET /api/formulaires-inscription/:id — détail admin (constructeur en édition). */
 route("GET", "/api/formulaires-inscription/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
   const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  if (!(await formulaireAcces(req, res, f, user))) return;
   sendJSON(res, 200, { formulaire: f });
 });
 
@@ -16373,7 +16484,7 @@ const FORMULAIRE_CHAMPS_MODIFIABLES = [
   "organisateur","date_ouverture_inscriptions","date_fermeture_inscriptions","places_max",
   "validation_auto","annulation_autorisee","confirmation_auto","autoriser_projet",
   "don_active","evenement_id","initiative_id","champs_custom_json",
-  "visibilite_montant","visibilite_participants",
+  "visibilite_montant","visibilite_participants","code_acces",
 ];
 
 /* ── "Faire un don" (priorités 13-14 v2) ────────────────────────────────────────────────────
@@ -16419,7 +16530,7 @@ async function assurerCagnotteFormulaireSiActive(formulaireId, user, objectifMon
 
 route("POST", "/api/formulaires-inscription", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
+  if (!(await formulaireEstProteje(user, res))) return;
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom du formulaire est requis." });
 
   const champsCustom = JSON.stringify(sanitizeFormulaireChampsCustom(body.champs_custom));
@@ -16454,9 +16565,8 @@ route("POST", "/api/formulaires-inscription", async (req, res, params, body) => 
 
 route("PUT", "/api/formulaires-inscription/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
-  const f = await db.prepare("SELECT id FROM formulaires_inscription WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  const f = await db.prepare("SELECT id, owner_user_id FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!(await formulaireAcces(req, res, f, user))) return;
 
   /* Colonnes INTEGER stockant un booléen : node:sqlite refuse un JS boolean brut comme
      paramètre lié ("Erreur serveur" 500, contrairement à better-sqlite3 qui coercerait) —
@@ -16486,11 +16596,12 @@ route("PUT", "/api/formulaires-inscription/:id", async (req, res, params, body) 
    revenir en arrière, ex. refermer un formulaire ouvert par erreur). */
 route("PATCH", "/api/formulaires-inscription/:id/statut", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
   const statut = body?.statut;
   if (!["brouillon","ouvert","ferme","archive"].includes(statut)) {
     return sendJSON(res, 400, { error: "Statut invalide." });
   }
+  const cible = await db.prepare("SELECT id, owner_user_id FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!(await formulaireAcces(req, res, cible, user))) return;
   const info = await db.prepare("UPDATE formulaires_inscription SET statut=?, updated_at=datetime('now') WHERE id=?").run(statut, params.id);
   if (!info.changes) return sendJSON(res, 404, { error: "Formulaire introuvable." });
   sendJSON(res, 200, { ok: true, statut });
@@ -16498,9 +16609,9 @@ route("PATCH", "/api/formulaires-inscription/:id/statut", async (req, res, param
 
 route("POST", "/api/formulaires-inscription/:id/dupliquer", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
+  if (!(await formulaireEstProteje(user, res))) return;
   const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  if (!formulairePeutGerer(f, user, res)) return;
   const slug = slugFormulaire(f.nom + "-copie");
   const id = (await db.prepare(`
     INSERT INTO formulaires_inscription (
@@ -16592,6 +16703,7 @@ route("GET", "/api/formulaires-inscription/public/:slug", async (req, res, param
       lieu: f.lieu, adresse: f.adresse, description: f.description, affiche_url: f.affiche_url,
       organisateur: f.organisateur, statut: f.statut, places_max: f.places_max,
       autoriser_projet: !!f.autoriser_projet, don_active: !!f.don_active, don,
+      /* code_acces volontairement absent : cette réponse est publique. */
       visibilite_montant: f.visibilite_montant, visibilite_participants: f.visibilite_participants,
       champs_custom: (() => { try { return JSON.parse(f.champs_custom_json || "[]"); } catch { return []; } })(),
       slug: f.slug,
@@ -16721,6 +16833,28 @@ route("POST", "/api/formulaires-inscription/public/:slug/inscriptions", async (r
   sendJSON(res, 201, { inscription: row, compte_existant: compteExistant });
 });
 
+/* POST /api/formulaires-inscription/public/:slug/acces — cadenas de la page publique.
+   Échange le code de l'organisateur contre un jeton signé valable 12 h. Fortement rate-limité :
+   c'est la seule porte d'entrée aux données personnelles des inscrits sans compte, un code se
+   teste sinon en masse. Le code n'est jamais renvoyé, et une erreur ne dit jamais si le
+   formulaire existe ou si c'est le code qui est faux. */
+route("POST", "/api/formulaires-inscription/public/:slug/acces", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const memLimit = SEC.rateLimit(`formulaire_acces:ip:${ip}`, 8, 15 * 60 * 1000);
+  if (!memLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${memLimit.retryAfter}s.` });
+  const guard = await dbLoginGuard(`formulaire_acces_ip:${ip}`, 8, 15 * 60 * 1000);
+  if (!guard.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${guard.retryAfter}s.` });
+
+  const f = await db.prepare("SELECT id, nom, code_acces FROM formulaires_inscription WHERE slug=?").get(params.slug);
+  const refus = () => { dbLoginRecord(`formulaire_acces_ip:${ip}`, false); return sendJSON(res, 403, { error: "Code incorrect." }); };
+  if (!f || !f.code_acces) return refus();
+  if (!codeAccesCorrect(String(body?.code || ""), f.code_acces)) return refus();
+
+  dbLoginRecord(`formulaire_acces_ip:${ip}`, true);
+  SEC.logSecurity("formulaire_acces", { fid: Number(f.id), ip });
+  sendJSON(res, 200, { jeton: construireJetonAcces(f.id), formulaire_id: f.id, nom: f.nom, expire_dans_h: 12 });
+});
+
 /* ═══ MÉDIAS DU PROJET/DE L'INITIATIVE (priorité 12 v2) ═══
    Upload SANS COMPTE (règle #6/#7 : jamais de compte obligatoire, y compris pour joindre des
    médias à une présentation de projet). Toutes les autres routes /api/upload/* exigent
@@ -16813,9 +16947,8 @@ route("POST", "/api/formulaires-inscription/public/upload", async (req, res) => 
    les autres routeurs à segments fixes de ce fichier. */
 route("GET", "/api/formulaires-inscription/:id/inscriptions", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
-  const f = await db.prepare("SELECT id FROM formulaires_inscription WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  const f = await db.prepare("SELECT id, owner_user_id FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!(await formulaireAcces(req, res, f, user))) return;
 
   let rows = await db.prepare("SELECT * FROM formulaire_inscriptions WHERE formulaire_id=? ORDER BY created_at DESC").all(params.id);
 
@@ -16838,14 +16971,17 @@ route("GET", "/api/formulaires-inscription/:id/inscriptions", async (req, res, p
 /* GET /api/formulaires-inscription/inscriptions/:inscriptionId — fiche individuelle détaillée. */
 route("GET", "/api/formulaires-inscription/inscriptions/:inscriptionId", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
   const r = await db.prepare(`
     SELECT fi.*, f.nom AS formulaire_nom, f.slug AS formulaire_slug, f.evenement_id,
-           f.don_active, f.cagnotte_id, f.champs_custom_json
+           f.don_active, f.cagnotte_id, f.champs_custom_json, f.owner_user_id
     FROM formulaire_inscriptions fi JOIN formulaires_inscription f ON f.id = fi.formulaire_id
     WHERE fi.id=?
   `).get(params.inscriptionId);
   if (!r) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  /* Cloisonnement : une inscription n'appartient pas à un compte, mais au formulaire qui l'a
+     recueillie — c'est donc le propriétaire de CE formulaire qui fait foi. */
+  if (!(await formulaireAcces(req, res, { id: r.formulaire_id, owner_user_id: r.owner_user_id }, user))) return;
+  delete r.owner_user_id;
 
   /* La définition des champs personnalisés accompagne la fiche : sans elle, l'interface ne
      pourrait afficher que des identifiants bruts (« repas ») au lieu des libellés voulus par
@@ -16886,11 +17022,16 @@ route("GET", "/api/formulaires-inscription/inscriptions/:inscriptionId", async (
    INITIAL à la soumission publique). */
 route("PATCH", "/api/formulaires-inscription/inscriptions/:inscriptionId/statut", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
   const statut = body?.statut;
   if (!["inscrit","confirme","present","absent","annule"].includes(statut)) {
     return sendJSON(res, 400, { error: "Statut invalide." });
   }
+  /* Vérifier la propriété AVANT d'écrire : sans ce contrôle, un compte Initiative pourrait
+     modifier le statut d'un inscrit d'une autre association en devinant un identifiant. */
+  const parent = await db.prepare(`SELECT f.id, f.owner_user_id FROM formulaire_inscriptions fi
+    JOIN formulaires_inscription f ON f.id = fi.formulaire_id WHERE fi.id=?`).get(params.inscriptionId);
+  if (!parent) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  if (!(await formulaireAcces(req, res, parent, user))) return;
   const info = await db.prepare("UPDATE formulaire_inscriptions SET statut=?, updated_at=datetime('now') WHERE id=?").run(statut, params.inscriptionId);
   if (!info.changes) return sendJSON(res, 404, { error: "Inscription introuvable." });
   sendJSON(res, 200, { ok: true, statut });
@@ -16904,9 +17045,8 @@ route("PATCH", "/api/formulaires-inscription/inscriptions/:inscriptionId/statut"
    vérité pour l'argent. */
 route("GET", "/api/formulaires-inscription/:id/stats", async (req, res, params) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
   const f = await db.prepare("SELECT * FROM formulaires_inscription WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  if (!(await formulaireAcces(req, res, f, user))) return;
 
   const rows = await db.prepare("SELECT type_participation, statut, presente_projet FROM formulaire_inscriptions WHERE formulaire_id=?").all(params.id);
 
@@ -16956,9 +17096,8 @@ const FORMULAIRE_TYPE_LABELS = { participant: "Participant", benevole: "Bénévo
 
 route("GET", "/api/formulaires-inscription/:id/export", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
-  const f = await db.prepare("SELECT id, nom FROM formulaires_inscription WHERE id=?").get(params.id);
-  if (!f) return sendJSON(res, 404, { error: "Formulaire introuvable." });
+  const f = await db.prepare("SELECT id, nom, owner_user_id FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!(await formulaireAcces(req, res, f, user))) return;
 
   const type = FORMULAIRE_EXPORT_TYPES.has(query?.type) ? query.type : "tous";
   const format = ["excel", "pdf"].includes(query?.format) ? query.format : "csv";
@@ -17027,8 +17166,6 @@ route("GET", "/api/formulaires-inscription/:id/export", async (req, res, params,
    lisible, comme /api/scanner/validate — l'accueil doit voir pourquoi, pas une erreur brute. */
 route("POST", "/api/formulaires-inscription/checkin", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!formulaireEstProteje(user, res)) return;
-
   const refus = (motif) => sendJSON(res, 200, { valide: false, motif });
   let insc = null;
 
@@ -17059,11 +17196,18 @@ route("POST", "/api/formulaires-inscription/checkin", async (req, res, params, b
   }
   if (insc.statut === "annule") return refus("Inscription annulée.");
 
-  const f = await db.prepare("SELECT id, nom, slug FROM formulaires_inscription WHERE id=?").get(insc.formulaire_id);
+  const f = await db.prepare("SELECT id, nom, slug, owner_user_id FROM formulaires_inscription WHERE id=?").get(insc.formulaire_id);
+  /* Un billet valide ne suffit pas : il faut aussi que la personne qui scanne soit bien
+     l'organisateur de CE formulaire (ou l'administration). */
+  if (!f) return refus("Formulaire introuvable.");
+  const autoriseParJeton = jetonAccesValide(req.headers["x-formulaire-acces"], f.id);
+  if (!autoriseParJeton && (!user || (user.role !== "administrateur" && Number(f.owner_user_id) !== Number(user.id)))) {
+    return refus("Ce billet ne concerne pas un de vos formulaires.");
+  }
   const dejaPresent = insc.statut === "present";
   if (!dejaPresent) {
     await db.prepare("UPDATE formulaire_inscriptions SET statut='present', checkin_at=datetime('now'), checkin_par=?, updated_at=datetime('now') WHERE id=?")
-      .run(user.id, insc.id);
+      .run(user ? user.id : null, insc.id);   /* null quand le pointage se fait par code, sans session */
   }
 
   sendJSON(res, 200, {

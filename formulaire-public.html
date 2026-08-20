@@ -56,6 +56,22 @@
 .fp-ref-val{font-size:22px;font-weight:900;color:var(--navy);letter-spacing:.04em;margin-top:3px;font-variant-numeric:tabular-nums;}
 .fp-qr{display:flex;justify-content:center;padding:16px;background:#fff;border-radius:10px;border:1px solid var(--border);}
 .fp-qr img,.fp-qr canvas{display:block;}
+/* Cadenas organisateur : volontairement discret (même intention que le cadenas administrateur
+   junior de login.html) — visible pour qui le cherche, invisible pour le grand public. */
+.fp-cadenas{display:block;margin:26px auto 0;background:none;border:none;cursor:pointer;font-size:15px;opacity:.16;padding:6px 10px;line-height:1;transition:opacity .2s;}
+.fp-cadenas:hover,.fp-cadenas:focus{opacity:.75;outline:none;}
+.fp-org{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto;}
+.fp-org-box{background:#fff;border-radius:14px;max-width:900px;width:100%;padding:22px;margin:auto;}
+.fp-org-onglets{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 16px;border-bottom:1px solid var(--border);padding-bottom:10px;}
+.fp-org-onglet{padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:13px;font-weight:700;cursor:pointer;color:var(--navy);}
+.fp-org-onglet.actif{background:#0D2B4E;color:#fff;border-color:#0D2B4E;}
+.fp-org-stat{display:inline-block;min-width:96px;background:var(--bg);border-radius:10px;padding:11px 14px;margin:0 8px 8px 0;}
+.fp-org-stat b{display:block;font-size:21px;color:var(--navy);}
+.fp-org-stat span{font-size:11.5px;color:var(--muted);}
+.fp-org-tab{width:100%;border-collapse:collapse;font-size:13px;}
+.fp-org-tab th{text-align:left;padding:7px 8px;background:#0D2B4E;color:#fff;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;}
+.fp-org-tab td{padding:7px 8px;border-bottom:1px solid var(--border);}
+.fp-org-lab{display:block;font-size:12px;font-weight:700;color:var(--navy);margin:10px 0 4px;}
 @media(max-width:600px){
   .fp-wrap{padding:18px 15px 80px;}
   .fp-title{font-size:22px;}
@@ -260,7 +276,9 @@
 
     if (!ouvert) {
       h += '<div class="fp-closed">'+escH(RAISON_LABELS[f.raison_fermeture] || 'Les inscriptions sont actuellement fermées.')+'</div>';
+      h += cadenasHtml();
       el.innerHTML = h;
+      brancherCadenas();
       return;
     }
 
@@ -303,8 +321,14 @@
       + '<div class="fp-hint" style="text-align:center;margin-top:10px;">Aucun compte n\'est nécessaire pour s\'inscrire.</div>'
       + '</form>';
 
+    h += cadenasHtml();
     el.innerHTML = h;
     brancherFormulaire(f, champs);
+    brancherCadenas();
+  }
+
+  function cadenasHtml(){
+    return '<button type="button" class="fp-cadenas" id="fp-cadenas" title="Accès organisateur" aria-label="Accès organisateur">🔒</button>';
   }
 
   function brancherFormulaire(f, champs){
@@ -472,11 +496,380 @@
     }
   }
 
+  /* ══ ESPACE ORGANISATEUR (cadenas) ═══════════════════════════════════════════════════════
+     Le code saisi est échangé une seule fois contre un JETON signé par le serveur, valable 12 h
+     et lié à ce seul formulaire ; c'est ce jeton qui accompagne ensuite chaque appel (en-tête
+     X-Formulaire-Acces). Le code lui-même n'est jamais conservé ni renvoyé. Le jeton vit dans
+     sessionStorage : il disparaît à la fermeture de l'onglet, ce qui évite de laisser un accès
+     ouvert sur un téléphone prêté ou un poste partagé. */
+  const CLE_JETON = 'fp_acces_' + slug;
+  let _jeton = null;
+  try { _jeton = sessionStorage.getItem(CLE_JETON); } catch(e) { _jeton = null; }
+
+  function brancherCadenas(){
+    const b = document.getElementById('fp-cadenas');
+    if (b) b.addEventListener('click', demanderCode);
+  }
+
+  /* Entrée sans code, réservée aux comptes habilités : le tableau de bord ouvre cette page avec
+     ?gerer=<id>. Si la session n'a pas le droit, l'appel échoue et le cadenas reste la seule voie. */
+  async function ouvrirParSession(fid){
+    _fid = Number(fid);
+    try {
+      await apiOrg('GET', '/formulaires-inscription/' + _fid);
+      _sessionHabilitee = true;
+      ouvrirEspace();
+      return true;
+    } catch(e) { _fid = null; return false; }
+  }
+
+  async function demanderCode(){
+    if (_jeton || _sessionHabilitee) return ouvrirEspace();
+    const code = prompt("Code d'accès organisateur :");
+    if (!code) return;
+    try {
+      const r = await fetch('/api/formulaires-inscription/public/' + encodeURIComponent(slug) + '/acces', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Accès refusé.');
+      _jeton = d.jeton;
+      try { sessionStorage.setItem(CLE_JETON, _jeton); } catch(e) {}
+      ouvrirEspace();
+    } catch(err) { alert(err.message); }
+  }
+
+  /* Tout appel de l'espace organisateur passe par ici : le jeton est ajouté systématiquement, et
+     un jeton périmé (12 h) ramène proprement à la demande de code au lieu d'une erreur opaque. */
+  async function apiOrg(methode, chemin, corps){
+    /* Deux façons d'être autorisé : le jeton du cadenas, ou une session habilitée (administration
+       ou compte Diaspo'Actif Officiel). On envoie ce qu'on a, le serveur tranche. */
+    const opts = { method: methode, headers: {}, credentials: 'same-origin' };
+    if (_jeton) opts.headers['X-Formulaire-Acces'] = _jeton;
+    if (corps !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(corps); }
+    const r = await fetch('/api' + chemin, opts);
+    const d = await r.json().catch(function(){ return {}; });
+    if (!r.ok) {
+      if (r.status === 403 || r.status === 404) {
+        if (_jeton) { _jeton = null; try { sessionStorage.removeItem(CLE_JETON); } catch(e) {} }
+        throw new Error(_sessionHabilitee ? "Vous n'avez pas accès à ce formulaire." : 'Votre accès a expiré — ressaisissez le code.');
+      }
+      throw new Error(d.error || 'Erreur.');
+    }
+    return d;
+  }
+
+  function ouvrirEspace(){
+    let ov = document.getElementById('fp-org');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'fp-org'; ov.className = 'fp-org';
+      ov.addEventListener('click', function(e){ if (e.target === ov) fermerEspace(); });
+      document.body.appendChild(ov);
+    }
+    ov.style.display = 'flex';
+    ov.innerHTML = '<div class="fp-org-box"><div class="fp-empty">Chargement…</div></div>';
+    onglet('inscrits');
+  }
+
+  function fermerEspace(){
+    arreterScan();
+    const ov = document.getElementById('fp-org');
+    if (ov) ov.style.display = 'none';
+  }
+  window.fpFermerEspace = fermerEspace;
+
+  function coquille(titre, contenu, actif){
+    const ongl = [['inscrits','\u{1F465} Inscrits'],['checkin','✅ Check-in'],['stats','\u{1F4CA} Statistiques'],['exports','\u{1F4E4} Exports'],['reglages','⚙️ Réglages']];
+    return '<div class="fp-org-box">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">'
+      + '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:800;">Espace organisateur</div>'
+      + '<h3 style="margin:2px 0 0;font-size:19px;color:var(--navy);">' + escH(titre) + '</h3></div>'
+      + '<button type="button" onclick="fpFermerEspace()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button></div>'
+      + '<div class="fp-org-onglets">'
+      + ongl.map(function(o){ return '<button type="button" class="fp-org-onglet' + (o[0]===actif?' actif':'') + '" onclick="fpOnglet(&quot;' + o[0] + '&quot;)">' + o[1] + '</button>'; }).join('')
+      + '</div><div id="fp-org-contenu">' + contenu + '</div></div>';
+  }
+
+  async function onglet(nom){
+    const ov = document.getElementById('fp-org');
+    if (!ov) return;
+    arreterScan();
+    ov.innerHTML = coquille(_f ? _f.nom : '', '<div class="fp-empty">Chargement…</div>', nom);
+    const zone = document.getElementById('fp-org-contenu');
+    try {
+      if (nom === 'inscrits')      await vueInscrits(zone);
+      else if (nom === 'checkin')  vueCheckin(zone);
+      else if (nom === 'stats')    await vueStats(zone);
+      else if (nom === 'exports')  await vueExports(zone);
+      else if (nom === 'reglages') await vueReglages(zone);
+    } catch(e) {
+      zone.innerHTML = '<div class="fp-error">' + escH(e.message) + '</div>';
+      if (e.message.indexOf('expiré') >= 0) setTimeout(function(){ fermerEspace(); }, 1800);
+    }
+  }
+  window.fpOnglet = onglet;
+
+  /* L'identifiant interne du formulaire n'est pas exposé par la lecture publique (volontairement).
+     Il est porté par le jeton lui-même, qui est signé : on peut donc le lire sans risque. */
+  let _fid = null, _sessionHabilitee = false;
+  function idFormulaire(){
+    if (_fid) return _fid;
+    if (_jeton) { _fid = JSON.parse(atob(_jeton)).fid; return _fid; }
+    return _fid;   /* renseigné par ouvrirParSession() quand on entre avec un compte habilité */
+  }
+
+  const STATUTS_INSC = { inscrit:'\u{1F4DD} Inscrit', confirme:'✅ Confirmé', present:'\u{1F7E2} Présent', absent:'⚪ Absent', annule:'❌ Annulé' };
+
+  async function vueInscrits(zone){
+    const fid = idFormulaire();
+    const d = await apiOrg('GET', '/formulaires-inscription/' + fid + '/inscriptions');
+    const list = d.inscriptions || [];
+    zone.innerHTML = '<input class="fp-input" id="fp-org-q" placeholder="Rechercher un nom, un téléphone, une référence…" style="margin-bottom:12px;">'
+      + '<div style="overflow-x:auto;"><table class="fp-org-tab"><thead><tr><th>Référence</th><th>Nom</th><th>Contact</th><th>Type</th><th>Statut</th><th></th></tr></thead><tbody id="fp-org-tbody"></tbody></table></div>'
+      + '<div id="fp-org-vide" style="display:none;" class="fp-empty">Aucun inscrit pour le moment.</div>';
+    const dessiner = function(filtre){
+      const q = (filtre||'').toLowerCase();
+      const vus = list.filter(function(i){ return !q || ((i.nom||'') + ' ' + (i.prenom||'') + ' ' + (i.telephone||'') + ' ' + (i.email||'') + ' ' + (i.reference||'')).toLowerCase().indexOf(q) >= 0; });
+      document.getElementById('fp-org-vide').style.display = vus.length ? 'none' : 'block';
+      document.getElementById('fp-org-tbody').innerHTML = vus.map(function(i){
+        return '<tr><td><strong>' + escH(i.reference||'—') + '</strong></td>'
+          + '<td>' + escH(i.prenom||'') + ' ' + escH(i.nom) + '<div style="font-size:11px;color:var(--muted);">' + escH(i.profession||'') + '</div></td>'
+          + '<td style="font-size:12px;">' + (i.telephone?escH(i.telephone)+'<br>':'') + escH(i.email||'') + '</td>'
+          + '<td>' + escH(PARTICIPATION_LABELS[i.type_participation]||i.type_participation) + '</td>'
+          + '<td><select onchange="fpStatutInsc(' + i.id + ',this.value)" class="fp-select" style="padding:4px 6px;font-size:12px;">'
+          + Object.keys(STATUTS_INSC).map(function(k){ return '<option value="' + k + '"' + (i.statut===k?' selected':'') + '>' + STATUTS_INSC[k] + '</option>'; }).join('')
+          + '</select></td>'
+          + '<td><button type="button" onclick="fpFiche(' + i.id + ')" title="Fiche complète" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;">\u{1F50D}</button></td></tr>';
+      }).join('');
+    };
+    dessiner('');
+    document.getElementById('fp-org-q').addEventListener('input', function(e){ dessiner(e.target.value); });
+  }
+
+  window.fpStatutInsc = async function(id, statut){
+    try { await apiOrg('PATCH', '/formulaires-inscription/inscriptions/' + id + '/statut', { statut }); }
+    catch(e) { alert(e.message); }
+  };
+
+  window.fpFiche = async function(id){
+    const zone = document.getElementById('fp-org-contenu');
+    zone.innerHTML = '<div class="fp-empty">Chargement…</div>';
+    try {
+      const d = await apiOrg('GET', '/formulaires-inscription/inscriptions/' + id);
+      const i = d.inscription;
+      const champs = Array.isArray(i.champs_custom) ? i.champs_custom : [];
+      const rep = i.reponses || {};
+      const ligne = function(l, v){ return (v===null||v===undefined||v==='') ? '' :
+        '<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);"><div style="flex:0 0 40%;font-size:12.5px;color:var(--muted);">' + escH(l) + '</div><div style="flex:1;font-size:13.5px;white-space:pre-wrap;">' + escH(v) + '</div></div>'; };
+      const photos = Array.isArray(i.projet_photos) ? i.projet_photos : [];
+      zone.innerHTML = '<button type="button" onclick="fpOnglet(&quot;inscrits&quot;)" style="background:none;border:none;color:var(--navy);font-weight:700;font-size:13px;cursor:pointer;padding:0 0 10px;">← Retour à la liste</button>'
+        + '<h4 style="margin:0 0 3px;font-size:18px;color:var(--navy);">' + escH(i.prenom||'') + ' ' + escH(i.nom) + '</h4>'
+        + '<div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">' + escH(i.reference||'') + ' · ' + escH(STATUTS_INSC[i.statut]||i.statut) + ' · ' + escH(PARTICIPATION_LABELS[i.type_participation]||i.type_participation) + (i.checkin_at?' · Pointé le ' + escH(String(i.checkin_at).slice(0,16).replace('T',' ')):'') + '</div>'
+        + ligne('Profession', i.profession) + ligne('Téléphone', i.telephone) + ligne('E-mail', i.email)
+        + ligne('Adresse', i.adresse) + ligne('Observation', i.observation)
+        + ligne('Inscrit le', (i.created_at||'').slice(0,16).replace('T',' '))
+        + (champs.length ? '<h4 style="margin:18px 0 6px;font-size:14px;color:var(--navy);">Réponses au formulaire</h4>'
+            + champs.map(function(c){ var v = rep[c.id]; if (Array.isArray(v)) v = v.join(', ');
+              return '<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);"><div style="flex:0 0 40%;font-size:12.5px;color:var(--muted);">' + escH(c.label) + '</div><div style="flex:1;font-size:13.5px;color:' + (v?'inherit':'#94a3b8') + ';">' + (v?escH(v):'— non renseigné') + '</div></div>'; }).join('') : '')
+        + (i.presente_projet ? '<h4 style="margin:18px 0 6px;font-size:14px;color:var(--navy);">\u{1F4CB} Projet présenté</h4>'
+            + ligne('Nom du projet', i.projet_nom) + ligne('Description', i.projet_description) + ligne('Objectifs', i.projet_objectifs)
+            + (photos.length ? '<div style="padding:9px 0;"><div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;">Photos (' + photos.length + ') — cliquez pour ouvrir ou enregistrer</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                + photos.map(function(u){ return '<a href="' + escH(u) + '" target="_blank" download><img src="' + escH(u) + '" style="width:92px;height:92px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"></a>'; }).join('') + '</div></div>' : '')
+            + (i.projet_pdf_url ? '<div style="padding:7px 0;"><a href="' + escH(i.projet_pdf_url) + '" target="_blank" download style="font-weight:700;color:var(--navy);font-size:13px;">\u{1F4C4} Télécharger le document PDF ↗</a></div>' : '')
+            + (i.projet_video_url ? '<div style="padding:7px 0;"><video src="' + escH(i.projet_video_url) + '" controls style="width:100%;max-height:260px;border-radius:8px;background:#000;"></video>'
+                + '<div style="margin-top:5px;"><a href="' + escH(i.projet_video_url) + '" target="_blank" download style="font-weight:700;color:var(--navy);font-size:13px;">⬇️ Télécharger la vidéo</a></div></div>' : '')
+          : '')
+        + (i.qr_payload ? '<h4 style="margin:18px 0 6px;font-size:14px;color:var(--navy);">\u{1F39F}️ Billet</h4><div class="fp-qr" id="fp-org-qr"></div>' : '');
+      if (i.qr_payload) {
+        const box = document.getElementById('fp-org-qr');
+        if (typeof QRCode !== 'undefined') new QRCode(box, { text: i.qr_payload, width:160, height:160, colorDark:'#0D2B4E', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.H });
+        else box.innerHTML = '<div class="fp-hint">Référence : <strong>' + escH(i.reference||'') + '</strong></div>';
+      }
+    } catch(e) { zone.innerHTML = '<div class="fp-error">' + escH(e.message) + '</div>'; }
+  };
+
+  /* ── Check-in ─────────────────────────────────────────────────────────────────────────── */
+  let _flux = null, _timer = null, _dernier = 0;
+
+  function vueCheckin(zone){
+    zone.innerHTML = '<div id="fp-scan-res" style="min-height:60px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:10px;padding:13px;font-size:14px;color:var(--muted);text-align:center;margin-bottom:12px;">Scannez un QR code ou saisissez une référence.</div>'
+      + '<div style="background:#000;border-radius:10px;overflow:hidden;margin-bottom:10px;"><video id="fp-scan-video" autoplay playsinline muted style="width:100%;max-height:260px;display:block;object-fit:cover;"></video><canvas id="fp-scan-canvas" style="display:none;"></canvas></div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:14px;"><button type="button" id="fp-scan-on" class="fp-submit" style="flex:1;padding:11px;font-size:14px;background:#0D2B4E;">▶ Démarrer la caméra</button>'
+      + '<button type="button" id="fp-scan-off" class="fp-submit" style="flex:1;padding:11px;font-size:14px;background:#dc2626;display:none;">⏹ Arrêter</button></div>'
+      + '<label class="fp-org-lab">Saisie manuelle (QR illisible, billet perdu…)</label>'
+      + '<div style="display:flex;gap:7px;"><input class="fp-input" id="fp-scan-ref" placeholder="DA-2026-000123" style="text-transform:uppercase;">'
+      + '<button type="button" id="fp-scan-val" class="fp-submit" style="width:auto;padding:11px 18px;font-size:14px;background:#16a34a;">Valider</button></div>';
+    document.getElementById('fp-scan-on').addEventListener('click', demarrerScan);
+    document.getElementById('fp-scan-off').addEventListener('click', arreterScan);
+    const val = function(){ pointer(null, document.getElementById('fp-scan-ref').value); };
+    document.getElementById('fp-scan-val').addEventListener('click', val);
+    document.getElementById('fp-scan-ref').addEventListener('keydown', function(e){ if (e.key === 'Enter') val(); });
+  }
+
+  function chargerJsQR(){
+    return new Promise(function(resolve, reject){
+      if (typeof jsQR !== 'undefined') return resolve();
+      const sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js';
+      sc.onload = function(){ typeof jsQR !== 'undefined' ? resolve() : reject(new Error('Lecteur QR indisponible.')); };
+      sc.onerror = function(){ reject(new Error('Lecteur QR inaccessible (connexion ?).')); };
+      document.head.appendChild(sc);
+    });
+  }
+
+  async function demarrerScan(){
+    const res = document.getElementById('fp-scan-res');
+    try {
+      await chargerJsQR();
+      _flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const v = document.getElementById('fp-scan-video');
+      v.srcObject = _flux; await v.play();
+      document.getElementById('fp-scan-on').style.display = 'none';
+      document.getElementById('fp-scan-off').style.display = '';
+      res.textContent = "Recherche d'un QR code…";
+      const cv = document.getElementById('fp-scan-canvas'), ctx = cv.getContext('2d');
+      _timer = setInterval(function(){
+        if (v.readyState !== v.HAVE_ENOUGH_DATA) return;
+        if (Date.now() - _dernier < 2500) return;
+        cv.width = v.videoWidth; cv.height = v.videoHeight;
+        ctx.drawImage(v, 0, 0);
+        const img = ctx.getImageData(0, 0, cv.width, cv.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code && code.data) { _dernier = Date.now(); pointer(code.data, null); }
+      }, 200);
+    } catch(e) {
+      res.innerHTML = '<span style="color:#dc2626;">Caméra indisponible : ' + escH(e.message) + ' — utilisez la saisie manuelle.</span>';
+    }
+  }
+
+  function arreterScan(){
+    if (_flux) { _flux.getTracks().forEach(function(t){ t.stop(); }); _flux = null; }
+    if (_timer) { clearInterval(_timer); _timer = null; }
+    const v = document.getElementById('fp-scan-video'); if (v) v.srcObject = null;
+    const on = document.getElementById('fp-scan-on'); if (on) on.style.display = '';
+    const off = document.getElementById('fp-scan-off'); if (off) off.style.display = 'none';
+  }
+
+  async function pointer(qr, reference){
+    const res = document.getElementById('fp-scan-res');
+    if (!res || (!qr && !(reference||'').trim())) return;
+    res.innerHTML = '⏳ Vérification…';
+    try {
+      const fid = idFormulaire();
+      const d = await apiOrg('POST', '/formulaires-inscription/checkin',
+        qr ? { qr_payload: qr, formulaire_id: fid } : { reference: (reference||'').trim(), formulaire_id: fid });
+      if (d.valide) {
+        const i = d.inscription;
+        res.style.background = '#f0fdf4';
+        res.innerHTML = '<div><div style="font-size:24px;">' + (d.deja_presente?'⚠️':'✅') + '</div>'
+          + '<div style="font-size:16px;font-weight:800;color:#166534;">' + escH(i.prenom||'') + ' ' + escH(i.nom) + '</div>'
+          + '<div style="font-size:12.5px;color:#15803d;">' + escH(PARTICIPATION_LABELS[i.type_participation]||i.type_participation) + ' · ' + escH(i.reference||'') + '</div>'
+          + (d.deja_presente?'<div style="font-size:12px;color:#b45309;margin-top:4px;font-weight:700;">Déjà pointé — entrée tout de même autorisée.</div>':'') + '</div>';
+        const c = document.getElementById('fp-scan-ref'); if (c) c.value = '';
+      } else {
+        res.style.background = '#fef2f2';
+        res.innerHTML = '<div><div style="font-size:24px;">⛔</div><div style="font-weight:700;color:#991b1b;">' + escH(d.motif||'Refusé') + '</div></div>';
+      }
+    } catch(e) {
+      res.style.background = '#fef2f2';
+      res.innerHTML = '<div style="color:#991b1b;font-weight:700;">' + escH(e.message) + '</div>';
+    }
+  }
+
+  /* ── Statistiques ─────────────────────────────────────────────────────────────────────── */
+  async function vueStats(zone){
+    const fid = idFormulaire();
+    const d = await apiOrg('GET', '/formulaires-inscription/' + fid + '/stats');
+    const carte = function(v, l){ return '<div class="fp-org-stat"><b>' + escH(v==null?'∞':v) + '</b><span>' + escH(l) + '</span></div>'; };
+    zone.innerHTML = carte(d.total_inscrits,'Inscrits') + carte(d.places_restantes,'Places restantes') + carte(d.nb_projets_presentes,'Projets présentés')
+      + '<h4 style="margin:16px 0 7px;font-size:14px;color:var(--navy);">Par type de participation</h4>'
+      + Object.keys(d.par_type||{}).map(function(k){ return carte(d.par_type[k], PARTICIPATION_LABELS[k]||k); }).join('')
+      + '<h4 style="margin:16px 0 7px;font-size:14px;color:var(--navy);">Par statut</h4>'
+      + Object.keys(d.par_statut||{}).map(function(k){ return carte(d.par_statut[k], (STATUTS_INSC[k]||k).replace(/^\S+\s/,'')); }).join('');
+  }
+
+  /* ── Exports ──────────────────────────────────────────────────────────────────────────────
+     Un téléchargement classique (lien href) ne peut pas porter l'en-tête du jeton : on récupère
+     donc le fichier par fetch, puis on déclenche l'enregistrement depuis le contenu reçu. */
+  async function vueExports(zone){
+    zone.innerHTML = '<label class="fp-org-lab">Contenu</label>'
+      + '<select class="fp-select" id="fp-exp-type"><option value="tous">Tous les inscrits</option><option value="participant">Participants</option><option value="benevole">Bénévoles</option><option value="intervenant">Intervenants</option><option value="exposant">Exposants</option><option value="presence">Liste de présence (imprimable)</option></select>'
+      + '<label class="fp-org-lab">Format</label>'
+      + '<select class="fp-select" id="fp-exp-format"><option value="csv">CSV</option><option value="excel">Excel</option><option value="pdf">PDF (imprimable)</option></select>'
+      + '<button type="button" id="fp-exp-btn" class="fp-submit" style="margin-top:16px;">⬇️ Télécharger</button>'
+      + '<div id="fp-exp-msg" class="fp-hint" style="text-align:center;margin-top:9px;"></div>';
+    document.getElementById('fp-exp-btn').addEventListener('click', async function(){
+      const msg = document.getElementById('fp-exp-msg');
+      msg.textContent = 'Préparation du fichier…';
+      try {
+        const fid = idFormulaire();
+        const type = document.getElementById('fp-exp-type').value;
+        const format = document.getElementById('fp-exp-format').value;
+        const enTetes = {}; if (_jeton) enTetes['X-Formulaire-Acces'] = _jeton;
+        const r = await fetch('/api/formulaires-inscription/' + fid + '/export?type=' + encodeURIComponent(type) + '&format=' + encodeURIComponent(format), { headers: enTetes, credentials: 'same-origin' });
+        if (!r.ok) throw new Error('Export impossible.');
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (type === 'presence' ? 'presence' : type) + '-formulaire.' + (format === 'excel' ? 'xls' : format === 'pdf' ? 'html' : 'csv');
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+        msg.textContent = 'Fichier téléchargé.';
+      } catch(e) { msg.textContent = e.message; }
+    });
+  }
+
+  /* ── Réglages : modification réelle du formulaire ─────────────────────────────────────── */
+  async function vueReglages(zone){
+    const fid = idFormulaire();
+    const d = await apiOrg('GET', '/formulaires-inscription/' + fid);
+    const f = d.formulaire;
+    const v = function(k){ return f[k] == null ? '' : f[k]; };
+    zone.innerHTML = '<div id="fp-reg-msg"></div>'
+      + '<label class="fp-org-lab">Statut du formulaire</label>'
+      + '<select class="fp-select" id="fp-reg-statut">'
+      + [['brouillon','\u{1F4DD} Brouillon (invisible du public)'],['ouvert','\u{1F7E2} Ouvert aux inscriptions'],['ferme','\u{1F534} Fermé'],['archive','\u{1F5C4} Archivé']]
+          .map(function(o){ return '<option value="' + o[0] + '"' + (f.statut===o[0]?' selected':'') + '>' + o[1] + '</option>'; }).join('') + '</select>'
+      + '<label class="fp-org-lab">Nom</label><input class="fp-input" id="fp-reg-nom" value="' + escH(v('nom')) + '">'
+      + '<label class="fp-org-lab">Date</label><input class="fp-input" type="date" id="fp-reg-date" value="' + escH(v('date_evt')) + '">'
+      + '<label class="fp-org-lab">Lieu</label><input class="fp-input" id="fp-reg-lieu" value="' + escH(v('lieu')) + '">'
+      + '<label class="fp-org-lab">Adresse</label><input class="fp-input" id="fp-reg-adresse" value="' + escH(v('adresse')) + '">'
+      + '<label class="fp-org-lab">Description</label><textarea class="fp-textarea" id="fp-reg-desc">' + escH(v('description')) + '</textarea>'
+      + '<label class="fp-org-lab">Nombre maximum de participants (vide = illimité)</label><input class="fp-input" type="number" min="0" id="fp-reg-places" value="' + escH(v('places_max')) + '">'
+      + '<button type="button" id="fp-reg-btn" class="fp-submit" style="margin-top:18px;">Enregistrer les modifications</button>';
+    document.getElementById('fp-reg-btn').addEventListener('click', async function(){
+      const msg = document.getElementById('fp-reg-msg');
+      const btn = document.getElementById('fp-reg-btn');
+      btn.disabled = true; btn.textContent = 'Enregistrement…';
+      try {
+        const statut = document.getElementById('fp-reg-statut').value;
+        await apiOrg('PUT', '/formulaires-inscription/' + fid, {
+          nom: document.getElementById('fp-reg-nom').value.trim(),
+          date_evt: document.getElementById('fp-reg-date').value || null,
+          lieu: document.getElementById('fp-reg-lieu').value.trim(),
+          adresse: document.getElementById('fp-reg-adresse').value.trim(),
+          description: document.getElementById('fp-reg-desc').value.trim(),
+          places_max: document.getElementById('fp-reg-places').value === '' ? null : Number(document.getElementById('fp-reg-places').value),
+        });
+        if (statut !== f.statut) await apiOrg('PATCH', '/formulaires-inscription/' + fid + '/statut', { statut });
+        msg.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:9px;padding:10px 12px;font-size:13.5px;margin-bottom:12px;">✅ Modifications enregistrées.</div>';
+      } catch(e) {
+        msg.innerHTML = '<div class="fp-error">' + escH(e.message) + '</div>';
+      }
+      btn.disabled = false; btn.textContent = 'Enregistrer les modifications';
+    });
+  }
+
   /* ── Chargement ────────────────────────────────────────────────────────────────────────── */
   if (!slug) {
     el.innerHTML = '<div class="fp-empty">🔒 Lien incomplet — aucun formulaire indiqué.</div>';
     return;
   }
+  const gerer = new URLSearchParams(location.search).get('gerer');
+  if (gerer) setTimeout(function(){ ouvrirParSession(gerer); }, 400);
+
   fetch('/api/auth/me', {credentials:'same-origin'})
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(d){ _user = d && d.user ? d.user : null; })

@@ -60,6 +60,7 @@
       <a href="centre-financier.html" data-aide="centre_financier">💰 Centre Financier</a>
       <a href="#parametres-vitrine" data-section="parametres-vitrine" data-aide="parametres_vitrine">⭐ Paramètres Vitrine</a>
       <a href="#cagnottes" data-section="cagnottes" data-aide="cagnottes">🪙 Mes Cagnottes</a>
+      <a href="#formulaires-inscription" data-section="formulaires-inscription">📝 Formulaires d'inscription</a>
 
       <div class="sb-group-lbl">01 — OUTILS</div>
       <a href="profil.html" data-aide="profil_public">👤 Mon profil public</a>
@@ -682,6 +683,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div id="evenements" style="display:none;"></div>
     <div id="billetterie-init" style="display:none;"></div>
     <div id="cagnottes" style="display:none;"></div>
+    <div id="formulaires-inscription" style="display:none;"></div>
     <div id="avancement" style="display:none;"></div>
     <div id="soumission-da" style="display:none;"><div id="da-sda-mount"></div></div>
 
@@ -3096,7 +3098,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (vo) content.appendChild(vo); }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
+  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','formulaires-inscription','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -3108,6 +3110,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'cagnottes') renderCagnottes();
+    if (name === 'formulaires-inscription') renderFormulairesInscription();
     if (name === 'avancement') renderAvancement();
     if (name === 'soumission-da') SoumissionDA.load();
     if (name === 'messages-vitrine') renderMessagesVitrine();
@@ -4208,6 +4211,70 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   };
   let _cagCategories = null;
   let _cagEditId = null;
+
+  /* ══ FORMULAIRES D'INSCRIPTION ═══════════════════════════════════════════════════════════
+     Réservé à l'administration et au compte Diaspo'Actif Officiel (contrôlé côté serveur — ce
+     module n'est qu'une porte d'entrée, pas une sécurité). La gestion complète d'un formulaire
+     (inscrits, fiches, médias, check-in, exports, réglages) se fait dans l'espace organisateur
+     de la page publique, ouvert ici en session via ?gerer=<id> : une seule interface à
+     maintenir, la même que celle qu'ouvre le cadenas le jour J. */
+  const FI_STATUTS = { brouillon:'📝 Brouillon', ouvert:'🟢 Ouvert', ferme:'🔴 Fermé', archive:'🗄 Archivé' };
+  const FI_TYPES = { evenement:'Événement', rencontre:'Rencontre', conference:'Conférence', formation:'Formation', networking:'Networking', forum:'Forum', projet:'Projet', initiative:'Initiative', autre:'Autre' };
+
+  async function renderFormulairesInscription() {
+    const el = document.getElementById('formulaires-inscription');
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h3 style="margin:0;">📝 Formulaires d'inscription</h3>
+            <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Créez un formulaire par rencontre, partagez le lien, suivez les inscrits et pointez les présences le jour J.</p>
+          </div>
+          <button class="btn btn-orange btn-sm" onclick="fiCreer()">+ Créer un formulaire</button>
+        </div>
+      </div>
+      <div id="fi-liste"><div class="notice">Chargement…</div></div>`;
+    chargerFormulairesInscription();
+  }
+
+  async function chargerFormulairesInscription() {
+    const zone = document.getElementById('fi-liste');
+    try {
+      const d = await api('GET', '/formulaires-inscription');
+      const list = d.formulaires || [];
+      if (!list.length) { zone.innerHTML = '<div class="notice">Aucun formulaire pour le moment. Créez-en un pour commencer à recueillir des inscriptions.</div>'; return; }
+      zone.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13.5px;">'
+        + '<thead><tr style="background:#0D2B4E;color:#fff;"><th style="text-align:left;padding:9px 10px;">Nom</th><th style="text-align:left;padding:9px 10px;">Date</th><th style="text-align:left;padding:9px 10px;">Statut</th><th style="text-align:center;padding:9px 10px;">Inscrits</th><th style="text-align:center;padding:9px 10px;">Présents</th><th style="padding:9px 10px;">Actions</th></tr></thead><tbody>'
+        + list.map(f => `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:9px 10px;"><strong>${esc(f.nom)}</strong><div style="font-size:11.5px;color:var(--muted);">${esc(FI_TYPES[f.type] || f.type || '')}${f.lieu ? ' · ' + esc(f.lieu) : ''}</div></td>
+            <td style="padding:9px 10px;">${f.date_evt ? esc(f.date_evt) : '—'}</td>
+            <td style="padding:9px 10px;">${FI_STATUTS[f.statut] || esc(f.statut)}</td>
+            <td style="padding:9px 10px;text-align:center;">${f.nb_inscrits}</td>
+            <td style="padding:9px 10px;text-align:center;">${f.nb_presents}</td>
+            <td style="padding:9px 10px;white-space:nowrap;">
+              <a class="btn btn-sm btn-orange" href="formulaire-public.html?slug=${encodeURIComponent(f.slug)}&gerer=${f.id}" target="_blank" style="text-decoration:none;">Gérer</a>
+              <button class="btn btn-sm btn-outline" onclick="fiCopierLien('${esc(f.slug)}')" title="Copier le lien public">🔗</button>
+            </td></tr>`).join('')
+        + '</tbody></table></div>';
+    } catch(e) {
+      zone.innerHTML = `<div class="notice" style="color:#dc2626;">${esc(e.message)}</div>`;
+    }
+  }
+
+  window.fiCreer = async function() {
+    const nom = prompt('Nom du formulaire (ex. « Rencontre de la diaspora 2026 ») :');
+    if (!nom || !nom.trim()) return;
+    try {
+      await api('POST', '/formulaires-inscription', { nom: nom.trim(), type: 'rencontre' });
+      chargerFormulairesInscription();
+    } catch(e) { alert('Erreur : ' + e.message); }
+  };
+
+  window.fiCopierLien = function(slug) {
+    const url = location.origin + '/formulaire-public.html?slug=' + encodeURIComponent(slug);
+    navigator.clipboard.writeText(url).then(function(){ alert('Lien copié : ' + url); })
+      .catch(function(){ prompt('Copiez le lien :', url); });
+  };
 
   async function renderCagnottes() {
     const el = document.getElementById('cagnottes');

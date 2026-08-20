@@ -13796,6 +13796,16 @@ function ouvrirFormulaireModal(id) {
       <div style="margin-bottom:16px;"><label style="font-size:12px;font-weight:700;">Organisateur</label>
         <input id="fi-organisateur" type="text" value="${esc(v('organisateur'))}" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></div>
 
+      <div style="margin-bottom:16px;"><label style="font-size:12px;font-weight:700;">Affiche du formulaire (facultatif)</label>
+        <div style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Image affichée en haut de la page publique d'inscription — JPEG, PNG, GIF ou WebP, 5 Mo maximum.</div>
+        <input type="hidden" id="fi-affiche-url" value="${esc(v('affiche_url'))}">
+        <input type="file" id="fi-affiche-fichier" accept="image/*" onchange="fiEnvoyerAffiche(this)" style="font-size:12.5px;">
+        <div id="fi-affiche-apercu" style="margin-top:8px;">${f && f.affiche_url ? `<img src="${esc(f.affiche_url)}" style="max-width:220px;max-height:120px;border-radius:8px;border:1px solid #e2e8f0;display:block;"><button type="button" onclick="fiRetirerAffiche()" style="margin-top:5px;font-size:11.5px;border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;">Retirer l'affiche</button>` : ''}</div></div>
+
+      <div style="margin-bottom:16px;"><label style="font-size:12px;font-weight:700;">Code d'accès organisateur (facultatif)</label>
+        <div style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Un petit cadenas apparaît en bas de la page publique. Ce code y ouvre la vue complète (inscrits, fiches, médias, check-in, exports, réglages) sans avoir à se connecter — pratique le jour J. Laissez vide pour désactiver le cadenas. Choisissez un code long : la page est publique.</div>
+        <input id="fi-code-acces" type="text" value="${esc(v('code_acces'))}" placeholder="Ex. 2208marcomanou01" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:ui-monospace,monospace;"></div>
+
       <h4 style="margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Gestion des inscriptions</h4>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
         <div><label style="font-size:12px;font-weight:700;">Ouverture des inscriptions</label>
@@ -13905,6 +13915,34 @@ function fiRenderChampsList() {
   }).join('');
 }
 
+/* Envoi de l'affiche : upload immediat vers le CDN, puis on ne conserve que l'URL dans un champ
+   cache -- le formulaire lui-meme n'est enregistre qu'au clic sur "Enregistrer", donc l'image
+   peut etre remplacee plusieurs fois sans laisser de trace en base. */
+async function fiEnvoyerAffiche(input) {
+  const fichier = input.files && input.files[0];
+  if (!fichier) return;
+  const apercu = document.getElementById('fi-affiche-apercu');
+  apercu.innerHTML = '<span style="font-size:12px;color:var(--muted);">Envoi en cours…</span>';
+  try {
+    const fd = new FormData();
+    fd.append('affiche', fichier);
+    const r = await fetch('/api/upload/formulaire-affiche', { method: 'POST', body: fd, credentials: 'same-origin' });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Envoi impossible.');
+    document.getElementById('fi-affiche-url').value = data.url;
+    apercu.innerHTML = '<img src="' + esc(data.url) + '" style="max-width:220px;max-height:120px;border-radius:8px;border:1px solid #e2e8f0;display:block;">'
+      + '<button type="button" onclick="fiRetirerAffiche()" style="margin-top:5px;font-size:11.5px;border:1px solid #e2e8f0;background:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;">Retirer l'affiche</button>';
+  } catch (e) {
+    apercu.innerHTML = '<span style="font-size:12px;color:#dc2626;">' + esc(e.message) + '</span>';
+  }
+  input.value = '';
+}
+
+function fiRetirerAffiche() {
+  document.getElementById('fi-affiche-url').value = '';
+  document.getElementById('fi-affiche-apercu').innerHTML = '';
+}
+
 async function fiEnregistrer(id) {
   const msg = document.getElementById('fi-modal-msg');
   const nom = document.getElementById('fi-nom').value.trim();
@@ -13930,6 +13968,8 @@ async function fiEnregistrer(id) {
     annulation_autorisee: document.getElementById('fi-annulation').checked,
     confirmation_auto: document.getElementById('fi-confirmation-auto').checked,
     autoriser_projet: document.getElementById('fi-projet').checked,
+    affiche_url: document.getElementById('fi-affiche-url').value || null,
+    code_acces: document.getElementById('fi-code-acces').value.trim() || null,
     don_active: document.getElementById('fi-don').checked,
     objectif_don: document.getElementById('fi-don-objectif') ? document.getElementById('fi-don-objectif').value : undefined,
     visibilite_montant: document.getElementById('fi-visibilite-montant').value,
