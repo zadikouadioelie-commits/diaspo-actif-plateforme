@@ -560,6 +560,17 @@ img[loading="lazy"].loaded { background: none; animation: none; }
     top: 0;
     height: 100dvh;
     padding-top: 14px;
+    /* Bug réel trouvé à l'exécution (pas un artefact d'outil de test, confirmé sur deux
+       pages différentes) : translateX(-100%)/(0) de styles.v2.css est un pourcentage —
+       recalculé par rapport à LARGEUR ACTUELLE de l'élément. Cette même règle change width
+       (240/280/300px → 100%) EN MÊME TEMPS que la classe .open change transform : la
+       transition de .3s se retrouvait à animer entre deux pourcentages recalculés en
+       continu pendant que la largeur se stabilisait, sans jamais se figer sur la valeur
+       cible (constaté : même un style en ligne transform + !important restait sans effet
+       tant que la transition existait ; se figeait immédiatement dès qu'elle était
+       désactivée). Un slide plein écran n'apporte de toute façon rien visuellement — la
+       transition est donc simplement retirée dans ce cas précis, pas ailleurs. */
+    transition: none;
   }
   .sidebar .brand { display: none; } /* redondant avec le logo du bandeau, visible derrière une fois le tiroir fermé */
   #da-sidebar-search-wrap {
