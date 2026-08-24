@@ -6,7 +6,7 @@
 <title>Audit Design System — Diaspo'Actif</title>
 <link rel="icon" href="/assets/logo.png">
 <link rel="stylesheet" href="/assets/ds.css">
-  <link rel="stylesheet" href="/assets/responsive.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <style>
 .audit-result{margin-bottom:2rem;}
@@ -96,7 +96,7 @@ const RULES = [
     severity: 'error',
     check: html => html.includes('/assets/ds.css') || html.includes('ds.css'),
     fix: 'Ajouter <link rel="stylesheet" href="/assets/ds.css">
-  <link rel="stylesheet" href="/assets/responsive.v2.css">
+  <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css"> dans le <head>',
   },
   {
