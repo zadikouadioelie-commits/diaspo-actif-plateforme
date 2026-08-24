@@ -33417,6 +33417,44 @@ route("PATCH", "/api/admin/accred/demandes/:id/refuser", async (req, res, params
   sendJSON(res, 200, { ok: true });
 });
 
+/* POST /api/admin/accred/octroyer-direct — accorder une accréditation sans passer par une
+   demande préalable (2026-08-19). Jusqu'ici, la seule façon d'accorder user_accreditations
+   était d'approuver une accred_demandes existante (PATCH .../approuver ci-dessus) : aucun
+   moyen d'octroyer directement, par exemple pour le compte officiel Diaspo'Actif lui-même,
+   qui ne passe jamais par le parcours d'achat normal. Même schéma d'écriture (INSERT ON
+   CONFLICT + historique + notification) que l'approbation d'une demande, sans la demande. */
+route("POST", "/api/admin/accred/octroyer-direct", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  /* target:'officielle' évite d'avoir à connaître/deviner l'id numérique du compte officiel
+     Diaspo'Actif — résolu via le même mécanisme déjà utilisé pour l'abonnement automatique
+     à l'inscription (getInitiativeOfficielleId(), server/index.js). */
+  let userId = Number(body.user_id);
+  if (!userId && body.target === 'officielle') {
+    const officielleId = await getInitiativeOfficielleId();
+    if (!officielleId) return sendJSON(res, 404, { error: "Initiative officielle introuvable." });
+    const officielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+    if (!officielle?.owner_user_id) return sendJSON(res, 404, { error: "Propriétaire de l'initiative officielle introuvable." });
+    userId = Number(officielle.owner_user_id);
+  }
+  if (!userId) return sendJSON(res, 400, { error: "user_id ou target:'officielle' requis." });
+  const def = await getAccredDef(body.type);
+  if (!def) return sendJSON(res, 404, { error: "Type d'accréditation introuvable." });
+  const cible = await db.prepare("SELECT id, nom, email FROM users WHERE id=?").get(userId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  await db.prepare(`INSERT INTO user_accreditations (user_id,accred_id,statut,admin_id,type_tarif,date_expiration,notes)
+    VALUES (?,?,'active',?,?,?,?)
+    ON CONFLICT(user_id,accred_id) DO UPDATE SET statut='active',admin_id=?,date_expiration=?,notes=?,updated_at=datetime('now')`)
+    .run(userId, def.id, admin.id, body.type_tarif || 'gratuit', body.date_expiration || null, body.notes || null,
+         admin.id, body.date_expiration || null, body.notes || null);
+  await db.prepare("INSERT INTO accred_historique_v2 (user_id,accred_id,action,admin_id,admin_nom,motif) VALUES (?,?,?,?,?,?)")
+    .run(userId, def.id, 'accorde_direct', admin.id, admin.nom, body.notes || null);
+  creerNotif(userId, "validation", "Accréditation accordée !",
+    `Félicitations ! Votre accréditation « ${def.emoji || ''} ${def.label || ''} » vient d'être accordée${body.date_expiration ? '' : ' de façon permanente'}.`,
+    { accred_type: def.type });
+  sendJSON(res, 200, { ok: true, user: cible.nom, type: def.type, date_expiration: body.date_expiration || null });
+});
+
 /* GET /api/admin/accred/users — liste des accréditations attribuées */
 route("GET", "/api/admin/accred/users", async (req, res) => {
   const admin = await getCurrentUser(req);
