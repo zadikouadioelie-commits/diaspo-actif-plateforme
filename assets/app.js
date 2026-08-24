@@ -4275,36 +4275,42 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // Aucun tiroir dédié sur cette page : on bascule alors l'affichage mobile de la nav
     // existante du topbar plutôt que d'exiger un tiroir dupliqué par page — la nav contient
     // déjà les bons liens pour cette page précise.
+    // "Menu" (barre basse) doit ouvrir le MÊME menu complet — tous les modules — partout,
+    // pas seulement sur les pages tableau de bord qui portent le vrai .sidebar riche (ex.
+    // dashboard-initiative.html). Signalé par l'utilisateur en conditions réelles : depuis
+    // profil-app.html (aucun .sidebar, seulement une petite nav de secours à 5 liens),
+    // "Menu" affichait cette nav limitée au lieu des ~30 modules attendus — incohérence
+    // laissée passer. Plutôt que de dupliquer ces ~30 items (avec leurs gestionnaires JS
+    // spécifiques, certains en navigation par data-section) sur chaque page dépourvue de
+    // tiroir, "Menu" navigue désormais vers le tableau de bord du rôle connecté avec un
+    // repère dans l'URL (#da-menu) que ce dernier détecte à son chargement pour ouvrir son
+    // propre menu automatiquement (voir plus bas, juste après la définition d'openSidebar) —
+    // même contenu réel, un aller-retour de page en plus depuis les pages qui n'ont pas ce
+    // contenu nativement, plutôt qu'un contenu tronqué ou dupliqué à l'identique ailleurs.
+    if (navToggle) navToggle.addEventListener("click", (e) => {
+      if (sidebar) return; // cette page a déjà le vrai menu, rien à rediriger
+      e.preventDefault();
+      const dest = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
+      window.location.href = dest + "#da-menu";
+    });
+
     if (!sidebar) {
+      // Repli historique du bouton ROND flottant uniquement (jamais affiché quand "Menu"
+      // existe dans la barre basse — sidebar-toggle--has-mobile-nav-alt le masque déjà —
+      // donc concerne seulement les rares pages sans aucune des deux barres). Inchangé.
       const nav = document.querySelector(".topbar .nav");
-      if (nav) {
-        // Au-delà de 768px, .nav est déjà affichée en permanence dans le topbar (voir
-        // styles.v2.css) : basculer nav-mobile-open n'y a alors aucun effet visible, ce qui
-        // rendait ce bouton flottant silencieusement inopérant sur desktop pour les pages
-        // sans tiroir #sidebar (ex. comptes-lies.html). On le masque donc au-delà de ce seuil.
-        if (toggle) toggle.classList.add("sidebar-toggle--no-sidebar");
-        const toggleNav = () => {
+      if (nav && toggle) {
+        toggle.classList.add("sidebar-toggle--no-sidebar");
+        toggle.addEventListener("click", () => {
           const isOpen = nav.classList.toggle("nav-mobile-open");
-          if (toggle) { toggle.textContent = isOpen ? "✕" : "☰"; toggle.setAttribute("aria-expanded", isOpen ? "true" : "false"); }
-          if (navToggleIcon) navToggleIcon.textContent = isOpen ? "✕" : "☰";
-          if (navToggle) navToggle.classList.toggle("active", isOpen);
-        };
-        if (toggle) toggle.addEventListener("click", toggleNav);
-        if (navToggle) navToggle.addEventListener("click", toggleNav);
+          toggle.textContent = isOpen ? "✕" : "☰";
+          toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
         nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
           nav.classList.remove("nav-mobile-open");
-          if (toggle) toggle.textContent = "☰";
-          if (navToggleIcon) navToggleIcon.textContent = "☰";
-          if (navToggle) navToggle.classList.remove("active");
+          toggle.textContent = "☰";
         }));
-        return;
       }
-      // Ni tiroir ni nav de topbar (ex. agenda.html, mon-associe.html) : seul repli sûr,
-      // "Menu" renvoie vers le tableau de bord du rôle connecté — déjà résolu par
-      // renderMobileBottomNavAuto() juste avant, pas de nouvel appel réseau ici.
-      if (navToggle) navToggle.addEventListener("click", () => {
-        window.location.href = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
-      });
       return;
     }
     // Une page qui a son propre bouton menu dans la barre du bas (mobile) n'a pas besoin
@@ -4415,6 +4421,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // Préférence mémorisée : ne rouvre au chargement que si l'utilisateur avait
     // explicitement laissé la sidebar ouverte lors de sa dernière visite.
     if (localStorage.getItem(LS_KEY) === "0") openSidebar(false);
+
+    // Ouverture automatique du menu à l'arrivée depuis une page sans .sidebar propre (voir
+    // #da-menu posé plus haut dans cette même fonction) — repère retiré de l'URL aussitôt
+    // utilisé pour ne pas rouvrir le menu à chaque rechargement de cette page ensuite.
+    if (location.hash === "#da-menu") {
+      openSidebar(false);
+      history.replaceState(null, "", location.pathname + location.search);
+    }
   })();
 
   applyAuthState();
