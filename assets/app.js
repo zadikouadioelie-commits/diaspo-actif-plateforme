@@ -4317,6 +4317,40 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const backdrop = document.getElementById("sidebar-backdrop");
     const LS_KEY = "da_sidebar_collapsed";
 
+    // Recherche dans le menu (2026-08-24, demande explicite avec captures du prototype à
+    // l'appui : barre "Rechercher un module…" en haut du menu plein écran). Insérée en tête
+    // de .sidebar plutôt que dans un composant séparé — le plein écran lui-même vient d'une
+    // règle CSS sur .sidebar (voir responsive.v2.css), les vrais liens/gestionnaires du
+    // tiroir restent donc en place, seul le filtrage est nouveau ici. N'insère qu'une fois
+    // même si initSidebarMobile tournait plusieurs fois (jamais le cas en pratique, mais coûte
+    // rien à vérifier).
+    if (!document.getElementById("da-sidebar-search")) {
+      const searchWrap = document.createElement("div");
+      searchWrap.id = "da-sidebar-search-wrap";
+      searchWrap.innerHTML = `<input type="search" id="da-sidebar-search" placeholder="🔍 Rechercher un module…" autocomplete="off">`;
+      sidebar.insertBefore(searchWrap, sidebar.firstChild);
+      const searchInput = document.getElementById("da-sidebar-search");
+      searchInput.addEventListener("input", () => {
+        const q = searchInput.value.trim().toLowerCase();
+        // Les libellés viennent du texte visible des liens, pas d'une liste séparée à tenir
+        // à jour — le filtre reste donc juste même si le contenu du tiroir change par ailleurs
+        // (droits d'un compte junior recalculés à chaque chargement, par exemple).
+        sidebar.querySelectorAll("a, button").forEach(el => {
+          if (el.id === "sidebar-close") return;
+          const texte = el.textContent.trim().toLowerCase();
+          el.hidden = q.length > 0 && !texte.includes(q);
+        });
+        // En-têtes de groupe (.sb-group-lbl) : pas de lien direct vers "leurs" items dans le
+        // DOM (simples <div> au fil des liens), donc pas masqués individuellement pendant la
+        // recherche — imprécision mineure assumée plutôt qu'une dépendance de structure fragile.
+      });
+      // Le clic sur un résultat filtré doit vider la recherche, sinon revenir sur "Menu"
+      // rouvrirait un tiroir toujours filtré sur la dernière saisie.
+      sidebar.addEventListener("click", (e) => {
+        if (e.target.closest("a")) { searchInput.value = ""; sidebar.querySelectorAll("a[hidden]").forEach(a => a.hidden = false); }
+      });
+    }
+
     function openSidebar(persist) {
       sidebar.classList.add("open");
       if (backdrop) backdrop.classList.add("open");
