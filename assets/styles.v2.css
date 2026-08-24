@@ -422,25 +422,20 @@ button{font-family:inherit;cursor:pointer;}
 
 /* ──────────────── RESPONSIVE MOBILE ──────────────── */
 
-/* Petit bouton rond fixe, toujours visible sur le bord gauche — rappelle la sidebar
-   repliée ou la referme si elle est ouverte, sur tous les formats. */
+/* Sur PC (par défaut) : un simple bouton icône DANS le bandeau du haut, au même endroit que
+   dans le HTML (.topbar-right) et dans le même langage visuel que les autres icônes du bandeau
+   (messagerie, notifications — voir .topbar-icon-btn). Le style "rond flottant" ci-dessous,
+   pensé pour le mobile où la nav horizontale disparaît, ne s'applique plus qu'en dessous de
+   768px (règle déplacée dans la media query plus bas) : avant ce correctif, il s'appliquait
+   à TOUS les formats et le bouton flottait par-dessus le contenu même sur grand écran. */
 .sidebar-toggle{
   display:flex;align-items:center;justify-content:center;
-  position:fixed;left:14px;top:74px;z-index:210;
-  width:50px;height:50px;border-radius:50%;flex:none;
-  background:var(--orange);color:#fff;border:3px solid #fff;cursor:pointer;
-  font-size:22px;box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 0 2px rgba(242,100,34,.25);
-  transition:background .15s,transform .15s;
+  width:34px;height:34px;border-radius:10px;flex:none;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+  color:#fff;cursor:pointer;font-size:18px;
+  transition:background .15s;
 }
-.sidebar-toggle:hover{background:#d9551a;transform:scale(1.06);}
-/* Petit libellé sous le bouton — n'agrandit pas le cercle, juste un repère visuel. */
-.sidebar-toggle::after{
-  content:"Menu";
-  position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  margin-top:5px;font-size:10.5px;font-weight:800;color:var(--navy);
-  background:#fff;padding:1px 6px;border-radius:6px;white-space:nowrap;
-  box-shadow:0 1px 4px rgba(0,0,0,.15);
-}
+.sidebar-toggle:hover{background:rgba(255,255,255,.16);}
 /* Fond sombre derrière le tiroir */
 .sidebar-backdrop{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:199;
@@ -459,6 +454,24 @@ button{font-family:inherit;cursor:pointer;}
 .sb-bandeau-group{display:none;}
 
 @media(max-width:768px){
+  /* Sur mobile uniquement : le bouton redevient le rond flottant orange avec son libellé
+     "Menu" — la nav horizontale disparaît (.nav{display:none} plus bas), ce bouton est donc le
+     seul accès à la sidebar et doit rester repérable en permanence, quel que soit le défilement. */
+  .sidebar-toggle{
+    position:fixed;left:14px;top:74px;z-index:210;
+    width:50px;height:50px;border-radius:50%;
+    background:var(--orange);border:3px solid #fff;color:#fff;
+    font-size:22px;box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 0 2px rgba(242,100,34,.25);
+    transition:background .15s,transform .15s;
+  }
+  .sidebar-toggle:hover{background:#d9551a;transform:scale(1.06);}
+  .sidebar-toggle::after{
+    content:"Menu";
+    position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    margin-top:5px;font-size:10.5px;font-weight:800;color:var(--navy);
+    background:#fff;padding:1px 6px;border-radius:6px;white-space:nowrap;
+    box-shadow:0 1px 4px rgba(0,0,0,.15);
+  }
   /* Repli du bouton menu (assets/app.js:initSidebarMobile) sur les pages sans tiroir #sidebar
      dédié : affiche la nav existante du topbar comme un menu déroulant plutôt que de la
      laisser purement invisible (.nav{display:none} ci-dessous). */
