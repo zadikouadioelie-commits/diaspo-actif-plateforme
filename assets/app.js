@@ -4351,6 +4351,28 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       });
     }
 
+    // "Déconnexion" en pied de menu (2026-08-24, demande explicite — présent en bas du menu
+    // plein écran du prototype). Retirée du bandeau haut sur mobile juste après (seul ce menu
+    // y donne accès une fois cette page rendue), pour ne pas la dupliquer. Réutilise l'API de
+    // déconnexion déjà en place (POST /auth/logout) plutôt que de dupliquer cette logique.
+    if (!document.getElementById("da-sidebar-logout")) {
+      const logoutItem = document.createElement("a");
+      logoutItem.id = "da-sidebar-logout";
+      logoutItem.href = "#";
+      logoutItem.textContent = "🚪 Déconnexion";
+      logoutItem.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try { await api("POST", "/auth/logout"); } catch (err) { /* ignore */ }
+        window.location.href = "index.html";
+      });
+      sidebar.appendChild(logoutItem);
+      // Signale à la CSS (responsive.v2.css) qu'un repli de déconnexion existe désormais
+      // dans le menu, pour qu'elle masque en toute sécurité celle du bandeau haut sur
+      // mobile — jamais posée sur les pages sans .sidebar (voir la branche juste au-dessus),
+      // qui n'ont donc aucun repli et gardent celle du bandeau visible.
+      document.body.classList.add("da-has-menu-logout");
+    }
+
     function openSidebar(persist) {
       sidebar.classList.add("open");
       if (backdrop) backdrop.classList.add("open");

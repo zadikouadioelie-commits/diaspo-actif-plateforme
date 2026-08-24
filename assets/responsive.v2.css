@@ -584,6 +584,26 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   }
   #da-sidebar-search::placeholder { color: rgba(255,255,255,.55); }
   .sidebar a[hidden] { display: none; }
+  /* "Déconnexion" en pied de menu (voir assets/app.js) : texte simple centré en rouge,
+     sans le fond blanc des autres items — cohérent avec la référence fournie et distinct
+     visuellement d'une action de navigation normale. */
+  #da-sidebar-logout {
+    display: block; text-align: center; background: none !important; color: #ff6b6b !important;
+    margin-top: 10px; box-shadow: none;
+  }
+}
+/* Doublon avec le bandeau haut (toujours visible ≥1024px, où le menu plein écran n'existe
+   pas) évité dans l'autre sens : cet item ajouté par JS sur toute largeur reste caché tant
+   que le menu plein écran lui-même ne l'est pas. */
+@media (min-width: 1024px) {
+  #da-sidebar-logout { display: none !important; }
+}
+/* #logout-link (bandeau haut) masqué sur mobile UNIQUEMENT quand #da-sidebar-logout existe
+   (posé par assets/app.js — la classe ci-dessous n'est ajoutée à <body> que dans ce cas
+   précis) : sur les pages sans .sidebar, aucun repli de déconnexion dans le menu n'existe,
+   le masquer y aurait laissé aucun moyen de se déconnecter. */
+@media (max-width: 1023px) {
+  body.da-has-menu-logout #logout-link { display: none !important; }
 }
 
 /* Pages sans tiroir #sidebar dédié (ex. comptes-lies.html) : au-delà de 768px, .nav est
