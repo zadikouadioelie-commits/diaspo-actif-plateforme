@@ -4200,12 +4200,42 @@ async function renderMobileBottomNavAuto() {
   const nav = document.createElement("nav");
   nav.className = "mobile-bottom-nav";
   nav.setAttribute("aria-label", "Navigation mobile");
-  nav.innerHTML = items.map(it => {
+  const itemsHtml = items.map(it => {
     const cls = "mobile-bottom-nav__item" + (it.active ? " active" : "");
     if (it.toggleId) return `<button type="button" class="${cls}" id="${it.toggleId}"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></button>`;
     return `<a class="${cls}" href="${it.href}"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></a>`;
   }).join("");
+  // Boutons ‹ › pour faire défiler explicitement la barre (2026-08-24, demande explicite —
+  // capture utilisateur montrant la barre à 9 items avec sa barre de défilement native,
+  // jugée insuffisante à elle seule). .mobile-bottom-nav__scroll porte le défilement
+  // horizontal ; les flèches, en dehors de cette zone, restent fixes à chaque extrémité.
+  nav.innerHTML = `
+    <button type="button" class="mobile-bottom-nav__arrow mobile-bottom-nav__arrow--left" aria-label="Voir les boutons précédents" hidden>‹</button>
+    <div class="mobile-bottom-nav__scroll">${itemsHtml}</div>
+    <button type="button" class="mobile-bottom-nav__arrow mobile-bottom-nav__arrow--right" aria-label="Voir les boutons suivants" hidden>›</button>
+  `;
   document.body.appendChild(nav);
+
+  const scrollEl = nav.querySelector(".mobile-bottom-nav__scroll");
+  const arrowLeft = nav.querySelector(".mobile-bottom-nav__arrow--left");
+  const arrowRight = nav.querySelector(".mobile-bottom-nav__arrow--right");
+  function majFleches() {
+    const debordement = scrollEl.scrollWidth > scrollEl.clientWidth + 1;
+    arrowLeft.hidden = !debordement || scrollEl.scrollLeft <= 4;
+    arrowRight.hidden = !debordement || scrollEl.scrollLeft >= scrollEl.scrollWidth - scrollEl.clientWidth - 4;
+  }
+  arrowLeft.addEventListener("click", () => scrollEl.scrollBy({ left: -scrollEl.clientWidth * 0.7, behavior: "smooth" }));
+  arrowRight.addEventListener("click", () => scrollEl.scrollBy({ left: scrollEl.clientWidth * 0.7, behavior: "smooth" }));
+  scrollEl.addEventListener("scroll", majFleches, { passive: true });
+  window.addEventListener("resize", majFleches);
+  // Layout pas encore calculé au moment de ce return (juste après l'insertion dans le DOM) —
+  // scrollWidth/clientWidth ne sont fiables qu'après le prochain repaint. Un seul
+  // requestAnimationFrame s'est avéré parfois trop tôt en pratique (testé : scrollWidth
+  // encore égal à clientWidth à ce moment précis, flèches restées cachées à tort) — un
+  // deuxième passage après un court délai rattrape les cas où la mise en page se stabilise
+  // après coup (polices, images).
+  requestAnimationFrame(majFleches);
+  setTimeout(majFleches, 300);
 }
 
 document.addEventListener("DOMContentLoaded", async ()=>{

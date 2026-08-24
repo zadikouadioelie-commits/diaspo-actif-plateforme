@@ -94,12 +94,14 @@ body {
    assets/app.js (source unique — voir la fonction pour le détail). Le prototype de
    référence (Diaspo'Actif Mobile.dc.html, ligne ~799) rend cette barre défilable
    horizontalement — jusqu'à 9 items pour un compte connecté (Menu/Tableau de bord/
-   Accueil/Annuaire/Profil/Événements/Fil/Mon Associé/Vitrines), 5 en visiteur. D'où
-   overflow-x:auto + items à largeur fixe (flex-shrink:0) plutôt que flex:1 : au-delà
-   de ce que la largeur d'écran peut afficher, le surplus devient défilable au lieu
-   d'être compressé illisible. La barre de défilement native n'est volontairement PAS
-   masquée : elle sert d'indice visuel qu'il y a plus d'items à découvrir (barre grise
-   visible sur les captures de référence). */
+   Accueil/Annuaire/Profil/Événements/Fil/Mon Associé/Vitrines), 5 en visiteur.
+   .mobile-bottom-nav__scroll porte le défilement horizontal (items à largeur fixe,
+   flex-shrink:0, plutôt que flex:1 : au-delà de ce que l'écran peut afficher, le surplus
+   devient défilable au lieu d'être compressé illisible) ; .mobile-bottom-nav (le parent,
+   fixed) reste lui immobile et porte en plus deux flèches ‹ › qui déclenchent ce
+   défilement par clic — demande explicite (2026-08-24) en complément du geste de
+   balayage, la seule barre de défilement native n'étant pas jugée suffisamment
+   découvrable à elle seule. */
 .mobile-bottom-nav {
   display: none;
   position: fixed;
@@ -113,11 +115,39 @@ body {
   box-shadow: 0 -2px 16px rgba(0,0,0,.08);
   z-index: 150;
   align-items: center;
+}
+.mobile-bottom-nav__scroll {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
+  /* Barre de défilement native VOLONTAIREMENT visible (pas scrollbar-width:none) : elle
+     sert d'indice visuel qu'il y a plus d'items à découvrir, en plus des flèches. */
 }
+.mobile-bottom-nav__arrow {
+  flex: none;
+  width: 26px;
+  height: 100%;
+  border: none;
+  background: rgba(255,255,255,.96);
+  color: #1a3a5c;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  padding: 0;
+}
+.mobile-bottom-nav__arrow--left { box-shadow: 4px 0 10px -4px rgba(0,0,0,.2); }
+.mobile-bottom-nav__arrow--right { box-shadow: -4px 0 10px -4px rgba(0,0,0,.2); }
+.mobile-bottom-nav__arrow[hidden] { display: none; }
 .mobile-bottom-nav__item {
   display: flex;
   flex-direction: column;
