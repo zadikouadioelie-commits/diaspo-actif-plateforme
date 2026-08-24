@@ -482,6 +482,27 @@ img[loading="lazy"].loaded { background: none; animation: none; }
 @media (max-width: 768px) {
   body.da-logged-out .logo { display: flex !important; font-size: 13px; gap: 6px; }
   body.da-logged-out .logo-img { width: 22px; height: 22px; }
+  /* Avec le logo réaffiché ci-dessus, "Se connecter" + "S'inscrire" (215px environ à eux
+     deux) ne tiennent plus dans l'espace restant de .topbar-right (mesuré à seulement 88px
+     sur un écran de 375px, une fois le logo ET la marge réservée pour #sidebar-toggle
+     soustraits) — "S'inscrire" se retrouvait poussé hors du défilement horizontal habituel
+     de cette zone (styles.v2.css:482-491, comportement volontaire pour les icônes/badges du
+     compte connecté, mais pas adapté à 2 boutons pleine largeur). Capture utilisateur à
+     l'appui montrant le chevauchement/troncature. Repli sur un retour à la ligne plutôt que
+     le défilement, réservé au visiteur déconnecté (peu de contenu dans topbar-right dans ce
+     cas — uniquement ces 2 boutons une fois le sélecteur de langue et les widgets assistants
+     masqués), pour ne pas changer le comportement délibéré du cas connecté (plus chargé). */
+  /* Premier essai (topbar-right seul en flex-wrap) corrigé : ça faisait chevaucher "Se
+     connecter" avec le logo au lieu de passer proprement à la ligne, la marge de gauche
+     réservée pour #sidebar-toggle (74px, styles.v2.css via la règle plus haut dans ce
+     fichier) interagissant mal avec le retour à la ligne d'un seul enfant. Plus robuste :
+     faire passer TOUT .topbar-inner sur 2 lignes (logo seul en haut, boutons en dessous,
+     pleine largeur) plutôt que de faire coexister les deux sur la même ligne. */
+  body.da-logged-out .topbar-inner { flex-wrap: wrap; }
+  body.da-logged-out .topbar-right {
+    flex-wrap: nowrap; justify-content: center; overflow-x: visible; mask-image: none;
+    width: 100%; margin-left: 0 !important; margin-top: 6px;
+  }
 }
 
 /* Bulle flottante consolidée des assistants (#assist-hub-fab, assets/app.js) — demandée à
