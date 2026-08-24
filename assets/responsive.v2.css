@@ -545,6 +545,17 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   #assist-hub-fab, #assist-hub-menu { display: none !important; }
 }
 
+/* "💎 Mon Associé" du bandeau haut (#mon-associe-btn, assets/app.js, posé pour tout compte
+   connecté) — demandé à retirer sur mobile pour libérer de la place (2026-08-24) : déjà
+   présent dans la barre basse (l'un des 9 items générés par renderMobileBottomNavAuto()),
+   donc pas de repli à construire, juste un doublon à masquer — même logique que Déconnexion
+   un peu plus tôt. Contrairement à Déconnexion, "Mon Associé" est TOUJOURS dans la barre
+   basse pour tout compte connecté (jamais conditionné à une redirection), donc masquage
+   inconditionnel ici, sans classe body à poser en JS. */
+@media (max-width: 1023px) {
+  #mon-associe-btn { display: none !important; }
+}
+
 /* ─── MENU "☰" PLEIN ÉCRAN SUR MOBILE (2026-08-24, demande explicite avec captures du
    prototype à l'appui : recherche + sections groupées) ─── Le tiroir .sidebar existant
    (280px) passe en plein écran sous 1024px quand ouvert, plutôt que de construire un
