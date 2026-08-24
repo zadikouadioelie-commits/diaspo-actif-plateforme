@@ -59,6 +59,9 @@
 .is-own .p-theme-swatches-banner { display:flex; }
 .p-theme-swatches-banner .theme-swatch { width:18px; height:18px; border-width:2px; box-shadow:0 1px 3px rgba(0,0,0,.35); }
 .p-theme-swatches-banner .theme-swatch.active { border-color:#fff; }
+/* Retirées sur mobile (2026-08-24, demande explicite) : trop de place prise sur la bannière
+   à côté de "Modifier la bannière" côté propriétaire. Reste inchangé sur ordinateur. */
+@media (max-width:768px) { .p-theme-swatches-banner { display:none !important; } }
 .banner-back-btn {
   position:absolute; top:12px; left:14px; z-index:10;
   background:rgba(0,0,0,.45); color:#fff; text-decoration:none;
