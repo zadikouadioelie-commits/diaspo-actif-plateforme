@@ -4174,7 +4174,10 @@ async function renderMobileBottomNavAuto() {
     ];
   } else {
     items = [
-      { icon: "🏠", label: "Accueil", href: "index.html", active: on("index.html", "") },
+      // "Accueil" remplacé par "Menu" ici (2026-08-24, demande explicite) : le retour à
+      // l'accueil reste possible via le logo du bandeau haut, rendu cliquable ci-dessous
+      // dans cette même fonction pour cette raison précise.
+      { icon: "☰", label: "Menu", toggleId: "mobile-nav-menu-toggle" },
       { icon: "🔍", label: "Annuaire", href: "annuaire.html", active: on("annuaire.html") },
       { icon: "🏪", label: "Vitrines", href: "vitrines.html", active: on("vitrines.html") },
       { icon: "📰", label: "Fil", href: "fil-actualite.html", active: on("fil-actualite.html") },
@@ -4183,6 +4186,16 @@ async function renderMobileBottomNavAuto() {
       { icon: "👤", label: "Profil", href: "login.html", active: false },
     ];
   }
+
+  // Le logo du bandeau haut n'a jamais été un lien (simple texte) — sans incidence tant que
+  // "Accueil" restait dans la barre basse ; devenu le seul chemin de retour à l'accueil pour
+  // un visiteur déconnecté maintenant que "Menu" a pris sa place ci-dessus.
+  document.querySelectorAll(".topbar .logo").forEach(el => {
+    if (el.dataset.daClickable) return; // évite de re-attacher à chaque appel de cette fonction
+    el.dataset.daClickable = "1";
+    el.style.cursor = "pointer";
+    el.addEventListener("click", () => { window.location.href = "index.html"; });
+  });
 
   const nav = document.createElement("nav");
   nav.className = "mobile-bottom-nav";
@@ -4216,6 +4229,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const navToggle = document.getElementById("mobile-nav-menu-toggle");
     if (!toggle && !navToggle) return;
     const navToggleIcon = navToggle ? navToggle.querySelector(".nav-icon") : null;
+    // Une page qui a son propre bouton menu dans la barre du bas (mobile) n'a pas besoin
+    // du bouton rond flottant en plus — doublon évité via cette classe (voir responsive.v2.css).
+    // Posé ICI, avant le branchement sidebar/pas-sidebar ci-dessous, pour s'appliquer dans
+    // les 3 cas (avec tiroir, avec nav de topbar, avec ni l'un ni l'autre) — un bug distinct
+    // (corrigé le même jour) ne l'appliquait qu'au cas "avec tiroir", laissant le bouton
+    // rond visible en double sur les pages sans tiroir malgré "Menu" déjà dans la barre
+    // basse (constaté sur profil-app.html, capture utilisateur à l'appui).
+    if (navToggle && toggle) toggle.classList.add("sidebar-toggle--has-mobile-nav-alt");
     // Repli sur la classe .sidebar quand l'id manque (plusieurs pages ont le tiroir sans
     // id="sidebar" — voir dashboard-utilisateur.html) : évite de dupliquer ce module en
     // script inline par page, comme c'était fait jusqu'ici sur 6 pages différentes.
