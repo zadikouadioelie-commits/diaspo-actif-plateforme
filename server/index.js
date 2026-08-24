@@ -5030,17 +5030,24 @@ async function verifyVoteDsId(userId, submittedCode) {
 /* Résout la liste des user_id éligibles pour un scrutin selon les sources choisies.
    V2 (différé) : sources "conseil_admin"/"comite" — cette donnée vit dans le système
    asso_* premium, hors périmètre du présent module ouvert à toute Initiative. */
+/* Renvoie une Map<userId, liste_id|null> plutôt qu'un simple ensemble d'ids — nécessaire
+   pour l'onglet "Votes publiés" (2026-08-19), qui doit pouvoir afficher de quelle liste
+   Réseau professionnel provient chaque électeur. liste_id reste null pour les sources qui
+   n'en ont pas (tous_actifs, abonnes, adhesion) : uniquement liste_perso/reseau_pro avec
+   criteresReseauPro.liste_id le renseignent. Si un même utilisateur est résolu par plusieurs
+   sources dans le même appel, la dernière branche l'emporte sur liste_id — simplification
+   assumée pour un enrichissement d'affichage, sans impact sur qui est effectivement électeur. */
 async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
-  const userIds = new Set();
+  const userIds = new Map();
   if (sources.includes("tous_actifs")) {
     const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(initiativeId);
-    if (init?.owner_user_id) userIds.add(Number(init.owner_user_id));
+    if (init?.owner_user_id) userIds.set(Number(init.owner_user_id), null);
     const rows = await db.prepare("SELECT user_id FROM initiative_membres WHERE initiative_id=? AND statut='accepte'").all(initiativeId);
-    rows.forEach(r => userIds.add(Number(r.user_id)));
+    rows.forEach(r => userIds.set(Number(r.user_id), null));
   }
   if (sources.includes("abonnes")) {
     const rows = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(initiativeId);
-    rows.forEach(r => userIds.add(Number(r.user_id)));
+    rows.forEach(r => userIds.set(Number(r.user_id), null));
   }
   if (sources.includes("adhesion") || sources.includes("cotisation")) {
     if (criteresReseauPro?.campagne_id) {
@@ -5065,14 +5072,14 @@ async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
   }
   if (sources.includes("liste_perso") && criteresReseauPro?.liste_id) {
     const rows = await db.prepare("SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL").all(criteresReseauPro.liste_id);
-    rows.forEach(r => userIds.add(Number(r.user_id)));
+    rows.forEach(r => userIds.set(Number(r.user_id), Number(criteresReseauPro.liste_id)));
   }
   if (sources.includes("reseau_pro") && criteresReseauPro) {
     if (criteresReseauPro.liste_id) {
       /* Réutilise une liste existante du module Réseau professionnel / Mes Listes — tous les comptes
          de cette liste reçoivent automatiquement l'invitation à voter. */
       const rows = await db.prepare("SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL").all(criteresReseauPro.liste_id);
-      rows.forEach(r => userIds.add(Number(r.user_id)));
+      rows.forEach(r => userIds.set(Number(r.user_id), Number(criteresReseauPro.liste_id)));
     } else {
       const clauses = []; const args = [];
       if (criteresReseauPro.pays) { clauses.push("pays=?"); args.push(criteresReseauPro.pays); }
@@ -5082,11 +5089,11 @@ async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
       if (criteresReseauPro.specialite) { clauses.push("situation_pro LIKE ?"); args.push(`%${criteresReseauPro.specialite}%`); }
       if (clauses.length) {
         const rows = await db.prepare(`SELECT id FROM users WHERE ${clauses.join(" AND ")}`).all(...args);
-        rows.forEach(r => userIds.add(Number(r.id)));
+        rows.forEach(r => userIds.set(Number(r.id), null));
       }
     }
   }
-  return Array.from(userIds);
+  return userIds; // Map<userId, liste_id|null>
 }
 
 /* ── Scrutins : liste + création (owner) ── */
@@ -5246,9 +5253,9 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
   if (!(await exigerPremium(user, res, "votes"))) return;
   const sources = Array.isArray(body.sources) ? body.sources : [];
   if (!sources.length) return sendJSON(res, 400, { error: "Au moins une source d'électeurs requise." });
-  const userIds = await resolveVoteElecteurs(s.initiative_id, sources, body.criteres || {});
+  const userIds = await resolveVoteElecteurs(s.initiative_id, sources, body.criteres || {}); // Map<userId, liste_id|null>
   let ajoutes = 0;
-  for (const uid of userIds) {
+  for (const [uid, listeId] of userIds) {
     if (Number(uid) === Number(user.id) && !sources.includes("tous_actifs")) continue;
     const existe = await db.prepare("SELECT id FROM vote_electeurs WHERE scrutin_id=? AND user_id=?").get(params.id, uid);
     if (existe) continue;
@@ -5256,7 +5263,7 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
     /* code_acces conservé pour compatibilité de schéma mais n'est plus utilisé pour authentifier le
        vote — la clé d'authentification est désormais le Code de Sécurité Diaspo'Actif (DS-ID) de
        l'électeur (users.ds_id), signature numérique personnelle déjà existante sur la plateforme. */
-    await db.prepare(`INSERT INTO vote_electeurs (scrutin_id,user_id,source,code_acces) VALUES (?,?,?,'DS-ID')`).run(params.id, uid, source);
+    await db.prepare(`INSERT INTO vote_electeurs (scrutin_id,user_id,source,liste_id,code_acces) VALUES (?,?,?,?,'DS-ID')`).run(params.id, uid, source, listeId || null);
     ajoutes++;
     const electeurUser = await db.prepare("SELECT email, nom, ds_id FROM users WHERE id=?").get(uid);
     creerNotif(uid, "vote_invitation", `Consultation : ${s.nom}`,
@@ -5286,9 +5293,19 @@ route("GET", "/api/vote-scrutins/:id/electeurs", async (req, res, params) => {
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  /* prenom + jointure listes_diffusion (nom/description/couleur/icone de la liste d'origine,
+     quand connue — liste_id reste NULL pour les sources sans liste ou les électeurs résolus
+     avant la migration liste_id, voir server/db.js) : ajoutés pour l'onglet "Votes publiés"
+     (2026-08-19), qui doit pouvoir afficher nom/prénom/email ET la liste concernée par
+     électeur, sans nouvel appel réseau séparé. */
   const rows = await db.prepare(`
-    SELECT ve.id, ve.user_id, ve.source, ve.a_vote, ve.notif_envoyee_at, ve.notif_ouverte_at, ve.vote_le, u.nom, u.email
-    FROM vote_electeurs ve JOIN users u ON u.id=ve.user_id WHERE ve.scrutin_id=? ORDER BY u.nom
+    SELECT ve.id, ve.user_id, ve.source, ve.liste_id, ve.a_vote, ve.notif_envoyee_at, ve.notif_ouverte_at, ve.vote_le,
+      u.nom, u.prenom, u.email,
+      l.nom AS liste_nom, l.description AS liste_description, l.couleur AS liste_couleur, l.icone AS liste_icone
+    FROM vote_electeurs ve
+    JOIN users u ON u.id=ve.user_id
+    LEFT JOIN listes_diffusion l ON l.id=ve.liste_id
+    WHERE ve.scrutin_id=? ORDER BY u.nom
   `).all(params.id);
   sendJSON(res, 200, { electeurs: rows });
 });

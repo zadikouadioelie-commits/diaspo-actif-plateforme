@@ -1030,6 +1030,8 @@ const COLONNES_MIGRATION = [
     ['formulaires_inscription', 'code_acces', 'TEXT'],
     ['formulaire_inscriptions', 'checkin_at', 'TEXT'],
     ['formulaire_inscriptions', 'checkin_par', 'INTEGER'],
+    // Onglet "Votes publiés" (2026-08-19) — miroir de la migration db.js
+    ['vote_electeurs', 'liste_id', 'INTEGER'],
     // Rubrique Vitrines — date de dernière modification publique de la vitrine
     ['initiatives', 'updated_at', 'TEXT'],
     // Module Adhésions — ouverture/fermeture globale (miroir de l'ALTER db.js)

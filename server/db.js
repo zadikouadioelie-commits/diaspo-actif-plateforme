@@ -1855,6 +1855,11 @@ const MIGRATIONS = [
   ["formulaires_inscription", "code_acces TEXT"],
   ["formulaire_inscriptions", "checkin_at TEXT"],
   ["formulaire_inscriptions", "checkin_par INTEGER"],
+  // Onglet "Votes publiés" (2026-08-19) : quelle liste Réseau professionnel précise a résolu
+  // chaque électeur — resolveVoteElecteurs() ne trackait jusqu'ici que la catégorie large
+  // (source), jamais l'id de liste. Reste NULL pour les sources sans liste (tous_actifs,
+  // abonnes, adhesion) et pour les électeurs déjà résolus avant cette migration.
+  ["vote_electeurs", "liste_id INTEGER"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -6110,6 +6115,7 @@ db.exec(`
       user_id           INTEGER NOT NULL,
       source            TEXT NOT NULL DEFAULT 'liste_perso'
                         CHECK(source IN ('tous_actifs','abonnes','adhesion','cotisation','liste_perso','reseau_pro')),
+      liste_id          INTEGER,
       code_acces        TEXT NOT NULL,
       a_vote            INTEGER DEFAULT 0,
       notif_envoyee_at  TEXT,

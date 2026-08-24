@@ -1157,6 +1157,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <button class="btn btn-sm" id="vo-tab-scrutins" onclick="voSwitchTab('scrutins')">Scrutins</button>
+        <button class="btn btn-sm btn-outline" id="vo-tab-publies" onclick="voSwitchTab('publies')">🗳️ Votes publiés</button>
         <button class="btn btn-sm btn-outline" id="vo-tab-archives" onclick="voSwitchTab('archives')">🗄️ Archivés</button>
       </div>
       <div id="votes-init-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
@@ -1194,7 +1195,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-outline" onclick="document.getElementById('modal-vo-scrutin').style.display='none'">Annuler</button>
-          <button class="btn btn-orange" onclick="voEnregistrerScrutin()">Créer le brouillon</button>
+          <button class="btn btn-outline" onclick="voEnregistrerScrutin()">Créer le brouillon</button>
+          <button class="btn btn-orange" onclick="voEnregistrerEtPublierScrutin()">🚀 Publier</button>
         </div>
       </div>
     </div>
@@ -7325,8 +7327,10 @@ let VO_TAB_ACTUEL = 'scrutins';
 function voSwitchTab(tab){
   VO_TAB_ACTUEL = tab;
   document.getElementById('vo-tab-scrutins').className = tab==='scrutins' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+  document.getElementById('vo-tab-publies').className = tab==='publies' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
   document.getElementById('vo-tab-archives').className = tab==='archives' ? 'btn btn-sm' : 'btn btn-sm btn-outline';
-  voRenderScrutins();
+  if (tab === 'publies') voRenderPublies();
+  else voRenderScrutins();
 }
 
 async function voRenderScrutins(){
@@ -7360,6 +7364,69 @@ async function voRenderScrutins(){
   }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
 }
 
+/* Onglet "Votes publiés" (2026-08-19) : regroupe les scrutins qui ont déjà été ouverts au
+   moins une fois (statut 'ouvert' ou 'clos', jamais 'brouillon') et affiche, pour chacun,
+   la liste des électeurs concernés — nom, prénom, e-mail (ou l'information disponible),
+   la liste Réseau professionnel d'origine quand elle est connue, et l'état du vote de
+   chaque électeur. Réutilise GET /vote-scrutins/:id/electeurs (déjà enrichi de liste_id/
+   liste_nom/prenom côté serveur) plutôt que d'inventer une nouvelle route. */
+async function voRenderPublies(){
+  const el = document.getElementById('votes-init-content');
+  const initId = window.__vitrineInitId;
+  if(!initId){ el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune initiative liée.</p>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+  try{
+    const r = await api('GET', `/initiatives/${initId}/vote-scrutins?archived=0`);
+    const publies = (r.scrutins || []).filter(s => s.statut !== 'brouillon');
+    if (!publies.length) {
+      el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">Aucun vote publié pour le moment. Un scrutin apparaît ici dès qu'il est ouvert.</div>`;
+      return;
+    }
+    const details = await Promise.all(publies.map(s =>
+      api('GET', `/vote-scrutins/${s.id}/electeurs`).then(r => r.electeurs || []).catch(() => [])
+    ));
+    el.innerHTML = publies.map((s, i) => {
+      const electeurs = details[i];
+      const nbVote = electeurs.filter(e => e.a_vote).length;
+      const rows = electeurs.map(e => {
+        const listeInfo = e.liste_nom
+          ? `${e.liste_icone || '📋'} ${escH(e.liste_nom)}${e.liste_description ? ` — <span style="color:var(--muted);">${escH(e.liste_description)}</span>` : ''}`
+          : `<span style="color:var(--muted);">— (${VO_SOURCE_LABELS[e.source] || e.source})</span>`;
+        const etat = e.a_vote
+          ? `✅ A voté${e.vote_le ? ' · ' + new Date(e.vote_le).toLocaleDateString('fr-FR') : ''}`
+          : (e.notif_ouverte_at ? '👁️ Invitation vue, pas encore voté' : (e.notif_envoyee_at ? '📩 Invité, pas encore voté' : '⏳ En attente'));
+        return `<tr>
+          <td style="padding:6px 10px;font-size:12.5px;">${escH(e.nom || '')}</td>
+          <td style="padding:6px 10px;font-size:12.5px;">${escH(e.prenom || '')}</td>
+          <td style="padding:6px 10px;font-size:12.5px;">${escH(e.email || '—')}</td>
+          <td style="padding:6px 10px;font-size:12px;">${listeInfo}</td>
+          <td style="padding:6px 10px;font-size:12px;white-space:nowrap;">${etat}</td>
+        </tr>`;
+      }).join('');
+      return `<div class="card" style="padding:16px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <div>
+            <div style="font-weight:700;font-size:14.5px;">${escH(s.nom)}</div>
+            <div style="font-size:11.5px;color:var(--muted);">${VO_TYPE_LABELS[s.type_scrutin]||s.type_scrutin} · ${VO_STATUT_LABELS[s.statut]||s.statut} · ${nbVote}/${electeurs.length} ont voté</div>
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="voOuvrirDetail(${s.id})">📋 Gérer</button>
+        </div>
+        ${electeurs.length ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="border-bottom:1.5px solid var(--border);text-align:left;">
+            <th style="padding:6px 10px;font-size:11px;color:var(--muted);">Nom</th>
+            <th style="padding:6px 10px;font-size:11px;color:var(--muted);">Prénom</th>
+            <th style="padding:6px 10px;font-size:11px;color:var(--muted);">E-mail</th>
+            <th style="padding:6px 10px;font-size:11px;color:var(--muted);">Liste concernée</th>
+            <th style="padding:6px 10px;font-size:11px;color:var(--muted);">État du vote</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>` : `<p style="font-size:12.5px;color:var(--muted);margin:0;">Aucun électeur défini pour ce scrutin.</p>`}
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+}
+const VO_SOURCE_LABELS = { tous_actifs: 'Tous les membres actifs', abonnes: 'Abonnés', adhesion: 'Adhérents à jour', cotisation: 'Adhérents à jour', liste_perso: 'Liste personnalisée', reseau_pro: 'Réseau professionnel' };
+
 function voOuvrirCreationScrutin(){
   document.getElementById('vo-nom').value = '';
   document.getElementById('vo-type').value = 'ag_ordinaire';
@@ -7387,6 +7454,45 @@ async function voEnregistrerScrutin(){
     voRenderScrutins();
     showToast('Scrutin créé en brouillon ✅');
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
+}
+
+/* Publier directement depuis la fenêtre de création (demandé le 2026-08-19) : crée le
+   scrutin puis tente immédiatement de l'ouvrir. Le serveur refuse d'ouvrir un scrutin sans
+   résolution (POST .../ouvrir, garde-fou volontaire — voir server/index.js) : dans ce cas,
+   très probable puisque cette fenêtre ne propose pas d'ajouter de résolution, on prévient
+   clairement puis on emmène directement sur la fiche du scrutin pour en ajouter une et
+   terminer la publication — jamais d'échec silencieux ni de blocage sans suite. */
+async function voEnregistrerEtPublierScrutin(){
+  const nom = document.getElementById('vo-nom').value.trim();
+  if(!nom){ showToast('Nom du scrutin requis.', 'warning'); return; }
+  const payload = {
+    nom, type_scrutin: document.getElementById('vo-type').value,
+    description: document.getElementById('vo-description').value || null,
+    date_ouverture: document.getElementById('vo-ouverture').value || null,
+    date_fermeture: document.getElementById('vo-fermeture').value || null,
+    vote_secret: document.getElementById('vo-secret').checked,
+    resultats_direct: document.getElementById('vo-resultats-direct').checked,
+    pv_auto: document.getElementById('vo-pv-auto').checked,
+  };
+  let scrutinId;
+  try{
+    const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
+    scrutinId = r.id;
+  }catch(e){ showToast('Erreur : '+e.message, 'danger'); return; }
+  document.getElementById('modal-vo-scrutin').style.display = 'none';
+  try{
+    await api('POST', `/vote-scrutins/${scrutinId}/ouvrir`, {});
+    voRenderScrutins();
+    showToast('Scrutin créé et publié 🚀');
+  }catch(e){
+    showToast('Scrutin créé, mais pas encore publiable : '+e.message, 'warning');
+    /* voOuvrirDetail() cherche le scrutin dans VO_SCRUTINS (rempli par voRenderScrutins()) —
+       sans ce rafraîchissement d'abord, le scrutin tout juste créé n'y est pas encore et
+       .find() renvoie undefined, faisant planter l'accès à .nom plus loin (bug constaté à
+       l'exécution, pas par lecture de code : 2026-08-19). */
+    await voRenderScrutins();
+    voOuvrirDetail(scrutinId);
+  }
 }
 
 async function voOuvrirDetail(scrutinId){
@@ -8152,7 +8258,13 @@ async function loadMesFormations() {
     updateFormationStats();
     renderFormationsList();
   } catch(e) {
-    document.getElementById('formations-list').innerHTML = `<p style="color:red;">Erreur : ${e.message}</p>`;
+    /* initFormationsSidebar() appelle loadMesFormations() dès le chargement de la page pour
+       tout compte Premium, quelle que soit la section actuellement affichée — #formations-list
+       n'existe dans le DOM que lorsque la section "Diaspo Formation" est active. Sans ce garde,
+       une erreur réseau ailleurs sur la page (ex. la section Votes juste au-dessus) plantait ici
+       avec "Cannot set properties of null" (constaté à l'exécution, 2026-08-19). */
+    const list = document.getElementById('formations-list');
+    if (list) list.innerHTML = `<p style="color:red;">Erreur : ${e.message}</p>`;
   }
 }
 
