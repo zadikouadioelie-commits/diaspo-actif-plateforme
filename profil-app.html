@@ -7617,6 +7617,37 @@ init();
 <script src="/assets/widget-board.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+
+<!-- ─── Mobile Bottom Navigation ─── (2026-08-19, adaptation phone-first : même motif
+     exact qu'annuaire.html/dashboard-utilisateur.html — voir assets/responsive.v2.css
+     .mobile-bottom-nav. "Profil" actif puisque c'est la page courante. ) -->
+<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+  <a class="mobile-bottom-nav__item active" href="#" id="mob-nav-profil"><span class="nav-icon">👤</span><span>Profil</span></a>
+  <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+  <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
+  <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">🔑</span><span>Compte</span></a>
+</nav>
+<script>
+(function(){
+  function render(user){
+    var navLogin = document.getElementById('mob-nav-login');
+    var navProfil = document.getElementById('mob-nav-profil');
+    if (user){
+      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+      if (navLogin) { navLogin.href = dash[user.role] || 'index.html'; navLogin.innerHTML = '<span class="nav-icon">⚙️</span><span>Compte</span>'; }
+      /* isOwn (variable globale de ce fichier) n'est fiable qu'une fois init() terminé —
+         d'où l'appel via fetchCurrentUser() ci-dessous plutôt qu'une lecture directe ici. */
+      if (navProfil) navProfil.href = 'profil.html?id=' + user.id;
+    } else if (navLogin) {
+      navLogin.href = 'login.html';
+    }
+  }
+  if (window.fetchCurrentUser) { window.fetchCurrentUser().then(render); }
+  else if (window.CURRENT_USER !== undefined) { render(window.CURRENT_USER); }
+})();
+</script>
 </body>
 </html>
 
