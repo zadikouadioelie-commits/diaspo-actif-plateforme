@@ -121,38 +121,6 @@
 </div>
 
 <!-- Navigation mobile -->
-<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
-  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
-  <a class="mobile-bottom-nav__item" href="vitrines.html"><span class="nav-icon">🏪</span><span>Vitrines</span></a>
-  <a class="mobile-bottom-nav__item active" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
-  <a class="mobile-bottom-nav__item" href="evenements.html"><span class="nav-icon">📅</span><span>Événements</span></a>
-  <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">👤</span><span>Compte</span></a>
-</nav>
-<script>
-(function(){
-  function render(user){
-    var box = document.getElementById('hb-account-section');
-    var navLogin = document.getElementById('mob-nav-login');
-    if (!box) return;
-    if (user){
-      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
-      var dashHref = dash[user.role] || 'index.html';
-      box.innerHTML = '<a href="' + dashHref + '#apparence">⚙️ Paramètres</a><a href="#" id="hb-logout-link">🚪 Déconnexion</a>';
-      var out = document.getElementById('hb-logout-link');
-      if (out) out.addEventListener('click', function(e){
-        e.preventDefault();
-        fetch('/api/auth/logout', {method:'POST', credentials:'same-origin'}).finally(function(){ window.location.href = 'index.html'; });
-      });
-      if (navLogin) navLogin.href = dashHref;
-    } else {
-      box.innerHTML = '<a href="login.html">🔑 Se connecter</a><a href="inscription.html">✨ Créer un compte</a>';
-    }
-  }
-  fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
-    .then(function(d){ render(d && d.user ? d.user : null); }).catch(function(){ render(null); });
-})();
-</script>
 
 <!-- Bouton flottant créer post (mobile) -->
 <button class="posts-fab" id="posts-fab" onclick="Posts.openModal()" title="Créer un post" style="display:none;">✍️</button>

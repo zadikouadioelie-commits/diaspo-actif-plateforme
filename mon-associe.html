@@ -917,29 +917,5 @@ document.getElementById('ma-premium-cancel').addEventListener('click', () => fer
 })();
 </script>
 
-<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
-  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
-  <a class="mobile-bottom-nav__item active" href="mon-associe.html"><span class="nav-icon">💎</span><span>Associé</span></a>
-  <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
-  <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">🔑</span><span>Compte</span></a>
-</nav>
-<script>
-(function(){
-  function render(user){
-    var navLogin = document.getElementById('mob-nav-login');
-    if (!navLogin) return;
-    if (user){
-      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
-      navLogin.href = dash[user.role] || 'index.html';
-      navLogin.innerHTML = '<span class="nav-icon">⚙️</span><span>Compte</span>';
-    } else {
-      navLogin.href = 'login.html';
-    }
-  }
-  if (window.fetchCurrentUser) { window.fetchCurrentUser().then(render); }
-  else if (window.CURRENT_USER !== undefined) { render(window.CURRENT_USER); }
-})();
-</script>
 </body>
 </html>

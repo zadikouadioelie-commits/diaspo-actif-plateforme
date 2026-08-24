@@ -4127,7 +4127,73 @@ async function initFormations() {
   apply();
 }
 
-document.addEventListener("DOMContentLoaded", ()=>{
+/* ---------- Barre de navigation mobile basse — source UNIQUE ----------
+   Avant le 2026-08-24 : chaque page portait sa propre barre codée en dur dans son HTML,
+   avec des jeux d'items différents selon qui l'avait construite (constaté sur le terrain :
+   index.html affichait Accueil/Annuaire/Vitrines/Profil/Alertes, d'autres pages
+   Accueil/Annuaire/Vitrines/Fil/Messages/Compte, d'autres encore un sous-ensemble
+   différent) — l'exact inverse du principe demandé ("un menu unique qui alimente le
+   rendu ordinateur ET le rendu téléphonique"). Remplacé par cette fonction unique,
+   génération identique partout, alignée sur le prototype de référence
+   (Diaspo'Actif Mobile.dc.html, tabDefs ligne ~2654) : 9 items en connecté (Menu,
+   Tableau de bord, Accueil, Annuaire, Profil, Événements, Fil, Mon Associé, Vitrines),
+   5 en visiteur (Accueil, Annuaire, Vitrines, Fil, Profil). "Messages" n'apparaît PAS
+   dans cette barre côté prototype (accessible via Menu → section Communication) —
+   volontairement omis ici pour rester fidèle à la référence, pas un oubli. */
+async function renderMobileBottomNavAuto() {
+  const user = await fetchCurrentUser();
+
+  // Retire toute barre déjà présente en dur dans le HTML de la page — transition pendant
+  // laquelle certaines pages peuvent encore contenir l'ancien bloc statique ; à terme,
+  // plus aucune page n'en aura et ce .remove() sera un no-op partout.
+  document.querySelectorAll(".mobile-bottom-nav").forEach(el => el.remove());
+
+  const page = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+  const on = (...names) => names.includes(page);
+
+  let items;
+  if (user) {
+    const profilHref = user.role === "collectivite" ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`;
+    items = [
+      { icon: "☰", label: "Menu", toggleId: "mobile-nav-menu-toggle" },
+      { icon: "📊", label: "Tableau de bord", href: ROLE_DASHBOARD[user.role] || "index.html", active: page.startsWith("dashboard-") },
+      { icon: "🏠", label: "Accueil", href: "index.html", active: on("index.html", "") },
+      { icon: "🔍", label: "Annuaire", href: "annuaire.html", active: on("annuaire.html") },
+      { icon: "👤", label: "Profil", href: profilHref, active: on("profil.html", "profil-app.html", "profil-collectivite.html") },
+      { icon: "📅", label: "Événements", href: "evenements.html", active: on("evenements.html") },
+      { icon: "📰", label: "Fil", href: "fil-actualite.html", active: on("fil-actualite.html") },
+      { icon: "💎", label: "Mon Associé", href: "mon-associe.html", active: on("mon-associe.html") },
+      { icon: "🏪", label: "Vitrines", href: "vitrines.html", active: on("vitrines.html") },
+    ];
+  } else {
+    items = [
+      { icon: "🏠", label: "Accueil", href: "index.html", active: on("index.html", "") },
+      { icon: "🔍", label: "Annuaire", href: "annuaire.html", active: on("annuaire.html") },
+      { icon: "🏪", label: "Vitrines", href: "vitrines.html", active: on("vitrines.html") },
+      { icon: "📰", label: "Fil", href: "fil-actualite.html", active: on("fil-actualite.html") },
+      // Pas de profil public sans compte — mène à la connexion plutôt que de dupliquer
+      // la modale de connexion du prototype (celui-ci est une SPA, pas ce site).
+      { icon: "👤", label: "Profil", href: "login.html", active: false },
+    ];
+  }
+
+  const nav = document.createElement("nav");
+  nav.className = "mobile-bottom-nav";
+  nav.setAttribute("aria-label", "Navigation mobile");
+  nav.innerHTML = items.map(it => {
+    const cls = "mobile-bottom-nav__item" + (it.active ? " active" : "");
+    if (it.toggleId) return `<button type="button" class="${cls}" id="${it.toggleId}"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></button>`;
+    return `<a class="${cls}" href="${it.href}"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></a>`;
+  }).join("");
+  document.body.appendChild(nav);
+}
+
+document.addEventListener("DOMContentLoaded", async ()=>{
+  // Doit être construite AVANT initSidebarMobile() juste en dessous : ce dernier cherche
+  // #mobile-nav-menu-toggle dans le DOM pour y attacher son écouteur de clic — s'il
+  // s'exécutait avant que cette barre existe, le bouton "Menu" resterait inerte.
+  await renderMobileBottomNavAuto();
+
   // ── Sidebar repliable (tous formats) : bouton rond fixe + préférence mémorisée ──
   // Placé EN PREMIER et isolé : c'est le seul moyen de naviguer sur certaines pages
   // (ex. dashboard-administrateur.html, sans barre du bas). Une exception non interceptée

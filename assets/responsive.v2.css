@@ -90,6 +90,16 @@ body {
 }
 
 /* ─── NAVIGATION MOBILE BOTTOM BAR ──────────────────────────────── */
+/* Depuis le 2026-08-24, générée exclusivement par renderMobileBottomNavAuto() dans
+   assets/app.js (source unique — voir la fonction pour le détail). Le prototype de
+   référence (Diaspo'Actif Mobile.dc.html, ligne ~799) rend cette barre défilable
+   horizontalement — jusqu'à 9 items pour un compte connecté (Menu/Tableau de bord/
+   Accueil/Annuaire/Profil/Événements/Fil/Mon Associé/Vitrines), 5 en visiteur. D'où
+   overflow-x:auto + items à largeur fixe (flex-shrink:0) plutôt que flex:1 : au-delà
+   de ce que la largeur d'écran peut afficher, le surplus devient défilable au lieu
+   d'être compressé illisible. La barre de défilement native n'est volontairement PAS
+   masquée : elle sert d'indice visuel qu'il y a plus d'items à découvrir (barre grise
+   visible sur les captures de référence). */
 .mobile-bottom-nav {
   display: none;
   position: fixed;
@@ -102,8 +112,11 @@ body {
   border-top: 1px solid #e0e8f0;
   box-shadow: 0 -2px 16px rgba(0,0,0,.08);
   z-index: 150;
-  justify-content: space-around;
   align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 }
 .mobile-bottom-nav__item {
   display: flex;
@@ -114,7 +127,8 @@ body {
   text-decoration: none;
   font-size: 0.65rem;
   font-weight: 700;
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: 64px;
   padding: 6px 4px;
   min-height: 52px;
   justify-content: center;
@@ -123,7 +137,12 @@ body {
   cursor: pointer;
   transition: color .15s;
   position: relative;
+  scroll-snap-align: start;
 }
+/* En dessous de 6 items (ex. barre visiteur, 5 items), flex:1 0 auto avec un contenu
+   total qui tient déjà dans l'écran se comporte comme l'ancien flex:1 pur (les items
+   grandissent pour occuper toute la largeur) — aucun changement visuel pour ce cas,
+   la bascule vers le défilement ne se déclenche que si le contenu déborde réellement. */
 .mobile-bottom-nav__item.active { color: #1a3a5c; }
 .mobile-bottom-nav__item .nav-icon { font-size: 1.3rem; }
 .mobile-bottom-nav__badge {
@@ -460,6 +479,22 @@ img[loading="lazy"].loaded { background: none; animation: none; }
    Voir assets/app.js:initSidebarMobile (classe ajoutée uniquement dans ce cas précis). */
 @media (min-width: 769px) {
   .sidebar-toggle.sidebar-toggle--no-sidebar { display: none; }
+}
+
+/* Chevauchement constaté sur mobile (annuaire.html et pages similaires, capture utilisateur
+   2026-08-24) : sous 769px, .logo et .nav du topbar passent en display:none (voir styles.v2.css),
+   ne laissant plus que .topbar-right comme unique enfant flex visible de .topbar-inner — avec
+   .sidebar-toggle sorti du flux (position:fixed), un seul enfant flex avec justify-content:
+   space-between se retrouve collé au bord GAUCHE du topbar, exactement sous le bouton rond
+   flottant (left:14px, width:50px) : "Se connecter" apparaissait à moitié caché derrière.
+   Condition ":not(--has-mobile-nav-alt)" plutôt que ciblée sur --no-sidebar : annuaire.html a
+   en réalité un <aside class="sidebar"> cache (bouton donc sans AUCUN des deux modificateurs,
+   ni --no-sidebar ni --has-mobile-nav-alt) — la vraie condition du bug est juste "le bouton
+   rond est effectivement affiché", pas telle ou telle variante précise. .sidebar-toggle
+   précède toujours .topbar-right dans le DOM (voir topbar-inner), d'où ce sélecteur de
+   fratrie plutôt qu'un enfant caché arbitraire ailleurs sur le site. */
+@media (max-width: 768px) {
+  .sidebar-toggle:not(.sidebar-toggle--has-mobile-nav-alt) ~ .topbar-right { margin-left: 74px; }
 }
 
 /* ─── BREAKPOINT : DESKTOP (1024px - 1279px) ────────────────────── */

@@ -1621,46 +1621,31 @@ async function proposerClassementContact(contactId, contactNom, convId){
        .topbar mesuré ci-dessus inclut déjà ce bandeau s'il existe, donc on l'utilise tel
        quel pour recaler la hauteur de .page plutôt que de mesurer #da-back-bar séparément. */
     var pageEl = document.querySelector('.page');
-    var backBar = document.getElementById('da-back-bar');
-    if (pageEl && backBar) {
+    if (pageEl) {
       /* .page{min-height:100vh} (styles.v2.css, règle partagée par toutes les pages)
          gagnait sur le height recalculé ci-dessous (min-height prime sur height quand
          il est plus grand) — .page débordait donc toujours du viewport de la hauteur
-         du bandeau retour malgré le height réduit. Il faut recaler les deux. */
-      var h = 'calc(100vh - ' + backBar.getBoundingClientRect().height + 'px)';
-      pageEl.style.height = h;
-      pageEl.style.minHeight = h;
+         de ce qui le précède dans <body>. Mesurer .page.getBoundingClientRect().top
+         plutôt que la seule hauteur de #da-back-bar : ce top reflète TOUT ce qui
+         s'empile avant .page, quel que soit le nombre de bandeaux réellement présents
+         (constaté à l'exécution : #origine-banner peut s'ajouter avant #da-back-bar
+         selon le compte connecté, ce que l'ancienne mesure — hauteur du seul
+         #da-back-bar — ignorait, laissant .page déborder de la hauteur du bandeau
+         supplémentaire). Cette position est déterminée uniquement par les éléments
+         PRÉCÉDENTS dans le flux normal, donc stable même après avoir déjà fixé la
+         hauteur de .page lors d'un appel précédent de cette fonction. */
+      var dessus = pageEl.getBoundingClientRect().top;
+      if (dessus > 0) {
+        var h = 'calc(100vh - ' + dessus + 'px)';
+        pageEl.style.height = h;
+        pageEl.style.minHeight = h;
+      }
     }
   }
   majOffset();
   window.addEventListener('resize', majOffset);
   window.addEventListener('load', majOffset);
   setTimeout(majOffset, 400);
-})();
-</script>
-
-<!-- ─── Mobile Bottom Navigation ─── (2026-08-19, adaptation phone-first) -->
-<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
-  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
-  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
-  <a class="mobile-bottom-nav__item active" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
-  <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
-  <a class="mobile-bottom-nav__item" href="#" id="mob-nav-login"><span class="nav-icon">⚙️</span><span>Compte</span></a>
-</nav>
-<script>
-(function(){
-  function render(user){
-    var navLogin = document.getElementById('mob-nav-login');
-    if (!navLogin) return;
-    if (user){
-      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
-      navLogin.href = dash[user.role] || 'index.html';
-    } else {
-      navLogin.href = 'login.html';
-      navLogin.innerHTML = '<span class="nav-icon">🔑</span><span>Compte</span>';
-    }
-  }
-  if (window.fetchCurrentUser) { window.fetchCurrentUser().then(render); }
 })();
 </script>
 </body>
