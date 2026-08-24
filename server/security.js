@@ -19,7 +19,11 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
-  "connect-src 'self' https://diaspoactif-media.b-cdn.net",
+  /* jsdelivr : uniquement pour charger les contours réels des continents (world-atlas,
+     carte animée du hero — 2026-08-19). Le script d3-geo/topojson lui-même était déjà
+     autorisé via script-src ci-dessus ; connect-src devait l'être aussi pour le fetch()
+     des données topojson elles-mêmes. */
+  "connect-src 'self' https://diaspoactif-media.b-cdn.net https://cdn.jsdelivr.net",
   "media-src 'self' data: blob: https:",
   "frame-ancestors 'self'",
   "base-uri 'self'",
