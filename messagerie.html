@@ -14,7 +14,14 @@
 <link rel="apple-touch-icon" href="assets/logo.png">
 <style>
 /* ===== MESSAGERIE LAYOUT ===== */
-.msg-shell{display:flex;height:calc(100vh - 58px);overflow:hidden;background:var(--bg);}
+/* La hauteur "calc(100vh - 58px)" d'origine supposait .topbar seule au-dessus — mais
+   assets/back-button.js insère son propre bandeau (~53px) AVANT .page dans le DOM, hors
+   du calcul, et .topbar elle-même mesure ~74px en pratique (pas 58px). Résultat constaté à
+   l'exécution (2026-08-19, en ajoutant .mobile-bottom-nov ci-dessous) : .msg-shell débordait
+   sous la barre de nav basse. --msg-top-offset est recalculée en JS (mesure réelle du bas
+   de .topbar) plutôt que par un nombre magique — robuste même si un bandeau change de
+   hauteur ou si back-button.js n'est pas présent sur une future variante de cette page. */
+.msg-shell{display:flex;height:calc(100vh - var(--msg-top-offset, 58px));overflow:hidden;background:var(--bg);}
 
 /* Panneau gauche */
 .msg-left{width:320px;flex-shrink:0;border-right:1px solid var(--border);background:#fff;display:flex;flex-direction:column;}
@@ -174,9 +181,16 @@
 /* Épinglé */
 .pinned-bar{background:var(--orange-light);border-bottom:1px solid var(--orange);padding:8px 16px;font-size:12.5px;font-weight:600;color:#2563EB;cursor:pointer;display:none;}
 .pinned-bar.visible{display:block;}
+/* Réserve la hauteur de .mobile-bottom-nav (60px + encoche, voir responsive.v2.css)
+   sous son propre seuil d'apparition (<1024px, pas seulement <700px comme les règles
+   ci-dessous) — sans ça, la barre de saisie du message se retrouverait cachée derrière
+   la barre de navigation basse, ajoutée le 2026-08-19 (adaptation phone-first). */
+@media (max-width:1023px){
+  .msg-shell{height:calc(100vh - var(--msg-top-offset, 58px) - 60px - env(safe-area-inset-bottom));}
+}
 /* Responsive mobile */
 @media (max-width:700px){
-  .msg-left{width:100%;position:absolute;z-index:10;height:calc(100vh - 58px);left:0;transform:translateX(0);transition:transform .25s;}
+  .msg-left{width:100%;position:absolute;z-index:10;height:calc(100vh - var(--msg-top-offset, 58px) - 60px - env(safe-area-inset-bottom));left:0;transform:translateX(0);transition:transform .25s;}
   .msg-left.hidden{transform:translateX(-100%);}
   .msg-right{width:100%;}
   .msg-back-btn{display:flex !important;}
@@ -1586,6 +1600,69 @@ async function proposerClassementContact(contactId, contactNom, convId){
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+
+<script>
+/* Mesure réelle du bas de .topbar (voir commentaire sur --msg-top-offset plus haut) —
+   couvre aussi bien .topbar seule que .topbar précédée du bandeau de back-button.js,
+   sans dépendre d'un nombre magique jamais tout à fait exact. Recalculé au chargement,
+   au redimensionnement (rotation d'écran) et une fois après le chargement complet
+   (polices/images pouvant décaler la hauteur réelle du topbar juste après le premier rendu). */
+(function(){
+  function majOffset(){
+    var topbar = document.querySelector('.topbar');
+    if (!topbar) return;
+    var bas = topbar.getBoundingClientRect().bottom;
+    if (bas <= 0) return;
+    document.documentElement.style.setProperty('--msg-top-offset', bas + 'px');
+    /* .page{height:100vh} suppose qu'aucun élément ne le précède dans <body> — faux dès
+       que le bandeau de back-button.js (#da-back-bar, ~53px) s'insère AVANT lui : .page
+       débordait alors le viewport de la hauteur de ce bandeau (constaté à l'exécution :
+       scrollHeight > innerHeight même avec .msg-shell correctement dimensionné). Le bas de
+       .topbar mesuré ci-dessus inclut déjà ce bandeau s'il existe, donc on l'utilise tel
+       quel pour recaler la hauteur de .page plutôt que de mesurer #da-back-bar séparément. */
+    var pageEl = document.querySelector('.page');
+    var backBar = document.getElementById('da-back-bar');
+    if (pageEl && backBar) {
+      /* .page{min-height:100vh} (styles.v2.css, règle partagée par toutes les pages)
+         gagnait sur le height recalculé ci-dessous (min-height prime sur height quand
+         il est plus grand) — .page débordait donc toujours du viewport de la hauteur
+         du bandeau retour malgré le height réduit. Il faut recaler les deux. */
+      var h = 'calc(100vh - ' + backBar.getBoundingClientRect().height + 'px)';
+      pageEl.style.height = h;
+      pageEl.style.minHeight = h;
+    }
+  }
+  majOffset();
+  window.addEventListener('resize', majOffset);
+  window.addEventListener('load', majOffset);
+  setTimeout(majOffset, 400);
+})();
+</script>
+
+<!-- ─── Mobile Bottom Navigation ─── (2026-08-19, adaptation phone-first) -->
+<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+  <a class="mobile-bottom-nav__item active" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
+  <a class="mobile-bottom-nav__item" href="fil-actualite.html"><span class="nav-icon">📰</span><span>Fil</span></a>
+  <a class="mobile-bottom-nav__item" href="#" id="mob-nav-login"><span class="nav-icon">⚙️</span><span>Compte</span></a>
+</nav>
+<script>
+(function(){
+  function render(user){
+    var navLogin = document.getElementById('mob-nav-login');
+    if (!navLogin) return;
+    if (user){
+      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+      navLogin.href = dash[user.role] || 'index.html';
+    } else {
+      navLogin.href = 'login.html';
+      navLogin.innerHTML = '<span class="nav-icon">🔑</span><span>Compte</span>';
+    }
+  }
+  if (window.fetchCurrentUser) { window.fetchCurrentUser().then(render); }
+})();
+</script>
 </body>
 </html>
 
