@@ -4267,6 +4267,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // rond visible en double sur les pages sans tiroir malgré "Menu" déjà dans la barre
     // basse (constaté sur profil-app.html, capture utilisateur à l'appui).
     if (navToggle && toggle) toggle.classList.add("sidebar-toggle--has-mobile-nav-alt");
+    // "Menu" mène désormais toujours au même menu complet, pied de liste "Déconnexion"
+    // compris (redirection vers le tableau de bord si la page courante n'a pas de .sidebar
+    // propre — voir plus bas) : la déconnexion du bandeau haut peut donc être masquée sur
+    // mobile sur TOUTE page connectée, plus seulement celles qui ont déjà un tiroir. Posé
+    // ici (avant le branchement sidebar/pas-sidebar) pour s'appliquer aux deux cas — demande
+    // explicite (2026-08-24) : prenait trop de place dans le bandeau, ex. profil-app.html.
+    document.body.classList.add("da-has-menu-logout");
     // Repli sur la classe .sidebar quand l'id manque (plusieurs pages ont le tiroir sans
     // id="sidebar" — voir dashboard-utilisateur.html) : évite de dupliquer ce module en
     // script inline par page, comme c'était fait jusqu'ici sur 6 pages différentes.
@@ -4372,11 +4379,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         window.location.href = "index.html";
       });
       sidebar.appendChild(logoutItem);
-      // Signale à la CSS (responsive.v2.css) qu'un repli de déconnexion existe désormais
-      // dans le menu, pour qu'elle masque en toute sécurité celle du bandeau haut sur
-      // mobile — jamais posée sur les pages sans .sidebar (voir la branche juste au-dessus),
-      // qui n'ont donc aucun repli et gardent celle du bandeau visible.
-      document.body.classList.add("da-has-menu-logout");
+      // body.da-has-menu-logout est désormais posée plus haut dans cette même fonction,
+      // inconditionnellement (toute page connectée redirige vers ce menu) — plus besoin de
+      // la reposer ici spécifiquement.
     }
 
     function openSidebar(persist) {
