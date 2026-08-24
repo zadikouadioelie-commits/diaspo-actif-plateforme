@@ -1193,6 +1193,27 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label class="da-pill"><input type="checkbox" id="vo-resultats-direct" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>📊 Résultats en direct</span></label>
           <label class="da-pill checked"><input type="checkbox" id="vo-pv-auto" checked onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>📄 PV automatique</span></label>
         </div>
+        <label style="font-size:12px;font-weight:700;">👥 Destinataires (qui pourra voter)</label>
+        <p style="font-size:11px;color:var(--muted);margin:2px 0 6px;">Facultatif ici — vous pourrez aussi les choisir plus tard depuis la fiche du scrutin.</p>
+        <div class="da-pill-group" style="margin:6px 0 10px;">
+          <label class="da-pill"><input type="checkbox" value="tous_actifs" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Tous les membres actifs</span></label>
+          <label class="da-pill"><input type="checkbox" value="abonnes" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Abonnés</span></label>
+          <label class="da-pill"><input type="checkbox" value="adhesion" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voCToggleCampagneRow(this.checked);"><span>Adhérents à jour</span></label>
+          <label class="da-pill"><input type="checkbox" value="reseau_pro" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voCToggleListeRow(this.checked);"><span>Réseau professionnel</span></label>
+        </div>
+        <div id="vo-c-campagne-row" style="display:none;margin-bottom:14px;">
+          <label style="font-size:12px;font-weight:700;">Campagne d'adhésion</label>
+          <select id="vo-c-crit-campagne" class="input" style="width:100%;">
+            <option value="">Toutes les adhésions à jour (sans filtrer par campagne)</option>
+          </select>
+        </div>
+        <div id="vo-c-reseau-pro-criteres" style="display:none;margin-bottom:14px;">
+          <label style="font-size:12px;font-weight:700;">Liste Réseau professionnel</label>
+          <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Choisissez une liste créée dans « Mes Listes » (module Réseau professionnel) — tous les comptes de cette liste pourront voter à ce scrutin.</p>
+          <select id="vo-c-crit-liste" class="input" style="width:100%;">
+            <option value="">— Sélectionner une liste —</option>
+          </select>
+        </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-outline" onclick="document.getElementById('modal-vo-scrutin').style.display='none'">Annuler</button>
           <button class="btn btn-outline" onclick="voEnregistrerScrutin()">Créer le brouillon</button>
@@ -7444,7 +7465,59 @@ function voOuvrirCreationScrutin(){
   document.getElementById('vo-description').value = '';
   document.getElementById('vo-ouverture').value = '';
   document.getElementById('vo-fermeture').value = '';
+  /* Destinataires (2026-08-19) : mêmes 4 sources que le modal "Définir électeurs" existant
+     (modal-vo-electeurs), dupliquées avec un préfixe vo-c- pour ne rien changer au modal
+     existant — remis à zéro à chaque ouverture. */
+  document.querySelectorAll('.vo-c-source').forEach(cb=>{ cb.checked=false; cb.closest('.da-pill').classList.remove('checked'); });
+  document.getElementById('vo-c-campagne-row').style.display = 'none';
+  document.getElementById('vo-c-reseau-pro-criteres').style.display = 'none';
   document.getElementById('modal-vo-scrutin').style.display = 'flex';
+}
+
+async function voCToggleCampagneRow(show){
+  document.getElementById('vo-c-campagne-row').style.display = show ? 'block' : 'none';
+  if(!show) return;
+  const sel = document.getElementById('vo-c-crit-campagne');
+  sel.innerHTML = '<option value="">Toutes les adhésions à jour (sans filtrer par campagne)</option>';
+  try{
+    const r = await api('GET', `/initiatives/${window.__vitrineInitId}/adhesion-campagnes`);
+    (r.campagnes||[]).forEach(c => {
+      sel.innerHTML += `<option value="${c.id}">${escH(c.nom)}${c.date_debut?' ('+c.date_debut.slice(0,10)+(c.date_fin?' → '+c.date_fin.slice(0,10):'')+')':''}</option>`;
+    });
+  }catch(e){}
+}
+
+async function voCToggleListeRow(show){
+  document.getElementById('vo-c-reseau-pro-criteres').style.display = show ? 'block' : 'none';
+  if(!show) return;
+  const sel = document.getElementById('vo-c-crit-liste');
+  sel.innerHTML = '<option value="">— Sélectionner une liste —</option>';
+  try{
+    const r = await api('GET', `/listes-diffusion`);
+    (r.listes||[]).forEach(l => {
+      sel.innerHTML += `<option value="${l.id}">${escH(l.nom)} (${l.nb_contacts||0} contact${l.nb_contacts>1?'s':''})</option>`;
+    });
+  }catch(e){}
+}
+
+/* Résout les destinataires choisis dans la fenêtre de création (si aucun n'a été coché,
+   ne fait rien — les destinataires restent facultatifs à cette étape, cf. modal-vo-electeurs
+   pour les définir plus tard). Retourne le nombre d'électeurs ajoutés, ou null si aucune
+   source n'était cochée. */
+async function voResoudreDestinatairesDepuisCreation(scrutinId){
+  const sources = Array.from(document.querySelectorAll('.vo-c-source:checked')).map(cb=>cb.value);
+  if(!sources.length) return null;
+  const criteres = {
+    campagne_id: document.getElementById('vo-c-crit-campagne')?.value || undefined,
+    liste_id: document.getElementById('vo-c-crit-liste')?.value || undefined,
+  };
+  try{
+    const r = await api('POST', `/vote-scrutins/${scrutinId}/electeurs/resoudre`, { sources, criteres });
+    return r.electeurs_ajoutes;
+  }catch(e){
+    showToast("Scrutin créé, mais erreur lors de l'ajout des destinataires : "+e.message, 'warning');
+    return null;
+  }
 }
 
 async function voEnregistrerScrutin(){
@@ -7460,19 +7533,21 @@ async function voEnregistrerScrutin(){
     pv_auto: document.getElementById('vo-pv-auto').checked,
   };
   try{
-    await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
+    const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
+    const nbElecteurs = await voResoudreDestinatairesDepuisCreation(r.id);
     document.getElementById('modal-vo-scrutin').style.display = 'none';
     voRenderScrutins();
-    showToast('Scrutin créé en brouillon ✅');
+    showToast(nbElecteurs ? `Scrutin créé en brouillon ✅ · ${nbElecteurs} destinataire(s) ajouté(s)` : 'Scrutin créé en brouillon ✅');
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); }
 }
 
 /* Publier directement depuis la fenêtre de création (demandé le 2026-08-19) : crée le
-   scrutin puis tente immédiatement de l'ouvrir. Le serveur refuse d'ouvrir un scrutin sans
-   résolution (POST .../ouvrir, garde-fou volontaire — voir server/index.js) : dans ce cas,
-   très probable puisque cette fenêtre ne propose pas d'ajouter de résolution, on prévient
-   clairement puis on emmène directement sur la fiche du scrutin pour en ajouter une et
-   terminer la publication — jamais d'échec silencieux ni de blocage sans suite. */
+   scrutin, résout les destinataires choisis (s'il y en a), puis tente immédiatement de
+   l'ouvrir. Le serveur refuse d'ouvrir un scrutin sans résolution (POST .../ouvrir,
+   garde-fou volontaire — voir server/index.js) : cette fenêtre ne propose toujours pas
+   d'ajouter une résolution, donc cet échec reste attendu même avec des destinataires déjà
+   choisis — on prévient clairement puis on emmène directement sur la fiche du scrutin
+   (électeurs déjà en place) pour ajouter une résolution et terminer la publication. */
 async function voEnregistrerEtPublierScrutin(){
   const nom = document.getElementById('vo-nom').value.trim();
   if(!nom){ showToast('Nom du scrutin requis.', 'warning'); return; }
@@ -7490,13 +7565,16 @@ async function voEnregistrerEtPublierScrutin(){
     const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
     scrutinId = r.id;
   }catch(e){ showToast('Erreur : '+e.message, 'danger'); return; }
+  const nbElecteurs = await voResoudreDestinatairesDepuisCreation(scrutinId);
   document.getElementById('modal-vo-scrutin').style.display = 'none';
   try{
     await api('POST', `/vote-scrutins/${scrutinId}/ouvrir`, {});
     voRenderScrutins();
-    showToast('Scrutin créé et publié 🚀');
+    showToast(nbElecteurs ? `Scrutin créé et publié 🚀 · ${nbElecteurs} destinataire(s)` : 'Scrutin créé et publié 🚀');
   }catch(e){
-    showToast('Scrutin créé, mais pas encore publiable : '+e.message, 'warning');
+    showToast(nbElecteurs
+      ? `Scrutin créé, ${nbElecteurs} destinataire(s) ajouté(s), mais pas encore publiable : ${e.message}`
+      : 'Scrutin créé, mais pas encore publiable : '+e.message, 'warning');
     /* voOuvrirDetail() cherche le scrutin dans VO_SCRUTINS (rempli par voRenderScrutins()) —
        sans ce rafraîchissement d'abord, le scrutin tout juste créé n'y est pas encore et
        .find() renvoie undefined, faisant planter l'accès à .nom plus loin (bug constaté à
