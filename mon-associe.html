@@ -10,6 +10,10 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#081120">
 <link rel="apple-touch-icon" href="assets/logo.png">
+<!-- Page bespoke (variables --ma-*, ne partage pas .page/.sidebar) : on ne récupère de
+     responsive.v2.css que le composant .mobile-bottom-nav, dont les couleurs sont ensuite
+     réadaptées au thème sombre de cette page ci-dessous (voir --mob-nav-*). -->
+<link rel="stylesheet" href="/assets/responsive.v2.css">
 <style>
 :root{
   --ma-bg:#081120; --ma-text:#EAF1FB; --ma-muted:#93A4BF; --ma-muted2:#7E90AC;
@@ -26,6 +30,18 @@ body{
 h1,h2,h3,.ma-brand{font-family:'Archivo',sans-serif}
 a{color:inherit}
 .ma-page{max-width:1200px;margin:0 auto;padding:0 20px 60px}
+/* Nav mobile basse partagée (assets/responsive.v2.css) : positionnement/structure repris
+   tels quels, seules les couleurs sont réadaptées au thème sombre --ma-* de cette page
+   (la version d'origine est blanche, pensée pour les pages claires du reste du site). */
+.mobile-bottom-nav{background:var(--ma-card);border-top-color:var(--ma-border)}
+.mobile-bottom-nav__item{color:var(--ma-muted)}
+.mobile-bottom-nav__item.active{color:var(--ma-accent)}
+/* Même z-index que .ma-msg-overlay (150, plein écran) : sans cette règle, une fois
+   l'overlay ouvert (classe .open) la nav basse — insérée après lui dans le DOM — passerait
+   par-dessus et chevaucherait la zone de saisie du fil de discussion (.ma-thread-input,
+   elle-même en bas de l'overlay). */
+.ma-msg-overlay.open ~ .mobile-bottom-nav{display:none}
+@media (max-width:1023px){.ma-page{padding-bottom:calc(60px + env(safe-area-inset-bottom) + 24px)}}
 .ma-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--ma-border);flex-wrap:wrap}
 .ma-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px;text-decoration:none}
 .ma-brand img{height:26px}
@@ -898,6 +914,31 @@ document.getElementById('ma-premium-cancel').addEventListener('click', () => fer
   document.getElementById('ma-tabs').style.display = MA.connected ? 'flex' : 'none';
   if (MA.connected) await checkAccesPublication();
   loadAnnonces();
+})();
+</script>
+
+<nav class="mobile-bottom-nav" aria-label="Navigation mobile">
+  <a class="mobile-bottom-nav__item" href="index.html"><span class="nav-icon">🏠</span><span>Accueil</span></a>
+  <a class="mobile-bottom-nav__item" href="annuaire.html"><span class="nav-icon">🔍</span><span>Annuaire</span></a>
+  <a class="mobile-bottom-nav__item active" href="mon-associe.html"><span class="nav-icon">💎</span><span>Associé</span></a>
+  <a class="mobile-bottom-nav__item" href="messagerie.html"><span class="nav-icon">💬</span><span>Messages</span></a>
+  <a class="mobile-bottom-nav__item" href="login.html" id="mob-nav-login"><span class="nav-icon">🔑</span><span>Compte</span></a>
+</nav>
+<script>
+(function(){
+  function render(user){
+    var navLogin = document.getElementById('mob-nav-login');
+    if (!navLogin) return;
+    if (user){
+      var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+      navLogin.href = dash[user.role] || 'index.html';
+      navLogin.innerHTML = '<span class="nav-icon">⚙️</span><span>Compte</span>';
+    } else {
+      navLogin.href = 'login.html';
+    }
+  }
+  if (window.fetchCurrentUser) { window.fetchCurrentUser().then(render); }
+  else if (window.CURRENT_USER !== undefined) { render(window.CURRENT_USER); }
 })();
 </script>
 </body>
