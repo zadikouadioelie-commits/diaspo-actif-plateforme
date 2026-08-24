@@ -4206,42 +4206,62 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // (ex. dashboard-administrateur.html, sans barre du bas). Une exception non interceptée
   // dans n'importe lequel des init* ci-dessous ne doit jamais pouvoir désactiver ce bouton.
   (function initSidebarMobile() {
-    const toggle = document.getElementById("sidebar-toggle");
-    if (!toggle) return;
+    const toggle = document.getElementById("sidebar-toggle"); // absent sur certaines pages bespoke (ex. agenda.html, mon-associe.html)
+    // #mobile-nav-menu-toggle est désormais posé par renderMobileBottomNavAuto() sur
+    // (quasi) toute page connectée, y compris celles sans #sidebar-toggle — ce qui n'était
+    // pas le cas quand ce bouton "Menu" était ajouté à la main page par page. Sans ce
+    // deuxième point d'entrée, un retour anticipé ici pour cause de #sidebar-toggle manquant
+    // laissait ce bouton "Menu" sans AUCUN gestionnaire de clic, silencieusement inerte
+    // (constaté sur agenda.html/mon-associe.html après le passage à la barre unique).
+    const navToggle = document.getElementById("mobile-nav-menu-toggle");
+    if (!toggle && !navToggle) return;
+    const navToggleIcon = navToggle ? navToggle.querySelector(".nav-icon") : null;
     // Repli sur la classe .sidebar quand l'id manque (plusieurs pages ont le tiroir sans
     // id="sidebar" — voir dashboard-utilisateur.html) : évite de dupliquer ce module en
     // script inline par page, comme c'était fait jusqu'ici sur 6 pages différentes.
     const sidebar = document.getElementById("sidebar") || document.querySelector(".sidebar");
 
-    // Aucun tiroir dédié sur cette page (le bouton existe seul, à côté de la nav du topbar) :
-    // on bascule alors l'affichage mobile de cette nav existante plutôt que d'exiger un
-    // tiroir dupliqué par page — la nav contient déjà les bons liens pour cette page précise.
+    // Aucun tiroir dédié sur cette page : on bascule alors l'affichage mobile de la nav
+    // existante du topbar plutôt que d'exiger un tiroir dupliqué par page — la nav contient
+    // déjà les bons liens pour cette page précise.
     if (!sidebar) {
       const nav = document.querySelector(".topbar .nav");
-      if (!nav) return; // rien à ouvrir/fermer sur cette page
-      // Au-delà de 768px, .nav est déjà affichée en permanence dans le topbar (voir
-      // styles.v2.css) : basculer nav-mobile-open n'y a alors aucun effet visible, ce qui
-      // rendait ce bouton flottant silencieusement inopérant sur desktop pour les pages
-      // sans tiroir #sidebar (ex. comptes-lies.html). On le masque donc au-delà de ce seuil.
-      toggle.classList.add("sidebar-toggle--no-sidebar");
-      toggle.setAttribute("aria-expanded", "false");
-      toggle.addEventListener("click", () => {
-        const isOpen = nav.classList.toggle("nav-mobile-open");
-        toggle.textContent = isOpen ? "✕" : "☰";
-        toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      if (nav) {
+        // Au-delà de 768px, .nav est déjà affichée en permanence dans le topbar (voir
+        // styles.v2.css) : basculer nav-mobile-open n'y a alors aucun effet visible, ce qui
+        // rendait ce bouton flottant silencieusement inopérant sur desktop pour les pages
+        // sans tiroir #sidebar (ex. comptes-lies.html). On le masque donc au-delà de ce seuil.
+        if (toggle) toggle.classList.add("sidebar-toggle--no-sidebar");
+        const toggleNav = () => {
+          const isOpen = nav.classList.toggle("nav-mobile-open");
+          if (toggle) { toggle.textContent = isOpen ? "✕" : "☰"; toggle.setAttribute("aria-expanded", isOpen ? "true" : "false"); }
+          if (navToggleIcon) navToggleIcon.textContent = isOpen ? "✕" : "☰";
+          if (navToggle) navToggle.classList.toggle("active", isOpen);
+        };
+        if (toggle) toggle.addEventListener("click", toggleNav);
+        if (navToggle) navToggle.addEventListener("click", toggleNav);
+        nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
+          nav.classList.remove("nav-mobile-open");
+          if (toggle) toggle.textContent = "☰";
+          if (navToggleIcon) navToggleIcon.textContent = "☰";
+          if (navToggle) navToggle.classList.remove("active");
+        }));
+        return;
+      }
+      // Ni tiroir ni nav de topbar (ex. agenda.html, mon-associe.html) : seul repli sûr,
+      // "Menu" renvoie vers le tableau de bord du rôle connecté — déjà résolu par
+      // renderMobileBottomNavAuto() juste avant, pas de nouvel appel réseau ici.
+      if (navToggle) navToggle.addEventListener("click", () => {
+        window.location.href = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
       });
-      nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
-        nav.classList.remove("nav-mobile-open");
-        toggle.textContent = "☰";
-        toggle.setAttribute("aria-expanded", "false");
-      }));
       return;
     }
-    const navToggle    = document.getElementById("mobile-nav-menu-toggle");
-    const navToggleIcon = navToggle ? navToggle.querySelector(".nav-icon") : null;
     // Une page qui a son propre bouton menu dans la barre du bas (mobile) n'a pas besoin
     // du bouton rond flottant en plus — doublon évité via cette classe (voir responsive.v2.css).
-    if (navToggle) toggle.classList.add("sidebar-toggle--has-mobile-nav-alt");
+    // "toggle" gardé (pas encore rencontré en pratique une page avec .sidebar mais sans
+    // #sidebar-toggle, mais renderMobileBottomNavAuto() pose désormais navToggle sur des
+    // pages jamais prévues pour ça à l'origine — mieux vaut ce garde-fou que de le supposer).
+    if (navToggle && toggle) toggle.classList.add("sidebar-toggle--has-mobile-nav-alt");
     const close    = document.getElementById("sidebar-close");
     const backdrop = document.getElementById("sidebar-backdrop");
     const LS_KEY = "da_sidebar_collapsed";
@@ -4250,7 +4270,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       sidebar.classList.add("open");
       if (backdrop) backdrop.classList.add("open");
       document.body.style.overflow = "hidden";
-      toggle.textContent = "✕";
+      if (toggle) toggle.textContent = "✕";
       if (navToggleIcon) navToggleIcon.textContent = "✕";
       if (navToggle) navToggle.classList.add("active");
       if (persist) localStorage.setItem(LS_KEY, "0");
@@ -4259,7 +4279,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       sidebar.classList.remove("open");
       if (backdrop) backdrop.classList.remove("open");
       document.body.style.overflow = "";
-      toggle.textContent = "☰";
+      if (toggle) toggle.textContent = "☰";
       if (navToggleIcon) navToggleIcon.textContent = "☰";
       if (navToggle) navToggle.classList.remove("active");
       if (persist) localStorage.setItem(LS_KEY, "1");
@@ -4270,7 +4290,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (sidebar.classList.contains("open")) closeSidebar(true);
       else openSidebar(true);
     }
-    toggle.addEventListener("click", toggleSidebar);
+    if (toggle) toggle.addEventListener("click", toggleSidebar);
     if (navToggle) navToggle.addEventListener("click", toggleSidebar);
     if (close)    close.addEventListener("click", () => closeSidebar(true));
     if (backdrop) backdrop.addEventListener("click", () => closeSidebar(true));
