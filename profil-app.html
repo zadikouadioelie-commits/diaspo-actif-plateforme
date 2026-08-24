@@ -782,7 +782,12 @@ html, body { overflow-x:clip; }
   .pvz-hero-top { flex-direction:column; }
   .pvz-avatar { margin-top:-40px; width:96px; height:96px; }
   .pvz-name { font-size:22px; }
-  .pvz-actions { padding-top:10px; }
+  /* .pvz-actions{flex:none} (règle de base) l'empêche de se contraindre à la largeur de son
+     parent : flex-wrap ne s'y déclenche donc jamais, le groupe de boutons grandit à la
+     largeur nécessaire pour tout tenir sur une ligne et déborde du cadre au lieu de passer
+     à la ligne — constaté sur "Gérer les adhésions" (propriétaire Association/ONG), qui
+     dépassait le bord droit de l'écran (signalé par l'utilisateur, capture à l'appui). */
+  .pvz-actions { padding-top:10px; flex:none; max-width:100%; }
 }
 
 /* =====================================================================
