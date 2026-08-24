@@ -473,6 +473,27 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   #da-cookie-banner { bottom: calc(60px + 16px + env(safe-area-inset-bottom)) !important; }
 }
 
+/* Logo réaffiché sur mobile, VISITEUR DÉCONNECTÉ UNIQUEMENT (2026-08-24, capture de référence
+   utilisateur — qui montrait précisément cet état). Masqué depuis styles.v2.css:480 pour
+   garder "Déconnexion" atteignable sans défiler ; testé connecté avec le logo réaffiché aussi
+   : "Déconnexion" sort alors du viewport (topbar-right y est déjà plus chargé — badges,
+   pastille compte...). Le body.da-logged-out est posé par renderMobileBottomNavAuto()
+   (assets/app.js), déjà déclenché sur chaque page — pas de logique dupliquée ici. */
+@media (max-width: 768px) {
+  body.da-logged-out .logo { display: flex !important; font-size: 13px; gap: 6px; }
+  body.da-logged-out .logo-img { width: 22px; height: 22px; }
+}
+
+/* Bulle flottante consolidée des assistants (#assist-hub-fab, assets/app.js) — demandée à
+   retirer sur mobile (capture de référence, 2026-08-24) : elle flotte au-dessus de la barre
+   de navigation basse et n'apporte rien que "Menu" ne couvre déjà (Support Pilote y est
+   listé). Les widgets individuels qu'elle consolide (#cb-fab, #oz-bubble…) restent chacun
+   masqués comme avant (classe .assist-hub-hidden, logique inchangée) — seul le bouton
+   consolidé disparaît, pas de doublon visible en repli. */
+@media (max-width: 1023px) {
+  #assist-hub-fab, #assist-hub-menu { display: none !important; }
+}
+
 /* Pages sans tiroir #sidebar dédié (ex. comptes-lies.html) : au-delà de 768px, .nav est
    déjà affichée en permanence dans le topbar (voir styles.v2.css), donc le bouton rond
    n'a plus rien à ouvrir/fermer — le masquer évite un bouton qui semble ne "rien faire".

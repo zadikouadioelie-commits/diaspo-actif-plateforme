@@ -4142,6 +4142,13 @@ async function initFormations() {
    volontairement omis ici pour rester fidèle à la référence, pas un oubli. */
 async function renderMobileBottomNavAuto() {
   const user = await fetchCurrentUser();
+  // Réutilisé par assets/responsive.v2.css pour ne réafficher le logo sur mobile (masqué
+  // depuis styles.v2.css:480) que côté visiteur déconnecté — la référence fournie montrait
+  // précisément cet état. Connecté, le bandeau porte déjà bien plus de contenu (badges
+  // messages/notifs, pastille compte, Déconnexion...) : y ajouter aussi le logo repousserait
+  // Déconnexion hors du viewport (récupérable par défilement horizontal existant, mais pas
+  // souhaitable pour un bouton aussi central) — testé et volontairement écarté.
+  document.body.classList.toggle("da-logged-out", !user);
 
   // Retire toute barre déjà présente en dur dans le HTML de la page — transition pendant
   // laquelle certaines pages peuvent encore contenir l'ancien bloc statique ; à terme,
