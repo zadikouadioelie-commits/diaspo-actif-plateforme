@@ -7956,6 +7956,7 @@ function ptChoisirMethode(m){
 }
 
 let ptSearchTimer;
+let PT_SEARCH_RESULTS = [];
 function ptRechercherCompte(){
   clearTimeout(ptSearchTimer);
   const q = document.getElementById('pt-recherche-compte').value.trim();
@@ -7963,13 +7964,24 @@ function ptRechercherCompte(){
   ptSearchTimer = setTimeout(async () => {
     try{
       const r = await api('GET', '/search/comptes?q='+encodeURIComponent(q));
-      document.getElementById('pt-resultats-compte').innerHTML = (r.comptes||[]).map(c => `
-        <div style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick='ptSelectionnerCompte(${JSON.stringify(c)})'>
+      /* PT_SEARCH_RESULTS + sélection par index (2026-08-25) plutôt que d'injecter le compte
+         entier dans l'attribut onclick='...' : un nom contenant une apostrophe (ex. "CEGOM-RO
+         ... de l'Outre-Mer ...", signalé par l'utilisateur — clic sans effet) casse cet
+         attribut au premier ' rencontré, JSON.stringify() n'échappant pas les apostrophes
+         (les chaînes JSON utilisent des guillemets doubles, pas simples). Un index numérique
+         ne peut jamais contenir de caractère problématique, quel que soit le nom du compte. */
+      PT_SEARCH_RESULTS = r.comptes || [];
+      document.getElementById('pt-resultats-compte').innerHTML = PT_SEARCH_RESULTS.map((c,i) => `
+        <div style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="ptSelectionnerCompteParIndex(${i})">
           <span>${escH(c.nom)} <span style="color:var(--muted);font-size:11px;">(${escH(c.role||c.source||'')})</span></span>
           <span style="color:var(--orange);font-size:12px;font-weight:700;">Choisir</span>
         </div>`).join('') || '<div style="padding:8px;color:var(--muted);font-size:12px;">Aucun résultat.</div>';
     }catch(e){}
   }, 300);
+}
+function ptSelectionnerCompteParIndex(i){
+  const c = PT_SEARCH_RESULTS[i];
+  if(c) ptSelectionnerCompte(c);
 }
 function ptSelectionnerCompte(c){
   PT_COMPTE_SELECTIONNE = c;
@@ -8269,18 +8281,32 @@ async function renderAffiliation() {
   } catch (e) { el.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
 }
 
-document.getElementById('aff-search-input')?.addEventListener('input', async function() {
-  const q = this.value.trim();
+/* Suggestions "commençant par les contacts du compte" (demande utilisateur, 2026-08-25) :
+   prioriser_abonnes=1 fait remonter en premier les comptes déjà abonnés à cette initiative sur
+   le Réseau Pro (voir server/index.js, route /api/users/search). Champ vide → la liste des
+   abonnés s'affiche directement, sans attendre une frappe : "commencer par eux" au sens propre. */
+async function affChargerSuggestions(q) {
   const box = document.getElementById('aff-search-results');
-  if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
   try {
-    const { users } = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
+    const { users } = await api('GET', `/users/search?q=${encodeURIComponent(q)}&prioriser_abonnes=1`);
     const candidats = (users || []).filter(u => u.role === 'utilisateur');
     box.innerHTML = candidats.length
-      ? candidats.map(u => `<div style="padding:9px 12px;font-size:13px;cursor:pointer;" onmousedown="affOuvrirInvite(${u.id}, ${JSON.stringify(assoEsc((u.prenom?u.prenom+' ':'')+u.nom))})">${assoEsc((u.prenom?u.prenom+' ':'')+u.nom)} <span style="color:var(--muted);font-size:11.5px;">${assoEsc(u.email)}</span></div>`).join('')
-      : '<div style="padding:9px 12px;font-size:12.5px;color:var(--muted);">Aucun compte utilisateur trouvé.</div>';
+      ? candidats.map(u => `<div style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;" onmousedown="affOuvrirInvite(${u.id}, ${JSON.stringify(assoEsc((u.prenom?u.prenom+' ':'')+u.nom))})">
+          <span>${assoEsc((u.prenom?u.prenom+' ':'')+u.nom)} <span style="color:var(--muted);font-size:11.5px;">${assoEsc(u.email)}</span></span>
+          ${u.abonne ? '<span style="flex:none;font-size:10.5px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:99px;padding:1px 8px;">🔗 Contact</span>' : ''}
+        </div>`).join('')
+      : (q ? '<div style="padding:9px 12px;font-size:12.5px;color:var(--muted);">Aucun compte utilisateur trouvé.</div>'
+           : '<div style="padding:9px 12px;font-size:12.5px;color:var(--muted);">Aucun contact abonné pour l\'instant — tapez un nom pour chercher dans tout Diaspo\'Actif.</div>');
     box.style.display = 'block';
   } catch (e) { box.style.display = 'none'; }
+}
+document.getElementById('aff-search-input')?.addEventListener('input', function() {
+  affChargerSuggestions(this.value.trim());
+});
+document.getElementById('aff-search-input')?.addEventListener('focus', function() {
+  /* Ne recharge pas si une frappe a déjà rempli le champ (évite un aller-retour réseau inutile
+     au simple retour de focus après avoir déjà tapé). */
+  if (!this.value.trim()) affChargerSuggestions('');
 });
 document.getElementById('aff-search-input')?.addEventListener('blur', () => {
   setTimeout(() => { const box = document.getElementById('aff-search-results'); if (box) box.style.display = 'none'; }, 150);

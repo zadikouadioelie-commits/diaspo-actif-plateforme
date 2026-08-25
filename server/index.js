@@ -780,46 +780,6 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
 
-/* GET /api/auth/dev-login — connexion directe par lien, un clic, sans mot de passe.
-   RÉSERVÉE au développement local (2026-08-19) : demandé pour générer des liens de test
-   rapides (compte Utilisateur / compte Initiative) sans ressaisir de code à chaque fois.
-   Verrou dur : ne répond jamais si l'en-tête Host n'est pas localhost/127.0.0.1 — sur
-   Vercel en production, cet en-tête est toujours le vrai domaine, donc cette route y est
-   inerte par construction, pas seulement par convention. */
-route("GET", "/api/auth/dev-login", async (req, res, params) => {
-  const host = req.headers.host || "";
-  const isLocalHost = /^localhost(:\d+)?$/.test(host) || /^127\.0\.0\.1(:\d+)?$/.test(host);
-  if (!isLocalHost) return sendJSON(res, 403, { error: "Réservé au développement local." });
-
-  const url = new URL(req.url, `http://${host}`);
-  const email = SEC.normalizeEmail(url.searchParams.get("email") || "");
-  if (!email) return sendJSON(res, 400, { error: "Paramètre email requis." });
-
-  const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
-  if (!user) return sendJSON(res, 404, { error: "Compte introuvable en local." });
-
-  await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
-  const token = createSession(user.id);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: user.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
-  const sf = cookieSecureFlag(req);
-  // ?go=profil ouvre le profil public (profil.html?id=…) plutôt que le tableau de bord —
-  // pratique pour tester le rendu vu par un visiteur plutôt que la vue propriétaire.
-  let dest;
-  if (url.searchParams.get("go") === "profil") {
-    dest = `/profil.html?id=${user.id}`;
-  } else {
-    // Miroir de ROLE_DASHBOARD (assets/app.js:82) — dupliqué ici plutôt qu'importé, cette
-    // route dev-only n'a pas besoin de rester synchronisée avec les rôles ajoutés côté client.
-    const DEV_LOGIN_DASHBOARD = { utilisateur: "/dashboard-utilisateur.html", initiative: "/dashboard-initiative.html", administrateur: "/dashboard-administrateur.html", collectivite: "/dashboard-collectivite.html" };
-    dest = DEV_LOGIN_DASHBOARD[user.role] || "/index.html";
-  }
-  res.writeHead(302, {
-    Location: dest,
-    "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`],
-  });
-  res.end();
-});
-
 /* POST /api/auth/forgot-password — demande de réinitialisation */
 route("POST", "/api/auth/forgot-password", async (req, res, params, body) => {
   const { email } = body;
@@ -9704,27 +9664,71 @@ route("POST", "/api/mon-associe/documents/:id/transmettre", async (req, res, par
 });
 
 /* ---------- Recherche utilisateurs (pour ajout membres) ---------- */
+/* ?prioriser_abonnes=1 (utilisé par le module Affiliation, dashboard-initiative.html) : fait
+   remonter en premier les comptes déjà abonnés à l'initiative de l'appelant — "commencer par les
+   contacts du compte" (demande utilisateur, 2026-08-25) avant le reste de la plateforme.
+   Volontairement un paramètre à part, jamais le comportement par défaut : cette route est
+   partagée par 6 pages (messagerie, agenda, réunions, business plan, admin…) qui n'ont aucun
+   lien avec les abonnements Réseau Pro d'une initiative — changer l'ordre par défaut les aurait
+   toutes affectées sans raison. */
 route("GET", "/api/users/search", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const q = (query.q || "").trim();
-  if (q.length < 2) return sendJSON(res, 200, { users: [] });
   // Restriction métier (ex: une collectivité ne peut contacter que collectivité/administrateur) —
   // voir PEUT_CONTACTER/PEUT_INITIER. Exclut aussi les comptes anonymisés (suppression RGPD) et
   // les comptes de démonstration, invisibles partout ailleurs sur la plateforme publique.
   const allowed = PEUT_CONTACTER[user.role] || [];
   const placeholders = allowed.map(() => "?").join(",");
   if (!placeholders) return sendJSON(res, 200, { users: [] });
+
+  const prioriserAbonnes = query.prioriser_abonnes === "1" && user.role === "initiative";
+  let abonnesIds = new Set();
+  if (prioriserAbonnes) {
+    const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+    if (init) {
+      const rows = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(init.id);
+      abonnesIds = new Set(rows.map(r => Number(r.user_id)));
+    }
+  }
+
+  if (q.length < 2) {
+    /* Champ vide : sans priorisation, on renvoyait déjà une liste vide (comportement inchangé
+       pour les 5 autres pages). Avec priorisation, "commencer par les contacts" veut dire
+       littéralement commencer là — les abonnés servent de suggestion par défaut, avant même
+       toute frappe. */
+    if (!prioriserAbonnes || !abonnesIds.size) return sendJSON(res, 200, { users: [] });
+    const idsPlaceholders = [...abonnesIds].map(() => "?").join(",");
+    const rows = await db.prepare(`
+      SELECT id, nom, prenom, email, role, photo_url AS avatar_url
+      FROM users
+      WHERE id IN (${idsPlaceholders}) AND role IN (${placeholders})
+        AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
+      ORDER BY nom ASC LIMIT 10
+    `).all(...abonnesIds, ...allowed);
+    return sendJSON(res, 200, { users: rows.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url, abonne: true })) });
+  }
+
   const like = `%${q}%`;
+  /* Bassin de candidats élargi (30 au lieu de 10) quand on priorise : sans ORDER BY métier sur
+     la table users, l'ordre SQL brut est arbitraire — un contact abonné pourrait sinon se
+     retrouver hors des 10 premiers par pur hasard et ne jamais remonter en tête après le tri. */
   const rows = await db.prepare(`
     SELECT id, nom, prenom, email, role, photo_url AS avatar_url
     FROM users
     WHERE id != ? AND role IN (${placeholders})
       AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
       AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ? OR CAST(id AS TEXT) = ?)
-    LIMIT 10
+    LIMIT ${prioriserAbonnes ? 30 : 10}
   `).all(user.id, ...allowed, like, like, like, q);
-  sendJSON(res, 200, { users: rows.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url })) });
+
+  let resultats = rows.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url, abonne: abonnesIds.has(Number(u.id)) }));
+  if (prioriserAbonnes) {
+    /* Tri stable : les abonnés d'abord (dans leur ordre d'origine entre eux), puis le reste —
+       jamais un tri alphabétique qui perdrait la pertinence déjà apportée par le LIKE. */
+    resultats = [...resultats.filter(u => u.abonne), ...resultats.filter(u => !u.abonne)].slice(0, 10);
+  }
+  sendJSON(res, 200, { users: resultats });
 });
 
 /* ---------- Membres d'une initiative ---------- */
