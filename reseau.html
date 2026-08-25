@@ -735,6 +735,7 @@ async function voirFiche(id){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:.82rem;">
         ${i.annee_creation?`<div><b>Fondée en :</b> ${i.annee_creation}</div>`:''}
         ${i.taille_structure?`<div><b>Taille :</b> ${escH(i.taille_structure)}</div>`:''}
+        ${i.forme_juridique?`<div><b>Type de structure :</b> ${escH(i.forme_juridique)}</div>`:''}
         ${i.pays_immatriculation?`<div><b>Pays d'immatriculation :</b> ${escH(i.pays_immatriculation)}</div>`:''}
         <div><b>👍 Recommandations :</b> ${i.nb_recommandations||0}</div>
         <div><b>🔗 Membres du réseau :</b> ${i.nb_affiliations||0}</div>
@@ -1037,6 +1038,13 @@ async function loadProfilReseauTab(){
     const services=safeParse(moi.services,[]);
     const langues=safeParse(moi.langues,[]);
     const PAYS_IMMAT={FR:'France — SIRET',BE:'Belgique — BCE',CI:"Côte d'Ivoire — RCCM/IF",SN:'Sénégal — NINEA',CA:'Canada — Numéro d\'entreprise',MA:'Maroc — ICE',TN:'Tunisie — MF',CM:'Cameroun — RCCM',ML:'Mali — RCCM',BF:'Burkina Faso — IFU',MG:'Madagascar — NIF',GA:'Gabon — NIF',CG:'Congo — RCCM',CD:'RDC — ID Nat.',DE:'Allemagne — HRB',GB:'Royaume-Uni — Companies House',US:'États-Unis — EIN',CH:'Suisse — IDE'};
+    /* Types de structure (demande utilisateur, 2026-08-26) — reprend le champ forme_juridique
+       déjà présent en base (rempli en texte libre à l'inscription pour les initiatives déjà
+       créées, voir inscription.html #i-forme-juridique) : pas de nouvelle colonne, juste un
+       menu structuré ici plutôt qu'un texte libre. "Autre (préciser)" garde toujours la valeur
+       existante visible, même si elle ne correspond à aucune option de la liste — même pattern
+       que "Autre pays" pour PAYS_IMMAT ci-dessus. */
+    const FORMES_JURIDIQUES=['Association loi 1901','ONG','Fondation','SARL','SAS','SASU','EURL','SA','Société civile','Coopérative (SCOP/SCIC)','GIE','Entreprise individuelle / Auto-entrepreneur'];
     el.innerHTML=`
       <h2 style="margin:0 0 6px;">⚙️ Profil réseau de <strong>${escH(moi.nom)}</strong></h2>
       <p style="color:var(--muted);font-size:.85rem;margin:0 0 20px;">Ces informations sont visibles dans les annuaires des réseaux professionnels. Aucun téléphone ni e-mail n'est jamais affiché.</p>
@@ -1083,6 +1091,15 @@ async function loadProfilReseauTab(){
             <option value="">— Sélectionner —</option>
             ${['1 (auto-entrepreneur)','2-10 personnes','11-50 personnes','51-200 personnes','201-500 personnes','500+ personnes'].map(t=>`<option ${moi.taille_structure===t?'selected':''}>${t}</option>`).join('')}
           </select>
+        </div>
+        <div class="form-field">
+          <label>Type de structure</label>
+          <select id="pr-forme-juridique" class="input-field" style="width:100%;" onchange="document.getElementById('pr-forme-juridique-autre').style.display=this.value==='AUTRE'?'block':'none';">
+            <option value="">— Sélectionner —</option>
+            ${FORMES_JURIDIQUES.map(f=>`<option ${moi.forme_juridique===f?'selected':''}>${f}</option>`).join('')}
+            <option value="AUTRE" ${moi.forme_juridique&&!FORMES_JURIDIQUES.includes(moi.forme_juridique)?'selected':''}>Autre (préciser)</option>
+          </select>
+          <input id="pr-forme-juridique-autre" class="input-field" style="width:100%;margin-top:6px;display:${moi.forme_juridique&&!FORMES_JURIDIQUES.includes(moi.forme_juridique)?'block':'none'};" placeholder="Précisez le type de structure…" value="${moi.forme_juridique&&!FORMES_JURIDIQUES.includes(moi.forme_juridique)?escH(moi.forme_juridique):''}">
         </div>
       </div>
       <div class="form-field" style="margin-top:14px;">
@@ -1144,6 +1161,7 @@ async function sauvegarderProfil(){
       pays_immatriculation:document.getElementById('pr-pays-immat').value||null,
       annee_creation:parseInt(document.getElementById('pr-annee').value)||null,
       taille_structure:document.getElementById('pr-taille').value||null,
+      forme_juridique:(document.getElementById('pr-forme-juridique').value==='AUTRE'?document.getElementById('pr-forme-juridique-autre').value.trim():document.getElementById('pr-forme-juridique').value)||null,
       services:window._currentServices||[],
       langues:window._currentLangues||[],
       reseau_visible:document.getElementById('pr-visible').checked,

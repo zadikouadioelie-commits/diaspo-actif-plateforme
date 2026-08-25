@@ -30221,11 +30221,19 @@ ${jsonLd}
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
       const myInit = await getMyInit(me.id);
       if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative." });
-      const { numero_immatriculation, pays_immatriculation, taille_structure, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
+      /* forme_juridique (2026-08-26) : champ déjà existant sur initiatives (rempli en texte
+         libre à l'inscription pour les initiatives déjà créées), jusqu'ici totalement absent de
+         cette route -- impossible de le renseigner ni de le corriger depuis le profil Réseau
+         Pro. Même convention COALESCE que les autres champs de ce bloc (donc la même limite
+         partagée : un champ vidé côté formulaire ne remet pas la colonne à vide, comme pour
+         numero_immatriculation/taille_structure ci-dessus -- pas une régression introduite ici,
+         juste le comportement déjà établi de cette route). */
+      const { numero_immatriculation, pays_immatriculation, taille_structure, forme_juridique, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
       await db.prepare(`UPDATE initiatives SET
         numero_immatriculation=COALESCE(?,numero_immatriculation),
         pays_immatriculation=COALESCE(?,pays_immatriculation),
         taille_structure=COALESCE(?,taille_structure),
+        forme_juridique=COALESCE(?,forme_juridique),
         annee_creation=COALESCE(?,annee_creation),
         services=COALESCE(?,services),
         langues=COALESCE(?,langues),
@@ -30233,7 +30241,8 @@ ${jsonLd}
         accepte_messages=COALESCE(?,accepte_messages)
         WHERE id=?`).run(
         numero_immatriculation||null, pays_immatriculation||null,
-        taille_structure||null, annee_creation||null,
+        taille_structure||null, forme_juridique||null,
+        annee_creation||null,
         services!==undefined?JSON.stringify(services):null,
         langues!==undefined?JSON.stringify(langues):null,
         reseau_visible!==undefined?(reseau_visible?1:0):null,
