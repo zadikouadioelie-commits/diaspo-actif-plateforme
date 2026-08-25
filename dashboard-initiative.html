@@ -45,6 +45,13 @@
       <button class="sidebar-close" id="sidebar-close">×</button>
       <div class="brand" id="sidebar-brand">Mon espace initiative</div>
 
+      <!-- Ajouté (2026-08-25) : formations.html (recherche/achat, catalogue public — pas
+           réservé Premium) n'existait que dans .topbar .nav, masquée sur mobile — absente du
+           menu plein écran mobile (généré depuis ce tiroir), donc pas de moyen d'y accéder
+           sur téléphone. Distinct de "Diaspo Formation" juste en dessous (créer/gérer SES
+           PROPRES formations, réservé Premium) — ceci est le catalogue pour en ACHETER. -->
+      <a href="formations.html" data-aide="formations">🎓 Catalogue Formations</a>
+
       <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
       <a href="#paiement" data-section="paiement" data-aide="paiement_initiative">💳 Module paiement</a>
       <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
