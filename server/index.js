@@ -17499,6 +17499,19 @@ route("DELETE", "/api/cagnottes/:id", async (req, res, params) => {
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   if (!(await exigerPremium(user, res, "cagnottes"))) return;
   if (c.est_publiee) return sendJSON(res, 400, { error: "Seul un brouillon peut être supprimé — clôturez la cagnotte à la place." });
+  /* Un brouillon jamais publié n'a normalement aucune contribution, mais peut déjà avoir des
+     participants autorisés (cagnotte privée), co-organisateurs ou invitations envoyées — ces
+     lignes filles ont toutes une FK vers cagnottes(id) sans ON DELETE CASCADE (voir server/db.js),
+     donc le DELETE parent échouait en violation de contrainte (500 "Erreur serveur" générique,
+     signalé par l'utilisateur) dès qu'au moins une existait. On les retire d'abord. Un formulaire
+     d'inscription qui pointait vers cette cagnotte (don lié) est détaché, jamais supprimé — c'est
+     un objet indépendant qui doit survivre à la suppression du brouillon. */
+  await db.prepare("UPDATE formulaires_inscription SET cagnotte_id=NULL, don_active=0 WHERE cagnotte_id=?").run(params.id);
+  await db.prepare("DELETE FROM cagnotte_contributions WHERE cagnotte_id=?").run(params.id);
+  await db.prepare("DELETE FROM cagnotte_invitations WHERE cagnotte_id=?").run(params.id);
+  await db.prepare("DELETE FROM cagnotte_actualites WHERE cagnotte_id=?").run(params.id);
+  await db.prepare("DELETE FROM cagnotte_co_organisateurs WHERE cagnotte_id=?").run(params.id);
+  await db.prepare("DELETE FROM cagnotte_participants_autorises WHERE cagnotte_id=?").run(params.id);
   await db.prepare("DELETE FROM cagnottes WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
 });
