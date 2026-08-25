@@ -955,7 +955,7 @@ async function loadDemandesTab(){
       <div class="dem-info">
         <div class="dem-nom">${escH(d.nom)}</div>
         <div class="dem-sub">${escH(d.type||'—')} · ${escH(d.domaine||'—')} · 📍 ${escH([d.ville,d.pays].filter(Boolean).join(', ')||'—')}</div>
-        ${d.numero_immatriculation?`<div class="dem-sub" style="margin-top:2px;">N° ${escH(d.numero_immatriculation)}</div>`:''}
+        ${d.numero_immatriculation?`<div class="dem-sub" style="margin-top:2px;">N° d'immatriculation : ${escH(d.numero_immatriculation)}</div>`:''}
         ${d.message?`<div class="dem-msg">"${escH(d.message)}"</div>`:''}
         ${d.reponse&&d.statut!=='en_attente'?`<div style="font-size:.78rem;color:var(--muted);margin-top:6px;">Votre réponse : "${escH(d.reponse)}"</div>`:''}
       </div>
