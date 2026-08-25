@@ -33454,7 +33454,16 @@ route("POST", "/api/admin/accred/octroyer-direct", async (req, res, params, body
     if (!officielle?.owner_user_id) return sendJSON(res, 404, { error: "Propriétaire de l'initiative officielle introuvable." });
     userId = Number(officielle.owner_user_id);
   }
-  if (!userId) return sendJSON(res, 400, { error: "user_id ou target:'officielle' requis." });
+  /* body.email (2026-08-25) : deuxième repli pratique, pour octroyer sans connaître/deviner
+     l'id numérique — utilisé notamment pour les comptes officiels secondaires
+     (contact@diaspoactif.com, diaspo.actif@gmail.com), qui ne passent pas par
+     getInitiativeOfficielleId() (ce n'est pas *l'*initiative officielle unique). */
+  if (!userId && body.email) {
+    const parEmail = await db.prepare("SELECT id FROM users WHERE LOWER(email)=LOWER(?)").get(String(body.email).trim());
+    if (!parEmail) return sendJSON(res, 404, { error: "Aucun compte avec cet email." });
+    userId = Number(parEmail.id);
+  }
+  if (!userId) return sendJSON(res, 400, { error: "user_id, target:'officielle' ou email requis." });
   const def = await getAccredDef(body.type);
   if (!def) return sendJSON(res, 404, { error: "Type d'accréditation introuvable." });
   const cible = await db.prepare("SELECT id, nom, email FROM users WHERE id=?").get(userId);
