@@ -28833,6 +28833,14 @@ ${jsonLd}
           aide: `${nbPosts} publication(s), ${nbFollowers} abonné(s), ${nbCollabs} collaboration(s).`,
           action: ptsActivite >= 12 ? null : { texte:'Publier sur le fil', href:'fil-actualite.html' } },
 
+        /* Ajouté le 2026-08-26 (demande explicite) : réutilise le même témoignage que la
+           proposition périodique (voir POST /api/temoignage, initTemoignageWidget dans
+           assets/app.js) — aucun nouveau formulaire, juste ce critère qui en récompense
+           l'envoi. temoignage_statut vient de la ligne users déjà chargée ci-dessus. */
+        { cle:'temoignage', icon:'💬', label:'Témoignage partagé', pts: user.temoignage_statut === 'fourni' ? 5 : 0, max:5, applicable:true,
+          aide: user.temoignage_statut === 'fourni' ? 'Merci pour votre témoignage !' : 'Partagez votre expérience de la plateforme.',
+          action: user.temoignage_statut === 'fourni' ? null : { texte:'Partager mon témoignage', href:'index.html#temoignage' } },
+
         { cle:'rencontre', icon:'🤝', label:'Rencontre Diaspo’Actif', pts: rencontreFaite ? 10 : 0, max:10, applicable:true,
           aide: AIDE_RENCONTRE[rencontre?.statut] || "Échangez avec un agent Diaspo’Actif, en personne ou en visioconférence.",
           statutRencontre: rencontre?.statut || null,
@@ -31608,7 +31616,12 @@ ${jsonLd}
       `).run(me.id, note || null, description.trim(), JSON.stringify(fonctionnalites || []),
         points_positifs || null, suggestions || null, type_usage || 'personnel',
         consentement_affichage ? 1 : 0, nomFinal, me.pays || null, me.role, score);
-      await db.prepare("UPDATE users SET temoignage_statut='fourni', updated_at=datetime('now') WHERE id=?").run(me.id);
+      /* users n'a pas de colonne updated_at (seulement created_at, voir server/db.js) — ce
+         UPDATE la référençait quand même et échouait silencieusement à chaque envoi (trouvé
+         le 2026-08-26 en testant en conditions réelles) : temoignage_statut ne passait donc
+         JAMAIS à 'fourni', et la relance périodique (voir initTemoignageWidget, assets/app.js)
+         ne s'arrêtait jamais non plus, même après un témoignage réellement envoyé. */
+      await db.prepare("UPDATE users SET temoignage_statut='fourni' WHERE id=?").run(me.id);
       return sendJSON(res, 201, { ok: true, message: "Merci pour votre témoignage ! Il sera affiché après validation." });
     }
 

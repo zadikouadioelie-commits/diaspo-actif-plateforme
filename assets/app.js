@@ -4258,11 +4258,211 @@ async function renderMobileBottomNavAuto() {
   setTimeout(majFleches, 300);
 }
 
+/* ---------- Widget témoignage — proposition périodique, site-wide (2026-08-26) ----------
+   Anciennement câblé seulement dans index.html (modal + déclenchement) : un compte qui ne
+   repassait jamais par l'accueil après connexion ne voyait donc jamais cette proposition —
+   demande explicite de l'utilisateur : "propose de temps en temps d'écrire un commentaire".
+   Centralisé ici pour tourner sur TOUTE page connectée (app.js y est déjà chargé partout),
+   avec exactement la même règle d'arrêt définitif une fois le témoignage envoyé OU
+   explicitement refusé (temoignage_statut) — "une fois fait, ne le propose plus". Le
+   carrousel public des témoignages ("Ils ont rejoint Diaspo'Actif") reste propre à
+   index.html : simple affichage de contenu déjà validé, sans rapport avec cette
+   proposition personnelle, volontairement laissé où il est. */
+function initTemoignageWidget(user) {
+  if (!user) return;
+  // Ouverture forcée : bouton "Partager mon témoignage" de l'indice de fiabilité
+  // (dashboard-*.html), qui pointe vers index.html#temoignage — un clic délibéré doit
+  // ignorer les règles de la proposition passive (nb de connexions, délai de 7 jours),
+  // mais pas rouvrir un témoignage déjà envoyé (le bouton n'existe alors même plus).
+  const forcerOuverture = location.hash === "#temoignage";
+  if (forcerOuverture) {
+    if (user.temoignage_statut === "fourni") return;
+  } else {
+    if (user.temoignage_statut === "fourni" || user.temoignage_statut === "refuse") return;
+    if ((user.nb_connexions || 0) < 5) return;
+    if (user.temoignage_derniere_demande) {
+      const diffJours = (Date.now() - new Date(user.temoignage_derniere_demande).getTime()) / 86400000;
+      if (diffJours < 7) return;
+    }
+  }
+  if (document.getElementById("temoignage-modal-overlay")) return; // déjà injecté sur cette page
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .tm-chip { display:inline-flex;align-items:center;gap:5px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all .15s; }
+    .tm-chip:has(input:checked) { background:#eff6ff;border-color:#3b82f6;color:#1d4ed8; }
+    .tm-chip input { display:none; }
+  `;
+  document.head.appendChild(style);
+
+  document.body.insertAdjacentHTML("beforeend", `
+    <div id="temoignage-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:#fff;border-radius:20px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.2);">
+        <div style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);padding:28px 28px 20px;border-radius:20px 20px 0 0;">
+          <div style="font-size:32px;margin-bottom:8px;">💬</div>
+          <h2 style="margin:0 0 6px;font-size:20px;font-weight:900;color:#fff;">Partagez votre expérience</h2>
+          <p style="margin:0;font-size:13px;color:rgba(255,255,255,.85);">Votre avis aide la communauté à grandir. 2 minutes suffisent !</p>
+        </div>
+        <div style="padding:24px 28px;">
+          <form id="temoignage-form">
+            <div style="margin-bottom:18px;">
+              <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">Note globale (optionnelle)</label>
+              <div id="star-rating" style="display:flex;gap:6px;">
+                <button type="button" class="star-btn" data-v="1" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+                <button type="button" class="star-btn" data-v="2" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+                <button type="button" class="star-btn" data-v="3" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+                <button type="button" class="star-btn" data-v="4" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+                <button type="button" class="star-btn" data-v="5" style="font-size:28px;background:none;border:none;cursor:pointer;padding:0;opacity:.4;">★</button>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Décrivez votre utilisation <span style="color:#ef4444;">*</span></label>
+              <textarea id="tm-description" rows="3" maxlength="500" required placeholder="Comment utilisez-vous Diaspo'Actif ? Qu'est-ce que ça vous a apporté ?" style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+              <div style="text-align:right;font-size:11px;color:#94a3b8;margin-top:3px;"><span id="tm-desc-count">0</span>/500</div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">Fonctionnalités les plus utilisées</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;" id="fonct-chips">
+                <label class="tm-chip"><input type="checkbox" value="Annuaire"> Annuaire</label>
+                <label class="tm-chip"><input type="checkbox" value="Deals"> Deals</label>
+                <label class="tm-chip"><input type="checkbox" value="Messagerie"> Messagerie</label>
+                <label class="tm-chip"><input type="checkbox" value="Événements"> Événements</label>
+                <label class="tm-chip"><input type="checkbox" value="Formations"> Formations</label>
+                <label class="tm-chip"><input type="checkbox" value="Fil d'actualité"> Fil d'actualité</label>
+                <label class="tm-chip"><input type="checkbox" value="Initiatives"> Initiatives</label>
+                <label class="tm-chip"><input type="checkbox" value="O-Z (assistant)"> O-Z (assistant)</label>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Points positifs</label>
+              <textarea id="tm-positifs" rows="2" maxlength="300" placeholder="Ce que vous appréciez le plus..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Suggestions d'amélioration</label>
+              <textarea id="tm-suggestions" rows="2" maxlength="300" placeholder="Ce que vous aimeriez voir évoluer..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:8px;">Mon usage est plutôt</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <label class="tm-chip"><input type="radio" name="type_usage" value="personnel" checked> Personnel</label>
+                <label class="tm-chip"><input type="radio" name="type_usage" value="professionnel"> Professionnel</label>
+                <label class="tm-chip"><input type="radio" name="type_usage" value="organisation"> Organisation/Association</label>
+                <label class="tm-chip"><input type="radio" name="type_usage" value="collectivite"> Collectivité</label>
+              </div>
+            </div>
+            <div style="margin-bottom:20px;padding:12px;background:#f8fafc;border-radius:10px;">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="tm-consent" style="margin-top:3px;flex-shrink:0;">
+                <div>
+                  <span style="font-size:13px;font-weight:600;color:#374151;">J'accepte que mon témoignage soit affiché publiquement</span>
+                  <div style="font-size:11px;color:#64748b;margin-top:2px;">Votre nom sera affiché tel que défini ci-dessous. Vous pouvez retirer ce consentement à tout moment.</div>
+                </div>
+              </label>
+              <div id="tm-nom-block" style="margin-top:10px;display:none;">
+                <input type="text" id="tm-nom" maxlength="50" placeholder="Nom affiché (ex: Jean K., Association AITO…)" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 12px;font-size:13px;box-sizing:border-box;">
+              </div>
+            </div>
+            <div id="tm-error" style="color:#ef4444;font-size:12px;margin-bottom:12px;display:none;"></div>
+            <div style="display:flex;gap:10px;">
+              <button type="submit" id="tm-submit" style="flex:1;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Envoyer mon témoignage</button>
+              <button type="button" id="tm-later" style="background:#f1f5f9;color:#64748b;border:none;border-radius:10px;padding:13px 18px;font-size:13px;font-weight:600;cursor:pointer;">Plus tard</button>
+              <button type="button" id="tm-never" style="background:none;color:#94a3b8;border:none;font-size:12px;cursor:pointer;white-space:nowrap;text-decoration:underline;">Ne plus demander</button>
+            </div>
+          </form>
+          <div id="tm-success" style="display:none;text-align:center;padding:20px 0;">
+            <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+            <h3 style="font-size:18px;font-weight:800;color:#15803d;margin:0 0 8px;">Merci pour votre témoignage !</h3>
+            <p style="font-size:14px;color:#64748b;">Il sera affiché sur la plateforme après validation par notre équipe.</p>
+            <button onclick="closeTemoignageModal()" style="margin-top:16px;background:#1e3a8a;color:#fff;border:none;border-radius:10px;padding:11px 28px;font-size:14px;font-weight:700;cursor:pointer;">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  let _starNote = 0;
+  const overlay = document.getElementById("temoignage-modal-overlay");
+  // Référencée par l'attribut onclick="" inline du bouton "Fermer" ci-dessus — doit donc
+  // rester globale, comme dans l'ancienne version portée par index.html.
+  window.closeTemoignageModal = function closeTemoignageModal() { overlay.style.display = "none"; };
+
+  document.querySelectorAll(".star-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _starNote = parseInt(btn.dataset.v);
+      document.querySelectorAll(".star-btn").forEach((b, i) => {
+        b.style.opacity = i < _starNote ? "1" : ".3";
+        b.style.color = i < _starNote ? "#f59e0b" : "#94a3b8";
+      });
+    });
+  });
+
+  document.getElementById("tm-description").addEventListener("input", function () {
+    document.getElementById("tm-desc-count").textContent = this.value.length;
+  });
+
+  document.getElementById("tm-consent").addEventListener("change", function () {
+    document.getElementById("tm-nom-block").style.display = this.checked ? "block" : "none";
+  });
+
+  document.getElementById("temoignage-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById("tm-submit");
+    const err = document.getElementById("tm-error");
+    err.style.display = "none";
+    const foncts = [...document.querySelectorAll("#fonct-chips input:checked")].map(c => c.value);
+    const payload = {
+      note: _starNote || null,
+      description: document.getElementById("tm-description").value.trim(),
+      fonctionnalites: foncts,
+      points_positifs: document.getElementById("tm-positifs").value.trim() || null,
+      suggestions: document.getElementById("tm-suggestions").value.trim() || null,
+      type_usage: document.querySelector('input[name="type_usage"]:checked')?.value || "personnel",
+      consentement_affichage: document.getElementById("tm-consent").checked ? 1 : 0,
+      nom_affichage: document.getElementById("tm-nom").value.trim() || null,
+    };
+    btn.disabled = true; btn.textContent = "Envoi…";
+    try {
+      await api("POST", "/temoignage", payload);
+      document.getElementById("temoignage-form").style.display = "none";
+      document.getElementById("tm-success").style.display = "block";
+    } catch (e2) {
+      err.textContent = e2?.data?.error || e2.message || "Erreur.";
+      err.style.display = "block";
+      btn.disabled = false; btn.textContent = "Envoyer mon témoignage";
+    }
+  });
+
+  document.getElementById("tm-later").addEventListener("click", async () => {
+    try { await api("POST", "/temoignage/ignorer", { refus_definitif: false }); } catch (e3) {}
+    window.closeTemoignageModal();
+  });
+
+  document.getElementById("tm-never").addEventListener("click", async () => {
+    try { await api("POST", "/temoignage/ignorer", { refus_definitif: true }); } catch (e3) {}
+    window.closeTemoignageModal();
+  });
+
+  // Délai de 3 secondes avant affichage — identique au comportement d'origine (index.html),
+  // pour ne pas interrompre le chargement de la page ; quasi immédiat pour une ouverture
+  // forcée (clic explicite), où l'attente n'a plus lieu d'être.
+  setTimeout(() => {
+    overlay.style.display = "flex";
+    const nomInput = document.getElementById("tm-nom");
+    if (nomInput) nomInput.placeholder = user.nom || "";
+    // Nettoie le hash pour ne pas rouvrir le modal à un simple rechargement de page.
+    if (forcerOuverture) history.replaceState(null, "", location.pathname + location.search);
+  }, forcerOuverture ? 300 : 3000);
+}
+
 document.addEventListener("DOMContentLoaded", async ()=>{
   // Doit être construite AVANT initSidebarMobile() juste en dessous : ce dernier cherche
   // #mobile-nav-menu-toggle dans le DOM pour y attacher son écouteur de clic — s'il
   // s'exécutait avant que cette barre existe, le bouton "Menu" resterait inerte.
   await renderMobileBottomNavAuto();
+
+  // CURRENT_USER vient d'être renseigné par renderMobileBottomNavAuto() ci-dessus (via
+  // fetchCurrentUser()) — pas de second appel réseau nécessaire pour ce widget.
+  try { initTemoignageWidget(CURRENT_USER); } catch (e) { console.error("widget témoignage", e); }
 
   // ── Sidebar repliable (tous formats) : bouton rond fixe + préférence mémorisée ──
   // Placé EN PREMIER et isolé : c'est le seul moyen de naviguer sur certaines pages
