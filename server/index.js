@@ -626,6 +626,19 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   } catch (e) { console.error('[fusion-cagnotte-signup]', e.message); }
 
+  /* Abonnement automatique au compte officiel Diaspo'Actif (2026-08-25, demande explicite) :
+     tout nouveau compte suit dès son inscription l'initiative officielle (résolue via
+     getInitiativeOfficielleId(), déjà utilisée ailleurs pour le même compte — abonnement
+     Premium à vie, etc.). Insertion dans la table 'abonnements' déjà utilisée par le
+     bouton "Suivre" normal (user_id, initiative_id) — même mécanisme, juste automatique ici.
+     Best-effort : une erreur ici ne doit jamais faire échouer l'inscription elle-même. */
+  try {
+    const officielleId = await getInitiativeOfficielleId();
+    if (officielleId) {
+      await db.prepare(`INSERT INTO abonnements (user_id, initiative_id) VALUES (?,?) ON CONFLICT(user_id,initiative_id) DO NOTHING`).run(id, officielleId);
+    }
+  } catch (e) { console.error('[abonnement-officiel-signup]', e.message); }
+
   { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
 });
 
@@ -33495,6 +33508,28 @@ route("POST", "/api/admin/accred/octroyer-direct", async (req, res, params, body
     `Félicitations ! Votre accréditation « ${def.emoji || ''} ${def.label || ''} » vient d'être accordée${body.date_expiration ? '' : ' de façon permanente'}.`,
     { accred_type: def.type });
   sendJSON(res, 200, { ok: true, user: cible.nom, type: def.type, date_expiration: body.date_expiration || null });
+});
+
+/* POST /api/admin/abonnements/backfill-officiel — abonne tous les comptes existants au
+   compte officiel Diaspo'Actif (2026-08-25). Rattrapage ponctuel : les nouvelles inscriptions
+   sont déjà abonnées automatiquement (voir POST /api/auth/signup) — cette route couvre les
+   comptes créés AVANT ce changement. Exclut le titulaire de l'initiative officielle
+   lui-même (s'abonner à sa propre initiative n'aurait aucun sens) et les comptes déjà
+   abonnés (ON CONFLICT DO NOTHING, idempotent — peut être rejouée sans risque de doublon). */
+route("POST", "/api/admin/abonnements/backfill-officiel", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  const officielleId = await getInitiativeOfficielleId();
+  if (!officielleId) return sendJSON(res, 404, { error: "Initiative officielle introuvable." });
+  const officielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+  const avant = await db.prepare("SELECT COUNT(*) c FROM abonnements WHERE initiative_id=?").get(officielleId);
+  await db.prepare(
+    `INSERT INTO abonnements (user_id, initiative_id)
+     SELECT id, ? FROM users WHERE id != ?
+     ON CONFLICT(user_id,initiative_id) DO NOTHING`
+  ).run(officielleId, officielle?.owner_user_id || 0);
+  const apres = await db.prepare("SELECT COUNT(*) c FROM abonnements WHERE initiative_id=?").get(officielleId);
+  sendJSON(res, 200, { ok: true, abonnes_avant: avant.c, abonnes_apres: apres.c, ajoutes: apres.c - avant.c });
 });
 
 /* GET /api/admin/accred/users — liste des accréditations attribuées */
