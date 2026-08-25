@@ -631,11 +631,21 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
      getInitiativeOfficielleId(), déjà utilisée ailleurs pour le même compte — abonnement
      Premium à vie, etc.). Insertion dans la table 'abonnements' déjà utilisée par le
      bouton "Suivre" normal (user_id, initiative_id) — même mécanisme, juste automatique ici.
-     Best-effort : une erreur ici ne doit jamais faire échouer l'inscription elle-même. */
+     Best-effort : une erreur ici ne doit jamais faire échouer l'inscription elle-même.
+     CORRECTIF 2026-08-26 : la table 'abonnements' alimente le compteur "Suivre" de la fiche
+     publique d'une initiative, mais PAS l'onglet "Abonnés" du module Réseau Pro (reseau.html)
+     — celui-ci lit 'user_follows' (follower_id/followed_id, comptes personnels entre eux), un
+     mécanisme totalement séparé (voir GET /api/profil/:id/abonnes). Sans ce second insert, le
+     compte officiel restait à "Abonnés (1)" dans ce module précis malgré 91+ lignes déjà
+     présentes dans 'abonnements' — signalé par l'utilisateur en consultant cet onglet. */
   try {
     const officielleId = await getInitiativeOfficielleId();
     if (officielleId) {
       await db.prepare(`INSERT INTO abonnements (user_id, initiative_id) VALUES (?,?) ON CONFLICT(user_id,initiative_id) DO NOTHING`).run(id, officielleId);
+      const officielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+      if (officielle?.owner_user_id && Number(officielle.owner_user_id) !== Number(id)) {
+        await db.prepare(`INSERT INTO user_follows (follower_id, followed_id) VALUES (?,?) ON CONFLICT(follower_id,followed_id) DO NOTHING`).run(id, officielle.owner_user_id);
+      }
     }
   } catch (e) { console.error('[abonnement-officiel-signup]', e.message); }
 
@@ -33735,21 +33745,41 @@ route("POST", "/api/admin/accred/octroyer-direct", async (req, res, params, body
    sont déjà abonnées automatiquement (voir POST /api/auth/signup) — cette route couvre les
    comptes créés AVANT ce changement. Exclut le titulaire de l'initiative officielle
    lui-même (s'abonner à sa propre initiative n'aurait aucun sens) et les comptes déjà
-   abonnés (ON CONFLICT DO NOTHING, idempotent — peut être rejouée sans risque de doublon). */
+   abonnés (ON CONFLICT DO NOTHING, idempotent — peut être rejouée sans risque de doublon).
+   CORRECTIF 2026-08-26 : rattrape aussi 'user_follows' (voir le même correctif dans
+   POST /api/auth/signup) — le premier passage du 2026-08-25 n'avait alimenté que
+   'abonnements', laissant l'onglet "Abonnés" du module Réseau Pro à 1 seul compte malgré
+   91 lignes déjà en base côté 'abonnements'. */
 route("POST", "/api/admin/abonnements/backfill-officiel", async (req, res) => {
   const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
   const officielleId = await getInitiativeOfficielleId();
   if (!officielleId) return sendJSON(res, 404, { error: "Initiative officielle introuvable." });
   const officielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+  const ownerUserId = officielle?.owner_user_id || 0;
   const avant = await db.prepare("SELECT COUNT(*) c FROM abonnements WHERE initiative_id=?").get(officielleId);
   await db.prepare(
     `INSERT INTO abonnements (user_id, initiative_id)
      SELECT id, ? FROM users WHERE id != ?
      ON CONFLICT(user_id,initiative_id) DO NOTHING`
-  ).run(officielleId, officielle?.owner_user_id || 0);
+  ).run(officielleId, ownerUserId);
   const apres = await db.prepare("SELECT COUNT(*) c FROM abonnements WHERE initiative_id=?").get(officielleId);
-  sendJSON(res, 200, { ok: true, abonnes_avant: avant.c, abonnes_apres: apres.c, ajoutes: apres.c - avant.c });
+
+  const avantFollows = await db.prepare("SELECT COUNT(*) c FROM user_follows WHERE followed_id=?").get(ownerUserId);
+  if (ownerUserId) {
+    await db.prepare(
+      `INSERT INTO user_follows (follower_id, followed_id)
+       SELECT id, ? FROM users WHERE id != ?
+       ON CONFLICT(follower_id,followed_id) DO NOTHING`
+    ).run(ownerUserId, ownerUserId);
+  }
+  const apresFollows = await db.prepare("SELECT COUNT(*) c FROM user_follows WHERE followed_id=?").get(ownerUserId);
+
+  sendJSON(res, 200, {
+    ok: true,
+    abonnes_avant: avant.c, abonnes_apres: apres.c, ajoutes: apres.c - avant.c,
+    follows_avant: avantFollows.c, follows_apres: apresFollows.c, follows_ajoutes: apresFollows.c - avantFollows.c
+  });
 });
 
 /* GET /api/admin/accred/users — liste des accréditations attribuées */
