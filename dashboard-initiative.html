@@ -3121,7 +3121,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (vo) content.appendChild(vo); }
 
   /* ══ ROUTER DE SECTIONS ══ */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','formulaires-inscription','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue'];
+  /* 'formations-gestion' ajouté (2026-08-25) : absent depuis la construction du module
+     "Diaspo Formation" (carte #formations-gestion, entièrement fonctionnelle par ailleurs —
+     stats, onglets, liste, formulaire de création) — cette liste piloté par
+     initShowSection() ne le connaissait pas, donc son display:none de départ n'était jamais
+     levé, quel que soit le statut Premium. Symptôme signalé : clic sur "Diaspo Formation"
+     sans effet, restait sur les cartes "Paiements boutique"/"Vérification organisation"
+     (visibles par ailleurs en permanence, voir commentaire plus bas dans cette fonction). */
+  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','formulaires-inscription','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue','formations-gestion'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -3132,10 +3139,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
        module actif (2026-08-09) — voir le commentaire juste avant leur définition dans le
        HTML. Signalé le 2026-08-19 (capture à l'appui) : ça n'a aucun sens dans "Votes
        sécurisés", qui n'a aucun rapport avec des paiements boutique ou une vérification
-       d'organisation — seule exception à la règle "toujours visibles", uniquement pour ce
-       module précis. */
+       d'organisation — première exception à la règle "toujours visibles". "Diaspo Formation"
+       ajouté à cette même exception le 2026-08-25 (demande explicite : le module doit
+       s'ouvrir sur la création/gestion de formations, pas sur ces deux cartes sans rapport
+       — même raisonnement exact que pour Votes sécurisés). */
     { const pm = document.getElementById('paiement-marketplace'), vo = document.getElementById('verification-organisation');
-      const cacher = name === 'votes-init';
+      const cacher = name === 'votes-init' || name === 'formations-gestion';
       if (pm) pm.style.display = cacher ? 'none' : '';
       if (vo) vo.style.display = cacher ? 'none' : ''; }
     document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
