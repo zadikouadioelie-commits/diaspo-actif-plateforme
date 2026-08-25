@@ -229,6 +229,14 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
 <script>
+  /* Préremplissage depuis un lien externe (ex. e-mail de confirmation de participation à une
+     cagnotte proposant de se connecter) — jamais de mot de passe, juste l'e-mail, un simple
+     confort. */
+  (() => {
+    const email = new URLSearchParams(location.search).get("email");
+    if (email) { const champ = document.getElementById("email"); if (champ) champ.value = email; }
+  })();
+
   function fillDemo(email, password) {
     document.getElementById("email").value = email;
     document.getElementById("password").value = password || "Demo1234!";

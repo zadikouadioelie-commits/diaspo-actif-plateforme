@@ -751,7 +751,73 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     await AdminJunior.journaliserJunior(db, { juniorUserId: user.id, acteurId: user.id, acteurNom: fresh.nom, action: 'connexion_reussie' });
   }
   SEC.logSecurity("login_success", { ip, email, uid: Number(user.id), role: user.role });
+
+  /* Proposition de fusion à la CONNEXION (module "Invitation externe", règle #5 du cahier des
+     charges) — pas seulement à l'inscription : une personne ayant DÉJÀ un compte peut très bien
+     avoir contribué en tant qu'invité sans se connecter (le paiement invité reste toujours
+     possible, y compris pour un e-mail qui a un compte). Best-effort, jamais bloquant. Dédoublonné
+     par un LIKE sur data_json : sans ça, la même proposition réapparaîtrait à CHAQUE connexion
+     tant que la contribution n'est pas rattachée (contrairement à l'inscription, qui n'arrive
+     qu'une fois). */
+  try {
+    const contribsExternes = await db.prepare(`
+      SELECT co.id, co.cagnotte_id, c.titre AS cagnotte_titre FROM cagnotte_contributions co
+      JOIN cagnottes c ON c.id = co.cagnotte_id
+      WHERE co.user_id IS NULL AND co.statut='paye' AND LOWER(co.email) = ?
+    `).all(email);
+    for (const f of contribsExternes) {
+      const dejaPropose = await db.prepare(
+        `SELECT id FROM notifications WHERE user_id=? AND type='cagnotte_fusion_proposee' AND data_json LIKE ?`
+      ).get(user.id, `%"contribution_id":${f.id}%`);
+      if (!dejaPropose) {
+        creerNotif(user.id, "cagnotte_fusion_proposee", "Contribution trouvée 🔗",
+          `Une contribution existe déjà pour votre adresse e-mail sur la cagnotte « ${f.cagnotte_titre} ». Voulez-vous la rattacher à votre compte ?`,
+          { contribution_id: f.id, cagnotte_id: f.cagnotte_id, cagnotte_titre: f.cagnotte_titre });
+      }
+    }
+  } catch (e) { console.error('[fusion-cagnotte-login]', e.message); }
+
   { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
+});
+
+/* GET /api/auth/dev-login — connexion directe par lien, un clic, sans mot de passe.
+   RÉSERVÉE au développement local (2026-08-19) : demandé pour générer des liens de test
+   rapides (compte Utilisateur / compte Initiative) sans ressaisir de code à chaque fois.
+   Verrou dur : ne répond jamais si l'en-tête Host n'est pas localhost/127.0.0.1 — sur
+   Vercel en production, cet en-tête est toujours le vrai domaine, donc cette route y est
+   inerte par construction, pas seulement par convention. */
+route("GET", "/api/auth/dev-login", async (req, res, params) => {
+  const host = req.headers.host || "";
+  const isLocalHost = /^localhost(:\d+)?$/.test(host) || /^127\.0\.0\.1(:\d+)?$/.test(host);
+  if (!isLocalHost) return sendJSON(res, 403, { error: "Réservé au développement local." });
+
+  const url = new URL(req.url, `http://${host}`);
+  const email = SEC.normalizeEmail(url.searchParams.get("email") || "");
+  if (!email) return sendJSON(res, 400, { error: "Paramètre email requis." });
+
+  const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = ?").get(email);
+  if (!user) return sendJSON(res, 404, { error: "Compte introuvable en local." });
+
+  await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
+  const token = createSession(user.id);
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: user.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const sf = cookieSecureFlag(req);
+  // ?go=profil ouvre le profil public (profil.html?id=…) plutôt que le tableau de bord —
+  // pratique pour tester le rendu vu par un visiteur plutôt que la vue propriétaire.
+  let dest;
+  if (url.searchParams.get("go") === "profil") {
+    dest = `/profil.html?id=${user.id}`;
+  } else {
+    // Miroir de ROLE_DASHBOARD (assets/app.js:82) — dupliqué ici plutôt qu'importé, cette
+    // route dev-only n'a pas besoin de rester synchronisée avec les rôles ajoutés côté client.
+    const DEV_LOGIN_DASHBOARD = { utilisateur: "/dashboard-utilisateur.html", initiative: "/dashboard-initiative.html", administrateur: "/dashboard-administrateur.html", collectivite: "/dashboard-collectivite.html" };
+    dest = DEV_LOGIN_DASHBOARD[user.role] || "/index.html";
+  }
+  res.writeHead(302, {
+    Location: dest,
+    "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`],
+  });
+  res.end();
 });
 
 /* POST /api/auth/forgot-password — demande de réinitialisation */
@@ -15281,13 +15347,29 @@ async function handleStripeWebhook(req, res) {
             }
           }
           /* Confirmation + remerciement au contributeur lui-même (cahier des charges point 4,
-             volet "participants") — canal in-app uniquement pour cet increment, l'e-mail de
-             remerciement personnalisé relève de la "communication" (Phase 2 point 8, hors scope).
-             Contributeur invité (user_id NULL) : pas de boîte de notifications in-app à
-             remplir — le remerciement se limite à la page de confirmation Stripe. */
-          if (contrib.user_id) creerNotif(contrib.user_id, "cagnotte_confirmation", "Merci pour votre contribution 🙏",
-            `Votre contribution de ${contrib.montant} ${contrib.devise} à « ${c.titre} » est confirmée. Merci pour votre soutien !`,
-            { cagnotte_id: contrib.cagnotte_id });
+             volet "participants"). Compte existant : notification in-app (a une boîte pour la
+             lire). Contributeur invité (user_id NULL) : aucune boîte de notifications in-app à
+             consulter — un e-mail est donc la SEULE trace écrite qu'il reçoit de sa
+             participation (module "Invitation externe", point 4/9 du cahier des charges). */
+          if (contrib.user_id) {
+            creerNotif(contrib.user_id, "cagnotte_confirmation", "Merci pour votre contribution 🙏",
+              `Votre contribution de ${contrib.montant} ${contrib.devise} à « ${c.titre} » est confirmée. Merci pour votre soutien !`,
+              { cagnotte_id: contrib.cagnotte_id });
+          } else if (contrib.email) {
+            const compteExistant = !!(await db.prepare("SELECT id FROM users WHERE lower(email)=? AND nom != 'Compte supprimé'").get(contrib.email.toLowerCase()));
+            require("./mailer").emailConfirmationParticipationCagnotte({
+              email: contrib.email, prenom: contrib.prenom, cagnotteTitre: c.titre,
+              montant: contrib.montant, devise: contrib.devise, cagnotteSlug: c.slug, compteExistant,
+            }).catch(e => console.error("[cagnotte-webhook] email confirmation:", e.message));
+          }
+          /* Invitation par e-mail (module "Invitation externe", point 8) : si cette contribution
+             provient d'un lien d'invitation, on la marque honorée — jamais avant confirmation du
+             paiement (une invitation "ouverte" mais jamais payée doit rester relançable). */
+          const invitationId = event.data.object.metadata?.diaspoactif_cagnotte_invitation_id;
+          if (invitationId) {
+            await db.prepare("UPDATE cagnotte_invitations SET statut='participee', contribution_id=? WHERE id=? AND statut != 'participee'")
+              .run(contribId, Number(invitationId));
+          }
         }
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
@@ -16320,6 +16402,23 @@ route("GET", "/api/cagnottes/public/:slug/contributeurs", async (req, res, param
     contributeurs: rows.map(r => ({ ...r, montant: c.afficher_montants ? r.montant : null })),
     afficher_montants: !!c.afficher_montants,
   });
+});
+
+/* GET /api/cagnottes/verifier-email — DOIT être enregistrée AVANT /api/cagnottes/:id : même
+   nombre de segments d'URL, "verifier-email" serait sinon capturé comme un :id par la première
+   route qui matche (même piège déjà documenté ci-dessus pour montants-predefinis). Indique si
+   une adresse correspond déjà à un compte Diaspo'Actif, pour proposer la connexion plutôt qu'un
+   doublon (règle #5 du cahier des charges "invitation externe"). Ne renvoie qu'un booléen,
+   jamais d'autre donnée du compte. Fortement limité par IP : c'est structurellement un oracle
+   de vérification d'e-mails. */
+route("GET", "/api/cagnottes/verifier-email", async (req, res, params, body, query) => {
+  const ip = SEC.clientIp(req);
+  const rl = SEC.rateLimit(`cagnotte-verifier-email:${ip}`, 20, 900000);
+  if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+  const email = String(query?.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 200, { existe: false });
+  const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=? AND nom != 'Compte supprimé'").get(email);
+  sendJSON(res, 200, { existe: !!compte });
 });
 
 route("GET", "/api/cagnottes/:id", async (req, res, params) => {
@@ -17446,6 +17545,98 @@ route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params)
   sendJSON(res, 200, { ok: true });
 });
 
+/* ── Invitation par e-mail à une cagnotte (personne sans compte) ──────────────────────────────
+   Distinct de POST /api/cagnottes/:id/participants (liste d'autorisation d'une cagnotte
+   PRIVÉE) : l'invitation par e-mail fonctionne pour une cagnotte publique OU privée — pour une
+   cagnotte privée, elle autorise AUSSI implicitement le destinataire (sans quoi le lien reçu par
+   e-mail serait inutilisable). Même standard de sécurité que le module Partenariat : token
+   généré via crypto.randomBytes, seul son hash SHA-256 est stocké. */
+const CagInvit = require("./cagnotte-invitations");
+
+/* GET /api/cagnottes/:id/invitations — liste des invitations envoyées (créateur/co-organisateur). */
+route("GET", "/api/cagnottes/:id/invitations", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  const rows = await db.prepare(`
+    SELECT id, email, statut, expire_at, ouverte_at, created_at
+    FROM cagnotte_invitations WHERE cagnotte_id=? ORDER BY created_at DESC
+  `).all(params.id);
+  /* Expiration paresseuse appliquée à l'affichage aussi, pas seulement à la lecture par token —
+     sans quoi la liste montrerait "envoyée" indéfiniment pour un lien en réalité périmé. */
+  const maintenant = CagInvit.maintenant();
+  sendJSON(res, 200, { invitations: rows.map(r => ({
+    ...r, statut: (r.statut !== "participee" && r.statut !== "expiree" && r.expire_at < maintenant) ? "expiree" : r.statut,
+  })) });
+});
+
+/* POST /api/cagnottes/:id/inviter — envoie l'invitation par e-mail. */
+route("POST", "/api/cagnottes/:id/inviter", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
+
+  const email = String(body?.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  const messagePersonnalise = body?.message ? String(body.message).trim().slice(0, 500) : null;
+
+  /* Anti-abus : ce point d'entrée pourrait sinon servir à spammer des adresses e-mail
+     arbitraires depuis un compte Premium compromis — limité par créateur, pas par IP (contexte
+     authentifié, contrairement à la contribution invité). */
+  const rl = SEC.rateLimit(`cagnotte-inviter:${user.id}`, 30, 3600000);
+  if (!rl.allowed) return sendJSON(res, 429, { error: "Trop d'invitations envoyées récemment. Réessayez plus tard." });
+
+  const token = CagInvit.genererToken();
+  const tokenHash = CagInvit.hashToken(token);
+  const expireAt = CagInvit.plusJours(30);
+  const invitId = (await db.prepare(`
+    INSERT INTO cagnotte_invitations (cagnotte_id, email, message_personnalise, token_hash, expire_at, invite_par_user_id)
+    VALUES (?,?,?,?,?,?)
+  `).run(c.id, email, messagePersonnalise, tokenHash, expireAt, user.id)).lastInsertRowid;
+
+  /* Cagnotte privée : l'invitation vaut autorisation — sans ça, le destinataire recevrait un
+     lien qui lui refuserait l'accès à l'ouverture. Ne crée jamais de doublon (même contrainte
+     que POST /api/cagnottes/:id/participants). */
+  if (c.visibilite === "privee") {
+    const dejaAutorise = await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(c.id, email);
+    if (!dejaAutorise) {
+      const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
+      await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email) VALUES (?,?,?)").run(c.id, compte ? compte.id : null, email);
+    }
+  }
+
+  const origin = getOrigin(req);
+  const lien = `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}&invitation=${token}`;
+  const { emailInvitationCagnotte } = require("./mailer");
+  emailInvitationCagnotte({
+    email, cagnotteTitre: c.titre, createurNom: user.nom || "Un membre de Diaspo'Actif",
+    messagePersonnalise, montantCollecte: c.montant_collecte, objectifMontant: c.objectif_montant,
+    devise: c.devise, lien, dureeValiditeJours: 30,
+  }).catch(e => console.error("[cagnotte-inviter] envoi e-mail:", e.message));
+
+  sendJSON(res, 201, { id: invitId });
+});
+
+/* GET /api/cagnottes/invitation/:token — résout un lien d'invitation reçu par e-mail (public,
+   aucune authentification). Marque l'invitation "ouverte" au premier accès, sans jamais la
+   rendre inutilisable pour autant — contrairement au module Partenariat (usage unique), ici la
+   personne doit pouvoir revenir plusieurs fois avant de payer. */
+route("GET", "/api/cagnottes/invitation/:token", async (req, res, params) => {
+  const inv = await CagInvit.chargerInvitationParToken(db, params.token);
+  if (!inv) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (inv.statut === "expiree") return sendJSON(res, 410, { error: "Ce lien d'invitation a expiré." });
+  if (inv.statut === "envoyee") {
+    await db.prepare("UPDATE cagnotte_invitations SET statut='ouverte', ouverte_at=datetime('now') WHERE id=?").run(inv.id);
+  }
+  const c = await db.prepare("SELECT slug FROM cagnottes WHERE id=?").get(inv.cagnotte_id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  sendJSON(res, 200, { slug: c.slug, email: inv.email, statut: inv.statut === "envoyee" ? "ouverte" : inv.statut });
+});
+
+
 /* ── Participation + paiement (Phase 1 — dernier increment) ── */
 /* (montants-predefinis + public/:slug/contributeurs sont enregistrées plus haut, avant /:id) */
 
@@ -17486,6 +17677,15 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
   const anonyme = body?.anonyme ? 1 : 0;
   const message = body?.message ? String(body.message).slice(0, 500) : null;
 
+  /* Invitation par e-mail (facultative) : si la personne arrive via un lien d'invitation, on
+     rattache la future contribution à cette invitation — mais on ne bloque JAMAIS le paiement
+     si le token est absent, invalide ou expiré, seule une trace de suivi est perdue. */
+  let invitationId = null;
+  if (body?.invitation_token) {
+    const inv = await CagInvit.chargerInvitationParToken(db, body.invitation_token);
+    if (inv && inv.cagnotte_id === Number(c.id) && inv.statut !== "expiree") invitationId = inv.id;
+  }
+
   const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
@@ -17511,7 +17711,10 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
         },
         quantity: 1,
       }],
-      metadata: { diaspoactif_cagnotte_contribution_id: String(contribId) },
+      metadata: {
+        diaspoactif_cagnotte_contribution_id: String(contribId),
+        ...(invitationId ? { diaspoactif_cagnotte_invitation_id: String(invitationId) } : {}),
+      },
       success_url: `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}&participation=succes`,
       cancel_url: `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}&participation=annule`,
     });

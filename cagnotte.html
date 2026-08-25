@@ -109,9 +109,16 @@
   };
   const slug = new URLSearchParams(location.search).get('slug');
   const participationResult = new URLSearchParams(location.search).get('participation');
+  /* Invitation par e-mail (module "Invitation externe") : le lien reçu par la personne invitée
+     porte ce paramètre en plus du slug — jamais utilisé pour l'accès en lui-même (la cagnotte
+     reste accessible par son slug seul, comme avant), seulement pour marquer l'invitation
+     "ouverte", préremplir l'e-mail dans le formulaire, et rattacher la contribution à
+     l'invitation une fois le paiement confirmé (voir soumettreParticipation). */
+  const invitationToken = new URLSearchParams(location.search).get('invitation');
   const el = document.getElementById('cg-content');
   let _cagnotte = null;
   let _montantChoisi = null;
+  let _invitationEmail = '';
 
   function bannerHtml(){
     if (participationResult === 'succes') return `<div class="cg-banner cg-banner-ok">✅ Merci ! Votre participation a bien été enregistrée. — Toute l'équipe Diaspo'Actif vous remercie chaleureusement.</div>`;
@@ -120,7 +127,10 @@
   }
 
   /* Proposition de compte pour les invités (2026-08-17, même pattern que adhesions.html) —
-     affichée sous la bannière de confirmation, jamais bloquante. */
+     affichée sous la bannière de confirmation, jamais bloquante. Règle #5 du cahier des charges
+     "Invitation externe" (2026-08-25) : si l'e-mail utilisé correspond DÉJÀ à un compte, on
+     propose de se connecter plutôt qu'un doublon — jamais de deuxième compte créé pour la
+     même adresse. */
   async function afficherPropositionCompte(){
     if (participationResult !== 'succes') return;
     let me = { user: null };
@@ -128,11 +138,18 @@
     if (me.user) return;
     let emailInvite = '';
     try { emailInvite = sessionStorage.getItem('cg_invite_email') || ''; sessionStorage.removeItem('cg_invite_email'); } catch(e) {}
+    let compteExistant = false;
+    if (emailInvite) {
+      try { ({ existe: compteExistant } = await (await fetch('/api/cagnottes/verifier-email?email=' + encodeURIComponent(emailInvite))).json()); } catch(e) {}
+    }
     const zone = document.createElement('div');
     zone.className = 'cg-banner';
     zone.style.cssText = 'background:#eff6ff;border:1px solid #93c5fd;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;';
-    zone.innerHTML = `<span>🔑 <strong>Créez votre compte Diaspo'Actif</strong> pour retrouver cette contribution et son reçu à tout moment.</span>
-      <a href="inscription.html?role=utilisateur${emailInvite ? '&email=' + encodeURIComponent(emailInvite) : ''}" class="btn btn-orange" style="padding:7px 16px;font-size:12.5px;">Créer mon compte</a>`;
+    zone.innerHTML = compteExistant
+      ? `<span>🔑 Cette adresse e-mail est déjà associée à un compte Diaspo'Actif. <strong>Connectez-vous</strong> pour retrouver cette contribution.</span>
+         <a href="login.html${emailInvite ? '?email=' + encodeURIComponent(emailInvite) : ''}" class="btn btn-orange" style="padding:7px 16px;font-size:12.5px;">Me connecter</a>`
+      : `<span>🔑 <strong>Créez votre compte Diaspo'Actif</strong> pour retrouver cette contribution et son reçu à tout moment.</span>
+         <a href="inscription.html?role=utilisateur${emailInvite ? '&email=' + encodeURIComponent(emailInvite) : ''}" class="btn btn-orange" style="padding:7px 16px;font-size:12.5px;">Créer mon compte</a>`;
     const banniereOk = document.querySelector('.cg-banner-ok');
     if (banniereOk) banniereOk.insertAdjacentElement('afterend', zone);
   }
@@ -162,7 +179,8 @@
         <p style="font-size:12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px 10px;margin:0 0 10px;">Vous participez sans compte Diaspo'Actif — renseignez simplement vos coordonnées ci-dessous. 🔑 <a href="login.html?retour=${encodeURIComponent(location.href)}">Déjà un compte ? Connectez-vous</a> pour préremplir automatiquement.</p>
         <input id="cg-part-nom" type="text" placeholder="Nom *" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
         <input id="cg-part-prenom" type="text" placeholder="Prénom" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
-        <input id="cg-part-email" type="email" placeholder="Adresse e-mail *" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;">` : ''}
+        <input id="cg-part-email" type="email" placeholder="Adresse e-mail *" value="${escH(_invitationEmail)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">
+        <div id="cg-part-email-note" style="display:none;font-size:11.5px;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:6px 8px;margin-bottom:10px;"></div>` : ''}
         <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;">
           <input type="checkbox" id="cg-part-anonyme"> Participer anonymement (mon nom ne sera pas affiché publiquement)
         </label>
@@ -182,6 +200,25 @@
         if (this.value) { _montantChoisi = null; modal.querySelectorAll('.cg-montant-pill').forEach(x => x.classList.remove('actif')); }
       });
       document.getElementById('cg-part-submit').addEventListener('click', () => soumettreParticipation(!user));
+      /* Détection "cet e-mail a déjà un compte" (règle #5) : jamais bloquant, juste une
+         suggestion affichée sous le champ — la personne peut tout de même continuer sans se
+         connecter (case cochée ou non, le paiement invité reste possible). */
+      const champEmail = document.getElementById('cg-part-email');
+      if (champEmail) {
+        champEmail.addEventListener('blur', async function(){
+          const note = document.getElementById('cg-part-email-note');
+          const val = champEmail.value.trim();
+          if (!val || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { note.style.display = 'none'; return; }
+          try {
+            const { existe } = await (await fetch('/api/cagnottes/verifier-email?email=' + encodeURIComponent(val))).json();
+            if (existe) {
+              note.innerHTML = 'Cette adresse est déjà associée à un compte Diaspo\'Actif — <a href="login.html?email=' + encodeURIComponent(val) + '&retour=' + encodeURIComponent(location.href) + '">connectez-vous</a> pour la retrouver automatiquement, ou continuez sans compte.';
+              note.style.display = 'block';
+            } else note.style.display = 'none';
+          } catch(e) { note.style.display = 'none'; }
+        });
+        if (_invitationEmail) champEmail.dispatchEvent(new Event('blur'));
+      }
     });
   }
 
@@ -208,6 +245,7 @@
         montant, nom, prenom, email,
         anonyme: document.getElementById('cg-part-anonyme').checked,
         message: document.getElementById('cg-part-message').value.trim() || undefined,
+        invitation_token: invitationToken || undefined,
       })
     }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; })
       .then(({ checkout_url }) => {
@@ -307,7 +345,18 @@
   if (!slug) {
     el.innerHTML = `<div class="cg-empty">Aucune cagnotte demandée.</div>`;
   } else {
-    fetch('/api/cagnottes/public/' + encodeURIComponent(slug), { credentials:'include' })
+    /* Invitation par e-mail : résolue AVANT le rendu de la page (et non en parallèle), sinon
+       l'ouverture automatique du formulaire de participation pourrait précéder la récupération
+       de l'e-mail invité — le champ se retrouverait vide selon la vitesse relative des deux
+       requêtes. Best effort : une invitation invalide/expirée ne bloque jamais l'accès à la
+       cagnotte, seul le préremplissage est perdu. */
+    (invitationToken
+      ? fetch('/api/cagnottes/invitation/' + encodeURIComponent(invitationToken)).then(r => r.ok ? r.json() : null).catch(() => null)
+      : Promise.resolve(null)
+    ).then(inv => {
+      if (inv && inv.email) _invitationEmail = inv.email;
+      return fetch('/api/cagnottes/public/' + encodeURIComponent(slug), { credentials:'include' });
+    })
       .then(async r => { if (!r.ok) throw await r.json().catch(()=>({error:'Introuvable.'})); return r.json(); })
       .then(({ cagnotte:c }) => {
         _cagnotte = c;
@@ -345,9 +394,9 @@
         renderContributeurs(slug, !!c.afficher_participants);
         renderActualites(c.id);
         afficherPropositionCompte();
-        /* Participation rapide via QR code (2026-08-17) : ?participer=1 ouvre directement le
-           formulaire de participation au chargement, sans clic supplémentaire. */
-        if (peutParticiper && new URLSearchParams(location.search).get('participer') === '1') ouvrirParticipation();
+        /* Participation rapide via QR code ou lien d'invitation : ?participer=1 OU une
+           invitation valide ouvrent directement le formulaire au chargement. */
+        if (peutParticiper && (new URLSearchParams(location.search).get('participer') === '1' || invitationToken)) ouvrirParticipation();
       })
       .catch(err => {
         el.innerHTML = `<div class="cg-empty">🔒 ${escH(err.error || 'Cette cagnotte est introuvable ou n\'est plus accessible.')}</div>`;

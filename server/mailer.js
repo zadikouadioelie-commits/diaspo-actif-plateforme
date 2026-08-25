@@ -495,4 +495,120 @@ function emailConfirmationBillets({ email, prenom, eventTitre, dateEvenement, li
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets };
+/* Invitation par e-mail à une cagnotte (module Cagnotte, invitation externe) — le lien mène à
+   la page publique de la cagnotte avec le token en paramètre ; la durée de validité est
+   affichée en toutes lettres, même convention que emailVerification/emailSuppressionProgrammee.
+   Accent orange (cohérent avec le reste du module Cagnotte sur la plateforme, cf. cagnotte.html)
+   plutôt que le bleu des autres e-mails de compte. */
+function emailInvitationCagnotte({ email, cagnotteTitre, createurNom, messagePersonnalise, montantCollecte, objectifMontant, devise, lien, dureeValiditeJours }) {
+  const dev = devise || "EUR";
+  const progression = (montantCollecte != null && objectifMontant)
+    ? `<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:16px 18px;margin:20px 0;">
+        <div style="font-size:20px;font-weight:900;color:#0D1B2A;">${Number(montantCollecte).toLocaleString('fr-FR')} ${dev}</div>
+        <div style="font-size:12.5px;color:#9A3412;margin-top:2px;">collectés sur un objectif de ${Number(objectifMontant).toLocaleString('fr-FR')} ${dev}</div>
+      </div>`
+    : (montantCollecte != null
+        ? `<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:16px 18px;margin:20px 0;">
+            <div style="font-size:20px;font-weight:900;color:#0D1B2A;">${Number(montantCollecte).toLocaleString('fr-FR')} ${dev}</div>
+            <div style="font-size:12.5px;color:#9A3412;margin-top:2px;">déjà collectés</div>
+          </div>` : "");
+  return sendEmail({
+    to: email,
+    subject: `${createurNom} vous invite à participer à « ${cagnotteTitre} » — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FFF7ED;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(242,100,34,.12);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:21px;font-weight:900;color:#0D1B2A;">🪙 ${createurNom} vous invite à participer</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 4px;">à la cagnotte</p>
+      <p style="color:#0D1B2A;font-weight:800;font-size:17px;margin:0 0 16px;">« ${cagnotteTitre} »</p>
+      ${messagePersonnalise ? `<div style="background:#F8FAFF;border-left:3px solid #F26422;border-radius:8px;padding:14px 16px;margin:16px 0;color:#334155;font-size:14px;line-height:1.6;font-style:italic;">« ${messagePersonnalise} »</div>` : ""}
+      ${progression}
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${lien}" style="display:inline-block;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 16px rgba(242,100,34,.3);">
+          Participer à la cagnotte →
+        </a>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0 0 4px;">
+        Aucun compte n'est nécessaire pour participer. Ce lien est valable ${dureeValiditeJours} jours.
+      </p>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+        Si vous ne connaissez pas ${createurNom}, vous pouvez ignorer cet e-mail.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+/* Confirmation envoyée au participant APRÈS paiement réussi — la seule trace écrite qu'a une
+   personne sans compte de sa participation (elle n'a pas d'espace "Mes notifications"), donc
+   toujours envoyée, y compris quand un compte existe déjà (auquel cas creerNotif() s'ajoute,
+   ne remplace pas cet e-mail). */
+function emailConfirmationParticipationCagnotte({ email, prenom, cagnotteTitre, montant, devise, cagnotteSlug, compteExistant }) {
+  const dev = devise || "EUR";
+  return sendEmail({
+    to: email,
+    subject: `Merci pour votre participation à « ${cagnotteTitre} » — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <div style="display:inline-block;background:#10B981;color:#fff;font-weight:800;font-size:13px;padding:6px 16px;border-radius:99px;margin-bottom:16px;">
+        Paiement confirmé ✅
+      </div>
+      <h1 style="margin:0 0 12px;font-size:20px;font-weight:900;color:#0D1B2A;">
+        Merci${prenom ? ` ${prenom}` : ""} pour votre participation !
+      </h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 20px;">
+        Votre don pour la cagnotte « ${cagnotteTitre} » a bien été reçu.
+      </p>
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:16px 18px;text-align:center;margin:0 0 24px;">
+        <div style="font-size:24px;font-weight:900;color:#166534;">${Number(montant).toLocaleString('fr-FR')} ${dev}</div>
+        <div style="font-size:12.5px;color:#15803D;margin-top:2px;">versés à « ${cagnotteTitre} »</div>
+      </div>
+      ${compteExistant ? `
+      <p style="color:#475569;line-height:1.7;font-size:14px;margin:0 0 16px;">
+        Cette adresse e-mail est déjà associée à un compte Diaspo'Actif. Connectez-vous pour retrouver cette participation dans votre espace.
+      </p>
+      <div style="text-align:center;margin:0 0 20px;">
+        <a href="https://diaspoactif.com/login.html?email=${encodeURIComponent(email)}" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;font-size:14px;padding:12px 26px;border-radius:12px;">
+          Me connecter →
+        </a>
+      </div>` : `
+      <p style="color:#475569;line-height:1.7;font-size:14px;margin:0 0 16px;">
+        Vous souhaitez retrouver facilement vos participations et découvrir Diaspo'Actif ?
+      </p>
+      <div style="text-align:center;margin:0 0 20px;">
+        <a href="https://diaspoactif.com/inscription.html?role=utilisateur&email=${encodeURIComponent(email)}" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;font-size:14px;padding:12px 26px;border-radius:12px;">
+          Créer mon compte gratuitement →
+        </a>
+      </div>`}
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+        <a href="https://diaspoactif.com/cagnotte.html?slug=${encodeURIComponent(cagnotteSlug)}" style="color:#94A3B8;">Voir la cagnotte</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte };

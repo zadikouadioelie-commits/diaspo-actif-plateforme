@@ -362,6 +362,32 @@ db.exec(`
     FOREIGN KEY(auteur_user_id) REFERENCES users(id)
   );
 
+  /* Invitations par e-mail à une cagnotte (personne sans compte Diaspo'Actif) — même standard
+     de sécurité que partenariat_invitations (voir server/cagnotte-invitations.js) : seul le
+     hash SHA-256 du token est stocké, jamais le token en clair. Statuts : 'envoyee' (e-mail
+     parti, pas encore ouverte) → 'ouverte' (lien cliqué au moins une fois) → 'participee' (une
+     contribution payée lui a été rattachée, via contribution_id) ; 'expiree' calculée à la
+     lecture (voir appliquerExpiration), jamais recalculée en 'expiree' une fois 'participee'.
+     Contrairement à partenariat_invitations (usage unique), plusieurs visites/tentatives
+     restent possibles avant le paiement réel — seule l'expiration bloque vraiment. */
+  CREATE TABLE IF NOT EXISTS cagnotte_invitations (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    cagnotte_id         INTEGER NOT NULL,
+    email               TEXT NOT NULL,
+    message_personnalise TEXT,
+    token_hash          TEXT NOT NULL UNIQUE,
+    statut              TEXT NOT NULL DEFAULT 'envoyee' CHECK(statut IN ('envoyee','ouverte','participee','expiree')),
+    expire_at           TEXT NOT NULL,
+    invite_par_user_id  INTEGER NOT NULL,
+    contribution_id     INTEGER,
+    ouverte_at          TEXT,
+    created_at          TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
+    FOREIGN KEY(invite_par_user_id) REFERENCES users(id),
+    FOREIGN KEY(contribution_id) REFERENCES cagnotte_contributions(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_cagnotte_invitations_cagnotte ON cagnotte_invitations(cagnotte_id);
+
   /* Contributions (paiements) à une cagnotte — Phase 1 "Participation + paiement".
      user_id nullable + nom/prenom/email (incrément "contribution invitée", 2026-08-17) : une
      personne sans compte Diaspo'Actif peut participer directement, son identité vient alors de
