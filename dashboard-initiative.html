@@ -3142,18 +3142,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       if(el) el.style.display = s===name ? '' : 'none';
     });
     /* "Paiements boutique"/"Vérification organisation" (paiement-marketplace,
-       verification-organisation) sont volontairement TOUJOURS visibles, quel que soit le
-       module actif (2026-08-09) — voir le commentaire juste avant leur définition dans le
-       HTML. Signalé le 2026-08-19 (capture à l'appui) : ça n'a aucun sens dans "Votes
-       sécurisés", qui n'a aucun rapport avec des paiements boutique ou une vérification
-       d'organisation — première exception à la règle "toujours visibles". "Diaspo Formation"
-       ajouté à cette même exception le 2026-08-25 (demande explicite : le module doit
-       s'ouvrir sur la création/gestion de formations, pas sur ces deux cartes sans rapport
-       — même raisonnement exact que pour Votes sécurisés). */
+       verification-organisation) étaient TOUJOURS visibles, quel que soit le module actif
+       (2026-08-09), avec une liste d'exceptions qui grandissait au fil des signalements
+       (Votes sécurisés le 2026-08-19, Diaspo Formation le 2026-08-25 — sans rapport ni l'un
+       ni l'autre avec des paiements boutique ou une vérification d'organisation). Inversé le
+       2026-08-25 (demande explicite) : ces deux cartes n'ont en réalité leur place que dans
+       "Module paiement" lui-même — affichées UNIQUEMENT là désormais, plutôt que partout
+       sauf une liste d'exceptions qui n'aurait fait que continuer à s'allonger. */
     { const pm = document.getElementById('paiement-marketplace'), vo = document.getElementById('verification-organisation');
-      const cacher = name === 'votes-init' || name === 'formations-gestion';
-      if (pm) pm.style.display = cacher ? 'none' : '';
-      if (vo) vo.style.display = cacher ? 'none' : ''; }
+      const afficher = name === 'paiement';
+      if (pm) pm.style.display = afficher ? '' : 'none';
+      if (vo) vo.style.display = afficher ? '' : 'none'; }
     document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
       a.classList.toggle('active', a.dataset.section===name);
     });
