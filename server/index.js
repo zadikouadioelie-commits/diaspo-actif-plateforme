@@ -2185,8 +2185,18 @@ route("PATCH", "/api/admin/rencontres/:id", async (req, res, params, body) => {
               updated_at=datetime('now') WHERE id=?`
     ).run(String(body.motif_refus || '').trim() || null, user.id, agent, r.id);
 
+  } else if (action === 'reporter') {
+    /* Mise de côté sans décision (2026-08-25, demande explicite) — ni confirmation ni refus,
+       juste sortie de l'onglet "À traiter" vers "Reportées" pour être retraitée plus tard.
+       Uniquement depuis 'demandee' : reporter une demande déjà reportée n'a pas de sens
+       (le client ne propose pas ce bouton dans ce cas, mais on protège aussi côté serveur). */
+    if (r.statut !== 'demandee') return sendJSON(res, 400, { error: "Seule une demande en attente de traitement peut être reportée." });
+    await db.prepare(
+      `UPDATE rencontres_diaspoactif SET statut='reportee', agent_id=?, agent_nom=?, updated_at=datetime('now') WHERE id=?`
+    ).run(user.id, agent, r.id);
+
   } else {
-    return sendJSON(res, 400, { error: "Action inconnue (planifier, attente, valider, ne_pas_valider ou refuser)." });
+    return sendJSON(res, 400, { error: "Action inconnue (planifier, reporter, attente, valider, ne_pas_valider ou refuser)." });
   }
 
   /* L'indice est mis en cache 5 minutes : sans purge, le membre ne verrait ses points
@@ -2201,11 +2211,17 @@ route("PATCH", "/api/admin/rencontres/:id", async (req, res, params, body) => {
     ne_pas_valider: ["Rencontre non validée", `${String(body.motif_refus || '').trim()} — vous pourrez faire une nouvelle demande dans ${RENCONTRE_DELAI_MOIS} mois.`],
     refuser:        ["Demande de rencontre non retenue", String(body.motif_refus || '').trim() || "Votre demande de rencontre n'a pas été retenue."],
   }[action];
-  try {
-    await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
-      r.user_id, 'rencontre_' + action, AVIS[0], AVIS[1], JSON.stringify({ rencontre_id: r.id })
-    );
-  } catch (e) { logError(e, "notification suivi de rencontre", req); }
+  /* 'reporter' n'a volontairement aucune entrée ci-dessus : rien n'a réellement changé du
+     point de vue du membre (toujours en attente, ni date ni refus) — le prévenir sèmerait
+     plus de confusion qu'autre chose. AVIS vaut alors undefined ; sans ce garde-fou,
+     AVIS[0] lèverait une erreur (silencieuse, mais inutile) à chaque report. */
+  if (AVIS) {
+    try {
+      await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+        r.user_id, 'rencontre_' + action, AVIS[0], AVIS[1], JSON.stringify({ rencontre_id: r.id })
+      );
+    } catch (e) { logError(e, "notification suivi de rencontre", req); }
+  }
 
   const maj = await db.prepare("SELECT * FROM rencontres_diaspoactif WHERE id=?").get(r.id);
   sendJSON(res, 200, { ok: true, rencontre: maj });

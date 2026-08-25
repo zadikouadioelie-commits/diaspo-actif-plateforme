@@ -7884,6 +7884,7 @@ async function paReactiverCodeDA(id) {
 
 const RDV_ONGLETS = [
   { cle:'demandee',              titre:'À traiter',       icone:'📥' },
+  { cle:'reportee',              titre:'Reportées',       icone:'⏭️' },
   { cle:'planifiee',             titre:'Rendez-vous fixé', icone:'📅' },
   { cle:'en_attente_validation', titre:'À valider',       icone:'⏳' },
   { cle:'validee',               titre:'Validées',        icone:'✅' },
@@ -7955,10 +7956,18 @@ function rdvCarte(r) {
   const l = (t, v) => v ? `<div style="margin-top:6px;"><strong style="font-size:12px;color:#64748B;">${t}</strong><br><span style="font-size:13px;">${rdvEsc(v)}</span></div>` : '';
 
   let actions = '';
-  if (r.statut === 'demandee') {
+  if (r.statut === 'demandee' || r.statut === 'reportee') {
     /* Le champ est prérempli avec le créneau proposé par le membre : dans le cas courant
        où il convient, l'agent n'a qu'un clic à faire. S'il ne convient pas, il le change. */
     const propose = r.disponibilites ? String(r.disponibilites).slice(0, 16).replace(' ', 'T') : '';
+    /* "Reporter" (2026-08-25, demande explicite) : un 3e choix entre confirmer et écarter,
+       pour les demandes que l'administrateur ne veut ni accepter ni refuser dans l'immédiat
+       — mise de côté sans date ni décision, dans l'onglet "Reportées", retraitable plus
+       tard avec les deux mêmes boutons (pas de bouton "annuler le report" séparé : la
+       demande y réapparaît simplement comme une demande normale à traiter). Absent une fois
+       déjà dans cet onglet — se reporter une demande déjà reportée n'a pas de sens. */
+    const btnReporter = r.statut === 'demandee'
+      ? `<button class="btn btn-outline" onclick="rdvAction(${r.id},'reporter')">⏭️ Reporter le rendez-vous</button>` : '';
     actions = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
         <input type="datetime-local" id="rdv-date-${r.id}" value="${propose}" style="padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;">
@@ -7966,6 +7975,7 @@ function rdvCarte(r) {
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
         <button class="btn btn-orange" onclick="rdvAction(${r.id},'planifier')">📅 Confirmer ce rendez-vous</button>
+        ${btnReporter}
         <button class="btn btn-outline" onclick="rdvAction(${r.id},'refuser')">✖️ Écarter la demande</button>
       </div>
       <p style="margin:6px 0 0;font-size:11.5px;color:#64748B;">Durée à prévoir : 30 à 45 minutes.</p>`;
@@ -7987,7 +7997,7 @@ function rdvCarte(r) {
       </div>`;
   }
 
-  const COULEUR = { demandee:'#F59E0B', planifiee:'#3B82F6', en_attente_validation:'#8B5CF6',
+  const COULEUR = { demandee:'#F59E0B', reportee:'#F97316', planifiee:'#3B82F6', en_attente_validation:'#8B5CF6',
                     validee:'#22C55E', non_validee:'#EF4444', refusee:'#94A3B8' }[r.statut] || '#94A3B8';
 
   return `<div class="card" style="border-left:4px solid ${COULEUR};margin-bottom:12px;">
