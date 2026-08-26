@@ -6586,6 +6586,7 @@ async function adhRenderFormules(){
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="adhOuvrirEditionFormule(${f.id})">✏️ Modifier</button>
             <button class="btn btn-sm btn-outline" onclick="adhDupliquerFormule(${f.id})">📄 Dupliquer</button>
+            ${f.actif ? `<button class="btn btn-sm btn-outline" onclick="adhOuvrirPartage(${f.id})">📤 Partager</button>` : ''}
             <button class="btn btn-sm btn-outline" onclick="adhToggleActifFormule(${f.id})">${f.actif?'🙈 Désactiver':'👁️ Activer'}</button>
             <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhSupprimerFormule(${f.id},'${escH(f.nom).replace(/'/g,"\\'")}')">🗑️</button>
           </div>
@@ -7437,6 +7438,39 @@ function adhOuvrirQR(nomCampagne){
   }
 }
 window.adhOuvrirQR = adhOuvrirQR;
+
+/* ── "📤 Partager" une formule précise (2026-08-26) : contrairement à adhOuvrirQR (générique,
+   niveau campagne), ce lien cible une formule précise via ?formule=<id> — adhesions.html
+   ouvre alors directement son formulaire de paiement. Aucun compte Diaspo'Actif requis côté
+   destinataire (paiement invité déjà en place, voir POST /api/adhesion-formules/:id/payer). ── */
+function adhOuvrirPartage(formuleId){
+  const f = ADH_FORMULES.find(x => x.id === formuleId);
+  if (!f) return;
+  let modal = document.getElementById('adh-partage-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'adh-partage-modal';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  const url = window.location.origin + '/adhesions.html?initiative=' + window.__vitrineInitId + '&formule=' + f.id;
+  const sujet = `Adhésion — ${f.nom}`;
+  const corps = `Bonjour,\n\nJe vous invite à adhérer à « ${f.nom} » sur Diaspo'Actif — aucun compte n'est nécessaire pour payer :\n${url}\n\nÀ bientôt !`;
+  const mailtoUrl = `mailto:?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}`;
+  modal.innerHTML = `<div class="modal-box" style="max-width:360px;text-align:center;">
+    <h3 style="margin:0 0 4px;">📤 Partager « ${escH(f.nom)} »</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Toute personne qui ouvre ce lien peut payer son adhésion à cette formule, même sans compte Diaspo'Actif.</p>
+    <div id="adh-partage-qr-holder" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+    <a href="${mailtoUrl}" class="btn btn-orange" style="width:100%;box-sizing:border-box;display:block;margin-bottom:8px;">✉️ Envoyer par e-mail</a>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('adh-partage-modal').remove()">Fermer</button>
+  </div>`;
+  if (window.ProfileQR) {
+    ProfileQR.render(document.getElementById('adh-partage-qr-holder'), { url, size: 160, showActions: true });
+  } else {
+    document.getElementById('adh-partage-qr-holder').innerHTML = '<span style="font-size:11px;color:var(--muted);">QR indisponible</span>';
+  }
+}
+window.adhOuvrirPartage = adhOuvrirPartage;
 
 async function adhCreerCampagne(){
   const nom = prompt('Nom de la campagne :'); if(!nom) return;
