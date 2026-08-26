@@ -860,6 +860,7 @@ function renderSection(key) {
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
   if (key === 'presentation') bpLoadTractionDocs();
   if (key === 'financement') bpCalcDilution();
+  if (key === 'rh') bpCalcMasseSalariale();
   if (!def?.noSave && monRole !== 'lecteur') {
     content.insertAdjacentHTML('beforeend', `
       <div class="bp-section" style="padding-top:0;">
@@ -1829,6 +1830,7 @@ function updProduit(i,key,val) {
 
 /* ---- 10-14. Sections texte (marketing, commercial, opérationnel, organisation, RH) ---- */
 function renderMarketing() {
+  const s = sections.strategie_marketing || {};
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>📢 Stratégie marketing</h2></div>
     <div class="bp-card-inner"><div class="fg">
@@ -1839,8 +1841,56 @@ function renderMarketing() {
       ${textarea('partenariats','Partenariats & co-marketing','Avec qui allez-vous vous associer ?',3,true)}
       ${textarea('evenements','Événements & présence terrain','Salons, conférences, événements locaux…',2,true)}
       ${textarea('fidelisation','Stratégie de fidélisation','Comment garder vos clients ?',2,true)}
+      ${field('budget_marketing_mensuel','Budget marketing mensuel','','number')}
+      ${field('budget_marketing_annuel','Budget marketing annuel','','number')}
+      ${field('roi_marketing','ROI marketing','')}
+      ${field('cout_fidelisation','Coût de fidélisation','','number')}
     </div></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Campagnes</h3>
+        <button class="btn btn-outline btn-sm" onclick="addCampagne()">+ Ajouter une campagne</button>
+      </div>
+      <div id="campagnes-list">${renderCampagnes(s.campagnes || [{ canal:'' }])}</div>
+    </div>
   </div>`;
+}
+function renderCampagnes(list) {
+  return list.map((c,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(c.canal||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Canal (ex : Facebook Ads, SEO…)" oninput="updCampagne(${i},'canal',this.value)">
+        <button onclick="removeCampagne(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Budget${helpIcon('camp_budget')}</label><input type="number" value="${esc(c.budget||'')}" oninput="updCampagne(${i},'budget',this.value)"></div>
+        <div><label>Durée${helpIcon('camp_duree')}</label><input value="${esc(c.duree||'')}" placeholder="Ex : 3 mois" oninput="updCampagne(${i},'duree',this.value)"></div>
+        <div><label>Objectif${helpIcon('camp_objectif')}</label><input value="${esc(c.objectif||'')}" oninput="updCampagne(${i},'objectif',this.value)"></div>
+        <div><label>Prospects générés${helpIcon('camp_prospects')}</label><input type="number" value="${esc(c.prospects||'')}" oninput="updCampagne(${i},'prospects',this.value)"></div>
+        <div><label>Conversions${helpIcon('camp_conversions')}</label><input type="number" value="${esc(c.conversions||'')}" oninput="updCampagne(${i},'conversions',this.value)"></div>
+        <div><label>Coût${helpIcon('camp_cout')}</label><input type="number" value="${esc(c.cout||'')}" oninput="updCampagne(${i},'cout',this.value)"></div>
+        <div><label>ROI${helpIcon('camp_roi')}</label><input value="${esc(c.roi||'')}" oninput="updCampagne(${i},'roi',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addCampagne() {
+  if (!sections.strategie_marketing) sections.strategie_marketing={};
+  if (!sections.strategie_marketing.campagnes) sections.strategie_marketing.campagnes=[];
+  sections.strategie_marketing.campagnes.push({canal:''});
+  document.getElementById('campagnes-list').innerHTML = renderCampagnes(sections.strategie_marketing.campagnes);
+  markDirty();
+}
+function removeCampagne(i) {
+  sections.strategie_marketing.campagnes.splice(i,1);
+  document.getElementById('campagnes-list').innerHTML = renderCampagnes(sections.strategie_marketing.campagnes);
+  markDirty();
+}
+function updCampagne(i,key,val) {
+  if (!sections.strategie_marketing) sections.strategie_marketing={};
+  if (!sections.strategie_marketing.campagnes) sections.strategie_marketing.campagnes=[];
+  if (!sections.strategie_marketing.campagnes[i]) sections.strategie_marketing.campagnes[i]={};
+  sections.strategie_marketing.campagnes[i][key]=val;
+  markDirty();
 }
 function renderCommercial() {
   return `<div class="bp-section">
@@ -1853,6 +1903,26 @@ function renderCommercial() {
       ${textarea('argumentaire','Argumentaire commercial','Vos arguments de vente clés…',3,true)}
       ${textarea('sav','Service après-vente','Comment gérez-vous le SAV ?',2,true)}
       ${textarea('kpi_commerciaux','KPI commerciaux','Indicateurs à suivre…',2,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Funnel de vente quantitatif</h3><div class="fg">
+      ${field('nb_prospects_funnel','Nombre de prospects','','number')}
+      ${field('nb_contacts_funnel','Nombre de contacts','','number')}
+      ${field('nb_rdv_funnel','Nombre de rendez-vous','','number')}
+      ${field('nb_propositions_funnel','Nombre de propositions','','number')}
+      ${field('nb_contrats_funnel','Nombre de contrats','','number')}
+      ${field('cycle_vente_moyen','Cycle de vente moyen','Ex : 45 jours')}
+      ${field('panier_moyen_commercial','Panier moyen','','number')}
+      ${field('frequence_achat_commercial','Fréquence d\'achat','')}
+      ${field('ca_par_commercial','Chiffre d\'affaires par commercial','','number')}
+      ${field('objectif_mensuel_commercial','Objectif mensuel','','number')}
+      ${field('objectif_annuel_commercial','Objectif annuel','','number')}
+      ${field('territoire_commercial','Territoire commercial','')}
+      ${field('canal_vente','Canal de vente','')}
+      ${field('responsable_ventes','Responsable des ventes','')}
+    </div></div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('premiers_10_clients','Comment comptez-vous obtenir vos 10 premiers clients ?','',3,true)}
+      ${textarea('premiers_100_clients','Comment comptez-vous obtenir vos 100 premiers clients ?','',3,true)}
     </div></div>
   </div>`;
 }
@@ -1868,6 +1938,34 @@ function renderOperationnel() {
       ${textarea('qualite','Contrôle qualité','Comment garantissez-vous la qualité ?',2,true)}
       ${textarea('securite','Sécurité','Mesures de sécurité en place…',2,true)}
     </div></div>
+    <!-- Renforcement 2026-08-26 (point 13). Les délais de paiement et le stock moyen sont déjà
+         saisis dans Plan financier > BFR (incrément 6) et alimentent son calcul -- pas
+         redemandés ici pour ne jamais avoir deux réponses possibles à la même question. -->
+    <div class="bp-card-inner"><h3>Capacité & dépendances</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Les délais de paiement et le stock moyen sont déjà renseignés dans Plan financier &gt; Besoin en fonds de roulement.</p>
+      <div class="fg">
+        ${field('capacite_actuelle_globale','Capacité actuelle','')}
+        ${field('capacite_maximale_globale','Capacité maximale','')}
+        ${field('capacite_prevue_op','Capacité prévue','')}
+        ${field('taux_utilisation_op','Taux d\'utilisation (%)','','number')}
+        ${field('delai_moyen_production_op','Délai moyen de production','')}
+        ${field('capacite_stockage_op','Capacité de stockage','')}
+        ${textarea('fournisseurs_principaux','Fournisseurs principaux','',2,true)}
+        ${textarea('fournisseurs_secondaires','Fournisseurs secondaires','',2,true)}
+        ${field('dependance_fournisseur_op','Dépendance à un fournisseur','')}
+        ${field('conditions_paiement_fournisseurs_op','Conditions de paiement fournisseurs','')}
+        ${field('delai_fournisseur_op','Délai fournisseur','')}
+        ${field('sous_traitance_op','Sous-traitance','')}
+        ${field('couts_logistiques_op','Coûts logistiques','','number')}
+        ${field('couts_transport_op','Coûts de transport','','number')}
+        ${textarea('besoins_equipements_op','Besoins en équipements','',2,true)}
+        ${textarea('besoins_locaux_op','Besoins en locaux','',2,true)}
+        ${textarea('autorisations_op','Autorisations nécessaires','',2,true)}
+        ${textarea('normes_op','Normes applicables','',2,true)}
+        ${textarea('certifications_op','Certifications','',2,true)}
+        ${textarea('assurances_op','Assurances professionnelles','RC pro, dommages…',2,true)}
+      </div>
+    </div>
   </div>`;
 }
 function renderOrganisation() {
@@ -1880,9 +1978,23 @@ function renderOrganisation() {
       ${textarea('consultants','Consultants & Experts','Experts externes mobilisés…',2,true)}
       ${textarea('benevoles','Bénévoles (si applicable)','Organisation du bénévolat…',2,true)}
     </div></div>
+    <!-- Renforcement 2026-08-26 (point 14). La forme juridique elle-même est déjà renseignée
+         dans Informations générales > Structure juridique (incrément 2), pas redemandée ici. -->
+    <div class="bp-card-inner"><h3>Gouvernance détaillée</h3><div class="fg">
+      ${textarea('gouvernance_detail','Gouvernance','Fonctionnement des instances de décision…',3,true)}
+      ${textarea('associes_gouvernance','Associés','Qui sont-ils, quel rôle ?',2,true)}
+      ${textarea('droits_decision','Droits de décision','Qui décide de quoi, avec quel pouvoir ?',2,true)}
+      ${textarea('conseil_administration','Conseil d\'administration','Composition, fréquence des réunions…',2,true)}
+      ${textarea('comite_strategique','Comité stratégique','',2,true)}
+      ${textarea('experts_gouvernance','Experts mobilisés dans la gouvernance','',2,true)}
+      ${textarea('investisseurs_actuels_gouvernance','Investisseurs actuels','',2,true)}
+      ${textarea('conflits_interets','Conflits d\'intérêts éventuels','',2,true)}
+      ${textarea('besoins_futurs_gouvernance','Besoins futurs en gouvernance','',2,true)}
+    </div></div>
   </div>`;
 }
 function renderRH() {
+  const s = sections.rh || {};
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>👥 Ressources humaines</h2></div>
     <div class="bp-card-inner"><div class="fg">
@@ -1893,7 +2005,69 @@ function renderRH() {
       ${textarea('formations','Formations prévues','Développement des compétences…',2,true)}
       ${textarea('politique_rh','Politique RH','Rémunération, avantages, culture d\'entreprise…',3,true)}
     </div></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Postes prévus (détail)</h3>
+        <button class="btn btn-outline btn-sm" onclick="addPosteRH()">+ Ajouter un poste</button>
+      </div>
+      <div id="postes-rh-list">${renderPostesRH(s.postes || [{ intitule:'' }])}</div>
+      <div id="rh-masse-salariale" style="margin-top:10px;font-size:12.5px;color:var(--muted);"></div>
+    </div>
   </div>`;
+}
+function renderPostesRH(list) {
+  setTimeout(bpCalcMasseSalariale, 0);
+  return list.map((p,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(p.intitule||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Intitulé du poste" oninput="updPosteRH(${i},'intitule',this.value)">
+        <button onclick="removePosteRH(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Nombre de personnes${helpIcon('poste_rh_nb')}</label><input type="number" value="${esc(p.nb_personnes||'')}" oninput="updPosteRH(${i},'nb_personnes',this.value);bpCalcMasseSalariale()"></div>
+        <div class="full"><label>Mission${helpIcon('poste_rh_mission')}</label><input value="${esc(p.mission||'')}" oninput="updPosteRH(${i},'mission',this.value)"></div>
+        <div><label>Compétences${helpIcon('poste_rh_competences')}</label><input value="${esc(p.competences||'')}" oninput="updPosteRH(${i},'competences',this.value)"></div>
+        <div><label>Niveau d'expérience${helpIcon('poste_rh_niveau')}</label><input value="${esc(p.niveau_experience||'')}" oninput="updPosteRH(${i},'niveau_experience',this.value)"></div>
+        <div><label>Salaire brut${helpIcon('poste_rh_salaire')}</label><input type="number" value="${esc(p.salaire_brut||'')}" oninput="updPosteRH(${i},'salaire_brut',this.value);bpCalcMasseSalariale()"></div>
+        <div><label>Charges${helpIcon('poste_rh_charges')}</label><input type="number" value="${esc(p.charges||'')}" oninput="updPosteRH(${i},'charges',this.value);bpCalcMasseSalariale()"></div>
+        <div><label>Coût total employeur${helpIcon('poste_rh_cout_total')}</label><input type="number" value="${esc(p.cout_total_employeur||'')}" oninput="updPosteRH(${i},'cout_total_employeur',this.value);bpCalcMasseSalariale()"></div>
+        <div><label>Date de recrutement${helpIcon('poste_rh_date')}</label><input type="date" value="${esc(p.date_recrutement||'')}" oninput="updPosteRH(${i},'date_recrutement',this.value)"></div>
+        <div><label>Temps plein / partiel${helpIcon('poste_rh_temps')}</label><select onchange="updPosteRH(${i},'temps',this.value)">
+          ${[['plein','Temps plein'],['partiel','Temps partiel']].map(([v,l])=>`<option value="${v}" ${p.temps===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Localisation${helpIcon('poste_rh_localisation')}</label><input value="${esc(p.localisation||'')}" oninput="updPosteRH(${i},'localisation',this.value)"></div>
+        <div><label>Formation nécessaire${helpIcon('poste_rh_formation')}</label><input value="${esc(p.formation_necessaire||'')}" oninput="updPosteRH(${i},'formation_necessaire',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addPosteRH() {
+  if (!sections.rh) sections.rh={};
+  if (!sections.rh.postes) sections.rh.postes=[];
+  sections.rh.postes.push({intitule:''});
+  document.getElementById('postes-rh-list').innerHTML = renderPostesRH(sections.rh.postes);
+  markDirty();
+}
+function removePosteRH(i) {
+  sections.rh.postes.splice(i,1);
+  document.getElementById('postes-rh-list').innerHTML = renderPostesRH(sections.rh.postes);
+  markDirty();
+}
+function updPosteRH(i,key,val) {
+  if (!sections.rh) sections.rh={};
+  if (!sections.rh.postes) sections.rh.postes=[];
+  if (!sections.rh.postes[i]) sections.rh.postes[i]={};
+  sections.rh.postes[i][key]=val;
+  markDirty();
+}
+/* Masse salariale totale, dérivée des postes -- pas de nouvelle "projection RH" séparée à
+   resaisir année par année : la somme sert de repère, réutilisable pour comparer avec
+   Plan financier > Salaires & charges (An 1). */
+function bpCalcMasseSalariale() {
+  const el = document.getElementById('rh-masse-salariale');
+  if (!el) return;
+  const postes = sections.rh?.postes || [];
+  const total = postes.reduce((sum,p) => sum + (parseFloat(p.cout_total_employeur)||0) * (parseFloat(p.nb_personnes)||1), 0);
+  el.textContent = total ? `💰 Masse salariale totale estimée : ${fmtEuro(total)} — à comparer avec "Salaires & charges" (Plan financier, An 1).` : '';
 }
 
 /* ---- 15. Calendrier (Gantt simplifié) ---- */
@@ -1903,13 +2077,25 @@ function renderCalendrier() {
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>📅 Calendrier de mise en œuvre</h2></div>
     <div class="bp-card-inner">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">Phases du projet</h3>
-        <button class="btn btn-outline btn-sm" onclick="addPhase()">+ Ajouter une phase</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="chargerJalonsPredefinis()">📋 Utiliser les jalons prédéfinis</button>
+          <button class="btn btn-outline btn-sm" onclick="addPhase()">+ Ajouter une phase</button>
+        </div>
       </div>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Jalons prédéfinis : Idée → Prototype → Test → MVP → Commercialisation → Premiers clients → Rentabilité → Expansion.</p>
       <div id="phases-list">${renderPhases(phases)}</div>
     </div>
   </div>`;
+}
+const BP_JALONS_PREDEFINIS = ['Idée','Prototype','Test','MVP','Commercialisation','Premiers clients','Rentabilité','Expansion'];
+function chargerJalonsPredefinis() {
+  if (!confirm('Remplacer les phases actuelles par les 8 jalons prédéfinis (Idée → Expansion) ?')) return;
+  sections.calendrier = sections.calendrier || {};
+  sections.calendrier.phases = BP_JALONS_PREDEFINIS.map(nom => ({ nom, responsable:'', debut:'', fin:'', taches:'', statut:'planifie' }));
+  document.getElementById('phases-list').innerHTML = renderPhases(sections.calendrier.phases);
+  markDirty();
 }
 function renderPhases(phases) {
   const statuts = [{v:'planifie',l:'📋 Planifié'},{v:'en_cours',l:'🔄 En cours'},{v:'termine',l:'✅ Terminé'},{v:'retard',l:'⚠️ En retard'}];
@@ -1926,6 +2112,12 @@ function renderPhases(phases) {
         <div><label>Statut${helpIcon('phase_statut')}</label><select onchange="updPhase(${i},'statut',this.value)">
           ${statuts.map(s=>`<option value="${s.v}" ${p.statut===s.v?'selected':''}>${s.l}</option>`).join('')}
         </select></div>
+        <div><label>Budget${helpIcon('phase_budget')}</label><input type="number" value="${esc(p.budget||'')}" oninput="updPhase(${i},'budget',this.value)"></div>
+        <div><label>Dépendances${helpIcon('phase_dependances')}</label><input value="${esc(p.dependances||'')}" placeholder="Phase(s) préalable(s)" oninput="updPhase(${i},'dependances',this.value)"></div>
+        <div><label>Objectif${helpIcon('phase_objectif')}</label><input value="${esc(p.objectif||'')}" oninput="updPhase(${i},'objectif',this.value)"></div>
+        <div><label>KPI${helpIcon('phase_kpi')}</label><input value="${esc(p.kpi||'')}" oninput="updPhase(${i},'kpi',this.value)"></div>
+        <div><label>Livrable${helpIcon('phase_livrable')}</label><input value="${esc(p.livrable||'')}" oninput="updPhase(${i},'livrable',this.value)"></div>
+        <div><label>Risque associé${helpIcon('phase_risque')}</label><input value="${esc(p.risque_associe||'')}" oninput="updPhase(${i},'risque_associe',this.value)"></div>
         <div class="full"><label>Tâches${helpIcon('phase_taches')}</label><textarea rows="2" placeholder="Tâches de cette phase…" oninput="updPhase(${i},'taches',this.value)">${esc(p.taches||'')}</textarea></div>
       </div>
     </div>`).join('');
@@ -2414,6 +2606,12 @@ function renderRisqueItems(items) {
         </select></div>
         <div><label>Mesures préventives${helpIcon('risque_prevention')}</label><input value="${esc(r.prevention||'')}" placeholder="Comment prévenir ce risque ?" oninput="updRisque(${i},'prevention',this.value)"></div>
         <div><label>Plan d'urgence${helpIcon('risque_urgence')}</label><input value="${esc(r.urgence||'')}" placeholder="Que faire si le risque survient ?" oninput="updRisque(${i},'urgence',this.value)"></div>
+        <div><label>Responsable${helpIcon('risque_responsable')}</label><input value="${esc(r.responsable||'')}" oninput="updRisque(${i},'responsable',this.value)"></div>
+        <div><label>Coût potentiel${helpIcon('risque_cout_potentiel')}</label><input type="number" value="${esc(r.cout_potentiel||'')}" oninput="updRisque(${i},'cout_potentiel',this.value)"></div>
+        <div><label>Indicateur d'alerte${helpIcon('risque_indicateur_alerte')}</label><input value="${esc(r.indicateur_alerte||'')}" placeholder="Quel signal montre que le risque se rapproche ?" oninput="updRisque(${i},'indicateur_alerte',this.value)"></div>
+        <div><label>Risque résiduel après prévention${helpIcon('risque_residuel')}</label><select onchange="updRisque(${i},'risque_residuel',this.value)">
+          ${opts.map(o=>`<option value="${o}" ${r.risque_residuel===o?'selected':''}>${{faible:'🟢 Faible',moyen:'🟡 Moyen',eleve:'🟠 Élevé',critique:'🔴 Critique'}[o]}</option>`).join('')}
+        </select></div>
       </div>
     </div>`).join('');
 }
@@ -2439,6 +2637,8 @@ function updRisque(i,key,val) {
 
 /* ---- 18-19. Impact & Financement ---- */
 function renderImpact() {
+  const s = sections.impact || {};
+  const indicateurs = s.indicateurs || [{ nom:'' }];
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🌱 Impact</h2></div>
     <div class="bp-card-inner"><div class="fg">
@@ -2448,7 +2648,59 @@ function renderImpact() {
       ${textarea('territorial','Impact territorial','Développement local, partenariats communautaires…',3,true)}
       ${textarea('kpi_impact','KPI & Indicateurs de performance','Comment mesurez-vous votre impact ?',3,true)}
     </div></div>
+    <div class="bp-card-inner"><h3>Bénéficiaires & emplois</h3><div class="fg">
+      ${field('beneficiaires_directs','Bénéficiaires directs','','number')}
+      ${field('beneficiaires_indirects','Bénéficiaires indirects','','number')}
+      ${field('emplois_directs','Emplois directs créés','','number')}
+      ${field('emplois_indirects','Emplois indirects créés','','number')}
+    </div></div>
+    <!-- Indicateurs d'impact structurés (2026-08-26, point 22) : situation initiale → cible,
+         méthode et fréquence de mesure -- répétable, un indicateur peut porter sur
+         l'économique, le social ou l'environnemental. -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Indicateurs de suivi</h3>
+        <button class="btn btn-outline btn-sm" onclick="addIndicateurImpact()">+ Ajouter un indicateur</button>
+      </div>
+      <div id="indicateurs-impact-list">${renderIndicateursImpact(indicateurs)}</div>
+    </div>
   </div>`;
+}
+function renderIndicateursImpact(list) {
+  return list.map((ind,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(ind.nom||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Nom de l'indicateur" oninput="updIndicateurImpact(${i},'nom',this.value)">
+        <button onclick="removeIndicateurImpact(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Situation initiale${helpIcon('ind_situation_initiale')}</label><input value="${esc(ind.situation_initiale||'')}" oninput="updIndicateurImpact(${i},'situation_initiale',this.value)"></div>
+        <div><label>Valeur actuelle${helpIcon('ind_valeur_actuelle')}</label><input value="${esc(ind.valeur_actuelle||'')}" oninput="updIndicateurImpact(${i},'valeur_actuelle',this.value)"></div>
+        <div><label>Objectif${helpIcon('ind_objectif')}</label><input value="${esc(ind.objectif||'')}" oninput="updIndicateurImpact(${i},'objectif',this.value)"></div>
+        <div><label>Valeur cible${helpIcon('ind_valeur_cible')}</label><input value="${esc(ind.valeur_cible||'')}" oninput="updIndicateurImpact(${i},'valeur_cible',this.value)"></div>
+        <div><label>Méthode de mesure${helpIcon('ind_methode')}</label><input value="${esc(ind.methode_mesure||'')}" oninput="updIndicateurImpact(${i},'methode_mesure',this.value)"></div>
+        <div><label>Fréquence de mesure${helpIcon('ind_frequence')}</label><input value="${esc(ind.frequence_mesure||'')}" placeholder="Ex : trimestrielle" oninput="updIndicateurImpact(${i},'frequence_mesure',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addIndicateurImpact() {
+  if (!sections.impact) sections.impact={};
+  if (!sections.impact.indicateurs) sections.impact.indicateurs=[];
+  sections.impact.indicateurs.push({nom:''});
+  document.getElementById('indicateurs-impact-list').innerHTML = renderIndicateursImpact(sections.impact.indicateurs);
+  markDirty();
+}
+function removeIndicateurImpact(i) {
+  sections.impact.indicateurs.splice(i,1);
+  document.getElementById('indicateurs-impact-list').innerHTML = renderIndicateursImpact(sections.impact.indicateurs);
+  markDirty();
+}
+function updIndicateurImpact(i,key,val) {
+  if (!sections.impact) sections.impact={};
+  if (!sections.impact.indicateurs) sections.impact.indicateurs=[];
+  if (!sections.impact.indicateurs[i]) sections.impact.indicateurs[i]={};
+  sections.impact.indicateurs[i][key]=val;
+  markDirty();
 }
 function renderFinancement() {
   const s = sections.financement || {};
