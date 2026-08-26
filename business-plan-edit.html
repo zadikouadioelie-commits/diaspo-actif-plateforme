@@ -253,6 +253,17 @@ html,body{height:100%;overflow:hidden;}
   #fr-doc{box-shadow:none;margin:0;max-width:100%;}
   .fr-section{page-break-after:auto;}
 }
+/* 3 niveaux de profondeur (2026-08-26) — cartes ajoutées par le renforcement du module,
+   masquées selon le niveau choisi ; les cartes d'origine (sans classe) restent toujours
+   visibles. */
+body.bp-profondeur-essentiel .bp-niveau-2, body.bp-profondeur-essentiel .bp-niveau-3 { display: none; }
+body.bp-profondeur-professionnel .bp-niveau-3 { display: none; }
+/* Questionnaire adaptatif (2026-08-26) — blocs propres à un type de projet, masqués tant
+   que ce type n'est pas sélectionné. bpAppliquerConditionnels() ajoute/retire cette classe. */
+.bp-conditionnel { display: none; }
+body.bp-type-numerique .bp-conditionnel-numerique { display: block; }
+body.bp-type-association .bp-conditionnel-association { display: block; }
+body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -302,6 +313,11 @@ html,body{height:100%;overflow:hidden;}
       <div class="bp-topbar">
         <input class="bp-title-input" id="bp-title-input" placeholder="Nom du projet…" onchange="patchMeta()">
         <span class="bp-save-status" id="save-status">✓ Sauvegardé</span>
+        <select id="bp-niveau-select" onchange="changerNiveauProfondeur(this.value)" title="Niveau de profondeur du questionnaire" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12.5px;font-family:inherit;background:#fff;">
+          <option value="essentiel">🟢 Essentiel</option>
+          <option value="professionnel">🔵 Professionnel</option>
+          <option value="investisseur">🟣 Investisseur</option>
+        </select>
         <button class="btn btn-outline btn-sm" onclick="toggleComments()">💬 Commentaires</button>
         <button class="btn btn-outline btn-sm" onclick="showCompletude()">📊 Complétude</button>
         <button class="btn btn-outline btn-sm" onclick="showCollaborateurs()">👥 Collaborateurs</button>
@@ -702,6 +718,9 @@ async function loadBP() {
     monRole = bp.mon_role || 'lecteur';
     document.title = `BP — ${bp.nom_projet||'Sans titre'} · Diaspo\'Actif`;
     document.getElementById('bp-title-input').value = bp.nom_projet || '';
+    appliquerNiveauProfondeur(bp.niveau_profondeur || 'essentiel');
+    document.getElementById('bp-niveau-select').value = bp.niveau_profondeur || 'essentiel';
+    bpAppliquerConditionnels();
     buildNav();
     updateProgress(bp.progression||0);
     renderSection(currentSection);
@@ -713,6 +732,38 @@ async function loadBP() {
   } catch(e) {
     document.getElementById('bp-content').innerHTML = `<div style="padding:40px;text-align:center;color:#D33;">${e.message}</div>`;
   }
+}
+
+/* ── 3 niveaux de profondeur (2026-08-26, point 25) ──
+   Chaque carte ajoutée depuis le renforcement du module porte une classe
+   bp-niveau-2/bp-niveau-3 (posée sur la balise elle-même, dans les fonctions
+   renderXxx) ; les cartes d'origine (avant ce chantier) n'en portent aucune et
+   restent donc toujours visibles, quel que soit le niveau -- c'est la base
+   "Essentiel". Purement CSS : aucune section ne perd sa donnée en changeant de
+   niveau, seul l'affichage change. */
+function appliquerNiveauProfondeur(niveau) {
+  document.body.classList.remove('bp-profondeur-essentiel','bp-profondeur-professionnel','bp-profondeur-investisseur');
+  document.body.classList.add(`bp-profondeur-${niveau||'essentiel'}`);
+}
+async function changerNiveauProfondeur(niveau) {
+  appliquerNiveauProfondeur(niveau);
+  if (bp) bp.niveau_profondeur = niveau;
+  if (monRole === 'lecteur') return;
+  try { await api('PUT', `/business-plans/${bpId}`, { niveau_profondeur: niveau }); } catch (e) {}
+}
+
+/* ── Questionnaire adaptatif (2026-08-26, point 24) ──
+   Déclencheur : infos_generales.type_initiative (existant, aucun nouveau champ de
+   classification) + infos_generales.secteur (texte libre, matché par mot-clé pour
+   l'agriculture — pas de liste fermée à ajouter). Ne supprime jamais un champ déjà
+   rempli si le type change ensuite : purement CSS (display:none), aucune donnée perdue. */
+function bpAppliquerConditionnels() {
+  const infos = sections.infos_generales || {};
+  const type = infos.type_initiative || '';
+  const secteur = (infos.secteur || '').toLowerCase();
+  document.body.classList.toggle('bp-type-numerique', ['startup','social'].includes(type) || /num[ée]rique|digital|app|logiciel|saas|web/.test(secteur));
+  document.body.classList.toggle('bp-type-association', ['association','ong'].includes(type));
+  document.body.classList.toggle('bp-type-agriculture', /agri|agro|ferme|élevage|elevage|maraîch|maraich/.test(secteur));
 }
 
 function updateProgress(prog) {
@@ -905,12 +956,12 @@ function renderInfosGenerales() {
         {v:'startup',l:'🚀 Startup'},{v:'pme',l:'🏢 PME'},{v:'association',l:'🤝 Association'},
         {v:'ong',l:'🌍 ONG'},{v:'cooperative',l:'🌾 Coopérative'},{v:'social',l:'💚 Entreprise sociale'},
         {v:'freelance',l:'💻 Freelance / Auto-entrepreneur'},{v:'autre',l:'📋 Autre'}
-      ])}
+      ]).replace("onchange=\"updateField('type_initiative',this.value)\"","onchange=\"updateField('type_initiative',this.value);bpAppliquerConditionnels()\"")}
       ${select('stade','Stade du projet',[
         {v:'idee',l:'💭 Idée'},{v:'prototype',l:'🔧 Prototype / MVP'},{v:'lancement',l:'🚀 Lancement'},
         {v:'croissance',l:'📈 Croissance'},{v:'expansion',l:'🌍 Expansion'}
       ])}
-      ${field('secteur','Secteur d\'activité','Ex : Numérique, Agriculture…','text')}
+      ${field('secteur','Secteur d\'activité','Ex : Numérique, Agriculture…','text').replace("oninput=\"updateField('secteur',this.value)\"","oninput=\"updateField('secteur',this.value);bpAppliquerConditionnels()\"")}
       ${field('sous_secteur','Sous-secteur','Spécialité…','text')}
       ${field('date_creation','Date de création','','date')}
     </div></div>
@@ -928,7 +979,7 @@ function renderInfosGenerales() {
       ${field('facebook','Facebook')}
       ${field('instagram','Instagram')}
     </div></div>
-    <div class="bp-card-inner"><h3>Structure juridique</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-2"><h3>Structure juridique</h3><div class="fg">
       ${select('forme_juridique_actuelle','Forme juridique actuelle',[
         {v:'',l:'— Non déterminée —'},{v:'auto_entrepreneur',l:'Auto-entrepreneur / Freelance'},
         {v:'ei',l:'Entreprise individuelle'},{v:'eirl',l:'EIRL'},{v:'sarl',l:'SARL / SUARL'},
@@ -952,7 +1003,7 @@ function renderInfosGenerales() {
       ])}
       ${textarea('repartition_capital','Répartition du capital','Ex : Fondateur 60%, Associé 25%, Investisseur 15%…',2,true)}
     </div></div>
-    <div class="bp-card-inner"><h3>Expérience & propriété intellectuelle</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-2"><h3>Expérience & propriété intellectuelle</h3><div class="fg">
       ${textarea('experience_entrepreneuriale','Expérience entrepreneuriale du porteur','Précédents projets créés, réussites, échecs…',3,true)}
       ${textarea('experience_secteur','Expérience dans le secteur','Années, postes occupés, expertise…',3,true)}
       ${textarea('actifs_deja_disponibles','Actifs déjà disponibles','Matériel, locaux, trésorerie, contacts…',3,true)}
@@ -969,7 +1020,7 @@ function renderInfosGenerales() {
       ${textarea('equipe_fondatrice','Membres de l\'équipe fondatrice','Un fondateur par ligne : NOM Prénom — Rôle',3,true)}
       ${textarea('organigramme','Description de l\'organigramme','Décrivez la structure organisationnelle…',3,true)}
     </div></div>
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-2">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Fiches détaillées par membre clé</h3>
         <button class="btn btn-outline btn-sm" onclick="addMembreEquipe()">+ Ajouter un membre</button>
@@ -1106,7 +1157,7 @@ function renderPresentation() {
    naturellement en premier, et resume_executif reste un résumé généré, pas un lieu
    de saisie de données brutes. */
 function renderTractionCard() {
-  return `<div class="bp-card-inner"><h3>📊 Validation, Traction & Preuves</h3>
+  return `<div class="bp-card-inner bp-niveau-2"><h3>📊 Validation, Traction & Preuves</h3>
     <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Ce que votre projet a déjà démontré, concrètement — la partie la plus regardée par une banque ou un investisseur.</p>
     <div class="fg">
       ${select('genere_revenus','Le projet génère-t-il déjà des revenus ?',[{v:'',l:'—'},{v:'oui',l:'Oui'},{v:'non',l:'Non'}])}
@@ -1237,7 +1288,7 @@ function renderMarche() {
   const segments = s.segments_clients || [{ nom_segment:'' }];
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>📊 Étude de marché</h2></div>
-    <div class="bp-card-inner"><h3>Taille du marché — TAM / SAM / SOM</h3>
+    <div class="bp-card-inner bp-niveau-2"><h3>Taille du marché — TAM / SAM / SOM</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">TAM : marché total adressable. SAM : marché accessible avec votre modèle. SOM : marché réellement visé à court terme.</p>
       <div class="fg">
         <div>${field('tam','TAM — Marché total adressable','','number')}${provenanceWidget('marche','tam')}</div>
@@ -1264,7 +1315,7 @@ function renderMarche() {
       ${textarea('besoins_clients','Besoins des clients','Ce qu\'ils recherchent vraiment…',3,true)}
       ${field('localisation_clients','Localisation géographique des clients','')}
     </div></div>
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-2">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">👥 Segments de clientèle (détail quantitatif)</h3>
         <button class="btn btn-outline btn-sm" onclick="addSegmentClient()">+ Ajouter un segment</button>
@@ -1522,7 +1573,7 @@ function renderBMC() {
     <!-- Unit Economics (2026-08-26, cahier des charges point 9) : "économie d'un client",
          chiffres agrégés au niveau du projet -- pas une fiche par produit, contrairement à
          "Capacité & exploitation" (renderProduits) qui elle est répétable par produit. -->
-    <div class="bp-card-inner"><h3>📐 Unit Economics — Économie d'un client</h3>
+    <div class="bp-card-inner bp-niveau-3"><h3>📐 Unit Economics — Économie d'un client</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Adaptez ces chiffres à votre activité — tous ne sont pas pertinents pour tous les modèles.</p>
       <div class="fg">
         ${field('prix_moyen','Prix moyen','','number')}
@@ -1650,7 +1701,7 @@ function renderProduits() {
          l'Étude de prix (stratégie tarifaire) -- ici, la mécanique de production. Le bloc
          "activité numérique" reste toujours visible pour l'instant (le questionnaire adaptatif
          qui le masquera selon le type de projet arrive à l'incrément 9). -->
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">⚙️ Capacité & exploitation</h3>
         <button class="btn btn-outline btn-sm" onclick="addCapaciteExploitation()">+ Ajouter</button>
@@ -1683,8 +1734,8 @@ function renderCapaciteExploitation(list) {
         <div><label>Saisonnalité${helpIcon('cap_saisonnalite')}</label><input value="${esc(c.saisonnalite||'')}" oninput="updCapaciteExploitation(${i},'saisonnalite',this.value)"></div>
         <div><label>Évolution prévue${helpIcon('cap_evolution_prevue')}</label><input value="${esc(c.evolution_prevue||'')}" oninput="updCapaciteExploitation(${i},'evolution_prevue',this.value)"></div>
       </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
-        <label style="font-size:11px;color:var(--muted);font-weight:700;">Si activité numérique</label>
+      <div class="bp-conditionnel bp-conditionnel-numerique" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;">Activité numérique</label>
         <div class="fg">
           <div><label>Utilisateurs${helpIcon('cap_utilisateurs')}</label><input type="number" value="${esc(c.utilisateurs||'')}" oninput="updCapaciteExploitation(${i},'utilisateurs',this.value)"></div>
           <div><label>Utilisateurs actifs${helpIcon('cap_utilisateurs_actifs')}</label><input type="number" value="${esc(c.utilisateurs_actifs||'')}" oninput="updCapaciteExploitation(${i},'utilisateurs_actifs',this.value)"></div>
@@ -1846,7 +1897,7 @@ function renderMarketing() {
       ${field('roi_marketing','ROI marketing','')}
       ${field('cout_fidelisation','Coût de fidélisation','','number')}
     </div></div>
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Campagnes</h3>
         <button class="btn btn-outline btn-sm" onclick="addCampagne()">+ Ajouter une campagne</button>
@@ -1904,7 +1955,7 @@ function renderCommercial() {
       ${textarea('sav','Service après-vente','Comment gérez-vous le SAV ?',2,true)}
       ${textarea('kpi_commerciaux','KPI commerciaux','Indicateurs à suivre…',2,true)}
     </div></div>
-    <div class="bp-card-inner"><h3>Funnel de vente quantitatif</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>Funnel de vente quantitatif</h3><div class="fg">
       ${field('nb_prospects_funnel','Nombre de prospects','','number')}
       ${field('nb_contacts_funnel','Nombre de contacts','','number')}
       ${field('nb_rdv_funnel','Nombre de rendez-vous','','number')}
@@ -1941,7 +1992,7 @@ function renderOperationnel() {
     <!-- Renforcement 2026-08-26 (point 13). Les délais de paiement et le stock moyen sont déjà
          saisis dans Plan financier > BFR (incrément 6) et alimentent son calcul -- pas
          redemandés ici pour ne jamais avoir deux réponses possibles à la même question. -->
-    <div class="bp-card-inner"><h3>Capacité & dépendances</h3>
+    <div class="bp-card-inner bp-niveau-3"><h3>Capacité & dépendances</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Les délais de paiement et le stock moyen sont déjà renseignés dans Plan financier &gt; Besoin en fonds de roulement.</p>
       <div class="fg">
         ${field('capacite_actuelle_globale','Capacité actuelle','')}
@@ -1966,6 +2017,14 @@ function renderOperationnel() {
         ${textarea('assurances_op','Assurances professionnelles','RC pro, dommages…',2,true)}
       </div>
     </div>
+    <!-- Questionnaire adaptatif (2026-08-26, point 24) : bloc agricole, affiché uniquement si
+         le secteur (infos_generales.secteur, texte libre) contient un mot-clé agricole. -->
+    <div class="bp-card-inner bp-conditionnel bp-conditionnel-agriculture"><h3>🌾 Activité agricole</h3><div class="fg">
+      ${field('surface_exploitation','Surface exploitée','Ex : 5 hectares')}
+      ${field('rendement_agricole','Rendement','Ex : 3 tonnes/hectare')}
+      ${field('irrigation','Irrigation','')}
+      ${field('capacite_stockage_agricole','Capacité de stockage','')}
+    </div></div>
   </div>`;
 }
 function renderOrganisation() {
@@ -1980,7 +2039,7 @@ function renderOrganisation() {
     </div></div>
     <!-- Renforcement 2026-08-26 (point 14). La forme juridique elle-même est déjà renseignée
          dans Informations générales > Structure juridique (incrément 2), pas redemandée ici. -->
-    <div class="bp-card-inner"><h3>Gouvernance détaillée</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>Gouvernance détaillée</h3><div class="fg">
       ${textarea('gouvernance_detail','Gouvernance','Fonctionnement des instances de décision…',3,true)}
       ${textarea('associes_gouvernance','Associés','Qui sont-ils, quel rôle ?',2,true)}
       ${textarea('droits_decision','Droits de décision','Qui décide de quoi, avec quel pouvoir ?',2,true)}
@@ -2005,7 +2064,7 @@ function renderRH() {
       ${textarea('formations','Formations prévues','Développement des compétences…',2,true)}
       ${textarea('politique_rh','Politique RH','Rémunération, avantages, culture d\'entreprise…',3,true)}
     </div></div>
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Postes prévus (détail)</h3>
         <button class="btn btn-outline btn-sm" onclick="addPosteRH()">+ Ajouter un poste</button>
@@ -2199,7 +2258,7 @@ function renderFinancier() {
 
     <!-- Immobilisations détaillées (2026-08-26, point 17) : liste répétable, en complément
          du champ "immobilisations" texte libre ci-dessus (conservé, pas remplacé). -->
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Immobilisations (détail)</h3>
         <button class="btn btn-outline btn-sm" onclick="addImmobilisation()">+ Ajouter</button>
@@ -2208,7 +2267,7 @@ function renderFinancier() {
     </div>
 
     <!-- Dette / emprunts (2026-08-26, point 17) -->
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Dette / Emprunts</h3>
         <button class="btn btn-outline btn-sm" onclick="addDette()">+ Ajouter un emprunt</button>
@@ -2246,7 +2305,7 @@ function renderFinancier() {
          du compte de résultat ci-dessus, pas en remplacement -- une charge cochée ici n'est
          pas automatiquement additionnée aux lignes "Autres charges", pour éviter tout double
          comptage silencieux ; elle sert de justificatif détaillé du poste. -->
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Détail des charges (fixes / variables)</h3>
         <button class="btn btn-outline btn-sm" onclick="addChargeDetaillee()">+ Ajouter une charge</button>
@@ -2648,7 +2707,7 @@ function renderImpact() {
       ${textarea('territorial','Impact territorial','Développement local, partenariats communautaires…',3,true)}
       ${textarea('kpi_impact','KPI & Indicateurs de performance','Comment mesurez-vous votre impact ?',3,true)}
     </div></div>
-    <div class="bp-card-inner"><h3>Bénéficiaires & emplois</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>Bénéficiaires & emplois</h3><div class="fg">
       ${field('beneficiaires_directs','Bénéficiaires directs','','number')}
       ${field('beneficiaires_indirects','Bénéficiaires indirects','','number')}
       ${field('emplois_directs','Emplois directs créés','','number')}
@@ -2657,7 +2716,7 @@ function renderImpact() {
     <!-- Indicateurs d'impact structurés (2026-08-26, point 22) : situation initiale → cible,
          méthode et fréquence de mesure -- répétable, un indicateur peut porter sur
          l'économique, le social ou l'environnemental. -->
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Indicateurs de suivi</h3>
         <button class="btn btn-outline btn-sm" onclick="addIndicateurImpact()">+ Ajouter un indicateur</button>
@@ -2717,7 +2776,7 @@ function renderFinancement() {
     </div></div>
 
     <!-- Financement par étapes / Runway (2026-08-26, point 19) -->
-    <div class="bp-card-inner"><h3>Montant &amp; calendrier</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>Montant &amp; calendrier</h3><div class="fg">
       ${field('montant_minimum_necessaire','Montant minimum nécessaire','','number')}
       ${field('montant_ideal_financement','Montant idéal','','number')}
       ${field('montant_maximum_financement','Montant maximum','','number')}
@@ -2728,8 +2787,16 @@ function renderFinancement() {
       ${textarea('financement_par_etapes','Financement par étapes','Ex : Seed puis Série A…',2,true)}
     </div></div>
 
+    <!-- Questionnaire adaptatif (2026-08-26, point 24) : bloc associatif, affiché uniquement
+         pour les types "Association" et "ONG" (infos_generales.type_initiative). -->
+    <div class="bp-card-inner bp-conditionnel bp-conditionnel-association"><h3>Ressources associatives</h3><div class="fg">
+      ${field('nb_adherents','Nombre d\'adhérents','','number')}
+      ${field('montant_cotisations','Montant des cotisations','','number')}
+      ${field('dons_recus','Dons reçus','','number')}
+    </div></div>
+
     <!-- Utilisation détaillée des fonds, par poste (répétable) -->
-    <div class="bp-card-inner">
+    <div class="bp-card-inner bp-niveau-3">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">Utilisation détaillée des fonds, par poste</h3>
         <button class="btn btn-outline btn-sm" onclick="addUtilisationPoste()">+ Ajouter un poste</button>
@@ -2738,7 +2805,7 @@ function renderFinancement() {
     </div>
 
     <!-- Capitalisation / Investisseur (2026-08-26, point 18 — manquait entièrement) -->
-    <div class="bp-card-inner"><h3>💼 Capitalisation actuelle</h3>
+    <div class="bp-card-inner bp-niveau-3"><h3>💼 Capitalisation actuelle</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Le capital social et sa répartition générale sont déjà renseignés dans "Informations générales" — précisez ici le détail par actionnaire.</p>
       <div class="fg">
         ${field('nb_parts_actions','Nombre de parts / actions','','number')}
@@ -2750,7 +2817,7 @@ function renderFinancement() {
         ${textarea('autres_detenteurs','Autres détenteurs','',2,true)}
       </div>
     </div>
-    <div class="bp-card-inner"><h3>💼 Levée de fonds</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>💼 Levée de fonds</h3><div class="fg">
       ${field('valorisation_avant','Valorisation avant investissement','','number')}
       ${field('valorisation_apres','Valorisation après investissement','','number').replace("oninput=\"updateField('valorisation_apres',this.value)\"","oninput=\"updateField('valorisation_apres',this.value);bpCalcDilution()\"")}
       ${field('pourcentage_propose','Pourcentage proposé','','number')}
@@ -2760,14 +2827,14 @@ function renderFinancement() {
     </div></div>
 
     <!-- Scénarios de financement (point 19) -->
-    <div class="bp-card-inner"><h3>Scénarios selon le financement obtenu</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>Scénarios selon le financement obtenu</h3><div class="fg">
       ${textarea('scenario_financement_50','Que se passe-t-il si vous ne recevez que 50% du financement demandé ?','',3,true)}
       ${textarea('scenario_financement_100','Scénario si 100% du financement est obtenu','',3,true)}
       ${textarea('scenario_financement_150','Scénario si 150% du financement est obtenu','',3,true)}
     </div></div>
 
     <!-- Stratégie de sortie enrichie (point 20) -->
-    <div class="bp-card-inner"><h3>Stratégie de sortie</h3><div class="fg">
+    <div class="bp-card-inner bp-niveau-3"><h3>Stratégie de sortie</h3><div class="fg">
       ${select('type_sortie','Type de sortie',[{v:'',l:'—'},{v:'acquisition',l:'Acquisition'},{v:'revente',l:'Revente'},{v:'dividendes',l:'Dividendes'},{v:'croissance_long_terme',l:'Croissance long terme'},{v:'aucune',l:'Aucune stratégie de sortie prévue'}])}
       ${field('horizon_sortie','Horizon','Ex : 5-7 ans')}
       ${textarea('acquereurs_potentiels','Acquéreurs potentiels','',2,true)}

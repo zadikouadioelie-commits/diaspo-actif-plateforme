@@ -35950,13 +35950,16 @@ app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
   if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
 
   const body = await parseBody(req);
-  const { sections, nom_projet, slogan, logo_url, type_initiative, secteur, statut, is_public } = body;
+  const { sections, nom_projet, slogan, logo_url, type_initiative, secteur, statut, is_public, niveau_profondeur } = body;
 
   const currentSections = safeJSON(bp.sections_json, {});
   const newSections = sections ? { ...currentSections, ...sections } : currentSections;
   const progression = await calcBPProgression(newSections);
 
   if (sections) await recordFieldHistory(bp.id, req.user.id, currentSections, sections);
+
+  const NIVEAUX_PROFONDEUR = ['essentiel', 'professionnel', 'investisseur'];
+  const niveauValide = NIVEAUX_PROFONDEUR.includes(niveau_profondeur) ? niveau_profondeur : null;
 
   await db.prepare(`UPDATE business_plans SET
     sections_json=?, progression=?,
@@ -35967,12 +35970,13 @@ app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
     secteur=COALESCE(?,secteur),
     statut=COALESCE(?,statut),
     is_public=COALESCE(?,is_public),
+    niveau_profondeur=COALESCE(?,niveau_profondeur),
     updated_at=datetime('now')
     WHERE id=?
   `).run(JSON.stringify(newSections), progression,
     nom_projet||null, slogan||null, logo_url||null,
     type_initiative||null, secteur||null, statut||null,
-    is_public!=null?is_public:null, bp.id);
+    is_public!=null?is_public:null, niveauValide, bp.id);
 
   sendJSON(res, 200, { ok: true, progression });
 });
