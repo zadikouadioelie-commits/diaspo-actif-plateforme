@@ -6605,6 +6605,7 @@ db.exec(`
     version INTEGER DEFAULT 1,
     progression INTEGER DEFAULT 0,
     is_public INTEGER DEFAULT 0,
+    niveau_profondeur TEXT DEFAULT 'essentiel',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
