@@ -36119,6 +36119,51 @@ app.post('/api/business-plans/:id/commentaires/:section', requireAuth, requireUt
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   BUSINESS PLAN — Justificatifs (bp_documents, 2026-08-26)
+   Le fichier lui-même passe par POST /api/upload/document (déjà existant, accepte
+   PDF/Office/image jusqu'à 15 Mo, vérifié par octets magiques) — ces routes ne
+   persistent que les métadonnées + l'URL Bunny déjà obtenue, exactement comme
+   verifications_organisation le fait pour son propre document_url.
+   ═══════════════════════════════════════════════════════════════════ */
+app.get('/api/business-plans/:id/documents', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const section = req.query?.section || null;
+  const list = section
+    ? await db.prepare('SELECT * FROM bp_documents WHERE bp_id=? AND section_key=? ORDER BY created_at DESC').all(req.params.id, section)
+    : await db.prepare('SELECT * FROM bp_documents WHERE bp_id=? ORDER BY created_at DESC').all(req.params.id);
+  sendJSON(res, 200, list);
+});
+
+app.post('/api/business-plans/:id/documents', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  const canEdit = bp.user_id === req.user.id || ['editeur', 'validateur'].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const { section_key, field_key, categorie, nom, url_bunny, type_mime } = await parseBody(req);
+  if (!url_bunny || !nom) return sendJSON(res, 400, { error: 'Nom et fichier requis.' });
+  const CATEGORIES = ['administratif','juridique','financier','commercial','technique','marche','equipe','traction','contrats','certifications','propriete_intellectuelle','temoignages','autre'];
+  const cat = CATEGORIES.includes(categorie) ? categorie : 'autre';
+  const r = await db.prepare(
+    'INSERT INTO bp_documents (bp_id, section_key, field_key, categorie, nom, url_bunny, type_mime, uploaded_by) VALUES (?,?,?,?,?,?,?,?)'
+  ).run(req.params.id, section_key || null, field_key || null, cat, String(nom).trim().slice(0, 200), url_bunny, type_mime || null, req.user.id);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+app.delete('/api/business-plans/:id/documents/:docId', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  const canEdit = bp.user_id === req.user.id || ['editeur', 'validateur'].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
+  await db.prepare('DELETE FROM bp_documents WHERE id=? AND bp_id=?').run(req.params.docId, req.params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
    ASSISTANT BP — Mémoire intelligente (recherche universelle dans les données)
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -36137,7 +36182,12 @@ const BP_FIELD_LABELS = {
     experience_entrepreneuriale:"Expérience entrepreneuriale", experience_secteur:"Expérience dans le secteur", actifs_deja_disponibles:"Actifs déjà disponibles", propriete_intellectuelle_existante:"Propriété intellectuelle existante", brevets:"Brevets", marques:"Marques", licences:"Licences", technologies_proprietaires:"Technologies propriétaires",
     competences_manquantes_equipe:"Compétences manquantes dans l'équipe" },
   resume_executif: { projet:"Description du projet", probleme:"Problème identifié", solution:"Solution proposée", marche:"Marché visé", besoins:"Besoins financiers", objectifs:"Objectifs" },
-  presentation: { vision:"Vision", mission:"Mission", valeurs:"Valeurs", obj_court:"Objectifs court terme", obj_moyen:"Objectifs moyen terme", obj_long:"Objectifs long terme", historique:"Historique", motivations:"Motivations" },
+  presentation: { vision:"Vision", mission:"Mission", valeurs:"Valeurs", obj_court:"Objectifs court terme", obj_moyen:"Objectifs moyen terme", obj_long:"Objectifs long terme", historique:"Historique", motivations:"Motivations",
+    genere_revenus:"Génère déjà des revenus", ca_realise_a_ce_jour:"CA réalisé à ce jour", ca_12_derniers_mois:"CA 12 derniers mois", ca_annee_precedente:"CA année précédente",
+    nb_clients_actuels:"Nombre de clients actuels", nb_clients_payants:"Nombre de clients payants", nb_utilisateurs:"Nombre d'utilisateurs", nb_utilisateurs_actifs:"Nombre d'utilisateurs actifs", nb_clients_recurrents:"Nombre de clients récurrents",
+    nb_commandes:"Nombre de commandes", nb_contrats_signes:"Nombre de contrats signés", nb_precommandes:"Nombre de précommandes", nb_prospects:"Nombre de prospects", nb_partenaires_engages:"Nombre de partenaires engagés", nb_lettres_intention:"Nombre de lettres d'intention", nb_pilotes_tests:"Nombre de pilotes/tests", resultats_tests:"Résultats des tests",
+    croissance_mensuelle:"Croissance mensuelle", croissance_annuelle:"Croissance annuelle", taux_fidelisation:"Taux de fidélisation", taux_reachat:"Taux de réachat",
+    temoignages_clients:"Témoignages clients", references_importantes:"Références importantes", prix_distinctions:"Prix/distinctions", subventions_obtenues:"Subventions obtenues", financements_obtenus:"Financements obtenus", montant_investi_fondateurs:"Montant investi par les fondateurs", autres_preuves_traction:"Autres preuves de traction" },
   probleme: { description:"Description du problème", pourquoi:"Pourquoi ce problème existe", qui_concerne:"Qui est concerné", ampleur:"Ampleur du problème", consequences:"Conséquences", pourquoi_pas_resolu:"Pourquoi non résolu", preuves:"Preuves & sources" },
   solution: { description:"Description de la solution", fonctionnement:"Fonctionnement", innovation:"Innovation", avantages:"Avantages client", valeur_ajoutee:"Valeur ajoutée", differenciants:"Éléments différenciants" },
   marche: { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", besoins_clients:"Besoins des clients", localisation_clients:"Localisation des clients", opportunites:"Opportunités de marché", menaces_marche:"Menaces du marché", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable" },

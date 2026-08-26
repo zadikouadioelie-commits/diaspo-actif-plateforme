@@ -858,6 +858,7 @@ function renderSection(key) {
   content.innerHTML = fn();
   if (key === 'plan_financier') calcAllFinance();
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
+  if (key === 'presentation') bpLoadTractionDocs();
   if (!def?.noSave && monRole !== 'lecteur') {
     content.insertAdjacentHTML('beforeend', `
       <div class="bp-section" style="padding-top:0;">
@@ -1089,11 +1090,111 @@ function renderPresentation() {
       ${textarea('obj_moyen','Objectifs à moyen terme (1-3 ans)','',3,true)}
       ${textarea('obj_long','Objectifs à long terme (3-5 ans+)','',3,true)}
     </div></div>
+    ${renderTractionCard()}
     <div class="bp-card-inner"><h3>Histoire & Motivations</h3><div class="fg">
       ${textarea('historique','Historique de l\'organisation','Comment est né ce projet ?',4,true)}
       ${textarea('motivations','Motivations des fondateurs','Pourquoi avez-vous lancé ce projet ?',3,true)}
     </div></div>
   </div>`;
+}
+
+/* ── Validation, Traction & Preuves (2026-08-26, cahier des charges point 2) ──
+   Logée dans "Présentation détaillée" (juste après Objectifs, avant Histoire) plutôt
+   que dans le Résumé exécutif : c'est là que "l'état réel du projet" se lit
+   naturellement en premier, et resume_executif reste un résumé généré, pas un lieu
+   de saisie de données brutes. */
+function renderTractionCard() {
+  return `<div class="bp-card-inner"><h3>📊 Validation, Traction & Preuves</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Ce que votre projet a déjà démontré, concrètement — la partie la plus regardée par une banque ou un investisseur.</p>
+    <div class="fg">
+      ${select('genere_revenus','Le projet génère-t-il déjà des revenus ?',[{v:'',l:'—'},{v:'oui',l:'Oui'},{v:'non',l:'Non'}])}
+      ${field('ca_realise_a_ce_jour','Chiffre d\'affaires réalisé à ce jour','','number')}
+      ${field('ca_12_derniers_mois','CA des 12 derniers mois','','number')}
+      ${field('ca_annee_precedente','CA de l\'année précédente','','number')}
+    </div>
+    <h3 style="font-size:13px;margin:16px 0 8px;">Clients & utilisateurs</h3><div class="fg">
+      ${field('nb_clients_actuels','Nombre de clients actuels','','number')}
+      ${field('nb_clients_payants','Nombre de clients payants','','number')}
+      ${field('nb_utilisateurs','Nombre d\'utilisateurs','','number')}
+      ${field('nb_utilisateurs_actifs','Nombre d\'utilisateurs actifs','','number')}
+      ${field('nb_clients_recurrents','Nombre de clients récurrents','','number')}
+    </div>
+    <h3 style="font-size:13px;margin:16px 0 8px;">Engagements & preuves concrètes</h3><div class="fg">
+      ${field('nb_commandes','Nombre de commandes','','number')}
+      ${field('nb_contrats_signes','Nombre de contrats signés','','number')}
+      ${field('nb_precommandes','Nombre de précommandes','','number')}
+      ${field('nb_prospects','Nombre de prospects','','number')}
+      ${field('nb_partenaires_engages','Nombre de partenaires déjà engagés','','number')}
+      ${field('nb_lettres_intention','Nombre de lettres d\'intention','','number')}
+      ${field('nb_pilotes_tests','Nombre de pilotes / tests réalisés','','number')}
+      ${textarea('resultats_tests','Résultats des tests','Ce que ces pilotes ont montré…',2,true)}
+    </div>
+    <h3 style="font-size:13px;margin:16px 0 8px;">Croissance & fidélisation</h3><div class="fg">
+      ${field('croissance_mensuelle','Croissance mensuelle','Ex : +8%/mois')}
+      ${field('croissance_annuelle','Croissance annuelle','Ex : +45%/an')}
+      ${field('taux_fidelisation','Taux de fidélisation','Ex : 70%')}
+      ${field('taux_reachat','Taux de réachat','Ex : 35%')}
+    </div>
+    <h3 style="font-size:13px;margin:16px 0 8px;">Reconnaissance & financement déjà obtenu</h3><div class="fg">
+      ${textarea('temoignages_clients','Témoignages clients','Citations, retours…',2,true)}
+      ${textarea('references_importantes','Références importantes','Clients ou partenaires connus…',2,true)}
+      ${textarea('prix_distinctions','Prix / distinctions obtenus','',2,true)}
+      ${textarea('subventions_obtenues','Subventions déjà obtenues','Organisme, montant…',2,true)}
+      ${textarea('financements_obtenus','Financements déjà obtenus','Type, montant, date…',2,true)}
+      ${field('montant_investi_fondateurs','Montant déjà investi par les fondateurs','','number')}
+      ${textarea('autres_preuves_traction','Autres preuves de traction','',2,true)}
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h3 style="margin:0;font-size:13px;">📎 Justificatifs (contrats, factures, lettres d'intention, captures d'écran…)</h3>
+        <button class="btn btn-outline btn-sm" onclick="bpTractionAjouterJustificatif()">+ Joindre un document</button>
+      </div>
+      <div id="traction-docs-list" style="font-size:12.5px;color:var(--muted);">Chargement…</div>
+    </div>
+  </div>`;
+}
+let _tractionDocsChargees = false;
+async function bpLoadTractionDocs() {
+  const el = document.getElementById('traction-docs-list');
+  if (!el) return;
+  try {
+    const docs = await api('GET', `/business-plans/${bpId}/documents?section=traction`);
+    el.innerHTML = docs.length
+      ? docs.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);">
+          <span><a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom)}</a> <span style="color:var(--muted);">(${esc(d.categorie)})</span></span>
+          ${monRole!=='lecteur'?`<button onclick="bpTractionSupprimerJustificatif(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>`:''}
+        </div>`).join('')
+      : '<div>Aucun justificatif joint pour l\'instant.</div>';
+  } catch (e) { el.innerHTML = '<div style="color:#dc2626;">Erreur de chargement.</div>'; }
+}
+function bpTractionAjouterJustificatif() {
+  if (monRole === 'lecteur') { alert('Lecture seule.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const nom = prompt('Nom de ce document ?', file.name) || file.name;
+    const categorie = prompt('Catégorie (administratif, juridique, financier, commercial, technique, marche, equipe, traction, contrats, certifications, propriete_intellectuelle, temoignages, autre) ?', 'traction') || 'traction';
+    const el = document.getElementById('traction-docs-list');
+    el.innerHTML = 'Envoi en cours…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+      const upData = await up.json();
+      if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'traction', categorie, nom, url_bunny: upData.url, type_mime: file.type });
+    } catch (e) { alert(e.message || 'Erreur.'); }
+    bpLoadTractionDocs();
+  };
+  input.click();
+}
+async function bpTractionSupprimerJustificatif(docId) {
+  if (!confirm('Supprimer ce justificatif ?')) return;
+  await api('DELETE', `/business-plans/${bpId}/documents/${docId}`);
+  bpLoadTractionDocs();
 }
 
 /* ---- 4. Problème ---- */
