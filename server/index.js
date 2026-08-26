@@ -36164,6 +36164,42 @@ app.delete('/api/business-plans/:id/documents/:docId', requireAuth, requireUtili
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   BUSINESS PLAN — Provenance des données (bp_provenance, 2026-08-26)
+   Distingue déclaré / justifié / vérifié / estimation / à confirmer pour un champ
+   chiffré donné, sans complexifier sections_json (une ligne par champ annoté,
+   UPSERT — sections_json reste la source unique des valeurs). Branché en premier
+   sur les champs de marché (TAM/SAM/SOM), les plus sensibles à sourcer.
+   ═══════════════════════════════════════════════════════════════════ */
+app.get('/api/business-plans/:id/provenance', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const list = await db.prepare('SELECT * FROM bp_provenance WHERE bp_id=?').all(req.params.id);
+  sendJSON(res, 200, list);
+});
+
+app.post('/api/business-plans/:id/provenance', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  const canEdit = bp.user_id === req.user.id || ['editeur', 'validateur'].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const { section_key, field_key, statut, source, source_url, date_donnee, methode, document_id } = await parseBody(req);
+  if (!section_key || !field_key) return sendJSON(res, 400, { error: 'section_key et field_key requis.' });
+  const STATUTS = ['declare','justifie','verifie','estimation','a_confirmer'];
+  const st = STATUTS.includes(statut) ? statut : 'declare';
+  await db.prepare(`
+    INSERT INTO bp_provenance (bp_id, section_key, field_key, statut, source, source_url, date_donnee, methode, document_id, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
+    ON CONFLICT(bp_id, section_key, field_key) DO UPDATE SET
+      statut=excluded.statut, source=excluded.source, source_url=excluded.source_url,
+      date_donnee=excluded.date_donnee, methode=excluded.methode, document_id=excluded.document_id, updated_at=datetime('now')
+  `).run(req.params.id, section_key, field_key, st, source || null, source_url || null, date_donnee || null, methode || null, document_id || null);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
    ASSISTANT BP — Mémoire intelligente (recherche universelle dans les données)
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -36190,7 +36226,8 @@ const BP_FIELD_LABELS = {
     temoignages_clients:"Témoignages clients", references_importantes:"Références importantes", prix_distinctions:"Prix/distinctions", subventions_obtenues:"Subventions obtenues", financements_obtenus:"Financements obtenus", montant_investi_fondateurs:"Montant investi par les fondateurs", autres_preuves_traction:"Autres preuves de traction" },
   probleme: { description:"Description du problème", pourquoi:"Pourquoi ce problème existe", qui_concerne:"Qui est concerné", ampleur:"Ampleur du problème", consequences:"Conséquences", pourquoi_pas_resolu:"Pourquoi non résolu", preuves:"Preuves & sources" },
   solution: { description:"Description de la solution", fonctionnement:"Fonctionnement", innovation:"Innovation", avantages:"Avantages client", valeur_ajoutee:"Valeur ajoutée", differenciants:"Éléments différenciants" },
-  marche: { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", besoins_clients:"Besoins des clients", localisation_clients:"Localisation des clients", opportunites:"Opportunités de marché", menaces_marche:"Menaces du marché", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable" },
+  marche: { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", besoins_clients:"Besoins des clients", localisation_clients:"Localisation des clients", opportunites:"Opportunités de marché", menaces_marche:"Menaces du marché", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable",
+    tam:"TAM (marché total adressable)", sam:"SAM (marché accessible)", som:"SOM (marché réellement visé)", saisonnalite:"Saisonnalité", facteurs_croissance:"Facteurs de croissance", facteurs_baisse:"Facteurs de baisse", dependance_economique:"Dépendance économique", dependance_reglementaire:"Dépendance réglementaire" },
   swot: { forces:"Forces (SWOT)", faiblesses:"Faiblesses (SWOT)", opportunites:"Opportunités (SWOT)", menaces:"Menaces (SWOT)" },
   business_model: { partenaires:"Partenaires clés", activites:"Activités clés", proposition:"Proposition de valeur", relations:"Relations clients", segments:"Segments de clientèle", ressources:"Ressources clés", canaux:"Canaux", couts:"Structure des coûts", revenus:"Sources de revenus" },
   strategie_marketing: { identite_marque:"Identité de marque", strategie_digitale:"Stratégie digitale", communication:"Plan de communication", publicite:"Publicité", partenariats:"Partenariats & co-marketing", evenements:"Événements", fidelisation:"Fidélisation" },
@@ -36220,7 +36257,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
   if (m) {
     const [, base, idx, sub] = m;
     const n = Number(idx) + 1;
-    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre' };
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment' };
     const subLabels = {
       nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
       niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
@@ -36233,6 +36270,14 @@ function bpFieldLabel(sectionKey, fieldKey) {
       disponibilite:'Disponibilité', temps_consacre:'Temps consacré', remuneration_prevue:'Rémunération prévue',
       participation_capital:'Participation au capital', responsabilites:'Responsabilités', cv_url:'CV', linkedin:'LinkedIn',
       competences_manquantes:'Compétences manquantes',
+      nb_clients_estime:'Nombre de clients estimé', ca_estime:'CA estimé', anciennete:'Ancienneté', presence_geographique:'Présence géographique',
+      canaux_distribution:'Canaux de distribution', reputation:'Réputation', avantages_technologiques:'Avantages technologiques',
+      avantages_commerciaux:'Avantages commerciaux', financement_connu:'Financement connu', investisseurs_connus:'Investisseurs connus',
+      cout_acquisition_estime:"Coût d'acquisition estimé", possibilite_copie:'Possibilité de copie', reaction_potentielle:'Réaction potentielle',
+      pourquoi_vous:'Pourquoi vous plutôt que ce concurrent', avantage_non_reproductible:'Avantage non reproductible',
+      nom_segment:'Nom du segment', nb_potentiel_clients:'Nombre potentiel de clients', profil:'Profil', age:'Âge', besoin:'Besoin',
+      budget:'Budget', panier_moyen:'Panier moyen', frequence_achat:"Fréquence d'achat", criteres_decision:'Critères de décision',
+      comportement_achat:"Comportement d'achat", canal_achat:"Canal d'achat privilégié",
     };
     const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
     const subLabel = subLabels[sub] || sub.replace(/_/g,' ');

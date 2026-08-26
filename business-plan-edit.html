@@ -1232,8 +1232,17 @@ function renderSolution() {
 function renderMarche() {
   const s = sections.marche || {};
   const concurrents = s.concurrents || [{ nom:'', type:'direct', produits:'', prix:'', positionnement:'moyen', forces:'', faiblesses:'', parts_marche:'', menace:'' }];
+  const segments = s.segments_clients || [{ nom_segment:'' }];
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>📊 Étude de marché</h2></div>
+    <div class="bp-card-inner"><h3>Taille du marché — TAM / SAM / SOM</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">TAM : marché total adressable. SAM : marché accessible avec votre modèle. SOM : marché réellement visé à court terme.</p>
+      <div class="fg">
+        <div>${field('tam','TAM — Marché total adressable','','number')}${provenanceWidget('marche','tam')}</div>
+        <div>${field('sam','SAM — Marché accessible','','number')}${provenanceWidget('marche','sam')}</div>
+        <div>${field('som','SOM — Marché réellement visé','','number')}${provenanceWidget('marche','som')}</div>
+      </div>
+    </div>
     <div class="bp-card-inner"><h3>Le marché global</h3><div class="fg">
       ${field('taille_marche','Taille du marché','Ex : 500 millions €')}
       ${field('evolution','Évolution / croissance','Ex : +12% par an')}
@@ -1241,6 +1250,11 @@ function renderMarche() {
       ${textarea('tendances','Tendances du marché','Quels sont les grands mouvements actuels ?',3,true)}
       ${textarea('barrieres_entree','Barrières à l\'entrée','Ce qui complique l\'arrivée de nouveaux acteurs…',3,true)}
       ${textarea('reglementation','Réglementation applicable','Lois, normes, autorisations nécessaires…',3,true)}
+      ${field('saisonnalite','Saisonnalité','Le marché varie-t-il selon la période de l\'année ?')}
+      ${textarea('facteurs_croissance','Facteurs de croissance','Ce qui pourrait faire grandir ce marché…',2,true)}
+      ${textarea('facteurs_baisse','Facteurs de baisse','Ce qui pourrait le faire reculer…',2,true)}
+      ${field('dependance_economique','Dépendance économique','Ex : sensible au taux de change, au prix du pétrole…')}
+      ${field('dependance_reglementaire','Dépendance réglementaire','Ex : soumis à une loi ou norme spécifique…')}
     </div></div>
     <div class="bp-card-inner"><h3>Clients cibles</h3><div class="fg">
       ${textarea('profil_client','Profil type du client','Age, situation, besoins…',3,true)}
@@ -1248,6 +1262,13 @@ function renderMarche() {
       ${textarea('besoins_clients','Besoins des clients','Ce qu\'ils recherchent vraiment…',3,true)}
       ${field('localisation_clients','Localisation géographique des clients','')}
     </div></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">👥 Segments de clientèle (détail quantitatif)</h3>
+        <button class="btn btn-outline btn-sm" onclick="addSegmentClient()">+ Ajouter un segment</button>
+      </div>
+      <div id="segments-list">${renderSegmentsClients(segments)}</div>
+    </div>
     <div class="bp-card-inner">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">⚔️ Concurrence</h3>
@@ -1263,6 +1284,108 @@ function renderMarche() {
       ${textarea('avantage_concurrentiel','Avantage concurrentiel','Ce qui vous donne un avantage durable…',3,true)}
     </div></div>
   </div>`;
+}
+function renderSegmentsClients(list) {
+  return list.map((seg,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(seg.nom_segment||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Nom du segment" oninput="updSegmentClient(${i},'nom_segment',this.value)">
+        <button onclick="removeSegmentClient(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Nombre potentiel de clients${helpIcon('segment_nb_potentiel')}</label><input type="number" value="${esc(seg.nb_potentiel_clients||'')}" oninput="updSegmentClient(${i},'nb_potentiel_clients',this.value)"></div>
+        <div><label>Profil${helpIcon('segment_profil')}</label><input value="${esc(seg.profil||'')}" oninput="updSegmentClient(${i},'profil',this.value)"></div>
+        <div><label>Âge (si pertinent)${helpIcon('segment_age')}</label><input value="${esc(seg.age||'')}" oninput="updSegmentClient(${i},'age',this.value)"></div>
+        <div><label>Localisation${helpIcon('segment_localisation')}</label><input value="${esc(seg.localisation||'')}" oninput="updSegmentClient(${i},'localisation',this.value)"></div>
+        <div><label>Besoin${helpIcon('segment_besoin')}</label><input value="${esc(seg.besoin||'')}" oninput="updSegmentClient(${i},'besoin',this.value)"></div>
+        <div><label>Budget${helpIcon('segment_budget')}</label><input value="${esc(seg.budget||'')}" oninput="updSegmentClient(${i},'budget',this.value)"></div>
+        <div><label>Panier moyen${helpIcon('segment_panier_moyen')}</label><input value="${esc(seg.panier_moyen||'')}" oninput="updSegmentClient(${i},'panier_moyen',this.value)"></div>
+        <div><label>Fréquence d'achat${helpIcon('segment_frequence')}</label><input value="${esc(seg.frequence_achat||'')}" oninput="updSegmentClient(${i},'frequence_achat',this.value)"></div>
+        <div><label>Critères de décision${helpIcon('segment_criteres')}</label><input value="${esc(seg.criteres_decision||'')}" oninput="updSegmentClient(${i},'criteres_decision',this.value)"></div>
+        <div><label>Comportement d'achat${helpIcon('segment_comportement')}</label><input value="${esc(seg.comportement_achat||'')}" oninput="updSegmentClient(${i},'comportement_achat',this.value)"></div>
+        <div><label>Canal d'achat privilégié${helpIcon('segment_canal')}</label><input value="${esc(seg.canal_achat||'')}" oninput="updSegmentClient(${i},'canal_achat',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addSegmentClient() {
+  if (!sections.marche) sections.marche={};
+  if (!sections.marche.segments_clients) sections.marche.segments_clients=[];
+  sections.marche.segments_clients.push({nom_segment:''});
+  document.getElementById('segments-list').innerHTML = renderSegmentsClients(sections.marche.segments_clients);
+  markDirty();
+}
+function removeSegmentClient(i) {
+  sections.marche.segments_clients.splice(i,1);
+  document.getElementById('segments-list').innerHTML = renderSegmentsClients(sections.marche.segments_clients);
+  markDirty();
+}
+function updSegmentClient(i,key,val) {
+  if (!sections.marche) sections.marche={};
+  if (!sections.marche.segments_clients) sections.marche.segments_clients=[];
+  if (!sections.marche.segments_clients[i]) sections.marche.segments_clients[i]={};
+  sections.marche.segments_clients[i][key]=val;
+  markDirty();
+}
+
+/* ── Provenance d'une donnée (2026-08-26, cahier des charges "Donnée/Hypothèse/Preuve") ──
+   Widget réutilisable : badge cliquable ouvrant un mini-panneau (statut + source + date +
+   méthode), sauvegardé via POST /api/business-plans/:id/provenance (une ligne par champ,
+   UPSERT). Branché en premier sur TAM/SAM/SOM (les données de marché les plus sensibles à
+   sourcer) — réutilisable tel quel pour n'importe quel autre champ dans les incréments
+   suivants (unit economics, plan financier…). */
+const BP_PROVENANCE_LABELS = { declare:'🟢 Déclaré', justifie:'🔵 Justifié', verifie:'🟣 Vérifié', estimation:'🟠 Estimation', a_confirmer:'🔴 À confirmer' };
+let _bpProvenanceCache = null;
+async function bpChargerProvenance() {
+  if (_bpProvenanceCache) return _bpProvenanceCache;
+  try { _bpProvenanceCache = await api('GET', `/business-plans/${bpId}/provenance`); }
+  catch (e) { _bpProvenanceCache = []; }
+  return _bpProvenanceCache;
+}
+function provenanceWidget(sectionKey, fieldKey) {
+  const id = `prov-${sectionKey}-${fieldKey}`;
+  setTimeout(() => bpRenderProvenanceBadge(id, sectionKey, fieldKey), 0);
+  return `<span id="${id}" style="display:inline-block;margin-top:3px;"><span style="font-size:11px;color:var(--muted);">Source…</span></span>`;
+}
+async function bpRenderProvenanceBadge(id, sectionKey, fieldKey) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const liste = await bpChargerProvenance();
+  const p = liste.find(x => x.section_key===sectionKey && x.field_key===fieldKey);
+  const label = BP_PROVENANCE_LABELS[p?.statut] || BP_PROVENANCE_LABELS.declare;
+  el.innerHTML = `<button type="button" onclick="bpTogglePanelProvenance('${id}','${sectionKey}','${fieldKey}')" style="font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:2px 9px;cursor:pointer;">${label}${monRole!=='lecteur'?' · modifier':''}</button><div id="${id}-panel" style="display:none;"></div>`;
+}
+function bpTogglePanelProvenance(id, sectionKey, fieldKey) {
+  if (monRole === 'lecteur') return;
+  const panel = document.getElementById(`${id}-panel`);
+  if (!panel) return;
+  if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+  const liste = _bpProvenanceCache || [];
+  const p = liste.find(x => x.section_key===sectionKey && x.field_key===fieldKey) || {};
+  panel.style.display = 'block';
+  panel.style.cssText = 'display:block;margin-top:6px;padding:10px;border:1px dashed var(--border);border-radius:8px;background:var(--bg);';
+  panel.innerHTML = `
+    <div class="fg" style="grid-template-columns:1fr 1fr;">
+      <div><label style="font-size:11px;">Statut</label><select id="${id}-statut">
+        ${Object.entries(BP_PROVENANCE_LABELS).map(([v,l])=>`<option value="${v}" ${p.statut===v?'selected':''}>${l}</option>`).join('')}
+      </select></div>
+      <div><label style="font-size:11px;">Date de la donnée</label><input type="date" id="${id}-date" value="${esc(p.date_donnee||'')}"></div>
+      <div class="full"><label style="font-size:11px;">Source</label><input id="${id}-source" value="${esc(p.source||'')}" placeholder="Ex : étude Xerfi 2026, entretien terrain…"></div>
+      <div class="full"><label style="font-size:11px;">Méthode</label><input id="${id}-methode" value="${esc(p.methode||'')}" placeholder="Comment cette donnée a-t-elle été obtenue ?"></div>
+    </div>
+    <button class="btn btn-orange btn-sm" style="margin-top:8px;" onclick="bpEnregistrerProvenance('${id}','${sectionKey}','${fieldKey}')">Enregistrer</button>`;
+}
+async function bpEnregistrerProvenance(id, sectionKey, fieldKey) {
+  const body = {
+    section_key: sectionKey, field_key: fieldKey,
+    statut: document.getElementById(`${id}-statut`).value,
+    date_donnee: document.getElementById(`${id}-date`).value || null,
+    source: document.getElementById(`${id}-source`).value.trim() || null,
+    methode: document.getElementById(`${id}-methode`).value.trim() || null,
+  };
+  await api('POST', `/business-plans/${bpId}/provenance`, body);
+  _bpProvenanceCache = null;
+  document.getElementById(`${id}-panel`).style.display = 'none';
+  bpRenderProvenanceBadge(id, sectionKey, fieldKey);
 }
 
 function renderConcurrents(list) {
@@ -1287,6 +1410,23 @@ function renderConcurrents(list) {
         <div><label>Faiblesses${helpIcon('concurrent_faiblesses')}</label><input value="${esc(c.faiblesses||'')}" oninput="updConcurrent(${i},'faiblesses',this.value)"></div>
         <div><label>Part de marché estimée${helpIcon('concurrent_parts_marche')}</label><input value="${esc(c.parts_marche||'')}" placeholder="Ex : 15%" oninput="updConcurrent(${i},'parts_marche',this.value)"></div>
         <div><label>Niveau de menace (0-100)${helpIcon('concurrent_menace')}</label><input type="number" min="0" max="100" value="${esc(c.menace||'')}" oninput="updConcurrent(${i},'menace',this.value);renderConcurrentsTop()"></div>
+        <div><label>Nombre de clients estimé${helpIcon('concurrent_nb_clients')}</label><input value="${esc(c.nb_clients_estime||'')}" oninput="updConcurrent(${i},'nb_clients_estime',this.value)"></div>
+        <div><label>Chiffre d'affaires estimé${helpIcon('concurrent_ca_estime')}</label><input value="${esc(c.ca_estime||'')}" placeholder="Si disponible" oninput="updConcurrent(${i},'ca_estime',this.value)"></div>
+        <div><label>Ancienneté${helpIcon('concurrent_anciennete')}</label><input value="${esc(c.anciennete||'')}" placeholder="Ex : 5 ans" oninput="updConcurrent(${i},'anciennete',this.value)"></div>
+        <div><label>Présence géographique${helpIcon('concurrent_presence_geo')}</label><input value="${esc(c.presence_geographique||'')}" oninput="updConcurrent(${i},'presence_geographique',this.value)"></div>
+        <div><label>Canaux de distribution${helpIcon('concurrent_canaux')}</label><input value="${esc(c.canaux_distribution||'')}" oninput="updConcurrent(${i},'canaux_distribution',this.value)"></div>
+        <div><label>Réputation${helpIcon('concurrent_reputation')}</label><input value="${esc(c.reputation||'')}" oninput="updConcurrent(${i},'reputation',this.value)"></div>
+        <div><label>Avantages technologiques${helpIcon('concurrent_avantages_tech')}</label><input value="${esc(c.avantages_technologiques||'')}" oninput="updConcurrent(${i},'avantages_technologiques',this.value)"></div>
+        <div><label>Avantages commerciaux${helpIcon('concurrent_avantages_commerciaux')}</label><input value="${esc(c.avantages_commerciaux||'')}" oninput="updConcurrent(${i},'avantages_commerciaux',this.value)"></div>
+        <div><label>Financement connu${helpIcon('concurrent_financement')}</label><input value="${esc(c.financement_connu||'')}" oninput="updConcurrent(${i},'financement_connu',this.value)"></div>
+        <div><label>Investisseurs connus${helpIcon('concurrent_investisseurs')}</label><input value="${esc(c.investisseurs_connus||'')}" oninput="updConcurrent(${i},'investisseurs_connus',this.value)"></div>
+        <div><label>Coût d'acquisition estimé${helpIcon('concurrent_cout_acquisition')}</label><input value="${esc(c.cout_acquisition_estime||'')}" placeholder="Si disponible" oninput="updConcurrent(${i},'cout_acquisition_estime',this.value)"></div>
+        <div><label>Possibilité de copie${helpIcon('concurrent_possibilite_copie')}</label><select onchange="updConcurrent(${i},'possibilite_copie',this.value)">
+          ${[['faible','Faible'],['moyenne','Moyenne'],['forte','Forte']].map(([v,l])=>`<option value="${v}" ${c.possibilite_copie===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div class="full"><label>Réaction potentielle à l'arrivée du projet${helpIcon('concurrent_reaction')}</label><input value="${esc(c.reaction_potentielle||'')}" oninput="updConcurrent(${i},'reaction_potentielle',this.value)"></div>
+        <div class="full"><label>Pourquoi un client choisirait-il votre projet plutôt que ce concurrent ?${helpIcon('concurrent_pourquoi_vous')}</label><input value="${esc(c.pourquoi_vous||'')}" oninput="updConcurrent(${i},'pourquoi_vous',this.value)"></div>
+        <div class="full"><label>Quel avantage est difficilement reproductible par ce concurrent ?${helpIcon('concurrent_avantage_non_reproductible')}</label><input value="${esc(c.avantage_non_reproductible||'')}" oninput="updConcurrent(${i},'avantage_non_reproductible',this.value)"></div>
       </div>
     </div>`).join('');
   setTimeout(renderConcurrentsTop, 0);
