@@ -1167,7 +1167,10 @@ db.exec(`
     image_b64 TEXT,
     categorie TEXT DEFAULT 'Général',
     statut TEXT DEFAULT 'brouillon',        -- brouillon|publie|archive|ferme
-    commission_pct REAL DEFAULT 5.0,        -- % plateforme
+    commission_pct REAL DEFAULT 3.0,        -- % plateforme (2026-08-26 : 5% -> 3% ; le DEFAULT ne
+                                             -- sert que pour une base neuve, jamais rejoue sur une
+                                             -- table existante -- voir la constante explicite
+                                             -- PLATFORM_COMMISSION_PCT dans POST /api/events)
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(organisateur_id) REFERENCES users(id)
