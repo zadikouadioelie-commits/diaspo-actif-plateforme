@@ -403,6 +403,23 @@
     </div>
   </div>
 
+  <!-- MODAL Archiver dans un dossier -->
+  <div class="msg-modal-bg" id="modal-archive-dossier" style="display:none;">
+    <div class="msg-modal" style="max-height:none;height:auto;">
+      <div class="msg-modal-head">
+        <h3>📁 Archiver la conversation</h3>
+        <button class="hd-btn" id="archive-dossier-close">✕</button>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:10px;">
+        <label style="font-size:12px;font-weight:700;color:var(--muted);">DOSSIER (facultatif)</label>
+        <input id="archive-dossier-input" class="input-field" list="archive-dossier-suggestions" placeholder="Ex : Anciens partenaires, À suivre…" autocomplete="off">
+        <datalist id="archive-dossier-suggestions"></datalist>
+        <div style="font-size:12px;color:var(--muted);">Laissez vide pour archiver sans dossier. Vous seul(e) voyez ce nom.</div>
+        <button class="btn btn-orange btn-block" id="btn-archive-confirm">Archiver</button>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /.page -->
 
 <script src="assets/data.js"></script>
@@ -518,7 +535,7 @@ async function loadConvList(searchQ){
     list.innerHTML=`<div style="padding:24px 16px;color:var(--muted);font-size:13px;text-align:center;">${filtre==="archives"?"Aucune conversation archivée.":filtre==="non_lus"?"Aucun message non lu.":"Aucune conversation.<br>Démarrez-en une nouvelle !"}</div>`;
     return;
   }
-  list.innerHTML=convs.map(c=>{
+  function convItemHtml(c){
     const preview=c.derniere_type==="file"?"📎 Pièce jointe":c.derniere_type==="image"?"🖼 Image":c.derniere_type==="link"?"🔗 Lien":(c.derniere||"Nouvelle conversation");
     return `
     <div class="msg-conv-item ${c.id===activeConvId?"active":""} ${c.non_lus>0?"unread":""}" data-id="${c.id}">
@@ -532,7 +549,27 @@ async function loadConvList(searchQ){
         ${c.non_lus>0?`<span class="unread-dot">${c.non_lus}</span>`:""}
       </div>
     </div>`;
-  }).join("");
+  }
+
+  if(filtre==="archives"){
+    // Regroupement par dossier (nommé par l'utilisateur à l'archivage), "Sans dossier" en dernier.
+    const groupes={};
+    convs.forEach(c=>{
+      const k=c.archive_dossier||"__sans__";
+      (groupes[k]=groupes[k]||[]).push(c);
+    });
+    const noms=Object.keys(groupes).filter(k=>k!=="__sans__").sort((a,b)=>a.localeCompare(b,"fr"));
+    if(groupes["__sans__"]) noms.push("__sans__");
+    list.innerHTML=noms.map(nom=>{
+      const label=nom==="__sans__"?"Sans dossier":`📁 ${escHtml(nom)}`;
+      return `<details class="conv-dossier-group" open>
+        <summary style="padding:10px 16px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;">${label} <span style="font-weight:400;">(${groupes[nom].length})</span></summary>
+        ${groupes[nom].map(convItemHtml).join("")}
+      </details>`;
+    }).join("");
+  } else {
+    list.innerHTML=convs.map(convItemHtml).join("");
+  }
 
   list.querySelectorAll(".msg-conv-item").forEach(item=>{
     item.addEventListener("click",()=>openConv(Number(item.dataset.id)));
@@ -746,11 +783,11 @@ document.getElementById("msg-input").addEventListener("input",function(){
   this.style.height=Math.min(this.scrollHeight,120)+"px";
 });
 
-/* ---- Archive / Supprimer ---- */
-document.getElementById("btn-archive").addEventListener("click",async()=>{
+/* ---- Archive (avec titre de dossier) / Supprimer ---- */
+async function appliquerArchive(dossier){
   if(!activeConvId) return;
   try{
-    const r=await api("PATCH",`/conversations/${activeConvId}/archive`);
+    const r=await api("PATCH",`/conversations/${activeConvId}/archive`,{dossier:dossier||""});
     const btn=document.getElementById("btn-archive");
     btn.textContent=r.archive?"📂":"📁";
     btn.title=r.archive?"Désarchiver":"Archiver";
@@ -761,6 +798,29 @@ document.getElementById("btn-archive").addEventListener("click",async()=>{
     }
     await loadConvList();
   }catch(e){ alert(e.message); }
+}
+document.getElementById("btn-archive").addEventListener("click",async()=>{
+  if(!activeConvId) return;
+  const dejaArchive=document.getElementById("btn-archive").textContent.trim()==="📂";
+  if(dejaArchive){ appliquerArchive(); return; } // désarchiver : direct, pas de dossier à demander
+  // Archiver : proposer un titre de dossier
+  try{
+    const {dossiers}=await api("GET","/conversations/archive-dossiers");
+    document.getElementById("archive-dossier-suggestions").innerHTML=(dossiers||[]).map(d=>`<option value="${escHtml(d)}">`).join("");
+  }catch(e){}
+  document.getElementById("archive-dossier-input").value="";
+  document.getElementById("modal-archive-dossier").style.display="flex";
+  setTimeout(()=>document.getElementById("archive-dossier-input").focus(),100);
+});
+document.getElementById("archive-dossier-close").addEventListener("click",()=>document.getElementById("modal-archive-dossier").style.display="none");
+document.getElementById("modal-archive-dossier").addEventListener("click",e=>{if(e.target===e.currentTarget) e.currentTarget.style.display="none";});
+document.getElementById("btn-archive-confirm").addEventListener("click",()=>{
+  const dossier=document.getElementById("archive-dossier-input").value.trim();
+  document.getElementById("modal-archive-dossier").style.display="none";
+  appliquerArchive(dossier);
+});
+document.getElementById("archive-dossier-input").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ e.preventDefault(); document.getElementById("btn-archive-confirm").click(); }
 });
 
 document.getElementById("btn-delete-conv").addEventListener("click",async()=>{

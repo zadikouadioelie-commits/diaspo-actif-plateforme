@@ -10712,6 +10712,7 @@ async function convAnonyme(conv, userId) {
     ...conv,
     autre_id: isU1 ? conv.user2_id : conv.user1_id,
     archive: isU1 ? !!conv.archive_u1 : !!conv.archive_u2,
+    archive_dossier: isU1 ? conv.archive_dossier_u1 : conv.archive_dossier_u2,
     deleted: isU1 ? !!conv.deleted_u1 : !!conv.deleted_u2,
   };
 }
@@ -10739,7 +10740,11 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
     ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC
   `).all(user.id, user.id, user.id, user.id, user.id);
 
-  let filtered = rows.map(r => ({ ...r, archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2 }));
+  let filtered = rows.map(r => ({
+    ...r,
+    archive: r.user1_id === user.id ? !!r.archive_u1 : !!r.archive_u2,
+    archive_dossier: r.user1_id === user.id ? r.archive_dossier_u1 : r.archive_dossier_u2,
+  }));
 
   if (filtre === "non_lus") filtered = filtered.filter(r => r.non_lus > 0);
   if (filtre === "archives") filtered = filtered.filter(r => r.archive);
@@ -11577,17 +11582,35 @@ route("DELETE", "/api/messages/:id", async (req, res, params) => {
   sendJSON(res, 200, { message: updated });
 });
 
-/* PATCH /api/conversations/:id/archive — archiver/désarchiver */
-route("PATCH", "/api/conversations/:id/archive", async (req, res, params) => {
+/* PATCH /api/conversations/:id/archive — archiver/désarchiver, avec titre de dossier optionnel
+   à l'archivage (indépendant pour chaque partie de la conversation). Le désarchivage efface
+   le dossier mémorisé pour repartir propre la prochaine fois. */
+route("PATCH", "/api/conversations/:id/archive", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const conv = await db.prepare("SELECT * FROM conversations WHERE id = ?").get(params.id);
   if (!conv || (conv.user1_id !== user.id && conv.user2_id !== user.id)) return sendJSON(res, 403, { error: "Accès refusé." });
 
   const col = conv.user1_id === user.id ? "archive_u1" : "archive_u2";
+  const colDossier = conv.user1_id === user.id ? "archive_dossier_u1" : "archive_dossier_u2";
   const current = conv[col];
-  await db.prepare(`UPDATE conversations SET ${col}=? WHERE id=?`).run(current ? 0 : 1, conv.id);
-  sendJSON(res, 200, { archive: !current });
+  const nouveauDossier = current ? null : ((body?.dossier || "").trim().slice(0, 60) || null);
+  await db.prepare(`UPDATE conversations SET ${col}=?, ${colDossier}=? WHERE id=?`).run(current ? 0 : 1, nouveauDossier, conv.id);
+  sendJSON(res, 200, { archive: !current, dossier: nouveauDossier });
+});
+
+/* GET /api/conversations/archive-dossiers — noms de dossiers déjà utilisés par l'utilisateur
+   courant, pour lui suggérer un dossier existant plutôt que d'en recréer un en double. */
+route("GET", "/api/conversations/archive-dossiers", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT DISTINCT CASE WHEN user1_id=? THEN archive_dossier_u1 ELSE archive_dossier_u2 END AS dossier
+    FROM conversations
+    WHERE (user1_id=? OR user2_id=?)
+      AND ((user1_id=? AND archive_dossier_u1 IS NOT NULL) OR (user2_id=? AND archive_dossier_u2 IS NOT NULL))
+  `).all(user.id, user.id, user.id, user.id, user.id);
+  sendJSON(res, 200, { dossiers: rows.map(r => r.dossier).filter(Boolean).sort() });
 });
 
 /* DELETE /api/conversations/:id — suppression douce côté utilisateur */

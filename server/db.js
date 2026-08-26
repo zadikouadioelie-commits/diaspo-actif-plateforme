@@ -498,6 +498,8 @@ db.exec(`
     sujet TEXT,
     archive_u1 INTEGER DEFAULT 0,
     archive_u2 INTEGER DEFAULT 0,
+    archive_dossier_u1 TEXT,
+    archive_dossier_u2 TEXT,
     deleted_u1 INTEGER DEFAULT 0,
     deleted_u2 INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
@@ -1436,6 +1438,10 @@ const MIGRATIONS = [
   ["conversations", "sujet TEXT"],
   ["conversations", "archive_u1 INTEGER DEFAULT 0"],
   ["conversations", "archive_u2 INTEGER DEFAULT 0"],
+  // Dossiers d'archivage nommés (2026-08-26) : titre choisi par chaque utilisateur à
+  // l'archivage, indépendant pour chacune des deux parties de la conversation.
+  ["conversations", "archive_dossier_u1 TEXT"],
+  ["conversations", "archive_dossier_u2 TEXT"],
   ["conversations", "deleted_u1 INTEGER DEFAULT 0"],
   ["conversations", "deleted_u2 INTEGER DEFAULT 0"],
   ["messages", "type TEXT DEFAULT 'text'"],
