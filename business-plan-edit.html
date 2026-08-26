@@ -1996,7 +1996,32 @@ function renderFinancier() {
       ${field('financement_recherche','Financement externe recherché (€)','','number').replace("oninput=\"updateField('financement_recherche',this.value)\"","oninput=\"updateField('financement_recherche',this.value);calcAllFinance()\"")}
       ${textarea('immobilisations','Détail des immobilisations','Équipements, locaux, brevets…',3,true)}
       ${textarea('bfr','Besoin en fonds de roulement (BFR)','Explication et montant…',2,true).replace("oninput=\"updateField('bfr',this.value)\"","oninput=\"updateField('bfr',this.value);calcAllFinance()\"")}
+      ${field('delai_paiement_clients','Délai de paiement clients','Ex : 30 jours')}
+      ${field('delai_paiement_fournisseurs','Délai de paiement fournisseurs','Ex : 45 jours')}
+      ${field('duree_stockage','Durée de stockage','Ex : 20 jours')}
+      ${field('creances_clients','Créances clients','','number')}
+      ${field('dettes_fournisseurs','Dettes fournisseurs','','number')}
+      ${field('stock_moyen_valeur','Stock moyen (valeur)','','number')}
     </div></div>
+
+    <!-- Immobilisations détaillées (2026-08-26, point 17) : liste répétable, en complément
+         du champ "immobilisations" texte libre ci-dessus (conservé, pas remplacé). -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Immobilisations (détail)</h3>
+        <button class="btn btn-outline btn-sm" onclick="addImmobilisation()">+ Ajouter</button>
+      </div>
+      <div id="immobilisations-list">${renderImmobilisations(s.immobilisations_liste || [{ nom:'' }])}</div>
+    </div>
+
+    <!-- Dette / emprunts (2026-08-26, point 17) -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Dette / Emprunts</h3>
+        <button class="btn btn-outline btn-sm" onclick="addDette()">+ Ajouter un emprunt</button>
+      </div>
+      <div id="dettes-list">${renderDettes(s.dettes || [{ nom:'' }])}</div>
+    </div>
 
     <div class="bp-card-inner">
       <h3>Compte de résultat prévisionnel</h3>
@@ -2022,6 +2047,19 @@ function renderFinancier() {
         <button class="btn btn-outline btn-sm" onclick="calcAllFinance()">🔄 Recalculer</button>
         <button class="btn btn-outline btn-sm" onclick="exportFinancierCSV()">📥 Exporter CSV</button>
       </div>
+    </div>
+
+    <!-- Détail des charges fixes/variables (2026-08-26, point 17) : en complément des lignes
+         du compte de résultat ci-dessus, pas en remplacement -- une charge cochée ici n'est
+         pas automatiquement additionnée aux lignes "Autres charges", pour éviter tout double
+         comptage silencieux ; elle sert de justificatif détaillé du poste. -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Détail des charges (fixes / variables)</h3>
+        <button class="btn btn-outline btn-sm" onclick="addChargeDetaillee()">+ Ajouter une charge</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Justifie le poste "Autres charges" ci-dessus — n'est pas additionné automatiquement, pour éviter un double comptage.</p>
+      <div id="charges-detaillees-list">${renderChargesDetaillees(s.charges_detaillees || [{ nom:'frais_bancaires' }])}</div>
     </div>
 
     <div class="bp-card-inner"><h3>Seuil de rentabilité</h3><div class="fg">
@@ -2089,6 +2127,126 @@ function updFin(key,val) {
   markDirty();
 }
 function fmtEuro(n){ return (Math.round(n*100)/100).toLocaleString('fr')+'€'; }
+
+/* ── Immobilisations détaillées (répétable) ── */
+function renderImmobilisations(list) {
+  return list.map((im,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(im.nom||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Nom de l'investissement" oninput="updImmobilisation(${i},'nom',this.value)">
+        <button onclick="removeImmobilisation(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Montant${helpIcon('immo_montant')}</label><input type="number" value="${esc(im.montant||'')}" oninput="updImmobilisation(${i},'montant',this.value)"></div>
+        <div><label>Date d'achat${helpIcon('immo_date_achat')}</label><input type="date" value="${esc(im.date_achat||'')}" oninput="updImmobilisation(${i},'date_achat',this.value)"></div>
+        <div><label>Durée d'amortissement (ans)${helpIcon('immo_duree')}</label><input type="number" value="${esc(im.duree_amortissement||'')}" oninput="updImmobilisation(${i},'duree_amortissement',this.value)"></div>
+        <div><label>Valeur résiduelle${helpIcon('immo_valeur_residuelle')}</label><input type="number" value="${esc(im.valeur_residuelle||'')}" oninput="updImmobilisation(${i},'valeur_residuelle',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addImmobilisation() {
+  if (!sections.plan_financier) sections.plan_financier={};
+  if (!sections.plan_financier.immobilisations_liste) sections.plan_financier.immobilisations_liste=[];
+  sections.plan_financier.immobilisations_liste.push({nom:''});
+  document.getElementById('immobilisations-list').innerHTML = renderImmobilisations(sections.plan_financier.immobilisations_liste);
+  markDirty();
+}
+function removeImmobilisation(i) {
+  sections.plan_financier.immobilisations_liste.splice(i,1);
+  document.getElementById('immobilisations-list').innerHTML = renderImmobilisations(sections.plan_financier.immobilisations_liste);
+  markDirty();
+}
+function updImmobilisation(i,key,val) {
+  if (!sections.plan_financier) sections.plan_financier={};
+  if (!sections.plan_financier.immobilisations_liste) sections.plan_financier.immobilisations_liste=[];
+  if (!sections.plan_financier.immobilisations_liste[i]) sections.plan_financier.immobilisations_liste[i]={};
+  sections.plan_financier.immobilisations_liste[i][key]=val;
+  markDirty();
+}
+
+/* ── Dette / Emprunts (répétable) ── */
+function renderDettes(list) {
+  return list.map((d,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(d.nom||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Nom de l'emprunt (ex : Prêt bancaire création)" oninput="updDette(${i},'nom',this.value)">
+        <button onclick="removeDette(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Montant${helpIcon('dette_montant')}</label><input type="number" value="${esc(d.montant||'')}" oninput="updDette(${i},'montant',this.value)"></div>
+        <div><label>Taux (%)${helpIcon('dette_taux')}</label><input type="number" value="${esc(d.taux||'')}" oninput="updDette(${i},'taux',this.value)"></div>
+        <div><label>Durée (mois)${helpIcon('dette_duree')}</label><input type="number" value="${esc(d.duree||'')}" oninput="updDette(${i},'duree',this.value)"></div>
+        <div><label>Différé (mois)${helpIcon('dette_differe')}</label><input type="number" value="${esc(d.differe||'')}" oninput="updDette(${i},'differe',this.value)"></div>
+        <div><label>Mensualité${helpIcon('dette_mensualite')}</label><input type="number" value="${esc(d.mensualite||'')}" oninput="updDette(${i},'mensualite',this.value)"></div>
+        <div><label>Date de début${helpIcon('dette_date_debut')}</label><input type="date" value="${esc(d.date_debut||'')}" oninput="updDette(${i},'date_debut',this.value)"></div>
+        <div><label>Date de fin${helpIcon('dette_date_fin')}</label><input type="date" value="${esc(d.date_fin||'')}" oninput="updDette(${i},'date_fin',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addDette() {
+  if (!sections.plan_financier) sections.plan_financier={};
+  if (!sections.plan_financier.dettes) sections.plan_financier.dettes=[];
+  sections.plan_financier.dettes.push({nom:''});
+  document.getElementById('dettes-list').innerHTML = renderDettes(sections.plan_financier.dettes);
+  markDirty();
+}
+function removeDette(i) {
+  sections.plan_financier.dettes.splice(i,1);
+  document.getElementById('dettes-list').innerHTML = renderDettes(sections.plan_financier.dettes);
+  markDirty();
+}
+function updDette(i,key,val) {
+  if (!sections.plan_financier) sections.plan_financier={};
+  if (!sections.plan_financier.dettes) sections.plan_financier.dettes=[];
+  if (!sections.plan_financier.dettes[i]) sections.plan_financier.dettes[i]={};
+  sections.plan_financier.dettes[i][key]=val;
+  markDirty();
+}
+
+/* ── Détail des charges fixes/variables (répétable) ── */
+const BP_CHARGES_CATALOGUE = [
+  ['frais_bancaires','Frais bancaires'],['frais_comptables','Frais comptables'],['assurances','Assurances'],
+  ['maintenance','Maintenance'],['telecommunications','Télécommunications'],['logiciels','Logiciels'],
+  ['frais_juridiques','Frais juridiques'],['taxes','Taxes'],['interets','Intérêts'],['commissions','Commissions'],
+  ['transport','Transport'],['stockage','Stockage'],['autre','Autre'],
+];
+function renderChargesDetaillees(list) {
+  return list.map((c,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <select style="font-weight:700;font-size:13px;flex:1;" onchange="updChargeDetaillee(${i},'nom',this.value)">
+          ${BP_CHARGES_CATALOGUE.map(([v,l])=>`<option value="${v}" ${c.nom===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        <button onclick="removeChargeDetaillee(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Type${helpIcon('charge_type')}</label><select onchange="updChargeDetaillee(${i},'type',this.value)">
+          ${[['fixe','Charge fixe'],['variable','Charge variable']].map(([v,l])=>`<option value="${v}" ${c.type===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Montant annuel${helpIcon('charge_montant')}</label><input type="number" value="${esc(c.montant_annuel||'')}" oninput="updChargeDetaillee(${i},'montant_annuel',this.value)"></div>
+        <div class="full"><label>Commentaire${helpIcon('charge_commentaire')}</label><input value="${esc(c.commentaire||'')}" oninput="updChargeDetaillee(${i},'commentaire',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addChargeDetaillee() {
+  if (!sections.plan_financier) sections.plan_financier={};
+  if (!sections.plan_financier.charges_detaillees) sections.plan_financier.charges_detaillees=[];
+  sections.plan_financier.charges_detaillees.push({nom:'frais_bancaires'});
+  document.getElementById('charges-detaillees-list').innerHTML = renderChargesDetaillees(sections.plan_financier.charges_detaillees);
+  markDirty();
+}
+function removeChargeDetaillee(i) {
+  sections.plan_financier.charges_detaillees.splice(i,1);
+  document.getElementById('charges-detaillees-list').innerHTML = renderChargesDetaillees(sections.plan_financier.charges_detaillees);
+  markDirty();
+}
+function updChargeDetaillee(i,key,val) {
+  if (!sections.plan_financier) sections.plan_financier={};
+  if (!sections.plan_financier.charges_detaillees) sections.plan_financier.charges_detaillees=[];
+  if (!sections.plan_financier.charges_detaillees[i]) sections.plan_financier.charges_detaillees[i]={};
+  sections.plan_financier.charges_detaillees[i][key]=val;
+  markDirty();
+}
 function ratioDot(value, seuilVert, seuilOrange, inverse) {
   let cls='red';
   if (inverse) { if(value<=seuilVert) cls='green'; else if(value<=seuilOrange) cls='orange'; }

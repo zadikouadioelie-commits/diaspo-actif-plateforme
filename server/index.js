@@ -36237,6 +36237,7 @@ const BP_FIELD_LABELS = {
   organisation: { dirigeants:"Direction & gouvernance", equipe:"Équipe actuelle", responsabilites:"Répartition des responsabilités", consultants:"Consultants & experts", benevoles:"Bénévoles" },
   rh: { effectif_actuel:"Effectif actuel", effectif_prevu:"Effectif prévu", recrutements:"Recrutements prévus", competences:"Compétences recherchées", formations:"Formations prévues", politique_rh:"Politique RH" },
   plan_financier: { investissement_initial:"Investissement total", apport_personnel:"Apport personnel", financement_recherche:"Financement recherché", immobilisations:"Immobilisations", bfr:"Besoin en fonds de roulement", seuil_rentabilite:"Seuil de rentabilité", point_mort:"Point mort", amortissements:"Plan d'amortissement", scenario_optimiste:"Scénario optimiste", scenario_realiste:"Scénario réaliste", scenario_prudent:"Scénario prudent",
+    delai_paiement_clients:"Délai paiement clients", delai_paiement_fournisseurs:"Délai paiement fournisseurs", duree_stockage:"Durée de stockage", creances_clients:"Créances clients", dettes_fournisseurs:"Dettes fournisseurs", stock_moyen_valeur:"Stock moyen",
     pf_apport:"Apport personnel (plan de financement)", pf_associes:"Associés", pf_famille:"Famille", pf_business_angels:"Business Angels", pf_banque:"Banque", pf_subvention:"Subvention", pf_investisseur:"Investisseur", pf_crowdfunding:"Crowdfunding", pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:"Autres ressources",
     pf_terrain:"Achat terrain", pf_construction:"Construction", pf_materiel:"Matériel", pf_vehicules:"Véhicules", pf_logiciels:"Logiciels", pf_stocks:"Stocks", pf_tresorerie:"Trésorerie (emploi)", pf_frais_admin:"Frais administratifs", pf_communication:"Communication (emploi)", pf_recrutement:"Recrutement (emploi)" },
   impact: { economique:"Impact économique", social:"Impact social", environnemental:"Impact environnemental", territorial:"Impact territorial", kpi_impact:"KPI d'impact" },
@@ -36258,7 +36259,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
   if (m) {
     const [, base, idx, sub] = m;
     const n = Number(idx) + 1;
-    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit' };
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit', immobilisations_liste:'Immobilisation', dettes:'Emprunt', charges_detaillees:'Charge' };
     const subLabels = {
       nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
       niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
@@ -36285,6 +36286,9 @@ function bpFieldLabel(sectionKey, fieldKey) {
       duree_vie:'Durée de vie', dependance_fournisseur:'Dépendance fournisseur', saisonnalite:'Saisonnalité', evolution_prevue:'Évolution prévue',
       utilisateurs:'Utilisateurs', utilisateurs_actifs:'Utilisateurs actifs', conversion_payant:'Conversion gratuit → payant', churn_numerique:'Churn',
       cout_serveur:'Coût serveur', cout_par_utilisateur:'Coût par utilisateur', cout_acquisition_numerique:"Coût d'acquisition", arpu:'ARPU',
+      montant:'Montant', date_achat:"Date d'achat", duree_amortissement:"Durée d'amortissement", valeur_residuelle:'Valeur résiduelle',
+      taux:'Taux', duree:'Durée', differe:'Différé', mensualite:'Mensualité', date_debut:'Date de début', date_fin:'Date de fin',
+      montant_annuel:'Montant annuel',
     };
     const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
     const subLabel = subLabels[sub] || sub.replace(/_/g,' ');
