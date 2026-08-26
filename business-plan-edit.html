@@ -2326,6 +2326,18 @@ function renderFinancier() {
       ${textarea('scenario_prudent','Scénario prudent','Hypothèses basses…',3,false)}
     </div></div>
 
+    <!-- Test de résistance (2026-08-26, point 28) : recalcul PUR côté client à partir des
+         données déjà saisies (An 1 du compte de résultat), jamais un nouvel appel serveur --
+         même logique que computeReportScore() du dossier final. -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="margin:0;">🧪 Test de résistance</h3>
+        <button class="btn btn-outline btn-sm" onclick="bpLancerTestResistance()">Lancer le test</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Simule 3 scénarios sur le Chiffre d'affaires et les charges de l'An 1 : Prudent (CA -30% / coûts +15%), Réaliste (hypothèses saisies), Optimiste (CA +20% / coûts maîtrisés).</p>
+      <div id="bp-test-resistance-result"></div>
+    </div>
+
     <div class="bp-card-inner">
       <h3>🏦 2. Plan de financement</h3>
       <p style="font-size:12.5px;color:var(--muted);margin-top:-4px;">Le total des Ressources doit être égal au total des Emplois.</p>
@@ -2617,6 +2629,48 @@ function bpAppliquerSuggestionCA(total) {
   markDirty();
   renderSection('plan_financier');
   calcAllFinance();
+}
+/* Test de résistance (point 28) : recalcule le résultat net An 1 sous 3 hypothèses, à
+   partir des lignes déjà saisies du compte de résultat -- aucune donnée n'est modifiée,
+   uniquement affichée en comparaison. */
+function bpLancerTestResistance() {
+  const el = document.getElementById('bp-test-resistance-result');
+  if (!el) return;
+  const s = sections.plan_financier || {};
+  const ca = parseFloat(s.ca_1) || 0;
+  const chargesBase = ['achats_1','salaires_1','loyers_1','marketing_charge_1','autres_charges_1']
+    .reduce((sum,k) => sum + (parseFloat(s[k])||0), 0);
+  if (!ca && !chargesBase) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:12.5px;">Renseignez d\'abord le compte de résultat (An 1) pour lancer le test.</div>';
+    return;
+  }
+  const scenarios = [
+    { nom:'🔴 Prudent',   ca: ca*0.7,  charges: chargesBase*1.15 },
+    { nom:'🟡 Réaliste',  ca: ca,      charges: chargesBase },
+    { nom:'🟢 Optimiste', ca: ca*1.2,  charges: chargesBase*0.9 },
+  ];
+  const investissement = parseFloat(s.investissement_initial) || 0;
+  el.innerHTML = `<div style="overflow-x:auto;"><table class="fin-table">
+    <thead><tr><th>Scénario</th><th>CA</th><th>Charges</th><th>Résultat net</th><th>Marge</th><th>Trésorerie (An 1)</th><th>Besoin financement complémentaire</th></tr></thead>
+    <tbody>
+      ${scenarios.map(sc => {
+        const resultat = sc.ca - sc.charges;
+        const marge = sc.ca ? (resultat/sc.ca*100) : 0;
+        const tresorerie = resultat; // approximation An 1, hors BFR/dette déjà présentés ailleurs
+        const besoinComplementaire = Math.max(0, investissement - (parseFloat(s.apport_personnel)||0) - (parseFloat(s.financement_recherche)||0) - Math.max(0,resultat));
+        return `<tr>
+          <td>${sc.nom}</td>
+          <td>${fmtEuro(sc.ca)}</td>
+          <td>${fmtEuro(sc.charges)}</td>
+          <td style="color:${resultat>=0?'#10b981':'#dc2626'};font-weight:700;">${fmtEuro(resultat)}</td>
+          <td>${marge.toFixed(1)}%</td>
+          <td style="color:${tresorerie>=0?'#10b981':'#dc2626'};">${fmtEuro(tresorerie)}</td>
+          <td>${besoinComplementaire>0?fmtEuro(besoinComplementaire):'—'}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>
+  <p style="font-size:11px;color:var(--muted);margin-top:8px;">Estimation indicative sur l'An 1 uniquement, à partir des lignes déjà saisies du compte de résultat — ne remplace pas une analyse financière complète.</p>`;
 }
 function exportFinancierCSV() {
   const s=sections.plan_financier||{};
@@ -2963,8 +3017,15 @@ function renderCompletude() {
   const prog = bp?.progression || 0;
   const valides = completude.filter(c=>c.ok).length;
   const total = completude.length;
+  setTimeout(bpChargerScoreExplicable, 0);
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>✅ Vérification de complétude</h2></div>
+    <!-- Score explicable (2026-08-26, point 27) : 11 sous-scores thématiques, chargé de
+         façon asynchrone (nécessite un appel serveur, contrairement à la complétude déjà
+         incluse dans bp au chargement). -->
+    <div class="bp-card-inner" id="bp-score-explicable">
+      <div style="text-align:center;padding:20px;color:var(--muted);">Calcul du score en cours…</div>
+    </div>
     <div class="bp-card-inner">
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
         <div style="text-align:center;">
@@ -2998,6 +3059,35 @@ function renderCompletude() {
       </div>
     </div>
   </div>`;
+}
+async function bpChargerScoreExplicable() {
+  const el = document.getElementById('bp-score-explicable');
+  if (!el) return;
+  try {
+    const s = await api('GET', `/business-plans/${bpId}/score`);
+    const coul = s.score>=80?'#10b981':s.score>=50?'var(--orange)':'#dc2626';
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:40px;font-weight:900;color:${coul};">${s.score}<span style="font-size:16px;">/100</span></div>
+          <div style="font-size:12px;color:var(--muted);">Score explicable</div>
+        </div>
+        <div style="flex:1;min-width:200px;font-size:12px;color:var(--muted);font-style:italic;">⚠️ ${esc(s.avertissement)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:16px;">
+        ${s.detail.map(c => `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:${c.pts>=c.max?'#f0fdf4':c.pts>0?'#fffbeb':'#fef2f2'};">
+            <div style="font-size:12px;font-weight:700;">${c.icon} ${esc(c.label)}</div>
+            <div style="font-size:11px;color:var(--muted);">${c.pts}/${c.max} — ${esc(c.aide)}</div>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;">
+        <div style="flex:1;min-width:180px;"><strong style="color:#10b981;">✅ Points forts</strong><br>${s.points_forts.length?s.points_forts.map(esc).join(', '):'Aucun pour l\'instant'}</div>
+        <div style="flex:1;min-width:180px;"><strong style="color:#dc2626;">⚠️ À renforcer</strong><br>${[...s.points_faibles,...s.manquants].length?[...s.points_faibles,...s.manquants].map(esc).join(', '):'Rien à signaler'}</div>
+      </div>
+      ${s.actions_prioritaires.length ? `<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:12.5px;"><strong>5 actions prioritaires :</strong> ${s.actions_prioritaires.map(esc).join(' · ')}</div>` : ''}
+    `;
+  } catch (e) { el.innerHTML = '<div style="color:#dc2626;">Score indisponible pour le moment.</div>'; }
 }
 
 /* ════════════════════════════════════════════════════

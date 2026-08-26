@@ -35894,6 +35894,95 @@ async function checkBPCompletude(sections) {
   });
 }
 
+/* ── Score explicable (2026-08-26, point 27) ──
+   Même gabarit que computeTrustScore (indice de fiabilité, ~ligne 28800) : un tableau
+   criteres[] avec {cle,label,pts,max,aide,action}, agrégé en score /100. Remplace
+   PROGRESSION (une % de remplissage brute, sans nuance) par 11 sous-scores thématiques
+   explicables — jamais présenté comme une notation financière certifiée, seulement un
+   repère de complétude qualitative. checkBPCompletude/calcBPProgression restent utilisés
+   ailleurs (nav section par section) et ne sont pas remplacés par ce score. */
+async function computeBPScore(bp, sections) {
+  const rempli = (v) => v != null && String(v).trim().length > 0;
+  const g = (sec, champ) => rempli(sections[sec]?.[champ]);
+  const listeNonVide = (sec, champ, champCle) => (sections[sec]?.[champ] || []).some(x => rempli(x?.[champCle]));
+
+  const infos = sections.infos_generales || {};
+  const marche = sections.marche || {};
+  const presentation = sections.presentation || {};
+  const financier = sections.plan_financier || {};
+  const risques = (sections.risques?.items) || [];
+  const impact = sections.impact || {};
+
+  let nbDocs = 0;
+  try { nbDocs = (await db.prepare('SELECT COUNT(*) n FROM bp_documents WHERE bp_id=?').get(bp.id))?.n || 0; } catch (e) {}
+
+  const criteres = [
+    { cle:'marche', icon:'📊', label:'Étude de marché', max:9,
+      pts: (rempli(marche.taille_marche) || rempli(marche.tam) ? 3:0) + ((marche.concurrents||[]).some(c=>rempli(c.nom)) ? 3:0) + (rempli(marche.profil_client) ? 3:0),
+      aide: 'Taille de marché, au moins un concurrent identifié, profil client.',
+      action: { texte:'Compléter le marché', href:'#marche' } },
+    { cle:'produit', icon:'💡', label:'Produit / Solution', max:9,
+      pts: (g('solution','description') ? 5:0) + ((sections.produits?.items||[]).some(p=>rempli(p.nom)) ? 4:0),
+      aide: 'Description de la solution et au moins un produit/service catalogué.',
+      action: { texte:'Compléter la solution', href:'#solution' } },
+    { cle:'equipe', icon:'👥', label:'Équipe', max:9,
+      pts: (g('infos_generales','responsable') ? 3:0) + (listeNonVide('infos_generales','membres_equipe','nom') ? 3:0) + (g('infos_generales','competences_manquantes_equipe') ? 3:0),
+      aide: 'Responsable identifié, au moins une fiche membre, compétences manquantes évaluées.',
+      action: { texte:'Compléter l\'équipe', href:'#infos_generales' } },
+    { cle:'traction', icon:'📈', label:'Traction', max:9,
+      pts: (rempli(presentation.genere_revenus) ? 3:0) + ([presentation.ca_realise_a_ce_jour,presentation.nb_clients_actuels,presentation.nb_utilisateurs].some(v=>parseFloat(v)>0) ? 3:0) + (nbDocs>0 ? 3:0),
+      aide: 'Traction déclarée, au moins un chiffre concret, un justificatif joint.',
+      action: { texte:'Compléter la traction', href:'#presentation' } },
+    { cle:'modele', icon:'🎯', label:'Modèle économique', max:9,
+      pts: (g('business_model','proposition') && g('business_model','revenus') ? 5:0) + ((g('business_model','cac')||g('business_model','ltv')) ? 4:0),
+      aide: 'Business Model Canvas rempli, au moins un indicateur d\'unit economics (CAC ou LTV).',
+      action: { texte:'Compléter le modèle économique', href:'#business_model' } },
+    { cle:'commercial', icon:'💼', label:'Plan commercial', max:9,
+      pts: (g('plan_commercial','objectifs_vente') ? 4:0) + ((g('plan_commercial','nb_prospects_funnel')||g('plan_commercial','nb_contrats_funnel')) ? 5:0),
+      aide: 'Objectifs de vente et funnel quantitatif renseignés.',
+      action: { texte:'Compléter le plan commercial', href:'#plan_commercial' } },
+    { cle:'finance', icon:'💰', label:'Finance', max:10,
+      pts: (g('plan_financier','ca_1') ? 3:0) + (g('plan_financier','investissement_initial') ? 3:0) + (((financier.dettes||[]).length || (financier.immobilisations_liste||[]).length) ? 2:0) + (g('plan_financier','bfr') ? 2:0),
+      aide: 'Chiffre d\'affaires An 1, investissement initial, dette/immobilisations, BFR.',
+      action: { texte:'Compléter le plan financier', href:'#plan_financier' } },
+    { cle:'operations', icon:'⚙️', label:'Opérations', max:9,
+      pts: (g('plan_operationnel','production') ? 5:0) + ((g('plan_operationnel','fournisseurs')||g('plan_operationnel','fournisseurs_principaux')) ? 4:0),
+      aide: 'Processus de production et fournisseurs identifiés.',
+      action: { texte:'Compléter le plan opérationnel', href:'#plan_operationnel' } },
+    { cle:'risques', icon:'⚠️', label:'Risques', max:9,
+      pts: (risques.filter(r=>rempli(r.description)).length>=2 ? 5:0) + (risques.some(r=>rempli(r.prevention)) ? 4:0),
+      aide: 'Au moins deux risques identifiés, avec mesures préventives.',
+      action: { texte:'Compléter les risques', href:'#risques' } },
+    { cle:'impact', icon:'🌱', label:'Impact', max:9,
+      pts: (rempli(impact.economique) && rempli(impact.social) ? 5:0) + ((impact.indicateurs||[]).some(i=>rempli(i.nom)) ? 4:0),
+      aide: 'Impact économique et social décrits, au moins un indicateur de suivi.',
+      action: { texte:'Compléter l\'impact', href:'#impact' } },
+    { cle:'financement', icon:'🏦', label:'Financement', max:9,
+      pts: (g('financement','montant') ? 4:0) + ((g('financement','valorisation_apres')||g('financement','type_instrument')) ? 5:0),
+      aide: 'Montant recherché et éléments de capitalisation/valorisation.',
+      action: { texte:'Compléter le financement', href:'#financement' } },
+  ];
+
+  const total = criteres.reduce((s,c) => s + c.pts, 0);
+  const sur = criteres.reduce((s,c) => s + c.max, 0);
+  const score = sur > 0 ? Math.round((total / sur) * 100) : 0;
+  const pointsForts = criteres.filter(c => c.pts >= c.max).map(c => c.label);
+  const pointsFaibles = criteres.filter(c => c.pts > 0 && c.pts < c.max).map(c => c.label);
+  const manquants = criteres.filter(c => c.pts === 0).map(c => c.label);
+  const actionsPrioritaires = criteres
+    .filter(c => c.pts < c.max)
+    .sort((a,b) => (a.pts/a.max) - (b.pts/b.max))
+    .slice(0, 5)
+    .map(c => c.action.texte);
+
+  return {
+    score, detail: criteres, sur, points: total,
+    points_forts: pointsForts, points_faibles: pointsFaibles, manquants,
+    actions_prioritaires: actionsPrioritaires,
+    avertissement: "Repère de complétude qualitative — jamais une notation financière certifiée.",
+  };
+}
+
 /* ---- Liste des business plans ---- */
 app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const rows = await db.prepare(`
@@ -36063,6 +36152,16 @@ app.get('/api/business-plans/:id/completude', requireAuth, requireUtilisateurAbo
   if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
   const sections = safeJSON(bp.sections_json, {});
   sendJSON(res, 200, { completude: await checkBPCompletude(sections), progression: await calcBPProgression(sections) });
+});
+
+/* ---- Score explicable (point 27) ---- */
+app.get('/api/business-plans/:id/score', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const sections = safeJSON(bp.sections_json, {});
+  sendJSON(res, 200, await computeBPScore(bp, sections));
 });
 
 /* ---- Collaborateurs ---- */
