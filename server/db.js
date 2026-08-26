@@ -1895,6 +1895,9 @@ const MIGRATIONS = [
   // (source), jamais l'id de liste. Reste NULL pour les sources sans liste (tous_actifs,
   // abonnes, adhesion) et pour les électeurs déjà résolus avant cette migration.
   ["vote_electeurs", "liste_id INTEGER"],
+  // Business Plan — 3 niveaux de profondeur (Essentiel/Professionnel/Investisseur),
+  // mémorise le dernier niveau choisi pour rouvrir le formulaire dans le même état.
+  ["business_plans", "niveau_profondeur TEXT DEFAULT 'essentiel'"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -6738,6 +6741,74 @@ db.exec(`
     finished_at TEXT,
     FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  /* ── Renforcement Business Plan (2026-08-26) — voir cahier des charges utilisateur ──
+     Justificatifs attachés à une donnée précise (traction, annexes...) — calqué sur
+     proj_eval_documents, qui a déjà 'business_plan' dans son propre CHECK categorie. */
+  CREATE TABLE IF NOT EXISTS bp_documents (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id        INTEGER NOT NULL,
+    section_key  TEXT,              -- ex. 'traction', NULL si document général
+    field_key    TEXT,              -- ex. 'ca_realise', NULL si non lié à un champ précis
+    categorie    TEXT NOT NULL DEFAULT 'autre' CHECK(categorie IN
+                 ('administratif','juridique','financier','commercial','technique',
+                  'marche','equipe','traction','contrats','certifications',
+                  'propriete_intellectuelle','temoignages','autre')),
+    nom          TEXT NOT NULL,
+    url_bunny    TEXT NOT NULL,
+    type_mime    TEXT,
+    uploaded_by  INTEGER,
+    created_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploaded_by) REFERENCES users(id)
+  );
+
+  /* Provenance/qualité d'une donnée chiffrée : déclaré / justifié / vérifié / estimation /
+     à confirmer — une ligne par champ annoté plutôt que de complexifier sections_json
+     (garde sections_json rétrocompatible avec les Business Plans déjà créés). */
+  CREATE TABLE IF NOT EXISTS bp_provenance (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id        INTEGER NOT NULL,
+    section_key  TEXT NOT NULL,
+    field_key    TEXT NOT NULL,
+    statut       TEXT NOT NULL DEFAULT 'declare' CHECK(statut IN
+                 ('declare','justifie','verifie','estimation','a_confirmer')),
+    source       TEXT,               -- nom de la source (étude, entretien...)
+    source_url   TEXT,
+    date_donnee  TEXT,
+    methode      TEXT,
+    document_id  INTEGER,            -- lien optionnel vers bp_documents (preuve)
+    updated_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(bp_id, section_key, field_key),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(document_id) REFERENCES bp_documents(id) ON DELETE SET NULL
+  );
+
+  /* Quota IA mensuel (chantier IA Defender, plus tard — table posée dès maintenant pour
+     ne pas re-migrer ensuite) — calqué sur pub_abonnements, reset dans le même webhook
+     Stripe invoice.payment_succeeded que le renouvellement Premium, jamais sur la période
+     de découverte gratuite (aucun paiement Stripe pendant l'essai, donc jamais crédité). */
+  CREATE TABLE IF NOT EXISTS bp_ia_quota (
+    user_id           INTEGER PRIMARY KEY,
+    credits_restants  INTEGER DEFAULT 0,
+    credits_reset_le  TEXT,
+    pass_actif_jusqua TEXT,           -- pass complémentaire payant, NULL si aucun
+    created_at        TEXT DEFAULT (datetime('now')),
+    updated_at        TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Rapports du Defender IA (chantier IA, plus tard). */
+  CREATE TABLE IF NOT EXISTS bp_defender_rapports (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id        INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    rapport_json TEXT NOT NULL,       -- incohérences détectées, questions posées
+    cout_usd     REAL,                -- coût réel de l'appel, pour suivre la marge
+    created_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
 
