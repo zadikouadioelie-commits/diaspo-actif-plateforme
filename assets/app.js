@@ -4522,21 +4522,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
 
     if (!sidebar) {
-      // Repli historique du bouton ROND flottant uniquement (jamais affiché quand "Menu"
-      // existe dans la barre basse — sidebar-toggle--has-mobile-nav-alt le masque déjà —
-      // donc concerne seulement les rares pages sans aucune des deux barres). Inchangé.
-      const nav = document.querySelector(".topbar .nav");
-      if (nav && toggle) {
-        toggle.classList.add("sidebar-toggle--no-sidebar");
-        toggle.addEventListener("click", () => {
-          const isOpen = nav.classList.toggle("nav-mobile-open");
-          toggle.textContent = isOpen ? "✕" : "☰";
-          toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      // Sur une page sans tiroir (ex. profil.html) : #sidebar-toggle basculait une petite
+      // nav déroulante (5 liens du topbar public), et restait masqué au bureau — inutile
+      // pour retrouver rapidement un module en cours de session. Remplacé (2026-08-26,
+      // demande explicite : "ajoute le menu depuis le profil public dans le bandeau du haut
+      // pour permettre au compte de choisir rapidement un module") par EXACTEMENT le même
+      // comportement que navToggle ci-dessus : redirige vers le tableau de bord du rôle
+      // connecté avec #da-menu, qui l'ouvre automatiquement — les ~30 modules réels, pas
+      // les 5 liens publics. Sur mobile ce bouton reste masqué (sidebar-toggle--has-mobile-
+      // nav-alt, la barre basse fait déjà le même travail) ; au bureau, où il restait
+      // invisible jusqu'ici (voir l'ancienne classe sidebar-toggle--no-sidebar, retirée), il
+      // apparaît désormais comme un accès rapide au menu complet depuis n'importe quelle
+      // page qui n'a pas son propre tiroir.
+      if (toggle) {
+        toggle.addEventListener("click", (e) => {
+          e.preventDefault();
+          const dest = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
+          window.location.href = dest + "#da-menu";
         });
-        nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
-          nav.classList.remove("nav-mobile-open");
-          toggle.textContent = "☰";
-        }));
       }
       return;
     }
