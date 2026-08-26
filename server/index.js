@@ -36132,7 +36132,10 @@ const BP_SECTION_LABELS = {
 };
 
 const BP_FIELD_LABELS = {
-  infos_generales: { nom_projet:"Nom du projet", slogan:"Slogan", type_initiative:"Type d'initiative", stade:"Stade du projet", secteur:"Secteur d'activité", sous_secteur:"Sous-secteur", date_creation:"Date de création", pays:"Pays", region:"Région", ville:"Ville", adresse:"Adresse", email:"Email professionnel", telephone:"Téléphone", site_web:"Site internet", linkedin:"LinkedIn", facebook:"Facebook", instagram:"Instagram", responsable:"Responsable principal", responsable_poste:"Poste du responsable", nb_collaborateurs:"Nombre de collaborateurs", equipe_fondatrice:"Équipe fondatrice", organigramme:"Organigramme" },
+  infos_generales: { nom_projet:"Nom du projet", slogan:"Slogan", type_initiative:"Type d'initiative", stade:"Stade du projet", secteur:"Secteur d'activité", sous_secteur:"Sous-secteur", date_creation:"Date de création", pays:"Pays", region:"Région", ville:"Ville", adresse:"Adresse", email:"Email professionnel", telephone:"Téléphone", site_web:"Site internet", linkedin:"LinkedIn", facebook:"Facebook", instagram:"Instagram", responsable:"Responsable principal", responsable_poste:"Poste du responsable", nb_collaborateurs:"Nombre de collaborateurs", equipe_fondatrice:"Équipe fondatrice", organigramme:"Organigramme",
+    forme_juridique_actuelle:"Forme juridique actuelle", forme_juridique_envisagee:"Forme juridique envisagée", pays_immatriculation:"Pays d'immatriculation", date_creation_prevue:"Date prévue de création", numero_siren_siret:"Numéro SIREN/SIRET", capital_social:"Capital social", repartition_capital:"Répartition du capital", statut_actuel_projet:"Statut actuel du projet",
+    experience_entrepreneuriale:"Expérience entrepreneuriale", experience_secteur:"Expérience dans le secteur", actifs_deja_disponibles:"Actifs déjà disponibles", propriete_intellectuelle_existante:"Propriété intellectuelle existante", brevets:"Brevets", marques:"Marques", licences:"Licences", technologies_proprietaires:"Technologies propriétaires",
+    competences_manquantes_equipe:"Compétences manquantes dans l'équipe" },
   resume_executif: { projet:"Description du projet", probleme:"Problème identifié", solution:"Solution proposée", marche:"Marché visé", besoins:"Besoins financiers", objectifs:"Objectifs" },
   presentation: { vision:"Vision", mission:"Mission", valeurs:"Valeurs", obj_court:"Objectifs court terme", obj_moyen:"Objectifs moyen terme", obj_long:"Objectifs long terme", historique:"Historique", motivations:"Motivations" },
   probleme: { description:"Description du problème", pourquoi:"Pourquoi ce problème existe", qui_concerne:"Qui est concerné", ampleur:"Ampleur du problème", consequences:"Conséquences", pourquoi_pas_resolu:"Pourquoi non résolu", preuves:"Preuves & sources" },
@@ -36167,7 +36170,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
   if (m) {
     const [, base, idx, sub] = m;
     const n = Number(idx) + 1;
-    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase' };
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre' };
     const subLabels = {
       nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
       niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
@@ -36175,6 +36178,11 @@ function bpFieldLabel(sectionKey, fieldKey) {
       parts_marche:'Part de marché', menace:'Niveau de menace',
       produit:'Produit', cout_revient:'Coût de revient', prix_vente:'Prix de vente', prix_concurrents:'Prix des concurrents',
       marge_souhaitee:'Marge souhaitée', volume_estime:'Volume estimé', strategie:'Stratégie tarifaire', seuil_psychologique:'Seuil psychologique',
+      fonction:'Fonction', formation:'Formation', annees_experience:"Années d'expérience", experience_secteur:'Expérience secteur',
+      competences_principales:'Compétences principales', experiences_entrepreneuriales:'Expériences entrepreneuriales', realisations:'Réalisations',
+      disponibilite:'Disponibilité', temps_consacre:'Temps consacré', remuneration_prevue:'Rémunération prévue',
+      participation_capital:'Participation au capital', responsabilites:'Responsabilités', cv_url:'CV', linkedin:'LinkedIn',
+      competences_manquantes:'Compétences manquantes',
     };
     const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
     const subLabel = subLabels[sub] || sub.replace(/_/g,' ');

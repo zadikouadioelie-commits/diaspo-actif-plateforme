@@ -884,6 +884,13 @@ async function validerSection() {
 }
 
 /* ---- 1. Informations générales ---- */
+/* Renforcement 2026-08-26 (cahier des charges "renforcer informations générales", point 3) :
+   - Structure juridique : forme actuelle ET envisagée coexistent volontairement, un projet
+     "en création" peut avoir une forme cible différente de sa forme provisoire (ex.
+     auto-entrepreneur en attendant l'immatriculation en SARL).
+   - Fiches détaillées par membre clé : vient COMPLÉTER equipe_fondatrice/organigramme
+     (texte libre, conservé), pas les remplacer — certains porteurs préfèrent une description
+     en prose, d'autres le détail structuré. */
 function renderInfosGenerales() {
   const s = sections.infos_generales || {};
   return `<div class="bp-section">
@@ -918,6 +925,40 @@ function renderInfosGenerales() {
       ${field('facebook','Facebook')}
       ${field('instagram','Instagram')}
     </div></div>
+    <div class="bp-card-inner"><h3>Structure juridique</h3><div class="fg">
+      ${select('forme_juridique_actuelle','Forme juridique actuelle',[
+        {v:'',l:'— Non déterminée —'},{v:'auto_entrepreneur',l:'Auto-entrepreneur / Freelance'},
+        {v:'ei',l:'Entreprise individuelle'},{v:'eirl',l:'EIRL'},{v:'sarl',l:'SARL / SUARL'},
+        {v:'sas',l:'SAS / SASU'},{v:'sa',l:'SA'},{v:'association_1901',l:"Association loi 1901"},
+        {v:'ong',l:'ONG'},{v:'cooperative',l:'Coopérative'},{v:'autre',l:'Autre'},
+      ])}
+      ${select('forme_juridique_envisagee','Forme juridique envisagée (si différente)',[
+        {v:'',l:'— Identique à la forme actuelle —'},{v:'auto_entrepreneur',l:'Auto-entrepreneur / Freelance'},
+        {v:'ei',l:'Entreprise individuelle'},{v:'eirl',l:'EIRL'},{v:'sarl',l:'SARL / SUARL'},
+        {v:'sas',l:'SAS / SASU'},{v:'sa',l:'SA'},{v:'association_1901',l:"Association loi 1901"},
+        {v:'ong',l:'ONG'},{v:'cooperative',l:'Coopérative'},{v:'autre',l:'Autre'},
+      ])}
+      ${field('pays_immatriculation','Pays d\'immatriculation','Ex : France, Sénégal…')}
+      ${field('date_creation_prevue','Date prévue de création','','date')}
+      ${field('numero_siren_siret','Numéro SIREN/SIRET ou équivalent','Si déjà attribué')}
+      ${field('capital_social','Capital social','','number')}
+      ${select('statut_actuel_projet','Statut actuel du projet',[
+        {v:'idee',l:'💭 Idée'},{v:'en_creation',l:'🏗 En cours de création'},
+        {v:'creee_non_lancee',l:'📋 Créée, pas encore lancée'},{v:'lancee',l:'🚀 Lancée'},
+        {v:'en_activite',l:'📈 En activité'},
+      ])}
+      ${textarea('repartition_capital','Répartition du capital','Ex : Fondateur 60%, Associé 25%, Investisseur 15%…',2,true)}
+    </div></div>
+    <div class="bp-card-inner"><h3>Expérience & propriété intellectuelle</h3><div class="fg">
+      ${textarea('experience_entrepreneuriale','Expérience entrepreneuriale du porteur','Précédents projets créés, réussites, échecs…',3,true)}
+      ${textarea('experience_secteur','Expérience dans le secteur','Années, postes occupés, expertise…',3,true)}
+      ${textarea('actifs_deja_disponibles','Actifs déjà disponibles','Matériel, locaux, trésorerie, contacts…',3,true)}
+      ${textarea('propriete_intellectuelle_existante','Propriété intellectuelle existante','Ce qui est déjà protégé ou en cours de dépôt…',3,true)}
+      ${field('brevets','Brevets','Numéros ou statut')}
+      ${field('marques','Marques déposées')}
+      ${field('licences','Licences détenues')}
+      ${textarea('technologies_proprietaires','Technologies propriétaires','Développements internes non reproductibles facilement…',2,true)}
+    </div></div>
     <div class="bp-card-inner"><h3>Équipe fondatrice</h3><div class="fg">
       ${field('responsable','Responsable principal','Prénom NOM','text',false,true)}
       ${field('responsable_poste','Poste / Rôle','Directeur Général…')}
@@ -925,7 +966,66 @@ function renderInfosGenerales() {
       ${textarea('equipe_fondatrice','Membres de l\'équipe fondatrice','Un fondateur par ligne : NOM Prénom — Rôle',3,true)}
       ${textarea('organigramme','Description de l\'organigramme','Décrivez la structure organisationnelle…',3,true)}
     </div></div>
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Fiches détaillées par membre clé</h3>
+        <button class="btn btn-outline btn-sm" onclick="addMembreEquipe()">+ Ajouter un membre</button>
+      </div>
+      <div id="membres-equipe-list">${renderMembresEquipe(s.membres_equipe || [])}</div>
+    </div>
+    <div class="bp-card-inner"><div class="fg">
+      ${textarea('competences_manquantes_equipe','Quelles compétences essentielles vous manquent actuellement dans l\'équipe et comment comptez-vous les obtenir ?','Recrutement prévu, prestataire externe, formation…',3,true)}
+    </div></div>
   </div>`;
+}
+function renderMembresEquipe(list) {
+  const html = list.map((m,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">Membre ${i+1}</strong>
+        <button onclick="removeMembreEquipe(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Nom${helpIcon('membre_nom')}</label><input value="${esc(m.nom||'')}" oninput="updMembreEquipe(${i},'nom',this.value)"></div>
+        <div><label>Fonction${helpIcon('membre_fonction')}</label><input value="${esc(m.fonction||'')}" oninput="updMembreEquipe(${i},'fonction',this.value)"></div>
+        <div><label>Formation${helpIcon('membre_formation')}</label><input value="${esc(m.formation||'')}" oninput="updMembreEquipe(${i},'formation',this.value)"></div>
+        <div><label>Années d'expérience${helpIcon('membre_annees_experience')}</label><input type="number" min="0" value="${esc(m.annees_experience||'')}" oninput="updMembreEquipe(${i},'annees_experience',this.value)"></div>
+        <div><label>Expérience dans le secteur${helpIcon('membre_experience_secteur')}</label><input value="${esc(m.experience_secteur||'')}" oninput="updMembreEquipe(${i},'experience_secteur',this.value)"></div>
+        <div><label>Compétences principales${helpIcon('membre_competences')}</label><input value="${esc(m.competences_principales||'')}" oninput="updMembreEquipe(${i},'competences_principales',this.value)"></div>
+        <div class="full"><label>Expériences entrepreneuriales${helpIcon('membre_experiences_entrepreneuriales')}</label><input value="${esc(m.experiences_entrepreneuriales||'')}" oninput="updMembreEquipe(${i},'experiences_entrepreneuriales',this.value)"></div>
+        <div class="full"><label>Réalisations importantes${helpIcon('membre_realisations')}</label><input value="${esc(m.realisations||'')}" oninput="updMembreEquipe(${i},'realisations',this.value)"></div>
+        <div><label>Disponibilité sur le projet${helpIcon('membre_disponibilite')}</label><select onchange="updMembreEquipe(${i},'disponibilite',this.value)">
+          ${[['temps_plein','Temps plein'],['temps_partiel','Temps partiel'],['ponctuel','Ponctuel']].map(([v,l])=>`<option value="${v}" ${m.disponibilite===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div><label>Temps consacré${helpIcon('membre_temps_consacre')}</label><input value="${esc(m.temps_consacre||'')}" placeholder="Ex : 20h/semaine" oninput="updMembreEquipe(${i},'temps_consacre',this.value)"></div>
+        <div><label>Rémunération prévue${helpIcon('membre_remuneration')}</label><input value="${esc(m.remuneration_prevue||'')}" oninput="updMembreEquipe(${i},'remuneration_prevue',this.value)"></div>
+        <div><label>Participation au capital (%)${helpIcon('membre_participation_capital')}</label><input type="number" min="0" max="100" value="${esc(m.participation_capital||'')}" oninput="updMembreEquipe(${i},'participation_capital',this.value)"></div>
+        <div class="full"><label>Responsabilités${helpIcon('membre_responsabilites')}</label><input value="${esc(m.responsabilites||'')}" oninput="updMembreEquipe(${i},'responsabilites',this.value)"></div>
+        <div><label>CV (lien)${helpIcon('membre_cv')}</label><input value="${esc(m.cv_url||'')}" placeholder="https://…" oninput="updMembreEquipe(${i},'cv_url',this.value)"></div>
+        <div><label>LinkedIn${helpIcon('membre_linkedin')}</label><input value="${esc(m.linkedin||'')}" placeholder="https://linkedin.com/in/…" oninput="updMembreEquipe(${i},'linkedin',this.value)"></div>
+        <div class="full"><label>Compétences manquantes (pour ce membre)${helpIcon('membre_competences_manquantes')}</label><input value="${esc(m.competences_manquantes||'')}" oninput="updMembreEquipe(${i},'competences_manquantes',this.value)"></div>
+      </div>
+    </div>`).join('');
+  return html;
+}
+function addMembreEquipe() {
+  if (!sections.infos_generales) sections.infos_generales={};
+  if (!sections.infos_generales.membres_equipe) sections.infos_generales.membres_equipe=[];
+  sections.infos_generales.membres_equipe.push({nom:'',fonction:'',formation:'',annees_experience:'',disponibilite:'temps_plein'});
+  document.getElementById('membres-equipe-list').innerHTML = renderMembresEquipe(sections.infos_generales.membres_equipe);
+  markDirty();
+}
+function removeMembreEquipe(i) {
+  sections.infos_generales.membres_equipe.splice(i,1);
+  document.getElementById('membres-equipe-list').innerHTML = renderMembresEquipe(sections.infos_generales.membres_equipe);
+  markDirty();
+}
+function updMembreEquipe(i,key,val) {
+  if (!sections.infos_generales) sections.infos_generales={};
+  if (!sections.infos_generales.membres_equipe) sections.infos_generales.membres_equipe=[];
+  if (!sections.infos_generales.membres_equipe[i]) sections.infos_generales.membres_equipe[i]={};
+  sections.infos_generales.membres_equipe[i][key]=val;
+  markDirty();
 }
 
 /* ---- 2. Résumé exécutif ---- */
