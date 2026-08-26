@@ -36241,7 +36241,12 @@ const BP_FIELD_LABELS = {
     pf_apport:"Apport personnel (plan de financement)", pf_associes:"Associés", pf_famille:"Famille", pf_business_angels:"Business Angels", pf_banque:"Banque", pf_subvention:"Subvention", pf_investisseur:"Investisseur", pf_crowdfunding:"Crowdfunding", pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:"Autres ressources",
     pf_terrain:"Achat terrain", pf_construction:"Construction", pf_materiel:"Matériel", pf_vehicules:"Véhicules", pf_logiciels:"Logiciels", pf_stocks:"Stocks", pf_tresorerie:"Trésorerie (emploi)", pf_frais_admin:"Frais administratifs", pf_communication:"Communication (emploi)", pf_recrutement:"Recrutement (emploi)" },
   impact: { economique:"Impact économique", social:"Impact social", environnemental:"Impact environnemental", territorial:"Impact territorial", kpi_impact:"KPI d'impact" },
-  financement: { montant:"Montant recherché", calendrier_decaissement:"Calendrier de décaissement", utilisation:"Utilisation des fonds", contreparties:"Contreparties proposées", roi:"ROI attendu", strategie_sortie:"Stratégie de sortie", recherche_active:"Financeurs ciblés" },
+  financement: { montant:"Montant recherché", calendrier_decaissement:"Calendrier de décaissement", utilisation:"Utilisation des fonds", contreparties:"Contreparties proposées", roi:"ROI attendu", strategie_sortie:"Stratégie de sortie", recherche_active:"Financeurs ciblés",
+    montant_minimum_necessaire:"Montant minimum nécessaire", montant_ideal_financement:"Montant idéal", montant_maximum_financement:"Montant maximum", date_limite:"Date limite", date_souhaitee_reception:"Date souhaitée de réception", duree_couverture_financement:"Durée de couverture", nb_mois_runway:"Mois de runway", financement_par_etapes:"Financement par étapes",
+    nb_parts_actions:"Nombre de parts/actions", valeur_nominale:"Valeur nominale", pct_fondateur1:"% Fondateur 1", pct_fondateur2:"% Fondateur 2", pct_autres_associes:"% Autres associés", pct_investisseurs_existants:"% Investisseurs existants", autres_detenteurs:"Autres détenteurs",
+    valorisation_avant:"Valorisation avant investissement", valorisation_apres:"Valorisation après investissement", pourcentage_propose:"Pourcentage proposé", dilution_maximale_acceptee:"Dilution maximale acceptée", type_instrument:"Type d'instrument",
+    scenario_financement_50:"Scénario à 50% du financement", scenario_financement_100:"Scénario à 100% du financement", scenario_financement_150:"Scénario à 150% du financement",
+    type_sortie:"Type de sortie", horizon_sortie:"Horizon de sortie", acquereurs_potentiels:"Acquéreurs potentiels", valorisation_cible:"Valorisation cible", scenario_acquisition:"Scénario acquisition", scenario_revente:"Scénario revente", scenario_dividendes:"Scénario dividendes", scenario_croissance_long_terme:"Scénario croissance long terme" },
 };
 
 /* Résout dynamiquement le libellé d'un champ, y compris les clés suffixées (ca_1, cf_ventes_M3, pf_*) */
@@ -36259,7 +36264,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
   if (m) {
     const [, base, idx, sub] = m;
     const n = Number(idx) + 1;
-    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit', immobilisations_liste:'Immobilisation', dettes:'Emprunt', charges_detaillees:'Charge' };
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit', immobilisations_liste:'Immobilisation', dettes:'Emprunt', charges_detaillees:'Charge', utilisation_postes:'Poste' };
     const subLabels = {
       nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
       niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
@@ -36288,7 +36293,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
       cout_serveur:'Coût serveur', cout_par_utilisateur:'Coût par utilisateur', cout_acquisition_numerique:"Coût d'acquisition", arpu:'ARPU',
       montant:'Montant', date_achat:"Date d'achat", duree_amortissement:"Durée d'amortissement", valeur_residuelle:'Valeur résiduelle',
       taux:'Taux', duree:'Durée', differe:'Différé', mensualite:'Mensualité', date_debut:'Date de début', date_fin:'Date de fin',
-      montant_annuel:'Montant annuel',
+      montant_annuel:'Montant annuel', poste:'Poste', pourcentage:'Pourcentage',
     };
     const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
     const subLabel = subLabels[sub] || sub.replace(/_/g,' ');

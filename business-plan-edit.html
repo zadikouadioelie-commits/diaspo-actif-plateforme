@@ -859,6 +859,7 @@ function renderSection(key) {
   if (key === 'plan_financier') calcAllFinance();
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
   if (key === 'presentation') bpLoadTractionDocs();
+  if (key === 'financement') bpCalcDilution();
   if (!def?.noSave && monRole !== 'lecteur') {
     content.insertAdjacentHTML('beforeend', `
       <div class="bp-section" style="padding-top:0;">
@@ -2450,18 +2451,128 @@ function renderImpact() {
   </div>`;
 }
 function renderFinancement() {
+  const s = sections.financement || {};
+  const postes = s.utilisation_postes || [{ poste:'' }];
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🏦 Recherche de financement</h2></div>
     <div class="bp-card-inner"><div class="fg">
-      ${field('montant','Montant recherché (€)','','number')}
+      ${field('montant','Montant recherché (€)','','number').replace("oninput=\"updateField('montant',this.value)\"","oninput=\"updateField('montant',this.value);bpCalcDilution()\"")}
       ${field('calendrier_decaissement','Calendrier de décaissement','Ex : 30% à la signature…')}
       ${textarea('utilisation','Utilisation des fonds','Détaillez comment seront utilisés les fonds levés…',4,true)}
       ${textarea('contreparties','Contreparties proposées','Parts sociales, redevances, royalties…',3,true)}
       ${textarea('roi','Retour sur investissement attendu','Pour les investisseurs : IRR, multiple, durée…',3,true)}
-      ${textarea('strategie_sortie','Stratégie de sortie','Rachat, introduction en bourse, remboursement…',3,true)}
       ${textarea('recherche_active','Financeurs ciblés','Banques, fonds, subventions, crowdfunding…',3,true)}
     </div></div>
+
+    <!-- Financement par étapes / Runway (2026-08-26, point 19) -->
+    <div class="bp-card-inner"><h3>Montant &amp; calendrier</h3><div class="fg">
+      ${field('montant_minimum_necessaire','Montant minimum nécessaire','','number')}
+      ${field('montant_ideal_financement','Montant idéal','','number')}
+      ${field('montant_maximum_financement','Montant maximum','','number')}
+      ${field('date_limite','Date limite','','date')}
+      ${field('date_souhaitee_reception','Date souhaitée de réception','','date')}
+      ${field('duree_couverture_financement','Durée de couverture du financement','Ex : 18 mois')}
+      ${field('nb_mois_runway','Nombre de mois de runway','','number')}
+      ${textarea('financement_par_etapes','Financement par étapes','Ex : Seed puis Série A…',2,true)}
+    </div></div>
+
+    <!-- Utilisation détaillée des fonds, par poste (répétable) -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">Utilisation détaillée des fonds, par poste</h3>
+        <button class="btn btn-outline btn-sm" onclick="addUtilisationPoste()">+ Ajouter un poste</button>
+      </div>
+      <div id="utilisation-postes-list">${renderUtilisationPostes(postes)}</div>
+    </div>
+
+    <!-- Capitalisation / Investisseur (2026-08-26, point 18 — manquait entièrement) -->
+    <div class="bp-card-inner"><h3>💼 Capitalisation actuelle</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Le capital social et sa répartition générale sont déjà renseignés dans "Informations générales" — précisez ici le détail par actionnaire.</p>
+      <div class="fg">
+        ${field('nb_parts_actions','Nombre de parts / actions','','number')}
+        ${field('valeur_nominale','Valeur nominale','','number')}
+        ${field('pct_fondateur1','Fondateur 1 (%)','','number')}
+        ${field('pct_fondateur2','Fondateur 2 (%)','','number')}
+        ${field('pct_autres_associes','Autres associés (%)','','number')}
+        ${field('pct_investisseurs_existants','Investisseurs existants (%)','','number')}
+        ${textarea('autres_detenteurs','Autres détenteurs','',2,true)}
+      </div>
+    </div>
+    <div class="bp-card-inner"><h3>💼 Levée de fonds</h3><div class="fg">
+      ${field('valorisation_avant','Valorisation avant investissement','','number')}
+      ${field('valorisation_apres','Valorisation après investissement','','number').replace("oninput=\"updateField('valorisation_apres',this.value)\"","oninput=\"updateField('valorisation_apres',this.value);bpCalcDilution()\"")}
+      ${field('pourcentage_propose','Pourcentage proposé','','number')}
+      ${field('dilution_maximale_acceptee','Dilution maximale acceptée (%)','','number')}
+      ${select('type_instrument','Type d\'instrument',[{v:'',l:'—'},{v:'actions',l:'Actions'},{v:'obligations_convertibles',l:'Obligations convertibles'},{v:'compte_courant',l:'Compte courant d\'associé'},{v:'autre',l:'Autre'}])}
+      <div class="full" id="bp-simulation-dilution" style="font-size:13px;background:var(--bg);border-radius:8px;padding:10px 12px;"></div>
+    </div></div>
+
+    <!-- Scénarios de financement (point 19) -->
+    <div class="bp-card-inner"><h3>Scénarios selon le financement obtenu</h3><div class="fg">
+      ${textarea('scenario_financement_50','Que se passe-t-il si vous ne recevez que 50% du financement demandé ?','',3,true)}
+      ${textarea('scenario_financement_100','Scénario si 100% du financement est obtenu','',3,true)}
+      ${textarea('scenario_financement_150','Scénario si 150% du financement est obtenu','',3,true)}
+    </div></div>
+
+    <!-- Stratégie de sortie enrichie (point 20) -->
+    <div class="bp-card-inner"><h3>Stratégie de sortie</h3><div class="fg">
+      ${select('type_sortie','Type de sortie',[{v:'',l:'—'},{v:'acquisition',l:'Acquisition'},{v:'revente',l:'Revente'},{v:'dividendes',l:'Dividendes'},{v:'croissance_long_terme',l:'Croissance long terme'},{v:'aucune',l:'Aucune stratégie de sortie prévue'}])}
+      ${field('horizon_sortie','Horizon','Ex : 5-7 ans')}
+      ${textarea('acquereurs_potentiels','Acquéreurs potentiels','',2,true)}
+      ${field('valorisation_cible','Valorisation cible','','number')}
+      ${textarea('scenario_acquisition','Scénario acquisition','',2,true)}
+      ${textarea('scenario_revente','Scénario revente','',2,true)}
+      ${textarea('scenario_dividendes','Scénario dividendes','',2,true)}
+      ${textarea('scenario_croissance_long_terme','Scénario croissance long terme','',2,true)}
+      ${textarea('roi','Retour sur investissement attendu','Pour les investisseurs : IRR, multiple, durée…',3,true)}
+      ${textarea('strategie_sortie','Stratégie de sortie (résumé)','Rachat, introduction en bourse, remboursement…',3,true)}
+    </div></div>
   </div>`;
+}
+function renderUtilisationPostes(list) {
+  return list.map((p,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(p.poste||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Poste (ex : Recrutement, Marketing…)" oninput="updUtilisationPoste(${i},'poste',this.value)">
+        <button onclick="removeUtilisationPoste(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Montant${helpIcon('poste_montant')}</label><input type="number" value="${esc(p.montant||'')}" oninput="updUtilisationPoste(${i},'montant',this.value)"></div>
+        <div><label>Pourcentage${helpIcon('poste_pourcentage')}</label><input type="number" value="${esc(p.pourcentage||'')}" oninput="updUtilisationPoste(${i},'pourcentage',this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+function addUtilisationPoste() {
+  if (!sections.financement) sections.financement={};
+  if (!sections.financement.utilisation_postes) sections.financement.utilisation_postes=[];
+  sections.financement.utilisation_postes.push({poste:''});
+  document.getElementById('utilisation-postes-list').innerHTML = renderUtilisationPostes(sections.financement.utilisation_postes);
+  markDirty();
+}
+function removeUtilisationPoste(i) {
+  sections.financement.utilisation_postes.splice(i,1);
+  document.getElementById('utilisation-postes-list').innerHTML = renderUtilisationPostes(sections.financement.utilisation_postes);
+  markDirty();
+}
+function updUtilisationPoste(i,key,val) {
+  if (!sections.financement) sections.financement={};
+  if (!sections.financement.utilisation_postes) sections.financement.utilisation_postes=[];
+  if (!sections.financement.utilisation_postes[i]) sections.financement.utilisation_postes[i]={};
+  sections.financement.utilisation_postes[i][key]=val;
+  markDirty();
+}
+/* Simulation de dilution (2026-08-26, point 18) : dérivée des champs déjà saisis, jamais
+   resaisie. montant recherché (financement.montant) / valorisation post-money = % cédé. */
+function bpCalcDilution() {
+  const el = document.getElementById('bp-simulation-dilution');
+  if (!el) return;
+  const s = sections.financement || {};
+  const montant = parseFloat(s.montant) || 0;
+  const valoApres = parseFloat(s.valorisation_apres) || 0;
+  if (!montant || !valoApres) { el.innerHTML = '<span style="color:var(--muted);">Renseignez le montant recherché et la valorisation après investissement pour voir la simulation de dilution.</span>'; return; }
+  const pctCede = (montant / valoApres) * 100;
+  const pctFondateursApres = 100 - pctCede;
+  el.innerHTML = `📉 <strong>Simulation de dilution</strong> — en cédant ${fmtEuro(montant)} contre ${pctCede.toFixed(1)}% du capital, les actionnaires actuels détiendraient environ <strong>${pctFondateursApres.toFixed(1)}%</strong> après l'opération (calcul indicatif, hors frais et clauses spécifiques).`;
 }
 
 /* ---- 20. Annexes ---- */
