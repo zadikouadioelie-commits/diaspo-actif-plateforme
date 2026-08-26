@@ -16048,6 +16048,21 @@ route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, param
     await db.prepare(
       "UPDATE initiatives SET organisation_verifiee=1, organisation_verifiee_le=?, organisation_expire_le=? WHERE id=?"
     ).run(now, addMonths(now, IDENTITY_VALIDITY_MONTHS), demande.initiative_id);
+    /* Incohérence signalée par un utilisateur (2026-08-26) : "Organisation vérifiée" (badge,
+       initiatives.organisation_verifiee) et "Immatriculation renseignée" (critère séparé de
+       l'indice de fiabilité + champ requis par le module Réseau Pro, tous deux basés sur
+       initiatives.numero_immatriculation) sont deux colonnes totalement indépendantes — un
+       dossier de vérification pouvait être approuvé sans jamais reporter son numéro dans
+       numero_immatriculation, laissant "Organisation vérifiée" acquis alors que
+       "Immatriculation renseignée" restait à 0. Le dossier de vérification contient déjà ce
+       numéro (demande.numero) : on le reporte donc ici, uniquement s'il est présent et que le
+       champ n'est pas déjà rempli (ne jamais écraser une valeur existante, potentiellement
+       corrigée depuis). */
+    if (demande.numero) {
+      await db.prepare(
+        "UPDATE initiatives SET numero_immatriculation=? WHERE id=? AND (numero_immatriculation IS NULL OR numero_immatriculation='')"
+      ).run(demande.numero, demande.initiative_id);
+    }
     if (init?.owner_user_id) {
       creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation vérifiée 🏢",
         `« ${init.nom} » a obtenu le badge Organisation vérifiée.`, { initiative_id: demande.initiative_id });
