@@ -36229,7 +36229,8 @@ const BP_FIELD_LABELS = {
   marche: { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", besoins_clients:"Besoins des clients", localisation_clients:"Localisation des clients", opportunites:"Opportunités de marché", menaces_marche:"Menaces du marché", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable",
     tam:"TAM (marché total adressable)", sam:"SAM (marché accessible)", som:"SOM (marché réellement visé)", saisonnalite:"Saisonnalité", facteurs_croissance:"Facteurs de croissance", facteurs_baisse:"Facteurs de baisse", dependance_economique:"Dépendance économique", dependance_reglementaire:"Dépendance réglementaire" },
   swot: { forces:"Forces (SWOT)", faiblesses:"Faiblesses (SWOT)", opportunites:"Opportunités (SWOT)", menaces:"Menaces (SWOT)" },
-  business_model: { partenaires:"Partenaires clés", activites:"Activités clés", proposition:"Proposition de valeur", relations:"Relations clients", segments:"Segments de clientèle", ressources:"Ressources clés", canaux:"Canaux", couts:"Structure des coûts", revenus:"Sources de revenus" },
+  business_model: { partenaires:"Partenaires clés", activites:"Activités clés", proposition:"Proposition de valeur", relations:"Relations clients", segments:"Segments de clientèle", ressources:"Ressources clés", canaux:"Canaux", couts:"Structure des coûts", revenus:"Sources de revenus",
+    prix_moyen:"Prix moyen", cout_variable_client:"Coût variable par client", marge_brute_pct:"Marge brute", cac:"CAC", taux_conversion_ue:"Taux de conversion", taux_retention:"Taux de rétention", taux_churn_ue:"Taux de churn", frequence_achat_ue:"Fréquence d'achat", duree_moyenne_relation:"Durée moyenne de relation", nb_moyen_achats:"Nombre moyen d'achats", ltv:"Valeur vie client (LTV)", delai_rentabilisation:"Délai de rentabilisation d'un client" },
   strategie_marketing: { identite_marque:"Identité de marque", strategie_digitale:"Stratégie digitale", communication:"Plan de communication", publicite:"Publicité", partenariats:"Partenariats & co-marketing", evenements:"Événements", fidelisation:"Fidélisation" },
   plan_commercial: { objectifs_vente:"Objectifs de vente", prospection:"Méthodes de prospection", tunnel_vente:"Tunnel de vente", politique_tarifaire:"Politique tarifaire", argumentaire:"Argumentaire commercial", sav:"Service après-vente", kpi_commerciaux:"KPI commerciaux" },
   plan_operationnel: { production:"Processus de production", logistique:"Logistique", fournisseurs:"Fournisseurs", equipements:"Équipements & matériel", technologies:"Technologies utilisées", qualite:"Contrôle qualité", securite:"Sécurité" },
@@ -36257,7 +36258,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
   if (m) {
     const [, base, idx, sub] = m;
     const n = Number(idx) + 1;
-    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment' };
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit' };
     const subLabels = {
       nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
       niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
@@ -36278,6 +36279,12 @@ function bpFieldLabel(sectionKey, fieldKey) {
       nom_segment:'Nom du segment', nb_potentiel_clients:'Nombre potentiel de clients', profil:'Profil', age:'Âge', besoin:'Besoin',
       budget:'Budget', panier_moyen:'Panier moyen', frequence_achat:"Fréquence d'achat", criteres_decision:'Critères de décision',
       comportement_achat:"Comportement d'achat", canal_achat:"Canal d'achat privilégié",
+      capacite_actuelle:'Capacité actuelle', capacite_maximale:'Capacité maximale', volume_actuel:'Volume actuel', volume_prevu:'Volume prévu',
+      delai_production:'Délai de production', cout_logistique:'Coût logistique', cout_distribution:'Coût de distribution',
+      taux_marge_brute:'Taux de marge brute', taux_marge_nette:'Taux de marge nette', taux_retour:'Taux de retour', taux_defaut:'Taux de défaut',
+      duree_vie:'Durée de vie', dependance_fournisseur:'Dépendance fournisseur', saisonnalite:'Saisonnalité', evolution_prevue:'Évolution prévue',
+      utilisateurs:'Utilisateurs', utilisateurs_actifs:'Utilisateurs actifs', conversion_payant:'Conversion gratuit → payant', churn_numerique:'Churn',
+      cout_serveur:'Coût serveur', cout_par_utilisateur:'Coût par utilisateur', cout_acquisition_numerique:"Coût d'acquisition", arpu:'ARPU',
     };
     const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
     const subLabel = subLabels[sub] || sub.replace(/_/g,' ');

@@ -1517,6 +1517,26 @@ function renderBMC() {
         ${bmcField('revenus','💰 Sources de revenus','Comment gagnez-vous de l\'argent ?')}
       </div>
     </div>
+    <!-- Unit Economics (2026-08-26, cahier des charges point 9) : "économie d'un client",
+         chiffres agrégés au niveau du projet -- pas une fiche par produit, contrairement à
+         "Capacité & exploitation" (renderProduits) qui elle est répétable par produit. -->
+    <div class="bp-card-inner"><h3>📐 Unit Economics — Économie d'un client</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Adaptez ces chiffres à votre activité — tous ne sont pas pertinents pour tous les modèles.</p>
+      <div class="fg">
+        ${field('prix_moyen','Prix moyen','','number')}
+        ${field('cout_variable_client','Coût variable par client','','number')}
+        ${field('marge_brute_pct','Marge brute (%)','','number')}
+        ${field('cac','Coût d\'acquisition client (CAC)','','number')}
+        ${field('taux_conversion_ue','Taux de conversion (%)','','number')}
+        ${field('taux_retention','Taux de rétention (%)','','number')}
+        ${field('taux_churn_ue','Taux de churn (%)','','number')}
+        ${field('frequence_achat_ue','Fréquence d\'achat','Ex : 2x/mois')}
+        ${field('duree_moyenne_relation','Durée moyenne de relation','Ex : 18 mois')}
+        ${field('nb_moyen_achats','Nombre moyen d\'achats','','number')}
+        ${field('ltv','Valeur vie client (LTV)','','number')}
+        ${field('delai_rentabilisation','Délai pour rentabiliser un client','Ex : 6 mois')}
+      </div>
+    </div>
     <div class="bp-card-inner">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">🤝 Partenaires potentiels</h3>
@@ -1624,7 +1644,76 @@ function renderProduits() {
       <p style="font-size:12.5px;color:var(--muted);margin-top:-6px;">Définissez une stratégie tarifaire cohérente avec le marché et la concurrence, produit par produit.</p>
       <div id="etude-prix-list">${renderEtudePrix(s.etude_prix || [{ produit:'', cout_revient:'', prix_vente:'', prix_concurrents:'', positionnement:'moyen', marge_souhaitee:'', volume_estime:'', strategie:'penetration', seuil_psychologique:'' }])}</div>
     </div>
+    <!-- Capacité & exploitation (2026-08-26, point 10) : répétable par produit, distincte de
+         l'Étude de prix (stratégie tarifaire) -- ici, la mécanique de production. Le bloc
+         "activité numérique" reste toujours visible pour l'instant (le questionnaire adaptatif
+         qui le masquera selon le type de projet arrive à l'incrément 9). -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">⚙️ Capacité & exploitation</h3>
+        <button class="btn btn-outline btn-sm" onclick="addCapaciteExploitation()">+ Ajouter</button>
+      </div>
+      <div id="capacite-exploitation-list">${renderCapaciteExploitation(s.capacite_exploitation || [{ produit:'' }])}</div>
+    </div>
   </div>`;
+}
+function renderCapaciteExploitation(list) {
+  return list.map((c,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <input value="${esc(c.produit||'')}" style="font-weight:700;font-size:13px;border:none;background:transparent;font-family:inherit;flex:1;outline:none;" placeholder="Produit / service concerné" oninput="updCapaciteExploitation(${i},'produit',this.value)">
+        <button onclick="removeCapaciteExploitation(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div><label>Capacité actuelle${helpIcon('cap_actuelle')}</label><input value="${esc(c.capacite_actuelle||'')}" oninput="updCapaciteExploitation(${i},'capacite_actuelle',this.value)"></div>
+        <div><label>Capacité maximale${helpIcon('cap_maximale')}</label><input value="${esc(c.capacite_maximale||'')}" oninput="updCapaciteExploitation(${i},'capacite_maximale',this.value)"></div>
+        <div><label>Volume actuel${helpIcon('cap_volume_actuel')}</label><input value="${esc(c.volume_actuel||'')}" oninput="updCapaciteExploitation(${i},'volume_actuel',this.value)"></div>
+        <div><label>Volume prévu${helpIcon('cap_volume_prevu')}</label><input value="${esc(c.volume_prevu||'')}" oninput="updCapaciteExploitation(${i},'volume_prevu',this.value)"></div>
+        <div><label>Délai de production${helpIcon('cap_delai')}</label><input value="${esc(c.delai_production||'')}" oninput="updCapaciteExploitation(${i},'delai_production',this.value)"></div>
+        <div><label>Coût logistique${helpIcon('cap_cout_logistique')}</label><input type="number" value="${esc(c.cout_logistique||'')}" oninput="updCapaciteExploitation(${i},'cout_logistique',this.value)"></div>
+        <div><label>Coût de distribution${helpIcon('cap_cout_distribution')}</label><input type="number" value="${esc(c.cout_distribution||'')}" oninput="updCapaciteExploitation(${i},'cout_distribution',this.value)"></div>
+        <div><label>Taux de marge brute (%)${helpIcon('cap_marge_brute')}</label><input type="number" value="${esc(c.taux_marge_brute||'')}" oninput="updCapaciteExploitation(${i},'taux_marge_brute',this.value)"></div>
+        <div><label>Taux de marge nette (%)${helpIcon('cap_marge_nette')}</label><input type="number" value="${esc(c.taux_marge_nette||'')}" oninput="updCapaciteExploitation(${i},'taux_marge_nette',this.value)"></div>
+        <div><label>Taux de retour (%)${helpIcon('cap_taux_retour')}</label><input type="number" value="${esc(c.taux_retour||'')}" oninput="updCapaciteExploitation(${i},'taux_retour',this.value)"></div>
+        <div><label>Taux de défaut (%)${helpIcon('cap_taux_defaut')}</label><input type="number" value="${esc(c.taux_defaut||'')}" oninput="updCapaciteExploitation(${i},'taux_defaut',this.value)"></div>
+        <div><label>Durée de vie${helpIcon('cap_duree_vie')}</label><input value="${esc(c.duree_vie||'')}" oninput="updCapaciteExploitation(${i},'duree_vie',this.value)"></div>
+        <div><label>Dépendance fournisseur${helpIcon('cap_dependance_fournisseur')}</label><input value="${esc(c.dependance_fournisseur||'')}" oninput="updCapaciteExploitation(${i},'dependance_fournisseur',this.value)"></div>
+        <div><label>Saisonnalité${helpIcon('cap_saisonnalite')}</label><input value="${esc(c.saisonnalite||'')}" oninput="updCapaciteExploitation(${i},'saisonnalite',this.value)"></div>
+        <div><label>Évolution prévue${helpIcon('cap_evolution_prevue')}</label><input value="${esc(c.evolution_prevue||'')}" oninput="updCapaciteExploitation(${i},'evolution_prevue',this.value)"></div>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;">Si activité numérique</label>
+        <div class="fg">
+          <div><label>Utilisateurs${helpIcon('cap_utilisateurs')}</label><input type="number" value="${esc(c.utilisateurs||'')}" oninput="updCapaciteExploitation(${i},'utilisateurs',this.value)"></div>
+          <div><label>Utilisateurs actifs${helpIcon('cap_utilisateurs_actifs')}</label><input type="number" value="${esc(c.utilisateurs_actifs||'')}" oninput="updCapaciteExploitation(${i},'utilisateurs_actifs',this.value)"></div>
+          <div><label>Conversion gratuit → payant (%)${helpIcon('cap_conversion_payant')}</label><input type="number" value="${esc(c.conversion_payant||'')}" oninput="updCapaciteExploitation(${i},'conversion_payant',this.value)"></div>
+          <div><label>Churn (%)${helpIcon('cap_churn')}</label><input type="number" value="${esc(c.churn_numerique||'')}" oninput="updCapaciteExploitation(${i},'churn_numerique',this.value)"></div>
+          <div><label>Coût serveur${helpIcon('cap_cout_serveur')}</label><input type="number" value="${esc(c.cout_serveur||'')}" oninput="updCapaciteExploitation(${i},'cout_serveur',this.value)"></div>
+          <div><label>Coût par utilisateur${helpIcon('cap_cout_utilisateur')}</label><input type="number" value="${esc(c.cout_par_utilisateur||'')}" oninput="updCapaciteExploitation(${i},'cout_par_utilisateur',this.value)"></div>
+          <div><label>Coût d'acquisition${helpIcon('cap_cout_acquisition')}</label><input type="number" value="${esc(c.cout_acquisition_numerique||'')}" oninput="updCapaciteExploitation(${i},'cout_acquisition_numerique',this.value)"></div>
+          <div><label>ARPU${helpIcon('cap_arpu')}</label><input type="number" value="${esc(c.arpu||'')}" oninput="updCapaciteExploitation(${i},'arpu',this.value)"></div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function addCapaciteExploitation() {
+  if (!sections.produits) sections.produits={};
+  if (!sections.produits.capacite_exploitation) sections.produits.capacite_exploitation=[];
+  sections.produits.capacite_exploitation.push({produit:''});
+  document.getElementById('capacite-exploitation-list').innerHTML = renderCapaciteExploitation(sections.produits.capacite_exploitation);
+  markDirty();
+}
+function removeCapaciteExploitation(i) {
+  sections.produits.capacite_exploitation.splice(i,1);
+  document.getElementById('capacite-exploitation-list').innerHTML = renderCapaciteExploitation(sections.produits.capacite_exploitation);
+  markDirty();
+}
+function updCapaciteExploitation(i,key,val) {
+  if (!sections.produits) sections.produits={};
+  if (!sections.produits.capacite_exploitation) sections.produits.capacite_exploitation=[];
+  if (!sections.produits.capacite_exploitation[i]) sections.produits.capacite_exploitation[i]={};
+  sections.produits.capacite_exploitation[i][key]=val;
+  markDirty();
 }
 function renderProduitRows(items) {
   return items.map((it,i) => `
@@ -1917,6 +2006,7 @@ function renderFinancier() {
           <tbody>
             <tr class="header-row"><td colspan="6">PRODUITS</td></tr>
             <tr><td>Chiffre d'affaires</td>${annees.map((_,i)=>`<td>${finInput('ca',i+1)}</td>`).join('')}</tr>
+            <tr id="ca-suggestion-row" style="display:none;"><td colspan="6" style="font-size:11.5px;color:var(--muted);padding-top:0;"></td></tr>
             <tr><td>Autres produits</td>${annees.map((_,i)=>`<td>${finInput('autres_produits',i+1)}</td>`).join('')}</tr>
             <tr class="header-row"><td colspan="6">CHARGES</td></tr>
             <tr><td>Achats & matières</td>${annees.map((_,i)=>`<td>${finInput('achats',i+1)}</td>`).join('')}</tr>
@@ -2090,6 +2180,33 @@ function calcAllFinance() {
   const tresorerieDisponible = calcTresorerie();
   const ratios = calcRatios();
   calcDashboard(tresorerieDisponible, ratios);
+  bpAfficherSuggestionCA();
+}
+/* Relation produits→CA (2026-08-26, plan de renforcement §4.1) : l'étude de prix
+   (sections.produits.etude_prix, déjà saisie produit par produit avec prix_vente et
+   volume_estime) peut estimer un chiffre d'affaires — affiché en suggestion, jamais
+   appliqué automatiquement, pour ne jamais écraser une valeur déjà réfléchie par
+   l'utilisateur. */
+function bpAfficherSuggestionCA() {
+  const row = document.getElementById('ca-suggestion-row');
+  if (!row) return;
+  const items = sections.produits?.etude_prix || [];
+  const total = items.reduce((sum, it) => {
+    const prix = parseFloat(it.prix_vente) || 0;
+    const vol = parseFloat(it.volume_estime) || 0;
+    return sum + prix * vol;
+  }, 0);
+  if (!total) { row.style.display = 'none'; return; }
+  row.style.display = '';
+  row.querySelector('td').innerHTML = `🔗 Estimation depuis l'étude de prix (Produits & Services) : ${fmtEuro(total)}
+    <button type="button" class="btn btn-outline btn-sm" style="margin-left:8px;padding:2px 8px;font-size:11px;" onclick="bpAppliquerSuggestionCA(${total})">Utiliser pour l'An 1</button>`;
+}
+function bpAppliquerSuggestionCA(total) {
+  if (!sections.plan_financier) sections.plan_financier = {};
+  sections.plan_financier.ca_1 = String(Math.round(total));
+  markDirty();
+  renderSection('plan_financier');
+  calcAllFinance();
 }
 function exportFinancierCSV() {
   const s=sections.plan_financier||{};
