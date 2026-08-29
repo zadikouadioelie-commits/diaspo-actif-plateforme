@@ -129,6 +129,7 @@
       <a href="agenda.html" data-aide="mon_agenda">📅 Mon Agenda</a>
 
       <div class="sb-group-lbl">07 — EXPANSION</div>
+      <a href="#" data-section="expansion-projets">🏗️ Mes Projets</a>
       <a href="business-plan.html" data-aide="business_plans">📋 Business Plans</a>
       <a href="#" data-section="soumission-da">📤 Soumettre à Diaspo'Actif</a>
       <a href="projets-evaluation.html" data-aide="evaluation_projet">📁 Évaluation de Projet</a>
@@ -621,6 +622,66 @@
           <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn btn-outline" onclick="oppCloseForm()">Annuler</button>
             <button class="btn btn-orange" onclick="oppSave()">💾 Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== MODULE EXPANSION — projets publics ===================== -->
+      <section id="section-expansion-projets" style="display:none;">
+        <div class="flex-between" style="margin-bottom:8px;">
+          <h2 style="margin:0;">🏗️ Mes Projets d'expansion</h2>
+          <button class="btn btn-orange" onclick="expOpenForm()">➕ Nouveau projet</button>
+        </div>
+        <div class="notice" style="margin-bottom:16px;">
+          📢 Ces fiches sont affichées publiquement sur votre profil, visibles par toute la diaspora — présentez vos
+          projets de développement, indiquez un budget recherché pour attirer des partenaires, ou archivez vos
+          réalisations. Décochez « Visible publiquement » pour préparer une fiche sans encore la publier.
+        </div>
+        <div id="exp-list" class="grid grid-2" style="gap:14px;"></div>
+      </section>
+
+      <!-- Modale création / édition d'un projet d'expansion -->
+      <div id="exp-modal" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;">
+        <div style="background:var(--card);border-radius:16px;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:22px;">
+          <div class="flex-between" style="margin-bottom:14px;">
+            <h3 style="margin:0;" id="exp-modal-titre">Nouveau projet</h3>
+            <button onclick="expCloseForm()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
+          </div>
+          <input type="hidden" id="exp-f-id">
+          <label class="opp-lbl">Titre *</label>
+          <input id="exp-f-titre" class="input-field" style="width:100%;margin-bottom:10px;" placeholder="Ex. Zone industrielle de transformation agroalimentaire">
+          <label class="opp-lbl">Description</label>
+          <textarea id="exp-f-desc" style="width:100%;min-height:70px;border-radius:10px;border:1px solid var(--border);padding:10px;font-family:inherit;margin-bottom:10px;resize:vertical;"></textarea>
+          <div class="grid grid-2" style="gap:10px;">
+            <div><label class="opp-lbl">Secteur</label><input id="exp-f-secteur" class="input-field" style="width:100%;" placeholder="Ex. Agroalimentaire"></div>
+            <div><label class="opp-lbl">Lieu</label><input id="exp-f-lieu" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Statut</label>
+              <select id="exp-f-statut" class="input-field" style="width:100%;">
+                <option value="en_cours">🚧 En cours</option>
+                <option value="recherche_partenaires">📢 Recherche de partenaires</option>
+                <option value="termine">🏆 Réalisé</option>
+              </select>
+            </div>
+            <div><label class="opp-lbl">Devise</label>
+              <select id="exp-f-devise" class="input-field" style="width:100%;">
+                <option value="EUR">EUR</option><option value="USD">USD</option><option value="XOF">XOF (FCFA)</option><option value="XAF">XAF (FCFA)</option><option value="MAD">MAD</option><option value="CAD">CAD</option><option value="GBP">GBP</option>
+              </select>
+            </div>
+            <div><label class="opp-lbl">Budget recherché</label><input type="number" id="exp-f-budget" class="input-field" style="width:100%;" min="0" step="0.01"></div>
+            <div><label class="opp-lbl">Montant déjà levé</label><input type="number" id="exp-f-leve" class="input-field" style="width:100%;" min="0" step="0.01"></div>
+            <div><label class="opp-lbl">Date de début</label><input type="date" id="exp-f-debut" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Fin prévue</label><input type="date" id="exp-f-fin" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Contact — nom</label><input id="exp-f-contact-nom" class="input-field" style="width:100%;"></div>
+            <div><label class="opp-lbl">Contact — e-mail</label><input type="email" id="exp-f-contact-email" class="input-field" style="width:100%;"></div>
+          </div>
+          <label class="opp-lbl">Image (URL, optionnel)</label>
+          <input id="exp-f-image" class="input-field" style="width:100%;margin-bottom:10px;" placeholder="https://…">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0 14px;cursor:pointer;">
+            <input type="checkbox" id="exp-f-visible" checked> Visible publiquement sur mon profil
+          </label>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="expCloseForm()">Annuler</button>
+            <button class="btn btn-orange" onclick="expSave()">💾 Enregistrer</button>
           </div>
         </div>
       </div>
@@ -1201,6 +1262,87 @@ async function oppDelete(id) {
   catch(e) { alert("Erreur : " + e.message); }
 }
 
+/* ══ MODULE EXPANSION — fiches projet publiques structurées ══ */
+const EXP_STATUT_LABELS = { en_cours: "🚧 En cours", recherche_partenaires: "📢 Recherche de partenaires", termine: "🏆 Réalisé" };
+let EXP_PROJETS_CACHE = [];
+async function loadExpansionProjets() {
+  const el = document.getElementById("exp-list");
+  el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--muted);">Chargement…</div>`;
+  try {
+    const r = await api("GET", "/collectivite/expansion-projets");
+    EXP_PROJETS_CACHE = r.projets || [];
+    if (!EXP_PROJETS_CACHE.length) { el.innerHTML = `<div class="empty" style="grid-column:1/-1;">Aucun projet pour le moment. Cliquez sur « Nouveau projet » pour présenter votre premier projet d'expansion à la diaspora.</div>`; return; }
+    el.innerHTML = EXP_PROJETS_CACHE.map(p => `
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:6px;">
+          <strong style="font-size:14.5px;">${escH(p.titre)}</strong>
+          <span style="font-size:11px;white-space:nowrap;">${p.visible_public ? '🌍 Public' : '🔒 Brouillon'}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">${escH((p.description||"").slice(0,90))}${(p.description||"").length>90?"…":""}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:11.5px;margin-bottom:10px;">
+          ${p.secteur?`<span class="cible-chip">${escH(p.secteur)}</span>`:""}
+          ${p.lieu?`<span class="cible-chip">📍 ${escH(p.lieu)}</span>`:""}
+          ${p.budget_recherche?`<span class="cible-chip">💰 ${Number(p.budget_recherche).toLocaleString('fr-FR')} ${escH(p.devise||'EUR')} recherchés</span>`:""}
+          <span class="cible-chip active">${EXP_STATUT_LABELS[p.statut]||p.statut}</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm btn-outline" onclick='expOpenForm(${JSON.stringify(p).replace(/'/g,"&#39;")})'>✏️ Modifier</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:#fff;" onclick="expDelete(${p.id})">🗑</button>
+        </div>
+      </div>`).join("");
+  } catch(e) { el.innerHTML = `<div class="notice">Erreur : ${escH(e.message)}</div>`; }
+}
+
+function expOpenForm(prefill) {
+  const g = id => document.getElementById(id);
+  g("exp-modal-titre").textContent = prefill?.id ? "Modifier le projet" : "Nouveau projet";
+  g("exp-f-id").value = prefill?.id || "";
+  g("exp-f-titre").value = prefill?.titre || "";
+  g("exp-f-desc").value = prefill?.description || "";
+  g("exp-f-secteur").value = prefill?.secteur || "";
+  g("exp-f-lieu").value = prefill?.lieu || "";
+  g("exp-f-statut").value = prefill?.statut || "en_cours";
+  g("exp-f-devise").value = prefill?.devise || "EUR";
+  g("exp-f-budget").value = prefill?.budget_recherche || "";
+  g("exp-f-leve").value = prefill?.montant_deja_leve || "";
+  g("exp-f-debut").value = prefill?.date_debut || "";
+  g("exp-f-fin").value = prefill?.date_fin_prevue || "";
+  g("exp-f-contact-nom").value = prefill?.contact_nom || "";
+  g("exp-f-contact-email").value = prefill?.contact_email || "";
+  g("exp-f-image").value = prefill?.image_url || "";
+  g("exp-f-visible").checked = prefill ? !!prefill.visible_public : true;
+  g("exp-modal").style.display = "flex";
+}
+function expCloseForm() { document.getElementById("exp-modal").style.display = "none"; }
+
+async function expSave() {
+  const g = id => document.getElementById(id).value.trim();
+  const titre = g("exp-f-titre");
+  if (!titre) { alert("Le titre est requis."); return; }
+  const payload = {
+    titre, description: g("exp-f-desc"), secteur: g("exp-f-secteur"), lieu: g("exp-f-lieu"),
+    statut: g("exp-f-statut"), devise: g("exp-f-devise"),
+    budget_recherche: g("exp-f-budget") ? Number(g("exp-f-budget")) : null,
+    montant_deja_leve: g("exp-f-leve") ? Number(g("exp-f-leve")) : null,
+    date_debut: g("exp-f-debut"), date_fin_prevue: g("exp-f-fin"),
+    contact_nom: g("exp-f-contact-nom"), contact_email: g("exp-f-contact-email"),
+    image_url: g("exp-f-image"), visible_public: document.getElementById("exp-f-visible").checked,
+  };
+  const id = document.getElementById("exp-f-id").value;
+  try {
+    if (id) await api("PUT", "/collectivite/expansion-projets/" + id, payload);
+    else await api("POST", "/collectivite/expansion-projets", payload);
+    expCloseForm();
+    loadExpansionProjets();
+  } catch(e) { alert("Erreur : " + e.message); }
+}
+
+async function expDelete(id) {
+  if (!confirm("Supprimer définitivement ce projet ?")) return;
+  try { await api("DELETE", "/collectivite/expansion-projets/" + id); loadExpansionProjets(); }
+  catch(e) { alert("Erreur : " + e.message); }
+}
+
 /* ══ SECTION EMPLOIS & STAGES — publication d'offres ══ */
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 const OE_STATUT_LABELS = {brouillon:'📝 Brouillon',publiee:'🟢 Publiée',cloturee:'🔒 Clôturée',archivee:'📁 Archivée'};
@@ -1331,6 +1473,7 @@ function showSection(name) {
   if (name === "oz-collectivite") loadOzCollectivite();
   if (name === "observatoire-territorial") loadObservatoireTerritorial();
   if (name === "opportunites") loadOpportunites();
+  if (name === "expansion-projets") loadExpansionProjets();
   if (name === "offres-emploi") renderOffresEmploiInit();
   if (name === "communications") loadCommHistorique();
   if (name === "consultations") loadConsultations();
@@ -2197,7 +2340,11 @@ async function loadPartenariats() {
   if (ACCRED) loadObservatoire();
 
   // Section par défaut = cockpit
-  showSection('cockpit');
+  /* Lien direct (ex. depuis le profil public : dashboard-collectivite.html#expansion-projets) —
+     n'ouvre la section visée que si elle existe vraiment côté sidebar, sinon repli sur le cockpit. */
+  const hashSection = location.hash.slice(1);
+  const hashValide = hashSection && document.querySelector(`.sidebar a[data-section="${hashSection}"]`);
+  showSection(hashValide ? hashSection : 'cockpit');
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>

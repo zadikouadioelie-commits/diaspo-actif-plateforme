@@ -7133,6 +7133,14 @@ route("GET", "/api/collectivites/:id/appels-projets", async (req, res, params) =
   sendJSON(res, 200, { posts });
 });
 
+/* GET /api/collectivites/:id/expansion-projets — fiches projet publiques structurées (module
+   Expansion, 2026-08-26). Remplace, côté profil-collectivite.html, les anciens blocs "Projets en
+   cours"/"Réalisations"/"Appels à projets" — un seul champ `statut` pilote les trois affichages. */
+route("GET", "/api/collectivites/:id/expansion-projets", async (req, res, params) => {
+  const rows = await db.prepare("SELECT * FROM collectivite_projets_expansion WHERE collectivite_id=? AND visible_public=1 ORDER BY ordre ASC, created_at DESC").all(params.id);
+  sendJSON(res, 200, { projets: rows });
+});
+
 /* ===========================================================================
    RESPONSABLE OFFICIEL D'UN COMPTE COLLECTIVITÉ — chaque compte est rattaché
    à une seule personne identifiée. Toute modification de son identité
@@ -20718,14 +20726,14 @@ async function requireCollectivite(req, res) {
 
 /* ── Profil ambassade ── */
 route("GET", "/api/collectivite/profil-ambassade", async (req, res) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   let profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
   if (!profil) profil = { user_id: user.id, nom_officiel: user.nom || "", pays_represente: user.pays || "" };
   sendJSON(res, 200, profil);
 });
 
 route("PUT", "/api/collectivite/profil-ambassade", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
   const exists = await db.prepare("SELECT user_id FROM ambassade_profil WHERE user_id=?").get(user.id);
   const data = {
@@ -20755,7 +20763,7 @@ route("PUT", "/api/collectivite/profil-ambassade", async (req, res, params, body
 
 /* ── Stats diaspora (agrégées, selon pays_represente) ── */
 route("GET", "/api/collectivite/stats-diaspora", async (req, res) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
   const pays = profil?.pays_represente || user.pays;
   const SEUIL = 10;
@@ -20781,7 +20789,7 @@ route("GET", "/api/collectivite/stats-diaspora", async (req, res) => {
 
 /* ── Espace Diaspora (initiatives filtrées) ── */
 route("GET", "/api/collectivite/diaspora-membres", async (req, res, params, body, query) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const profil = await db.prepare("SELECT * FROM ambassade_profil WHERE user_id=?").get(user.id);
   const pays = profil?.pays_represente || user.pays;
   const { ville, secteur, type } = query;
@@ -20794,13 +20802,13 @@ route("GET", "/api/collectivite/diaspora-membres", async (req, res, params, body
 
 /* ── Services consulaires ── */
 route("GET", "/api/collectivite/services", async (req, res) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const rows = await db.prepare("SELECT * FROM ambassade_services WHERE user_id=? ORDER BY ordre,created_at").all(user.id);
   sendJSON(res, 200, { services: rows });
 });
 
 route("POST", "/api/collectivite/services", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   if (!body.nom) return sendJSON(res, 400, { error: "Nom requis." });
   const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
   const r = await db.prepare("INSERT INTO ambassade_services(user_id,nom,type,icone,description,conditions,documents_requis,delai,tarif,procedure,ordre) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(user.id, body.nom, body.type||"document", body.icone||"📄", body.description||null, body.conditions||null, j(body.documents_requis), body.delai||null, body.tarif||null, body.procedure||null, body.ordre||0);
@@ -20808,93 +20816,139 @@ route("POST", "/api/collectivite/services", async (req, res, params, body) => {
 });
 
 route("PUT", "/api/collectivite/services/:id", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const j = v => { try { return JSON.stringify(Array.isArray(v) ? v : JSON.parse(v || "[]")); } catch { return "[]"; } };
   await db.prepare("UPDATE ambassade_services SET nom=?,type=?,icone=?,description=?,conditions=?,documents_requis=?,delai=?,tarif=?,procedure=?,actif=?,ordre=? WHERE id=? AND user_id=?").run(body.nom, body.type||"document", body.icone||"📄", body.description||null, body.conditions||null, j(body.documents_requis), body.delai||null, body.tarif||null, body.procedure||null, body.actif??1, body.ordre||0, params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("DELETE", "/api/collectivite/services/:id", async (req, res, params) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("DELETE FROM ambassade_services WHERE id=? AND user_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 /* ── Agenda ── */
 route("GET", "/api/collectivite/agenda", async (req, res) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const rows = await db.prepare("SELECT * FROM ambassade_agenda WHERE user_id=? ORDER BY date_debut DESC").all(user.id);
   sendJSON(res, 200, { agenda: rows });
 });
 
 route("POST", "/api/collectivite/agenda", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   if (!body.titre || !body.date_debut) return sendJSON(res, 400, { error: "Titre et date requis." });
   const r = await db.prepare("INSERT INTO ambassade_agenda(user_id,titre,type,description,date_debut,date_fin,lieu,lien,public) VALUES(?,?,?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"evenement", body.description||null, body.date_debut, body.date_fin||null, body.lieu||null, body.lien||null, body.public??1);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
 route("PUT", "/api/collectivite/agenda/:id", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("UPDATE ambassade_agenda SET titre=?,type=?,description=?,date_debut=?,date_fin=?,lieu=?,lien=?,public=? WHERE id=? AND user_id=?").run(body.titre, body.type||"evenement", body.description||null, body.date_debut, body.date_fin||null, body.lieu||null, body.lien||null, body.public??1, params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("DELETE", "/api/collectivite/agenda/:id", async (req, res, params) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("DELETE FROM ambassade_agenda WHERE id=? AND user_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 /* ── Partenariats institutionnels ── */
 route("GET", "/api/collectivite/partenariats-inst", async (req, res) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const rows = await db.prepare("SELECT * FROM ambassade_partenariats WHERE user_id=? ORDER BY created_at DESC").all(user.id);
   sendJSON(res, 200, { partenariats: rows });
 });
 
 route("POST", "/api/collectivite/partenariats-inst", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   if (!body.nom) return sendJSON(res, 400, { error: "Nom requis." });
   const r = await db.prepare("INSERT INTO ambassade_partenariats(user_id,nom,type,description,logo_url,site_web) VALUES(?,?,?,?,?,?)").run(user.id, body.nom, body.type||"institutionnel", body.description||null, body.logo_url||null, body.site_web||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
 route("PUT", "/api/collectivite/partenariats-inst/:id", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("UPDATE ambassade_partenariats SET nom=?,type=?,description=?,logo_url=?,site_web=? WHERE id=? AND user_id=?").run(body.nom, body.type||"institutionnel", body.description||null, body.logo_url||null, body.site_web||null, params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("DELETE", "/api/collectivite/partenariats-inst/:id", async (req, res, params) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("DELETE FROM ambassade_partenariats WHERE id=? AND user_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 /* ── Opportunités ── */
 route("GET", "/api/collectivite/opportunites", async (req, res) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   const rows = await db.prepare("SELECT * FROM ambassade_opportunites WHERE user_id=? ORDER BY created_at DESC").all(user.id);
   sendJSON(res, 200, { opportunites: rows });
 });
 
 route("POST", "/api/collectivite/opportunites", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   if (!body.titre) return sendJSON(res, 400, { error: "Titre requis." });
   const r = await db.prepare("INSERT INTO ambassade_opportunites(user_id,titre,type,description,date_limite,lien,budget) VALUES(?,?,?,?,?,?,?)").run(user.id, body.titre, body.type||"appel_offres", body.description||null, body.date_limite||null, body.lien||null, body.budget||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
 route("PUT", "/api/collectivite/opportunites/:id", async (req, res, params, body) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("UPDATE ambassade_opportunites SET titre=?,type=?,description=?,date_limite=?,lien=?,budget=?,actif=? WHERE id=? AND user_id=?").run(body.titre, body.type||"appel_offres", body.description||null, body.date_limite||null, body.lien||null, body.budget||null, body.actif??1, params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 
 route("DELETE", "/api/collectivite/opportunites/:id", async (req, res, params) => {
-  const user = requireCollectivite(req, res); if (!user) return;
+  const user = await requireCollectivite(req, res); if (!user) return;
   await db.prepare("DELETE FROM ambassade_opportunites WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Module Expansion (2026-08-26) — fiches projet publiques structurées, gestion côté
+   collectivité. Voir le commentaire de la table collectivite_projets_expansion (db.js) pour
+   la distinction avec `opportunites` (veille interne, jamais publique). ── */
+route("GET", "/api/collectivite/expansion-projets", async (req, res) => {
+  const user = await requireCollectivite(req, res); if (!user) return;
+  const rows = await db.prepare("SELECT * FROM collectivite_projets_expansion WHERE collectivite_id=? ORDER BY ordre ASC, created_at DESC").all(user.id);
+  sendJSON(res, 200, { projets: rows });
+});
+
+route("POST", "/api/collectivite/expansion-projets", async (req, res, params, body) => {
+  const user = await requireCollectivite(req, res); if (!user) return;
+  if (!body.titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const statut = ['en_cours','recherche_partenaires','termine'].includes(body.statut) ? body.statut : 'en_cours';
+  const r = await db.prepare(`INSERT INTO collectivite_projets_expansion
+      (collectivite_id,titre,description,secteur,statut,budget_recherche,devise,montant_deja_leve,date_debut,date_fin_prevue,lieu,image_url,business_plan_id,contact_email,contact_nom,visible_public)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(user.id, body.titre, body.description||null, body.secteur||null, statut, body.budget_recherche||null, body.devise||'EUR', body.montant_deja_leve||null, body.date_debut||null, body.date_fin_prevue||null, body.lieu||null, body.image_url||null, body.business_plan_id||null, body.contact_email||null, body.contact_nom||null, body.visible_public===false?0:1);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/collectivite/expansion-projets/:id", async (req, res, params, body) => {
+  const user = await requireCollectivite(req, res); if (!user) return;
+  const statut = ['en_cours','recherche_partenaires','termine'].includes(body.statut) ? body.statut : null;
+  const visiblePublic = body.visible_public != null ? (body.visible_public ? 1 : 0) : null;
+  const r = await db.prepare(`UPDATE collectivite_projets_expansion SET
+      titre=COALESCE(?,titre), description=COALESCE(?,description), secteur=COALESCE(?,secteur),
+      statut=COALESCE(?,statut), budget_recherche=COALESCE(?,budget_recherche), devise=COALESCE(?,devise),
+      montant_deja_leve=COALESCE(?,montant_deja_leve), date_debut=COALESCE(?,date_debut),
+      date_fin_prevue=COALESCE(?,date_fin_prevue), lieu=COALESCE(?,lieu), image_url=COALESCE(?,image_url),
+      business_plan_id=COALESCE(?,business_plan_id), contact_email=COALESCE(?,contact_email),
+      contact_nom=COALESCE(?,contact_nom), visible_public=COALESCE(?,visible_public), updated_at=datetime('now')
+    WHERE id=? AND collectivite_id=?`)
+    .run(body.titre||null, body.description||null, body.secteur||null, statut,
+      body.budget_recherche??null, body.devise||null, body.montant_deja_leve??null,
+      body.date_debut||null, body.date_fin_prevue||null, body.lieu||null, body.image_url||null, body.business_plan_id??null,
+      body.contact_email||null, body.contact_nom||null, visiblePublic, params.id, user.id);
+  if (!r.changes) return sendJSON(res, 404, { error: "Projet introuvable ou non autorisé." });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/collectivite/expansion-projets/:id", async (req, res, params) => {
+  const user = await requireCollectivite(req, res); if (!user) return;
+  await db.prepare("DELETE FROM collectivite_projets_expansion WHERE id=? AND collectivite_id=?").run(params.id, user.id);
   sendJSON(res, 200, { ok: true });
 });
 

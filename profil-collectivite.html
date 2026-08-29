@@ -213,7 +213,7 @@ function applyPcTheme(name) {
       <!-- ══ COLONNE CENTRE — fil (actualités, appels à projets) ══ -->
       <div class="pc-col-center">
         <div class="pc-appel-card" id="pc-appels-card" style="display:none;">
-          <h3 style="margin:0 0 10px;">📢 Appels à projets & recherche de partenariats</h3>
+          <h3 style="margin:0 0 10px;">📢 Recherche de partenaires <span style="font-weight:400;font-size:12px;color:var(--muted,#888);">— projets ouverts à un partenariat/investissement</span></h3>
           <div id="pc-appels"></div>
         </div>
 
@@ -224,16 +224,20 @@ function applyPcTheme(name) {
 
       <!-- ══ COLONNE DROITE — projets & galerie (statique) ══ -->
       <div class="pc-col-right">
-        ${(profil.projets_en_cours.length || profil.is_owner) ? `
-        <div class="pc-card">
-          <h3>🚧 Projets en cours ${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-projet">+ Ajouter</button>` : ''}</h3>
-          <div id="pc-projets-list">${profil.projets_en_cours.map(p => `<div class="pc-proj"><span class="pc-proj-badge cours">En cours</span><br><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:3px;color:var(--muted,#666);">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet en cours.</div>'}</div>
-        </div>` : ''}
+        <div class="pc-card" id="pc-exp-cours-card" style="display:none;">
+          <h3>🚧 Projets en cours ${profil.is_owner ? `<a class="pc-mini-btn" href="dashboard-collectivite.html#expansion-projets" style="text-decoration:none;display:inline-block;">+ Gérer</a>` : ''}</h3>
+          <div id="pc-exp-cours-list"></div>
+        </div>
 
-        ${(profil.realisations.length || profil.is_owner) ? `
-        <div class="pc-card">
-          <h3>🏆 Projets réalisés ${profil.is_owner ? `<button class="pc-mini-btn" id="pc-btn-add-realisation">+ Ajouter</button>` : ''}</h3>
-          <div id="pc-realisations-list">${profil.realisations.map(p => `<div class="pc-proj"><span class="pc-proj-badge fait">Réalisé</span><br><strong>${esc(p.titre)}</strong>${p.description ? `<div style="margin-top:3px;color:var(--muted,#666);">${esc(p.description)}</div>` : ''}</div>`).join('') || '<div class="pc-empty">Aucun projet réalisé archivé.</div>'}</div>
+        <div class="pc-card" id="pc-exp-termine-card" style="display:none;">
+          <h3>🏆 Projets réalisés ${profil.is_owner ? `<a class="pc-mini-btn" href="dashboard-collectivite.html#expansion-projets" style="text-decoration:none;display:inline-block;">+ Gérer</a>` : ''}</h3>
+          <div id="pc-exp-termine-list"></div>
+        </div>
+
+        ${profil.is_owner ? `
+        <div class="pc-card" id="pc-exp-empty-card">
+          <h3>🏗️ Projets d'expansion</h3>
+          <div class="pc-empty">Aucun projet publié pour le moment. <a href="dashboard-collectivite.html#expansion-projets">Créez votre premier projet</a> pour le présenter à la diaspora.</div>
         </div>` : ''}
 
         ${profil.galerie.length ? `
@@ -274,15 +278,44 @@ function applyPcTheme(name) {
       : '<div class="pc-empty">Aucun événement à venir.</div>';
   } catch (e) { document.getElementById('pc-agenda').innerHTML = '<div class="pc-empty">Indisponible.</div>'; }
 
-  // Appels à projets & recherche de partenariats
-  let appelsData = [];
+  // Projets d'expansion — fiches structurées (module Expansion, 2026-08-26) : un seul
+  // chargement alimente les 3 blocs (recherche de partenaires / en cours / réalisés),
+  // regroupés par statut. Remplace les anciens blocs "Appels à projets" (fil_posts non
+  // structuré) et "Projets en cours/Réalisations" (JSON libre saisi par prompt()).
+  let expansionData = [];
   try {
-    const r = await api('GET', `/collectivites/${id}/appels-projets`);
-    appelsData = r.posts || [];
-    if (appelsData.length) {
+    const r = await api('GET', `/collectivites/${id}/expansion-projets`);
+    expansionData = r.projets || [];
+    const parStatut = s => expansionData.filter(p => p.statut === s);
+    const renderProjCard = (p, badgeClass, badgeLabel) => {
+      const pct = (p.budget_recherche && p.montant_deja_leve != null) ? Math.min(100, Math.round(p.montant_deja_leve / p.budget_recherche * 100)) : null;
+      return `<div class="pc-proj">
+        <span class="pc-proj-badge ${badgeClass}">${badgeLabel}</span><br>
+        <strong>${esc(p.titre)}</strong>
+        ${p.secteur || p.lieu ? `<div style="font-size:11px;color:var(--muted,#888);margin-top:2px;">${[p.secteur, p.lieu].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
+        ${p.description ? `<div style="margin-top:3px;color:var(--muted,#666);">${esc(p.description)}</div>` : ''}
+        ${p.budget_recherche ? `<div style="margin-top:6px;font-size:12px;"><strong>${Number(p.budget_recherche).toLocaleString('fr-FR')} ${esc(p.devise||'EUR')}</strong> recherchés${pct!=null?` — ${pct}% déjà levés`:''}</div>` : ''}
+        ${p.contact_email ? `<a href="mailto:${esc(p.contact_email)}?subject=${encodeURIComponent('Partenariat — '+p.titre)}" class="pc-mini-btn" style="display:inline-block;margin-top:6px;text-decoration:none;">✉️ Contacter</a>` : ''}
+      </div>`;
+    };
+
+    const recherche = parStatut('recherche_partenaires');
+    if (recherche.length) {
       document.getElementById('pc-appels-card').style.display = '';
-      document.getElementById('pc-appels').innerHTML = appelsData.map(p => Posts.renderPostCard(p, { currentUserId: CU ? CU.id : null })).join('');
+      document.getElementById('pc-appels').innerHTML = recherche.map(p => renderProjCard(p, 'cours', '🤝 Recherche partenaire')).join('');
     }
+    const enCours = parStatut('en_cours');
+    if (enCours.length) {
+      document.getElementById('pc-exp-cours-card').style.display = '';
+      document.getElementById('pc-exp-cours-list').innerHTML = enCours.map(p => renderProjCard(p, 'cours', 'En cours')).join('');
+    }
+    const termines = parStatut('termine');
+    if (termines.length) {
+      document.getElementById('pc-exp-termine-card').style.display = '';
+      document.getElementById('pc-exp-termine-list').innerHTML = termines.map(p => renderProjCard(p, 'fait', 'Réalisé')).join('');
+    }
+    const emptyCard = document.getElementById('pc-exp-empty-card');
+    if (emptyCard && expansionData.length) emptyCard.style.display = 'none';
   } catch (e) { /* section masquée si indisponible */ }
 
   if (profil.galerie.length && typeof loadGaleriePhotoCounts === 'function') loadGaleriePhotoCounts('user', profil.id);
@@ -368,22 +401,9 @@ function applyPcTheme(name) {
       const docs = [...profil.documents, { nom, url }];
       try { await api('PUT', '/profil', { documents_publics: docs }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
     });
-
-    const btnProjet = document.getElementById('pc-btn-add-projet');
-    if (btnProjet) btnProjet.addEventListener('click', async () => {
-      const titre = prompt("Titre du projet en cours :"); if (!titre) return;
-      const description = prompt("Description (optionnel) :") || '';
-      const list = [...profil.projets_en_cours, { titre, description }];
-      try { await api('PUT', '/profil', { projets_en_cours: list }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
-    });
-
-    const btnReal = document.getElementById('pc-btn-add-realisation');
-    if (btnReal) btnReal.addEventListener('click', async () => {
-      const titre = prompt("Titre du projet réalisé :"); if (!titre) return;
-      const description = prompt("Description (optionnel) :") || '';
-      const list = [...profil.realisations, { titre, description }];
-      try { await api('PUT', '/profil', { realisations: list }); location.reload(); } catch (e) { alert('Erreur : ' + e.message); }
-    });
+    /* "Projets en cours"/"Réalisations" : géré depuis le module Expansion du tableau de
+       bord (liens "+ Gérer" ci-dessus) depuis le 2026-08-26 -- ancien ajout par prompt()
+       retiré au profit de vraies fiches structurées (budget, secteur, statut, contact). */
   }
 
   /* ── Assistant IA d'information territoriale ── agent d'information, pas de décision.
@@ -439,8 +459,9 @@ function applyPcTheme(name) {
       if (!profil.nom_responsable) return "Aucune information de gouvernance renseignée.";
       return `${[profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' ')} — ${profil.fonction_responsable || 'Responsable'}.${profil.presentation_gouvernance ? ' ' + profil.presentation_gouvernance : ''}`;
     }
-    if (/projet.*cours|en cours/.test(t)) return profil.projets_en_cours.length ? profil.projets_en_cours.map(p => `• ${p.titre}`).join('\n') : "Aucun projet en cours n'est publié pour le moment.";
-    if (/r[ée]alis|termin[ée]|historique/.test(t)) return profil.realisations.length ? profil.realisations.map(p => `• ${p.titre}`).join('\n') : "Aucun projet réalisé n'est publié pour le moment.";
+    if (/projet.*cours|en cours/.test(t)) { const l = expansionData.filter(p => p.statut === 'en_cours'); return l.length ? l.map(p => `• ${p.titre}`).join('\n') : "Aucun projet en cours n'est publié pour le moment."; }
+    if (/r[ée]alis|termin[ée]|historique/.test(t)) { const l = expansionData.filter(p => p.statut === 'termine'); return l.length ? l.map(p => `• ${p.titre}`).join('\n') : "Aucun projet réalisé n'est publié pour le moment."; }
+    if (/partenaire|investisse|financement/.test(t)) { const l = expansionData.filter(p => p.statut === 'recherche_partenaires'); return l.length ? l.map(p => `• ${p.titre}${p.budget_recherche?` (${Number(p.budget_recherche).toLocaleString('fr-FR')} ${p.devise||'EUR'} recherchés)`:''}`).join('\n') : "Aucun appel à partenariat n'est publié pour le moment."; }
     if (/[ée]v[ée]nement|agenda|rencontre|forum/.test(t)) return agendaEvents.length ? agendaEvents.map(e => `• ${e.titre} — ${e.date_evt ? new Date(e.date_evt).toLocaleDateString('fr-FR') : ''}${e.lieu ? ' (' + e.lieu + ')' : ''}`).join('\n') : "Aucun événement à venir n'est actuellement publié.";
     if (/appel.*projet|partenariat|opportunit[ée]/.test(t)) return appelsData.length ? appelsData.map(p => `• ${p.contenu.slice(0,120)}`).join('\n') : "Aucun appel à projets ou recherche de partenariat en cours.";
     if (/contact|joindre|site|web|r[ée]seau/.test(t)) {

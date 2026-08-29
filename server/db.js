@@ -955,6 +955,44 @@ db.exec(`
     FOREIGN KEY(opportunite_id) REFERENCES opportunites(id)
   );
 
+  /* ===== MODULE EXPANSION (2026-08-26) — fiches projet structurées d'une collectivité,
+     destinées à être montrées publiquement à la diaspora (contrairement à la table
+     opportunites ci-dessus, qui reste un outil de veille 100% interne). Remplace, côté
+     profil-collectivite.html, les anciens blocs "Projets en cours"/"Réalisations" (simples
+     listes JSON sur users, saisies par prompt()) et le bloc "Appels à projets" (posts
+     fil_posts non structurés) : un seul champ statut pilote maintenant les trois affichages
+     (en_cours / recherche_partenaires / termine).
+     Table dédiée plutôt que de réutiliser la table projets : cette dernière sert de pipeline
+     de VALIDATION (une collectivité y valide des projets soumis PAR D'AUTRES) — y mélanger
+     les propres vitrines de la collectivité aurait fait apparaître ses propres fiches dans
+     les listes "à valider" de toutes les autres collectivités (GET /api/projets pour
+     role=collectivite montre tous les projets non-DA de la plateforme). */
+  CREATE TABLE IF NOT EXISTS collectivite_projets_expansion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collectivite_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    secteur TEXT,
+    statut TEXT DEFAULT 'en_cours' CHECK(statut IN ('en_cours','recherche_partenaires','termine')),
+    budget_recherche REAL,
+    devise TEXT DEFAULT 'EUR',
+    montant_deja_leve REAL,
+    date_debut TEXT,
+    date_fin_prevue TEXT,
+    lieu TEXT,
+    image_url TEXT,
+    business_plan_id INTEGER,
+    contact_email TEXT,
+    contact_nom TEXT,
+    visible_public INTEGER DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(collectivite_id) REFERENCES users(id),
+    FOREIGN KEY(business_plan_id) REFERENCES business_plans(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_coll_proj_expansion_coll ON collectivite_projets_expansion(collectivite_id);
+
   /* ===== SYSTÈME DE CERTIFICATION ===== */
 
   /* Certification active d'une initiative */
