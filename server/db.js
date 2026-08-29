@@ -7011,6 +7011,17 @@ db.exec(`
   const dc = db.prepare("PRAGMA table_info(demandes_contact)").all().map(c => c.name);
   if (dc.includes('motif')) {
     db.exec("DROP TABLE IF EXISTS demandes_contact");
+    /* Parenthèse fermante et point-virgule remis sur leur propre ligne (2026-08-29) — pas
+       une simple question de style : colonnesDeclareesParTable() (server/pg-init.js) repère
+       la fin d'un CREATE TABLE par la séquence "\n  );" en fin de ligne. L'ancienne écriture
+       compacte ("...id))`);", parenthèse de FOREIGN KEY et parenthèse de CREATE TABLE collées,
+       jamais suivies d'un ';') ne correspondait jamais à ce motif : la capture "avalait" tout
+       le texte jusqu'au PROCHAIN "\n  );" trouvé plus bas dans le fichier — celui de la table
+       support_tickets qui suit juste après — et lui attribuait toutes ses colonnes (dont
+       user_id NOT NULL). Reproduit en production : ajouterColonnesManquantes() (rejoué à
+       chaque cold start ET par /api/admin/reparer-schema) ajoutait bel et bien ces colonnes
+       sur demandes_contact, faisant échouer toute nouvelle demande de contact
+      ("null value in column user_id of relation demandes_contact"). */
     db.exec(`CREATE TABLE IF NOT EXISTS demandes_contact (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       demandeur_id INTEGER NOT NULL,
@@ -7022,7 +7033,8 @@ db.exec(`
       created_at TEXT DEFAULT (datetime('now')),
       repondu_at TEXT,
       FOREIGN KEY(demandeur_id) REFERENCES users(id),
-      FOREIGN KEY(destinataire_id) REFERENCES users(id))`);
+      FOREIGN KEY(destinataire_id) REFERENCES users(id)
+    );`);
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_dc_en_attente_unique ON demandes_contact(demandeur_id, destinataire_id) WHERE statut='en_attente'");
   }
 }

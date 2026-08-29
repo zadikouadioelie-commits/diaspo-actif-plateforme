@@ -1084,6 +1084,29 @@ async function migratePg(pool) {
       console.error(`[pg-init migration] ${table}.${col}:`, e.message);
     }
   }
+
+  /* ── Nettoyage demandes_contact (2026-08-29) ──
+     Bug de parsing dans colonnesDeclareesParTable() (voir le commentaire sur le CREATE TABLE
+     concerné, server/db.js) : la parenthèse fermante du CREATE TABLE demandes_contact
+     "secondaire" (migration de l'ancien schéma avec colonne motif) était collée sur la même
+     ligne sans point-virgule propre, jamais reconnue comme fin de table par le motif recherché
+     ("\n  );"). Le texte capturé "débordait" jusqu'à la table support_tickets qui suit
+     immédiatement dans le fichier, et ajouterColonnesManquantes() (rejouée à chaque cold
+     start ET par /api/admin/reparer-schema) a donc ajouté toutes SES colonnes sur
+     demandes_contact — dont user_id NOT NULL, jamais rempli par la vraie insertion
+     (demandeur_id/destinataire_id/message), provoquant l'échec de toute nouvelle demande de
+     contact. Formatage corrigé pour empêcher la récidive ; ce nettoyage retire les colonnes
+     déjà ajoutées à tort. Aucune perte de données réelle : demandes_contact était vide au
+     moment du diagnostic (table jamais utilisable depuis l'introduction du bug). */
+  const COLONNES_DEMANDES_CONTACT_A_RETIRER = [
+    'numero', 'user_id', 'role', 'categorie', 'gravite', 'description', 'module_concerne',
+    'page_url', 'navigateur', 'os', 'app_version', 'screenshots_json', 'admin_id',
+    'priorite_ia', 'groupe_ia', 'notes_internes', 'updated_at', 'resolved_at',
+  ];
+  for (const col of COLONNES_DEMANDES_CONTACT_A_RETIRER) {
+    try { await pool.query(`ALTER TABLE demandes_contact DROP COLUMN IF EXISTS ${col}`); }
+    catch (e) { console.error(`[pg-init migration] demandes_contact.${col} (retrait):`, e.message); }
+  }
   // Rubrique Vitrines — initialise updated_at pour les initiatives déjà existantes (jamais
   // modifiées depuis), sinon elles resteraient NULL et disparaîtraient toujours en dernier
   // du tri "Dernière mise à jour" au lieu de refléter leur date de création.

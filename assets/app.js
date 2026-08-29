@@ -1502,11 +1502,12 @@ function renderInitiativeCard(it){
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
-      <div class="ann-card-foot" style="flex-wrap:wrap;gap:6px;">
+      <div class="ann-card-foot" style="flex-wrap:wrap;gap:6px;" onclick="event.stopPropagation()">
         ${membres}
         <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
+        ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
             ? `<a href="dashboard-initiative.html#adhesions-init" class="ann-card-btn ann-card-btn-adherer" onclick="event.stopPropagation()">Gérer les adhésions</a>`
@@ -1710,8 +1711,9 @@ async function initAnnuaire(){
         ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
         <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
-        <div class="ann-card-foot">
+        <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
+          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
         </div>
       </div>
     </div>`;
@@ -1738,9 +1740,10 @@ async function initAnnuaire(){
         ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">🌍 <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
         ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
-        <div class="ann-card-foot">
+        <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>
           ${abonnerBtn}
+          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${o.id}" data-relation-classe="ann-card-btn"></span>` : ''}
         </div>
       </div>
     </div>`;
@@ -1799,6 +1802,7 @@ async function initAnnuaire(){
         <p style="font-size:.88rem;">Essayez un autre mot-clé ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
       </div>`;
     renderChips();
+    if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
   }
 
   /* ── Appliquer les filtres ── */
@@ -1840,6 +1844,7 @@ async function initAnnuaire(){
             <p style="font-size:.88rem;">Essayez avec d'autres filtres ou <button onclick="annResetFilters()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:700;text-decoration:underline;">réinitialisez la recherche</button>.</p>
           </div>`;
       renderChips();
+      if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
       return;
     }
 
