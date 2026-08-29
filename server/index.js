@@ -29647,8 +29647,14 @@ ${jsonLd}
       // suffirait à contourner la restriction).
       if (!me || me.role !== 'administrateur') {
         try {
-          const totalMembresPublic = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
-          const nbPaysPublic = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!='' AND (is_demo IS NULL OR is_demo=FALSE)`).get())?.n;
+          /* nom != 'Compte supprimé' (2026-08-29, signalé par l'utilisateur — chiffre public
+             perçu comme trop élevé) : les comptes supprimés sont anonymisés (voir DELETE
+             /api/auth/account), jamais retirés physiquement, donc jamais exclus par défaut.
+             Sans ce filtre, 65 des 86 comptes comptés ici étaient en réalité des comptes
+             supprimés — le vrai total tombe à 21. Même convention que partout ailleurs dans
+             ce fichier (ex. ligne ~2114, ~6049). */
+          const totalMembresPublic = (await db.prepare(`SELECT COUNT(*) n FROM users WHERE role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE) AND nom != 'Compte supprimé'`).get())?.n;
+          const nbPaysPublic = (await db.prepare(`SELECT COUNT(DISTINCT pays) n FROM users WHERE pays IS NOT NULL AND pays!='' AND (is_demo IS NULL OR is_demo=FALSE) AND nom != 'Compte supprimé'`).get())?.n;
           return sendJSON(res, 200, {
             general: { totalMembres: Number(totalMembresPublic || 0) },
             geo: { nbPays: Number(nbPaysPublic || 0) },
@@ -29660,10 +29666,10 @@ ${jsonLd}
       }
 
       try {
-        // ── Membres par rôle (comptes de démonstration exclus) ──
+        // ── Membres par rôle (comptes de démonstration ET comptes supprimés exclus, 2026-08-29) ──
         const roles = await db.prepare(`
           SELECT role, COUNT(*) n FROM users
-          WHERE role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE) ${fPays} ${sw.replace('created_at','created_at')}
+          WHERE role NOT IN ('administrateur') AND (is_demo IS NULL OR is_demo=FALSE) AND nom != 'Compte supprimé' ${fPays} ${sw.replace('created_at','created_at')}
           GROUP BY role
         `).all(...fPaysArg);
         const byRole = {};
