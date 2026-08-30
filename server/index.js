@@ -13897,10 +13897,15 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   /* Comptes organisme (initiative/collectivité/administrateur) : le nom de la structure prime
      sur le nom personnel, qui n'apparaît plus qu'en information secondaire "responsable du compte". */
   let nomStructure = null, responsable = null, initiativeId = null, initiativeType = null, adhesionsOuvertes = null, photoFallbackInitiative = null;
+  let descriptionStructure = null;
   if (u.role === 'initiative') {
-    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url FROM initiatives WHERE owner_user_id=?").get(u.id);
+    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url, description FROM initiatives WHERE owner_user_id=?").get(u.id);
     if (initRow) {
       nomStructure = initRow.nom;
+      /* Description réelle de l'ACTIVITÉ (2026-08-30, signalé : "que fait cette entreprise"
+         répondait mal) — jusqu'ici l'assistant du profil ne connaissait que u.bio, la bio
+         PERSONNELLE du responsable, jamais la présentation de la structure elle-même. */
+      descriptionStructure = initRow.description || null;
       responsable = { prenom: initRow.prenom_responsable || u.prenom, nom: initRow.nom_responsable || u.nom, fonction: initRow.fonction_responsable };
       /* Exposé pour le bouton "Adhérer" (Associations/ONG), affiché sur le profil personnel
          du responsable en plus de la fiche initiative.html — même bouton, même route
@@ -14000,6 +14005,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     assistant_actif: u.assistant_actif == null ? 1 : u.assistant_actif,
     galerie: safeParseArray(u.galerie_json),
     nom_structure: nomStructure,
+    structure_description: descriptionStructure,
     responsable,
     type_organisme: u.type_organisme,
     affiliations,

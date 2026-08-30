@@ -1474,12 +1474,35 @@ async function renderEnrichedColumns() {
   }
 
   /* ── Assistant IA du compte (règles/intents, données du profil) ── */
+  /* Distance d'édition (Levenshtein) — tolérance aux fautes de frappe (demande explicite du
+     2026-08-30 : "qie fai cette entreprise" ne déclenchait rien du tout). Volontairement
+     minimal (pas de bibliothèque, pas d'IA) : suffisant pour absorber 1-2 lettres décalées/
+     manquantes sur un mot-clé court, jamais utilisé pour un vrai traitement du langage. */
+  function ppLevenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+    return dp[m][n];
+  }
   function ppAssistantReponse(q) {
     const t = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    const has = (...w) => w.some(x => t.includes(x));
+    const mots = t.split(/[^a-z0-9]+/).filter(Boolean);
+    const has = (...w) => w.some(x => t.includes(x) || mots.some(m => {
+      const tolerance = x.length <= 4 ? 1 : 2; // mot-clé court = tolérance plus stricte, sinon faux positifs
+      return Math.abs(m.length - x.length) <= tolerance && ppLevenshtein(m, x) <= tolerance;
+    }));
     const nomComplet = [profil.prenom, profil.nom].filter(Boolean).join(' ');
-    if (has('qui', 'presentation', 'bio', 'parcours', 'faites')) {
-      return profil.bio || profil.titre_pro || `${nomComplet}${profil.titre_pro ? ', ' + profil.titre_pro : ''}.`;
+    /* Réponse "qui/que fait" : pour un compte organisme (initiative/collectivité), la vraie
+       présentation de l'ACTIVITÉ vient de la structure (profil.structure_description, ajoutée
+       le 2026-08-30 côté serveur), jamais de la bio PERSONNELLE du responsable qui répond
+       souvent mal ou vide à "que fait cette entreprise". */
+    if (has('qui', 'presentation', 'bio', 'parcours', 'faites', 'fait')) {
+      return profil.structure_description || profil.bio || profil.titre_pro || `${nomComplet}${profil.titre_pro ? ', ' + profil.titre_pro : ''}.`;
     }
     if (has('competence', 'savoir', 'expertise', 'skill')) {
       const c = (profil.competences || []).map(x => typeof x === 'string' ? x : (x.nom || x.label)).filter(Boolean);
@@ -1514,7 +1537,15 @@ async function renderEnrichedColumns() {
       const b = profil.besoins || [];
       return (b.length ? `Opportunités/recherches actuelles : ${b.join(', ')}. ` : `Aucune opportunité annoncée pour l'instant. `) + `<button onclick="ppContact('Proposition')" style="color:var(--tp);font-weight:700;background:none;border:none;cursor:pointer;padding:0;">Me contacter →</button>`;
     }
-    return `Je n'ai pas de réponse précise. Vous pouvez <a href="messagerie.html?user=${profil.id}" style="color:var(--tp);font-weight:700;">écrire directement à ${esc2(nomComplet)}</a>.`;
+    /* Proposition de reformulation (demande explicite du 2026-08-30) plutôt qu'un simple constat
+       d'échec — quelques exemples concrets de questions que le robot sait traiter, pour guider
+       vers une formulation qui fonctionnera, sans deviner l'intention (pas d'IA ici). */
+    return `Je n'ai pas compris votre question. Essayez de la reformuler, par exemple :<br>`
+      + `« Que fait ${profil.nom_structure ? 'cette structure' : nomComplet} ? »<br>`
+      + `« Quelles sont vos compétences ? »<br>`
+      + `« Quelles sont vos dernières activités ? »<br>`
+      + `« Avez-vous des opportunités en ce moment ? »<br>`
+      + `Sinon, <a href="messagerie.html?user=${profil.id}" style="color:var(--tp);font-weight:700;">écrivez directement à ${esc2(nomComplet)}</a>.`;
   }
   function ppRenderAssistant() {
     document.getElementById('pp-ia-fab')?.remove();
