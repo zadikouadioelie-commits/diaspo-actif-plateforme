@@ -944,6 +944,7 @@ function renderSection(key) {
   if (key === 'plan_financier') calcAllFinance();
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
   if (key === 'presentation') bpLoadTractionDocs();
+  if (key === 'annexes') bpLoadBiblioDocuments();
   if (key === 'financement') bpCalcDilution();
   if (key === 'rh') bpCalcMasseSalariale();
   if (!def?.noSave && monRole !== 'lecteur') {
@@ -1195,13 +1196,13 @@ function renderTractionCard() {
     <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Ce que votre projet a déjà démontré, concrètement — la partie la plus regardée par une banque ou un investisseur.</p>
     <div class="fg">
       ${select('genere_revenus','Le projet génère-t-il déjà des revenus ?',[{v:'',l:'—'},{v:'oui',l:'Oui'},{v:'non',l:'Non'}])}
-      ${field('ca_realise_a_ce_jour','Chiffre d\'affaires réalisé à ce jour','','number')}
+      <div>${field('ca_realise_a_ce_jour','Chiffre d\'affaires réalisé à ce jour','','number')}${provenanceWidget('presentation','ca_realise_a_ce_jour')}</div>
       ${field('ca_12_derniers_mois','CA des 12 derniers mois','','number')}
       ${field('ca_annee_precedente','CA de l\'année précédente','','number')}
     </div>
     <h3 style="font-size:13px;margin:16px 0 8px;">Clients & utilisateurs</h3><div class="fg">
-      ${field('nb_clients_actuels','Nombre de clients actuels','','number')}
-      ${field('nb_clients_payants','Nombre de clients payants','','number')}
+      <div>${field('nb_clients_actuels','Nombre de clients actuels','','number')}${provenanceWidget('presentation','nb_clients_actuels')}</div>
+      <div>${field('nb_clients_payants','Nombre de clients payants','','number')}${provenanceWidget('presentation','nb_clients_payants')}</div>
       ${field('nb_utilisateurs','Nombre d\'utilisateurs','','number')}
       ${field('nb_utilisateurs_actifs','Nombre d\'utilisateurs actifs','','number')}
       ${field('nb_clients_recurrents','Nombre de clients récurrents','','number')}
@@ -1217,9 +1218,9 @@ function renderTractionCard() {
       ${textarea('resultats_tests','Résultats des tests','Ce que ces pilotes ont montré…',2,true)}
     </div>
     <h3 style="font-size:13px;margin:16px 0 8px;">Croissance & fidélisation</h3><div class="fg">
-      ${field('croissance_mensuelle','Croissance mensuelle','Ex : +8%/mois')}
+      <div>${field('croissance_mensuelle','Croissance mensuelle','Ex : +8%/mois')}${provenanceWidget('presentation','croissance_mensuelle')}</div>
       ${field('croissance_annuelle','Croissance annuelle','Ex : +45%/an')}
-      ${field('taux_fidelisation','Taux de fidélisation','Ex : 70%')}
+      <div>${field('taux_fidelisation','Taux de fidélisation','Ex : 70%')}${provenanceWidget('presentation','taux_fidelisation')}</div>
       ${field('taux_reachat','Taux de réachat','Ex : 35%')}
     </div>
     <h3 style="font-size:13px;margin:16px 0 8px;">Reconnaissance & financement déjà obtenu</h3><div class="fg">
@@ -1298,7 +1299,7 @@ function renderProbleme() {
       ${textarea('preuves','Preuves & Sources','Études, articles, rapports, statistiques…',3,true)}
     </div></div>
     <div class="bp-card-inner bp-niveau-2"><h3>Ampleur chiffrée</h3><div class="fg">
-      ${field('nb_personnes_concernees','Nombre de personnes concernées','Ex : 12 000',   'number')}
+      <div>${field('nb_personnes_concernees','Nombre de personnes concernées','Ex : 12 000','number')}${provenanceWidget('probleme','nb_personnes_concernees')}</div>
       ${field('frequence_probleme','Fréquence du problème','Ex : quotidien, une fois par mois…')}
       ${field('cout_probleme','Coût du problème pour une personne concernée','Ex : 40 € par mois, 3h perdues par semaine…')}
       ${textarea('solutions_existantes','Solutions actuellement utilisées','Comment les gens font aujourd\'hui, faute de mieux…',3,true)}
@@ -1335,7 +1336,7 @@ function renderSolution() {
       ${field('nb_tests','Nombre de tests réalisés','','number')}
       ${field('nb_utilisateurs_test','Nombre d\'utilisateurs testeurs','','number')}
       ${textarea('resultats_tests_solution','Résultats des tests','Ce que ces tests ont montré…',3,true)}
-      ${field('taux_satisfaction','Taux de satisfaction des testeurs','Ex : 85%')}
+      <div>${field('taux_satisfaction','Taux de satisfaction des testeurs','Ex : 85%')}${provenanceWidget('solution','taux_satisfaction')}</div>
       ${textarea('ameliorations_prevues','Améliorations prévues','',3,true)}
     </div></div>
     <div class="bp-card-inner bp-niveau-3"><h3>Coûts, protection & risques</h3><div class="fg">
@@ -3063,6 +3064,20 @@ function renderAnnexes() {
             </div>`).join('')}
         </div>` : '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucune annexe ajoutée.</p>'}
     </div>
+
+    <!-- Bibliothèque unifiée (2026-08-31, point 23) : réutilise bp_documents, jusque-là
+         seulement exposé pour la Traction -- centralise ici TOUS les justificatifs versés
+         n'importe où dans le plan (dont ceux de Traction), avec les vraies catégories
+         métier. Coexiste avec la liste de liens externes ci-dessus (deux besoins différents :
+         un lien vers un doc déjà hébergé ailleurs / un vrai fichier téléversé et catégorisé). -->
+    <div class="bp-card-inner" style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <h3 style="margin:0;">📎 Bibliothèque de justificatifs</h3>
+        <button class="btn btn-orange btn-sm" onclick="bpAjouterDocumentBiblio()">+ Téléverser un document</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Tous les documents versés dans ce plan (y compris ceux joints à la section Traction), classés par catégorie.</p>
+      <div id="bp-biblio-list">Chargement…</div>
+    </div>
   </div>`;
 }
 function addAnnexe() { document.getElementById('annexes-form').style.display='block'; }
@@ -3079,6 +3094,57 @@ function delAnnexe(i) {
   sections.annexes.items.splice(i,1);
   markDirty();
   renderSection('annexes');
+}
+
+const BP_DOC_CATEGORIES = ['administratif','juridique','financier','commercial','technique','marche','equipe','traction','contrats','certifications','propriete_intellectuelle','temoignages','autre'];
+const BP_DOC_CATEGORIES_LABELS = { administratif:'📋 Administratif', juridique:'⚖️ Juridique', financier:'💰 Financier', commercial:'💼 Commercial', technique:'⚙️ Technique', marche:'📊 Marché', equipe:'👥 Équipe', traction:'📈 Traction', contrats:'📝 Contrats', certifications:'🎖 Certifications', propriete_intellectuelle:'🔒 Propriété intellectuelle', temoignages:'💬 Témoignages', autre:'📎 Autre' };
+async function bpLoadBiblioDocuments() {
+  const el = document.getElementById('bp-biblio-list');
+  if (!el) return;
+  try {
+    const docs = await api('GET', `/business-plans/${bpId}/documents`);
+    if (!docs.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">Aucun document téléversé pour l\'instant.</p>'; return; }
+    const parCategorie = {};
+    docs.forEach(d => { (parCategorie[d.categorie] = parCategorie[d.categorie] || []).push(d); });
+    el.innerHTML = Object.entries(parCategorie).map(([cat, liste]) => `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:4px;">${BP_DOC_CATEGORIES_LABELS[cat]||cat} (${liste.length})</div>
+        ${liste.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+          <a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom)}</a>
+          ${monRole!=='lecteur'?`<button onclick="bpSupprimerDocumentBiblio(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>`:''}
+        </div>`).join('')}
+      </div>`).join('');
+  } catch (e) { el.innerHTML = '<p style="color:#dc2626;font-size:12.5px;">Erreur de chargement.</p>'; }
+}
+function bpAjouterDocumentBiblio() {
+  if (monRole === 'lecteur') { alert('Lecture seule.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const nom = prompt('Nom de ce document ?', file.name) || file.name;
+    const catChoix = prompt(`Catégorie (${BP_DOC_CATEGORIES.join(', ')}) ?`, 'autre') || 'autre';
+    const categorie = BP_DOC_CATEGORIES.includes(catChoix) ? catChoix : 'autre';
+    const el = document.getElementById('bp-biblio-list');
+    el.innerHTML = 'Envoi en cours…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+      const upData = await up.json();
+      if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'annexes', categorie, nom, url_bunny: upData.url, type_mime: file.type });
+    } catch (e) { alert(e.message || 'Erreur.'); }
+    bpLoadBiblioDocuments();
+  };
+  input.click();
+}
+async function bpSupprimerDocumentBiblio(docId) {
+  if (!confirm('Supprimer ce document ?')) return;
+  await api('DELETE', `/business-plans/${bpId}/documents/${docId}`);
+  bpLoadBiblioDocuments();
 }
 
 /* ---- 21. Complétude ---- */
