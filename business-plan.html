@@ -205,6 +205,7 @@ function renderBPCard(bp, partage) {
       <div class="bp-foot">
         <span class="bp-date">Modifié le ${fmtDate(bp.updated_at)}</span>
         <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
+          <button class="btn btn-sm btn-orange" onclick="openBP(${bp.id})">👁️ Consulter</button>
           <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer</button>
           ${!partage?`<button class="btn btn-sm btn-outline" style="color:#D33;" onclick="delBP(${bp.id},'${esc(bp.nom_projet||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
         </div>
