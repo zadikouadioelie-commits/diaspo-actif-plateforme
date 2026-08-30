@@ -4397,12 +4397,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
              (cagnotte.html/GET /api/cagnottes/public/:slug renvoient 404 tant que
              est_publiee=0) : cagOuvrirQR le signale clairement dans sa fenêtre pour un
              brouillon, sans bloquer l'affichage du QR lui-même. */
-          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOuvrirQR('${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}',true)">📱 QR participation rapide</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagToggleQRInline(${c.id},'${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}',true)">📱 QR participation rapide</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagSupprimer(${c.id})">🗑️ Supprimer</button>`);
         } else if (c.statut === 'active') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
           actions.push(`<a class="btn btn-sm btn-outline" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}" target="_blank">🔗 Voir la page publique</a>`);
-          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOuvrirQR('${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}')">📱 QR participation rapide</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagToggleQRInline(${c.id},'${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}')">📱 QR participation rapide</button>`);
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagAction(${c.id},'pause')">⏸️ Mettre en pause</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
         } else if (c.statut === 'en_pause') {
@@ -4410,7 +4410,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
         }
         if (c.visibilite === 'privee') {
-          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenParticipants(${c.id})">👥 Participants autorisés</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenParticipants(${c.id},'${c.slug}')">👥 Participants autorisés</button>`);
         }
         if (c.statut !== 'brouillon') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenContributions(${c.id})">📊 Contributions</button>`);
@@ -4433,6 +4433,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               ${barre}
               <div style="font-size:11.5px;color:var(--muted);">${c.date_debut ? fmtDateInit(c.date_debut) : '—'} → ${c.date_fin ? fmtDateInit(c.date_fin) : '—'}</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${actions.join('')}</div>
+              <div id="cag-qr-inline-${c.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);"></div>
             </div>
           </div>
         </div>`;
@@ -4592,7 +4593,29 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   };
 
   /* ── Cagnotte privée : gestion des participants autorisés ── */
-  window.cagOpenParticipants = async function(id) {
+  /* Copie du lien avec repli si l'API presse-papiers est refusée (permission bloquée par le
+     navigateur) — sans ce repli, un clic pouvait ne rien faire du tout sans aucun message
+     (constaté en test le 2026-08-30 : navigator.clipboard.writeText rejette silencieusement
+     dans certains contextes, et le bouton ne changeait jamais de texte). */
+  window.cagCopierLien = function(btn, lien) {
+    const ok = () => { btn.textContent = '✅ Copié !'; setTimeout(() => { btn.textContent = '🔗 Copier le lien'; }, 1500); };
+    const repli = () => {
+      const ta = document.createElement('textarea');
+      ta.value = lien; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      let copie = false;
+      try { copie = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (copie) { ok(); }
+      else { btn.textContent = '❌ Copie impossible — sélectionnez le lien ci-dessus'; setTimeout(() => { btn.textContent = '🔗 Copier le lien'; }, 2500); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lien).then(ok).catch(repli);
+    } else {
+      repli();
+    }
+  };
+  window.cagOpenParticipants = async function(id, slug) {
     let modal = document.getElementById('cag-participants-modal');
     if (!modal) {
       modal = document.createElement('div');
@@ -4600,14 +4623,36 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       modal.className = 'modal-overlay';
       document.body.appendChild(modal);
     }
+    /* Lien à copier/partager manuellement (2026-08-30, demande explicite) : ajouter un e-mail
+       ci-dessous envoie désormais un vrai e-mail (corrigé le même jour), mais certaines
+       personnes se joignent plus facilement via WhatsApp ou SMS — un lien qu'on colle
+       soi-même ailleurs, sans dépendre d'un nouveau fournisseur (SMS/WhatsApp automatisés
+       nécessiteraient un compte Twilio séparé, pas encore en place). L'ACCÈS reste conditionné
+       à l'ajout de l'e-mail ci-dessous — ce lien seul ne suffit pas pour une cagnotte privée. */
+    const lien = `${location.origin}/cagnotte.html?slug=${encodeURIComponent(slug)}`;
     modal.innerHTML = `<div class="modal-box" style="max-width:440px;text-align:left;">
       <h3 style="margin:0 0 4px;">👥 Participants autorisés</h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Seules ces personnes peuvent consulter cette cagnotte privée.</p>
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
-        <input id="cag-part-email" type="email" placeholder="email@exemple.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+      <label style="font-size:11.5px;font-weight:700;color:var(--muted);">🔎 Rechercher un compte Diaspo'Actif existant par nom</label>
+      <input id="cag-part-recherche" type="text" placeholder="Nom, prénom…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin:4px 0 6px;" oninput="cagRechercherParticipant(${id},this.value)">
+      <div id="cag-part-recherche-resultats" style="margin-bottom:10px;"></div>
+      <label style="font-size:11.5px;font-weight:700;color:var(--muted);">Ou par e-mail direct (compte existant ou non)</label>
+      <div style="display:flex;gap:8px;margin:4px 0 4px;">
+        <input id="cag-part-email" type="email" placeholder="email@exemple.com" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;" oninput="cagVerifierEmailParticipant(this.value)">
         <button class="btn btn-sm btn-orange" onclick="cagAjouterParticipant(${id})">+ Ajouter</button>
       </div>
+      <div id="cag-part-email-statut" style="font-size:11.5px;margin-bottom:10px;min-height:14px;"></div>
       <div id="cag-part-error" class="auth-error" style="display:none;margin-bottom:10px;"></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+        <div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">🔗 Lien à transmettre vous-même (WhatsApp, SMS, autre e-mail…)</div>
+        <div style="font-size:11.5px;color:var(--muted);word-break:break-all;background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-bottom:8px;">${escH(lien)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm btn-outline" onclick="cagCopierLien(this,'${lien.replace(/'/g,"\\'")}')">🔗 Copier le lien</button>
+          <a class="btn btn-sm btn-outline" href="https://wa.me/?text=${encodeURIComponent(lien)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+          <a class="btn btn-sm btn-outline" href="mailto:?body=${encodeURIComponent(lien)}" style="text-decoration:none;">✉️ Mail</a>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">Ce lien seul ne donne pas accès : la personne doit aussi être ajoutée par e-mail ci-dessus.</p>
+      </div>
       <div id="cag-part-liste" style="max-height:260px;overflow-y:auto;">Chargement…</div>
       <div style="text-align:right;margin-top:14px;">
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-participants-modal').remove()">Fermer</button>
@@ -4627,6 +4672,28 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>`).join('') : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:14px 0;">Aucun participant autorisé pour l'instant.</p>`;
     } catch(e) { wrap.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`; }
   }
+  /* Vérification de l'e-mail saisi manuellement (demande explicite du 2026-08-30) : réutilise
+     GET /api/cagnottes/verifier-email, déjà en place pour "Inviter par e-mail" — ne renvoie
+     volontairement qu'un booléen (jamais le nom/la photo du compte), c'est structurellement un
+     oracle de vérification d'e-mails, limité par IP côté serveur. Simple confirmation visuelle
+     avant l'ajout, pas une recherche de compte à proprement parler. */
+  let CAG_PART_EMAIL_TIMER = null;
+  window.cagVerifierEmailParticipant = function(valeur) {
+    clearTimeout(CAG_PART_EMAIL_TIMER);
+    const statut = document.getElementById('cag-part-email-statut');
+    if (!statut) return;
+    const email = (valeur || '').trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { statut.textContent = ''; return; }
+    statut.textContent = '…';
+    statut.style.color = 'var(--muted)';
+    CAG_PART_EMAIL_TIMER = setTimeout(async () => {
+      try {
+        const { existe } = await api('GET', '/cagnottes/verifier-email?email=' + encodeURIComponent(email));
+        statut.textContent = existe ? '✅ Cette adresse correspond à un compte Diaspo\'Actif existant.' : 'ℹ️ Aucun compte trouvé — la personne recevra un e-mail d\'invitation à en créer un.';
+        statut.style.color = existe ? '#16a34a' : 'var(--muted)';
+      } catch (e) { statut.textContent = ''; }
+    }, 400);
+  };
   window.cagAjouterParticipant = async function(id) {
     const errBox = document.getElementById('cag-part-error');
     errBox.style.display = 'none';
@@ -4634,6 +4701,39 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     try {
       await api('POST', '/cagnottes/'+id+'/participants', { email });
       document.getElementById('cag-part-email').value = '';
+      document.getElementById('cag-part-email-statut').textContent = '';
+      cagRenderParticipants(id);
+    } catch(e) { errBox.textContent = e.message || 'Erreur.'; errBox.style.display = 'block'; }
+  };
+  /* Recherche par nom (demande explicite du 2026-08-30) : réutilise /api/recherche-contacts,
+     déjà utilisée ailleurs sur la plateforme pour chercher un compte par nom — authentifiée,
+     couvre tous les types de comptes, ne renvoie jamais d'e-mail. Le clic sur un résultat
+     ajoute directement la personne (POST avec user_id) : l'e-mail n'est jamais affiché ni
+     saisi, le serveur le résout lui-même (voir POST /api/cagnottes/:id/participants). */
+  let CAG_PART_RECHERCHE_TIMER = null;
+  window.cagRechercherParticipant = function(id, terme) {
+    clearTimeout(CAG_PART_RECHERCHE_TIMER);
+    const zone = document.getElementById('cag-part-recherche-resultats');
+    if (!zone) return;
+    if ((terme || '').trim().length < 2) { zone.innerHTML = ''; return; }
+    CAG_PART_RECHERCHE_TIMER = setTimeout(async () => {
+      try {
+        const { results } = await api('GET', '/recherche-contacts?q=' + encodeURIComponent(terme));
+        zone.innerHTML = !results.length ? '<div style="font-size:12px;color:var(--muted);padding:4px 0;">Aucun résultat.</div>'
+          : results.map(r => `<div onclick="cagAjouterParticipantParId(${id},${r.target_user_id},'${escH(r.nom).replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:12.5px;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+              ${r.photo_url ? `<img src="${r.photo_url}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;">` : `<span style="width:24px;height:24px;border-radius:50%;background:var(--bg);display:inline-flex;align-items:center;justify-content:center;">👤</span>`}
+              <span>${escH(r.nom)} <span style="color:var(--muted);">— ${escH(r.sous_titre)}${r.lieu ? ' · ' + escH(r.lieu) : ''}</span></span>
+            </div>`).join('');
+      } catch (e) { zone.innerHTML = ''; }
+    }, 300);
+  };
+  window.cagAjouterParticipantParId = async function(id, targetUserId, nomAffiche) {
+    const errBox = document.getElementById('cag-part-error');
+    errBox.style.display = 'none';
+    try {
+      await api('POST', '/cagnottes/'+id+'/participants', { user_id: targetUserId });
+      document.getElementById('cag-part-recherche').value = '';
+      document.getElementById('cag-part-recherche-resultats').innerHTML = '';
       cagRenderParticipants(id);
     } catch(e) { errBox.textContent = e.message || 'Erreur.'; errBox.style.display = 'block'; }
   };
@@ -4840,28 +4940,29 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      platform-wide (assets/profile-qr.js) avec une URL personnalisée (option url:) pointant vers
      la cagnotte + ?participer=1, qui ouvre directement le formulaire de participation côté
      cagnotte.html sans clic supplémentaire. ── */
-  window.cagOuvrirQR = function(slug, titre, pasEncorePublie) {
-    let modal = document.getElementById('cag-qr-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'cag-qr-modal';
-      modal.className = 'modal-overlay';
-      document.body.appendChild(modal);
-    }
+  /* Affichage direct sur le cartouche (demande explicite du 2026-08-30) : auparavant le QR et
+     le lien s'ouvraient dans une fenêtre séparée (cagOuvrirQR) — désormais ils apparaissent
+     repliés/dépliés directement dans la carte de la cagnotte, sans quitter la liste.
+     ProfileQR.render() fournit déjà son propre bouton "🔗 Copier" dans ses actions, donc pas
+     besoin d'un lien copiable séparé. */
+  window.cagToggleQRInline = function(id, slug, titre, pasEncorePublie) {
+    const holder = document.getElementById('cag-qr-inline-' + id);
+    if (!holder) return;
+    const dejaOuvert = holder.style.display !== 'none';
+    if (dejaOuvert) { holder.style.display = 'none'; return; }
+    holder.style.display = 'block';
+    if (holder.dataset.rendu === '1') return;
+    holder.dataset.rendu = '1';
     const url = window.location.origin + '/cagnotte.html?slug=' + encodeURIComponent(slug) + '&participer=1';
-    modal.innerHTML = `<div class="modal-box" style="max-width:340px;text-align:center;">
-      <h3 style="margin:0 0 4px;">📱 QR participation rapide</h3>
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">« ${escH(titre)} » — un scan ouvre directement le formulaire de participation.</p>
+    holder.innerHTML = `
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">📱 Un scan ouvre directement le formulaire de participation à « ${escH(titre)} ».</p>
       ${pasEncorePublie ? `<div class="notice" style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11.5px;padding:8px 10px;margin-bottom:12px;">⚠️ Ce QR est le lien définitif (il ne changera jamais, même après publication), mais il ne fonctionnera qu'une fois la cagnotte publiée via « 🚀 Publier ».</div>` : ''}
-      <div id="cag-qr-holder" style="display:flex;justify-content:center;"></div>
-      <div style="text-align:center;margin-top:14px;">
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('cag-qr-modal').remove()">Fermer</button>
-      </div>
-    </div>`;
+      <div id="cag-qr-holder-${id}" style="display:flex;justify-content:center;"></div>
+    `;
     if (window.ProfileQR) {
-      ProfileQR.render(document.getElementById('cag-qr-holder'), { url, size: 180, showActions: true });
+      ProfileQR.render(document.getElementById('cag-qr-holder-' + id), { url, size: 150, showActions: true });
     } else {
-      document.getElementById('cag-qr-holder').innerHTML = '<span style="font-size:11px;color:var(--muted);">QR indisponible</span>';
+      document.getElementById('cag-qr-holder-' + id).innerHTML = '<span style="font-size:11px;color:var(--muted);">QR indisponible</span>';
     }
   };
 

@@ -17602,7 +17602,18 @@ route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) 
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   if (!(await exigerPremium(user, res, "cagnottes"))) return;
-  const email = String(body?.email || "").trim().toLowerCase();
+  /* Ajout par recherche de nom (2026-08-30) : le client envoie user_id (jamais l'e-mail, qui
+     reste privé — cf. /api/recherche-contacts, déjà utilisée ailleurs sans exposer d'e-mail).
+     On résout l'e-mail nous-mêmes côté serveur et on retombe ensuite dans le même chemin que
+     l'ajout manuel par e-mail, sans dupliquer la logique d'insertion/notification/envoi. */
+  let email;
+  if (body?.user_id) {
+    const cible = await db.prepare("SELECT email FROM users WHERE id=? AND nom != 'Compte supprimé'").get(body.user_id);
+    if (!cible || !cible.email) return sendJSON(res, 404, { error: "Compte introuvable." });
+    email = String(cible.email).trim().toLowerCase();
+  } else {
+    email = String(body?.email || "").trim().toLowerCase();
+  }
   if (!email || !email.includes("@")) return sendJSON(res, 400, { error: "E-mail invalide." });
   const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
   const dejaAutorise = await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(params.id, email);
