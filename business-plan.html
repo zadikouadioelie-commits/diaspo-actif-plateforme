@@ -204,8 +204,9 @@ function renderBPCard(bp, partage) {
       </div>
       <div class="bp-foot">
         <span class="bp-date">Modifié le ${fmtDate(bp.updated_at)}</span>
-        <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-orange" onclick="openBP(${bp.id})">👁️ Consulter</button>
+          ${(!partage || ['editeur','validateur'].includes(bp.mon_role))?`<button class="btn btn-sm btn-outline" onclick="editBP(${bp.id})">✏️ Modifier</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer</button>
           ${!partage?`<button class="btn btn-sm btn-outline" style="color:#D33;" onclick="delBP(${bp.id},'${esc(bp.nom_projet||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
         </div>
@@ -239,7 +240,8 @@ async function loadBPs() {
   }
 }
 
-function openBP(id) { window.location.href = `business-plan-edit.html?id=${id}`; }
+function openBP(id) { window.location.href = `business-plan-view.html?id=${id}`; }
+function editBP(id) { window.location.href = `business-plan-edit.html?id=${id}`; }
 
 async function dupBP(id) {
   try {

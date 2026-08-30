@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Consultation Business Plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  html,body{background:#EEF1F6;}
+  .bpv-shell{max-width:1180px;margin:0 auto;padding:24px 20px 80px;display:grid;grid-template-columns:230px 1fr;gap:28px;align-items:start;}
+  @media(max-width:860px){.bpv-shell{grid-template-columns:1fr;} .bpv-toc{display:none;}}
+
+  /* ---- Barre d'actions ---- */
+  .bpv-actionbar{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:4px;}
+  .bpv-actionbar .left{display:flex;align-items:center;gap:10px;}
+  .bpv-back{color:var(--muted);text-decoration:none;font-size:13px;font-weight:700;}
+  .bpv-back:hover{color:var(--orange);}
+
+  /* ---- Sommaire (TOC) ---- */
+  .bpv-toc{position:sticky;top:16px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 0;max-height:calc(100vh - 32px);overflow-y:auto;}
+  .bpv-toc-title{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:0 16px 8px;}
+  .bpv-toc a{display:flex;align-items:center;gap:8px;padding:7px 16px;font-size:12.5px;font-weight:600;color:var(--text);text-decoration:none;border-left:3px solid transparent;transition:background .1s;}
+  .bpv-toc a:hover{background:var(--surface2,#f3f4f6);}
+  .bpv-toc a.active{border-left-color:var(--orange,#ff6b00);color:var(--orange,#ff6b00);background:#fff7f0;}
+  .bpv-toc .n{width:16px;text-align:center;font-size:13px;}
+
+  /* ---- Document ---- */
+  .bpv-doc{background:#fff;border:1px solid var(--border);border-radius:16px;padding:0;overflow:hidden;box-shadow:0 2px 16px rgba(13,43,78,.06);}
+
+  /* Couverture */
+  .bpv-cover{background:linear-gradient(135deg,#0D2B4E,#173e6b);color:#fff;padding:52px 56px 40px;position:relative;}
+  .bpv-cover-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:rgba(255,255,255,.14);border-radius:99px;padding:5px 14px;margin-bottom:18px;}
+  .bpv-cover-logo{width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,var(--orange,#ff6b00),#ffb27a);display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:18px;overflow:hidden;}
+  .bpv-cover-logo img{width:100%;height:100%;object-fit:cover;}
+  .bpv-cover h1{margin:0 0 8px;font-size:32px;font-weight:800;line-height:1.15;}
+  .bpv-cover .slogan{font-size:16px;font-style:italic;opacity:.88;margin:0 0 22px;}
+  .bpv-cover-meta{display:flex;flex-wrap:wrap;gap:8px;}
+  .bpv-cover-meta span{font-size:12px;font-weight:700;background:rgba(255,255,255,.14);border-radius:99px;padding:4px 12px;}
+  .bpv-cover-foot{margin-top:26px;font-size:11.5px;opacity:.7;}
+
+  /* Sections */
+  .bpv-section{padding:34px 56px;border-top:1px solid var(--border);}
+  .bpv-section:first-of-type{border-top:none;}
+  .bpv-section-head{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+  .bpv-section-head .ic{font-size:22px;}
+  .bpv-section-head h2{margin:0;font-size:19px;font-weight:800;color:#0D2B4E;}
+  .bpv-empty-section{color:var(--muted);font-size:13px;font-style:italic;}
+
+  .bpv-field{margin-bottom:16px;}
+  .bpv-field:last-child{margin-bottom:0;}
+  .bpv-field h4{margin:0 0 4px;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  .bpv-field p{margin:0;font-size:14.5px;line-height:1.65;white-space:pre-wrap;color:#1a2233;}
+  .bpv-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 28px;}
+  @media(max-width:640px){.bpv-field-grid{grid-template-columns:1fr;}}
+
+  /* Tableaux */
+  .bpv-table-wrap{overflow-x:auto;margin-bottom:8px;}
+  table.bpv-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.bpv-table th{text-align:left;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border-bottom:2px solid var(--border);padding:6px 10px;white-space:nowrap;}
+  table.bpv-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  table.bpv-table tr:last-child td{border-bottom:none;}
+
+  /* Cartes (concurrents, risques, phases...) */
+  .bpv-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:8px;}
+  .bpv-mini-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .bpv-mini-card strong{font-size:13.5px;}
+  .bpv-mini-card .row{font-size:12px;color:var(--muted);margin-top:4px;}
+
+  /* BMC */
+  .bmc-grid{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto;gap:8px;}
+  .bmc-cell{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fafbfc;min-height:70px;}
+  .bmc-cell h5{margin:0 0 4px;font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--orange,#ff6b00);}
+  .bmc-cell p{margin:0;font-size:12.5px;line-height:1.5;white-space:pre-wrap;}
+  .bmc-partenaires{grid-row:1/3;}
+  .bmc-activites{grid-row:1;}
+  .bmc-proposition{grid-row:1/3;}
+  .bmc-relations{grid-row:1;}
+  .bmc-segments{grid-row:1/3;}
+  .bmc-ressources{grid-row:2;}
+  .bmc-canaux{grid-row:2;}
+  .bmc-couts{grid-column:1/3;}
+  .bmc-revenus{grid-column:3/6;}
+  @media(max-width:760px){.bmc-grid{grid-template-columns:1fr 1fr;} .bmc-cell{grid-row:auto!important;grid-column:auto!important;}}
+
+  /* Timeline calendrier */
+  .bpv-timeline{border-left:2px solid var(--border);margin-left:6px;padding-left:20px;display:flex;flex-direction:column;gap:18px;}
+  .bpv-timeline .pt{position:relative;}
+  .bpv-timeline .pt::before{content:'';position:absolute;left:-25px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--orange,#ff6b00);}
+  .bpv-timeline .pt-dates{font-size:11px;color:var(--muted);font-weight:700;}
+  .bpv-timeline .pt-nom{font-size:14.5px;font-weight:800;margin:2px 0 4px;}
+
+  .badge-statut{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;background:var(--surface2,#f3f4f6);color:var(--muted);}
+
+  #bpv-loading, #bpv-error{max-width:600px;margin:80px auto;text-align:center;color:var(--muted);}
+
+  @media print{
+    body{background:#fff;}
+    .topbar, .bpv-toc, .bpv-actionbar{display:none!important;}
+    .bpv-shell{display:block;max-width:none;padding:0;}
+    .bpv-doc{border:none;box-shadow:none;border-radius:0;}
+    .bpv-section{break-inside:avoid;padding:20px 6px;}
+    .bpv-cover{padding:30px 6px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div id="bpv-loading">Chargement du business plan…</div>
+  <div id="bpv-error" style="display:none;"></div>
+
+  <div class="bpv-shell" id="bpv-shell" style="display:none;">
+    <div class="bpv-actionbar">
+      <div class="left">
+        <a href="business-plan.html" class="bpv-back">← Mes Business Plans</a>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Imprimer / Exporter PDF</button>
+        <a class="btn btn-orange btn-sm" id="bpv-btn-edit" href="#" style="display:none;">✏️ Modifier</a>
+      </div>
+    </div>
+
+    <nav class="bpv-toc" id="bpv-toc"></nav>
+
+    <div class="bpv-doc" id="bpv-doc"></div>
+  </div>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=11"></script>
+<script>
+/* ===========================================================================
+   CONSULTATION BUSINESS PLAN — lecture seule, mise en page "document".
+   Réutilise GET /api/business-plans/:id (même contrôle d'accès propriétaire/
+   collaborateur que l'éditeur, aucune nouvelle route serveur). Chaque section
+   n'affiche que les champs réellement remplis — jamais de champ vide, pour
+   garder un vrai rendu "document fini" plutôt qu'un formulaire vidé.
+   =========================================================================== */
+function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
+function nl2br(s){ return esc(s); } // white-space:pre-wrap gère déjà les retours à la ligne
+function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) : ''; }
+function fmtMontant(n, devise){ return (n===null||n===undefined||n==='') ? '' : `${Number(n).toLocaleString('fr-FR')} ${devise||'EUR'}`; }
+const has = v => v !== null && v !== undefined && String(v).trim() !== '';
+
+const TYPES = { startup:'🚀 Startup', pme:'🏢 PME', association:'🤝 Association', ong:'🌍 ONG', cooperative:'🌾 Coopérative', social:'💚 Social', autre:'📋 Autre' };
+
+/* ---- Schéma des sections texte simples : {champ: Libellé} dans l'ordre d'affichage ---- */
+const TEXT_SECTIONS = {
+  resume_executif: { projet:'Le projet en bref', probleme:'Le problème identifié', solution:'Notre solution', marche:'Le marché visé', besoins:'Besoins de financement', objectifs:'Objectifs' },
+  presentation: { vision:'Vision', mission:'Mission', valeurs:'Valeurs', obj_court:'Objectifs à 12 mois', obj_moyen:'Objectifs à 1-3 ans', obj_long:'Objectifs à 3-5 ans', historique:'Historique du projet', motivations:"Motivations de l'équipe" },
+  probleme: { description:'Description du problème', pourquoi:'Causes', qui_concerne:'Qui est concerné', ampleur:'Ampleur', consequences:'Conséquences actuelles', pourquoi_pas_resolu:"Pourquoi ce problème n'est pas déjà résolu", preuves:'Preuves & indices' },
+  solution: { description:'Description de la solution', fonctionnement:'Fonctionnement', innovation:'Ce qui est innovant', avantages:'Avantages pour le client', valeur_ajoutee:'Valeur ajoutée', differenciants:'Facteurs différenciants' },
+  marche: { taille_marche:'Taille du marché', evolution:'Évolution du marché', potentiel:'Potentiel visé', tendances:'Tendances', barrieres_entree:"Barrières à l'entrée", reglementation:'Réglementation applicable', profil_client:'Profil du client type', segmentation:'Segmentation', besoins_clients:'Besoins des clients', localisation_clients:'Localisation des clients', opportunites:'Opportunités', menaces_marche:'Menaces', positionnement:'Positionnement', avantage_concurrentiel:'Avantage concurrentiel' },
+  strategie_marketing: { identite_marque:'Identité de marque', strategie_digitale:'Stratégie digitale', communication:'Communication', publicite:'Publicité', partenariats:'Partenariats marketing', evenements:'Événements', fidelisation:'Fidélisation' },
+  plan_commercial: { objectifs_vente:'Objectifs de vente', prospection:'Prospection', tunnel_vente:'Tunnel de vente', politique_tarifaire:'Politique tarifaire', argumentaire:'Argumentaire commercial', sav:'Service après-vente', kpi_commerciaux:'Indicateurs suivis' },
+  plan_operationnel: { production:'Production', logistique:'Logistique', fournisseurs:'Fournisseurs', equipements:'Équipements', technologies:'Technologies utilisées', qualite:'Contrôle qualité', securite:'Sécurité' },
+  organisation: { dirigeants:'Dirigeants & gouvernance', equipe:"Composition de l'équipe", responsabilites:'Répartition des responsabilités', consultants:'Consultants externes', benevoles:'Bénévoles' },
+  rh: { effectif_actuel:'Effectif actuel', effectif_prevu:'Effectif prévu à 12 mois', recrutements:'Recrutements prévus', competences:'Compétences recherchées', formations:'Formations prévues', politique_rh:'Politique RH' },
+  impact: { economique:'Impact économique', social:'Impact social', environnemental:'Impact environnemental', territorial:'Impact territorial', kpi_impact:"Indicateurs d'impact" },
+  financement: { montant:'Montant recherché', calendrier_decaissement:'Calendrier de décaissement', utilisation:'Utilisation des fonds', contreparties:'Contreparties proposées', roi:'Retour sur investissement estimé', strategie_sortie:'Stratégie de sortie', recherche_active:'Financeurs ciblés' },
+};
+
+const PF_RESSOURCES = { pf_apport:'Apport personnel', pf_associes:'Associés', pf_famille:'Famille & proches', pf_business_angels:'Business angels', pf_banque:'Prêt bancaire', pf_subvention:'Subvention', pf_investisseur:'Investisseur', pf_crowdfunding:'Crowdfunding', pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:'Autres ressources' };
+const PF_EMPLOIS = { pf_terrain:'Terrain', pf_construction:'Construction / aménagement', pf_materiel:'Matériel', pf_vehicules:'Véhicules', pf_logiciels:'Logiciels & outils', pf_stocks:'Stock initial', pf_tresorerie:'Trésorerie de départ', pf_frais_admin:'Frais administratifs', pf_communication:'Communication', pf_recrutement:'Recrutement' };
+const CR_LIGNES = { ca:"Chiffre d'affaires", autres_produits:'Autres produits', achats:'Achats & charges variables', salaires:'Salaires & charges', loyers:'Loyers', marketing_charge:'Marketing', autres_charges:'Autres charges' };
+
+function renderFieldGrid(section, schema){
+  const rows = Object.entries(schema).filter(([k]) => has(section?.[k]));
+  if (!rows.length) return '';
+  return `<div class="bpv-field-grid">${rows.map(([k,label]) => `
+    <div class="bpv-field"><h4>${esc(label)}</h4><p>${nl2br(section[k])}</p></div>`).join('')}</div>`;
+}
+
+function renderInfosGenerales(s){
+  const rows = [];
+  const push = (label, val) => { if (has(val)) rows.push([label, val]); };
+  push('Stade du projet', s.stade); push('Secteur', s.secteur); push('Sous-secteur', s.sous_secteur);
+  push('Date de création', s.date_creation ? fmtDate(s.date_creation) : '');
+  push('Localisation', [s.ville, s.region, s.pays].filter(Boolean).join(', '));
+  push('Adresse', s.adresse); push('E-mail', s.email); push('Téléphone', s.telephone); push('Site web', s.site_web);
+  push('Responsable', s.responsable ? `${s.responsable}${s.responsable_poste ? ' — ' + s.responsable_poste : ''}` : '');
+  push('Nombre de collaborateurs', s.nb_collaborateurs);
+  let html = rows.length ? `<div class="bpv-field-grid">${rows.map(([l,v]) => `<div class="bpv-field"><h4>${esc(l)}</h4><p>${nl2br(v)}</p></div>`).join('')}</div>` : '';
+  if (has(s.equipe_fondatrice)) html += `<div class="bpv-field" style="margin-top:14px;"><h4>Équipe fondatrice</h4><p>${nl2br(s.equipe_fondatrice)}</p></div>`;
+  if (has(s.organigramme)) html += `<div class="bpv-field"><h4>Organigramme</h4><p>${nl2br(s.organigramme)}</p></div>`;
+  return html;
+}
+
+function renderSwot(s){
+  const blocs = [['forces','💪 Forces','#d1fae5'],['faiblesses','⚠️ Faiblesses','#fee2e2'],['opportunites','🚀 Opportunités','#dbeafe'],['menaces','🌩️ Menaces','#fef3c7']];
+  const actifs = blocs.filter(([k]) => has(s?.[k]));
+  if (!actifs.length) return '';
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">${actifs.map(([k,label,bg]) => `
+    <div style="background:${bg};border-radius:10px;padding:14px 16px;"><h4 style="margin:0 0 6px;font-size:12px;font-weight:800;">${label}</h4><p style="margin:0;font-size:13px;line-height:1.6;white-space:pre-wrap;">${nl2br(s[k])}</p></div>`).join('')}</div>`;
+}
+
+function renderBMC(bm){
+  const cells = [
+    ['partenaires','Partenaires clés','bmc-partenaires'],['activites','Activités clés','bmc-activites'],
+    ['proposition','Proposition de valeur','bmc-proposition'],['relations','Relations clients','bmc-relations'],
+    ['segments','Segments de clientèle','bmc-segments'],['ressources','Ressources clés','bmc-ressources'],
+    ['canaux','Canaux','bmc-canaux'],['couts','Structure de coûts','bmc-couts'],['revenus','Sources de revenus','bmc-revenus'],
+  ];
+  const hasAny = cells.some(([k]) => has(bm?.[k]));
+  if (!hasAny) return '';
+  let html = `<div class="bmc-grid">${cells.map(([k,label,cls]) => `
+    <div class="bmc-cell ${cls}"><h5>${label}</h5><p>${has(bm[k]) ? nl2br(bm[k]) : '—'}</p></div>`).join('')}</div>`;
+  if (Array.isArray(bm.partenaires_liste) && bm.partenaires_liste.length) {
+    html += `<div class="bpv-table-wrap" style="margin-top:16px;"><table class="bpv-table"><thead><tr><th>Partenaire</th><th>Type</th><th>Pays</th><th>Rôle attendu</th><th>Niveau</th><th>Contact</th></tr></thead><tbody>
+      ${bm.partenaires_liste.map(p => `<tr><td><strong>${esc(p.nom)}</strong></td><td>${esc(p.type||'')}</td><td>${esc(p.pays||'')}</td><td>${esc(p.role||'')}</td><td>${esc(p.niveau||'')}</td><td>${esc(p.contact||'')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+  return html;
+}
+
+function renderMarcheConcurrents(concurrents){
+  if (!Array.isArray(concurrents) || !concurrents.length) return '';
+  return `<div class="bpv-table-wrap" style="margin-top:16px;"><table class="bpv-table"><thead><tr>
+    <th>Concurrent</th><th>Type</th><th>Produits</th><th>Prix</th><th>Positionnement</th><th>Forces</th><th>Faiblesses</th></tr></thead><tbody>
+    ${concurrents.map(c => `<tr><td><strong>${esc(c.nom)}</strong></td><td>${esc(c.type||'')}</td><td>${esc(c.produits||'')}</td><td>${esc(c.prix||'')}</td><td>${esc(c.positionnement||'')}</td><td>${esc(c.forces||'')}</td><td>${esc(c.faiblesses||'')}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+function renderProduits(p){
+  let html = '';
+  if (Array.isArray(p?.items) && p.items.length) {
+    html += `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Produit / Service</th><th>Description</th><th>Coût de revient</th><th>Prix de vente</th><th>Marge</th><th>Cycle</th></tr></thead><tbody>
+      ${p.items.map(i => `<tr><td><strong>${esc(i.nom)}</strong></td><td>${esc(i.description||'')}</td><td>${esc(i.cout_revient||'')}</td><td>${esc(i.prix_vente||'')}</td><td>${has(i.marge)?esc(i.marge)+'%':''}</td><td>${esc(i.cycle||'')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+  if (Array.isArray(p?.etude_prix) && p.etude_prix.length) {
+    html += `<div class="bpv-field" style="margin-top:${html?'18px':'0'};"><h4>Étude de prix</h4></div>
+      <div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Produit</th><th>Prix concurrents</th><th>Positionnement</th><th>Volume estimé</th><th>Stratégie</th></tr></thead><tbody>
+      ${p.etude_prix.map(e => `<tr><td><strong>${esc(e.produit)}</strong></td><td>${esc(e.prix_concurrents||'')}</td><td>${esc(e.positionnement||'')}</td><td>${esc(e.volume_estime||'')}</td><td>${esc(e.strategie||'')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+  return html;
+}
+
+function renderCalendrier(phases){
+  if (!Array.isArray(phases) || !phases.length) return '';
+  return `<div class="bpv-timeline">${phases.map(ph => `
+    <div class="pt">
+      <div class="pt-dates">${ph.debut?fmtDate(ph.debut):''}${ph.debut&&ph.fin?' → ':''}${ph.fin?fmtDate(ph.fin):''}</div>
+      <div class="pt-nom">${esc(ph.nom)} ${ph.statut?`<span class="badge-statut">${esc(ph.statut)}</span>`:''}</div>
+      ${ph.responsable?`<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">👤 ${esc(ph.responsable)}</div>`:''}
+      ${ph.taches?`<p style="margin:0;font-size:13px;white-space:pre-wrap;">${nl2br(ph.taches)}</p>`:''}
+    </div>`).join('')}</div>`;
+}
+
+function renderRisques(items){
+  if (!Array.isArray(items) || !items.length) return '';
+  return `<div class="bpv-cards">${items.map(r => `
+    <div class="bpv-mini-card">
+      <strong>${esc(r.description)}</strong>
+      <div class="row">Probabilité : ${esc(r.probabilite||'—')} · Impact : ${esc(r.impact||'—')}</div>
+      ${r.prevention?`<div class="row">🛡️ Prévention : ${esc(r.prevention)}</div>`:''}
+      ${r.urgence?`<div class="row">🚨 Si ça arrive : ${esc(r.urgence)}</div>`:''}
+    </div>`).join('')}</div>`;
+}
+
+function renderAnnexes(items){
+  if (!Array.isArray(items) || !items.length) return '';
+  return `<div class="bpv-cards">${items.map(a => `
+    <div class="bpv-mini-card">
+      <strong>📎 ${esc(a.nom)}</strong>
+      ${a.description?`<div class="row">${esc(a.description)}</div>`:''}
+      ${a.url?`<div class="row"><a href="${esc(a.url)}" target="_blank" rel="noopener">Ouvrir le document →</a></div>`:''}
+    </div>`).join('')}</div>`;
+}
+
+function renderPlanFinancier(pf){
+  if (!pf) return '';
+  let html = '';
+  const resume = [
+    ['investissement_initial','Investissement initial'], ['apport_personnel','Apport personnel'],
+    ['financement_recherche','Financement recherché'], ['bfr',"Besoin en fonds de roulement"],
+    ['seuil_rentabilite','Seuil de rentabilité'], ['point_mort','Point mort (mois)'],
+  ].filter(([k]) => has(pf[k]));
+  if (resume.length) {
+    html += `<div class="bpv-field-grid" style="margin-bottom:20px;">${resume.map(([k,l]) => `
+      <div class="bpv-field"><h4>${l}</h4><p>${k==='point_mort'?esc(pf[k])+' mois':fmtMontant(pf[k])}</p></div>`).join('')}</div>`;
+  }
+  ['immobilisations','amortissements','scenario_optimiste','scenario_realiste','scenario_prudent'].forEach(k => {
+    const labels = { immobilisations:'Immobilisations', amortissements:'Amortissements', scenario_optimiste:'Scénario optimiste', scenario_realiste:'Scénario réaliste', scenario_prudent:'Scénario prudent' };
+    if (has(pf[k])) html += `<div class="bpv-field"><h4>${labels[k]}</h4><p>${nl2br(pf[k])}</p></div>`;
+  });
+
+  // Compte de résultat prévisionnel 5 ans
+  const anneesCR = [1,2,3,4,5].filter(a => Object.keys(CR_LIGNES).some(k => has(pf[`${k}_${a}`])));
+  if (anneesCR.length) {
+    html += `<div class="bpv-field" style="margin-top:20px;"><h4>Compte de résultat prévisionnel</h4></div>
+      <div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Ligne</th>${anneesCR.map(a=>`<th>Année ${a}</th>`).join('')}</tr></thead><tbody>
+      ${Object.entries(CR_LIGNES).map(([k,label]) => `<tr><td>${label}</td>${anneesCR.map(a=>`<td>${has(pf[`${k}_${a}`])?fmtMontant(pf[`${k}_${a}`]):'—'}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div>`;
+  }
+
+  // Plan de financement — Ressources / Emplois
+  const ress = Object.entries(PF_RESSOURCES).filter(([k]) => has(pf[k]));
+  const emp = Object.entries(PF_EMPLOIS).filter(([k]) => has(pf[k]));
+  if (ress.length || emp.length) {
+    html += `<div class="bpv-field" style="margin-top:20px;"><h4>Plan de financement</h4></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        ${ress.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">RESSOURCES</div>${ress.map(([k,l]) => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${l}</span><strong>${fmtMontant(pf[k])}</strong></div>`).join('')}</div>` : ''}
+        ${emp.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">EMPLOIS</div>${emp.map(([k,l]) => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${l}</span><strong>${fmtMontant(pf[k])}</strong></div>`).join('')}</div>` : ''}
+      </div>`;
+  }
+  return html;
+}
+
+/* ---- Assemblage d'une section (titre + contenu), masquée entièrement si vide ---- */
+function buildSection(meta, contentHtml){
+  const empty = !contentHtml || !contentHtml.trim();
+  return { meta, empty, html: `
+    <section class="bpv-section" id="sec-${meta.key}">
+      <div class="bpv-section-head"><span class="ic">${meta.icon}</span><h2>${esc(meta.label)}</h2></div>
+      ${empty ? `<div class="bpv-empty-section">Section non renseignée.</div>` : contentHtml}
+    </section>` };
+}
+
+async function init(){
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { showError("Aucun business plan spécifié."); return; }
+  let bp;
+  try { bp = await api('GET', `/business-plans/${id}`); }
+  catch(e) { showError(e.status === 403 ? "Vous n'avez pas accès à ce business plan." : (e.status === 404 ? 'Business plan introuvable.' : ('Erreur : ' + e.message))); return; }
+
+  document.title = `${bp.nom_projet || 'Business Plan'} — Diaspo'Actif`;
+  const s = bp.sections || {};
+
+  if (bp.mon_role === 'proprietaire' || bp.mon_role === 'editeur' || bp.mon_role === 'validateur') {
+    const btn = document.getElementById('bpv-btn-edit');
+    btn.href = `business-plan-edit.html?id=${id}`;
+    btn.style.display = '';
+  }
+
+  const SECTION_META = [
+    { key:'infos_generales', icon:'🏷', label:'Informations générales' },
+    { key:'resume_executif', icon:'📄', label:'Résumé exécutif' },
+    { key:'presentation', icon:'🏢', label:'Présentation détaillée' },
+    { key:'probleme', icon:'🔍', label:'Analyse du problème' },
+    { key:'solution', icon:'💡', label:'Solution proposée' },
+    { key:'marche', icon:'📊', label:'Étude de marché' },
+    { key:'swot', icon:'⚡', label:'Analyse SWOT' },
+    { key:'business_model', icon:'🎯', label:'Business Model Canvas' },
+    { key:'produits', icon:'📦', label:'Produits & Services' },
+    { key:'strategie_marketing', icon:'📢', label:'Stratégie marketing' },
+    { key:'plan_commercial', icon:'💼', label:'Plan commercial' },
+    { key:'plan_operationnel', icon:'⚙️', label:'Plan opérationnel' },
+    { key:'organisation', icon:'🏗', label:'Organisation & Gouvernance' },
+    { key:'rh', icon:'👥', label:'Ressources humaines' },
+    { key:'calendrier', icon:'📅', label:'Calendrier de mise en œuvre' },
+    { key:'plan_financier', icon:'💰', label:'Plan financier' },
+    { key:'risques', icon:'⚠️', label:'Analyse des risques' },
+    { key:'impact', icon:'🌱', label:'Impact' },
+    { key:'financement', icon:'🏦', label:'Recherche de financement' },
+    { key:'annexes', icon:'📎', label:'Annexes' },
+  ];
+
+  const sections = SECTION_META.map(meta => {
+    const data = s[meta.key] || {};
+    let content = '';
+    if (meta.key === 'infos_generales') content = renderInfosGenerales(data);
+    else if (meta.key === 'swot') content = renderSwot(data);
+    else if (meta.key === 'business_model') content = renderBMC(data);
+    else if (meta.key === 'marche') content = renderFieldGrid(data, TEXT_SECTIONS.marche) + renderMarcheConcurrents(data.concurrents);
+    else if (meta.key === 'produits') content = renderProduits(data);
+    else if (meta.key === 'calendrier') content = renderCalendrier(data.phases);
+    else if (meta.key === 'plan_financier') content = renderPlanFinancier(data);
+    else if (meta.key === 'risques') content = renderRisques(data.items);
+    else if (meta.key === 'annexes') content = renderAnnexes(data.items);
+    else if (TEXT_SECTIONS[meta.key]) content = renderFieldGrid(data, TEXT_SECTIONS[meta.key]);
+    return buildSection(meta, content);
+  });
+
+  const statutLabel = { brouillon:'✏️ Brouillon', complet:'✅ Complet', archive:'📦 Archivé' }[bp.statut] || 'Brouillon';
+  const cover = `
+    <div class="bpv-cover">
+      <span class="bpv-cover-badge">📄 Document de consultation — lecture seule</span>
+      <div class="bpv-cover-logo">${bp.logo_url ? `<img src="${esc(bp.logo_url)}" alt="">` : (TYPES[bp.type_initiative]||'📋')[0]}</div>
+      <h1>${esc(bp.nom_projet || 'Sans titre')}</h1>
+      ${bp.slogan ? `<p class="slogan">"${esc(bp.slogan)}"</p>` : ''}
+      <div class="bpv-cover-meta">
+        <span>${TYPES[bp.type_initiative]||bp.type_initiative||'—'}</span>
+        ${bp.secteur?`<span>📂 ${esc(bp.secteur)}</span>`:''}
+        <span>${statutLabel}</span>
+        <span>${bp.progression||0}% complété</span>
+      </div>
+      <div class="bpv-cover-foot">Dernière mise à jour le ${fmtDate(bp.updated_at)} — généré depuis Diaspo'Actif</div>
+    </div>`;
+
+  document.getElementById('bpv-doc').innerHTML = cover + sections.map(sec => sec.html).join('');
+
+  document.getElementById('bpv-toc').innerHTML = `
+    <div class="bpv-toc-title">Sommaire</div>
+    ${sections.filter(sec => !sec.empty).map(sec => `<a href="#sec-${sec.meta.key}"><span class="n">${sec.meta.icon}</span>${esc(sec.meta.label)}</a>`).join('')}`;
+
+  // Surbrillance de la section visible au scroll
+  const links = [...document.querySelectorAll('.bpv-toc a')];
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(en => { if (en.isIntersecting) { links.forEach(l => l.classList.remove('active')); document.querySelector(`.bpv-toc a[href="#${en.target.id}"]`)?.classList.add('active'); } });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  document.querySelectorAll('.bpv-section').forEach(sec => io.observe(sec));
+
+  document.getElementById('bpv-loading').style.display = 'none';
+  document.getElementById('bpv-shell').style.display = 'grid';
+}
+
+function showError(msg){
+  document.getElementById('bpv-loading').style.display = 'none';
+  const el = document.getElementById('bpv-error');
+  el.style.display = '';
+  el.innerHTML = `<div style="font-size:40px;margin-bottom:10px;">🚫</div><p>${esc(msg)}</p><a href="business-plan.html" class="btn btn-outline" style="margin-top:12px;display:inline-block;">← Retour à mes Business Plans</a>`;
+}
+
+init();
+</script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>
