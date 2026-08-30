@@ -734,7 +734,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <div class="card" style="margin-bottom:20px;display:none;" id="formations-gestion">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <h3 style="margin:0;">🎓 Gestion des formations</h3>
-        <button class="btn btn-orange" onclick="openFormationForm()">+ Nouvelle formation</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline" onclick="ouvrirMesFormationsSuivies()">🎓 Mes formations suivies</button>
+          <button class="btn btn-orange" onclick="openFormationForm()">+ Nouvelle formation</button>
+        </div>
       </div>
       <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Créez, gérez et suivez vos formations sur Diaspo Formation.</p>
 
@@ -1528,17 +1531,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <h3 style="margin:0;" id="pt-modal-titre">➕ Ajouter un partenaire</h3>
           <button class="btn btn-sm btn-outline" onclick="ptFermerModal()">✕</button>
         </div>
-        <div id="pt-methode-row" style="display:flex;gap:8px;margin-bottom:16px;">
-          <button type="button" id="pt-methode-compte" onclick="ptChoisirMethode('compte')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;">🔎 Compte Diaspo'Actif</button>
-          <button type="button" id="pt-methode-externe" onclick="ptChoisirMethode('externe')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--orange);background:var(--orange);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">✏️ Partenaire externe</button>
+        <!-- Recherche unifiée (demande explicite du 2026-08-30) : un seul champ, plus de choix
+             préalable entre "compte" et "externe". On tape un nom, les comptes Diaspo'Actif
+             correspondants s'affichent en suggestions (réutilise /api/search/comptes, déjà en
+             place) ; si aucun ne correspond, l'option "partenaire externe" apparaît d'elle-même
+             avec le nom déjà repris, au lieu d'exiger un choix à l'aveugle avant même de taper. -->
+        <div class="pe-field" style="margin-bottom:6px;">
+          <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Nom du partenaire *</label>
+          <input id="pt-nom" placeholder="Tapez un nom — les comptes Diaspo'Actif correspondants s'affichent automatiquement" oninput="ptRechercherCompte()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;">
+          <div id="pt-resultats-compte" style="max-height:180px;overflow-y:auto;margin-top:6px;"></div>
+          <div id="pt-compte-selectionne" style="margin-top:6px;font-size:13px;"></div>
+          <div id="pt-aucun-compte" style="display:none;"></div>
         </div>
-        <div id="pt-bloc-compte" style="display:none;margin-bottom:12px;">
-          <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Rechercher un compte (nom ou ID DA)</label>
-          <input id="pt-recherche-compte" placeholder="Ex : Jean Kouassi ou DA-12345" oninput="ptRechercherCompte()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;">
-          <div id="pt-resultats-compte" style="max-height:180px;overflow-y:auto;margin-top:8px;"></div>
-          <div id="pt-compte-selectionne" style="margin-top:8px;font-size:13px;"></div>
-        </div>
-        <div class="pe-field" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Nom du partenaire *</label><input id="pt-nom" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;"></div>
         <div class="pe-field" style="margin-bottom:12px;">
           <label style="font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:5px;">Logo / Photo</label>
           <div style="display:flex;flex-direction:column;gap:8px;">
@@ -1728,7 +1732,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div class="card" style="margin-bottom:20px;">
         <h3 style="margin:0 0 12px;">Inviter un compte</h3>
         <div style="position:relative;max-width:420px;">
-          <input type="text" id="aff-search-input" placeholder="Rechercher un membre par nom ou email…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;">
+          <input type="text" id="aff-search-input" placeholder="Rechercher un membre par nom ou email…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="if(!this.value.trim()) affChargerSuggestions('')" onblur="setTimeout(()=>{const b=document.getElementById('aff-search-results'); if(b) b.style.display='none';},150)">
           <div id="aff-search-results" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
         </div>
       </div>
@@ -5530,10 +5534,14 @@ const PV_RESEAUX_FIELDS = [
   ['facebook','Facebook'], ['instagram','Instagram'], ['linkedin','LinkedIn'],
   ['x','X / Twitter'], ['youtube','YouTube'], ['tiktok','TikTok'],
 ];
+let PV_VILLES_IMPLANTATION = [];
+let PV_PAYS_IMPLANTATION = [];
 function renderPvInfosForm() {
   const box = document.getElementById('pv-infos-form');
   if (!box || !__pvInit) return;
   const init = __pvInit;
+  PV_VILLES_IMPLANTATION = Array.isArray(init.villes_implantation) ? [...init.villes_implantation] : [];
+  PV_PAYS_IMPLANTATION = Array.isArray(init.pays_implantation) ? [...init.pays_implantation] : [];
   let rs = {};
   try { rs = JSON.parse(init.reseaux_sociaux || '{}') || {}; } catch (e) {}
   box.innerHTML = `
@@ -5562,6 +5570,29 @@ function renderPvInfosForm() {
         <div><label class="pv-lbl">Pays</label><input id="pv-f-pays" value="${_mvEsc(init.vitrine_pays||init.pays||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Téléphone de contact de la vitrine</label><input id="pv-f-tel" value="${_mvEsc(init.vitrine_tel_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Email pro</label><input id="pv-f-email" value="${_mvEsc(init.vitrine_email_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <!-- Pays d'origine / ville de résidence (demande explicite du 2026-08-30) : informations
+             du COMPTE du porteur (profil personnel), affichées ici en lecture seule uniquement —
+             pas éditables depuis ce formulaire de vitrine, qui ne gère que l'initiative elle-même. -->
+        <div style="grid-column:1/-1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--muted);">
+          🌍 Pays d'origine du porteur : <strong style="color:var(--text);">${_mvEsc([init.porteur_origine1, init.porteur_origine2].filter(Boolean).join(', ') || '—')}</strong>
+          &nbsp;·&nbsp; 📍 Ville de résidence : <strong style="color:var(--text);">${_mvEsc(init.porteur_ville_residence || '—')}</strong>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label class="pv-lbl">🏙️ Villes d'implantation (en plus du siège — signale une expansion d'activité)</label>
+          <div style="display:flex;gap:8px;margin-bottom:6px;">
+            <input id="pv-f-nouvelle-ville" placeholder="Ex : Dakar" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;" onkeydown="if(event.key==='Enter'){event.preventDefault();pvAjouterImplantation('ville');}">
+            <button type="button" class="btn btn-sm btn-outline" onclick="pvAjouterImplantation('ville')">+ Ajouter</button>
+          </div>
+          <div id="pv-villes-implantation-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label class="pv-lbl">🌐 Pays d'implantation (en plus du siège)</label>
+          <div style="display:flex;gap:8px;margin-bottom:6px;">
+            <input id="pv-f-nouveau-pays" placeholder="Ex : Sénégal" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;" onkeydown="if(event.key==='Enter'){event.preventDefault();pvAjouterImplantation('pays');}">
+            <button type="button" class="btn btn-sm btn-outline" onclick="pvAjouterImplantation('pays')">+ Ajouter</button>
+          </div>
+          <div id="pv-pays-implantation-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
       </div>
       <!-- Renseigner un numero ne vaut pas consentement a le publier : la decision est
            separee de la saisie, et masquee par defaut. -->
@@ -5586,6 +5617,34 @@ function renderPvInfosForm() {
     <span id="pv-infos-saved" style="margin-left:10px;font-size:12.5px;color:#16a34a;font-weight:700;display:none;">✓ Enregistré</span>
     <style>.pv-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:4px;}</style>
   `;
+  pvRenderImplantationChips();
+}
+
+/* Villes/pays d'implantation (2026-08-30, demande explicite) : simples listes à puces, ajout/
+   retrait local (état en mémoire PV_VILLES_IMPLANTATION/PV_PAYS_IMPLANTATION), envoyées en bloc
+   à "💾 Enregistrer" (pvSaveInfos) — pas de sauvegarde immédiate par entrée, cohérent avec le
+   reste du formulaire "Paramètres Vitrine" qui s'enregistre lui aussi en un seul geste. */
+function pvRenderImplantationChips() {
+  const chipHtml = (val, type, i) => `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:4px 6px 4px 10px;font-size:12px;">${_mvEsc(val)}<button type="button" onclick="pvRetirerImplantation('${type}',${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;">×</button></span>`;
+  const villesBox = document.getElementById('pv-villes-implantation-chips');
+  if (villesBox) villesBox.innerHTML = PV_VILLES_IMPLANTATION.map((v,i)=>chipHtml(v,'ville',i)).join('') || '<span style="font-size:12px;color:var(--muted);">Aucune pour l\'instant.</span>';
+  const paysBox = document.getElementById('pv-pays-implantation-chips');
+  if (paysBox) paysBox.innerHTML = PV_PAYS_IMPLANTATION.map((v,i)=>chipHtml(v,'pays',i)).join('') || '<span style="font-size:12px;color:var(--muted);">Aucun pour l\'instant.</span>';
+}
+function pvAjouterImplantation(type) {
+  const inputId = type === 'ville' ? 'pv-f-nouvelle-ville' : 'pv-f-nouveau-pays';
+  const input = document.getElementById(inputId);
+  const val = (input.value || '').trim();
+  if (!val) return;
+  const liste = type === 'ville' ? PV_VILLES_IMPLANTATION : PV_PAYS_IMPLANTATION;
+  if (!liste.some(v => v.toLowerCase() === val.toLowerCase())) liste.push(val);
+  input.value = '';
+  pvRenderImplantationChips();
+}
+function pvRetirerImplantation(type, i) {
+  const liste = type === 'ville' ? PV_VILLES_IMPLANTATION : PV_PAYS_IMPLANTATION;
+  liste.splice(i, 1);
+  pvRenderImplantationChips();
 }
 
 async function pvUploadLogo(input) {
@@ -5615,6 +5674,8 @@ async function pvSaveInfos() {
     vitrine_tel_pro: document.getElementById('pv-f-tel').value.trim(),
     vitrine_email_pro: document.getElementById('pv-f-email').value.trim(),
     reseaux_sociaux: rs,
+    villes_implantation: PV_VILLES_IMPLANTATION,
+    pays_implantation: PV_PAYS_IMPLANTATION,
   };
   try {
     await api('PUT', `/initiatives/${window.__vitrineInitId}/vitrine`, payload);
@@ -7866,7 +7927,12 @@ async function voOuvrirDetail(scrutinId){
 
       ${VO_SCRUTIN_ACTUEL.statut==='brouillon'?`<button class="btn btn-orange" onclick="voOuvrirScrutin(${scrutinId})">🚀 Ouvrir le scrutin</button>`:''}
     `;
-  }catch(e){ el.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`; }
+  }catch(e){
+    /* Corrigé le 2026-08-30 : un échec ici (ex. une des 3 requêtes en parallèle) affichait une
+       erreur SANS aucun bouton retour — la seule échappatoire était de recharger toute la page.
+       Le bouton retour reste maintenant affiché même en cas d'erreur. */
+    el.innerHTML = `<button class="btn btn-sm btn-outline" onclick="voRenderScrutins()">← Retour</button><div class="notice" style="margin-top:10px;">Erreur : ${escH(e.message)}</div>`;
+  }
 }
 
 function voOuvrirModalResolution(){
@@ -8045,22 +8111,23 @@ async function ptDrop(e){
 }
 
 function ptOuvrirCreation(){
-  PT_EDIT_ID = null; PT_COMPTE_SELECTIONNE = null; PT_LOGO_URL = null;
+  PT_EDIT_ID = null; PT_METHODE = 'externe'; PT_COMPTE_SELECTIONNE = null; PT_LOGO_URL = null;
   document.getElementById('pt-modal-titre').textContent = '➕ Ajouter un partenaire';
-  ['pt-nom','pt-type','pt-description','pt-site','pt-pays','pt-email','pt-tel','pt-recherche-compte'].forEach(id=>document.getElementById(id).value='');
+  ['pt-nom','pt-type','pt-description','pt-site','pt-pays','pt-email','pt-tel'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pt-afficher-contact').checked = false;
   document.getElementById('pt-logo-preview').style.display = 'none';
   document.getElementById('pt-logo-status').textContent = '';
   PT_LOGO_UPLOADING = false;
   document.getElementById('pt-compte-selectionne').innerHTML = '';
   document.getElementById('pt-resultats-compte').innerHTML = '';
-  ptChoisirMethode('externe');
+  document.getElementById('pt-aucun-compte').style.display = 'none';
+  document.getElementById('pt-champs-externes').style.display = 'none';
   document.getElementById('modal-partenaire-form').style.display = 'flex';
 }
 
 function ptOuvrirEdition(id){
   const p = PT_LISTE.find(x=>x.id===id); if(!p) return;
-  PT_EDIT_ID = id; PT_COMPTE_SELECTIONNE = null; PT_LOGO_URL = p.logo_url || null;
+  PT_EDIT_ID = id; PT_METHODE = p.type==='compte' ? 'compte' : 'externe'; PT_COMPTE_SELECTIONNE = null; PT_LOGO_URL = p.logo_url || null;
   document.getElementById('pt-modal-titre').textContent = '✏️ Modifier le partenaire';
   document.getElementById('pt-nom').value = p.nom || '';
   document.getElementById('pt-type').value = p.type_partenaire || '';
@@ -8072,30 +8139,37 @@ function ptOuvrirEdition(id){
   document.getElementById('pt-afficher-contact').checked = !!p.afficher_contact;
   const preview = document.getElementById('pt-logo-preview');
   if(p.logo_url){ preview.src = p.logo_url; preview.style.display = 'block'; } else preview.style.display = 'none';
-  document.getElementById('pt-methode-row').style.display = 'none';
-  document.getElementById('pt-bloc-compte').style.display = 'none';
+  document.getElementById('pt-resultats-compte').innerHTML = '';
+  document.getElementById('pt-aucun-compte').style.display = 'none';
+  document.getElementById('pt-compte-selectionne').innerHTML = p.type==='compte' ? `<div style="background:var(--bg);padding:8px 10px;border-radius:8px;">✅ Compte Diaspo'Actif lié</div>` : '';
   document.getElementById('pt-champs-externes').style.display = p.type==='compte' ? 'none' : 'block';
   document.getElementById('modal-partenaire-form').style.display = 'flex';
 }
 
 function ptFermerModal(){ document.getElementById('modal-partenaire-form').style.display = 'none'; }
 
-function ptChoisirMethode(m){
-  PT_METHODE = m;
-  document.getElementById('pt-methode-row').style.display = 'flex';
-  const isCompte = m === 'compte';
-  document.getElementById('pt-methode-compte').style.cssText = `flex:1;padding:10px;border-radius:8px;border:1.5px solid ${isCompte?'var(--orange)':'var(--border)'};background:${isCompte?'var(--orange)':'#fff'};color:${isCompte?'#fff':'var(--muted)'};font-size:13px;font-weight:700;cursor:pointer;`;
-  document.getElementById('pt-methode-externe').style.cssText = `flex:1;padding:10px;border-radius:8px;border:1.5px solid ${!isCompte?'var(--orange)':'var(--border)'};background:${!isCompte?'var(--orange)':'#fff'};color:${!isCompte?'#fff':'var(--muted)'};font-size:13px;font-weight:700;cursor:pointer;`;
-  document.getElementById('pt-bloc-compte').style.display = isCompte ? 'block' : 'none';
-  document.getElementById('pt-champs-externes').style.display = isCompte ? 'none' : 'block';
-}
-
+/* Recherche unifiée (demande explicite du 2026-08-30, à la place de l'ancien choix préalable
+   "Compte Diaspo'Actif" / "Partenaire externe" par onglets) : on tape un nom dans le champ
+   "Nom du partenaire", les comptes correspondants s'affichent en suggestions automatiquement ;
+   sans correspondance, l'option "partenaire externe" apparaît d'elle-même avec le nom déjà
+   repris — plus besoin de deviner avant de taper lequel des deux choisir. */
 let ptSearchTimer;
 let PT_SEARCH_RESULTS = [];
 function ptRechercherCompte(){
   clearTimeout(ptSearchTimer);
-  const q = document.getElementById('pt-recherche-compte').value.trim();
-  if(q.length < 2){ document.getElementById('pt-resultats-compte').innerHTML = ''; return; }
+  /* Toute nouvelle frappe invalide une sélection précédente : on repart d'une recherche propre
+     plutôt que de garder un compte sélectionné qui ne correspond plus au texte affiché. */
+  if (PT_COMPTE_SELECTIONNE) {
+    PT_COMPTE_SELECTIONNE = null; PT_METHODE = 'externe';
+    document.getElementById('pt-compte-selectionne').innerHTML = '';
+  }
+  const q = document.getElementById('pt-nom').value.trim();
+  document.getElementById('pt-aucun-compte').style.display = 'none';
+  if(q.length < 2){
+    document.getElementById('pt-resultats-compte').innerHTML = '';
+    document.getElementById('pt-champs-externes').style.display = 'none';
+    return;
+  }
   ptSearchTimer = setTimeout(async () => {
     try{
       const r = await api('GET', '/search/comptes?q='+encodeURIComponent(q));
@@ -8106,11 +8180,19 @@ function ptRechercherCompte(){
          (les chaînes JSON utilisent des guillemets doubles, pas simples). Un index numérique
          ne peut jamais contenir de caractère problématique, quel que soit le nom du compte. */
       PT_SEARCH_RESULTS = r.comptes || [];
-      document.getElementById('pt-resultats-compte').innerHTML = PT_SEARCH_RESULTS.map((c,i) => `
-        <div style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="ptSelectionnerCompteParIndex(${i})">
-          <span>${escH(c.nom)} <span style="color:var(--muted);font-size:11px;">(${escH(c.role||c.source||'')})</span></span>
-          <span style="color:var(--orange);font-size:12px;font-weight:700;">Choisir</span>
-        </div>`).join('') || '<div style="padding:8px;color:var(--muted);font-size:12px;">Aucun résultat.</div>';
+      if (PT_SEARCH_RESULTS.length) {
+        document.getElementById('pt-resultats-compte').innerHTML = PT_SEARCH_RESULTS.map((c,i) => `
+          <div style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="ptSelectionnerCompteParIndex(${i})">
+            <span>${escH(c.nom)} <span style="color:var(--muted);font-size:11px;">(${escH(c.role||c.source||'')})</span></span>
+            <span style="color:var(--orange);font-size:12px;font-weight:700;">Choisir</span>
+          </div>`).join('');
+        document.getElementById('pt-aucun-compte').style.display = 'none';
+      } else {
+        document.getElementById('pt-resultats-compte').innerHTML = '';
+        document.getElementById('pt-aucun-compte').style.display = 'block';
+        document.getElementById('pt-aucun-compte').innerHTML = `<div style="font-size:12.5px;color:var(--muted);padding:6px 0;">Aucun compte Diaspo'Actif trouvé pour « ${escH(q)} » — complétez ci-dessous pour l'ajouter comme partenaire externe.</div>`;
+        document.getElementById('pt-champs-externes').style.display = 'block';
+      }
     }catch(e){}
   }, 300);
 }
@@ -8120,10 +8202,19 @@ function ptSelectionnerCompteParIndex(i){
 }
 function ptSelectionnerCompte(c){
   PT_COMPTE_SELECTIONNE = c;
+  PT_METHODE = 'compte';
   document.getElementById('pt-nom').value = c.nom;
   if(c.avatar_url) PT_LOGO_URL = c.avatar_url;
-  document.getElementById('pt-compte-selectionne').innerHTML = `<div style="background:var(--bg);padding:8px 10px;border-radius:8px;">✅ Sélectionné : <strong>${escH(c.nom)}</strong></div>`;
+  document.getElementById('pt-compte-selectionne').innerHTML = `<div style="background:var(--bg);padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">✅ Compte sélectionné : <strong>${escH(c.nom)}</strong> <button type="button" onclick="ptDeselectionnerCompte()" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:700;">Changer</button></div>`;
   document.getElementById('pt-resultats-compte').innerHTML = '';
+  document.getElementById('pt-aucun-compte').style.display = 'none';
+  document.getElementById('pt-champs-externes').style.display = 'none';
+}
+function ptDeselectionnerCompte(){
+  PT_COMPTE_SELECTIONNE = null; PT_METHODE = 'externe';
+  document.getElementById('pt-compte-selectionne').innerHTML = '';
+  document.getElementById('pt-nom').value = '';
+  document.getElementById('pt-nom').focus();
 }
 
 let PT_LOGO_UPLOADING = false;
@@ -8435,17 +8526,13 @@ async function affChargerSuggestions(q) {
     box.style.display = 'block';
   } catch (e) { box.style.display = 'none'; }
 }
-document.getElementById('aff-search-input')?.addEventListener('input', function() {
-  affChargerSuggestions(this.value.trim());
-});
-document.getElementById('aff-search-input')?.addEventListener('focus', function() {
-  /* Ne recharge pas si une frappe a déjà rempli le champ (évite un aller-retour réseau inutile
-     au simple retour de focus après avoir déjà tapé). */
-  if (!this.value.trim()) affChargerSuggestions('');
-});
-document.getElementById('aff-search-input')?.addEventListener('blur', () => {
-  setTimeout(() => { const box = document.getElementById('aff-search-results'); if (box) box.style.display = 'none'; }, 150);
-});
+/* Bug trouvé par exécution réelle le 2026-08-30 (signalé : "je commence à écrire un nom...
+   propose moi des correspondances" — ne s'affichait jamais) : ce bloc s'exécutait AVANT que
+   #aff-search-input existe dans le DOM (getElementById renvoyait null ici, confirmé par log),
+   donc addEventListener ne s'attachait jamais, silencieusement (?. avale l'échec sans erreur).
+   Les gestionnaires input/focus/blur sont donc désormais posés en attributs HTML directement
+   sur le champ ci-dessus (oninput/onfocus/onblur) — fiables quel que soit le moment où l'élément
+   apparaît réellement dans le DOM, contrairement à une attache imposée depuis ce script global. */
 
 window.affOuvrirInvite = function(userId, nom) {
   affPendingUser = userId;
@@ -8676,6 +8763,62 @@ function renderFormationsList() {
     }).join('')}
   </div>`;
 }
+
+/* 🎓 Mes formations suivies (demande explicite du 2026-08-30) : distinct de "Gestion des
+   formations" ci-dessus qui liste ce que ce compte PUBLIE en tant qu'organisme formateur —
+   ici, ce que ce compte SUIT en tant qu'apprenant. La table formation_inscriptions et la
+   route GET /api/mes-inscriptions existaient déjà (utilisées nulle part côté interface),
+   pas de nouveau mécanisme d'enregistrement à créer : l'inscription se fait déjà ailleurs
+   (achat/accès à une formation), on ne fait qu'afficher ce qui est déjà suivi. */
+const FORM_SUIVIE_STATUT_LABELS = {
+  active: { label: '🟢 En cours', color: '#16a34a' },
+  annulee: { label: '⚪ Annulée', color: '#6b7280' },
+  expiree: { label: '🔴 Expirée', color: '#dc2626' },
+};
+window.ouvrirMesFormationsSuivies = async function() {
+  let modal = document.getElementById('mes-formations-suivies-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'mes-formations-suivies-modal';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div class="modal-box" style="max-width:520px;text-align:left;max-height:88vh;overflow-y:auto;">
+    <h3 style="margin:0 0 4px;">🎓 Mes formations suivies</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Les formations auxquelles ce compte est inscrit en tant qu'apprenant.</p>
+    <div id="mes-formations-suivies-liste">Chargement…</div>
+    <div style="text-align:right;margin-top:14px;">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('mes-formations-suivies-modal').remove()">Fermer</button>
+    </div>
+  </div>`;
+  const zone = document.getElementById('mes-formations-suivies-liste');
+  try {
+    const { inscriptions } = await api('GET', '/mes-inscriptions');
+    if (!inscriptions.length) {
+      zone.innerHTML = `<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0;">Aucune formation suivie pour le moment.</p>`;
+      return;
+    }
+    zone.innerHTML = inscriptions.map(i => {
+      const st = FORM_SUIVIE_STATUT_LABELS[i.statut] || FORM_SUIVIE_STATUT_LABELS.active;
+      return `<div class="card" style="margin-bottom:10px;padding:12px 14px;display:flex;gap:12px;align-items:center;">
+        ${i.image_url ? `<img src="${i.image_url}" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex:none;">` : `<div style="width:56px;height:56px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">🎓</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+            <strong style="font-size:13.5px;">${escH(i.titre)}</strong>
+            <span style="font-size:10.5px;font-weight:700;color:${st.color};">${st.label}</span>
+          </div>
+          <div style="height:5px;background:var(--bg);border-radius:99px;overflow:hidden;margin:4px 0;"><div style="height:100%;width:${i.avancement_pct||0}%;background:var(--orange);"></div></div>
+          <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;">
+            <span>${i.avancement_pct||0}% complété · inscrit le ${i.date_inscription ? new Date(i.date_inscription.replace(' ','T')).toLocaleDateString('fr-FR') : '—'}</span>
+            <a href="suivre-formation.html?id=${i.formation_id}" target="_blank" rel="noopener" style="font-weight:700;">Continuer →</a>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    zone.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`;
+  }
+};
 
 function openFormationForm(id) {
   _formEditId = id || null;

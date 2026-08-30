@@ -10,6 +10,10 @@ async function uploadMedia(file, type = 'avatar') {
   const endpoint = {
     avatar:      '/api/upload/avatar',
     banner:      '/api/upload/banner',
+    /* Distinct de 'banner' (2026-08-30) : n'écrit aucune colonne côté serveur, contrairement à
+       'banner' qui écrase toujours users.banner_url — la bannière de vitrine doit pouvoir
+       différer de celle du profil personnel (voir editVitrineBanner, profil-app.html). */
+    'vitrine-banner': '/api/upload/vitrine-banniere',
     logo:        '/api/upload/logo',
     post:        '/api/upload/post',
     produit:     '/api/upload/produit',

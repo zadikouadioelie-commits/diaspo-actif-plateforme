@@ -1495,6 +1495,25 @@ async function renderEnrichedColumns() {
     if (has('contact', 'joindre', 'ecrire', 'message')) {
       return `Écrivez-moi via la <a href="messagerie.html?user=${profil.id}" style="color:var(--tp);">messagerie Diaspo'Actif</a>.`;
     }
+    /* Catégories ajoutées le 2026-08-30 (demande explicite : "alimente... de tout le contenu du
+       compte... quelles sont les activités... les dernières choses postées... nos centres
+       d'intérêt... les opportunités du compte") — toujours à partir des données déjà chargées
+       dans `profil` (déjà publiques sur la fiche), jamais de donnée privée/d'inscription : même
+       principe "sans IA, catégories élargies" que les branches ci-dessus, pas d'appel externe. */
+    if (has('activite', 'poste', 'publication', 'derniere chose')) {
+      const pubs = (profil.publications || []).slice(0, 3);
+      if (!pubs.length) return `Aucune publication récente pour l'instant.`;
+      const liste = pubs.map(p => `« ${(p.contenu || '').slice(0, 80)}${(p.contenu || '').length > 80 ? '…' : ''} »`).join('<br>');
+      return `Dernières publications :<br>${liste}<br><a href="#pp-publications" style="color:var(--tp);font-weight:700;">Voir toutes les activités →</a>`;
+    }
+    if (has('interet', 'passion', 'aime', 'hobby')) {
+      const ci = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
+      return ci.length ? `Centres d'intérêt : ${ci.join(', ')}.` : `Aucun centre d'intérêt renseigné pour l'instant.`;
+    }
+    if (has('opportunite')) {
+      const b = profil.besoins || [];
+      return (b.length ? `Opportunités/recherches actuelles : ${b.join(', ')}. ` : `Aucune opportunité annoncée pour l'instant. `) + `<button onclick="ppContact('Proposition')" style="color:var(--tp);font-weight:700;background:none;border:none;cursor:pointer;padding:0;">Me contacter →</button>`;
+    }
     return `Je n'ai pas de réponse précise. Vous pouvez <a href="messagerie.html?user=${profil.id}" style="color:var(--tp);font-weight:700;">écrire directement à ${esc2(nomComplet)}</a>.`;
   }
   function ppRenderAssistant() {
@@ -2675,7 +2694,11 @@ async function renderVitrineVisitor(init) {
     ${banniere ? `<img loading="lazy" src="${esc(banniere)}" alt="">` : ''}
     <div class="pvt-hero-overlay"></div>
     <div class="pvt-hero-content">
-      <div class="pvt-hero-title">${esc(init.nom||'Vitrine')}</div>
+      <!-- Nom de l'initiative retiré du survol de la bannière (demande explicite du 2026-08-30 :
+           "ça parasite l'affiche de la bannière") — la bannière contient déjà souvent son propre
+           nom/logo intégré à l'image (cas d'une affiche/poster déjà designée), un second nom
+           surimposé en plus faisait doublon. Le nom reste affiché ailleurs sur la page (titre,
+           carte de profil). -->
       ${slogan ? `<div class="pvt-hero-sub">${slogan}</div>` : ''}
       ${(catalogues.length || produits.length) ? `<a href="${catalogues.length?'#pv-collections':'#pv-produits'}" class="pvt-hero-cta">VOIR NOS PRODUITS</a>` : ''}
     </div>
@@ -4165,7 +4188,11 @@ async function editVitrineBanner() {
     try {
       const cropped = await openImageCropper(file, { shape: 'rect', aspect: 16/6, outW: 2000, outH: 750 });
       if (!cropped) return;
-      const url = await uploadMedia(cropped, 'banner');
+      /* 'vitrine-banner' (2026-08-30, corrige le fait que la bannière de vitrine écrasait
+         jusqu'ici silencieusement la bannière du profil personnel — voir server/index.js,
+         POST /api/upload/vitrine-banniere) : cette route n'écrit rien elle-même, seul
+         vitrineSave() ci-dessous enregistre l'URL, uniquement sur l'initiative. */
+      const url = await uploadMedia(cropped, 'vitrine-banner');
       await vitrineSave({ vitrine_banniere_url: url });
       _vitrineInit.vitrine_banniere_url = url;
       renderVitrineVisitor(_vitrineInit);

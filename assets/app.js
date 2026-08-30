@@ -304,7 +304,10 @@ async function annuaireEditInitiativeCover(initiativeId, apres) {
     try {
       const cropped = await openImageCropper(file, { shape: "rect", aspect: 16 / 6, outW: 2000, outH: 750 });
       if (!cropped) return;
-      const url = await uploadMedia(cropped, "banner");
+      /* 'vitrine-banner' (2026-08-30) : même bug que profil-app.html/editVitrineBanner — "banner"
+         écrase toujours users.banner_url côté serveur, alors que ceci édite la bannière de
+         l'INITIATIVE depuis sa cartouche annuaire, pas le profil personnel du propriétaire. */
+      const url = await uploadMedia(cropped, "vitrine-banner");
       await api("PUT", `/initiatives/${initiativeId}/vitrine`, { vitrine_banniere_url: url });
       if (typeof apres === "function") apres(url);
       else if (window.annuaireRefresh) window.annuaireRefresh();
@@ -451,6 +454,7 @@ const NOTIF_ICONS = {
   affiliation_refusee: "🚫",
   affiliation_fonction_modifiee: "🔗",
   affiliation_terminee: "🔗",
+  initiative_expansion: "🌍",
   responsable_a_revalider: "🪪",
   responsable_verifie: "✅",
   responsable_refuse: "⚠️",

@@ -1442,6 +1442,47 @@ route("POST", "/api/upload/banner", async (req, res) => {
   }
 });
 
+/* POST /api/upload/vitrine-banniere — upload bannière VITRINE, distincte de la bannière du
+   profil personnel (demande explicite du 2026-08-30 : "dissociable... deux photos différentes").
+   Bug trouvé en creusant la demande : editVitrineBanner() (profil-app.html) réutilisait par
+   erreur uploadMedia(..., 'banner') → /api/upload/banner ci-dessus, qui écrit TOUJOURS
+   users.banner_url en plus de renvoyer l'URL — la bannière du profil personnel était donc
+   silencieusement écrasée à chaque changement de bannière de vitrine, même si l'appelant
+   enregistrait ensuite l'URL correctement sur initiatives.vitrine_banniere_url de son côté.
+   Cette route-ci n'écrit AUCUNE colonne (même principe que /api/upload/logo juste au-dessus) :
+   elle ne fait qu'héberger le fichier, à l'appelant de décider où stocker l'URL renvoyée. */
+route("POST", "/api/upload/vitrine-banniere", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+
+  const chunks = [];
+  req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["vitrine-banner"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+
+  if (file.buffer.length > 10 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 10 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "banners");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "vitrine-banniere", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "upload vitrine-banniere"));
+  }
+});
+
 /* POST /api/upload/logo — upload logo initiative */
 route("POST", "/api/upload/logo", async (req, res) => {
   const user = await getCurrentUser(req);
@@ -2305,6 +2346,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_style_json,
     // Informations générales (identité de la structure — éditables aussi depuis "Paramètres Vitrine")
     nom, domaine, domaines_secondaires, logo_url, reseaux_sociaux, slogan,
+    // Villes/pays d'implantation (2026-08-30, demande explicite)
+    villes_implantation, pays_implantation,
     // Modules "Galerie vidéos", "Portfolio", "Réservation"
     vitrine_videos_json, vitrine_portfolio_json, vitrine_reservation_json,
   } = body;
@@ -2385,11 +2428,48 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     ['domaines_secondaires_json', domaines_secondaires !== undefined
       ? JSON.stringify((Array.isArray(domaines_secondaires) ? domaines_secondaires : []).filter(Boolean).slice(0, 2))
       : undefined],
+    ['villes_implantation_json', villes_implantation !== undefined
+      ? JSON.stringify([...new Set((Array.isArray(villes_implantation) ? villes_implantation : []).map(v => String(v||'').trim()).filter(Boolean))])
+      : undefined],
+    ['pays_implantation_json', pays_implantation !== undefined
+      ? JSON.stringify([...new Set((Array.isArray(pays_implantation) ? pays_implantation : []).map(v => String(v||'').trim()).filter(Boolean))])
+      : undefined],
   ]) {
     if (valeur === undefined) continue;
     try { await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(valeur, params.id); }
     catch (e) { console.error('[vitrine] colonne indisponible', champ, e.message); }
   }
+
+  /* Notification des abonnés lors d'une expansion d'activité (2026-08-30, demande explicite) :
+     seules les entrées VRAIMENT nouvelles déclenchent une notification (jamais un simple
+     retrait, jamais un doublon déjà notifié) — comparé à l'état AVANT cette requête (`init`,
+     chargé en tout début de route). Best-effort, ne doit jamais faire échouer l'enregistrement
+     des paramètres si l'envoi de notifications rencontre un problème. */
+  try {
+    const nouvelles = [];
+    if (villes_implantation !== undefined) {
+      const avant = new Set(safeParseArray(init.villes_implantation_json));
+      (Array.isArray(villes_implantation) ? villes_implantation : []).forEach(v => {
+        const vv = String(v||'').trim(); if (vv && !avant.has(vv)) nouvelles.push(vv);
+      });
+    }
+    if (pays_implantation !== undefined) {
+      const avant = new Set(safeParseArray(init.pays_implantation_json));
+      (Array.isArray(pays_implantation) ? pays_implantation : []).forEach(v => {
+        const vv = String(v||'').trim(); if (vv && !avant.has(vv)) nouvelles.push(vv);
+      });
+    }
+    if (nouvelles.length) {
+      const abonnes = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(params.id);
+      for (const a of abonnes) {
+        creerNotif(a.user_id, "initiative_expansion",
+          "Expansion d'activité",
+          `${init.nom} étend son activité à ${nouvelles.join(', ')}.`,
+          { initiative_id: Number(params.id) });
+      }
+    }
+  } catch (e) { console.error('[vitrine] notification expansion:', e.message); }
+
   sendJSON(res, 200, { ok: true });
 });
 
@@ -6104,7 +6184,11 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     if (termesOriginaux.length) {
       score = annuaireScorerEntite([
         [[ini.nom, ini.sigle], 1000],
-        [[ini.domaine, ini.type], 500],
+        /* domaines_secondaires_json ajouté le 2026-08-30 (demande explicite : "vérifier les
+           descriptions d'activités déclarées") — jusqu'ici seul le domaine PRINCIPAL comptait,
+           une initiative avec domaine principal "Agriculture" et domaine secondaire "Formation"
+           déclaré n'apparaissait jamais pour une recherche "formation". */
+        [[ini.domaine, ini.type, safeParseArray(ini.domaines_secondaires_json)], 500],
         [[ini.services, safeParse(ini.vitrine_services_categories_json)], 400],
         [produits.map(p => `${p.nom} ${p.categorie}`), 380],
         [[ini.description, ini.mission, ini.historique, ini.objectifs], 200],
@@ -6393,6 +6477,16 @@ route("GET", "/api/mon-initiative", async (req, res, params, body, query) => {
   if (!row) return sendJSON(res, 200, { initiative: null });
   row.nationalites_concernees = safeParse(row.nationalites_concernees);
   row.domaines_secondaires = safeParseArray(row.domaines_secondaires_json);
+  /* Villes/pays d'implantation (2026-08-30) — distincts du siège ; affichés en lecture avec le
+     pays d'origine / la ville de résidence du porteur (voir jointure ci-dessous), qui ne sont
+     eux jamais modifiables depuis ce formulaire (ce sont des informations du COMPTE, pas de
+     l'initiative — gérées depuis le profil personnel). */
+  row.villes_implantation = safeParseArray(row.villes_implantation_json);
+  row.pays_implantation = safeParseArray(row.pays_implantation_json);
+  const porteur = await db.prepare("SELECT ville, origine1, origine2 FROM users WHERE id=?").get(user.id);
+  row.porteur_ville_residence = porteur?.ville || null;
+  row.porteur_origine1 = porteur?.origine1 || null;
+  row.porteur_origine2 = porteur?.origine2 || null;
   row.nationalite_unique = !!row.nationalite_unique;
   row.abonnement_actif = !!row.abonnement_actif;
   /* ?preview=draft : utilisé par le constructeur "Paramètres Vitrine" (aperçu dynamique) et son

@@ -106,6 +106,12 @@ db.exec(`
     rayonnement TEXT DEFAULT 'locale',
     domaine TEXT,
     domaines_secondaires_json TEXT DEFAULT '[]',
+    /* Villes/pays d'implantation (2026-08-30, demande explicite) : distincts du siège
+       (ville/pays "classiques" déjà existants) — une initiative peut être implantée dans
+       plusieurs villes/pays à la fois. Sert à signaler une expansion d'activité (notification
+       aux abonnés quand une nouvelle entrée est ajoutée, voir PUT /api/initiatives/:id/vitrine). */
+    villes_implantation_json TEXT DEFAULT '[]',
+    pays_implantation_json TEXT DEFAULT '[]',
     type TEXT,
     /* Statut de création (voir "Statut de l'initiative") : 'en_creation' tant que la structure
        n'est pas officiellement créée (infos administratives facultatives, compte utilisable
@@ -5691,6 +5697,10 @@ db.exec(`
   // Déjà déclarée dans le CREATE TABLE plus haut : self-healing automatique sur PostgreSQL
   // (ajouterColonnesManquantes, pg-init.js) ; cette ligne ne sert qu'au SQLite local déjà créé.
   if (!initCols7.includes('domaines_secondaires_json'))       db.exec("ALTER TABLE initiatives ADD COLUMN domaines_secondaires_json TEXT DEFAULT '[]'");
+  // Villes/pays d'implantation (2026-08-30) — même remarque : déjà dans le CREATE TABLE plus
+  // haut, self-healing auto sur PostgreSQL ; ces lignes ne servent qu'au SQLite local déjà créé.
+  if (!initCols7.includes('villes_implantation_json'))         db.exec("ALTER TABLE initiatives ADD COLUMN villes_implantation_json TEXT DEFAULT '[]'");
+  if (!initCols7.includes('pays_implantation_json'))           db.exec("ALTER TABLE initiatives ADD COLUMN pays_implantation_json TEXT DEFAULT '[]'");
   // Statut de l'initiative (en_creation / existante) — même remarque : déjà dans le CREATE TABLE,
   // ces lignes ne servent qu'au SQLite local déjà créé (self-healing auto sur PostgreSQL).
   if (!initCols7.includes('statut_creation'))                  db.exec("ALTER TABLE initiatives ADD COLUMN statut_creation TEXT DEFAULT 'existante'");

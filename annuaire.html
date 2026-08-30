@@ -234,7 +234,13 @@
   .logo{flex:1;justify-content:center;text-align:center;}
 }
 @media(min-width:769px){
-  #sidebar, #sidebar-backdrop, #sidebar-toggle{display:none!important;}
+  /* #sidebar-toggle retiré de cette règle le 2026-08-30 (demande explicite : "ajoute le bouton
+     menu également dans l'annuaire") — cette page n'a effectivement pas de tiroir #sidebar,
+     mais le bouton lui-même sert désormais aussi de raccourci générique vers le tableau de
+     bord du rôle connecté sur les pages sans tiroir (assets/app.js, initSidebarMobile, ajouté
+     le 2026-08-26 sur profil.html) ; cette règle plus ancienne le masquait encore ici sans
+     avoir été mise à jour en même temps, laissant l'Annuaire en retard sur ce point précis. */
+  #sidebar, #sidebar-backdrop{display:none!important;}
 }
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -454,6 +460,32 @@
     fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
       .then(function(d){ render(d && d.user ? d.user : null); }).catch(function(){ render(null); });
   })();
+
+  /* Bouton "☰ Menu" du bandeau, réactivé sur cette page le 2026-08-30 (demande explicite :
+     "ajoute le bouton menu également dans l'annuaire") — la règle CSS ci-dessus qui le masquait
+     sur desktop a été retirée, mais annuaire.html contient un vrai <aside id="sidebar"> (inclus
+     globalement, jamais destiné à s'afficher ici, volontairement masqué en permanence par cette
+     même règle CSS) : le module partagé (assets/app.js, initSidebarMobile) le détecte donc comme
+     "cette page a déjà un tiroir" et tente de l'ouvrir/fermer au lieu de rediriger vers le menu
+     complet du tableau de bord — sans effet visible puisque ce tiroir reste caché. On attend que
+     ce module ait fini de s'initialiser (même événement DOMContentLoaded, enregistré après lui
+     donc exécuté après), puis on clone le bouton pour retirer son gestionnaire et le remplace par
+     le même comportement "redirection #da-menu" que sur les pages sans tiroir (ex. profil.html). */
+  document.addEventListener('DOMContentLoaded', function(){
+    var oldBtn = document.getElementById('sidebar-toggle');
+    if (!oldBtn) return;
+    var newBtn = oldBtn.cloneNode(true);
+    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+    newBtn.addEventListener('click', function(e){
+      e.preventDefault();
+      fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); })
+        .then(function(d){
+          var dash = {utilisateur:'dashboard-utilisateur.html', initiative:'dashboard-initiative.html', administrateur:'dashboard-administrateur.html', collectivite:'dashboard-collectivite.html'};
+          var dest = (d && d.user && dash[d.user.role]) || 'index.html';
+          window.location.href = dest + '#da-menu';
+        }).catch(function(){ window.location.href = 'index.html'; });
+    });
+  });
   </script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
