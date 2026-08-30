@@ -172,8 +172,16 @@ const TYPES = { startup:'🚀 Startup', pme:'🏢 PME', association:'🤝 Associ
 const TEXT_SECTIONS = {
   resume_executif: { projet:'Le projet en bref', probleme:'Le problème identifié', solution:'Notre solution', marche:'Le marché visé', besoins:'Besoins de financement', objectifs:'Objectifs' },
   presentation: { vision:'Vision', mission:'Mission', valeurs:'Valeurs', obj_court:'Objectifs à 12 mois', obj_moyen:'Objectifs à 1-3 ans', obj_long:'Objectifs à 3-5 ans', historique:'Historique du projet', motivations:"Motivations de l'équipe" },
-  probleme: { description:'Description du problème', pourquoi:'Causes', qui_concerne:'Qui est concerné', ampleur:'Ampleur', consequences:'Conséquences actuelles', pourquoi_pas_resolu:"Pourquoi ce problème n'est pas déjà résolu", preuves:'Preuves & indices' },
-  solution: { description:'Description de la solution', fonctionnement:'Fonctionnement', innovation:'Ce qui est innovant', avantages:'Avantages pour le client', valeur_ajoutee:'Valeur ajoutée', differenciants:'Facteurs différenciants' },
+  probleme: {
+    description:'Le problème', pourquoi:'Causes', qui_concerne:'Qui est concerné', ampleur:'Ampleur', consequences:'Conséquences actuelles', pourquoi_pas_resolu:"Pourquoi ce problème n'est pas déjà résolu", preuves:'Preuves & sources',
+    nb_personnes_concernees:'Nombre de personnes concernées', frequence_probleme:'Fréquence du problème', cout_probleme:'Coût du problème', solutions_existantes:'Solutions actuellement utilisées', cout_solutions_existantes:'Coût des solutions existantes', limites_solutions_existantes:'Limites des solutions existantes',
+    consequences_financieres:'Conséquences financières', consequences_sociales:'Conséquences sociales', consequences_environnementales:'Conséquences environnementales', resultats_entretiens_clients:"Résultats d'entretiens clients", nb_personnes_interrogees:'Nombre de personnes interrogées', resultats_enquetes:"Résultats d'enquêtes", temoignages_probleme:'Témoignages',
+  },
+  solution: {
+    description:'La solution', fonctionnement:'Fonctionnement', innovation:'Ce qui est innovant', avantages:'Avantages pour le client', valeur_ajoutee:'Valeur ajoutée', differenciants:'Facteurs différenciants',
+    niveau_developpement:'Niveau de développement', date_prototype:'Date du prototype', nb_tests:'Nombre de tests réalisés', nb_utilisateurs_test:'Utilisateurs testeurs', resultats_tests_solution:'Résultats des tests', taux_satisfaction:'Taux de satisfaction', ameliorations_prevues:'Améliorations prévues',
+    cout_developpement:'Coût de développement', cout_production:'Coût de production', certification_necessaire:'Certification nécessaire', reglementation_solution:'Réglementation applicable', propriete_intellectuelle_solution:'Propriété intellectuelle de la solution', risques_technologiques:'Risques technologiques', possibilite_reproduction:'Possibilité de reproduction par un concurrent', ce_qui_empeche_copie:'Ce qui empêche la copie',
+  },
   marche: { taille_marche:'Taille du marché', evolution:'Évolution du marché', potentiel:'Potentiel visé', tendances:'Tendances', barrieres_entree:"Barrières à l'entrée", reglementation:'Réglementation applicable', profil_client:'Profil du client type', segmentation:'Segmentation', besoins_clients:'Besoins des clients', localisation_clients:'Localisation des clients', opportunites:'Opportunités', menaces_marche:'Menaces', positionnement:'Positionnement', avantage_concurrentiel:'Avantage concurrentiel' },
   strategie_marketing: { identite_marque:'Identité de marque', strategie_digitale:'Stratégie digitale', communication:'Communication', publicite:'Publicité', partenariats:'Partenariats marketing', evenements:'Événements', fidelisation:'Fidélisation' },
   plan_commercial: { objectifs_vente:'Objectifs de vente', prospection:'Prospection', tunnel_vente:'Tunnel de vente', politique_tarifaire:'Politique tarifaire', argumentaire:'Argumentaire commercial', sav:'Service après-vente', kpi_commerciaux:'Indicateurs suivis' },
@@ -184,7 +192,8 @@ const TEXT_SECTIONS = {
   financement: { montant:'Montant recherché', calendrier_decaissement:'Calendrier de décaissement', utilisation:'Utilisation des fonds', contreparties:'Contreparties proposées', roi:'Retour sur investissement estimé', strategie_sortie:'Stratégie de sortie', recherche_active:'Financeurs ciblés' },
 };
 
-const PF_RESSOURCES = { pf_apport:'Apport personnel', pf_associes:'Associés', pf_famille:'Famille & proches', pf_business_angels:'Business angels', pf_banque:'Prêt bancaire', pf_subvention:'Subvention', pf_investisseur:'Investisseur', pf_crowdfunding:'Crowdfunding', pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:'Autres ressources' };
+const NIVEAU_DEV_LABELS = { idee:'Idée', prototype:'Prototype', mvp:'MVP (version minimale testable)', commercialise:'Déjà commercialisé' };
+const PF_RESSOURCES ={ pf_apport:'Apport personnel', pf_associes:'Associés', pf_famille:'Famille & proches', pf_business_angels:'Business angels', pf_banque:'Prêt bancaire', pf_subvention:'Subvention', pf_investisseur:'Investisseur', pf_crowdfunding:'Crowdfunding', pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:'Autres ressources' };
 const PF_EMPLOIS = { pf_terrain:'Terrain', pf_construction:'Construction / aménagement', pf_materiel:'Matériel', pf_vehicules:'Véhicules', pf_logiciels:'Logiciels & outils', pf_stocks:'Stock initial', pf_tresorerie:'Trésorerie de départ', pf_frais_admin:'Frais administratifs', pf_communication:'Communication', pf_recrutement:'Recrutement' };
 const CR_LIGNES = { ca:"Chiffre d'affaires", autres_produits:'Autres produits', achats:'Achats & charges variables', salaires:'Salaires & charges', loyers:'Loyers', marketing_charge:'Marketing', autres_charges:'Autres charges' };
 
@@ -393,6 +402,7 @@ async function init(){
     else if (meta.key === 'plan_financier') content = renderPlanFinancier(data);
     else if (meta.key === 'risques') content = renderRisques(data.items);
     else if (meta.key === 'annexes') content = renderAnnexes(data.items);
+    else if (meta.key === 'solution') content = renderFieldGrid({ ...data, niveau_developpement: NIVEAU_DEV_LABELS[data.niveau_developpement] || data.niveau_developpement }, TEXT_SECTIONS.solution);
     else if (TEXT_SECTIONS[meta.key]) content = renderFieldGrid(data, TEXT_SECTIONS[meta.key]);
     return buildSection(meta, content);
   });

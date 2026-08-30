@@ -520,20 +520,54 @@ const HELP = {
   'historique':"Comment le projet est né et ce qui s'est passé jusqu'à aujourd'hui.",
   'motivations':"Pourquoi vous (et votre équipe) avez décidé de lancer ce projet précis.",
   // Analyse du problème
-  'presentation|description':"Décrivez le problème que rencontrent vos futurs clients avec vos mots à vous, simplement.",
+  /* Clés corrigées le 2026-08-31 : 'presentation|description' et 'produits|description' ne
+     correspondaient à aucune section réelle (currentSection vaut 'probleme'/'solution', jamais
+     'presentation'/'produits') -- l'infobulle du champ "description" de ces deux sections ne
+     s'affichait donc jamais. Voir helpText() : HELP[currentSection+'|'+key] puis HELP[key]. */
+  'probleme|description':"Décrivez le problème que rencontrent vos futurs clients avec vos mots à vous, simplement.",
   'pourquoi':"Selon vous, quelle est la cause de ce problème ?",
   'qui_concerne':"Qui souffre de ce problème : quel type de personnes, dans quelle situation ?",
   'ampleur':"Ce problème touche-t-il beaucoup de monde ? Est-il fréquent, grave, coûteux ?",
   'consequences':"Que se passe-t-il aujourd'hui, concrètement, à cause de ce problème non résolu ?",
   'pourquoi_pas_resolu':"Pourquoi personne (ou pas assez) ne résout déjà ce problème correctement ?",
   'preuves':"Avez-vous des chiffres, témoignages ou exemples qui montrent que ce problème est réel ?",
+  // Analyse du problème — validation quantifiée (2026-08-31)
+  'nb_personnes_concernees':"Une estimation chiffrée du nombre de personnes ou d'entreprises touchées par ce problème.",
+  'frequence_probleme':"À quelle fréquence ce problème se présente-t-il pour une personne concernée (quotidien, occasionnel, ponctuel...) ?",
+  'cout_probleme':"Ce que ce problème coûte aujourd'hui à une personne concernée (argent, temps, opportunités perdues...).",
+  'consequences_financieres':"Les pertes d'argent concrètes causées par ce problème non résolu.",
+  'consequences_sociales':"Les effets sur les personnes, les familles, la communauté.",
+  'consequences_environnementales':"Les effets sur l'environnement, s'il y en a.",
+  'solutions_existantes':"Comment les gens font aujourd'hui pour contourner ce problème, faute de mieux.",
+  'cout_solutions_existantes':"Ce que coûtent ces solutions de contournement actuelles.",
+  'limites_solutions_existantes':"Pourquoi ces solutions actuelles ne résolvent pas vraiment le problème.",
+  'resultats_entretiens_clients':"Ce que vous avez appris en parlant directement à des personnes concernées.",
+  'nb_personnes_interrogees':"Le nombre de personnes que vous avez réellement interrogées sur ce sujet.",
+  'resultats_enquetes':"Les résultats chiffrés d'un questionnaire ou d'une enquête que vous auriez menée.",
+  'temoignages_probleme':"Des citations ou témoignages de personnes décrivant ce problème dans leurs mots.",
   // Solution proposée
-  'produits|description':"Décrivez simplement ce que vous vendez ou proposez : à quoi ça ressemble, à quoi ça sert.",
+  'solution|description':"Décrivez simplement ce que vous vendez ou proposez : à quoi ça ressemble, à quoi ça sert.",
   'fonctionnement':"Expliquez étape par étape comment le client utilise votre produit ou service.",
   'innovation':"Qu'est-ce qui rend votre solution nouvelle ou différente de ce qui existe déjà ?",
   'avantages':"Qu'est-ce que le client gagne concrètement en utilisant votre solution (temps, argent, confort...) ?",
   'valeur_ajoutee':"En quoi votre solution apporte-t-elle plus qu'une solution basique ou existante ?",
   'differenciants':"Les 2-3 points qui vous distinguent clairement de vos concurrents.",
+  // Solution proposée — maturité & protection (2026-08-31)
+  'niveau_developpement':"Où en est concrètement votre solution aujourd'hui : simple idée, prototype, MVP testé, ou déjà commercialisée ?",
+  'date_prototype':"La date à laquelle votre premier prototype ou MVP a été réalisé (ou est prévu).",
+  'nb_tests':"Le nombre de fois où vous avez testé votre solution auprès de vrais utilisateurs.",
+  'nb_utilisateurs_test':"Le nombre de personnes différentes ayant testé votre solution.",
+  'resultats_tests_solution':"Ce que ces tests ont montré : ce qui marche, ce qui a été ajusté.",
+  'taux_satisfaction':"Le pourcentage d'utilisateurs testeurs satisfaits, si vous l'avez mesuré.",
+  'ameliorations_prevues':"Les évolutions déjà prévues pour la prochaine version de votre solution.",
+  'cout_developpement':"Ce qu'a coûté (ou coûtera) le développement de votre solution jusqu'à sa version actuelle.",
+  'cout_production':"Le coût pour produire ou délivrer une unité de votre solution.",
+  'certification_necessaire':"Les certifications ou homologations nécessaires avant de pouvoir vendre votre solution.",
+  'reglementation_solution':"Les lois ou normes spécifiques qui encadrent votre solution elle-même (au-delà de la réglementation générale du marché).",
+  'propriete_intellectuelle_solution':"Comment votre solution elle-même est protégée : brevet déposé, secret de fabrication, marque...",
+  'risques_technologiques':"Les risques liés à la technologie utilisée (fiabilité, dépendance à un fournisseur technique, obsolescence...).",
+  'possibilite_reproduction':"À quel point il serait facile ou difficile pour un concurrent de copier votre solution rapidement.",
+  'ce_qui_empeche_copie':"Qu'est-ce qui empêcherait concrètement un concurrent de reproduire facilement votre solution ?",
   // Étude de marché
   'taille_marche':"Une estimation du nombre de clients potentiels ou du volume d'argent dépensé sur ce marché.",
   'evolution':"Ce marché est-il en train de grandir, de stagner ou de diminuer ?",
@@ -1263,6 +1297,23 @@ function renderProbleme() {
       ${textarea('pourquoi_pas_resolu','Pourquoi n\'a-t-il pas encore été résolu ?','Barrières existantes, tentatives échouées…',3,true)}
       ${textarea('preuves','Preuves & Sources','Études, articles, rapports, statistiques…',3,true)}
     </div></div>
+    <div class="bp-card-inner bp-niveau-2"><h3>Ampleur chiffrée</h3><div class="fg">
+      ${field('nb_personnes_concernees','Nombre de personnes concernées','Ex : 12 000',   'number')}
+      ${field('frequence_probleme','Fréquence du problème','Ex : quotidien, une fois par mois…')}
+      ${field('cout_probleme','Coût du problème pour une personne concernée','Ex : 40 € par mois, 3h perdues par semaine…')}
+      ${textarea('solutions_existantes','Solutions actuellement utilisées','Comment les gens font aujourd\'hui, faute de mieux…',3,true)}
+      ${field('cout_solutions_existantes','Coût de ces solutions actuelles','')}
+      ${textarea('limites_solutions_existantes','Limites de ces solutions existantes','Pourquoi elles ne résolvent pas vraiment le problème…',3,true)}
+    </div></div>
+    <div class="bp-card-inner bp-niveau-3"><h3>Conséquences détaillées & preuves de terrain</h3><div class="fg">
+      ${textarea('consequences_financieres','Conséquences financières','Pertes d\'argent concrètes causées par ce problème…',3,true)}
+      ${textarea('consequences_sociales','Conséquences sociales','Effets sur les personnes, les familles, la communauté…',3,true)}
+      ${textarea('consequences_environnementales','Conséquences environnementales','',3,true)}
+      ${textarea('resultats_entretiens_clients','Résultats d\'entretiens clients','Ce que vous avez appris en parlant directement à des personnes concernées…',3,true)}
+      ${field('nb_personnes_interrogees','Nombre de personnes interrogées','','number')}
+      ${textarea('resultats_enquetes','Résultats d\'enquêtes','Chiffres d\'un questionnaire ou d\'une enquête menée…',3,true)}
+      ${textarea('temoignages_probleme','Témoignages','Citations de personnes décrivant ce problème dans leurs mots…',3,true)}
+    </div></div>
   </div>`;
 }
 
@@ -1277,6 +1328,25 @@ function renderSolution() {
       ${textarea('avantages','Avantages pour l\'utilisateur','Bénéfices concrets…',3,true)}
       ${textarea('valeur_ajoutee','Valeur ajoutée','Ce que vous apportez en plus…',3,true)}
       ${textarea('differenciants','Éléments différenciants','Ce qui vous rend unique face à la concurrence…',3,true)}
+    </div></div>
+    <div class="bp-card-inner bp-niveau-2"><h3>Maturité & tests</h3><div class="fg">
+      ${select('niveau_developpement','Niveau actuel de développement',[{v:'idee',l:'Idée'},{v:'prototype',l:'Prototype'},{v:'mvp',l:'MVP (version minimale testable)'},{v:'commercialise',l:'Déjà commercialisé'}])}
+      ${field('date_prototype','Date du prototype (réalisée ou prévue)','','date')}
+      ${field('nb_tests','Nombre de tests réalisés','','number')}
+      ${field('nb_utilisateurs_test','Nombre d\'utilisateurs testeurs','','number')}
+      ${textarea('resultats_tests_solution','Résultats des tests','Ce que ces tests ont montré…',3,true)}
+      ${field('taux_satisfaction','Taux de satisfaction des testeurs','Ex : 85%')}
+      ${textarea('ameliorations_prevues','Améliorations prévues','',3,true)}
+    </div></div>
+    <div class="bp-card-inner bp-niveau-3"><h3>Coûts, protection & risques</h3><div class="fg">
+      ${field('cout_developpement','Coût de développement','')}
+      ${field('cout_production','Coût de production (par unité)','')}
+      ${field('certification_necessaire','Certification nécessaire','')}
+      ${textarea('reglementation_solution','Réglementation applicable à la solution','',2,true)}
+      ${textarea('propriete_intellectuelle_solution','Propriété intellectuelle de la solution','Brevet déposé, secret de fabrication, marque…',2,true)}
+      ${textarea('risques_technologiques','Risques technologiques','',2,true)}
+      ${textarea('possibilite_reproduction','Possibilité de reproduction par un concurrent','',2,true)}
+      ${textarea('ce_qui_empeche_copie','Qu\'est-ce qui empêcherait un concurrent de reproduire facilement votre solution ?','',3,true)}
     </div></div>
   </div>`;
 }
