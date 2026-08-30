@@ -1508,9 +1508,23 @@ async function renderEnrichedColumns() {
          intégral plutôt que de tout déverser d'un coup dans la bulle de discussion. */
       const texteLong = profil.structure_description || profil.bio;
       if (texteLong) {
-        const premierePhrase = texteLong.split(/(?<=[.!?])\s|\n/)[0].trim();
-        const resume = premierePhrase.length > 180 ? premierePhrase.slice(0, 177) + '…' : premierePhrase;
-        const tronque = resume.length < texteLong.trim().length;
+        /* Corrigé le 2026-08-30 (constaté en prod : « L'EQUIPE IT » tout seul, réponse
+           inexploitable) — un simple saut de ligne juste après le nom de la structure (mise en
+           forme fréquente : nom sur sa propre ligne, puis le paragraphe) était traité comme une
+           fin de phrase. Les sauts de ligne sont d'abord aplatis en espaces, la coupure ne se
+           fait plus que sur une vraie ponctuation de fin de phrase ; un premier fragment trop
+           court (probablement juste un nom/titre) est complété par la phrase suivante. */
+        const texteAplati = texteLong.replace(/\s*\n+\s*/g, ' ').trim();
+        const phrases = texteAplati.split(/(?<=[.!?])\s+/).filter(Boolean);
+        let resume = '';
+        for (const p of phrases) {
+          const suivant = resume ? resume + ' ' + p : p;
+          if (resume && suivant.length > 180) break;
+          resume = suivant;
+          if (resume.length >= 30) break; // assez d'information pour être utile
+        }
+        if (resume.length > 180) resume = resume.slice(0, 177) + '…';
+        const tronque = resume.length < texteAplati.length;
         return resume + (tronque ? ` <a href="#pv-presentation" style="color:var(--tp);font-weight:700;">En savoir plus →</a>` : '');
       }
       return profil.titre_pro || `${nomComplet}${profil.titre_pro ? ', ' + profil.titre_pro : ''}.`;
