@@ -1502,7 +1502,18 @@ async function renderEnrichedColumns() {
        le 2026-08-30 côté serveur), jamais de la bio PERSONNELLE du responsable qui répond
        souvent mal ou vide à "que fait cette entreprise". */
     if (has('qui', 'presentation', 'bio', 'parcours', 'faites', 'fait')) {
-      return profil.structure_description || profil.bio || profil.titre_pro || `${nomComplet}${profil.titre_pro ? ', ' + profil.titre_pro : ''}.`;
+      /* Résumé, pas le texte entier (demande explicite du 2026-08-30 : "trop d'information,
+         donne uniquement ce qui est demandé") — la description complète peut faire plusieurs
+         phrases/paragraphes ; on ne garde que la première phrase, avec un lien vers le texte
+         intégral plutôt que de tout déverser d'un coup dans la bulle de discussion. */
+      const texteLong = profil.structure_description || profil.bio;
+      if (texteLong) {
+        const premierePhrase = texteLong.split(/(?<=[.!?])\s|\n/)[0].trim();
+        const resume = premierePhrase.length > 180 ? premierePhrase.slice(0, 177) + '…' : premierePhrase;
+        const tronque = resume.length < texteLong.trim().length;
+        return resume + (tronque ? ` <a href="#pv-presentation" style="color:var(--tp);font-weight:700;">En savoir plus →</a>` : '');
+      }
+      return profil.titre_pro || `${nomComplet}${profil.titre_pro ? ', ' + profil.titre_pro : ''}.`;
     }
     if (has('competence', 'savoir', 'expertise', 'skill')) {
       const c = (profil.competences || []).map(x => typeof x === 'string' ? x : (x.nom || x.label)).filter(Boolean);
