@@ -611,4 +611,50 @@ function emailConfirmationParticipationCagnotte({ email, prenom, cagnotteTitre, 
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte };
+/* Accès accordé à une cagnotte PRIVÉE (liste "Participants autorisés", distincte de
+   l'invitation à contribuer ci-dessus) — 2026-08-30, signalé par l'utilisateur : ajouter un
+   e-mail à cette liste ne prévenait jamais son destinataire par e-mail, seulement par
+   notification in-app (creerNotif), donc jamais vu par quelqu'un qui n'a pas encore de
+   compte — exactement le cas d'usage de cette liste. Même gabarit visuel que
+   emailInvitationCagnotte (accent orange, module Cagnotte), message différent : accès à une
+   cagnotte réservée, pas une sollicitation à contribuer. */
+function emailAccesCagnottePrivee({ email, cagnotteTitre, createurNom, lien }) {
+  return sendEmail({
+    to: email,
+    subject: `${createurNom} vous donne accès à la cagnotte privée « ${cagnotteTitre} » — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FFF7ED;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(242,100,34,.12);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:21px;font-weight:900;color:#0D1B2A;">🔒 ${createurNom} vous donne accès</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 4px;">à la cagnotte privée</p>
+      <p style="color:#0D1B2A;font-weight:800;font-size:17px;margin:0 0 16px;">« ${cagnotteTitre} »</p>
+      <p style="color:#475569;line-height:1.7;margin:0 0 20px;">
+        Cette cagnotte est réservée aux personnes autorisées. Vous en faites désormais partie.
+      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${lien}" style="display:inline-block;background:linear-gradient(135deg,#F26422,#c2410c);color:#fff;text-decoration:none;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;box-shadow:0 4px 16px rgba(242,100,34,.3);">
+          Accéder à la cagnotte →
+        </a>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+        Si vous ne connaissez pas ${createurNom}, vous pouvez ignorer cet e-mail.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee };

@@ -17587,11 +17587,18 @@ route("GET", "/api/cagnottes/:id/participants", async (req, res, params) => {
   sendJSON(res, 200, { participants: rows });
 });
 
-/* POST /api/cagnottes/:id/participants — ajoute un participant autorisé par e-mail (compte existant ou non). */
+/* POST /api/cagnottes/:id/participants — ajoute un participant autorisé par e-mail (compte existant ou non).
+   E-mail réel ajouté le 2026-08-30 (signalé par l'utilisateur : "je rentre les adresses mail...
+   ils ne le reçoivent pas par mail") — jusque-là, seule une notification in-app (creerNotif)
+   était posée, et seulement si l'e-mail correspondait à un compte déjà existant. Une personne
+   sans compte — cas d'usage évident de cette liste — n'était donc jamais prévenue d'aucune
+   façon. Même gabarit de lien que POST /api/cagnottes/:id/inviter (cagnotte.html?slug=...),
+   sans le paramètre "invitation=" propre à cette autre route (ici, pas de token d'invitation à
+   contribuer — juste un accès déjà accordé). */
 route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  const c = await db.prepare("SELECT owner_user_id, titre, slug FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   if (!(await exigerPremium(user, res, "cagnottes"))) return;
@@ -17603,6 +17610,14 @@ route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) 
   const id = (await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email) VALUES (?,?,?)")
     .run(params.id, compte ? compte.id : null, email)).lastInsertRowid;
   if (compte) creerNotif(compte.id, "cagnotte_invitation", "Invitation à une cagnotte privée", "Vous avez été ajouté(e) comme participant autorisé à une cagnotte privée.", { cagnotte_id: Number(params.id) });
+
+  const origin = getOrigin(req);
+  const lien = `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}`;
+  const { emailAccesCagnottePrivee } = require("./mailer");
+  emailAccesCagnottePrivee({
+    email, cagnotteTitre: c.titre, createurNom: user.nom || "Un membre de Diaspo'Actif", lien,
+  }).catch(e => console.error("[cagnotte-participants] envoi e-mail:", e.message));
+
   sendJSON(res, 201, { id });
 });
 
