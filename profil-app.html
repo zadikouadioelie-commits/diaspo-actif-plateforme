@@ -2750,12 +2750,11 @@ async function renderVitrineVisitor(init) {
     ${banniere ? `<img loading="lazy" src="${esc(banniere)}" alt="">` : ''}
     <div class="pvt-hero-overlay"></div>
     <div class="pvt-hero-content">
-      <!-- Nom de l'initiative retiré du survol de la bannière (demande explicite du 2026-08-30 :
-           "ça parasite l'affiche de la bannière") — la bannière contient déjà souvent son propre
-           nom/logo intégré à l'image (cas d'une affiche/poster déjà designée), un second nom
-           surimposé en plus faisait doublon. Le nom reste affiché ailleurs sur la page (titre,
-           carte de profil). -->
-      ${slogan ? `<div class="pvt-hero-sub">${slogan}</div>` : ''}
+      <!-- Nom ET slogan retirés du survol de la bannière (demande explicite du 2026-08-30 :
+           "ça parasite l'affiche de la bannière" puis "retire complètement l'inscription") —
+           la bannière contient déjà souvent son propre texte intégré à l'image (cas d'une
+           affiche/poster déjà designée), un texte surimposé en plus faisait doublon. Le nom et
+           la présentation restent affichés ailleurs sur la page (titre, section Présentation). -->
       ${(catalogues.length || produits.length) ? `<a href="${catalogues.length?'#pv-collections':'#pv-produits'}" class="pvt-hero-cta">VOIR NOS PRODUITS</a>` : ''}
     </div>
     ${isOwn ? `<button onclick="editVitrineBanner()" style="position:absolute;top:14px;right:14px;z-index:5;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;">📷 ${banniere?'Changer':'Ajouter'} la bannière</button>` : ''}
