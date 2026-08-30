@@ -2407,10 +2407,16 @@ async function renderVitrineCols() {
         ${prixMin != null ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:18px;font-weight:800;">${prixMin}<span style="font-size:11px;">${esc2(devise)}</span></div><div style="font-size:10px;color:var(--muted);">À partir de</div></div>` : ''}
       </div>
     </div>
-    ${avis && avis.moyenne ? `<div class="pp-side-card">
+    ${avis ? `<div class="pp-side-card">
       <h4>⭐ Avis clients</h4>
-      <div style="font-size:20px;font-weight:800;color:#f59e0b;">${'★'.repeat(Math.round(avis.moyenne))}${'☆'.repeat(5 - Math.round(avis.moyenne))} <span style="color:var(--text);font-size:15px;">${avis.moyenne}/5</span></div>
-      <div style="font-size:12px;color:var(--muted);">Basé sur ${avis.total} avis</div>
+      <div style="font-size:20px;font-weight:800;color:#f59e0b;">${'★'.repeat(Math.round(Number(avis.moyenne)||0))}${'☆'.repeat(5 - Math.round(Number(avis.moyenne)||0))} <span style="color:var(--text);font-size:15px;">${(Number(avis.moyenne)||0).toFixed(1)}/5</span></div>
+      <div style="font-size:12px;color:var(--muted);">Basé sur ${avis.total||0} avis</div>
+      <!-- Bouton ajouté le 2026-08-30 (demande explicite) : ce cartouche-résumé n'offrait
+           jusqu'ici aucune action, contrairement aux autres colonnes de la boutique — même
+           logique canReview/pvtWriteAvis que la vraie section "Avis" (onglet), pour ne pas
+           dupliquer les règles d'éligibilité (pas le propriétaire, connecté). -->
+      ${!isOwn && CU ? `<button onclick="pvtWriteAvis(${_vitrineInit.id})" style="margin-top:10px;width:100%;font-size:12.5px;font-weight:700;color:#fff;background:var(--v1,#8E1B2E);border:none;border-radius:8px;padding:8px;cursor:pointer;">✍️ Laisser un avis</button>`
+        : (!CU ? `<a href="login.html" style="display:block;margin-top:10px;text-align:center;font-size:12px;color:var(--v1,#8E1B2E);">Connectez-vous pour laisser un avis</a>` : '')}
     </div>` : ''}
     <div class="pp-side-card">
       <h4>🔒 Acheter en confiance</h4>
