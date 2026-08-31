@@ -745,6 +745,7 @@ const HELP = {
   'utilisation':"Ce que vous allez faire concrètement avec l'argent obtenu.",
   'contreparties':"Ce que vous proposez en échange à la personne qui vous finance (parts, intérêts, avantages...).",
   'roi':"Ce que le financeur peut espérer gagner en retour de son investissement.",
+  'roi_sortie':"Le gain attendu spécifiquement au moment de la sortie envisagée (IRR, multiple, durée) — distinct du ROI général, propre au scénario de sortie choisi.",
   'strategie_sortie':"Comment un investisseur pourrait récupérer sa mise à terme (revente, rachat...).",
   'recherche_active':"Les banques, investisseurs ou organismes que vous ciblez activement.",
   // Annexes
@@ -3499,7 +3500,7 @@ function renderFinancement() {
       ${textarea('scenario_revente','Scénario revente','',2,true)}
       ${textarea('scenario_dividendes','Scénario dividendes','',2,true)}
       ${textarea('scenario_croissance_long_terme','Scénario croissance long terme','',2,true)}
-      ${textarea('roi','Retour sur investissement attendu','Pour les investisseurs : IRR, multiple, durée…',3,true)}
+      ${textarea('roi_sortie','Retour sur investissement attendu à la sortie','IRR, multiple, durée jusqu\'à la sortie envisagée…',3,true)}
       ${textarea('strategie_sortie','Stratégie de sortie (résumé)','Rachat, introduction en bourse, remboursement…',3,true)}
     </div></div>
   </div>`;
@@ -3709,6 +3710,98 @@ async function bpSupprimerDocumentBiblio(docId) {
 }
 
 /* ---- 21. Complétude ---- */
+/* ── Alertes de cohérence (2026-08-31, point 27 du cahier des charges "Évolution du module
+   Business Plan") ──
+   Distinct du Business Plan Defender ci-dessous : le Defender est une analyse À LA DEMANDE qui
+   pose des questions narratives (moteur de règles qualitatif) ; ceci est un contrôle
+   ARITHMÉTIQUE pur, recalculé automatiquement à chaque ouverture de cette page à partir des
+   données déjà chargées en mémoire (`sections`) -- jamais un appel serveur, jamais persisté.
+   Chaque alerte est explicable : elle affiche toujours les deux valeurs comparées, jamais un
+   simple "incohérence détectée" sans preuve à l'appui. */
+function bpDetecterIncoherences() {
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+  const fmt = n => n === null ? '—' : Math.round(n).toLocaleString('fr-FR');
+  const alertes = [];
+
+  const fin = sections.plan_financier || {};
+  const commercial = sections.plan_commercial || {};
+  const financement = sections.financement || {};
+  const etudePrix = sections.produits?.etude_prix || [];
+
+  const ca1 = num(fin.ca_1);
+  const contratsFunnel = num(commercial.nb_contrats_funnel);
+  const panierMoyen = num(commercial.panier_moyen_commercial);
+
+  // 1. CA prévisionnel très supérieur à ce que peut raisonnablement produire le funnel commercial
+  if (ca1 !== null && ca1 > 0 && contratsFunnel !== null && contratsFunnel > 0 && panierMoyen !== null && panierMoyen > 0) {
+    const caFunnelMax = contratsFunnel * panierMoyen * 12;
+    if (ca1 > caFunnelMax * 3) {
+      alertes.push({ titre: 'Chiffre d\'affaires très supérieur à la capacité commerciale déclarée',
+        detail: `CA An 1 saisi : ${fmt(ca1)}. Capacité suggérée par le funnel (${contratsFunnel} contrats × ${fmt(panierMoyen)} × 12 mois) : environ ${fmt(caFunnelMax)}.`,
+        cible: 'plan_commercial' });
+    } else if (ca1 * 3 < contratsFunnel * panierMoyen) {
+      alertes.push({ titre: 'Chiffre d\'affaires très inférieur à ce que suggèrent les contrats et le panier moyen',
+        detail: `${contratsFunnel} contrats × ${fmt(panierMoyen)} de panier moyen = ${fmt(contratsFunnel*panierMoyen)}, largement supérieur au CA An 1 saisi (${fmt(ca1)}).`,
+        cible: 'plan_commercial' });
+    }
+  }
+
+  // 2. Marge déclarée (étude de prix) vs marge réellement calculée sur le compte de résultat An 1
+  if (ca1 !== null && ca1 > 0) {
+    const margeCalculee = ((ca1 - (num(fin.achats_1)||0)) / ca1) * 100;
+    etudePrix.forEach(e => {
+      const margeDeclaree = num(e.marge_souhaitee);
+      if (margeDeclaree !== null && Math.abs(margeDeclaree - margeCalculee) > 20) {
+        alertes.push({ titre: `Marge déclarée sur « ${e.produit || 'un produit'} » très différente de la marge calculée`,
+          detail: `Marge souhaitée saisie : ${margeDeclaree}%. Marge brute calculée sur le compte de résultat An 1 (CA − achats) / CA : ${margeCalculee.toFixed(1)}%.`,
+          cible: 'produits' });
+      }
+    });
+  }
+
+  // 3. Montant de financement recherché vs besoin réel (investissement initial, éventuellement + BFR si saisi en nombre)
+  const montantRecherche = num(financement.montant);
+  const investissement = num(fin.investissement_initial);
+  const bfrNum = num(fin.bfr);
+  if (montantRecherche !== null && investissement !== null && investissement > 0) {
+    const besoin = investissement + (bfrNum || 0);
+    if (montantRecherche < besoin * 0.9) {
+      alertes.push({ titre: 'Montant recherché inférieur au besoin identifié',
+        detail: `Montant recherché : ${fmt(montantRecherche)}. Investissement initial déclaré${bfrNum?' + BFR':''} : ${fmt(besoin)}.`,
+        cible: 'financement' });
+    }
+  }
+
+  // 4. Pourcentage de capital proposé vs dilution réellement calculée (montant / valorisation après)
+  const pctPropose = num(financement.pourcentage_propose);
+  const valorisationApres = num(financement.valorisation_apres);
+  if (pctPropose !== null && montantRecherche !== null && valorisationApres !== null && valorisationApres > 0) {
+    const dilutionCalculee = (montantRecherche / valorisationApres) * 100;
+    if (Math.abs(pctPropose - dilutionCalculee) > 5) {
+      alertes.push({ titre: 'Pourcentage de capital proposé incohérent avec la valorisation',
+        detail: `Pourcentage déclaré : ${pctPropose}%. Calculé (montant recherché / valorisation après) : ${dilutionCalculee.toFixed(1)}%.`,
+        cible: 'financement' });
+    }
+  }
+
+  return alertes;
+}
+
+function renderBPIncoherences() {
+  const alertes = bpDetecterIncoherences();
+  return `<div class="bp-card-inner">
+    <h3 style="margin:0 0 4px;">🚦 Alertes de cohérence</h3>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Contrôles arithmétiques automatiques et permanents, recalculés à chaque ouverture de cette page à partir des données déjà saisies.</p>
+    ${alertes.length ? `<div style="display:flex;flex-direction:column;gap:10px;">${alertes.map(a => `
+      <div style="border:1px solid #f5c67a;background:#fff8ec;border-radius:10px;padding:12px 14px;">
+        <div style="font-weight:700;font-size:13px;color:#92400e;">⚠️ ${esc(a.titre)}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">${esc(a.detail)}</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;font-size:11px;" onclick="navTo('${a.cible}')">Vérifier</button>
+      </div>`).join('')}</div>`
+      : `<div style="font-size:12.5px;color:#10b981;">✅ Aucune incohérence arithmétique détectée sur les données actuellement renseignées.</div>`}
+  </div>`;
+}
+
 function renderCompletude() {
   const completude = bp?.completude || [];
   const prog = bp?.progression || 0;
@@ -3724,6 +3817,7 @@ function renderCompletude() {
     <div class="bp-card-inner" id="bp-score-explicable">
       <div style="text-align:center;padding:20px;color:var(--muted);">Calcul du score en cours…</div>
     </div>
+    ${renderBPIncoherences()}
     <!-- Business Plan Defender (2026-08-31, point 29) : moteur de règles déterministe, pas un
          LLM (voir commentaire serveur analyserBPDefender) -- une liste de questions qu'un
          investisseur pourrait poser, à charge pour le porteur d'y répondre pour lui-même. -->
