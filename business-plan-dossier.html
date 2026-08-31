@@ -201,6 +201,22 @@ function onTemplateChange(key){
   if (DOSSIER_BP) renderDossier(DOSSIER_BP, key);
 }
 
+/* ---- Adaptation automatique au profil du projet ----
+   Même règle exacte que bpAppliquerConditionnels() dans l'éditeur (type_initiative + mots-clés
+   du secteur) : le générateur ne réinvente pas une seconde classification, il réutilise celle
+   que le porteur de projet a déjà vue s'appliquer à son questionnaire. Sert uniquement à
+   PRIORISER l'affichage de champs qui existent déjà dans le schéma (jamais un nouveau champ
+   inventé) -- une startup SaaS voit ses métriques d'usage remontées en KPI cards plutôt que
+   noyées dans du texte, une exploitation agricole voit sa capacité de production de même. */
+function classifyProfile(bp){
+  const type = bp.type_initiative || '', secteur = (bp.secteur||'').toLowerCase();
+  return {
+    numerique: ['startup','social'].includes(type) || /num[ée]rique|digital|app|logiciel|saas|web/.test(secteur),
+    association: ['association','ong'].includes(type),
+    agriculture: /agri|agro|ferme|élevage|elevage|maraîch|maraich/.test(secteur),
+  };
+}
+
 /* ---- Composants ---- */
 function kpi(label, value, note){ if (!has(value)) return ''; return `<div class="kpi"><p class="kl">${esc(label)}</p><p class="kv">${esc(value)}</p>${note?`<p class="kn">${esc(note)}</p>`:''}</div>`; }
 function kpiRow(items){ const cells = items.filter(([l,v]) => has(v)).map(([l,v,n]) => kpi(l,v,n)); if (!cells.length) return ''; const n = Math.min(cells.length,4); return `<div class="kpi-row n${n}">${cells.join('')}</div>`; }
@@ -492,7 +508,14 @@ function pageBMC(bp){
   const cells = [['partenaires','Partenaires clés','bmc-partenaires'],['activites','Activités clés','bmc-activites'],['proposition','Proposition de valeur','bmc-proposition value'],['relations','Relations clients','bmc-relations'],['segments','Segments de clientèle','bmc-segments'],['ressources','Ressources clés','bmc-ressources'],['canaux','Canaux','bmc-canaux'],['couts','Structure de coûts','bmc-couts'],['revenus','Sources de revenus','bmc-revenus']];
   if (!cells.some(([k])=>has(b[k]))) return '';
   const grid = `<div class="bmc-grid">${cells.map(([k,l,cls])=>`<div class="bmc-cell ${cls}"><h5>${esc(l)}</h5><p>${has(b[k])?esc(b[k]):'—'}</p></div>`).join('')}</div>`;
-  const ue = kpiRow([['Prix moyen', has(b.prix_moyen)?fmtEUR(b.prix_moyen):''],['CAC', has(b.cac)?fmtEUR(b.cac):''],['LTV', has(b.ltv)?fmtEUR(b.ltv):''],['Marge brute', pct(b.marge_brute_pct)]]);
+  const ueItems = [['Prix moyen', has(b.prix_moyen)?fmtEUR(b.prix_moyen):''],['CAC', has(b.cac)?fmtEUR(b.cac):''],['LTV', has(b.ltv)?fmtEUR(b.ltv):''],['Marge brute', pct(b.marge_brute_pct)]];
+  // Profil numérique/SaaS : les métriques d'usage priment sur le prix moyen classique --
+  // remontées ici plutôt que laissées dans le détail produit, en tête de la ligne de KPI.
+  if (classifyProfile(bp).numerique) {
+    const num = (((bp.sections||{}).produits||{}).capacite_exploitation||[]).find(c => has(c.utilisateurs_actifs)||has(c.arpu)||has(c.conversion_payant)||has(c.churn_numerique));
+    if (num) ueItems.unshift(...[['Utilisateurs actifs', num.utilisateurs_actifs],['ARPU', has(num.arpu)?fmtEUR(num.arpu):''],['Conversion payant', pct(num.conversion_payant)],['Churn', pct(num.churn_numerique)]].filter(([,v])=>has(v)));
+  }
+  const ue = kpiRow(ueItems);
   return page('bmc','',`
     ${chromeTop(bp,'Business Model')}
     <p class="eyebrow-tag">Business Model Canvas</p>
@@ -631,6 +654,18 @@ function pageGenerique(bp, key, label, eyebrow, headline){
     const f = [['nb_prospects_funnel','Prospects'],['nb_contacts_funnel','Contacts'],['nb_rdv_funnel','RDV'],['nb_propositions_funnel','Propositions'],['nb_contrats_funnel','Clients']].map(([k,l]) => [l, parseNum(data[k])]).filter(([,v]) => v!=null && v>=0);
     if (f.length >= 2) content = funnelDiagram(f) + content;
     const kpis = kpiRow([['CAC (via commercial)', data.ca_par_commercial],['Panier moyen', has(data.panier_moyen_commercial)?fmtEUR(data.panier_moyen_commercial):''],['Cycle de vente moyen', data.cycle_vente_moyen],['Objectif mensuel', has(data.objectif_mensuel_commercial)?fmtEUR(data.objectif_mensuel_commercial):'']]);
+    if (kpis) content = kpis + content;
+  }
+  // Profil agricole : la capacité de production prime sur le texte libre -- remontée en KPI
+  // cards plutôt que noyée dans le champ "Capacité actuelle" en prose.
+  if (key === 'plan_operationnel' && classifyProfile(bp).agriculture) {
+    const agri = (((bp.sections||{}).produits||{}).capacite_exploitation||[]).find(c => has(c.capacite_actuelle)||has(c.volume_actuel)||has(c.saisonnalite));
+    const kpis = kpiRow([
+      ['Capacité actuelle', data.capacite_actuelle_globale || agri?.capacite_actuelle],
+      ['Capacité maximale', data.capacite_maximale_globale || agri?.capacite_maximale],
+      ['Taux d\'utilisation', pct(data.taux_utilisation_op)],
+      ['Saisonnalité', agri?.saisonnalite],
+    ]);
     if (kpis) content = kpis + content;
   }
   if (key === 'annexes' && Array.isArray(data.items) && data.items.length) {
