@@ -2142,11 +2142,13 @@ function renderRH() {
       </div>
       <div id="postes-rh-list">${renderPostesRH(s.postes || [{ intitule:'' }])}</div>
       <div id="rh-masse-salariale" style="margin-top:10px;font-size:12.5px;color:var(--muted);"></div>
+      <div id="rh-projection" style="margin-top:12px;"></div>
     </div>
   </div>`;
 }
 function renderPostesRH(list) {
   setTimeout(bpCalcMasseSalariale, 0);
+  setTimeout(bpCalcProjectionRH, 0);
   return list.map((p,i) => `
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
@@ -2161,7 +2163,7 @@ function renderPostesRH(list) {
         <div><label>Salaire brut${helpIcon('poste_rh_salaire')}</label><input type="number" value="${esc(p.salaire_brut||'')}" oninput="updPosteRH(${i},'salaire_brut',this.value);bpCalcMasseSalariale()"></div>
         <div><label>Charges${helpIcon('poste_rh_charges')}</label><input type="number" value="${esc(p.charges||'')}" oninput="updPosteRH(${i},'charges',this.value);bpCalcMasseSalariale()"></div>
         <div><label>Coût total employeur${helpIcon('poste_rh_cout_total')}</label><input type="number" value="${esc(p.cout_total_employeur||'')}" oninput="updPosteRH(${i},'cout_total_employeur',this.value);bpCalcMasseSalariale()"></div>
-        <div><label>Date de recrutement${helpIcon('poste_rh_date')}</label><input type="date" value="${esc(p.date_recrutement||'')}" oninput="updPosteRH(${i},'date_recrutement',this.value)"></div>
+        <div><label>Date de recrutement${helpIcon('poste_rh_date')}</label><input type="date" value="${esc(p.date_recrutement||'')}" oninput="updPosteRH(${i},'date_recrutement',this.value);bpCalcProjectionRH()"></div>
         <div><label>Temps plein / partiel${helpIcon('poste_rh_temps')}</label><select onchange="updPosteRH(${i},'temps',this.value)">
           ${[['plein','Temps plein'],['partiel','Temps partiel']].map(([v,l])=>`<option value="${v}" ${p.temps===v?'selected':''}>${l}</option>`).join('')}
         </select></div>
@@ -2175,12 +2177,12 @@ function addPosteRH() {
   if (!sections.rh.postes) sections.rh.postes=[];
   sections.rh.postes.push({intitule:''});
   document.getElementById('postes-rh-list').innerHTML = renderPostesRH(sections.rh.postes);
-  markDirty();
+  markDirty(); bpCalcProjectionRH();
 }
 function removePosteRH(i) {
   sections.rh.postes.splice(i,1);
   document.getElementById('postes-rh-list').innerHTML = renderPostesRH(sections.rh.postes);
-  markDirty();
+  markDirty(); bpCalcProjectionRH();
 }
 function updPosteRH(i,key,val) {
   if (!sections.rh) sections.rh={};
@@ -2198,6 +2200,37 @@ function bpCalcMasseSalariale() {
   const postes = sections.rh?.postes || [];
   const total = postes.reduce((sum,p) => sum + (parseFloat(p.cout_total_employeur)||0) * (parseFloat(p.nb_personnes)||1), 0);
   el.textContent = total ? `💰 Masse salariale totale estimée : ${fmtEuro(total)} — à comparer avec "Salaires & charges" (Plan financier, An 1).` : '';
+}
+/* Projection RH automatique An 1 → An 5 (2026-08-31, point 15) : chaque poste entre dans le
+   calcul à partir de son année d'arrivée, déduite de sa date de recrutement -- l'année la plus
+   ancienne saisie sert de repère "Année 1" (un poste sans date est considéré actif dès l'Année
+   1). Les effectifs sont cumulés d'une année sur l'autre (on suppose qu'un poste pourvu reste
+   pourvu, faute d'une donnée de départ dans le module). */
+function bpCalcProjectionRH() {
+  const el = document.getElementById('rh-projection');
+  if (!el) return;
+  const postes = (sections.rh?.postes || []).filter(p => p.intitule);
+  if (!postes.length) { el.innerHTML = ''; return; }
+  const dates = postes.map(p => p.date_recrutement).filter(Boolean).sort();
+  const anneeRef = dates.length ? new Date(dates[0]).getFullYear() : null;
+  const anneeDuPoste = p => {
+    if (!p.date_recrutement || anneeRef === null) return 1;
+    const diff = new Date(p.date_recrutement).getFullYear() - anneeRef;
+    return Math.min(5, Math.max(1, diff + 1));
+  };
+  const parAnnee = { 1:{eff:0,cout:0}, 2:{eff:0,cout:0}, 3:{eff:0,cout:0}, 4:{eff:0,cout:0}, 5:{eff:0,cout:0} };
+  postes.forEach(p => {
+    const an = anneeDuPoste(p);
+    const nb = parseFloat(p.nb_personnes) || 1;
+    const cout = (parseFloat(p.cout_total_employeur) || 0) * nb;
+    for (let a = an; a <= 5; a++) { parAnnee[a].eff += nb; parAnnee[a].cout += cout; }
+  });
+  el.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">📈 Projection RH (cumulée, année d'entrée déduite de la date de recrutement)</div>
+    <div style="overflow-x:auto;"><table class="fin-table"><thead><tr><th>Poste</th>${[1,2,3,4,5].map(a=>`<th>Année ${a}</th>`).join('')}</tr></thead><tbody>
+      <tr><td>Effectif cumulé</td>${[1,2,3,4,5].map(a=>`<td>${parAnnee[a].eff||'—'}</td>`).join('')}</tr>
+      <tr><td>Masse salariale cumulée</td>${[1,2,3,4,5].map(a=>`<td>${parAnnee[a].cout?fmtEuro(parAnnee[a].cout):'—'}</td>`).join('')}</tr>
+    </tbody></table></div>`;
 }
 
 /* ---- 15. Calendrier (Gantt simplifié) ---- */
@@ -2362,7 +2395,9 @@ function renderFinancier() {
             <tr><td>Loyers & immobilier</td>${annees.map((_,i)=>`<td>${finInput('loyers',i+1)}</td>`).join('')}</tr>
             <tr><td>Marketing & comm.</td>${annees.map((_,i)=>`<td>${finInput('marketing_charge',i+1)}</td>`).join('')}</tr>
             <tr><td>Autres charges</td>${annees.map((_,i)=>`<td>${finInput('autres_charges',i+1)}</td>`).join('')}</tr>
-            <tr class="total-row" id="fin-resultat-row"><td>RÉSULTAT NET</td>${annees.map((_,i)=>`<td id="fin-res-${i+1}">—</td>`).join('')}</tr>
+            <tr style="color:var(--muted);"><td>+ Amortissements <span style="font-size:10.5px;">(calculé depuis les immobilisations ci-dessus, s'ajoute aux charges)</span></td>${annees.map((_,i)=>`<td id="fin-amort-${i+1}">—</td>`).join('')}</tr>
+            <tr style="color:var(--muted);"><td>+ Intérêts d'emprunt <span style="font-size:10.5px;">(calculé depuis les emprunts ci-dessus, s'ajoute aux charges)</span></td>${annees.map((_,i)=>`<td id="fin-interets-${i+1}">—</td>`).join('')}</tr>
+            <tr class="total-row" id="fin-resultat-row"><td>RÉSULTAT NET <span style="font-size:10.5px;font-weight:400;">(inclut amortissements + intérêts ci-dessus)</span></td>${annees.map((_,i)=>`<td id="fin-res-${i+1}">—</td>`).join('')}</tr>
           </tbody>
         </table>
       </div>
@@ -2484,19 +2519,19 @@ function addImmobilisation() {
   if (!sections.plan_financier.immobilisations_liste) sections.plan_financier.immobilisations_liste=[];
   sections.plan_financier.immobilisations_liste.push({nom:''});
   document.getElementById('immobilisations-list').innerHTML = renderImmobilisations(sections.plan_financier.immobilisations_liste);
-  markDirty();
+  markDirty(); calcFinRow();
 }
 function removeImmobilisation(i) {
   sections.plan_financier.immobilisations_liste.splice(i,1);
   document.getElementById('immobilisations-list').innerHTML = renderImmobilisations(sections.plan_financier.immobilisations_liste);
-  markDirty();
+  markDirty(); calcFinRow();
 }
 function updImmobilisation(i,key,val) {
   if (!sections.plan_financier) sections.plan_financier={};
   if (!sections.plan_financier.immobilisations_liste) sections.plan_financier.immobilisations_liste=[];
   if (!sections.plan_financier.immobilisations_liste[i]) sections.plan_financier.immobilisations_liste[i]={};
   sections.plan_financier.immobilisations_liste[i][key]=val;
-  markDirty();
+  markDirty(); calcFinRow();
 }
 
 /* ── Dette / Emprunts (répétable) ── */
@@ -2523,19 +2558,19 @@ function addDette() {
   if (!sections.plan_financier.dettes) sections.plan_financier.dettes=[];
   sections.plan_financier.dettes.push({nom:''});
   document.getElementById('dettes-list').innerHTML = renderDettes(sections.plan_financier.dettes);
-  markDirty();
+  markDirty(); calcFinRow();
 }
 function removeDette(i) {
   sections.plan_financier.dettes.splice(i,1);
   document.getElementById('dettes-list').innerHTML = renderDettes(sections.plan_financier.dettes);
-  markDirty();
+  markDirty(); calcFinRow();
 }
 function updDette(i,key,val) {
   if (!sections.plan_financier) sections.plan_financier={};
   if (!sections.plan_financier.dettes) sections.plan_financier.dettes=[];
   if (!sections.plan_financier.dettes[i]) sections.plan_financier.dettes[i]={};
   sections.plan_financier.dettes[i][key]=val;
-  markDirty();
+  markDirty(); calcFinRow();
 }
 
 /* ── Détail des charges fixes/variables (répétable) ── */
@@ -2588,13 +2623,50 @@ function ratioDot(value, seuilVert, seuilOrange, inverse) {
   else { if(value>=seuilVert) cls='green'; else if(value>=seuilOrange) cls='orange'; }
   return `<span class="ratio-dot ${cls}"></span>`;
 }
+/* Amortissements/intérêts reliés automatiquement au compte de résultat (2026-08-31, point 17).
+   Simplification assumée et documentée : un amortissement linéaire appliqué uniformément sur
+   les 5 années du plan (pas de calcul date d'achat par date d'achat), et des intérêts répartis
+   linéairement sur la durée de l'emprunt (pas un vrai tableau d'amortissement bancaire) --
+   suffisant pour une estimation de dossier, jamais présenté comme un calcul comptable certifié. */
+function bpCalcAmortissementAnnuel() {
+  const liste = sections.plan_financier?.immobilisations_liste || [];
+  return liste.reduce((total, im) => {
+    const duree = parseFloat(im.duree_amortissement);
+    if (!duree || duree <= 0) return total;
+    const base = (parseFloat(im.montant) || 0) - (parseFloat(im.valeur_residuelle) || 0);
+    return total + Math.max(0, base) / duree;
+  }, 0);
+}
+function bpCalcInteretsParAnnee() {
+  const liste = sections.plan_financier?.dettes || [];
+  const parAnnee = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+  liste.forEach(d => {
+    const dureeMois = parseFloat(d.duree);
+    if (!dureeMois || dureeMois <= 0) return;
+    const dureeAnnees = Math.min(5, Math.max(1, Math.ceil(dureeMois / 12)));
+    const montant = parseFloat(d.montant) || 0;
+    const mensualite = parseFloat(d.mensualite) || 0;
+    /* Coût total du crédit = ce qui est remboursé - ce qui est emprunté. Sans mensualité
+       saisie, on retombe sur une approximation à intérêts simples (montant × taux). */
+    const coutTotal = mensualite > 0 ? Math.max(0, mensualite * dureeMois - montant) : montant * ((parseFloat(d.taux) || 0) / 100) * (dureeMois / 12);
+    const interetAnnuel = coutTotal / dureeAnnees;
+    for (let an = 1; an <= dureeAnnees; an++) parAnnee[an] += interetAnnuel;
+  });
+  return parAnnee;
+}
 function calcFinRow() {
   const s = sections.plan_financier||{};
+  const amortAnnuel = bpCalcAmortissementAnnuel();
+  const interetsParAnnee = bpCalcInteretsParAnnee();
   for(let i=1;i<=5;i++){
     const ca=(parseFloat(s[`ca_${i}`])||0)+(parseFloat(s[`autres_produits_${i}`])||0);
+    const interets = interetsParAnnee[i] || 0;
     const charges=(parseFloat(s[`achats_${i}`])||0)+(parseFloat(s[`salaires_${i}`])||0)+
-      (parseFloat(s[`loyers_${i}`])||0)+(parseFloat(s[`marketing_charge_${i}`])||0)+(parseFloat(s[`autres_charges_${i}`])||0);
+      (parseFloat(s[`loyers_${i}`])||0)+(parseFloat(s[`marketing_charge_${i}`])||0)+(parseFloat(s[`autres_charges_${i}`])||0)+
+      amortAnnuel+interets;
     const res=ca-charges;
+    const elAmort=document.getElementById(`fin-amort-${i}`); if(elAmort) elAmort.textContent=fmtEuro(amortAnnuel);
+    const elInt=document.getElementById(`fin-interets-${i}`); if(elInt) elInt.textContent=fmtEuro(interets);
     const el=document.getElementById(`fin-res-${i}`);
     if(el){el.textContent=fmtEuro(res);el.style.color=res>=0?'#10b981':'#dc2626';}
   }
@@ -2632,7 +2704,10 @@ function calcRatios() {
   const ca1=(parseFloat(s.ca_1)||0)+(parseFloat(s.autres_produits_1)||0);
   const ca2=(parseFloat(s.ca_2)||0)+(parseFloat(s.autres_produits_2)||0);
   const achats1=parseFloat(s.achats_1)||0;
-  const charges1=achats1+(parseFloat(s.salaires_1)||0)+(parseFloat(s.loyers_1)||0)+(parseFloat(s.marketing_charge_1)||0)+(parseFloat(s.autres_charges_1)||0);
+  /* Amortissements + intérêts inclus ici aussi (2026-08-31) pour que le tableau de bord
+     reste cohérent avec le compte de résultat détaillé (calcFinRow), qui les intègre déjà. */
+  const chargesFinancieresAn1 = bpCalcAmortissementAnnuel() + (bpCalcInteretsParAnnee()[1] || 0);
+  const charges1=achats1+(parseFloat(s.salaires_1)||0)+(parseFloat(s.loyers_1)||0)+(parseFloat(s.marketing_charge_1)||0)+(parseFloat(s.autres_charges_1)||0)+chargesFinancieresAn1;
   const resultat1=ca1-charges1;
   const invest=parseFloat(s.investissement_initial)||0;
   const financement=parseFloat(s.financement_recherche)||0;
