@@ -275,6 +275,21 @@ body.bp-profondeur-professionnel .bp-niveau-3 { display: none; }
 body.bp-type-numerique .bp-conditionnel-numerique { display: block; }
 body.bp-type-association .bp-conditionnel-association { display: block; }
 body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
+
+/* Présentation visuelle (2026-08-31) — photo principale, galerie, vidéo de pitch */
+.bp-media-photo-zone{margin-bottom:12px;}
+.bp-media-photo-wrap{position:relative;border-radius:12px;overflow:hidden;max-width:420px;aspect-ratio:16/10;}
+.bp-media-photo-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
+.bp-media-photo-empty{max-width:420px;aspect-ratio:16/10;border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13.5px;font-weight:700;cursor:pointer;text-align:center;padding:16px;transition:all .15s;}
+.bp-media-photo-empty:hover{border-color:#2563EB;color:#2563EB;background:var(--surface2);}
+.bp-media-remove{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1;}
+.bp-media-remove.sm{width:20px;height:20px;font-size:11px;top:4px;right:4px;}
+.bp-media-galerie{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+.bp-media-thumb{position:relative;width:78px;height:78px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+.bp-media-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.bp-media-thumb-add{width:78px;height:78px;border-radius:8px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted);cursor:pointer;transition:all .15s;}
+.bp-media-thumb-add:hover{border-color:#2563EB;color:#2563EB;}
+.bp-media-video-wrap video{max-width:420px;width:100%;border-radius:12px;display:block;background:#000;}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -461,6 +476,7 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
+<script src="assets/upload-media.js"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -1000,10 +1016,166 @@ async function validerSection() {
    - Fiches détaillées par membre clé : vient COMPLÉTER equipe_fondatrice/organigramme
      (texte libre, conservé), pas les remplacer — certains porteurs préfèrent une description
      en prose, d'autres le détail structuré. */
+/* ── Présentation visuelle (2026-08-31) — photo principale, galerie, vidéo de pitch ──
+   Stockées comme colonnes dédiées de business_plans (pas dans sections_json) et réutilisées
+   partout où ce plan est affiché : carte de la liste, bannière de consultation, export final.
+   Chaque action (upload/suppression) appelle directement le serveur puis met à jour `bp` et
+   ne redessine que ce bloc, sans passer par updateField()/markDirty() (rien à sauvegarder :
+   déjà persisté côté serveur dès l'upload). */
+function renderBPMediaBlock() {
+  const photo = bp?.photo_principale_url;
+  const galerie = bp?.galerie || [];
+  const video = bp?.video_pitch_url;
+  const ro = monRole === 'lecteur';
+  return `<div class="bp-card-inner" id="bp-media-block">
+    <h3>🖼️ Présentation visuelle</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:-6px 0 12px;">Cette photo et cette vidéo sont réutilisées automatiquement partout où ce Business Plan est affiché (liste, consultation, export).</p>
+    <label style="display:block;font-size:12.5px;font-weight:700;margin-bottom:6px;">Photo principale</label>
+    <div class="bp-media-photo-zone">
+      ${photo
+        ? `<div class="bp-media-photo-wrap"><img src="${esc(photo)}" alt="">${!ro?`<button type="button" class="bp-media-remove" onclick="bpSupprimerPhotoPrincipale()" title="Retirer la photo">✕</button>`:''}</div>`
+        : `<div class="bp-media-photo-empty" ${!ro?'onclick="bpUploadPhotoPrincipale()"':''}>${ro?'Aucune photo':'📷 + Ajouter une photo principale'}</div>`}
+    </div>
+    <label style="display:block;font-size:12.5px;font-weight:700;margin:14px 0 6px;">Galerie (jusqu'à 6 photos)</label>
+    <div class="bp-media-galerie">
+      ${galerie.map(g => `<div class="bp-media-thumb"><img src="${esc(g)}" alt="">${!ro?`<button type="button" class="bp-media-remove sm" onclick="bpSupprimerGalerieImage('${esc(g).replace(/'/g,"\\'")}')" title="Retirer">✕</button>`:''}</div>`).join('')}
+      ${(!ro && galerie.length<6) ? `<div class="bp-media-thumb-add" onclick="bpUploadGalerie()" title="Ajouter une photo">+</div>` : ''}
+      ${(ro && !galerie.length) ? `<p style="font-size:12.5px;color:var(--muted);">Aucune photo dans la galerie.</p>` : ''}
+    </div>
+    <label style="display:block;font-size:12.5px;font-weight:700;margin:14px 0 6px;">🎬 Vidéo de présentation (2 minutes maximum)</label>
+    <div class="bp-media-video-zone">
+      ${video
+        ? `<div class="bp-media-video-wrap"><video src="${esc(video)}" controls></video>${!ro?`<button type="button" class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="bpSupprimerVideoPitch()">🗑 Retirer la vidéo</button>`:''}</div>`
+        : (!ro ? `<button type="button" class="btn btn-sm btn-outline" onclick="bpUploadVideoPitch()">+ Ajouter une vidéo de pitch</button>` : `<p style="font-size:12.5px;color:var(--muted);">Aucune vidéo.</p>`)}
+      <p id="bp-media-video-status" style="font-size:11.5px;color:var(--muted);margin-top:6px;"></p>
+    </div>
+  </div>`;
+}
+
+function bpRefreshMediaBlock() {
+  const el = document.getElementById('bp-media-block');
+  if (el) el.outerHTML = renderBPMediaBlock();
+}
+
+function bpPickFile(accept) {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.onchange = () => { const f = input.files[0]; document.body.removeChild(input); resolve(f || null); };
+    input.oncancel = () => { document.body.removeChild(input); resolve(null); };
+    input.click();
+  });
+}
+
+async function bpUploadMediaFile(kind, file) {
+  const fd = new FormData();
+  fd.append('type', kind);
+  fd.append('file', file, file.name || kind);
+  const res = await fetch(`${API_BASE}/business-plans/${bpId}/media`, { method: 'POST', body: fd, credentials: 'same-origin' });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `Erreur upload (${res.status})`); }
+  return (await res.json()).url;
+}
+
+async function bpUploadPhotoPrincipale() {
+  if (monRole === 'lecteur') return;
+  const file = await bpPickFile('image/jpeg,image/png,image/webp,image/gif');
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) { alert('Image trop volumineuse (max 8 Mo).'); return; }
+  try {
+    const compressed = await compressImageFile(file, 1200, 900, 0.85);
+    const url = await bpUploadMediaFile('photo_principale', compressed);
+    bp.photo_principale_url = url;
+    bpRefreshMediaBlock();
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function bpSupprimerPhotoPrincipale() {
+  if (!confirm('Retirer la photo principale ?')) return;
+  try {
+    await api('DELETE', `/business-plans/${bpId}/media?type=photo_principale`);
+    bp.photo_principale_url = null;
+    bpRefreshMediaBlock();
+  } catch (e) { alert(e.message); }
+}
+
+async function bpUploadGalerie() {
+  if (monRole === 'lecteur') return;
+  if ((bp.galerie || []).length >= 6) { alert('Maximum 6 images dans la galerie.'); return; }
+  const file = await bpPickFile('image/jpeg,image/png,image/webp,image/gif');
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) { alert('Image trop volumineuse (max 8 Mo).'); return; }
+  try {
+    const compressed = await compressImageFile(file, 800, 800, 0.85);
+    const url = await bpUploadMediaFile('galerie', compressed);
+    bp.galerie = [...(bp.galerie || []), url];
+    bpRefreshMediaBlock();
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function bpSupprimerGalerieImage(url) {
+  if (!confirm('Retirer cette image de la galerie ?')) return;
+  try {
+    await api('DELETE', `/business-plans/${bpId}/media?type=galerie&url=${encodeURIComponent(url)}`);
+    bp.galerie = (bp.galerie || []).filter(g => g !== url);
+    bpRefreshMediaBlock();
+  } catch (e) { alert(e.message); }
+}
+
+/* La durée réelle (≤2 min) n'est vérifiable qu'en décodant la vidéo — vérifiée ICI, dans le
+   navigateur, avant tout envoi (le serveur ne peut pas la mesurer sans ffprobe, absent de ce
+   serveur ; voir le commentaire de la route POST /api/business-plans/:id/media). */
+function bpLireDureeVideo(file) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(v.duration); };
+    v.onerror = () => { URL.revokeObjectURL(v.src); reject(new Error('Impossible de lire cette vidéo. Formats acceptés : MP4, WebM.')); };
+    v.src = URL.createObjectURL(file);
+  });
+}
+
+async function bpUploadVideoPitch() {
+  if (monRole === 'lecteur') return;
+  const file = await bpPickFile('video/mp4,video/webm');
+  if (!file) return;
+  const MAX_VIDEO_MO = 100;
+  if (file.size > MAX_VIDEO_MO * 1024 * 1024) { alert(`Vidéo trop volumineuse (max ${MAX_VIDEO_MO} Mo).`); return; }
+  const statusEl = document.getElementById('bp-media-video-status');
+  try {
+    if (statusEl) statusEl.textContent = 'Vérification de la durée…';
+    const duree = await bpLireDureeVideo(file);
+    if (duree > 120) {
+      alert(`Cette vidéo dure ${Math.round(duree)} secondes — 2 minutes (120 s) maximum.`);
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Envoi de la vidéo…';
+    const url = await bpUploadMediaFile('video_pitch', file);
+    bp.video_pitch_url = url;
+    bpRefreshMediaBlock();
+  } catch (e) {
+    alert('Erreur : ' + e.message);
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
+async function bpSupprimerVideoPitch() {
+  if (!confirm('Retirer la vidéo de pitch ?')) return;
+  try {
+    await api('DELETE', `/business-plans/${bpId}/media?type=video_pitch`);
+    bp.video_pitch_url = null;
+    bpRefreshMediaBlock();
+  } catch (e) { alert(e.message); }
+}
+
 function renderInfosGenerales() {
   const s = sections.infos_generales || {};
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🏷 Informations générales</h2><p>La carte d'identité de votre projet.</p></div>
+    ${renderBPMediaBlock()}
     <div class="bp-card-inner"><h3>Identité du projet</h3><div class="fg">
       ${field('nom_projet','Nom du projet','Mon projet…','text',false,true)}
       ${field('slogan','Slogan / Accroche','Une phrase qui résume tout…','text',false)}

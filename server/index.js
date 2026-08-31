@@ -36187,7 +36187,8 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
     JOIN bp_collaborateurs bc ON bc.bp_id=bp.id AND bc.user_id=?
     ORDER BY bp.updated_at DESC
   `).all(req.user.id);
-  sendJSON(res, 200, { mes_plans: rows, partages: collab });
+  const parseGalerie = list => list.map(bp => ({ ...bp, galerie: safeJSON(bp.galerie_json, []) }));
+  sendJSON(res, 200, { mes_plans: parseGalerie(rows), partages: parseGalerie(collab) });
 });
 
 /* ---- Créer un business plan ---- */
@@ -36213,7 +36214,7 @@ app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
   const sections = safeJSON(bp.sections_json, {});
   const completude = await checkBPCompletude(sections);
   const progression = await calcBPProgression(sections);
-  sendJSON(res, 200, { ...bp, sections, completude, progression, mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
+  sendJSON(res, 200, { ...bp, sections, galerie: safeJSON(bp.galerie_json, []), completude, progression, mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
 });
 
 /* ---- Mise à jour (auto-save) ---- */
@@ -36261,6 +36262,98 @@ app.delete('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, a
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
   await db.prepare('DELETE FROM business_plans WHERE id=?').run(bp.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Média de présentation (photo principale, galerie, vidéo de pitch) ----
+   En route() brute (pas app.post) : comme /api/upload/document, elle a besoin de lire le
+   corps multipart elle-même sur le flux req brut — le shim app.* pré-parse déjà req.body,
+   ce qui consommerait le flux avant nous. */
+route("POST", "/api/business-plans/:id/media", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const bp = await db.prepare("SELECT * FROM business_plans WHERE id=?").get(params.id);
+  if (!bp) return sendJSON(res, 404, { error: "Plan introuvable" });
+  const collab = await db.prepare("SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?").get(bp.id, user.id);
+  const canEdit = bp.user_id === user.id || ["editeur", "validateur"].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: "Accès refusé" });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const raw = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { fields, files } = parseMultipart(raw, boundaryMatch[1]);
+  const kind = fields.type;
+  if (!["photo_principale", "galerie", "video_pitch"].includes(kind)) {
+    return sendJSON(res, 400, { error: "Type de média invalide" });
+  }
+  const file = files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  const b = file.buffer;
+
+  try {
+    if (kind === "video_pitch") {
+      /* La durée réelle (≤2 min) n'est vérifiable qu'en décodant la vidéo (ffprobe) —
+         absent de ce serveur. Elle est donc vérifiée côté client avant l'envoi ; ici on se
+         protège uniquement par le type réel (magic bytes) et une taille max raisonnable. */
+      const MAX_VIDEO = 100 * 1024 * 1024;
+      if (b.length > MAX_VIDEO) return sendJSON(res, 400, { error: "Vidéo trop volumineuse (max 100 Mo)." });
+      const vidType = SEC.isSafeVideo(b);
+      if (!vidType) return sendJSON(res, 400, { error: "Format vidéo non supporté (MP4 ou WebM requis)." });
+      const filename = `bp-${bp.id}-video-${Date.now()}.${vidType.split("/")[1]}`;
+      const url = await uploadToBunny(b, filename, "business-plans");
+      await db.prepare("UPDATE business_plans SET video_pitch_url=?, updated_at=datetime('now') WHERE id=?").run(url, bp.id);
+      SEC.logSecurity("upload", { uid: Number(user.id), kind: "bp_video_pitch", bpId: Number(bp.id), size: b.length });
+      return sendJSON(res, 200, { url });
+    }
+
+    const MAX_IMG = 8 * 1024 * 1024;
+    if (b.length > MAX_IMG) return sendJSON(res, 400, { error: "Image trop volumineuse (max 8 Mo)." });
+    const imgType = SEC.isSafeRasterImage(b);
+    if (!imgType) return sendJSON(res, 400, { error: "Format d'image non supporté (JPEG, PNG, WebP ou GIF requis)." });
+    const filename = `bp-${bp.id}-${kind}-${Date.now()}.${imgType.split("/")[1].replace("jpeg", "jpg")}`;
+    const url = await uploadToBunny(b, filename, "business-plans");
+
+    if (kind === "photo_principale") {
+      await db.prepare("UPDATE business_plans SET photo_principale_url=?, updated_at=datetime('now') WHERE id=?").run(url, bp.id);
+    } else {
+      const MAX_GALERIE = 6;
+      const galerie = safeJSON(bp.galerie_json, []);
+      if (galerie.length >= MAX_GALERIE) return sendJSON(res, 400, { error: `Maximum ${MAX_GALERIE} images dans la galerie.` });
+      galerie.push(url);
+      await db.prepare("UPDATE business_plans SET galerie_json=?, updated_at=datetime('now') WHERE id=?").run(JSON.stringify(galerie), bp.id);
+    }
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "bp_" + kind, bpId: Number(bp.id), size: b.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload media business plan")); }
+});
+
+/* ---- Retirer un média (photo principale, vidéo de pitch, ou une image précise de la galerie) ---- */
+route("DELETE", "/api/business-plans/:id/media", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const bp = await db.prepare("SELECT * FROM business_plans WHERE id=?").get(params.id);
+  if (!bp) return sendJSON(res, 404, { error: "Plan introuvable" });
+  const collab = await db.prepare("SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?").get(bp.id, user.id);
+  const canEdit = bp.user_id === user.id || ["editeur", "validateur"].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: "Accès refusé" });
+
+  const u = new URL(req.url, "http://x");
+  const kind = u.searchParams.get("type");
+  if (kind === "photo_principale") {
+    await db.prepare("UPDATE business_plans SET photo_principale_url=NULL, updated_at=datetime('now') WHERE id=?").run(bp.id);
+  } else if (kind === "video_pitch") {
+    await db.prepare("UPDATE business_plans SET video_pitch_url=NULL, updated_at=datetime('now') WHERE id=?").run(bp.id);
+  } else if (kind === "galerie") {
+    const target = u.searchParams.get("url") || "";
+    const galerie = safeJSON(bp.galerie_json, []).filter(g => g !== target);
+    await db.prepare("UPDATE business_plans SET galerie_json=?, updated_at=datetime('now') WHERE id=?").run(JSON.stringify(galerie), bp.id);
+  } else {
+    return sendJSON(res, 400, { error: "Type de média invalide" });
+  }
   sendJSON(res, 200, { ok: true });
 });
 

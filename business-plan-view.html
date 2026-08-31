@@ -43,6 +43,18 @@
   .bpv-cover-meta{display:flex;flex-wrap:wrap;gap:8px;}
   .bpv-cover-meta span{font-size:12px;font-weight:700;background:rgba(255,255,255,.14);border-radius:99px;padding:4px 12px;}
   .bpv-cover-foot{margin-top:26px;font-size:11.5px;opacity:.7;}
+  .bpv-cover.has-photo{background-size:cover;background-position:center;}
+  .bpv-cover.has-photo::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(13,43,78,.88),rgba(23,62,107,.82));}
+  .bpv-cover.has-photo > *{position:relative;z-index:1;}
+
+  /* Vidéo de pitch + galerie (2026-08-31) */
+  .bpv-media-block{padding:28px 56px;border-top:1px solid var(--border);display:flex;gap:22px;flex-wrap:wrap;}
+  .bpv-media-video{flex:1 1 380px;max-width:520px;}
+  .bpv-media-video video{width:100%;border-radius:12px;display:block;background:#000;}
+  .bpv-media-video h4, .bpv-media-galerie h4{margin:0 0 10px;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  .bpv-media-galerie{flex:1 1 260px;}
+  .bpv-media-galerie-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;}
+  .bpv-media-galerie-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;border:1px solid var(--border);cursor:zoom-in;}
 
   /* Sections */
   .bpv-section{padding:34px 56px;border-top:1px solid var(--border);}
@@ -137,6 +149,7 @@
         <a href="business-plan.html" class="bpv-back">← Mes Business Plans</a>
       </div>
       <div style="display:flex;gap:8px;">
+        <a class="btn btn-outline btn-sm" id="bpv-btn-dossier" href="#">📊 Générer le dossier investisseur</a>
         <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Imprimer / Exporter PDF</button>
         <a class="btn btn-orange btn-sm" id="bpv-btn-edit" href="#" style="display:none;">✏️ Modifier</a>
       </div>
@@ -366,6 +379,8 @@ async function init(){
   document.title = `${bp.nom_projet || 'Business Plan'} — Diaspo'Actif`;
   const s = bp.sections || {};
 
+  document.getElementById('bpv-btn-dossier').href = `business-plan-dossier.html?id=${id}`;
+
   if (bp.mon_role === 'proprietaire' || bp.mon_role === 'editeur' || bp.mon_role === 'validateur') {
     const btn = document.getElementById('bpv-btn-edit');
     btn.href = `business-plan-edit.html?id=${id}`;
@@ -418,8 +433,9 @@ async function init(){
   });
 
   const statutLabel = { brouillon:'✏️ Brouillon', complet:'✅ Complet', archive:'📦 Archivé' }[bp.statut] || 'Brouillon';
+  const hasPhoto = !!bp.photo_principale_url;
   const cover = `
-    <div class="bpv-cover">
+    <div class="bpv-cover${hasPhoto?' has-photo':''}"${hasPhoto?` style="background-image:url('${esc(bp.photo_principale_url)}')"`:''}>
       <span class="bpv-cover-badge">📄 Document de consultation — lecture seule</span>
       <div class="bpv-cover-logo">${bp.logo_url ? `<img src="${esc(bp.logo_url)}" alt="">` : (TYPES[bp.type_initiative]||'📋')[0]}</div>
       <h1>${esc(bp.nom_projet || 'Sans titre')}</h1>
@@ -433,7 +449,14 @@ async function init(){
       <div class="bpv-cover-foot">Dernière mise à jour le ${fmtDate(bp.updated_at)} — généré depuis Diaspo'Actif</div>
     </div>`;
 
-  document.getElementById('bpv-doc').innerHTML = cover + sections.map(sec => sec.html).join('');
+  const galerie = bp.galerie || [];
+  const mediaBlock = (bp.video_pitch_url || galerie.length) ? `
+    <div class="bpv-media-block">
+      ${bp.video_pitch_url ? `<div class="bpv-media-video"><h4>🎬 Vidéo de présentation</h4><video src="${esc(bp.video_pitch_url)}" controls></video></div>` : ''}
+      ${galerie.length ? `<div class="bpv-media-galerie"><h4>🖼️ Galerie</h4><div class="bpv-media-galerie-grid">${galerie.map(g=>`<img src="${esc(g)}" alt="" onclick="window.open('${esc(g)}','_blank')">`).join('')}</div></div>` : ''}
+    </div>` : '';
+
+  document.getElementById('bpv-doc').innerHTML = cover + mediaBlock + sections.map(sec => sec.html).join('');
 
   document.getElementById('bpv-toc').innerHTML = `
     <div class="bpv-toc-title">Sommaire</div>

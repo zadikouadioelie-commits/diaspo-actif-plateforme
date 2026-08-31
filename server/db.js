@@ -1942,6 +1942,12 @@ const MIGRATIONS = [
   // Business Plan — 3 niveaux de profondeur (Essentiel/Professionnel/Investisseur),
   // mémorise le dernier niveau choisi pour rouvrir le formulaire dans le même état.
   ["business_plans", "niveau_profondeur TEXT DEFAULT 'essentiel'"],
+  // Business Plan — présentation visuelle (2026-08-31) : photo principale (réutilisée partout :
+  // carte liste, bannière consultation, export), galerie de photos secondaires, vidéo de pitch
+  // courte (≤2 min, vérifié côté client — voir POST /api/business-plans/:id/media).
+  ["business_plans", "photo_principale_url TEXT"],
+  ["business_plans", "galerie_json TEXT DEFAULT '[]'"],
+  ["business_plans", "video_pitch_url TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
