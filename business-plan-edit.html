@@ -496,8 +496,14 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <!-- Génération PowerPoint réelle (point 18) -- aucune lib de ce type n'existait encore sur la
      plateforme (confirmé par l'audit préalable), pptxgenjs chargé en client pur (bundle
-     navigateur), même schéma d'intégration CDN que gsap plus bas sur cette page. -->
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+     navigateur), même schéma d'intégration CDN que gsap plus bas sur cette page.
+     Version figée à 4.0.1 (pas 3.12.0) : testé en conditions réelles dans un vrai Chrome, la
+     3.12.0 bloque indéfiniment pres.writeFile()/write() -- même pour une diapositive triviale
+     sans graphique ni tableau, confirmé par chronométrage (aucune résolution après 15s) -- alors
+     que la 4.0.1, avec le même code, exporte en ~20ms. Bug de cette version précise de la
+     bibliothèque, pas du code de cette page ; sans ce correctif le bouton "PowerPoint (.pptx)"
+     restait bloqué indéfiniment sur "Génération…" pour tout visiteur qui cliquait dessus. -->
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
