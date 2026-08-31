@@ -283,13 +283,42 @@ function pageTraction(bp){
 }
 
 /* ---- Page : Marché ---- */
+function parseNum(v){ if (!has(v)) return null; const n = parseFloat(String(v).replace(',','.').replace(/[^0-9.\-]/g,'')); return isNaN(n) ? null : n; }
+
+/* Matrice concurrentielle : Menace (0-100, champ numérique garanti côté formulaire) en X,
+   Part de marché estimée en Y quand elle se laisse lire comme un nombre ("15%", "15", "≈15 %"
+   parsent tous ; un texte purement qualitatif comme "faible" ne parse pas). Seuls les
+   concurrents dont LES DEUX valeurs sont exploitables sont placés sur le graphique — jamais de
+   position devinée. En dessous de 2 concurrents plaçables, on retombe sur le tableau seul. */
+function competitiveMatrix(concurrents){
+  const points = concurrents.map(c => ({ c, x: parseNum(c.menace), y: parseNum(c.parts_marche) })).filter(p => p.x!=null && p.y!=null);
+  if (points.length < 2) return '';
+  const maxY = Math.max(...points.map(p=>p.y), 1);
+  const W=320, H=170, PAD=34;
+  const sx = x => PAD + (x/100)*(W-PAD-14);
+  const sy = y => H-PAD - (y/maxY)*(H-PAD-14);
+  const dots = points.map(p => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="5" fill="#F26422" opacity="0.85"/><text x="${(sx(p.x)+8).toFixed(1)}" y="${(sy(p.y)+3).toFixed(1)}" font-family="Public Sans,Arial" font-size="9" fill="#181B20">${esc(p.c.nom)}</text>`).join('');
+  return `<p class="block-title">Matrice concurrentielle</p>
+    <div style="display:flex;gap:20px;align-items:center;">
+      <svg width="320" height="170" viewBox="0 0 ${W} ${H}">
+        <line x1="${PAD}" y1="14" x2="${PAD}" y2="${H-PAD}" stroke="#DBD6C8"/>
+        <line x1="${PAD}" y1="${H-PAD}" x2="${W-6}" y2="${H-PAD}" stroke="#DBD6C8"/>
+        <text x="${PAD}" y="10" font-family="JetBrains Mono,monospace" font-size="8" fill="#4B5160">Part de marché ↑</text>
+        <text x="${W-6}" y="${H-PAD+14}" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="8" fill="#4B5160">Menace →</text>
+        ${dots}
+      </svg>
+      <p style="font-size:11px;line-height:1.6;color:var(--dp-ink-soft);flex:1;margin:0;">Positionnement des concurrents pour lesquels un niveau de menace et une part de marché ont été estimés. Les autres concurrents renseignés restent listés dans le tableau ci-dessous.</p>
+    </div>`;
+}
+
 function pageMarche(bp){
   const m = (bp.sections||{}).marche || {};
   const tamRow = kpiRow([['TAM — Marché total', has(m.tam)?fmtEUR(m.tam):''],['SAM — Marché accessible', has(m.sam)?fmtEUR(m.sam):''],['SOM — Marché visé', has(m.som)?fmtEUR(m.som):'']]);
   const textSchema = { taille_marche:"Taille du marché", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", opportunites:"Opportunités de marché", barrieres_entree:"Barrières à l'entrée" };
   const grid = fieldGrid(m, textSchema);
   const concurrents = Array.isArray(m.concurrents) ? m.concurrents.filter(c=>has(c.nom)) : [];
-  const concTable = concurrents.length ? `<p class="block-title">Concurrence</p><table class="doc-table"><thead><tr><th style="text-align:left;">Concurrent</th><th style="text-align:left;">Positionnement</th><th>Prix</th><th>Menace</th></tr></thead><tbody>${concurrents.map(c=>`<tr><td>${esc(c.nom)}</td><td style="text-align:left;">${esc(c.positionnement||'—')}</td><td>${esc(c.prix||'—')}</td><td>${esc(c.menace||'—')}</td></tr>`).join('')}</tbody></table>` : '';
+  const matrix = competitiveMatrix(concurrents);
+  const concTable = concurrents.length ? `<p class="block-title">${matrix?'Concurrents renseignés':'Concurrence'}</p><table class="doc-table"><thead><tr><th style="text-align:left;">Concurrent</th><th style="text-align:left;">Positionnement</th><th>Prix</th><th>Menace</th></tr></thead><tbody>${concurrents.map(c=>`<tr><td>${esc(c.nom)}</td><td style="text-align:left;">${esc(c.positionnement||'—')}</td><td>${esc(c.prix||'—')}</td><td>${esc(c.menace||'—')}</td></tr>`).join('')}</tbody></table>` : '';
   if (!tamRow && !grid && !concTable) return '';
   return page('marche','',`
     ${chromeTop(bp,'Marché')}
@@ -297,7 +326,91 @@ function pageMarche(bp){
     <h2 class="pg-title">Dimension et dynamique du marché</h2>
     ${tamRow}
     ${grid}
+    ${matrix}
     ${concTable}
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : SWOT ---- */
+function pageSWOT(bp){
+  const sw = (bp.sections||{}).swot || {};
+  const quads = [
+    ['forces','Forces','#1A7A52','rgba(26,122,82,.07)'],
+    ['faiblesses','Faiblesses','#B5451F','rgba(181,69,31,.07)'],
+    ['opportunites','Opportunités','#1E4F8A','rgba(30,79,138,.07)'],
+    ['menaces','Menaces','#4B5160','rgba(75,81,96,.09)'],
+  ];
+  if (!quads.some(([k]) => has(sw[k]))) return '';
+  return page('swot','',`
+    ${chromeTop(bp,'SWOT')}
+    <p class="eyebrow-tag">Analyse SWOT</p>
+    <h2 class="pg-title">Forces, faiblesses, opportunités, menaces</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;flex:1;min-height:0;">
+      ${quads.map(([k,label,color,bg]) => `
+        <div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:16px;">
+          <p style="font-family:var(--dp-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:${color};font-weight:700;margin:0 0 8px;">${label}</p>
+          <p style="font-size:11.5px;line-height:1.55;margin:0;color:var(--dp-ink);white-space:pre-wrap;">${has(sw[k])?esc(sw[k]):'—'}</p>
+        </div>`).join('')}
+    </div>
+    ${chromeBottom()}
+  `);
+}
+
+/* Entonnoir commercial : barres proportionnelles à la valeur, taux de conversion entre chaque
+   étage calculé à partir des vrais chiffres saisis (jamais un pourcentage inventé). */
+function funnelDiagram(stages){
+  const max = Math.max(...stages.map(([,v]) => v), 1);
+  const rows = stages.map(([label,val], i) => {
+    const wPct = Math.max(8, Math.round((val/max)*100));
+    const conv = i>0 && stages[i-1][1]>0 ? Math.round(val/stages[i-1][1]*100) : null;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <div style="width:88px;font-size:9.5px;color:var(--dp-ink-soft);text-align:right;flex:none;">${esc(label)}</div>
+      <div style="flex:1;background:var(--dp-line);border-radius:2px;height:20px;position:relative;">
+        <div style="width:${wPct}%;height:100%;background:${i===stages.length-1?'#F26422':'#0D2B4E'};opacity:${1-i*0.12};border-radius:2px;"></div>
+      </div>
+      <div style="width:52px;font-family:var(--dp-mono);font-size:10.5px;font-weight:600;flex:none;">${val.toLocaleString('fr-FR')}</div>
+      <div style="width:44px;font-family:var(--dp-mono);font-size:9px;color:var(--dp-ink-soft);flex:none;">${conv!=null?conv+' %':''}</div>
+    </div>`;
+  }).join('');
+  return `<p class="block-title">Funnel commercial</p><div style="margin-bottom:6px;">${rows}</div>`;
+}
+
+/* ---- Page : Risques ---- */
+function pageRisques(bp){
+  const items = ((bp.sections||{}).risques?.items || []).filter(r => has(r.description));
+  if (!items.length) return '';
+  const NIV = { faible:{n:0,label:'Faible',color:'#1A7A52'}, moyen:{n:1,label:'Moyen',color:'#C9A227'}, eleve:{n:2,label:'Élevé',color:'#D2691E'}, critique:{n:3,label:'Critique',color:'#B5451F'} };
+  const withNiv = items.map(r => ({ r, p: NIV[r.probabilite], i: NIV[r.impact] }));
+  const plottable = withNiv.filter(x => x.p && x.i);
+  const LEVELS = ['faible','moyen','eleve','critique'];
+  let matrix = '';
+  if (plottable.length) {
+    const cellSize = 60;
+    matrix = `<p class="block-title">Probabilité × Impact</p>
+    <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:repeat(4,${cellSize}px);grid-template-rows:repeat(4,${cellSize}px);gap:2px;">
+        ${LEVELS.slice().reverse().flatMap(impactKey => LEVELS.map(probaKey => {
+          const cellItems = plottable.filter(x => x.r.probabilite===probaKey && x.r.impact===impactKey);
+          const heat = (NIV[probaKey].n + NIV[impactKey].n) / 6; // 0 (faible/faible) → 1 (critique/critique)
+          const bg = `rgba(181,69,31,${(0.06+heat*0.34).toFixed(2)})`;
+          return `<div style="background:${bg};border:1px solid var(--dp-line);border-radius:2px;padding:4px;font-size:8px;line-height:1.3;overflow:hidden;">${cellItems.map(x=>esc(x.r.description.slice(0,22))).join('<br>')}</div>`;
+        })).join('')}
+      </div>
+      <div style="font-size:9px;color:var(--dp-ink-soft);padding-bottom:4px;">
+        <p style="margin:0 0 4px;font-family:var(--dp-mono);text-transform:uppercase;letter-spacing:.05em;">Lecture</p>
+        <p style="margin:0;">Axe horizontal : probabilité (faible → critique).<br>Axe vertical : impact (critique en haut).<br>Plus la case est foncée, plus la combinaison est préoccupante.</p>
+      </div>
+    </div>`;
+  }
+  const cards = `<div class="card-grid">${items.map(r => `<div class="kpi"><p style="font-weight:700;font-size:11.5px;margin:0 0 4px;">${esc(r.description)}</p><p style="font-size:10px;color:var(--dp-ink-soft);margin:0;">Probabilité : ${esc(NIV[r.probabilite]?.label||r.probabilite||'—')} · Impact : ${esc(NIV[r.impact]?.label||r.impact||'—')}</p>${has(r.prevention)?`<p style="font-size:10px;margin:4px 0 0;">🛡️ ${esc(r.prevention)}</p>`:''}${has(r.responsable)?`<p style="font-size:9.5px;color:var(--dp-ink-soft);margin:2px 0 0;">Responsable : ${esc(r.responsable)}</p>`:''}</div>`).join('')}</div>`;
+  return page('risques','',`
+    ${chromeTop(bp,'Risques')}
+    <p class="eyebrow-tag">Vigilance</p>
+    <h2 class="pg-title">Ce qui pourrait mal tourner</h2>
+    ${matrix}
+    ${matrix ? '<p class="block-title">Détail et mesures prévues</p>' : ''}
+    ${cards}
     ${chromeBottom()}
   `);
 }
@@ -429,8 +542,11 @@ function pageGenerique(bp, key, label, eyebrow, headline){
   if (key === 'calendrier' && Array.isArray(data.phases) && data.phases.length) {
     content += `${hadContent?'<p class="block-title">Jalons</p>':''}<table class="doc-table"><thead><tr><th style="text-align:left;">Phase</th><th style="text-align:left;">Période</th><th style="text-align:left;">Statut</th></tr></thead><tbody>${data.phases.filter(p=>has(p.nom)).map(p=>`<tr><td>${esc(p.nom)}</td><td style="text-align:left;">${[p.debut&&fmtDate(p.debut),p.fin&&fmtDate(p.fin)].filter(Boolean).join(' → ')||'—'}</td><td style="text-align:left;">${esc(p.statut||'—')}</td></tr>`).join('')}</tbody></table>`;
   }
-  if (key === 'risques' && Array.isArray(data.items) && data.items.length) {
-    content += `${hadContent?'<p class="block-title">Principaux risques</p>':''}<div class="card-grid">${data.items.filter(r=>has(r.description)).map(r=>`<div class="kpi"><p style="font-weight:700;font-size:11.5px;margin:0 0 4px;">${esc(r.description)}</p><p style="font-size:10px;color:var(--dp-ink-soft);margin:0;">Probabilité : ${esc(r.probabilite||'—')} · Impact : ${esc(r.impact||'—')}</p>${has(r.prevention)?`<p style="font-size:10px;margin:4px 0 0;">🛡️ ${esc(r.prevention)}</p>`:''}</div>`).join('')}</div>`;
+  if (key === 'plan_commercial') {
+    const f = [['nb_prospects_funnel','Prospects'],['nb_contacts_funnel','Contacts'],['nb_rdv_funnel','RDV'],['nb_propositions_funnel','Propositions'],['nb_contrats_funnel','Clients']].map(([k,l]) => [l, parseNum(data[k])]).filter(([,v]) => v!=null && v>=0);
+    if (f.length >= 2) content = funnelDiagram(f) + content;
+    const kpis = kpiRow([['CAC (via commercial)', data.ca_par_commercial],['Panier moyen', has(data.panier_moyen_commercial)?fmtEUR(data.panier_moyen_commercial):''],['Cycle de vente moyen', data.cycle_vente_moyen],['Objectif mensuel', has(data.objectif_mensuel_commercial)?fmtEUR(data.objectif_mensuel_commercial):'']]);
+    if (kpis) content = kpis + content;
   }
   if (key === 'annexes' && Array.isArray(data.items) && data.items.length) {
     content += `<table class="doc-table"><thead><tr><th style="text-align:left;">Document</th><th style="text-align:left;">Description</th></tr></thead><tbody>${data.items.filter(a=>has(a.nom)).map(a=>`<tr><td>${esc(a.nom)}</td><td style="text-align:left;">${esc(a.description||'—')}</td></tr>`).join('')}</tbody></table>`;
@@ -464,7 +580,6 @@ const GENERIC_SECTIONS = {
   organisation: ['Organisation & gouvernance','Gouvernance','Qui décide quoi'],
   rh: ['Ressources humaines','Effectifs','Recruter au bon rythme'],
   calendrier: ['Calendrier de mise en œuvre','Feuille de route','Les prochaines étapes'],
-  risques: ['Analyse des risques','Vigilance','Ce qui pourrait mal tourner'],
   impact: ['Impact','Retombées','Impact économique, social & environnemental'],
   annexes: ['Annexes','Pièces jointes','Documents complémentaires'],
 };
@@ -491,11 +606,13 @@ async function init(){
     generic(bp,'probleme'), generic(bp,'solution'),
     { id:'traction', label:'Traction', html: pageTraction(bp) },
     { id:'marche', label:'Marché', html: pageMarche(bp) },
+    { id:'swot', label:'Analyse SWOT', html: pageSWOT(bp) },
     { id:'bmc', label:'Business Model', html: pageBMC(bp) },
     generic(bp,'produits'), generic(bp,'strategie_marketing'), generic(bp,'plan_commercial'),
     generic(bp,'plan_operationnel'), generic(bp,'organisation'), generic(bp,'rh'), generic(bp,'calendrier'),
     { id:'finances', label:'Plan financier', html: pageFinances(bp) },
-    generic(bp,'risques'), generic(bp,'impact'),
+    { id:'risques', label:'Analyse des risques', html: pageRisques(bp) },
+    generic(bp,'impact'),
     { id:'financement', label:'Financement', html: pageFinancement(bp) },
     generic(bp,'annexes'),
     { id:'equipe', label:'Équipe', html: pageEquipe(bp) },
@@ -685,6 +802,25 @@ async function generatePPTX(){
         title(slide, 'Dimension et dynamique du marché', { fontSize:26, h:0.9 });
         statRow(slide, 2.2, tamRow);
         if (has(m.avantage_concurrentiel)) slide.addText(m.avantage_concurrentiel, { x:MX, y:4.0, w:W-MX*2, h:1.2, fontFace:FB, fontSize:13, color:C.ink, valign:'top' });
+      }
+    }
+
+    /* ---------- SWOT ---------- */
+    {
+      const sw = s.swot||{};
+      const quads = [['Forces',sw.forces,C.green],['Faiblesses',sw.faiblesses,'B5451F'],['Opportunités',sw.opportunites,C.blue],['Menaces',sw.menaces,C.soft]];
+      if (quads.some(([,v])=>has(v))) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'SWOT');
+        title(slide, 'Forces, faiblesses, opportunités, menaces', { fontSize:22, h:0.7, y:1.0 });
+        const gap=0.18, cw=(W-MX*2-gap)/2, ch=2.4, y0=1.85;
+        quads.forEach(([label,val,color],i) => {
+          const col=i%2, row=Math.floor(i/2);
+          const x=MX+col*(cw+gap), y=y0+row*(ch+gap);
+          slide.addShape(R, { x, y, w:cw, h:ch, fill:{color:C.paper}, line:{color, width:1.5} });
+          slide.addText(label.toUpperCase(), { x:x+0.18, y:y+0.14, w:cw-0.36, h:0.3, fontFace:FB, fontSize:9, bold:true, color, charSpacing:0.8 });
+          slide.addText(has(val)?String(val):'—', { x:x+0.18, y:y+0.5, w:cw-0.36, h:ch-0.65, fontFace:FB, fontSize:10.5, color:C.ink, valign:'top' });
+        });
       }
     }
 
