@@ -36983,6 +36983,161 @@ app.get('/api/business-plans/:id/assistant/history', requireAuth, requireUtilisa
 });
 
 /* ═══════════════════════════════════════════════════════════════════
+   BUSINESS PLAN DEFENDER (2026-08-31, point 29 du plan de renforcement)
+   Les tables bp_defender_rapports / bp_ia_quota existaient déjà (posées à
+   l'incrément 1/10, jamais branchées) avec une colonne cout_usd -- signe que la
+   conception initiale prévoyait un vrai appel LLM payant. Choix assumé ici :
+   PAS d'appel LLM (aucune intégration IA générative n'existe nulle part ailleurs
+   dans ce module -- l'"Assistant BP" lui-même, getBPAssistantResponse(), est déjà
+   un système à règles/mots-clés, pas un LLM). Le Defender reprend donc la même
+   philosophie que le reste du module : un moteur de règles déterministe,
+   gratuit, immédiat, sans dépendance externe -- cout_usd reste NULL, bp_ia_quota
+   n'est pas consommé. Si un vrai raisonnement IA est souhaité plus tard, c'est un
+   chantier séparé (choix de fournisseur, coût, clé API), pas une extension de
+   ceci. ═══════════════════════════════════════════════════════════════════ */
+function analyserBPDefender(bp, sections) {
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+  const vide = v => v === undefined || v === null || String(v).trim() === '';
+  const findings = [];
+  let fid = 0;
+  const ajouter = (categorie, gravite, constat, question) => { findings.push({ id: ++fid, categorie, gravite, constat, question, reponse: null }); };
+
+  const traction = sections.presentation || {};
+  const marche = sections.marche || {};
+  const fin = sections.plan_financier || {};
+  const financement = sections.financement || {};
+  const risques = sections.risques?.items || [];
+  const equipe = sections.infos_generales?.membres_equipe || [];
+  const produits = sections.produits || {};
+  const commercial = sections.plan_commercial || {};
+  const niveauInvestisseur = bp.niveau_profondeur === 'investisseur';
+
+  // 1. Absence de traction malgré une recherche de financement active
+  const aDeTraction = traction.genere_revenus === 'oui' || num(traction.nb_clients_actuels) > 0 || num(traction.nb_contrats_signes) > 0 || num(traction.nb_pilotes_tests) > 0;
+  if (!aDeTraction && (num(financement.montant) > 0 || num(fin.financement_recherche) > 0)) {
+    ajouter('traction', 'majeure', "Le dossier recherche un financement mais n'affiche aucune preuve de traction (pas de revenus, clients, pilotes ou contrats déclarés).",
+      "Avez-vous déjà des signaux concrets d'intérêt (clients, pilotes, lettres d'intention) que vous n'avez pas encore renseignés, ou le projet est-il encore au stade purement théorique ?");
+  }
+
+  // 2. Croissance affichée sans base de départ cohérente
+  const croissanceMensuelle = num(traction.croissance_mensuelle);
+  if (croissanceMensuelle !== null && croissanceMensuelle > 20 && !aDeTraction) {
+    ajouter('traction', 'majeure', `Une croissance mensuelle de ${croissanceMensuelle}% est annoncée, mais aucune traction actuelle n'est déclarée pour la mesurer.`,
+      "Sur quelle période et quelle base de départ avez-vous calculé cette croissance ?");
+  }
+
+  // 3. Marché insuffisamment documenté pour un dossier investisseur
+  if (niveauInvestisseur && vide(marche.tam) && vide(marche.sam) && vide(marche.som)) {
+    ajouter('marche', 'majeure', "Niveau de profondeur \"Investisseur\" sélectionné, mais le marché n'est pas quantifié (TAM/SAM/SOM vides).",
+      "Quelle est votre estimation, même approximative, de la taille du marché total, du marché accessible et du marché réellement visé ?");
+  }
+
+  // 4. Concurrence sous-estimée
+  const concurrents = marche.concurrents || [];
+  const concurrentsRenseignes = concurrents.filter(c => c?.nom);
+  if (!concurrentsRenseignes.length && (marche.taille_marche || marche.potentiel)) {
+    ajouter('marche', 'moyenne', "Un marché est décrit mais aucun concurrent n'est listé.",
+      "Pourquoi un client choisirait-il votre projet plutôt qu'une alternative déjà existante sur ce marché ?");
+  }
+
+  // 5. Chiffre d'affaires An 1 incohérent avec l'étude de prix produit
+  const etudePrix = produits.etude_prix || [];
+  const caEstimeProduits = etudePrix.reduce((s,e) => s + ((num(e.prix_vente)||0) * (num(e.volume_estime)||0)), 0);
+  const ca1 = num(fin.ca_1);
+  if (caEstimeProduits > 0 && ca1 !== null && ca1 > 0) {
+    const ecart = Math.abs(ca1 - caEstimeProduits) / caEstimeProduits;
+    if (ecart > 0.5) {
+      ajouter('finance', 'moyenne', `Le CA An 1 saisi (${ca1.toLocaleString('fr-FR')}) s'écarte de plus de 50% de l'estimation issue de l'étude de prix produit (${Math.round(caEstimeProduits).toLocaleString('fr-FR')}).`,
+        "D'où vient l'écart entre le chiffre d'affaires saisi et celui que suggèrent vos prix et volumes estimés par produit ?");
+    }
+  }
+
+  // 6. Objectif "premiers clients" non chiffré malgré un plan commercial rempli
+  if ((commercial.nb_prospects_funnel || commercial.objectifs_vente) && vide(commercial.premiers_10_clients)) {
+    ajouter('commercial', 'mineure', "Le plan commercial contient des objectifs chiffrés, mais la question \"comment obtenir vos 10 premiers clients\" n'est pas renseignée.",
+      "Comment comptez-vous obtenir concrètement vos 10 premiers clients ?");
+  }
+
+  // 7. Financement recherché sans plan de risques
+  if ((num(financement.montant) > 0 || num(fin.financement_recherche) > 0) && !risques.length) {
+    ajouter('risques', 'majeure', "Un financement est recherché mais aucun risque n'est identifié dans le dossier.",
+      "Quels sont les 2 ou 3 principaux risques qui pourraient compromettre ce projet, et comment comptez-vous les limiter ?");
+  }
+
+  // 8. Trésorerie/résultat négatif sans runway défini
+  const resultatAn1 = (ca1||0) + (num(fin.autres_produits_1)||0) - ((num(fin.achats_1)||0)+(num(fin.salaires_1)||0)+(num(fin.loyers_1)||0)+(num(fin.marketing_charge_1)||0)+(num(fin.autres_charges_1)||0));
+  if (resultatAn1 < 0 && vide(fin.nb_mois_runway)) {
+    ajouter('finance', 'majeure', `Le résultat net An 1 est négatif (${Math.round(resultatAn1).toLocaleString('fr-FR')}) mais aucun nombre de mois de trésorerie disponible (runway) n'est renseigné.`,
+      "Combien de mois de trésorerie avez-vous devant vous avant d'atteindre la rentabilité ou d'épuiser vos fonds ?");
+  }
+
+  // 9. Marge élevée non justifiée
+  etudePrix.forEach(e => {
+    const marge = num(e.marge_souhaitee);
+    if (marge !== null && marge > 70 && vide(e.strategie)) {
+      ajouter('produit', 'mineure', `Une marge de ${marge}% est visée sur "${e.produit||'un produit'}" sans stratégie de prix expliquée.`,
+        `Comment justifiez-vous une marge de ${marge}% sur ce produit face à la concurrence ?`);
+    }
+  });
+
+  // 10. Équipe incomplète sans plan de recrutement
+  if (!equipe.length) {
+    ajouter('equipe', 'moyenne', "Aucun membre de l'équipe fondatrice n'est renseigné en détail.",
+      "Qui porte concrètement ce projet aujourd'hui, et quelles compétences essentielles vous manquent encore ?");
+  } else if (sections.infos_generales?.competences_manquantes_equipe && equipe.length < 2) {
+    ajouter('equipe', 'mineure', "Des compétences manquantes sont identifiées dans l'équipe, mais l'équipe déclarée compte moins de 2 personnes.",
+      "Comment comptez-vous combler les compétences manquantes identifiées : recrutement, association, prestataire externe ?");
+  }
+
+  const graviteOrdre = { majeure: 0, moyenne: 1, mineure: 2 };
+  findings.sort((a,b) => graviteOrdre[a.gravite]-graviteOrdre[b.gravite]);
+  return {
+    findings,
+    resume: findings.length
+      ? `${findings.length} point${findings.length>1?'s':''} à examiner, dont ${findings.filter(f=>f.gravite==='majeure').length} jugé${findings.filter(f=>f.gravite==='majeure').length>1?'s':''} prioritaire${findings.filter(f=>f.gravite==='majeure').length>1?'s':''}.`
+      : "Aucune incohérence détectée par les vérifications automatiques sur les données actuellement renseignées.",
+    avertissement: "Analyse automatique par règles déterministes, pas un jugement humain ni une garantie d'obtention de financement — à prendre comme une liste de questions qu'un investisseur pourrait poser.",
+  };
+}
+
+app.post('/api/business-plans/:id/defender/analyser', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const sections = safeJSON(bp.sections_json, {});
+  const rapport = analyserBPDefender(bp, sections);
+  const r = await db.prepare('INSERT INTO bp_defender_rapports (bp_id, user_id, rapport_json) VALUES (?,?,?)').run(bp.id, req.user.id, JSON.stringify(rapport));
+  sendJSON(res, 201, { id: r.lastInsertRowid, ...rapport });
+});
+
+app.get('/api/business-plans/:id/defender/rapports', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const rows = await db.prepare('SELECT * FROM bp_defender_rapports WHERE bp_id=? ORDER BY created_at DESC LIMIT 10').all(req.params.id);
+  sendJSON(res, 200, rows.map(r => ({ id: r.id, created_at: r.created_at, ...safeJSON(r.rapport_json, {}) })));
+});
+
+app.put('/api/business-plans/:id/defender/rapports/:rapportId', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT user_id FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(req.params.id, req.user.id);
+  const canEdit = bp.user_id === req.user.id || ['editeur','validateur'].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
+  const rapportRow = await db.prepare('SELECT * FROM bp_defender_rapports WHERE id=? AND bp_id=?').get(req.params.rapportId, req.params.id);
+  if (!rapportRow) return sendJSON(res, 404, { error: 'Rapport introuvable' });
+  const { findingId, reponse } = await parseBody(req);
+  const rapport = safeJSON(rapportRow.rapport_json, { findings: [] });
+  const finding = (rapport.findings||[]).find(f => f.id === Number(findingId));
+  if (!finding) return sendJSON(res, 404, { error: 'Point introuvable dans ce rapport' });
+  finding.reponse = String(reponse||'').trim().slice(0, 2000);
+  await db.prepare('UPDATE bp_defender_rapports SET rapport_json=? WHERE id=?').run(JSON.stringify(rapport), rapportRow.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
    SIMULATIONS DE PRÉSENTATION BP
    ═══════════════════════════════════════════════════════════════════ */
 

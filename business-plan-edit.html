@@ -3229,6 +3229,7 @@ function renderCompletude() {
   const valides = completude.filter(c=>c.ok).length;
   const total = completude.length;
   setTimeout(bpChargerScoreExplicable, 0);
+  setTimeout(bpChargerDernierRapportDefender, 0);
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>✅ Vérification de complétude</h2></div>
     <!-- Score explicable (2026-08-26, point 27) : 11 sous-scores thématiques, chargé de
@@ -3236,6 +3237,17 @@ function renderCompletude() {
          incluse dans bp au chargement). -->
     <div class="bp-card-inner" id="bp-score-explicable">
       <div style="text-align:center;padding:20px;color:var(--muted);">Calcul du score en cours…</div>
+    </div>
+    <!-- Business Plan Defender (2026-08-31, point 29) : moteur de règles déterministe, pas un
+         LLM (voir commentaire serveur analyserBPDefender) -- une liste de questions qu'un
+         investisseur pourrait poser, à charge pour le porteur d'y répondre pour lui-même. -->
+    <div class="bp-card-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <h3 style="margin:0;">🛡️ Business Plan Defender</h3>
+        <button class="btn btn-orange btn-sm" onclick="bpLancerAnalyseDefender()">🔍 Lancer l'analyse</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Se met à la place d'un investisseur critique : détecte les incohérences, les hypothèses non justifiées et les questions que votre dossier laisse sans réponse.</p>
+      <div id="bp-defender-zone"><div style="color:var(--muted);font-size:12.5px;">Aucune analyse effectuée pour l'instant.</div></div>
     </div>
     <div class="bp-card-inner">
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
@@ -3299,6 +3311,56 @@ async function bpChargerScoreExplicable() {
       ${s.actions_prioritaires.length ? `<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:12.5px;"><strong>5 actions prioritaires :</strong> ${s.actions_prioritaires.map(esc).join(' · ')}</div>` : ''}
     `;
   } catch (e) { el.innerHTML = '<div style="color:#dc2626;">Score indisponible pour le moment.</div>'; }
+}
+
+const BP_DEFENDER_GRAVITE = { majeure: { label:'🔴 Majeur', couleur:'#fef2f2' }, moyenne: { label:'🟠 Moyen', couleur:'#fffbeb' }, mineure: { label:'🟡 Mineur', couleur:'#f9fafb' } };
+let _bpDefenderRapportId = null;
+async function bpChargerDernierRapportDefender() {
+  const zone = document.getElementById('bp-defender-zone');
+  if (!zone) return;
+  try {
+    const rapports = await api('GET', `/business-plans/${bpId}/defender/rapports`);
+    if (rapports.length) bpRenderDefenderRapport(rapports[0]);
+  } catch (e) { /* pas de rapport encore, on laisse le message par défaut */ }
+}
+async function bpLancerAnalyseDefender() {
+  const zone = document.getElementById('bp-defender-zone');
+  zone.innerHTML = '<div style="color:var(--muted);font-size:12.5px;">Analyse en cours…</div>';
+  try {
+    const rapport = await api('POST', `/business-plans/${bpId}/defender/analyser`, {});
+    bpRenderDefenderRapport(rapport);
+  } catch (e) { zone.innerHTML = `<div style="color:#dc2626;font-size:12.5px;">Erreur : ${esc(e.message)}</div>`; }
+}
+function bpRenderDefenderRapport(rapport) {
+  _bpDefenderRapportId = rapport.id;
+  const zone = document.getElementById('bp-defender-zone');
+  if (!rapport.findings || !rapport.findings.length) {
+    zone.innerHTML = `<div style="color:#10b981;font-size:12.5px;">✅ ${esc(rapport.resume)}</div>`;
+    return;
+  }
+  zone.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${esc(rapport.resume)}<br><em>⚠️ ${esc(rapport.avertissement)}</em></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${rapport.findings.map(f => `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:12px;background:${BP_DEFENDER_GRAVITE[f.gravite]?.couleur||'#fff'};">
+          <div style="font-size:11px;font-weight:800;margin-bottom:4px;">${BP_DEFENDER_GRAVITE[f.gravite]?.label||f.gravite} · ${esc(f.categorie)}</div>
+          <div style="font-size:13px;margin-bottom:6px;">${esc(f.constat)}</div>
+          <div style="font-size:13px;font-style:italic;margin-bottom:8px;">« ${esc(f.question)} »</div>
+          ${monRole!=='lecteur' ? `
+            <textarea id="defender-rep-${f.id}" rows="2" placeholder="Votre réponse…" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:inherit;font-size:12.5px;box-sizing:border-box;">${esc(f.reponse||'')}</textarea>
+            <button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="bpSauverReponseDefender(${f.id})">💾 Enregistrer la réponse</button>
+          ` : (f.reponse ? `<div style="font-size:12.5px;background:#fff;border-radius:6px;padding:6px 8px;">${esc(f.reponse)}</div>` : '')}
+        </div>`).join('')}
+    </div>`;
+}
+async function bpSauverReponseDefender(findingId) {
+  const ta = document.getElementById(`defender-rep-${findingId}`);
+  if (!ta || !_bpDefenderRapportId) return;
+  try {
+    await api('PUT', `/business-plans/${bpId}/defender/rapports/${_bpDefenderRapportId}`, { findingId, reponse: ta.value });
+    ta.style.borderColor = '#10b981';
+    setTimeout(() => { ta.style.borderColor = ''; }, 1200);
+  } catch (e) { alert('Erreur : ' + e.message); }
 }
 
 /* ════════════════════════════════════════════════════
