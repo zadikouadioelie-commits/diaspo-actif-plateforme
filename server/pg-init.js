@@ -131,6 +131,31 @@ function colonnesDeclareesParTable() {
       })
       .filter(Boolean);
   }
+
+  /* Colonnes ajoutées via le tableau `MIGRATIONS` de db.js (pattern `["table", "colonne
+     DEFINITION"]`, appliqué localement via une boucle ALTER TABLE ADD COLUMN) -- jusqu'ici
+     invisibles ici, donc invisibles à ajouterColonnesManquantes()/reparerSchema() et au bouton
+     admin "Réparer le schéma", qui reposent tous deux sur cette fonction. Seul le mirroir manuel
+     COLONNES_MIGRATION (plus bas dans ce fichier) les couvrait, et seulement pour les entrées
+     qu'on pensait à y recopier à la main -- oubli constaté le 2026-08-31 (business_plans.
+     photo_principale_url/devise_config absentes en production malgré un déploiement réussi,
+     corrigées manuellement en urgence). Ajoutées ici pour que TOUTE colonne MIGRATIONS future
+     soit détectée automatiquement, sans dépendre d'une recopie manuelle. Ne remplace pas
+     COLONNES_MIGRATION (laissé intact, toujours utilisé par migratePg()) -- purement additif. */
+  const migBloc = dbSrc.match(/const MIGRATIONS\s*=\s*\[([\s\S]*?)\n\];/);
+  if (migBloc) {
+    const reEntry = /\[\s*"([a-zA-Z0-9_]+)"\s*,\s*"([^"]+)"\s*\]/g;
+    let e;
+    while ((e = reEntry.exec(migBloc[1])) !== null) {
+      const [, table, definition] = e;
+      const nom = (definition.match(/^([a-zA-Z0-9_]+)/) || [])[1];
+      if (!nom) continue;
+      if (!parTable[table]) parTable[table] = [];
+      if (parTable[table].some(c => c.nom.toLowerCase() === nom.toLowerCase())) continue; // déjà dans le CREATE TABLE
+      parTable[table].push({ nom, definition: definition.slice(nom.length).trim() });
+    }
+  }
+
   return parTable;
 }
 

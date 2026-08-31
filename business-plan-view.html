@@ -230,13 +230,94 @@ const TEXT_SECTIONS = {
   organisation: { dirigeants:'Dirigeants & gouvernance', equipe:"Composition de l'équipe", responsabilites:'Répartition des responsabilités', consultants:'Consultants externes', benevoles:'Bénévoles' },
   rh: { effectif_actuel:'Effectif actuel', effectif_prevu:'Effectif prévu à 12 mois', recrutements:'Recrutements prévus', competences:'Compétences recherchées', formations:'Formations prévues', politique_rh:'Politique RH' },
   impact: { economique:'Impact économique', social:'Impact social', environnemental:'Impact environnemental', territorial:'Impact territorial', kpi_impact:"Indicateurs d'impact" },
-  financement: { montant:'Montant recherché', calendrier_decaissement:'Calendrier de décaissement', utilisation:'Utilisation des fonds', contreparties:'Contreparties proposées', roi:'Retour sur investissement estimé', roi_sortie:'Retour sur investissement attendu à la sortie', strategie_sortie:'Stratégie de sortie', recherche_active:'Financeurs ciblés' },
+  // financement : plus dans TEXT_SECTIONS -- rendu par la fonction dédiée renderFinancement()
+  // (2026-09-01), la section a trop de champs typés différemment (montants, %, dates, tableau
+  // répétable) pour le renderFieldGrid générique texte-brut.
 };
 
 const NIVEAU_DEV_LABELS = { idee:'Idée', prototype:'Prototype', mvp:'MVP (version minimale testable)', commercialise:'Déjà commercialisé' };
 const PF_RESSOURCES ={ pf_apport:'Apport personnel', pf_associes:'Associés', pf_famille:'Famille & proches', pf_business_angels:'Business angels', pf_banque:'Prêt bancaire', pf_subvention:'Subvention', pf_investisseur:'Investisseur', pf_crowdfunding:'Crowdfunding', pf_diaspo_invest:"Diaspo'Invest", pf_autres_ress:'Autres ressources' };
 const PF_EMPLOIS = { pf_terrain:'Terrain', pf_construction:'Construction / aménagement', pf_materiel:'Matériel', pf_vehicules:'Véhicules', pf_logiciels:'Logiciels & outils', pf_stocks:'Stock initial', pf_tresorerie:'Trésorerie de départ', pf_frais_admin:'Frais administratifs', pf_communication:'Communication', pf_recrutement:'Recrutement' };
 const CR_LIGNES = { ca:"Chiffre d'affaires", autres_produits:'Autres produits', achats:'Achats & charges variables', salaires:'Salaires & charges', loyers:'Loyers', marketing_charge:'Marketing', autres_charges:'Autres charges' };
+
+/* Rendu dédié de "Recherche de financement" (2026-09-01) -- la section mélange texte libre,
+   montants, pourcentages, dates et un tableau répétable (utilisation_postes[]) ; le
+   renderFieldGrid générique (texte brut uniquement) produisait des montants non formatés
+   ("45000" au lieu de "45 000 €") et n'affichait qu'une poignée de champs sur la vingtaine que
+   compte réellement cette section -- tous les champs niveau Investisseur (capitalisation, levée
+   de fonds, scénarios, stratégie de sortie) restaient invisibles sur cette page alors qu'ils
+   sont bien saisis et sauvegardés. */
+function renderFinancement(data){
+  if (!data) return '';
+  const grid = rows => rows.length ? `<div class="bpv-field-grid">${rows.map(([l,v]) => `<div class="bpv-field"><h4>${esc(l)}</h4><p>${nl2br(v)}</p></div>`).join('')}</div>` : '';
+  const champ = (label, val) => has(val) ? `<div class="bpv-field"><h4>${esc(label)}</h4><p>${nl2br(val)}</p></div>` : '';
+  const titre = t => `<div class="bpv-field" style="margin-top:16px;"><h4 style="text-transform:none;font-size:13px;letter-spacing:0;color:#0D2B4E;">${t}</h4></div>`;
+  const pct = v => has(v) ? `${v} %` : '';
+  const montant = v => has(v) ? fmtMontant(v) : '';
+  const TYPE_INSTRUMENT = { actions:'Actions', obligations_convertibles:'Obligations convertibles', compte_courant:'Compte courant d’associé', autre:'Autre' };
+  const TYPE_SORTIE = { acquisition:'Acquisition', revente:'Revente', dividendes:'Dividendes', croissance_long_terme:'Croissance long terme', aucune:'Aucune stratégie de sortie prévue' };
+
+  let html = '';
+  html += grid([['Montant recherché', montant(data.montant)], ['Calendrier de décaissement', data.calendrier_decaissement]].filter(([,v])=>has(v)));
+  html += champ('Utilisation des fonds', data.utilisation);
+  html += champ('Contreparties proposées', data.contreparties);
+  html += champ('Retour sur investissement estimé', data.roi);
+  html += champ('Financeurs ciblés', data.recherche_active);
+
+  const montantCalendrier = [
+    ['Montant minimum', montant(data.montant_minimum_necessaire)], ['Montant idéal', montant(data.montant_ideal_financement)],
+    ['Montant maximum', montant(data.montant_maximum_financement)],
+    ['Date limite', data.date_limite ? fmtDate(data.date_limite) : ''], ['Date souhaitée de réception', data.date_souhaitee_reception ? fmtDate(data.date_souhaitee_reception) : ''],
+    ['Durée de couverture', data.duree_couverture_financement], ['Mois de runway', data.nb_mois_runway],
+  ].filter(([,v])=>has(v));
+  if (montantCalendrier.length) html += titre('Montant & calendrier') + grid(montantCalendrier);
+  html += champ('Financement par étapes', data.financement_par_etapes);
+
+  const asso = [['Nombre d’adhérents', data.nb_adherents], ['Montant des cotisations', montant(data.montant_cotisations)], ['Dons reçus', montant(data.dons_recus)]].filter(([,v])=>has(v));
+  if (asso.length) html += titre('Ressources associatives') + grid(asso);
+
+  const postes = (data.utilisation_postes||[]).filter(p=>has(p.poste));
+  if (postes.length) {
+    html += titre('Utilisation détaillée des fonds, par poste') +
+      `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Poste</th><th>Montant</th><th>Pourcentage</th></tr></thead><tbody>
+      ${postes.map(p=>`<tr><td>${esc(p.poste)}</td><td>${has(p.montant)?montant(p.montant):'—'}</td><td>${has(p.pourcentage)?esc(String(p.pourcentage))+' %':'—'}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  const capitalisation = [
+    ['Nombre de parts / actions', data.nb_parts_actions], ['Valeur nominale', montant(data.valeur_nominale)],
+    ['Fondateur 1', pct(data.pct_fondateur1)], ['Fondateur 2', pct(data.pct_fondateur2)],
+    ['Autres associés', pct(data.pct_autres_associes)], ['Investisseurs existants', pct(data.pct_investisseurs_existants)],
+  ].filter(([,v])=>has(v));
+  if (capitalisation.length) html += titre('💼 Capitalisation actuelle') + grid(capitalisation);
+  html += champ('Autres détenteurs', data.autres_detenteurs);
+
+  const levee = [
+    ['Valorisation avant investissement', montant(data.valorisation_avant)], ['Valorisation après investissement', montant(data.valorisation_apres)],
+    ['Pourcentage proposé', pct(data.pourcentage_propose)], ['Dilution maximale acceptée', pct(data.dilution_maximale_acceptee)],
+    ['Type d’instrument', TYPE_INSTRUMENT[data.type_instrument] || data.type_instrument],
+  ].filter(([,v])=>has(v));
+  if (levee.length) html += titre('💼 Levée de fonds') + grid(levee);
+
+  html += champ('Scénario à 50 % du financement demandé', data.scenario_financement_50);
+  html += champ('Scénario à 100 % du financement demandé', data.scenario_financement_100);
+  html += champ('Scénario à 150 % du financement demandé', data.scenario_financement_150);
+
+  const sortie = [
+    ['Type de sortie', TYPE_SORTIE[data.type_sortie] || data.type_sortie], ['Horizon', data.horizon_sortie],
+    ['Valorisation cible', montant(data.valorisation_cible)],
+  ].filter(([,v])=>has(v));
+  if (sortie.length) html += titre('Stratégie de sortie') + grid(sortie);
+  html += champ('Acquéreurs potentiels', data.acquereurs_potentiels);
+  html += champ('Scénario acquisition', data.scenario_acquisition);
+  html += champ('Scénario revente', data.scenario_revente);
+  html += champ('Scénario dividendes', data.scenario_dividendes);
+  html += champ('Scénario croissance long terme', data.scenario_croissance_long_terme);
+  html += champ('Retour sur investissement attendu à la sortie', data.roi_sortie);
+  html += champ('Stratégie de sortie (résumé)', data.strategie_sortie);
+
+  return html;
+}
 
 function renderFieldGrid(section, schema){
   const rows = Object.entries(schema).filter(([k]) => has(section?.[k]));
@@ -466,11 +547,7 @@ async function init(){
     else if (meta.key === 'risques') content = renderRisques(data.items);
     else if (meta.key === 'annexes') content = renderAnnexes(data.items);
     else if (meta.key === 'solution') content = renderFieldGrid({ ...data, niveau_developpement: NIVEAU_DEV_LABELS[data.niveau_developpement] || data.niveau_developpement }, TEXT_SECTIONS.solution);
-    // financement.montant est un champ numérique (contrairement au reste de cette section, du
-    // texte libre) -- mis en forme comme les autres montants du document (espace milliers +
-    // devise) plutôt que laissé brut ("45000" au lieu de "45 000 EUR"), incohérence trouvée sur
-    // l'exemple réel publié, corrigée le 2026-08-31.
-    else if (meta.key === 'financement') content = renderFieldGrid({ ...data, montant: has(data.montant) ? fmtMontant(data.montant) : data.montant }, TEXT_SECTIONS.financement);
+    else if (meta.key === 'financement') content = renderFinancement(data);
     else if (TEXT_SECTIONS[meta.key]) content = renderFieldGrid(data, TEXT_SECTIONS[meta.key]);
     return buildSection(meta, content);
   });
