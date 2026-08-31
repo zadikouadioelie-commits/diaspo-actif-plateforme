@@ -133,7 +133,7 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
     <div class="dossier-toolbar">
       <div class="left">
         <a href="#" id="dossier-back" class="dossier-back">← Retour au business plan</a>
-        <span class="pill" style="border-color:var(--border);">🟣 Gabarit Premium — investisseurs</span>
+        <select id="dossier-template-select" onchange="onTemplateChange(this.value)"></select>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-outline btn-sm" id="dossier-btn-pptx" onclick="generatePPTX()" disabled>⏳ PowerPoint…</button>
@@ -177,6 +177,30 @@ function pct(n){ return has(n) ? `${n}${String(n).includes('%')?'':' %'}` : ''; 
 const TYPES = { startup:'Startup', pme:'PME', association:'Association', ong:'ONG', cooperative:'Coopérative', social:'Entreprise sociale', freelance:'Freelance', autre:'Projet' };
 const STATUTS = { brouillon:'Brouillon', complet:'Dossier complet', archive:'Archivé' };
 
+/* ---- Gabarits ----
+   Même base de données, même structure de pages — seuls changent le dosage de couleur, la
+   composition de couverture et le degré de sobriété (cf. maquette validée). Le logo reste
+   toujours celui de Diaspo'Actif, jamais recoloré. */
+const TEMPLATES = {
+  premium:   { label:'🟣 Premium — investisseurs', navy:'#0D2B4E', orange:'#F26422', blue:'#1E4F8A', paper:'#F7F5F0', ink:'#181B20', inkSoft:'#4B5160', line:'#DBD6C8', cover:'dark', coverBg:'radial-gradient(ellipse 900px 500px at 15% 8%, rgba(242,100,34,.14), transparent 60%), linear-gradient(165deg,#14171C 0%,#0D2B4E 130%)' },
+  corporate: { label:'🟦 Corporate — institutions', navy:'#0D2B4E', orange:'#F26422', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#DDE3EE', cover:'light' },
+  moderne:   { label:'🟢 Moderne — entrepreneurial', navy:'#0D2B4E', orange:'#F26422', blue:'#1E4F8A', paper:'#EEF2F8', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#D7DFEC', cover:'dark', coverBg:'linear-gradient(135deg,#0D2B4E,#1E4F8A)' },
+  impact:    { label:'🌍 Impact — social & territorial', navy:'#0D2B4E', orange:'#1A7A52', blue:'#1E4F8A', paper:'#F4F0E6', ink:'#0D2B4E', inkSoft:'#6B6250', line:'#E4DCC8', cover:'impact' },
+  finance:   { label:'🏦 Finance — banques & financeurs', navy:'#14171C', orange:'#8A6D3F', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#14171C', inkSoft:'#5B5F66', line:'#E2E4E8', cover:'light' },
+};
+let ACTIVE_TPL = TEMPLATES.premium;
+function applyTemplate(key){
+  const t = TEMPLATES[key] || TEMPLATES.premium;
+  ACTIVE_TPL = t;
+  const root = document.documentElement.style;
+  root.setProperty('--dp-navy', t.navy); root.setProperty('--dp-orange', t.orange); root.setProperty('--dp-blue', t.blue);
+  root.setProperty('--dp-paper', t.paper); root.setProperty('--dp-ink', t.ink); root.setProperty('--dp-ink-soft', t.inkSoft); root.setProperty('--dp-line', t.line);
+}
+function onTemplateChange(key){
+  applyTemplate(key);
+  if (DOSSIER_BP) renderDossier(DOSSIER_BP, key);
+}
+
 /* ---- Composants ---- */
 function kpi(label, value, note){ if (!has(value)) return ''; return `<div class="kpi"><p class="kl">${esc(label)}</p><p class="kv">${esc(value)}</p>${note?`<p class="kn">${esc(note)}</p>`:''}</div>`; }
 function kpiRow(items){ const cells = items.filter(([l,v]) => has(v)).map(([l,v,n]) => kpi(l,v,n)); if (!cells.length) return ''; const n = Math.min(cells.length,4); return `<div class="kpi-row n${n}">${cells.join('')}</div>`; }
@@ -197,20 +221,67 @@ const FIELD_LABELS = {
   impact:{ economique:"Impact économique", social:"Impact social", environnemental:"Impact environnemental", territorial:"Impact territorial" },
 };
 
-/* ---- Page : Couverture ---- */
-function pageCouverture(bp){
+/* ---- Page : Couverture ----
+   Trois compositions possibles selon le gabarit (cf. maquette) : sombre et premium (Premium,
+   Moderne), claire et institutionnelle (Corporate, Finance), ou territoriale et chaleureuse
+   (Impact) — la structure des informations affichées ne change jamais, seul l'habillage change. */
+function pageCouverture(bp, tpl){
+  tpl = tpl || ACTIVE_TPL;
   const meta = [TYPES[bp.type_initiative]||bp.type_initiative, bp.secteur, [bp.sections?.infos_generales?.ville, bp.sections?.infos_generales?.pays].filter(Boolean).join(', '), STATUTS[bp.statut]].filter(has);
-  return `<div class="sheet dark" data-page-id="cover" style="background:radial-gradient(ellipse 900px 500px at 15% 8%, rgba(242,100,34,.14), transparent 60%), linear-gradient(165deg,#14171C 0%,#0D2B4E 130%);">
+  const metaPills = (color, borderA) => meta.map(m=>`<span class="pill" style="border-color:${borderA};color:${color};">${esc(m)}</span>`).join('');
+
+  if (tpl.cover === 'light') {
+    return `<div class="sheet" data-page-id="cover" style="background:#FFFFFF;border-top:5px solid ${tpl.navy};">
+      <div class="pg" style="padding:26mm 20mm 18mm;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <img src="${LOGO_DATA}" style="width:64px;height:64px;">
+          <span class="pill" style="border-color:${tpl.line};color:${tpl.inkSoft};">Confidentiel</span>
+        </div>
+        <div>
+          <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${tpl.orange};font-weight:600;margin:0 0 20px;">Business Plan — Dossier Investisseur</p>
+          <h1 style="font-family:var(--dp-display);color:${tpl.navy};font-size:48px;font-weight:700;line-height:1.05;margin:0 0 16px;letter-spacing:-.02em;text-wrap:balance;">${esc(bp.nom_projet||'Sans titre')}</h1>
+          ${has(bp.slogan) ? `<p style="font-family:var(--dp-body);color:${tpl.inkSoft};font-size:16px;font-style:italic;margin:0 0 30px;">${esc(bp.slogan)}</p>` : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaPills(tpl.navy, tpl.line)}</div>
+        </div>
+        <div class="pg-chrome-bottom" style="border-top-color:${tpl.line};color:${tpl.inkSoft};">
+          <span>Diaspo'Actif — Écosystème diaspora</span><span>${fmtDate(bp.updated_at)}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if (tpl.cover === 'impact') {
+    return `<div class="sheet" data-page-id="cover" style="background:${tpl.paper};border-left:6px solid ${tpl.orange};">
+      <div class="pg" style="padding:26mm 20mm 18mm;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <img src="${LOGO_DATA}" style="width:64px;height:64px;">
+          <span class="pill" style="border-color:${tpl.line};color:${tpl.inkSoft};">Confidentiel</span>
+        </div>
+        <div>
+          <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${tpl.orange};font-weight:600;margin:0 0 20px;">Business Plan — Dossier Impact</p>
+          <h1 style="font-family:var(--dp-display);color:${tpl.navy};font-size:48px;font-weight:700;line-height:1.05;margin:0 0 16px;letter-spacing:-.02em;text-wrap:balance;">${esc(bp.nom_projet||'Sans titre')}</h1>
+          ${has(bp.slogan) ? `<p style="font-family:var(--dp-body);color:${tpl.inkSoft};font-size:16px;font-style:italic;margin:0 0 30px;">${esc(bp.slogan)}</p>` : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaPills(tpl.navy, tpl.line)}</div>
+        </div>
+        <div class="pg-chrome-bottom" style="border-top-color:${tpl.line};color:${tpl.inkSoft};">
+          <span>Diaspo'Actif — Écosystème diaspora</span><span>${fmtDate(bp.updated_at)}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // cover === 'dark' (Premium, Moderne)
+  return `<div class="sheet dark" data-page-id="cover" style="background:${tpl.coverBg};">
     <div class="pg" style="padding:26mm 20mm 18mm;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <img src="${LOGO_DATA}" style="width:70px;height:70px;">
         <span class="pill" style="border-color:rgba(247,245,240,.25);color:#F7F5F0;">Confidentiel</span>
       </div>
       <div>
-        <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#F26422;font-weight:600;margin:0 0 20px;">Business Plan — Dossier Investisseur</p>
+        <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${tpl.orange};font-weight:600;margin:0 0 20px;">Business Plan — Dossier Investisseur</p>
         <h1 style="font-family:var(--dp-display);color:#F7F5F0;font-size:52px;font-weight:700;line-height:1;margin:0 0 16px;letter-spacing:-.02em;text-wrap:balance;">${esc(bp.nom_projet||'Sans titre')}</h1>
         ${has(bp.slogan) ? `<p style="font-family:var(--dp-body);color:rgba(247,245,240,.72);font-size:16px;font-style:italic;margin:0 0 30px;">${esc(bp.slogan)}</p>` : ''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">${meta.map(m=>`<span class="pill" style="border-color:rgba(247,245,240,.25);color:#F7F5F0;">${esc(m)}</span>`).join('')}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${metaPills('#F7F5F0','rgba(247,245,240,.25)')}</div>
       </div>
       <div class="pg-chrome-bottom" style="border-top-color:rgba(247,245,240,.18);color:rgba(247,245,240,.5);">
         <span>Diaspo'Actif — Écosystème diaspora</span><span>${fmtDate(bp.updated_at)}</span>
@@ -297,7 +368,7 @@ function competitiveMatrix(concurrents){
   const W=320, H=170, PAD=34;
   const sx = x => PAD + (x/100)*(W-PAD-14);
   const sy = y => H-PAD - (y/maxY)*(H-PAD-14);
-  const dots = points.map(p => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="5" fill="#F26422" opacity="0.85"/><text x="${(sx(p.x)+8).toFixed(1)}" y="${(sy(p.y)+3).toFixed(1)}" font-family="Public Sans,Arial" font-size="9" fill="#181B20">${esc(p.c.nom)}</text>`).join('');
+  const dots = points.map(p => `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="5" style="fill:var(--dp-orange)" opacity="0.85"/><text x="${(sx(p.x)+8).toFixed(1)}" y="${(sy(p.y)+3).toFixed(1)}" font-family="Public Sans,Arial" font-size="9" style="fill:var(--dp-ink)">${esc(p.c.nom)}</text>`).join('');
   return `<p class="block-title">Matrice concurrentielle</p>
     <div style="display:flex;gap:20px;align-items:center;">
       <svg width="320" height="170" viewBox="0 0 ${W} ${H}">
@@ -367,7 +438,7 @@ function funnelDiagram(stages){
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
       <div style="width:88px;font-size:9.5px;color:var(--dp-ink-soft);text-align:right;flex:none;">${esc(label)}</div>
       <div style="flex:1;background:var(--dp-line);border-radius:2px;height:20px;position:relative;">
-        <div style="width:${wPct}%;height:100%;background:${i===stages.length-1?'#F26422':'#0D2B4E'};opacity:${1-i*0.12};border-radius:2px;"></div>
+        <div style="width:${wPct}%;height:100%;background:${i===stages.length-1?'var(--dp-orange)':'var(--dp-navy)'};opacity:${1-i*0.12};border-radius:2px;"></div>
       </div>
       <div style="width:52px;font-family:var(--dp-mono);font-size:10.5px;font-weight:600;flex:none;">${val.toLocaleString('fr-FR')}</div>
       <div style="width:44px;font-family:var(--dp-mono);font-size:9px;color:var(--dp-ink-soft);flex:none;">${conv!=null?conv+' %':''}</div>
@@ -445,16 +516,16 @@ function pageFinances(bp){
     if (caVals.length >= 2){
       const max = Math.max(...caVals);
       const bw = 320/annees.length, gap=8;
-      const bars = annees.map((a,i) => { const v = Number(pf[`ca_${a}`])||0; if (!v) return ''; const h = Math.round((v/max)*90); const x = i*bw+gap/2; return `<rect x="${x}" y="${108-h}" width="${bw-gap}" height="${h}" fill="${i===annees.length-1?'#F26422':'#0D2B4E'}" opacity="${i===annees.length-1?1:0.35+0.1*i}"/><text x="${x+(bw-gap)/2}" y="${108-h-4}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#4B5160">${Math.round(v/1000)}k</text><text x="${x+(bw-gap)/2}" y="119" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#4B5160">An ${a}</text>`; }).join('');
+      const bars = annees.map((a,i) => { const v = Number(pf[`ca_${a}`])||0; if (!v) return ''; const h = Math.round((v/max)*90); const x = i*bw+gap/2; return `<rect x="${x}" y="${108-h}" width="${bw-gap}" height="${h}" style="fill:${i===annees.length-1?'var(--dp-orange)':'var(--dp-navy)'}" opacity="${i===annees.length-1?1:0.35+0.1*i}"/><text x="${x+(bw-gap)/2}" y="${108-h-4}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7.5" style="fill:var(--dp-ink-soft)">${Math.round(v/1000)}k</text><text x="${x+(bw-gap)/2}" y="119" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="7.5" style="fill:var(--dp-ink-soft)">An ${a}</text>`; }).join('');
       chart = `<p class="block-title">Chiffre d'affaires prévisionnel</p><svg width="100%" height="122" viewBox="0 0 320 122" preserveAspectRatio="xMinYMid meet"><line x1="0" y1="108" x2="320" y2="108" stroke="#DBD6C8"/>${bars}</svg>`;
     }
   }
-  const charges1 = [['achats_1','Achats','#0D2B4E'],['salaires_1','Salaires','#F26422'],['loyers_1','Loyers','#1E4F8A'],['marketing_charge_1','Marketing','#8B93A1'],['autres_charges_1','Autres','#4B5160']].filter(([k])=>has(pf[k])&&Number(pf[k])>0);
+  const charges1 = [['achats_1','Achats','var(--dp-navy)'],['salaires_1','Salaires','var(--dp-orange)'],['loyers_1','Loyers','var(--dp-blue)'],['marketing_charge_1','Marketing','#8B93A1'],['autres_charges_1','Autres','var(--dp-ink-soft)']].filter(([k])=>has(pf[k])&&Number(pf[k])>0);
   let donut = '';
   if (charges1.length >= 2){
     const total = charges1.reduce((s,[k])=>s+Number(pf[k]),0);
     let offset = 0;
-    const arcs = charges1.map(([k,l,color]) => { const v=Number(pf[k]); const frac = v/total*100; const arc = `<circle r="16" cx="18" cy="18" fill="transparent" stroke="${color}" stroke-width="4" stroke-dasharray="${frac} ${100-frac}" stroke-dashoffset="${-offset}" transform="rotate(-90 18 18)"/>`; offset += frac; return arc; }).join('');
+    const arcs = charges1.map(([k,l,color]) => { const v=Number(pf[k]); const frac = v/total*100; const arc = `<circle r="16" cx="18" cy="18" fill="transparent" style="stroke:${color}" stroke-width="4" stroke-dasharray="${frac} ${100-frac}" stroke-dashoffset="${-offset}" transform="rotate(-90 18 18)"/>`; offset += frac; return arc; }).join('');
     donut = `<p class="block-title">Répartition des charges (An 1)</p><div style="display:flex;align-items:center;gap:16px;"><svg width="86" height="86" viewBox="0 0 36 36"><circle r="16" cx="18" cy="18" fill="transparent" stroke="#DBD6C8" stroke-width="4"/>${arcs}</svg><div style="font-size:9.5px;line-height:2;">${charges1.map(([k,l,c])=>`<p style="margin:0;"><span style="color:${c};">●</span> ${esc(l)} — ${Math.round(Number(pf[k])/total*100)}%</p>`).join('')}</div></div>`;
   }
   if (!kRow && !crTable && !donut) return '';
@@ -513,16 +584,30 @@ function pageEquipe(bp){
 }
 
 /* ---- Page : Conclusion ---- */
-function pageConclusion(bp){
+function pageConclusion(bp, tpl){
+  tpl = tpl || ACTIVE_TPL;
   const fi = (bp.sections||{}).financement || {}, ig = (bp.sections||{}).infos_generales || {};
   const ask = has(fi.montant) ? `${fmtEUR(fi.montant)} recherchés${has(fi.utilisation)?' — '+fi.utilisation.split(/[.\n]/)[0]:''}.` : "Merci de l'attention portée à ce dossier.";
   const contactName = ig.responsable || '', contactEmail = ig.email || '';
-  return `<div class="sheet dark" data-page-id="conclusion" style="background:linear-gradient(170deg,#0D2B4E,#14171C 120%);"><div class="pg" style="padding:26mm 20mm 18mm;align-items:flex-start;">
+  const contactBlock = (labelColor, valColor) => (has(contactName)||has(contactEmail)) ? `<div style="display:flex;gap:36px;font-size:11.5px;">${has(contactName)?`<div><p style="font-family:var(--dp-mono);font-size:8.5px;text-transform:uppercase;color:${labelColor};margin:0 0 4px;">Contact</p><p style="margin:0;color:${valColor};font-weight:600;">${esc(contactName)}</p></div>`:''}${has(contactEmail)?`<div><p style="font-family:var(--dp-mono);font-size:8.5px;text-transform:uppercase;color:${labelColor};margin:0 0 4px;">Email</p><p style="margin:0;color:${valColor};font-weight:600;">${esc(contactEmail)}</p></div>`:''}</div>` : '';
+
+  if (tpl.cover === 'light' || tpl.cover === 'impact') {
+    return `<div class="sheet" data-page-id="conclusion" style="background:${tpl.paper};border-top:5px solid ${tpl.navy};"><div class="pg" style="padding:26mm 20mm 18mm;align-items:flex-start;">
+      <img src="${LOGO_DATA}" style="width:44px;height:44px;margin-bottom:auto;">
+      <div style="margin-top:auto;">
+        <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${tpl.orange};font-weight:600;margin:0 0 16px;">Prochaine étape</p>
+        <h2 style="font-family:var(--dp-display);color:${tpl.navy};font-size:28px;font-weight:700;line-height:1.2;margin:0 0 18px;max-width:480px;text-wrap:balance;">${esc(ask)}</h2>
+        ${contactBlock(tpl.inkSoft, tpl.navy)}
+      </div>
+      <div class="pg-chrome-bottom" style="border-top-color:${tpl.line};color:${tpl.inkSoft};"><span>Diaspo'Actif — Écosystème diaspora</span><span class="dp-pagenum">—</span></div>
+    </div></div>`;
+  }
+  return `<div class="sheet dark" data-page-id="conclusion" style="background:linear-gradient(170deg,${tpl.navy},#14171C 120%);"><div class="pg" style="padding:26mm 20mm 18mm;align-items:flex-start;">
     <img src="${LOGO_DATA}" style="width:48px;height:48px;margin-bottom:auto;">
     <div style="margin-top:auto;">
-      <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#F26422;font-weight:600;margin:0 0 16px;">Prochaine étape</p>
+      <p style="font-family:var(--dp-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${tpl.orange};font-weight:600;margin:0 0 16px;">Prochaine étape</p>
       <h2 style="font-family:var(--dp-display);color:#F7F5F0;font-size:30px;font-weight:700;line-height:1.15;margin:0 0 18px;max-width:480px;text-wrap:balance;">${esc(ask)}</h2>
-      ${(has(contactName)||has(contactEmail)) ? `<div style="display:flex;gap:36px;font-size:11.5px;color:rgba(247,245,240,.75);">${has(contactName)?`<div><p style="font-family:var(--dp-mono);font-size:8.5px;text-transform:uppercase;color:rgba(247,245,240,.5);margin:0 0 4px;">Contact</p><p style="margin:0;color:#F7F5F0;font-weight:600;">${esc(contactName)}</p></div>`:''}${has(contactEmail)?`<div><p style="font-family:var(--dp-mono);font-size:8.5px;text-transform:uppercase;color:rgba(247,245,240,.5);margin:0 0 4px;">Email</p><p style="margin:0;color:#F7F5F0;font-weight:600;">${esc(contactEmail)}</p></div>`:''}</div>` : ''}
+      ${contactBlock('rgba(247,245,240,.5)', '#F7F5F0')}
     </div>
     <div class="pg-chrome-bottom" style="border-top-color:rgba(247,245,240,.18);color:rgba(247,245,240,.5);"><span>Diaspo'Actif — Dossier confidentiel</span><span class="dp-pagenum">—</span></div>
   </div></div>`;
@@ -588,16 +673,10 @@ const generic = (bp,key) => pageGeneriqueLabels(bp,key);
 
 let DOSSIER_BP = null; // rendu accessible à generatePPTX() une fois le chargement terminé
 
-async function init(){
-  const id = new URLSearchParams(location.search).get('id');
-  if (!id) { showError("Aucun business plan spécifié."); return; }
-  document.getElementById('dossier-back').href = `business-plan-view.html?id=${id}`;
-  let bp;
-  try { bp = await api('GET', `/business-plans/${id}`); }
-  catch(e) { showError(e.status === 403 ? "Vous n'avez pas accès à ce business plan." : (e.status === 404 ? 'Business plan introuvable.' : ('Erreur : ' + e.message))); return; }
-  DOSSIER_BP = bp;
-
-  document.title = `Dossier — ${bp.nom_projet || 'Business Plan'} — Diaspo'Actif`;
+/* Construit (ou reconstruit, au changement de gabarit) l'intégralité du document dans le DOM.
+   Séparée de init() pour être rappelable par onTemplateChange() sans re-fetcher les données. */
+function renderDossier(bp, tplKey){
+  const tpl = TEMPLATES[tplKey] || TEMPLATES.premium;
 
   // Ordre narratif investisseur : la thèse, puis le problème/solution, la preuve, le marché
   // et le modèle, le détail opérationnel, la finance, et enfin l'équipe qui porte tout ça.
@@ -619,7 +698,7 @@ async function init(){
   ].filter(p => p.html);
 
   const stage = document.getElementById('dossier-stage');
-  stage.innerHTML = pageCouverture(bp) + pageToc(bp) + pageDefs.map(p=>p.html).join('') + pageConclusion(bp);
+  stage.innerHTML = pageCouverture(bp, tpl) + pageToc(bp) + pageDefs.map(p=>p.html).join('') + pageConclusion(bp, tpl);
 
   // Table des matières + numérotation, calculées sur les pages réellement produites.
   const sheets = [...stage.querySelectorAll('.sheet')];
@@ -633,6 +712,25 @@ async function init(){
     const entries = pageDefs.map(p => ({ label:p.label, num: sheets.findIndex(s=>s.dataset.pageId===p.id)+1 }));
     tocList.innerHTML = entries.map((e,i) => `<div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--dp-line);font-size:12px;"><span style="font-family:var(--dp-mono);color:var(--dp-orange);font-weight:600;">${String(i+1).padStart(2,'0')}</span><span style="flex:1;">${esc(e.label)}</span><span style="font-family:var(--dp-mono);color:var(--dp-ink-soft);">${String(e.num).padStart(2,'0')}</span></div>`).join('');
   }
+}
+
+async function init(){
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { showError("Aucun business plan spécifié."); return; }
+  document.getElementById('dossier-back').href = `business-plan-view.html?id=${id}`;
+  let bp;
+  try { bp = await api('GET', `/business-plans/${id}`); }
+  catch(e) { showError(e.status === 403 ? "Vous n'avez pas accès à ce business plan." : (e.status === 404 ? 'Business plan introuvable.' : ('Erreur : ' + e.message))); return; }
+  DOSSIER_BP = bp;
+
+  document.title = `Dossier — ${bp.nom_projet || 'Business Plan'} — Diaspo'Actif`;
+
+  const select = document.getElementById('dossier-template-select');
+  select.innerHTML = Object.entries(TEMPLATES).map(([k,t]) => `<option value="${k}">${esc(t.label)}</option>`).join('');
+  select.value = 'premium';
+
+  applyTemplate('premium');
+  renderDossier(bp, 'premium');
 
   document.getElementById('dossier-loading').style.display = 'none';
   document.getElementById('dossier-shell').style.display = '';
@@ -677,7 +775,10 @@ async function generatePPTX(){
     pres.author = "Diaspo'Actif";
     pres.title = `${bp.nom_projet || 'Business Plan'} — Dossier investisseur`;
 
-    const C = { navy:'0D2B4E', orange:'F26422', blue:'1E4F8A', green:'1A7A52', paper:'F7F5F0', ink:'181B20', soft:'4B5160', line:'DBD6C8', white:'FFFFFF', dark:'14171C' };
+    // Reprend le gabarit couleur actif dans le PDF (sélecteur de la barre d'outils) -- même
+    // dossier, même identité, quelle que soit la sortie choisie. pptxgenjs veut du hex SANS #.
+    const noHash = h => (h||'').replace('#','');
+    const C = { navy:noHash(ACTIVE_TPL.navy), orange:noHash(ACTIVE_TPL.orange), blue:noHash(ACTIVE_TPL.blue), green:'1A7A52', paper:noHash(ACTIVE_TPL.paper), ink:noHash(ACTIVE_TPL.ink), soft:noHash(ACTIVE_TPL.inkSoft), line:noHash(ACTIVE_TPL.line), white:'FFFFFF', dark:'14171C' };
     const FD = 'Cambria', FB = 'Calibri'; // display / body — voir note ci-dessus
     const R = pres.ShapeType.rect, OV = pres.ShapeType.ellipse;
     const W = 13.333, MX = 0.55;
