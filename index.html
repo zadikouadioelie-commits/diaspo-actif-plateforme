@@ -961,12 +961,12 @@
 @media (prefers-reduced-motion: reduce) {
   .hp-hero-eyebrow, .hp-hero-title, .hp-hero-map, .hp-hero-sub, .hp-hero-ctas { animation: none !important; }
 }
-/* Le tiroir de menu (#sidebar) n'existe que pour le hamburger mobile.
-   Sur cette page (pas de mise en page .with-sidebar), il ne doit
-   jamais apparaître en permanence au-delà du point de rupture mobile. */
-@media (min-width: 769px) {
-  #sidebar, #sidebar-backdrop, #sidebar-toggle { display: none !important; }
-}
+/* 2026-08-31 : l'ancien blocage total (#sidebar-toggle compris) au-delà de 768px a été retiré
+   -- il empêchait le bouton Menu d'apparaître sur PC alors que le comportement standard
+   (assets/styles.v2.css) l'affiche déjà comme une simple icône dans le bandeau, cohérent avec
+   les autres pages (ex. profil.html, corrigé le même jour). #sidebar/#sidebar-backdrop restent
+   hors champ visuel par défaut (transform:translateX(-100%), voir styles.v2.css), donc aucune
+   régression : le tiroir ne s'ouvre toujours qu'au clic. */
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
