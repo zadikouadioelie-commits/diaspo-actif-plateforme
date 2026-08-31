@@ -25809,7 +25809,12 @@ ${jsonLd}
        transitions à partir de en_analyse/retenu/oriente_partenaire/mise_en_relation sont
        normalement déclenchées par les routes dédiées de l'incrément 5 (retour, demande
        d'infos, orientation partenaire), listées ici pour la validation du champ `statut`. */
-    const STATUTS_PROJETS_DA = ['brouillon','soumis','en_analyse','infos_demandees','retenu','oriente_partenaire','mise_en_relation','abouti','sans_suite'];
+    /* 'accompagnement' ajouté le 2026-08-30 (module Business Plan → Transmission à Diaspo'Actif) :
+       purement additif, aucune contrainte CHECK sur projets.statut à migrer — les dossiers déjà
+       existants dans n'importe quel statut continuent de fonctionner à l'identique. Partagé avec
+       les soumissions génériques (non issues d'un Business Plan), sans effet pour elles tant que
+       personne ne fait avancer un dossier jusque-là. */
+    const STATUTS_PROJETS_DA = ['brouillon','soumis','en_analyse','infos_demandees','retenu','oriente_partenaire','mise_en_relation','accompagnement','abouti','sans_suite'];
     const STATUT_TRANSITIONS_DA = {
       brouillon:           ['soumis'],
       soumis:               ['en_analyse'],
@@ -25817,7 +25822,8 @@ ${jsonLd}
       infos_demandees:      ['en_analyse'],
       retenu:               ['oriente_partenaire','sans_suite'],
       oriente_partenaire:   ['mise_en_relation','sans_suite'],
-      mise_en_relation:     ['abouti','sans_suite'],
+      mise_en_relation:     ['accompagnement','abouti','sans_suite'],
+      accompagnement:       ['abouti','sans_suite'],
       abouti:               [],
       sans_suite:           []
     };
@@ -25931,7 +25937,19 @@ ${jsonLd}
         retours = await db.prepare(`SELECT id,avis_general,observations,points_forts,points_faibles,recommandations,infos_manquantes,modifications_demandees,niveau_maturite,avis_faisabilite,commentaires,created_at FROM projets_retours_da WHERE projet_id=? ORDER BY created_at DESC`).all(id);
         demandes_infos = await db.prepare(`SELECT id,demande_texte,statut,reponse_texte,repondu_le,created_at FROM projets_demandes_infos WHERE projet_id=? ORDER BY created_at DESC`).all(id);
       }
-      return sendJSON(res, 200, { projet: p, commentaires, documents: documents || [], retours: retours || [], demandes_infos: demandes_infos || [] });
+      /* Résumé léger du Business Plan source (2026-08-30, module Transmission à Diaspo'Actif) :
+         le plan reste la source de vérité pour son contenu — juste de quoi afficher un lien
+         "voir le plan complet" côté admin, jamais une copie de sections_json ici. */
+      let business_plan = null, business_plan_documents = [];
+      if (p.business_plan_id) {
+        business_plan = await db.prepare(`SELECT id, nom_projet, secteur, progression FROM business_plans WHERE id=?`).get(p.business_plan_id);
+        // Pièces jointes ajoutées spécifiquement à la transmission (section_key='transmission_da',
+        // voir POST /api/business-plans/:id/documents) — distinctes des autres documents du plan.
+        business_plan_documents = await db.prepare(
+          `SELECT id, nom, url_bunny, type_mime, created_at FROM bp_documents WHERE bp_id=? AND section_key='transmission_da' ORDER BY created_at DESC`
+        ).all(p.business_plan_id);
+      }
+      return sendJSON(res, 200, { projet: p, commentaires, documents: documents || [], retours: retours || [], demandes_infos: demandes_infos || [], business_plan, business_plan_documents });
     }
 
     /* PUT /api/projets/:id — modifier. Pour type='soumission_da', modification bloquée dès que
@@ -36171,9 +36189,15 @@ async function computeBPScore(bp, sections) {
 
 /* ---- Liste des business plans ---- */
 app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  /* Statut de la dernière transmission (sous-requête corrélée, une ligne par plan) : donne le
+     badge "⚪ Non transmis / 🔵 Transmis / ..." sur la cartouche sans requête séparée par plan. */
+  const sousRequeteTransmission = `
+      (SELECT p.statut FROM projets p WHERE p.business_plan_id=bp.id ORDER BY p.created_at DESC LIMIT 1) AS transmission_statut,
+      (SELECT p.laisser_da_choisir FROM projets p WHERE p.business_plan_id=bp.id ORDER BY p.created_at DESC LIMIT 1) AS transmission_laisser_da_choisir`;
   const rows = await db.prepare(`
     SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom,
-      (SELECT COUNT(*) FROM bp_collaborateurs bc WHERE bc.bp_id=bp.id) as nb_collab
+      (SELECT COUNT(*) FROM bp_collaborateurs bc WHERE bc.bp_id=bp.id) as nb_collab,
+      ${sousRequeteTransmission}
     FROM business_plans bp
     JOIN users u ON u.id=bp.user_id
     WHERE bp.user_id=?
@@ -36181,7 +36205,8 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
   `).all(req.user.id);
   // Aussi les BPs où l'utilisateur est collaborateur
   const collab = await db.prepare(`
-    SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom, bc.role as mon_role
+    SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom, bc.role as mon_role,
+      ${sousRequeteTransmission}
     FROM business_plans bp
     JOIN users u ON u.id=bp.user_id
     JOIN bp_collaborateurs bc ON bc.bp_id=bp.id AND bc.user_id=?
@@ -36214,9 +36239,17 @@ app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
   const sections = safeJSON(bp.sections_json, {});
   const completude = await checkBPCompletude(sections);
   const progression = await calcBPProgression(sections);
+  /* Historique des transmissions (2026-08-30) : plusieurs lignes projets possibles pour un même
+     business_plan_id (une par tentative — statuts terminaux abouti/sans_suite permettent de
+     retransmettre), donne l'historique "gratuitement" sans nouvelle table. */
+  const transmissions = await db.prepare(
+    `SELECT id, statut, laisser_da_choisir, organismes_vises_texte, commentaire_transmission, besoins, budget_estime, date_soumission_da, updated_at
+     FROM projets WHERE business_plan_id=? ORDER BY created_at DESC`
+  ).all(bp.id);
   sendJSON(res, 200, { ...bp, sections, galerie: safeJSON(bp.galerie_json, []),
     devise_config: safeJSON(bp.devise_config, { reference: 'EUR', secondaires: [] }), completude, progression,
-    mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
+    mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur'),
+    transmissions: transmissions.map(t => ({ ...t, besoins: safeJSON(t.besoins, []) })) });
 });
 
 /* ---- Mise à jour (auto-save) ---- */
@@ -36454,6 +36487,58 @@ app.post('/api/business-plans/:id/duplicate', requireAuth, requireUtilisateurAbo
     VALUES (?,?,?,?,?,?,?)
   `).run(req.user.id, `Copie de ${bp.nom_projet}`, bp.slogan, bp.type_initiative, bp.secteur, bp.template, bp.sections_json);
   sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* ---- Transmettre à Diaspo'Actif (2026-08-30) ----
+   Réutilise le pipeline "soumission_da" déjà construit pour le module Projets générique
+   (mêmes tables/statuts/écran admin) plutôt que d'en dupliquer un second — voir
+   STATUTS_PROJETS_DA / STATUT_TRANSITIONS_DA plus haut. Un instantané des champs pertinents
+   du Business Plan est copié dans la ligne `projets` créée (le Business Plan reste la source
+   de vérité pour son contenu, consulté via business_plan_id, jamais recopié en intégralité). */
+app.post('/api/business-plans/:id/transmettre', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
+  const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
+  if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
+  // Propriétaire uniquement — décision qui engage le porteur du projet, pas les collaborateurs invités.
+  if (bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Réservé au propriétaire du plan.' });
+  // Même verrou Premium que la soumission générique (POST /api/projets, type='soumission_da') —
+  // requireUtilisateurAbonneMw ci-dessus ne couvre que le rôle 'utilisateur', pas 'initiative'.
+  if (req.user.role === 'initiative' && !(await hasAccreditation(req.user.id, 'initiative_abonne'))) {
+    return sendJSON(res, 402, { error: "La transmission d'un Business Plan à Diaspo'Actif est réservée aux Initiatives Abonné.", accred_type: 'initiative_abonne' });
+  }
+
+  const STATUTS_TERMINAUX_DA = ['abouti', 'sans_suite'];
+  const enCours = await db.prepare(
+    `SELECT id FROM projets WHERE business_plan_id=? AND statut NOT IN (${STATUTS_TERMINAUX_DA.map(() => '?').join(',')})`
+  ).get(bp.id, ...STATUTS_TERMINAUX_DA);
+  if (enCours) return sendJSON(res, 400, { error: 'Une transmission est déjà en cours pour ce plan.' });
+
+  const body = await parseBody(req);
+  const sections = safeJSON(bp.sections_json, {});
+  const infos = sections.infos_generales || {};
+  const financier = sections.plan_financier || {};
+
+  const laisserChoisir = !!body.laisser_da_choisir;
+  const organismesTexte = String(body.organismes_vises_texte || '').trim().slice(0, 2000);
+  const commentaire = String(body.commentaire_transmission || '').trim().slice(0, 1000);
+  const besoins = Array.isArray(body.besoins) ? body.besoins.filter(Boolean).slice(0, 10) : [];
+  // Montant recherché : repris du Business Plan si non précisé à la transmission — jamais
+  // redemandé si déjà disponible (demande explicite du cahier des charges, point 6).
+  const montant = body.budget_estime !== undefined && body.budget_estime !== ''
+    ? Number(body.budget_estime) : (Number(financier.financement_recherche) || null);
+
+  const r = await db.prepare(`
+    INSERT INTO projets (
+      titre, description, type, statut, createur_id, categorie, pays, region, ville,
+      budget_estime, besoins, business_plan_id, laisser_da_choisir,
+      organismes_vises_texte, commentaire_transmission, date_soumission_da
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+  `).run(
+    bp.nom_projet || 'Sans titre', bp.slogan || null, 'soumission_da', 'soumis', req.user.id,
+    bp.secteur || 'Général', infos.pays || null, infos.region || null, infos.ville || null,
+    montant, JSON.stringify(besoins), bp.id, laisserChoisir ? 1 : 0,
+    organismesTexte || null, commentaire || null
+  );
+  sendJSON(res, 201, { id: r.lastInsertRowid, statut: 'soumis' });
 });
 
 /* ---- Versions ---- */

@@ -193,6 +193,19 @@ function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digi
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 const TYPES = { startup:'🚀 Startup', pme:'🏢 PME', association:'🤝 Association', ong:'🌍 ONG', cooperative:'🌾 Coopérative', social:'💚 Social', autre:'📋 Autre' };
+/* Badge de statut de transmission (2026-08-30) — miroir client de la table de correspondance du
+   plan : plusieurs statuts projets.statut peuvent replier sur un même badge utilisateur. */
+const BP_TRANSMISSION_BADGES = {
+  soumis:             { label:'🔵 Transmis à Diaspo\'Actif', bg:'#dbeafe', color:'#1e40af' },
+  en_analyse:         { label:'🟠 En cours d\'analyse', bg:'#ffedd5', color:'#9a3412' },
+  infos_demandees:    { label:'🟠 En cours d\'analyse', bg:'#ffedd5', color:'#9a3412' },
+  retenu:             { label:'🟣 Orientation en cours', bg:'#ede9fe', color:'#6d28d9' },
+  oriente_partenaire: { label:'🟢 Organisme identifié', bg:'#dcfce7', color:'#166534' },
+  mise_en_relation:   { label:'🤝 Mise en relation', bg:'#fef9c3', color:'#854d0e' },
+  accompagnement:     { label:'✅ Accompagnement en cours', bg:'#dcfce7', color:'#166534' },
+  abouti:             { label:'❌ Dossier clôturé', bg:'#f1f5f9', color:'#475569' },
+  sans_suite:         { label:'❌ Dossier clôturé', bg:'#f1f5f9', color:'#475569' },
+};
 
 const STADE_LABELS = { idee:'💭 Idée', prototype:'🔧 Prototype / MVP', lancement:'🚀 Lancement', croissance:'📈 Croissance', expansion:'🌍 Expansion' };
 
@@ -231,6 +244,7 @@ function renderBPCard(bp, partage) {
           ${bp.secteur?`<span class="bp-tag">📂 ${esc(bp.secteur)}</span>`:''}
           <span class="bp-tag ${statutCls}">${statutLabel}</span>
           ${partage?`<span class="bp-tag" style="background:#ede9fe;color:#6d28d9;">🔗 Partagé — ${esc(bp.mon_role)}</span>`:''}
+          ${(() => { const badge = BP_TRANSMISSION_BADGES[bp.transmission_statut]; return badge ? `<span class="bp-tag" style="background:${badge.bg};color:${badge.color};">${badge.label}</span>` : `<span class="bp-tag" style="background:#f1f5f9;color:#94a3b8;">⚪ Non transmis</span>`; })()}
         </div>
         <div>
           <div class="bp-progress-bar"><div class="fill" style="width:${prog}%"></div></div>
@@ -246,6 +260,7 @@ function renderBPCard(bp, partage) {
           <button class="btn btn-sm btn-orange" onclick="openBP(${bp.id})">👁️ Consulter</button>
           ${(!partage || ['editeur','validateur'].includes(bp.mon_role))?`<button class="btn btn-sm btn-outline" onclick="editBP(${bp.id})">✏️ Modifier</button>`:''}
           <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer</button>
+          ${!partage?`<button class="btn btn-sm btn-orange" onclick="ouvrirTransmissionDA(${bp.id})">📤 Transmettre à Diaspo'Actif</button>`:''}
           ${!partage?`<button class="btn btn-sm btn-outline" style="color:#D33;" onclick="delBP(${bp.id},'${esc(bp.nom_projet||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
         </div>
       </div>
@@ -294,6 +309,219 @@ async function delBP(id, nom) {
     await api('DELETE', `/business-plans/${id}`);
     loadBPs();
   } catch(e) { alert(e.message); }
+}
+
+/* ══════════════ Transmission à Diaspo'Actif (2026-08-30) ══════════════
+   Modale à 3 vues (formulaire → récapitulatif → confirmation), construite à la main comme le
+   reste de la plateforme (pas de framework). "Organismes visés" est un simple champ texte libre
+   (pas de recherche/sélection dans une base) — décision explicite de l'utilisateur : le porteur
+   décrit à qui il veut avoir accès, Diaspo'Actif fait le reste manuellement. */
+const TDA_TYPE_DEMANDE_OPTIONS = [
+  ['financement', '💰 Recherche de financement'],
+  ['accompagnement', '🤝 Recherche d\'accompagnement'],
+  ['organisme_financier', '🏦 Recherche d\'un organisme financier'],
+  ['partenaires', '👥 Recherche de partenaires'],
+  ['visibilite', '📢 Recherche de visibilité'],
+  ['orientation', '🧭 Besoin d\'orientation'],
+  ['financement_accompagnement', '🔄 Financement + accompagnement'],
+  ['autre', '✏️ Autre'],
+];
+let tdaBP = null; // le business plan en cours de transmission (fiche complète, chargée à l'ouverture)
+let tdaBrouillon = { organismes_vises_texte:'', laisser_da_choisir:false, commentaire_transmission:'', besoins:[], budget_estime:null };
+let tdaVue = 'formulaire';
+
+function tdaOverlay() {
+  let overlay = document.getElementById('tda-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'tda-overlay';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;';
+    overlay.innerHTML = '<div class="card" id="tda-corps" style="max-width:520px;width:100%;margin:auto;background:#fff;padding:22px;"></div>';
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+}
+
+async function ouvrirTransmissionDA(bpId) {
+  const overlay = tdaOverlay();
+  const corps = document.getElementById('tda-corps');
+  corps.innerHTML = '<p style="text-align:center;color:var(--muted,#64748b);padding:20px;">Chargement…</p>';
+  overlay.style.display = 'flex';
+  tdaPiecesJointes = [];
+  try {
+    tdaBP = await api('GET', `/business-plans/${bpId}`);
+  } catch(e) { corps.innerHTML = `<p style="color:#D33;">Erreur : ${esc(e.message)}</p>`; return; }
+  const transmissionActive = (tdaBP.transmissions||[]).find(t => !['abouti','sans_suite'].includes(t.statut));
+  if (transmissionActive) {
+    corps.innerHTML = `<h3 style="margin:0 0 10px;">📤 Transmettre à Diaspo'Actif</h3>
+      <p style="color:var(--muted,#64748b);">Une transmission est déjà en cours pour « ${esc(tdaBP.nom_projet)} » (statut : ${esc(BP_TRANSMISSION_BADGES[transmissionActive.statut]?.label||transmissionActive.statut)}).</p>
+      <div style="text-align:right;margin-top:16px;"><button class="btn btn-outline" onclick="fermerTransmissionDA()">Fermer</button></div>`;
+    return;
+  }
+  const financier = (tdaBP.sections||{}).plan_financier || {};
+  tdaBrouillon = {
+    organismes_vises_texte: '', laisser_da_choisir: false, commentaire_transmission: '',
+    besoins: [], budget_estime: financier.financement_recherche ? Number(financier.financement_recherche) : null,
+  };
+  tdaVue = 'formulaire';
+  tdaRender();
+}
+function fermerTransmissionDA() {
+  const overlay = document.getElementById('tda-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function tdaRender() {
+  const corps = document.getElementById('tda-corps');
+  if (tdaVue === 'formulaire') corps.innerHTML = tdaVueFormulaire();
+  else if (tdaVue === 'recap') corps.innerHTML = tdaVueRecap();
+  else corps.innerHTML = tdaVueConfirmation();
+}
+
+function tdaVueFormulaire() {
+  const montantPreRempli = tdaBrouillon.budget_estime != null;
+  return `
+    <h3 style="margin:0 0 4px;">📤 Transmettre à Diaspo'Actif</h3>
+    <p style="font-size:12.5px;color:var(--muted,#64748b);margin:0 0 16px;">« ${esc(tdaBP.nom_projet)} »</p>
+
+    <label style="font-size:12px;font-weight:700;color:var(--muted,#64748b);">🎯 Organismes visés</label>
+    <textarea id="tda-organismes" rows="2" placeholder="Ex : Banque X, Fonds d'investissement Y…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:8px;margin:4px 0 4px;font-family:inherit;" ${tdaBrouillon.laisser_da_choisir?'disabled':''}>${esc(tdaBrouillon.organismes_vises_texte)}</textarea>
+    <p style="font-size:11.5px;color:var(--muted,#64748b);margin:0 0 12px;">Indiquez avec quels organismes vous souhaitez travailler ou auprès desquels vous souhaitez présenter votre projet (banque, fonds d'investissement, organisme public, organisme d'accompagnement, fondation, institution, programme de financement, partenaire privé…). Vous pouvez laisser ce champ vide.</p>
+
+    <label style="display:flex;gap:9px;align-items:flex-start;padding:10px 12px;background:var(--bg,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;cursor:pointer;margin-bottom:14px;">
+      <input type="checkbox" id="tda-laisser-choisir" ${tdaBrouillon.laisser_da_choisir?'checked':''} onchange="tdaToggleLaisserChoisir(this.checked)" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;">
+      <span>
+        <span style="font-size:13px;font-weight:700;">☑ Je laisse Diaspo'Actif identifier l'organisme le plus adapté</span>
+        <span style="display:block;font-size:12px;color:var(--muted,#64748b);line-height:1.5;margin-top:2px;">Diaspo'Actif analysera votre projet et pourra vous orienter vers l'organisme de financement ou d'accompagnement le plus adapté à votre activité et à vos besoins.</span>
+      </span>
+    </label>
+
+    <label style="font-size:12px;font-weight:700;color:var(--muted,#64748b);">Type de demande</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0 14px;">
+      ${TDA_TYPE_DEMANDE_OPTIONS.map(([v,l]) => `<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;cursor:pointer;">
+        <input type="checkbox" value="${v}" ${tdaBrouillon.besoins.includes(v)?'checked':''} onchange="tdaToggleBesoin('${v}',this.checked)"> ${l}
+      </label>`).join('')}
+    </div>
+
+    <label style="font-size:12px;font-weight:700;color:var(--muted,#64748b);">💰 Montant recherché (€)${montantPreRempli?' — repris de votre Business Plan':''}</label>
+    <input type="number" id="tda-montant" value="${tdaBrouillon.budget_estime ?? ''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:8px;margin:4px 0 14px;">
+
+    <label style="font-size:12px;font-weight:700;color:var(--muted,#64748b);">💬 Commentaire (facultatif)</label>
+    <textarea id="tda-commentaire" rows="3" maxlength="1000" placeholder="Ajoutez un message ou des précisions concernant votre projet, votre besoin de financement ou votre demande d'accompagnement…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border,#e2e8f0);border-radius:8px;margin:4px 0 4px;font-family:inherit;" oninput="document.getElementById('tda-compteur').textContent=this.value.length">${esc(tdaBrouillon.commentaire_transmission)}</textarea>
+    <p style="font-size:11px;color:var(--muted,#64748b);text-align:right;margin:0 0 16px;"><span id="tda-compteur">${tdaBrouillon.commentaire_transmission.length}</span>/1000</p>
+
+    <label style="font-size:12px;font-weight:700;color:var(--muted,#64748b);">📎 Pièce jointe (facultatif)</label>
+    <div style="margin:4px 0 16px;">
+      <input type="file" id="tda-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="tdaUploaderPiece(this)" style="font-size:12.5px;">
+      <div id="tda-piece-statut" style="font-size:11.5px;color:var(--muted,#64748b);margin-top:6px;"></div>
+      <div id="tda-pieces-liste"></div>
+    </div>
+
+    <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="fermerTransmissionDA()">Annuler</button>
+      <button class="btn btn-orange" onclick="tdaAllerRecap()">Continuer →</button>
+    </div>`;
+}
+/* Pièces jointes (2026-08-31) : facultatif, ne bloque jamais l'envoi — réutilise l'upload
+   générique déjà utilisé ailleurs dans l'éditeur (POST /api/upload/document, validation
+   magic-bytes côté serveur) puis les rattache au Business Plan via bp_documents, avec un
+   section_key dédié pour les distinguer du reste des pièces du plan. */
+let tdaPiecesJointes = [];
+async function tdaUploaderPiece(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statut = document.getElementById('tda-piece-statut');
+  statut.textContent = 'Envoi en cours…';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+    const upData = await up.json();
+    if (!up.ok) throw new Error(upData.error || 'Erreur upload');
+    await api('POST', `/business-plans/${tdaBP.id}/documents`, {
+      section_key: 'transmission_da', categorie: 'financier', nom: file.name, url_bunny: upData.url, type_mime: file.type,
+    });
+    tdaPiecesJointes.push(file.name);
+    statut.textContent = '';
+    document.getElementById('tda-pieces-liste').innerHTML = tdaPiecesJointes.map(n => `<div style="font-size:12.5px;margin-top:4px;">📄 ${esc(n)}</div>`).join('');
+    input.value = '';
+  } catch(e) { statut.textContent = 'Erreur : ' + e.message; }
+}
+function tdaToggleLaisserChoisir(checked) {
+  tdaBrouillon.laisser_da_choisir = checked;
+  tdaRender();
+}
+function tdaToggleBesoin(v, checked) {
+  tdaBrouillon.besoins = checked ? [...tdaBrouillon.besoins, v] : tdaBrouillon.besoins.filter(x => x !== v);
+}
+function tdaAllerRecap() {
+  tdaBrouillon.organismes_vises_texte = document.getElementById('tda-organismes').value.trim();
+  tdaBrouillon.commentaire_transmission = document.getElementById('tda-commentaire').value.trim().slice(0, 1000);
+  const montantVal = document.getElementById('tda-montant').value;
+  tdaBrouillon.budget_estime = montantVal !== '' ? Number(montantVal) : null;
+  tdaVue = 'recap';
+  tdaRender();
+}
+
+function tdaVueRecap() {
+  const typeLabels = tdaBrouillon.besoins.map(v => (TDA_TYPE_DEMANDE_OPTIONS.find(([vv]) => vv===v)||[,v])[1]).join(', ') || '—';
+  return `
+    <h3 style="margin:0 0 14px;">📤 Transmettre à Diaspo'Actif</h3>
+    <div style="background:var(--bg,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:14px;font-size:13px;line-height:1.9;margin-bottom:16px;">
+      <div><strong>📄 Business Plan</strong><br>${esc(tdaBP.nom_projet)}</div>
+      <div style="margin-top:8px;"><strong>🎯 Organismes visés</strong><br>${tdaBrouillon.laisser_da_choisir ? "Diaspo'Actif choisira l'organisme le plus adapté" : (esc(tdaBrouillon.organismes_vises_texte) || '—')}</div>
+      <div style="margin-top:8px;"><strong>💰 Besoin</strong><br>${tdaBrouillon.budget_estime != null ? Number(tdaBrouillon.budget_estime).toLocaleString('fr-FR')+' €' : '—'}</div>
+      <div style="margin-top:8px;"><strong>🤝 Demande</strong><br>${typeLabels}</div>
+      <div style="margin-top:8px;"><strong>💬 Message</strong><br>${esc(tdaBrouillon.commentaire_transmission) || '—'}</div>
+    </div>
+    <div id="tda-erreur" style="display:none;color:#D33;font-size:12.5px;margin-bottom:10px;"></div>
+    <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="tdaVue='formulaire';tdaRender();">← Modifier</button>
+      <button class="btn btn-orange" onclick="tdaEnvoyer(${tdaBP.id})">📤 Transmettre à Diaspo'Actif</button>
+    </div>`;
+}
+
+async function tdaEnvoyer(bpId) {
+  try {
+    await api('POST', `/business-plans/${bpId}/transmettre`, {
+      organismes_vises_texte: tdaBrouillon.organismes_vises_texte,
+      laisser_da_choisir: tdaBrouillon.laisser_da_choisir,
+      commentaire_transmission: tdaBrouillon.commentaire_transmission,
+      besoins: tdaBrouillon.besoins,
+      budget_estime: tdaBrouillon.budget_estime,
+    });
+    tdaVue = 'confirmation';
+    tdaRender();
+    loadBPs();
+  } catch(e) {
+    // 402 = verrou Premium (Initiative non Abonné) — repli compact dans la modale plutôt que
+    // remplacer toute la page comme afficherUpsellAbonneBP() (réservé au module entier).
+    if (e.status === 402) {
+      document.getElementById('tda-corps').innerHTML = `
+        <div style="text-align:center;padding:10px 0;">
+          <div style="font-size:32px;margin-bottom:10px;">🔒</div>
+          <h3 style="margin:0 0 8px;">Fonctionnalité réservée aux comptes Abonné</h3>
+          <p style="color:var(--muted,#64748b);font-size:13px;margin:0 0 18px;">${esc(e.message)}</p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn btn-outline" onclick="fermerTransmissionDA()">Fermer</button>
+            <a class="btn btn-orange" href="premium.html?type=initiative" style="text-decoration:none;">🎉 Passer à Premium</a>
+          </div>
+        </div>`;
+      return;
+    }
+    const err = document.getElementById('tda-erreur');
+    if (err) { err.textContent = e.message; err.style.display = 'block'; }
+  }
+}
+
+function tdaVueConfirmation() {
+  return `
+    <div style="text-align:center;padding:10px 0;">
+      <div style="font-size:36px;margin-bottom:10px;">✅</div>
+      <h3 style="margin:0 0 8px;">Votre Business Plan a bien été transmis à Diaspo'Actif.</h3>
+      <p style="color:var(--muted,#64748b);font-size:13px;margin:0 0 20px;">Statut : Transmis</p>
+      <button class="btn btn-orange" onclick="fermerTransmissionDA()">Fermer</button>
+    </div>`;
 }
 
 function openCreateModal() { document.getElementById('modal-create').style.display='flex'; document.getElementById('new-nom').focus(); }

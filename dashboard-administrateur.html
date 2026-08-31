@@ -5576,6 +5576,7 @@ const PN_DA_STATUT_LABELS = {
   brouillon: '📝 Brouillon', soumis: '📤 Soumis', en_analyse: '🔍 En analyse',
   infos_demandees: "❓ Infos demandées", retenu: '✅ Retenu',
   oriente_partenaire: '🤝 Orienté partenaire', mise_en_relation: '🔗 Mise en relation',
+  accompagnement: '🌱 Accompagnement en cours', // ajouté 2026-08-30 (Business Plan → Transmission)
   abouti: '🏆 Abouti', sans_suite: '⛔ Sans suite',
 };
 
@@ -5586,7 +5587,10 @@ async function loadDossiersDA() {
     if (!soumissions.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun dossier soumis pour l\'instant.</p>'; return; }
     el.innerHTML = soumissions.map(p => `
       <div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div><strong style="font-size:13px;">${esc(p.titre)}</strong> <span style="font-size:11px;color:var(--muted);">par ${esc(p.createur_nom || '—')} (${esc(p.createur_role || '')}) · ${PN_DA_STATUT_LABELS[p.statut] || esc(p.statut)}</span></div>
+        <div><strong style="font-size:13px;">${esc(p.titre)}</strong> <span style="font-size:11px;color:var(--muted);">par ${esc(p.createur_nom || '—')} (${esc(p.createur_role || '')}) · ${PN_DA_STATUT_LABELS[p.statut] || esc(p.statut)}</span>
+          ${p.business_plan_id ? `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:99px;background:#f5f3ff;color:#6d28d9;margin-left:6px;">📄 Business Plan</span>` : ''}
+          ${Number(p.laisser_da_choisir) ? `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fef9c3;color:#854d0e;margin-left:6px;">🧭 ORIENTATION DEMANDÉE</span>` : ''}
+        </div>
         <button class="btn btn-outline btn-sm" onclick="pnOuvrirDossierDetail(${p.id})">👁️ Détail</button>
       </div>`).join('');
   } catch (e) { el.innerHTML = '<p style="color:red;font-size:13px;">Erreur de chargement.</p>'; }
@@ -5606,15 +5610,43 @@ async function pnOuvrirDossierDetail(projetId) {
 }
 function pnFermerDossierDetail() { document.getElementById('pn-dossier-detail-modal-bg').style.display = 'none'; _pnDossierCourant = null; loadDossiersDA(); }
 
+/* Miroir client de STATUT_TRANSITIONS_DA (server/index.js) — sert uniquement à peupler les
+   options du sélecteur ; la vraie validation reste côté serveur (PUT /api/projets/:id/statut). */
+const PN_DA_TRANSITIONS = {
+  brouillon: ['soumis'], soumis: ['en_analyse'],
+  en_analyse: ['infos_demandees','retenu','sans_suite'],
+  infos_demandees: ['en_analyse'],
+  retenu: ['oriente_partenaire','sans_suite'],
+  oriente_partenaire: ['mise_en_relation','sans_suite'],
+  mise_en_relation: ['accompagnement','abouti','sans_suite'],
+  accompagnement: ['abouti','sans_suite'],
+  abouti: [], sans_suite: [],
+};
 function pnRenderDossierDetail(data) {
   const p = data.projet;
   document.getElementById('pn-dossier-detail-titre').textContent = p.titre;
   const infosOuvertes = (data.demandes_infos || []).filter(d => d.statut === 'en_attente');
+  const suivantes = PN_DA_TRANSITIONS[p.statut] || [];
   document.getElementById('pn-dossier-detail-content').innerHTML = `
-    <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#dbeafe;color:#1e40af;">${PN_DA_STATUT_LABELS[p.statut] || esc(p.statut)}</span> <span style="font-size:12px;color:var(--muted);">par ${esc(p.createur_nom || '—')}</span></div>
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#dbeafe;color:#1e40af;">${PN_DA_STATUT_LABELS[p.statut] || esc(p.statut)}</span>
+      ${Number(p.laisser_da_choisir) ? `<span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;background:#fef9c3;color:#854d0e;">🧭 ORIENTATION DEMANDÉE</span>` : ''}
+      <span style="font-size:12px;color:var(--muted);">par ${esc(p.createur_nom || '—')}</span>
+    </div>
+    ${data.business_plan ? `<div style="margin-bottom:10px;padding:8px 12px;background:#f5f3ff;border-radius:8px;font-size:12.5px;">📄 Issu du Business Plan « ${esc(data.business_plan.nom_projet)} » (${data.business_plan.progression||0}% complété) — <a href="business-plan-view.html?id=${data.business_plan.id}" target="_blank" rel="noopener" style="color:#6d28d9;font-weight:700;">Voir le Business Plan complet →</a></div>` : ''}
+    ${(p.organismes_vises_texte || '').trim() ? `<div style="margin-bottom:10px;"><strong style="font-size:13px;">🎯 Organismes visés</strong><p style="font-size:13px;margin:4px 0 0;white-space:pre-wrap;">${esc(p.organismes_vises_texte)}</p></div>` : ''}
+    ${(p.commentaire_transmission || '').trim() ? `<div style="margin-bottom:10px;"><strong style="font-size:13px;">💬 Commentaire du porteur</strong><p style="font-size:13px;margin:4px 0 0;white-space:pre-wrap;">${esc(p.commentaire_transmission)}</p></div>` : ''}
+    ${(data.business_plan_documents||[]).length ? `<div style="margin-bottom:10px;"><strong style="font-size:13px;">📎 Pièces jointes (transmission)</strong>${data.business_plan_documents.map(d => `<div style="font-size:13px;margin-top:4px;"><a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom)}</a></div>`).join('')}</div>` : ''}
+    ${p.budget_estime ? `<div style="margin-bottom:10px;font-size:13px;"><strong>💰 Montant recherché :</strong> ${Number(p.budget_estime).toLocaleString('fr-FR')} €</div>` : ''}
     ${p.presentation ? `<p style="font-size:13.5px;">${esc(p.presentation)}</p>` : ''}
     ${p.description ? `<p style="font-size:13px;color:var(--muted);">${esc(p.description)}</p>` : ''}
     ${(data.documents || []).length ? `<div style="margin:10px 0;"><strong style="font-size:13px;">📎 Documents</strong>${data.documents.map(d => `<div style="font-size:13px;margin-top:4px;"><a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom_fichier)}</a></div>`).join('')}</div>` : ''}
+    ${suivantes.length ? `<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">
+      <strong style="font-size:13px;">📋 Statut du dossier</strong>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+        ${suivantes.map(s => `<button class="btn btn-outline btn-sm" onclick="pnChangerStatutDA(${p.id},'${s}')">${PN_DA_STATUT_LABELS[s]||s}</button>`).join('')}
+      </div>
+    </div>` : ''}
 
     <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px;">
       <strong style="font-size:13px;">💬 Retours d'analyse envoyés</strong>
@@ -5653,6 +5685,13 @@ async function pnEnvoyerDemandeInfos(projetId) {
     await api('POST', '/admin/projets/' + projetId + '/demande-infos', { demande_texte });
     pnOuvrirDossierDetail(projetId);
   } catch (e) { alert(e.message || "Erreur lors de l'envoi de la demande."); }
+}
+async function pnChangerStatutDA(projetId, statut) {
+  if (['abouti','sans_suite'].includes(statut) && !confirm(`Clôturer ce dossier avec le statut "${PN_DA_STATUT_LABELS[statut]}" ?`)) return;
+  try {
+    await api('PUT', '/projets/' + projetId + '/statut', { statut });
+    pnOuvrirDossierDetail(projetId);
+  } catch (e) { alert(e.message || 'Erreur lors du changement de statut.'); }
 }
 
 let _pnOrienterProjetId = null;

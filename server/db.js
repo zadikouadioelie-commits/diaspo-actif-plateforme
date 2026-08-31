@@ -1148,10 +1148,21 @@ db.exec(`
     besoins_autres_precisions TEXT,
     infos_complementaires TEXT,
     date_soumission_da TEXT,
+    /* Transmission d'un Business Plan à Diaspo'Actif (2026-08-30) : business_plan_id NULL pour
+       toute soumission générique (module "Projets"), renseigné uniquement quand ce dossier
+       provient du bouton "📤 Transmettre à Diaspo'Actif" sur une cartouche business-plan.html.
+       organismes_vises_texte est volontairement du texte libre (pas de table de référence
+       d'organismes) : le porteur décrit simplement à qui il veut avoir accès, Diaspo'Actif fait
+       le reste manuellement — décision explicite de l'utilisateur, pas une sélection structurée. */
+    business_plan_id INTEGER,
+    laisser_da_choisir INTEGER DEFAULT 0,
+    organismes_vises_texte TEXT,
+    commentaire_transmission TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(createur_id) REFERENCES users(id),
-    FOREIGN KEY(validateur_id) REFERENCES users(id)
+    FOREIGN KEY(validateur_id) REFERENCES users(id),
+    FOREIGN KEY(business_plan_id) REFERENCES business_plans(id)
   );
 
   CREATE TABLE IF NOT EXISTS projets_commentaires (
@@ -1190,6 +1201,17 @@ db.exec(`
   [["presentation","TEXT"],["territoire_concerne","TEXT"],["objectifs","TEXT"],["public_concerne","TEXT"],
    ["niveau_avancement","TEXT"],["besoins","TEXT DEFAULT '[]'"],["besoins_autres_precisions","TEXT"],
    ["infos_complementaires","TEXT"],["date_soumission_da","TEXT"]].forEach(([col,type]) => {
+    if (!cols.includes(col)) db.exec(`ALTER TABLE projets ADD COLUMN ${col} ${type}`);
+  });
+})();
+
+/* Migration : transmission d'un Business Plan à Diaspo'Actif sur projets (même remarque que
+   ci-dessus — déjà déclarées dans le CREATE TABLE plus haut, self-healing auto sur PostgreSQL ;
+   ces lignes ne servent qu'au SQLite local déjà créé). */
+;(function migrateBPTransmissionDA() {
+  const cols = db.prepare("PRAGMA table_info(projets)").all().map(c => c.name);
+  [["business_plan_id","INTEGER"],["laisser_da_choisir","INTEGER DEFAULT 0"],
+   ["organismes_vises_texte","TEXT"],["commentaire_transmission","TEXT"]].forEach(([col,type]) => {
     if (!cols.includes(col)) db.exec(`ALTER TABLE projets ADD COLUMN ${col} ${type}`);
   });
 })();
