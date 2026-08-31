@@ -161,7 +161,8 @@
       </div>
       <div style="display:flex;gap:8px;">
         <a class="btn btn-outline btn-sm" id="bpv-btn-dossier" href="#">📊 Générer le dossier investisseur</a>
-        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Imprimer / Exporter PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ Imprimer</button>
+        <button class="btn btn-outline btn-sm" id="bpv-btn-pdf" onclick="bpvExportPDF()">📥 Télécharger en PDF</button>
         <a class="btn btn-orange btn-sm" id="bpv-btn-edit" href="#" style="display:none;">✏️ Modifier</a>
       </div>
     </div>
@@ -177,6 +178,10 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
 <script src="assets/currency-manager.js"></script>
+<!-- Génération PDF réelle (point 17 du cahier des charges "Gestion multidevise" : "il ne suffit
+     pas que les conversions apparaissent uniquement dans l'interface") -- même bibliothèque déjà
+     utilisée ailleurs sur la plateforme (cv-builder.js), pas une nouvelle dépendance. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 /* ===========================================================================
    CONSULTATION BUSINESS PLAN — lecture seule, mise en page "document".
@@ -197,6 +202,12 @@ function fmtMontant(n){ return (n===null||n===undefined||n==='') ? '' : Currency
 const has = v => v !== null && v !== undefined && String(v).trim() !== '';
 
 const TYPES = { startup:'🚀 Startup', pme:'🏢 PME', association:'🤝 Association', ong:'🌍 ONG', cooperative:'🌾 Coopérative', social:'💚 Social', autre:'📋 Autre' };
+/* Miroir de BP_TRANSMISSION_BADGES (business-plan.html) — labels seuls, pas de couleurs ici. */
+const BP_TRANSMISSION_LABELS = {
+  soumis:'🔵 Transmis à Diaspo\'Actif', en_analyse:'🟠 En cours d\'analyse', infos_demandees:'🟠 En cours d\'analyse',
+  retenu:'🟣 Orientation en cours', oriente_partenaire:'🟢 Organisme identifié', mise_en_relation:'🤝 Mise en relation',
+  accompagnement:'✅ Accompagnement en cours', abouti:'❌ Dossier clôturé', sans_suite:'❌ Dossier clôturé',
+};
 
 /* ---- Schéma des sections texte simples : {champ: Libellé} dans l'ordre d'affichage ---- */
 const TEXT_SECTIONS = {
@@ -506,7 +517,20 @@ async function init(){
       <p class="bpv-devise-note">Les montants présentés dans ce document sont exprimés dans la monnaie de référence et convertis selon les taux enregistrés dans le Business Plan à la date indiquée.</p>
     </div>` : '';
 
-  document.getElementById('bpv-doc').innerHTML = cover + mediaBlock + referentielBlock + sections.map(sec => sec.html).join('');
+  /* Historique de transmission à Diaspo'Actif (2026-08-31) : suivi interne du porteur, pas
+     affiché à un visiteur qui aurait juste un lien de partage en lecture — même logique de
+     visibilité que le bouton "Modifier" juste au-dessus. */
+  const peutVoirTransmissions = ['proprietaire','editeur','validateur'].includes(bp.mon_role);
+  const transmissionBlock = (peutVoirTransmissions && (bp.transmissions||[]).length) ? `
+    <div class="bpv-section">
+      <h3>📤 Historique de transmission à Diaspo'Actif</h3>
+      ${bp.transmissions.map(t => `<div style="padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;font-size:13px;">
+        <strong>${BP_TRANSMISSION_LABELS[t.statut] || t.statut}</strong> — ${fmtDate(t.date_soumission_da)}
+        ${t.organismes_vises_texte ? `<div style="margin-top:4px;color:#64748b;">🎯 ${esc(t.organismes_vises_texte)}</div>` : (t.laisser_da_choisir ? `<div style="margin-top:4px;color:#64748b;">🧭 Diaspo'Actif a été chargé de choisir l'organisme</div>` : '')}
+      </div>`).join('')}
+    </div>` : '';
+
+  document.getElementById('bpv-doc').innerHTML = cover + mediaBlock + referentielBlock + transmissionBlock + sections.map(sec => sec.html).join('');
 
   document.getElementById('bpv-toc').innerHTML = `
     <div class="bpv-toc-title">Sommaire</div>
@@ -521,6 +545,36 @@ async function init(){
 
   document.getElementById('bpv-loading').style.display = 'none';
   document.getElementById('bpv-shell').style.display = 'grid';
+}
+
+/* Export PDF réel (point 17) -- même bibliothèque/pattern que cv-builder.js (repli sur
+   window.print() si le CDN html2pdf est indisponible, jamais d'échec silencieux). Cible le
+   document déjà affiché (#bpv-doc) : couverture (photo + référentiel monétaire déjà résolus),
+   sections, tableaux multidevise -- tout ce qui est à l'écran est déjà correctement converti,
+   aucune donnée à recalculer pour l'export. */
+async function bpvExportPDF(){
+  const btn = document.getElementById('bpv-btn-pdf');
+  if (typeof html2pdf === 'undefined') { window.print(); return; }
+  const doc = document.getElementById('bpv-doc');
+  if (!doc) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Génération…'; }
+  try {
+    const clone = doc.cloneNode(true);
+    clone.style.cssText = 'width:210mm;border:none;box-shadow:none;border-radius:0;';
+    const filename = `${(bp?.nom_projet || 'business-plan').replace(/[^a-zA-Z0-9À-ÿ_-]+/g, '_')}.pdf`;
+    await html2pdf().set({
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: '.bpv-section' }
+    }).from(clone).save();
+  } catch (e) {
+    alert('Erreur lors de la génération du PDF : ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 Télécharger en PDF'; }
+  }
 }
 
 function showError(msg){

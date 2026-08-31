@@ -447,7 +447,9 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
       <button class="fr-theme-btn active" id="fr-theme-corporate" style="background:#1E3A8A;color:#fff;" onclick="setReportTheme('corporate')">🟦 Corporate</button>
       <button class="fr-theme-btn" id="fr-theme-moderne" style="background:#065f46;color:#fff;" onclick="setReportTheme('moderne')">🟢 Moderne</button>
       <button class="fr-theme-btn" id="fr-theme-premium" style="background:#111827;color:#B8860B;" onclick="setReportTheme('premium')">🟣 Premium</button>
-      <button class="btn btn-orange btn-sm" onclick="window.print()">🖨️ Imprimer / PDF</button>
+      <button class="btn btn-orange btn-sm" onclick="window.print()">🖨️ Imprimer</button>
+      <button class="btn btn-orange btn-sm" id="fr-btn-pdf" onclick="frExportPDF()">📥 PDF</button>
+      <button class="btn btn-outline btn-sm" id="fr-btn-pptx" onclick="frExportPPTX()" style="background:#fff;">📊 PowerPoint (.pptx)</button>
       <button class="btn btn-outline btn-sm" onclick="downloadReportHTML()" style="background:#fff;">🌐 Télécharger HTML</button>
       <button class="btn btn-outline btn-sm" onclick="closeFinalReport()" style="background:#fff;">✕ Fermer</button>
     </div>
@@ -489,6 +491,13 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="assets/app.js?v=11"></script>
 <script src="assets/upload-media.js"></script>
 <script src="assets/currency-manager.js"></script>
+<!-- Génération PDF réelle (point 17) -- même bibliothèque déjà utilisée ailleurs sur la
+     plateforme (cv-builder.js), pas une nouvelle dépendance. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- Génération PowerPoint réelle (point 18) -- aucune lib de ce type n'existait encore sur la
+     plateforme (confirmé par l'audit préalable), pptxgenjs chargé en client pur (bundle
+     navigateur), même schéma d'intégration CDN que gsap plus bas sur cette page. -->
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -4281,6 +4290,109 @@ function downloadReportHTML() {
   a.href = URL.createObjectURL(blob);
   a.download = `dossier-final-${(bp?.nom_projet||'business-plan').toLowerCase().replace(/[^a-z0-9]+/g,'-')}.html`;
   a.click();
+}
+
+/* Export PDF réel du dossier final (point 17) -- même bibliothèque/pattern que cv-builder.js
+   (repli sur window.print() si le CDN html2pdf est indisponible). Le contenu de #fr-doc a déjà
+   été généré par buildFinalReportHTML() avec les montants convertis (fmtEuro) -- rien à
+   recalculer, l'export part directement du DOM affiché. */
+async function frExportPDF() {
+  const btn = document.getElementById('fr-btn-pdf');
+  if (typeof html2pdf === 'undefined') { window.print(); return; }
+  const doc = document.getElementById('fr-doc');
+  if (!doc) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Génération…'; }
+  try {
+    const clone = doc.cloneNode(true);
+    clone.style.cssText = 'width:210mm;box-shadow:none;';
+    const format = doc.dataset.format || 'classique';
+    const filename = `${(bp?.nom_projet||'business-plan').replace(/[^a-zA-Z0-9À-ÿ_-]+/g,'_')}-${format}.pdf`;
+    await html2pdf().set({
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: '.fr-section, .fr-slide' }
+    }).from(clone).save();
+  } catch (e) {
+    alert('Erreur lors de la génération du PDF : ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 PDF'; }
+  }
+}
+
+/* ── Export PowerPoint réel (point 18) ──
+   Aucune bibliothèque de ce type n'existait sur la plateforme avant ce chantier (confirmé par
+   l'audit préalable) -- pptxgenjs en client pur. Construit un VRAI fichier .pptx à partir des
+   MÊMES données sources que frBlockPitchDeck() (7 diapositives), mais en éléments PowerPoint
+   natifs (texte, formes) plutôt qu'en scrappant le HTML déjà généré -- pptxgenjs a besoin de
+   contenu structuré, pas de DOM. Les montants passent tous par fmtEuro(), donc déjà multidevise. */
+async function frExportPPTX() {
+  const btn = document.getElementById('fr-btn-pptx');
+  if (typeof PptxGenJS === 'undefined') { alert("La génération PowerPoint n'a pas pu se charger (bibliothèque indisponible). Réessayez, ou utilisez l'export HTML/PDF."); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Génération…'; }
+  try {
+    const resume = sections.resume_executif || {}, presentation = sections.presentation || {},
+      probleme = sections.probleme || {}, solution = sections.solution || {}, marche = sections.marche || {},
+      bm = sections.business_model || {}, fin = sections.financement || {}, infos = sections.infos_generales || {};
+
+    const pres = new PptxGenJS();
+    pres.defineLayout({ name: 'BP16x9', width: 10, height: 5.625 });
+    pres.layout = 'BP16x9';
+    const NAVY = '0D2B4E', ORANGE = 'FF6B00', WHITE = 'FFFFFF', MUTED = '6B7280';
+
+    const ajouterDiapoTitre = () => {
+      const s = pres.addSlide();
+      s.background = { color: NAVY };
+      s.addText(bp?.nom_projet || 'Sans titre', { x: 0.6, y: 2.0, w: 8.8, h: 1.0, fontSize: 32, bold: true, color: WHITE, fontFace: 'Arial' });
+      if (bp?.slogan) s.addText(`"${bp.slogan}"`, { x: 0.6, y: 2.9, w: 8.8, h: 0.6, fontSize: 16, italic: true, color: 'CADCFC', fontFace: 'Arial' });
+      s.addText('Pitch Deck — généré depuis Diaspo\'Actif', { x: 0.6, y: 4.9, w: 8.8, h: 0.4, fontSize: 10, color: '9CA3AF', fontFace: 'Arial' });
+      return s;
+    };
+    const ajouterDiapoContenu = (titre, paragraphes) => {
+      const s = pres.addSlide();
+      s.background = { color: WHITE };
+      s.addText(titre, { x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 26, bold: true, color: NAVY, fontFace: 'Arial' });
+      s.addShape(pres.ShapeType.rect, { x: 0.6, y: 1.15, w: 1.2, h: 0.04, fill: { color: ORANGE } });
+      const texte = paragraphes.filter(Boolean);
+      if (!texte.length) {
+        s.addText('Non renseigné.', { x: 0.6, y: 1.6, w: 8.8, h: 3.5, fontSize: 14, italic: true, color: MUTED, fontFace: 'Arial' });
+      } else {
+        s.addText(texte.map(t => ({ text: t, options: { breakLine: true, paraSpaceAfter: 14 } })), { x: 0.6, y: 1.6, w: 8.8, h: 3.7, fontSize: 14, color: '1A2233', fontFace: 'Arial', valign: 'top' });
+      }
+      return s;
+    };
+
+    ajouterDiapoTitre();
+    ajouterDiapoContenu('Le problème', [probleme.description || resume.probleme]);
+    ajouterDiapoContenu('Notre solution', [solution.description || resume.solution]);
+    ajouterDiapoContenu('Le marché', [
+      marche.taille_marche || resume.marche,
+      marche.tam ? `TAM : ${marche.tam}  ·  SAM : ${marche.sam||'—'}  ·  SOM : ${marche.som||'—'}` : null,
+    ]);
+    ajouterDiapoContenu('Notre modèle économique', [bm.revenus]);
+    ajouterDiapoContenu('Traction', [
+      presentation.ca_realise_a_ce_jour ? `CA réalisé à ce jour : ${fmtEuro(presentation.ca_realise_a_ce_jour)}` : null,
+      presentation.nb_clients_actuels ? `Clients actuels : ${presentation.nb_clients_actuels}` : null,
+      presentation.nb_clients_payants ? `Clients payants : ${presentation.nb_clients_payants}` : null,
+      presentation.temoignages_clients,
+    ]);
+    ajouterDiapoContenu("L'équipe", [
+      (infos.membres_equipe||[]).map(m => `${m.nom}${m.fonction?' — '+m.fonction:''}`).join('\n') || null,
+    ]);
+    ajouterDiapoContenu('Le financement', [
+      fin.montant ? `Montant recherché : ${fmtEuro(fin.montant)}` : null,
+      fin.utilisation,
+    ]);
+
+    const filename = `${(bp?.nom_projet||'business-plan').replace(/[^a-zA-Z0-9À-ÿ_-]+/g,'_')}-pitch-deck.pptx`;
+    await pres.writeFile({ fileName: filename });
+  } catch (e) {
+    alert('Erreur lors de la génération du PowerPoint : ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📊 PowerPoint (.pptx)'; }
+  }
 }
 
 /* ════════════════════════════════════════════════════
