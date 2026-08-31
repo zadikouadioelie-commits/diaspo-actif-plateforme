@@ -307,15 +307,20 @@ function renderPlanFinancier(pf){
   let html = '';
   const resume = [
     ['investissement_initial','Investissement initial'], ['apport_personnel','Apport personnel'],
-    ['financement_recherche','Financement recherché'], ['bfr',"Besoin en fonds de roulement"],
+    ['financement_recherche','Financement recherché'],
     ['seuil_rentabilite','Seuil de rentabilité'], ['point_mort','Point mort (mois)'],
   ].filter(([k]) => has(pf[k]));
   if (resume.length) {
     html += `<div class="bpv-field-grid" style="margin-bottom:20px;">${resume.map(([k,l]) => `
       <div class="bpv-field"><h4>${l}</h4><p>${k==='point_mort'?esc(pf[k])+' mois':fmtMontant(pf[k])}</p></div>`).join('')}</div>`;
   }
-  ['immobilisations','amortissements','scenario_optimiste','scenario_realiste','scenario_prudent'].forEach(k => {
-    const labels = { immobilisations:'Immobilisations', amortissements:'Amortissements', scenario_optimiste:'Scénario optimiste', scenario_realiste:'Scénario réaliste', scenario_prudent:'Scénario prudent' };
+  {/* bfr : champ de texte libre ("Explication et montant…" dans l'éditeur), pas un nombre pur
+       -- rendu ici en texte comme immobilisations/amortissements/scénarios, jamais via
+       fmtMontant() (qui produisait "NaN EUR" dès que la valeur contenait autre chose qu'un
+       chiffre, ex. "12 000 € pour couvrir 2 mois d'achat..."). Bug trouvé sur l'exemple réel
+       publié, corrigé le 2026-08-31. */}
+  ['bfr','immobilisations','amortissements','scenario_optimiste','scenario_realiste','scenario_prudent'].forEach(k => {
+    const labels = { bfr:'Besoin en fonds de roulement (BFR)', immobilisations:'Immobilisations', amortissements:'Amortissements', scenario_optimiste:'Scénario optimiste', scenario_realiste:'Scénario réaliste', scenario_prudent:'Scénario prudent' };
     if (has(pf[k])) html += `<div class="bpv-field"><h4>${labels[k]}</h4><p>${nl2br(pf[k])}</p></div>`;
   });
 
@@ -403,6 +408,11 @@ async function init(){
     else if (meta.key === 'risques') content = renderRisques(data.items);
     else if (meta.key === 'annexes') content = renderAnnexes(data.items);
     else if (meta.key === 'solution') content = renderFieldGrid({ ...data, niveau_developpement: NIVEAU_DEV_LABELS[data.niveau_developpement] || data.niveau_developpement }, TEXT_SECTIONS.solution);
+    // financement.montant est un champ numérique (contrairement au reste de cette section, du
+    // texte libre) -- mis en forme comme les autres montants du document (espace milliers +
+    // devise) plutôt que laissé brut ("45000" au lieu de "45 000 EUR"), incohérence trouvée sur
+    // l'exemple réel publié, corrigée le 2026-08-31.
+    else if (meta.key === 'financement') content = renderFieldGrid({ ...data, montant: has(data.montant) ? fmtMontant(data.montant) : data.montant }, TEXT_SECTIONS.financement);
     else if (TEXT_SECTIONS[meta.key]) content = renderFieldGrid(data, TEXT_SECTIONS[meta.key]);
     return buildSection(meta, content);
   });
