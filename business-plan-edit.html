@@ -1211,8 +1211,15 @@ function bpDeviseInit() {
   bpDeviseWorking = JSON.parse(JSON.stringify(saved));
 }
 
+/* 166 devises (toutes les monnaies du monde couvertes par la source de taux, 2026-08-31) --
+   les plus courantes en tête (groupe "populaire" du cahier des charges initial), le reste
+   alphabétique par code, via <optgroup> pour rester navigable dans un <select> aussi long. */
 function bpDeviseOptions(selected) {
-  return CurrencyManager.LISTE.map(d => `<option value="${d.code}" ${d.code===selected?'selected':''}>${d.code} — ${d.nom} (${d.symbole})</option>`).join('');
+  const opt = d => `<option value="${d.code}" ${d.code===selected?'selected':''}>${d.code} — ${d.nom} (${d.symbole})</option>`;
+  const populaires = CurrencyManager.LISTE.filter(d => d.populaire);
+  const autres = CurrencyManager.LISTE.filter(d => !d.populaire).sort((a,b) => a.code.localeCompare(b.code));
+  return `<optgroup label="Monnaies courantes">${populaires.map(opt).join('')}</optgroup>` +
+         `<optgroup label="Toutes les monnaies (A–Z)">${autres.map(opt).join('')}</optgroup>`;
 }
 
 /* Symbole de la devise de référence courante, pour les libellés de champ ("Investissement
@@ -1246,8 +1253,23 @@ function bpDeviseToggleSecondaire(idx, checked) {
   bpDeviseRerender();
 }
 
-function bpDeviseSetSecondaireCode(idx, code) { bpDeviseWorking.secondaires[idx].code = code; bpDeviseRerender(); }
-function bpDeviseSetSecondaireTaux(idx, val) { bpDeviseWorking.secondaires[idx].taux = val; }
+function bpDeviseSetSecondaireCode(idx, code) {
+  const sec = bpDeviseWorking.secondaires[idx];
+  sec.code = code;
+  // Le taux appartenait à l'ancienne devise -- ne pas le laisser traîner sous un nouveau code.
+  sec.taux = ''; sec.type = 'manuel'; sec.source = 'Taux renseigné manuellement';
+  bpDeviseRerender();
+}
+/* Une modification manuelle du taux annule l'étiquette "automatique" d'un taux précédemment
+   récupéré -- ne pas laisser un chiffre modifié à la main continuer d'afficher "🔄 Taux de
+   marché". Pas de rerender ici (perdrait le focus du champ pendant la frappe) : seul le badge
+   texte, mis à jour au prochain rerender (changement de devise, taux du marché, ou sauvegarde). */
+function bpDeviseSetSecondaireTaux(idx, val) {
+  const sec = bpDeviseWorking.secondaires[idx];
+  sec.taux = val;
+  sec.type = 'manuel';
+  sec.source = 'Taux renseigné manuellement';
+}
 
 async function bpDeviseChargerHistorique() {
   const el = document.getElementById('bp-devise-historique');
@@ -1264,6 +1286,47 @@ async function bpDeviseChargerHistorique() {
   } catch (e) { el.innerHTML = 'Erreur de chargement.'; }
 }
 
+/* Bloc "devise secondaire" (select + taux + bouton d'indexation automatique, point 5 du cahier
+   des charges : "prévoir une architecture permettant ultérieurement de récupérer les taux depuis
+   une source externe" -- construit le 2026-08-31 sur demande explicite). */
+function bpDeviseSecondaireHTML(idx, sec, reference, ro) {
+  const typeLabel = sec.type === 'automatique'
+    ? `<span style="color:#059669;">🔄 Taux de marché${sec.source ? ' — ' + esc(sec.source) : ''}</span>`
+    : `<span style="color:var(--muted);">✍️ Taux saisi manuellement</span>`;
+  return `<div class="fg" style="margin-top:8px;">
+    <div><label>Devise secondaire</label><select ${ro?'disabled':''} onchange="bpDeviseSetSecondaireCode(${idx},this.value)">${bpDeviseOptions(sec.code)}</select></div>
+    <div>
+      <label>Taux de change (1 ${esc(reference)} = ? ${esc(sec.code)})</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" step="any" min="0" style="flex:1;" ${ro?'readonly':''} value="${esc(sec.taux ?? '')}" placeholder="Ex : 655" oninput="bpDeviseSetSecondaireTaux(${idx},this.value)">
+        ${!ro ? `<button type="button" class="btn btn-sm btn-outline" id="bp-devise-auto-${idx}" style="white-space:nowrap;" onclick="bpDeviseRecupererTaux(${idx})">🔄 Taux du marché</button>` : ''}
+      </div>
+      <p style="font-size:11.5px;margin:4px 0 0;">${typeLabel}</p>
+    </div>
+  </div>`;
+}
+
+/* Récupère le taux réel EUR→devise (ou référence→devise) auprès de la source de marché
+   (server/index.js, GET /api/devises/taux) et le renseigne automatiquement -- l'utilisateur doit
+   ensuite toujours cliquer "Enregistrer la configuration" pour le confirmer (le taux reste figé
+   tant qu'il n'est pas volontairement validé, point 7). */
+async function bpDeviseRecupererTaux(idx) {
+  const sec = bpDeviseWorking.secondaires[idx];
+  if (!sec) return;
+  const btn = document.getElementById(`bp-devise-auto-${idx}`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+  try {
+    const r = await api('GET', `/devises/taux?de=${encodeURIComponent(bpDeviseWorking.reference)}&vers=${encodeURIComponent(sec.code)}`);
+    sec.taux = r.taux;
+    sec.type = 'automatique';
+    sec.source = r.source;
+    bpDeviseRerender();
+  } catch (e) {
+    alert('Impossible de récupérer le taux de marché : ' + (e.data?.error || e.message));
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Taux du marché'; }
+  }
+}
+
 function renderBPDeviseBlock() {
   if (!bpDeviseWorking) bpDeviseInit();
   const ro = monRole === 'lecteur';
@@ -1278,17 +1341,11 @@ function renderBPDeviseBlock() {
     </div>
     <div class="bp-devise-sec">
       <label class="bp-devise-check"><input type="checkbox" ${sec1?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(0,this.checked)"> Afficher une monnaie supplémentaire</label>
-      ${sec1 ? `<div class="fg" style="margin-top:8px;">
-        <div><label>Devise secondaire</label><select ${ro?'disabled':''} onchange="bpDeviseSetSecondaireCode(0,this.value)">${bpDeviseOptions(sec1.code)}</select></div>
-        <div><label>Taux de change (1 ${esc(w.reference)} = ? ${esc(sec1.code)})</label><input type="number" step="any" min="0" ${ro?'readonly':''} value="${esc(sec1.taux ?? '')}" placeholder="Ex : 655" oninput="bpDeviseSetSecondaireTaux(0,this.value)"></div>
-      </div>` : ''}
+      ${sec1 ? bpDeviseSecondaireHTML(0, sec1, w.reference, ro) : ''}
     </div>
     ${sec1 ? `<div class="bp-devise-sec">
       <label class="bp-devise-check"><input type="checkbox" ${sec2?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(1,this.checked)"> Ajouter une deuxième monnaie</label>
-      ${sec2 ? `<div class="fg" style="margin-top:8px;">
-        <div><label>Devise secondaire</label><select ${ro?'disabled':''} onchange="bpDeviseSetSecondaireCode(1,this.value)">${bpDeviseOptions(sec2.code)}</select></div>
-        <div><label>Taux de change (1 ${esc(w.reference)} = ? ${esc(sec2.code)})</label><input type="number" step="any" min="0" ${ro?'readonly':''} value="${esc(sec2.taux ?? '')}" placeholder="Ex : 1.08" oninput="bpDeviseSetSecondaireTaux(1,this.value)"></div>
-      </div>` : ''}
+      ${sec2 ? bpDeviseSecondaireHTML(1, sec2, w.reference, ro) : ''}
     </div>` : ''}
     ${!ro ? `<button type="button" class="btn btn-sm btn-orange" style="margin-top:14px;" onclick="bpEnregistrerDeviseConfig()">💾 Enregistrer la configuration</button>` : ''}
     <p id="bp-devise-status" style="font-size:12.5px;margin-top:8px;color:var(--muted);"></p>

@@ -36401,7 +36401,19 @@ route("DELETE", "/api/business-plans/:id/media", async (req, res, params) => {
    CurrencyManager.validerConfig côté client, assets/currency-manager.js) : le serveur ne peut
    pas charger un script écrit pour le navigateur (`window.CurrencyManager`), et ne doit de toute
    façon jamais faire confiance à une validation faite uniquement côté client. */
-const DEVISES_VALIDES_BP = ['EUR','USD','GBP','CHF','CAD','XOF','XAF','MAD','DZD','TND','CDF','GHS','NGN'];
+/* Toutes les monnaies du monde couvertes par la source de taux de marché (open.er-api.com),
+   moins XDR (unité de compte FMI) et CLF (unité indexée chilienne) -- ni l'une ni l'autre n'est
+   une monnaie facturable. Doit rester identique à CURRENCY_LIST (assets/currency-manager.js). */
+const DEVISES_VALIDES_BP = ['EUR','USD','GBP','CHF','CAD','XOF','XAF','MAD','DZD','TND','CDF','GHS','NGN','CNY',
+  'AED','AFN','ALL','AMD','ANG','AOA','ARS','AUD','AWG','AZN','BAM','BBD','BDT','BGN','BHD','BIF','BMD','BND',
+  'BOB','BRL','BSD','BTN','BWP','BYN','BZD','CLP','CNH','COP','CRC','CUP','CVE','CZK','DJF','DKK','DOP','EGP',
+  'ERN','ETB','FJD','FKP','FOK','GEL','GGP','GIP','GMD','GNF','GTQ','GYD','HKD','HNL','HRK','HTG','HUF','IDR',
+  'ILS','IMP','INR','IQD','IRR','ISK','JEP','JMD','JOD','JPY','KES','KGS','KHR','KID','KMF','KRW','KWD','KYD',
+  'KZT','LAK','LBP','LKR','LRD','LSL','LYD','MDL','MGA','MKD','MMK','MNT','MOP','MRU','MUR','MVR','MWK','MXN',
+  'MYR','MZN','NAD','NIO','NOK','NPR','NZD','OMR','PAB','PEN','PGK','PHP','PKR','PLN','PYG','QAR','RON','RSD',
+  'RUB','RWF','SAR','SBD','SCR','SDG','SEK','SGD','SHP','SLE','SLL','SOS','SRD','SSP','STN','SYP','SZL','THB',
+  'TJS','TMT','TOP','TRY','TTD','TVD','TWD','TZS','UAH','UGX','UYU','UZS','VES','VND','VUV','WST','XCD','XCG',
+  'XPF','YER','ZAR','ZMW','ZWG','ZWL'];
 function validerDeviseConfigBP(config) {
   const erreurs = [];
   if (!config || !config.reference || !DEVISES_VALIDES_BP.includes(config.reference)) {
@@ -36474,6 +36486,46 @@ route("GET", "/api/business-plans/:id/devise-config/historique", async (req, res
   if (bp.user_id !== user.id && !collab) return sendJSON(res, 403, { error: "Accès refusé" });
   const historique = await db.prepare("SELECT * FROM bp_taux_historique WHERE bp_id=? ORDER BY created_at DESC").all(params.id);
   sendJSON(res, 200, { historique });
+});
+
+/* ---- Taux de marché en temps réel (2026-08-31) ----
+   Cahier des charges "Gestion multidevise", point 5 : "prévoir une architecture permettant
+   ULTÉRIEUREMENT de récupérer les taux depuis une source externe" -- construit maintenant sur
+   demande explicite du 2026-08-31 ("indexation automatique à l'euro selon la valeur réelle").
+   Source : open.er-api.com -- gratuite, sans clé, ~166 devises, mise à jour quotidienne.
+   XOF/XAF traités à part : leur parité avec l'euro est FIXE (1 EUR = 655,957 XOF/XAF, garantie
+   par le Trésor français depuis 1999), pas un taux de marché flottant -- interroger l'API pour
+   ces deux-là n'ajouterait qu'un bruit d'arrondi sur une constante déjà connue avec certitude. */
+const PARITE_FIXE_XOF_XAF = 655.957;
+route("GET", "/api/devises/taux", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const u = new URL(req.url, "http://x");
+  const de = (u.searchParams.get("de") || "EUR").toUpperCase();
+  const vers = (u.searchParams.get("vers") || "").toUpperCase();
+  if (!vers || !DEVISES_VALIDES_BP.includes(vers)) return sendJSON(res, 400, { error: "Devise cible invalide." });
+  if (de !== 'EUR' && !DEVISES_VALIDES_BP.includes(de)) return sendJSON(res, 400, { error: "Devise de référence invalide." });
+
+  if (de === 'EUR' && (vers === 'XOF' || vers === 'XAF')) {
+    return sendJSON(res, 200, { taux: PARITE_FIXE_XOF_XAF, source: 'Parité fixe (Trésor français / BCEAO-BEAC, depuis 1999)', type: 'automatique', date: new Date().toISOString() });
+  }
+
+  try {
+    const r = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(de)}`);
+    if (!r.ok) throw new Error(`Service de taux indisponible (${r.status})`);
+    const data = await r.json();
+    if (data.result !== 'success' || !data.rates || !(vers in data.rates)) {
+      return sendJSON(res, 502, { error: `Taux indisponible pour ${vers}.` });
+    }
+    sendJSON(res, 200, {
+      taux: data.rates[vers],
+      source: 'Taux de marché (open.er-api.com)',
+      type: 'automatique',
+      date: data.time_last_update_utc || new Date().toISOString(),
+    });
+  } catch (e) {
+    sendJSON(res, 502, SEC.safeError(e, "taux de change"));
+  }
 });
 
 /* ---- Dupliquer ---- */
