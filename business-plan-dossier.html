@@ -463,6 +463,22 @@ function funnelDiagram(stages){
   return `<p class="block-title">Funnel commercial</p><div style="margin-bottom:6px;">${rows}</div>`;
 }
 
+/* Diagramme de flux : étapes côte à côte reliées par des flèches, chaque intitulé étant un champ
+   réellement saisi (l'ordre gauche→droite est le seul apport du gabarit). Le texte de chaque
+   étape est tronqué pour tenir dans la case ; le champ complet reste visible plus bas dans la
+   page (field-grid), le diagramme n'en est qu'un résumé visuel. */
+function processFlow(stages){
+  const boxes = stages.map(([label,val], i) => `
+    <div style="flex:1;min-width:0;">
+      <div style="background:rgba(13,43,78,.035);border:1px solid var(--dp-line);border-radius:4px;padding:10px 12px;height:100%;">
+        <p style="font-family:var(--dp-mono);font-size:8px;letter-spacing:.05em;text-transform:uppercase;color:var(--dp-orange);font-weight:700;margin:0 0 6px;">${String(i+1).padStart(2,'0')} · ${esc(label)}</p>
+        <p style="font-size:9.5px;line-height:1.4;margin:0;color:var(--dp-ink);">${esc(String(val).slice(0,90))}${String(val).length>90?'…':''}</p>
+      </div>
+    </div>
+    ${i<stages.length-1 ? `<div style="flex:none;display:flex;align-items:center;color:var(--dp-line);font-size:16px;padding:0 2px;">→</div>` : ''}`).join('');
+  return `<p class="block-title">Chaîne opérationnelle</p><div style="display:flex;align-items:stretch;margin-bottom:14px;">${boxes}</div>`;
+}
+
 /* ---- Page : Risques ---- */
 function pageRisques(bp){
   const items = ((bp.sections||{}).risques?.items || []).filter(r => has(r.description));
@@ -656,6 +672,15 @@ function pageGenerique(bp, key, label, eyebrow, headline){
     const kpis = kpiRow([['CAC (via commercial)', data.ca_par_commercial],['Panier moyen', has(data.panier_moyen_commercial)?fmtEUR(data.panier_moyen_commercial):''],['Cycle de vente moyen', data.cycle_vente_moyen],['Objectif mensuel', has(data.objectif_mensuel_commercial)?fmtEUR(data.objectif_mensuel_commercial):'']]);
     if (kpis) content = kpis + content;
   }
+  // Chaîne opérationnelle : quand au moins 2 des étapes classiques sont renseignées, la
+  // séquence fournisseur → production → qualité → logistique se lit d'un coup d'œil plutôt
+  // que d'être éclatée en 4 blocs de texte sans lien visible entre eux. Les intitulés
+  // eux-mêmes ne sont jamais inventés, seul l'ORDRE (déjà logique dans tout process de
+  // production) vient du gabarit -- le contenu de chaque étape reste le texte saisi.
+  if (key === 'plan_operationnel') {
+    const stages = [['Fournisseurs',data.fournisseurs],['Production',data.production],['Contrôle qualité',data.qualite],['Logistique',data.logistique]].filter(([,v])=>has(v));
+    if (stages.length >= 2) content = processFlow(stages) + content;
+  }
   // Profil agricole : la capacité de production prime sur le texte libre -- remontée en KPI
   // cards plutôt que noyée dans le champ "Capacité actuelle" en prose.
   if (key === 'plan_operationnel' && classifyProfile(bp).agriculture) {
@@ -669,7 +694,8 @@ function pageGenerique(bp, key, label, eyebrow, headline){
     if (kpis) content = kpis + content;
   }
   if (key === 'annexes' && Array.isArray(data.items) && data.items.length) {
-    content += `<table class="doc-table"><thead><tr><th style="text-align:left;">Document</th><th style="text-align:left;">Description</th></tr></thead><tbody>${data.items.filter(a=>has(a.nom)).map(a=>`<tr><td>${esc(a.nom)}</td><td style="text-align:left;">${esc(a.description||'—')}</td></tr>`).join('')}</tbody></table>`;
+    const rows = data.items.filter(a=>has(a.nom));
+    content += `<table class="doc-table"><thead><tr><th style="text-align:left;">N°</th><th style="text-align:left;">Document</th><th style="text-align:left;">Type</th><th style="text-align:left;">Description</th><th style="text-align:left;">Lien</th></tr></thead><tbody>${rows.map((a,i)=>`<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(a.nom)}</td><td style="text-align:left;">${esc(a.type||'—')}</td><td style="text-align:left;">${esc(a.description||'—')}</td><td style="text-align:left;">${has(a.url)?`<a href="${esc(a.url)}" style="color:var(--dp-orange);">Ouvrir ↗</a>`:'—'}</td></tr>`).join('')}</tbody></table>`;
   }
   if (key === 'impact' && Array.isArray(data.indicateurs) && data.indicateurs.length) {
     content = kpiRow(data.indicateurs.filter(i=>has(i.nom)&&has(i.valeur_actuelle)).map(i=>[i.nom, i.valeur_actuelle, has(i.valeur_cible)?`Cible : ${i.valeur_cible}`:''])) + content;
