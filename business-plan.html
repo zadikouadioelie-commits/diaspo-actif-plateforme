@@ -17,8 +17,13 @@
 
 /* Colonne média : photo principale + galerie de vignettes */
 .bp-card-media{display:flex;flex-direction:column;gap:8px;min-width:0;}
-.bp-card-photo{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:16/11;background:linear-gradient(135deg,var(--orange-light,#ffe9d6),#fff);display:flex;align-items:center;justify-content:center;font-size:40px;}
+.bp-card-photo{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:16/11;background:linear-gradient(135deg,var(--orange-light,#ffe9d6),#fff);display:flex;align-items:center;justify-content:center;}
 .bp-card-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.bp-card-photo-fallback{font-size:40px;}
+.bp-card-photo-empty{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:background .15s;}
+.bp-card-photo-empty:hover{background:rgba(255,255,255,.5);}
+.bp-card-photo-empty .ic{font-size:26px;opacity:.75;}
+.bp-card-photo-empty .txt{font-size:11.5px;font-weight:700;color:var(--orange,#ff6b00);text-align:center;padding:0 14px;}
 .bp-card-stade{position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.62);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;display:flex;align-items:center;gap:5px;}
 .bp-card-stade .dot{width:6px;height:6px;border-radius:50%;background:#22c55e;}
 .bp-card-video-badge{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.62);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:99px;}
@@ -185,6 +190,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
 <script src="assets/subscription-required.js"></script>
+<script src="assets/upload-media.js"></script>
 <script>
 let me = null;
 let selectedTpl = 'startup';
@@ -221,10 +227,16 @@ function renderBPCard(bp, partage) {
   const responsable = [bp.owner_prenom, bp.owner_nom].filter(Boolean).join(' ');
   const nbEquipe = (Number(bp.nb_collab)||0) + 1; // + le propriétaire
   return `
-    <div class="bp-card" onclick="openBP(${bp.id})">
+    <div class="bp-card" data-bp-id="${bp.id}" onclick="openBP(${bp.id})">
       <div class="bp-card-media">
         <div class="bp-card-photo">
-          ${bp.photo_principale_url ? `<img src="${esc(bp.photo_principale_url)}" alt="">` : (TYPES[bp.type_initiative]||'📋')[0]}
+          ${bp.photo_principale_url
+            ? `<img src="${esc(bp.photo_principale_url)}" alt="">`
+            : (!partage
+                ? `<div class="bp-card-photo-empty" onclick="event.stopPropagation();bpCardUploadPhoto(${bp.id})">
+                     <span class="ic">📷</span><span class="txt">Ajouter une photo de couverture</span>
+                   </div>`
+                : `<span class="bp-card-photo-fallback">${(TYPES[bp.type_initiative]||'📋 x').split(' ')[0]}</span>`)}
           ${infos.stade ? `<span class="bp-card-stade"><span class="dot"></span>Stade : ${(STADE_LABELS[infos.stade]||infos.stade).replace(/^[^ ]+ /,'')}</span>` : ''}
           ${bp.video_pitch_url ? `<span class="bp-card-video-badge">🎬 Vidéo</span>` : ''}
         </div>
@@ -294,6 +306,45 @@ async function loadBPs() {
 }
 
 function openBP(id) { window.location.href = `business-plan-view.html?id=${id}`; }
+
+/* Upload direct de la photo de couverture depuis la liste (2026-08-31) — évite d'avoir à ouvrir
+   l'éditeur juste pour ça. Même route et mêmes contraintes que bpUploadPhotoPrincipale() dans
+   business-plan-edit.html (compression avant envoi, POST /media, colonne photo_principale_url
+   déjà réutilisée partout où ce plan s'affiche) ; seule la cible du re-rendu diffère (cette
+   carte plutôt que le bloc "Présentation visuelle" de l'éditeur). */
+async function bpCardUploadPhoto(id) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const file = input.files[0];
+    document.body.removeChild(input);
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { alert('Image trop volumineuse (max 8 Mo).'); return; }
+    const zone = document.querySelector(`.bp-card[data-bp-id="${id}"] .bp-card-photo-empty`);
+    if (zone) zone.innerHTML = `<span class="ic">⏳</span><span class="txt">Envoi…</span>`;
+    try {
+      const compressed = await compressImageFile(file, 1200, 900, 0.85);
+      const fd = new FormData();
+      fd.append('type', 'photo_principale');
+      fd.append('file', compressed, compressed.name || 'photo.jpg');
+      const res = await fetch(`/api/business-plans/${id}/media`, { method: 'POST', body: fd, credentials: 'same-origin' });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `Erreur upload (${res.status})`); }
+      const { url } = await res.json();
+      const photoBox = document.querySelector(`.bp-card[data-bp-id="${id}"] .bp-card-photo`);
+      if (photoBox) {
+        const badges = Array.from(photoBox.querySelectorAll('.bp-card-stade, .bp-card-video-badge')).map(el => el.outerHTML).join('');
+        photoBox.innerHTML = `<img src="${esc(url)}" alt="">${badges}`;
+      }
+    } catch (e) {
+      alert('Erreur : ' + e.message);
+      if (zone) zone.innerHTML = `<span class="ic">📷</span><span class="txt">Ajouter une photo de couverture</span>`;
+    }
+  };
+  input.click();
+}
 function editBP(id) { window.location.href = `business-plan-edit.html?id=${id}`; }
 
 async function dupBP(id) {
