@@ -1388,9 +1388,9 @@ function renderMarche() {
       </div>
     </div>
     <div class="bp-card-inner"><h3>Le marché global</h3><div class="fg">
-      ${field('taille_marche','Taille du marché','Ex : 500 millions €')}
+      <div>${field('taille_marche','Taille du marché','Ex : 500 millions €')}${provenanceWidget('marche','taille_marche')}</div>
       ${field('evolution','Évolution / croissance','Ex : +12% par an')}
-      ${field('potentiel','Potentiel pour votre projet','')}
+      <div>${field('potentiel','Potentiel pour votre projet','')}${provenanceWidget('marche','potentiel')}</div>
       ${textarea('tendances','Tendances du marché','Quels sont les grands mouvements actuels ?',3,true)}
       ${textarea('barrieres_entree','Barrières à l\'entrée','Ce qui complique l\'arrivée de nouveaux acteurs…',3,true)}
       ${textarea('reglementation','Réglementation applicable','Lois, normes, autorisations nécessaires…',3,true)}
@@ -1477,7 +1477,12 @@ function updSegmentClient(i,key,val) {
    UPSERT). Branché en premier sur TAM/SAM/SOM (les données de marché les plus sensibles à
    sourcer) — réutilisable tel quel pour n'importe quel autre champ dans les incréments
    suivants (unit economics, plan financier…). */
-const BP_PROVENANCE_LABELS = { declare:'🟢 Déclaré', justifie:'🔵 Justifié', verifie:'🟣 Vérifié', estimation:'🟠 Estimation', a_confirmer:'🔴 À confirmer' };
+/* Libellés alignés mot pour mot sur le point 26 du cahier des charges (2026-08-31) :
+   "Donnée déclarée par le porteur / justifiée par un document / issue d'une source externe /
+   Hypothèse / À vérifier". Seuls les LIBELLÉS changent -- les clés stockées en base
+   (declare/justifie/verifie/estimation/a_confirmer, colonne bp_provenance.statut) restent
+   inchangées pour ne rien casser sur les données déjà enregistrées. */
+const BP_PROVENANCE_LABELS = { declare:'🟢 Déclaré par le porteur', justifie:'🔵 Justifié par un document', verifie:'🟣 Source externe', estimation:'🟠 Hypothèse', a_confirmer:'🔴 À vérifier' };
 let _bpProvenanceCache = null;
 async function bpChargerProvenance() {
   if (_bpProvenanceCache) return _bpProvenanceCache;
@@ -2035,6 +2040,7 @@ function updCampagne(i,key,val) {
   markDirty();
 }
 function renderCommercial() {
+  setTimeout(bpCalcFunnelConversion, 0);
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>💼 Plan commercial</h2></div>
     <div class="bp-card-inner"><div class="fg">
@@ -2047,11 +2053,11 @@ function renderCommercial() {
       ${textarea('kpi_commerciaux','KPI commerciaux','Indicateurs à suivre…',2,true)}
     </div></div>
     <div class="bp-card-inner bp-niveau-3"><h3>Funnel de vente quantitatif</h3><div class="fg">
-      ${field('nb_prospects_funnel','Nombre de prospects','','number')}
-      ${field('nb_contacts_funnel','Nombre de contacts','','number')}
-      ${field('nb_rdv_funnel','Nombre de rendez-vous','','number')}
-      ${field('nb_propositions_funnel','Nombre de propositions','','number')}
-      ${field('nb_contrats_funnel','Nombre de contrats','','number')}
+      ${field('nb_prospects_funnel','Nombre de prospects','','number').replace("oninput=\"updateField('nb_prospects_funnel',this.value)\"","oninput=\"updateField('nb_prospects_funnel',this.value);bpCalcFunnelConversion()\"")}
+      ${field('nb_contacts_funnel','Nombre de contacts','','number').replace("oninput=\"updateField('nb_contacts_funnel',this.value)\"","oninput=\"updateField('nb_contacts_funnel',this.value);bpCalcFunnelConversion()\"")}
+      ${field('nb_rdv_funnel','Nombre de rendez-vous','','number').replace("oninput=\"updateField('nb_rdv_funnel',this.value)\"","oninput=\"updateField('nb_rdv_funnel',this.value);bpCalcFunnelConversion()\"")}
+      ${field('nb_propositions_funnel','Nombre de propositions','','number').replace("oninput=\"updateField('nb_propositions_funnel',this.value)\"","oninput=\"updateField('nb_propositions_funnel',this.value);bpCalcFunnelConversion()\"")}
+      ${field('nb_contrats_funnel','Nombre de contrats','','number').replace("oninput=\"updateField('nb_contrats_funnel',this.value)\"","oninput=\"updateField('nb_contrats_funnel',this.value);bpCalcFunnelConversion()\"")}
       ${field('cycle_vente_moyen','Cycle de vente moyen','Ex : 45 jours')}
       ${field('panier_moyen_commercial','Panier moyen','','number')}
       ${field('frequence_achat_commercial','Fréquence d\'achat','')}
@@ -2061,12 +2067,39 @@ function renderCommercial() {
       ${field('territoire_commercial','Territoire commercial','')}
       ${field('canal_vente','Canal de vente','')}
       ${field('responsable_ventes','Responsable des ventes','')}
-    </div></div>
+    </div>
+    <div id="funnel-conversion-taux" style="margin-top:6px;"></div>
+    </div>
     <div class="bp-card-inner"><div class="fg">
       ${textarea('premiers_10_clients','Comment comptez-vous obtenir vos 10 premiers clients ?','',3,true)}
       ${textarea('premiers_100_clients','Comment comptez-vous obtenir vos 100 premiers clients ?','',3,true)}
     </div></div>
   </div>`;
+}
+/* "Taux de conversion à chaque étape" (2026-08-31, point 12 du cahier des charges) --
+   demandé explicitement mais absent : les 5 nombres du funnel existaient déjà, sans jamais
+   calculer les pourcentages de passage d'une étape à la suivante. Calcul en direct, jamais
+   stocké (dérivé des champs existants, comme calcFinRow() pour le compte de résultat). */
+function bpCalcFunnelConversion() {
+  const el = document.getElementById('funnel-conversion-taux');
+  if (!el) return;
+  const s = sections.plan_commercial || {};
+  const etapes = [
+    ['Prospects', parseFloat(s.nb_prospects_funnel)],
+    ['Contacts', parseFloat(s.nb_contacts_funnel)],
+    ['Rendez-vous', parseFloat(s.nb_rdv_funnel)],
+    ['Propositions', parseFloat(s.nb_propositions_funnel)],
+    ['Contrats', parseFloat(s.nb_contrats_funnel)],
+  ];
+  const renseignees = etapes.filter(([,v]) => v > 0);
+  if (renseignees.length < 2) { el.innerHTML = ''; return; }
+  const taux = [];
+  for (let i = 1; i < etapes.length; i++) {
+    const [labelPrec, valPrec] = etapes[i-1], [label, val] = etapes[i];
+    if (valPrec > 0 && val >= 0) taux.push(`<span class="cible-chip">${labelPrec} → ${label} : <strong>${Math.round(val/valPrec*100)}%</strong></span>`);
+  }
+  const global = etapes[0][1] > 0 && etapes[4][1] >= 0 ? `<span class="cible-chip active">Global Prospects → Contrats : <strong>${Math.round(etapes[4][1]/etapes[0][1]*100)}%</strong></span>` : '';
+  el.innerHTML = taux.length ? `<div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">Taux de conversion à chaque étape (calculé)</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${taux.join('')}${global}</div>` : '';
 }
 function renderOperationnel() {
   return `<div class="bp-section">
@@ -2367,7 +2400,7 @@ function renderFinancier() {
     </div>
 
     <div class="bp-card-inner"><h3>Investissements initiaux</h3><div class="fg">
-      ${field('investissement_initial','Investissement total requis (€)','','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}
+      <div>${field('investissement_initial','Investissement total requis (€)','','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}${provenanceWidget('plan_financier','investissement_initial')}</div>
       ${field('apport_personnel','Apport personnel / fonds propres (€)','','number').replace("oninput=\"updateField('apport_personnel',this.value)\"","oninput=\"updateField('apport_personnel',this.value);calcAllFinance()\"")}
       ${field('financement_recherche','Financement externe recherché (€)','','number').replace("oninput=\"updateField('financement_recherche',this.value)\"","oninput=\"updateField('financement_recherche',this.value);calcAllFinance()\"")}
       ${textarea('immobilisations','Détail des immobilisations','Équipements, locaux, brevets…',3,true)}
@@ -2441,7 +2474,7 @@ function renderFinancier() {
     </div>
 
     <div class="bp-card-inner"><h3>Seuil de rentabilité</h3><div class="fg">
-      ${field('seuil_rentabilite','Seuil de rentabilité (€ de CA)','','number')}
+      <div>${field('seuil_rentabilite','Seuil de rentabilité (€ de CA)','','number')}${provenanceWidget('plan_financier','seuil_rentabilite')}</div>
       ${field('point_mort','Point mort (nb de mois)','','number').replace("oninput=\"updateField('point_mort',this.value)\"","oninput=\"updateField('point_mort',this.value);calcAllFinance()\"")}
       ${textarea('amortissements','Plan d\'amortissement','',3,true)}
     </div></div>
@@ -2930,7 +2963,7 @@ function renderImpact() {
     <div class="bp-card-inner bp-niveau-3"><h3>Bénéficiaires & emplois</h3><div class="fg">
       ${field('beneficiaires_directs','Bénéficiaires directs','','number')}
       ${field('beneficiaires_indirects','Bénéficiaires indirects','','number')}
-      ${field('emplois_directs','Emplois directs créés','','number')}
+      <div>${field('emplois_directs','Emplois directs créés','','number')}${provenanceWidget('impact','emplois_directs')}</div>
       ${field('emplois_indirects','Emplois indirects créés','','number')}
     </div></div>
     <!-- Indicateurs d'impact structurés (2026-08-26, point 22) : situation initiale → cible,
@@ -2984,10 +3017,11 @@ function updIndicateurImpact(i,key,val) {
 function renderFinancement() {
   const s = sections.financement || {};
   const postes = s.utilisation_postes || [{ poste:'' }];
+  setTimeout(bpCalcScenariosFinancement, 0);
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🏦 Recherche de financement</h2></div>
     <div class="bp-card-inner"><div class="fg">
-      ${field('montant','Montant recherché (€)','','number').replace("oninput=\"updateField('montant',this.value)\"","oninput=\"updateField('montant',this.value);bpCalcDilution()\"")}
+      <div>${field('montant','Montant recherché (€)','','number').replace("oninput=\"updateField('montant',this.value)\"","oninput=\"updateField('montant',this.value);bpCalcDilution();bpCalcScenariosFinancement()\"")}${provenanceWidget('financement','montant')}</div>
       ${field('calendrier_decaissement','Calendrier de décaissement','Ex : 30% à la signature…')}
       ${textarea('utilisation','Utilisation des fonds','Détaillez comment seront utilisés les fonds levés…',4,true)}
       ${textarea('contreparties','Contreparties proposées','Parts sociales, redevances, royalties…',3,true)}
@@ -3038,8 +3072,8 @@ function renderFinancement() {
       </div>
     </div>
     <div class="bp-card-inner bp-niveau-3"><h3>💼 Levée de fonds</h3><div class="fg">
-      ${field('valorisation_avant','Valorisation avant investissement','','number')}
-      ${field('valorisation_apres','Valorisation après investissement','','number').replace("oninput=\"updateField('valorisation_apres',this.value)\"","oninput=\"updateField('valorisation_apres',this.value);bpCalcDilution()\"")}
+      <div>${field('valorisation_avant','Valorisation avant investissement','','number')}${provenanceWidget('financement','valorisation_avant')}</div>
+      <div>${field('valorisation_apres','Valorisation après investissement','','number').replace("oninput=\"updateField('valorisation_apres',this.value)\"","oninput=\"updateField('valorisation_apres',this.value);bpCalcDilution()\"")}${provenanceWidget('financement','valorisation_apres')}</div>
       ${field('pourcentage_propose','Pourcentage proposé','','number')}
       ${field('dilution_maximale_acceptee','Dilution maximale acceptée (%)','','number')}
       ${select('type_instrument','Type d\'instrument',[{v:'',l:'—'},{v:'actions',l:'Actions'},{v:'obligations_convertibles',l:'Obligations convertibles'},{v:'compte_courant',l:'Compte courant d\'associé'},{v:'autre',l:'Autre'}])}
@@ -3047,11 +3081,15 @@ function renderFinancement() {
     </div></div>
 
     <!-- Scénarios de financement (point 19) -->
-    <div class="bp-card-inner bp-niveau-3"><h3>Scénarios selon le financement obtenu</h3><div class="fg">
-      ${textarea('scenario_financement_50','Que se passe-t-il si vous ne recevez que 50% du financement demandé ?','',3,true)}
-      ${textarea('scenario_financement_100','Scénario si 100% du financement est obtenu','',3,true)}
-      ${textarea('scenario_financement_150','Scénario si 150% du financement est obtenu','',3,true)}
-    </div></div>
+    <div class="bp-card-inner bp-niveau-3">
+      <h3>Scénarios selon le financement obtenu</h3>
+      <div id="fin-scenarios-chiffres" style="margin-bottom:14px;"></div>
+      <div class="fg">
+        ${textarea('scenario_financement_50','Que se passe-t-il si vous ne recevez que 50% du financement demandé ?','',3,true)}
+        ${textarea('scenario_financement_100','Scénario si 100% du financement est obtenu','',3,true)}
+        ${textarea('scenario_financement_150','Scénario si 150% du financement est obtenu','',3,true)}
+      </div>
+    </div>
 
     <!-- Stratégie de sortie enrichie (point 20) -->
     <div class="bp-card-inner bp-niveau-3"><h3>Stratégie de sortie</h3><div class="fg">
@@ -3112,6 +3150,29 @@ function bpCalcDilution() {
   const pctCede = (montant / valoApres) * 100;
   const pctFondateursApres = 100 - pctCede;
   el.innerHTML = `📉 <strong>Simulation de dilution</strong> — en cédant ${fmtEuro(montant)} contre ${pctCede.toFixed(1)}% du capital, les actionnaires actuels détiendraient environ <strong>${pctFondateursApres.toFixed(1)}%</strong> après l'opération (calcul indicatif, hors frais et clauses spécifiques).`;
+}
+
+/* Scénarios 50/100/150% du financement demandé, chiffrés (2026-08-31, point 19 du cahier des
+   charges) -- jusqu'ici uniquement 3 champs de texte libre. Calcule pour chaque palier le
+   montant réellement reçu et sa couverture de l'investissement initial déclaré (Plan
+   financier), en complément du texte narratif ci-dessous, jamais à sa place. */
+function bpCalcScenariosFinancement() {
+  const el = document.getElementById('fin-scenarios-chiffres');
+  if (!el) return;
+  const montant = parseFloat(sections.financement?.montant) || 0;
+  const besoin = parseFloat(sections.plan_financier?.investissement_initial) || 0;
+  if (!montant) { el.innerHTML = ''; return; }
+  const paliers = [50, 100, 150];
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;">${paliers.map(pct => {
+    const recu = montant * pct / 100;
+    const couverture = besoin > 0 ? Math.round(recu / besoin * 100) : null;
+    const statut = couverture===null ? '' : couverture>=100 ? '✅ Investissement couvert' : couverture>=60 ? '⚠️ Couverture partielle' : '🔴 Financement très insuffisant';
+    return `<div style="flex:1;min-width:150px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+      <div style="font-size:11px;font-weight:800;color:var(--muted);">${pct}% obtenu</div>
+      <div style="font-size:16px;font-weight:800;">${fmtEuro(recu)}</div>
+      ${couverture!==null ? `<div style="font-size:11.5px;color:var(--muted);">${couverture}% de l'investissement initial (${fmtEuro(besoin)})</div><div style="font-size:12px;margin-top:2px;">${statut}</div>` : '<div style="font-size:11px;color:var(--muted);">Renseignez l\'investissement initial (Plan financier) pour voir la couverture.</div>'}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 /* ---- 20. Annexes ---- */
@@ -3204,9 +3265,12 @@ async function bpLoadBiblioDocuments() {
     el.innerHTML = Object.entries(parCategorie).map(([cat, liste]) => `
       <div style="margin-bottom:12px;">
         <div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:4px;">${BP_DOC_CATEGORIES_LABELS[cat]||cat} (${liste.length})</div>
-        ${liste.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
-          <a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom)}</a>
-          ${monRole!=='lecteur'?`<button onclick="bpSupprimerDocumentBiblio(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>`:''}
+        ${liste.map(d => `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom)}</a>
+            ${monRole!=='lecteur'?`<button onclick="bpSupprimerDocumentBiblio(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>`:''}
+          </div>
+          ${d.field_key?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">🔗 Justifie : ${esc(d.field_key)}</div>`:''}
         </div>`).join('')}
       </div>`).join('');
   } catch (e) { el.innerHTML = '<p style="color:#dc2626;font-size:12.5px;">Erreur de chargement.</p>'; }
@@ -3222,6 +3286,10 @@ function bpAjouterDocumentBiblio() {
     const nom = prompt('Nom de ce document ?', file.name) || file.name;
     const catChoix = prompt(`Catégorie (${BP_DOC_CATEGORIES.join(', ')}) ?`, 'autre') || 'autre';
     const categorie = BP_DOC_CATEGORIES.includes(catChoix) ? catChoix : 'autre';
+    // Lien document↔donnée (2026-08-31, point 23) : facultatif, texte libre plutôt qu'une
+    // liste déroulante des ~150 champs possibles du plan -- suffisant pour retrouver "quelle
+    // information ce document justifie" sans construire un sélecteur exhaustif par section.
+    const fieldKey = prompt('Ce document justifie quelle information précise du plan ? (facultatif, ex. "CA réalisé à ce jour")', '') || null;
     const el = document.getElementById('bp-biblio-list');
     el.innerHTML = 'Envoi en cours…';
     try {
@@ -3230,7 +3298,7 @@ function bpAjouterDocumentBiblio() {
       const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
       const upData = await up.json();
       if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
-      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'annexes', categorie, nom, url_bunny: upData.url, type_mime: file.type });
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'annexes', field_key: fieldKey, categorie, nom, url_bunny: upData.url, type_mime: file.type });
     } catch (e) { alert(e.message || 'Erreur.'); }
     bpLoadBiblioDocuments();
   };
