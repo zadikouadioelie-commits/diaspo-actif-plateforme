@@ -36187,7 +36187,7 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
     JOIN bp_collaborateurs bc ON bc.bp_id=bp.id AND bc.user_id=?
     ORDER BY bp.updated_at DESC
   `).all(req.user.id);
-  const parseGalerie = list => list.map(bp => ({ ...bp, galerie: safeJSON(bp.galerie_json, []) }));
+  const parseGalerie = list => list.map(bp => ({ ...bp, galerie: safeJSON(bp.galerie_json, []), devise_config: safeJSON(bp.devise_config, { reference: 'EUR', secondaires: [] }) }));
   sendJSON(res, 200, { mes_plans: parseGalerie(rows), partages: parseGalerie(collab) });
 });
 
@@ -36214,7 +36214,9 @@ app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
   const sections = safeJSON(bp.sections_json, {});
   const completude = await checkBPCompletude(sections);
   const progression = await calcBPProgression(sections);
-  sendJSON(res, 200, { ...bp, sections, galerie: safeJSON(bp.galerie_json, []), completude, progression, mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
+  sendJSON(res, 200, { ...bp, sections, galerie: safeJSON(bp.galerie_json, []),
+    devise_config: safeJSON(bp.devise_config, { reference: 'EUR', secondaires: [] }), completude, progression,
+    mon_role: bp.user_id===req.user.id?'proprietaire':(collab?.role||'lecteur') });
 });
 
 /* ---- Mise à jour (auto-save) ---- */
@@ -36355,6 +36357,90 @@ route("DELETE", "/api/business-plans/:id/media", async (req, res, params) => {
     return sendJSON(res, 400, { error: "Type de média invalide" });
   }
   sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Configuration monétaire (multidevise, 2026-08-31) ----
+   Cahier des charges dédié "Gestion multidevise". Route dédiée (même principe que
+   changerNiveauProfondeur() côté client pour niveau_profondeur) plutôt que noyée dans le PUT
+   générique : se sauvegarde indépendamment de la section en cours d'édition, et chaque
+   changement de taux doit être un choix explicite et tracé (points 7/8) -- jamais un effet de
+   bord d'une sauvegarde de section. Validation dupliquée ici volontairement (même règles que
+   CurrencyManager.validerConfig côté client, assets/currency-manager.js) : le serveur ne peut
+   pas charger un script écrit pour le navigateur (`window.CurrencyManager`), et ne doit de toute
+   façon jamais faire confiance à une validation faite uniquement côté client. */
+const DEVISES_VALIDES_BP = ['EUR','USD','GBP','CHF','CAD','XOF','XAF','MAD','DZD','TND','CDF','GHS','NGN'];
+function validerDeviseConfigBP(config) {
+  const erreurs = [];
+  if (!config || !config.reference || !DEVISES_VALIDES_BP.includes(config.reference)) {
+    erreurs.push("Monnaie de référence invalide.");
+    return erreurs;
+  }
+  const secondaires = Array.isArray(config.secondaires) ? config.secondaires : [];
+  if (secondaires.length > 2) erreurs.push("Maximum 2 monnaies secondaires.");
+  const codes = [config.reference, ...secondaires.map(s => s.code)];
+  const vus = new Set();
+  for (const c of codes) {
+    if (vus.has(c)) { erreurs.push("Cette devise est déjà utilisée dans ce Business Plan."); break; }
+    vus.add(c);
+  }
+  secondaires.forEach(s => {
+    if (!s.code || !DEVISES_VALIDES_BP.includes(s.code)) erreurs.push(`Devise secondaire invalide : ${s.code || '—'}.`);
+    if (!s.taux || isNaN(Number(s.taux)) || Number(s.taux) <= 0) erreurs.push(`Taux invalide pour ${s.code || 'une devise secondaire'}.`);
+  });
+  return erreurs;
+}
+
+route("PUT", "/api/business-plans/:id/devise-config", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const bp = await db.prepare("SELECT * FROM business_plans WHERE id=?").get(params.id);
+  if (!bp) return sendJSON(res, 404, { error: "Plan introuvable" });
+  const collab = await db.prepare("SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?").get(bp.id, user.id);
+  const canEdit = bp.user_id === user.id || ["editeur", "validateur"].includes(collab?.role);
+  if (!canEdit) return sendJSON(res, 403, { error: "Accès refusé" });
+
+  const config = body?.devise_config;
+  const erreurs = validerDeviseConfigBP(config);
+  if (erreurs.length) return sendJSON(res, 400, { error: erreurs[0], erreurs });
+
+  /* Historique (points 6/27) : une ligne par devise secondaire à CHAQUE sauvegarde de la config
+     (création initiale ou modification confirmée) -- append-only, jamais de UPDATE/DELETE, pour
+     qu'un ancien export reste historiquement cohérent même si le taux change ensuite. */
+  for (const sec of (config.secondaires || [])) {
+    await db.prepare(`
+      INSERT INTO bp_taux_historique (bp_id, devise_reference, devise_secondaire, taux, type_taux, source, defini_par)
+      VALUES (?,?,?,?,?,?,?)
+    `).run(bp.id, config.reference, sec.code, Number(sec.taux), sec.type === 'automatique' ? 'automatique' : 'manuel',
+      sec.source || 'Taux renseigné manuellement', user.id);
+  }
+
+  const configEnregistree = {
+    reference: config.reference,
+    secondaires: (config.secondaires || []).map(sec => ({
+      code: sec.code,
+      taux: Number(sec.taux),
+      type: sec.type === 'automatique' ? 'automatique' : 'manuel',
+      source: sec.source || 'Taux renseigné manuellement',
+      date: new Date().toISOString(),
+    })),
+  };
+
+  await db.prepare("UPDATE business_plans SET devise_config=?, updated_at=datetime('now') WHERE id=?")
+    .run(JSON.stringify(configEnregistree), bp.id);
+  SEC.logSecurity("bp_devise_config", { uid: Number(user.id), bpId: Number(bp.id), reference: config.reference, secondaires: (config.secondaires || []).map(s => s.code) });
+  sendJSON(res, 200, { ok: true, devise_config: configEnregistree });
+});
+
+/* ---- Historique des taux utilisés par ce plan (lecture seule, append-only) ---- */
+route("GET", "/api/business-plans/:id/devise-config/historique", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const bp = await db.prepare("SELECT user_id FROM business_plans WHERE id=?").get(params.id);
+  if (!bp) return sendJSON(res, 404, { error: "Plan introuvable" });
+  const collab = await db.prepare("SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?").get(params.id, user.id);
+  if (bp.user_id !== user.id && !collab) return sendJSON(res, 403, { error: "Accès refusé" });
+  const historique = await db.prepare("SELECT * FROM bp_taux_historique WHERE bp_id=? ORDER BY created_at DESC").all(params.id);
+  sendJSON(res, 200, { historique });
 });
 
 /* ---- Dupliquer ---- */

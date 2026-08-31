@@ -1948,6 +1948,14 @@ const MIGRATIONS = [
   ["business_plans", "photo_principale_url TEXT"],
   ["business_plans", "galerie_json TEXT DEFAULT '[]'"],
   ["business_plans", "video_pitch_url TEXT"],
+  // Business Plan — gestion multidevise (2026-08-31, cahier des charges dédié) : monnaie de
+  // référence obligatoire + jusqu'à 2 monnaies secondaires avec taux figé par plan (point 7).
+  // Colonne racine (comme niveau_profondeur) plutôt que nichée dans sections_json : c'est un
+  // réglage de tout le document, pas d'une section précise, et il doit pouvoir se sauvegarder
+  // indépendamment de la section en cours d'édition (voir PUT /api/business-plans/:id/devise-config).
+  // Rétrocompatibilité (point 28) : NULL ici => CurrencyManager applique EUR par défaut, aucune
+  // donnée existante n'est modifiée.
+  ["business_plans", "devise_config TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -6864,6 +6872,27 @@ db.exec(`
     created_at   TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
     FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Historique des taux de change (2026-08-31, cahier des charges "Gestion multidevise",
+     points 6/8/27) : append-only, jamais mis à jour ni supprimé -- chaque changement de taux
+     (y compris le tout premier, à la création de la config) ajoute une ligne. Permet de savoir
+     avec quel taux un export a été généré même si le taux courant a changé depuis (point 27),
+     et donne l'historique complet des taux utilisés par ce plan dans le temps (point 6). Le taux
+     COURANT reste dans business_plans.devise_config (JSON) -- cette table est l'historique, pas
+     la source de vérité pour "le taux actif maintenant". */
+  CREATE TABLE IF NOT EXISTS bp_taux_historique (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    bp_id              INTEGER NOT NULL,
+    devise_reference   TEXT NOT NULL,
+    devise_secondaire  TEXT NOT NULL,
+    taux               REAL NOT NULL,
+    type_taux          TEXT NOT NULL DEFAULT 'manuel' CHECK(type_taux IN ('manuel','automatique')),
+    source             TEXT,
+    defini_par         INTEGER,
+    created_at         TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(bp_id) REFERENCES business_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY(defini_par) REFERENCES users(id)
   );
 `);
 

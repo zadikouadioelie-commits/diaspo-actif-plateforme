@@ -56,6 +56,17 @@
   .bpv-media-galerie-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;}
   .bpv-media-galerie-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;border:1px solid var(--border);cursor:zoom-in;}
 
+  /* Référentiel monétaire (multidevise, 2026-08-31) */
+  .bpv-devise-referentiel{padding:22px 56px;border-top:1px solid var(--border);background:#fafbfc;}
+  .bpv-devise-referentiel h4{margin:0 0 12px;font-size:13px;font-weight:800;color:#0D2B4E;}
+  .bpv-devise-lignes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 24px;}
+  .bpv-devise-lignes .k{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  .bpv-devise-lignes .v{display:block;font-size:13.5px;font-weight:700;color:#1a2233;}
+  .bpv-devise-note{margin:12px 0 0;font-size:11.5px;color:var(--muted);font-style:italic;}
+  .cm-principal{font-weight:800;}
+  .cm-secondaire{font-weight:500;color:var(--muted);font-size:.86em;margin-left:6px;}
+  .cm-secondaire::before{content:'— ';}
+
   /* Sections */
   .bpv-section{padding:34px 56px;border-top:1px solid var(--border);}
   .bpv-section:first-of-type{border-top:none;}
@@ -165,6 +176,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
+<script src="assets/currency-manager.js"></script>
 <script>
 /* ===========================================================================
    CONSULTATION BUSINESS PLAN — lecture seule, mise en page "document".
@@ -173,10 +185,15 @@
    n'affiche que les champs réellement remplis — jamais de champ vide, pour
    garder un vrai rendu "document fini" plutôt qu'un formulaire vidé.
    =========================================================================== */
+let bp; // promu en variable de module (pas seulement locale à init()) : fmtMontant() en a besoin
 function esc(s){ const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML; }
 function nl2br(s){ return esc(s); } // white-space:pre-wrap gère déjà les retours à la ligne
 function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) : ''; }
-function fmtMontant(n, devise){ return (n===null||n===undefined||n==='') ? '' : `${Number(n).toLocaleString('fr-FR')} ${devise||'EUR'}`; }
+/* Multidevise (2026-08-31) : remplace l'ancien formatage EUR codé en dur par le service centralisé
+   (assets/currency-manager.js), piloté par la config du plan chargé (bp.devise_config). Le 2ᵉ
+   paramètre `devise` n'était de toute façon jamais transmis par aucun appelant -- conservé pour
+   compat mais ignoré : la devise de référence vient désormais toujours de la config du plan. */
+function fmtMontant(n){ return (n===null||n===undefined||n==='') ? '' : CurrencyManager.afficherMontant(n, bp?.devise_config); }
 const has = v => v !== null && v !== undefined && String(v).trim() !== '';
 
 const TYPES = { startup:'🚀 Startup', pme:'🏢 PME', association:'🤝 Association', ong:'🌍 ONG', cooperative:'🌾 Coopérative', social:'💚 Social', autre:'📋 Autre' };
@@ -337,12 +354,28 @@ function renderPlanFinancier(pf){
     if (has(pf[k])) html += `<div class="bpv-field"><h4>${labels[k]}</h4><p>${nl2br(pf[k])}</p></div>`;
   });
 
-  // Compte de résultat prévisionnel 5 ans
+  // Compte de résultat prévisionnel 5 ans — une colonne par devise active (point 15 du cahier
+  // des charges "Gestion multidevise" : "si une troisième devise est activée, ajouter
+  // automatiquement une colonne"). Sans devise secondaire configurée (cas par défaut/anciens
+  // plans, point 28), devisesActives=[reference] => une seule colonne par année, identique au
+  // rendu d'avant cette fonctionnalité.
   const anneesCR = [1,2,3,4,5].filter(a => Object.keys(CR_LIGNES).some(k => has(pf[`${k}_${a}`])));
   if (anneesCR.length) {
+    const dcCR = CurrencyManager.normaliserConfig(bp?.devise_config);
+    const devisesActives = [dcCR.reference, ...dcCR.secondaires.map(s => s.code)];
+    const tauxParDevise = { [dcCR.reference]: 1 };
+    dcCR.secondaires.forEach(s => { tauxParDevise[s.code] = s.taux; });
+    const celluleMontant = (val, code) => {
+      if (!has(val)) return '—';
+      const montant = code === dcCR.reference ? Number(val) : CurrencyManager.convertir(val, tauxParDevise[code]);
+      return montant !== null ? CurrencyManager.format(montant, code) : '—';
+    };
     html += `<div class="bpv-field" style="margin-top:20px;"><h4>Compte de résultat prévisionnel</h4></div>
-      <div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Ligne</th>${anneesCR.map(a=>`<th>Année ${a}</th>`).join('')}</tr></thead><tbody>
-      ${Object.entries(CR_LIGNES).map(([k,label]) => `<tr><td>${label}</td>${anneesCR.map(a=>`<td>${has(pf[`${k}_${a}`])?fmtMontant(pf[`${k}_${a}`]):'—'}</td>`).join('')}</tr>`).join('')}
+      <div class="bpv-table-wrap"><table class="bpv-table"><thead>
+        <tr><th${devisesActives.length>1?' rowspan="2"':''}>Ligne</th>${anneesCR.map(a=>`<th colspan="${devisesActives.length}">Année ${a}</th>`).join('')}</tr>
+        ${devisesActives.length>1 ? `<tr>${anneesCR.map(()=>devisesActives.map(code=>`<th>${esc(code)}</th>`).join('')).join('')}</tr>` : ''}
+      </thead><tbody>
+      ${Object.entries(CR_LIGNES).map(([k,label]) => `<tr><td>${label}</td>${anneesCR.map(a=>devisesActives.map(code=>`<td>${celluleMontant(pf[`${k}_${a}`], code)}</td>`).join('')).join('')}</tr>`).join('')}
     </tbody></table></div>`;
   }
 
@@ -372,7 +405,6 @@ function buildSection(meta, contentHtml){
 async function init(){
   const id = new URLSearchParams(location.search).get('id');
   if (!id) { showError("Aucun business plan spécifié."); return; }
-  let bp;
   try { bp = await api('GET', `/business-plans/${id}`); }
   catch(e) { showError(e.status === 403 ? "Vous n'avez pas accès à ce business plan." : (e.status === 404 ? 'Business plan introuvable.' : ('Erreur : ' + e.message))); return; }
 
@@ -456,7 +488,25 @@ async function init(){
       ${galerie.length ? `<div class="bpv-media-galerie"><h4>🖼️ Galerie</h4><div class="bpv-media-galerie-grid">${galerie.map(g=>`<img src="${esc(g)}" alt="" onclick="window.open('${esc(g)}','_blank')">`).join('')}</div></div>` : ''}
     </div>` : '';
 
-  document.getElementById('bpv-doc').innerHTML = cover + mediaBlock + sections.map(sec => sec.html).join('');
+  /* Référentiel monétaire (point 19 du cahier des charges "Gestion multidevise") : affiché une
+     seule fois en tête de document dès qu'au moins une devise secondaire est configurée -- les
+     montants du reste du document ne répètent jamais le taux complet (point 20), juste la note
+     discrète en pied de bloc. */
+  const dc = bp.devise_config;
+  const referentielBlock = (dc && dc.secondaires && dc.secondaires.length) ? `
+    <div class="bpv-devise-referentiel">
+      <h4>💱 Référentiel monétaire</h4>
+      <div class="bpv-devise-lignes">
+        <div><span class="k">Monnaie de référence</span><span class="v">${esc(dc.reference)} — ${esc(CurrencyManager.devise(dc.reference).nom)} (${esc(CurrencyManager.devise(dc.reference).symbole)})</span></div>
+        ${dc.secondaires.map(sec => `
+        <div><span class="k">Monnaie secondaire</span><span class="v">${esc(sec.code)} — ${esc(CurrencyManager.devise(sec.code).nom)} (${esc(CurrencyManager.devise(sec.code).symbole)})</span></div>
+        <div><span class="k">Taux utilisé</span><span class="v">1 ${esc(dc.reference)} = ${esc(String(sec.taux))} ${esc(sec.code)}</span></div>
+        <div><span class="k">Date du taux</span><span class="v">${fmtDate(sec.date) || '—'}</span></div>`).join('')}
+      </div>
+      <p class="bpv-devise-note">Les montants présentés dans ce document sont exprimés dans la monnaie de référence et convertis selon les taux enregistrés dans le Business Plan à la date indiquée.</p>
+    </div>` : '';
+
+  document.getElementById('bpv-doc').innerHTML = cover + mediaBlock + referentielBlock + sections.map(sec => sec.html).join('');
 
   document.getElementById('bpv-toc').innerHTML = `
     <div class="bpv-toc-title">Sommaire</div>

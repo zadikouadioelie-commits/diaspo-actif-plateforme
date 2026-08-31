@@ -290,6 +290,17 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 .bp-media-thumb-add{width:78px;height:78px;border-radius:8px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted);cursor:pointer;transition:all .15s;}
 .bp-media-thumb-add:hover{border-color:#2563EB;color:#2563EB;}
 .bp-media-video-wrap video{max-width:420px;width:100%;border-radius:12px;display:block;background:#000;}
+
+/* Configuration monétaire (2026-08-31) */
+.bp-devise-hint{font-size:12.5px;color:var(--muted);margin:-6px 0 14px;line-height:1.5;}
+.bp-devise-sec{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.bp-devise-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.bp-devise-check input{width:16px;height:16px;}
+/* Devise dominante à l'affichage (point 13) : la référence en gras/pleine taille, les
+   conversions secondaires en retrait — classes posées par CurrencyManager.afficherMontantHTML(). */
+.cm-principal{font-weight:800;}
+.cm-secondaire{font-weight:500;color:var(--muted);font-size:.88em;margin-left:6px;}
+.cm-secondaire::before{content:'— ';}
 </style>
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
@@ -477,6 +488,7 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
 <script src="assets/upload-media.js"></script>
+<script src="assets/currency-manager.js"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -786,6 +798,7 @@ async function loadBP() {
     bp = await api('GET', `/business-plans/${bpId}`);
     sections = bp.sections || {};
     monRole = bp.mon_role || 'lecteur';
+    bpDeviseWorking = null; // réinitialise l'état de travail de la config monétaire sur ce plan fraîchement chargé
     document.title = `BP — ${bp.nom_projet||'Sans titre'} · Diaspo\'Actif`;
     document.getElementById('bp-title-input').value = bp.nom_projet || '';
     appliquerNiveauProfondeur(bp.niveau_profondeur || 'essentiel');
@@ -1171,11 +1184,149 @@ async function bpSupprimerVideoPitch() {
   } catch (e) { alert(e.message); }
 }
 
+/* ── Configuration monétaire (2026-08-31, cahier des charges "Gestion multidevise") ──
+   État de travail local, distinct de bp.devise_config : les modifications ne sont PERSISTÉES
+   qu'au clic explicite sur "Enregistrer la configuration" — jamais via updateField()/markDirty()/
+   l'auto-save de section (points 7/8 : le taux doit rester figé tant qu'un changement n'est pas
+   volontairement confirmé). */
+let bpDeviseWorking = null;
+
+function bpDeviseInit() {
+  const saved = (bp?.devise_config && bp.devise_config.reference) ? bp.devise_config : CurrencyManager.configParDefaut();
+  bpDeviseWorking = JSON.parse(JSON.stringify(saved));
+}
+
+function bpDeviseOptions(selected) {
+  return CurrencyManager.LISTE.map(d => `<option value="${d.code}" ${d.code===selected?'selected':''}>${d.code} — ${d.nom} (${d.symbole})</option>`).join('');
+}
+
+/* Symbole de la devise de référence courante, pour les libellés de champ ("Investissement
+   total requis (€)") qui doivent refléter la devise réellement configurée sur ce plan, pas un €
+   codé en dur. */
+function bpDeviseRefSymbole() {
+  return CurrencyManager.devise((bp?.devise_config?.reference) || 'EUR').symbole;
+}
+
+function bpDeviseAutreDevise() {
+  const utilisees = [bpDeviseWorking.reference, ...bpDeviseWorking.secondaires.filter(Boolean).map(s=>s.code)];
+  const dispo = CurrencyManager.LISTE.find(d => !utilisees.includes(d.code));
+  return dispo ? dispo.code : CurrencyManager.LISTE[0].code;
+}
+
+function bpDeviseRerender() {
+  const el = document.getElementById('bp-devise-block');
+  if (el) el.outerHTML = renderBPDeviseBlock();
+}
+
+function bpDeviseSetRef(code) { bpDeviseWorking.reference = code; bpDeviseRerender(); }
+
+function bpDeviseToggleSecondaire(idx, checked) {
+  if (idx === 0) {
+    if (checked) { if (!bpDeviseWorking.secondaires[0]) bpDeviseWorking.secondaires[0] = { code: bpDeviseAutreDevise(), taux: '', type: 'manuel' }; }
+    else { bpDeviseWorking.secondaires = []; } // décoche la 1ère => retire aussi la 2e (dépendante)
+  } else {
+    if (checked) { if (!bpDeviseWorking.secondaires[1]) bpDeviseWorking.secondaires[1] = { code: bpDeviseAutreDevise(), taux: '', type: 'manuel' }; }
+    else { bpDeviseWorking.secondaires = bpDeviseWorking.secondaires.slice(0, 1); }
+  }
+  bpDeviseRerender();
+}
+
+function bpDeviseSetSecondaireCode(idx, code) { bpDeviseWorking.secondaires[idx].code = code; bpDeviseRerender(); }
+function bpDeviseSetSecondaireTaux(idx, val) { bpDeviseWorking.secondaires[idx].taux = val; }
+
+async function bpDeviseChargerHistorique() {
+  const el = document.getElementById('bp-devise-historique');
+  if (!el || el.dataset.loaded) return;
+  el.dataset.loaded = '1';
+  try {
+    const r = await api('GET', `/business-plans/${bpId}/devise-config/historique`);
+    const rows = r.historique || [];
+    el.innerHTML = rows.length ? rows.map(h => `
+      <div style="padding:5px 0;border-bottom:1px solid var(--border);">
+        1 ${esc(h.devise_reference)} = ${esc(String(h.taux))} ${esc(h.devise_secondaire)}
+        <span style="color:var(--muted);">— ${h.type_taux==='automatique'?'automatique':'manuel'}, le ${new Date(h.created_at).toLocaleDateString('fr-FR')}</span>
+      </div>`).join('') : '<p style="color:var(--muted);">Aucun historique.</p>';
+  } catch (e) { el.innerHTML = 'Erreur de chargement.'; }
+}
+
+function renderBPDeviseBlock() {
+  if (!bpDeviseWorking) bpDeviseInit();
+  const ro = monRole === 'lecteur';
+  const w = bpDeviseWorking;
+  const sec1 = w.secondaires[0], sec2 = w.secondaires[1];
+  const dejaConfigure = (bp?.devise_config?.secondaires || []).length > 0;
+  return `<div class="bp-card-inner" id="bp-devise-block">
+    <h3>💱 Configuration monétaire</h3>
+    <p class="bp-devise-hint">Construisez votre Business Plan dans une monnaie de référence, et affichez automatiquement les montants dans jusqu'à deux monnaies supplémentaires — dans le logiciel comme dans les documents exportés.</p>
+    <div class="fg">
+      <div><label>Monnaie de référence</label><select ${ro?'disabled':''} onchange="bpDeviseSetRef(this.value)">${bpDeviseOptions(w.reference)}</select></div>
+    </div>
+    <div class="bp-devise-sec">
+      <label class="bp-devise-check"><input type="checkbox" ${sec1?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(0,this.checked)"> Afficher une monnaie supplémentaire</label>
+      ${sec1 ? `<div class="fg" style="margin-top:8px;">
+        <div><label>Devise secondaire</label><select ${ro?'disabled':''} onchange="bpDeviseSetSecondaireCode(0,this.value)">${bpDeviseOptions(sec1.code)}</select></div>
+        <div><label>Taux de change (1 ${esc(w.reference)} = ? ${esc(sec1.code)})</label><input type="number" step="any" min="0" ${ro?'readonly':''} value="${esc(sec1.taux ?? '')}" placeholder="Ex : 655" oninput="bpDeviseSetSecondaireTaux(0,this.value)"></div>
+      </div>` : ''}
+    </div>
+    ${sec1 ? `<div class="bp-devise-sec">
+      <label class="bp-devise-check"><input type="checkbox" ${sec2?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(1,this.checked)"> Ajouter une deuxième monnaie</label>
+      ${sec2 ? `<div class="fg" style="margin-top:8px;">
+        <div><label>Devise secondaire</label><select ${ro?'disabled':''} onchange="bpDeviseSetSecondaireCode(1,this.value)">${bpDeviseOptions(sec2.code)}</select></div>
+        <div><label>Taux de change (1 ${esc(w.reference)} = ? ${esc(sec2.code)})</label><input type="number" step="any" min="0" ${ro?'readonly':''} value="${esc(sec2.taux ?? '')}" placeholder="Ex : 1.08" oninput="bpDeviseSetSecondaireTaux(1,this.value)"></div>
+      </div>` : ''}
+    </div>` : ''}
+    ${!ro ? `<button type="button" class="btn btn-sm btn-orange" style="margin-top:14px;" onclick="bpEnregistrerDeviseConfig()">💾 Enregistrer la configuration</button>` : ''}
+    <p id="bp-devise-status" style="font-size:12.5px;margin-top:8px;color:var(--muted);"></p>
+    ${dejaConfigure ? `<details style="margin-top:10px;" ontoggle="bpDeviseChargerHistorique()"><summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);">Historique des taux</summary><div id="bp-devise-historique" style="margin-top:8px;font-size:12.5px;">Chargement…</div></details>` : ''}
+  </div>`;
+}
+
+async function bpEnregistrerDeviseConfig() {
+  if (monRole === 'lecteur') return;
+  const w = bpDeviseWorking;
+  const secondaires = w.secondaires.filter(Boolean).map(s => ({ code: s.code, taux: s.taux, type: s.type || 'manuel', source: s.type === 'automatique' ? s.source : 'Taux renseigné manuellement' }));
+  const config = { reference: w.reference, secondaires };
+  const erreurs = CurrencyManager.validerConfig(config);
+  if (erreurs.length) { alert(erreurs.join('\n')); return; }
+
+  // Confirmation avant modification d'un taux déjà enregistré (point 8) — pas de confirmation
+  // pour une toute première configuration, ni si rien n'a réellement changé.
+  const ancien = bp?.devise_config?.secondaires || [];
+  const dejaEnregistre = ancien.length > 0;
+  const cleTaux = list => JSON.stringify(list.map(s => ({ code: s.code, taux: Number(s.taux) })).sort((a,b)=>a.code.localeCompare(b.code)));
+  const tauxOntChange = dejaEnregistre && cleTaux(ancien) !== cleTaux(secondaires);
+  if (tauxOntChange && !confirm("⚠️ Modifier le taux de change recalculera toutes les valeurs converties de ce Business Plan.\n\nConfirmer ?")) return;
+
+  const statusEl = document.getElementById('bp-devise-status');
+  if (statusEl) statusEl.textContent = 'Enregistrement…';
+  try {
+    const r = await api('PUT', `/business-plans/${bpId}/devise-config`, { devise_config: config });
+    bp.devise_config = r.devise_config;
+    bpDeviseInit();
+    bpDeviseRerender();
+    const status2 = document.getElementById('bp-devise-status');
+    if (status2) status2.textContent = '✓ Configuration enregistrée';
+    bpRafraichirAffichageDevise();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '';
+    alert('Erreur : ' + (e.data?.error || e.message));
+  }
+}
+
+/* Recalcule l'affichage des montants déjà rendus à l'écran quand la config change, sans recharger
+   toute la page — appelé après chaque sauvegarde de configuration monétaire. Les fonctions de
+   calcul financier (calcAllFinance, etc.) lisent déjà bp.devise_config à chaque exécution ; il
+   suffit donc de les redéclencher si la section financière est actuellement affichée. */
+function bpRafraichirAffichageDevise() {
+  if (currentSection === 'plan_financier' && typeof calcAllFinance === 'function') calcAllFinance();
+}
+
 function renderInfosGenerales() {
   const s = sections.infos_generales || {};
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🏷 Informations générales</h2><p>La carte d'identité de votre projet.</p></div>
     ${renderBPMediaBlock()}
+    ${renderBPDeviseBlock()}
     <div class="bp-card-inner"><h3>Identité du projet</h3><div class="fg">
       ${field('nom_projet','Nom du projet','Mon projet…','text',false,true)}
       ${field('slogan','Slogan / Accroche','Une phrase qui résume tout…','text',false)}
@@ -1351,7 +1502,7 @@ function genResumeAuto() {
   if (pb.description && !s.probleme) s.probleme = pb.description.substring(0,300);
   if (sol.description && !s.solution) s.solution = sol.description.substring(0,300);
   if (mar.taille_marche && !s.marche) s.marche = `Taille du marché : ${mar.taille_marche}. ${mar.tendances||''}`;
-  if (fin.montant && !s.besoins) s.besoins = `Montant recherché : ${fin.montant}€. Utilisation : ${fin.utilisation||'—'}`;
+  if (fin.montant && !s.besoins) s.besoins = `Montant recherché : ${fmtEuro(fin.montant)}. Utilisation : ${fin.utilisation||'—'}`;
   markDirty();
   renderSection('resume_executif');
 }
@@ -2572,9 +2723,9 @@ function renderFinancier() {
     </div>
 
     <div class="bp-card-inner"><h3>Investissements initiaux</h3><div class="fg">
-      <div>${field('investissement_initial','Investissement total requis (€)','','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}${provenanceWidget('plan_financier','investissement_initial')}</div>
-      ${field('apport_personnel','Apport personnel / fonds propres (€)','','number').replace("oninput=\"updateField('apport_personnel',this.value)\"","oninput=\"updateField('apport_personnel',this.value);calcAllFinance()\"")}
-      ${field('financement_recherche','Financement externe recherché (€)','','number').replace("oninput=\"updateField('financement_recherche',this.value)\"","oninput=\"updateField('financement_recherche',this.value);calcAllFinance()\"")}
+      <div>${field('investissement_initial',`Investissement total requis (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('investissement_initial',this.value)\"","oninput=\"updateField('investissement_initial',this.value);calcAllFinance()\"")}${provenanceWidget('plan_financier','investissement_initial')}</div>
+      ${field('apport_personnel',`Apport personnel / fonds propres (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('apport_personnel',this.value)\"","oninput=\"updateField('apport_personnel',this.value);calcAllFinance()\"")}
+      ${field('financement_recherche',`Financement externe recherché (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('financement_recherche',this.value)\"","oninput=\"updateField('financement_recherche',this.value);calcAllFinance()\"")}
       ${textarea('immobilisations','Détail des immobilisations','Équipements, locaux, brevets…',3,true)}
       ${textarea('bfr','Besoin en fonds de roulement (BFR)','Explication et montant…',2,true).replace("oninput=\"updateField('bfr',this.value)\"","oninput=\"updateField('bfr',this.value);calcAllFinance()\"")}
       ${field('delai_paiement_clients','Délai de paiement clients','Ex : 30 jours')}
@@ -2646,7 +2797,7 @@ function renderFinancier() {
     </div>
 
     <div class="bp-card-inner"><h3>Seuil de rentabilité</h3><div class="fg">
-      <div>${field('seuil_rentabilite','Seuil de rentabilité (€ de CA)','','number')}${provenanceWidget('plan_financier','seuil_rentabilite')}</div>
+      <div>${field('seuil_rentabilite',`Seuil de rentabilité (${bpDeviseRefSymbole()} de CA)`,'','number')}${provenanceWidget('plan_financier','seuil_rentabilite')}</div>
       ${field('point_mort','Point mort (nb de mois)','','number').replace("oninput=\"updateField('point_mort',this.value)\"","oninput=\"updateField('point_mort',this.value);calcAllFinance()\"")}
       ${textarea('amortissements','Plan d\'amortissement','',3,true)}
     </div></div>
@@ -2721,7 +2872,10 @@ function updFin(key,val) {
   sections.plan_financier[key]=val;
   markDirty();
 }
-function fmtEuro(n){ return (Math.round(n*100)/100).toLocaleString('fr')+'€'; }
+/* Multidevise (2026-08-31) : remplace l'ancien formatage EUR codé en dur par le service
+   centralisé (assets/currency-manager.js), piloté par bp.devise_config. Nom de fonction conservé
+   (fmtEuro) pour ne toucher AUCUN des ~20 appelants existants -- seul le contenu change. */
+function fmtEuro(n){ if (n===null||n===undefined||n==='') return ''; return CurrencyManager.afficherMontant(Math.round(Number(n)*100)/100, bp?.devise_config); }
 
 /* ── Immobilisations détaillées (répétable) ── */
 function renderImmobilisations(list) {
@@ -3193,7 +3347,7 @@ function renderFinancement() {
   return `<div class="bp-section">
     <div class="bp-section-head"><h2>🏦 Recherche de financement</h2></div>
     <div class="bp-card-inner"><div class="fg">
-      <div>${field('montant','Montant recherché (€)','','number').replace("oninput=\"updateField('montant',this.value)\"","oninput=\"updateField('montant',this.value);bpCalcDilution();bpCalcScenariosFinancement()\"")}${provenanceWidget('financement','montant')}</div>
+      <div>${field('montant',`Montant recherché (${bpDeviseRefSymbole()})`,'','number').replace("oninput=\"updateField('montant',this.value)\"","oninput=\"updateField('montant',this.value);bpCalcDilution();bpCalcScenariosFinancement()\"")}${provenanceWidget('financement','montant')}</div>
       ${field('calendrier_decaissement','Calendrier de décaissement','Ex : 30% à la signature…')}
       ${textarea('utilisation','Utilisation des fonds','Détaillez comment seront utilisés les fonds levés…',4,true)}
       ${textarea('contreparties','Contreparties proposées','Parts sociales, redevances, royalties…',3,true)}
@@ -3801,13 +3955,26 @@ function frTable(list, cols) {
     <tbody>${arr.map(x=>`<tr>${cols.map(c=>`<td>${esc(x[c.key]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
+/* Étiquette compacte multidevise pour graphiques (point 16 du cahier des charges "Gestion
+   multidevise" : "Afficher 120 k€ et éventuellement 78,6 M FCFA") -- une ligne par devise
+   active, jamais un second graphique dupliqué. */
+function cmChartLabel(v) {
+  const config = CurrencyManager.normaliserConfig(bp?.devise_config);
+  const parts = [CurrencyManager.formatCompact(v, config.reference)];
+  config.secondaires.forEach(sec => {
+    const conv = CurrencyManager.convertir(v, sec.taux);
+    if (conv !== null) parts.push(CurrencyManager.formatCompact(conv, sec.code));
+  });
+  return parts.join('<br>');
+}
+
 function frBarChart(values, labels) {
   const max = Math.max(...values, 1);
   if (values.every(v=>!v)) return '<p style="color:#9ca3af;font-style:italic;">Renseignez le compte de résultat prévisionnel pour générer ce graphique.</p>';
   return `<div class="fr-chart-bar">${values.map((v,i)=>`
     <div class="fr-bar-col">
       <div class="fr-bar" style="height:${Math.max(2,Math.round(v/max*100))}%;" title="${v}"></div>
-      <div class="fr-bar-label">${labels[i]}<br>${Math.round(v).toLocaleString('fr')}€</div>
+      <div class="fr-bar-label">${labels[i]}<br>${cmChartLabel(v)}</div>
     </div>`).join('')}</div>`;
 }
 
@@ -3905,8 +4072,8 @@ function frBlockFinance() {
   return `<div class="fr-section" id="fr-finance">
     <h2>Plan financier</h2>
     <div class="fr-score-card">
-      <div class="fr-score-box"><div class="fr-score-num">${fin.investissement_initial?Number(fin.investissement_initial).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Investissement initial</div></div>
-      <div class="fr-score-box"><div class="fr-score-num">${fin.seuil_rentabilite?Number(fin.seuil_rentabilite).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Seuil de rentabilité</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${fin.investissement_initial?fmtEuro(fin.investissement_initial):'—'}</div><div class="fr-score-label">Investissement initial</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${fin.seuil_rentabilite?fmtEuro(fin.seuil_rentabilite):'—'}</div><div class="fr-score-label">Seuil de rentabilité</div></div>
       <div class="fr-score-box"><div class="fr-score-num">${fin.point_mort||'—'}</div><div class="fr-score-label">Point mort (mois)</div></div>
     </div>
     <h4>Chiffre d'affaires prévisionnel (5 ans)</h4>
@@ -3958,7 +4125,7 @@ async function frBlockFinal() {
 function frBlockTraction() {
   const t = sections.presentation || {};
   const rows = [
-    ['CA réalisé à ce jour', t.ca_realise_a_ce_jour ? Number(t.ca_realise_a_ce_jour).toLocaleString('fr')+'€' : null],
+    ['CA réalisé à ce jour', t.ca_realise_a_ce_jour ? fmtEuro(t.ca_realise_a_ce_jour) : null],
     ['Clients actuels', t.nb_clients_actuels], ['Clients payants', t.nb_clients_payants],
     ['Contrats signés', t.nb_contrats_signes], ['Croissance mensuelle', t.croissance_mensuelle?t.croissance_mensuelle+'%':null],
     ['Taux de fidélisation', t.taux_fidelisation?t.taux_fidelisation+'%':null],
@@ -3989,9 +4156,9 @@ function frBlockImpact() {
 function frBlockCapitalisation() {
   const f = sections.financement || {};
   const rows = [
-    ['Montant recherché', f.montant?Number(f.montant).toLocaleString('fr')+'€':null],
-    ['Valorisation avant levée', f.valorisation_avant?Number(f.valorisation_avant).toLocaleString('fr')+'€':null],
-    ['Valorisation après levée', f.valorisation_apres?Number(f.valorisation_apres).toLocaleString('fr')+'€':null],
+    ['Montant recherché', f.montant?fmtEuro(f.montant):null],
+    ['Valorisation avant levée', f.valorisation_avant?fmtEuro(f.valorisation_avant):null],
+    ['Valorisation après levée', f.valorisation_apres?fmtEuro(f.valorisation_apres):null],
     ["% cédé (estimation)", f.montant&&f.valorisation_apres ? Math.round(f.montant/f.valorisation_apres*100)+'%' : null],
     ['Type d\'instrument', f.type_instrument], ['Stratégie de sortie', f.type_sortie],
   ].filter(([,v])=>v);
@@ -4010,7 +4177,7 @@ function frBlockPitchDeck() {
     slide(4,'Notre modèle économique', `<p>${esc(bm.revenus||'Non renseigné.')}</p>`),
     slide(5,'Traction', frBlockTraction().replace(/<div class="fr-section"[^>]*>|<\/div>$/g,'').replace('<h2>Validation & Traction</h2>','')),
     slide(6,"L'équipe", `<p>${esc((sections.infos_generales?.membres_equipe||[]).map(m=>m.nom+(m.fonction?' — '+m.fonction:'')).join(', ')||'Non renseignée.')}</p>`),
-    slide(7,'Le financement', `<p>${esc(fin.montant?Number(fin.montant).toLocaleString('fr')+'€ recherchés':'Non renseigné.')}</p><p>${esc(fin.utilisation||'')}</p>`),
+    slide(7,'Le financement', `<p>${esc(fin.montant?fmtEuro(fin.montant)+' recherchés':'Non renseigné.')}</p><p>${esc(fin.utilisation||'')}</p>`),
   ].join('');
 }
 async function frBlockExecutiveSummary() {
@@ -4022,8 +4189,8 @@ async function frBlockExecutiveSummary() {
     <p style="font-style:italic;color:#6b7280;">${esc(infos.slogan||'')}</p>
     <h4>En bref</h4><p>${esc(resume.projet||'Non renseigné.')}</p>
     <div class="fr-score-card">
-      <div class="fr-score-box"><div class="fr-score-num">${fin.ca_1?Number(fin.ca_1).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">CA prévisionnel An 1</div></div>
-      <div class="fr-score-box"><div class="fr-score-num">${financement.montant?Number(financement.montant).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Financement recherché</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${fin.ca_1?fmtEuro(fin.ca_1):'—'}</div><div class="fr-score-label">CA prévisionnel An 1</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${financement.montant?fmtEuro(financement.montant):'—'}</div><div class="fr-score-label">Financement recherché</div></div>
       <div class="fr-score-box"><div class="fr-score-num">${score}/100</div><div class="fr-score-label">Score du dossier</div></div>
     </div>
     <h4>Marché</h4><p>${esc(resume.marche||'Non renseigné.')}</p>
