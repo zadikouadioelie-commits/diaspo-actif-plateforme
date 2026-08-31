@@ -245,6 +245,17 @@ html,body{height:100%;overflow:hidden;}
 .fr-pie-legend{display:flex;flex-direction:column;gap:5px;justify-content:center;font-size:12px;}
 .fr-pie-legend span.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;}
 .fr-footer{text-align:center;font-size:11px;color:#9ca3af;padding-top:20px;border-top:1px solid #e5e7eb;margin-top:40px;}
+/* Pitch Deck (2026-08-31, point 30) : mise en page "diapositive", très différente d'un
+   dossier texte -- une idée par écran, gros titre, peu de texte. */
+.fr-slide{min-height:70vh;display:flex;flex-direction:column;justify-content:center;padding:40px 20px;page-break-after:always;border-bottom:1px dashed #e5e7eb;position:relative;}
+.fr-slide .fr-slide-num{position:absolute;top:16px;right:20px;font-size:11px;color:#9ca3af;}
+.fr-slide h2{font-size:34px;color:var(--fr-primary);margin:0 0 20px;}
+.fr-slide .fr-slide-body{font-size:17px;line-height:1.7;max-width:780px;}
+.fr-slide .fr-slide-body h4{color:var(--fr-primary);font-size:13px;text-transform:uppercase;margin:14px 0 4px;}
+.fr-slide .fr-slide-body p{font-size:16px;}
+#fr-doc[data-format="pitch_deck"] .fr-cover,#fr-doc[data-format="executive_summary"] .fr-cover,
+#fr-doc[data-format="pitch_deck"] .fr-toc,#fr-doc[data-format="executive_summary"] .fr-toc,
+#fr-doc[data-format="pitch_deck"] .fr-footer,#fr-doc[data-format="executive_summary"] .fr-footer{display:none;}
 @media print{
   body *{visibility:hidden;}
   #fr-overlay, #fr-overlay *{visibility:visible;}
@@ -398,6 +409,15 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
   <div id="fr-toolbar">
     <h3>📦 Dossier final — <span id="fr-title"></span></h3>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select id="fr-format-select" onchange="openFinalReport()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-family:inherit;font-size:12.5px;">
+        <option value="classique">📄 Business Plan classique</option>
+        <option value="bancaire">🏦 Dossier bancaire</option>
+        <option value="investisseur">💼 Dossier investisseur</option>
+        <option value="subvention">🏛️ Dossier subvention</option>
+        <option value="partenaire">🤝 Dossier partenaire</option>
+        <option value="pitch_deck">⚡ Pitch Deck</option>
+        <option value="executive_summary">📊 Executive Summary</option>
+      </select>
       <button class="fr-theme-btn active" id="fr-theme-corporate" style="background:#1E3A8A;color:#fff;" onclick="setReportTheme('corporate')">🟦 Corporate</button>
       <button class="fr-theme-btn" id="fr-theme-moderne" style="background:#065f46;color:#fff;" onclick="setReportTheme('moderne')">🟢 Moderne</button>
       <button class="fr-theme-btn" id="fr-theme-premium" style="background:#111827;color:#B8860B;" onclick="setReportTheme('premium')">🟣 Premium</button>
@@ -3586,23 +3606,53 @@ function computeReportScore() {
   return { score, niveauRisque, potentiel };
 }
 
-async function buildFinalReportHTML() {
-  const nom = bp?.nom_projet || 'Sans titre';
-  const infos = sections.infos_generales || {};
-  const resume = sections.resume_executif || {};
-  const presentation = sections.presentation || {};
-  const marche = sections.marche || {};
-  const swot = sections.swot || {};
+/* ── Génération multi-format (2026-08-31, point 30 du plan de renforcement) ──
+   Jusqu'ici : un seul contenu fixe (sections A à F), 3 thèmes de COULEUR
+   seulement -- aucune adaptation du CONTENU au destinataire. Refactorisé en
+   blocs réutilisables (frBlockXxx), assemblés différemment selon FR_FORMATS.
+   La même base de données (sections_json) alimente donc plusieurs dossiers
+   réellement différents, pas juste repeints. */
+const FR_FORMATS = {
+  classique:  { label:'📄 Business Plan classique', blocs:['presentation','strategie','finance','reseau','marche_prix','final'] },
+  bancaire:   { label:'🏦 Dossier bancaire', blocs:['presentation','finance','traction','final'] },
+  investisseur: { label:'💼 Dossier investisseur', blocs:['presentation','strategie','traction','finance','capitalisation','final'] },
+  subvention: { label:'🏛️ Dossier subvention', blocs:['presentation','impact','marche_prix','finance'] },
+  partenaire: { label:'🤝 Dossier partenaire', blocs:['presentation','reseau','strategie'] },
+  pitch_deck: { label:'⚡ Pitch Deck', blocs:['pitch_deck'] },
+  executive_summary: { label:'📊 Executive Summary', blocs:['executive_summary'] },
+};
+
+function frBlockPresentation() {
+  const infos = sections.infos_generales || {}, resume = sections.resume_executif || {}, presentation = sections.presentation || {};
+  return `<div class="fr-section" id="fr-presentation">
+    <h2>Présentation du projet</h2>
+    <h4>Résumé exécutif</h4><p>${esc(resume.projet||'Non renseigné.')}</p>
+    <div class="fr-grid2">
+      <div><h4>Vision</h4><p>${esc(presentation.vision||'Non renseignée.')}</p></div>
+      <div><h4>Mission</h4><p>${esc(presentation.mission||'Non renseignée.')}</p></div>
+    </div>
+    <h4>Objectifs</h4><p>${esc(resume.objectifs||'Non renseignés.')}</p>
+    <h4>Porteur du projet</h4><p>${esc(infos.responsable||'—')}${infos.responsable_poste?` — ${esc(infos.responsable_poste)}`:''}</p>
+  </div>`;
+}
+function frBlockStrategie() {
+  const marche = sections.marche || {}, swot = sections.swot || {};
+  return `<div class="fr-section" id="fr-strategie">
+    <h2>Analyse stratégique</h2>
+    <h4>Étude de marché</h4><p>${esc(marche.taille_marche||'—')} · ${esc(marche.evolution||'')}</p>
+    <h4>Positionnement</h4><p>${esc(marche.positionnement||'Non renseigné.')}</p>
+    <div class="fr-grid2">
+      <div><h4>Analyse SWOT — Forces</h4><p>${esc(swot.forces||'—')}</p><h4>Opportunités</h4><p>${esc(swot.opportunites||'—')}</p></div>
+      <div><h4>Faiblesses</h4><p>${esc(swot.faiblesses||'—')}</p><h4>Menaces</h4><p>${esc(swot.menaces||'—')}</p></div>
+    </div>
+    <h4>Concurrents à surveiller en priorité</h4>
+    ${frTopList(marche.concurrents,'menace','nom','menace')}
+    <h4>Partenaires à contacter en priorité</h4>
+    ${frTopList(sections.business_model?.partenaires_liste,'interet','nom','intérêt')}
+  </div>`;
+}
+function frBlockFinance() {
   const fin = sections.plan_financier || {};
-  const { score, niveauRisque, potentiel } = computeReportScore();
-
-  let recommandations = 'Chargement des recommandations…';
-  try {
-    const r1 = await api('POST', `/business-plans/${bpId}/assistant`, { message:'Fais un audit complet de mon business plan', currentSection });
-    const r2 = await api('POST', `/business-plans/${bpId}/assistant`, { message:'Quels sont les risques prioritaires ?', currentSection });
-    recommandations = `${r1.response||''}\n\n${r2.response||''}`;
-  } catch(e) { recommandations = "Recommandations indisponibles pour le moment."; }
-
   const annees=[1,2,3,4,5];
   const caValues = annees.map(a=>(parseFloat(fin[`ca_${a}`])||0)+(parseFloat(fin[`autres_produits_${a}`])||0));
   const charges1 = [
@@ -3612,99 +3662,195 @@ async function buildFinalReportHTML() {
     {label:'Marketing & comm.',value:parseFloat(fin.marketing_charge_1)||0,color:'#8b5cf6'},
     {label:'Autres charges',value:parseFloat(fin.autres_charges_1)||0,color:'#dc2626'},
   ];
+  return `<div class="fr-section" id="fr-finance">
+    <h2>Plan financier</h2>
+    <div class="fr-score-card">
+      <div class="fr-score-box"><div class="fr-score-num">${fin.investissement_initial?Number(fin.investissement_initial).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Investissement initial</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${fin.seuil_rentabilite?Number(fin.seuil_rentabilite).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Seuil de rentabilité</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${fin.point_mort||'—'}</div><div class="fr-score-label">Point mort (mois)</div></div>
+    </div>
+    <h4>Chiffre d'affaires prévisionnel (5 ans)</h4>
+    ${frBarChart(caValues, annees.map(a=>'An '+a))}
+    <h4>Répartition des charges (An 1)</h4>
+    ${frPieChart(charges1)}
+    <h4>Besoin en fonds de roulement</h4><p>${esc(fin.bfr||'Non renseigné.')}</p>
+  </div>`;
+}
+function frBlockReseau() {
+  const marche = sections.marche || {};
+  return `<div class="fr-section" id="fr-reseau">
+    <h2>Réseau stratégique</h2>
+    <h4>Partenaires identifiés</h4>
+    ${frTable(sections.business_model?.partenaires_liste, [{key:'nom',label:'Nom'},{key:'type',label:'Type'},{key:'niveau',label:'Niveau'},{key:'interet',label:'Intérêt (0-100)'}])}
+    <h4>Concurrents analysés</h4>
+    ${frTable(marche.concurrents, [{key:'nom',label:'Nom'},{key:'type',label:'Type'},{key:'positionnement',label:'Positionnement'},{key:'menace',label:'Menace (0-100)'}])}
+  </div>`;
+}
+function frBlockMarchePrix() {
+  const marche = sections.marche || {};
+  return `<div class="fr-section" id="fr-marche-prix">
+    <h2>Étude de marché & prix</h2>
+    <h4>Segmentation client</h4><p>${esc(marche.segmentation||'Non renseignée.')}</p>
+    <h4>Stratégie tarifaire</h4>
+    ${frTable(sections.produits?.etude_prix, [{key:'produit',label:'Produit'},{key:'prix_vente',label:'Prix envisagé'},{key:'prix_concurrents',label:'Prix concurrents'},{key:'strategie',label:'Stratégie'}])}
+  </div>`;
+}
+async function frBlockFinal() {
+  const { score, niveauRisque, potentiel } = computeReportScore();
+  let recommandations = 'Chargement des recommandations…';
+  try {
+    const r1 = await api('POST', `/business-plans/${bpId}/assistant`, { message:'Fais un audit complet de mon business plan', currentSection });
+    const r2 = await api('POST', `/business-plans/${bpId}/assistant`, { message:'Quels sont les risques prioritaires ?', currentSection });
+    recommandations = `${r1.response||''}\n\n${r2.response||''}`;
+  } catch(e) { recommandations = "Recommandations indisponibles pour le moment."; }
+  return `<div class="fr-section" id="fr-final">
+    <h2>Analyse finale</h2>
+    <div class="fr-score-card">
+      <div class="fr-score-box"><div class="fr-score-num">${score}/100</div><div class="fr-score-label">Score global (indicateur interne)</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${niveauRisque}</div><div class="fr-score-label">Niveau de risque</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${potentiel}</div><div class="fr-score-label">Potentiel</div></div>
+    </div>
+    <h4>Recommandations</h4>
+    <div style="font-size:13px;line-height:1.6;">${renderMarkdown(recommandations)}</div>
+    <p style="font-size:11px;color:#9ca3af;margin-top:10px;">Score calculé automatiquement à partir des données saisies (avancement, ratios financiers, couverture des risques et du marché). Ce n'est pas une note certifiée par un tiers.</p>
+  </div>`;
+}
+function frBlockTraction() {
+  const t = sections.presentation || {};
+  const rows = [
+    ['CA réalisé à ce jour', t.ca_realise_a_ce_jour ? Number(t.ca_realise_a_ce_jour).toLocaleString('fr')+'€' : null],
+    ['Clients actuels', t.nb_clients_actuels], ['Clients payants', t.nb_clients_payants],
+    ['Contrats signés', t.nb_contrats_signes], ['Croissance mensuelle', t.croissance_mensuelle?t.croissance_mensuelle+'%':null],
+    ['Taux de fidélisation', t.taux_fidelisation?t.taux_fidelisation+'%':null],
+  ].filter(([,v])=>v);
+  return `<div class="fr-section" id="fr-traction">
+    <h2>Validation & Traction</h2>
+    ${rows.length ? `<div class="fr-grid2">${rows.map(([l,v])=>`<div><h4>${esc(l)}</h4><p>${esc(String(v))}</p></div>`).join('')}</div>` : '<p style="color:#9ca3af;font-style:italic;">Aucune traction renseignée pour l\'instant.</p>'}
+    ${t.temoignages_clients ? `<h4>Témoignages clients</h4><p>${esc(t.temoignages_clients)}</p>` : ''}
+    ${t.references_importantes ? `<h4>Références</h4><p>${esc(t.references_importantes)}</p>` : ''}
+  </div>`;
+}
+function frBlockImpact() {
+  const im = sections.impact || {};
+  return `<div class="fr-section" id="fr-impact">
+    <h2>Impact</h2>
+    <div class="fr-grid2">
+      <div><h4>Impact économique</h4><p>${esc(im.economique||'—')}</p></div>
+      <div><h4>Impact social</h4><p>${esc(im.social||'—')}</p></div>
+      <div><h4>Impact environnemental</h4><p>${esc(im.environnemental||'—')}</p></div>
+      <div><h4>Impact territorial</h4><p>${esc(im.territorial||'—')}</p></div>
+    </div>
+    ${(im.beneficiaires_directs||im.beneficiaires_indirects) ? `<h4>Bénéficiaires</h4><p>${esc(im.beneficiaires_directs||'')}${im.beneficiaires_directs&&im.beneficiaires_indirects?' — ':''}${esc(im.beneficiaires_indirects||'')}</p>`:''}
+    ${(im.emplois_directs||im.emplois_indirects) ? `<h4>Emplois créés</h4><p>${esc(im.emplois_directs||'0')} direct(s) · ${esc(im.emplois_indirects||'0')} indirect(s)</p>`:''}
+    <h4>Indicateurs de suivi</h4>
+    ${frTable(im.indicateurs, [{key:'objectif',label:'Objectif'},{key:'valeur_cible',label:'Valeur cible'},{key:'methode_mesure',label:'Méthode de mesure'}])}
+  </div>`;
+}
+function frBlockCapitalisation() {
+  const f = sections.financement || {};
+  const rows = [
+    ['Montant recherché', f.montant?Number(f.montant).toLocaleString('fr')+'€':null],
+    ['Valorisation avant levée', f.valorisation_avant?Number(f.valorisation_avant).toLocaleString('fr')+'€':null],
+    ['Valorisation après levée', f.valorisation_apres?Number(f.valorisation_apres).toLocaleString('fr')+'€':null],
+    ["% cédé (estimation)", f.montant&&f.valorisation_apres ? Math.round(f.montant/f.valorisation_apres*100)+'%' : null],
+    ['Type d\'instrument', f.type_instrument], ['Stratégie de sortie', f.type_sortie],
+  ].filter(([,v])=>v);
+  return `<div class="fr-section" id="fr-capitalisation">
+    <h2>Capitalisation & Levée de fonds</h2>
+    ${rows.length ? `<div class="fr-grid2">${rows.map(([l,v])=>`<div><h4>${esc(l)}</h4><p>${esc(String(v))}</p></div>`).join('')}</div>` : '<p style="color:#9ca3af;font-style:italic;">Section Capitalisation non renseignée.</p>'}
+  </div>`;
+}
+function frBlockPitchDeck() {
+  const resume=sections.resume_executif||{}, presentation=sections.presentation||{}, probleme=sections.probleme||{}, solution=sections.solution||{}, marche=sections.marche||{}, bm=sections.business_model||{}, fin=sections.financement||{};
+  const slide = (n,titre,contenu) => `<div class="fr-slide"><div class="fr-slide-num">${n}</div><h2>${esc(titre)}</h2><div class="fr-slide-body">${contenu}</div></div>`;
+  return [
+    slide(1,'Le problème', `<p>${esc(probleme.description||resume.probleme||'Non renseigné.')}</p>`),
+    slide(2,'Notre solution', `<p>${esc(solution.description||resume.solution||'Non renseigné.')}</p>`),
+    slide(3,'Le marché', `<p>${esc(marche.taille_marche||resume.marche||'Non renseigné.')}</p>${marche.tam?`<p><strong>TAM</strong> ${esc(marche.tam)} · <strong>SAM</strong> ${esc(marche.sam||'—')} · <strong>SOM</strong> ${esc(marche.som||'—')}</p>`:''}`),
+    slide(4,'Notre modèle économique', `<p>${esc(bm.revenus||'Non renseigné.')}</p>`),
+    slide(5,'Traction', frBlockTraction().replace(/<div class="fr-section"[^>]*>|<\/div>$/g,'').replace('<h2>Validation & Traction</h2>','')),
+    slide(6,"L'équipe", `<p>${esc((sections.infos_generales?.membres_equipe||[]).map(m=>m.nom+(m.fonction?' — '+m.fonction:'')).join(', ')||'Non renseignée.')}</p>`),
+    slide(7,'Le financement', `<p>${esc(fin.montant?Number(fin.montant).toLocaleString('fr')+'€ recherchés':'Non renseigné.')}</p><p>${esc(fin.utilisation||'')}</p>`),
+  ].join('');
+}
+async function frBlockExecutiveSummary() {
+  const nom = bp?.nom_projet || 'Sans titre';
+  const infos=sections.infos_generales||{}, resume=sections.resume_executif||{}, fin=sections.plan_financier||{}, financement=sections.financement||{};
+  const { score } = computeReportScore();
+  return `<div class="fr-section" id="fr-exec-summary">
+    <h2>${esc(nom)} — Executive Summary</h2>
+    <p style="font-style:italic;color:#6b7280;">${esc(infos.slogan||'')}</p>
+    <h4>En bref</h4><p>${esc(resume.projet||'Non renseigné.')}</p>
+    <div class="fr-score-card">
+      <div class="fr-score-box"><div class="fr-score-num">${fin.ca_1?Number(fin.ca_1).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">CA prévisionnel An 1</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${financement.montant?Number(financement.montant).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Financement recherché</div></div>
+      <div class="fr-score-box"><div class="fr-score-num">${score}/100</div><div class="fr-score-label">Score du dossier</div></div>
+    </div>
+    <h4>Marché</h4><p>${esc(resume.marche||'Non renseigné.')}</p>
+    <h4>Besoins de financement</h4><p>${esc(resume.besoins||'Non renseigné.')}</p>
+    <h4>Objectifs</h4><p>${esc(resume.objectifs||'Non renseignés.')}</p>
+  </div>`;
+}
+
+const FR_BLOC_BUILDERS = {
+  presentation: frBlockPresentation, strategie: frBlockStrategie, finance: frBlockFinance,
+  reseau: frBlockReseau, marche_prix: frBlockMarchePrix, final: frBlockFinal,
+  traction: frBlockTraction, impact: frBlockImpact, capitalisation: frBlockCapitalisation,
+  pitch_deck: frBlockPitchDeck, executive_summary: frBlockExecutiveSummary,
+};
+async function buildFinalReportHTML(format) {
+  format = FR_FORMATS[format] ? format : 'classique';
+  const nom = bp?.nom_projet || 'Sans titre';
+  const infos = sections.infos_generales || {};
+  const blocs = FR_FORMATS[format].blocs;
+
+  const contenus = [];
+  for (const key of blocs) {
+    const fn = FR_BLOC_BUILDERS[key];
+    contenus.push(fn.constructor.name === 'AsyncFunction' ? await fn() : fn());
+  }
+
+  // Pitch Deck et Executive Summary sont des mises en page à part (pas de couverture/sommaire
+  // classiques) -- ils sortent directement leur propre contenu.
+  if (format === 'pitch_deck' || format === 'executive_summary') return contenus.join('');
+
+  const TITRES = { presentation:'Présentation du projet', strategie:'Analyse stratégique', finance:'Plan financier', reseau:'Réseau stratégique', marche_prix:'Étude de marché & prix', final:'Analyse finale', traction:'Validation & Traction', impact:'Impact', capitalisation:'Capitalisation & Levée de fonds' };
+  const IDS = { presentation:'fr-presentation', strategie:'fr-strategie', finance:'fr-finance', reseau:'fr-reseau', marche_prix:'fr-marche-prix', final:'fr-final', traction:'fr-traction', impact:'fr-impact', capitalisation:'fr-capitalisation' };
 
   return `
     <div class="fr-cover">
       <div class="fr-brand">Diaspo'Actif</div>
       <h1>${esc(nom)}</h1>
       <div class="fr-slogan">${esc(infos.slogan||'')}</div>
+      <p style="margin-top:8px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">${esc(FR_FORMATS[format].label)}</p>
       <p style="margin-top:16px;font-size:12.5px;color:#6b7280;">Dossier généré le ${new Date().toLocaleDateString('fr-FR')}</p>
     </div>
 
     <div class="fr-toc">
       <h3>Table des matières</h3>
-      <a href="#fr-a">A. Présentation du projet</a>
-      <a href="#fr-b">B. Analyse stratégique</a>
-      <a href="#fr-c">C. Plan financier</a>
-      <a href="#fr-d">D. Réseau stratégique</a>
-      <a href="#fr-e">E. Étude de marché & prix</a>
-      <a href="#fr-f">F. Analyse finale</a>
+      ${blocs.map((k,i)=>`<a href="#${IDS[k]}">${String.fromCharCode(65+i)}. ${TITRES[k]}</a>`).join('')}
     </div>
 
-    <div class="fr-section" id="fr-a">
-      <h2>A. Présentation du projet</h2>
-      <h4>Résumé exécutif</h4><p>${esc(resume.projet||'Non renseigné.')}</p>
-      <div class="fr-grid2">
-        <div><h4>Vision</h4><p>${esc(presentation.vision||'Non renseignée.')}</p></div>
-        <div><h4>Mission</h4><p>${esc(presentation.mission||'Non renseignée.')}</p></div>
-      </div>
-      <h4>Objectifs</h4><p>${esc(resume.objectifs||'Non renseignés.')}</p>
-      <h4>Porteur du projet</h4><p>${esc(infos.responsable||'—')}${infos.responsable_poste?` — ${esc(infos.responsable_poste)}`:''}</p>
-    </div>
-
-    <div class="fr-section" id="fr-b">
-      <h2>B. Analyse stratégique</h2>
-      <h4>Étude de marché</h4><p>${esc(marche.taille_marche||'—')} · ${esc(marche.evolution||'')}</p>
-      <h4>Positionnement</h4><p>${esc(marche.positionnement||'Non renseigné.')}</p>
-      <div class="fr-grid2">
-        <div><h4>Analyse SWOT — Forces</h4><p>${esc(swot.forces||'—')}</p><h4>Opportunités</h4><p>${esc(swot.opportunites||'—')}</p></div>
-        <div><h4>Faiblesses</h4><p>${esc(swot.faiblesses||'—')}</p><h4>Menaces</h4><p>${esc(swot.menaces||'—')}</p></div>
-      </div>
-      <h4>Concurrents à surveiller en priorité</h4>
-      ${frTopList(marche.concurrents,'menace','nom','menace')}
-      <h4>Partenaires à contacter en priorité</h4>
-      ${frTopList(sections.business_model?.partenaires_liste,'interet','nom','intérêt')}
-    </div>
-
-    <div class="fr-section" id="fr-c">
-      <h2>C. Plan financier</h2>
-      <div class="fr-score-card">
-        <div class="fr-score-box"><div class="fr-score-num">${fin.investissement_initial?Number(fin.investissement_initial).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Investissement initial</div></div>
-        <div class="fr-score-box"><div class="fr-score-num">${fin.seuil_rentabilite?Number(fin.seuil_rentabilite).toLocaleString('fr'):'—'}€</div><div class="fr-score-label">Seuil de rentabilité</div></div>
-        <div class="fr-score-box"><div class="fr-score-num">${fin.point_mort||'—'}</div><div class="fr-score-label">Point mort (mois)</div></div>
-      </div>
-      <h4>Chiffre d'affaires prévisionnel (5 ans)</h4>
-      ${frBarChart(caValues, annees.map(a=>'An '+a))}
-      <h4>Répartition des charges (An 1)</h4>
-      ${frPieChart(charges1)}
-    </div>
-
-    <div class="fr-section" id="fr-d">
-      <h2>D. Réseau stratégique</h2>
-      <h4>Partenaires identifiés</h4>
-      ${frTable(sections.business_model?.partenaires_liste, [{key:'nom',label:'Nom'},{key:'type',label:'Type'},{key:'niveau',label:'Niveau'},{key:'interet',label:'Intérêt (0-100)'}])}
-      <h4>Concurrents analysés</h4>
-      ${frTable(marche.concurrents, [{key:'nom',label:'Nom'},{key:'type',label:'Type'},{key:'positionnement',label:'Positionnement'},{key:'menace',label:'Menace (0-100)'}])}
-    </div>
-
-    <div class="fr-section" id="fr-e">
-      <h2>E. Étude de marché & prix</h2>
-      <h4>Segmentation client</h4><p>${esc(marche.segmentation||'Non renseignée.')}</p>
-      <h4>Stratégie tarifaire</h4>
-      ${frTable(sections.produits?.etude_prix, [{key:'produit',label:'Produit'},{key:'prix_vente',label:'Prix envisagé'},{key:'prix_concurrents',label:'Prix concurrents'},{key:'strategie',label:'Stratégie'}])}
-    </div>
-
-    <div class="fr-section" id="fr-f">
-      <h2>F. Analyse finale</h2>
-      <div class="fr-score-card">
-        <div class="fr-score-box"><div class="fr-score-num">${score}/100</div><div class="fr-score-label">Score global (indicateur interne)</div></div>
-        <div class="fr-score-box"><div class="fr-score-num">${niveauRisque}</div><div class="fr-score-label">Niveau de risque</div></div>
-        <div class="fr-score-box"><div class="fr-score-num">${potentiel}</div><div class="fr-score-label">Potentiel</div></div>
-      </div>
-      <h4>Recommandations</h4>
-      <div style="font-size:13px;line-height:1.6;">${renderMarkdown(recommandations)}</div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:10px;">Score calculé automatiquement à partir des données saisies (avancement, ratios financiers, couverture des risques et du marché). Ce n'est pas une note certifiée par un tiers.</p>
-    </div>
+    ${contenus.join('')}
 
     <div class="fr-footer">Document généré automatiquement par Diaspo'Actif — ${esc(nom)}</div>
   `;
 }
 
+let _frRequestToken = 0;
 async function openFinalReport() {
   document.getElementById('fr-title').textContent = bp?.nom_projet || '';
   document.getElementById('fr-doc').innerHTML = '<p style="text-align:center;padding:60px;color:#9ca3af;">Génération du dossier en cours…</p>';
   document.getElementById('fr-overlay').classList.add('open');
-  const html = await buildFinalReportHTML();
+  const format = document.getElementById('fr-format-select')?.value || 'classique';
+  document.getElementById('fr-doc').dataset.format = format;
+  /* Garde-fou anti-course (2026-08-31) : buildFinalReportHTML() attend des appels réseau
+     (recommandations IA) dont la durée varie -- un changement rapide de format pouvait faire
+     apparaître le résultat d'une génération précédente, plus lente, après la nouvelle. Seul le
+     dernier appel lancé est autorisé à écrire dans le DOM. */
+  const monToken = ++_frRequestToken;
+  const html = await buildFinalReportHTML(format);
+  if (monToken !== _frRequestToken) return;
   document.getElementById('fr-doc').innerHTML = html;
 }
 function closeFinalReport() {
