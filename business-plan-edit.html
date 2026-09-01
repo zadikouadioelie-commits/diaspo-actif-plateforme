@@ -346,7 +346,13 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
       <div class="bp-sidebar-foot">
         <button class="btn btn-outline btn-sm" onclick="saveVersion()">💾 Sauvegarder version</button>
         <button class="btn btn-outline btn-sm" onclick="showVersions()">🕓 Historique</button>
-        <button class="btn btn-orange btn-sm" onclick="openFinalReport()">📦 Dossier final</button>
+        <!-- 2026-09-01 : redirige vers le générateur premium (business-plan-dossier.html --
+             couverture, matrices stratégiques, 5 gabarits, formats par audience, export PDF/
+             PowerPoint réels) plutôt que d'ouvrir l'ancien aperçu texte in-page. openFinalReport()
+             et buildFinalReportHTML() restent intacts dans ce fichier (chantier multidevise d'une
+             autre session), simplement ce bouton ne les appelle plus -- un seul point d'entrée
+             visible pour l'utilisateur, décision actée avec l'utilisateur le 2026-09-01. -->
+        <button class="btn btn-orange btn-sm" onclick="window.location.href='business-plan-dossier.html?id='+bpId">📊 Dossier investisseur</button>
       </div>
     </div>
 
