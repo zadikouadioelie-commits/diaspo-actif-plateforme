@@ -22515,9 +22515,14 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         lien:'dashboard-administrateur.html', lbl:'Modération' },
     ];
 
-    faqSeed.forEach(item => {
+    /* for…of et non forEach : forEach ne peut pas attendre une fonction fléchée async, donc
+       getCat(item.cat) — qui renvoie une Promise — était bindé tel quel comme category_id, ce
+       qui échouait toujours la contrainte FOREIGN KEY (jamais vu sur la base de dev/prod, qui a
+       déjà ses catégories FAQ depuis longtemps ; découvert le 2026-09-01 en démarrant contre une
+       base neuve où ce seed s'exécute pour la première fois). */
+    for (const item of faqSeed) {
       try {
-        const catId = getCat(item.cat);
+        const catId = await getCat(item.cat);
         insQ.run(
           catId,
           item.types,
@@ -22530,7 +22535,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
           item.lbl || null
         );
       } catch(e) { console.error('FAQ seed error:', e.message); }
-    });
+    }
   }
 
   /* ──────── D'A TUTOR AI — TUTOS CRÉÉS PAR SUPER ADMIN ──────── */

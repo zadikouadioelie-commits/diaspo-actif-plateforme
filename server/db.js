@@ -2005,6 +2005,12 @@ const MIGRATIONS = [
   ["cagnotte_participants_autorises", "approved_by INTEGER"],
   ["cagnotte_participants_autorises", "rejected_by INTEGER"],
   ["cagnotte_participants_autorises", "revoked_by INTEGER"],
+  // adhesion_membres.reponses_json (module Adhésions, incrément 2, 2026-08-07) — vivait comme
+  // ALTER TABLE ad-hoc isolé plus loin dans ce fichier, AVANT la CREATE TABLE de
+  // adhesion_membres (donc jamais appliqué sur une base neuve, cf. correctif du 2026-09-01
+  // sur l'ordre des migrations) ; déplacé ici pour repasser par appliquerMigrations(), déjà
+  // appelée une seconde fois après la création de cette table (voir plus bas).
+  ["adhesion_membres", "reponses_json TEXT DEFAULT '{}'"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -2676,13 +2682,26 @@ db.exec(`
     FOREIGN KEY(responsable_id) REFERENCES users(id)
   );
 `);
-for (const [table, col] of MIGRATIONS) {
-  const colName = col.split(" ")[0];
-  const exists = db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === colName);
-  if (!exists) {
-    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`); } catch (e) { /* déjà présent */ }
+/* Applique les colonnes MIGRATIONS dont la table existe déjà à cet instant — no-op silencieux
+   pour toute table pas encore créée (ALTER TABLE sur une table absente échoue, capturé par le
+   try/catch). Appelée ici une première fois (couvre la grande majorité des tables, déjà créées
+   plus haut), puis une seconde fois plus bas dans ce fichier (voir appliquerMigrationsRestantes,
+   après la dernière table encore référencée par MIGRATIONS mais créée plus loin dans le
+   fichier) — sans quoi ces colonnes n'étaient JAMAIS ajoutées sur une base neuve : bug
+   pré-existant, invisible sur une base qui a déjà cette colonne depuis longtemps, mais qui
+   faisait planter tout démarrage à froid (constaté le 2026-09-01 en isolant un test contre un
+   fichier SQLite vide — voir tests/cagnotte-acces.test.js). Idempotente (relire deux fois ne
+   fait rien de plus la seconde fois pour une table déjà couverte). */
+function appliquerMigrations() {
+  for (const [table, col] of MIGRATIONS) {
+    const colName = col.split(" ")[0];
+    const exists = db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === colName);
+    if (!exists) {
+      try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`); } catch (e) { /* déjà présent, ou table pas encore créée */ }
+    }
   }
 }
+appliquerMigrations();
 
 /* =====================================================================
    TRUST SCORE · RÉACTIVITÉ · ABSENCE · SIGNALEMENTS
@@ -4549,16 +4568,6 @@ try { db.exec("ALTER TABLE user_accreditations ADD COLUMN feature_slug TEXT"); }
 
 /* Extension user_accreditations : suivi de l'abonnement Stripe (accréditations payantes récurrentes) */
 try { db.exec("ALTER TABLE user_accreditations ADD COLUMN stripe_subscription_id TEXT"); } catch(_) {}
-
-/* Extension adhesion_membres : fiche externe complète (adresse/pays/ville/observations) */
-try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN adresse TEXT"); } catch(_) {}
-try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN pays TEXT"); } catch(_) {}
-try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN ville TEXT"); } catch(_) {}
-try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN observations TEXT"); } catch(_) {}
-
-/* Module Adhésions — incrément 2 (2026-08-07) : réponses au formulaire personnalisable
-   (champs standard + champs custom de la formule), format JSON libre { cle: valeur }. */
-try { db.exec("ALTER TABLE adhesion_membres ADD COLUMN reponses_json TEXT DEFAULT '{}'"); } catch(_) {}
 
 /* Extension admin_suppressions_membres : informations du compte au moment de la suppression
    (nom/prénom/email/date de création figés avant l'anonymisation, + motif de l'admin). */
@@ -6951,6 +6960,49 @@ db.exec(`
     FOREIGN KEY(defini_par) REFERENCES users(id)
   );
 `);
+
+/* Rattrapage de colonnes ajoutées par des ALTER TABLE ad-hoc (hors tableau MIGRATIONS) placés
+   plus haut dans ce fichier AVANT la création de leur table — même bug que celui corrigé pour
+   MIGRATIONS ci-dessous, mais pour ce pattern-là (`const xCols = PRAGMA table_info(...); if
+   (!xCols.includes(...)) db.exec("ALTER TABLE...")`) : sur une base neuve, xCols est un
+   tableau vide (table pas encore créée), le if passe, et la colonne n'est donc jamais ajoutée.
+   Les lignes d'origine (produits_vitrine ~5664+, commandes_vitrine ~5681+, vitrine_publications
+   ~5683, vitrine_avis ~5707+, publicites ~1400) restent en place telles quelles (elles ne font
+   plus rien de neuf mais ne cassent rien) — uniquement pour ne pas risquer de casser leur
+   contexte en les déplaçant une par une. Trouvé le 2026-09-01 en démarrant le serveur contre un
+   fichier SQLite vide (voir tests/cagnotte-acces.test.js). */
+;[
+  ["produits_vitrine", "statut TEXT DEFAULT 'disponible'"],
+  ["produits_vitrine", "date_retour TEXT"],
+  ["produits_vitrine", "reference TEXT"],
+  ["produits_vitrine", "prix_promo REAL"],
+  ["produits_vitrine", "catalogue_id INTEGER"],
+  ["commandes_vitrine", "publication_id INTEGER"],
+  ["commandes_vitrine", "paiement_statut TEXT DEFAULT 'aucun'"],
+  ["commandes_vitrine", "montant_total REAL"],
+  ["commandes_vitrine", "stripe_session_id TEXT"],
+  ["vitrine_publications", "media_bg TEXT"],
+  ["vitrine_avis", "titre TEXT"],
+  ["vitrine_avis", "reponse_texte TEXT"],
+  ["vitrine_avis", "reponse_date TEXT"],
+  ["publicites", "charte_acceptee_le TEXT"],
+].forEach(([table, col]) => {
+  const colName = col.split(" ")[0];
+  try {
+    const exists = db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === colName);
+    if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
+  } catch (e) { /* déjà présent */ }
+});
+
+/* Second passage de appliquerMigrations() (voir sa définition ~ligne 2679) : 13 tables
+   référencées par MIGRATIONS sont créées plus haut dans ce fichier mais APRÈS le premier
+   passage (le module Business Plan ci-dessus, business_plans compris, est la dernière) — sur
+   une base neuve, ces colonnes n'étaient donc jamais ajoutées par le premier passage (table
+   pas encore créée à ce moment-là). Placé ICI précisément : après la création de ces 13
+   tables, mais AVANT les migrations de reconstruction plus bas (migrateInitiativeMembresStatuts,
+   migrateAdhesionMembresRadie, etc.) qui lisent certaines de ces colonnes (ex.
+   initiative_membres.message) et plantaient sinon au tout premier démarrage sur une base vide. */
+appliquerMigrations();
 
 /* ═══════════════════════════════════════════════════════════
    MODULE AUDIOVISUEL
