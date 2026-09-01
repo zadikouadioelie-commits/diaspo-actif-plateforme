@@ -706,7 +706,40 @@ function pageFinances(bp){
   const annees = [1,2,3,4,5].filter(a => Object.keys(CR).some(k=>has(pf[`${k}_${a}`])));
   let crTable = '', chart = '';
   if (annees.length){
-    crTable = `<p class="block-title">Compte de résultat prévisionnel</p><table class="doc-table"><thead><tr><th style="text-align:left;">Ligne</th>${annees.map(a=>`<th>An ${a}</th>`).join('')}</tr></thead><tbody>${Object.entries(CR).map(([k,l])=>`<tr><td>${esc(l)}</td>${annees.map(a=>`<td>${has(pf[`${k}_${a}`])?fmtEUR(pf[`${k}_${a}`]):'—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    // Soldes Intermédiaires de Gestion (SIG) -- présentation comptable officielle plutôt qu'un
+    // compte de résultat plat, dérivée UNIQUEMENT de champs déjà saisis (aucune nouvelle
+    // question posée au porteur de projet) + des mêmes fonctions de calcul que l'éditeur
+    // (BPCalc, assets/business-plan-calc.js) pour rester cohérent avec ce qu'il a vu se calculer
+    // en remplissant. Le résultat s'arrête volontairement AVANT impôt : aucun taux d'IS n'est
+    // saisi nulle part dans le module, l'inventer produirait un résultat net faux.
+    const amortAnnuel = (typeof BPCalc!=='undefined' && (pf.immobilisations_liste||[]).length) ? BPCalc.calcAmortissementAnnuel(pf.immobilisations_liste) : 0;
+    const interetsParAn = (typeof BPCalc!=='undefined' && (pf.dettes||[]).length) ? BPCalc.calcInteretsParAnnee(pf.dettes) : {};
+    const sig = annees.map(a => {
+      const ca = Number(pf[`ca_${a}`])||0, autresProduits = Number(pf[`autres_produits_${a}`])||0;
+      const produits = ca + autresProduits;
+      const achats = Number(pf[`achats_${a}`])||0;
+      const chargesExternes = (Number(pf[`loyers_${a}`])||0) + (Number(pf[`marketing_charge_${a}`])||0) + (Number(pf[`autres_charges_${a}`])||0);
+      const va = produits - achats - chargesExternes;
+      const chargesPersonnel = Number(pf[`salaires_${a}`])||0;
+      const ebe = va - chargesPersonnel;
+      const resExploitation = ebe - amortAnnuel;
+      const interets = interetsParAn[a] || 0;
+      const resAvantImpot = resExploitation - interets;
+      return { a, produits, achats, chargesExternes, va, chargesPersonnel, ebe, amortAnnuel, resExploitation, interets, resAvantImpot };
+    });
+    const sigRow = (label, get, gras) => `<tr${gras?' class="total"':''}><td>${label}</td>${sig.map(s=>`<td>${fmtEUR(get(s))}</td>`).join('')}</tr>`;
+    crTable = `<p class="block-title">Soldes intermédiaires de gestion (SIG)</p><table class="doc-table"><thead><tr><th style="text-align:left;">Ligne</th>${annees.map(a=>`<th>An ${a}</th>`).join('')}</tr></thead><tbody>
+      ${sigRow('Produits d\'exploitation', s=>s.produits)}
+      ${sigRow('− Achats', s=>-s.achats)}
+      ${sigRow('− Charges externes', s=>-s.chargesExternes)}
+      ${sigRow('= Valeur ajoutée', s=>s.va, true)}
+      ${sigRow('− Charges de personnel', s=>-s.chargesPersonnel)}
+      ${sigRow('= Excédent brut d\'exploitation (EBE)', s=>s.ebe, true)}
+      ${sigRow('− Dotations aux amortissements', s=>-s.amortAnnuel)}
+      ${sigRow('= Résultat d\'exploitation', s=>s.resExploitation, true)}
+      ${sigRow('− Intérêts d\'emprunt', s=>-s.interets)}
+      ${sigRow('= Résultat avant impôt', s=>s.resAvantImpot, true)}
+    </tbody></table><p style="font-size:9.5px;color:var(--dp-ink-soft);margin:-4px 0 10px;">Avant impôt sur les sociétés — aucun taux d'IS renseigné dans le business plan.</p>`;
     const caVals = annees.map(a => Number(pf[`ca_${a}`])||0).filter(v=>v>0);
     if (caVals.length >= 2){
       const max = Math.max(...caVals);
