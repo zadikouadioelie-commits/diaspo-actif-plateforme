@@ -31,7 +31,15 @@
   .bpv-toc .n{width:16px;text-align:center;font-size:13px;}
 
   /* ---- Document ---- */
-  .bpv-doc{background:#fff;border:1px solid var(--border);border-radius:16px;padding:0;overflow:hidden;box-shadow:0 2px 16px rgba(13,43,78,.06);}
+  /* Coins arrondis appliqués localement (couverture + dernier bloc) plutôt qu'un overflow:hidden
+     sur tout le conteneur (2026-09-01) : ce document peut dépasser 5000px de haut une fois
+     rempli -- clipper un si grand conteneur pour arrondir 16px de coin est inutilement coûteux
+     à composer, et provoquait un rendu figé/déchiré au défilement observé en testant. Le fond
+     blanc de .bpv-doc n'a de toute façon rien à clipper hors de la couverture (seul bloc à fond
+     plein) et du dernier bloc visible. */
+  .bpv-doc{background:#fff;border:1px solid var(--border);border-radius:16px;padding:0;box-shadow:0 2px 16px rgba(13,43,78,.06);}
+  .bpv-doc > *:first-child{border-radius:16px 16px 0 0;overflow:hidden;}
+  .bpv-doc > *:last-child{border-radius:0 0 16px 16px;overflow:hidden;}
 
   /* Couverture */
   .bpv-cover{background:linear-gradient(135deg,#0D2B4E,#173e6b);color:#fff;padding:52px 56px 40px;position:relative;}
@@ -88,6 +96,12 @@
   table.bpv-table th{text-align:left;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border-bottom:2px solid var(--border);padding:6px 10px;white-space:nowrap;}
   table.bpv-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
   table.bpv-table tr:last-child td{border-bottom:none;}
+  table.bpv-table tbody tr:nth-child(even){background:#fafbfd;}
+  /* Colonnes de montants/nombres (2026-09-01) : alignées à droite avec chiffres tabulaires,
+     comme le reste de la plateforme -- une colonne de nombres alignée à gauche oblige l'œil à
+     comparer des chiffres qui ne s'empilent pas visuellement. */
+  table.bpv-table td.num, table.bpv-table th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.bpv-table td.num strong, table.bpv-table th.num{font-variant-numeric:tabular-nums;}
 
   /* Cartes (concurrents, risques, phases...) */
   .bpv-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:8px;}
@@ -123,12 +137,21 @@
   #bpv-loading, #bpv-error{max-width:600px;margin:80px auto;text-align:center;color:var(--muted);}
 
   @media print{
+    /* Sans ceci, la plupart des moteurs d'impression suppriment les couleurs de fond (couverture
+       dégradée, cartes BMC, lignes de tableau alternées, référentiel monétaire) même quand l'écran
+       les affiche correctement -- le document imprimé/exporté paraît alors bien plus pauvre que ce
+       que l'utilisateur a vu avant de cliquer "Imprimer". */
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
     body{background:#fff;}
     .topbar, .bpv-toc, .bpv-actionbar{display:none!important;}
     .bpv-shell{display:block;max-width:none;padding:0;}
     .bpv-doc{border:none;box-shadow:none;border-radius:0;}
+    .bpv-doc > *:first-child, .bpv-doc > *:last-child{border-radius:0;}
     .bpv-section{break-inside:avoid;padding:20px 6px;}
     .bpv-cover{padding:30px 6px;}
+    .bmc-cell, .bpv-mini-card, .bpv-devise-referentiel{break-inside:avoid;}
+    table.bpv-table tr{break-inside:avoid;}
+    .bpv-field-grid{break-inside:avoid;}
   }
 </style>
 </head>
@@ -279,8 +302,8 @@ function renderFinancement(data){
   const postes = (data.utilisation_postes||[]).filter(p=>has(p.poste));
   if (postes.length) {
     html += titre('Utilisation détaillée des fonds, par poste') +
-      `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Poste</th><th>Montant</th><th>Pourcentage</th></tr></thead><tbody>
-      ${postes.map(p=>`<tr><td>${esc(p.poste)}</td><td>${has(p.montant)?montant(p.montant):'—'}</td><td>${has(p.pourcentage)?esc(String(p.pourcentage))+' %':'—'}</td></tr>`).join('')}
+      `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Poste</th><th class="num">Montant</th><th class="num">Pourcentage</th></tr></thead><tbody>
+      ${postes.map(p=>`<tr><td>${esc(p.poste)}</td><td class="num">${has(p.montant)?montant(p.montant):'—'}</td><td class="num">${has(p.pourcentage)?esc(String(p.pourcentage))+' %':'—'}</td></tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -379,8 +402,12 @@ function renderMarcheConcurrents(concurrents){
 function renderProduits(p){
   let html = '';
   if (Array.isArray(p?.items) && p.items.length) {
-    html += `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Produit / Service</th><th>Description</th><th>Coût de revient</th><th>Prix de vente</th><th>Marge</th><th>Cycle</th></tr></thead><tbody>
-      ${p.items.map(i => `<tr><td><strong>${esc(i.nom)}</strong></td><td>${esc(i.description||'')}</td><td>${esc(i.cout_revient||'')}</td><td>${esc(i.prix_vente||'')}</td><td>${has(i.marge)?esc(i.marge)+'%':''}</td><td>${esc(i.cycle||'')}</td></tr>`).join('')}
+    // cout_revient/prix_vente sont des champs numériques purs dans l'éditeur (type="number") --
+    // mis en forme via fmtMontant() comme tout autre montant du document (2026-09-01), au lieu
+    // d'un nombre brut sans devise ("450" au lieu de "450 €") : même incohérence que celle déjà
+    // corrigée sur financement.montant le 2026-08-31.
+    html += `<div class="bpv-table-wrap"><table class="bpv-table"><thead><tr><th>Produit / Service</th><th>Description</th><th class="num">Coût de revient</th><th class="num">Prix de vente</th><th class="num">Marge</th><th>Cycle</th></tr></thead><tbody>
+      ${p.items.map(i => `<tr><td><strong>${esc(i.nom)}</strong></td><td>${esc(i.description||'')}</td><td class="num">${has(i.cout_revient)?fmtMontant(i.cout_revient):'—'}</td><td class="num">${has(i.prix_vente)?fmtMontant(i.prix_vente):'—'}</td><td class="num">${has(i.marge)?esc(i.marge)+'%':'—'}</td><td>${esc(i.cycle||'')}</td></tr>`).join('')}
     </tbody></table></div>`;
   }
   if (Array.isArray(p?.etude_prix) && p.etude_prix.length) {
@@ -464,10 +491,10 @@ function renderPlanFinancier(pf){
     };
     html += `<div class="bpv-field" style="margin-top:20px;"><h4>Compte de résultat prévisionnel</h4></div>
       <div class="bpv-table-wrap"><table class="bpv-table"><thead>
-        <tr><th${devisesActives.length>1?' rowspan="2"':''}>Ligne</th>${anneesCR.map(a=>`<th colspan="${devisesActives.length}">Année ${a}</th>`).join('')}</tr>
-        ${devisesActives.length>1 ? `<tr>${anneesCR.map(()=>devisesActives.map(code=>`<th>${esc(code)}</th>`).join('')).join('')}</tr>` : ''}
+        <tr><th${devisesActives.length>1?' rowspan="2"':''}>Ligne</th>${anneesCR.map(a=>`<th class="num" colspan="${devisesActives.length}">Année ${a}</th>`).join('')}</tr>
+        ${devisesActives.length>1 ? `<tr>${anneesCR.map(()=>devisesActives.map(code=>`<th class="num">${esc(code)}</th>`).join('')).join('')}</tr>` : ''}
       </thead><tbody>
-      ${Object.entries(CR_LIGNES).map(([k,label]) => `<tr><td>${label}</td>${anneesCR.map(a=>devisesActives.map(code=>`<td>${celluleMontant(pf[`${k}_${a}`], code)}</td>`).join('')).join('')}</tr>`).join('')}
+      ${Object.entries(CR_LIGNES).map(([k,label]) => `<tr><td>${label}</td>${anneesCR.map(a=>devisesActives.map(code=>`<td class="num">${celluleMontant(pf[`${k}_${a}`], code)}</td>`).join('')).join('')}</tr>`).join('')}
     </tbody></table></div>`;
   }
 
@@ -475,11 +502,18 @@ function renderPlanFinancier(pf){
   const ress = Object.entries(PF_RESSOURCES).filter(([k]) => has(pf[k]));
   const emp = Object.entries(PF_EMPLOIS).filter(([k]) => has(pf[k]));
   if (ress.length || emp.length) {
+    // Total + équilibre (2026-09-01) : un plan de financement doit toujours avoir
+    // Ressources = Emplois -- visible ici, pas seulement dans l'éditeur (BPCalc.detecterIncoherences),
+    // pour qu'un lecteur externe (banque, investisseur) voie l'équilibre sans avoir accès à l'éditeur.
+    const totalRess = Object.keys(PF_RESSOURCES).reduce((s,k) => s + (parseFloat(pf[k])||0), 0);
+    const totalEmp = Object.keys(PF_EMPLOIS).reduce((s,k) => s + (parseFloat(pf[k])||0), 0);
+    const equilibre = Math.abs(totalRess - totalEmp) < Math.max(1, Math.max(totalRess,totalEmp) * 0.01);
     html += `<div class="bpv-field" style="margin-top:20px;"><h4>Plan de financement</h4></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        ${ress.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">RESSOURCES</div>${ress.map(([k,l]) => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${l}</span><strong>${fmtMontant(pf[k])}</strong></div>`).join('')}</div>` : ''}
-        ${emp.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">EMPLOIS</div>${emp.map(([k,l]) => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${l}</span><strong>${fmtMontant(pf[k])}</strong></div>`).join('')}</div>` : ''}
-      </div>`;
+        ${ress.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">RESSOURCES</div>${ress.map(([k,l]) => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${l}</span><strong style="font-variant-numeric:tabular-nums;">${fmtMontant(pf[k])}</strong></div>`).join('')}<div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0 0;font-weight:800;"><span>Total</span><strong style="font-variant-numeric:tabular-nums;">${fmtMontant(totalRess)}</strong></div></div>` : ''}
+        ${emp.length ? `<div><div style="font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;">EMPLOIS</div>${emp.map(([k,l]) => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span>${l}</span><strong style="font-variant-numeric:tabular-nums;">${fmtMontant(pf[k])}</strong></div>`).join('')}<div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0 0;font-weight:800;"><span>Total</span><strong style="font-variant-numeric:tabular-nums;">${fmtMontant(totalEmp)}</strong></div></div>` : ''}
+      </div>
+      ${(ress.length && emp.length) ? `<div style="margin-top:10px;font-size:12px;font-weight:700;color:${equilibre?'#0a7d4f':'#b3701f'};">${equilibre?'✅ Équilibré — Ressources = Emplois':`⚠️ Écart de ${fmtMontant(Math.abs(totalRess-totalEmp))} entre Ressources et Emplois`}</div>` : ''}`;
   }
   return html;
 }
