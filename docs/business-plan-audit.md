@@ -120,3 +120,15 @@ Quatre chantiers de consolidation identifiés et traités, sur demande explicite
 4. **BFR réellement calculé** — `BPCalc.calcBFR()` (formule normative : stock moyen + créances clients − dettes fournisseurs, à partir de 3 champs déjà numériques). **Bug trouvé au passage** : le ratio BFR/CA du tableau de bord (`calcRatios()`) lisait `parseFloat(sections.plan_financier.bfr)` — un champ de texte libre — et retombait donc systématiquement sur 0/NaN pour toute saisie normale ; le ratio affichait silencieusement "0.0%" (toujours au vert) sur n'importe quel plan rempli. Corrigé pour utiliser le vrai calcul.
 
 **Effet de bord trouvé en marge (sans rapport avec le Business Plan)** : en testant la nouvelle suite, `node --test` lancé sans argument (auto-découverte, différent de `npm test`) a balayé `server/seed-comptes-test.js` — un script d'exécution manuelle (pas une suite de tests) qui écrit de vrais comptes en base, dont un mot de passe administrateur en dur, à cause de son nom de fichier terminant en `-test.js`. Aucune donnée touchée (vérifié : `DATABASE_URL` n'était pas défini dans l'environnement au moment des essais), mais le risque était réel si l'environnement avait été différent. Renommé en `server/seed-comptes.js` pour rendre la classe de risque impossible.
+
+## L. Provenance étendue (2026-09-01, 5ᵉ chantier de consolidation)
+
+Le 5ᵉ point identifié lors du retour honnête sur le module (« le système de preuves/provenance est réel mais superficiel — ~15 champs sur 180 ») a été traité : 6 nouveaux champs scalaires à fort enjeu couverts par `provenanceWidget()`, portant le total de 17 à 23 :
+- `business_model.cac` et `business_model.ltv` (Unit Economics — les deux chiffres les plus scrutés par un investisseur, souvent des estimations)
+- `plan_commercial.ca_par_commercial`
+- `impact.beneficiaires_directs` et `impact.beneficiaires_indirects` (complètent `emplois_directs`, déjà couvert)
+- `financement.montant_ideal_financement` (complète `montant`, déjà couvert)
+
+**Choix de périmètre assumé** : les champs des tableaux répétables (`ca_1`..`ca_5` du compte de résultat, postes RH, immobilisations détaillées) n'ont **pas** reçu de badge. `provenanceWidget()` est conçu pour un champ scalaire dans une grille `.fg` (label + badge côte à côte) ; l'insérer dans une cellule `<td>` du tableau du compte de résultat (5 colonnes déjà serrées) aurait dégradé la lisibilité — exactement ce que le chantier suivant (§M, visuel du rendu document) cherche à améliorer, pas à contredire. Étendre la provenance aux tableaux répétables demanderait un widget par ligne, une évolution distincte non traitée ici.
+
+Vérifié par exécution réelle : les 6 badges confirmés affichés sur un plan de test, cycle complet POST/GET `/api/business-plans/:id/provenance` confirmé (statut, source, méthode persistés et relus correctement). Plan de test supprimé après vérification.

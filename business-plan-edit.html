@@ -2074,14 +2074,14 @@ function renderBMC() {
         ${field('prix_moyen','Prix moyen','','number')}
         ${field('cout_variable_client','Coût variable par client','','number')}
         ${field('marge_brute_pct','Marge brute (%)','','number')}
-        ${field('cac','Coût d\'acquisition client (CAC)','','number')}
+        <div>${field('cac','Coût d\'acquisition client (CAC)','','number')}${provenanceWidget('business_model','cac')}</div>
         ${field('taux_conversion_ue','Taux de conversion (%)','','number')}
         ${field('taux_retention','Taux de rétention (%)','','number')}
         ${field('taux_churn_ue','Taux de churn (%)','','number')}
         ${field('frequence_achat_ue','Fréquence d\'achat','Ex : 2x/mois')}
         ${field('duree_moyenne_relation','Durée moyenne de relation','Ex : 18 mois')}
         ${field('nb_moyen_achats','Nombre moyen d\'achats','','number')}
-        ${field('ltv','Valeur vie client (LTV)','','number')}
+        <div>${field('ltv','Valeur vie client (LTV)','','number')}${provenanceWidget('business_model','ltv')}</div>
         ${field('delai_rentabilisation','Délai pour rentabiliser un client','Ex : 6 mois')}
       </div>
     </div>
@@ -2460,7 +2460,7 @@ function renderCommercial() {
       ${field('cycle_vente_moyen','Cycle de vente moyen','Ex : 45 jours')}
       ${field('panier_moyen_commercial','Panier moyen','','number')}
       ${field('frequence_achat_commercial','Fréquence d\'achat','')}
-      ${field('ca_par_commercial','Chiffre d\'affaires par commercial','','number')}
+      <div>${field('ca_par_commercial','Chiffre d\'affaires par commercial','','number')}${provenanceWidget('plan_commercial','ca_par_commercial')}</div>
       ${field('objectif_mensuel_commercial','Objectif mensuel','','number')}
       ${field('objectif_annuel_commercial','Objectif annuel','','number')}
       ${field('territoire_commercial','Territoire commercial','')}
@@ -3371,8 +3371,8 @@ function renderImpact() {
       ${textarea('kpi_impact','KPI & Indicateurs de performance','Comment mesurez-vous votre impact ?',3,true)}
     </div></div>
     <div class="bp-card-inner bp-niveau-3"><h3>Bénéficiaires & emplois</h3><div class="fg">
-      ${field('beneficiaires_directs','Bénéficiaires directs','','number')}
-      ${field('beneficiaires_indirects','Bénéficiaires indirects','','number')}
+      <div>${field('beneficiaires_directs','Bénéficiaires directs','','number')}${provenanceWidget('impact','beneficiaires_directs')}</div>
+      <div>${field('beneficiaires_indirects','Bénéficiaires indirects','','number')}${provenanceWidget('impact','beneficiaires_indirects')}</div>
       <div>${field('emplois_directs','Emplois directs créés','','number')}${provenanceWidget('impact','emplois_directs')}</div>
       ${field('emplois_indirects','Emplois indirects créés','','number')}
     </div></div>
@@ -3442,7 +3442,7 @@ function renderFinancement() {
     <!-- Financement par étapes / Runway (2026-08-26, point 19) -->
     <div class="bp-card-inner bp-niveau-3"><h3>Montant &amp; calendrier</h3><div class="fg">
       ${field('montant_minimum_necessaire','Montant minimum nécessaire','','number')}
-      ${field('montant_ideal_financement','Montant idéal','','number')}
+      <div>${field('montant_ideal_financement','Montant idéal','','number')}${provenanceWidget('financement','montant_ideal_financement')}</div>
       ${field('montant_maximum_financement','Montant maximum','','number')}
       ${field('date_limite','Date limite','','date')}
       ${field('date_souhaitee_reception','Date souhaitée de réception','','date')}
