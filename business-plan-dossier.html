@@ -102,6 +102,8 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
 .team-avatar{width:40px;height:40px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--dp-display);font-weight:700;font-size:14px;flex:none;}
 
 .empty-note{color:var(--dp-ink-soft);font-size:11.5px;font-style:italic;}
+.annexe-qr{width:44px;height:44px;}
+.annexe-qr img{display:block;width:100%;height:100%;}
 
 @media print{
   .topbar,.dossier-toolbar{display:none!important;}
@@ -156,6 +158,9 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
      bloqué indéfiniment dans le navigateur, même pour une diapositive triviale -- bug confirmé de
      cette version précise, pas de notre code (4.0.1 exporte correctement en ~20ms). -->
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js" defer></script>
+<!-- QR codes sur les annexes -- même bibliothèque déjà utilisée ailleurs sur la plateforme
+     (mes-billets.html), même schéma d'intégration CDN. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 <script>
 /* ===========================================================================
    GÉNÉRATEUR DE DOSSIER — Business Plan → document investisseur (gabarit Premium)
@@ -315,6 +320,29 @@ function pageToc(bp){
     <div id="dp-toc-list" style="margin-top:10px;"></div>
     ${chromeBottom()}
   </div></div>`;
+}
+
+/* ---- Page : Séparateur de chapitre ----
+   Grande composition graphique, peu de texte : un numéro, un titre de chapitre, et la liste
+   des pages qu'il contient (calculée à partir des pages réellement produites pour ce chapitre
+   -- jamais une liste figée qui listerait une page absente faute de données). */
+function pageChapitre(bp, tpl, num, titre, sousTitre, itemsLabels){
+  tpl = tpl || ACTIVE_TPL;
+  const dark = tpl.cover === 'dark';
+  const bg = dark ? (tpl.coverBg || `linear-gradient(165deg,#14171C 0%,${tpl.navy} 130%)`) : tpl.paper;
+  const ink = dark ? '#F7F5F0' : tpl.navy;
+  const inkSoft = dark ? 'rgba(247,245,240,.55)' : tpl.inkSoft;
+  return `<div class="sheet ${dark?'dark':''}" data-page-id="chap-${num}" style="background:${bg};${!dark?`border-top:5px solid ${tpl.navy};`:''}">
+    <div class="pg" style="padding:26mm 20mm 18mm;justify-content:center;">
+      <p style="font-family:var(--dp-display);font-size:120px;font-weight:700;line-height:1;margin:0 0 8px;color:${tpl.orange};opacity:.9;">${String(num).padStart(2,'0')}</p>
+      <h2 style="font-family:var(--dp-display);font-size:38px;font-weight:700;line-height:1.08;margin:0 0 10px;color:${ink};text-wrap:balance;max-width:80%;">${esc(titre)}</h2>
+      ${sousTitre ? `<p style="font-family:var(--dp-body);font-size:14px;color:${inkSoft};margin:0 0 30px;max-width:70%;">${esc(sousTitre)}</p>` : ''}
+      ${itemsLabels.length ? `<div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:10px;">${itemsLabels.map(l=>`<span style="font-family:var(--dp-mono);font-size:10.5px;letter-spacing:.04em;color:${inkSoft};">— ${esc(l)}</span>`).join('')}</div>` : ''}
+      <div class="pg-chrome-bottom" style="border-top-color:${dark?'rgba(247,245,240,.18)':tpl.line};color:${inkSoft};">
+        <span>${esc(bp.nom_projet||'Business Plan')}</span><span class="dp-pagenum">—</span>
+      </div>
+    </div>
+  </div>`;
 }
 
 /* ---- Page : Résumé exécutif ---- */
@@ -787,7 +815,7 @@ function pageGenerique(bp, key, label, eyebrow, headline){
   }
   if (key === 'annexes' && Array.isArray(data.items) && data.items.length) {
     const rows = data.items.filter(a=>has(a.nom));
-    content += `<table class="doc-table"><thead><tr><th style="text-align:left;">N°</th><th style="text-align:left;">Document</th><th style="text-align:left;">Type</th><th style="text-align:left;">Description</th><th style="text-align:left;">Lien</th></tr></thead><tbody>${rows.map((a,i)=>`<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(a.nom)}</td><td style="text-align:left;">${esc(a.type||'—')}</td><td style="text-align:left;">${esc(a.description||'—')}</td><td style="text-align:left;">${has(a.url)?`<a href="${esc(a.url)}" style="color:var(--dp-orange);">Ouvrir ↗</a>`:'—'}</td></tr>`).join('')}</tbody></table>`;
+    content += `<table class="doc-table"><thead><tr><th style="text-align:left;">N°</th><th style="text-align:left;">Document</th><th style="text-align:left;">Type</th><th style="text-align:left;">Description</th><th style="text-align:left;">Accès</th></tr></thead><tbody>${rows.map((a,i)=>`<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(a.nom)}</td><td style="text-align:left;">${esc(a.type||'—')}</td><td style="text-align:left;">${esc(a.description||'—')}</td><td style="text-align:left;">${has(a.url)?`<div id="qr-annexe-${bp.id}-${i}" class="annexe-qr" data-url="${esc(a.url)}"></div>`:'—'}</td></tr>`).join('')}</tbody></table>`;
   }
   if (key === 'impact' && Array.isArray(data.indicateurs) && data.indicateurs.length) {
     content = kpiRow(data.indicateurs.filter(i=>has(i.nom)&&has(i.valeur_actuelle)).map(i=>[i.nom, i.valeur_actuelle, has(i.valeur_cible)?`Cible : ${i.valeur_cible}`:''])) + content;
@@ -855,8 +883,29 @@ function renderDossier(bp, tplKey){
     { id:'equipe', label:'Équipe', html: pageEquipe(bp) },
   ].filter(p => p.html);
 
+  // Pages de séparation de chapitre : une grande composition graphique, peu de texte, insérée
+  // avant la première page réellement présente de chaque chapitre -- jamais de chapitre listé
+  // s'il n'a produit aucune page (calculé sur pageDefs déjà filtré, pas sur une liste figée).
+  const CHAPTERS = [
+    { num:1, titre:'Le projet', sous:'Résumé, problème et solution', ids:['resume','probleme','solution'] },
+    { num:2, titre:'Marché & traction', sous:'Étude de marché, positionnement et preuves', ids:['traction','marche','pestel','persona','swot'] },
+    { num:3, titre:'Modèle & opérations', sous:'Business model, produits et organisation', ids:['bmc','produits','bcg','strategie_marketing','plan_commercial','capsoncas','plan_operationnel','organisation','rh','calendrier'] },
+    { num:4, titre:'Finances', sous:'Trajectoire financière, risques et impact', ids:['finances','risques','impact','financement'] },
+    { num:5, titre:"Équipe & annexes", sous:'Qui porte le projet', ids:['equipe','annexes'] },
+  ];
+  let currentChapitre = null, bodyHtml = '';
+  pageDefs.forEach(p => {
+    const chap = CHAPTERS.find(c => c.ids.includes(p.id));
+    if (chap && chap.num !== currentChapitre) {
+      currentChapitre = chap.num;
+      const itemsLabels = pageDefs.filter(pd => chap.ids.includes(pd.id)).map(pd => pd.label);
+      bodyHtml += pageChapitre(bp, tpl, chap.num, chap.titre, chap.sous, itemsLabels);
+    }
+    bodyHtml += p.html;
+  });
+
   const stage = document.getElementById('dossier-stage');
-  stage.innerHTML = pageCouverture(bp, tpl) + pageToc(bp) + pageDefs.map(p=>p.html).join('') + pageConclusion(bp, tpl);
+  stage.innerHTML = pageCouverture(bp, tpl) + pageToc(bp) + bodyHtml + pageConclusion(bp, tpl);
 
   // Table des matières + numérotation, calculées sur les pages réellement produites.
   const sheets = [...stage.querySelectorAll('.sheet')];
@@ -870,6 +919,27 @@ function renderDossier(bp, tplKey){
     const entries = pageDefs.map(p => ({ label:p.label, num: sheets.findIndex(s=>s.dataset.pageId===p.id)+1 }));
     tocList.innerHTML = entries.map((e,i) => `<div style="display:flex;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--dp-line);font-size:12px;"><span style="font-family:var(--dp-mono);color:var(--dp-orange);font-weight:600;">${String(i+1).padStart(2,'0')}</span><span style="flex:1;">${esc(e.label)}</span><span style="font-family:var(--dp-mono);color:var(--dp-ink-soft);">${String(e.num).padStart(2,'0')}</span></div>`).join('');
   }
+
+  renderAnnexeQRCodes();
+}
+
+/* QR codes sur les annexes qui ont un lien -- posés après coup (la bibliothèque dessine dans
+   un élément DOM déjà présent, elle ne peut pas produire une chaîne HTML à l'avance). Si le
+   CDN n'a pas encore fini de charger, on réessaie une fois après un court délai plutôt que de
+   laisser des cases vides silencieusement. */
+function renderAnnexeQRCodes(attempt){
+  const zones = document.querySelectorAll('.annexe-qr');
+  if (!zones.length) return;
+  if (typeof QRCode === 'undefined') {
+    if ((attempt||0) < 5) setTimeout(() => renderAnnexeQRCodes((attempt||0)+1), 300);
+    return;
+  }
+  zones.forEach(el => {
+    if (el.dataset.rendered) return;
+    el.innerHTML = '';
+    new QRCode(el, { text: el.dataset.url, width: 88, height: 88, colorDark: ACTIVE_TPL.navy, colorLight: '#FFFFFF', correctLevel: QRCode.CorrectLevel.M });
+    el.dataset.rendered = '1';
+  });
 }
 
 async function init(){
