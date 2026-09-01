@@ -136,6 +136,7 @@ table.doc-table tr.total td{font-weight:700;border-top:1.5px solid var(--dp-ink)
       <div class="left">
         <a href="#" id="dossier-back" class="dossier-back">← Retour au business plan</a>
         <select id="dossier-template-select" onchange="onTemplateChange(this.value)"></select>
+        <select id="dossier-format-select" onchange="onFormatChange(this.value)"></select>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-outline btn-sm" id="dossier-btn-pptx" onclick="generatePPTX()" disabled>⏳ PowerPoint…</button>
@@ -203,7 +204,27 @@ function applyTemplate(key){
 }
 function onTemplateChange(key){
   applyTemplate(key);
-  if (DOSSIER_BP) renderDossier(DOSSIER_BP, key);
+  if (DOSSIER_BP) renderDossier(DOSSIER_BP, key, ACTIVE_FORMAT);
+}
+
+/* ---- Formats par audience ----
+   Reprend le principe des 7 formats de l'ancien générateur (business-plan-edit.html,
+   buildFinalReportHTML) -- la meilleure idée qui lui manquait à celui-ci : un banquier, un
+   organisme de subvention et un partenaire commercial ne veulent pas lire le même dossier.
+   Contrairement à l'ancien (qui recombine des blocs de texte simples), les formats ici
+   filtrent l'ensemble déjà riche de pages (matrices, graphiques, gabarits) -- même contenu
+   source, sélection différente. "complet" = comportement actuel, aucune restriction. */
+const FORMATS = {
+  complet:     { label:'📄 Business Plan complet', ids:null },
+  bancaire:    { label:'🏦 Dossier bancaire', ids:['resume','traction','marche','finances','risques','financement','equipe','annexes'] },
+  investisseur:{ label:'💼 Dossier investisseur', ids:['resume','probleme','solution','traction','marche','pestel','swot','bmc','produits','bcg','finances','risques','financement','equipe'] },
+  subvention:  { label:'🏛️ Dossier subvention', ids:['resume','probleme','solution','marche','persona','impact','finances','calendrier','equipe','annexes'] },
+  partenaire:  { label:'🤝 Dossier partenaire', ids:['resume','traction','bmc','produits','strategie_marketing','plan_commercial','organisation','equipe'] },
+};
+let ACTIVE_FORMAT = 'complet';
+function onFormatChange(key){
+  ACTIVE_FORMAT = key;
+  if (DOSSIER_BP) renderDossier(DOSSIER_BP, Object.keys(TEMPLATES).find(k=>TEMPLATES[k]===ACTIVE_TPL) || 'premium', key);
 }
 
 /* ---- Adaptation automatique au profil du projet ----
@@ -856,8 +877,9 @@ let DOSSIER_BP = null; // rendu accessible à generatePPTX() une fois le chargem
 
 /* Construit (ou reconstruit, au changement de gabarit) l'intégralité du document dans le DOM.
    Séparée de init() pour être rappelable par onTemplateChange() sans re-fetcher les données. */
-function renderDossier(bp, tplKey){
+function renderDossier(bp, tplKey, formatKey){
   const tpl = TEMPLATES[tplKey] || TEMPLATES.premium;
+  const format = FORMATS[formatKey] || FORMATS.complet;
 
   // Ordre narratif investisseur : la thèse, puis le problème/solution, la preuve, le marché
   // et le modèle, le détail opérationnel, la finance, et enfin l'équipe qui porte tout ça.
@@ -881,7 +903,7 @@ function renderDossier(bp, tplKey){
     { id:'financement', label:'Financement', html: pageFinancement(bp) },
     generic(bp,'annexes'),
     { id:'equipe', label:'Équipe', html: pageEquipe(bp) },
-  ].filter(p => p.html);
+  ].filter(p => p.html).filter(p => !format.ids || format.ids.includes(p.id));
 
   // Pages de séparation de chapitre : une grande composition graphique, peu de texte, insérée
   // avant la première page réellement présente de chaque chapitre -- jamais de chapitre listé
@@ -957,8 +979,12 @@ async function init(){
   select.innerHTML = Object.entries(TEMPLATES).map(([k,t]) => `<option value="${k}">${esc(t.label)}</option>`).join('');
   select.value = 'premium';
 
+  const formatSelect = document.getElementById('dossier-format-select');
+  formatSelect.innerHTML = Object.entries(FORMATS).map(([k,f]) => `<option value="${k}">${esc(f.label)}</option>`).join('');
+  formatSelect.value = ACTIVE_FORMAT;
+
   applyTemplate('premium');
-  renderDossier(bp, 'premium');
+  renderDossier(bp, 'premium', ACTIVE_FORMAT);
 
   document.getElementById('dossier-loading').style.display = 'none';
   document.getElementById('dossier-shell').style.display = '';
