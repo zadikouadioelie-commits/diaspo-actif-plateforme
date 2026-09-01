@@ -26,6 +26,11 @@ html,body{height:100%;overflow:hidden;}
 .bp-nav-item.active{background:var(--orange-light);border-left-color:#2563EB;color:#2563EB;}
 .bp-nav-item .nav-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center;}
 .bp-nav-item .check{margin-left:auto;font-size:13px;}
+/* Repère "nouveau" (2026-09-01) : les 4 outils stratégiques ajoutés vivent DANS des sections
+   déjà existantes (pas de nouvelle entrée dans la barre latérale, pour ne pas multiplier les
+   rubriques) -- sans repère visuel, un porteur de projet qui a rempli son BP avant leur ajout
+   n'a aucune raison de les remarquer. Un utilisateur ne l'a pas vu du premier coup en pratique. */
+.bp-badge-new{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.03em;color:#fff;background:var(--orange,#ff6b00);border-radius:99px;padding:2px 8px;margin-left:8px;vertical-align:middle;text-transform:uppercase;}
 .bp-sidebar-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
 
 /* Zone centrale */
@@ -1835,7 +1840,7 @@ function renderMarche() {
          conservé tel quel) par les dimensions que ce champ seul ne capture pas -- traits de
          personnalité, canaux de contact, frustrations, motivations, citations, objections.
          Outil marketing standard, pas un doublon du profil texte libre. -->
-    <div class="bp-card-inner bp-niveau-2"><h3>🧑‍🤝‍🧑 Persona — portrait du client idéal</h3>
+    <div class="bp-card-inner bp-niveau-2"><h3>🧑‍🤝‍🧑 Persona — portrait du client idéal<span class="bp-badge-new">Nouveau</span></h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Le profil type ci-dessus dit QUI est le client ; ce portrait dit COMMENT il pense, ce qui le freine et ce qui le convainc.</p>
       <div class="fg">
         ${textarea('persona_traits','Traits de personnalité','Prudent, pressé, technophile, fidèle à ses habitudes…',2,true)}
@@ -1871,7 +1876,7 @@ function renderMarche() {
     <!-- Matrice PESTEL (2026-08-31) : les 6 familles de facteurs macro-environnementaux,
          complémentaire du SWOT (qui reste centré projet/marché immédiat) -- outil standard
          des dossiers de création d'entreprise, absent jusqu'ici du module. -->
-    <div class="bp-card-inner bp-niveau-2"><h3>🌐 Matrice PESTEL — environnement macro-économique</h3>
+    <div class="bp-card-inner bp-niveau-2"><h3>🌐 Matrice PESTEL — environnement macro-économique<span class="bp-badge-new">Nouveau</span></h3>
       <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Opportunités et menaces qui dépassent votre marché immédiat, par famille de facteurs.</p>
       <div class="fg">
         ${textarea('pestel_politique','Politique','Régulation, fiscalité, politique économique, lobbying…',2,true)}
@@ -2090,7 +2095,7 @@ function renderSWOT() {
     <!-- Prolongement du SWOT en plan d'action (2026-08-31) : la matrice seule dit "quoi",
          ce bloc dit "et donc on fait quoi" -- consolider/réduire/exploiter, comme dans les
          dossiers de création d'entreprise classiques. -->
-    <div class="bp-card-inner bp-niveau-2"><h3>Du diagnostic au plan d'action</h3>
+    <div class="bp-card-inner bp-niveau-2"><h3>Du diagnostic au plan d'action<span class="bp-badge-new">Nouveau</span></h3>
       <div class="fg">
         ${textarea('swot_action_forces','Comment consolider mes forces ?','Ex. investir dans ce qui marche déjà, en faire un argument commercial…')}
         ${textarea('swot_action_faiblesses','Comment réduire mes faiblesses et me sécuriser face aux menaces ?','Ex. formation, recrutement, partenariat pour combler un manque…')}
@@ -2245,7 +2250,7 @@ function renderProduits() {
             <th style="min-width:100px;">Prix de vente${helpIcon('produit_prix')}</th>
             <th style="min-width:80px;">Marge %</th>
             <th style="min-width:120px;">Cycle de vie${helpIcon('produit_cycle')}</th>
-            <th style="min-width:130px;">Matrice BCG${helpIcon('produit_bcg')}</th>
+            <th style="min-width:130px;">Matrice BCG${helpIcon('produit_bcg')}<span class="bp-badge-new">Nouveau</span></th>
             <th>Action</th>
           </tr></thead>
           <tbody id="produits-tbody">${renderProduitRows(items)}</tbody>
@@ -2554,7 +2559,7 @@ function renderCommercial() {
          jusqu'ici du module. -->
     <div class="bp-card-inner bp-niveau-3">
       <div style="margin-bottom:12px;">
-        <h3 style="margin:0;">🗣️ Matrice CAP-SONCAS — argumentaire commercial</h3>
+        <h3 style="margin:0;">🗣️ Matrice CAP-SONCAS — argumentaire commercial<span class="bp-badge-new">Nouveau</span></h3>
         <p style="font-size:12.5px;color:var(--muted);margin:4px 0 0;">Pour chaque motivation d'achat pertinente : la caractéristique de votre offre, l'avantage client qui en découle, et la preuve qui rend l'argument crédible.</p>
       </div>
       <div id="cap-soncas-list">${renderCapSoncas(sections.plan_commercial?.cap_soncas || [])}</div>

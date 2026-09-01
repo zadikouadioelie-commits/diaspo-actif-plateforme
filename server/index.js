@@ -36165,6 +36165,17 @@ async function computeBPScore(bp, sections) {
       pts: (g('financement','montant') ? 4:0) + ((g('financement','valorisation_apres')||g('financement','type_instrument')) ? 5:0),
       aide: 'Montant recherché et éléments de capitalisation/valorisation.',
       action: { texte:'Compléter le financement', href:'#financement' } },
+    /* 2026-09-01 : les 4 outils stratégiques (PESTEL/Persona/BCG/CAP-SONCAS) vivent DANS des
+       sections déjà notées ailleurs (marché, produits, plan commercial) sans jamais y être
+       comptés -- un porteur de projet pouvait les remplir intégralement sans que son score
+       bouge d'un point. Critère à part plutôt que rouvrir les critères existants : évite de
+       recalibrer leurs points déjà distribués, et rend visible ce qui a été ajouté. */
+    { cle:'strategie_avancee', icon:'🧭', label:'Outils stratégiques avancés', max:9,
+      pts: ([marche.pestel_politique,marche.pestel_economique,marche.pestel_social,marche.pestel_technologique,marche.pestel_environnemental,marche.pestel_legal].some(rempli) ? 3:0)
+         + ([marche.persona_traits,marche.persona_motivations,marche.persona_frustrations,marche.persona_canaux].some(rempli) ? 3:0)
+         + (((sections.produits?.items)||[]).some(p=>rempli(p.bcg_quadrant)) || ((sections.plan_commercial?.cap_soncas)||[]).some(c=>rempli(c.caracteristiques)||rempli(c.avantages)) ? 3:0),
+      aide: 'Matrice PESTEL, Persona Canvas, classification BCG ou argumentaire CAP-SONCAS renseignés.',
+      action: { texte:'Explorer les outils stratégiques', href:'#marche' } },
   ];
 
   const total = criteres.reduce((s,c) => s + c.pts, 0);
