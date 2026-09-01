@@ -405,6 +405,18 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   // Assigner le DA-ID à l'utilisateur
   try { await db.prepare('UPDATE users SET da_id=? WHERE id=?').run(generateDaId(), id); } catch (_) {}
+  /* Cagnotte — association automatique compte ↔ demande d'accès existante (cahier des charges
+     "Demander l'accès", 2026-09-01, points 6/15) : une personne a pu demander l'accès à une
+     cagnotte privée (ou en avoir reçu un directement) AVANT de créer son compte Diaspo'Actif —
+     on relie ici toutes les lignes cagnotte_participants_autorises déjà enregistrées sous cette
+     adresse e-mail, quel que soit leur statut (pending/approved/rejected/revoked), pour que
+     l'historique reste exact même pour une demande refusée avant la création du compte. Ne
+     change jamais le statut lui-même — seule l'association user_id est posée ici, l'accès reste
+     conditionné à statut='approved' comme partout ailleurs. Best-effort : ne doit jamais faire
+     échouer l'inscription. */
+  try {
+    await db.prepare("UPDATE cagnotte_participants_autorises SET user_id=? WHERE lower(email)=? AND user_id IS NULL").run(id, emailNorm);
+  } catch (_) {}
   // 🥇 Découverte Premium : 30 jours d'accès Premium offerts automatiquement à la création du compte
   await accorderDecouvertePremium(id, role);
   // Réseau Pro : quelques listes par défaut, entièrement modifiables/supprimables ensuite
@@ -16523,8 +16535,18 @@ route("GET", "/api/cagnottes/public/:slug", async (req, res, params) => {
   if (c.visibilite === "privee") {
     const user = await getCurrentUser(req);
     const estProprietaire = user && Number(c.owner_user_id) === Number(user.id);
-    const estAutorise = user && !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
-    if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
+    const estAutorise = user && !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=? AND statut='approved'").get(c.id, user.id));
+    if (!estProprietaire && !estAutorise) {
+      /* Réponse enrichie (2026-09-01, module "Demander l'accès") : au lieu d'un simple mur
+         d'erreur, le client a besoin du minimum pour proposer le bouton "Demander l'accès"
+         (titre, organisateur) — jamais le montant collecté ni la description, réservés aux
+         personnes autorisées. */
+      const ownerInfo = await db.prepare("SELECT nom FROM users WHERE id=?").get(c.owner_user_id);
+      return sendJSON(res, 403, {
+        error: "Cette cagnotte est privée.", prive: true,
+        cagnotte_id: c.id, slug: c.slug, titre: c.titre, organisateur_nom: ownerInfo?.nom || null,
+      });
+    }
   }
   const owner = await db.prepare("SELECT nom, photo_url FROM users WHERE id=?").get(c.owner_user_id);
   /* Compteur de vues (Phase 2 point 7, statistiques) — jamais pour le propriétaire consultant
@@ -16536,6 +16558,78 @@ route("GET", "/api/cagnottes/public/:slug", async (req, res, params) => {
     if (!estProprietaire) await db.prepare("UPDATE cagnottes SET vues=vues+1 WHERE id=?").run(c.id);
   } catch (_) {}
   sendJSON(res, 200, { cagnotte: { ...cagnotteAvecStatut(c), organisateur_nom: owner?.nom || null, organisateur_photo: owner?.photo_url || null } });
+});
+
+/* POST /api/cagnottes/public/:slug/demander-acces — demande d'accès à une cagnotte privée
+   (cahier des charges "Demander l'accès", 2026-09-01). Fonctionne aussi bien pour un visiteur
+   connecté que non connecté, avec ou sans compte Diaspo'Actif existant (points 4/5 du cahier).
+   Une seule ligne 'pending' par (cagnotte_id, email) — jamais de doublon actif (point 20). */
+route("POST", "/api/cagnottes/public/:slug/demander-acces", async (req, res, params, body) => {
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE slug=?").get(params.slug);
+  if (!c || !c.est_publiee) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (c.visibilite !== "privee") return sendJSON(res, 400, { error: "Cette cagnotte n'est pas privée — aucune demande d'accès n'est nécessaire." });
+
+  const ip = SEC.clientIp(req);
+  const rl = SEC.rateLimit(`cagnotte-demander-acces:${ip}`, 10, 3600000);
+  if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+
+  const visiteur = await getCurrentUser(req).catch(() => null);
+  /* Une personne connectée demande l'accès pour son PROPRE compte — son e-mail de session fait
+     foi, jamais un e-mail qu'elle pourrait saisir à la place (§12 du cahier des charges : une
+     adresse e-mail seule ne doit jamais permettre de contourner l'authentification — ici on va
+     plus loin, on ne laisse même pas quelqu'un de connecté déclarer l'adresse d'un tiers). */
+  const email = SEC.normalizeEmail(visiteur ? visiteur.email : String(body?.email || ""));
+  if (!email || !SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  if (visiteur && Number(c.owner_user_id) === Number(visiteur.id)) return sendJSON(res, 400, { error: "Vous êtes déjà le créateur de cette cagnotte." });
+
+  const nom = visiteur ? (visiteur.nom || null) : (body?.nom ? String(body.nom).trim().slice(0, 120) : null);
+  const message = body?.message ? String(body.message).trim().slice(0, 500) : null;
+  /* Compte Diaspo'Actif correspondant à cet e-mail (CAS A du cahier) — recherché même sans
+     connexion : sert uniquement à enrichir l'affichage du gestionnaire et à notifier ce compte,
+     jamais à accorder un accès (toujours conditionné à la session authentifiée — voir les
+     vérifications d'accès plus haut dans ce fichier, qui filtrent sur statut='approved' ET
+     user_id de la session, jamais sur l'e-mail saisi ici). */
+  const compte = visiteur || await db.prepare("SELECT id, nom FROM users WHERE lower(email)=? AND nom != 'Compte supprimé'").get(email);
+
+  const existante = await db.prepare("SELECT id, statut FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(c.id, email);
+  if (existante) {
+    if (existante.statut === 'approved') return sendJSON(res, 400, { error: "Vous avez déjà accès à cette cagnotte." });
+    if (existante.statut === 'pending') return sendJSON(res, 400, { error: "Votre demande est déjà en attente de validation." });
+    // Refusée ou retirée précédemment : on relance une nouvelle demande sur la même ligne
+    // (un seul historique par cagnotte_id+email, jamais un doublon).
+    await db.prepare("UPDATE cagnotte_participants_autorises SET statut='pending', user_id=?, nom=?, message=?, requested_at=datetime('now') WHERE id=?")
+      .run(compte ? compte.id : null, nom, message, existante.id);
+  } else {
+    await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email, nom, message, statut, requested_at) VALUES (?,?,?,?,?,'pending',datetime('now'))")
+      .run(c.id, compte ? compte.id : null, email, nom, message);
+  }
+
+  creerNotif(c.owner_user_id, "cagnotte_demande_acces", "🔑 Nouvelle demande d'accès",
+    `${nom || email} souhaite accéder à votre cagnotte privée « ${c.titre} ».`, { cagnotte_id: c.id });
+  if (compte) {
+    creerNotif(compte.id, "cagnotte_demande_envoyee", "Demande d'accès enregistrée",
+      `Votre demande d'accès à la cagnotte privée « ${c.titre} » a bien été enregistrée. Vous serez prévenu(e) de la décision.`, { cagnotte_id: c.id });
+  }
+
+  sendJSON(res, 201, { ok: true, compte_existant: !!compte });
+});
+
+/* GET /api/cagnottes/public/:slug/statut-acces?email=... — état de la demande d'accès pour un
+   e-mail donné sur une cagnotte privée (cahier des charges, point 10) : none/pending/approved/
+   rejected/revoked. Ne renvoie jamais d'accès ni d'autre information — un simple statut
+   d'affichage (§12 : ne jamais authentifier par e-mail seul). Limité par IP, même standard que
+   GET /api/cagnottes/verifier-email (oracle d'e-mails) ci-dessous. */
+route("GET", "/api/cagnottes/public/:slug/statut-acces", async (req, res, params, body, query) => {
+  const ip = SEC.clientIp(req);
+  const rl = SEC.rateLimit(`cagnotte-statut-acces:${ip}`, 20, 900000);
+  if (!rl.allowed) return sendJSON(res, 429, { error: "Trop de tentatives. Réessayez plus tard." });
+  const c = await db.prepare("SELECT id, visibilite FROM cagnottes WHERE slug=? AND est_publiee=1").get(params.slug);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (c.visibilite !== "privee") return sendJSON(res, 200, { statut: "approved" });
+  const email = SEC.normalizeEmail(String(query?.email || ""));
+  if (!email || !SEC.isValidEmail(email)) return sendJSON(res, 200, { statut: "none" });
+  const row = await db.prepare("SELECT statut FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(c.id, email);
+  sendJSON(res, 200, { statut: row ? row.statut : "none" });
 });
 
 /* Montants prédéfinis proposés au participant, en plus du montant libre (cahier des charges).
@@ -17672,7 +17766,10 @@ route("DELETE", "/api/cagnottes/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* GET /api/cagnottes/:id/participants — liste des participants autorisés (propriétaire uniquement). */
+/* GET /api/cagnottes/:id/participants — "Gestion des accès" (propriétaire uniquement) : liste
+   TOUTES les lignes (approuvées, en attente, refusées, retirées) — cf. cahier des charges
+   "Demander l'accès" (2026-09-01), point 16. Les demandes en attente remontent en premier
+   (nécessitent une action), le reste par date décroissante. */
 route("GET", "/api/cagnottes/:id/participants", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -17680,14 +17777,18 @@ route("GET", "/api/cagnottes/:id/participants", async (req, res, params) => {
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   const rows = await db.prepare(`
-    SELECT p.id, p.email, p.user_id, u.nom AS user_nom
+    SELECT p.id, p.email, p.user_id, p.nom AS demande_nom, p.message, p.statut,
+           p.requested_at, p.approved_at, p.rejected_at, p.revoked_at, p.created_at,
+           u.nom AS user_nom
     FROM cagnotte_participants_autorises p LEFT JOIN users u ON u.id=p.user_id
-    WHERE p.cagnotte_id=? ORDER BY p.created_at DESC
+    WHERE p.cagnotte_id=? ORDER BY (p.statut='pending') DESC, p.created_at DESC
   `).all(params.id);
   sendJSON(res, 200, { participants: rows });
 });
 
-/* POST /api/cagnottes/:id/participants — ajoute un participant autorisé par e-mail (compte existant ou non).
+/* POST /api/cagnottes/:id/participants — ajoute/autorise directement un participant par e-mail
+   (compte existant ou non) — action du créateur, donc statut='approved' immédiatement (à la
+   différence d'une demande d'accès venue du public, qui démarre 'pending', voir plus bas).
    E-mail réel ajouté le 2026-08-30 (signalé par l'utilisateur : "je rentre les adresses mail...
    ils ne le reçoivent pas par mail") — jusque-là, seule une notification in-app (creerNotif)
    était posée, et seulement si l'e-mail correspondait à un compte déjà existant. Une personne
@@ -17716,10 +17817,20 @@ route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) 
   }
   if (!email || !email.includes("@")) return sendJSON(res, 400, { error: "E-mail invalide." });
   const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
-  const dejaAutorise = await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(params.id, email);
-  if (dejaAutorise) return sendJSON(res, 400, { error: "Cette personne est déjà autorisée." });
-  const id = (await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email) VALUES (?,?,?)")
-    .run(params.id, compte ? compte.id : null, email)).lastInsertRowid;
+  /* Une ligne existante pour ce couple (cagnotte, e-mail) — quel que soit son statut passé
+     (ancienne demande refusée, accès retiré...) — bascule directement en 'approved' au lieu
+     d'un doublon : un seul historique par (cagnotte_id, email), jamais deux lignes. */
+  const existante = await db.prepare("SELECT id, statut FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(params.id, email);
+  if (existante && existante.statut === 'approved') return sendJSON(res, 400, { error: "Cette personne est déjà autorisée." });
+  let id;
+  if (existante) {
+    await db.prepare("UPDATE cagnotte_participants_autorises SET statut='approved', user_id=?, approved_at=datetime('now'), approved_by=? WHERE id=?")
+      .run(compte ? compte.id : null, user.id, existante.id);
+    id = existante.id;
+  } else {
+    id = (await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email, statut, approved_at, approved_by) VALUES (?,?,?,'approved',datetime('now'),?)")
+      .run(params.id, compte ? compte.id : null, email, user.id)).lastInsertRowid;
+  }
   if (compte) creerNotif(compte.id, "cagnotte_invitation", "Invitation à une cagnotte privée", "Vous avez été ajouté(e) comme participant autorisé à une cagnotte privée.", { cagnotte_id: Number(params.id) });
 
   const origin = getOrigin(req);
@@ -17732,15 +17843,58 @@ route("POST", "/api/cagnottes/:id/participants", async (req, res, params, body) 
   sendJSON(res, 201, { id });
 });
 
-/* DELETE /api/cagnottes/:id/participants/:pid — retire un participant autorisé. */
-route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params) => {
+/* POST /api/cagnottes/:id/participants/:pid/approuver — valide une demande d'accès en attente
+   (créée via POST /api/cagnottes/public/:slug/demander-acces ci-dessous). */
+route("POST", "/api/cagnottes/:id/participants/:pid/approuver", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const c = await db.prepare("SELECT owner_user_id FROM cagnottes WHERE id=?").get(params.id);
+  const c = await db.prepare("SELECT owner_user_id, titre, slug FROM cagnottes WHERE id=?").get(params.id);
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
   if (!(await exigerPremium(user, res, "cagnottes"))) return;
-  await db.prepare("DELETE FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").run(params.pid, params.id);
+  const p = await db.prepare("SELECT * FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").get(params.pid, params.id);
+  if (!p) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (p.statut !== 'pending') return sendJSON(res, 400, { error: "Cette demande n'est plus en attente." });
+  await db.prepare("UPDATE cagnotte_participants_autorises SET statut='approved', approved_at=datetime('now'), approved_by=? WHERE id=?").run(user.id, p.id);
+  if (p.user_id) creerNotif(p.user_id, "cagnotte_acces_accorde", "Demande d'accès acceptée ✅", `Votre demande d'accès à la cagnotte privée « ${c.titre} » a été acceptée. Vous pouvez maintenant y accéder.`, { cagnotte_id: Number(params.id) });
+  const origin = getOrigin(req);
+  const lien = `${origin}/cagnotte.html?slug=${encodeURIComponent(c.slug)}`;
+  const { emailAccesCagnottePrivee } = require("./mailer");
+  emailAccesCagnottePrivee({
+    email: p.email, cagnotteTitre: c.titre, createurNom: user.nom || "Un membre de Diaspo'Actif", lien,
+  }).catch(e => console.error("[cagnotte-demandes-acces] envoi e-mail:", e.message));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/cagnottes/:id/participants/:pid/refuser — refuse une demande d'accès en attente. */
+route("POST", "/api/cagnottes/:id/participants/:pid/refuser", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id, titre FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const p = await db.prepare("SELECT * FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").get(params.pid, params.id);
+  if (!p) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (p.statut !== 'pending') return sendJSON(res, 400, { error: "Cette demande n'est plus en attente." });
+  await db.prepare("UPDATE cagnotte_participants_autorises SET statut='rejected', rejected_at=datetime('now'), rejected_by=? WHERE id=?").run(user.id, p.id);
+  if (p.user_id) creerNotif(p.user_id, "cagnotte_acces_refuse", "Demande d'accès refusée", `Votre demande d'accès à la cagnotte privée « ${c.titre} » a été refusée par son gestionnaire.`, { cagnotte_id: Number(params.id) });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/cagnottes/:id/participants/:pid — retire un accès précédemment accordé (statut
+   'revoked', conserve l'historique — cf. cahier des charges point 17 — au lieu d'une suppression
+   physique comme avant cette évolution). */
+route("DELETE", "/api/cagnottes/:id/participants/:pid", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT owner_user_id, titre FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  if (!(await exigerPremium(user, res, "cagnottes"))) return;
+  const p = await db.prepare("SELECT id, user_id FROM cagnotte_participants_autorises WHERE id=? AND cagnotte_id=?").get(params.pid, params.id);
+  if (!p) return sendJSON(res, 404, { error: "Participant introuvable." });
+  await db.prepare("UPDATE cagnotte_participants_autorises SET statut='revoked', revoked_at=datetime('now'), revoked_by=? WHERE id=?").run(user.id, p.id);
+  if (p.user_id) creerNotif(p.user_id, "cagnotte_acces_retire", "Accès retiré", `Votre accès à la cagnotte privée « ${c.titre} » a été retiré.`, { cagnotte_id: Number(params.id) });
   sendJSON(res, 200, { ok: true });
 });
 
@@ -17800,10 +17954,12 @@ route("POST", "/api/cagnottes/:id/inviter", async (req, res, params, body) => {
      lien qui lui refuserait l'accès à l'ouverture. Ne crée jamais de doublon (même contrainte
      que POST /api/cagnottes/:id/participants). */
   if (c.visibilite === "privee") {
-    const dejaAutorise = await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(c.id, email);
-    if (!dejaAutorise) {
-      const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
-      await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email) VALUES (?,?,?)").run(c.id, compte ? compte.id : null, email);
+    const existante = await db.prepare("SELECT id, statut FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND email=?").get(c.id, email);
+    const compte = await db.prepare("SELECT id FROM users WHERE lower(email)=?").get(email);
+    if (!existante) {
+      await db.prepare("INSERT INTO cagnotte_participants_autorises (cagnotte_id, user_id, email, statut, approved_at, approved_by) VALUES (?,?,?,'approved',datetime('now'),?)").run(c.id, compte ? compte.id : null, email, user.id);
+    } else if (existante.statut !== 'approved') {
+      await db.prepare("UPDATE cagnotte_participants_autorises SET statut='approved', user_id=?, approved_at=datetime('now'), approved_by=? WHERE id=?").run(compte ? compte.id : null, user.id, existante.id);
     }
   }
 
@@ -17867,7 +18023,7 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
     invite = { nom, prenom: String(body?.prenom || "").trim() || null, email };
   } else if (c.visibilite === "privee") {
     const estProprietaire = Number(c.owner_user_id) === Number(user.id);
-    const estAutorise = !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id));
+    const estAutorise = !!(await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=? AND statut='approved'").get(c.id, user.id));
     if (!estProprietaire && !estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
   }
 
@@ -18112,7 +18268,7 @@ route("GET", "/api/cagnottes/:id/actualites", async (req, res, params) => {
   if (c.visibilite === "privee") {
     const user = await getCurrentUser(req).catch(() => null);
     const estAutorise = user && (Number(c.owner_user_id) === Number(user.id)
-      || (await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=?").get(c.id, user.id)));
+      || (await db.prepare("SELECT id FROM cagnotte_participants_autorises WHERE cagnotte_id=? AND user_id=? AND statut='approved'").get(c.id, user.id)));
     if (!estAutorise) return sendJSON(res, 403, { error: "Cette cagnotte est privée." });
   }
   const rows = await db.prepare(`

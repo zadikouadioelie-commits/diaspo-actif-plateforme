@@ -154,6 +154,114 @@
     if (banniereOk) banniereOk.insertAdjacentElement('afterend', zone);
   }
 
+  /* ── "Demander l'accès" à une cagnotte privée (cahier des charges 2026-09-01) ──────────────
+     Remplace l'ancien mur "🔒 Cette cagnotte est privée." par un panneau permettant à un
+     visiteur (connecté ou non, avec ou sans compte Diaspo'Actif) de faire sa demande, en
+     reflétant son statut réel (aucune demande / en attente / refusée / retrait) plutôt que de
+     toujours proposer le même bouton. */
+  function renderAccesPrive(err){
+    if (!err || !err.prive) {
+      el.innerHTML = `<div class="cg-empty">🔒 ${escH((err && err.error) || 'Cette cagnotte est introuvable ou n\'est plus accessible.')}</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="cg-header-row">
+        <a class="cg-back" href="cagnottes.html" style="margin:0;">← Toutes les cagnottes</a>
+      </div>
+      <div class="cg-photo">🔒</div>
+      <h1 class="cg-title">${escH(err.titre)}</h1>
+      <div class="cg-organisateur">Organisée par ${escH(err.organisateur_nom || 'une initiative Diaspo\'Actif')}</div>
+      <div class="cg-card" id="cg-acces-zone">
+        <h3 style="margin:0 0 6px;font-size:16px;color:var(--navy);">🔒 Cagnotte privée</h3>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Cette cagnotte n'est visible que par les personnes autorisées par son organisateur.</p>
+        <div id="cg-acces-contenu">Chargement…</div>
+      </div>`;
+    chargerEtatAcces(err.slug);
+  }
+
+  async function chargerEtatAcces(slugCagnotte){
+    const zone = document.getElementById('cg-acces-contenu');
+    let me = null;
+    try { me = (await (await fetch('/api/auth/me', { credentials:'include' })).json()).user || null; } catch(e) {}
+    let statut = null;
+    if (me) {
+      try {
+        statut = (await (await fetch('/api/cagnottes/public/' + encodeURIComponent(slugCagnotte) + '/statut-acces?email=' + encodeURIComponent(me.email))).json()).statut || 'none';
+      } catch(e) { statut = 'none'; }
+    }
+    renderZoneAcces(zone, slugCagnotte, { connecte: !!me, email: me ? me.email : '', statut });
+  }
+
+  function renderZoneAcces(zone, slugCagnotte, etat){
+    /* §12 du cahier des charges : une adresse déjà 'approved' mais qui ne correspond pas au
+       compte actuellement connecté (donc toujours refusée par le serveur, voir la réponse 403
+       ci-dessus) doit être expliquée clairement, jamais proposer une nouvelle demande qui serait
+       de toute façon rejetée par le serveur ("Vous avez déjà accès"). */
+    if (etat.statut === 'approved') {
+      zone.innerHTML = `<div class="cg-banner" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;">L'adresse <strong>${escH(etat.email)}</strong> a déjà accès à cette cagnotte, mais votre compte connecté ne correspond pas exactement à cette autorisation. Reconnectez-vous avec cette adresse pour y accéder.</div>`;
+      return;
+    }
+    if (etat.statut === 'pending') {
+      zone.innerHTML = `<div class="cg-banner cg-banner-annule">⏳ Votre demande d'accès est en attente de validation par l'organisateur.</div>`;
+      return;
+    }
+    if (etat.statut === 'rejected' || etat.statut === 'revoked') {
+      zone.innerHTML = `<div class="cg-banner" style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca;">${etat.statut === 'rejected' ? '❌ Votre demande d\'accès a été refusée.' : '🚫 Votre accès à cette cagnotte a été retiré.'}</div>
+        <button class="cg-participer" id="cg-acces-btn" style="margin-top:12px;">🔑 Faire une nouvelle demande</button>`;
+    } else {
+      zone.innerHTML = `<button class="cg-participer" id="cg-acces-btn">🔑 Demander l'accès</button>`;
+    }
+    const btn = document.getElementById('cg-acces-btn');
+    if (btn) btn.addEventListener('click', () => ouvrirFormulaireDemandeAcces(slugCagnotte, etat));
+  }
+
+  function ouvrirFormulaireDemandeAcces(slugCagnotte, etat){
+    const zone = document.getElementById('cg-acces-contenu');
+    zone.innerHTML = `
+      ${etat.connecte ? `
+      <input type="email" value="${escH(etat.email)}" disabled style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg);color:var(--muted);">` : `
+      <input id="cg-acces-nom" type="text" placeholder="Votre nom" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+      <input id="cg-acces-email" type="email" placeholder="Adresse e-mail *" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">`}
+      <textarea id="cg-acces-message" rows="2" placeholder="Message pour l'organisateur (optionnel)" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;margin-bottom:10px;"></textarea>
+      <div id="cg-acces-error" class="auth-error" style="display:none;margin-bottom:10px;"></div>
+      <button class="cg-participer" id="cg-acces-submit">Envoyer la demande</button>`;
+    document.getElementById('cg-acces-submit').addEventListener('click', () => soumettreDemandeAcces(slugCagnotte, etat));
+  }
+
+  async function soumettreDemandeAcces(slugCagnotte, etat){
+    const errBox = document.getElementById('cg-acces-error');
+    errBox.style.display = 'none';
+    const body = { message: (document.getElementById('cg-acces-message') || {}).value || '' };
+    let emailUtilise = etat.email;
+    if (!etat.connecte) {
+      body.nom = (document.getElementById('cg-acces-nom') || {}).value.trim() || '';
+      emailUtilise = (document.getElementById('cg-acces-email') || {}).value.trim();
+      body.email = emailUtilise;
+      if (!emailUtilise || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailUtilise)) {
+        errBox.textContent = 'Merci de renseigner une adresse e-mail valide.';
+        errBox.style.display = 'block';
+        return;
+      }
+    }
+    try {
+      const r = await fetch('/api/cagnottes/public/' + encodeURIComponent(slugCagnotte) + '/demander-acces', {
+        method: 'POST', headers: { 'Content-Type':'application/json' }, credentials:'include', body: JSON.stringify(body),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw data;
+      const zone = document.getElementById('cg-acces-contenu');
+      zone.innerHTML = `<div class="cg-banner cg-banner-ok">✅ Votre demande d'accès a bien été enregistrée. Vous serez prévenu(e) dès que l'organisateur aura répondu.</div>
+        ${!data.compte_existant ? `
+        <div class="cg-card" style="margin-top:12px;padding:16px;">
+          <p style="font-size:13px;color:var(--text);margin:0 0 10px;">Vous ne possédez pas encore de compte Diaspo'Actif. Créez-le avec cette même adresse e-mail afin de pouvoir accéder facilement à vos espaces autorisés dès que votre demande sera validée.</p>
+          <a class="cg-participer" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box;" href="inscription.html?role=utilisateur&email=${encodeURIComponent(emailUtilise)}">Créer mon compte Diaspo'Actif</a>
+        </div>` : ''}`;
+    } catch (e) {
+      errBox.textContent = (e && e.error) || 'Une erreur est survenue.';
+      errBox.style.display = 'block';
+    }
+  }
+
   function ouvrirParticipation(){
     /* Participation invitée (2026-08-17) : plus de redirection forcée vers la connexion — le
        formulaire ci-dessous demande nom/prénom/e-mail directement à la personne sans compte,
@@ -399,7 +507,7 @@
         if (peutParticiper && (new URLSearchParams(location.search).get('participer') === '1' || invitationToken)) ouvrirParticipation();
       })
       .catch(err => {
-        el.innerHTML = `<div class="cg-empty">🔒 ${escH(err.error || 'Cette cagnotte est introuvable ou n\'est plus accessible.')}</div>`;
+        renderAccesPrive(err);
       });
   }
 })();

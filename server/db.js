@@ -37,7 +37,11 @@ const { DatabaseSync } = require("node:sqlite");
 const path = require("node:path");
 
 const IS_PROD = process.env.VERCEL || process.env.NODE_ENV === "production";
-const DB_PATH = IS_PROD ? "/tmp/diaspoactif.db" : path.join(__dirname, "diaspoactif.db");
+/* DIASPOACTIF_TEST_DB_PATH (2026-09-01) : permet à un test d'intégration de démarrer le
+   serveur contre un fichier SQLite isolé (ex. un temp file) au lieu de la base de dev
+   partagée — jamais utilisé en dehors des tests, absent => comportement strictement
+   inchangé. Voir tests/cagnotte-acces.test.js. */
+const DB_PATH = process.env.DIASPOACTIF_TEST_DB_PATH || (IS_PROD ? "/tmp/diaspoactif.db" : path.join(__dirname, "diaspoactif.db"));
 const db = new DatabaseSync(DB_PATH);
 
 db.exec(`
@@ -1978,6 +1982,29 @@ const MIGRATIONS = [
   // Rétrocompatibilité (point 28) : NULL ici => CurrencyManager applique EUR par défaut, aucune
   // donnée existante n'est modifiée.
   ["business_plans", "devise_config TEXT"],
+  // Cagnotte — demande d'accès (cahier des charges 2026-09-01) : la table
+  // cagnotte_participants_autorises devient la source unique pour l'accès à une cagnotte
+  // privée, qu'il soit accordé directement par le créateur (comportement historique,
+  // statut='approved' par défaut ci-dessous pour toutes les lignes déjà en production) ou
+  // demandé par un visiteur puis validé/refusé. Un seul historique par (cagnotte_id, email) —
+  // pas une table séparée, conformément à la consigne « ne pas recréer un système parallèle » :
+  // les vérifications d'accès existantes (public/:slug, participer, actualites) gagnent
+  // simplement un filtre AND statut='approved'.
+  // Valeurs possibles : 'pending' | 'approved' | 'rejected' | 'revoked' — validées en JS
+  // (server/index.js), pas par CHECK ici : aucune autre entrée MIGRATIONS n'en utilise
+  // (ALTER TABLE ADD COLUMN + CHECK est risqué sur SQLite ancien, et non repris par le
+  // parseur de colonnes de pg-init.js), donc on reste sur le même standard que le reste
+  // du fichier plutôt que d'introduire un cas particulier.
+  ["cagnotte_participants_autorises", "statut TEXT NOT NULL DEFAULT 'approved'"],
+  ["cagnotte_participants_autorises", "nom TEXT"],
+  ["cagnotte_participants_autorises", "message TEXT"],
+  ["cagnotte_participants_autorises", "requested_at TEXT"],
+  ["cagnotte_participants_autorises", "approved_at TEXT"],
+  ["cagnotte_participants_autorises", "rejected_at TEXT"],
+  ["cagnotte_participants_autorises", "revoked_at TEXT"],
+  ["cagnotte_participants_autorises", "approved_by INTEGER"],
+  ["cagnotte_participants_autorises", "rejected_by INTEGER"],
+  ["cagnotte_participants_autorises", "revoked_by INTEGER"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -4084,6 +4111,18 @@ db.exec(`
     WHERE accred_id IN (SELECT id FROM accred_definitions WHERE type IN (${ph}))`).run(...types);
 })();
 
+/* Extension de accred_tarifs — abonnement mensuel avec réduction sur le total annuel.
+   DOIT rester avant seedUtilisateurAbonne() juste en dessous : ce seed insère une ligne
+   accred_tarifs avec reduction_annuelle_pct dès le chargement du module, donc la colonne doit
+   déjà exister. Vivait plus bas dans ce fichier (section "MOTEUR ACCRÉDITATIONS v2") jusqu'au
+   2026-09-01 — invisible sur les bases existantes (colonne déjà présente depuis longtemps),
+   mais provoquait un crash immédiat au tout premier démarrage contre une base neuve
+   ("table accred_tarifs has no column named reduction_annuelle_pct"), découvert en isolant un
+   test contre un fichier SQLite vide (voir tests/cagnotte-acces.test.js). */
+;["reduction_annuelle_pct REAL DEFAULT 0"].forEach(col => {
+  try { db.exec(`ALTER TABLE accred_tarifs ADD COLUMN ${col}`); } catch(_) {}
+});
+
 /* Accréditation "Utilisateur Abonné" : débloque Réseau Pro, Business Plans, Mes projets
    pour les comptes Utilisateur individuels. Paiement carte bancaire (Stripe), auto-activée
    au paiement (pas de validation admin). Une seule ligne accred_tarifs par rôle (contrainte
@@ -4178,11 +4217,6 @@ db.exec(`
   "controle_documentaire INTEGER DEFAULT 0",
   "date_application TEXT"
 ].forEach(col => { try { db.exec(`ALTER TABLE accred_definitions ADD COLUMN ${col}`); } catch(_) {} });
-
-/* Extension de accred_tarifs — abonnement mensuel avec réduction sur le total annuel */
-;["reduction_annuelle_pct REAL DEFAULT 0"].forEach(col => {
-  try { db.exec(`ALTER TABLE accred_tarifs ADD COLUMN ${col}`); } catch(_) {}
-});
 
 db.exec(`
   /* Journal d'audit des modifications d'accréditations */

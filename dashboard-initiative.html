@@ -4414,7 +4414,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
         }
         if (c.visibilite === 'privee') {
-          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenParticipants(${c.id},'${c.slug}')">👥 Participants autorisés</button>`);
+          actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenParticipants(${c.id},'${c.slug}')">🔐 Gestion des accès</button>`);
         }
         if (c.statut !== 'brouillon') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenContributions(${c.id})">📊 Contributions</button>`);
@@ -4635,8 +4635,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
        à l'ajout de l'e-mail ci-dessous — ce lien seul ne suffit pas pour une cagnotte privée. */
     const lien = `${location.origin}/cagnotte.html?slug=${encodeURIComponent(slug)}`;
     modal.innerHTML = `<div class="modal-box" style="max-width:440px;text-align:left;">
-      <h3 style="margin:0 0 4px;">👥 Participants autorisés</h3>
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Seules ces personnes peuvent consulter cette cagnotte privée.</p>
+      <h3 style="margin:0 0 4px;">🔐 Gestion des accès</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Seules les personnes autorisées ci-dessous peuvent consulter cette cagnotte privée — y compris celles qui ont fait une demande d'accès directement depuis la page.</p>
       <label style="font-size:11.5px;font-weight:700;color:var(--muted);">🔎 Rechercher un compte Diaspo'Actif existant par nom</label>
       <input id="cag-part-recherche" type="text" placeholder="Nom, prénom…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin:4px 0 6px;" oninput="cagRechercherParticipant(${id},this.value)">
       <div id="cag-part-recherche-resultats" style="margin-bottom:10px;"></div>
@@ -4664,18 +4664,51 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     </div>`;
     cagRenderParticipants(id);
   };
+  /* Libellés de statut affichés dans le tableau "Gestion des accès" (cahier des charges
+     "Demander l'accès", 2026-09-01, point 16) — une seule liste couvre désormais les accès
+     accordés directement par le créateur ET les demandes venues du public. */
+  const CAG_ACCES_STATUT_LABELS = {
+    approved: { label: '✅ Autorisé', couleur: '#16a34a' },
+    pending:  { label: '⏳ En attente', couleur: '#b45309' },
+    rejected: { label: '❌ Refusé', couleur: '#dc2626' },
+    revoked:  { label: '🚫 Retiré', couleur: '#6b7280' },
+  };
   async function cagRenderParticipants(id) {
     const wrap = document.getElementById('cag-part-liste');
     if (!wrap) return;
     try {
       const { participants } = await api('GET', '/cagnottes/'+id+'/participants');
-      wrap.innerHTML = participants.length ? participants.map(p => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
-          <span>${escH(p.user_nom || p.email)}${p.user_nom ? ` <span style="color:var(--muted);">(${escH(p.email)})</span>` : ''}</span>
-          <button class="btn btn-sm" style="color:#dc2626;padding:2px 8px;" onclick="cagRetirerParticipant(${id},${p.id})">Retirer</button>
-        </div>`).join('') : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:14px 0;">Aucun participant autorisé pour l'instant.</p>`;
+      wrap.innerHTML = participants.length ? participants.map(p => {
+        const st = CAG_ACCES_STATUT_LABELS[p.statut] || CAG_ACCES_STATUT_LABELS.approved;
+        const nomAffiche = p.user_nom || p.demande_nom || p.email;
+        let actions;
+        if (p.statut === 'pending') {
+          actions = `<button class="btn btn-sm btn-orange" style="padding:2px 8px;" onclick="cagApprouverDemande(${id},${p.id})">Accepter</button>
+            <button class="btn btn-sm" style="color:#dc2626;padding:2px 8px;" onclick="cagRefuserDemande(${id},${p.id})">Refuser</button>`;
+        } else if (p.statut === 'approved') {
+          actions = `<button class="btn btn-sm" style="color:#dc2626;padding:2px 8px;" onclick="cagRetirerParticipant(${id},${p.id})">Retirer</button>`;
+        } else {
+          actions = '';
+        }
+        return `
+        <div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span>${escH(nomAffiche)}${nomAffiche !== p.email ? ` <span style="color:var(--muted);">(${escH(p.email)})</span>` : ''} — <span style="color:${st.couleur};font-weight:700;">${st.label}</span>${p.user_id ? '' : ' <span style="color:var(--muted);font-size:11px;">· sans compte Diaspo\'Actif</span>'}</span>
+            <span style="display:flex;gap:6px;">${actions}</span>
+          </div>
+          ${p.message ? `<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">💬 « ${escH(p.message)} »</div>` : ''}
+        </div>`;
+      }).join('') : `<p style="color:var(--muted);font-size:13px;text-align:center;padding:14px 0;">Aucun accès pour l'instant.</p>`;
     } catch(e) { wrap.innerHTML = `<p style="color:#dc2626;font-size:13px;">Erreur de chargement.</p>`; }
   }
+  window.cagApprouverDemande = async function(id, pid) {
+    try { await api('POST', '/cagnottes/'+id+'/participants/'+pid+'/approuver'); cagRenderParticipants(id); }
+    catch(e) { alert('Erreur : '+e.message); }
+  };
+  window.cagRefuserDemande = async function(id, pid) {
+    try { await api('POST', '/cagnottes/'+id+'/participants/'+pid+'/refuser'); cagRenderParticipants(id); }
+    catch(e) { alert('Erreur : '+e.message); }
+  };
   /* Vérification de l'e-mail saisi manuellement (demande explicite du 2026-08-30) : réutilise
      GET /api/cagnottes/verifier-email, déjà en place pour "Inviter par e-mail" — ne renvoie
      volontairement qu'un booléen (jamais le nom/la photo du compte), c'est structurellement un
