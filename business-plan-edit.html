@@ -785,6 +785,32 @@ const HELP = {
   'concurrent_positionnement':"Ce concurrent se positionne-t-il plutôt sur les prix bas, le milieu de gamme, ou le haut de gamme ?",
   'concurrent_parts_marche':"Une estimation de la place que ce concurrent occupe sur le marché total (en %).",
   'concurrent_menace':"À quel point ce concurrent représente un danger réel pour votre projet, de 0 (aucun risque) à 100 (menace majeure).",
+  // Matrice BCG (produits)
+  'produit_bcg':"Vedette : produit en croissance qui gagne des parts de marché. Vache à lait : mature, rentable, sans gros investissement. Dilemme : marché porteur mais votre position y est encore faible. Poids mort : ni croissance ni rentabilité — à questionner.",
+  // SWOT — plan d'action
+  'swot_action_forces':"Concrètement, que faites-vous pour capitaliser sur vos points forts plutôt que de les laisser inexploités ?",
+  'swot_action_faiblesses':"Les actions prévues pour combler vos manques avant qu'une menace externe ne les transforme en vrai problème.",
+  'swot_action_opportunites':"Ce que vous comptez entreprendre en premier pour saisir les opportunités identifiées.",
+  'swot_facteurs_cles':"Les 2 ou 3 conditions sans lesquelles le projet ne peut pas réussir — ce sur quoi vous ne pouvez pas vous permettre d'échouer.",
+  // Persona Canvas
+  'persona_traits':"Le tempérament du client type : prudent, impulsif, technophile, fidèle à ses habitudes… ce qui influence sa façon de décider.",
+  'persona_canaux':"Où ce client passe du temps et comment il préfère être contacté : réseaux sociaux, recherche web, bouche-à-oreille, en magasin…",
+  'persona_interets':"Ce qu'il consulte avant de se décider : avis en ligne, comparateurs, réseau de connaissances, presse spécialisée…",
+  'persona_frustrations':"Ce qui l'agace ou le bloque aujourd'hui avec les solutions existantes sur ce besoin.",
+  'persona_motivations':"La raison profonde qui le pousse à agir — souvent différente du besoin qu'il exprime au premier abord.",
+  'persona_citations':"Une phrase entendue telle quelle d'un client ou prospect réel — plus convaincant qu'une reformulation.",
+  'persona_objections':"Ce qui le fait hésiter ou renoncer au dernier moment : prix, confiance, complexité, timing…",
+  // Matrice PESTEL
+  'pestel_politique':"Régulations, fiscalité, subventions, politique économique susceptibles d'affecter votre activité.",
+  'pestel_economique':"Contexte économique général : croissance, inflation, pouvoir d'achat, cycle du marché.",
+  'pestel_social':"Évolutions démographiques, habitudes de consommation, mode de vie de votre clientèle.",
+  'pestel_technologique':"Innovations ou évolutions technologiques qui peuvent créer une opportunité ou rendre votre offre obsolète.",
+  'pestel_environnemental':"Enjeux climatiques, réglementation environnementale, attentes écologiques des clients.",
+  'pestel_legal':"Lois, normes, certifications ou obligations de sécurité propres à votre secteur.",
+  // Matrice CAP-SONCAS
+  'soncas_caracteristique':"Un élément concret de votre offre qui répond à cette motivation d'achat précise.",
+  'soncas_avantage':"Ce que cette caractéristique apporte concrètement au client — traduite en bénéfice, pas en fonctionnalité.",
+  'soncas_preuve':"Ce qui rend l'avantage crédible : certification, chiffre vérifiable, témoignage, garantie…",
   // Partenaires potentiels
   'partenaire_nom':"Le nom de la structure ou personne qui pourrait vous soutenir, financer ou collaborer avec vous.",
   'partenaire_type':"La nature de ce partenaire : institution publique, entreprise privée, banque, ONG, investisseur, association...",
@@ -1805,6 +1831,22 @@ function renderMarche() {
       ${textarea('besoins_clients','Besoins des clients','Ce qu\'ils recherchent vraiment…',3,true)}
       ${field('localisation_clients','Localisation géographique des clients','')}
     </div></div>
+    <!-- Persona Canvas (2026-08-31) : approfondit "Profil type du client" (déjà existant,
+         conservé tel quel) par les dimensions que ce champ seul ne capture pas -- traits de
+         personnalité, canaux de contact, frustrations, motivations, citations, objections.
+         Outil marketing standard, pas un doublon du profil texte libre. -->
+    <div class="bp-card-inner bp-niveau-2"><h3>🧑‍🤝‍🧑 Persona — portrait du client idéal</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Le profil type ci-dessus dit QUI est le client ; ce portrait dit COMMENT il pense, ce qui le freine et ce qui le convainc.</p>
+      <div class="fg">
+        ${textarea('persona_traits','Traits de personnalité','Prudent, pressé, technophile, fidèle à ses habitudes…',2,true)}
+        ${textarea('persona_canaux','Points de contact & canaux préférés','Où le trouve-t-on ? Réseaux sociaux, bouche-à-oreille, recherche web, magasin…',2,true)}
+        ${textarea('persona_interets','Centres d\'intérêt & sources d\'information','Ce qu\'il lit, suit, consulte avant de décider…',2,true)}
+        ${textarea('persona_frustrations','Frustrations, obstacles, besoins non satisfaits','Ce qui l\'agace aujourd\'hui avec les solutions existantes…',2,true)}
+        ${textarea('persona_motivations','Motivations profondes','Ce qui le pousse vraiment à agir, au-delà du besoin affiché…',2,true)}
+        ${textarea('persona_citations','Citations ou verbatims de clients','Une phrase entendue telle quelle, si vous en avez une…',2,true)}
+        ${textarea('persona_objections','Objections et freins à l\'achat','Ce qui le fait hésiter ou renoncer…',2,true)}
+      </div>
+    </div>
     <div class="bp-card-inner bp-niveau-2">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;">👥 Segments de clientèle (détail quantitatif)</h3>
@@ -1826,6 +1868,20 @@ function renderMarche() {
       ${textarea('positionnement','Positionnement','Comment vous positionnez-vous ?',3,true)}
       ${textarea('avantage_concurrentiel','Avantage concurrentiel','Ce qui vous donne un avantage durable…',3,true)}
     </div></div>
+    <!-- Matrice PESTEL (2026-08-31) : les 6 familles de facteurs macro-environnementaux,
+         complémentaire du SWOT (qui reste centré projet/marché immédiat) -- outil standard
+         des dossiers de création d'entreprise, absent jusqu'ici du module. -->
+    <div class="bp-card-inner bp-niveau-2"><h3>🌐 Matrice PESTEL — environnement macro-économique</h3>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Opportunités et menaces qui dépassent votre marché immédiat, par famille de facteurs.</p>
+      <div class="fg">
+        ${textarea('pestel_politique','Politique','Régulation, fiscalité, politique économique, lobbying…',2,true)}
+        ${textarea('pestel_economique','Économique','Croissance, inflation, cycle du marché, pouvoir d\'achat…',2,true)}
+        ${textarea('pestel_social','Social','Habitudes d\'achat, démographie, mode de vie…',2,true)}
+        ${textarea('pestel_technologique','Technologique','Innovations, tendances technologiques, R&D…',2,true)}
+        ${textarea('pestel_environnemental','Environnemental','Météo, climat, recyclage, politiques environnementales…',2,true)}
+        ${textarea('pestel_legal','Légal','Lois, réglementation, droit, sécurité, certifications…',2,true)}
+      </div>
+    </div>
   </div>`;
 }
 function renderSegmentsClients(list) {
@@ -2031,6 +2087,17 @@ function renderSWOT() {
           <textarea data-swot="menaces" placeholder="Risques externes, concurrence, réglementation…" ${ro?'readonly':''} oninput="updateSwot('menaces',this.value)">${esc(s.menaces||'')}</textarea></div>
       </div>
     </div>
+    <!-- Prolongement du SWOT en plan d'action (2026-08-31) : la matrice seule dit "quoi",
+         ce bloc dit "et donc on fait quoi" -- consolider/réduire/exploiter, comme dans les
+         dossiers de création d'entreprise classiques. -->
+    <div class="bp-card-inner bp-niveau-2"><h3>Du diagnostic au plan d'action</h3>
+      <div class="fg">
+        ${textarea('swot_action_forces','Comment consolider mes forces ?','Ex. investir dans ce qui marche déjà, en faire un argument commercial…')}
+        ${textarea('swot_action_faiblesses','Comment réduire mes faiblesses et me sécuriser face aux menaces ?','Ex. formation, recrutement, partenariat pour combler un manque…')}
+        ${textarea('swot_action_opportunites','Comment me développer sur les opportunités ?','Ex. nouvelle offre, nouveau marché à saisir en premier…')}
+        ${textarea('swot_facteurs_cles','Facteurs clés de succès du projet','Ce qui doit absolument fonctionner pour que le projet réussisse')}
+      </div>
+    </div>
   </div>`;
 }
 function updateSwot(key,val) {
@@ -2178,6 +2245,7 @@ function renderProduits() {
             <th style="min-width:100px;">Prix de vente${helpIcon('produit_prix')}</th>
             <th style="min-width:80px;">Marge %</th>
             <th style="min-width:120px;">Cycle de vie${helpIcon('produit_cycle')}</th>
+            <th style="min-width:130px;">Matrice BCG${helpIcon('produit_bcg')}</th>
             <th>Action</th>
           </tr></thead>
           <tbody id="produits-tbody">${renderProduitRows(items)}</tbody>
@@ -2272,6 +2340,13 @@ function renderProduitRows(items) {
       <td><input type="number" value="${esc(it.prix_vente||'')}" placeholder="0" oninput="updProduit(${i},'prix_vente',this.value);calcMarge(${i})"></td>
       <td><input id="marge-${i}" value="${esc(it.marge||'')}" readonly style="background:var(--surface2);color:#2563EB;font-weight:700;">%</td>
       <td><input value="${esc(it.cycle||'')}" placeholder="Ex : 3 ans" oninput="updProduit(${i},'cycle',this.value)"></td>
+      <td><select onchange="updProduit(${i},'bcg_quadrant',this.value)">
+        <option value="" ${!it.bcg_quadrant?'selected':''}>— Non classé —</option>
+        <option value="vedette" ${it.bcg_quadrant==='vedette'?'selected':''}>⭐ Vedette</option>
+        <option value="dilemme" ${it.bcg_quadrant==='dilemme'?'selected':''}>❓ Dilemme</option>
+        <option value="vache_lait" ${it.bcg_quadrant==='vache_lait'?'selected':''}>🐄 Vache à lait</option>
+        <option value="poids_mort" ${it.bcg_quadrant==='poids_mort'?'selected':''}>⚓ Poids mort</option>
+      </select></td>
       <td style="text-align:center;"><button onclick="delProduit(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">🗑</button></td>
     </tr>`).join('');
 }
@@ -2473,7 +2548,60 @@ function renderCommercial() {
       ${textarea('premiers_10_clients','Comment comptez-vous obtenir vos 10 premiers clients ?','',3,true)}
       ${textarea('premiers_100_clients','Comment comptez-vous obtenir vos 100 premiers clients ?','',3,true)}
     </div></div>
+    <!-- Matrice CAP-SONCAS (2026-08-31) : argumentaire commercial structuré par motivation
+         d'achat -- 6 catégories fixes (le client choisit lesquelles remplir), chacune avec
+         caractéristique/avantage/preuve. Outil de formation commerciale classique, absent
+         jusqu'ici du module. -->
+    <div class="bp-card-inner bp-niveau-3">
+      <div style="margin-bottom:12px;">
+        <h3 style="margin:0;">🗣️ Matrice CAP-SONCAS — argumentaire commercial</h3>
+        <p style="font-size:12.5px;color:var(--muted);margin:4px 0 0;">Pour chaque motivation d'achat pertinente : la caractéristique de votre offre, l'avantage client qui en découle, et la preuve qui rend l'argument crédible.</p>
+      </div>
+      <div id="cap-soncas-list">${renderCapSoncas(sections.plan_commercial?.cap_soncas || [])}</div>
+    </div>
   </div>`;
+}
+const CAP_SONCAS_LABELS = { securite:'🛡️ Sécurité', orgueil:'👑 Orgueil', nouveaute:'✨ Nouveauté', confort:'🛋️ Confort', argent:'💰 Argent', sympathie:'🤝 Sympathie' };
+function renderCapSoncas(list) {
+  const used = list.map(x=>x.motivation);
+  const restants = Object.keys(CAP_SONCAS_LABELS).filter(k=>!used.includes(k));
+  return list.map((c,i) => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <select style="font-weight:700;font-size:13px;" onchange="updCapSoncas(${i},'motivation',this.value)">
+          ${Object.entries(CAP_SONCAS_LABELS).map(([v,l])=>`<option value="${v}" ${c.motivation===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        <button onclick="removeCapSoncas(${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <div class="fg">
+        <div class="full"><label>Caractéristique de votre offre${helpIcon('soncas_caracteristique')}</label><input value="${esc(c.caracteristiques||'')}" oninput="updCapSoncas(${i},'caracteristiques',this.value)"></div>
+        <div class="full"><label>Avantage pour le client${helpIcon('soncas_avantage')}</label><input value="${esc(c.avantages||'')}" oninput="updCapSoncas(${i},'avantages',this.value)"></div>
+        <div class="full"><label>Preuve${helpIcon('soncas_preuve')}</label><input value="${esc(c.preuves||'')}" oninput="updCapSoncas(${i},'preuves',this.value)"></div>
+      </div>
+    </div>`).join('') +
+    (restants.length ? `<button class="btn btn-outline btn-sm" onclick="addCapSoncas()">+ Ajouter une motivation (${restants.length} restante${restants.length>1?'s':''})</button>` : '');
+}
+function addCapSoncas() {
+  if (!sections.plan_commercial) sections.plan_commercial={};
+  if (!sections.plan_commercial.cap_soncas) sections.plan_commercial.cap_soncas=[];
+  const used = sections.plan_commercial.cap_soncas.map(x=>x.motivation);
+  const next = Object.keys(CAP_SONCAS_LABELS).find(k=>!used.includes(k));
+  if (!next) return;
+  sections.plan_commercial.cap_soncas.push({motivation:next,caracteristiques:'',avantages:'',preuves:''});
+  document.getElementById('cap-soncas-list').innerHTML = renderCapSoncas(sections.plan_commercial.cap_soncas);
+  markDirty();
+}
+function removeCapSoncas(i) {
+  sections.plan_commercial.cap_soncas.splice(i,1);
+  document.getElementById('cap-soncas-list').innerHTML = renderCapSoncas(sections.plan_commercial.cap_soncas);
+  markDirty();
+}
+function updCapSoncas(i,key,val) {
+  if (!sections.plan_commercial) sections.plan_commercial={};
+  if (!sections.plan_commercial.cap_soncas) sections.plan_commercial.cap_soncas=[];
+  if (!sections.plan_commercial.cap_soncas[i]) sections.plan_commercial.cap_soncas[i]={};
+  sections.plan_commercial.cap_soncas[i][key]=val;
+  markDirty();
 }
 /* "Taux de conversion à chaque étape" (2026-08-31, point 12 du cahier des charges) --
    demandé explicitement mais absent : les 5 nombres du funnel existaient déjà, sans jamais

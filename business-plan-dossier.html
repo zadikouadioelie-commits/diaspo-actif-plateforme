@@ -429,17 +429,109 @@ function pageSWOT(bp){
     ['menaces','Menaces','#4B5160','rgba(75,81,96,.09)'],
   ];
   if (!quads.some(([k]) => has(sw[k]))) return '';
+  const actions = [['swot_action_forces','Consolider les forces'],['swot_action_faiblesses','Réduire les faiblesses'],['swot_action_opportunites','Exploiter les opportunités'],['swot_facteurs_cles','Facteurs clés de succès']].filter(([k])=>has(sw[k]));
   return page('swot','',`
     ${chromeTop(bp,'SWOT')}
     <p class="eyebrow-tag">Analyse SWOT</p>
     <h2 class="pg-title">Forces, faiblesses, opportunités, menaces</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;flex:1;min-height:0;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;height:280px;">
       ${quads.map(([k,label,color,bg]) => `
-        <div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:16px;">
+        <div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:16px;overflow:hidden;">
           <p style="font-family:var(--dp-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:${color};font-weight:700;margin:0 0 8px;">${label}</p>
           <p style="font-size:11.5px;line-height:1.55;margin:0;color:var(--dp-ink);white-space:pre-wrap;">${has(sw[k])?esc(sw[k]):'—'}</p>
         </div>`).join('')}
     </div>
+    ${actions.length ? `<p class="block-title">Du diagnostic au plan d'action</p><div class="field-grid">${actions.map(([k,l])=>`<div class="field"><p class="fl">${esc(l)}</p><p class="fv">${esc(sw[k])}</p></div>`).join('')}</div>` : ''}
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : PESTEL ---- */
+function pagePESTEL(bp){
+  const m = (bp.sections||{}).marche || {};
+  const cells = [
+    ['pestel_politique','Politique','#0D2B4E'],['pestel_economique','Économique','#F26422'],
+    ['pestel_social','Social','#1E4F8A'],['pestel_technologique','Technologique','#1A7A52'],
+    ['pestel_environnemental','Environnemental','#1A7A52'],['pestel_legal','Légal','#4B5160'],
+  ];
+  if (!cells.some(([k])=>has(m[k]))) return '';
+  return page('pestel','',`
+    ${chromeTop(bp,'PESTEL')}
+    <p class="eyebrow-tag">Environnement macro-économique</p>
+    <h2 class="pg-title">Matrice PESTEL</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:10px;">
+      ${cells.map(([k,label,color])=>`
+        <div style="background:rgba(13,43,78,.03);border:1px solid var(--dp-line);border-left:2px solid ${color};border-radius:2px;padding:12px 14px;">
+          <p style="font-family:var(--dp-mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:${color};font-weight:700;margin:0 0 6px;">${label}</p>
+          <p style="font-size:10.5px;line-height:1.5;margin:0;color:var(--dp-ink);white-space:pre-wrap;">${has(m[k])?esc(m[k]):'—'}</p>
+        </div>`).join('')}
+    </div>
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : Persona ---- */
+function pagePersona(bp){
+  const m = (bp.sections||{}).marche || {};
+  const blocks = [
+    ['persona_traits','Traits de personnalité'],['persona_canaux','Points de contact & canaux'],
+    ['persona_interets','Centres d\'intérêt'],['persona_frustrations','Frustrations & obstacles'],
+    ['persona_motivations','Motivations profondes'],['persona_objections','Objections & freins'],
+  ].filter(([k])=>has(m[k]));
+  if (!blocks.length && !has(m.persona_citations)) return '';
+  return page('persona','',`
+    ${chromeTop(bp,'Persona')}
+    <p class="eyebrow-tag">Focus client idéal</p>
+    <h2 class="pg-title">${has(m.profil_client)?esc(m.profil_client.slice(0,70)):'Portrait du client idéal'}</h2>
+    <div class="card-grid">
+      ${blocks.map(([k,l])=>`<div class="kpi"><p class="kl" style="margin-bottom:6px;">${esc(l)}</p><p style="font-size:11px;line-height:1.5;margin:0;color:var(--dp-ink);">${esc(m[k])}</p></div>`).join('')}
+    </div>
+    ${has(m.persona_citations) ? `<p class="block-title">« Dans leurs mots »</p><p style="font-size:12px;font-style:italic;line-height:1.6;color:var(--dp-ink-soft);margin:0;">${esc(m.persona_citations)}</p>` : ''}
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : Matrice BCG ---- */
+function pageBCG(bp){
+  const items = (((bp.sections||{}).produits||{}).items||[]).filter(i=>has(i.nom)&&has(i.bcg_quadrant));
+  if (!items.length) return '';
+  const quads = [
+    ['vedette','⭐ Vedettes','Forte croissance, forte part de marché','#1A7A52','rgba(26,122,82,.07)'],
+    ['dilemme','❓ Dilemmes','Forte croissance, faible part de marché','#F26422','rgba(242,100,34,.07)'],
+    ['vache_lait','🐄 Vaches à lait','Faible croissance, forte part de marché','#1E4F8A','rgba(30,79,138,.07)'],
+    ['poids_mort','⚓ Poids morts','Faible croissance, faible part de marché','#4B5160','rgba(75,81,96,.09)'],
+  ];
+  return page('bcg','',`
+    ${chromeTop(bp,'Matrice BCG')}
+    <p class="eyebrow-tag">Portefeuille de produits &amp; services</p>
+    <h2 class="pg-title">Matrice BCG</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;height:280px;margin-bottom:10px;">
+      ${quads.map(([k,label,sub,color,bg])=>{
+        const list = items.filter(i=>i.bcg_quadrant===k);
+        return `<div style="background:${bg};border:1px solid ${color}33;border-radius:4px;padding:14px;overflow:hidden;">
+          <p style="font-family:var(--dp-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:${color};font-weight:700;margin:0 0 3px;">${label}</p>
+          <p style="font-size:8.5px;color:var(--dp-ink-soft);margin:0 0 8px;">${sub}</p>
+          ${list.length ? `<ul style="margin:0;padding-left:16px;font-size:11px;line-height:1.6;color:var(--dp-ink);">${list.map(i=>`<li>${esc(i.nom)}</li>`).join('')}</ul>` : `<p style="font-size:10px;color:var(--dp-ink-soft);margin:0;">—</p>`}
+        </div>`;
+      }).join('')}
+    </div>
+    <p style="font-size:9.5px;color:var(--dp-ink-soft);margin:0;">Axes : taux de croissance du marché (vertical) × part de marché relative (horizontal).</p>
+    ${chromeBottom()}
+  `);
+}
+
+/* ---- Page : CAP-SONCAS ---- */
+function pageCapSoncas(bp){
+  const list = ((bp.sections||{}).plan_commercial?.cap_soncas||[]).filter(c=>has(c.motivation)&&(has(c.caracteristiques)||has(c.avantages)||has(c.preuves)));
+  if (!list.length) return '';
+  const LABELS = { securite:'🛡️ Sécurité', orgueil:'👑 Orgueil', nouveaute:'✨ Nouveauté', confort:'🛋️ Confort', argent:'💰 Argent', sympathie:'🤝 Sympathie' };
+  return page('capsoncas','',`
+    ${chromeTop(bp,'CAP-SONCAS')}
+    <p class="eyebrow-tag">Argumentaire commercial</p>
+    <h2 class="pg-title">Matrice CAP-SONCAS</h2>
+    <table class="doc-table"><thead><tr><th style="text-align:left;">Motivation</th><th style="text-align:left;">Caractéristique</th><th style="text-align:left;">Avantage client</th><th style="text-align:left;">Preuve</th></tr></thead><tbody>
+      ${list.map(c=>`<tr><td>${esc(LABELS[c.motivation]||c.motivation)}</td><td style="text-align:left;">${esc(c.caracteristiques||'—')}</td><td style="text-align:left;">${esc(c.avantages||'—')}</td><td style="text-align:left;">${esc(c.preuves||'—')}</td></tr>`).join('')}
+    </tbody></table>
     ${chromeBottom()}
   `);
 }
@@ -746,9 +838,14 @@ function renderDossier(bp, tplKey){
     generic(bp,'probleme'), generic(bp,'solution'),
     { id:'traction', label:'Traction', html: pageTraction(bp) },
     { id:'marche', label:'Marché', html: pageMarche(bp) },
+    { id:'pestel', label:'Matrice PESTEL', html: pagePESTEL(bp) },
+    { id:'persona', label:'Persona', html: pagePersona(bp) },
     { id:'swot', label:'Analyse SWOT', html: pageSWOT(bp) },
     { id:'bmc', label:'Business Model', html: pageBMC(bp) },
-    generic(bp,'produits'), generic(bp,'strategie_marketing'), generic(bp,'plan_commercial'),
+    generic(bp,'produits'),
+    { id:'bcg', label:'Matrice BCG', html: pageBCG(bp) },
+    generic(bp,'strategie_marketing'), generic(bp,'plan_commercial'),
+    { id:'capsoncas', label:'CAP-SONCAS', html: pageCapSoncas(bp) },
     generic(bp,'plan_operationnel'), generic(bp,'organisation'), generic(bp,'rh'), generic(bp,'calendrier'),
     { id:'finances', label:'Plan financier', html: pageFinances(bp) },
     { id:'risques', label:'Analyse des risques', html: pageRisques(bp) },
@@ -982,6 +1079,45 @@ async function generatePPTX(){
           slide.addShape(R, { x, y, w:cw, h:ch, fill:{color:C.paper}, line:{color, width:1.5} });
           slide.addText(label.toUpperCase(), { x:x+0.18, y:y+0.14, w:cw-0.36, h:0.3, fontFace:FB, fontSize:9, bold:true, color, charSpacing:0.8 });
           slide.addText(has(val)?String(val):'—', { x:x+0.18, y:y+0.5, w:cw-0.36, h:ch-0.65, fontFace:FB, fontSize:10.5, color:C.ink, valign:'top' });
+        });
+      }
+    }
+
+    /* ---------- Matrice BCG ---------- */
+    {
+      const items = (s.produits?.items||[]).filter(i=>has(i.nom)&&has(i.bcg_quadrant));
+      if (items.length) {
+        const quads = [['vedette','Vedettes',C.green],['dilemme','Dilemmes',C.orange],['vache_lait','Vaches à lait',C.blue],['poids_mort','Poids morts',C.soft]];
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'Matrice BCG');
+        title(slide, 'Portefeuille de produits & services', { fontSize:22, h:0.7, y:1.0 });
+        const gap=0.18, cw=(W-MX*2-gap)/2, ch=2.4, y0=1.85;
+        quads.forEach(([key,label,color],i) => {
+          const col=i%2, row=Math.floor(i/2);
+          const x=MX+col*(cw+gap), y=y0+row*(ch+gap);
+          const list = items.filter(it=>it.bcg_quadrant===key);
+          slide.addShape(R, { x, y, w:cw, h:ch, fill:{color:C.paper}, line:{color, width:1.5} });
+          slide.addText(label.toUpperCase(), { x:x+0.18, y:y+0.14, w:cw-0.36, h:0.3, fontFace:FB, fontSize:9, bold:true, color, charSpacing:0.8 });
+          slide.addText(list.length ? list.map(it=>({text:'• '+it.nom+'\n', options:{breakLine:false}})) : [{text:'—',options:{}}], { x:x+0.18, y:y+0.5, w:cw-0.36, h:ch-0.65, fontFace:FB, fontSize:10.5, color:C.ink, valign:'top' });
+        });
+      }
+    }
+
+    /* ---------- Matrice PESTEL ---------- */
+    {
+      const m = s.marche||{};
+      const cells = [['pestel_politique','Politique'],['pestel_economique','Économique'],['pestel_social','Social'],['pestel_technologique','Technologique'],['pestel_environnemental','Environnemental'],['pestel_legal','Légal']];
+      if (cells.some(([k])=>has(m[k]))) {
+        const slide = pres.addSlide(); slide.background = { color: C.white };
+        chrome(slide, 'PESTEL');
+        title(slide, 'Environnement macro-économique', { fontSize:22, h:0.7, y:1.0 });
+        const cols=3, gap=0.18, cw=(W-MX*2-gap*(cols-1))/cols, ch=2.4, y0=1.85;
+        cells.forEach(([key,label],i) => {
+          const col=i%cols, row=Math.floor(i/cols);
+          const x=MX+col*(cw+gap), y=y0+row*(ch+gap);
+          slide.addShape(R, { x, y, w:cw, h:ch, fill:{color:C.paper}, line:{color:C.line, width:0.75} });
+          slide.addText(label.toUpperCase(), { x:x+0.15, y:y+0.12, w:cw-0.3, h:0.3, fontFace:FB, fontSize:8.5, bold:true, color:C.orange, charSpacing:0.5 });
+          slide.addText(has(m[key])?String(m[key]):'—', { x:x+0.15, y:y+0.44, w:cw-0.3, h:ch-0.56, fontFace:FB, fontSize:9, color:C.ink, valign:'top' });
         });
       }
     }

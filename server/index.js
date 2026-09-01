@@ -36823,8 +36823,11 @@ const BP_FIELD_LABELS = {
   probleme: { description:"Description du problème", pourquoi:"Pourquoi ce problème existe", qui_concerne:"Qui est concerné", ampleur:"Ampleur du problème", consequences:"Conséquences", pourquoi_pas_resolu:"Pourquoi non résolu", preuves:"Preuves & sources" },
   solution: { description:"Description de la solution", fonctionnement:"Fonctionnement", innovation:"Innovation", avantages:"Avantages client", valeur_ajoutee:"Valeur ajoutée", differenciants:"Éléments différenciants" },
   marche: { taille_marche:"Taille du marché", evolution:"Évolution du marché", potentiel:"Potentiel pour le projet", tendances:"Tendances du marché", profil_client:"Profil client", segmentation:"Segmentation", besoins_clients:"Besoins des clients", localisation_clients:"Localisation des clients", opportunites:"Opportunités de marché", menaces_marche:"Menaces du marché", positionnement:"Positionnement", avantage_concurrentiel:"Avantage concurrentiel", barrieres_entree:"Barrières à l'entrée", reglementation:"Réglementation applicable",
-    tam:"TAM (marché total adressable)", sam:"SAM (marché accessible)", som:"SOM (marché réellement visé)", saisonnalite:"Saisonnalité", facteurs_croissance:"Facteurs de croissance", facteurs_baisse:"Facteurs de baisse", dependance_economique:"Dépendance économique", dependance_reglementaire:"Dépendance réglementaire" },
-  swot: { forces:"Forces (SWOT)", faiblesses:"Faiblesses (SWOT)", opportunites:"Opportunités (SWOT)", menaces:"Menaces (SWOT)" },
+    tam:"TAM (marché total adressable)", sam:"SAM (marché accessible)", som:"SOM (marché réellement visé)", saisonnalite:"Saisonnalité", facteurs_croissance:"Facteurs de croissance", facteurs_baisse:"Facteurs de baisse", dependance_economique:"Dépendance économique", dependance_reglementaire:"Dépendance réglementaire",
+    persona_traits:"Traits de personnalité (persona)", persona_canaux:"Points de contact & canaux (persona)", persona_interets:"Centres d'intérêt (persona)", persona_frustrations:"Frustrations (persona)", persona_motivations:"Motivations profondes (persona)", persona_citations:"Citations clients (persona)", persona_objections:"Objections & freins (persona)",
+    pestel_politique:"Politique (PESTEL)", pestel_economique:"Économique (PESTEL)", pestel_social:"Social (PESTEL)", pestel_technologique:"Technologique (PESTEL)", pestel_environnemental:"Environnemental (PESTEL)", pestel_legal:"Légal (PESTEL)" },
+  swot: { forces:"Forces (SWOT)", faiblesses:"Faiblesses (SWOT)", opportunites:"Opportunités (SWOT)", menaces:"Menaces (SWOT)",
+    swot_action_forces:"Comment consolider les forces", swot_action_faiblesses:"Comment réduire les faiblesses", swot_action_opportunites:"Comment exploiter les opportunités", swot_facteurs_cles:"Facteurs clés de succès" },
   business_model: { partenaires:"Partenaires clés", activites:"Activités clés", proposition:"Proposition de valeur", relations:"Relations clients", segments:"Segments de clientèle", ressources:"Ressources clés", canaux:"Canaux", couts:"Structure des coûts", revenus:"Sources de revenus",
     prix_moyen:"Prix moyen", cout_variable_client:"Coût variable par client", marge_brute_pct:"Marge brute", cac:"CAC", taux_conversion_ue:"Taux de conversion", taux_retention:"Taux de rétention", taux_churn_ue:"Taux de churn", frequence_achat_ue:"Fréquence d'achat", duree_moyenne_relation:"Durée moyenne de relation", nb_moyen_achats:"Nombre moyen d'achats", ltv:"Valeur vie client (LTV)", delai_rentabilisation:"Délai de rentabilisation d'un client" },
   strategie_marketing: { identite_marque:"Identité de marque", strategie_digitale:"Stratégie digitale", communication:"Plan de communication", publicite:"Publicité", partenariats:"Partenariats & co-marketing", evenements:"Événements", fidelisation:"Fidélisation",
@@ -36865,7 +36868,7 @@ function bpFieldLabel(sectionKey, fieldKey) {
   if (m) {
     const [, base, idx, sub] = m;
     const n = Number(idx) + 1;
-    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit', immobilisations_liste:'Immobilisation', dettes:'Emprunt', charges_detaillees:'Charge', utilisation_postes:'Poste', campagnes:'Campagne', postes:'Poste', indicateurs:'Indicateur' };
+    const baseLabels = { concurrents:'Concurrent', partenaires_liste:'Partenaire', etude_prix:'Étude de prix', items:'Élément', phases:'Phase', membres_equipe:'Membre', segments_clients:'Segment', capacite_exploitation:'Produit', immobilisations_liste:'Immobilisation', dettes:'Emprunt', charges_detaillees:'Charge', utilisation_postes:'Poste', campagnes:'Campagne', postes:'Poste', indicateurs:'Indicateur', cap_soncas:'Motivation SONCAS' };
     const subLabels = {
       nom:'Nom', type:'Type', pays:'Pays', localisation:'Localisation', secteur:'Secteur', role:'Rôle',
       niveau:'Niveau', contact:'Contact', interet:'Intérêt estimé', commentaire:'Commentaire',
@@ -36902,6 +36905,8 @@ function bpFieldLabel(sectionKey, fieldKey) {
       situation_initiale:'Situation initiale', valeur_actuelle:'Valeur actuelle', valeur_cible:'Valeur cible', methode_mesure:'Méthode de mesure', frequence_mesure:'Fréquence de mesure',
       responsable:'Responsable', cout_potentiel:'Coût potentiel', indicateur_alerte:"Indicateur d'alerte", risque_residuel:'Risque résiduel',
       budget:'Budget', dependances:'Dépendances', kpi:'KPI', livrable:'Livrable', risque_associe:'Risque associé',
+      motivation:'Motivation', caracteristiques:'Caractéristique', avantages:'Avantage client', preuves:'Preuve',
+      bcg_quadrant:'Matrice BCG',
     };
     const baseLabel = baseLabels[base] || base.replace(/_/g,' ');
     const subLabel = subLabels[sub] || sub.replace(/_/g,' ');
