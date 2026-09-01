@@ -164,6 +164,25 @@ test('detecterIncoherences', async (t) => {
     assert.ok(alertes.some(a => a.titre.includes('inférieur au besoin identifié')));
   });
 
+  await t.test('ne signale rien quand le financement recherché + l\'apport personnel couvrent le besoin -- correctif du 2026-09-01', () => {
+    // Trouvé en créant un vrai plan ("Optim Home") : le besoin total peut être sciemment couvert
+    // en partie par l'apport personnel, pas uniquement par le financement recherché -- comparer
+    // le montant recherché seul au besoin produisait une fausse alerte.
+    const alertes = BPCalc.detecterIncoherences({
+      plan_financier: { investissement_initial: '9000', apport_personnel: '2000', stock_moyen_valeur: '800', creances_clients: '0', dettes_fournisseurs: '0' },
+      financement: { montant: '7000' },
+    });
+    assert.ok(!alertes.some(a => a.titre.includes('inférieur au besoin identifié')));
+  });
+
+  await t.test('signale quand même si financement + apport ne suffisent pas', () => {
+    const alertes = BPCalc.detecterIncoherences({
+      plan_financier: { investissement_initial: '9000', apport_personnel: '500' },
+      financement: { montant: '3000' },
+    });
+    assert.ok(alertes.some(a => a.titre.includes('inférieur au besoin identifié')));
+  });
+
   await t.test('détecte un pourcentage de capital proposé incohérent avec la dilution calculée', () => {
     const alertes = BPCalc.detecterIncoherences({
       financement: { montant: '45000', valorisation_apres: '125000', pourcentage_propose: '5' }, // calculé ~36%

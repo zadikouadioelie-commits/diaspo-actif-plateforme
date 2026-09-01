@@ -142,9 +142,15 @@
     if (montantRecherche !== null && investissement !== null && investissement > 0) {
       const bfr = calcBFR({ stockMoyen: fin.stock_moyen_valeur, creancesClients: fin.creances_clients, dettesFournisseurs: fin.dettes_fournisseurs });
       const besoin = investissement + Math.max(0, bfr);
-      if (montantRecherche < besoin * 0.9) {
-        alertes.push({ titre: 'Montant recherché inférieur au besoin identifié',
-          detail: `Montant recherché : ${Math.round(montantRecherche)}. Investissement initial déclaré${bfr>0?' + BFR calculé':''} : ${Math.round(besoin)}.`,
+      // Le besoin total est couvert par le financement recherché ET l'apport personnel -- les
+      // comparer l'un à l'autre isolément produisait une fausse alerte sur tout plan où une
+      // partie du besoin est sciemment couverte par l'apport plutôt que par le financement
+      // recherché (trouvé le 2026-09-01 en créant un plan réel avec ce cas de figure).
+      const apport = num(fin.apport_personnel);
+      const finance = montantRecherche + apport;
+      if (finance < besoin * 0.9) {
+        alertes.push({ titre: 'Montant recherché (+ apport personnel) inférieur au besoin identifié',
+          detail: `Montant recherché + apport personnel : ${Math.round(finance)}. Investissement initial déclaré${bfr>0?' + BFR calculé':''} : ${Math.round(besoin)}.`,
           cible: 'financement' });
       }
     }
