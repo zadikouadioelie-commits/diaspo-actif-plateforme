@@ -55,6 +55,48 @@
     return parAnnee;
   }
 
+  /* Vraie mensualité d'emprunt (formule PMT), pas une approximation -- ajoutée le 2026-09-01,
+     n'existait nulle part sur la plateforme (aucun simulateur de prêt, aucun autre module).
+     N'affecte PAS calcInteretsParAnnee() ci-dessus (toujours utilisée par calcFinRow/calcRatios/
+     detecterIncoherences dans business-plan-edit.html) : fonction purement additive, réservée
+     à un affichage détaillé (échéancier) qui n'existait pas avant. Taux à 0% : capital réparti
+     également sur la durée, aucun intérêt (la formule standard divise par zéro à ce taux). */
+  function calcMensualite(montant, tauxAnnuelPct, dureeMoisRemboursement) {
+    const c = num(montant), n = num(dureeMoisRemboursement), tMensuel = num(tauxAnnuelPct) / 100 / 12;
+    if (!c || !n || n <= 0) return 0;
+    if (!tMensuel) return c / n;
+    return c * tMensuel / (1 - Math.pow(1 + tMensuel, -n));
+  }
+
+  /* Échéancier complet d'un emprunt : capital restant dû / intérêts payés / capital remboursé,
+     agrégés par année (1..N) plutôt que mois par mois (plus lisible dans un dossier). Convention
+     du différé : aucune échéance (ni capital ni intérêt) pendant les `differe` premiers mois --
+     le remboursement s'étale ensuite sur (duree - differe) mois restants. Si `mensualite` est
+     saisie par l'utilisateur, elle prime sur le calcul PMT (on ne contredit jamais une donnée
+     déclarée) ; sinon, la vraie mensualité est calculée. */
+  function calcEcheancierEmprunt(dette) {
+    const montant = num(dette?.montant), tauxAnnuel = num(dette?.taux), dureeMois = num(dette?.duree), differeMois = Math.max(0, num(dette?.differe));
+    if (!montant || !dureeMois || dureeMois <= differeMois) return null;
+    const dureeRemboursement = dureeMois - differeMois;
+    const mensualite = num(dette.mensualite) > 0 ? num(dette.mensualite) : calcMensualite(montant, tauxAnnuel, dureeRemboursement);
+    const tauxMensuel = tauxAnnuel ? tauxAnnuel / 100 / 12 : 0;
+    let capitalRestant = montant;
+    const parAnnee = {};
+    for (let mois = 1; mois <= dureeMois; mois++) {
+      const annee = Math.ceil(mois / 12);
+      if (!parAnnee[annee]) parAnnee[annee] = { interets: 0, capitalRembourse: 0, capitalRestantFin: capitalRestant };
+      if (mois > differeMois) {
+        const interetMois = capitalRestant * tauxMensuel;
+        const capitalMois = Math.min(capitalRestant, Math.max(0, mensualite - interetMois));
+        capitalRestant = Math.max(0, capitalRestant - capitalMois);
+        parAnnee[annee].interets += interetMois;
+        parAnnee[annee].capitalRembourse += capitalMois;
+      }
+      parAnnee[annee].capitalRestantFin = capitalRestant;
+    }
+    return { mensualite, dureeRemboursement, parAnnee, capitalRestantFin: capitalRestant };
+  }
+
   /* Simulation de dilution : % du capital cédé pour le montant recherché, à la valorisation
      après investissement déclarée. Retourne null si les données manquent (pas de valeur par
      défaut trompeuse). */
@@ -199,5 +241,5 @@
     return alertes;
   }
 
-  return { calcAmortissementAnnuel, calcInteretsParAnnee, calcDilution, calcScenariosFinancement, calcBFR, detecterIncoherences };
+  return { calcAmortissementAnnuel, calcInteretsParAnnee, calcMensualite, calcEcheancierEmprunt, calcDilution, calcScenariosFinancement, calcBFR, detecterIncoherences };
 });
