@@ -504,6 +504,9 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
      bibliothèque, pas du code de cette page ; sans ce correctif le bouton "PowerPoint (.pptx)"
      restait bloqué indéfiniment sur "Génération…" pour tout visiteur qui cliquait dessus. -->
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js"></script>
+<!-- Fonctions de calcul pures (2026-09-01, consolidation) -- voir assets/business-plan-calc.js
+     pour le pourquoi (testabilité, fin de la duplication de logique). -->
+<script src="assets/business-plan-calc.js"></script>
 <script>
 /* ===================================================
    BUSINESS PLAN EDITOR
@@ -2804,9 +2807,10 @@ function renderFinancier() {
       ${field('delai_paiement_clients','Délai de paiement clients','Ex : 30 jours')}
       ${field('delai_paiement_fournisseurs','Délai de paiement fournisseurs','Ex : 45 jours')}
       ${field('duree_stockage','Durée de stockage','Ex : 20 jours')}
-      ${field('creances_clients','Créances clients','','number')}
-      ${field('dettes_fournisseurs','Dettes fournisseurs','','number')}
-      ${field('stock_moyen_valeur','Stock moyen (valeur)','','number')}
+      ${field('creances_clients','Créances clients','','number').replace("oninput=\"updateField('creances_clients',this.value)\"","oninput=\"updateField('creances_clients',this.value);calcAllFinance()\"")}
+      ${field('dettes_fournisseurs','Dettes fournisseurs','','number').replace("oninput=\"updateField('dettes_fournisseurs',this.value)\"","oninput=\"updateField('dettes_fournisseurs',this.value);calcAllFinance()\"")}
+      ${field('stock_moyen_valeur','Stock moyen (valeur)','','number').replace("oninput=\"updateField('stock_moyen_valeur',this.value)\"","oninput=\"updateField('stock_moyen_valeur',this.value);calcAllFinance()\"")}
+      <div class="full" id="bp-bfr-calcule" style="font-size:12.5px;background:var(--bg);border-radius:8px;padding:10px 12px;"></div>
     </div></div>
 
     <!-- Immobilisations détaillées (2026-08-26, point 17) : liste répétable, en complément
@@ -3080,31 +3084,14 @@ function ratioDot(value, seuilVert, seuilOrange, inverse) {
    les 5 années du plan (pas de calcul date d'achat par date d'achat), et des intérêts répartis
    linéairement sur la durée de l'emprunt (pas un vrai tableau d'amortissement bancaire) --
    suffisant pour une estimation de dossier, jamais présenté comme un calcul comptable certifié. */
+/* Ces deux fonctions délèguent tout le calcul à BPCalc (assets/business-plan-calc.js, 2026-09-01)
+   -- lisent toujours `sections` global ici, comme avant, mais la logique elle-même est testable
+   hors navigateur. Comportement externe strictement inchangé. */
 function bpCalcAmortissementAnnuel() {
-  const liste = sections.plan_financier?.immobilisations_liste || [];
-  return liste.reduce((total, im) => {
-    const duree = parseFloat(im.duree_amortissement);
-    if (!duree || duree <= 0) return total;
-    const base = (parseFloat(im.montant) || 0) - (parseFloat(im.valeur_residuelle) || 0);
-    return total + Math.max(0, base) / duree;
-  }, 0);
+  return BPCalc.calcAmortissementAnnuel(sections.plan_financier?.immobilisations_liste || []);
 }
 function bpCalcInteretsParAnnee() {
-  const liste = sections.plan_financier?.dettes || [];
-  const parAnnee = { 1:0, 2:0, 3:0, 4:0, 5:0 };
-  liste.forEach(d => {
-    const dureeMois = parseFloat(d.duree);
-    if (!dureeMois || dureeMois <= 0) return;
-    const dureeAnnees = Math.min(5, Math.max(1, Math.ceil(dureeMois / 12)));
-    const montant = parseFloat(d.montant) || 0;
-    const mensualite = parseFloat(d.mensualite) || 0;
-    /* Coût total du crédit = ce qui est remboursé - ce qui est emprunté. Sans mensualité
-       saisie, on retombe sur une approximation à intérêts simples (montant × taux). */
-    const coutTotal = mensualite > 0 ? Math.max(0, mensualite * dureeMois - montant) : montant * ((parseFloat(d.taux) || 0) / 100) * (dureeMois / 12);
-    const interetAnnuel = coutTotal / dureeAnnees;
-    for (let an = 1; an <= dureeAnnees; an++) parAnnee[an] += interetAnnuel;
-  });
-  return parAnnee;
+  return BPCalc.calcInteretsParAnnee(sections.plan_financier?.dettes || []);
 }
 function calcFinRow() {
   const s = sections.plan_financier||{};
@@ -3163,7 +3150,13 @@ function calcRatios() {
   const resultat1=ca1-charges1;
   const invest=parseFloat(s.investissement_initial)||0;
   const financement=parseFloat(s.financement_recherche)||0;
-  const bfrMontant=parseFloat(s.bfr)||0;
+  /* bfr est un champ de TEXTE LIBRE ("Besoin en fonds de roulement estimé à 12 000 € pour
+     couvrir..."), jamais un nombre pur -- parseFloat(s.bfr) retombait donc systématiquement sur
+     0/NaN pour toute saisie normale, et le ratio BFR/CA affichait silencieusement "0.0%" (toujours
+     au vert) sur n'importe quel plan rempli. Bug trouvé le 2026-09-01 en consolidant ce module.
+     BPCalc.calcBFR() calcule un vrai BFR normatif à partir de 3 champs numériques qui existent
+     déjà (stock moyen + créances clients − dettes fournisseurs), jamais utilisés jusqu'ici. */
+  const bfrMontant=BPCalc.calcBFR({ stockMoyen: s.stock_moyen_valeur, creancesClients: s.creances_clients, dettesFournisseurs: s.dettes_fournisseurs });
 
   const margeBrute = ca1>0 ? (ca1-achats1)/ca1*100 : 0;
   const margeNette = ca1>0 ? resultat1/ca1*100 : 0;
@@ -3201,6 +3194,24 @@ function calcAllFinance() {
   const ratios = calcRatios();
   calcDashboard(tresorerieDisponible, ratios);
   bpAfficherSuggestionCA();
+  bpAfficherBFRCalcule();
+}
+/* BFR calculé (2026-09-01, consolidation) -- affiché en complément du champ texte libre
+   "Besoin en fonds de roulement" ci-dessus, JAMAIS à sa place (même principe que
+   bpAfficherSuggestionCA : une suggestion visible, jamais un écrasement silencieux). Calculé à
+   partir des 3 champs numériques déjà existants (stock moyen, créances clients, dettes
+   fournisseurs) -- c'est aussi cette valeur qui alimente désormais le ratio BFR/CA du tableau de
+   bord, qui affichait silencieusement "0.0%" jusqu'ici (voir calcRatios). */
+function bpAfficherBFRCalcule() {
+  const el = document.getElementById('bp-bfr-calcule');
+  if (!el) return;
+  const s = sections.plan_financier || {};
+  if (!s.stock_moyen_valeur && !s.creances_clients && !s.dettes_fournisseurs) {
+    el.innerHTML = '<span style="color:var(--muted);">Renseignez le stock moyen, les créances clients et les dettes fournisseurs ci-dessus pour voir le BFR calculé.</span>';
+    return;
+  }
+  const bfr = BPCalc.calcBFR({ stockMoyen: s.stock_moyen_valeur, creancesClients: s.creances_clients, dettesFournisseurs: s.dettes_fournisseurs });
+  el.innerHTML = `🧮 <strong>BFR calculé</strong> — Stock moyen + Créances clients − Dettes fournisseurs = <strong>${fmtEuro(bfr)}</strong>${bfr<0?' <span style="color:#10b981;">(les fournisseurs financent le cycle d\'exploitation)</span>':''}. C\'est cette valeur, pas le champ texte au-dessus, qui alimente le ratio BFR/CA du tableau de bord.`;
 }
 /* Relation produits→CA (2026-08-26, plan de renforcement §4.1) : l'étude de prix
    (sections.produits.etude_prix, déjà saisie produit par produit avec prix_vente et
@@ -3543,12 +3554,9 @@ function bpCalcDilution() {
   const el = document.getElementById('bp-simulation-dilution');
   if (!el) return;
   const s = sections.financement || {};
-  const montant = parseFloat(s.montant) || 0;
-  const valoApres = parseFloat(s.valorisation_apres) || 0;
-  if (!montant || !valoApres) { el.innerHTML = '<span style="color:var(--muted);">Renseignez le montant recherché et la valorisation après investissement pour voir la simulation de dilution.</span>'; return; }
-  const pctCede = (montant / valoApres) * 100;
-  const pctFondateursApres = 100 - pctCede;
-  el.innerHTML = `📉 <strong>Simulation de dilution</strong> — en cédant ${fmtEuro(montant)} contre ${pctCede.toFixed(1)}% du capital, les actionnaires actuels détiendraient environ <strong>${pctFondateursApres.toFixed(1)}%</strong> après l'opération (calcul indicatif, hors frais et clauses spécifiques).`;
+  const dilution = BPCalc.calcDilution(s.montant, s.valorisation_apres);
+  if (!dilution) { el.innerHTML = '<span style="color:var(--muted);">Renseignez le montant recherché et la valorisation après investissement pour voir la simulation de dilution.</span>'; return; }
+  el.innerHTML = `📉 <strong>Simulation de dilution</strong> — en cédant ${fmtEuro(s.montant)} contre ${dilution.pctCede.toFixed(1)}% du capital, les actionnaires actuels détiendraient environ <strong>${dilution.pctFondateursApres.toFixed(1)}%</strong> après l'opération (calcul indicatif, hors frais et clauses spécifiques).`;
 }
 
 /* Scénarios 50/100/150% du financement demandé, chiffrés (2026-08-31, point 19 du cahier des
@@ -3558,20 +3566,16 @@ function bpCalcDilution() {
 function bpCalcScenariosFinancement() {
   const el = document.getElementById('fin-scenarios-chiffres');
   if (!el) return;
-  const montant = parseFloat(sections.financement?.montant) || 0;
   const besoin = parseFloat(sections.plan_financier?.investissement_initial) || 0;
-  if (!montant) { el.innerHTML = ''; return; }
-  const paliers = [50, 100, 150];
-  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;">${paliers.map(pct => {
-    const recu = montant * pct / 100;
-    const couverture = besoin > 0 ? Math.round(recu / besoin * 100) : null;
-    const statut = couverture===null ? '' : couverture>=100 ? '✅ Investissement couvert' : couverture>=60 ? '⚠️ Couverture partielle' : '🔴 Financement très insuffisant';
-    return `<div style="flex:1;min-width:150px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+  const scenarios = BPCalc.calcScenariosFinancement(sections.financement?.montant, besoin);
+  if (!scenarios.length) { el.innerHTML = ''; return; }
+  const STATUT_LABEL = { couvert: '✅ Investissement couvert', partiel: '⚠️ Couverture partielle', insuffisant: '🔴 Financement très insuffisant' };
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;">${scenarios.map(({pct, recu, couverture, statut}) => `
+    <div style="flex:1;min-width:150px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
       <div style="font-size:11px;font-weight:800;color:var(--muted);">${pct}% obtenu</div>
       <div style="font-size:16px;font-weight:800;">${fmtEuro(recu)}</div>
-      ${couverture!==null ? `<div style="font-size:11.5px;color:var(--muted);">${couverture}% de l'investissement initial (${fmtEuro(besoin)})</div><div style="font-size:12px;margin-top:2px;">${statut}</div>` : '<div style="font-size:11px;color:var(--muted);">Renseignez l\'investissement initial (Plan financier) pour voir la couverture.</div>'}
-    </div>`;
-  }).join('')}</div>`;
+      ${couverture!==null ? `<div style="font-size:11.5px;color:var(--muted);">${couverture}% de l'investissement initial (${fmtEuro(besoin)})</div><div style="font-size:12px;margin-top:2px;">${STATUT_LABEL[statut]}</div>` : '<div style="font-size:11px;color:var(--muted);">Renseignez l\'investissement initial (Plan financier) pour voir la couverture.</div>'}
+    </div>`).join('')}</div>`;
 }
 
 /* ---- 20. Annexes ---- */
@@ -3719,72 +3723,7 @@ async function bpSupprimerDocumentBiblio(docId) {
    Chaque alerte est explicable : elle affiche toujours les deux valeurs comparées, jamais un
    simple "incohérence détectée" sans preuve à l'appui. */
 function bpDetecterIncoherences() {
-  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
-  const fmt = n => n === null ? '—' : Math.round(n).toLocaleString('fr-FR');
-  const alertes = [];
-
-  const fin = sections.plan_financier || {};
-  const commercial = sections.plan_commercial || {};
-  const financement = sections.financement || {};
-  const etudePrix = sections.produits?.etude_prix || [];
-
-  const ca1 = num(fin.ca_1);
-  const contratsFunnel = num(commercial.nb_contrats_funnel);
-  const panierMoyen = num(commercial.panier_moyen_commercial);
-
-  // 1. CA prévisionnel très supérieur à ce que peut raisonnablement produire le funnel commercial
-  if (ca1 !== null && ca1 > 0 && contratsFunnel !== null && contratsFunnel > 0 && panierMoyen !== null && panierMoyen > 0) {
-    const caFunnelMax = contratsFunnel * panierMoyen * 12;
-    if (ca1 > caFunnelMax * 3) {
-      alertes.push({ titre: 'Chiffre d\'affaires très supérieur à la capacité commerciale déclarée',
-        detail: `CA An 1 saisi : ${fmt(ca1)}. Capacité suggérée par le funnel (${contratsFunnel} contrats × ${fmt(panierMoyen)} × 12 mois) : environ ${fmt(caFunnelMax)}.`,
-        cible: 'plan_commercial' });
-    } else if (ca1 * 3 < contratsFunnel * panierMoyen) {
-      alertes.push({ titre: 'Chiffre d\'affaires très inférieur à ce que suggèrent les contrats et le panier moyen',
-        detail: `${contratsFunnel} contrats × ${fmt(panierMoyen)} de panier moyen = ${fmt(contratsFunnel*panierMoyen)}, largement supérieur au CA An 1 saisi (${fmt(ca1)}).`,
-        cible: 'plan_commercial' });
-    }
-  }
-
-  // 2. Marge déclarée (étude de prix) vs marge réellement calculée sur le compte de résultat An 1
-  if (ca1 !== null && ca1 > 0) {
-    const margeCalculee = ((ca1 - (num(fin.achats_1)||0)) / ca1) * 100;
-    etudePrix.forEach(e => {
-      const margeDeclaree = num(e.marge_souhaitee);
-      if (margeDeclaree !== null && Math.abs(margeDeclaree - margeCalculee) > 20) {
-        alertes.push({ titre: `Marge déclarée sur « ${e.produit || 'un produit'} » très différente de la marge calculée`,
-          detail: `Marge souhaitée saisie : ${margeDeclaree}%. Marge brute calculée sur le compte de résultat An 1 (CA − achats) / CA : ${margeCalculee.toFixed(1)}%.`,
-          cible: 'produits' });
-      }
-    });
-  }
-
-  // 3. Montant de financement recherché vs besoin réel (investissement initial, éventuellement + BFR si saisi en nombre)
-  const montantRecherche = num(financement.montant);
-  const investissement = num(fin.investissement_initial);
-  const bfrNum = num(fin.bfr);
-  if (montantRecherche !== null && investissement !== null && investissement > 0) {
-    const besoin = investissement + (bfrNum || 0);
-    if (montantRecherche < besoin * 0.9) {
-      alertes.push({ titre: 'Montant recherché inférieur au besoin identifié',
-        detail: `Montant recherché : ${fmt(montantRecherche)}. Investissement initial déclaré${bfrNum?' + BFR':''} : ${fmt(besoin)}.`,
-        cible: 'financement' });
-    }
-  }
-
-  // 4. Pourcentage de capital proposé vs dilution réellement calculée (montant / valorisation après)
-  const pctPropose = num(financement.pourcentage_propose);
-  const valorisationApres = num(financement.valorisation_apres);
-  if (pctPropose !== null && montantRecherche !== null && valorisationApres !== null && valorisationApres > 0) {
-    const dilutionCalculee = (montantRecherche / valorisationApres) * 100;
-    if (Math.abs(pctPropose - dilutionCalculee) > 5) {
-      alertes.push({ titre: 'Pourcentage de capital proposé incohérent avec la valorisation',
-        detail: `Pourcentage déclaré : ${pctPropose}%. Calculé (montant recherché / valorisation après) : ${dilutionCalculee.toFixed(1)}%.`,
-        cible: 'financement' });
-    }
-  }
-
-  return alertes;
+  return BPCalc.detecterIncoherences(sections);
 }
 
 function renderBPIncoherences() {

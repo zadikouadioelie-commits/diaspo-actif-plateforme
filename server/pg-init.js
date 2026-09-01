@@ -1502,7 +1502,7 @@ async function seedPg(pool) {
 
   // Comptes de démonstration : pas de vraie adresse email → déjà "vérifiés"
   await pool.query(`UPDATE users SET email_verifie=1 WHERE email LIKE '%@diaspoactif.demo'`).catch(()=>{});
-  // Comptes de démonstration (connexion "Comptes test" + comptes créés par seed-comptes-test.js) :
+  // Comptes de démonstration (connexion "Comptes test" + comptes créés par seed-comptes.js) :
   // jamais dans l'annuaire, les recherches ni les compteurs de membres — voir les clauses "is_demo"
   // du code. Ciblage précis par liste d'emails exacte (PAS un LIKE '%@diaspoactif.demo' large : ce
   // domaine est aussi partagé par d'autres comptes légitimes comme des mairies/préfectures ou de
@@ -1511,7 +1511,7 @@ async function seedPg(pool) {
   // ce qu'un autre script a pu positionner avant.
   const emailsComptesTest = [
     ...demoUsers.map(u => u.email),
-    // 'admin@diaspoactif.com' est l'email prévu par seed-comptes-test.js, mais n'existe pas en
+    // 'admin@diaspoactif.com' est l'email prévu par seed-comptes.js, mais n'existe pas en
     // production : le compte administrateur réel (id=4) a été créé avec contact@diaspoactif.com
     // (voir vitrine-admin-connexion.html) — sans cette entrée, l'UPDATE ci-dessous ne matchait
     // aucune ligne (silencieusement, via le .catch(()=>{}) plus bas) et la carte "Administrateur"

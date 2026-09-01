@@ -15,7 +15,16 @@
    uniquement des conversions calculées à l'affichage, à partir du montant de
    référence et du taux figé enregistré dans le Business Plan.
    ═══════════════════════════════════════════════════════════════════ */
-(function () {
+/* Rendu partageable client/serveur (2026-09-01, consolidation) : jusqu'ici <script> navigateur
+   uniquement -- server/index.js maintenait sa PROPRE copie de la liste de devises
+   (DEVISES_VALIDES_BP) pour valider côté serveur, forcément resynchronisée à la main à chaque
+   ajout de devise (déjà fait une fois manuellement le 2026-08-31). Même schéma UMD que
+   assets/business-plan-calc.js : `require()`-able côté Node (server/index.js, tests), toujours
+   `window.CurrencyManager` inchangé côté navigateur. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.CurrencyManager = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
 
   /* Liste normalisée ISO 4217 -- TOUTES les monnaies couvertes par la source de taux de marché
      (server/index.js, GET /api/devises/taux -- open.er-api.com, 166 devises), pas seulement un
@@ -308,7 +317,7 @@
     return erreurs;
   }
 
-  window.CurrencyManager = {
+  return {
     LISTE: CURRENCY_LIST,
     devise,
     format,
@@ -320,4 +329,4 @@
     afficherMontantHTML,
     validerConfig,
   };
-})();
+});

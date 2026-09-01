@@ -36398,22 +36398,13 @@ route("DELETE", "/api/business-plans/:id/media", async (req, res, params) => {
    générique : se sauvegarde indépendamment de la section en cours d'édition, et chaque
    changement de taux doit être un choix explicite et tracé (points 7/8) -- jamais un effet de
    bord d'une sauvegarde de section. Validation dupliquée ici volontairement (même règles que
-   CurrencyManager.validerConfig côté client, assets/currency-manager.js) : le serveur ne peut
-   pas charger un script écrit pour le navigateur (`window.CurrencyManager`), et ne doit de toute
-   façon jamais faire confiance à une validation faite uniquement côté client. */
-/* Toutes les monnaies du monde couvertes par la source de taux de marché (open.er-api.com),
-   moins XDR (unité de compte FMI) et CLF (unité indexée chilienne) -- ni l'une ni l'autre n'est
-   une monnaie facturable. Doit rester identique à CURRENCY_LIST (assets/currency-manager.js). */
-const DEVISES_VALIDES_BP = ['EUR','USD','GBP','CHF','CAD','XOF','XAF','MAD','DZD','TND','CDF','GHS','NGN','CNY',
-  'AED','AFN','ALL','AMD','ANG','AOA','ARS','AUD','AWG','AZN','BAM','BBD','BDT','BGN','BHD','BIF','BMD','BND',
-  'BOB','BRL','BSD','BTN','BWP','BYN','BZD','CLP','CNH','COP','CRC','CUP','CVE','CZK','DJF','DKK','DOP','EGP',
-  'ERN','ETB','FJD','FKP','FOK','GEL','GGP','GIP','GMD','GNF','GTQ','GYD','HKD','HNL','HRK','HTG','HUF','IDR',
-  'ILS','IMP','INR','IQD','IRR','ISK','JEP','JMD','JOD','JPY','KES','KGS','KHR','KID','KMF','KRW','KWD','KYD',
-  'KZT','LAK','LBP','LKR','LRD','LSL','LYD','MDL','MGA','MKD','MMK','MNT','MOP','MRU','MUR','MVR','MWK','MXN',
-  'MYR','MZN','NAD','NIO','NOK','NPR','NZD','OMR','PAB','PEN','PGK','PHP','PKR','PLN','PYG','QAR','RON','RSD',
-  'RUB','RWF','SAR','SBD','SCR','SDG','SEK','SGD','SHP','SLE','SLL','SOS','SRD','SSP','STN','SYP','SZL','THB',
-  'TJS','TMT','TOP','TRY','TTD','TVD','TWD','TZS','UAH','UGX','UYU','UZS','VES','VND','VUV','WST','XCD','XCG',
-  'XPF','YER','ZAR','ZMW','ZWG','ZWL'];
+   CurrencyManager.validerConfig côté client) : le serveur ne doit jamais faire confiance à une
+   validation faite uniquement côté client -- mais la LISTE des devises valides, elle, n'a plus
+   besoin d'être recopiée à la main : assets/currency-manager.js est maintenant require()-able
+   des deux côtés (UMD, 2026-09-01), fin de la double liste qu'il fallait resynchroniser à la
+   main à chaque devise ajoutée (déjà fait une fois le 2026-08-31). */
+const CurrencyManager = require("../assets/currency-manager.js");
+const DEVISES_VALIDES_BP = CurrencyManager.LISTE.map(d => d.code);
 function validerDeviseConfigBP(config) {
   const erreurs = [];
   if (!config || !config.reference || !DEVISES_VALIDES_BP.includes(config.reference)) {

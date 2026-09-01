@@ -1,8 +1,18 @@
 #!/usr/bin/env node
 /* ── Création des comptes de test Diaspo'Actif ──
-   Lance avec : node server/seed-comptes-test.js
+   Lance avec : node server/seed-comptes.js
    Nécessite DATABASE_URL dans l'environnement.
-*/
+
+   Renommé le 2026-09-01 (était seed-comptes-test.js) : ce n'est PAS une suite de tests, c'est
+   un script d'exécution manuelle qui écrit de vrais comptes en base (dont un mot de passe
+   admin en dur). Son ancien nom se terminait en "-test.js", exactement le motif que
+   `node --test` (sans argument, auto-découverte) balaie par défaut dans tout le dépôt --
+   trouvé en ajoutant la vraie suite de tests du module Business Plan (test/*.test.js,
+   2026-09-01) : `node --test` embarquait ce script comme s'il s'agissait d'un test, avec le
+   risque bien réel de réinitialiser ce mot de passe admin en production si DATABASE_URL est
+   défini dans l'environnement au moment du lancement. Aucune donnée touchée lors de la
+   découverte de ce risque (DATABASE_URL n'était pas défini dans cet environnement-là) --
+   renommé pour rendre la classe de risque impossible plutôt que de compter sur la chance. */
 const { Pool } = require("pg");
 const crypto = require("node:crypto");
 
