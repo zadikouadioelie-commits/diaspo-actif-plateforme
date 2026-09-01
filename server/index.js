@@ -36223,8 +36223,19 @@ app.get('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (r
     JOIN bp_collaborateurs bc ON bc.bp_id=bp.id AND bc.user_id=?
     ORDER BY bp.updated_at DESC
   `).all(req.user.id);
+  /* Modèle de référence (2026-09-01) : un business plan marqué is_public=1 sert d'exemple
+     consultable par TOUS les comptes de la plateforme (pas seulement propriétaire/collaborateurs),
+     en lecture seule (voir garde is_public dans PUT/DELETE ci-dessous). Exclu ici si c'est déjà
+     le propriétaire qui consulte (il l'a déjà dans mes_plans). */
+  const exemples = await db.prepare(`
+    SELECT bp.*, u.nom as owner_nom, u.prenom as owner_prenom
+    FROM business_plans bp
+    JOIN users u ON u.id=bp.user_id
+    WHERE bp.is_public=1 AND bp.user_id!=?
+    ORDER BY bp.updated_at DESC
+  `).all(req.user.id);
   const parseGalerie = list => list.map(bp => ({ ...bp, galerie: safeJSON(bp.galerie_json, []), devise_config: safeJSON(bp.devise_config, { reference: 'EUR', secondaires: [] }) }));
-  sendJSON(res, 200, { mes_plans: parseGalerie(rows), partages: parseGalerie(collab) });
+  sendJSON(res, 200, { mes_plans: parseGalerie(rows), partages: parseGalerie(collab), exemples: parseGalerie(exemples) });
 });
 
 /* ---- Créer un business plan ---- */
@@ -36244,9 +36255,9 @@ app.post('/api/business-plans', requireAuth, requireUtilisateurAbonneMw, async (
 app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
-  // Vérifier accès (propriétaire ou collaborateur)
+  // Vérifier accès (propriétaire, collaborateur, ou modèle de référence public — lecture seule pour tous)
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
-  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  if (bp.user_id !== req.user.id && !collab && !bp.is_public) return sendJSON(res, 403, { error: 'Accès refusé' });
   const sections = safeJSON(bp.sections_json, {});
   const completude = await checkBPCompletude(sections);
   const progression = await calcBPProgression(sections);
@@ -36267,6 +36278,10 @@ app.get('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
 app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Plan introuvable' });
+  // Modèle de référence public : non modifiable, même par son propriétaire (protège l'exemple
+  // affiché à toute la plateforme). Pour le corriger un jour : repasser is_public à 0 en base,
+  // éditer, puis remettre is_public à 1.
+  if (bp.is_public) return sendJSON(res, 403, { error: 'Ce business plan est un exemple de référence en lecture seule, non modifiable.' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
   const canEdit = bp.user_id===req.user.id || ['editeur','validateur'].includes(collab?.role);
   if (!canEdit) return sendJSON(res, 403, { error: 'Accès refusé' });
@@ -36307,6 +36322,7 @@ app.put('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, asyn
 app.delete('/api/business-plans/:id', requireAuth, requireUtilisateurAbonneMw, async (req, res) => {
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp || bp.user_id !== req.user.id) return sendJSON(res, 403, { error: 'Accès refusé' });
+  if (bp.is_public) return sendJSON(res, 403, { error: 'Ce business plan est un exemple de référence protégé — suppression désactivée.' });
   await db.prepare('DELETE FROM business_plans WHERE id=?').run(bp.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -36535,7 +36551,9 @@ app.post('/api/business-plans/:id/duplicate', requireAuth, requireUtilisateurAbo
   const bp = await db.prepare('SELECT * FROM business_plans WHERE id=?').get(req.params.id);
   if (!bp) return sendJSON(res, 404, { error: 'Introuvable' });
   const collab = await db.prepare('SELECT role FROM bp_collaborateurs WHERE bp_id=? AND user_id=?').get(bp.id, req.user.id);
-  if (bp.user_id !== req.user.id && !collab) return sendJSON(res, 403, { error: 'Accès refusé' });
+  // Le modèle de référence public peut être dupliqué par n'importe quel compte comme point de
+  // départ (c'est tout son intérêt) — la copie appartient au demandeur et n'est pas publique.
+  if (bp.user_id !== req.user.id && !collab && !bp.is_public) return sendJSON(res, 403, { error: 'Accès refusé' });
   const r = await db.prepare(`
     INSERT INTO business_plans (user_id, nom_projet, slogan, type_initiative, secteur, template, sections_json)
     VALUES (?,?,?,?,?,?,?)

@@ -110,6 +110,7 @@
     <div class="bp-tabs">
       <button class="bp-tab active" data-tab="mes">Mes plans (<span id="tab-mes-count">0</span>)</button>
       <button class="bp-tab" data-tab="partages">Partagés avec moi (<span id="tab-part-count">0</span>)</button>
+      <button class="bp-tab" data-tab="exemple">🌟 Exemple de référence</button>
     </div>
 
     <!-- Mes plans -->
@@ -122,6 +123,16 @@
     <!-- Partagés -->
     <div class="tab-panel" id="tab-partages">
       <div id="bp-part-list" class="bp-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Exemple de référence -->
+    <div class="tab-panel" id="tab-exemple">
+      <p style="margin:0 0 16px;color:var(--muted);font-size:13px;">
+        Un business plan complet, rempli avec tous les outils de la plateforme, à titre d'exemple. Consultable par tous les comptes, non modifiable.
+      </p>
+      <div id="bp-exemple-list" class="bp-grid">
         <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
       </div>
     </div>
@@ -215,7 +226,7 @@ const BP_TRANSMISSION_BADGES = {
 
 const STADE_LABELS = { idee:'💭 Idée', prototype:'🔧 Prototype / MVP', lancement:'🚀 Lancement', croissance:'📈 Croissance', expansion:'🌍 Expansion' };
 
-function renderBPCard(bp, partage) {
+function renderBPCard(bp, partage, exemple) {
   const prog = bp.progression || 0;
   const statutCls = `statut-${bp.statut||'brouillon'}`;
   const statutLabel = { brouillon:'✏️ Brouillon', complet:'✅ Complet', archive:'📦 Archivé' }[bp.statut] || 'Brouillon';
@@ -232,7 +243,7 @@ function renderBPCard(bp, partage) {
         <div class="bp-card-photo">
           ${bp.photo_principale_url
             ? `<img src="${esc(bp.photo_principale_url)}" alt="">`
-            : (!partage
+            : (!partage && !exemple
                 ? `<div class="bp-card-photo-empty" onclick="event.stopPropagation();bpCardUploadPhoto(${bp.id})">
                      <span class="ic">📷</span><span class="txt">Ajouter une photo de couverture</span>
                    </div>`
@@ -255,6 +266,7 @@ function renderBPCard(bp, partage) {
           <span class="bp-tag">${TYPES[bp.type_initiative]||bp.type_initiative||'—'}</span>
           ${bp.secteur?`<span class="bp-tag">📂 ${esc(bp.secteur)}</span>`:''}
           <span class="bp-tag ${statutCls}">${statutLabel}</span>
+          ${exemple?`<span class="bp-tag" style="background:#fef3c7;color:#92400e;">🌟 Exemple de référence — lecture seule</span>`:''}
           ${partage?`<span class="bp-tag" style="background:#ede9fe;color:#6d28d9;">🔗 Partagé — ${esc(bp.mon_role)}</span>`:''}
           ${(() => { const badge = BP_TRANSMISSION_BADGES[bp.transmission_statut]; return badge ? `<span class="bp-tag" style="background:${badge.bg};color:${badge.color};">${badge.label}</span>` : `<span class="bp-tag" style="background:#f1f5f9;color:#94a3b8;">⚪ Non transmis</span>`; })()}
         </div>
@@ -270,10 +282,10 @@ function renderBPCard(bp, partage) {
         </div>
         <div class="bp-foot" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-orange" onclick="openBP(${bp.id})">👁️ Consulter</button>
-          ${(!partage || ['editeur','validateur'].includes(bp.mon_role))?`<button class="btn btn-sm btn-outline" onclick="editBP(${bp.id})">✏️ Modifier</button>`:''}
-          <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer</button>
-          ${!partage?`<button class="btn btn-sm btn-orange" onclick="ouvrirTransmissionDA(${bp.id})">📤 Transmettre à Diaspo'Actif</button>`:''}
-          ${!partage?`<button class="btn btn-sm btn-outline" style="color:#D33;" onclick="delBP(${bp.id},'${esc(bp.nom_projet||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
+          ${(!exemple && (!partage || ['editeur','validateur'].includes(bp.mon_role)))?`<button class="btn btn-sm btn-outline" onclick="editBP(${bp.id})">✏️ Modifier</button>`:''}
+          <button class="btn btn-sm btn-outline" onclick="dupBP(${bp.id})">📋 Dupliquer${exemple?' comme point de départ':''}</button>
+          ${!partage && !exemple?`<button class="btn btn-sm btn-orange" onclick="ouvrirTransmissionDA(${bp.id})">📤 Transmettre à Diaspo'Actif</button>`:''}
+          ${!partage && !exemple?`<button class="btn btn-sm btn-outline" style="color:#D33;" onclick="delBP(${bp.id},'${esc(bp.nom_projet||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
         </div>
       </div>
     </div>`;
@@ -284,6 +296,7 @@ async function loadBPs() {
     const data = await api('GET', '/business-plans');
     const mes = data.mes_plans || [];
     const part = data.partages || [];
+    const exemples = data.exemples || [];
 
     document.getElementById('tab-mes-count').textContent = mes.length;
     document.getElementById('tab-part-count').textContent = part.length;
@@ -300,6 +313,10 @@ async function loadBPs() {
     document.getElementById('bp-part-list').innerHTML = part.length
       ? part.map(bp => renderBPCard(bp, true)).join('')
       : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun plan partagé avec vous.</div>`;
+
+    document.getElementById('bp-exemple-list').innerHTML = exemples.length
+      ? exemples.map(bp => renderBPCard(bp, false, true)).join('')
+      : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucun exemple de référence publié pour le moment.</div>`;
   } catch(e) {
     document.getElementById('bp-mes-list').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#D33;">${e.message}</div>`;
   }
