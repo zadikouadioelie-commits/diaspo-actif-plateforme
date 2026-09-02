@@ -1054,6 +1054,7 @@ function renderSection(key) {
   if (key === 'plan_financier') calcAllFinance();
   if (key === 'produits') (sections.produits?.etude_prix||[]).forEach((_,i)=>calcMargeEtudePrix(i));
   if (key === 'presentation') bpLoadTractionDocs();
+  if (key === 'infos_generales') bpChargerDocsMembresEquipe();
   if (key === 'annexes') bpLoadBiblioDocuments();
   if (key === 'financement') bpCalcDilution();
   if (key === 'rh') bpCalcMasseSalariale();
@@ -1513,14 +1514,15 @@ function renderInfosGenerales() {
       ${field('responsable','Responsable principal','Prénom NOM','text',false,true)}
       ${field('responsable_poste','Poste / Rôle','Directeur Général…')}
       ${field('nb_collaborateurs','Nombre de collaborateurs','','number')}
-      ${textarea('equipe_fondatrice','Membres de l\'équipe fondatrice','Un fondateur par ligne : NOM Prénom — Rôle',3,true)}
+      ${textarea('equipe_fondatrice','Notes libres sur l\'équipe (optionnel)','Complément non couvert par les fiches ci-dessous…',2,true)}
       ${textarea('organigramme','Description de l\'organigramme','Décrivez la structure organisationnelle…',3,true)}
     </div></div>
     <div class="bp-card-inner bp-niveau-2">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <h3 style="margin:0;">Fiches détaillées par membre clé</h3>
-        <button class="btn btn-outline btn-sm" onclick="addMembreEquipe()">+ Ajouter un membre</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <h3 style="margin:0;">🧑‍🤝‍🧑 Collaborateurs</h3>
+        <button class="btn btn-orange btn-sm" onclick="addMembreEquipe()">+ Nouveau collaborateur</button>
       </div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Une fiche par personne — plutôt que de les regrouper dans un seul champ : nom, prénom, fonction, formation/diplôme, et les pièces jointes utiles (CV, diplôme…).</p>
       <div id="membres-equipe-list">${renderMembresEquipe(s.membres_equipe || [])}</div>
     </div>
     <div class="bp-card-inner"><div class="fg">
@@ -1528,7 +1530,14 @@ function renderInfosGenerales() {
     </div></div>
   </div>`;
 }
+/* Identifiant stable par membre (2026-09-02) : sert de field_key pour ses pièces jointes
+   (bp_documents) — un index de tableau se déciderait mal, il change si un membre au-dessus est
+   retiré, et une pièce jointe se retrouverait alors attachée à la mauvaise personne. Les fiches
+   déjà enregistrées avant cette évolution n'ont pas encore d'id : on le complète ici, au premier
+   rendu, plutôt que d'exiger une migration. */
+function bpGenId() { return (crypto.randomUUID ? crypto.randomUUID() : 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)); }
 function renderMembresEquipe(list) {
+  list.forEach(m => { if (!m.id) m.id = bpGenId(); });
   const html = list.map((m,i) => `
     <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg);">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
@@ -1537,6 +1546,7 @@ function renderMembresEquipe(list) {
       </div>
       <div class="fg">
         <div><label>Nom${helpIcon('membre_nom')}</label><input value="${esc(m.nom||'')}" oninput="updMembreEquipe(${i},'nom',this.value)"></div>
+        <div><label>Prénom${helpIcon('membre_prenom')}</label><input value="${esc(m.prenom||'')}" oninput="updMembreEquipe(${i},'prenom',this.value)"></div>
         <div><label>Fonction${helpIcon('membre_fonction')}</label><input value="${esc(m.fonction||'')}" oninput="updMembreEquipe(${i},'fonction',this.value)"></div>
         <div><label>Formation${helpIcon('membre_formation')}</label><input value="${esc(m.formation||'')}" oninput="updMembreEquipe(${i},'formation',this.value)"></div>
         <div><label>Années d'expérience${helpIcon('membre_annees_experience')}</label><input type="number" min="0" value="${esc(m.annees_experience||'')}" oninput="updMembreEquipe(${i},'annees_experience',this.value)"></div>
@@ -1555,19 +1565,28 @@ function renderMembresEquipe(list) {
         <div><label>LinkedIn${helpIcon('membre_linkedin')}</label><input value="${esc(m.linkedin||'')}" placeholder="https://linkedin.com/in/…" oninput="updMembreEquipe(${i},'linkedin',this.value)"></div>
         <div class="full"><label>Compétences manquantes (pour ce membre)${helpIcon('membre_competences_manquantes')}</label><input value="${esc(m.competences_manquantes||'')}" oninput="updMembreEquipe(${i},'competences_manquantes',this.value)"></div>
       </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11.5px;font-weight:700;color:var(--muted);">📎 Pièces jointes (CV, diplôme…)</span>
+          <button class="btn btn-outline btn-sm" onclick="bpAjouterPieceJointeMembre('${m.id}')">+ Joindre</button>
+        </div>
+        <div id="membre-docs-${m.id}" style="font-size:11.5px;color:var(--muted);">Chargement…</div>
+      </div>
     </div>`).join('');
   return html;
 }
 function addMembreEquipe() {
   if (!sections.infos_generales) sections.infos_generales={};
   if (!sections.infos_generales.membres_equipe) sections.infos_generales.membres_equipe=[];
-  sections.infos_generales.membres_equipe.push({nom:'',fonction:'',formation:'',annees_experience:'',disponibilite:'temps_plein'});
+  sections.infos_generales.membres_equipe.push({id:bpGenId(),nom:'',prenom:'',fonction:'',formation:'',annees_experience:'',disponibilite:'temps_plein'});
   document.getElementById('membres-equipe-list').innerHTML = renderMembresEquipe(sections.infos_generales.membres_equipe);
+  bpChargerDocsMembresEquipe();
   markDirty();
 }
 function removeMembreEquipe(i) {
   sections.infos_generales.membres_equipe.splice(i,1);
   document.getElementById('membres-equipe-list').innerHTML = renderMembresEquipe(sections.infos_generales.membres_equipe);
+  bpChargerDocsMembresEquipe();
   markDirty();
 }
 function updMembreEquipe(i,key,val) {
@@ -1576,6 +1595,59 @@ function updMembreEquipe(i,key,val) {
   if (!sections.infos_generales.membres_equipe[i]) sections.infos_generales.membres_equipe[i]={};
   sections.infos_generales.membres_equipe[i][key]=val;
   markDirty();
+}
+/* Pièces jointes par collaborateur (2026-09-02) — même route/mécanisme que les justificatifs
+   Traction (bpLoadTractionDocs ci-dessus) et Annexes, jamais un système parallèle : un seul
+   fichier passe par POST /api/upload/document (Bunny, vérifié par octets magiques), puis
+   POST /business-plans/:id/documents en garde la référence, avec field_key = l'id du membre
+   (voir bpGenId) pour que chaque pièce reste attachée à la bonne personne quel que soit
+   l'ordre de la liste. Une seule requête GET pour toute la section (pas une par membre),
+   filtrée côté client par field_key. */
+async function bpChargerDocsMembresEquipe() {
+  const membres = sections.infos_generales?.membres_equipe || [];
+  if (!membres.length) return;
+  let docs = [];
+  try { docs = await api('GET', `/business-plans/${bpId}/documents?section=infos_generales`); }
+  catch (e) { membres.forEach(m => { const el = document.getElementById('membre-docs-'+m.id); if (el) el.innerHTML = '<span style="color:#dc2626;">Erreur de chargement.</span>'; }); return; }
+  membres.forEach(m => {
+    const el = document.getElementById('membre-docs-'+m.id);
+    if (!el) return;
+    const mesDocs = docs.filter(d => d.field_key === 'membre_'+m.id);
+    el.innerHTML = mesDocs.length
+      ? mesDocs.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;">
+          <a href="${esc(d.url_bunny)}" target="_blank" rel="noopener">📄 ${esc(d.nom)}</a>
+          ${monRole!=='lecteur'?`<button onclick="bpSupprimerPieceJointeMembre(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);">✕</button>`:''}
+        </div>`).join('')
+      : 'Aucune pièce jointe pour l\'instant.';
+  });
+}
+function bpAjouterPieceJointeMembre(membreId) {
+  if (monRole === 'lecteur') { alert('Lecture seule.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const nom = prompt('Nom de ce document (CV, diplôme…) ?', file.name) || file.name;
+    const el = document.getElementById('membre-docs-'+membreId);
+    if (el) el.innerHTML = 'Envoi en cours…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
+      const upData = await up.json();
+      if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'infos_generales', field_key: 'membre_'+membreId, categorie: 'equipe', nom, url_bunny: upData.url, type_mime: file.type });
+    } catch (e) { alert(e.message || 'Erreur.'); }
+    bpChargerDocsMembresEquipe();
+  };
+  input.click();
+}
+async function bpSupprimerPieceJointeMembre(docId) {
+  if (!confirm('Supprimer cette pièce jointe ?')) return;
+  await api('DELETE', `/business-plans/${bpId}/documents/${docId}`);
+  bpChargerDocsMembresEquipe();
 }
 
 /* ---- 2. Résumé exécutif ---- */
