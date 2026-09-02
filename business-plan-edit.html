@@ -296,11 +296,16 @@ body.bp-type-agriculture .bp-conditionnel-agriculture { display: block; }
 .bp-media-thumb-add:hover{border-color:#2563EB;color:#2563EB;}
 .bp-media-video-wrap video{max-width:420px;width:100%;border-radius:12px;display:block;background:#000;}
 
-/* Configuration monétaire (2026-08-31) */
+/* Configuration monétaire (2026-08-31 ; rendu plus visible le 2026-09-02 — bouton plutôt que
+   simple case à cocher discrète, pour qu'on le remarque sans avoir à chercher) */
 .bp-devise-hint{font-size:12.5px;color:var(--muted);margin:-6px 0 14px;line-height:1.5;}
 .bp-devise-sec{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
-.bp-devise-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;}
-.bp-devise-check input{width:16px;height:16px;}
+.bp-devise-check{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:800;cursor:pointer;
+  background:#fff7ed;border:1.5px solid #fdba74;border-radius:12px;padding:12px 16px;color:#9a3412;
+  transition:background .15s,border-color .15s;}
+.bp-devise-check:hover{background:#ffedd5;border-color:#F26422;}
+.bp-devise-check input{width:18px;height:18px;accent-color:#F26422;flex-shrink:0;}
+.bp-devise-check:has(input:checked){background:#fff1e6;border-color:#F26422;color:#7c2d12;}
 /* Devise dominante à l'affichage (point 13) : la référence en gras/pleine taille, les
    conversions secondaires en retrait — classes posées par CurrencyManager.afficherMontantHTML(). */
 .cm-principal{font-weight:800;}
@@ -1381,11 +1386,11 @@ function renderBPDeviseBlock() {
       <div><label>Monnaie de référence</label><select ${ro?'disabled':''} onchange="bpDeviseSetRef(this.value)">${bpDeviseOptions(w.reference)}</select></div>
     </div>
     <div class="bp-devise-sec">
-      <label class="bp-devise-check"><input type="checkbox" ${sec1?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(0,this.checked)"> Afficher une monnaie supplémentaire</label>
+      <label class="bp-devise-check"><input type="checkbox" ${sec1?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(0,this.checked)"> ➕ Afficher une monnaie supplémentaire</label>
       ${sec1 ? bpDeviseSecondaireHTML(0, sec1, w.reference, ro) : ''}
     </div>
     ${sec1 ? `<div class="bp-devise-sec">
-      <label class="bp-devise-check"><input type="checkbox" ${sec2?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(1,this.checked)"> Ajouter une deuxième monnaie</label>
+      <label class="bp-devise-check"><input type="checkbox" ${sec2?'checked':''} ${ro?'disabled':''} onchange="bpDeviseToggleSecondaire(1,this.checked)"> ➕ Ajouter une deuxième monnaie</label>
       ${sec2 ? bpDeviseSecondaireHTML(1, sec2, w.reference, ro) : ''}
     </div>` : ''}
     ${!ro ? `<button type="button" class="btn btn-sm btn-orange" style="margin-top:14px;" onclick="bpEnregistrerDeviseConfig()">💾 Enregistrer la configuration</button>` : ''}
