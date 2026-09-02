@@ -84,6 +84,15 @@ html,body{height:100%;overflow:hidden;}
 .bp-help .bp-help-tip{display:none;position:absolute;left:0;bottom:135%;background:#1f2937;color:#fff;font-size:12px;font-weight:400;line-height:1.4;padding:8px 10px;border-radius:6px;width:230px;white-space:normal;z-index:80;box-shadow:0 4px 12px rgba(0,0,0,.25);text-transform:none;}
 .bp-help:hover .bp-help-tip,.bp-help.active .bp-help-tip{display:block;}
 
+/* Pièce jointe par champ (2026-09-02) — même principe visuel que l'aide (?) ci-dessus :
+   une icône discrète à côté du libellé, un panneau au clic. Présente sur CHAQUE champ
+   (field/textarea), sur toutes les sections — voir attachIcon() plus bas. */
+.bp-attach{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#dbeafe;color:#1d4ed8;font-size:9px;cursor:pointer;margin-left:4px;position:relative;vertical-align:middle;flex-shrink:0;}
+.bp-attach:hover,.bp-attach.active{background:#2563eb;}
+.bp-attach.has-docs{background:#F26422;}
+.bp-attach .bp-attach-panel{display:none;position:absolute;left:0;top:135%;background:#fff;border:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:400;line-height:1.4;padding:10px;border-radius:8px;width:230px;white-space:normal;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.18);text-align:left;cursor:default;}
+.bp-attach.active .bp-attach-panel{display:block;}
+
 /* Tableau de bord financier */
 .fin-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:10px;}
 .fin-dash-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
@@ -984,12 +993,89 @@ function helpIcon(key) {
   return `<span class="bp-help" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('active')">?<span class="bp-help-tip">${esc(t)}</span></span>`;
 }
 
+/* ---- Pièce jointe par champ (2026-09-02) ----
+   Demande explicite : pouvoir joindre un PDF, un Excel ou une photo à N'IMPORTE QUEL champ du
+   business plan. Ajouté une seule fois ici, dans field()/textarea() (voir plus bas), pour
+   couvrir automatiquement les ~150 champs du document plutôt que de dupliquer un bouton
+   partout. Réutilise le mécanisme déjà en place pour les justificatifs Traction/Annexes/Équipe
+   (POST /api/upload/document puis POST /business-plans/:id/documents, table bp_documents) —
+   jamais un système parallèle : section_key = la section active, field_key = la clé du champ.
+   Chargement paresseux (au clic seulement) : avec ~150 champs sur la page, précharger les
+   pièces jointes de chacun au rendu de la section enverrait ~150 requêtes pour rien. */
+const BP_SECTION_CATEGORIES = {
+  infos_generales:'administratif', resume_executif:'autre', presentation:'autre',
+  probleme:'marche', solution:'technique', marche:'marche', swot:'autre',
+  business_model:'commercial', produits:'technique', strategie_marketing:'commercial',
+  plan_commercial:'commercial', plan_operationnel:'technique', organisation:'administratif',
+  rh:'equipe', calendrier:'autre', plan_financier:'financier', risques:'autre',
+  impact:'autre', financement:'financier', annexes:'autre',
+};
+function attachIcon(key) {
+  const sectionKey = currentSection;
+  return `<span class="bp-attach" data-section="${sectionKey}" data-field="${key}" title="Joindre un document (PDF, Excel, photo…)" onclick="event.preventDefault();event.stopPropagation();bpToggleAttachPanel(this,'${sectionKey}','${key}')">📎<span class="bp-attach-panel" onclick="event.stopPropagation()"></span></span>`;
+}
+function bpToggleAttachPanel(iconEl, sectionKey, fieldKey) {
+  const etaitActif = iconEl.classList.contains('active');
+  // Un seul panneau ouvert à la fois — sans ça, plusieurs pourraient s'empiler sur une longue page.
+  document.querySelectorAll('.bp-attach.active').forEach(e => { if (e !== iconEl) e.classList.remove('active'); });
+  iconEl.classList.toggle('active', !etaitActif);
+  if (!etaitActif) bpChargerPiecesJointesChamp(iconEl, sectionKey, fieldKey);
+}
+async function bpChargerPiecesJointesChamp(iconEl, sectionKey, fieldKey) {
+  const panel = iconEl.querySelector('.bp-attach-panel');
+  panel.innerHTML = 'Chargement…';
+  let docs;
+  try { docs = await api('GET', `/business-plans/${bpId}/documents?section=${encodeURIComponent(sectionKey)}`); }
+  catch (e) { panel.innerHTML = '<span style="color:#dc2626;">Erreur de chargement.</span>'; return; }
+  const mine = docs.filter(d => d.field_key === fieldKey);
+  iconEl.classList.toggle('has-docs', mine.length > 0);
+  const ro = monRole === 'lecteur';
+  panel.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px;">📎 Pièces jointes</div>
+    <div>${mine.length ? mine.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:3px 0;">
+        <a href="${esc(d.url_bunny)}" target="_blank" rel="noopener" style="word-break:break-all;">${esc(d.nom)}</a>
+        ${ro?'':`<button onclick="event.stopPropagation();bpSupprimerPieceJointeChamp(${d.id},this)" style="background:none;border:none;cursor:pointer;color:var(--muted);flex-shrink:0;">✕</button>`}
+      </div>`).join('') : '<div style="color:var(--muted);">Aucun document.</div>'}</div>
+    ${ro?'':`<button type="button" class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;box-sizing:border-box;" onclick="event.stopPropagation();bpAjouterPieceJointeChamp('${sectionKey}','${fieldKey}',this)">+ Joindre (PDF, Excel, photo…)</button>`}
+  `;
+}
+function bpAjouterPieceJointeChamp(sectionKey, fieldKey, btnEl) {
+  if (monRole === 'lecteur') return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.xls,.xlsx,.csv,image/*';
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const nom = prompt('Nom de ce document ?', file.name) || file.name;
+    btnEl.disabled = true; btnEl.textContent = 'Envoi en cours…';
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      const up = await fetch('/api/upload/document', { method:'POST', credentials:'same-origin', body: fd });
+      const upData = await up.json();
+      if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: sectionKey, field_key: fieldKey, categorie: BP_SECTION_CATEGORIES[sectionKey] || 'autre', nom, url_bunny: upData.url, type_mime: file.type });
+    } catch (e) { alert(e.message || 'Erreur.'); }
+    const iconEl = btnEl.closest('.bp-attach');
+    if (iconEl) bpChargerPiecesJointesChamp(iconEl, sectionKey, fieldKey);
+  };
+  input.click();
+}
+async function bpSupprimerPieceJointeChamp(docId, btnEl) {
+  if (!confirm('Supprimer cette pièce jointe ?')) return;
+  const iconEl = btnEl.closest('.bp-attach');
+  const sectionKey = iconEl.dataset.section, fieldKey = iconEl.dataset.field;
+  await api('DELETE', `/business-plans/${bpId}/documents/${docId}`);
+  if (iconEl) bpChargerPiecesJointesChamp(iconEl, sectionKey, fieldKey);
+}
+
 /* ---- Helpers de saisie ---- */
 function field(key, label, placeholder='', type='text', full=false, required=false) {
   const val = sections[currentSection]?.[key]||'';
   const ro = monRole==='lecteur';
   return `<div class="${full?'full':''}">
-    <label>${label}${required?` <span style="color:#D33;">*</span>`:''}${helpIcon(key)}</label>
+    <label>${label}${required?` <span style="color:#D33;">*</span>`:''}${helpIcon(key)}${attachIcon(key)}</label>
     <input type="${type}" data-key="${key}" value="${esc(val)}" placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateField('${key}',this.value)">
   </div>`;
 }
@@ -998,7 +1084,7 @@ function textarea(key, label, placeholder='', rows=3, full=true) {
   const val = sections[currentSection]?.[key]||'';
   const ro = monRole==='lecteur';
   return `<div class="${full?'full':''}">
-    <label>${label}${helpIcon(key)}</label>
+    <label>${label}${helpIcon(key)}${attachIcon(key)}</label>
     <textarea data-key="${key}" rows="${rows}" placeholder="${placeholder}" ${ro?'readonly':''} oninput="updateField('${key}',this.value)">${esc(val)}</textarea>
   </div>`;
 }
@@ -1007,7 +1093,7 @@ function select(key, label, options, full=false) {
   const val = sections[currentSection]?.[key]||'';
   const ro = monRole==='lecteur';
   return `<div class="${full?'full':''}">
-    <label>${label}${helpIcon(key)}</label>
+    <label>${label}${helpIcon(key)}${attachIcon(key)}</label>
     <select data-key="${key}" ${ro?'disabled':''} onchange="updateField('${key}',this.value)">
       ${options.map(o=>typeof o==='string'?`<option value="${o}" ${val===o?'selected':''}>${o}</option>`:`<option value="${o.v}" ${val===o.v?'selected':''}>${o.l}</option>`).join('')}
     </select>
