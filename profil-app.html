@@ -2808,13 +2808,20 @@ async function renderVitrineVisitor(init) {
 
   const servicesCats = safeParseJson(init.vitrine_services_categories_json, null);
   const hasServices = (servicesCats && servicesCats.length) || init.vitrine_services;
+  const enModeCategories = !!(servicesCats && servicesCats.length);
   const services = ((hasServices || isOwn) && modOn('services')) ? `<section id="pv-services" class="pvt-section">
-    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🛠 Services</h3>${isOwn?`<button onclick="pvtEditServices()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3>🛠 Services</h3>
+      <div style="display:flex;gap:6px;">
+        ${isOwn?`<button onclick="pvtEditServices()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}
+        ${isOwn && !enModeCategories?`<button onclick="pvtAddServiceRow()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter</button>`:''}
+      </div>
+    </div>
     <div id="pvt-services-body" class="pvt-services-list">${
-      servicesCats && servicesCats.length
+      enModeCategories
         ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${servicesCats.map(c=>`<span class="pvz-interest-chip">${vitrineCategorieLabel(c)}</span>`).join('')}${servicesCats.length<MAX_SERVICES_CATEGORIES && isOwn ? Array.from({length:Math.min(3,MAX_SERVICES_CATEGORIES-servicesCats.length)}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('') : ''}</div>`
         : (init.vitrine_services
-            ? init.vitrine_services.split('\n').filter(Boolean).map(s=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span>${esc(s)}</div>`).join('')
+            ? init.vitrine_services.split('\n').filter(Boolean).map((s,i)=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span><span style="flex:1;">${esc(s)}</span>${isOwn?`<button onclick="pvtRemoveServiceRow(${i})" title="Retirer ce service" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 6px;flex:none;">✕</button>`:''}</div>`).join('')
             : isOwn
               ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${Array.from({length:3}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('')}</div>`
               : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun service renseigné.</span>`)
@@ -3851,6 +3858,57 @@ async function pvtSaveServices() {
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
+/* ══════════ Services : ajout/retrait d'une ligne au texte libre (2026-09-04) ══════════
+   Complète pvtEditServices() (qui ne gère que les catégories fixes, VITRINE_CATEGORIES) —
+   ici on édite ligne par ligne le champ texte libre vitrine_services (une ligne = un service
+   affiché avec une puce ✔, voir le rendu ci-dessus). Le bouton « ➕ Ajouter » n'apparaît que
+   quand la section n'est pas déjà en mode catégories, pour éviter d'écrire dans un champ que
+   l'affichage actuel ignorerait. */
+function pvtAddServiceRow() {
+  if (!isOwn || !_vitrineInit) return;
+  const body = document.getElementById('pvt-services-body');
+  if (!body || document.getElementById('pvt-service-add-row')) return;
+  const row = document.createElement('div');
+  row.id = 'pvt-service-add-row';
+  row.className = 'pvt-service-row';
+  row.innerHTML = `<span class="pvt-service-ico">➕</span>
+    <input id="pvt-service-add-input" type="text" placeholder="Ex : Livraison à domicile" maxlength="200" style="flex:1;box-sizing:border-box;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;">
+    <button onclick="pvtValidateServiceRow()" style="background:var(--v1,#8E1B2E);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;flex:none;">✓ Valider</button>
+    <button onclick="pvtCancelServiceRow()" title="Annuler" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 6px;flex:none;">✕</button>`;
+  body.appendChild(row);
+  const input = document.getElementById('pvt-service-add-input');
+  input.focus();
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pvtValidateServiceRow(); } else if (e.key === 'Escape') { pvtCancelServiceRow(); } });
+}
+function pvtCancelServiceRow() {
+  document.getElementById('pvt-service-add-row')?.remove();
+}
+async function pvtValidateServiceRow() {
+  const input = document.getElementById('pvt-service-add-input');
+  const val = (input?.value || '').trim();
+  if (!val) { input?.focus(); return; }
+  const lignes = (_vitrineInit.vitrine_services || '').split('\n').filter(Boolean);
+  lignes.push(val);
+  const nouveauTexte = lignes.join('\n');
+  try {
+    await vitrineSave({ vitrine_services: nouveauTexte });
+    _vitrineInit.vitrine_services = nouveauTexte;
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+async function pvtRemoveServiceRow(index) {
+  if (!isOwn || !_vitrineInit) return;
+  if (!confirm('Retirer ce service ?')) return;
+  const lignes = (_vitrineInit.vitrine_services || '').split('\n').filter(Boolean);
+  lignes.splice(index, 1);
+  const nouveauTexte = lignes.join('\n');
+  try {
+    await vitrineSave({ vitrine_services: nouveauTexte });
+    _vitrineInit.vitrine_services = nouveauTexte;
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
 /* ══════════ Coordonnées : sauvegarde immédiate au changement d'un champ ══════════ */
 async function pvtSaveCoordField(field, value) {
   if (!isOwn || !_vitrineInit) return;
@@ -3955,7 +4013,11 @@ function renderPvtCatalogues(catalogues, produits, ownerId) {
     const plein = articles.length >= MAX_ARTICLES_PAR_CATALOGUE;
     return `<div class="pvt-catalogue-block" data-catid="${cat.id}" style="margin-bottom:22px;${cat.statut==='masque'?'opacity:.55;':''}">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-        ${cat.image_url ? `<img loading="lazy" src="${esc(cat.image_url)}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none;">` : `<div style="width:52px;height:52px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">📁</div>`}
+        ${cat.image_url
+          ? (isCatalogueCoverVideo(cat.image_url)
+            ? `<div style="width:52px;height:52px;border-radius:10px;background:#1F2937;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;" title="Vidéo de couverture">🎬</div>`
+            : `<img loading="lazy" src="${esc(cat.image_url)}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none;">`)
+          : `<div style="width:52px;height:52px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none;">📁</div>`}
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:15px;">${esc(cat.nom)}${cat.statut==='masque'?' <span style="font-size:11px;font-weight:600;opacity:.8;">(masqué)</span>':''}</div>
           ${cat.description ? `<div style="font-size:12px;opacity:.85;">${esc(cat.description)}</div>` : ''}
@@ -4001,6 +4063,13 @@ function wireCatalogueDrag(grid, initiativeId) {
   });
 }
 
+/* Une couverture de catalogue peut être une image OU une vidéo (2026-09-04) — les deux
+   partagent la même colonne image_url, le type se déduit de l'extension réelle renvoyée par
+   le serveur (.mp4/.webm), jamais du nom de fichier d'origine côté client. */
+function isCatalogueCoverVideo(url) {
+  return /\.(mp4|webm)(\?|$)/i.test(url || '');
+}
+
 let _catalogueCoverUrl = null;
 function openCatalogueModal(catalogueId) {
   const editing = !!catalogueId;
@@ -4022,9 +4091,11 @@ function openCatalogueModal(catalogueId) {
         <option value="">—</option>
         ${VITRINE_CATEGORIES.map(([k,e,l]) => `<option value="${k}" ${cat&&cat.categorie===k?'selected':''}>${e} ${l}</option>`).join('')}
       </select>
-      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Image de couverture</label>
-      <div id="cf-cover-slot" style="width:100%;height:120px;border:1.5px dashed #E2E8F0;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:12px;overflow:hidden;position:relative;" onclick="document.getElementById('cf-cover-file').click()"></div>
-      <input type="file" id="cf-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleCatalogueCover(this)">
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Image ou vidéo de couverture</label>
+      <div id="cf-cover-slot" style="width:100%;height:120px;border:1.5px dashed #E2E8F0;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:6px;overflow:hidden;position:relative;" onclick="document.getElementById('cf-cover-file').click()"></div>
+      <p style="font-size:11.5px;color:#94a3b8;margin:0 0 8px;">Vidéo : 3 minutes maximum, format MP4 ou WebM.</p>
+      <input type="file" id="cf-cover-file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" style="display:none;" onchange="handleCatalogueCover(this)">
+      <p id="cf-cover-status" style="font-size:11.5px;color:#94a3b8;margin:-4px 0 8px;"></p>
       <label style="display:flex;align-items:center;gap:7px;margin-bottom:14px;font-size:13px;cursor:pointer;">
         <input type="checkbox" id="cf-visible" ${!cat||cat.statut!=='masque'?'checked':''}> Visible sur la vitrine publique
       </label>
@@ -4043,20 +4114,58 @@ function openCatalogueModal(catalogueId) {
 function renderCatalogueCoverSlot() {
   const slot = document.getElementById('cf-cover-slot');
   if (!slot) return;
-  slot.innerHTML = _catalogueCoverUrl
-    ? `<img src="${esc(_catalogueCoverUrl)}" style="width:100%;height:100%;object-fit:cover;"><button onclick="event.stopPropagation();_catalogueCoverUrl=null;renderCatalogueCoverSlot();" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;">✕</button>`
-    : `<span style="color:#94a3b8;font-size:13px;">＋ Ajouter une image</span>`;
+  const removeBtn = `<button onclick="event.stopPropagation();_catalogueCoverUrl=null;renderCatalogueCoverSlot();" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;">✕</button>`;
+  slot.innerHTML = !_catalogueCoverUrl
+    ? `<span style="color:#94a3b8;font-size:13px;">＋ Ajouter une image ou une vidéo</span>`
+    : isCatalogueCoverVideo(_catalogueCoverUrl)
+      ? `<video src="${esc(_catalogueCoverUrl)}" controls muted style="width:100%;height:100%;object-fit:cover;"></video>${removeBtn}`
+      : `<img src="${esc(_catalogueCoverUrl)}" style="width:100%;height:100%;object-fit:cover;">${removeBtn}`;
+}
+
+/* La durée réelle (≤3 min) n'est vérifiable qu'en décodant la vidéo — contrôlée ICI, dans le
+   navigateur, avant tout envoi (le serveur ne peut pas la mesurer sans ffprobe, absent de ce
+   serveur ; même limitation documentée sur POST /api/business-plans/:id/media, video_pitch). */
+function pvtLireDureeVideo(file) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(v.duration); };
+    v.onerror = () => { URL.revokeObjectURL(v.src); reject(new Error('Impossible de lire ce fichier vidéo. Formats acceptés : MP4, WebM.')); };
+    v.src = URL.createObjectURL(file);
+  });
 }
 
 async function handleCatalogueCover(input) {
   const file = input.files[0];
   if (!file) return;
+  const statusEl = document.getElementById('cf-cover-status');
+  const isVideo = file.type.startsWith('video/');
   try {
-    const compressed = await compressImageFile(file, 800, 800, 0.82);
-    const url = await uploadMedia(compressed, 'produit');
-    _catalogueCoverUrl = url;
+    if (isVideo) {
+      const MAX_VIDEO_MO = 150;
+      if (file.size > MAX_VIDEO_MO * 1024 * 1024) { alert(`Vidéo trop volumineuse (max ${MAX_VIDEO_MO} Mo).`); input.value = ''; return; }
+      if (statusEl) statusEl.textContent = 'Vérification de la durée…';
+      const duree = await pvtLireDureeVideo(file);
+      if (duree > 180) {
+        alert(`Cette vidéo dure ${Math.round(duree)} secondes — 3 minutes (180 s) maximum.`);
+        if (statusEl) statusEl.textContent = '';
+        input.value = '';
+        return;
+      }
+      if (statusEl) statusEl.textContent = 'Envoi de la vidéo…';
+      const url = await uploadMedia(file, 'produit');
+      _catalogueCoverUrl = url;
+    } else {
+      const compressed = await compressImageFile(file, 800, 800, 0.82);
+      const url = await uploadMedia(compressed, 'produit');
+      _catalogueCoverUrl = url;
+    }
+    if (statusEl) statusEl.textContent = '';
     renderCatalogueCoverSlot();
-  } catch (e) { alert('Erreur upload image : ' + e.message); }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '';
+    alert(`Erreur upload ${isVideo?'vidéo':'image'} : ` + e.message);
+  }
 }
 
 async function saveCatalogue(catalogueId) {

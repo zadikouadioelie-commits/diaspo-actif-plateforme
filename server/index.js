@@ -1545,7 +1545,12 @@ route("POST", "/api/upload/post", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload post")); }
 });
 
-/* POST /api/upload/produit — photo produit (Vitrine/Boutique) */
+/* POST /api/upload/produit — photo produit (Vitrine/Boutique), ou vidéo de couverture de
+   catalogue (2026-09-04, ≤3 min). La durée réelle n'est vérifiable qu'en décodant la vidéo
+   (ffprobe, absent de ce serveur) : elle est contrôlée côté client avant l'envoi (voir
+   pvtLireDureeVideo, profil-app.html) ; ici on se protège par le type réel (magic bytes) et
+   une taille max raisonnable — même mécanique que video_pitch sur
+   POST /api/business-plans/:id/media. */
 route("POST", "/api/upload/produit", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
@@ -1559,9 +1564,22 @@ route("POST", "/api/upload/produit", async (req, res) => {
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["produit"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+
+  const vidType = SEC.isSafeVideo(file.buffer);
+  if (vidType) {
+    const MAX_VIDEO = 150 * 1024 * 1024;
+    if (file.buffer.length > MAX_VIDEO) return sendJSON(res, 400, { error: "Vidéo trop volumineuse (max 150 Mo)." });
+    try {
+      const filename = `${user.id}-${Date.now()}.${vidType.split("/")[1]}`;
+      const url = await uploadToBunny(file.buffer, filename, "produits");
+      SEC.logSecurity("upload", { uid: Number(user.id), kind: "produit_video", type: vidType, size: file.buffer.length });
+      return sendJSON(res, 200, { url });
+    } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "upload produit video")); }
+  }
+
   if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
   const imgType = SEC.isSafeRasterImage(file.buffer);
-  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  if (!imgType) return sendJSON(res, 400, { error: "Format non valide (JPEG, PNG, GIF, WebP ou vidéo MP4/WebM requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
     const url = await uploadToBunny(file.buffer, filename, "produits");
