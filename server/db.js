@@ -1676,6 +1676,20 @@ const MIGRATIONS = [
   // Dossier QR Code Participants — cycle de vie
   ["events", "qr_folder_notified_at TEXT"],
   ["events", "qr_folder_purged_at TEXT"],
+  // Fiche conceptuelle — pièces jointes complémentaires (2026-09-02, demande explicite) :
+  // pdf_url/pdf_nom restent le PDF principal (inchangés) ; pdf_extra_json accueille les PDF
+  // ajoutés via "+ Ajouter un autre PDF", au même format que galerie_photos (tableau JSON,
+  // base64 comme le reste de la fiche conceptuelle — jamais un système de stockage parallèle).
+  ["events", "pdf_extra_json TEXT DEFAULT '[]'"],
+  // Pièce jointe (image ou PDF) spécifique au champ "Programme / Déroulé" de la fiche
+  // structurée — un planning détaillé au format affiche/PDF, distinct du PDF principal.
+  ["events", "fc_programme_fichier_url TEXT"],
+  ["events", "fc_programme_fichier_nom TEXT"],
+  // Inscription via un lien externe (2026-09-02, demande explicite) : l'organisateur a déjà
+  // créé sa propre liste d'inscription ailleurs (Google Forms, etc.) et colle simplement son
+  // URL — un 5e mode à côté de libre/facultative/obligatoire/validation, jamais suivi côté
+  // Diaspo'Actif (pas d'ID DA/DS-ID pour ce mode, juste un bouton qui ouvre le lien).
+  ["events", "inscription_lien_externe TEXT"],
   // Agenda events — lien source
   ["agenda_events", "source_type TEXT DEFAULT 'manuel'"],
   ["agenda_events", "source_id INTEGER"],
@@ -2011,6 +2025,25 @@ const MIGRATIONS = [
   // sur l'ordre des migrations) ; déplacé ici pour repasser par appliquerMigrations(), déjà
   // appelée une seconde fois après la création de cette table (voir plus bas).
   ["adhesion_membres", "reponses_json TEXT DEFAULT '{}'"],
+  // Module Paramètres du compte — taxonomie "domaine d'activité" unifiée (2026-09-04) :
+  // un domaine (liste fermée avec icône, assets/domaines-activite.js) + jusqu'à 2 sous-domaines
+  // en texte libre, partagée entre comptes individuels (users) et initiatives, remplaçant à
+  // terme les anciennes listes disjointes (users.domaine_utilisateur jamais affiché nulle part ;
+  // initiatives.domaine, liste différente sans icônes). Additif : les anciennes colonnes restent
+  // intactes, l'affichage bascule sur les nouvelles UNIQUEMENT quand un compte les a renseignées
+  // (migration "self-service", jamais de ré-écriture automatique des comptes existants).
+  ["users", "domaine_principal TEXT"],
+  ["users", "sous_domaine_1 TEXT"],
+  ["users", "sous_domaine_2 TEXT"],
+  ["initiatives", "domaine_principal TEXT"],
+  ["initiatives", "sous_domaine_1 TEXT"],
+  ["initiatives", "sous_domaine_2 TEXT"],
+  // Notifications (Paramètres du compte) : réutilise le seul pattern de préférence réel et
+  // générique disponible (pas de fabrication de catégories qui ne déclenchent rien) — un
+  // opt-out des e-mails non essentiels. Les e-mails de sécurité/transactionnels (vérification,
+  // réinitialisation, confirmation de billet...) restent TOUJOURS envoyés, ce booléen ne les
+  // concerne pas.
+  ["users", "notif_emails_non_essentiels INTEGER DEFAULT 1"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

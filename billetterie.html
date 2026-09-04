@@ -680,6 +680,17 @@ async function confirmBuyTicket(eid, ttid, saveCard, notify) {
 
 /* ══ INSCRIPTION SÉCURISÉE (ID DA + DS-ID) ══ */
 async function renderInscriptionSecuriseeSection(e) {
+  /* Lien d'inscription externe (2026-09-02) : l'organisateur a déjà sa propre liste
+     (Google Forms…) — un simple bouton qui ouvre son lien, jamais de suivi ID DA/DS-ID côté
+     Diaspo'Actif pour ce mode, contrairement aux 4 autres. */
+  if (e.inscription_mode === 'lien_externe') {
+    if (!e.inscription_lien_externe) return '';
+    return `<div style="margin-top:16px;padding:14px 16px;background:rgba(37,99,235,0.06);border:1.5px solid #2563EB;border-radius:12px;">
+      <div style="font-weight:700;color:#2563EB;margin-bottom:8px;">🔗 Inscription via un lien externe</div>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;">L'organisateur gère les inscriptions sur sa propre liste, en dehors de Diaspo'Actif.</p>
+      <a href="${escH(e.inscription_lien_externe)}" target="_blank" rel="noopener" class="btn btn-orange" style="font-size:13px;display:inline-block;text-decoration:none;">↗ S'inscrire</a>
+    </div>`;
+  }
   // Vérifier statut si connecté
   if (ME) {
     try {

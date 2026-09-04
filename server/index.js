@@ -26881,10 +26881,11 @@ ${jsonLd}
         image_b64, ticket_types, statut: statutInit,
         image_couverture, galerie_photos,
         video1_url, video1_titre, video1_thumb, video2_url, video2_titre, video2_thumb,
-        pdf_url, pdf_nom, pdf_acces,
+        pdf_url, pdf_nom, pdf_acces, pdf_extra,
         cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
-        programmed_at, timezone, billetterie_config,
+        fc_programme_fichier_url, fc_programme_fichier_nom,
+        programmed_at, timezone, billetterie_config, inscription_lien_externe,
         rayon_publication, langue, mode_participation, region, departement, communaute
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
@@ -26900,6 +26901,7 @@ ${jsonLd}
       const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || '[]');
       const cibleListeStr = Array.isArray(cible_liste_ids) ? JSON.stringify(cible_liste_ids) : (cible_liste_ids || '[]');
       const partenairesIdsStr = Array.isArray(fc_partenaires_ids) ? JSON.stringify(fc_partenaires_ids) : (fc_partenaires_ids || '[]');
+      const pdfExtraStr = Array.isArray(pdf_extra) ? JSON.stringify(pdf_extra.slice(0,10)) : (pdf_extra || '[]');
       // Statut final
       let finalStatut = statutInit || 'brouillon';
       if (programmed_at && finalStatut !== 'publie') finalStatut = 'brouillon_programme';
@@ -26908,21 +26910,23 @@ ${jsonLd}
          image_b64,statut,commission_pct,created_at,updated_at,
          image_couverture,galerie_photos,
          video1_url,video1_titre,video1_thumb,video2_url,video2_titre,video2_thumb,
-         pdf_url,pdf_nom,pdf_acces,cible_type,cible_liste_ids,
+         pdf_url,pdf_nom,pdf_acces,pdf_extra_json,cible_type,cible_liste_ids,
          fc_resume,fc_objectifs,fc_public,fc_programme,fc_partenaires,fc_partenaires_ids,fc_contact,fc_notes,
-         programmed_at,timezone,
+         fc_programme_fichier_url,fc_programme_fichier_nom,
+         programmed_at,timezone,inscription_lien_externe,
          rayon_publication,langue,mode_participation,region,departement,communaute)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
              capacite||0, categorie||'Général', coverImg, finalStatut, PLATFORM_COMMISSION_PCT, ts, ts,
              coverImg, galerie,
              video1_url||null, video1_titre||null, video1_thumb||null,
              video2_url||null, video2_titre||null, video2_thumb||null,
-             pdf_url||null, pdf_nom||null, pdf_acces||'public',
+             pdf_url||null, pdf_nom||null, pdf_acces||'public', pdfExtraStr,
              cible_type||'tous', cibleListeStr,
              fc_resume||null, fc_objectifs||null, fc_public||null,
              fc_programme||null, fc_partenaires||null, partenairesIdsStr, fc_contact||null, fc_notes||null,
-             programmed_at||null, timezone||'Europe/Paris',
+             fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
+             programmed_at||null, timezone||'Europe/Paris', inscription_lien_externe||null,
              rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
              region||null, departement||null, communaute||null)).lastInsertRowid;
       // Fixer publie_at et envoyer notifications si publication immédiate
@@ -26961,15 +26965,17 @@ ${jsonLd}
         titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
         image_b64, statut, image_couverture, galerie_photos,
         video1_url, video1_titre, video1_thumb, video2_url, video2_titre, video2_thumb,
-        pdf_url, pdf_nom, pdf_acces, cible_type, cible_liste_ids,
+        pdf_url, pdf_nom, pdf_acces, pdf_extra, cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
+        fc_programme_fichier_url, fc_programme_fichier_nom,
         programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config,
-        langue, mode_participation, region, departement, communaute
+        inscription_lien_externe, langue, mode_participation, region, departement, communaute
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
       const cibleListeUpd = Array.isArray(cible_liste_ids) ? JSON.stringify(cible_liste_ids) : (cible_liste_ids || null);
       const partenairesUpd = Array.isArray(fc_partenaires_ids) ? JSON.stringify(fc_partenaires_ids) : (fc_partenaires_ids || null);
+      const pdfExtraUpd = Array.isArray(pdf_extra) ? JSON.stringify(pdf_extra.slice(0,10)) : (pdf_extra || null);
       // Calculer statut final
       let finalStatut = statut || null;
       if (finalStatut === 'publie' && !ev.programmed_at) {/* ok */}
@@ -26984,16 +26990,17 @@ ${jsonLd}
         galerie_photos=COALESCE(?,galerie_photos),
         video1_url=COALESCE(?,video1_url), video1_titre=COALESCE(?,video1_titre), video1_thumb=COALESCE(?,video1_thumb),
         video2_url=COALESCE(?,video2_url), video2_titre=COALESCE(?,video2_titre), video2_thumb=COALESCE(?,video2_thumb),
-        pdf_url=COALESCE(?,pdf_url), pdf_nom=COALESCE(?,pdf_nom), pdf_acces=COALESCE(?,pdf_acces),
+        pdf_url=COALESCE(?,pdf_url), pdf_nom=COALESCE(?,pdf_nom), pdf_acces=COALESCE(?,pdf_acces), pdf_extra_json=COALESCE(?,pdf_extra_json),
         cible_type=COALESCE(?,cible_type), cible_liste_ids=COALESCE(?,cible_liste_ids),
         fc_resume=COALESCE(?,fc_resume), fc_objectifs=COALESCE(?,fc_objectifs),
         fc_public=COALESCE(?,fc_public),
         fc_programme=COALESCE(?,fc_programme), fc_partenaires=COALESCE(?,fc_partenaires),
         fc_partenaires_ids=COALESCE(?,fc_partenaires_ids),
         fc_contact=COALESCE(?,fc_contact), fc_notes=COALESCE(?,fc_notes),
+        fc_programme_fichier_url=COALESCE(?,fc_programme_fichier_url), fc_programme_fichier_nom=COALESCE(?,fc_programme_fichier_nom),
         programmed_at=COALESCE(?,programmed_at), timezone=COALESCE(?,timezone),
         inscription_mode=COALESCE(?,inscription_mode), nb_places=COALESCE(?,nb_places), liste_attente=COALESCE(?,liste_attente),
-        rayon_publication=COALESCE(?,rayon_publication),
+        rayon_publication=COALESCE(?,rayon_publication), inscription_lien_externe=COALESCE(?,inscription_lien_externe),
         langue=COALESCE(?,langue), mode_participation=COALESCE(?,mode_participation),
         region=COALESCE(?,region), departement=COALESCE(?,departement), communaute=COALESCE(?,communaute),
         statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
@@ -27002,14 +27009,15 @@ ${jsonLd}
              coverUpd, coverUpd, galerieUpd,
              video1_url||null, video1_titre||null, video1_thumb||null,
              video2_url||null, video2_titre||null, video2_thumb||null,
-             pdf_url||null, pdf_nom||null, pdf_acces||null,
+             pdf_url||null, pdf_nom||null, pdf_acces||null, pdfExtraUpd,
              cible_type||null, cibleListeUpd,
              fc_resume||null, fc_objectifs||null, fc_public||null,
              fc_programme||null, fc_partenaires||null, partenairesUpd,
              fc_contact||null, fc_notes||null,
+             fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
              programmed_at||null, timezone||null,
              inscription_mode||null, nb_places!=null?Number(nb_places):null, liste_attente!=null?Number(liste_attente):null,
-             rayon_publication||null,
+             rayon_publication||null, inscription_lien_externe||null,
              langue||null, mode_participation||null, region||null, departement||null, communaute||null,
              finalStatut, eid);
       // Fixer publie_at (première publication, ou rétroactivement si publie_at est null)

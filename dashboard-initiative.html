@@ -3358,6 +3358,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   const EVT_STATUTS = {brouillon:'🟡 Brouillon', publie:'🟢 Publié', ferme:'🔴 Fermé', archive:'⬛ Archivé'};
   let initEvtEditingId = null;
   let initEvtCoverB64 = null, initEvtGallery = [null,null,null,null], initEvtPdfB64 = null, initEvtPdfNom = null;
+  let initEvtPdfExtra = [], initEvtProgrammeFichierB64 = null, initEvtProgrammeFichierNom = null;
 
   window.renderInitEvenements = async function renderInitEvenements() {
     const el = document.getElementById('evenements');
@@ -3423,6 +3424,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (!id && !window._daPremiumInitiative && !window.daBypassActive?.('evenements')) { openPremiumUpsell('evenements'); return; }
     initEvtEditingId = id || null;
     initEvtCoverB64 = null; initEvtGallery = [null,null,null,null]; initEvtPdfB64 = null; initEvtPdfNom = null;
+    initEvtPdfExtra = []; initEvtProgrammeFichierB64 = null; initEvtProgrammeFichierNom = null;
     const modal = document.getElementById('init-evt-modal-bg');
     const form = document.getElementById('init-evt-form-content');
     modal.style.display = 'flex';
@@ -3431,6 +3433,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       try {
         const { event: e } = await api('GET', '/events/'+id);
         initEvtCoverB64 = e.image_couverture || e.image_b64 || null;
+        try { initEvtPdfExtra = JSON.parse(e.pdf_extra_json||'[]'); } catch(_) { initEvtPdfExtra = []; }
+        initEvtProgrammeFichierB64 = e.fc_programme_fichier_url || null;
+        initEvtProgrammeFichierNom = e.fc_programme_fichier_nom || null;
         renderInitEvtForm(e);
       } catch(err) { form.innerHTML = '<div style="color:#ef4444;">Erreur : '+err.message+'</div>'; }
     } else {
@@ -3552,6 +3557,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
           </div>
           <input type="file" id="iev-pdf-file" accept="application/pdf" style="display:none">
+
+          <div id="iev-pdf-extra-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">${ievRenderPdfExtraListHTML()}</div>
+          <button type="button" onclick="ievAjouterPdfExtra()" style="margin-top:8px;padding:8px 12px;border:1px dashed var(--border);border-radius:8px;background:none;cursor:pointer;font-size:12.5px;font-weight:700;color:#2563EB;width:100%;">➕ Ajouter un autre PDF</button>
+          <input type="file" id="iev-pdf-extra-file" accept="application/pdf" style="display:none">
         </div>
 
         <!-- Panel Fiche structurée -->
@@ -3580,8 +3589,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
 
             <div>
-              <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">📅 Programme / Déroulé</label>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">📅 Programme / Déroulé</label>
+                <button type="button" onclick="document.getElementById('iev-programme-fichier').click()" style="font-size:11px;font-weight:700;color:#2563EB;background:none;border:none;cursor:pointer;padding:2px 4px;">📎 Joindre une image ou un PDF</button>
+              </div>
               <textarea id="iev-fc-programme" rows="4" placeholder="9h00 — Accueil&#10;10h00 — Conférence plénière&#10;12h30 — Déjeuner networking&#10;14h00 — Ateliers…" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${v(e?.fc_programme)}</textarea>
+              <div id="iev-programme-fichier-label" style="font-size:11.5px;margin-top:5px;${e?.fc_programme_fichier_nom?'':'display:none;'}color:#166534;">✅ ${e?.fc_programme_fichier_nom?escH(e.fc_programme_fichier_nom):''} <button type="button" onclick="ievRetirerProgrammeFichier()" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">✕ retirer</button></div>
+              <input type="file" id="iev-programme-fichier" accept="application/pdf,image/*" style="display:none">
             </div>
 
             <div>
@@ -3657,13 +3671,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             ['facultative','📝 Pré-inscription facultative','Facultative — les participants peuvent s\'inscrire en avance'],
             ['obligatoire','✅ Pré-inscription obligatoire','Requiert une inscription avec ID DA + DS-ID'],
             ['validation','🔍 Inscription avec validation','L\'organisateur valide chaque demande'],
+            ['lien_externe','🔗 Lien d\'inscription externe','Vous avez déjà votre propre liste (Google Forms…)'],
           ].map(([val,lbl,desc])=>`
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);">
             <input type="radio" name="iev-insc-mode" value="${val}" ${(e?.inscription_mode||'libre')===val?'checked':''} style="accent-color:#2563EB;" onchange="ievTogglePlaces()">
             <div><strong style="font-size:13px;">${lbl}</strong><div style="font-size:11px;color:var(--muted);">${desc}</div></div>
           </label>`).join('')}
         </div>
-        <div id="iev-places-panel" style="display:${e?.inscription_mode && e.inscription_mode!=='libre'?'':'none'};margin-top:10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;">
+        <div id="iev-places-panel" style="display:${e?.inscription_mode && !['libre','lien_externe'].includes(e.inscription_mode)?'':'none'};margin-top:10px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div>
               <label style="font-size:12px;font-weight:700;color:#166534;">👥 Nombre de places</label>
@@ -3676,6 +3691,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               </label>
             </div>
           </div>
+        </div>
+        <div id="iev-lien-externe-panel" style="display:${e?.inscription_mode==='lien_externe'?'':'none'};margin-top:10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;">
+          <label style="font-size:12px;font-weight:700;color:#1d4ed8;">🔗 Lien vers votre liste d'inscription</label>
+          <input type="url" id="iev-lien-externe-url" value="${v(e?.inscription_lien_externe)}" placeholder="https://forms.gle/…" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #93C5FD;border-radius:6px;font-size:13px;font-family:inherit;">
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">Un bouton « S'inscrire » sur la page publique de l'événement ouvrira ce lien dans un nouvel onglet — aucun suivi côté Diaspo'Actif pour ce mode.</div>
         </div>
         <div style="margin-top:10px;background:rgba(255,107,0,0.05);border:1px solid rgba(255,107,0,0.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.5;">
           💡 Avec l'inscription obligatoire, les participants s'identifient avec leur <strong>Identifiant Diaspo'Actif (ID DA)</strong> et signent avec leur <strong>Code de Sécurité (DS-ID)</strong>. Chaque inscription est tracée et sécurisée.
@@ -3750,6 +3770,34 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       initEvtPdfNom=file.name;
       const reader=new FileReader();
       reader.onload=rv=>{initEvtPdfB64=rv.target.result;document.getElementById('iev-pdf-label').textContent='✅ '+file.name;};
+      reader.readAsDataURL(file);
+    });
+    // PDF supplémentaires ("+ Ajouter un autre PDF")
+    const pdfExtraFile = document.getElementById('iev-pdf-extra-file');
+    if (pdfExtraFile) pdfExtraFile.addEventListener('change', ev => {
+      const file = ev.target.files[0]; if(!file) return;
+      if(file.size>5*1024*1024){showToast('PDF trop lourd (max 5 Mo).','warning');return;}
+      const reader=new FileReader();
+      reader.onload=rv=>{
+        initEvtPdfExtra.push({ nom:file.name, url:rv.target.result });
+        document.getElementById('iev-pdf-extra-list').innerHTML = ievRenderPdfExtraListHTML();
+      };
+      reader.readAsDataURL(file);
+      ev.target.value = '';
+    });
+    // Pièce jointe du Programme / Déroulé
+    const programmeFile = document.getElementById('iev-programme-fichier');
+    if (programmeFile) programmeFile.addEventListener('change', ev => {
+      const file = ev.target.files[0]; if(!file) return;
+      if(file.size>5*1024*1024){showToast('Fichier trop lourd (max 5 Mo).','warning');return;}
+      initEvtProgrammeFichierNom=file.name;
+      const reader=new FileReader();
+      reader.onload=rv=>{
+        initEvtProgrammeFichierB64=rv.target.result;
+        const lbl=document.getElementById('iev-programme-fichier-label');
+        lbl.style.display='';
+        lbl.innerHTML='✅ '+escH(file.name)+' <button type="button" onclick="ievRetirerProgrammeFichier()" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">✕ retirer</button>';
+      };
       reader.readAsDataURL(file);
     });
     // Cible radio
@@ -3957,13 +4005,40 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.ievTogglePlaces = function() {
     const mode = document.querySelector('input[name="iev-insc-mode"]:checked')?.value||'libre';
     const panel = document.getElementById('iev-places-panel');
-    if(panel) panel.style.display = mode !== 'libre' ? '' : 'none';
+    if(panel) panel.style.display = (mode!=='libre' && mode!=='lien_externe') ? '' : 'none';
+    const panelExt = document.getElementById('iev-lien-externe-panel');
+    if(panelExt) panelExt.style.display = mode==='lien_externe' ? '' : 'none';
+  };
+
+  // ── PDF supplémentaires de la fiche conceptuelle ("+ Ajouter un autre PDF") ──
+  function ievRenderPdfExtraListHTML() {
+    return initEvtPdfExtra.map((p,i)=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-size:12.5px;">
+        <span>📄 ${escH(p.nom)}</span>
+        <button type="button" onclick="ievRetirerPdfExtra(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">✕ retirer</button>
+      </div>`).join('');
+  }
+  window.ievAjouterPdfExtra = function() { document.getElementById('iev-pdf-extra-file').click(); };
+  window.ievRetirerPdfExtra = function(i) {
+    initEvtPdfExtra.splice(i,1);
+    document.getElementById('iev-pdf-extra-list').innerHTML = ievRenderPdfExtraListHTML();
+  };
+  window.ievRetirerProgrammeFichier = function() {
+    initEvtProgrammeFichierB64 = null; initEvtProgrammeFichierNom = null;
+    const lbl = document.getElementById('iev-programme-fichier-label');
+    if(lbl){ lbl.style.display='none'; lbl.innerHTML=''; }
+    const input = document.getElementById('iev-programme-fichier');
+    if(input) input.value='';
   };
 
   window.saveInitEvt = async function() {
     const titre = document.getElementById('iev-titre').value.trim();
     const debut = document.getElementById('iev-debut').value;
     if(!titre||!debut){showToast('Titre et date de début requis.','warning');return;}
+    const modeInscCheck = document.querySelector('input[name="iev-insc-mode"]:checked')?.value;
+    if(modeInscCheck==='lien_externe' && !document.getElementById('iev-lien-externe-url')?.value?.trim()){
+      showToast('Collez le lien de votre liste d\'inscription externe.','warning');return;
+    }
 
     // Mode publication
     const modePub = document.querySelector('input[name="iev-mode-pub"]:checked')?.value||'publie';
@@ -4003,10 +4078,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       pdf_url: initEvtPdfB64||null,
       pdf_nom: initEvtPdfNom||null,
       pdf_acces: document.getElementById('iev-pdf-acces')?.value||'public',
+      pdf_extra: initEvtPdfExtra,
       fc_resume: document.getElementById('iev-fc-resume')?.value||null,
       fc_objectifs: document.getElementById('iev-fc-objectifs')?.value||null,
       fc_public: document.getElementById('iev-fc-public')?.value||null,
       fc_programme: document.getElementById('iev-fc-programme')?.value||null,
+      fc_programme_fichier_url: initEvtProgrammeFichierB64||null,
+      fc_programme_fichier_nom: initEvtProgrammeFichierNom||null,
       fc_partenaires: partenaires.map(p=>p.nom).join(', ')||null,
       fc_partenaires_ids: partenaires,
       fc_contact: document.getElementById('iev-fc-contact')?.value||null,
@@ -4016,6 +4094,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       programmed_at,
       timezone: document.getElementById('iev-prog-tz')?.value||'Europe/Paris',
       inscription_mode: document.querySelector('input[name="iev-insc-mode"]:checked')?.value||'libre',
+      inscription_lien_externe: document.getElementById('iev-lien-externe-url')?.value?.trim()||null,
       nb_places: parseInt(document.getElementById('iev-nb-places')?.value)||null,
       liste_attente: document.getElementById('iev-liste-attente')?.checked ? 1 : 0,
       rayon_publication: document.querySelector('input[name="iev-rayon"]:checked')?.value||'international'
