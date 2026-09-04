@@ -11,8 +11,34 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; background: #F6F9FD; font-family: 'Instrument Sans', system-ui, sans-serif; color: #1B2430; }
+  body { margin: 0; background: #F6F9FD; font-family: 'Instrument Sans', system-ui, sans-serif; color: #1B2430; overflow-x: hidden; }
   a { text-decoration: none; color: inherit; }
+  .pv-hamburger { display: none; }
+  /* Page entièrement en style inline à l'origine (aucune media query) — même correctif que
+     site-vitrine.html / vitrine-plateforme.html (2026-08-31 / 2026-09-02, "il y a un problème
+     avec l'affichage sur téléphone"), appliqué ici le 2026-09-02. */
+  @media (max-width: 860px) {
+    .pv-nav { display: none !important; flex-direction: column; align-items: flex-start !important; gap: 0 !important; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border-bottom: 1px solid rgba(14,46,90,.1); padding: 8px 20px 14px !important; }
+    .pv-nav.pv-nav-open { display: flex !important; }
+    .pv-nav a { padding: 10px 0; width: 100%; border-bottom: 1px solid rgba(14,46,90,.06); }
+    .pv-hamburger { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 1.5px solid #0E2E5A; border-radius: 8px; background: none; cursor: pointer; flex: none; color: #0E2E5A; }
+    .pv-header { padding-left: 20px !important; padding-right: 20px !important; }
+    .pv-header > a span { display: none; }
+    .pv-wrap { padding-left: 20px !important; padding-right: 20px !important; }
+    .pv-grid-2, .pv-grid-3, .pv-grid-4 { grid-template-columns: 1fr !important; }
+    .pv-footer-grid { grid-template-columns: 1fr !important; gap: 30px !important; }
+    .pv-heading-60 { font-size: 32px !important; }
+    .pv-heading-46 { font-size: 28px !important; }
+    .pv-heading-44 { font-size: 27px !important; }
+    .pv-heading-42 { font-size: 26px !important; }
+    .pv-heading-40 { font-size: 25px !important; }
+    /* Réseau d'acteurs (§9) : diagramme à positions absolues en pixels fixes (640×640, chaque
+       nœud placé via left/top en px) — ne peut pas se redimensionner comme le reste de la page
+       sans réécrire toutes les coordonnées en %. Scroll horizontal local plutôt qu'un
+       redimensionnement approximatif qui casserait l'alignement des connexions SVG. */
+    .pv-diagram-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .pv-diagram-scroll > div { margin: 0 !important; }
+  }
   @keyframes diUp { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
   @keyframes diPulse { 0% { transform: scale(1); opacity: .55; } 70% { transform: scale(2.6); opacity: 0; } 100% { opacity: 0; } }
   .cap-marker { position: relative; }
@@ -35,12 +61,12 @@
 <div style="width: 100%; background: #F6F9FD;">
 
   <!-- NAV -->
-  <header style="position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 14px 48px; background: rgba(255,255,255,.86); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(14,46,90,.1); box-shadow: 0 4px 20px rgba(14,46,90,.05);">
+  <header class="pv-header" style="position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 14px 48px; background: rgba(255,255,255,.86); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(14,46,90,.1); box-shadow: 0 4px 20px rgba(14,46,90,.05);">
     <a href="site-vitrine.html" style="display: flex; align-items: center; gap: 11px;">
       <img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="Diaspo'Actif" style="height: 44px; width: auto; display: block;">
       <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -.01em; color: #0E2E5A;">DIASPO'ACTIF</span>
     </a>
-    <nav style="display: flex; align-items: center; gap: 18px; font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #5B6472;">
+    <nav class="pv-nav" id="pv-nav" style="display: flex; align-items: center; gap: 18px; font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #5B6472;">
       <a href="site-vitrine.html">Accueil</a>
       <a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a>
       <a href="vitrine-plateforme.html">Plateforme Diaspo'Actif</a>
@@ -51,18 +77,23 @@
       <a href="vitrine-partenaires.html">Nos partenaires</a>
       <a href="vitrine-actualites.html">Actualités</a>
     </nav>
-    <a href="vitrine-contact.html" style="font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #FFFFFF; background: #0E2E5A; padding: 12px 20px; border-radius: 999px; white-space: nowrap;">Contact</a>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button type="button" class="pv-hamburger" onclick="document.getElementById('pv-nav').classList.toggle('pv-nav-open')" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <a href="vitrine-contact.html" style="font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #FFFFFF; background: #0E2E5A; padding: 12px 20px; border-radius: 999px; white-space: nowrap;">Contact</a>
+    </div>
   </header>
 
   <!-- 1. HERO -->
   <section style="position: relative; overflow: hidden; min-height: 680px; display: flex; align-items: center;">
     <img src="assets/vitrine/photos/8654753-267e0c.jpeg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit:cover;">
     <div style="position: absolute; inset: 0; background: linear-gradient(118deg, rgba(9,28,60,.92) 0%, rgba(11,38,82,.78) 42%, rgba(20,74,150,.5) 100%);"></div>
-    <div style="position: relative; z-index: 2; max-width: 1180px; margin: 0 auto; padding: 90px 54px; width: 100%; color: #FFFFFF; text-align: center;">
+    <div class="pv-wrap" style="position: relative; z-index: 2; max-width: 1180px; margin: 0 auto; padding: 90px 54px; width: 100%; color: #FFFFFF; text-align: center;">
       <div style="animation: diUp .8s .05s both;">
         <div style="display: inline-flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .28em; color: #7FB0EE; margin-bottom: 26px;"><span style="width: 24px; height: 1px; background: #E2711D;"></span>DIASPO IMPACT<span style="width: 24px; height: 1px; background: #E2711D;"></span></div>
       </div>
-      <h1 style="animation: diUp .8s .12s both; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 60px; line-height: 1.04; letter-spacing: -.025em; margin: 0 auto 24px; max-width: 940px; text-wrap: balance;">L'outil financier au service d'une diaspora actrice du développement</h1>
+      <h1 class="pv-heading-60" style="animation: diUp .8s .12s both; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 60px; line-height: 1.04; letter-spacing: -.025em; margin: 0 auto 24px; max-width: 940px; text-wrap: balance;">L'outil financier au service d'une diaspora actrice du développement</h1>
       <p style="animation: diUp .8s .22s both; font-size: 20px; line-height: 1.5; color: #DCE7F5; margin: 0 auto 40px; max-width: 620px;">Investir avec confiance. Construire avec transparence. Développer avec impact.</p>
       <div style="animation: diUp .8s .32s both; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
         <a href="#di-reponse" style="font-size: 13.5px; font-weight: 600; letter-spacing: .02em; color: #FFFFFF; background: #E2711D; padding: 16px 30px; border-radius: 999px; box-shadow: 0 12px 30px rgba(226,113,29,.36);">Découvrir notre vision</a>
@@ -73,8 +104,8 @@
   </section>
 
   <!-- 2. NOTRE CONSTAT -->
-  <section style="padding: 96px 54px; background: #FFFFFF;">
-    <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: .92fr 1.08fr; gap: 60px; align-items: center;">
+  <section class="pv-wrap" style="padding: 96px 54px; background: #FFFFFF;">
+    <div class="pv-grid-2" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: .92fr 1.08fr; gap: 60px; align-items: center;">
       <div data-reveal style="position: relative;">
         <img src="assets/vitrine/photos/16909091-004ed3.jpeg" alt="" style="width: 100%; height: 460px; display: block; box-shadow: 0 24px 60px rgba(14,46,90,.16); object-fit:cover;">
         <div style="position: absolute; bottom: -26px; left: -26px; background: #E2711D; color: #fff; padding: 20px 26px; border-radius: 18px; box-shadow: 0 16px 40px rgba(226,113,29,.34); max-width: 220px;">
@@ -84,7 +115,7 @@
       </div>
       <div>
         <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ NOTRE CONSTAT</div>
-        <h2 data-reveal data-delay="60" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; line-height: 1.05; letter-spacing: -.02em; margin: 0 0 16px; color: #0E2E5A;">Pourquoi Diaspo Impact ?</h2>
+        <h2 data-reveal data-delay="60" class="pv-heading-44" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; line-height: 1.05; letter-spacing: -.02em; margin: 0 0 16px; color: #0E2E5A;">Pourquoi Diaspo Impact ?</h2>
         <p data-reveal data-delay="120" style="font-size: 16px; line-height: 1.6; color: #5B6472; margin: 0 0 32px; max-width: 520px;">Chaque année, des millions de membres des diasporas veulent investir dans leur pays d'origine. Trop souvent, les mêmes obstacles bloquent leur élan.</p>
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <div data-reveal data-delay="60" style="display: flex; align-items: center; gap: 16px; background: #F6F9FD; border: 1px solid rgba(14,46,90,.08); border-radius: 14px; padding: 16px 20px;"><span style="flex: none; width: 34px; height: 34px; border-radius: 10px; background: #FDEDE4; color: #E2711D; display: flex; align-items: center; justify-content: center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span><span style="font-size: 15.5px; font-weight: 500; color: #1B2430;">Un manque de confiance</span></div>
@@ -98,10 +129,10 @@
   </section>
 
   <!-- 3. NOTRE RÉPONSE -->
-  <section id="di-reponse" style="position: relative; overflow: hidden; padding: 100px 54px; background: linear-gradient(160deg, #0E2E5A 0%, #123A6B 60%, #1B5AA6 100%); color: #fff;">
+  <section id="di-reponse" class="pv-wrap" style="position: relative; overflow: hidden; padding: 100px 54px; background: linear-gradient(160deg, #0E2E5A 0%, #123A6B 60%, #1B5AA6 100%); color: #fff;">
     <div style="max-width: 1000px; margin: 0 auto; text-align: center;">
       <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .18em; color: #7FB0EE; margin-bottom: 18px;">/ NOTRE RÉPONSE</div>
-      <h2 data-reveal data-delay="60" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 46px; line-height: 1.08; letter-spacing: -.02em; margin: 0 auto 40px; max-width: 800px; text-wrap: balance;">La sécurisation de l'investissement par l'institution</h2>
+      <h2 data-reveal data-delay="60" class="pv-heading-46" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 46px; line-height: 1.08; letter-spacing: -.02em; margin: 0 auto 40px; max-width: 800px; text-wrap: balance;">La sécurisation de l'investissement par l'institution</h2>
       <div data-reveal data-delay="120" style="display: inline-block; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.16); border-radius: 20px; padding: 30px 44px; backdrop-filter: blur(8px); margin-bottom: 56px;">
         <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-style: italic; font-size: 27px; line-height: 1.3; color: #fff;">« La confiance est le premier investissement. »</div>
       </div>
@@ -125,13 +156,13 @@
   </section>
 
   <!-- 4. LE MODÈLE (TIMELINE) -->
-  <section id="di-modele" style="padding: 96px 54px; background: #F6F9FD;">
+  <section id="di-modele" class="pv-wrap" style="padding: 96px 54px; background: #F6F9FD;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 54px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ COMMENT FONCTIONNE LE MODÈLE</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Un parcours structuré, de bout en bout</h2>
+        <h2 class="pv-heading-44" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Un parcours structuré, de bout en bout</h2>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+      <div class="pv-grid-4" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
         <div data-reveal data-delay="0" style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 16px; padding: 26px; box-shadow: 0 8px 24px rgba(14,46,90,.05); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-6px); box-shadow: 0 20px 44px rgba(14,46,90,.13);"><div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #2E7DD1; margin-bottom: 14px;">01</div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; margin: 0 0 8px; color: #0E2E5A;">Identification</h3><p style="font-size: 13.5px; line-height: 1.55; color: #5B6472; margin: 0;">Repérage des besoins et des porteurs de projets sur le terrain.</p></div>
         <div data-reveal data-delay="60" style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 16px; padding: 26px; box-shadow: 0 8px 24px rgba(14,46,90,.05); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-6px); box-shadow: 0 20px 44px rgba(14,46,90,.13);"><div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #2E7DD1; margin-bottom: 14px;">02</div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; margin: 0 0 8px; color: #0E2E5A;">Étude</h3><p style="font-size: 13.5px; line-height: 1.55; color: #5B6472; margin: 0;">Analyse de viabilité économique, sociale et technique.</p></div>
         <div data-reveal data-delay="120" style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 16px; padding: 26px; box-shadow: 0 8px 24px rgba(14,46,90,.05); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-6px); box-shadow: 0 20px 44px rgba(14,46,90,.13);"><div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #2E7DD1; margin-bottom: 14px;">03</div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; margin: 0 0 8px; color: #0E2E5A;">Sélection</h3><p style="font-size: 13.5px; line-height: 1.55; color: #5B6472; margin: 0;">Validation des projets par un comité et les institutions.</p></div>
@@ -145,13 +176,13 @@
   </section>
 
   <!-- 5. NOS PILIERS -->
-  <section id="di-piliers" style="padding: 96px 54px; background: #FFFFFF;">
+  <section id="di-piliers" class="pv-wrap" style="padding: 96px 54px; background: #FFFFFF;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 54px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ NOS PILIERS</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Six exigences non négociables</h2>
+        <h2 class="pv-heading-44" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Six exigences non négociables</h2>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px;">
+      <div class="pv-grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px;">
         <div data-reveal data-delay="0" style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 20px; padding: 34px; box-shadow: 0 10px 30px rgba(14,46,90,.06); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-8px); box-shadow: 0 24px 54px rgba(14,46,90,.14);"><div style="width: 54px; height: 54px; border-radius: 15px; background: linear-gradient(135deg, #EAF2FC, #DCEBFA); color: #1B5AA6; display: flex; align-items: center; justify-content: center; margin-bottom: 22px;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 10 12 4 20 10"/><line x1="4" y1="20" x2="20" y2="20"/><line x1="7" y1="20" x2="7" y2="11"/><line x1="12" y1="20" x2="12" y2="11"/><line x1="17" y1="20" x2="17" y2="11"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; margin: 0 0 10px; color: #0E2E5A;">Gouvernance</h3><p style="font-size: 14.5px; line-height: 1.6; color: #5B6472; margin: 0;">Une collaboration claire diaspora / institutions.</p></div>
         <div data-reveal data-delay="80" style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 20px; padding: 34px; box-shadow: 0 10px 30px rgba(14,46,90,.06); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-8px); box-shadow: 0 24px 54px rgba(14,46,90,.14);"><div style="width: 54px; height: 54px; border-radius: 15px; background: linear-gradient(135deg, #EAF2FC, #DCEBFA); color: #1B5AA6; display: flex; align-items: center; justify-content: center; margin-bottom: 22px;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; margin: 0 0 10px; color: #0E2E5A;">Sécurisation</h3><p style="font-size: 14.5px; line-height: 1.6; color: #5B6472; margin: 0;">Chaque investissement adossé à un cadre institutionnel.</p></div>
         <div data-reveal data-delay="160" style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 20px; padding: 34px; box-shadow: 0 10px 30px rgba(14,46,90,.06); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-8px); box-shadow: 0 24px 54px rgba(14,46,90,.14);"><div style="width: 54px; height: 54px; border-radius: 15px; background: linear-gradient(135deg, #EAF2FC, #DCEBFA); color: #1B5AA6; display: flex; align-items: center; justify-content: center; margin-bottom: 22px;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; margin: 0 0 10px; color: #0E2E5A;">Transparence</h3><p style="font-size: 14.5px; line-height: 1.6; color: #5B6472; margin: 0;">Des données et des résultats accessibles à tous.</p></div>
@@ -163,14 +194,14 @@
   </section>
 
   <!-- 6. TRANSPARENCE / COMPTEURS -->
-  <section style="padding: 90px 54px; background: #EEF4FB;">
+  <section class="pv-wrap" style="padding: 90px 54px; background: #EEF4FB;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 50px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ TRANSPARENCE</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -.02em; margin: 0 0 10px; color: #0E2E5A;">Nos chiffres, en toute transparence</h2>
+        <h2 class="pv-heading-40" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -.02em; margin: 0 0 10px; color: #0E2E5A;">Nos chiffres, en toute transparence</h2>
         <p style="font-size: 15px; color: #5B6472; margin: 0;">La structure est prête — les indicateurs seront publiés au fil du déploiement.</p>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+      <div class="pv-grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
         <div data-reveal data-delay="0" style="background: #fff; border-radius: 18px; padding: 32px; text-align: center; box-shadow: 0 10px 30px rgba(14,46,90,.06);"><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 48px; color: #0E2E5A; line-height: 1;" data-count="0">0</div><div style="font-size: 14px; color: #5B6472; margin-top: 10px;">Rapports publiés</div></div>
         <div data-reveal data-delay="60" style="background: #fff; border-radius: 18px; padding: 32px; text-align: center; box-shadow: 0 10px 30px rgba(14,46,90,.06);"><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 48px; color: #0E2E5A; line-height: 1;" data-count="0">0</div><div style="font-size: 14px; color: #5B6472; margin-top: 10px;">Projets suivis</div></div>
         <div data-reveal data-delay="120" style="background: #fff; border-radius: 18px; padding: 32px; text-align: center; box-shadow: 0 10px 30px rgba(14,46,90,.06);"><div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 48px; color: #0E2E5A; line-height: 1;" data-count="0" data-suffix=" €">0</div><div style="font-size: 14px; color: #5B6472; margin-top: 10px;">Investissements mobilisés</div></div>
@@ -182,13 +213,13 @@
   </section>
 
   <!-- 7. PHASE PILOTE -->
-  <section id="di-pilote" style="padding: 96px 54px; background: #FFFFFF;">
+  <section id="di-pilote" class="pv-wrap" style="padding: 96px 54px; background: #FFFFFF;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 50px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ PHASE PILOTE</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">La Côte d'Ivoire, premier territoire d'expérimentation</h2>
+        <h2 class="pv-heading-42" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">La Côte d'Ivoire, premier territoire d'expérimentation</h2>
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;">
+      <div class="pv-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;">
         <div data-reveal style="position: relative; border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px rgba(14,46,90,.16);">
           <img src="assets/vitrine/photos/yobo-ci-high-330418.png" alt="" style="width: 100%; height: 420px; display: block; object-fit:cover;">
           <div style="position: absolute; inset: 0; background: linear-gradient(160deg, rgba(14,46,90,.35), rgba(14,46,90,.05));"></div>
@@ -216,11 +247,11 @@
   </section>
 
   <!-- 8. DÉPLOIEMENT INTERNATIONAL -->
-  <section style="position: relative; overflow: hidden; padding: 96px 54px; background: linear-gradient(160deg, #0B2247 0%, #123A6B 100%); color: #fff;">
+  <section class="pv-wrap" style="position: relative; overflow: hidden; padding: 96px 54px; background: linear-gradient(160deg, #0B2247 0%, #123A6B 100%); color: #fff;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 44px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #7FB0EE; margin-bottom: 14px;">/ DÉPLOIEMENT INTERNATIONAL</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0 0 12px;">Un modèle pensé pour le monde entier</h2>
+        <h2 class="pv-heading-42" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0 0 12px;">Un modèle pensé pour le monde entier</h2>
         <p style="font-size: 16px; color: #B9CBE6; margin: 0 auto; max-width: 640px;">Diaspo Impact a vocation à relier les diasporas de tous les continents autour d'un même standard de confiance.</p>
       </div>
       <div data-reveal data-delay="80" style="position: relative; border-radius: 24px; overflow: hidden; border: 1px solid rgba(255,255,255,.14);">
@@ -237,12 +268,13 @@
   </section>
 
   <!-- 9. LES ACTEURS -->
-  <section id="di-acteurs" style="padding: 96px 54px; background: #F6F9FD;">
+  <section id="di-acteurs" class="pv-wrap" style="padding: 96px 54px; background: #F6F9FD;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 40px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ LES ACTEURS</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Un écosystème réuni autour d'un point de confiance</h2>
+        <h2 class="pv-heading-42" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Un écosystème réuni autour d'un point de confiance</h2>
       </div>
+      <div class="pv-diagram-scroll">
       <div data-reveal data-delay="80" style="position: relative; width: 640px; height: 640px; max-width: 100%; margin: 0 auto;">
         <svg viewBox="0 0 640 640" style="position: absolute; inset: 0; width: 100%; height: 100%;" fill="none" stroke="#C4D6EC" stroke-width="1.4">
           <line x1="320" y1="320" x2="320" y2="70"/><line x1="320" y1="320" x2="455" y2="110"/><line x1="320" y1="320" x2="547" y2="216"/><line x1="320" y1="320" x2="568" y2="356"/><line x1="320" y1="320" x2="509" y2="484"/><line x1="320" y1="320" x2="391" y2="560"/><line x1="320" y1="320" x2="249" y2="560"/><line x1="320" y1="320" x2="131" y2="484"/><line x1="320" y1="320" x2="72" y2="356"/><line x1="320" y1="320" x2="93" y2="216"/><line x1="320" y1="320" x2="185" y2="110"/>
@@ -260,19 +292,20 @@
         <div style="position: absolute; left: 93px; top: 216px; transform: translate(-50%,-50%); background: #fff; border: 1px solid rgba(14,46,90,.1); border-radius: 999px; padding: 10px 18px; font-size: 13px; font-weight: 600; color: #0E2E5A; box-shadow: 0 8px 20px rgba(14,46,90,.08); white-space: nowrap;">Universités</div>
         <div style="position: absolute; left: 185px; top: 110px; transform: translate(-50%,-50%); background: #fff; border: 1px solid rgba(14,46,90,.1); border-radius: 999px; padding: 10px 18px; font-size: 13px; font-weight: 600; color: #0E2E5A; box-shadow: 0 8px 20px rgba(14,46,90,.08); white-space: nowrap;">Experts</div>
       </div>
+      </div>
     </div>
   </section>
 
 
   <!-- 11. GALERIE -->
-  <section id="di-galerie" style="padding: 96px 54px; background: #EEF4FB;">
+  <section id="di-galerie" class="pv-wrap" style="padding: 96px 54px; background: #EEF4FB;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 44px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ GALERIE</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0 0 8px; color: #0E2E5A;">Le modèle sur le terrain</h2>
+        <h2 class="pv-heading-42" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0 0 8px; color: #0E2E5A;">Le modèle sur le terrain</h2>
         <p style="font-size: 14px; color: #5B6472; margin: 0;">Cliquez une photo pour l'ouvrir en plein écran.</p>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 200px; gap: 14px;">
+      <div class="pv-grid-4" style="display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 200px; gap: 14px;">
         <div data-reveal data-lightbox style="position: relative; grid-column: span 2; grid-row: span 2; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 34px rgba(14,46,90,.1);"><img src="assets/vitrine/photos/yobo-ci-high-2ad3c8.png" alt="" style="width: 100%; height: 100%; display: block; object-fit:cover;"><span style="position: absolute; bottom: 14px; left: 16px; background: rgba(11,34,71,.72); color: #fff; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; backdrop-filter: blur(4px);">Missions terrain</span></div>
         <div data-reveal data-delay="60" data-lightbox style="position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 34px rgba(14,46,90,.1);"><img src="assets/vitrine/photos/capture-d-cran-2026-07-02-151112-high-9faf05.png" alt="" style="width: 100%; height: 100%; display: block; object-fit:cover;"><span style="position: absolute; bottom: 12px; left: 14px; background: rgba(11,34,71,.72); color: #fff; font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 999px;">Réunions</span></div>
         <div data-reveal data-delay="120" data-lightbox style="position: relative; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 34px rgba(14,46,90,.1);"><img src="assets/vitrine/photos/7263556-64bd0e.jpeg" alt="" style="width: 100%; height: 100%; display: block; object-fit:cover;"><span style="position: absolute; bottom: 12px; left: 14px; background: rgba(11,34,71,.72); color: #fff; font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 999px;">Collectivités</span></div>
@@ -285,16 +318,16 @@
   </section>
 
   <!-- 12. ACTUALITÉS -->
-  <section style="padding: 96px 54px; background: #FFFFFF;">
+  <section class="pv-wrap" style="padding: 96px 54px; background: #FFFFFF;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 40px; flex-wrap: wrap; gap: 16px;">
         <div>
           <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ ACTUALITÉS DIASPO IMPACT</div>
-          <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Les dernières avancées</h2>
+          <h2 class="pv-heading-40" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -.02em; margin: 0; color: #0E2E5A;">Les dernières avancées</h2>
         </div>
         <a href="vitrine-actualites.html" style="font-size: 13px; font-weight: 600; color: #1B5AA6;">Toutes les actualités →</a>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px;">
+      <div class="pv-grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px;">
         <a href="vitrine-actualites.html" data-reveal data-delay="0" style="display: block; background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(14,46,90,.06); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-6px); box-shadow: 0 22px 48px rgba(14,46,90,.13);"><div style="padding: 24px 26px 28px;"><div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #E2711D; margin-bottom: 10px;">LANCEMENT · 12.06.26</div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; line-height: 1.22; margin: 0 0 10px; color: #0E2E5A;">Diaspo Impact présenté au Forum AKOMCA</h3><p style="font-size: 14px; line-height: 1.55; color: #5B6472; margin: 0 0 14px;">Le dispositif de sécurisation présenté devant décideurs ivoiriens et français.</p><span style="font-size: 13px; font-weight: 600; color: #1B5AA6;">Lire l'article →</span></div></a>
         <a href="vitrine-actualites.html" data-reveal data-delay="80" style="display: block; background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(14,46,90,.06); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-6px); box-shadow: 0 22px 48px rgba(14,46,90,.13);"><div style="padding: 24px 26px 28px;"><div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #E2711D; margin-bottom: 10px;">PARTENARIAT · 28.05.26</div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; line-height: 1.22; margin: 0 0 10px; color: #0E2E5A;">L'ANADER rejoint le dispositif de sécurisation</h3><p style="font-size: 14px; line-height: 1.55; color: #5B6472; margin: 0 0 14px;">Un partenariat institutionnel pour encadrer les projets agricoles.</p><span style="font-size: 13px; font-weight: 600; color: #1B5AA6;">Lire l'article →</span></div></a>
         <a href="vitrine-actualites.html" data-reveal data-delay="160" style="display: block; background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(14,46,90,.06); transition: transform .3s, box-shadow .3s;" style-hover="transform: translateY(-6px); box-shadow: 0 22px 48px rgba(14,46,90,.13);"><div style="padding: 24px 26px 28px;"><div style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .1em; color: #E2711D; margin-bottom: 10px;">TERRAIN · 09.05.26</div><h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 20px; line-height: 1.22; margin: 0 0 10px; color: #0E2E5A;">Premières exploitations agricoles en préparation</h3><p style="font-size: 14px; line-height: 1.55; color: #5B6472; margin: 0 0 14px;">Validation des paramètres opérationnels sur le terrain.</p><span style="font-size: 13px; font-weight: 600; color: #1B5AA6;">Lire l'article →</span></div></a>
@@ -303,11 +336,11 @@
   </section>
 
   <!-- 13. RAPPORTS DIASPO IMPACT -->
-  <section id="di-rapports" style="padding: 96px 54px; background: #F6F9FD;">
+  <section id="di-rapports" class="pv-wrap" style="padding: 96px 54px; background: #F6F9FD;">
     <div style="max-width: 1200px; margin: 0 auto;">
       <div data-reveal style="text-align: center; margin-bottom: 30px;">
         <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #E2711D; margin-bottom: 14px;">/ RAPPORTS DIASPO IMPACT</div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0 0 12px; color: #0E2E5A;">Rapports Diaspo Impact</h2>
+        <h2 class="pv-heading-42" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; letter-spacing: -.02em; margin: 0 0 12px; color: #0E2E5A;">Rapports Diaspo Impact</h2>
         <p style="font-size: 16px; line-height: 1.6; color: #5B6472; margin: 0 auto; max-width: 640px;">La transparence en action : consultez l'évolution réelle des projets à travers des rapports multimédias — textes, photos et vidéos du terrain.</p>
       </div>
 
@@ -321,7 +354,7 @@
       </div>
 
       <!-- FICHES MULTIMÉDIAS -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 30px;">
+      <div class="pv-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 30px;">
         <div data-reveal style="background: #fff; border: 1px solid rgba(14,46,90,.08); border-radius: 20px; overflow: hidden; box-shadow: 0 12px 34px rgba(14,46,90,.07);">
           <div style="position: relative; height: 230px;">
             <img src="assets/vitrine/photos/yobo-ci-high-330418.png" alt="" style="width: 100%; height: 100%; display: block; object-fit:cover;">
@@ -361,15 +394,15 @@
       </div>
 
       <!-- ABONNEMENT -->
-      <div data-reveal style="background: linear-gradient(135deg, #0E2E5A, #16457E); border-radius: 24px; padding: 44px; color: #fff; box-shadow: 0 24px 60px rgba(14,46,90,.22);">
-        <div style="display: grid; grid-template-columns: 1fr 1.15fr; gap: 44px; align-items: center;">
+      <div data-reveal class="pv-wrap" style="background: linear-gradient(135deg, #0E2E5A, #16457E); border-radius: 24px; padding: 44px; color: #fff; box-shadow: 0 24px 60px rgba(14,46,90,.22);">
+        <div class="pv-grid-2" style="display: grid; grid-template-columns: 1fr 1.15fr; gap: 44px; align-items: center;">
           <div>
             <div style="display: inline-flex; align-items: center; gap: 12px; margin-bottom: 16px;"><span style="width: 44px; height: 44px; border-radius: 12px; background: rgba(226,113,29,.22); color: #FFB27A; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .14em; color: #7FB0EE;">ABONNEMENT</span></div>
             <h3 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 30px; line-height: 1.1; letter-spacing: -.02em; margin: 0 0 14px;">Abonnez-vous aux Rapports Diaspo Impact</h3>
             <p style="font-size: 15px; line-height: 1.6; color: #C6D5EC; margin: 0;">Recevez une notification à chaque nouveau rapport, un résumé hebdomadaire ou mensuel, et suivez l'évolution réelle des projets en temps réel.</p>
           </div>
           <div style="background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 26px; backdrop-filter: blur(8px);">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="pv-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
               <select style="grid-column: span 2; background: rgba(255,255,255,.95); border: none; border-radius: 10px; padding: 13px 14px; font-family: inherit; font-size: 14px; color: #1B2430;"><option>Filtrer par pays</option><option>Côte d'Ivoire</option><option>France</option><option>Toutes les diasporas</option></select>
               <select style="background: rgba(255,255,255,.95); border: none; border-radius: 10px; padding: 13px 14px; font-family: inherit; font-size: 14px; color: #1B2430;"><option>Projet</option><option>Exploitations agricoles</option><option>Forum AKOMCA</option><option>Tous les projets</option></select>
               <select style="background: rgba(255,255,255,.95); border: none; border-radius: 10px; padding: 13px 14px; font-family: inherit; font-size: 14px; color: #1B2430;"><option>Thématique</option><option>Agriculture</option><option>Formation</option><option>Investissement</option></select>
@@ -392,18 +425,18 @@
   <section style="position: relative; overflow: hidden; min-height: 460px; display: flex; align-items: center;">
     <img src="assets/vitrine/photos/7421766-1da2b4.jpeg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit:cover;">
     <div style="position: absolute; inset: 0; background: linear-gradient(110deg, rgba(9,28,60,.92), rgba(11,38,82,.72) 55%, rgba(20,74,150,.5));"></div>
-    <div style="position: relative; z-index: 2; max-width: 1000px; margin: 0 auto; padding: 80px 54px; color: #fff; text-align: center;">
+    <div class="pv-wrap" style="position: relative; z-index: 2; max-width: 1000px; margin: 0 auto; padding: 80px 54px; color: #fff; text-align: center;">
       <div data-reveal style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .18em; color: #7FB0EE; margin-bottom: 20px;">/ NOTRE AMBITION</div>
-      <h2 data-reveal data-delay="80" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; line-height: 1.12; letter-spacing: -.02em; margin: 0 auto 28px; max-width: 860px; text-wrap: balance;">Faire de Diaspo Impact la référence internationale de la sécurisation des investissements des diasporas.</h2>
+      <h2 data-reveal data-delay="80" class="pv-heading-44" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 44px; line-height: 1.12; letter-spacing: -.02em; margin: 0 auto 28px; max-width: 860px; text-wrap: balance;">Faire de Diaspo Impact la référence internationale de la sécurisation des investissements des diasporas.</h2>
       <p data-reveal data-delay="160" style="font-family: 'Space Grotesk', sans-serif; font-style: italic; font-size: 22px; color: #DCE7F5; margin: 0;">« Transformer l'attachement à son pays en prospérité partagée. »</p>
     </div>
   </section>
 
   <!-- 15. CONTACT -->
-  <section style="padding: 96px 54px; background: #FFFFFF;">
-    <div data-reveal style="max-width: 1100px; margin: 0 auto; background: linear-gradient(135deg, #0E2E5A, #16457E); border-radius: 28px; padding: 64px 54px; text-align: center; color: #fff; box-shadow: 0 30px 70px rgba(14,46,90,.28);">
+  <section class="pv-wrap" style="padding: 96px 54px; background: #FFFFFF;">
+    <div data-reveal class="pv-wrap" style="max-width: 1100px; margin: 0 auto; background: linear-gradient(135deg, #0E2E5A, #16457E); border-radius: 28px; padding: 64px 54px; text-align: center; color: #fff; box-shadow: 0 30px 70px rgba(14,46,90,.28);">
       <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .18em; color: #7FB0EE; margin-bottom: 18px;">/ REJOIGNEZ DIASPO IMPACT</div>
-      <h2 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; line-height: 1.08; letter-spacing: -.02em; margin: 0 auto 16px; max-width: 660px;">Investissez avec confiance. Construisez l'avenir.</h2>
+      <h2 class="pv-heading-42" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 42px; line-height: 1.08; letter-spacing: -.02em; margin: 0 auto 16px; max-width: 660px;">Investissez avec confiance. Construisez l'avenir.</h2>
       <p style="font-size: 16px; line-height: 1.6; color: #C6D5EC; margin: 0 auto 38px; max-width: 560px;">Investisseur, collectivité, entreprise ou porteur de projet — parlons de votre engagement.</p>
       <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
         <a href="vitrine-contact.html" style="font-size: 13.5px; font-weight: 600; color: #0E2E5A; background: #fff; padding: 16px 28px; border-radius: 999px;">Nous contacter</a>
@@ -421,9 +454,9 @@
 
   <!-- FOOTER -->
 
-  <footer style="padding: 62px 54px 40px; background: #0B2247; color: #A9BAD4;">
+  <footer class="pv-wrap" style="padding: 62px 54px 40px; background: #0B2247; color: #A9BAD4;">
     <div style="max-width: 1200px; margin: 0 auto;">
-      <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid rgba(169,186,212,.18);">
+      <div class="pv-footer-grid" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid rgba(169,186,212,.18);">
         <div>
           <div style="display: flex; align-items: center; gap: 11px; margin-bottom: 16px;"><img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="" style="height: 44px; width: auto; filter: brightness(0) invert(1); opacity: .92;"><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; color: #FFFFFF;">DIASPO'ACTIF</span></div>
           <p style="font-size: 13.5px; line-height: 1.6; margin: 0; max-width: 320px;">Diaspo Impact — sécuriser les investissements de la diaspora et accompagner le développement des territoires.</p>

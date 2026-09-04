@@ -9,12 +9,28 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; background: #F4F1EA; font-family: 'Space Grotesk', system-ui, sans-serif; color: #26292C; }
+  body { margin: 0; background: #F4F1EA; font-family: 'Space Grotesk', system-ui, sans-serif; color: #26292C; overflow-x: hidden; }
   a { text-decoration: none; color: inherit; }
   input, select { font-family: inherit; }
   input::placeholder { color: #9A958B; }
   .rep-card { transition: transform .25s, box-shadow .25s; }
   .rep-card:hover { transform: translateY(-5px); box-shadow: 0 22px 48px rgba(38,41,44,.14); }
+  .pv-hamburger { display: none; }
+  /* Page entièrement en style inline à l'origine (aucune media query) — même correctif que
+     site-vitrine.html / vitrine-plateforme.html / vitrine-qui-sommes-nous.html (2026-08-31 /
+     2026-09-02, "il y a un problème avec l'affichage sur téléphone"), appliqué ici le 2026-09-04. */
+  @media (max-width: 860px) {
+    .pv-nav { display: none !important; flex-direction: column; align-items: flex-start !important; gap: 0 !important; position: absolute; top: 100%; left: 0; right: 0; background: #F4F1EA; border-bottom: 1.5px solid #26292C; padding: 8px 20px 14px !important; }
+    .pv-nav.pv-nav-open { display: flex !important; }
+    .pv-nav a { padding: 10px 0; width: 100%; border-bottom: 1px solid rgba(38,41,44,.08); }
+    .pv-hamburger { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 1.5px solid #26292C; background: none; cursor: pointer; flex: none; }
+    .pv-header { padding-left: 20px !important; padding-right: 20px !important; }
+    .pv-header > a span { display: none; }
+    .pv-wrap { padding-left: 20px !important; padding-right: 20px !important; }
+    .pv-grid-2, .pv-grid-3 { grid-template-columns: 1fr !important; }
+    .pv-footer-grid { grid-template-columns: 1fr !important; gap: 30px !important; }
+    .pv-heading-74 { font-size: 40px !important; }
+  }
 </style>
   <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 </head>
@@ -47,7 +63,7 @@
       </div>
       <div style="padding: 24px 26px;">
         <p style="font-size: 13.5px; line-height: 1.55; color: #4A4E52; margin: 0 0 18px;">Remplissez cette fiche : notre équipe étudie votre demande et vous transmet un code d'accès.</p>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="pv-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">PRÉNOM</label><input class="rq" data-k="prenom" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
           <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">NOM</label><input class="rq" data-k="nom" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
           <div><label style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8A857C;">VILLE</label><input class="rq" data-k="ville" style="width: 100%; margin-top: 6px; border: 1.5px solid #26292C; background: #fff; padding: 11px 13px; font-size: 14px; color: #26292C; outline: none; font-family: inherit;"></div>
@@ -64,12 +80,12 @@
   </div>
 
   <!-- NAV -->
-  <header style="position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 40px; background: rgba(244,241,234,.92); backdrop-filter: blur(8px); border-bottom: 1.5px solid #26292C;">
+  <header class="pv-header" style="position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 40px; background: rgba(244,241,234,.92); backdrop-filter: blur(8px); border-bottom: 1.5px solid #26292C;">
     <a href="site-vitrine.html" style="display: flex; align-items: center; gap: 12px;">
       <img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="Diaspo'Actif" style="height: 46px; width: auto; display: block;">
       <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: -.01em;">DIASPO'ACTIF</span>
     </a>
-    <nav style="display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: #4A4E52;">
+    <nav class="pv-nav" id="pv-nav" style="display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 500; letter-spacing: .03em; text-transform: uppercase; color: #4A4E52;">
       <a href="site-vitrine.html">Accueil</a>
       <a href="vitrine-qui-sommes-nous.html">Qui sommes-nous</a>
       <a href="vitrine-plateforme.html">Plateforme Diaspo'Actif</a>
@@ -80,19 +96,24 @@
       <a href="vitrine-partenaires.html">Partenaires</a>
       <a href="vitrine-actualites.html">Actualités</a>
     </nav>
-    <a href="vitrine-contact.html" style="font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #F4F1EA; background: #26292C; padding: 10px 14px; white-space: nowrap;">Contact</a>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button type="button" class="pv-hamburger" onclick="document.getElementById('pv-nav').classList.toggle('pv-nav-open')" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <a href="vitrine-contact.html" style="font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #F4F1EA; background: #26292C; padding: 10px 14px; white-space: nowrap;">Contact</a>
+    </div>
   </header>
 
   <!-- HERO -->
   <section style="border-bottom: 1.5px solid #26292C;">
-    <div style="max-width: 1200px; margin: 0 auto; padding: 56px 40px 46px;">
+    <div class="pv-wrap" style="max-width: 1200px; margin: 0 auto; padding: 56px 40px 46px;">
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 26px; flex-wrap: wrap; gap: 12px;">
         <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #C13527;">[ LA BIBLIOTHÈQUE OFFICIELLE DE NOS ACTIONS ]</span>
         <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .16em; color: #8A857C;">ACCUEIL → RAPPORTS</span>
       </div>
       <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;">
         <div>
-          <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 74px; line-height: .96; letter-spacing: -.03em; margin: 0 0 18px;">Rapports<br><span style="color: #C13527;">Diaspo Impact</span></h1>
+          <h1 class="pv-heading-74" style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 74px; line-height: .96; letter-spacing: -.03em; margin: 0 0 18px;">Rapports<br><span style="color: #C13527;">Diaspo Impact</span></h1>
           <p style="font-size: 18px; line-height: 1.5; color: #4A4E52; margin: 0; max-width: 620px;">Projets, missions de terrain, résultats et impacts — publiés en toute transparence. Rapports PDF, vidéos, albums photos, articles et communiqués officiels.</p>
         </div>
         <button id="notify-btn" style="display: inline-flex; align-items: center; gap: 11px; font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: .02em; color: #FFF3EE; background: #C13527; border: none; padding: 16px 24px; cursor: pointer; white-space: nowrap;">
@@ -105,7 +126,7 @@
 
   <!-- FILTERS -->
   <section style="border-bottom: 1.5px solid #26292C; background: #EFE9DE;">
-    <div style="max-width: 1200px; margin: 0 auto; padding: 20px 40px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+    <div class="pv-wrap" style="max-width: 1200px; margin: 0 auto; padding: 20px 40px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
       <div style="display: flex; align-items: center; gap: 9px; background: #F4F1EA; border: 1.5px solid #26292C; padding: 10px 15px; flex: 1; min-width: 220px;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A857C" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
         <input id="rep-search" placeholder="Rechercher un rapport…" style="border: none; outline: none; background: transparent; font-size: 14px; width: 100%; color: #26292C;">
@@ -118,9 +139,9 @@
 
   <!-- GRID -->
   <section>
-    <div style="max-width: 1200px; margin: 0 auto; padding: 40px 40px 70px;">
+    <div class="pv-wrap" style="max-width: 1200px; margin: 0 auto; padding: 40px 40px 70px;">
       <div id="rep-count" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; color: #8A857C; margin-bottom: 24px;"></div>
-      <div id="rep-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px;"></div>
+      <div id="rep-grid" class="pv-grid-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px;"></div>
     </div>
   </section>
 
@@ -129,9 +150,9 @@
 
 
   <!-- FOOTER -->
-  <footer style="padding: 56px 40px 38px; background: #26292C; color: #B7B2A8;">
+  <footer class="pv-wrap" style="padding: 56px 40px 38px; background: #26292C; color: #B7B2A8;">
     <div style="max-width: 1200px; margin: 0 auto;">
-      <div style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid rgba(183,178,168,.16);">
+      <div class="pv-footer-grid" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px; padding-bottom: 36px; border-bottom: 1px solid rgba(183,178,168,.16);">
         <div>
           <div style="display: flex; align-items: center; gap: 11px; margin-bottom: 16px;"><img src="assets/vitrine/logo-diaspo-actif-transparent.png" alt="" style="height: 44px; width: auto;"><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px; color: #F4F1EA;">DIASPO'ACTIF</span></div>
           <p style="font-size: 13.5px; line-height: 1.6; margin: 0; max-width: 300px;">La bibliothèque officielle de nos actions, résultats et impacts. Du Sud au Nord.</p>
@@ -276,6 +297,7 @@ class Component {
         '<span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:.1em;color:#8A857C;">'+items.length+' RAPPORT'+(items.length>1?'S':'')+'</span></div>';
       if (items.length) {
         const g = document.createElement('div');
+        g.className = 'pv-grid-3';
         g.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:26px;';
         items.forEach(r => g.appendChild(this.card(r)));
         sec.appendChild(g);
@@ -334,12 +356,12 @@ class Component {
         '<div><div style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:20px;">M\'informer</div><div style="font-size:12.5px;color:#FBD5C7;">Recevez automatiquement les nouveaux rapports</div></div>'+
       '</div>'+
       '<div style="padding:24px 26px;">'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">'+
+        '<div class="pv-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">'+
           '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">PRÉNOM</label><input class="sub-in" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
           '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">NOM</label><input class="sub-in" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
         '</div>'+
         '<div style="margin-bottom:12px;"><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">ADRESSE E-MAIL</label><input class="sub-in" type="email" placeholder="vous@exemple.com" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'+
+        '<div class="pv-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">'+
           '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">PAYS</label><input class="sub-in" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
           '<div><label style="font-family:\'JetBrains Mono\',monospace;font-size:10px;letter-spacing:.1em;color:#8A857C;">ORGANISATION</label><input class="sub-in" placeholder="facultatif" style="width:100%;margin-top:6px;border:1.5px solid #26292C;background:#fff;padding:11px 13px;font-size:14px;outline:none;"></div>'+
         '</div>'+
