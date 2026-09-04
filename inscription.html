@@ -369,13 +369,20 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           </div>
         </div>
         <div class="grid-2" style="margin-top:12px">
-          <div><label>Votre activite precise <span style="font-size:11px;color:#64748B;">(ex : "Transit France – Cote d'Ivoire")</span></label>
+          <div><label>Sous domaine 1 <span style="font-size:11px;color:#64748B;">(ex : "Transit France – Cote d'Ivoire")</span></label>
             <input id="i-sous-domaine-1" placeholder="Precisez votre activite reelle"></div>
-          <div><label>Deuxieme activite <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+          <div><label>Sous domaine 2 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
             <input id="i-sous-domaine-2" placeholder="Facultatif"></div>
         </div>
         <script>
-          (function(){
+          /* Peuplé au DOMContentLoaded plutôt qu'en ligne ici : assets/domaines-activite.js est
+             chargé tout en bas de la page (avec les autres scripts d'assets), donc s'exécuter
+             immédiatement à cet endroit (avant lui dans l'ordre du document) trouvait
+             window.DOMAINES_ACTIVITE encore indéfini et ne remplissait rien, silencieusement
+             (garde `if` jamais vraie) — bug trouvé en conditions réelles le 2026-09-04, liste
+             vide malgré aucune erreur console. DOMContentLoaded garantit que tous les scripts
+             synchrones du document, où qu'ils soient placés, ont déjà été exécutés. */
+          document.addEventListener('DOMContentLoaded', function(){
             const sel = document.getElementById('i-domaine');
             if (sel && window.DOMAINES_ACTIVITE) {
               window.DOMAINES_ACTIVITE.forEach(([cle, icone, label]) => {
@@ -384,7 +391,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
                 sel.appendChild(o);
               });
             }
-          })();
+          });
         </script>
         <div style="margin-top:12px"><label>Description <span style="color:#2563EB">*</span></label>
           <textarea id="i-desc" rows="3" placeholder="Presentez votre initiative…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
