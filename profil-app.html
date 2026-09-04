@@ -2812,7 +2812,7 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🛠 Services</h3>${isOwn?`<button onclick="pvtEditServices()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
     <div id="pvt-services-body" class="pvt-services-list">${
       servicesCats && servicesCats.length
-        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${servicesCats.map(c=>`<span class="pvz-interest-chip">${vitrineCategorieLabel(c)}</span>`).join('')}${servicesCats.length<3 && isOwn ? Array.from({length:3-servicesCats.length}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('') : ''}</div>`
+        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${servicesCats.map(c=>`<span class="pvz-interest-chip">${vitrineCategorieLabel(c)}</span>`).join('')}${servicesCats.length<MAX_SERVICES_CATEGORIES && isOwn ? Array.from({length:Math.min(3,MAX_SERVICES_CATEGORIES-servicesCats.length)}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('') : ''}</div>`
         : (init.vitrine_services
             ? init.vitrine_services.split('\n').filter(Boolean).map(s=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span>${esc(s)}</div>`).join('')
             : isOwn
@@ -3807,7 +3807,11 @@ async function pvtDeletePromo(initId, promoId) {
   catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
-/* ══════════ Services : sélection de catégories (max 3) ══════════ */
+/* ══════════ Services : sélection de catégories (max MAX_SERVICES_CATEGORIES) ══════════
+   Relevé de 3 à 6 (2026-09-04) : une activité réelle couvre souvent plus de 3 secteurs
+   (ex. agriculture + transformation + import-export) — la liste de chips ci-dessous
+   (pvt-services-body, flex-wrap) absorbe sans problème un plus grand nombre. */
+const MAX_SERVICES_CATEGORIES = 6;
 function pvtEditServices() {
   if (!isOwn || !_vitrineInit) return;
   const current = safeParseJson(_vitrineInit.vitrine_services_categories_json, []);
@@ -3817,7 +3821,7 @@ function pvtEditServices() {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:22px;max-height:85vh;overflow-y:auto;">
     <h2 style="margin:0 0 6px;font-size:16px;">🛠 Services proposés</h2>
-    <p style="font-size:12.5px;color:#6B7686;margin:0 0 14px;">Sélectionnez jusqu'à 3 catégories principales.</p>
+    <p style="font-size:12.5px;color:#6B7686;margin:0 0 14px;">Sélectionnez jusqu'à ${MAX_SERVICES_CATEGORIES} catégories principales (cliquez sur autant de cases que nécessaire).</p>
     <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">
       ${VITRINE_CATEGORIES.map(([k,e,l])=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px;padding:5px 10px;border:1px solid #E2E8F0;border-radius:99px;${current.includes(k)?'background:#EAF1FE;border-color:#2F6BED;color:#2F6BED;font-weight:600;':''}">
         <input type="checkbox" value="${k}" ${current.includes(k)?'checked':''} onchange="pvtToggleServiceCat(this)" style="accent-color:#2F6BED;"> ${e} ${l}
@@ -3834,7 +3838,7 @@ function pvtEditServices() {
 }
 function pvtToggleServiceCat(input) {
   const checked = [...document.querySelectorAll('#pvt-services-modal input[type=checkbox]:checked')];
-  if (checked.length > 3) { input.checked = false; document.getElementById('pvt-services-err').textContent = 'Maximum 3 catégories.'; document.getElementById('pvt-services-err').style.display = 'block'; }
+  if (checked.length > MAX_SERVICES_CATEGORIES) { input.checked = false; document.getElementById('pvt-services-err').textContent = `Maximum ${MAX_SERVICES_CATEGORIES} catégories.`; document.getElementById('pvt-services-err').style.display = 'block'; }
   else document.getElementById('pvt-services-err').style.display = 'none';
 }
 async function pvtSaveServices() {
