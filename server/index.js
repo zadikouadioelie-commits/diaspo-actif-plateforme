@@ -306,6 +306,10 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     centres_interet, situation_pro,
     // initiative
     type_org, description, domaine, domaine_secondaire, objectifs,
+    // domaine d'activité unifié (2026-09-04) — remplace domaine/domaine_secondaire ci-dessus
+    // pour les nouvelles inscriptions ; les deux anciens champs restent lus pour compatibilité
+    // (formulaire externe/API tierce qui n'aurait pas encore été mis à jour).
+    domaine_principal, sous_domaine_1, sous_domaine_2,
     nombre_membres, nombre_salaries,
     origine1, origine2,
     // initiative — statut de création et informations administratives
@@ -498,7 +502,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     if (initRow) try {
       const THEMES_VITRINE_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
       const vitrineThemeChoisi = THEMES_VITRINE_VALIDES.includes(body.vitrine_theme) ? body.vitrine_theme : null;
-      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=?, membres=?, nb_salaries=?, domaines_secondaires_json=?, date_debut_creation=?, genre_responsable=?, tel_responsable_2=?, tel_responsable_3=?, vitrine_theme=COALESCE(?,vitrine_theme) WHERE id=?').run(
+      await db.prepare('UPDATE initiatives SET publics_json=?, besoins_json=?, annee_creation=?, membres=?, nb_salaries=?, domaines_secondaires_json=?, date_debut_creation=?, genre_responsable=?, tel_responsable_2=?, tel_responsable_3=?, vitrine_theme=COALESCE(?,vitrine_theme), domaine_principal=?, sous_domaine_1=?, sous_domaine_2=? WHERE id=?').run(
         Array.isArray(body.publics) && body.publics.length ? JSON.stringify(body.publics) : null,
         Array.isArray(body.besoins) && body.besoins.length ? JSON.stringify(body.besoins) : null,
         body.annee_creation ? parseInt(body.annee_creation) || null : null,
@@ -513,6 +517,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
         statut_creation === 'en_creation' ? (date_debut_creation || null) : null,
         genre_responsable || null, tel_responsable_2 || null, tel_responsable_3 || null,
         vitrineThemeChoisi,
+        domaine_principal || null, sous_domaine_1 || null, sous_domaine_2 || null,
         initRow.id);
     } catch(_) {}
   }
@@ -6156,7 +6161,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, nationalite1, nationalite2, origine1, origine2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
@@ -6314,7 +6319,7 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
   ).all();
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }
@@ -13929,7 +13934,7 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
 
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
-  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json,nationalite1,nationalite2,origine1,origine2,nom_institution,type_organisme,fonction_responsable_etatique FROM users WHERE id=?").get(params.id);
+  const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json,nationalite1,nationalite2,origine1,origine2,nom_institution,type_organisme,fonction_responsable_etatique,domaine_principal,sous_domaine_1,sous_domaine_2,notif_emails_non_essentiels FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const me = await getCurrentUser(req);
   if (u.compte_masque && (!me || Number(me.id) !== Number(u.id))) return sendJSON(res, 404, { error: "Profil introuvable." });
@@ -13938,10 +13943,14 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
      sur le nom personnel, qui n'apparaît plus qu'en information secondaire "responsable du compte". */
   let nomStructure = null, responsable = null, initiativeId = null, initiativeType = null, adhesionsOuvertes = null, photoFallbackInitiative = null;
   let descriptionStructure = null;
+  // Domaine d'activité unifié : porté par users pour tout compte, sauf initiative (porté par
+  // initiatives, écrasé juste en-dessous si une ligne existe — même logique que nom_structure).
+  let domaineActivite = { domaine_principal: u.domaine_principal||null, sous_domaine_1: u.sous_domaine_1||null, sous_domaine_2: u.sous_domaine_2||null };
   if (u.role === 'initiative') {
-    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url, description FROM initiatives WHERE owner_user_id=?").get(u.id);
+    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url, description, domaine_principal, sous_domaine_1, sous_domaine_2 FROM initiatives WHERE owner_user_id=?").get(u.id);
     if (initRow) {
       nomStructure = initRow.nom;
+      domaineActivite = { domaine_principal: initRow.domaine_principal||null, sous_domaine_1: initRow.sous_domaine_1||null, sous_domaine_2: initRow.sous_domaine_2||null };
       /* Description réelle de l'ACTIVITÉ (2026-08-30, signalé : "que fait cette entreprise"
          répondait mal) — jusqu'ici l'assistant du profil ne connaissait que u.bio, la bio
          PERSONNELLE du responsable, jamais la présentation de la structure elle-même. */
@@ -14047,6 +14056,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     nom_structure: nomStructure,
     structure_description: descriptionStructure,
     responsable,
+    ...domaineActivite,
+    notif_emails_non_essentiels: u.notif_emails_non_essentiels==null ? true : !!u.notif_emails_non_essentiels,
     type_organisme: u.type_organisme,
     affiliations,
     initiative_id: initiativeId,
@@ -14187,18 +14198,64 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
       await db.prepare("UPDATE initiatives SET nom=? WHERE owner_user_id=?").run(nomStructure, user.id);
     }
   }
+  /* Domaine d'activité unifié (Paramètres du compte, 2026-09-04) : un compte "initiative" porte
+     son identité publique sur la table initiatives (comme nom_structure ci-dessus), tout autre
+     rôle la porte directement sur users. Toujours les 3 champs ensemble (un domaine peut être
+     réenregistré vide "" volontairement pour l'effacer, donc on teste !==undefined, pas la
+     vérité du champ). */
+  if (body.domaine_principal !== undefined || body.sous_domaine_1 !== undefined || body.sous_domaine_2 !== undefined) {
+    const dp = body.domaine_principal !== undefined ? (String(body.domaine_principal||"").trim() || null) : undefined;
+    const sd1 = body.sous_domaine_1 !== undefined ? (String(body.sous_domaine_1||"").trim() || null) : undefined;
+    const sd2 = body.sous_domaine_2 !== undefined ? (String(body.sous_domaine_2||"").trim() || null) : undefined;
+    if (user.role === "initiative") {
+      const dFields = [], dVals = [];
+      if (dp !== undefined)  { dFields.push("domaine_principal=?"); dVals.push(dp); }
+      if (sd1 !== undefined) { dFields.push("sous_domaine_1=?");    dVals.push(sd1); }
+      if (sd2 !== undefined) { dFields.push("sous_domaine_2=?");    dVals.push(sd2); }
+      if (dFields.length) { dVals.push(user.id); await db.prepare(`UPDATE initiatives SET ${dFields.join(",")} WHERE owner_user_id=?`).run(...dVals); }
+    } else {
+      if (dp !== undefined)  { fields.push("domaine_principal=?"); vals.push(dp); }
+      if (sd1 !== undefined) { fields.push("sous_domaine_1=?");    vals.push(sd1); }
+      if (sd2 !== undefined) { fields.push("sous_domaine_2=?");    vals.push(sd2); }
+    }
+  }
+  if (body.notif_emails_non_essentiels !== undefined) { fields.push("notif_emails_non_essentiels=?"); vals.push(body.notif_emails_non_essentiels ? 1 : 0); }
   if (fields.length) { vals.push(user.id); await db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
-  const up = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json,privacy_json,nom_institution FROM users WHERE id=?").get(user.id);
+  const up = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,telephone,profil_json,privacy_json,nom_institution,domaine_principal,sous_domaine_1,sous_domaine_2,notif_emails_non_essentiels FROM users WHERE id=?").get(user.id);
   let nomStructureOut = up.role === "collectivite" || up.role === "administrateur" ? (up.nom_institution || null) : null;
+  let domaineOut = { domaine_principal: up.domaine_principal||null, sous_domaine_1: up.sous_domaine_1||null, sous_domaine_2: up.sous_domaine_2||null };
   if (up.role === "initiative") {
-    const initRow = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(up.id);
+    const initRow = await db.prepare("SELECT nom,domaine_principal,sous_domaine_1,sous_domaine_2 FROM initiatives WHERE owner_user_id=?").get(up.id);
     nomStructureOut = initRow ? initRow.nom : null;
+    if (initRow) domaineOut = { domaine_principal: initRow.domaine_principal||null, sous_domaine_1: initRow.sous_domaine_1||null, sous_domaine_2: initRow.sous_domaine_2||null };
   }
   sendJSON(res, 200, { profil: { ...publicUser(up), bio: up.bio, photo_url: up.photo_url, banner_url: up.banner_url,
     prenom: up.prenom, titre_pro: up.titre_pro, theme_couleur: up.theme_couleur,
     competences: safeParse(up.competences||"[]"), experiences: safeParse(up.experiences||"[]"),
     centres_interet: safeParse(up.centres_interet||"[]"), situation_pro: up.situation_pro, telephone: up.telephone,
-    privacy: safeParse(up.privacy_json||"{}"), nom_structure: nomStructureOut } });
+    privacy: safeParse(up.privacy_json||"{}"), nom_structure: nomStructureOut,
+    ...domaineOut, notif_emails_non_essentiels: up.notif_emails_non_essentiels==null ? true : !!up.notif_emails_non_essentiels } });
+});
+
+/* ---------- Changement de mot de passe (compte connecté) ----------
+   N'existait pas avant ce module (seul le flux "mot de passe oublié" par e-mail existait,
+   POST /api/auth/reset-password ci-dessus) — exige ici le mot de passe ACTUEL, comme tout
+   changement de mot de passe "je suis déjà connecté" standard. Réutilise hashPassword/
+   verifyPassword de ./auth (même fonctions que login et reset-password, aucune nouvelle
+   logique de hachage inventée). */
+route("PUT", "/api/profil/mot-de-passe", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const { mot_de_passe_actuel, nouveau_mot_de_passe } = body;
+  if (!mot_de_passe_actuel || !nouveau_mot_de_passe) return sendJSON(res, 400, { error: "Mot de passe actuel et nouveau mot de passe requis." });
+  if (nouveau_mot_de_passe.length < 8) return sendJSON(res, 400, { error: "Le nouveau mot de passe doit comporter au moins 8 caractères." });
+  const full = await db.prepare("SELECT password_hash, password_salt FROM users WHERE id=?").get(user.id);
+  if (!full || !verifyPassword(mot_de_passe_actuel, full.password_salt, full.password_hash)) {
+    return sendJSON(res, 403, { error: "Mot de passe actuel incorrect." });
+  }
+  const { hash, salt } = hashPassword(nouveau_mot_de_passe);
+  await db.prepare("UPDATE users SET password_hash=?, password_salt=? WHERE id=?").run(hash, salt, user.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ---------- Profil — Fil d'activité publique ---------- */

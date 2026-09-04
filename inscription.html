@@ -364,37 +364,28 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
             <input type="number" min="0" id="i-nb-salaries" placeholder="Ex : 12"></div>
         </div>
         <div class="grid-2" style="margin-top:12px">
-          <div><label>Domaine d'activite principal</label>
-            <select id="i-domaine">
-              <option value="">— Selectionner —</option>
-              <option>Agriculture</option><option>Agropastoral</option><option>Artisanat</option><option>Assurance</option>
-              <option>Commerce</option><option>Construction</option><option>Consulting</option>
-              <option>Culture</option><option>Éducation</option><option>Emploi</option>
-              <option>Énergie</option><option>Entrepreneuriat</option><option>Environnement</option>
-              <option>Événementiel</option><option>Finance</option><option>Formation</option>
-              <option>Immobilier</option><option>Industrie</option><option>Institution</option>
-              <option>Investissement</option><option>Numérique</option><option>Restauration</option>
-              <option>Santé</option><option>Soin santé / thérapie</option><option>Sport</option>
-              <option>Technologie</option><option>Tourisme</option><option>Transport</option>
-              <option>Autre</option>
-            </select>
-          </div>
-          <div><label>Domaine d'activite secondaire <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
-            <select id="i-domaine2">
-              <option value="">— Selectionner —</option>
-              <option>Agriculture</option><option>Agropastoral</option><option>Artisanat</option><option>Assurance</option>
-              <option>Commerce</option><option>Construction</option><option>Consulting</option>
-              <option>Culture</option><option>Éducation</option><option>Emploi</option>
-              <option>Énergie</option><option>Entrepreneuriat</option><option>Environnement</option>
-              <option>Événementiel</option><option>Finance</option><option>Formation</option>
-              <option>Immobilier</option><option>Industrie</option><option>Institution</option>
-              <option>Investissement</option><option>Numérique</option><option>Restauration</option>
-              <option>Santé</option><option>Soin santé / thérapie</option><option>Sport</option>
-              <option>Technologie</option><option>Tourisme</option><option>Transport</option>
-              <option>Autre</option>
-            </select>
+          <div><label>Domaine d'activite</label>
+            <select id="i-domaine"><option value="">— Selectionner —</option></select>
           </div>
         </div>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Votre activite precise <span style="font-size:11px;color:#64748B;">(ex : "Transit France – Cote d'Ivoire")</span></label>
+            <input id="i-sous-domaine-1" placeholder="Precisez votre activite reelle"></div>
+          <div><label>Deuxieme activite <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <input id="i-sous-domaine-2" placeholder="Facultatif"></div>
+        </div>
+        <script>
+          (function(){
+            const sel = document.getElementById('i-domaine');
+            if (sel && window.DOMAINES_ACTIVITE) {
+              window.DOMAINES_ACTIVITE.forEach(([cle, icone, label]) => {
+                const o = document.createElement('option');
+                o.value = cle; o.textContent = `${icone} ${label}`;
+                sel.appendChild(o);
+              });
+            }
+          })();
+        </script>
         <div style="margin-top:12px"><label>Description <span style="color:#2563EB">*</span></label>
           <textarea id="i-desc" rows="3" placeholder="Presentez votre initiative…" style="width:100%;resize:vertical;box-sizing:border-box"></textarea>
         </div>
@@ -757,6 +748,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 </footer>
 </div>
 <script src="assets/data.js"></script>
+<script src="assets/domaines-activite.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=11"></script>
@@ -1245,8 +1237,9 @@ document.getElementById("i-submit").addEventListener("click",async()=>{
       origine1:orig1,
       origine2:orig2i||null,
       rayonnement,pays_intervention,
-      domaine:document.getElementById("i-domaine").value,
-      domaine_secondaire:document.getElementById("i-domaine2").value||null,
+      domaine_principal:document.getElementById("i-domaine").value||null,
+      sous_domaine_1:document.getElementById("i-sous-domaine-1").value.trim()||null,
+      sous_domaine_2:document.getElementById("i-sous-domaine-2").value.trim()||null,
       description:desc,objectifs:document.getElementById("i-objectifs").value.trim()||null,
       pays,region:document.getElementById("i-region").value.trim()||null,
       ville,adresse:document.getElementById("i-adresse").value.trim()||null,
@@ -1311,17 +1304,6 @@ document.getElementById("i-type").addEventListener("change", function(){
   boxSalaries.style.display = estEntreprise ? "" : "none";
   row.style.display = (estAssociation || estEntreprise) ? "" : "none";
 });
-
-/* Empeche de choisir 2 fois le meme domaine — desactive l'option deja prise dans l'autre liste. */
-(function(){
-  const d1 = document.getElementById("i-domaine"), d2 = document.getElementById("i-domaine2");
-  function sync(){
-    [...d2.options].forEach(o => o.disabled = !!o.value && o.value === d1.value);
-    [...d1.options].forEach(o => o.disabled = !!o.value && o.value === d2.value);
-  }
-  d1.addEventListener("change", sync);
-  d2.addEventListener("change", sync);
-})();
 
 /* ===== Rayonnement + territoires dynamiques ===== */
 function refreshRayPills(){

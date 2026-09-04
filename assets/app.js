@@ -1153,6 +1153,13 @@ async function applyAuthState() {
       <a href="${user.role === 'collectivite' ? `profil-collectivite.html?id=${user.id}` : `profil.html?id=${user.id}`}" class="topbar-icon-btn" title="Mon profil public">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
       </a>
+      <!-- Paramètres du compte (2026-09-04) : nom, domaine d'activité, e-mail, mot de passe,
+           notifications — module unique, distinct du tableau de bord et du profil public.
+           Icône "curseurs de réglage", volontairement différente de l'engrenage du tableau
+           de bord juste au-dessus pour ne pas dupliquer visuellement la même icône. -->
+      <a href="parametres-compte.html" class="topbar-icon-btn" title="Paramètres du compte">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+      </a>
       <!-- Identité fusionnée (refonte "onglets segmentés") : avatar + nom + rôle dans une
            seule pastille cliquable vers le tableau de bord, au lieu de 3 éléments distincts. -->
       <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="acc-chip">
@@ -1453,7 +1460,15 @@ async function daToggleSuivre(type, id, btn){
 window.daToggleSuivre = daToggleSuivre;
 
 function renderInitiativeCard(it){
-  const badge   = DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()};
+  /* Domaine d'activité unifié (2026-09-04) : prime sur l'ancien it.domaine quand renseigné —
+     migration "self-service", les deux champs coexistent tant qu'un compte n'a pas rouvert
+     Paramètres du compte pour le renseigner. domaineActiviteInfo n'est chargé que sur les pages
+     qui en ont besoin (assets/domaines-activite.js) : garde défensive si absent. */
+  const domNouveau = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(it.domaine_principal) : null;
+  const badge   = domNouveau
+    ? { bg: '#1B3A6B', label: `${domNouveau.icone} ${domNouveau.label}`.toUpperCase() }
+    : (DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()});
+  const sousDomaines = [it.sous_domaine_1, it.sous_domaine_2].filter(Boolean).join(' • ');
   /* Seulement les visuels chargés par le compte lui-même. À défaut, ses initiales sur la
      couleur de son domaine : une photo d'illustration ferait passer une image sans rapport
      pour celle de l'initiative. */
@@ -1509,6 +1524,7 @@ function renderInitiativeCard(it){
       </div>
       ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+      ${sousDomaines ? `<div class="ann-card-origs">🎯 <strong>Activité :</strong> ${sousDomaines}</div>` : ''}
       ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${it.fonction_responsable ? ` — ${it.fonction_responsable}` : ''}</div>` : ''}
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
@@ -1713,14 +1729,23 @@ async function initAnnuaire(){
     // nationalite avec repli "-", origine seulement si l'information existe reellement.
     const nats  = [u.nationalite1, u.nationalite2].filter(Boolean).join(' • ') || '—';
     const origs = daOrigineDeclaree(u);
+    // Domaine d'activité unifié (2026-09-04) : un compte individuel n'affichait aucun domaine
+    // jusqu'ici (badge "UTILISATEUR" générique) — remplacé par son domaine s'il l'a renseigné
+    // via Paramètres du compte, garde défensive comme pour renderInitiativeCard.
+    const domUser = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(u.domaine_principal) : null;
+    const badgeUser = domUser
+      ? `<span class="ann-cat-badge" style="background:#1B3A6B;">${(`${domUser.icone} ${domUser.label}`).toUpperCase()}</span>`
+      : `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`;
+    const sousDomainesUser = [u.sous_domaine_1, u.sous_domaine_2].filter(Boolean).join(' • ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>${daBadgeOrigine(u)}`, isOwn)}
+      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `${badgeUser}${daBadgeOrigine(u)}`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
         <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
+        ${sousDomainesUser ? `<div class="ann-card-origs">🎯 <strong>Activité :</strong> ${sousDomainesUser}</div>` : ''}
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn" onclick="event.stopPropagation()">👁 Voir le profil</a>

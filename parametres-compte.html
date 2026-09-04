@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Paramètres du compte</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .pc-wrap{max-width:640px;}
+  .pc-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:22px 24px;margin-bottom:18px;}
+  .pc-card h2{margin:0 0 4px;font-size:16px;}
+  .pc-card .pc-desc{margin:0 0 16px;font-size:12.5px;color:var(--muted);line-height:1.55;}
+  .pc-field{margin-bottom:12px;}
+  .pc-field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px;}
+  .pc-field input,.pc-field select{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;}
+  .pc-field input:focus,.pc-field select:focus{outline:none;border-color:#2563EB;}
+  .pc-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:520px){.pc-row2{grid-template-columns:1fr;}}
+  .pc-btn{border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;}
+  .pc-btn-save{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;}
+  .pc-btn-save:disabled{opacity:.6;cursor:default;}
+  .pc-btn-outline{background:var(--bg);border:1.5px solid var(--border) !important;color:var(--text);}
+  .pc-msg{font-size:12.5px;margin-top:10px;display:none;}
+  .pc-msg-ok{color:#15803d;}
+  .pc-msg-err{color:#dc2626;}
+  .pc-current-email{font-size:13.5px;color:var(--text);background:var(--bg);border-radius:9px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .pc-verified-badge{font-size:11px;font-weight:700;color:#15803d;background:rgba(21,128,61,.12);border-radius:99px;padding:2px 9px;white-space:nowrap;}
+  .pc-unverified-badge{font-size:11px;font-weight:700;color:#b45309;background:rgba(180,83,9,.12);border-radius:99px;padding:2px 9px;white-space:nowrap;}
+  .pc-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:14px;}
+  .pc-toggle-label{font-size:13.5px;font-weight:600;}
+  .pc-toggle-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .pc-switch{position:relative;width:44px;height:24px;flex:none;}
+  .pc-switch input{opacity:0;width:0;height:0;}
+  .pc-switch-track{position:absolute;inset:0;background:var(--border);border-radius:99px;cursor:pointer;transition:background .15s;}
+  .pc-switch-track::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .pc-switch input:checked + .pc-switch-track{background:#2563EB;}
+  .pc-switch input:checked + .pc-switch-track::before{transform:translateX(20px);}
+  .pc-hint{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Vitrines</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <h1 style="margin:0 0 4px;">⚙️ Paramètres du compte</h1>
+    <p class="sub" style="margin:0 0 24px;">Nom, domaine d'activité, e-mail, mot de passe et notifications.</p>
+
+    <div class="pc-wrap" id="pc-wrap">
+      <div class="notice">Chargement…</div>
+    </div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/domaines-activite.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=11"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+<script>
+(async function(){
+  const wrap = document.getElementById('pc-wrap');
+  let moi = null, profil = null;
+
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) { location.href = 'login.html'; return; }
+    moi = me.user;
+  } catch(e) { location.href = 'login.html'; return; }
+
+  try {
+    const r = await api('GET', `/profil/${moi.id}`);
+    profil = r.profil;
+  } catch(e) {
+    wrap.innerHTML = `<div class="notice" style="color:#dc2626;">Erreur de chargement du profil.</div>`;
+    return;
+  }
+
+  const isOrg = ['initiative','collectivite','administrateur'].includes(profil.role);
+  const domaineOptions = (window.DOMAINES_ACTIVITE||[]).map(([cle,icone,label]) =>
+    `<option value="${cle}" ${profil.domaine_principal===cle?'selected':''}>${icone} ${label}</option>`
+  ).join('');
+
+  wrap.innerHTML = `
+    <div class="pc-card">
+      <h2>👤 Identité</h2>
+      <p class="pc-desc">${isOrg ? "Le nom affiché en priorité sur l'annuaire et le profil public." : "Votre nom tel qu'il apparaît sur votre profil."}</p>
+      ${isOrg ? `
+        <div class="pc-field"><label>Nom de la structure</label><input id="pc-nom-structure" value="${esc(profil.nom_structure||'')}"></div>
+        <div class="pc-row2">
+          <div class="pc-field"><label>Prénom du responsable</label><input id="pc-prenom" value="${esc(profil.prenom||'')}"></div>
+          <div class="pc-field"><label>Nom du responsable</label><input id="pc-nom" value="${esc(profil.nom||'')}"></div>
+        </div>
+      ` : `
+        <div class="pc-row2">
+          <div class="pc-field"><label>Prénom</label><input id="pc-prenom" value="${esc(profil.prenom||'')}"></div>
+          <div class="pc-field"><label>Nom</label><input id="pc-nom" value="${esc(profil.nom||'')}"></div>
+        </div>
+      `}
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-identite">Enregistrer</button>
+      <p class="pc-msg" id="pc-msg-identite"></p>
+    </div>
+
+    <div class="pc-card">
+      <h2>🎯 Domaine d'activité</h2>
+      <p class="pc-desc">Un domaine, et jusqu'à deux précisions en texte libre — affichés sur l'annuaire et le profil public.</p>
+      <div class="pc-field"><label>Domaine</label>
+        <select id="pc-domaine"><option value="">— Sélectionner —</option>${domaineOptions}</select>
+      </div>
+      <div class="pc-row2">
+        <div class="pc-field"><label>Activité précise</label><input id="pc-sous-domaine-1" placeholder="Ex : Transit France – Côte d'Ivoire" value="${esc(profil.sous_domaine_1||'')}"></div>
+        <div class="pc-field"><label>Deuxième activité <span style="text-transform:none;font-weight:400;">(facultatif)</span></label><input id="pc-sous-domaine-2" placeholder="Facultatif" value="${esc(profil.sous_domaine_2||'')}"></div>
+      </div>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-domaine">Enregistrer</button>
+      <p class="pc-msg" id="pc-msg-domaine"></p>
+    </div>
+
+    <div class="pc-card">
+      <h2>✉️ Adresse e-mail</h2>
+      <div class="pc-current-email">
+        <span>${esc(profil.email||moi.email||'')}</span>
+        ${profil.email_verifie ? `<span class="pc-verified-badge">✓ Vérifiée</span>` : `<span class="pc-unverified-badge">Non vérifiée</span>`}
+      </div>
+      <div class="pc-field"><label>Nouvelle adresse e-mail</label><input id="pc-email" type="email" placeholder="nouvelle-adresse@exemple.com"></div>
+      <p class="pc-hint">Un e-mail de confirmation sera envoyé à la nouvelle adresse. Elle ne sera active qu'après confirmation. Si votre identité était vérifiée, ce changement demande une nouvelle vérification.</p>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-email" style="margin-top:10px;">Changer d'adresse</button>
+      <p class="pc-msg" id="pc-msg-email"></p>
+    </div>
+
+    <div class="pc-card">
+      <h2>🔒 Mot de passe</h2>
+      <div class="pc-field"><label>Mot de passe actuel</label><input id="pc-pwd-actuel" type="password"></div>
+      <div class="pc-row2">
+        <div class="pc-field"><label>Nouveau mot de passe</label><input id="pc-pwd-nouveau" type="password" placeholder="8 caractères minimum"></div>
+        <div class="pc-field"><label>Confirmer</label><input id="pc-pwd-confirme" type="password"></div>
+      </div>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-pwd">Changer le mot de passe</button>
+      <p class="pc-msg" id="pc-msg-pwd"></p>
+    </div>
+
+    <div class="pc-card">
+      <h2>🔔 Notifications</h2>
+      <div class="pc-toggle-row">
+        <div>
+          <div class="pc-toggle-label">E-mails non essentiels</div>
+          <div class="pc-toggle-sub">Confirmations, invitations, informations qui ne concernent pas la sécurité de votre compte.</div>
+        </div>
+        <label class="pc-switch">
+          <input type="checkbox" id="pc-notif-toggle" ${profil.notif_emails_non_essentiels!==false ? 'checked' : ''}>
+          <span class="pc-switch-track"></span>
+        </label>
+      </div>
+      <p class="pc-hint">Les e-mails de sécurité (vérification de compte, réinitialisation de mot de passe) sont toujours envoyés, quel que soit ce réglage.</p>
+      <p class="pc-msg" id="pc-msg-notif"></p>
+    </div>
+  `;
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function showMsg(id, text, ok){
+    const el = document.getElementById(id);
+    el.textContent = text; el.className = 'pc-msg ' + (ok ? 'pc-msg-ok' : 'pc-msg-err');
+    el.style.display = 'block';
+  }
+
+  document.getElementById('pc-btn-identite').addEventListener('click', async () => {
+    const btn = document.getElementById('pc-btn-identite'); btn.disabled = true;
+    try {
+      const body = { prenom: document.getElementById('pc-prenom').value.trim(), nom: document.getElementById('pc-nom').value.trim() };
+      const nomStructureEl = document.getElementById('pc-nom-structure');
+      if (nomStructureEl) body.nom_structure = nomStructureEl.value.trim();
+      await api('PUT', '/profil', body);
+      showMsg('pc-msg-identite', 'Enregistré ✓', true);
+    } catch(e) { showMsg('pc-msg-identite', e.message || 'Erreur.', false); }
+    finally { btn.disabled = false; }
+  });
+
+  document.getElementById('pc-btn-domaine').addEventListener('click', async () => {
+    const btn = document.getElementById('pc-btn-domaine'); btn.disabled = true;
+    try {
+      await api('PUT', '/profil', {
+        domaine_principal: document.getElementById('pc-domaine').value || '',
+        sous_domaine_1: document.getElementById('pc-sous-domaine-1').value.trim(),
+        sous_domaine_2: document.getElementById('pc-sous-domaine-2').value.trim(),
+      });
+      showMsg('pc-msg-domaine', 'Enregistré ✓', true);
+    } catch(e) { showMsg('pc-msg-domaine', e.message || 'Erreur.', false); }
+    finally { btn.disabled = false; }
+  });
+
+  document.getElementById('pc-btn-email').addEventListener('click', async () => {
+    const val = document.getElementById('pc-email').value.trim();
+    if (!val) { showMsg('pc-msg-email', 'Saisissez une adresse.', false); return; }
+    const btn = document.getElementById('pc-btn-email'); btn.disabled = true;
+    try {
+      await api('PUT', '/profil/informations-declarees', { email: val });
+      showMsg('pc-msg-email', 'E-mail de confirmation envoyé à la nouvelle adresse ✓', true);
+      document.getElementById('pc-email').value = '';
+    } catch(e) { showMsg('pc-msg-email', e.message || 'Erreur.', false); }
+    finally { btn.disabled = false; }
+  });
+
+  document.getElementById('pc-btn-pwd').addEventListener('click', async () => {
+    const actuel = document.getElementById('pc-pwd-actuel').value;
+    const nouveau = document.getElementById('pc-pwd-nouveau').value;
+    const confirme = document.getElementById('pc-pwd-confirme').value;
+    if (!actuel || !nouveau) { showMsg('pc-msg-pwd', 'Tous les champs sont requis.', false); return; }
+    if (nouveau.length < 8) { showMsg('pc-msg-pwd', 'Le nouveau mot de passe doit comporter au moins 8 caractères.', false); return; }
+    if (nouveau !== confirme) { showMsg('pc-msg-pwd', 'Les deux mots de passe ne correspondent pas.', false); return; }
+    const btn = document.getElementById('pc-btn-pwd'); btn.disabled = true;
+    try {
+      await api('PUT', '/profil/mot-de-passe', { mot_de_passe_actuel: actuel, nouveau_mot_de_passe: nouveau });
+      showMsg('pc-msg-pwd', 'Mot de passe changé ✓', true);
+      document.getElementById('pc-pwd-actuel').value = '';
+      document.getElementById('pc-pwd-nouveau').value = '';
+      document.getElementById('pc-pwd-confirme').value = '';
+    } catch(e) { showMsg('pc-msg-pwd', e.message || 'Erreur.', false); }
+    finally { btn.disabled = false; }
+  });
+
+  document.getElementById('pc-notif-toggle').addEventListener('change', async (ev) => {
+    try {
+      await api('PUT', '/profil', { notif_emails_non_essentiels: ev.target.checked });
+      showMsg('pc-msg-notif', 'Préférence enregistrée ✓', true);
+    } catch(e) { ev.target.checked = !ev.target.checked; showMsg('pc-msg-notif', e.message || 'Erreur.', false); }
+  });
+})();
+</script>
+</body>
+</html>
