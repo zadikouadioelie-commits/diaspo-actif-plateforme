@@ -6171,11 +6171,21 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
        est obligatoire et validée à leur accréditation. */
     `SELECT id, nom, nom_institution, type_organisme, ville, pays, photo_url, banner_url, bio, role,
        nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
-       origine1, origine2, pays_origine_institution, nationalite1, nationalite2
+       origine1, origine2, pays_origine_institution, nationalite1, nationalite2, domaine_principal
      FROM users WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
   ).all();
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
+
+  /* Filtre « Domaine d'activité » — taxonomie unifiée (assets/domaines-activite.js), stockée
+     sur users.domaine_principal / initiatives.domaine_principal. Distinct de query.domaine
+     (l'ancien champ "domaine" de l'initiative, encore utilisé pour le badge de couleur des
+     cartes) : les deux coexistent, celui-ci est le filtre demandé pour l'Annuaire. */
+  if (query.domaine_activite) {
+    initiatives = initiatives.filter(r => r.domaine_principal === query.domaine_activite);
+    utilisateurs = utilisateurs.filter(r => r.domaine_principal === query.domaine_activite);
+    organismes = organismes.filter(r => r.domaine_principal === query.domaine_activite);
+  }
 
   /* Filtre « Pays d'origine » — jusqu'ici totalement inopérant : le paramètre n'était ni
      envoyé par le client ni lu par cette route. Les champs testés sont exactement ceux que

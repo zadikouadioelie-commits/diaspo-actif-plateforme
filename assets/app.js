@@ -1671,7 +1671,7 @@ async function initAnnuaire(){
   }
 
   /* État des filtres */
-  const state = { typeOrg: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "", motCle: "" };
+  const state = { typeOrg: "", domaineActivite: "", paysRes: "", paysOrig: "", ville: "", nom: "", prenom: "", motCle: "" };
   let USERS_CACHE = null;
 
   /* Normalisation */
@@ -1766,17 +1766,22 @@ async function initAnnuaire(){
     if (!bar) return;
     const labels = {
       typeOrg:  "Type",
+      domaineActivite: "Domaine",
       paysRes:  "Résidence",
       paysOrig: "Origine",
       ville:    "Ville",
       nom:      "Nom",
       prenom:   "Prénom",
     };
+    // Le domaine est stocké sous sa clé technique (ex. "medecine_sante") — affiche le libellé
+    // lisible sur la chip plutôt que la clé brute, quand la taxonomie est chargée.
+    const displayValue = (k, v) => k === "domaineActivite" && typeof domaineActiviteInfo === "function"
+      ? (domaineActiviteInfo(v)?.label || v) : v;
     const active = Object.entries(state).filter(([,v]) => v);
     bar.style.display = active.length ? "flex" : "none";
     bar.innerHTML = active.length
       ? active.map(([k, v]) =>
-          `<span class="ann-chip">${labels[k]} : ${v}
+          `<span class="ann-chip">${labels[k]} : ${displayValue(k, v)}
             <button class="ann-chip-remove" onclick="annRemoveFilter('${k}')" title="Retirer ce filtre">✕</button>
           </span>`
         ).join("") +
@@ -1790,6 +1795,7 @@ async function initAnnuaire(){
   async function applyRechercheMotCle() {
     const params = new URLSearchParams({ q: state.motCle || "" });
     if (state.typeOrg) params.set("type", state.typeOrg);
+    if (state.domaineActivite) params.set("domaine_activite", state.domaineActivite);
     if (state.ville) params.set("ville", state.ville);
     if (state.paysRes) params.set("pays", state.paysRes);
     /* state.paysOrig n'était jamais transmis : choisir un pays d'origine ne changeait
@@ -1834,6 +1840,7 @@ async function initAnnuaire(){
         if (state.nom && !norm(u.nom||"").includes(norm(state.nom))) return false;
         if (state.prenom && !norm(u.prenom||"").includes(norm(state.prenom))) return false;
         if (state.ville && !norm(u.ville||"").includes(norm(state.ville))) return false;
+        if (state.domaineActivite && u.domaine_principal !== state.domaineActivite) return false;
         /* Cette branche (type "Utilisateurs" sans mot-clé) court-circuite la recherche
            serveur qui gère normalement le filtre d'origine — sans ce test, choisir un
            pays d'origine ici n'avait strictement aucun effet, comme pour toutes les
@@ -1872,9 +1879,11 @@ async function initAnnuaire(){
 
   /* ── Exposer reset et removeFilter globalement ── */
   window.annResetFilters = function() {
-    state.typeOrg = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = state.motCle = "";
+    state.typeOrg = state.domaineActivite = state.paysRes = state.paysOrig = state.ville = state.nom = state.prenom = state.motCle = "";
     const typeEl = document.getElementById("f-type-org");
     if (typeEl) typeEl.value = "";
+    const domaineEl = document.getElementById("f-domaine-activite");
+    if (domaineEl) domaineEl.value = "";
     const villeEl = document.getElementById("f-ville-simple");
     if (villeEl) villeEl.value = "";
     const nomEl = document.getElementById("f-nom-simple");
@@ -1897,6 +1906,7 @@ async function initAnnuaire(){
   window.annRemoveFilter = function(key) {
     state[key] = "";
     if (key === "typeOrg") { const el = document.getElementById("f-type-org"); if(el) el.value = ""; syncQuickButtons(); }
+    if (key === "domaineActivite") { const el = document.getElementById("f-domaine-activite"); if(el) el.value = ""; }
     if (key === "ville")   { const el = document.getElementById("f-ville-simple"); if(el) el.value = ""; }
     if (key === "nom")     { const el = document.getElementById("f-nom-simple"); if(el) el.value = ""; }
     if (key === "prenom")  { const el = document.getElementById("f-prenom-simple"); if(el) el.value = ""; }
@@ -1922,6 +1932,18 @@ async function initAnnuaire(){
     if (btnQuickColl) btnQuickColl.classList.toggle("active", state.typeOrg === "Collectivité");
   }
   if (typeEl) typeEl.addEventListener("change", () => { state.typeOrg = typeEl.value; syncQuickButtons(); apply(); });
+
+  /* ── Domaine d'activité (taxonomie unifiée, assets/domaines-activite.js) ── */
+  const domaineActiviteEl = document.getElementById("f-domaine-activite");
+  if (domaineActiviteEl && Array.isArray(window.DOMAINES_ACTIVITE)) {
+    window.DOMAINES_ACTIVITE.forEach(([cle, icone, label]) => {
+      const o = document.createElement("option");
+      o.value = cle;
+      o.textContent = `${icone} ${label}`;
+      domaineActiviteEl.appendChild(o);
+    });
+    domaineActiviteEl.addEventListener("change", () => { state.domaineActivite = domaineActiviteEl.value; apply(); });
+  }
   if (btnQuickInit) btnQuickInit.addEventListener("click", () => {
     state.typeOrg = state.typeOrg === "Initiative" ? "" : "Initiative";
     if (typeEl) typeEl.value = state.typeOrg;
