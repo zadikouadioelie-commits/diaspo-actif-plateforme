@@ -584,16 +584,6 @@ img[loading="lazy"].loaded { background: none; animation: none; }
     transition: none;
   }
   .sidebar .brand { display: none; } /* redondant avec le logo du bandeau, visible derrière une fois le tiroir fermé */
-  #da-sidebar-search-wrap {
-    position: sticky; top: 0; z-index: 2;
-    background: var(--navy); padding: 6px 0 14px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  #da-sidebar-search {
-    flex: 1; min-width: 0; padding: 11px 14px; border-radius: 12px; border: none;
-    background: rgba(255,255,255,.1); color: #fff; font-size: 14px;
-  }
-  #da-sidebar-search::placeholder { color: rgba(255,255,255,.55); }
   .sidebar a[hidden] { display: none; }
   /* "Déconnexion" en pied de menu (voir assets/app.js) : texte simple centré en rouge,
      sans le fond blanc des autres items — cohérent avec la référence fournie et distinct
