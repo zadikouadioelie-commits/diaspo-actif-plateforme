@@ -437,12 +437,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
              synchrones du document, où qu'ils soient placés, ont déjà été exécutés. */
           document.addEventListener('DOMContentLoaded', function(){
             const sel = document.getElementById('i-domaine');
-            if (sel && window.DOMAINES_ACTIVITE) {
-              window.DOMAINES_ACTIVITE.forEach(([cle, icone, label]) => {
-                const o = document.createElement('option');
-                o.value = cle; o.textContent = `${icone} ${label}`;
-                sel.appendChild(o);
-              });
+            // Groupé par lettre initiale (<optgroup>) — repère visuel demandé, fonction
+            // partagée avec parametres-compte.html et le filtre annuaire (assets/domaines-activite.js).
+            if (sel && window.domaineActiviteOptionsHTML) {
+              sel.insertAdjacentHTML('beforeend', domaineActiviteOptionsHTML());
             }
             // Suggestions de sous-domaine déjà saisies par d'autres comptes du même domaine
             // (assets/domaines-activite.js) — voir GET /api/domaines-activite/sous-domaines.

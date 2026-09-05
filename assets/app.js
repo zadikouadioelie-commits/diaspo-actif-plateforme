@@ -1961,12 +1961,18 @@ async function initAnnuaire(){
   /* ── Domaine d'activité (taxonomie unifiée, assets/domaines-activite.js) ── */
   const domaineActiviteEl = document.getElementById("f-domaine-activite");
   if (domaineActiviteEl && Array.isArray(window.DOMAINES_ACTIVITE)) {
-    window.DOMAINES_ACTIVITE.forEach(([cle, icone, label]) => {
-      const o = document.createElement("option");
-      o.value = cle;
-      o.textContent = `${icone} ${label}`;
-      domaineActiviteEl.appendChild(o);
-    });
+    // Groupé par lettre initiale (<optgroup>) — fonction partagée (assets/domaines-activite.js)
+    // avec inscription.html et parametres-compte.html, pour que les groupes ne divergent jamais.
+    if (typeof domaineActiviteOptionsHTML === "function") {
+      domaineActiviteEl.insertAdjacentHTML("beforeend", domaineActiviteOptionsHTML());
+    } else {
+      window.DOMAINES_ACTIVITE.forEach(([cle, icone, label]) => {
+        const o = document.createElement("option");
+        o.value = cle;
+        o.textContent = `${icone} ${label}`;
+        domaineActiviteEl.appendChild(o);
+      });
+    }
     domaineActiviteEl.addEventListener("change", () => { state.domaineActivite = domaineActiviteEl.value; apply(); });
   }
   if (btnQuickInit) btnQuickInit.addEventListener("click", () => {

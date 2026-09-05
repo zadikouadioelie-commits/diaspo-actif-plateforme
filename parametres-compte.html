@@ -102,9 +102,9 @@
   }
 
   const isOrg = ['initiative','collectivite','administrateur'].includes(profil.role);
-  const domaineOptions = (window.DOMAINES_ACTIVITE||[]).map(([cle,icone,label]) =>
-    `<option value="${cle}" ${profil.domaine_principal===cle?'selected':''}>${icone} ${label}</option>`
-  ).join('');
+  // Groupé par lettre initiale (<optgroup>) — fonction partagée (assets/domaines-activite.js)
+  // avec inscription.html et le filtre annuaire, pour que les groupes ne divergent jamais.
+  const domaineOptions = window.domaineActiviteOptionsHTML ? domaineActiviteOptionsHTML(profil.domaine_principal) : '';
 
   wrap.innerHTML = `
     <div class="pc-card">
