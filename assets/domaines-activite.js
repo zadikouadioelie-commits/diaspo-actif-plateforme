@@ -7,6 +7,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 window.DOMAINES_ACTIVITE = [
   ['medecine_sante',            '🏥', 'Médecine & Santé'],
+  ['sante_mentale',              '🧠', 'Santé mentale'],
   ['transport_logistique',      '🚛', 'Transport & Logistique'],
   ['agriculture',                '🌾', 'Agriculture'],
   ['btp_immobilier',             '🏗️', 'BTP & Immobilier'],
