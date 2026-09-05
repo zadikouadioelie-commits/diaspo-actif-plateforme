@@ -229,6 +229,7 @@ html, body{overflow-x:clip !important;}
 </div>
 
 <script src="assets/decouverte-premium.js"></script>
+<script src="assets/domaines-activite.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
@@ -310,6 +311,16 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
 
   const localisation = [init.ville, init.region, init.pays].filter(Boolean).join(' · ');
 
+  /* Domaine d'activité unifié + sous-domaines (2026-09-05) — même logique et même format que
+     la cartouche de l'annuaire (renderInitiativeCard, assets/app.js) : cette fiche affichait
+     encore uniquement l'ancien champ texte libre init.domaine, sans les sous-domaines pourtant
+     déjà visibles sur la cartouche d'où l'on arrive en cliquant « Voir le profil ». */
+  const domNouveauInit = (typeof domaineActiviteInfo === 'function') ? domaineActiviteInfo(init.domaine_principal) : null;
+  const sousDomainesInit = [init.sous_domaine_1, init.sous_domaine_2].filter(Boolean).join(' • ');
+  const domaineLigneInit = domNouveauInit
+    ? `${domNouveauInit.icone} ${domNouveauInit.label}${sousDomainesInit ? ' — ' + sousDomainesInit : ''}`
+    : (init.domaine || sousDomainesInit || '');
+
   document.title = `Diaspo'Actif — ${init.nom}`;
 
   el.innerHTML = `
@@ -366,7 +377,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
             ${(!init.accreditations?.includes('initiative_abonne') && init.decouverte_premium && window.decouvertePremiumBadgeHtml) ? window.decouvertePremiumBadgeHtml(init.decouverte_premium.date_expiration) : ''}
           </div>
           <div class="init-profile-meta">
-            ${init.domaine ? `<span>📂 ${init.domaine}</span>` : ''}
+            ${domaineLigneInit ? `<span>📂 ${domaineLigneInit}</span>` : ''}
             ${localisation ? `<span class="sep">|</span><span>📍 ${localisation}</span>` : ''}
             ${init.site_web ? `<span class="sep">|</span><a href="${init.site_web}" target="_blank" rel="noopener" style="color:#2563EB;">🌐 Site web</a>` : ''}
           </div>
