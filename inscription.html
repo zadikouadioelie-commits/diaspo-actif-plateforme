@@ -13,6 +13,23 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="assets/logo.png">
 <style>
+/* Colonnes latérales (publicités + événements) — écrans larges uniquement. Même pattern que
+   .init-3col (initiative.html) / .p-grid3 (profil-app.html) : grille 3 colonnes avec côtés
+   sticky, empilée en une seule colonne sous 1180px (le formulaire lui-même reste inchangé,
+   .insc-wrap garde son propre max-width:720px et se centre normalement dans la colonne du
+   milieu, qui peut être plus large). */
+.insc-page-grid{max-width:1400px;margin:0 auto;padding:0 16px;display:grid;grid-template-columns:280px minmax(0,1fr) 280px;gap:24px;align-items:start;}
+.insc-side-col{position:sticky;top:78px;max-height:calc(100vh - 96px);overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding-top:32px;}
+.insc-events-widget{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--surface,#fff);}
+.insc-events-widget h4{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
+.evt-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;}
+.evt-img{width:100%;height:90px;object-fit:cover;background:linear-gradient(135deg,#0D2B4E,#1B3A6B);display:flex;align-items:center;justify-content:center;font-size:26px;}
+.evt-body{padding:8px 10px;}
+.evt-date{font-size:10.5px;color:#F26422;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+@media(max-width:1180px){
+  .insc-page-grid{grid-template-columns:1fr;max-width:720px;}
+  .insc-side-col{display:none;}
+}
 .insc-wrap{max-width:720px;margin:32px auto;padding:0 16px 64px}
 .insc-stepper{display:flex;align-items:center;margin-bottom:32px}
 .insc-step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
@@ -92,6 +109,10 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
     </div>
   </div>
 </header>
+<div class="insc-page-grid">
+  <aside class="insc-side-col">
+    <div id="ad-insc-gauche" data-ad-emplacement="inscription_sidebar_gauche" style="display:none;"></div>
+  </aside>
 <main class="insc-wrap">
   <div style="text-align:center;margin-bottom:28px">
     <h2 style="margin:0 0 6px">Creer un compte Diaspo'Actif</h2>
@@ -391,6 +412,35 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
                 sel.appendChild(o);
               });
             }
+          });
+        </script>
+        <script>
+          /* Widget "Prochains événements" de la colonne latérale droite — construit ici (aucun
+             widget compact n'existait ailleurs sur la plateforme). Réutilise GET /api/events,
+             déjà trié et filtré aux événements actifs par le serveur (server/index.js) : aucun
+             filtre supplémentaire à refaire côté client. */
+          document.addEventListener('DOMContentLoaded', async function(){
+            const widget = document.getElementById('insc-events-widget');
+            const list = document.getElementById('insc-events-list');
+            if (!widget || !list) return;
+            const escInsc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            try {
+              const r = await fetch('/api/events').then(x => x.json());
+              const events = (r.events||[]).slice(0, 3);
+              if (!events.length) return;
+              list.innerHTML = events.map(e => {
+                const d = e.date_debut ? new Date(e.date_debut) : null;
+                const dateLabel = d ? d.toLocaleDateString('fr-FR', { day:'2-digit', month:'short' }) : '';
+                return `<a href="evenement-billetterie.html?id=${e.id}" class="evt-card" style="display:block;text-decoration:none;color:inherit;margin-bottom:10px;">
+                  ${e.image_b64 ? `<img class="evt-img" src="${e.image_b64}" alt="">` : `<div class="evt-img">🎟️</div>`}
+                  <div class="evt-body">
+                    <div class="evt-date">${escInsc(dateLabel)}${e.ville ? ' · '+escInsc(e.ville) : ''}</div>
+                    <div style="font-weight:700;font-size:13px;">${escInsc(e.titre)}</div>
+                  </div>
+                </a>`;
+              }).join('');
+              widget.style.display = '';
+            } catch(e) { /* widget reste masqué */ }
           });
         </script>
         <div style="margin-top:12px"><label>Description <span style="color:#2563EB">*</span></label>
@@ -749,6 +799,14 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
     </div>
   </div>
 </main>
+  <aside class="insc-side-col">
+    <div id="ad-insc-droite" data-ad-emplacement="inscription_sidebar_droite" style="display:none;"></div>
+    <div class="insc-events-widget" id="insc-events-widget" style="display:none;">
+      <h4>📅 Prochains événements</h4>
+      <div id="insc-events-list"></div>
+    </div>
+  </aside>
+</div>
 <footer class="footer">
   <span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> ·
   <a href="confidentialite.html" class="footer-link">Confidentialite des donnees</a>
