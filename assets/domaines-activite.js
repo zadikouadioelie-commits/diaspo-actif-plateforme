@@ -34,6 +34,7 @@ window.DOMAINES_ACTIVITE = [
   ['numerique_technologie',      '💻', 'Numérique & Technologie'],
   ['recherche_innovation',       '🔬', 'Recherche & Innovation'],
   ['restauration_agroalimentaire','🍽️', 'Restauration & Agroalimentaire'],
+  ['sante',                      '🩺', 'Santé'],
   ['sante_mentale',              '🧠', 'Santé mentale'],
   ['social_famille',             '👶', 'Social & Famille'],
   ['sport',                      '🏃', 'Sport'],
