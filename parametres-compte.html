@@ -187,6 +187,15 @@
     el.style.display = 'block';
   }
 
+  // Suggestions de sous-domaine déjà saisies par d'autres comptes du même domaine
+  // (assets/domaines-activite.js) — voir GET /api/domaines-activite/sous-domaines.
+  if (window.wireSousDomaineSuggestions) {
+    window.wireSousDomaineSuggestions(document.getElementById('pc-domaine'), [
+      document.getElementById('pc-sous-domaine-1'),
+      document.getElementById('pc-sous-domaine-2'),
+    ]);
+  }
+
   document.getElementById('pc-btn-identite').addEventListener('click', async () => {
     const btn = document.getElementById('pc-btn-identite'); btn.disabled = true;
     try {

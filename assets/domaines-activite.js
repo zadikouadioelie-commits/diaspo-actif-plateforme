@@ -46,3 +46,37 @@ function domaineActiviteLabel(cle) {
   const d = domaineActiviteInfo(cle);
   return d ? `${d.icone} ${d.label}` : '';
 }
+
+/* Suggestions de sous-domaine (2026-09-05, demande explicite) : « lorsqu'un domaine et un
+   sous-domaine sont enregistrés, propose-les aux prochains inscrits qui choisissent le même
+   domaine ». Sous domaine 1/2 restent des champs texte libres — pas de liste fermée possible
+   (trop de nuances par métier) — mais une <datalist> native propose ce que d'autres comptes
+   ont déjà tapé pour le même domaine : menu déroulant au clic/à la frappe, tout en laissant
+   la main pour taper autre chose. Fonction PARTAGÉE par inscription.html et
+   parametres-compte.html. Un seul appel réseau par domaine choisi (résultat mis en cache
+   localement à cette page). */
+function wireSousDomaineSuggestions(domaineSelect, sousDomaineInputs) {
+  if (!domaineSelect || !sousDomaineInputs || !sousDomaineInputs.length) return;
+  const dl = document.createElement('datalist');
+  dl.id = 'sda-suggestions-' + Math.random().toString(36).slice(2, 8);
+  document.body.appendChild(dl);
+  sousDomaineInputs.forEach(inp => inp && inp.setAttribute('list', dl.id));
+
+  const cache = {};
+  function afficher(liste) {
+    dl.innerHTML = '';
+    (liste || []).forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
+  }
+  async function charger(domaine) {
+    if (!domaine) { afficher([]); return; }
+    if (cache[domaine]) { afficher(cache[domaine]); return; }
+    try {
+      const r = await api('GET', `/domaines-activite/sous-domaines?domaine=${encodeURIComponent(domaine)}`);
+      cache[domaine] = r.suggestions || [];
+      afficher(cache[domaine]);
+    } catch (e) { /* champ libre, la saisie reste possible sans suggestion */ }
+  }
+  domaineSelect.addEventListener('change', () => charger(domaineSelect.value));
+  if (domaineSelect.value) charger(domaineSelect.value);
+}
+window.wireSousDomaineSuggestions = wireSousDomaineSuggestions;

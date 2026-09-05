@@ -444,6 +444,14 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
                 sel.appendChild(o);
               });
             }
+            // Suggestions de sous-domaine déjà saisies par d'autres comptes du même domaine
+            // (assets/domaines-activite.js) — voir GET /api/domaines-activite/sous-domaines.
+            if (sel && window.wireSousDomaineSuggestions) {
+              window.wireSousDomaineSuggestions(sel, [
+                document.getElementById('i-sous-domaine-1'),
+                document.getElementById('i-sous-domaine-2'),
+              ]);
+            }
           });
         </script>
         <script>

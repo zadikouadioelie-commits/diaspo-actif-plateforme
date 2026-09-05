@@ -13932,6 +13932,33 @@ route("GET", "/api/observatoire", async (req, res, params, body, query) => {
   sendJSON(res, 200, { nationalite, seuil_confidentialite: SEUIL_CONFIDENTIALITE, total_membres: totalMembres, par_pays: Object.values(parPays) });
 });
 
+/* GET /api/domaines-activite/sous-domaines — suggestions de sous-domaines déjà saisis par
+   d'autres comptes pour un domaine donné (2026-09-05, demande explicite avec capture :
+   « lorsqu'un domaine et un sous-domaine sont enregistrés, propose-les aux prochains
+   inscrits qui choisissent le même domaine »). Sous domaine 1/2 restent des champs texte
+   libres (pas de liste fermée possible, trop de nuances par métier) — mais rien n'empêche
+   de proposer ce que d'autres ont déjà tapé pour ce domaine, via <datalist> côté client.
+   Publique (utilisée dès inscription.html, avant toute connexion). Agrège users ET
+   initiatives (le domaine d'une Initiative vit sur la table initiatives, pas users — même
+   distinction que /api/profil/:id) ; comptes de démonstration exclus pour ne pas polluer
+   les suggestions avec des données de test. */
+route("GET", "/api/domaines-activite/sous-domaines", async (req, res, params, body, query) => {
+  const domaine = (query?.domaine || "").trim();
+  if (!domaine) return sendJSON(res, 200, { suggestions: [] });
+  const rows = await db.prepare(`
+    SELECT sous_domaine, COUNT(*) AS n FROM (
+      SELECT sous_domaine_1 AS sous_domaine FROM users WHERE domaine_principal=? AND sous_domaine_1 IS NOT NULL AND sous_domaine_1<>'' AND (is_demo IS NULL OR is_demo=FALSE)
+      UNION ALL
+      SELECT sous_domaine_2 FROM users WHERE domaine_principal=? AND sous_domaine_2 IS NOT NULL AND sous_domaine_2<>'' AND (is_demo IS NULL OR is_demo=FALSE)
+      UNION ALL
+      SELECT i.sous_domaine_1 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE i.domaine_principal=? AND i.sous_domaine_1 IS NOT NULL AND i.sous_domaine_1<>'' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      UNION ALL
+      SELECT i.sous_domaine_2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE i.domaine_principal=? AND i.sous_domaine_2 IS NOT NULL AND i.sous_domaine_2<>'' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+    ) t GROUP BY sous_domaine ORDER BY n DESC, sous_domaine ASC LIMIT 20
+  `).all(domaine, domaine, domaine, domaine);
+  sendJSON(res, 200, { suggestions: rows.map(r => r.sous_domaine) });
+});
+
 /* ---------- Profil (lecture enrichie) ---------- */
 route("GET", "/api/profil/:id", async (req, res, params) => {
   const u = await db.prepare("SELECT id,nom,prenom,email,role,ville,pays,bio,photo_url,banner_url,titre_pro,competences,experiences,theme_couleur,centres_interet,situation_pro,profil_json,privacy_json,created_at,da_id,reseaux_sociaux,email_verifie,compte_masque,telephone,publics_json,besoins_json,realisations_json,stats_perso_json,services_perso,zones_json,reseaux_json,annee_debut,assistant_actif,galerie_json,nationalite1,nationalite2,origine1,origine2,nom_institution,type_organisme,fonction_responsable_etatique,domaine_principal,sous_domaine_1,sous_domaine_2,notif_emails_non_essentiels FROM users WHERE id=?").get(params.id);
