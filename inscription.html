@@ -273,6 +273,33 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
           <label><input type="checkbox" class="u-sitpro" value="autre"> Autre</label>
         </div>
       </div>
+      <div class="form-section"><h4>Domaine d'activite <span style="font-size:11px;color:#64748B;font-weight:400;">(facultatif)</span></h4>
+        <div class="grid-2">
+          <div><label>Domaine d'activite</label>
+            <select id="u-domaine"><option value="">— Selectionner —</option></select>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:12px">
+          <div><label>Sous domaine 1</label>
+            <input id="u-sous-domaine-1" placeholder="Precisez votre activite reelle"></div>
+          <div><label>Sous domaine 2 <span style="font-size:11px;color:#64748B;">(facultatif)</span></label>
+            <input id="u-sous-domaine-2" placeholder="Facultatif"></div>
+        </div>
+        <script>
+          document.addEventListener('DOMContentLoaded', function(){
+            const sel = document.getElementById('u-domaine');
+            if (sel && window.domaineActiviteOptionsHTML) {
+              sel.insertAdjacentHTML('beforeend', domaineActiviteOptionsHTML());
+            }
+            if (sel && window.wireSousDomaineSuggestions) {
+              window.wireSousDomaineSuggestions(sel, [
+                document.getElementById('u-sous-domaine-1'),
+                document.getElementById('u-sous-domaine-2'),
+              ]);
+            }
+          });
+        </script>
+      </div>
       <div class="form-section"><h4>Profil public (facultatif)</h4>
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">🎯 Public / secteurs qui vous concernent</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
@@ -1289,6 +1316,9 @@ document.getElementById("u-submit").addEventListener("click",async()=>{
       code_postal:document.getElementById("u-cp").value.trim()||null,
       telephone:document.getElementById("u-tel").value.trim()||null,
       centres_interet:interests,situation_pro:sitpro,
+      domaine_principal:document.getElementById("u-domaine").value||null,
+      sous_domaine_1:document.getElementById("u-sous-domaine-1").value.trim()||null,
+      sous_domaine_2:document.getElementById("u-sous-domaine-2").value.trim()||null,
       publics:[...document.querySelectorAll('.u-public:checked')].map(c=>c.value),
       besoins:[...document.querySelectorAll('.u-besoin:checked')].map(c=>c.value),
       theme_couleur:THEME_CHOISI_U

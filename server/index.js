@@ -388,8 +388,9 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     INSERT INTO users (nom, prenom, email, password_hash, password_salt, role,
       ville, pays, region, departement, adresse, code_postal, telephone, date_naissance,
       nationalite1, nationalite2, nationalite3, origine1, origine2,
-      centres_interet, situation_pro, type_institution, statut_verification)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      centres_interet, situation_pro, type_institution, statut_verification,
+      domaine_principal, sous_domaine_1, sous_domaine_2)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     nom, prenom || null, emailNorm, hash, salt, role,
     ville || null, (role === "collectivite" ? pays_concerne : pays) || null,
@@ -404,7 +405,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     JSON.stringify(Array.isArray(centres_interet) ? centres_interet : []),
     situation_pro || null,
     type_institution || null,
-    statutVerif
+    statutVerif,
+    /* Domaine d'activité unifié (2026-09-05) — même colonnes que Paramètres du compte,
+       renseignables dès l'inscription pour un compte individuel comme pour une initiative
+       (celle-ci les réécrit ensuite sur `initiatives` juste en-dessous, voir plus bas). */
+    domaine_principal || null, sous_domaine_1 || null, sous_domaine_2 || null
   )).lastInsertRowid;
 
   // Assigner le DA-ID à l'utilisateur
