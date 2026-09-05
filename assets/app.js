@@ -1469,6 +1469,12 @@ function renderInitiativeCard(it){
     ? { bg: '#1B3A6B', label: `${domNouveau.icone} ${domNouveau.label}`.toUpperCase() }
     : (DOMAIN_BADGE[it.domaine] || {bg:'#1B3A6B', label:(it.domaine||'INITIATIVE').toUpperCase()});
   const sousDomaines = [it.sous_domaine_1, it.sous_domaine_2].filter(Boolean).join(' • ');
+  // Ligne "Domaine d'activité" (2026-09-05, renommée depuis "Activité") : combine le domaine
+  // ET le(s) sous-domaine(s) — le badge coloré ci-dessus reste un repère visuel rapide, cette
+  // ligne est la version lisible complète.
+  const domaineLigne = domNouveau
+    ? `${domNouveau.icone} ${domNouveau.label}${sousDomaines ? ' — ' + sousDomaines : ''}`
+    : sousDomaines;
   /* Seulement les visuels chargés par le compte lui-même. À défaut, ses initiales sur la
      couleur de son domaine : une photo d'illustration ferait passer une image sans rapport
      pour celle de l'initiative. */
@@ -1509,7 +1515,6 @@ function renderInitiativeCard(it){
       <span class="ann-card-initiales">${initiales}</span>
       ${photo ? `<img src="${photo}" alt="${it.nom}" loading="lazy" onerror="this.remove()">` : ''}
       <span class="ann-cat-badge" style="background:${badge.bg};">${badge.label}</span>
-      ${daBadgeOrigine(it)}
       ${it.type ? `<span class="ann-type-badge">${it.type}</span>` : ''}
       ${certifBadgeHtml}
       ${isOwnInit ? `<button type="button" class="ann-card-cover-edit" onclick="event.stopPropagation(); annuaireEditInitiativeCover(${it.id})">📷 Modifier la couverture</button>` : ''}
@@ -1525,7 +1530,7 @@ function renderInitiativeCard(it){
       </div>
       ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
       <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
-      ${sousDomaines ? `<div class="ann-card-origs">🎯 <strong>Activité :</strong> ${sousDomaines}</div>` : ''}
+      ${domaineLigne ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigne}</div>` : ''}
       ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${it.fonction_responsable ? ` — ${it.fonction_responsable}` : ''}</div>` : ''}
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
@@ -1737,15 +1742,18 @@ async function initAnnuaire(){
       ? `<span class="ann-cat-badge" style="background:#1B3A6B;">${(`${domUser.icone} ${domUser.label}`).toUpperCase()}</span>`
       : `<span class="ann-cat-badge" style="background:#1B3A6B;">UTILISATEUR</span>`;
     const sousDomainesUser = [u.sous_domaine_1, u.sous_domaine_2].filter(Boolean).join(' • ');
+    const domaineLigneUser = domUser
+      ? `${domUser.icone} ${domUser.label}${sousDomainesUser ? ' — ' + sousDomainesUser : ''}`
+      : sousDomainesUser;
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, `${badgeUser}${daBadgeOrigine(u)}`, isOwn)}
+      ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, badgeUser, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
         <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
-        ${sousDomainesUser ? `<div class="ann-card-origs">🎯 <strong>Activité :</strong> ${sousDomainesUser}</div>` : ''}
+        ${domaineLigneUser ? `<div class="ann-card-origs">🎯 <strong>Domaine d'activité :</strong> ${domaineLigneUser}</div>` : ''}
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
@@ -1769,7 +1777,7 @@ async function initAnnuaire(){
     const responsableNom = [o.prenom_responsable_etatique, o.nom_responsable_etatique].filter(Boolean).join(' ');
     return `
     <div class="ann-card ann-card-profile" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
-      ${annCardCoverHtml(o.id, nomAffiche, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>${daBadgeOrigine(o)}`, isOwn)}
+      ${annCardCoverHtml(o.id, nomAffiche, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nomAffiche}</div>
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>

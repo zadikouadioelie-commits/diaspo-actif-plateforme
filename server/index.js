@@ -358,6 +358,11 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   if (role === "initiative" && !(tel_responsable || telephone)) {
     return sendJSON(res, 400, { error: "Le numéro de téléphone est obligatoire pour un compte Initiative." });
   }
+  /* Domaine d'activité obligatoire (2026-09-05, demande explicite) — Utilisateur et Initiative
+     uniquement, revalidé ici comme les autres champs requis (pas seulement côté formulaire). */
+  if ((role === "utilisateur" || role === "initiative") && !domaine_principal) {
+    return sendJSON(res, 400, { error: "Le domaine d'activité est obligatoire." });
+  }
   /* Statut de l'initiative — "en_creation" : le porteur de projet peut créer son compte
      immédiatement, les informations administratives restent facultatives. "existante" :
      la structure est déjà officiellement créée, ces informations deviennent obligatoires
