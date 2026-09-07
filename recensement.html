@@ -147,6 +147,14 @@
 
   async function init(){
     try { const me = await api('GET', '/auth/me'); moi = me.user || null; } catch(e){ moi = null; }
+    /* Retour depuis Stripe Identity (return_url de verificationSessions.create côté serveur) —
+       le statut réel est mis à jour par le webhook, pas ici : ce n'est qu'un message d'accueil,
+       jamais une confirmation de vérification. */
+    if (params.get('identity') === 'retour') {
+      wrap.innerHTML = `<div class="rec-empty">🪪<br><br>Vérification reçue — son résultat sera visible sous peu sur votre déclaration.<br><br>
+        <a class="rec-btn rec-btn-primary" href="recensement.html?vue=mes-recensements" style="margin-top:14px;">Voir mes recensements</a></div>`;
+      return;
+    }
     const vue = params.get('vue') || 'accueil';
     if (vue === 'accueil') return vueAccueil();
     if (vue === 'mes-recensements') return vueMesRecensements();
@@ -180,6 +188,7 @@
         <div class="rec-grid">
           ${recensements.map(r => `
             <div class="rec-card rec-campagne-card" onclick="location.href='recensement.html?vue=participer&id=${r.id}'">
+              ${r.image_url ? `<img src="${esc(r.image_url)}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:9px;margin-bottom:10px;">` : ''}
               <span class="rec-badge rec-badge-${r.statut}">${STATUT_LABELS[r.statut]||r.statut}</span>
               <h3 style="margin:10px 0 6px;font-size:15.5px;">${esc(r.nom)}</h3>
               <p style="margin:0 0 10px;font-size:12.5px;color:var(--muted);">${esc((r.description||'').slice(0,110))}${(r.description||'').length>110?'…':''}</p>
@@ -308,6 +317,12 @@
     function renderEtape1(body){
       body.innerHTML = `
         <h3 style="margin:0 0 16px;">Informations générales</h3>
+        <div class="rec-field">
+          <label>Image d'illustration (facultatif)</label>
+          <div id="ce-image-preview" style="margin-bottom:8px;${rec.image_url?'':'display:none;'}"><img src="${esc(rec.image_url||'')}" alt="" style="max-width:220px;max-height:130px;border-radius:9px;border:1.5px solid var(--border);display:block;object-fit:cover;"></div>
+          <input type="file" id="ce-image-file" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="rec-msg" id="ce-image-msg" style="margin-top:6px;"></p>
+        </div>
         <div class="rec-field"><label>Nom du dénombrement *</label><input id="ce-nom" value="${esc(rec.nom==='Nouveau recensement'?'':rec.nom)}"></div>
         <div class="rec-field"><label>Description / objectif *</label><textarea id="ce-desc" rows="3">${esc(rec.description==='.'?'':rec.description)}</textarea></div>
         <div class="rec-field"><label>Population concernée *</label><input id="ce-population" value="${esc(rec.population_concernee==='.'?'':rec.population_concernee)}"></div>
@@ -322,10 +337,31 @@
           <div class="rec-field"><label>Date de début *</label><input type="date" id="ce-date-debut" value="${rec.date_debut||''}"></div>
           <div class="rec-field"><label>Date de fin</label><input type="date" id="ce-date-fin" value="${rec.date_fin||''}" ${!rec.date_fin&&rec.date_fin!==undefined?'':''}></div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="ce-pas-date-fin" ${!rec.date_fin?'checked':''}> Pas de date de fin</label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:700;cursor:pointer;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:9px;padding:12px 14px;color:#1e40af;">
+          <input type="checkbox" id="ce-pas-date-fin" style="width:18px;height:18px;flex:none;" ${!rec.date_fin?'checked':''}> ♾️ Pas de date de fin — campagne ouverte en continu
+        </label>
       `;
       document.getElementById('ce-pas-date-fin').addEventListener('change', (e) => { document.getElementById('ce-date-fin').disabled = e.target.checked; if (e.target.checked) document.getElementById('ce-date-fin').value=''; });
       document.getElementById('ce-date-fin').disabled = !rec.date_fin;
+      document.getElementById('ce-image-file').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const msg = document.getElementById('ce-image-msg');
+        if (file.size > 5 * 1024 * 1024) { msg.className = 'rec-msg rec-msg-err'; msg.textContent = 'Fichier trop volumineux (5 Mo max).'; return; }
+        msg.className = 'rec-msg'; msg.textContent = '⏳ Envoi…'; msg.style.display = 'block';
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const r = await apiRec('POST', `/recensements/${id}/image`, { data: reader.result });
+            rec.image_url = r.image_url;
+            const prev = document.getElementById('ce-image-preview');
+            prev.style.display = '';
+            prev.querySelector('img').src = r.image_url;
+            msg.className = 'rec-msg rec-msg-ok'; msg.textContent = 'Image enregistrée ✓';
+          } catch (err) { msg.className = 'rec-msg rec-msg-err'; msg.textContent = err.message; }
+        };
+        reader.readAsDataURL(file);
+      });
     }
 
     function renderChampsListe(liste, predefinis){
@@ -392,8 +428,8 @@
     function renderEtape3(body){
       body.innerHTML = `
         <h3 style="margin:0 0 16px;">Personnes mineures</h3>
-        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;margin-bottom:16px;">
-          <input type="checkbox" id="ce-mineurs" ${rec.mineurs_autorises?'checked':''}> Autoriser l'inscription de personnes mineures
+        <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:9px;padding:12px 14px;color:#1e40af;">
+          <input type="checkbox" id="ce-mineurs" style="width:18px;height:18px;flex:none;" ${rec.mineurs_autorises?'checked':''}> 🧒 Autoriser l'inscription de personnes mineures
         </label>
         <div id="ce-mineurs-detail" style="${rec.mineurs_autorises?'':'display:none;'}">
           <div class="rec-card" style="background:var(--bg);border:none;margin-bottom:14px;font-size:12.5px;">
@@ -499,6 +535,12 @@
         <h1>${esc(rec.nom)} <span class="rec-badge rec-badge-${rec.statut}">${STATUT_LABELS[rec.statut]}</span></h1>
         <p>Identifiant : ${esc(rec.identifiant)}</p>
       </div><a class="rec-btn rec-btn-outline" href="recensement.html?vue=mes-recensements">← Retour</a></div>
+      ${rec.suppression_prevue_le ? `
+      <div class="rec-card" style="background:#FEF2F2;border-color:#fecaca;">
+        <h3 style="margin:0 0 8px;color:#991b1b;">🗑️ Suppression définitive programmée</h3>
+        <p style="font-size:13px;color:#991b1b;margin:0 0 12px;">Cette campagne et toutes ses déclarations seront définitivement supprimées le <strong>${new Date(rec.suppression_prevue_le).toLocaleString('fr-FR')}</strong>, sauf annulation avant cette date.</p>
+        <button class="rec-btn rec-btn-primary" id="rec-btn-annuler-suppr">↩️ Annuler la suppression</button>
+      </div>` : ''}
       <div class="rec-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-bottom:18px;">
         <div class="rec-stat-tile"><div class="n">${stats.total||0}</div><div class="l">Personnes recensées</div></div>
         <div class="rec-stat-tile"><div class="n">${stats.adultes||0}</div><div class="l">Adultes</div></div>
@@ -518,12 +560,22 @@
           <a class="rec-btn rec-btn-outline" href="recensement.html?vue=creation&id=${id}&etape=1">✏️ Modifier</a>
           <button class="rec-btn rec-btn-outline" onclick="window.__recSuspendre(${id})">${rec.statut==='suspendu'?'▶️ Réactiver':'⏸️ Suspendre'}</button>
           <a class="rec-btn rec-btn-outline" href="recensement.html?vue=participer&id=${id}" target="_blank">Voir le formulaire</a>
+          ${!rec.suppression_prevue_le ? `<button class="rec-btn rec-btn-danger" id="rec-btn-supprimer-campagne">🗑️ Supprimer la campagne</button>` : ''}
         </div>
         <p style="font-size:12px;color:var(--muted);margin:0;">Statistiques par pays de résidence, pays d'origine et métier : disponibles dès qu'il y a des déclarations.</p>
       </div>
     `;
     window.__recSuspendre = async (id2) => { try { await apiRec('POST', `/recensements/${id2}/suspendre`); vueGestion(id2); } catch(e) { alert(e.message); } };
     window.__recTraiterDemande = async (demandeId, statut) => { try { await apiRec('PATCH', `/recensement-modification-demandes/${demandeId}`, { statut }); vueGestion(id); } catch(e) { alert(e.message); } };
+    const btnSupprCampagne = document.getElementById('rec-btn-supprimer-campagne');
+    if (btnSupprCampagne) btnSupprCampagne.addEventListener('click', async () => {
+      if (!confirm(`⚠️ Supprimer « ${rec.nom} » ?\n\nLa campagne ET toutes ses déclarations seront supprimées DÉFINITIVEMENT dans 3 jours. Vous pourrez annuler à tout moment avant cette échéance.\n\nProgrammer la suppression ?`)) return;
+      try { await apiRec('POST', `/recensements/${id}/programmer-suppression`); vueGestion(id); } catch(e) { alert(e.message); }
+    });
+    const btnAnnulerSuppr = document.getElementById('rec-btn-annuler-suppr');
+    if (btnAnnulerSuppr) btnAnnulerSuppr.addEventListener('click', async () => {
+      try { await apiRec('POST', `/recensements/${id}/annuler-suppression`); vueGestion(id); } catch(e) { alert(e.message); }
+    });
   }
 
   /* ══════════ LISTE DES DÉCLARATIONS (créateur) ══════════ */
@@ -541,10 +593,16 @@
             <span class="rec-champ-nom">${esc([d.reponses.prenom,d.reponses.nom].filter(Boolean).join(' ') || d.identifiant)} ${d.est_mineur?'<span class="rec-champ-cat">(mineur)</span>':''}
               <br><span class="rec-champ-cat">${esc(d.identifiant)} · ${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></span>
             <span class="rec-badge rec-badge-${d.identite_statut}">${IDENTITE_LABELS[d.identite_statut]||d.identite_statut}</span>
+            <button class="rec-btn rec-btn-outline" style="padding:5px 9px;font-size:11px;color:#dc2626;border-color:#dc2626 !important;" data-suppr-decl="${d.id}" title="Retirer cette déclaration (doublon, erreur, test...)">🗑️</button>
           </div>`).join('')}
       </div>
-      <p style="font-size:11.5px;color:var(--muted);">Cette liste n'est visible que par vous, en tant que créateur de ce recensement — jamais publiquement (§20).</p>
+      <p style="font-size:11.5px;color:var(--muted);">Cette liste n'est visible que par vous, en tant que créateur de ce recensement — jamais publiquement (§20). Retirer une déclaration ici ne prive jamais la personne concernée de son propre droit de suppression, déjà disponible depuis sa fiche.</p>
     `;
+    wrap.querySelectorAll('[data-suppr-decl]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm("Retirer cette déclaration de la liste ? Cette action est réservée aux doublons/erreurs manifestes — la personne concernée garde par ailleurs son propre droit de suppression.")) return;
+      try { await apiRec('DELETE', `/recensements/${id}/declarations/${btn.dataset.supprDecl}`); vueDeclarations(id); }
+      catch(e) { alert(e.message); }
+    }));
   }
 
   /* ══════════ PARTICIPER ══════════ */
@@ -567,14 +625,15 @@
     }
 
     wrap.innerHTML = `
+      ${rec.image_url ? `<img src="${esc(rec.image_url)}" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px;margin-bottom:18px;">` : ''}
       <div class="rec-hero"><div><h1>${esc(rec.nom)}</h1><p>${esc(rec.description)}</p></div>
         <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
       <div class="rec-card">
         <h3 style="margin:0 0 14px;">Vos informations</h3>
         <div id="part-champs-adulte">${champsActifs.map(c => champHtml(c, 'pa')).join('')}</div>
         ${rec.mineurs_autorises ? `
-          <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;margin:18px 0 10px;">
-            <input type="checkbox" id="part-est-mineur"> Je déclare une personne mineure
+          <label style="display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:700;cursor:pointer;margin:18px 0 10px;background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:9px;padding:13px 14px;color:#9A3412;">
+            <input type="checkbox" id="part-est-mineur" style="width:18px;height:18px;flex:none;"> 🧒 Je déclare une personne mineure (au lieu de moi-même)
           </label>
           <div id="part-mineur-detail" style="display:none;">
             <div class="rec-card" style="background:var(--bg);border:none;">
@@ -644,15 +703,36 @@
     let data;
     try { data = await apiRec('GET', `/recensement-declarations/${declId}`, undefined, declId); }
     catch(e) { wrap.innerHTML = `<div class="rec-empty">⚠️ ${e.status===403?'Accès refusé.':'Déclaration introuvable.'}</div>`; return; }
-    const d = data.declaration, rep = d.reponses;
+    const d = data.declaration, rep = d.reponses, recMeta = data.recensement || {};
+    /* Vérification d'identité — le bouton n'apparaît que si le créateur l'a activée pour ce
+       recensement ET que la déclaration n'est pas déjà vérifiée/en cours. Si "les_deux"
+       documents sont acceptés, on demande d'abord lequel le participant compte présenter :
+       Stripe Identity ne restreint pas par pays (il détecte le document lui-même), ce choix
+       est donc uniquement informatif/déclaratif, gardé en mémoire côté navigateur pour cette
+       session — jamais envoyé comme une preuve, seul le document réel scanné par Stripe fait foi. */
+    const peutVerifier = recMeta.verification_identite === 'activee' && !['verifie','en_cours'].includes(d.identite_statut);
+    const docsAcceptes = recMeta.verification_identite_documents || 'les_deux';
     wrap.innerHTML = `
-      <div class="rec-hero"><div><h1>Ma déclaration</h1><p>${esc(data.recensement?.nom||'')} — ${esc(d.identifiant)}</p></div>
+      <div class="rec-hero"><div><h1>Ma déclaration</h1><p>${esc(recMeta.nom||'')} — ${esc(d.identifiant)}</p></div>
         <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
       <div class="rec-card">
         <span class="rec-badge rec-badge-${d.identite_statut}">${IDENTITE_LABELS[d.identite_statut]||d.identite_statut}</span>
         <div style="margin-top:14px;">
           ${Object.entries(rep).map(([k,v]) => v ? `<div class="rec-resume-row"><span class="k">${esc(k.replace(/_/g,' '))}</span><span class="v">🔒 ${esc(Array.isArray(v)?v.join(', '):v)}</span></div>` : '').join('')}
         </div>
+        ${peutVerifier ? `
+        <div class="rec-card" style="background:#EFF6FF;border-color:#BFDBFE;margin-top:16px;">
+          <h4 style="margin:0 0 8px;color:#1e40af;">🪪 Vérification d'identité</h4>
+          <p style="font-size:12.5px;color:#1e40af;margin:0 0 12px;">Diaspo'Actif ne stocke jamais votre document — il est transmis directement à notre prestataire (Stripe Identity), seul le résultat de la vérification est conservé.</p>
+          ${docsAcceptes === 'les_deux' ? `
+          <div class="rec-field"><label>Avec quel document allez-vous vérifier votre identité ?</label>
+            <select id="decl-verif-doc">
+              <option value="residence">Document du pays de résidence</option>
+              <option value="origine">Document du pays d'origine</option>
+            </select>
+          </div>` : `<p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Document accepté pour ce recensement : ${docsAcceptes==='residence'?'pays de résidence':'pays d\'origine'}.</p>`}
+          <button class="rec-btn rec-btn-primary" id="decl-btn-verifier">🪪 Vérifier mon identité</button>
+        </div>` : ''}
         <div class="rec-actions" style="margin-top:18px;">
           <button class="rec-btn rec-btn-outline" id="decl-btn-modif">✏️ Demander une modification</button>
           <button class="rec-btn rec-btn-danger" id="decl-btn-suppr">🗑️ Supprimer mes informations</button>
@@ -660,6 +740,19 @@
         <p class="rec-msg" id="decl-msg"></p>
       </div>
     `;
+    if (peutVerifier) {
+      document.getElementById('decl-btn-verifier').addEventListener('click', async () => {
+        const btn = document.getElementById('decl-btn-verifier');
+        btn.disabled = true; btn.textContent = '⏳ Préparation…';
+        try {
+          const r = await apiRec('POST', `/recensement-declarations/${declId}/verification-identite`, {}, declId);
+          location.href = r.url;
+        } catch(e) {
+          btn.disabled = false; btn.textContent = '🪪 Vérifier mon identité';
+          const m=document.getElementById('decl-msg'); m.className='rec-msg rec-msg-err'; m.textContent = e.message;
+        }
+      });
+    }
     document.getElementById('decl-btn-modif').addEventListener('click', () => {
       const champ = prompt("Quel champ souhaitez-vous modifier ? (ex : email, telephone, adresse...)");
       if (!champ) return;

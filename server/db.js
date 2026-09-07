@@ -2044,6 +2044,14 @@ const MIGRATIONS = [
   // réinitialisation, confirmation de billet...) restent TOUJOURS envoyés, ce booléen ne les
   // concerne pas.
   ["users", "notif_emails_non_essentiels INTEGER DEFAULT 1"],
+  // Recensement — image d'illustration de la campagne (facultative) + suppression différée
+  // (3 jours de latence avant suppression définitive, pour rattraper une erreur). Pas de
+  // nouvelle valeur dans le CHECK de `statut` (jamais modifier un CHECK sur une table
+  // existante) : la suppression programmée est un état ORTHOGONAL porté par cette seule
+  // colonne, quel que soit le statut (brouillon/actif/suspendu/termine) au moment de la
+  // demande.
+  ["recensements", "image_url TEXT"],
+  ["recensements", "suppression_prevue_le TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

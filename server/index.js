@@ -39309,6 +39309,23 @@ route('GET', '/api/recensements/:id/declarations', async (req, res, params, body
   sendJSON(res, 200, { declarations: rows.map(r => ({ ...r, est_mineur: !!r.est_mineur, reponses: safeJSON(r.reponses_json, {}), reponses_json: undefined })) });
 });
 
+/* Suppression d'UNE déclaration PAR LE CRÉATEUR (modération — doublon manifeste, entrée
+   erronée, test...). Distincte à dessein de DELETE /api/recensement-declarations/:id
+   ci-dessous (droit du participant lui-même, §19/§20, que le créateur ne peut jamais
+   bloquer) : même effet (soft-delete), permission et route différentes, pour que les deux
+   déclencheurs restent chacun clairement traçables. */
+route('DELETE', '/api/recensements/:id/declarations/:declId', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const decl = await db.prepare('SELECT id FROM recensement_declarations WHERE id=? AND recensement_id=? AND supprime_le IS NULL').get(params.declId, params.id);
+  if (!decl) return sendJSON(res, 404, { error: 'Déclaration introuvable.' });
+  await db.prepare("UPDATE recensement_declarations SET supprime_le=datetime('now'), reponses_json='{}', match_nom=NULL, match_prenom=NULL, match_date_naissance=NULL, match_email=NULL WHERE id=?").run(decl.id);
+  await db.prepare("UPDATE recensements SET nb_declarations=(CASE WHEN nb_declarations>0 THEN nb_declarations-1 ELSE 0 END) WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* Jeton d'accès pour un participant SANS compte Diaspo'Actif — réutilise signAuthToken/
    verifyAuthToken (server/auth.js), génériques (payload arbitraire + expiration optionnelle),
    déjà utilisés pour les vrais comptes ; ici le payload porte un declaration_id, jamais un uid. */
@@ -39363,7 +39380,7 @@ async function chargerDeclarationAutorisee(req, declarationId) {
 route('GET', '/api/recensement-declarations/:id', async (req, res, params) => {
   const { decl, erreur } = await chargerDeclarationAutorisee(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: erreur === 404 ? 'Déclaration introuvable.' : 'Accès refusé.' });
-  const rec = await db.prepare('SELECT identifiant, nom FROM recensements WHERE id=?').get(decl.recensement_id);
+  const rec = await db.prepare('SELECT identifiant, nom, verification_identite, verification_identite_documents FROM recensements WHERE id=?').get(decl.recensement_id);
   /* Ne JAMAIS renvoyer acces_password_hash/salt (même hachés, aucune raison de les exposer
      au client) ni les colonnes match_* (usage interne détection de doublons uniquement) —
      bug trouvé en testant ce endpoint en conditions réelles, corrigé avant tout déploiement. */
@@ -39487,6 +39504,78 @@ route('POST', '/api/recensement-declarations/:id/verification-identite', async (
   } catch (e) {
     await logError(e, 'recensement-identity-verify', req);
     sendJSON(res, 500, SEC.safeError(e, 'recensement-identity-verify'));
+  }
+});
+
+/* ── Suppression de la campagne ENTIÈRE — 3 jours de latence avant suppression définitive,
+   pour rattraper une erreur (demande explicite). `suppression_prevue_le` est un état
+   ORTHOGONAL au `statut` (brouillon/actif/suspendu/termine reste inchangé pendant le délai) :
+   c'est le purgeur (cron ci-dessous) qui vérifie cette seule colonne, quel que soit le statut.
+   Le recensement reste visible/actif tel quel pendant les 3 jours — seule la bannière ajoutée
+   côté front prévient le créateur, avec un bouton "Annuler" tant que le délai n'est pas passé. */
+route('POST', '/api/recensements/:id/programmer-suppression', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const dateSuppression = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString();
+  await db.prepare("UPDATE recensements SET suppression_prevue_le=? WHERE id=?").run(dateSuppression, params.id);
+  sendJSON(res, 200, { ok: true, suppression_prevue_le: dateSuppression });
+});
+
+route('POST', '/api/recensements/:id/annuler-suppression', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  await db.prepare("UPDATE recensements SET suppression_prevue_le=NULL WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Purge — GET *et* POST, même pattern que les autres crons de la plateforme (ex.
+   da-codes-expiration) : appelée par un scheduler externe (Vercel Cron en GET). Suppression
+   RÉELLE (pas d'anonymisation) : la campagne entière n'a plus d'utilité une fois son
+   créateur confirmé vouloir l'effacer, contrairement à un compte utilisateur qui continue
+   d'exister ailleurs sur la plateforme. Les déclarations qui lui sont rattachées n'ont de
+   sens que dans le cadre de CETTE campagne : elles sont supprimées avec elle. */
+async function routeCronRecensementPurge(req, res) {
+  const dus = await db.prepare("SELECT id FROM recensements WHERE suppression_prevue_le IS NOT NULL AND suppression_prevue_le <= datetime('now')").all();
+  for (const r of dus) {
+    await db.prepare('DELETE FROM recensement_declarations WHERE recensement_id=?').run(r.id);
+    await db.prepare('DELETE FROM recensement_modification_demandes WHERE recensement_id=?').run(r.id);
+    await db.prepare('DELETE FROM recensements WHERE id=?').run(r.id);
+  }
+  sendJSON(res, 200, { ok: true, supprimes: dus.length });
+}
+route('GET', '/api/cron/recensement-purge', routeCronRecensementPurge);
+route('POST', '/api/cron/recensement-purge', routeCronRecensementPurge);
+
+/* ── Image d'illustration de la campagne (facultative) — même pattern d'upload que
+   /api/upload/cagnotte (Bunny CDN via server/upload.js), owner-only. */
+route('POST', '/api/recensements/:id/image', async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const { data } = body || {};
+  if (!data || !String(data).startsWith('data:')) return sendJSON(res, 400, { error: 'Image manquante.' });
+  const match = String(data).match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return sendJSON(res, 400, { error: 'Format de données invalide.' });
+  const mime = match[1];
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mime)) return sendJSON(res, 400, { error: 'Type de fichier non autorisé.' });
+  const buf = Buffer.from(match[2], 'base64');
+  if (buf.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: 'Fichier trop volumineux (5 Mo max).' });
+  if (!SEC.isSafeRasterImage(buf)) return sendJSON(res, 400, { error: 'Fichier image invalide.' });
+  try {
+    const { uploadToBunny } = require('./upload');
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] || 'jpg';
+    const filename = `${params.id}-${Date.now()}.${ext}`;
+    const url = await uploadToBunny(buf, filename, 'recensements');
+    await db.prepare('UPDATE recensements SET image_url=? WHERE id=?').run(url, params.id);
+    sendJSON(res, 200, { ok: true, image_url: url });
+  } catch (e) {
+    await logError(e, 'recensement-image-upload', req);
+    sendJSON(res, 500, SEC.safeError(e, 'recensement-image-upload'));
   }
 });
 
