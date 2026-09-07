@@ -1082,6 +1082,13 @@ async function initComptesLiesSwitcher(user) {
       dd.style.top = Math.round(r.bottom + 8) + 'px';
       dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
       dd.classList.add('open');
+      /* Activé avec un léger délai plutôt qu'immédiatement : le bouton n'est souvent visible
+         qu'après défilement horizontal de .topbar-right (overflow-x:auto sous 768px), et le
+         navigateur ajuste parfois lui-même ce défilement juste après le clic pour garder
+         l'élément mis au point visible — un scroll listener actif dès l'ouverture refermait
+         alors le menu à l'instant même où il apparaissait (« le bouton ne fonctionne plus »,
+         signalé par capture d'écran). */
+      setTimeout(() => window.addEventListener('scroll', fermerAuScroll, true), 200);
     }
   });
   dd.addEventListener('click', async (e) => {
@@ -1105,10 +1112,14 @@ document.addEventListener('click', e => {
 /* Le menu est en position:fixed (coordonnées figées à l'ouverture) : un défilement — y compris
    celui, horizontal, de .topbar-right sur mobile — le laisserait visuellement détaché du
    bouton. Capture:true : un scroll sur .topbar-right (ou tout autre conteneur) ne remonte pas
-   jusqu'à window via la bulle normale, seule la phase de capture le traverse. */
-window.addEventListener('scroll', () => {
+   jusqu'à window via la bulle normale, seule la phase de capture le traverse. Écouteur posé
+   puis retiré à chaque ouverture (voir initComptesLiesSwitcher) plutôt que permanent : actif
+   en continu, il se déclenchait parfois sur l'ajustement de scroll natif du navigateur juste
+   après le clic d'ouverture, refermant le menu avant même qu'il soit visible. */
+function fermerAuScroll() {
   document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
-}, true);
+  window.removeEventListener('scroll', fermerAuScroll, true);
+}
 
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
