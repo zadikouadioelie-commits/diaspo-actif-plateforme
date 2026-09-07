@@ -1024,7 +1024,7 @@ html, body { overflow-x:clip; }
   <div id="p-view-switch" style="display:none;margin-bottom:16px;">
     <div style="display:inline-flex;background:#fff;border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px;">
       <button id="p-view-btn-profil" class="p-view-btn active" onclick="switchProfileView('profil')">📱 Profil</button>
-      <button id="p-view-btn-vitrine" class="p-view-btn" onclick="switchProfileView('vitrine')">🏪 Vitrine</button>
+      <button id="p-view-btn-vitrine" class="p-view-btn" onclick="switchProfileView('vitrine')">🏪 Boutique</button>
     </div>
   </div>
 
@@ -1852,7 +1852,7 @@ function renderVisitorProfile() {
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const reportBtn = CU ? `<button class="pvz-btn" style="color:#dc2626;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g,"\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : '';
-  const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Vitrine…</button>` : '';
+  const vitrineToggleBtn = (isOwn && isInit) ? `<button class="pvz-btn" id="pvz-vitrine-toggle-btn" onclick="pvzQuickToggleVitrine()" disabled>⏳ Boutique…</button>` : '';
   /* Propriétaire d'une Association/ONG (2026-08-08) : accès direct à la gestion des formules
      d'adhésion depuis son propre profil public, plutôt que rien — même destination que le
      bouton "Adhérer" côté visiteur, mais vers la configuration au lieu du paiement. */
@@ -1866,7 +1866,7 @@ function renderVisitorProfile() {
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
       <button class="pvz-seg-btn profil active" id="pvz-seg-profil" onclick="pvzSwitchTab('profil')">🪪 Profil</button>
-      ${isInit ? `<button class="pvz-seg-btn vitrine" id="pvz-seg-vitrine" onclick="pvzSwitchTab('vitrine')">🏬 Vitrine</button>` : ''}
+      ${isInit ? `<button class="pvz-seg-btn vitrine" id="pvz-seg-vitrine" onclick="pvzSwitchTab('vitrine')">🏬 Boutique</button>` : ''}
     </div>`;
   const stats = `<div class="pvz-stats">
       <div class="pvz-stat"><div class="n" style="color:#E5484D;">${profil.nbAbonnes||0}</div><div class="l">abonnés</div></div>
@@ -2496,7 +2496,7 @@ async function renderVitrineCols() {
 
 async function renderVitrine() {
   const el = document.getElementById('p-vitrine');
-  el.innerHTML = '<div class="empty-p" style="padding:30px 0;">Chargement de la vitrine…</div>';
+  el.innerHTML = '<div class="empty-p" style="padding:30px 0;">Chargement de la boutique…</div>';
 
   // Récupérer l'initiative liée à ce profil. Le propriétaire passe par /mon-initiative (jamais
   // filtrée par is_demo : on doit toujours pouvoir gérer sa propre vitrine) ; un visiteur passe par
@@ -2517,7 +2517,7 @@ async function renderVitrine() {
   } catch (e) { init = null; }
 
   if (!init) {
-    el.innerHTML = `<div class="empty-p" style="padding:40px 0;"><div class="ei">🏪</div>${isOwn ? "Vous n'avez pas encore d'initiative associée pour activer la vitrine." : "Cette initiative n'a pas encore de vitrine."}</div>`;
+    el.innerHTML = `<div class="empty-p" style="padding:40px 0;"><div class="ei">🏪</div>${isOwn ? "Vous n'avez pas encore d'initiative associée pour activer la boutique." : "Cette initiative n'a pas encore de boutique."}</div>`;
     return;
   }
   _vitrineInit = init;
@@ -2525,7 +2525,7 @@ async function renderVitrine() {
   // Vitrine masquée par son propriétaire : invisible aux visiteurs (sauf admin), le propriétaire garde accès complet
   const isAdmin = CU && CU.role === 'administrateur';
   if (init.vitrine_active === 0 && !isOwn && !isAdmin) {
-    el.innerHTML = `<div class="empty-p" style="padding:40px 0;"><div class="ei">🔒</div>Cette vitrine n'est pas disponible pour le moment.</div>`;
+    el.innerHTML = `<div class="empty-p" style="padding:40px 0;"><div class="ei">🔒</div>Cette boutique n'est pas disponible pour le moment.</div>`;
     return;
   }
 
@@ -2548,7 +2548,7 @@ async function renderVitrine() {
     /* Aucun compte à rebours : les contenus sont conservés sans limite de durée. Annoncer
        une échéance inexistante inquiéterait pour rien. */
     el.insertAdjacentHTML('afterbegin', `<div style="margin:0 0 16px;padding:14px 16px;background:#FFF7ED;border:1.5px solid #F26422;border-radius:12px;">
-      <div style="font-weight:800;color:#9a3412;font-size:13.5px;">🛠️ Votre vitrine n'est plus visible du public</div>
+      <div style="font-weight:800;color:#9a3412;font-size:13.5px;">🛠️ Votre boutique n'est plus visible du public</div>
       <div style="font-size:12.5px;color:#9a3412;margin-top:4px;line-height:1.6;">
         Votre abonnement Premium est arrivé à expiration. <strong>Rien n'est supprimé :</strong> vos contenus sont conservés et réapparaîtront intacts dès le renouvellement.
         <a href="premium.html?type=initiative" style="color:#9a3412;font-weight:800;">Renouveler →</a>
@@ -2573,7 +2573,7 @@ async function renderVitrine() {
     </div>
     <div id="vt-subscribe" style="margin-top:14px;"></div>
     <div class="p-widget" style="margin-top:14px;">
-      <div class="p-widget-title">🎨 Thème couleur de la vitrine publique</div>
+      <div class="p-widget-title">🎨 Thème couleur de la boutique publique</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         ${PVT_THEMES.map(t=>`<button class="vt-theme-sw" data-theme="${t.id}" title="${t.label}" onclick="ownerSetVitrineTheme('${t.id}')" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:${t.color};border:2px solid ${((init.vitrine_theme||'bordeaux')===t.id)?'#16233D':'#fff'};box-shadow:0 1px 4px rgba(0,0,0,.2);"></button>`).join('')}
         <span style="font-size:12px;color:var(--muted);">Choisissez la couleur vue par les visiteurs de votre boutique.</span>
@@ -2622,11 +2622,11 @@ async function renderVitrine() {
       </div>
     </div>` : ''}
     <div class="p-widget" style="margin-top:14px;">
-      <div class="p-widget-title">📱 Partager la vitrine</div>
+      <div class="p-widget-title">📱 Partager la boutique</div>
       <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
         <div id="vt-qr" style="flex-shrink:0;"></div>
         <div style="flex:1;min-width:180px;font-size:13px;color:var(--muted);line-height:1.6;">
-          Scannez ou partagez ce QR code pour accéder directement à cette vitrine.
+          Scannez ou partagez ce QR code pour accéder directement à cette boutique.
         </div>
       </div>
     </div>
@@ -2638,8 +2638,8 @@ async function renderVitrine() {
   if (window.ProfileQR) {
     ProfileQR.render(document.getElementById('vt-qr'), {
       url: vitrineUrl,
-      userName: (init.nom || 'Vitrine'),
-      userRole: 'Vitrine', size: 150
+      userName: (init.nom || 'Boutique'),
+      userRole: 'Boutique', size: 150
     });
   }
 
@@ -2783,7 +2783,7 @@ async function renderVitrineVisitor(init) {
   </section>`;
 
   const presentation = ((init.description || isOwn) && modOn('a_propos')) ? `<section id="pv-presentation" class="pvt-section">
-    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la vitrine</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la boutique</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
     <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</p></div>
   </section>` : '';
 
@@ -3085,15 +3085,15 @@ async function renderVitrineVisitor(init) {
       <div style="display:flex;flex-direction:column;gap:9px;">${dynBtns.join('')}</div>
     </div>
     <div style="text-align:center;">
-      <h4 style="text-align:center;">Partager la vitrine</h4>
+      <h4 style="text-align:center;">Partager la boutique</h4>
       <div id="pvt-qr" style="display:flex;justify-content:center;"></div>
     </div>
   </section>`;
 
   const vitrineVisible = init.vitrine_active !== 0;
   const masqueeBanner = isOwn ? `<div style="background:${vitrineVisible?'#F0FDF4':'#1F2937'};color:${vitrineVisible?'#166534':'#FBBF24'};padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-    <span>${vitrineVisible ? '🟢 Votre vitrine est visible publiquement.' : "🔒 Votre vitrine est actuellement masquée. Elle n'est visible que par vous et les administrateurs de Diaspo'Actif."}</span>
-    <button class="pvz-btn" style="white-space:nowrap;${window._daPremiumInitiative===false?'background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;border:none;':''}" onclick="pvzQuickToggleVitrine()">${vitrineVisible ? '🔒 Masquer la vitrine' : '🌐 Rendre visible'}</button>
+    <span>${vitrineVisible ? '🟢 Votre boutique est visible publiquement.' : "🔒 Votre boutique est actuellement masquée. Elle n'est visible que par vous et les administrateurs de Diaspo'Actif."}</span>
+    <button class="pvz-btn" style="white-space:nowrap;${window._daPremiumInitiative===false?'background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;border:none;':''}" onclick="pvzQuickToggleVitrine()">${vitrineVisible ? '🔒 Masquer la boutique' : '🌐 Rendre visible'}</button>
   </div>` : '';
 
   /* Ordre reel des sections : pilote par "Organiser ma vitrine" (dashboard, glisser-deposer),
@@ -3219,7 +3219,7 @@ async function renderVitrineVisitor(init) {
 
   // QR de partage
   if (window.ProfileQR) {
-    ProfileQR.render(document.getElementById('pvt-qr'), { url:`${location.origin}/profil.html?id=${profil.id}#vitrine`, userName:(init.nom||'Vitrine'), userRole:'Vitrine', size:130 });
+    ProfileQR.render(document.getElementById('pvt-qr'), { url:`${location.origin}/profil.html?id=${profil.id}#vitrine`, userName:(init.nom||'Boutique'), userRole:'Boutique', size:130 });
   }
 
   // Abonnement + publications promotionnelles (réutilise l'existant)
@@ -4097,7 +4097,7 @@ function openCatalogueModal(catalogueId) {
       <input type="file" id="cf-cover-file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" style="display:none;" onchange="handleCatalogueCover(this)">
       <p id="cf-cover-status" style="font-size:11.5px;color:#94a3b8;margin:-4px 0 8px;"></p>
       <label style="display:flex;align-items:center;gap:7px;margin-bottom:14px;font-size:13px;cursor:pointer;">
-        <input type="checkbox" id="cf-visible" ${!cat||cat.statut!=='masque'?'checked':''}> Visible sur la vitrine publique
+        <input type="checkbox" id="cf-visible" ${!cat||cat.statut!=='masque'?'checked':''}> Visible sur la boutique publique
       </label>
       <p id="cf-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -4245,11 +4245,11 @@ function paintSubscribeBtn(initId) {
   box.innerHTML = `
     <div class="vt-sub-card">
       <div class="vt-sub-txt">
-        <strong>${_vtAbonne ? '✓ Vous suivez cette vitrine' : 'Suivez cette vitrine'}</strong>
+        <strong>${_vtAbonne ? '✓ Vous suivez cette boutique' : 'Suivez cette boutique'}</strong>
         <span>Soyez averti des nouveaux produits, publications « À la une », promotions et disponibilités.</span>
       </div>
       <button class="vt-sub-btn ${_vtAbonne ? 'abonne' : ''}" onclick="toggleVitrineSubscribe(${initId})">
-        ${_vtAbonne ? '✓ Abonné' : '➕ S’abonner à cette vitrine'}
+        ${_vtAbonne ? '✓ Abonné' : '➕ S’abonner à cette boutique'}
       </button>
     </div>`;
 }
@@ -4294,8 +4294,8 @@ function pvzPaintVitrineToggleBtn(initId, visible) {
   btn.dataset.visible = visible ? '1' : '0';
   if (!premium) {
     /* Sans Premium, la vitrine reste masquée : le bouton est doré et ouvre l'upsell au lieu de basculer. */
-    btn.textContent = '🔒 Vitrine masquée';
-    btn.title = 'Rendre votre vitrine visible au public est réservé aux comptes Premium.';
+    btn.textContent = '🔒 Boutique masquée';
+    btn.title = 'Rendre votre boutique visible au public est réservé aux comptes Premium.';
     btn.style.background = 'linear-gradient(135deg,#c8960c,#f2c94c)';
     btn.style.color = '#2a1e00';
     btn.style.border = 'none';
@@ -4305,8 +4305,8 @@ function pvzPaintVitrineToggleBtn(initId, visible) {
         `<button id="pvz-vitrine-bypass-btn" class="pvz-btn" onclick="pvzBypassVitrine()" title="Développement/tests uniquement — accès temporaire, sans abonnement." style="background:none;border:1px dashed #b45309;color:#b45309;font-size:11px;">🛠 Bypass Premium (dev)</button>`);
     }
   } else {
-    btn.textContent = visible ? '🌐 Vitrine visible' : '🔒 Vitrine masquée';
-    btn.title = visible ? 'Cliquer pour masquer votre vitrine au public' : 'Cliquer pour rendre votre vitrine visible au public';
+    btn.textContent = visible ? '🌐 Boutique visible' : '🔒 Boutique masquée';
+    btn.title = visible ? 'Cliquer pour masquer votre boutique au public' : 'Cliquer pour rendre votre boutique visible au public';
     btn.style.background = '';
     btn.style.color = '';
     btn.style.border = '';
@@ -4316,7 +4316,7 @@ async function pvzQuickToggleVitrine() {
   const btn = document.getElementById('pvz-vitrine-toggle-btn');
   if (!btn || !btn.dataset.initId) return;
   if (!window._daPremiumInitiative && !pvzVitrineBypassActif()) {
-    if (confirm("Rendre votre vitrine visible au public est réservé aux comptes Premium.\n\nDécouvrir Premium maintenant ?")) {
+    if (confirm("Rendre votre boutique visible au public est réservé aux comptes Premium.\n\nDécouvrir Premium maintenant ?")) {
       window.location.href = 'premium.html?type=initiative';
     }
     return;
