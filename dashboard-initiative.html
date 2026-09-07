@@ -4436,11 +4436,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     chargerFormulairesInscription();
   }
 
+  let FI_LIST_CACHE = [];
   async function chargerFormulairesInscription() {
     const zone = document.getElementById('fi-liste');
     try {
       const d = await api('GET', '/formulaires-inscription');
       const list = d.formulaires || [];
+      FI_LIST_CACHE = list;
       if (!list.length) { zone.innerHTML = '<div class="notice">Aucun formulaire pour le moment. Créez-en un pour commencer à recueillir des inscriptions.</div>'; return; }
       zone.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13.5px;">'
         + '<thead><tr style="background:#0D2B4E;color:#fff;"><th style="text-align:left;padding:9px 10px;">Nom</th><th style="text-align:left;padding:9px 10px;">Date</th><th style="text-align:left;padding:9px 10px;">Statut</th><th style="text-align:center;padding:9px 10px;">Inscrits</th><th style="text-align:center;padding:9px 10px;">Présents</th><th style="padding:9px 10px;">Actions</th></tr></thead><tbody>'
@@ -4453,6 +4455,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <td style="padding:9px 10px;white-space:nowrap;">
               <a class="btn btn-sm btn-orange" href="formulaire-public.html?slug=${encodeURIComponent(f.slug)}&gerer=${f.id}" target="_blank" style="text-decoration:none;">Gérer</a>
               <button class="btn btn-sm btn-outline" onclick="fiCopierLien('${esc(f.slug)}')" title="Copier le lien public">🔗</button>
+              <button class="btn btn-sm btn-outline" onclick="fiModifier(${f.id})" title="Modifier">✏️</button>
+              <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="fiSupprimer(${f.id})" title="Supprimer">🗑</button>
             </td></tr>`).join('')
         + '</tbody></table></div>';
     } catch(e) {
@@ -4473,6 +4477,69 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const url = location.origin + '/formulaire-public.html?slug=' + encodeURIComponent(slug);
     navigator.clipboard.writeText(url).then(function(){ alert('Lien copié : ' + url); })
       .catch(function(){ prompt('Copiez le lien :', url); });
+  };
+
+  /* Modification rapide (nom/type/date/lieu) depuis la liste — sans passer par l'espace
+     organisateur complet (Gérer), pour les corrections courantes (2026-09-07, demande
+     explicite). Réutilise PUT /api/formulaires-inscription/:id, déjà en place. */
+  window.fiModifier = function(id) {
+    const f = FI_LIST_CACHE.find(x => x.id === id);
+    if (!f) return;
+    if (!document.getElementById('fi-edit-modal')) {
+      document.body.insertAdjacentHTML('beforeend', `
+        <div id="fi-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this) fiFermerModal()">
+          <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:480px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <h3 style="margin:0;font-size:1.05rem;">✏️ Modifier le formulaire</h3>
+              <button onclick="fiFermerModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+            </div>
+            <div><label>Nom *</label><input id="fi-e-nom" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+              <div><label>Type</label><select id="fi-e-type" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></select></div>
+              <div><label>Date</label><input type="date" id="fi-e-date" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+            </div>
+            <div style="margin-top:10px;"><label>Lieu</label><input id="fi-e-lieu" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+              <button class="btn btn-outline" onclick="fiFermerModal()">Annuler</button>
+              <button class="btn" onclick="fiEnregistrerModif()">Enregistrer</button>
+            </div>
+          </div>
+        </div>`);
+      document.getElementById('fi-e-type').innerHTML = Object.entries(FI_TYPES).map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join('');
+    }
+    document.getElementById('fi-edit-modal').dataset.id = id;
+    document.getElementById('fi-e-nom').value = f.nom || '';
+    document.getElementById('fi-e-type').value = f.type || 'rencontre';
+    document.getElementById('fi-e-date').value = f.date_evt || '';
+    document.getElementById('fi-e-lieu').value = f.lieu || '';
+    document.getElementById('fi-edit-modal').style.display = 'flex';
+  };
+  window.fiFermerModal = function() { const m = document.getElementById('fi-edit-modal'); if (m) m.style.display = 'none'; };
+  window.fiEnregistrerModif = async function() {
+    const id = document.getElementById('fi-edit-modal').dataset.id;
+    const nom = document.getElementById('fi-e-nom').value.trim();
+    if (!nom) { alert('Le nom est requis.'); return; }
+    try {
+      await api('PUT', `/formulaires-inscription/${id}`, {
+        nom, type: document.getElementById('fi-e-type').value,
+        date_evt: document.getElementById('fi-e-date').value || null,
+        lieu: document.getElementById('fi-e-lieu').value.trim() || null,
+      });
+      fiFermerModal();
+      chargerFormulairesInscription();
+    } catch(e) { alert('Erreur : ' + e.message); }
+  };
+
+  /* Suppression (2026-09-07, demande explicite) — le serveur refuse lui-même si des
+     inscriptions existent déjà (voir DELETE /api/formulaires-inscription/:id), pour ne
+     jamais perdre un historique réel par erreur. */
+  window.fiSupprimer = async function(id) {
+    const f = FI_LIST_CACHE.find(x => x.id === id);
+    if (!confirm(`Supprimer définitivement « ${f ? f.nom : 'ce formulaire'} » ?\n\nCette action est irréversible.`)) return;
+    try {
+      await api('DELETE', `/formulaires-inscription/${id}`);
+      chargerFormulairesInscription();
+    } catch(e) { alert(e.message || 'Erreur.'); }
   };
 
   async function renderCagnottes() {

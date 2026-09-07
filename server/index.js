@@ -17599,6 +17599,23 @@ route("PATCH", "/api/formulaires-inscription/:id/statut", async (req, res, param
   sendJSON(res, 200, { ok: true, statut });
 });
 
+/* DELETE .../:id — suppression définitive (2026-09-07, demande explicite depuis le tableau
+   de bord). Bloquée s'il existe déjà des inscriptions réelles : l'historique d'une rencontre
+   qui a eu des inscrits ne doit pas disparaître par erreur — on propose d'archiver à la place
+   (même statut "archive" que le PATCH .../statut ci-dessus). Un formulaire encore vide
+   (brouillon jamais utilisé, ou créé par erreur) peut en revanche être retiré proprement. */
+route("DELETE", "/api/formulaires-inscription/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  const f = await db.prepare("SELECT id, owner_user_id, nom FROM formulaires_inscription WHERE id=?").get(params.id);
+  if (!(await formulaireAcces(req, res, f, user))) return;
+  const nbInscriptions = (await db.prepare("SELECT COUNT(*) n FROM formulaire_inscriptions WHERE formulaire_id=?").get(params.id))?.n || 0;
+  if (nbInscriptions > 0) {
+    return sendJSON(res, 400, { error: `Ce formulaire a déjà ${nbInscriptions} inscription(s) — archivez-le plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+  }
+  await db.prepare("DELETE FROM formulaires_inscription WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("POST", "/api/formulaires-inscription/:id/dupliquer", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!(await formulaireEstProteje(user, res))) return;
