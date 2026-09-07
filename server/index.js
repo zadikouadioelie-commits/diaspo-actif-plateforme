@@ -14032,13 +14032,18 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
   if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
 
   // Totaux globaux
-  const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
-  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
-  const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='collectivite' AND (is_demo IS NULL OR is_demo=FALSE)").get())?.n;
-  // Contenu réel uniquement : on exclut les comptes de démonstration (is_demo).
-  const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
-  const totalFormations    = (await db.prepare("SELECT COUNT(*) AS n FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
-  const totalAbonnements   = (await db.prepare("SELECT COUNT(*) AS n FROM abonnements a JOIN users u ON u.id=a.user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE)").get())?.n;
+  // Comptes réels uniquement : exclut les comptes de démonstration (is_demo) ET les comptes
+  // supprimés (nom='Compte supprimé', marqueur d'anonymisation RGPD standard — voir ex.
+  // server/index.js:2519, :6496, :6512) — jusqu'ici absent d'ici, les comptes supprimés
+  // restaient comptés dans les totaux affichés à l'administrateur (2026-09-07, signalé).
+  const totalUtilisateurs  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='utilisateur' AND (is_demo IS NULL OR is_demo=FALSE) AND nom!='Compte supprimé'").get())?.n;
+  const totalInitiatives   = (await db.prepare("SELECT COUNT(*) AS n FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.nom IS NULL OR u.nom!='Compte supprimé')").get())?.n;
+  // 'Institutions' doit inclure institutionnel/officiel comme partout ailleurs (ex.
+  // server/index.js:6512) — se limitait à 'collectivite' seul, sous-comptage (2026-09-07).
+  const totalInstitutions  = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('collectivite','institutionnel','officiel') AND (is_demo IS NULL OR is_demo=FALSE) AND nom!='Compte supprimé'").get())?.n;
+  const totalPublications  = (await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom!='Compte supprimé'").get())?.n;
+  const totalFormations    = (await db.prepare("SELECT COUNT(*) AS n FROM formations f LEFT JOIN users u ON u.id=f.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.nom IS NULL OR u.nom!='Compte supprimé')").get())?.n;
+  const totalAbonnements   = (await db.prepare("SELECT COUNT(*) AS n FROM abonnements a JOIN users u ON u.id=a.user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom!='Compte supprimé'").get())?.n;
 
   // Nouveaux inscrits
   const inscJour    = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE date(created_at)=date('now')").get())?.n;
