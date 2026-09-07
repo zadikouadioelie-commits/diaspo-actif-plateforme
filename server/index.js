@@ -5176,7 +5176,7 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     if (reservationDA?.fraichementReserve) {
       try {
         if (calcule.avantage_da.fournisseur === 'code_adhesion_da') {
-          await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(calcule.avantage_da.code_id);
+          await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = (CASE WHEN nb_utilisations>0 THEN nb_utilisations-1 ELSE 0 END) WHERE id=?`).run(calcule.avantage_da.code_id);
           await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
         } else if (calcule.avantage_da.fournisseur === 'parrainage_initiative') {
           await db.prepare(`UPDATE parrainage_initiative_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
@@ -12197,7 +12197,7 @@ route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const info = await db.prepare("DELETE FROM abonnements WHERE user_id = ? AND initiative_id = ?").run(user.id, params.id);
-  if (info.changes > 0) await db.prepare("UPDATE initiatives SET abonnes = MAX(0, abonnes - 1) WHERE id = ?").run(params.id);
+  if (info.changes > 0) await db.prepare("UPDATE initiatives SET abonnes = (CASE WHEN abonnes>0 THEN abonnes-1 ELSE 0 END) WHERE id = ?").run(params.id);
   sendJSON(res, 200, { ok: true, abonne: false });
 });
 
@@ -15895,7 +15895,7 @@ async function handleStripeWebhook(req, res) {
         "SELECT * FROM da_codes_utilisations WHERE accred_paiement_id=? AND statut='en_attente'"
       ).get(paiementId);
       if (utilisationAbandonnee) {
-        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(utilisationAbandonnee.code_id);
+        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = (CASE WHEN nb_utilisations>0 THEN nb_utilisations-1 ELSE 0 END) WHERE id=?`).run(utilisationAbandonnee.code_id);
         await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(utilisationAbandonnee.id);
       }
       /* Compensation Parrainage Initiative : pas de compteur à restaurer (illimité), juste
@@ -27930,7 +27930,7 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { motif } = body || {};
       await db.prepare(`UPDATE tickets SET validation_manuelle_statut='refuse', statut='cancelled' WHERE id=?`).run(tid);
-      await db.prepare(`UPDATE ticket_types SET quantite_vendue=MAX(0,quantite_vendue-1) WHERE id=?`).run(ticket.ticket_type_id);
+      await db.prepare(`UPDATE ticket_types SET quantite_vendue=(CASE WHEN quantite_vendue>0 THEN quantite_vendue-1 ELSE 0 END) WHERE id=?`).run(ticket.ticket_type_id);
       creerNotif(ticket.user_id, 'billetterie_validation', 'Commande refusée', `Votre demande de billet pour « ${check.ev.titre} » n'a pas été retenue${motif ? ' : '+motif : '.'}`, { event_id: ticket.event_id });
       return sendJSON(res, 200, { ok: true });
     }
