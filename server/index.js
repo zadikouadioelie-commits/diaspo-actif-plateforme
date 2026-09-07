@@ -27445,12 +27445,46 @@ ${jsonLd}
       return sendJSON(res, 200, { total_events, publies, total_tickets, revenu_total, commission_total, par_pays, top_events });
     }
 
+    /* Auto-réparation ciblée (2026-09-07) : ces 5 colonnes ("Rayon de publication" +
+       langue/mode de participation) sont bien déclarées dans MIGRATIONS (db.js) et
+       COLONNES_MIGRATION (pg-init.js) — mais aucune migration ne s'exécute jamais toute
+       seule au démarrage sur Postgres (seule la route admin /api/admin/reparer-schema
+       lance réellement migratePg(), et personne ne l'avait relancée depuis leur ajout).
+       Résultat en production : INSERT/UPDATE sur events plantait avec "column ... does
+       not exist", remonté tel quel par Vercel (FUNCTION_INVOCATION_FAILED, pas du JSON) —
+       d'où le bouton "Enregistrement…" qui semblait bloqué. Ceinture-bretelles : exécutée
+       une seule fois par process (mémoïsée), avant toute création/modification d'événement,
+       sans dépendre d'une action admin manuelle. IF NOT EXISTS = no-op silencieux si la
+       colonne existe déjà (SQLite local comme Postgres production). */
+    async function ensureEventGeoColumns() {
+      // Mémoïsation sur `global` (et non une variable locale) : ce bloc est réévalué à
+      // chaque requête (il vit dans le gestionnaire de requêtes), une `let` locale
+      // repartirait donc à `false` à chaque fois — inoffensif (IF NOT EXISTS) mais inutile.
+      if (global.__eventGeoColsEnsured) return;
+      const cols = [
+        ["langue", "TEXT DEFAULT 'francais'"],
+        ["mode_participation", "TEXT DEFAULT 'presentiel'"],
+        ["region", "TEXT"],
+        ["departement", "TEXT"],
+        ["communaute", "TEXT"],
+        // whatsapp_lien : même défaut de migration repéré au passage (2026-09-07), corrigé
+        // ici aussi plutôt que d'attendre un futur "column does not exist" sur ce module.
+        ["whatsapp_lien", "TEXT"],
+      ];
+      for (const [name, type] of cols) {
+        try { await db.prepare(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ${name} ${type}`).run(); }
+        catch (e) { console.error('[ensureEventGeoColumns]', name, e.message); }
+      }
+      global.__eventGeoColsEnsured = true;
+    }
+
     /* ── POST /api/events — créer un événement ── */
     if (req.method === 'POST' && pathname === '/api/events') {
       const me = await getCurrentUser(req);
       /* 'partenaire' ouvert à l'incrément 6 du module Partenariat — un partenaire peut organiser
          ses propres événements sur la plateforme, comme une initiative. */
       if (!me || !['initiative','administrateur','partenaire'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux initiatives.' });
+      await ensureEventGeoColumns();
       const {
         titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
         image_b64, ticket_types, statut: statutInit,
@@ -27536,6 +27570,7 @@ ${jsonLd}
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
       if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      await ensureEventGeoColumns();
       const {
         titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
         image_b64, statut, image_couverture, galerie_photos,

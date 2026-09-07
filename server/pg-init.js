@@ -430,6 +430,10 @@ const COLONNES_MIGRATION = [
     ['events', 'region', 'TEXT'],
     ['events', 'departement', 'TEXT'],
     ['events', 'communaute', 'TEXT'],
+    /* Chaîne WhatsApp (2026-09-07) — présente dans MIGRATIONS (db.js) mais oubliée ici,
+       même défaut que les 5 colonnes juste au-dessus : corrigé avant que ça casse en
+       production (voir aussi le filet ensureEventGeoColumns() dans index.js). */
+    ['events', 'whatsapp_lien', 'TEXT'],
     // evenements (module Programmation — moteur de priorité, table réellement utilisée par evenements.html)
     ['evenements', 'langue', "TEXT DEFAULT 'francais'"],
     ['evenements', 'mode_participation', "TEXT DEFAULT 'presentiel'"],
