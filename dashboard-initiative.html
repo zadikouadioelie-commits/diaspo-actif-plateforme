@@ -25,7 +25,7 @@
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
-        <a href="vitrines.html">Vitrines</a>
+        <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
         <a href="formations.html">Formations</a>
         <a href="actualites.html" style="display:none;">Actualités</a>
@@ -53,6 +53,7 @@
       <a href="formations.html" data-aide="formations">🎓 Catalogue Formations</a>
 
       <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
+      <a href="#crm" data-section="crm" data-aide="crm">🤝 CRM</a>
       <a href="#paiement" data-section="paiement" data-aide="paiement_initiative">💳 Module paiement</a>
       <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#publicites-init" data-section="publicites-init" data-aide="publicites">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
@@ -61,11 +62,11 @@
       <a href="#adhesions-init" data-section="adhesions-init" data-aide="cotisations_adhesions">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init" data-aide="votes_securises">🗳️ Votes sécurisés</a>
       <a href="#billetterie-init" data-section="billetterie-init" data-aide="billetterie">🎟️ Billetterie <span class="pill" id="init-billets-badge" style="display:none;"></span></a>
-      <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la vitrine <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
+      <a href="#messages-vitrine" data-section="messages-vitrine" data-aide="messages_vitrine">🛍️ Messages de la boutique <span class="pill" id="vitrine-msg-count" style="display:none;"></span></a>
       <a href="#offres-emploi" data-section="offres-emploi" data-aide="emplois_stages">💼 Emplois & Stages</a>
       <a href="#recrutement" data-section="recrutement" data-aide="candidatures">📋 Candidatures <span class="pill" id="cand-badge" style="display:none;"></span></a>
       <a href="centre-financier.html" data-aide="centre_financier">💰 Centre Financier</a>
-      <a href="#parametres-vitrine" data-section="parametres-vitrine" data-aide="parametres_vitrine">⭐ Paramètres Vitrine</a>
+      <a href="#parametres-vitrine" data-section="parametres-vitrine" data-aide="parametres_vitrine">⭐ Paramètres Boutique</a>
       <a href="#cagnottes" data-section="cagnottes" data-aide="cagnottes">🪙 Mes Cagnottes</a>
       <a href="#formulaires-inscription" data-section="formulaires-inscription">📝 Formulaires d'inscription</a>
 
@@ -687,6 +688,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     </div>
 
     <!-- ═══ SECTION ÉVÉNEMENTS & BILLETTERIE ═══ -->
+    <!-- ═══ SECTION CRM (2026-09-07) — centre de pilotage, connecte les modules existants ═══ -->
+    <div id="crm" style="display:none;"></div>
+
     <div id="evenements" style="display:none;"></div>
     <div id="billetterie-init" style="display:none;"></div>
     <div id="cagnottes" style="display:none;"></div>
@@ -1077,7 +1081,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     <!-- ══ SECTION MESSAGES DE LA VITRINE ══ -->
     <div class="card" style="margin-bottom:20px;display:none;" id="messages-vitrine">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h3 style="margin:0;">🛍️ Messages de la vitrine</h3>
+        <h3 style="margin:0;">🛍️ Messages de la boutique</h3>
         <button class="btn btn-sm btn-outline" onclick="renderMessagesVitrine()">↺ Actualiser</button>
       </div>
       <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Conversations issues de votre boutique. Chaque message peut être lié à un produit précis.</p>
@@ -1105,7 +1109,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <p style="font-size:11.5px;color:var(--muted);margin:6px 0 0;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;display:inline-block;">ℹ️ Diaspo'Actif fournit un reçu de paiement pour chaque adhésion, mais ne délivre pas de reçu fiscal officiel (Cerfa). Si votre organisation est éligible à en émettre pour des dons, cela reste de votre responsabilité de les délivrer vous-même.</p>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Vitrines, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:6px 14px;" title="Quand fermées, le bouton « Adhérer » disparaît partout (Annuaire, Boutiques, profil public) et aucune nouvelle adhésion n'est possible. Les membres déjà inscrits peuvent toujours renouveler.">
             <input type="checkbox" id="adh-toggle-ouvertes" checked onchange="adhToggleOuvertes(this.checked)"> Adhésions ouvertes
           </label>
           <button class="btn btn-outline" onclick="adhOuvrirRelancesConfig()" title="Choisissez à quel moment les rappels de renouvellement sont envoyés (avant et/ou après expiration).">⏰ Délais de relance</button>
@@ -1573,12 +1577,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
     <!-- ══ SECTION ⭐ PARAMÈTRES VITRINE ══ -->
     <div style="display:none;" id="parametres-vitrine">
-      <h2 style="margin:0 0 6px;">⭐ Paramètres Vitrine</h2>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre vitrine publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma vitrine ».</p>
+      <h2 style="margin:0 0 6px;">⭐ Paramètres Boutique</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Configurez à gauche, voyez le résultat en direct à droite. Rien ne change sur votre boutique publique tant que vous n'avez pas cliqué sur « 🚀 Publier ma boutique ».</p>
 
       <div id="parametres-vitrine-premium-notice" style="display:none;background:linear-gradient(135deg,#fffbeb,#fff7e0);border:1.5px solid #f2c94c;border-radius:12px;padding:14px 18px;margin-bottom:20px;">
         <div style="font-weight:800;color:#92400e;margin-bottom:4px;">🔒 Vous n'êtes pas encore Abonné</div>
-        <p style="font-size:13px;color:#92400e;margin:0 0 10px;">Vous pouvez configurer librement votre vitrine : produits, prix, présentation, thème. En revanche, tant que vous n'êtes pas Abonné, elle reste <strong>en brouillon</strong> — invisible du public et impossible à commander.</p>
+        <p style="font-size:13px;color:#92400e;margin:0 0 10px;">Vous pouvez configurer librement votre boutique : produits, prix, présentation, thème. En revanche, tant que vous n'êtes pas Abonné, elle reste <strong>en brouillon</strong> — invisible du public et impossible à commander.</p>
         <button class="btn" onclick="openPremiumUpsell('parametres_vitrine')" style="background:linear-gradient(135deg,#c8960c,#f2c94c);color:#2a1e00;font-weight:800;border:none;">🎉 Passer à Premium</button>
       </div>
 
@@ -1592,13 +1596,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
           <div class="card" style="margin-bottom:20px;">
             <h3 style="margin:0 0 4px;font-size:15px;">📋 Informations générales</h3>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ces informations sont enregistrées immédiatement (pas de brouillon) et aussi modifiables directement depuis votre vitrine publique.</p>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ces informations sont enregistrées immédiatement (pas de brouillon) et aussi modifiables directement depuis votre boutique publique.</p>
             <div id="pv-infos-form"><div class="notice">Chargement…</div></div>
           </div>
 
           <div class="card" style="margin-bottom:20px;">
             <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la vitrine</h3>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre vitrine est visible par les visiteurs, ou masquée le temps de la préparer.</p>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre boutique est visible par les visiteurs, ou masquée le temps de la préparer.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <button class="btn" id="btn-statut-visible" onclick="definirStatutVitrine(1)" style="flex:1;min-width:180px;justify-content:center;">🟢 Visible</button>
               <button class="btn" id="btn-statut-masque" onclick="definirStatutVitrine(0)" style="flex:1;min-width:180px;justify-content:center;">🔒 Non visible</button>
@@ -1614,7 +1618,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div class="card" style="margin-bottom:20px;">
             <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;flex-wrap:wrap;">
               <span style="background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex:none;">Étape 1</span>
-              <h3 style="margin:0;font-size:15px;">🎯 À quoi sert votre vitrine ?</h3>
+              <h3 style="margin:0;font-size:15px;">🎯 À quoi sert votre boutique ?</h3>
             </div>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Ce choix active les modules adaptés à votre activité. Il ne change <strong>pas</strong> l'apparence — c'est l'étape 2. Vos modules déjà actifs et vos contenus restent intacts.</p>
             <div id="pv-templates-grid" style="display:flex;flex-direction:column;gap:10px;"><div class="notice">Chargement…</div></div>
@@ -1627,7 +1631,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <span style="background:var(--navy);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;flex:none;">Étape 2</span>
               <h3 style="margin:0;font-size:15px;">🖌️ Quel style visuel ?</h3>
             </div>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">L'habillage graphique de votre vitrine. Indépendant de l'étape 1 : changer de style ne touche jamais à vos modules ni à vos contenus.</p>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">L'habillage graphique de votre boutique. Indépendant de l'étape 1 : changer de style ne touche jamais à vos modules ni à vos contenus.</p>
             <div id="pv-style-presets" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"><div class="notice">Chargement…</div></div>
             <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
               <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;">Couleur dominante</div>
@@ -1637,14 +1641,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>
 
           <div class="card" style="margin-bottom:20px;">
-            <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma vitrine</h3>
+            <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
             <div id="pv-modules-lib"><div class="notice">Chargement…</div></div>
           </div>
 
           <div class="card" style="margin-bottom:20px;" id="pv-order-card">
-            <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma vitrine</h3>
-            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre vitrine.</p>
+            <h3 style="margin:0 0 4px;font-size:15px;">↕️ Organiser ma boutique</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Glissez-déposez pour réordonner les sections actives de votre boutique.</p>
             <div id="pv-order-list" style="display:flex;flex-direction:column;gap:8px;"><div class="notice">Chargement…</div></div>
           </div>
 
@@ -1681,7 +1685,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
             <p style="font-size:11px;color:var(--muted);margin:8px 0 0;flex:none;">💡 Cliquez sur une section de l'aperçu pour aller directement à son réglage.</p>
             <div id="pv-draft-status" style="margin:10px 0 8px;font-size:12.5px;font-weight:700;flex:none;"></div>
-            <button class="btn btn-orange btn-block" onclick="pvPublish()" style="flex:none;">🚀 Publier ma vitrine</button>
+            <button class="btn btn-orange btn-block" onclick="pvPublish()" style="flex:none;">🚀 Publier ma boutique</button>
           </div>
         </div>
       </div>
@@ -1852,7 +1856,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <h3 style="margin:0;">🏢 Vérification de l'organisation</h3>
         <button class="btn btn-sm btn-outline" onclick="renderVerificationOrganisation()" style="font-size:12px;">↺ Actualiser</button>
       </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites vérifier votre organisation pour obtenir le badge <strong>🏢 Organisation vérifiée</strong>, visible dans l'Annuaire et les Vitrines. Les documents demandés dépendent du type déclaré à l'inscription.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites vérifier votre organisation pour obtenir le badge <strong>🏢 Organisation vérifiée</strong>, visible dans l'Annuaire et les Boutiques. Les documents demandés dépendent du type déclaré à l'inscription.</p>
       <div id="verification-organisation-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
@@ -2323,7 +2327,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         homepage_feed: "Fil de la page d'accueil",
         between_posts: 'Entre les publications',
         between_videos: 'Entre les vidéos',
-        vitrine_section: 'Section vitrine',
+        vitrine_section: 'Section boutique',
       };
       document.getElementById('ad-emplacements').className = 'da-pill-group';
       document.getElementById('ad-emplacements').innerHTML = _adSlots.map(s => `
@@ -2536,8 +2540,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>`
     },
     vitrine_section: {
-      titre: 'Section vitrine',
-      caption: "Affichée dans une section dédiée des vitrines boutiques (profils Initiative), en complément des produits mis en avant.",
+      titre: 'Section boutique',
+      caption: "Affichée dans une section dédiée des boutiques (profils Initiative), en complément des produits mis en avant.",
       html: `
         <div style="background:#F4F6FA;border-radius:10px;padding:12px;">
           <div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">🛍️ VITRINE — BOUTIQUE</div>
@@ -2957,7 +2961,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const etatChecklist = [
       { label: 'Présentation', done: !!init.description },
       { label: 'Porteur du projet', done: !!(init.nom_responsable && init.email_responsable && init.tel_responsable) },
-      { label: 'Vitrine', done: !!Number(init.vitrine_active) },
+      { label: 'Boutique', done: !!Number(init.vitrine_active) },
       { label: 'Business Plan', done: !!init.a_business_plan },
       { label: 'Immatriculation', done: !!init.numero_immatriculation },
       { label: 'Vérification', done: false },
@@ -3032,18 +3036,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
 
       <div class="card" style="margin-top:16px;">
-        <h3 style="margin:0 0 12px;font-size:15px;">👁️ Visibilité de la vitrine</h3>
+        <h3 style="margin:0 0 12px;font-size:15px;">👁️ Visibilité de la boutique</h3>
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div id="vitrine-visibilite-statut" style="font-size:14px;font-weight:700;"></div>
-          <button class="btn btn-outline" onclick="initShowSection('parametres-vitrine')">⭐ Paramètres Vitrine</button>
+          <button class="btn btn-outline" onclick="initShowSection('parametres-vitrine')">⭐ Paramètres Boutique</button>
         </div>
       </div>
       <div class="card" style="margin-top:16px;">
-        <h3 style="margin:0 0 12px;font-size:15px;">📱 QR code de ma vitrine</h3>
+        <h3 style="margin:0 0 12px;font-size:15px;">📱 QR code de ma boutique</h3>
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
           <div id="cockpit-vitrine-qr" style="flex-shrink:0;"></div>
           <div style="flex:1;min-width:200px;font-size:13px;color:var(--muted);line-height:1.6;">
-            Partagez ce QR code pour donner un accès direct à votre boutique. Les visiteurs arrivent directement sur votre vitrine.
+            Partagez ce QR code pour donner un accès direct à votre boutique. Les visiteurs arrivent directement sur votre boutique.
           </div>
         </div>
       </div>
@@ -3068,7 +3072,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       if (ownerId && window.ProfileQR) {
         ProfileQR.render(document.getElementById('cockpit-vitrine-qr'), {
           url: `${location.origin}/profil.html?id=${ownerId}#vitrine`,
-          userName: (init.nom || 'Vitrine'), userRole: 'Vitrine', size: 150
+          userName: (init.nom || 'Boutique'), userRole: 'Boutique', size: 150
         });
       }
     } catch(e) {}
@@ -3139,7 +3143,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      levé, quel que soit le statut Premium. Symptôme signalé : clic sur "Diaspo Formation"
      sans effet, restait sur les cartes "Paiements boutique"/"Vérification organisation"
      (visibles par ailleurs en permanence, voir commentaire plus bas dans cette fonction). */
-  const INIT_SECTIONS = ['cockpit','presentation','publications','cagnottes','formulaires-inscription','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue','formations-gestion'];
+  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','formulaires-inscription','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue','formations-gestion'];
   window.initShowSection = function(name) {
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -3160,6 +3164,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     document.querySelectorAll('.sidebar a[data-section]').forEach(a => {
       a.classList.toggle('active', a.dataset.section===name);
     });
+    if (name === 'crm') { if (!window._crmInit) { window._crmInit = true; crmSwitchTab('dashboard'); } else { crmRefreshCurrentTab(); } }
     if (name === 'evenements') window.renderInitEvenements?.();
     if (name === 'billetterie-init') renderInitBilletterie();
     if (name === 'cagnottes') renderCagnottes();
@@ -5473,9 +5478,9 @@ function renderVisibiliteVitrineStatut(vitrineActive) {
   if (!el) return;
   const actif = Number(vitrineActive) === 1;
   el.innerHTML = actif
-    ? '<span style="color:#16a34a;">🟢 Vitrine publique</span>'
-    : '<span style="color:#dc2626;">🔒 Vitrine masquée</span>';
-  if (btn) btn.textContent = actif ? '👁️ Visibilité de la vitrine' : '👁️‍🗨️ Rendre la vitrine publique';
+    ? '<span style="color:#16a34a;">🟢 Boutique publique</span>'
+    : '<span style="color:#dc2626;">🔒 Boutique masquée</span>';
+  if (btn) btn.textContent = actif ? '👁️ Visibilité de la boutique' : '👁️‍🗨️ Rendre la boutique publique';
 }
 
 async function loadCockpitSocialSyncWidget() {
@@ -5519,8 +5524,8 @@ function renderStatutVitrineSection() {
   const actif = Number(window.__vitrineActive) === 1;
   const elStatut = document.getElementById('parametres-vitrine-statut');
   if (elStatut) elStatut.innerHTML = actif
-    ? '<span style="color:#16a34a;">🟢 Vitrine publique — visible par les visiteurs</span>'
-    : '<span style="color:#dc2626;">🔒 Vitrine non visible — masquée aux visiteurs</span>';
+    ? '<span style="color:#16a34a;">🟢 Boutique publique — visible par les visiteurs</span>'
+    : '<span style="color:#dc2626;">🔒 Boutique non visible — masquée aux visiteurs</span>';
   const btnVisible = document.getElementById('btn-statut-visible');
   const btnMasque = document.getElementById('btn-statut-masque');
   if (btnVisible) { btnVisible.classList.toggle('btn-orange', actif); btnVisible.classList.toggle('btn-outline', !actif); }
@@ -5536,14 +5541,14 @@ function definirStatutVitrine(nouvelEtat) {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:26px;">
-      <h2 style="margin:0 0 12px;font-size:17px;">Masquer votre vitrine ?</h2>
+      <h2 style="margin:0 0 12px;font-size:17px;">Masquer votre boutique ?</h2>
       <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 16px;">
-        Votre vitrine ne sera plus visible par les visiteurs, ne sera plus affichée dans Vitrine Market, les recherches, les recommandations et le fil d'actualité.<br><br>
+        Votre boutique ne sera plus visible par les visiteurs, ne sera plus affichée dans Boutique Market, les recherches, les recommandations et le fil d'actualité.<br><br>
         Vos données seront conservées et vous pourrez la rendre publique à tout moment.
       </p>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button onclick="document.getElementById('visibilite-vitrine-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
-        <button onclick="toggleVisibiliteVitrine(0)" style="padding:9px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">Masquer la vitrine</button>
+        <button onclick="toggleVisibiliteVitrine(0)" style="padding:9px 16px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">Masquer la boutique</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -5582,7 +5587,7 @@ async function loadParametresVitrineFull() {
   if (!window.__vitrineInitId) {
     ['pv-infos-form','pv-templates-grid','pv-modules-lib','pv-order-list','pv-theme-swatches','pv-style-presets'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.innerHTML = '<div class="notice">Créez votre initiative pour configurer sa vitrine.</div>';
+      if (el) el.innerHTML = '<div class="notice">Créez votre initiative pour configurer sa boutique.</div>';
     });
     return;
   }
@@ -5629,7 +5634,7 @@ function renderPvDraftStatus() {
   if (!el) return;
   el.innerHTML = __pvDraftPending
     ? '<span style="color:#B45309;">🟡 Modifications non publiées</span>'
-    : '<span style="color:#16a34a;">✅ Vitrine à jour</span>';
+    : '<span style="color:#16a34a;">✅ Boutique à jour</span>';
 }
 
 /* Merge-patch centralise vers le brouillon — toute action de configuration passe par ici. */
@@ -5646,7 +5651,7 @@ async function pvPublish() {
     __pvDraftPending = false;
     renderPvDraftStatus();
     pvRefreshPreview();
-    if (typeof showToast === 'function') showToast('Vitrine publiée ✓', 'success'); else alert('Vitrine publiée ✓');
+    if (typeof showToast === 'function') showToast('Boutique publiée ✓', 'success'); else alert('Boutique publiée ✓');
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -5672,7 +5677,7 @@ function renderPvInfosForm() {
         <label class="btn btn-sm btn-outline" style="cursor:pointer;">📷 Logo<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="pvUploadLogo(this)"></label>
       </div>
       <div style="flex:1;min-width:240px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="grid-column:1/-1;"><label class="pv-lbl">Nom de la vitrine</label><input id="pv-f-nom" value="${_mvEsc(init.nom||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="grid-column:1/-1;"><label class="pv-lbl">Nom de la boutique</label><input id="pv-f-nom" value="${_mvEsc(init.nom||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div style="grid-column:1/-1;"><label class="pv-lbl">Description courte (sous-titre de la bannière)</label><input id="pv-f-slogan" value="${_mvEsc(init.slogan||'')}" placeholder="Ex : Artisanat durable pour la diaspora" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Catégorie</label><select id="pv-f-domaine" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           <option value="">—</option>${PV_DOMAINES.map(d=>`<option value="${d}" ${init.domaine===d?'selected':''}>${d}</option>`).join('')}
@@ -5689,7 +5694,7 @@ function renderPvInfosForm() {
         <div><label class="pv-lbl">Site web</label><input id="pv-f-siteweb" value="${_mvEsc(init.site_web||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Ville</label><input id="pv-f-ville" value="${_mvEsc(init.vitrine_ville||init.ville||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Pays</label><input id="pv-f-pays" value="${_mvEsc(init.vitrine_pays||init.pays||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
-        <div><label class="pv-lbl">Téléphone de contact de la vitrine</label><input id="pv-f-tel" value="${_mvEsc(init.vitrine_tel_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div><label class="pv-lbl">Téléphone de contact de la boutique</label><input id="pv-f-tel" value="${_mvEsc(init.vitrine_tel_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <div><label class="pv-lbl">Email pro</label><input id="pv-f-email" value="${_mvEsc(init.vitrine_email_pro||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
         <!-- Pays d'origine / ville de résidence (demande explicite du 2026-08-30) : informations
              du COMPTE du porteur (profil personnel), affichées ici en lecture seule uniquement —
@@ -5720,7 +5725,7 @@ function renderPvInfosForm() {
       <label style="display:flex;gap:9px;align-items:flex-start;margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;">
         <input type="checkbox" id="pv-f-tel-visible" ${Number(init.vitrine_tel_visible)===1?'checked':''} style="margin-top:2px;width:16px;height:16px;flex-shrink:0;">
         <span>
-          <span style="font-size:13px;font-weight:700;">Afficher mon numéro de contact sur ma vitrine</span>
+          <span style="font-size:13px;font-weight:700;">Afficher mon numéro de contact sur ma boutique</span>
           <span style="display:block;font-size:12px;color:var(--muted);line-height:1.5;margin-top:2px;">
             Décoché, le numéro reste enregistré mais n'apparaît nulle part publiquement.
             Le téléphone de votre compte, lui, n'est jamais affiché : il sert à la sécurité et à la récupération de votre accès.
@@ -6147,7 +6152,7 @@ async function pvOuvrirRetraitModal(type) {
 
     <p style="font-size:13.5px;color:#475569;line-height:1.7;margin:0 0 14px;">
       ${rienDautre
-        ? "C'est le dernier type sélectionné : votre vitrine n'aura plus aucun module actif tant que vous n'en choisissez pas un autre."
+        ? "C'est le dernier type sélectionné : votre boutique n'aura plus aucun module actif tant que vous n'en choisissez pas un autre."
         : `Les modules encore couverts par ${typesRestants.length > 1 ? 'vos autres types sélectionnés' : `« ${_mvEsc(__pvRegistry.templates[typesRestants[0]]?.label || typesRestants[0])} »`} restent inchangés.`}
     </p>
 
@@ -6186,7 +6191,7 @@ async function pvRetirerTypeAppliquer(type, mode) {
   /* « Repartir à zéro » supprime des contenus : la confirmation doit être explicite et
      nommer la conséquence, pas se contenter d'un « êtes-vous sûr ». */
   if (mode === 'zero' && !confirm(
-      "Attention : cette action supprimera les contenus actuels de votre vitrine qui n'ont pas leur place dans vos types restants.\n\n" +
+      "Attention : cette action supprimera les contenus actuels de votre boutique qui n'ont pas leur place dans vos types restants.\n\n" +
       "Une sauvegarde est prise automatiquement et vous pourrez revenir en arrière depuis « Sauvegardes ».\n\n" +
       "Confirmer ?")) return;
   try {
@@ -6195,7 +6200,7 @@ async function pvRetirerTypeAppliquer(type, mode) {
     __pvVitrineType = r.types[0] || null;
     __pvModulesState = r.draft.modules;
     if (Array.isArray(r.journal) && r.journal.length) {
-      alert("Vitrine mise à jour :\n\n• " + r.journal.join("\n• ") +
+      alert("Boutique mise à jour :\n\n• " + r.journal.join("\n• ") +
             "\n\nVérifiez l'aperçu, ajustez si besoin, puis publiez.");
     }
     document.getElementById('pv-confirm-modal')?.remove();
@@ -6230,10 +6235,10 @@ async function pvChargerSauvegardes() {
 }
 
 async function pvRestaurer(id) {
-  if (!confirm("Restaurer cette version de votre vitrine ?\n\nLes contenus actuels seront remplacés par ceux enregistrés à cette date.")) return;
+  if (!confirm("Restaurer cette version de votre boutique ?\n\nLes contenus actuels seront remplacés par ceux enregistrés à cette date.")) return;
   try {
     const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vitrine/restaurer/${id}`);
-    alert(`Vitrine restaurée (${r.champs_restaures} élément(s)).\n\nRechargez la page pour voir le résultat.`);
+    alert(`Boutique restaurée (${r.champs_restaures} élément(s)).\n\nRechargez la page pour voir le résultat.`);
     location.reload();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
@@ -6408,7 +6413,7 @@ async function renderMessagesVitrine(){
     // Rafraîchit le badge du menu
     const badge = document.getElementById('vitrine-msg-count');
     if(badge){ const n=r.total_non_lus||0; if(n>0){badge.textContent=n;badge.style.display='';}else{badge.style.display='none';} }
-    if(!msgs.length){ el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun message de la vitrine pour le moment.</p>'; return; }
+    if(!msgs.length){ el.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucun message de la boutique pour le moment.</p>'; return; }
     el.innerHTML = msgs.map(m => {
       const prod = m.produit ? `<a href="profil.html?id=${initId}#vitrine" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#2563EB;text-decoration:none;background:rgba(37,99,235,.08);border-radius:6px;padding:3px 10px;margin-top:6px;">🛍️ ${_mvEsc(m.produit.nom)}${m.produit.reference?` · ${_mvEsc(m.produit.reference)}`:''}</a>` : '';
       const unread = m.non_lus>0;
@@ -7488,11 +7493,11 @@ async function renderStatsImpact(initId){
     ]},
     { titre:'👁️ Visibilité', color:'#2563EB', bg:'#EFF6FF', data:'visibilite', cards:[
       ['vues_profil','Vues du profil public','Consultations de votre fiche publique.',fmtNum],
-      ['vues_vitrine','Vues de la vitrine','Visites de votre boutique / vitrine.',fmtNum],
+      ['vues_vitrine','Vues de la boutique','Visites de votre boutique.',fmtNum],
       ['vues_produits','Vues des produits','Consultations des produits.',fmtNum],
       ['vues_publications','Vues des publications','Lectures de vos publications.',fmtNum],
       ['qr_scans','QR Code scanné','Scans de votre QR Code officiel.',fmtNum],
-      ['partages','Partages','Partages de votre profil ou vitrine.',fmtNum],
+      ['partages','Partages','Partages de votre profil ou boutique.',fmtNum],
     ]},
     { titre:'🛒 Boutique', color:'#059669', bg:'#ECFDF5', data:'boutique', cards:[
       ['produits_publies','Produits publiés','Produits actuellement en ligne.',fmtNum],
@@ -9029,6 +9034,7 @@ document.querySelector('[data-section="formations-gestion"]')?.addEventListener(
    Paiements boutique (Stripe Connect), Module de paiement billetterie & cotisations,
    Cotisations & Adhésions, Votes sécurisés, Paramètres Vitrine. */
 const PREMIUM_UPSELL_CONTEXTS = {
+  crm: { title:'Débloquez le CRM', intro:"Le CRM (contacts, prospects, opportunités, tâches, centre de pilotage) est réservé aux comptes Premium." },
   publicites:  { title:'Créez vos campagnes publicitaires', intro:"La création de publicités est réservée aux comptes Premium." },
   evenements:  { title:'Créez vos événements', intro:"La création d'événements est réservée aux comptes Premium." },
   business_plans: { title:'Débloquez les Business Plans', intro:"Le module Business Plans complet est réservé aux comptes Premium." },
@@ -9038,9 +9044,9 @@ const PREMIUM_UPSELL_CONTEXTS = {
   adhesions: { title:'Gérez cotisations & adhésions', intro:"Le module Cotisations & Adhésions est réservé aux comptes Premium." },
   cagnottes: { title:'Lancez vos cagnottes', intro:"La création et la gestion de cagnottes sont réservées aux comptes Premium." },
   votes: { title:'Organisez des votes sécurisés', intro:"Le module Votes sécurisés est réservé aux comptes Premium." },
-  parametres_vitrine: { title:'Personnalisez votre vitrine', intro:"La configuration avancée de la vitrine (modèles, modules, apparence, aperçu en direct) est réservée aux comptes Premium." },
+  parametres_vitrine: { title:'Personnalisez votre boutique', intro:"La configuration avancée de la boutique (modèles, modules, apparence, aperçu en direct) est réservée aux comptes Premium." },
   expansion_module: { title:'Activez ce module', intro:"L'activation des modules Expansion est réservée aux comptes Abonné — l'abonnement inclut l'activation de tous les modules disponibles pour votre type d'initiative." },
-  messages_vitrine: { title:'Consultez les messages de votre vitrine', intro:"Les messages reçus via votre Vitrine sont réservés aux comptes Premium." },
+  messages_vitrine: { title:'Consultez les messages de votre boutique', intro:"Les messages reçus via votre Boutique sont réservés aux comptes Premium." },
   billetterie: { title:'Vendez des billets', intro:"La billetterie est réservée aux comptes Premium." },
   centre_financier: { title:'Gérez vos finances', intro:"Le Centre Financier (revenus, comptes de réception, retraits) est réservé aux comptes Premium." },
   emplois_stages: { title:'Publiez vos offres', intro:"La publication d'offres d'emploi et de stage est réservée aux comptes Premium." },
@@ -9110,6 +9116,7 @@ async function initPremiumGates() {
 
   /* Modules dorés communs aux 3 types d'initiative. */
   const SIDEBAR_PREMIUM_LINKS_TOUS = [
+    { href: '#crm', context: 'crm', intercept: true },
     { href: '#paiement', context: 'paiement_boutique' },
     { href: '#cagnottes', context: 'cagnottes', intercept: true },
     { href: '#formations-gestion', context: 'espace_formateur', intercept: true },
@@ -9219,6 +9226,578 @@ initPremiumGates();
   <script src="/assets/theme-manager.js"></script>
 <script src="/assets/guided-tour.js"></script>
 <script src="/assets/tours/tour-evenement-dashboard.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE CRM (2026-09-07) — centre de pilotage du compte Initiative.
+   Un seul module, sous-onglets internes (même pattern que adhSwitchTab pour
+   Cotisations & Adhésions). Ne stocke rien en propre pour Campagnes/
+   Événements/Échanges/Demandes — ces onglets lisent directement les API
+   existantes (/api/ads, /api/events, /api/conversations, /api/crm/demandes
+   qui lit devis_demandes). Seuls Contacts/Prospects/Opportunités/Tâches ont
+   de vraies tables dédiées (server/db.js), voir server/index.js pour les
+   routes /api/crm/*.
+   ═══════════════════════════════════════════════════════════════════ */
+
+function crmEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function crmDepuis(dateStr) {
+  if (!dateStr) return '';
+  const diff = (Date.now() - new Date(String(dateStr).replace(' ', 'T') + 'Z').getTime()) / 1000;
+  if (diff < 60) return 'à l’instant';
+  if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+  return `il y a ${Math.floor(diff / 86400)} j`;
+}
+const CRM_PIPELINE_STATUTS = [
+  ['nouveau', 'Nouveau'], ['contacte', 'Contacté'], ['interesse', 'Intéressé'],
+  ['devis_envoye', 'Devis envoyé'], ['negociation', 'Négociation'], ['gagne', 'Gagné'], ['perdu', 'Perdu'],
+];
+function crmStatutLabel(k) { return (CRM_PIPELINE_STATUTS.find(s => s[0] === k) || [null, k])[1]; }
+let CRM_TAB = 'dashboard';
+let CRM_CONTACTS_CACHE = [];
+let CRM_ME_ID = null;
+async function crmMyId() {
+  if (CRM_ME_ID) return CRM_ME_ID;
+  try { const r = await api('GET', '/auth/me'); CRM_ME_ID = (r.user || r).id; } catch (_) {}
+  return CRM_ME_ID;
+}
+const CRM_TABS = [
+  ['dashboard', '🏠 Tableau de bord'], ['contacts', '👥 Contacts'], ['prospects', '🎯 Prospects'],
+  ['opportunites', '💼 Opportunités'], ['demandes', '📩 Demandes'], ['campagnes', '📢 Campagnes'],
+  ['evenements', '🎟️ Événements'], ['echanges', '💬 Échanges'], ['taches', '📋 Tâches'],
+  ['stats', '📊 Statistiques'], ['parametres', '⚙️ Paramètres'],
+];
+
+function crmSwitchTab(tab) {
+  CRM_TAB = tab;
+  const wrap = document.getElementById('crm');
+  if (!wrap.querySelector('.crm-shell')) {
+    wrap.innerHTML = `
+      <div class="crm-shell">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+          <div>
+            <h2 style="margin:0;">🤝 CRM</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Le centre de pilotage de votre activité — contacts, prospects, opportunités, et tout ce qui s'y connecte.</p>
+          </div>
+          <div style="position:relative;min-width:240px;">
+            <input type="search" id="crm-search-input" placeholder="🔍 Rechercher dans le CRM…" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;">
+            <div id="crm-search-results" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border-radius:10px;box-shadow:0 14px 30px rgba(0,0,0,.18);z-index:60;max-height:360px;overflow-y:auto;border:1px solid var(--border);"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="btn btn-sm" onclick="crmOpenContactForm()">+ Nouveau contact</button>
+          <button class="btn btn-sm btn-outline" onclick="crmOpenContactForm(null,'prospect')">+ Nouveau prospect</button>
+          <button class="btn btn-sm btn-outline" onclick="crmOpenOppForm()">+ Nouvelle opportunité</button>
+          <button class="btn btn-sm btn-outline" onclick="crmOpenTacheForm()">+ Nouvelle tâche</button>
+        </div>
+        <div id="crm-tabs" style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;"></div>
+        <div id="crm-tab-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      </div>
+      <div id="crm-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this) crmCloseModal()">
+        <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 id="crm-modal-title" style="margin:0;font-size:1.05rem;"></h3>
+            <button onclick="crmCloseModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+          </div>
+          <div id="crm-modal-body"></div>
+        </div>
+      </div>`;
+    crmWireSearch();
+  }
+  document.getElementById('crm-tabs').innerHTML = CRM_TABS.map(([key, label]) =>
+    `<button class="btn btn-sm ${key === tab ? '' : 'btn-outline'}" onclick="crmSwitchTab('${key}')">${label}</button>`
+  ).join('');
+  crmRenderTab(tab);
+}
+function crmRefreshCurrentTab() { crmRenderTab(CRM_TAB); }
+function crmRenderTab(tab) {
+  const fns = {
+    dashboard: crmRenderDashboard, contacts: () => crmRenderContacts(), prospects: crmRenderProspects,
+    opportunites: crmRenderOpportunites, demandes: crmRenderDemandes, campagnes: crmRenderCampagnes,
+    evenements: crmRenderEvenements, echanges: crmRenderEchanges, taches: () => crmRenderTaches(),
+    stats: crmRenderStats, parametres: crmRenderParametres,
+  };
+  (fns[tab] || crmRenderDashboard)();
+}
+function crmOpenModal(title, bodyHtml) {
+  document.getElementById('crm-modal-title').textContent = title;
+  document.getElementById('crm-modal-body').innerHTML = bodyHtml;
+  document.getElementById('crm-modal-backdrop').style.display = 'flex';
+}
+function crmCloseModal() { const el = document.getElementById('crm-modal-backdrop'); if (el) el.style.display = 'none'; }
+
+/* ── Recherche globale CRM ── */
+function crmWireSearch() {
+  const input = document.getElementById('crm-search-input');
+  const results = document.getElementById('crm-search-results');
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { results.style.display = 'none'; return; }
+    timer = setTimeout(async () => {
+      try {
+        const r = await api('GET', `/crm/recherche?q=${encodeURIComponent(q)}`);
+        const items = [];
+        (r.contacts || []).forEach(x => items.push({ label: `👤 ${x.prenom || ''} ${x.nom}`, tab: 'contacts' }));
+        (r.opportunites || []).forEach(x => items.push({ label: `💼 ${x.titre}`, tab: 'opportunites' }));
+        (r.taches || []).forEach(x => items.push({ label: `📋 ${x.titre}`, tab: 'taches' }));
+        (r.demandes || []).forEach(x => items.push({ label: `📩 ${x.requester_first_name || ''} ${x.requester_last_name || ''}${x.produit_nom ? ' — ' + x.produit_nom : ''}`, tab: 'demandes' }));
+        results.innerHTML = items.length
+          ? items.map(it => `<div style="padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="crmCloseSearch();crmSwitchTab('${it.tab}');">${crmEsc(it.label)}</div>`).join('')
+          : '<div style="padding:10px 14px;font-size:13px;color:var(--muted);">Aucun résultat.</div>';
+        results.style.display = 'block';
+      } catch (_) {}
+    }, 250);
+  });
+  document.addEventListener('click', e => { if (results && !results.contains(e.target) && e.target !== input) results.style.display = 'none'; });
+}
+function crmCloseSearch() {
+  const r = document.getElementById('crm-search-results'); if (r) r.style.display = 'none';
+  const i = document.getElementById('crm-search-input'); if (i) i.value = '';
+}
+
+/* ── 🏠 Tableau de bord ── */
+async function crmRenderDashboard() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const d = await api('GET', '/crm/dashboard');
+    const cartes = [
+      ['contacts', '👥', 'Contacts', d.compteurs.contacts],
+      ['prospects', '🎯', 'Prospects actifs', d.compteurs.prospects],
+      ['opportunites', '💼', 'Opportunités', d.compteurs.opportunites],
+      ['demandes', '📩', 'Demandes', d.compteurs.demandes],
+      ['campagnes', '📢', 'Campagnes actives', d.compteurs.campagnes],
+      ['evenements', '🎟️', 'Événements à venir', d.compteurs.evenements],
+      ['echanges', '💬', 'Messages non lus', d.compteurs.messages_non_lus],
+      ['taches', '📋', 'Tâches à faire', d.compteurs.taches],
+    ];
+    const couleurAlerte = { rouge: '#dc2626', orange: '#f59e0b', jaune: '#eab308', vert: '#16a34a' };
+    const tabParType = { demande: 'demandes', prospect: 'prospects', tache: 'taches' };
+    c.innerHTML = `
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);">
+        ${cartes.map(([tab, icon, label, n]) => `
+          <div class="stat-card" style="cursor:pointer;" onclick="crmSwitchTab('${tab}')">
+            <div class="num">${icon} ${n}</div>
+            <div class="label">${label}</div>
+          </div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-top:20px;align-items:start;">
+        <div class="card" style="padding:16px 18px;">
+          <h4 style="margin-top:0;">Activité récente</h4>
+          ${d.activite_recente.length ? d.activite_recente.map(a => `
+            <div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="crmSwitchTab('${tabParType[a.type] || 'dashboard'}')">
+              <div style="font-weight:600;font-size:13.5px;">${crmEsc(a.label)}</div>
+              ${a.sous ? `<div style="font-size:12px;color:var(--muted);">${crmEsc(a.sous)}</div>` : ''}
+              <div style="font-size:11px;color:var(--muted);">${crmDepuis(a.date)}</div>
+            </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Rien pour l’instant.</p>'}
+        </div>
+        <div class="card" style="padding:16px 18px;">
+          <h4 style="margin-top:0;">À faire</h4>
+          ${d.a_faire.length ? d.a_faire.map(x => `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 0;">
+              <span style="width:10px;height:10px;border-radius:50%;background:${couleurAlerte[x.niveau] || '#94a3b8'};flex-shrink:0;"></span>
+              <span style="font-size:13.5px;">${crmEsc(x.label)}</span>
+            </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Rien d’urgent.</p>'}
+        </div>
+      </div>`;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+
+/* ── 👥 Contacts ── */
+let CRM_CONTACTS_FILTER = '';
+async function crmRenderContacts(relation) {
+  if (relation !== undefined) CRM_CONTACTS_FILTER = relation;
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const q = CRM_CONTACTS_FILTER ? `?relation=${CRM_CONTACTS_FILTER}` : '';
+    const { contacts } = await api('GET', `/crm/contacts${q}`);
+    CRM_CONTACTS_CACHE = contacts;
+    const filtres = [['', 'Tous'], ['prospect', 'Prospects'], ['client', 'Clients'], ['partenaire', 'Partenaires'], ['autre', 'Autres']];
+    const relLabel = { prospect: '🎯 Prospect', client: '✅ Client', partenaire: '🤝 Partenaire', autre: 'Autre' };
+    c.innerHTML = `
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        ${filtres.map(([v, l]) => `<button class="btn btn-sm ${CRM_CONTACTS_FILTER === v ? '' : 'btn-outline'}" onclick="crmRenderContacts('${v}')">${l}</button>`).join('')}
+      </div>
+      ${contacts.length ? `
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:2px solid var(--border);text-align:left;">
+          <th style="padding:8px;">Nom</th><th style="padding:8px;">Société</th><th style="padding:8px;">Contact</th>
+          <th style="padding:8px;">Relation</th><th style="padding:8px;">Statut</th>
+        </tr></thead><tbody>
+        ${contacts.map(ct => `
+          <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="crmOpenContactForm(${ct.id})">
+            <td style="padding:8px;font-weight:700;">${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</td>
+            <td style="padding:8px;color:var(--muted);">${crmEsc(ct.societe || '—')}</td>
+            <td style="padding:8px;color:var(--muted);">${crmEsc(ct.email || ct.telephone || '—')}</td>
+            <td style="padding:8px;"><span class="pill">${relLabel[ct.relation] || ct.relation}</span></td>
+            <td style="padding:8px;">${ct.pipeline_statut ? crmEsc(crmStatutLabel(ct.pipeline_statut)) : '—'}</td>
+          </tr>`).join('')}
+      </tbody></table></div>
+      ` : '<p style="color:var(--muted);">Aucun contact pour l’instant. Ajoutez-en un, ou créez-en un depuis une demande de devis.</p>'}
+    `;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+async function crmOpenContactForm(id, defaultRelation) {
+  let c = { nom: '', prenom: '', email: '', telephone: '', ville: '', pays: '', societe: '', fonction: '', relation: defaultRelation || 'autre', notes: '' };
+  let extra = null;
+  if (id) { const r = await api('GET', `/crm/contacts/${id}`); c = r.contact; extra = r; }
+  const relOpts = { prospect: 'Prospect', client: 'Client', partenaire: 'Partenaire', autre: 'Autre' };
+  const historiqueHtml = extra ? `
+    <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+      <h5 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Historique</h5>
+      ${extra.demande ? `<div style="font-size:12.5px;margin-bottom:4px;">📩 Demande de devis${extra.demande.produit_nom ? ' — ' + crmEsc(extra.demande.produit_nom) : ''} (${crmEsc(extra.demande.statut)})</div>` : ''}
+      ${extra.opportunites.map(o => `<div style="font-size:12.5px;margin-bottom:4px;">💼 ${crmEsc(o.titre)}${o.valeur ? ' — ' + Number(o.valeur).toLocaleString('fr-FR') + ' €' : ''} (${crmEsc(crmStatutLabel(o.statut))})</div>`).join('')}
+      ${extra.taches.map(t => `<div style="font-size:12.5px;margin-bottom:4px;">📋 ${crmEsc(t.titre)} (${crmEsc(t.statut)})</div>`).join('')}
+      ${extra.nb_messages != null ? `<div style="font-size:12.5px;margin-bottom:4px;">💬 ${extra.nb_messages} message(s) échangé(s) — <a href="messagerie.html?with=${c.linked_user_id}" target="_blank">ouvrir</a></div>` : ''}
+      ${(!extra.demande && !extra.opportunites.length && !extra.taches.length && extra.nb_messages == null) ? '<div style="font-size:12.5px;color:var(--muted);">Rien pour l’instant.</div>' : ''}
+    </div>` : '';
+  crmOpenModal(id ? '✏️ Modifier le contact' : '➕ Nouveau contact', `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div><label>Nom *</label><input id="crm-c-nom" value="${crmEsc(c.nom)}"></div>
+      <div><label>Prénom</label><input id="crm-c-prenom" value="${crmEsc(c.prenom)}"></div>
+      <div><label>E-mail</label><input id="crm-c-email" value="${crmEsc(c.email)}"></div>
+      <div><label>Téléphone</label><input id="crm-c-telephone" value="${crmEsc(c.telephone)}"></div>
+      <div><label>Ville</label><input id="crm-c-ville" value="${crmEsc(c.ville)}"></div>
+      <div><label>Pays</label><input id="crm-c-pays" value="${crmEsc(c.pays)}"></div>
+      <div><label>Société</label><input id="crm-c-societe" value="${crmEsc(c.societe)}"></div>
+      <div><label>Fonction</label><input id="crm-c-fonction" value="${crmEsc(c.fonction)}"></div>
+    </div>
+    <div style="margin-top:10px;"><label>Relation</label>
+      <select id="crm-c-relation">${Object.entries(relOpts).map(([v, l]) => `<option value="${v}" ${c.relation === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    </div>
+    <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-c-notes" rows="3" style="width:100%;">${crmEsc(c.notes)}</textarea></div>
+    <div style="display:flex;justify-content:space-between;margin-top:16px;">
+      ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteContact(${id})">🗑 Supprimer</button>` : '<span></span>'}
+      <button class="btn" onclick="crmSaveContact(${id || 'null'})">Enregistrer</button>
+    </div>
+    ${historiqueHtml}
+  `);
+}
+async function crmSaveContact(id) {
+  const body = {
+    nom: document.getElementById('crm-c-nom').value.trim(),
+    prenom: document.getElementById('crm-c-prenom').value.trim(),
+    email: document.getElementById('crm-c-email').value.trim(),
+    telephone: document.getElementById('crm-c-telephone').value.trim(),
+    ville: document.getElementById('crm-c-ville').value.trim(),
+    pays: document.getElementById('crm-c-pays').value.trim(),
+    societe: document.getElementById('crm-c-societe').value.trim(),
+    fonction: document.getElementById('crm-c-fonction').value.trim(),
+    relation: document.getElementById('crm-c-relation').value,
+    notes: document.getElementById('crm-c-notes').value.trim(),
+  };
+  if (!body.nom) { alert('Le nom est requis.'); return; }
+  try {
+    if (id) await api('PUT', `/crm/contacts/${id}`, body); else await api('POST', '/crm/contacts', body);
+    crmCloseModal(); crmRefreshCurrentTab();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function crmDeleteContact(id) {
+  if (!confirm('Supprimer ce contact ? Cette action est définitive.')) return;
+  try { await api('DELETE', `/crm/contacts/${id}`); crmCloseModal(); crmRefreshCurrentTab(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+
+/* ── 🎯 Prospects (kanban) ── */
+async function crmRenderProspects() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const { pipeline } = await api('GET', '/crm/pipeline');
+    c.innerHTML = pipeline.length ? `<div id="crm-kanban" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;"></div>`
+      : '<p style="color:var(--muted);">Aucun prospect pour l’instant — marquez un contact comme « Prospect » ou créez-en un directement.</p>';
+    if (!pipeline.length) return;
+    const board = document.getElementById('crm-kanban');
+    board.innerHTML = CRM_PIPELINE_STATUTS.map(([key, label]) => {
+      const cards = pipeline.filter(p => p.statut === key);
+      return `<div data-statut="${key}" style="flex:0 0 220px;background:var(--bg);border-radius:10px;padding:10px;min-height:200px;"
+                ondragover="event.preventDefault();this.style.background='#e2e8f0';" ondragleave="this.style.background='var(--bg)';" ondrop="crmKanbanDrop(event,'${key}')">
+        <div style="font-weight:800;font-size:12px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">${label} (${cards.length})</div>
+        ${cards.map(p => `
+          <div class="card" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${p.contact_id}')"
+               style="padding:10px;margin-bottom:8px;cursor:grab;" onclick="crmOpenContactForm(${p.contact_id})">
+            <div style="font-weight:700;font-size:13px;">${crmEsc(p.prenom || '')} ${crmEsc(p.nom)}</div>
+            ${p.societe ? `<div style="font-size:11.5px;color:var(--muted);">${crmEsc(p.societe)}</div>` : ''}
+            ${p.valeur_potentielle ? `<div style="font-size:12px;font-weight:700;color:var(--orange);margin-top:4px;">${Number(p.valeur_potentielle).toLocaleString('fr-FR')} €</div>` : ''}
+            ${p.prochaine_action ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">➡️ ${crmEsc(p.prochaine_action)}</div>` : ''}
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+async function crmKanbanDrop(ev, statut) {
+  ev.preventDefault();
+  ev.currentTarget.style.background = 'var(--bg)';
+  const contactId = ev.dataTransfer.getData('text/plain');
+  if (!contactId) return;
+  try { await api('PATCH', `/crm/pipeline/${contactId}`, { statut }); crmRenderProspects(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+
+/* ── 💼 Opportunités ── */
+async function crmRenderOpportunites() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const { opportunites } = await api('GET', '/crm/opportunites');
+    c.innerHTML = opportunites.length ? `
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:2px solid var(--border);text-align:left;">
+          <th style="padding:8px;">Titre</th><th style="padding:8px;">Contact</th><th style="padding:8px;">Valeur</th>
+          <th style="padding:8px;">Statut</th><th style="padding:8px;">Probabilité</th><th style="padding:8px;">Date prévue</th>
+        </tr></thead><tbody>
+        ${opportunites.map(o => `
+          <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="crmOpenOppForm(${o.id})">
+            <td style="padding:8px;font-weight:700;">${crmEsc(o.titre)}</td>
+            <td style="padding:8px;color:var(--muted);">${o.contact_nom ? crmEsc(o.contact_prenom || '') + ' ' + crmEsc(o.contact_nom) : '—'}</td>
+            <td style="padding:8px;">${o.valeur ? Number(o.valeur).toLocaleString('fr-FR') + ' ' + (o.devise || 'EUR') : '—'}</td>
+            <td style="padding:8px;">${crmEsc(crmStatutLabel(o.statut))}</td>
+            <td style="padding:8px;">${o.probabilite}%</td>
+            <td style="padding:8px;">${o.date_prevue || '—'}</td>
+          </tr>`).join('')}
+      </tbody></table></div>
+    ` : '<p style="color:var(--muted);">Aucune opportunité pour l’instant.</p>';
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+async function crmOpenOppForm(id) {
+  let o = { titre: '', valeur: '', statut: 'nouveau', probabilite: 50, date_prevue: '', prochaine_action: '', notes: '', contact_id: null };
+  if (id) { const { opportunites } = await api('GET', '/crm/opportunites'); o = opportunites.find(x => x.id === id) || o; }
+  if (!CRM_CONTACTS_CACHE.length) CRM_CONTACTS_CACHE = (await api('GET', '/crm/contacts')).contacts;
+  crmOpenModal(id ? '✏️ Modifier l’opportunité' : '➕ Nouvelle opportunité', `
+    <div><label>Titre *</label><input id="crm-o-titre" value="${crmEsc(o.titre)}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+      <div><label>Valeur (€)</label><input type="number" id="crm-o-valeur" value="${o.valeur || ''}"></div>
+      <div><label>Probabilité (%)</label><input type="number" min="0" max="100" id="crm-o-probabilite" value="${o.probabilite || 50}"></div>
+      <div><label>Statut</label><select id="crm-o-statut">${CRM_PIPELINE_STATUTS.map(([k, l]) => `<option value="${k}" ${o.statut === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div><label>Date prévue</label><input type="date" id="crm-o-date" value="${o.date_prevue || ''}"></div>
+    </div>
+    <div style="margin-top:10px;"><label>Contact lié</label><select id="crm-o-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${o.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select></div>
+    <div style="margin-top:10px;"><label>Prochaine action</label><input id="crm-o-action" value="${crmEsc(o.prochaine_action || '')}"></div>
+    <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-o-notes" rows="3" style="width:100%;">${crmEsc(o.notes || '')}</textarea></div>
+    <div style="display:flex;justify-content:space-between;margin-top:16px;">
+      ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteOpp(${id})">🗑 Supprimer</button>` : '<span></span>'}
+      <button class="btn" onclick="crmSaveOpp(${id || 'null'})">Enregistrer</button>
+    </div>
+  `);
+}
+async function crmSaveOpp(id) {
+  const body = {
+    titre: document.getElementById('crm-o-titre').value.trim(),
+    valeur: document.getElementById('crm-o-valeur').value || null,
+    probabilite: document.getElementById('crm-o-probabilite').value,
+    statut: document.getElementById('crm-o-statut').value,
+    date_prevue: document.getElementById('crm-o-date').value || null,
+    contact_id: document.getElementById('crm-o-contact').value || null,
+    prochaine_action: document.getElementById('crm-o-action').value.trim(),
+    notes: document.getElementById('crm-o-notes').value.trim(),
+  };
+  if (!body.titre) { alert('Le titre est requis.'); return; }
+  try {
+    if (id) await api('PUT', `/crm/opportunites/${id}`, body); else await api('POST', '/crm/opportunites', body);
+    crmCloseModal(); crmRefreshCurrentTab();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function crmDeleteOpp(id) {
+  if (!confirm('Supprimer cette opportunité ?')) return;
+  try { await api('DELETE', `/crm/opportunites/${id}`); crmCloseModal(); crmRefreshCurrentTab(); } catch (e) { alert(e.message || 'Erreur.'); }
+}
+
+/* ── 📩 Demandes (lecture — devis_demandes, module existant) ── */
+async function crmRenderDemandes() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const { demandes } = await api('GET', '/crm/demandes');
+    const STATUT_LABELS = { nouvelle: '🟠 Nouvelle', en_cours: '🔵 En cours', devis_envoye: '🟣 Devis envoyé', acceptee: '🟢 Acceptée', cloturee: '⚫ Clôturée' };
+    c.innerHTML = demandes.length ? demandes.map(d => `
+      <div class="card" style="margin-bottom:10px;padding:14px 16px;">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div style="font-weight:700;">${crmEsc(d.requester_first_name || '')} ${crmEsc(d.requester_last_name || '')} ${d.produit_nom ? '— ' + crmEsc(d.produit_nom) : ''}</div>
+            <div style="font-size:12px;color:var(--muted);">${crmEsc(d.requester_email || '')} · ${crmDepuis(d.created_at)}</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;">${STATUT_LABELS[d.statut] || crmEsc(d.statut)}</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          ${d.conversation_id ? `<a class="btn btn-sm btn-outline" href="messagerie.html?with=${d.requester_user_id || ''}" target="_blank">💬 Ouvrir la conversation</a>` : ''}
+          ${d.contact_id ? `<button class="btn btn-sm btn-outline" onclick="crmOpenContactForm(${d.contact_id})">Voir la fiche contact</button>` : `<button class="btn btn-sm" onclick="crmContactFromDevis(${d.id})">➕ Créer une fiche contact</button>`}
+        </div>
+      </div>
+    `).join('') : '<p style="color:var(--muted);">Aucune demande de devis pour l’instant.</p>';
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+async function crmContactFromDevis(devisId) {
+  try { await api('POST', `/crm/contacts/from-devis/${devisId}`); crmRenderDemandes(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+
+/* ── 📢 Campagnes (lecture/action — publicites, module existant) ── */
+async function crmRenderCampagnes() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const { publicites } = await api('GET', '/ads/mes');
+    c.innerHTML = `
+      <div style="margin-bottom:12px;"><button class="btn btn-sm" onclick="initShowSection('publicites-init')">+ Nouvelle campagne</button></div>
+      ${publicites && publicites.length ? publicites.map(a => `
+        <div class="card" style="margin-bottom:10px;padding:14px 16px;">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-weight:700;">${crmEsc(a.titre || 'Sans titre')}</div>
+              <div style="font-size:12px;color:var(--muted);">${a.statut === 'approved' ? '🟢 Active' : a.statut === 'paused' ? '⏸ En pause' : crmEsc(a.statut)}</div>
+            </div>
+            <div style="font-size:12px;color:var(--muted);text-align:right;">👁 ${a.nb_impressions || 0} · 🖱 ${a.nb_clics || 0}</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            ${a.statut === 'approved' ? `<button class="btn btn-sm btn-outline" onclick="crmPauseAd(${a.id})">⏸ Mettre en pause</button>` : ''}
+            ${a.statut === 'paused' ? `<button class="btn btn-sm btn-outline" onclick="crmResumeAd(${a.id})">▶️ Reprendre</button>` : ''}
+            <button class="btn btn-sm btn-outline" onclick="initShowSection('publicites-init')">Voir / modifier</button>
+          </div>
+        </div>
+      `).join('') : '<p style="color:var(--muted);">Aucune campagne pour l’instant.</p>'}
+    `;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+async function crmPauseAd(id) { try { await api('POST', `/ads/${id}/pause`); crmRenderCampagnes(); } catch (e) { alert(e.message || 'Erreur.'); } }
+async function crmResumeAd(id) { try { await api('POST', `/ads/${id}/resume`); crmRenderCampagnes(); } catch (e) { alert(e.message || 'Erreur.'); } }
+
+/* ── 🎟️ Événements (lecture — events, module existant) ── */
+async function crmRenderEvenements() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const { events } = await api('GET', '/events?mine=1&all=1');
+    c.innerHTML = `
+      <div style="margin-bottom:12px;"><button class="btn btn-sm" onclick="initShowSection('evenements')">+ Nouvel événement</button></div>
+      ${events && events.length ? events.map(e => `
+        <div class="card" style="margin-bottom:10px;padding:14px 16px;">
+          <div style="font-weight:700;">🎟️ ${crmEsc(e.titre)}</div>
+          <div style="font-size:12px;color:var(--muted);">${e.date_debut ? new Date(e.date_debut).toLocaleDateString('fr-FR') : ''} · ${crmEsc(e.ville || '')} · ${e.billets_vendus || 0} inscrit(s)</div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="initShowSection('evenements')">Gérer</button>
+          </div>
+        </div>
+      `).join('') : '<p style="color:var(--muted);">Aucun événement pour l’instant.</p>'}
+    `;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+
+/* ── 💬 Échanges (lecture — conversations/messages, module existant) ── */
+async function crmRenderEchanges() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const myId = await crmMyId();
+    const { conversations } = await api('GET', '/conversations?filtre=tous');
+    const nonLus = conversations.reduce((s, cv) => s + (cv.non_lus || 0), 0);
+    c.innerHTML = `
+      <div class="card" style="margin-bottom:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="font-weight:700;">💬 ${nonLus} message(s) non lu(s)</div>
+        <a class="btn btn-sm" href="messagerie.html" target="_blank">Ouvrir la messagerie</a>
+      </div>
+      ${conversations.slice(0, 15).map(cv => {
+        const withId = Number(cv.user1_id) === Number(myId) ? cv.user2_id : cv.user1_id;
+        return `<a href="messagerie.html?with=${withId}" target="_blank" style="text-decoration:none;color:inherit;display:block;">
+          <div class="card" style="margin-bottom:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:700;font-size:13px;">${crmEsc(cv.avec_nom || 'Conversation')}</div>
+              <div style="font-size:12px;color:var(--muted);">${crmEsc((cv.derniere || '').slice(0, 60))}</div>
+            </div>
+            ${cv.non_lus ? `<span class="pill" style="background:var(--orange);color:#fff;">${cv.non_lus}</span>` : ''}
+          </div>
+        </a>`;
+      }).join('') || '<p style="color:var(--muted);">Aucune conversation pour l’instant.</p>'}
+    `;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+
+/* ── 📋 Tâches ── */
+async function crmRenderTaches(statut) {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const q = statut ? `?statut=${statut}` : '';
+    const { taches } = await api('GET', `/crm/taches${q}`);
+    const PRIORITE_COULEUR = { basse: '#94a3b8', normale: '#2563eb', haute: '#f59e0b', urgente: '#dc2626' };
+    c.innerHTML = `
+      <div style="margin-bottom:12px;"><button class="btn btn-sm" onclick="crmOpenTacheForm()">+ Nouvelle tâche</button></div>
+      ${taches.length ? taches.map(t => `
+        <div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;${t.statut === 'terminee' ? 'opacity:.55;' : ''}">
+          <input type="checkbox" ${t.statut === 'terminee' ? 'checked' : ''} onchange="crmToggleTache(${t.id}, this.checked)" style="margin-top:3px;">
+          <div style="flex:1;cursor:pointer;" onclick="crmOpenTacheForm(${t.id})">
+            <div style="font-weight:700;font-size:13.5px;${t.statut === 'terminee' ? 'text-decoration:line-through;' : ''}">${crmEsc(t.titre)}</div>
+            <div style="font-size:11.5px;color:var(--muted);">${t.date_echeance ? '📅 ' + t.date_echeance : ''}${t.contact_nom ? ' · 👤 ' + crmEsc(t.contact_prenom || '') + ' ' + crmEsc(t.contact_nom) : ''}</div>
+          </div>
+          <span style="width:8px;height:8px;border-radius:50%;background:${PRIORITE_COULEUR[t.priorite] || '#94a3b8'};margin-top:5px;flex-shrink:0;"></span>
+        </div>
+      `).join('') : '<p style="color:var(--muted);">Aucune tâche pour l’instant.</p>'}
+    `;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+async function crmToggleTache(id, done) {
+  try { await api('PUT', `/crm/taches/${id}`, { statut: done ? 'terminee' : 'a_faire' }); crmRenderTaches(); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function crmOpenTacheForm(id) {
+  let t = { titre: '', description: '', priorite: 'normale', date_echeance: '', contact_id: null };
+  if (id) { const { taches } = await api('GET', '/crm/taches'); t = taches.find(x => x.id === id) || t; }
+  if (!CRM_CONTACTS_CACHE.length) CRM_CONTACTS_CACHE = (await api('GET', '/crm/contacts')).contacts;
+  crmOpenModal(id ? '✏️ Modifier la tâche' : '➕ Nouvelle tâche', `
+    <div><label>Titre *</label><input id="crm-t-titre" value="${crmEsc(t.titre)}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+      <div><label>Priorité</label><select id="crm-t-priorite">${['basse', 'normale', 'haute', 'urgente'].map(p => `<option value="${p}" ${t.priorite === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+      <div><label>Échéance</label><input type="date" id="crm-t-date" value="${t.date_echeance || ''}"></div>
+    </div>
+    <div style="margin-top:10px;"><label>Lié à un contact</label><select id="crm-t-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${t.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select></div>
+    <div style="margin-top:10px;"><label>Description</label><textarea id="crm-t-desc" rows="3" style="width:100%;">${crmEsc(t.description || '')}</textarea></div>
+    <div style="display:flex;justify-content:space-between;margin-top:16px;">
+      ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteTache(${id})">🗑 Supprimer</button>` : '<span></span>'}
+      <button class="btn" onclick="crmSaveTache(${id || 'null'})">Enregistrer</button>
+    </div>
+  `);
+}
+async function crmSaveTache(id) {
+  const body = {
+    titre: document.getElementById('crm-t-titre').value.trim(),
+    priorite: document.getElementById('crm-t-priorite').value,
+    date_echeance: document.getElementById('crm-t-date').value || null,
+    contact_id: document.getElementById('crm-t-contact').value || null,
+    description: document.getElementById('crm-t-desc').value.trim(),
+  };
+  if (!body.titre) { alert('Le titre est requis.'); return; }
+  try {
+    if (id) await api('PUT', `/crm/taches/${id}`, body); else await api('POST', '/crm/taches', body);
+    crmCloseModal(); crmRefreshCurrentTab();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+}
+async function crmDeleteTache(id) {
+  if (!confirm('Supprimer cette tâche ?')) return;
+  try { await api('DELETE', `/crm/taches/${id}`); crmCloseModal(); crmRefreshCurrentTab(); } catch (e) { alert(e.message || 'Erreur.'); }
+}
+
+/* ── 📊 Statistiques — agrège les compteurs CRM ; ne fabrique aucun chiffre pour les modules
+   qui ont déjà leur propre tableau de bord détaillé (Campagnes, Événements) ── */
+async function crmRenderStats() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const d = await api('GET', '/crm/dashboard');
+    c.innerHTML = `
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card"><div class="num">${d.compteurs.contacts}</div><div class="label">Contacts</div></div>
+        <div class="stat-card"><div class="num">${d.compteurs.prospects}</div><div class="label">Prospects actifs</div></div>
+        <div class="stat-card"><div class="num">${d.compteurs.opportunites}</div><div class="label">Opportunités en cours</div></div>
+        <div class="stat-card"><div class="num">${d.compteurs.demandes}</div><div class="label">Demandes</div></div>
+      </div>
+      <p style="margin-top:16px;color:var(--muted);font-size:13px;">
+        Pour le détail par campagne ou par événement, ouvrez l'onglet <a href="#" onclick="crmSwitchTab('campagnes');return false;">📢 Campagnes</a> ou
+        <a href="#" onclick="crmSwitchTab('evenements');return false;">🎟️ Événements</a> — chacun affiche déjà ses propres statistiques détaillées.
+      </p>`;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+
+/* ── ⚙️ Paramètres — volontairement minimal (pas d'options non demandées en v1) ── */
+function crmRenderParametres() {
+  const c = document.getElementById('crm-tab-content');
+  c.innerHTML = `
+    <div class="card" style="padding:20px;">
+      <h4 style="margin-top:0;">⚙️ Paramètres</h4>
+      <p style="color:var(--muted);font-size:13px;">Les statuts du pipeline, les catégories de contacts et les tags sont pour l'instant fixes — configurables ici dans une prochaine version, au fil des besoins réels.</p>
+    </div>`;
+}
+</script>
 </body>
 </html>
 

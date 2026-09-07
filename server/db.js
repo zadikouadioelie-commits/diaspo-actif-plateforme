@@ -4302,8 +4302,8 @@ db.exec(`
   const insT = db.prepare(`INSERT OR IGNORE INTO accred_tarifs
     (accred_id,role,type_tarif,montant,devise,validation_admin,reduction_annuelle_pct) VALUES (?,?,?,?,?,?,?)`);
   insD.run('initiative_abonne','Initiative Abonnée','⭐',
-    "Abonnement qui débloque le module paiement, la publicité, les événements, les business plans, les cotisations & adhésions, les votes sécurisés et la visibilité publique de la vitrine.",
-    JSON.stringify(['Module paiement (Stripe Connect)','Publicités','Événements','Business Plans','Cotisations & Adhésions','Votes sécurisés','Vitrine visible au public']),
+    "Abonnement qui débloque le module paiement, la publicité, les événements, les business plans, les cotisations & adhésions, les votes sécurisés et la visibilité publique de la boutique.",
+    JSON.stringify(['Module paiement (Stripe Connect)','Publicités','Événements','Business Plans','Cotisations & Adhésions','Votes sécurisés','Boutique visible au public']),
     '#c8960c','#fffbeb','#f2c94c','#8a6400','compte_initiative', 1);
   const { id } = db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
   insR.run(id,'initiative','automatique');
@@ -6820,6 +6820,135 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+`);
+
+/* ═══════════════════════════════════════════════
+   MODULE CRM (comptes Initiative) — Tables (2026-09-07)
+   ═══════════════════════════════════════════════
+   Un seul module CRM, plusieurs sous-modules internes. Pas de duplication de ce qui existe
+   déjà (produits_vitrine, events, publicites, conversations/messages, devis_demandes) — ces
+   4 tables ne couvrent QUE ce qui n'a nulle part d'équivalent : un carnet de contacts propre
+   à l'initiative, un statut de pipeline commercial, des opportunités chiffrées, et des tâches.
+   Toutes rattachées à initiative_id (même convention que produits_vitrine/catalogues_vitrine),
+   jamais à owner_user_id directement — la vérification de propriété se fait en resolvant
+   l'initiative de l'utilisateur connecté, exactement comme pour la vitrine/les produits. */
+db.exec(`
+  /* Carnet de contacts du CRM. linked_user_id (optionnel) rattache un contact à un compte
+     Diaspo'Actif existant quand on le connaît, pour ne PAS dupliquer son profil (nom/ville/
+     photo restent lus depuis users si linked_user_id est renseigné — voir server/index.js) ;
+     un contact "externe" (jamais inscrit) n'a que les champs saisis ici. Distincte à dessein
+     de adhesion_membres (couplée aux cotisations) et listes_diffusion_contacts (carnet
+     d'adresses minimal, sans société/notes/relation) — aucune des deux ne convient à un
+     usage commercial générique. */
+  CREATE TABLE IF NOT EXISTS crm_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    linked_user_id INTEGER,
+    nom TEXT NOT NULL,
+    prenom TEXT,
+    email TEXT,
+    telephone TEXT,
+    ville TEXT,
+    pays TEXT,
+    societe TEXT,
+    fonction TEXT,
+    relation TEXT NOT NULL DEFAULT 'autre' CHECK(relation IN ('prospect','client','partenaire','autre')),
+    notes TEXT,
+    source TEXT,
+    devis_demande_id INTEGER,
+    tags_json TEXT DEFAULT '[]',
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(linked_user_id) REFERENCES users(id),
+    FOREIGN KEY(created_by) REFERENCES users(id)
+  );
+
+  /* Statut d'un contact dans le tunnel commercial (sous-module "🎯 Prospects", vues Tableau/
+     Kanban) — UNE ligne par contact (UNIQUE), pas un historique : déplacer un prospect entre
+     colonnes du kanban MET À JOUR sa ligne, il ne s'agit pas de dupliquer contact+prospect en
+     deux fiches séparées (décision actée avec l'utilisateur, 2026-09-07). */
+  CREATE TABLE IF NOT EXISTS crm_pipeline (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id INTEGER NOT NULL UNIQUE,
+    initiative_id INTEGER NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'nouveau' CHECK(statut IN ('nouveau','contacte','interesse','devis_envoye','negociation','gagne','perdu')),
+    valeur_potentielle REAL,
+    devise TEXT DEFAULT 'EUR',
+    produit_service TEXT,
+    derniere_interaction_at TEXT,
+    prochaine_action TEXT,
+    prochaine_action_date TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(contact_id) REFERENCES crm_contacts(id) ON DELETE CASCADE,
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+
+  /* Opportunité commerciale (sous-module "💼 Opportunités") — plus détaillée qu'une entrée de
+     pipeline, liaisons optionnelles vers les modules déjà existants plutôt que dupliquer leurs
+     données (produit, événement, demande de devis, campagne). Nom volontairement différent de
+     la table "opportunites" déjà existante (veille stratégique réservée aux collectivités,
+     server/db.js:936 — aucun rapport, même mot mais domaine totalement différent). */
+  CREATE TABLE IF NOT EXISTS crm_opportunites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    contact_id INTEGER,
+    titre TEXT NOT NULL,
+    valeur REAL,
+    devise TEXT DEFAULT 'EUR',
+    statut TEXT NOT NULL DEFAULT 'nouveau' CHECK(statut IN ('nouveau','contacte','interesse','devis_envoye','negociation','gagne','perdu')),
+    probabilite INTEGER DEFAULT 50,
+    date_prevue TEXT,
+    prochaine_action TEXT,
+    notes TEXT,
+    lie_produit_id INTEGER,
+    lie_event_id INTEGER,
+    lie_devis_demande_id INTEGER,
+    lie_campagne_id INTEGER,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(contact_id) REFERENCES crm_contacts(id) ON DELETE SET NULL,
+    FOREIGN KEY(lie_produit_id) REFERENCES produits_vitrine(id) ON DELETE SET NULL,
+    FOREIGN KEY(lie_event_id) REFERENCES events(id) ON DELETE SET NULL,
+    FOREIGN KEY(lie_campagne_id) REFERENCES publicites(id) ON DELETE SET NULL,
+    FOREIGN KEY(created_by) REFERENCES users(id)
+  );
+
+  /* Tâches professionnelles (sous-module "📋 Tâches") — aucun système générique équivalent
+     ailleurs sur la plateforme (deal_tasks est scopé aux espaces "Deal" inter-initiatives,
+     agenda_reminders aux événements d'agenda, reunion_decisions aux comptes-rendus de
+     réunion — confirmé avant construction). Liens optionnels vers les autres sous-modules
+     CRM, jamais de duplication de leurs champs. */
+  CREATE TABLE IF NOT EXISTS crm_taches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    titre TEXT NOT NULL,
+    description TEXT,
+    priorite TEXT NOT NULL DEFAULT 'normale' CHECK(priorite IN ('basse','normale','haute','urgente')),
+    statut TEXT NOT NULL DEFAULT 'a_faire' CHECK(statut IN ('a_faire','en_cours','terminee','annulee')),
+    date_echeance TEXT,
+    heure_echeance TEXT,
+    rappel_envoye INTEGER DEFAULT 0,
+    contact_id INTEGER,
+    opportunite_id INTEGER,
+    devis_demande_id INTEGER,
+    event_id INTEGER,
+    campagne_id INTEGER,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(contact_id) REFERENCES crm_contacts(id) ON DELETE SET NULL,
+    FOREIGN KEY(opportunite_id) REFERENCES crm_opportunites(id) ON DELETE SET NULL,
+    FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE SET NULL,
+    FOREIGN KEY(campagne_id) REFERENCES publicites(id) ON DELETE SET NULL,
+    FOREIGN KEY(created_by) REFERENCES users(id)
   );
 `);
 
