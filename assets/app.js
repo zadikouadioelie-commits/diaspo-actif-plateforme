@@ -1011,13 +1011,12 @@ function showIdentityReminderModal() {
 }
 
 /* ── Liaison de comptes — indicateur/bascule permanents (Étape 7) ──
-   Widget volontairement scopé aux 4 dashboards (décision actée avec l'utilisateur) : les
-   pages publiques n'affichent pas ce sélecteur. N'apparaît que si l'utilisateur a au moins
-   un autre compte relié — reste invisible (aucune requête réseau superflue au-delà du GET
-   initial) pour l'immense majorité des comptes qui n'ont rien lié. */
-function surDashboardLiaison() {
-  return Object.values(ROLE_DASHBOARD).some(p => location.pathname.endsWith(p));
-}
+   Initialement scopé aux seuls dashboards (surDashboardLiaison()) ; étendu le 2026-09-08 à
+   TOUTE page authentifiée sur demande explicite — le bouton de bascule doit être accessible
+   partout où la topbar existe, pas seulement depuis le tableau de bord. N'apparaît que si
+   l'utilisateur a au moins un autre compte relié (comptes.length<=1 ci-dessous) — reste
+   invisible pour l'immense majorité des comptes qui n'ont rien lié, un seul GET /comptes-lies
+   étant de toute façon nécessaire pour le savoir. */
 function injectComptesLiesSwitcherStyles() {
   if (document.getElementById("cl-switch-style")) return;
   const st = document.createElement("style");
@@ -1039,7 +1038,6 @@ function injectComptesLiesSwitcherStyles() {
   document.head.appendChild(st);
 }
 async function initComptesLiesSwitcher(user) {
-  if (!surDashboardLiaison()) return;
   let comptes;
   try {
     const r = await api('GET', '/comptes-lies');
