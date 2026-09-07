@@ -38999,7 +38999,12 @@ route('DELETE', '/api/recensement-declarations/:id', async (req, res, params) =>
   /* Suppression contrôlée par la personne concernée — le créateur du recensement ne peut pas
      l'empêcher (§19/§20) : aucune vérification du côté "créateur" ici, volontairement. */
   await db.prepare("UPDATE recensement_declarations SET supprime_le=datetime('now'), reponses_json='{}', match_nom=NULL, match_prenom=NULL, match_date_naissance=NULL, match_email=NULL WHERE id=?").run(decl.id);
-  await db.prepare("UPDATE recensements SET nb_declarations=MAX(0,nb_declarations-1) WHERE id=?").run(decl.recensement_id);
+  /* CASE plutôt que MAX(0,x) : MAX() est un agrégat sur des LIGNES en PostgreSQL, pas une
+     fonction scalaire à 2 arguments comme en SQLite (bug trouvé en testant en conditions
+     réelles en production — 500 sur cette route) ; GREATEST() marcherait côté PostgreSQL
+     mais casserait le développement local (SQLite ne le connaît pas). CASE est portable à
+     l'identique sur les deux bases, sans dépendre d'une traduction de requête. */
+  await db.prepare("UPDATE recensements SET nb_declarations=(CASE WHEN nb_declarations>0 THEN nb_declarations-1 ELSE 0 END) WHERE id=?").run(decl.recensement_id);
   sendJSON(res, 200, { ok: true });
 });
 
