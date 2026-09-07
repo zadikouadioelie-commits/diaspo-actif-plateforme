@@ -78,6 +78,12 @@
     </div>
 
     <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="font-size:14px;margin:0 0 6px;">🔔 Notifications sur mon téléphone</h3>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Recevez une notification directement sur cet appareil dès qu'il se passe quelque chose sur votre compte (message, réponse, invitation…). Sur iPhone, ajoutez d'abord Diaspo'Actif à votre écran d'accueil (voir ci-dessus) — Apple l'exige avant d'autoriser les notifications.</p>
+      <div id="push-pref-zone"></div>
+    </div>
+
+    <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
       <h3 style="color:#dc2626;font-size:14px;margin:0 0 6px;">⚠️ Zone de danger</h3>
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p>
       <button class="btn-ico" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;padding:8px 16px;" onclick="openDeleteAccountModal()">🙈 Masquer mon compte</button>
@@ -259,6 +265,83 @@
     };
   }
   render();
+})();
+
+/* ── Notifications push (2026-09-07) — voir server/push.js pour l'envoi, sw.js pour la
+   réception. Contrairement au raccourci PWA ci-dessus (réglage de COMPTE), un abonnement
+   push est lié À CET APPAREIL précis : l'état affiché ici ne concerne que le navigateur
+   actuellement ouvert, pas les autres appareils du compte. */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+(async function initPushPrefZone(){
+  const zone = document.getElementById('push-pref-zone');
+  if (!zone) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    zone.innerHTML = `<p style="font-size:13px;color:var(--muted);margin:0;">Votre navigateur ne prend pas en charge les notifications push.</p>`;
+    return;
+  }
+
+  function renderState(state, msg) {
+    const configs = {
+      actif:    { label: '🔔 Notifications activées sur cet appareil.', btn: '🔕 Désactiver', action: 'off' },
+      inactif:  { label: msg || '🔕 Notifications non activées sur cet appareil.', btn: '🔔 Activer les notifications', action: 'on' },
+      refuse:   { label: '🚫 Notifications bloquées pour ce site dans les réglages de votre navigateur.', btn: null, action: null },
+    };
+    const c = configs[state];
+    zone.innerHTML = `<p style="font-size:13px;color:#374151;margin:0 0 10px;">${c.label}</p>` +
+      (c.btn ? `<button class="btn-ico" id="push-pref-btn" style="padding:8px 16px;">${c.btn}</button>` : '');
+    const btn = document.getElementById('push-pref-btn');
+    if (btn) btn.onclick = () => (c.action === 'on' ? activerPush(btn) : desactiverPush(btn));
+  }
+
+  async function activerPush(btn) {
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      if (Notification.permission === 'denied') { renderState('refuse'); return; }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') { renderState('inactif', "Autorisation refusée — vous pourrez réessayer plus tard."); return; }
+      const { publicKey } = await api('GET', '/push/vapid-public-key');
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      await api('POST', '/push/subscribe', { subscription: subscription.toJSON() });
+      renderState('actif');
+    } catch (e) {
+      alert(e.message || "Impossible d'activer les notifications.");
+      renderState('inactif');
+    }
+  }
+
+  async function desactiverPush(btn) {
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.getSubscription();
+      if (subscription) {
+        await api('POST', '/push/unsubscribe', { endpoint: subscription.endpoint });
+        await subscription.unsubscribe();
+      }
+      renderState('inactif');
+    } catch (e) {
+      alert(e.message || "Erreur.");
+    }
+  }
+
+  try {
+    if (Notification.permission === 'denied') { renderState('refuse'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const subscription = await reg.pushManager.getSubscription();
+    renderState(subscription ? 'actif' : 'inactif');
+  } catch (e) {
+    zone.innerHTML = `<p style="font-size:13px;color:var(--muted);margin:0;">Notifications indisponibles sur cet appareil.</p>`;
+  }
 })();
 
 /* Vérification d'identité (Stripe Identity) — comptes Utilisateur ET responsables d'Initiative.

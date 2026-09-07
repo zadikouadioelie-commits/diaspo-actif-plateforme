@@ -634,6 +634,21 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
+  /* Notifications push téléphone (Web Push, 2026-09-07) — un compte peut avoir plusieurs
+     abonnements (plusieurs appareils/navigateurs). endpoint UNIQUE : ré-abonner le même
+     appareil ne crée jamais de doublon (INSERT OR IGNORE plus bas). Aucune donnée de
+     paiement/carte ici — uniquement les clés publiques nécessaires au protocole Web Push. */
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS evenements_participants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     evenement_id INTEGER NOT NULL,

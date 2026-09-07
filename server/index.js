@@ -15335,6 +15335,9 @@ async function creerNotif(userId, type, titre, contenu, data = {}) {
   try {
     await db.prepare("INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES (?,?,?,?,?)").run(userId, type, titre, contenu, JSON.stringify(data));
   } catch (e) { /* silencieux */ }
+  /* Push téléphone (2026-09-07) — un seul point de branchement pour les 200+ appels
+     existants à creerNotif(), voir server/push.js. Best-effort, jamais bloquant. */
+  try { require("./push").envoyerPush(userId, { titre, contenu, data }); } catch (_) {}
 }
 
 /* Notifie tous les abonnés d'une vitrine (initiative), sauf les user_id exclus (ex: déjà notifiés) */
@@ -16878,6 +16881,41 @@ route("POST", "/api/notifications/lire-tout", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   await db.prepare("UPDATE notifications SET lue=1 WHERE user_id=?").run(user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---------- Notifications push téléphone (Web Push, 2026-09-07) ----------
+   Clé publique servie par API plutôt que codée en dur côté front : une seule source de
+   vérité (la variable d'environnement), pas de risque de désynchronisation si la clé
+   change un jour. Pas de garde de connexion : une page publique peut vouloir l'afficher
+   avant que l'utilisateur se connecte (non utilisé aujourd'hui, mais rien ne l'empêche). */
+route("GET", "/api/push/vapid-public-key", async (req, res) => {
+  const { VAPID_PUBLIC_KEY } = require("./push");
+  if (!VAPID_PUBLIC_KEY) return sendJSON(res, 503, { error: "Notifications push non configurées." });
+  sendJSON(res, 200, { publicKey: VAPID_PUBLIC_KEY });
+});
+
+route("POST", "/api/push/subscribe", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const sub = body && body.subscription;
+  if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+    return sendJSON(res, 400, { error: "Abonnement invalide." });
+  }
+  /* Un même appareil qui se réabonne après une connexion sous un AUTRE compte (poste
+     partagé) doit basculer vers le nouveau compte, pas rester lié à l'ancien. */
+  await db.prepare("DELETE FROM push_subscriptions WHERE endpoint=? AND user_id<>?").run(sub.endpoint, user.id);
+  await db.prepare("INSERT OR IGNORE INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent) VALUES (?,?,?,?,?)")
+    .run(user.id, sub.endpoint, sub.keys.p256dh, sub.keys.auth, (req.headers["user-agent"] || "").slice(0, 300));
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/push/unsubscribe", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const endpoint = body && body.endpoint;
+  if (endpoint) await db.prepare("DELETE FROM push_subscriptions WHERE endpoint=? AND user_id=?").run(endpoint, user.id);
+  else await db.prepare("DELETE FROM push_subscriptions WHERE user_id=?").run(user.id);
   sendJSON(res, 200, { ok: true });
 });
 
