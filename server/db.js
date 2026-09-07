@@ -1450,6 +1450,9 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // E-mail de bienvenue "Sceau" (Initiative/Utilisateur, 2026-09-07) — horodatage pour
+  // déclencher une fois par compte (création ET rattrapage rétroactif), jamais deux fois.
+  ["users", "bienvenue_envoyee_at TEXT"],
   // Formations — ajout du niveau Chapitre entre Module et Leçon
   ["formation_lecons", "chapitre_id INTEGER"],
   // Formations — permission de téléchargement par ressource + nombre de pages (PDF)
@@ -2052,6 +2055,12 @@ const MIGRATIONS = [
   // demande.
   ["recensements", "image_url TEXT"],
   ["recensements", "suppression_prevue_le TEXT"],
+  // Gel administratif (module Observatoire Recensement) — même principe : ORTHOGONAL au
+  // `statut` existant, jamais de nouvelle valeur dans son CHECK. gele_le non NULL bloque les
+  // nouvelles déclarations et le retire de la liste publique, sans toucher au statut propre
+  // du créateur (actif/suspendu/...), qui reprend son cours normal dès le dégel.
+  ["recensements", "gele_le TEXT"],
+  ["recensements", "gele_motif TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

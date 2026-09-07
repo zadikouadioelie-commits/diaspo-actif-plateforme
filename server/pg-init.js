@@ -385,6 +385,9 @@ async function pgInit() {
 /* Liste unique des colonnes attendues — partagee entre la migration et le controle
    post-deploiement, pour qu'elles ne puissent jamais diverger. */
 const COLONNES_MIGRATION = [
+    /* E-mail de bienvenue "Sceau" (Initiative/Utilisateur, 2026-09-07) — miroir exact de
+       l'ALTER db.js, voir le commentaire équivalent là-bas. */
+    ['users', 'bienvenue_envoyee_at', 'TEXT'],
     /* Module d'affiliation Initiative → Utilisateur (2026-07-27) — miroir de l'ALTER db.js. */
     ['initiative_membres', 'message', 'TEXT'],
     /* Rencontres Diaspo'Actif — miroir de l'ALTER ajouté dans db.js. Sans cette ligne,
@@ -1101,6 +1104,9 @@ const COLONNES_MIGRATION = [
     // Recensement — image d'illustration + suppression differee 3 jours (miroir de l'ALTER db.js)
     ['recensements', 'image_url', 'TEXT'],
     ['recensements', 'suppression_prevue_le', 'TEXT'],
+    // Gel administratif (module Observatoire Recensement, miroir de l'ALTER db.js)
+    ['recensements', 'gele_le', 'TEXT'],
+    ['recensements', 'gele_motif', 'TEXT'],
     /* Module « Demander un devis » (2026-09-07) — miroir des deux entrées du tableau additif
        de server/db.js. La table devis_demandes n'a pas besoin d'entrée ici : createMissingTables()
        (plus haut dans ce fichier) parse dynamiquement les blocs db.exec(`CREATE TABLE...`) de

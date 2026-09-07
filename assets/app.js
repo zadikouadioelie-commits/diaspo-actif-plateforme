@@ -464,6 +464,7 @@ const NOTIF_ICONS = {
   cagnotte_fusion_proposee: "🔗",
   initiative_devenir_benevole: "🙋",
   initiative_devenir_partenaire: "🤝",
+  bienvenue: "🎉",
 };
 
 // Destinations pour les data.cta envoyés par certains types de notifications

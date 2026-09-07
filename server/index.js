@@ -606,10 +606,20 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification, email_verifie FROM users WHERE id = ?").get(id);
   const authTok = signAuthToken({ uid: id, role: user.role, cv: 1, exp: Math.floor(Date.now()/1000) + TOKEN_TTL }); // nouveau compte : credential_version démarre toujours à 1
 
-  // Email de bienvenue (non bloquant)
+  // Email de bienvenue + "Sceau" (non bloquant) + notification in-app (2026-09-07 : canal
+  // "les deux" demandé explicitement). Nom complet (prénom+nom), jamais le prénom seul.
   try {
     const { emailBienvenue } = require("./mailer");
-    emailBienvenue({ prenom: user.prenom || user.nom, email: user.email, role: user.role, nom_institution: nom_institution || null });
+    emailBienvenue({ prenom: user.prenom, nom: user.nom, email: user.email, role: user.role, nom_institution: nom_institution || null });
+    if (user.role === "initiative" || user.role === "utilisateur") {
+      const nomAffiche = [user.prenom, user.nom].filter(Boolean).join(" ") || user.email;
+      creerNotif(id, "bienvenue", "🎉 Bienvenue sur Diaspo'Actif !",
+        user.role === "initiative"
+          ? `Bonjour ${nomAffiche}, votre compte initiative « ${nom_institution || nom} » est prêt. Complétez votre vitrine pour développer votre visibilité.`
+          : `Bonjour ${nomAffiche}, découvrez les initiatives, les événements et développez votre réseau au sein de la diaspora.`,
+        { lien: user.role === "initiative" ? "dashboard-initiative.html" : "dashboard-utilisateur.html" });
+      db.prepare("UPDATE users SET bienvenue_envoyee_at=datetime('now') WHERE id=?").run(id).catch(() => {});
+    }
   } catch (_) {}
 
   // Email de vérification d'adresse (non bloquant — soft gate, ne bloque pas la connexion)
@@ -5176,7 +5186,7 @@ route("POST", "/api/accreditations/:type/payer", async (req, res, params, body) 
     if (reservationDA?.fraichementReserve) {
       try {
         if (calcule.avantage_da.fournisseur === 'code_adhesion_da') {
-          await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(calcule.avantage_da.code_id);
+          await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = (CASE WHEN nb_utilisations>0 THEN nb_utilisations-1 ELSE 0 END) WHERE id=?`).run(calcule.avantage_da.code_id);
           await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
         } else if (calcule.avantage_da.fournisseur === 'parrainage_initiative') {
           await db.prepare(`UPDATE parrainage_initiative_utilisations SET statut='annulee' WHERE id=?`).run(reservationDA.utilisationId);
@@ -12197,7 +12207,7 @@ route("DELETE", "/api/initiatives/:id/suivre", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const info = await db.prepare("DELETE FROM abonnements WHERE user_id = ? AND initiative_id = ?").run(user.id, params.id);
-  if (info.changes > 0) await db.prepare("UPDATE initiatives SET abonnes = MAX(0, abonnes - 1) WHERE id = ?").run(params.id);
+  if (info.changes > 0) await db.prepare("UPDATE initiatives SET abonnes = (CASE WHEN abonnes>0 THEN abonnes-1 ELSE 0 END) WHERE id = ?").run(params.id);
   sendJSON(res, 200, { ok: true, abonne: false });
 });
 
@@ -15895,7 +15905,7 @@ async function handleStripeWebhook(req, res) {
         "SELECT * FROM da_codes_utilisations WHERE accred_paiement_id=? AND statut='en_attente'"
       ).get(paiementId);
       if (utilisationAbandonnee) {
-        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = MAX(0, nb_utilisations - 1) WHERE id=?`).run(utilisationAbandonnee.code_id);
+        await db.prepare(`UPDATE da_codes_adhesion SET nb_utilisations = (CASE WHEN nb_utilisations>0 THEN nb_utilisations-1 ELSE 0 END) WHERE id=?`).run(utilisationAbandonnee.code_id);
         await db.prepare(`UPDATE da_codes_utilisations SET statut='annulee' WHERE id=?`).run(utilisationAbandonnee.id);
       }
       /* Compensation Parrainage Initiative : pas de compteur à restaurer (illimité), juste
@@ -27930,7 +27940,7 @@ ${jsonLd}
       if (check.error) return sendJSON(res, check.error.code, { error: check.error.msg });
       const { motif } = body || {};
       await db.prepare(`UPDATE tickets SET validation_manuelle_statut='refuse', statut='cancelled' WHERE id=?`).run(tid);
-      await db.prepare(`UPDATE ticket_types SET quantite_vendue=MAX(0,quantite_vendue-1) WHERE id=?`).run(ticket.ticket_type_id);
+      await db.prepare(`UPDATE ticket_types SET quantite_vendue=(CASE WHEN quantite_vendue>0 THEN quantite_vendue-1 ELSE 0 END) WHERE id=?`).run(ticket.ticket_type_id);
       creerNotif(ticket.user_id, 'billetterie_validation', 'Commande refusée', `Votre demande de billet pour « ${check.ev.titre} » n'a pas été retenue${motif ? ' : '+motif : '.'}`, { event_id: ticket.event_id });
       return sendJSON(res, 200, { ok: true });
     }
@@ -34740,6 +34750,66 @@ route("POST", "/api/admin/abonnements/backfill-officiel", async (req, res) => {
   });
 });
 
+/* Rattrapage rétroactif du "Sceau" de bienvenue (2026-09-07, demande explicite : cible = tous
+   les comptes Initiative/Utilisateur existants + nouveaux, canal = e-mail ET notification).
+   Idempotent par construction : chaque envoi marque bienvenue_envoyee_at, un second appel ne
+   renvoie donc jamais deux fois au même compte — sûr à relancer. `dryRun=1` (query string) ne
+   fait qu'un décompte, sans rien envoyer ni marquer : à utiliser en premier pour vérifier le
+   volume avant l'envoi réel. */
+route("POST", "/api/admin/bienvenue/rattrapage", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé." });
+  let dryRun = true;
+  try { dryRun = new URL(req.url, "http://x").searchParams.get("dryRun") !== "0"; } catch (_) {}
+  if (body && body.dryRun === false) dryRun = false;
+
+  // Exclusion explicite (déjà contacté personnellement par l'administrateur, 2026-09-07) —
+  // marquée même hors dry-run réel, pour qu'un futur rattrapage ne le sélectionne plus jamais.
+  if (!dryRun) {
+    await db.prepare("UPDATE users SET bienvenue_envoyee_at=datetime('now') WHERE LOWER(email)='mansare-aly@hotmail.fr' AND bienvenue_envoyee_at IS NULL").run();
+  }
+
+  const candidats = await db.prepare(`
+    SELECT id, nom, prenom, email, role FROM users
+    WHERE role IN ('utilisateur','initiative') AND bienvenue_envoyee_at IS NULL
+      AND LOWER(email) <> 'mansare-aly@hotmail.fr'
+  `).all();
+
+  if (dryRun) {
+    return sendJSON(res, 200, {
+      ok: true, dry_run: true, eligibles: candidats.length,
+      exemples: candidats.slice(0, 10).map(u => ({ id: u.id, nom: [u.prenom, u.nom].filter(Boolean).join(" "), email: u.email, role: u.role }))
+    });
+  }
+
+  const { emailBienvenue } = require("./mailer");
+  let envoyes = 0, erreurs = 0;
+  for (const u of candidats) {
+    try {
+      let nomInstitution = null;
+      if (u.role === "initiative") {
+        const init = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=? ORDER BY id DESC LIMIT 1").get(u.id);
+        nomInstitution = init ? init.nom : null;
+      }
+      await emailBienvenue({ prenom: u.prenom, nom: u.nom, email: u.email, role: u.role, nom_institution: nomInstitution });
+      const nomAffiche = [u.prenom, u.nom].filter(Boolean).join(" ") || u.email;
+      await creerNotif(u.id, "bienvenue", "🎉 Bienvenue sur Diaspo'Actif !",
+        u.role === "initiative"
+          ? `Bonjour ${nomAffiche}, votre compte initiative « ${nomInstitution || u.nom} » est prêt. Complétez votre vitrine pour développer votre visibilité.`
+          : `Bonjour ${nomAffiche}, découvrez les initiatives, les événements et développez votre réseau au sein de la diaspora.`,
+        { lien: u.role === "initiative" ? "dashboard-initiative.html" : "dashboard-utilisateur.html" });
+      await db.prepare("UPDATE users SET bienvenue_envoyee_at=datetime('now') WHERE id=?").run(u.id);
+      envoyes++;
+      // Espacement volontaire — éviter de heurter le rate-limit Resend sur un envoi massif.
+      await new Promise(r => setTimeout(r, 350));
+    } catch (e) {
+      erreurs++;
+      console.error("[bienvenue-rattrapage]", u.id, e.message);
+    }
+  }
+  sendJSON(res, 200, { ok: true, dry_run: false, eligibles: candidats.length, envoyes, erreurs });
+});
+
 /* GET /api/admin/accred/users — liste des accréditations attribuées */
 route("GET", "/api/admin/accred/users", async (req, res) => {
   const admin = await getCurrentUser(req);
@@ -39210,7 +39280,9 @@ route('GET', '/api/recensements', async (req, res, params, body, query) => {
     const rows = await db.prepare('SELECT * FROM recensements WHERE owner_user_id=? ORDER BY created_at DESC').all(user.id);
     return sendJSON(res, 200, { recensements: rows });
   }
-  const rows = await db.prepare("SELECT * FROM recensements WHERE statut='actif' ORDER BY created_at DESC LIMIT 200").all();
+  // gele_le : gel administratif, ORTHOGONAL au statut (voir Observatoire Recensement) — un
+  // recensement gelé disparaît de la liste publique même s'il reste 'actif' pour son créateur.
+  const rows = await db.prepare("SELECT * FROM recensements WHERE statut='actif' AND gele_le IS NULL ORDER BY created_at DESC LIMIT 200").all();
   sendJSON(res, 200, { recensements: rows });
 });
 
@@ -39219,7 +39291,7 @@ route('GET', '/api/recensements/:id', async (req, res, params) => {
   const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
   if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
   const estProprietaire = !!(user && user.id === rec.owner_user_id);
-  if (rec.statut !== 'actif' && !estProprietaire) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if ((rec.statut !== 'actif' || rec.gele_le) && !estProprietaire) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
   sendJSON(res, 200, {
     recensement: {
       ...rec,
@@ -39241,6 +39313,7 @@ route('POST', '/api/recensements/:id/declarations', async (req, res, params, bod
   const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
   if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
   if (rec.statut !== 'actif') return sendJSON(res, 400, { error: "Ce recensement n'accepte plus de déclarations." });
+  if (rec.gele_le) return sendJSON(res, 423, { error: "Ce recensement est temporairement gelé par l'administration et n'accepte plus de déclarations." });
 
   const estMineur = !!body.est_mineur;
   if (estMineur && !rec.mineurs_autorises) return sendJSON(res, 400, { error: "Ce recensement n'autorise pas les déclarations de personnes mineures." });
@@ -39549,6 +39622,84 @@ async function routeCronRecensementPurge(req, res) {
 }
 route('GET', '/api/cron/recensement-purge', routeCronRecensementPurge);
 route('POST', '/api/cron/recensement-purge', routeCronRecensementPurge);
+
+/* ── Observatoire Recensement (Super Administrateur) ────────────────────────────────────────
+   Aucune route existante ne donnait une vue transverse de TOUS les recensements, tous comptes
+   et tous statuts confondus : /api/recensements est cloisonnée par propriétaire (?mine=1) ou
+   restreinte aux 'actif' publiquement. Le gel est un état ADMINISTRATIF, orthogonal au statut
+   propre du créateur (brouillon/actif/suspendu/termine) — jamais de nouvelle valeur ajoutée à
+   son CHECK, comme pour suppression_prevue_le ci-dessus. */
+route('GET', '/api/admin/recensements', async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  if (user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux Administrateurs.' });
+  const rows = await db.prepare(`
+    SELECT r.*, i.nom AS initiative_nom, u.nom AS owner_nom, u.prenom AS owner_prenom, u.email AS owner_email
+    FROM recensements r
+    LEFT JOIN initiatives i ON i.id = r.initiative_id
+    LEFT JOIN users u ON u.id = r.owner_user_id
+    ORDER BY r.created_at DESC
+  `).all();
+  sendJSON(res, 200, { recensements: rows });
+});
+
+route('GET', '/api/admin/recensements/:id', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  if (user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux Administrateurs.' });
+  const rec = await db.prepare(`
+    SELECT r.*, i.nom AS initiative_nom, u.nom AS owner_nom, u.prenom AS owner_prenom, u.email AS owner_email
+    FROM recensements r
+    LEFT JOIN initiatives i ON i.id = r.initiative_id
+    LEFT JOIN users u ON u.id = r.owner_user_id
+    WHERE r.id=?
+  `).get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  const declarations = await db.prepare(
+    "SELECT id, est_mineur, identite_statut, created_at, supprime_le FROM recensement_declarations WHERE recensement_id=? ORDER BY created_at DESC LIMIT 500"
+  ).all(params.id);
+  sendJSON(res, 200, {
+    recensement: { ...rec, territoire: safeJSON(rec.territoire_json, {}) },
+    declarations,
+  });
+});
+
+route('POST', '/api/admin/recensements/:id/geler', async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  if (user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux Administrateurs.' });
+  const rec = await db.prepare('SELECT id, owner_user_id, nom, gele_le FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if (rec.gele_le) return sendJSON(res, 400, { error: 'Ce recensement est déjà gelé.' });
+  const motif = body?.motif ? String(body.motif).trim().slice(0, 500) : null;
+  await db.prepare("UPDATE recensements SET gele_le=datetime('now'), gele_motif=? WHERE id=?").run(motif, params.id);
+  try {
+    await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+      rec.owner_user_id, 'recensement_gele', 'Recensement gelé par l\'administration',
+      `Votre recensement « ${rec.nom} » a été temporairement gelé par l'administration${motif ? ' : ' + motif : '.'} Il n'accepte plus de nouvelles déclarations tant que le gel n'est pas levé.`,
+      JSON.stringify({ recensement_id: rec.id })
+    );
+  } catch (e) { await logError(e, 'recensement-geler-notification', req); }
+  sendJSON(res, 200, { ok: true });
+});
+
+route('POST', '/api/admin/recensements/:id/degeler', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  if (user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux Administrateurs.' });
+  const rec = await db.prepare('SELECT id, owner_user_id, nom, gele_le FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if (!rec.gele_le) return sendJSON(res, 400, { error: "Ce recensement n'est pas gelé." });
+  await db.prepare("UPDATE recensements SET gele_le=NULL, gele_motif=NULL WHERE id=?").run(params.id);
+  try {
+    await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+      rec.owner_user_id, 'recensement_degele', 'Recensement dégelé',
+      `Votre recensement « ${rec.nom} » n'est plus gelé et peut de nouveau recevoir des déclarations.`,
+      JSON.stringify({ recensement_id: rec.id })
+    );
+  } catch (e) { await logError(e, 'recensement-degeler-notification', req); }
+  sendJSON(res, 200, { ok: true });
+});
 
 /* ── Image d'illustration de la campagne (facultative) — même pattern d'upload que
    /api/upload/cagnotte (Bunny CDN via server/upload.js), owner-only. */
