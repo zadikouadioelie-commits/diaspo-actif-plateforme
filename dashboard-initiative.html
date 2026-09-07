@@ -3647,6 +3647,19 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
       </div>
 
+      <!-- PAYS CIBLE (2026-09-07, demande explicite) — distinct du champ "Pays" plus haut
+           (lieu physique de l'événement) : le ou les pays de la diaspora visée, pour que
+           l'événement remonte aussi sous le filtre "Tous pays" d'Événements Diaspo'Actif
+           pour ces pays-là, même s'il se déroule ailleurs. -->
+      <div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">🎯 Pays cible <span style="font-weight:400;color:var(--muted);">(facultatif)</span></div>
+      <p style="font-size:11.5px;color:var(--muted);margin:0 0 8px;">Précisez jusqu'à deux pays si l'événement s'adresse en priorité à une diaspora particulière (ex. France ou Côte d'Ivoire) — sinon laissez vide ou cliquez « Tout pays », il apparaîtra sous tous les filtres pays.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <input type="text" id="iev-origine1" value="${v(e?.origine1)}" placeholder="Ex : France" list="iev-pays-cible-dl" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;">
+        <input type="text" id="iev-origine2" value="${v(e?.origine2)}" placeholder="Ex : Côte d'Ivoire (facultatif)" list="iev-pays-cible-dl" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;">
+        <datalist id="iev-pays-cible-dl">${(typeof PAYS_LIST!=='undefined'?PAYS_LIST:[]).map(p=>`<option value="${p}">`).join('')}</datalist>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('iev-origine1').value='';document.getElementById('iev-origine2').value='';">🌍 Tout pays (retirer le ciblage)</button>
+
       <!-- CIBLE -->
       <div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#555;border-top:1px solid var(--border);padding-top:14px;">🎯 Cible</div>
       <div style="display:flex;flex-direction:column;gap:7px;" id="iev-cible-radios">
@@ -4141,6 +4154,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       fc_contact: document.getElementById('iev-fc-contact')?.value||null,
       fc_notes: document.getElementById('iev-fc-notes')?.value||null,
       whatsapp_lien: document.getElementById('iev-whatsapp-lien')?.value?.trim()||null,
+      origine1: document.getElementById('iev-origine1')?.value?.trim()||null,
+      origine2: document.getElementById('iev-origine2')?.value?.trim()||null,
       cible_type: cibleType,
       cible_liste_ids: cibleListes,
       programmed_at,

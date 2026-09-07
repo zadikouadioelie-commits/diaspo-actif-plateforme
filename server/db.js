@@ -1722,6 +1722,17 @@ const MIGRATIONS = [
   // publique de l'événement, ouvrant le lien de la chaîne/du groupe renseigné par
   // l'organisateur — simple lien à coller, même logique qu'inscription_lien_externe.
   ["events", "whatsapp_lien TEXT"],
+  // Pays cible / origine diaspora visée (2026-09-07, demande explicite) — jusqu'à deux pays,
+  // distincts du pays/lieu physique de l'événement (pays/ville déjà existants). Nommage
+  // origine1/origine2 aligné sur la convention déjà utilisée ailleurs sur la plateforme
+  // (users.origine1/origine2, initiatives.origine1/origine2). Côté `events` (module
+  // Billetterie), les deux colonnes sont nouvelles. Côté `evenements` (page publique),
+  // origine1 réutilise la colonne `origine` déjà existante (déjà écrite par le formulaire de
+  // création direct de evenements.html, champ "Origine (diaspora ciblée)") — seule origine2
+  // est réellement nouvelle, pour ne pas dupliquer un mécanisme équivalent sous deux noms.
+  ["events", "origine1 TEXT"],
+  ["events", "origine2 TEXT"],
+  ["evenements", "origine2 TEXT"],
   // Agenda events — lien source
   ["agenda_events", "source_type TEXT DEFAULT 'manuel'"],
   ["agenda_events", "source_id INTEGER"],

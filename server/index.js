@@ -17013,8 +17013,13 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
   let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
-  if (query.pays) rows = rows.filter(r => r.pays === query.pays);
-  if (query.origine) rows = rows.filter(r => r.origine === query.origine);
+  /* Filtre "🌍 Tous pays" (2026-09-07, demande explicite) — élargi pour matcher aussi les
+     pays cible (origine/origine2, la diaspora visée), pas seulement le pays où se déroule
+     physiquement l'événement : un événement en France ciblant la diaspora ivoirienne doit
+     remonter aussi sous le filtre "Côte d'Ivoire". Un événement sans pays cible renseigné
+     (origine1/2 vides) ne remonte que sous son propre pays physique, comme avant. */
+  if (query.pays) rows = rows.filter(r => r.pays === query.pays || r.origine === query.pays || r.origine2 === query.pays);
+  if (query.origine) rows = rows.filter(r => r.origine === query.origine || r.origine2 === query.origine);
   if (query.ville) { const v = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(v)); }
   if (query.type) rows = rows.filter(r => r.type_evt === query.type);
   /* Filtre par organisateur — alimente le module "Événements" de la vitrine. */
@@ -27532,6 +27537,10 @@ ${jsonLd}
       // Chaîne WhatsApp (2026-09-07) — même filet auto-réparateur.
       try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS whatsapp_lien TEXT`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol/whatsapp_lien]', e.message); }
+      // Pays cible / origine diaspora visée (2026-09-07) — origine1 réutilise la colonne
+      // `origine` déjà existante, seule origine2 nécessite ce filet.
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS origine2 TEXT`).run(); }
+      catch (e) { console.error('[ensureEvenementsSourceCol/origine2]', e.message); }
       global.__evenementsSourceColEnsured = true;
     }
     async function syncEvenementVersProgrammation(eventId) {
@@ -27576,6 +27585,7 @@ ${jsonLd}
           visibilite: 'public', inscription_ouverte: 1,
           lien_inscription: ev.inscription_lien_externe || null,
           statut: 'ouvert', prix_min: prixMin, whatsapp_lien: ev.whatsapp_lien || null,
+          origine: ev.origine1 || null, origine2: ev.origine2 || null,
         };
         const colonnes = Object.keys(champs);
         const valeurs = Object.values(champs);
@@ -27656,7 +27666,8 @@ ${jsonLd}
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
         fc_programme_fichier_url, fc_programme_fichier_nom,
         programmed_at, timezone, billetterie_config, inscription_lien_externe, whatsapp_lien,
-        rayon_publication, langue, mode_participation, region, departement, communaute
+        rayon_publication, langue, mode_participation, region, departement, communaute,
+        origine1, origine2,
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
       const ts = new Date().toISOString();
@@ -27684,8 +27695,8 @@ ${jsonLd}
          fc_resume,fc_objectifs,fc_public,fc_programme,fc_partenaires,fc_partenaires_ids,fc_contact,fc_notes,
          fc_programme_fichier_url,fc_programme_fichier_nom,
          programmed_at,timezone,inscription_lien_externe,whatsapp_lien,
-         rayon_publication,langue,mode_participation,region,departement,communaute)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+         rayon_publication,langue,mode_participation,region,departement,communaute,origine1,origine2)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
              capacite||0, categorie||'Général', coverImg, finalStatut, PLATFORM_COMMISSION_PCT, ts, ts,
              coverImg, galerie,
@@ -27698,7 +27709,7 @@ ${jsonLd}
              fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
              programmed_at||null, timezone||'Europe/Paris', inscription_lien_externe||null, whatsapp_lien||null,
              rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
-             region||null, departement||null, communaute||null)).lastInsertRowid;
+             region||null, departement||null, communaute||null, origine1||null, origine2||null)).lastInsertRowid;
       // Fixer publie_at et envoyer notifications si publication immédiate
       if (finalStatut === 'publie') {
         await db.prepare(`UPDATE events SET publie_at=datetime('now') WHERE id=?`).run(eid);
@@ -27741,7 +27752,8 @@ ${jsonLd}
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
         fc_programme_fichier_url, fc_programme_fichier_nom,
         programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config,
-        inscription_lien_externe, whatsapp_lien, langue, mode_participation, region, departement, communaute
+        inscription_lien_externe, whatsapp_lien, langue, mode_participation, region, departement, communaute,
+        origine1, origine2,
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
@@ -27776,6 +27788,7 @@ ${jsonLd}
         whatsapp_lien=COALESCE(?,whatsapp_lien),
         langue=COALESCE(?,langue), mode_participation=COALESCE(?,mode_participation),
         region=COALESCE(?,region), departement=COALESCE(?,departement), communaute=COALESCE(?,communaute),
+        origine1=COALESCE(?,origine1), origine2=COALESCE(?,origine2),
         statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
         .run(titre||null, description||null, pays||null, ville||null, adresse||null,
              date_debut||null, date_fin||null, capacite||null, categorie||null,
@@ -27792,6 +27805,7 @@ ${jsonLd}
              inscription_mode||null, nb_places!=null?Number(nb_places):null, liste_attente!=null?Number(liste_attente):null,
              rayon_publication||null, inscription_lien_externe||null, whatsapp_lien||null,
              langue||null, mode_participation||null, region||null, departement||null, communaute||null,
+             origine1||null, origine2||null,
              finalStatut, eid);
       // Fixer publie_at (première publication, ou rétroactivement si publie_at est null)
       if (finalStatut === 'publie') {

@@ -442,6 +442,10 @@ const COLONNES_MIGRATION = [
        même défaut que les 5 colonnes juste au-dessus : corrigé avant que ça casse en
        production (voir aussi le filet ensureEventGeoColumns() dans index.js). */
     ['events', 'whatsapp_lien', 'TEXT'],
+    // Pays cible / origine diaspora visée (2026-09-07) — miroir exact de l'ALTER db.js.
+    ['events', 'origine1', 'TEXT'],
+    ['events', 'origine2', 'TEXT'],
+    ['evenements', 'origine2', 'TEXT'],
     // evenements (module Programmation — moteur de priorité, table réellement utilisée par evenements.html)
     ['evenements', 'langue', "TEXT DEFAULT 'francais'"],
     ['evenements', 'mode_participation', "TEXT DEFAULT 'presentiel'"],

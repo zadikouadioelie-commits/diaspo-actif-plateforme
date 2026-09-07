@@ -379,7 +379,7 @@ function renderEvts() {
         <div class="evt-meta">
           ${evt.lieu ? '<span>📍 '+esc(evt.lieu)+'</span>' : ''}
           ${evt.pays ? '<span>🌍 '+esc(evt.pays)+'</span>' : ''}
-          ${evt.origine ? '<span>👥 Origine : '+esc(evt.origine)+'</span>' : ''}
+          ${evt.origine ? '<span>🎯 '+[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
           ${evt.prix_min ? '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>' : '<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>'}
@@ -796,6 +796,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.ville ? `<span>🏙️ ${esc(evt.ville)}</span>` : ''}
         ${evt.pays ? `<span>🌍 ${esc(evt.pays)}</span>` : ''}
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
+        ${evt.origine ? `<span class="evt-tag">🎯 ${[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')}</span>` : ''}
         ${evt.prix_min ? `<span class="evt-tag">💶 À partir de ${Number(evt.prix_min).toLocaleString('fr-FR')} €</span>` : `<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>`}
       </div>
       ${evt.description ? `<p style="font-size:14px;line-height:1.65;color:#444;margin:0 0 12px;">${mdBold(esc(evt.description))}</p>` : ''}
