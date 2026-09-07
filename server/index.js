@@ -18975,21 +18975,36 @@ route("DELETE", "/api/evenements/:id", async (req, res, params) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const row = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
-  if (row.owner_user_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const estAdmin = user.role === "administrateur";
+  if (row.owner_user_id !== user.id && !estAdmin) return sendJSON(res, 403, { error: "Accès refusé." });
+  /* L'administrateur peut passer outre le blocage sur de simples participants (aucun argent en
+     jeu) — 2026-09-08, demande explicite : « pouvoir supprimer tout type d'événement créé ».
+     Les billets PAYÉS restent en revanche protégés même pour l'admin (voir plus bas) : une
+     trace financière ne doit jamais disparaître silencieusement — suspendre l'événement puis
+     rembourser (POST /api/tickets/:id/refund) est le chemin prévu avant suppression. */
   const nbParticipants = (await db.prepare("SELECT COUNT(*) n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n || 0;
-  if (nbParticipants > 0) {
+  if (nbParticipants > 0 && !estAdmin) {
     return sendJSON(res, 400, { error: `Cet événement a déjà ${nbParticipants} participant(s) — contactez l'administration plutôt que de le supprimer, pour ne pas perdre cet historique.` });
   }
   if (row.source_events_id) {
     const billetsVendus = (await db.prepare("SELECT COUNT(*) n FROM tickets WHERE event_id=? AND payment_status='paid'").get(row.source_events_id))?.n || 0;
     const inscriptions = (await db.prepare("SELECT COUNT(*) n FROM event_inscriptions_securisees WHERE event_id=?").get(row.source_events_id))?.n || 0;
-    if (billetsVendus > 0 || inscriptions > 0) {
-      return sendJSON(res, 400, { error: `Cet événement a déjà ${billetsVendus} billet(s) vendu(s) et ${inscriptions} inscription(s) — fermez-le plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+    if (billetsVendus > 0) {
+      return sendJSON(res, 400, { error: `Cet événement a déjà ${billetsVendus} billet(s) vendu(s) — suspendez-le puis remboursez les billets avant de le supprimer, pour ne pas perdre l'historique financier.` });
     }
+    if (inscriptions > 0 && !estAdmin) {
+      return sendJSON(res, 400, { error: `Cet événement a déjà ${inscriptions} inscription(s) — contactez l'administration plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+    }
+    // Bypass admin avec inscriptions réelles : nettoyer les FK dépendantes avant de supprimer
+    // les lignes events/evenements elles-mêmes (contrainte FOREIGN KEY sinon violée).
+    if (inscriptions > 0) await db.prepare("DELETE FROM event_inscriptions_securisees WHERE event_id=?").run(row.source_events_id);
     await db.prepare("DELETE FROM ticket_types WHERE event_id=?").run(row.source_events_id);
     await db.prepare("DELETE FROM events WHERE id=?").run(row.source_events_id);
   }
+  // Bypass admin avec participants réels : même raison, nettoyer la FK dépendante d'abord.
+  if (nbParticipants > 0) await db.prepare("DELETE FROM evenements_participants WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM evenements WHERE id=?").run(params.id);
+  if (estAdmin) SEC.logSecurity('evenement_force_deleted_by_admin', { admin_id: user.id, evenement_id: params.id, avait_participants: nbParticipants });
   sendJSON(res, 200, { ok: true });
 });
 
@@ -27859,15 +27874,25 @@ ${jsonLd}
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
-      if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const estAdmin = me.role === 'administrateur';
+      if (ev.organisateur_id !== me.id && !estAdmin) return sendJSON(res, 403, { error: 'Accès refusé.' });
       const billetsVendus = (await db.prepare("SELECT COUNT(*) n FROM tickets WHERE event_id=? AND payment_status='paid'").get(eid))?.n || 0;
       const inscriptions = (await db.prepare("SELECT COUNT(*) n FROM event_inscriptions_securisees WHERE event_id=?").get(eid))?.n || 0;
-      if (billetsVendus > 0 || inscriptions > 0) {
-        return sendJSON(res, 400, { error: `Cet événement a déjà ${billetsVendus} billet(s) vendu(s) et ${inscriptions} inscription(s) — fermez-le plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+      /* L'administrateur peut passer outre le blocage sur les inscriptions (aucun argent en jeu),
+         mais PAS sur des billets réellement payés — 2026-09-08, demande explicite : suspendre
+         l'événement (POST /api/admin/events/:id/suspendre) puis rembourser
+         (POST /api/tickets/:id/refund) reste le chemin prévu avant suppression, pour ne jamais
+         faire disparaître une trace financière silencieusement. */
+      if (billetsVendus > 0) {
+        return sendJSON(res, 400, { error: `Cet événement a déjà ${billetsVendus} billet(s) vendu(s) — suspendez-le puis remboursez les billets avant de le supprimer, pour ne pas perdre l'historique financier.` });
+      }
+      if (inscriptions > 0 && !estAdmin) {
+        return sendJSON(res, 400, { error: `Cet événement a déjà ${inscriptions} inscription(s) — fermez-le plutôt que de le supprimer, pour ne pas perdre cet historique.` });
       }
       await db.prepare("DELETE FROM evenements WHERE source_events_id=?").run(eid);
       await db.prepare("DELETE FROM ticket_types WHERE event_id=?").run(eid);
       await db.prepare("DELETE FROM events WHERE id=?").run(eid);
+      if (estAdmin) SEC.logSecurity('event_force_deleted_by_admin', { admin_id: me.id, event_id: eid, avait_inscriptions: inscriptions });
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -29879,15 +29904,70 @@ ${jsonLd}
       return res.end('﻿' + csv);
     }
 
-    /* ── GET /api/admin/events ── */
+    /* ── GET /api/admin/events — TOUS les événements de la plateforme, quel que soit leur type
+       (2026-09-08, demande explicite : « pouvoir gérer/suspendre/supprimer tout type
+       d'événement créé »). Deux requêtes séparées plutôt qu'un UNION SQL : les tables
+       `events` (Billetterie) et `evenements` (créés directement sur la page publique, sans
+       billetterie) n'ont pas du tout le même schéma — un UNION forcerait à aligner des
+       colonnes incompatibles entre SQLite (local) et Postgres (prod). On exclut les
+       `evenements` déjà couvertes via `source_events_id` (sinon un même événement Billetterie
+       apparaîtrait deux fois : une fois comme `events`, une fois comme sa copie synchronisée). ── */
     if (req.method === 'GET' && pathname === '/api/admin/events') {
       const me = await getCurrentUser(req);
       if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
-      const events = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
+      const eventsBillet = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
         (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') nb_billets,
         (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') revenu
         FROM events e LEFT JOIN users u ON u.id=e.organisateur_id ORDER BY e.created_at DESC LIMIT 200`).all();
+      eventsBillet.forEach(e => { e.source_table = 'events'; });
+
+      const evenementsNatifs = await db.prepare(`SELECT ev.id, ev.titre, ev.date_evt AS date_debut, ev.pays, ev.ville,
+        ev.statut, ev.created_at, ev.owner_user_id AS organisateur_id, u.nom AS organisateur_nom,
+        (SELECT COUNT(*) FROM evenements_participants p WHERE p.evenement_id=ev.id) nb_participants
+        FROM evenements ev LEFT JOIN users u ON u.id=ev.owner_user_id
+        WHERE ev.source_events_id IS NULL ORDER BY ev.created_at DESC LIMIT 200`).all();
+      evenementsNatifs.forEach(e => { e.source_table = 'evenements'; e.nb_billets = 0; e.revenu = 0; });
+
+      const events = [...eventsBillet, ...evenementsNatifs]
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       return sendJSON(res, 200, { events });
+    }
+
+    /* ── POST /api/admin/events/:id/suspendre et /reactiver — gèle/dégèle un événement du
+       module Billetterie (admin uniquement). Réutilise directement le statut déjà vérifié par
+       POST /api/events/:id/buy (`WHERE statut='publie'`) : passer à 'suspendu' bloque donc
+       immédiatement toute nouvelle vente/collecte de fonds, sans toucher aux billets déjà
+       vendus. Le PUT /api/events/:id existant ferait la même chose, mais ces deux routes
+       dédiées évitent au dashboard admin de repasser par le formulaire complet d'édition. ── */
+    if (req.method === 'POST' && /^\/api\/admin\/events\/\d+\/(suspendre|reactiver)$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const eid = parseInt(pathname.split('/')[4]);
+      const suspendre = pathname.endsWith('/suspendre');
+      const ev = await db.prepare("SELECT id, statut FROM events WHERE id=?").get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      const nouveauStatut = suspendre ? 'suspendu' : 'publie';
+      await db.prepare("UPDATE events SET statut=?, updated_at=datetime('now') WHERE id=?").run(nouveauStatut, eid);
+      await syncEvenementVersProgrammation(eid);
+      SEC.logSecurity(suspendre ? 'event_suspended_by_admin' : 'event_reactivated_by_admin', { admin_id: me.id, event_id: eid });
+      return sendJSON(res, 200, { ok: true, statut: nouveauStatut });
+    }
+
+    /* ── POST /api/admin/evenements/:id/suspendre et /reactiver — même chose pour un événement
+       créé directement sur la page publique (table `evenements`, sans passer par la
+       Billetterie) : aucun PUT n'existe pour cette table (elle n'a jamais eu besoin d'édition
+       admin jusqu'ici), donc route dédiée plutôt que d'ajouter un PUT générique complet. ── */
+    if (req.method === 'POST' && /^\/api\/admin\/evenements\/\d+\/(suspendre|reactiver)$/.test(pathname)) {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé.' });
+      const eid = parseInt(pathname.split('/')[4]);
+      const suspendre = pathname.endsWith('/suspendre');
+      const row = await db.prepare("SELECT id FROM evenements WHERE id=?").get(eid);
+      if (!row) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      await db.prepare("UPDATE evenements SET statut=?, inscription_ouverte=? WHERE id=?")
+        .run(suspendre ? 'suspendu' : 'ouvert', suspendre ? 0 : 1, eid);
+      SEC.logSecurity(suspendre ? 'evenement_suspended_by_admin' : 'evenement_reactivated_by_admin', { admin_id: me.id, evenement_id: eid });
+      return sendJSON(res, 200, { ok: true });
     }
 
     /* ── GET /api/events/:id/financier — tableau de bord financier d'un événement ── */
