@@ -4368,6 +4368,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   const FI_STATUTS = { brouillon:'📝 Brouillon', ouvert:'🟢 Ouvert', ferme:'🔴 Fermé', archive:'🗄 Archivé' };
   const FI_TYPES = { evenement:'Événement', rencontre:'Rencontre', conference:'Conférence', formation:'Formation', networking:'Networking', forum:'Forum', projet:'Projet', initiative:'Initiative', autre:'Autre' };
 
+  /* esc() n'était définie NULLE PART dans ce fichier (bug pré-existant, signalé 2026-09-07 :
+     "Formulaires d'inscription" restait bloqué sur "Chargement…" indéfiniment). En cause :
+     tout appel à esc() ci-dessous levait un ReferenceError — y compris DANS le bloc catch
+     de chargerFormulairesInscription(), qui essayait d'afficher l'erreur avec esc(e.message)
+     et échouait donc lui-même silencieusement, sans jamais remplacer le "Chargement…" par
+     quoi que ce soit (ni le tableau, ni un message d'erreur lisible). */
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
   async function renderFormulairesInscription() {
     const el = document.getElementById('formulaires-inscription');
     el.innerHTML = `
@@ -9129,6 +9137,14 @@ async function initPremiumGates() {
     /* Paramètres Vitrine reste accessible sans Premium (voir renderStatutVitrineSection,
        bandeau d'avertissement) — badgeOnly : doré comme module premium, jamais verrouillé. */
     { href: '#parametres-vitrine', context: 'parametres_vitrine', badgeOnly: true },
+    /* Recensement : création réellement réservée aux Initiatives Abonné côté serveur
+       (hasAccreditation('initiative_abonne'), server/index.js ~39192) — verrouillage réel. */
+    { href: 'recensement.html', context: 'recensement', intercept: true },
+    /* Formulaires d'inscription : réservé côté serveur à l'administration et au compte
+       Diaspo'Actif Officiel (formulaireEstProteje, server/index.js ~17244), pas à
+       l'accréditation Premium — doré pour signaler un module à part, jamais verrouillé
+       par le modal Premium (qui promettrait un accès qu'un abonnement ne débloque pas). */
+    { href: '#formulaires-inscription', context: 'formulaires_inscription', badgeOnly: true },
   ];
   /* Modules dorés spécifiques à certains types — absents (ni socle, ni premium, ni expansion)
      pour les types non listés ici, donc masqués plutôt que simplement laissés non dorés. */
