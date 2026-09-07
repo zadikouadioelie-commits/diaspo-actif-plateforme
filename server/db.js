@@ -6592,6 +6592,75 @@ db.exec(`
     FOREIGN KEY(acheteur_id) REFERENCES users(id)
   );
 
+  /* ── Demandes de devis (2026-09-07) — module « 📩 Demander un devis » ──
+     Table dédiée plutôt que conversations/messages : conversations.user1_id/user2_id ET
+     messages.sender_id sont NOT NULL (FK vers users), donc structurellement incapables
+     d'accueillir un demandeur SANS compte. Cette table est la source de vérité pour TOUTE
+     demande (connectée ou invité) ; conversation_id n'est renseigné que pour un demandeur
+     connecté, où une vraie conversation (contexte='vitrine', même mécanique que le bouton
+     "Contacter le vendeur" existant) est créée en plus, pour que la messagerie existante reste
+     l'unique fil de discussion réel. produit_nom/produit_reference sont un instantané figé au
+     moment de la demande : la demande doit rester consultable même si le produit est ensuite
+     supprimé/désactivé (produit_id devient alors la seule trace, nullable à dessein).
+     statut : pas de contrainte CHECK — volontaire, voir STATUTS_DEVIS/STATUT_TRANSITIONS_DEVIS
+     dans server/index.js (même choix que STATUTS_PROJETS_DA, pour rester extensible sans
+     migration destructive, cf. cahier des charges point 7 et 22 : Devis → Commande → Facture
+     pourra s'ajouter plus tard en pure extension de ce tableau JS).
+     guest_access_token_hash : colonne réservée, INUTILISÉE en v1 — si un accès sécurisé direct
+     pour l'invité est construit plus tard, réutiliser exactement le mécanisme déjà éprouvé de
+     server/cagnotte-invitations.js (token aléatoire, seul le hash SHA-256 est stocké). */
+  CREATE TABLE IF NOT EXISTS devis_demandes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vitrine_id INTEGER NOT NULL,
+    produit_id INTEGER,
+    produit_nom TEXT NOT NULL,
+    produit_reference TEXT,
+    owner_id INTEGER NOT NULL,
+    conversation_id INTEGER,
+    requester_user_id INTEGER,
+    requester_first_name TEXT,
+    requester_last_name TEXT,
+    requester_email TEXT NOT NULL,
+    requester_phone TEXT,
+    quantity INTEGER,
+    desired_date TEXT,
+    description TEXT,
+    dimensions TEXT,
+    additional_information TEXT,
+    attachment_url TEXT,
+    attachment_nom TEXT,
+    extra_fields_json TEXT DEFAULT '{}',
+    statut TEXT DEFAULT 'nouvelle',
+    guest_access_token_hash TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(vitrine_id) REFERENCES initiatives(id),
+    FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id) ON DELETE SET NULL,
+    FOREIGN KEY(owner_id) REFERENCES users(id),
+    FOREIGN KEY(conversation_id) REFERENCES conversations(id),
+    FOREIGN KEY(requester_user_id) REFERENCES users(id)
+  );
+
+  /* Journal de réponses pour une demande de devis dont le demandeur N'A PAS de compte
+     (devis_demandes.conversation_id IS NULL). Ce n'est délibérément PAS un deuxième système
+     de messagerie : pas de liste de conversations, pas de lu/non-lu, pas de fil général — un
+     simple journal append-only propre à UNE demande, dont la seule raison d'être est de
+     combler l'absence de ligne users côté invité. Le parcours connecté n'y touche jamais :
+     il passe entièrement par messages/conversations existants. */
+  CREATE TABLE IF NOT EXISTS devis_reponses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    devis_demande_id INTEGER NOT NULL,
+    auteur_role TEXT NOT NULL CHECK(auteur_role IN ('owner','guest')),
+    auteur_user_id INTEGER,
+    contenu TEXT,
+    fichier_url TEXT,
+    fichier_nom TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(devis_demande_id) REFERENCES devis_demandes(id),
+    FOREIGN KEY(auteur_user_id) REFERENCES users(id)
+  );
+
+
   -- Avis clients sur une vitrine (un avis par utilisateur et par initiative)
   CREATE TABLE IF NOT EXISTS vitrine_avis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7225,6 +7294,12 @@ db.exec(`
   ["vitrine_avis", "reponse_texte TEXT"],
   ["vitrine_avis", "reponse_date TEXT"],
   ["publicites", "charte_acceptee_le TEXT"],
+  /* Module « Demander un devis » (2026-09-07) — devis_active : tri-état (NULL=hérite le
+     réglage de la vitrine, 1=forcé actif, 0=forcé inactif), voir server/index.js pour la
+     résolution. vitrine_devis_tel_requis : téléphone obligatoire ou non pour un demandeur
+     invité, réglable par vitrine. */
+  ["produits_vitrine", "devis_active INTEGER"],
+  ["initiatives", "vitrine_devis_tel_requis INTEGER DEFAULT 0"],
 ].forEach(([table, col]) => {
   const colName = col.split(" ")[0];
   try {
