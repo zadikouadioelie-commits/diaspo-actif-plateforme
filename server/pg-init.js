@@ -1098,6 +1098,19 @@ const COLONNES_MIGRATION = [
     ['users', 'credential_version', 'INTEGER NOT NULL DEFAULT 1'],
     // Module Administrateurs Junior — suspension manuelle (miroir de l'ALTER db.js)
     ['admin_junior_meta', 'suspendu', 'INTEGER DEFAULT 0'],
+    // Recensement — image d'illustration + suppression differee 3 jours (miroir de l'ALTER db.js)
+    ['recensements', 'image_url', 'TEXT'],
+    ['recensements', 'suppression_prevue_le', 'TEXT'],
+    /* Module « Demander un devis » (2026-09-07) — miroir des deux entrées du tableau additif
+       de server/db.js. La table devis_demandes n'a pas besoin d'entrée ici : createMissingTables()
+       (plus haut dans ce fichier) parse dynamiquement les blocs db.exec(`CREATE TABLE...`) de
+       db.js, seules les colonnes ajoutées via ALTER TABLE doivent être déclarées manuellement ici
+       pour que /api/admin/reparer-schema (et migratePg() au cold start) les appliquent. Bug
+       découvert le 2026-09-07 : sans cette entrée, reparerSchema() rapportait "rien à réparer"
+       tout en laissant la colonne durablement absente — même défaut de silence que celui déjà
+       documenté plus haut pour d'autres tables (demandes_contact). */
+    ['produits_vitrine', 'devis_active', 'INTEGER'],
+    ['initiatives', 'vitrine_devis_tel_requis', 'INTEGER DEFAULT 0'],
 ];
 
 async function migratePg(pool) {
