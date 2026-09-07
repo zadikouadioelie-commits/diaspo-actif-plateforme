@@ -1031,7 +1031,13 @@ function injectComptesLiesSwitcherStyles() {
    du color du parent (il applique le rendu "form control" du thème système) — en mode sombre
    système/navigateur, le nom du compte ressortait blanc sur le fond blanc du menu, illisible
    (signalé par capture d'écran). */
-.cl-switch-dd{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;color:#111;color-scheme:light;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);min-width:220px;padding:8px;z-index:2000;}
+/* position:fixed (coordonnées calculées en JS à l'ouverture, voir click sur cl-switch-btn) —
+   PAS absolute : .cl-switch-wrap est niché dans #auth-area/.topbar-right, qui devient
+   overflow-x:auto sous 768px (styles.v2.css, comportement mobile volontaire pour faire défiler
+   les icônes de la topbar) — un descendant position:absolute y est alors ROGNÉ par cet ancêtre
+   en overflow, invisible ou tronqué (signalé par capture d'écran : menu réduit à une fine
+   bande). position:fixed échappe à ce rognage, quel que soit l'ancêtre qui défile. */
+.cl-switch-dd{display:none;position:fixed;background:#fff;color:#111;color-scheme:light;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);min-width:220px;max-width:calc(100vw - 16px);padding:8px;z-index:2000;}
 .cl-switch-dd.open{display:block;}
 .cl-switch-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;padding:8px;border-radius:8px;cursor:pointer;font-size:13px;color:#111;}
 .cl-switch-item:hover:not(:disabled){background:#f3f4f6;}
@@ -1069,7 +1075,14 @@ async function initComptesLiesSwitcher(user) {
     e.stopPropagation();
     const open = dd.classList.contains('open');
     document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
-    if (!open) dd.classList.add('open');
+    if (!open) {
+      // Coordonnées calculées ici (position:fixed) plutôt qu'en CSS pur : voir le commentaire
+      // sur .cl-switch-dd (échappe au rognage par un ancêtre overflow-x:auto).
+      const r = btn.getBoundingClientRect();
+      dd.style.top = Math.round(r.bottom + 8) + 'px';
+      dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
+      dd.classList.add('open');
+    }
   });
   dd.addEventListener('click', async (e) => {
     const item = e.target.closest('.cl-switch-item');
@@ -1089,6 +1102,13 @@ document.addEventListener('click', e => {
     document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
   }
 });
+/* Le menu est en position:fixed (coordonnées figées à l'ouverture) : un défilement — y compris
+   celui, horizontal, de .topbar-right sur mobile — le laisserait visuellement détaché du
+   bouton. Capture:true : un scroll sur .topbar-right (ou tout autre conteneur) ne remonte pas
+   jusqu'à window via la bulle normale, seule la phase de capture le traverse. */
+window.addEventListener('scroll', () => {
+  document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
+}, true);
 
 async function applyAuthState() {
   const el = document.getElementById("auth-area");
