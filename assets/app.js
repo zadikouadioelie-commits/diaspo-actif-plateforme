@@ -1027,15 +1027,19 @@ function injectComptesLiesSwitcherStyles() {
    pages, blanc sur d'autres) — un fond transparent à opacité réduite s'y fondait trop. */
 .cl-switch-btn{background:linear-gradient(135deg,#c8960c,#f2c94c);border:none;cursor:pointer;color:#2a1e00;font-size:12px;font-weight:800;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;box-shadow:0 1px 4px rgba(0,0,0,.3);transition:transform .15s;}
 .cl-switch-btn:hover{transform:scale(1.1);}
-.cl-switch-dd{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;color:#111;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);min-width:220px;padding:8px;z-index:2000;}
+/* color-scheme:light + color explicite sur chaque item : un <button> n'hérite pas toujours
+   du color du parent (il applique le rendu "form control" du thème système) — en mode sombre
+   système/navigateur, le nom du compte ressortait blanc sur le fond blanc du menu, illisible
+   (signalé par capture d'écran). */
+.cl-switch-dd{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;color:#111;color-scheme:light;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);min-width:220px;padding:8px;z-index:2000;}
 .cl-switch-dd.open{display:block;}
-.cl-switch-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;padding:8px;border-radius:8px;cursor:pointer;font-size:13px;}
+.cl-switch-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;padding:8px;border-radius:8px;cursor:pointer;font-size:13px;color:#111;}
 .cl-switch-item:hover:not(:disabled){background:#f3f4f6;}
 .cl-switch-item:disabled{cursor:default;opacity:.55;}
 .cl-switch-avatar{width:26px;height:26px;border-radius:50%;overflow:hidden;flex:none;display:flex;align-items:center;justify-content:center;background:#e5e7eb;font-size:14px;}
 .cl-switch-avatar img{width:100%;height:100%;object-fit:cover;}
 .cl-switch-info{display:flex;flex-direction:column;line-height:1.3;}
-.cl-switch-nom{font-weight:700;}
+.cl-switch-nom{font-weight:700;color:#111;}
 .cl-switch-role{font-size:10.5px;color:#6b7280;}
 .cl-switch-manage{display:block;text-align:center;font-size:11.5px;font-weight:600;color:var(--navy,#0D2B4E);text-decoration:none;padding:8px 4px 2px;margin-top:4px;border-top:1px solid #e5e7eb;}`;
   document.head.appendChild(st);
