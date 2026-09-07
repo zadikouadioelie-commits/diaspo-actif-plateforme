@@ -18,6 +18,7 @@ async function uploadMedia(file, type = 'avatar') {
     post:        '/api/upload/post',
     produit:     '/api/upload/produit',
     cagnotte:    '/api/upload/cagnotte',
+    evenement:   '/api/upload/evenement',
     publication: '/api/upload/post',
     document:    '/api/upload/document'
   }[type] || '/api/upload/avatar';

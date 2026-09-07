@@ -3365,6 +3365,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   let initEvtEditingId = null;
   let initEvtCoverB64 = null, initEvtGallery = [null,null,null,null], initEvtPdfB64 = null, initEvtPdfNom = null;
   let initEvtPdfExtra = [], initEvtProgrammeFichierB64 = null, initEvtProgrammeFichierNom = null;
+  /* Malgré leur nom hérité (`...B64`), ces variables contiennent désormais des URL Bunny CDN
+     retournées par uploadMedia() — plus jamais du base64 embarqué dans le JSON de l'événement
+     (voir le correctif du 2026-09-07 : un PDF proche de 5 Mo faisait dépasser la taille de
+     requête acceptée par la plateforme, bouton "Enregistrement…" bloqué sans erreur visible).
+     Ce compteur empêche d'enregistrer l'événement tant qu'un envoi est encore en cours. */
+  let initEvtUploadsPending = 0;
 
   window.renderInitEvenements = async function renderInitEvenements() {
     const el = document.getElementById('evenements');
@@ -3751,60 +3757,86 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <button class="btn btn-orange" onclick="saveInitEvt()" id="iev-btn-save" style="min-width:180px;">${initEvtEditingId?'💾 Enregistrer les modifications':'✅ Créer l\'événement'}</button>
       </div>`;
 
-    // Listeners image couverture
+    // Listeners image couverture — envoyée immédiatement au CDN (voir correctif 2026-09-07,
+    // ievUploadsPending évite un "Créer l'événement" pendant qu'un envoi est encore en cours).
     document.getElementById('iev-cover-file').addEventListener('change', async ev => {
       const file = ev.target.files[0]; if(!file) return;
-      initEvtCoverB64 = await ievCompressImage(file, 1280, 720, 0.8);
       const drop = document.getElementById('iev-cover-drop');
-      drop.innerHTML = `<img src="${initEvtCoverB64}" style="max-height:100px;max-width:100%;border-radius:6px;object-fit:cover;" alt="">`;
+      drop.innerHTML = `<span style="font-size:13px;color:var(--muted);">⏳ Envoi en cours…</span>`;
+      initEvtUploadsPending++;
+      try {
+        const compressed = await compressImageFile(file, 1280, 720, 0.8);
+        initEvtCoverB64 = await uploadMedia(compressed, 'evenement');
+        drop.innerHTML = `<img src="${initEvtCoverB64}" style="max-height:100px;max-width:100%;border-radius:6px;object-fit:cover;" alt="">`;
+      } catch(err) {
+        showToast('Erreur envoi image : '+err.message,'error');
+        drop.innerHTML = `<div id="iev-cover-img-wrap"><span id="iev-cover-ph" style="font-size:13px;color:var(--muted);">📷 Cliquer pour choisir · JPG PNG WebP · max 2 Mo</span></div>`;
+      } finally { initEvtUploadsPending--; }
     });
     // Galerie
     for(let i=0;i<4;i++){
       document.getElementById('iev-gf-'+i).addEventListener('change', async ev => {
         const file = ev.target.files[0]; if(!file) return;
-        const b64 = await ievCompressImage(file,800,800,0.75);
-        initEvtGallery[i]=b64;
-        document.getElementById('iev-gi-'+i).src=b64; document.getElementById('iev-gi-'+i).style.display='';
-        document.getElementById('iev-gph-'+i).style.display='none'; document.getElementById('iev-gd-'+i).style.display='';
+        initEvtUploadsPending++;
+        try {
+          const compressed = await compressImageFile(file, 800, 800, 0.75);
+          const url = await uploadMedia(compressed, 'evenement');
+          initEvtGallery[i]=url;
+          document.getElementById('iev-gi-'+i).src=url; document.getElementById('iev-gi-'+i).style.display='';
+          document.getElementById('iev-gph-'+i).style.display='none'; document.getElementById('iev-gd-'+i).style.display='';
+        } catch(err) {
+          showToast('Erreur envoi photo : '+err.message,'error');
+        } finally { initEvtUploadsPending--; }
       });
     }
-    // PDF
+    // PDF — réutilise l'upload document déjà existant de la plateforme (jusqu'à 15 Mo, validé
+    // par en-tête réelle du fichier côté serveur), au lieu d'un base64 collé dans le JSON.
     const pdfFile = document.getElementById('iev-pdf-file');
-    if (pdfFile) pdfFile.addEventListener('change', ev => {
+    if (pdfFile) pdfFile.addEventListener('change', async ev => {
       const file = ev.target.files[0]; if(!file) return;
       if(file.size>5*1024*1024){showToast('PDF trop lourd (max 5 Mo).','warning');return;}
-      initEvtPdfNom=file.name;
-      const reader=new FileReader();
-      reader.onload=rv=>{initEvtPdfB64=rv.target.result;document.getElementById('iev-pdf-label').textContent='✅ '+file.name;};
-      reader.readAsDataURL(file);
+      document.getElementById('iev-pdf-label').textContent = '⏳ Envoi de « '+file.name+' »…';
+      initEvtUploadsPending++;
+      try {
+        initEvtPdfB64 = await uploadMedia(file, 'document');
+        initEvtPdfNom = file.name;
+        document.getElementById('iev-pdf-label').textContent='✅ '+file.name;
+      } catch(err) {
+        showToast('Erreur envoi PDF : '+err.message,'error');
+        document.getElementById('iev-pdf-label').textContent='Glisser ou cliquer pour choisir un PDF';
+      } finally { initEvtUploadsPending--; }
     });
     // PDF supplémentaires ("+ Ajouter un autre PDF")
     const pdfExtraFile = document.getElementById('iev-pdf-extra-file');
-    if (pdfExtraFile) pdfExtraFile.addEventListener('change', ev => {
+    if (pdfExtraFile) pdfExtraFile.addEventListener('change', async ev => {
       const file = ev.target.files[0]; if(!file) return;
       if(file.size>5*1024*1024){showToast('PDF trop lourd (max 5 Mo).','warning');return;}
-      const reader=new FileReader();
-      reader.onload=rv=>{
-        initEvtPdfExtra.push({ nom:file.name, url:rv.target.result });
-        document.getElementById('iev-pdf-extra-list').innerHTML = ievRenderPdfExtraListHTML();
-      };
-      reader.readAsDataURL(file);
       ev.target.value = '';
+      initEvtUploadsPending++;
+      try {
+        const url = await uploadMedia(file, 'document');
+        initEvtPdfExtra.push({ nom:file.name, url });
+        document.getElementById('iev-pdf-extra-list').innerHTML = ievRenderPdfExtraListHTML();
+      } catch(err) {
+        showToast('Erreur envoi PDF : '+err.message,'error');
+      } finally { initEvtUploadsPending--; }
     });
     // Pièce jointe du Programme / Déroulé
     const programmeFile = document.getElementById('iev-programme-fichier');
-    if (programmeFile) programmeFile.addEventListener('change', ev => {
+    if (programmeFile) programmeFile.addEventListener('change', async ev => {
       const file = ev.target.files[0]; if(!file) return;
       if(file.size>5*1024*1024){showToast('Fichier trop lourd (max 5 Mo).','warning');return;}
-      initEvtProgrammeFichierNom=file.name;
-      const reader=new FileReader();
-      reader.onload=rv=>{
-        initEvtProgrammeFichierB64=rv.target.result;
-        const lbl=document.getElementById('iev-programme-fichier-label');
-        lbl.style.display='';
+      const lbl=document.getElementById('iev-programme-fichier-label');
+      lbl.style.display=''; lbl.textContent='⏳ Envoi de « '+file.name+' »…';
+      initEvtUploadsPending++;
+      try {
+        initEvtProgrammeFichierB64 = await uploadMedia(file, 'document');
+        initEvtProgrammeFichierNom = file.name;
         lbl.innerHTML='✅ '+escH(file.name)+' <button type="button" onclick="ievRetirerProgrammeFichier()" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:12px;">✕ retirer</button>';
-      };
-      reader.readAsDataURL(file);
+      } catch(err) {
+        showToast('Erreur envoi fichier : '+err.message,'error');
+        lbl.style.display='none';
+      } finally { initEvtUploadsPending--; }
     });
     // Cible radio
     document.querySelectorAll('input[name="iev-cible"]').forEach(r=>{
@@ -4038,6 +4070,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   };
 
   window.saveInitEvt = async function() {
+    if(initEvtUploadsPending>0){showToast('Un fichier est encore en cours d\'envoi, patientez quelques secondes.','warning');return;}
     const titre = document.getElementById('iev-titre').value.trim();
     const debut = document.getElementById('iev-debut').value;
     if(!titre||!debut){showToast('Titre et date de début requis.','warning');return;}

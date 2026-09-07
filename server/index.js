@@ -1624,6 +1624,38 @@ route("POST", "/api/upload/produit", async (req, res) => {
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload produit")); }
 });
 
+/* POST /api/upload/evenement — image de couverture / galerie d'un événement Initiative.
+   Corrige un bug réel (2026-09-07) : ces images (+ le PDF de fiche conceptuelle) partaient
+   auparavant encodées en base64 DANS le JSON de POST /api/events, avec un PDF à lui seul
+   jusqu'à ~6,7 Mo une fois encodé (5 Mo annoncé côté formulaire) — au-delà de ce que la
+   plateforme accepte en un seul corps de requête JSON, d'où un bouton "Enregistrement…" qui
+   restait bloqué sans jamais afficher d'erreur claire. Simple stockage Bunny sans effet de
+   bord, sur le modèle exact de /api/upload/produit (branche image) — le PDF, lui, réutilise
+   directement /api/upload/document (déjà existant, jusqu'à 15 Mo, déjà utilisé ailleurs). */
+route("POST", "/api/upload/evenement", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["evenement"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format non valide (JPEG, PNG ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const url = await uploadToBunny(file.buffer, filename, "evenements");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "evenement", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload evenement")); }
+});
+
 /* POST /api/upload/cagnotte — image principale d'une cagnotte.
    Route manquante jusqu'ici (2026-08-18) : assets/upload-media.js appelait déjà
    pickAndUpload('cagnotte', ...), mais uploadMedia() n'avait pas d'entrée 'cagnotte' dans sa
