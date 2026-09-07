@@ -1022,8 +1022,11 @@ function injectComptesLiesSwitcherStyles() {
   const st = document.createElement("style");
   st.id = "cl-switch-style";
   st.textContent = `
-.cl-switch-btn{background:none;border:none;cursor:pointer;color:inherit;font-size:12px;padding:4px 6px;margin-left:-6px;opacity:.7;}
-.cl-switch-btn:hover{opacity:1;}
+/* Pastille dorée pleine (plutôt qu'un simple ▾ transparent hérité de la couleur du texte) :
+   le bouton doit rester repérable quel que soit le fond de la topbar (navy sur certaines
+   pages, blanc sur d'autres) — un fond transparent à opacité réduite s'y fondait trop. */
+.cl-switch-btn{background:linear-gradient(135deg,#c8960c,#f2c94c);border:none;cursor:pointer;color:#2a1e00;font-size:12px;font-weight:800;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;box-shadow:0 1px 4px rgba(0,0,0,.3);transition:transform .15s;}
+.cl-switch-btn:hover{transform:scale(1.1);}
 .cl-switch-dd{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;color:#111;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);min-width:220px;padding:8px;z-index:2000;}
 .cl-switch-dd.open{display:block;}
 .cl-switch-item{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;text-align:left;padding:8px;border-radius:8px;cursor:pointer;font-size:13px;}
