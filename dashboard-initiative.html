@@ -3425,6 +3425,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               ${e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="initPublishEvent(${e.id})">🟢 Publier</button>`:''}
               ${e.statut==='publie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="initCloseEvent(${e.id})">🔒 Fermer</button>`:''}
               <button class="btn btn-sm btn-outline" onclick="initShowEventFinancier(${e.id})">📊 Stats</button>
+              ${['publie','ferme'].includes(e.statut) ? `<button class="btn btn-sm btn-outline" onclick="initSyncVersDiaspoActif(${e.id})">📅 Ajouter à Événements Diaspo'Actif</button>` : ''}
               <button class="btn btn-sm btn-outline" onclick="initGererBillets(${e.id})" style="margin-left:auto;">🎟️ Gérer les billets</button>
             </div>
             <div id="fin-panel-${e.id}" style="display:none;margin-top:12px;"></div>
@@ -4390,6 +4391,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if(!confirm('Fermer les ventes pour cet événement ?')) return;
     try { await api('PUT','/events/'+id,{statut:'ferme'}); renderInitBilletterie(); }
     catch(e){alert('Erreur : '+e.message);}
+  };
+  /* Bouton par événement (2026-09-07, demande explicite) — utile pour un événement publié
+     avant la mise en place du pont Billetterie → Événements Diaspo'Actif, sans attendre un
+     rattrapage global côté administration. */
+  window.initSyncVersDiaspoActif = async function(id) {
+    try {
+      await api('POST', '/events/'+id+'/sync-evenements-diaspoactif');
+      alert("Ajouté à « Événements Diaspo'Actif » ✓");
+    } catch(e) { alert('Erreur : '+e.message); }
   };
 
   /* ══ SECTION CAGNOTTES — Phase 1 (création + gestion de base) ══ */

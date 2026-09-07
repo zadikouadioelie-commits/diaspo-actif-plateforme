@@ -27604,6 +27604,30 @@ ${jsonLd}
       return sendJSON(res, 200, { total_events_eligibles: events.length, synchronises: synced });
     }
 
+    /* ── POST /api/events/:id/sync-evenements-diaspoactif — bouton par événement (2026-09-07,
+       demande explicite : "ajouter un bouton (ajouter à événement diaspo'actif)"). Même
+       synchronisation que le rattrapage admin ci-dessus, mais pour UN seul événement, à
+       l'initiative du propriétaire lui-même — utile pour un événement publié avant le pont,
+       sans attendre que l'administrateur relance le rattrapage global. */
+    if (req.method === 'POST' && /^\/api\/events\/\d+\/sync-evenements-diaspoactif$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      if (!['publie', 'ferme'].includes(ev.statut)) {
+        return sendJSON(res, 400, { error: "Publiez d'abord l'événement pour pouvoir l'ajouter à \"Événements Diaspo'Actif\"." });
+      }
+      const organisateur = await db.prepare("SELECT role FROM users WHERE id=?").get(ev.organisateur_id);
+      if (!(organisateur && await estPremiumActif(ev.organisateur_id, organisateur.role))) {
+        return sendJSON(res, 400, { error: "Un abonnement Premium actif est nécessaire pour apparaître sur \"Événements Diaspo'Actif\"." });
+      }
+      await syncEvenementVersProgrammation(eid);
+      const ligne = await db.prepare("SELECT id FROM evenements WHERE source_events_id=?").get(eid);
+      if (!ligne) return sendJSON(res, 500, { error: "La synchronisation a échoué — réessayez, ou contactez l'administration." });
+      return sendJSON(res, 200, { ok: true });
+    }
+
     /* ── POST /api/events — créer un événement ── */
     if (req.method === 'POST' && pathname === '/api/events') {
       const me = await getCurrentUser(req);
