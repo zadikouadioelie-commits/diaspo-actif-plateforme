@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Recensement</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .rec-wrap{max-width:900px;margin:0 auto;padding:28px 16px 60px;}
+  .rec-hero{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;margin-bottom:22px;}
+  .rec-hero h1{margin:0 0 4px;font-size:23px;}
+  .rec-hero p{margin:0;color:var(--muted);font-size:13.5px;max-width:520px;}
+  .rec-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .rec-btn{border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .rec-btn-primary{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;}
+  .rec-btn-outline{background:var(--card);border:1.5px solid var(--border) !important;color:var(--text);}
+  .rec-btn-danger{background:#dc2626;color:#fff;}
+  .rec-btn:disabled{opacity:.55;cursor:default;}
+  .rec-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:16px;}
+  .rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+  .rec-campagne-card{cursor:pointer;transition:box-shadow .15s;}
+  .rec-campagne-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.08);}
+  .rec-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;}
+  .rec-badge-actif{background:#dcfce7;color:#166534;}
+  .rec-badge-brouillon{background:#f1f5f9;color:#64748b;}
+  .rec-badge-suspendu{background:#ffedd5;color:#9a3412;}
+  .rec-badge-termine{background:#e2e8f0;color:#334155;}
+  .rec-badge-verifie{background:#dcfce7;color:#166534;}
+  .rec-badge-en_cours{background:#dbeafe;color:#1e40af;}
+  .rec-badge-echec{background:#fee2e2;color:#991b1b;}
+  .rec-badge-non_verifie{background:#f1f5f9;color:#64748b;}
+  .rec-field{margin-bottom:14px;}
+  .rec-field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;}
+  .rec-field input,.rec-field select,.rec-field textarea{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;}
+  .rec-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:600px){.rec-row2{grid-template-columns:1fr;}}
+  .rec-stepper{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap;}
+  .rec-step-dot{flex:1;min-width:90px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding-bottom:8px;border-bottom:3px solid var(--border);}
+  .rec-step-dot.active{color:#2563EB;border-bottom-color:#2563EB;}
+  .rec-step-dot.done{color:#166534;border-bottom-color:#166534;}
+  .rec-champ-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .rec-champ-row:last-child{border-bottom:none;}
+  .rec-champ-nom{flex:1;font-size:13.5px;font-weight:600;}
+  .rec-champ-cat{font-size:11px;color:var(--muted);font-weight:400;}
+  .rec-toggle{position:relative;width:40px;height:22px;flex:none;}
+  .rec-toggle input{opacity:0;width:0;height:0;}
+  .rec-toggle-track{position:absolute;inset:0;background:var(--border);border-radius:99px;cursor:pointer;transition:background .15s;}
+  .rec-toggle-track::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .15s;}
+  .rec-toggle input:checked + .rec-toggle-track{background:#2563EB;}
+  .rec-toggle input:checked + .rec-toggle-track::before{transform:translateX(18px);}
+  .rec-oblig-chk{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);flex:none;white-space:nowrap;}
+  .rec-type-card{border:2px solid var(--border);border-radius:14px;padding:22px;text-align:center;cursor:pointer;transition:border-color .15s;}
+  .rec-type-card:hover{border-color:#2563EB;}
+  .rec-type-card .ic{font-size:38px;margin-bottom:10px;}
+  .rec-type-card h3{margin:0 0 8px;font-size:16px;}
+  .rec-type-card p{margin:0 0 14px;font-size:12.5px;color:var(--muted);line-height:1.5;}
+  .rec-msg{font-size:12.5px;margin-top:10px;padding:8px 12px;border-radius:8px;display:none;}
+  .rec-msg-ok{background:#dcfce7;color:#166534;display:block;}
+  .rec-msg-err{background:#fee2e2;color:#991b1b;display:block;}
+  .rec-stat-tile{background:var(--bg);border-radius:10px;padding:14px 16px;text-align:center;}
+  .rec-stat-tile .n{font-size:24px;font-weight:800;}
+  .rec-stat-tile .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+  .rec-empty{text-align:center;padding:50px 20px;color:var(--muted);}
+  .rec-resume-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;gap:16px;}
+  .rec-resume-row:last-child{border-bottom:none;}
+  .rec-resume-row .k{color:var(--muted);font-weight:600;flex:none;}
+  .rec-resume-row .v{text-align:right;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="recensement.html" class="active">📋 Recensement</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="rec-wrap" id="rec-wrap">
+    <div class="notice">Chargement…</div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/domaines-activite.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=11"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Module Recensement — front-end (2026-09-07), première version : un seul
+   type disponible ("denombrement"), architecture prête pour en ajouter
+   d'autres (RECENSEMENT_TYPES_UI ci-dessous, un seul tableau à étendre).
+   ══════════════════════════════════════════════════════════════════ */
+(function(){
+  const wrap = document.getElementById('rec-wrap');
+  const params = new URLSearchParams(location.search);
+  let moi = null;
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function nav(vue, extra){ const p = new URLSearchParams(); p.set('vue', vue); if (extra) Object.entries(extra).forEach(([k,v])=>p.set(k,v)); location.href = 'recensement.html?' + p.toString(); }
+
+  /* Jetons d'accès "sans compte" (un participant peut avoir plusieurs déclarations sur des
+     recensements différents) — stockés localement sur cet appareil, jamais envoyés ailleurs
+     qu'à notre propre API, jamais utilisés pour créer un compte Diaspo'Actif. */
+  function getTokens(){ try { return JSON.parse(localStorage.getItem('da_recensement_acces')||'{}'); } catch(e){ return {}; } }
+  function setToken(declId, token){ const t = getTokens(); t[declId] = token; try { localStorage.setItem('da_recensement_acces', JSON.stringify(t)); } catch(e){} }
+  async function apiRec(method, path, body, declIdPourToken){
+    const opts = { method, headers: {}, credentials: 'same-origin' };
+    if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    if (declIdPourToken) { const t = getTokens()[declIdPourToken]; if (t) opts.headers['X-Recensement-Token'] = t; }
+    const res = await fetch('/api' + path, opts);
+    let data = {}; try { data = await res.json(); } catch(e){}
+    if (!res.ok) throw Object.assign(new Error(data.message || data.error || 'Erreur serveur'), { status: res.status, data });
+    return data;
+  }
+
+  const RECENSEMENT_TYPES_UI = [
+    { id: 'denombrement', icone: '👥', label: 'Dénombrement',
+      description: "Recenser une population afin d'en déterminer le nombre et d'obtenir les informations nécessaires à sa connaissance, son organisation et sa représentativité." },
+    // Futurs types de recensement : ajouter une entrée ici suffit pour qu'elle apparaisse
+    // sur l'écran de sélection (vueTypeRecensement ci-dessous n'a rien à changer).
+  ];
+
+  const STATUT_LABELS = { brouillon: '⚪ Brouillon', actif: '🟢 Actif', suspendu: '🟠 Suspendu', termine: '🔵 Terminé' };
+  const IDENTITE_LABELS = { verifie: '🟢 Vérifiée', en_cours: '🔵 En cours', echec: '🔴 Échec', non_verifie: '⚪ Non vérifiée' };
+
+  async function init(){
+    try { const me = await api('GET', '/auth/me'); moi = me.user || null; } catch(e){ moi = null; }
+    const vue = params.get('vue') || 'accueil';
+    if (vue === 'accueil') return vueAccueil();
+    if (vue === 'mes-recensements') return vueMesRecensements();
+    if (vue === 'acces-sans-compte') return vueAccesSansCompte();
+    if (vue === 'type') return vueTypeRecensement();
+    if (vue === 'creation') return vueCreation(params.get('id'));
+    if (vue === 'gestion') return vueGestion(params.get('id'));
+    if (vue === 'declarations') return vueDeclarations(params.get('id'));
+    if (vue === 'participer') return vueParticiper(params.get('id'));
+    if (vue === 'declaration') return vueDeclaration(params.get('decl'));
+    vueAccueil();
+  }
+
+  /* ══════════ ACCUEIL ══════════ */
+  async function vueAccueil(){
+    let recensements = [];
+    try { const r = await apiRec('GET', '/recensements'); recensements = r.recensements || []; } catch(e){}
+    const peutCreer = moi && moi.role === 'initiative';
+    wrap.innerHTML = `
+      <div class="rec-hero">
+        <div>
+          <h1>📋 Recensement</h1>
+          <p>Consultez les recensements en cours, participez, ou créez le vôtre si vous représentez une Initiative.</p>
+        </div>
+        <div class="rec-actions">
+          ${moi ? `<a class="rec-btn rec-btn-outline" href="recensement.html?vue=mes-recensements">📋 Mes recensements</a>` : `<a class="rec-btn rec-btn-outline" href="recensement.html?vue=acces-sans-compte">🔐 Accéder à mes déclarations</a>`}
+          ${peutCreer ? `<a class="rec-btn rec-btn-primary" href="recensement.html?vue=type">➕ Créer un recensement</a>` : ''}
+        </div>
+      </div>
+      ${!recensements.length ? `<div class="rec-empty">📋<br><br>Aucun recensement actif pour le moment.</div>` : `
+        <div class="rec-grid">
+          ${recensements.map(r => `
+            <div class="rec-card rec-campagne-card" onclick="location.href='recensement.html?vue=participer&id=${r.id}'">
+              <span class="rec-badge rec-badge-${r.statut}">${STATUT_LABELS[r.statut]||r.statut}</span>
+              <h3 style="margin:10px 0 6px;font-size:15.5px;">${esc(r.nom)}</h3>
+              <p style="margin:0 0 10px;font-size:12.5px;color:var(--muted);">${esc((r.description||'').slice(0,110))}${(r.description||'').length>110?'…':''}</p>
+              <div style="font-size:11.5px;color:var(--muted);">👥 ${r.nb_declarations||0} personne${(r.nb_declarations||0)>1?'s':''} recensée${(r.nb_declarations||0)>1?'s':''}</div>
+            </div>
+          `).join('')}
+        </div>`}
+    `;
+  }
+
+  /* ══════════ MES RECENSEMENTS (compte connecté) ══════════ */
+  async function vueMesRecensements(){
+    if (!moi) { location.href = 'login.html'; return; }
+    let declarations = [], creations = [];
+    try { const r = await apiRec('GET', '/mes-recensements'); declarations = r.declarations || []; } catch(e){}
+    if (moi.role === 'initiative') { try { const r = await apiRec('GET', '/recensements?mine=1'); creations = r.recensements || []; } catch(e){} }
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>📋 Mes recensements</h1><p>Vos déclarations en tant que participant${moi.role==='initiative'?', et les recensements que vous avez créés':''}.</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      ${creations.length ? `<div class="rec-card"><h3 style="margin:0 0 12px;">Recensements créés</h3>
+        ${creations.map(r => `<div class="rec-champ-row" style="cursor:pointer;" onclick="location.href='recensement.html?vue=gestion&id=${r.id}'">
+          <span class="rec-champ-nom">${esc(r.nom)} <span class="rec-champ-cat">${r.identifiant}</span></span>
+          <span class="rec-badge rec-badge-${r.statut}">${STATUT_LABELS[r.statut]||r.statut}</span>
+        </div>`).join('')}
+      </div>` : ''}
+      <div class="rec-card"><h3 style="margin:0 0 12px;">Mes déclarations</h3>
+        ${!declarations.length ? `<p style="color:var(--muted);font-size:13px;">Vous n'avez participé à aucun recensement pour le moment.</p>` :
+          declarations.map(d => `<div class="rec-champ-row" style="cursor:pointer;" onclick="location.href='recensement.html?vue=declaration&decl=${d.id}'">
+            <span class="rec-champ-nom">${esc(d.recensement_nom)}<br><span class="rec-champ-cat">Participation le ${new Date(d.created_at).toLocaleDateString('fr-FR')} · ${d.identifiant}</span></span>
+            <span class="rec-badge rec-badge-${d.identite_statut}">${IDENTITE_LABELS[d.identite_statut]||d.identite_statut}</span>
+          </div>`).join('')}
+      </div>
+    `;
+  }
+
+  /* ══════════ ACCÈS SANS COMPTE ══════════ */
+  function vueAccesSansCompte(){
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>🔐 Accéder à mes déclarations</h1><p>Retrouvez une déclaration faite sans compte Diaspo'Actif.</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      <div class="rec-card" style="max-width:420px;">
+        <div class="rec-field"><label>Adresse e-mail</label><input type="email" id="ras-email"></div>
+        <div class="rec-field"><label>Mot de passe</label><input type="password" id="ras-pwd"></div>
+        <button class="rec-btn rec-btn-primary" id="ras-btn">Se connecter</button>
+        <p class="rec-msg" id="ras-msg"></p>
+      </div>
+    `;
+    document.getElementById('ras-btn').addEventListener('click', async () => {
+      const email = document.getElementById('ras-email').value.trim();
+      const password = document.getElementById('ras-pwd').value;
+      const msg = document.getElementById('ras-msg');
+      try {
+        const r = await apiRec('POST', '/recensement-acces/connexion', { email, password });
+        setToken(r.declaration_id, r.acces_token);
+        location.href = `recensement.html?vue=declaration&decl=${r.declaration_id}`;
+      } catch(e) { msg.className = 'rec-msg rec-msg-err'; msg.textContent = e.message; }
+    });
+  }
+
+  /* ══════════ CHOIX DU TYPE ══════════ */
+  function vueTypeRecensement(){
+    if (!moi || moi.role !== 'initiative') { wrap.innerHTML = `<div class="rec-empty">⚠️ Réservé aux comptes Initiative.</div>`; return; }
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>Créer un nouveau recensement</h1><p>Choisissez le type de recensement à créer.</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      <div class="rec-grid">
+        ${RECENSEMENT_TYPES_UI.map(t => `
+          <div class="rec-type-card">
+            <div class="ic">${t.icone}</div>
+            <h3>${esc(t.label)}</h3>
+            <p>${esc(t.description)}</p>
+            <button class="rec-btn rec-btn-primary" onclick="window.__recCreer('${t.id}')">Sélectionner</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    window.__recCreer = async (type) => {
+      try {
+        const r = await apiRec('POST', '/recensements', { type, nom: 'Nouveau recensement', description: '.', population_concernee: '.', date_debut: new Date().toISOString().slice(0,10) });
+        location.href = `recensement.html?vue=creation&id=${r.id}`;
+      } catch(e) { alert(e.message); }
+    };
+  }
+
+  /* ══════════ ASSISTANT DE CONFIGURATION ══════════ */
+  async function vueCreation(id){
+    if (!id) return vueTypeRecensement();
+    let data;
+    try { data = await apiRec('GET', `/recensements/${id}`); } catch(e) { wrap.innerHTML = `<div class="rec-empty">Recensement introuvable.</div>`; return; }
+    const rec = data.recensement;
+    if (!data.est_proprietaire) { wrap.innerHTML = `<div class="rec-empty">⚠️ Accès refusé.</div>`; return; }
+
+    // État local de l'assistant (persisté à chaque étape via PUT)
+    let champsConfig = rec.champs_config.length ? rec.champs_config : data.champs_predefinis.map(p => ({ ...p, predefini: true, actif: false, obligatoire: false }));
+    let champsMineurConfig = rec.champs_mineur_config.length ? rec.champs_mineur_config : data.champs_mineur_predefinis.map(p => ({ ...p, predefini: true, actif: true, obligatoire: false }));
+    let etape = Number(params.get('etape')) || 1;
+    const territoire = rec.territoire || {};
+
+    function renderStepper(){
+      const noms = ['Informations générales', 'Informations demandées', 'Personnes mineures', "Vérification d'identité", 'Résumé'];
+      return `<div class="rec-stepper">${noms.map((n,i) => `<div class="rec-step-dot ${i+1===etape?'active':i+1<etape?'done':''}">${i+1}. ${n}</div>`).join('')}</div>`;
+    }
+
+    function render(){
+      wrap.innerHTML = `
+        <div class="rec-hero"><div><h1>Créer un nouveau recensement</h1><p>${esc(rec.identifiant)} — Dénombrement</p></div>
+          <a class="rec-btn rec-btn-outline" href="recensement.html?vue=mes-recensements">Enregistrer et quitter</a></div>
+        ${renderStepper()}
+        <div class="rec-card" id="rec-etape-body"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:16px;">
+          <button class="rec-btn rec-btn-outline" id="rec-btn-prev" ${etape===1?'disabled':''}>← Précédent</button>
+          <button class="rec-btn rec-btn-primary" id="rec-btn-next">${etape===5?'Voir le résumé':'Suivant →'}</button>
+        </div>
+        <p class="rec-msg" id="rec-etape-msg"></p>
+      `;
+      const body = document.getElementById('rec-etape-body');
+      if (etape === 1) renderEtape1(body);
+      else if (etape === 2) renderEtape2(body);
+      else if (etape === 3) renderEtape3(body);
+      else if (etape === 4) renderEtape4(body);
+      else renderEtape5(body);
+      document.getElementById('rec-btn-prev').addEventListener('click', () => { etape--; render(); });
+      document.getElementById('rec-btn-next').addEventListener('click', sauvegarderEtape);
+    }
+
+    function renderEtape1(body){
+      body.innerHTML = `
+        <h3 style="margin:0 0 16px;">Informations générales</h3>
+        <div class="rec-field"><label>Nom du dénombrement *</label><input id="ce-nom" value="${esc(rec.nom==='Nouveau recensement'?'':rec.nom)}"></div>
+        <div class="rec-field"><label>Description / objectif *</label><textarea id="ce-desc" rows="3">${esc(rec.description==='.'?'':rec.description)}</textarea></div>
+        <div class="rec-field"><label>Population concernée *</label><input id="ce-population" value="${esc(rec.population_concernee==='.'?'':rec.population_concernee)}"></div>
+        <div class="rec-field"><label>Territoire concerné *</label>
+          <select id="ce-territoire-type">
+            <option value="">— Sélectionner —</option>
+            ${['pays','region','departement','ville','commune','zone_geographique','personnalise'].map(t => `<option value="${t}" ${territoire.type===t?'selected':''}>${{pays:'Pays',region:'Région',departement:'Département',ville:'Ville',commune:'Commune',zone_geographique:'Zone géographique',personnalise:'Personnalisé'}[t]}</option>`).join('')}
+          </select>
+        </div>
+        <div class="rec-field"><label>Précision du territoire</label><input id="ce-territoire-valeur" value="${esc(territoire.valeur||'')}" placeholder="Ex : France, Toulouse..."></div>
+        <div class="rec-row2">
+          <div class="rec-field"><label>Date de début *</label><input type="date" id="ce-date-debut" value="${rec.date_debut||''}"></div>
+          <div class="rec-field"><label>Date de fin</label><input type="date" id="ce-date-fin" value="${rec.date_fin||''}" ${!rec.date_fin&&rec.date_fin!==undefined?'':''}></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="ce-pas-date-fin" ${!rec.date_fin?'checked':''}> Pas de date de fin</label>
+      `;
+      document.getElementById('ce-pas-date-fin').addEventListener('change', (e) => { document.getElementById('ce-date-fin').disabled = e.target.checked; if (e.target.checked) document.getElementById('ce-date-fin').value=''; });
+      document.getElementById('ce-date-fin').disabled = !rec.date_fin;
+    }
+
+    function renderChampsListe(liste, predefinis){
+      return liste.map((c, i) => `
+        <div class="rec-champ-row">
+          <span class="rec-champ-nom">${esc(c.label)}${c.categorie?` <span class="rec-champ-cat">— ${esc(c.categorie)}</span>`:''}${!c.predefini?` <span class="rec-champ-cat">— personnalisé (${c.type})</span>`:''}</span>
+          <label class="rec-oblig-chk"><input type="checkbox" data-oblig="${i}" ${c.obligatoire?'checked':''} ${!c.actif?'disabled':''}> Obligatoire</label>
+          <label class="rec-toggle"><input type="checkbox" data-actif="${i}" ${c.actif?'checked':''}><span class="rec-toggle-track"></span></label>
+          ${!c.predefini ? `<button type="button" class="rec-btn rec-btn-outline" style="padding:5px 9px;font-size:11px;" data-suppr="${i}">✕</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function renderEtape2(body){
+      body.innerHTML = `
+        <h3 style="margin:0 0 4px;">Informations demandées</h3>
+        <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">Activez les champs à demander aux participants, et décidez lesquels sont obligatoires.</p>
+        <div id="ce-champs-liste">${renderChampsListe(champsConfig)}</div>
+        <button type="button" class="rec-btn rec-btn-outline" style="margin-top:14px;" id="ce-btn-ajouter-champ">➕ Ajouter une information</button>
+      `;
+      wireChampsListe(document.getElementById('ce-champs-liste'), champsConfig);
+      document.getElementById('ce-btn-ajouter-champ').addEventListener('click', () => ouvrirModaleChampPerso(champsConfig, () => renderEtape2(body)));
+    }
+    function wireChampsListe(el, liste){
+      el.querySelectorAll('[data-actif]').forEach(inp => inp.addEventListener('change', () => { liste[+inp.dataset.actif].actif = inp.checked; el.querySelector(`[data-oblig="${inp.dataset.actif}"]`).disabled = !inp.checked; if(!inp.checked) liste[+inp.dataset.actif].obligatoire=false; }));
+      el.querySelectorAll('[data-oblig]').forEach(inp => inp.addEventListener('change', () => { liste[+inp.dataset.oblig].obligatoire = inp.checked; }));
+      el.querySelectorAll('[data-suppr]').forEach(btn => btn.addEventListener('click', () => { liste.splice(+btn.dataset.suppr, 1); renderEtape2(document.getElementById('rec-etape-body')); }));
+    }
+
+    function ouvrirModaleChampPerso(liste, onDone){
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+      overlay.innerHTML = `<div class="rec-card" style="max-width:420px;width:100%;margin:0;">
+        <h3 style="margin:0 0 14px;">➕ Ajouter une information</h3>
+        <div class="rec-field"><label>Nom du champ</label><input id="cp-label"></div>
+        <div class="rec-field"><label>Description</label><input id="cp-desc"></div>
+        <div class="rec-field"><label>Type de réponse</label>
+          <select id="cp-type">
+            <option value="texte">Texte</option><option value="nombre">Nombre</option><option value="date">Date</option>
+            <option value="oui_non">Oui / Non</option><option value="choix_unique">Choix unique</option>
+            <option value="choix_multiple">Choix multiple</option><option value="liste_deroulante">Liste déroulante</option>
+          </select>
+        </div>
+        <div class="rec-field" id="cp-options-wrap" style="display:none;"><label>Options (une par ligne)</label><textarea id="cp-options" rows="3"></textarea></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px;"><input type="checkbox" id="cp-oblig"> Obligatoire</label>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button class="rec-btn rec-btn-outline" id="cp-annuler">Annuler</button>
+          <button class="rec-btn rec-btn-primary" id="cp-ajouter">Ajouter</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      document.getElementById('cp-type').addEventListener('change', (e) => { document.getElementById('cp-options-wrap').style.display = ['choix_unique','choix_multiple','liste_deroulante'].includes(e.target.value) ? '' : 'none'; });
+      document.getElementById('cp-annuler').addEventListener('click', () => overlay.remove());
+      document.getElementById('cp-ajouter').addEventListener('click', () => {
+        const label = document.getElementById('cp-label').value.trim();
+        if (!label) return;
+        const type = document.getElementById('cp-type').value;
+        const options = document.getElementById('cp-options').value.split('\n').map(s=>s.trim()).filter(Boolean);
+        liste.push({ label, description: document.getElementById('cp-desc').value.trim(), type, obligatoire: document.getElementById('cp-oblig').checked, actif: true, predefini: false, ...(options.length?{options}:{}) });
+        overlay.remove(); onDone();
+      });
+    }
+
+    function renderEtape3(body){
+      body.innerHTML = `
+        <h3 style="margin:0 0 16px;">Personnes mineures</h3>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;margin-bottom:16px;">
+          <input type="checkbox" id="ce-mineurs" ${rec.mineurs_autorises?'checked':''}> Autoriser l'inscription de personnes mineures
+        </label>
+        <div id="ce-mineurs-detail" style="${rec.mineurs_autorises?'':'display:none;'}">
+          <div class="rec-card" style="background:var(--bg);border:none;margin-bottom:14px;font-size:12.5px;">
+            Une personne mineure doit être déclarée par un <strong>responsable légal déclarant</strong>. Un adulte = une personne recensée, un mineur = une personne recensée — il n'existe aucune « fiche famille ».
+          </div>
+          <h4 style="margin:0 0 8px;">Informations demandées pour les mineurs</h4>
+          <div id="ce-champs-mineur-liste">${renderChampsListe(champsMineurConfig)}</div>
+        </div>
+      `;
+      document.getElementById('ce-mineurs').addEventListener('change', (e) => { document.getElementById('ce-mineurs-detail').style.display = e.target.checked ? '' : 'none'; });
+      wireChampsListe(document.getElementById('ce-champs-mineur-liste'), champsMineurConfig);
+    }
+
+    function renderEtape4(body){
+      body.innerHTML = `
+        <h3 style="margin:0 0 16px;">Vérification d'identité</h3>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;margin-bottom:14px;">
+          <input type="checkbox" id="ce-verif" ${rec.verification_identite==='activee'?'checked':''}> Activer la vérification d'identité (Stripe Identity)
+        </label>
+        <div id="ce-verif-detail" style="${rec.verification_identite==='activee'?'':'display:none;'}">
+          <div class="rec-field"><label>Documents acceptés</label>
+            <select id="ce-verif-docs">
+              <option value="residence" ${rec.verification_identite_documents==='residence'?'selected':''}>Document du pays de résidence</option>
+              <option value="origine" ${rec.verification_identite_documents==='origine'?'selected':''}>Document du pays d'origine</option>
+              <option value="les_deux" ${rec.verification_identite_documents==='les_deux'?'selected':''}>Les deux</option>
+            </select>
+          </div>
+          <p style="font-size:11.5px;color:var(--muted);">Diaspo'Actif ne stocke jamais les documents d'identité — ils sont transmis directement au prestataire (Stripe Identity), seul le statut de vérification est conservé.</p>
+        </div>
+      `;
+      document.getElementById('ce-verif').addEventListener('change', (e) => { document.getElementById('ce-verif-detail').style.display = e.target.checked ? '' : 'none'; });
+    }
+
+    function renderEtape5(body){
+      const territoireLabel = territoire.type ? `${{pays:'Pays',region:'Région',departement:'Département',ville:'Ville',commune:'Commune',zone_geographique:'Zone géographique',personnalise:'Personnalisé'}[territoire.type]} — ${esc(territoire.valeur||'')}` : '—';
+      const actifsChamps = champsConfig.filter(c=>c.actif).map(c=>c.label).join(', ') || '—';
+      body.innerHTML = `
+        <h3 style="margin:0 0 16px;">Vérifiez votre dénombrement</h3>
+        <div class="rec-resume-row"><span class="k">Nom</span><span class="v">${esc(document.getElementById('ce-nom')?.value || rec.nom)}</span></div>
+        <div class="rec-resume-row"><span class="k">Objectif</span><span class="v">${esc(rec.description)}</span></div>
+        <div class="rec-resume-row"><span class="k">Population</span><span class="v">${esc(rec.population_concernee)}</span></div>
+        <div class="rec-resume-row"><span class="k">Territoire</span><span class="v">${territoireLabel}</span></div>
+        <div class="rec-resume-row"><span class="k">Date de début</span><span class="v">${rec.date_debut||'—'}</span></div>
+        <div class="rec-resume-row"><span class="k">Date de fin</span><span class="v">${rec.date_fin || 'Sans date de fin'}</span></div>
+        <div class="rec-resume-row"><span class="k">Personnes mineures</span><span class="v">${rec.mineurs_autorises?'Activées':'Désactivées'}</span></div>
+        <div class="rec-resume-row"><span class="k">Vérification d'identité</span><span class="v">${rec.verification_identite==='activee'?'Activée':'Désactivée'}</span></div>
+        <div class="rec-resume-row"><span class="k">Détection des doublons</span><span class="v">Activée</span></div>
+        <div class="rec-resume-row"><span class="k">Participation sans compte</span><span class="v">Activée</span></div>
+        <div class="rec-resume-row"><span class="k">Informations demandées</span><span class="v" style="text-align:right;max-width:60%;">${esc(actifsChamps)}</span></div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+          <button class="rec-btn rec-btn-outline" id="rec-btn-brouillon">Enregistrer comme brouillon</button>
+          <button class="rec-btn rec-btn-primary" id="rec-btn-publier">Publier le dénombrement</button>
+        </div>
+      `;
+      document.getElementById('rec-btn-prev').style.display = 'none';
+      document.getElementById('rec-btn-next').style.display = 'none';
+      document.getElementById('rec-btn-brouillon').addEventListener('click', async () => { await sauvegarder(); location.href = 'recensement.html?vue=mes-recensements'; });
+      document.getElementById('rec-btn-publier').addEventListener('click', async () => {
+        await sauvegarder();
+        try { await apiRec('POST', `/recensements/${id}/publier`); location.href = `recensement.html?vue=gestion&id=${id}`; }
+        catch(e) { document.getElementById('rec-etape-msg').className='rec-msg rec-msg-err'; document.getElementById('rec-etape-msg').textContent = e.message; }
+      });
+    }
+
+    async function sauvegarder(){
+      const body = {};
+      if (document.getElementById('ce-nom')) body.nom = document.getElementById('ce-nom').value.trim();
+      if (document.getElementById('ce-desc')) body.description = document.getElementById('ce-desc').value.trim();
+      if (document.getElementById('ce-population')) body.population_concernee = document.getElementById('ce-population').value.trim();
+      if (document.getElementById('ce-territoire-type')) { territoire.type = document.getElementById('ce-territoire-type').value; territoire.valeur = document.getElementById('ce-territoire-valeur').value.trim(); if (territoire.type) body.territoire = territoire; }
+      if (document.getElementById('ce-date-debut')) body.date_debut = document.getElementById('ce-date-debut').value;
+      if (document.getElementById('ce-date-fin')) body.date_fin = document.getElementById('ce-pas-date-fin').checked ? null : document.getElementById('ce-date-fin').value;
+      if (etape === 2) body.champs_config = champsConfig;
+      if (etape === 3) { rec.mineurs_autorises = document.getElementById('ce-mineurs').checked; body.mineurs_autorises = rec.mineurs_autorises; body.champs_mineur_config = champsMineurConfig; }
+      if (etape === 4) { rec.verification_identite = document.getElementById('ce-verif').checked ? 'activee' : 'desactivee'; body.verification_identite = rec.verification_identite; body.verification_identite_documents = document.getElementById('ce-verif-docs')?.value || 'les_deux'; }
+      Object.assign(rec, body);
+      try { await apiRec('PUT', `/recensements/${id}`, body); } catch(e) { const m = document.getElementById('rec-etape-msg'); if (m) { m.className='rec-msg rec-msg-err'; m.textContent = e.message; } }
+    }
+
+    async function sauvegarderEtape(){
+      if (etape === 1) {
+        const req = ['ce-nom','ce-desc','ce-population','ce-territoire-type','ce-date-debut'];
+        for (const id2 of req) { if (!document.getElementById(id2).value) { const m=document.getElementById('rec-etape-msg'); m.className='rec-msg rec-msg-err'; m.textContent='Merci de compléter tous les champs obligatoires (*).'; return; } }
+      }
+      await sauvegarder();
+      etape++; render();
+    }
+
+    render();
+  }
+
+  /* ══════════ GESTION (après publication) ══════════ */
+  async function vueGestion(id){
+    let data, stats, demandes = [];
+    try { data = await apiRec('GET', `/recensements/${id}`); } catch(e) { wrap.innerHTML = `<div class="rec-empty">Recensement introuvable.</div>`; return; }
+    if (!data.est_proprietaire) { wrap.innerHTML = `<div class="rec-empty">⚠️ Accès refusé.</div>`; return; }
+    const rec = data.recensement;
+    try { stats = await apiRec('GET', `/recensements/${id}/stats`); } catch(e) { stats = { total: 0 }; }
+    try { const r = await apiRec('GET', `/recensements/${id}/modification-demandes`); demandes = (r.demandes||[]).filter(d=>d.statut==='en_attente'); } catch(e){}
+    const lien = `${location.origin}/recensement.html?vue=participer&id=${id}`;
+    wrap.innerHTML = `
+      <div class="rec-hero"><div>
+        <h1>${esc(rec.nom)} <span class="rec-badge rec-badge-${rec.statut}">${STATUT_LABELS[rec.statut]}</span></h1>
+        <p>Identifiant : ${esc(rec.identifiant)}</p>
+      </div><a class="rec-btn rec-btn-outline" href="recensement.html?vue=mes-recensements">← Retour</a></div>
+      <div class="rec-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));margin-bottom:18px;">
+        <div class="rec-stat-tile"><div class="n">${stats.total||0}</div><div class="l">Personnes recensées</div></div>
+        <div class="rec-stat-tile"><div class="n">${stats.adultes||0}</div><div class="l">Adultes</div></div>
+        <div class="rec-stat-tile"><div class="n">${stats.mineurs||0}</div><div class="l">Mineurs</div></div>
+        <div class="rec-stat-tile"><div class="n">${stats.verifications?.verifie||0}</div><div class="l">Identités vérifiées</div></div>
+      </div>
+      ${demandes.length ? `<div class="rec-card" style="border-color:#f59e0b;"><h3 style="margin:0 0 10px;">🟠 ${demandes.length} demande${demandes.length>1?'s':''} de modification en attente</h3>
+        ${demandes.map(d => `<div class="rec-champ-row"><span class="rec-champ-nom">${esc(d.champ)} → « ${esc(d.nouvelle_valeur)} »${d.motif?` <span class="rec-champ-cat">(${esc(d.motif)})</span>`:''}</span>
+          <button class="rec-btn rec-btn-outline" style="padding:5px 10px;" onclick="window.__recTraiterDemande(${d.id},'refusee')">Refuser</button>
+          <button class="rec-btn rec-btn-primary" style="padding:5px 10px;" onclick="window.__recTraiterDemande(${d.id},'acceptee')">Accepter</button>
+        </div>`).join('')}
+      </div>` : ''}
+      <div class="rec-card">
+        <div class="rec-actions" style="margin-bottom:14px;">
+          <a class="rec-btn rec-btn-primary" href="recensement.html?vue=declarations&id=${id}">📋 Voir les déclarations</a>
+          <button class="rec-btn rec-btn-outline" onclick="navigator.clipboard.writeText('${lien}').then(()=>alert('Lien copié !'))">🔗 Partager</button>
+          <a class="rec-btn rec-btn-outline" href="recensement.html?vue=creation&id=${id}&etape=1">✏️ Modifier</a>
+          <button class="rec-btn rec-btn-outline" onclick="window.__recSuspendre(${id})">${rec.statut==='suspendu'?'▶️ Réactiver':'⏸️ Suspendre'}</button>
+          <a class="rec-btn rec-btn-outline" href="recensement.html?vue=participer&id=${id}" target="_blank">Voir le formulaire</a>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:0;">Statistiques par pays de résidence, pays d'origine et métier : disponibles dès qu'il y a des déclarations.</p>
+      </div>
+    `;
+    window.__recSuspendre = async (id2) => { try { await apiRec('POST', `/recensements/${id2}/suspendre`); vueGestion(id2); } catch(e) { alert(e.message); } };
+    window.__recTraiterDemande = async (demandeId, statut) => { try { await apiRec('PATCH', `/recensement-modification-demandes/${demandeId}`, { statut }); vueGestion(id); } catch(e) { alert(e.message); } };
+  }
+
+  /* ══════════ LISTE DES DÉCLARATIONS (créateur) ══════════ */
+  async function vueDeclarations(id){
+    let data, decls;
+    try { data = await apiRec('GET', `/recensements/${id}`); } catch(e) { wrap.innerHTML = `<div class="rec-empty">Recensement introuvable.</div>`; return; }
+    if (!data.est_proprietaire) { wrap.innerHTML = `<div class="rec-empty">⚠️ Accès refusé.</div>`; return; }
+    try { const r = await apiRec('GET', `/recensements/${id}/declarations`); decls = r.declarations || []; } catch(e) { decls = []; }
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>Déclarations — ${esc(data.recensement.nom)}</h1><p>${decls.length} déclaration${decls.length>1?'s':''}</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html?vue=gestion&id=${id}">← Retour</a></div>
+      <div class="rec-card">
+        ${!decls.length ? `<p style="color:var(--muted);font-size:13px;">Aucune déclaration pour le moment.</p>` :
+          decls.map(d => `<div class="rec-champ-row">
+            <span class="rec-champ-nom">${esc([d.reponses.prenom,d.reponses.nom].filter(Boolean).join(' ') || d.identifiant)} ${d.est_mineur?'<span class="rec-champ-cat">(mineur)</span>':''}
+              <br><span class="rec-champ-cat">${esc(d.identifiant)} · ${new Date(d.created_at).toLocaleDateString('fr-FR')}</span></span>
+            <span class="rec-badge rec-badge-${d.identite_statut}">${IDENTITE_LABELS[d.identite_statut]||d.identite_statut}</span>
+          </div>`).join('')}
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);">Cette liste n'est visible que par vous, en tant que créateur de ce recensement — jamais publiquement (§20).</p>
+    `;
+  }
+
+  /* ══════════ PARTICIPER ══════════ */
+  async function vueParticiper(id){
+    let data;
+    try { data = await apiRec('GET', `/recensements/${id}`); } catch(e) { wrap.innerHTML = `<div class="rec-empty">Recensement introuvable ou clos.</div>`; return; }
+    const rec = data.recensement;
+    const champsActifs = rec.champs_config.filter(c => c.actif);
+
+    function champHtml(c, prefix){
+      const fid = `${prefix}-${c.id}`;
+      const oblig = c.obligatoire ? ' *' : '';
+      if (c.type === 'oui_non') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><select id="${fid}"><option value="">—</option><option value="oui">Oui</option><option value="non">Non</option></select></div>`;
+      if (['choix_unique','liste_deroulante'].includes(c.type)) return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><select id="${fid}"><option value="">—</option>${(c.options||[]).map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select></div>`;
+      if (c.type === 'choix_multiple') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label>${(c.options||[]).map(o=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:4px;"><input type="checkbox" class="cm-${fid}" value="${esc(o)}"> ${esc(o)}</label>`).join('')}</div>`;
+      if (c.type === 'nombre') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="number" id="${fid}"></div>`;
+      if (c.type === 'date' || c.id === 'date_naissance') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="date" id="${fid}"></div>`;
+      if (c.id === 'email') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="email" id="${fid}"></div>`;
+      return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="text" id="${fid}"></div>`;
+    }
+
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>${esc(rec.nom)}</h1><p>${esc(rec.description)}</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      <div class="rec-card">
+        <h3 style="margin:0 0 14px;">Vos informations</h3>
+        <div id="part-champs-adulte">${champsActifs.map(c => champHtml(c, 'pa')).join('')}</div>
+        ${rec.mineurs_autorises ? `
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;margin:18px 0 10px;">
+            <input type="checkbox" id="part-est-mineur"> Je déclare une personne mineure
+          </label>
+          <div id="part-mineur-detail" style="display:none;">
+            <div class="rec-card" style="background:var(--bg);border:none;">
+              <h4 style="margin:0 0 10px;">Informations de la personne mineure</h4>
+              ${rec.champs_mineur_config.filter(c=>c.actif).map(c => champHtml(c, 'pm')).join('')}
+              <h4 style="margin:14px 0 10px;">Responsable légal déclarant</h4>
+              <div class="rec-field"><label>Nom *</label><input id="resp-nom"></div>
+              <div class="rec-field"><label>Prénom *</label><input id="resp-prenom"></div>
+              <div class="rec-field"><label>Adresse e-mail *</label><input type="email" id="resp-email"></div>
+              <div class="rec-field"><label>Téléphone</label><input id="resp-tel"></div>
+            </div>
+          </div>` : ''}
+        <div id="part-acces-wrap" style="${moi ? 'display:none;' : ''}">
+          <h4 style="margin:18px 0 8px;">Pour retrouver votre déclaration</h4>
+          <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">${moi ? 'Vous êtes connecté — votre déclaration sera associée à votre compte.' : "Vous n'êtes pas connecté : cette adresse e-mail et ce mot de passe vous permettront de retrouver votre déclaration."}</p>
+          <div class="rec-field"><label>Adresse e-mail</label><input type="email" id="part-acces-email"></div>
+          <div class="rec-field"><label>Mot de passe</label><input type="password" id="part-acces-pwd"></div>
+        </div>
+        <button class="rec-btn rec-btn-primary" id="part-btn-envoyer">Envoyer ma déclaration</button>
+        <p class="rec-msg" id="part-msg"></p>
+      </div>
+    `;
+    const chk = document.getElementById('part-est-mineur');
+    if (chk) chk.addEventListener('change', (e) => { document.getElementById('part-mineur-detail').style.display = e.target.checked ? '' : 'none'; document.getElementById('part-acces-wrap').style.display = (moi || e.target.checked) ? 'none' : ''; });
+
+    function lireChamps(liste, prefix){
+      const out = {};
+      liste.forEach(c => {
+        const fid = `${prefix}-${c.id}`;
+        if (c.type === 'choix_multiple') { out[c.id] = [...document.querySelectorAll(`.cm-${fid}:checked`)].map(x=>x.value); return; }
+        const el = document.getElementById(fid);
+        if (el) out[c.id] = el.value;
+      });
+      return out;
+    }
+
+    document.getElementById('part-btn-envoyer').addEventListener('click', async () => {
+      const msg = document.getElementById('part-msg');
+      const estMineur = chk && chk.checked;
+      const reponses = lireChamps(champsActifs, 'pa');
+      for (const c of champsActifs) if (c.obligatoire && !reponses[c.id]) { msg.className='rec-msg rec-msg-err'; msg.textContent = `Le champ « ${c.label} » est obligatoire.`; return; }
+      const body = { est_mineur: !!estMineur, reponses };
+      if (estMineur) {
+        body.reponses = lireChamps(rec.champs_mineur_config.filter(c=>c.actif), 'pm');
+        body.responsable = { nom: document.getElementById('resp-nom').value.trim(), prenom: document.getElementById('resp-prenom').value.trim(), email: document.getElementById('resp-email').value.trim(), telephone: document.getElementById('resp-tel').value.trim() };
+        if (!body.responsable.nom || !body.responsable.prenom || !body.responsable.email) { msg.className='rec-msg rec-msg-err'; msg.textContent = 'Les informations du responsable légal déclarant sont obligatoires.'; return; }
+      }
+      if (!moi) {
+        body.acces_email = document.getElementById('part-acces-email').value.trim();
+        body.acces_password = document.getElementById('part-acces-pwd').value;
+        if (!body.acces_email || !body.acces_password) { msg.className='rec-msg rec-msg-err'; msg.textContent = 'Adresse e-mail et mot de passe requis pour retrouver votre déclaration.'; return; }
+      }
+      try {
+        const r = await apiRec('POST', `/recensements/${id}/declarations`, body);
+        if (r.acces_token) setToken(r.id, r.acces_token);
+        location.href = `recensement.html?vue=declaration&decl=${r.id}`;
+      } catch(e) {
+        msg.className = 'rec-msg rec-msg-err';
+        msg.textContent = e.status === 409 ? e.message : (e.message || 'Erreur lors de l\'envoi.');
+      }
+    });
+  }
+
+  /* ══════════ MA DÉCLARATION ══════════ */
+  async function vueDeclaration(declId){
+    if (!declId) { location.href = 'recensement.html'; return; }
+    let data;
+    try { data = await apiRec('GET', `/recensement-declarations/${declId}`, undefined, declId); }
+    catch(e) { wrap.innerHTML = `<div class="rec-empty">⚠️ ${e.status===403?'Accès refusé.':'Déclaration introuvable.'}</div>`; return; }
+    const d = data.declaration, rep = d.reponses;
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>Ma déclaration</h1><p>${esc(data.recensement?.nom||'')} — ${esc(d.identifiant)}</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      <div class="rec-card">
+        <span class="rec-badge rec-badge-${d.identite_statut}">${IDENTITE_LABELS[d.identite_statut]||d.identite_statut}</span>
+        <div style="margin-top:14px;">
+          ${Object.entries(rep).map(([k,v]) => v ? `<div class="rec-resume-row"><span class="k">${esc(k.replace(/_/g,' '))}</span><span class="v">🔒 ${esc(Array.isArray(v)?v.join(', '):v)}</span></div>` : '').join('')}
+        </div>
+        <div class="rec-actions" style="margin-top:18px;">
+          <button class="rec-btn rec-btn-outline" id="decl-btn-modif">✏️ Demander une modification</button>
+          <button class="rec-btn rec-btn-danger" id="decl-btn-suppr">🗑️ Supprimer mes informations</button>
+        </div>
+        <p class="rec-msg" id="decl-msg"></p>
+      </div>
+    `;
+    document.getElementById('decl-btn-modif').addEventListener('click', () => {
+      const champ = prompt("Quel champ souhaitez-vous modifier ? (ex : email, telephone, adresse...)");
+      if (!champ) return;
+      const val = prompt("Nouvelle valeur :");
+      if (!val) return;
+      const motif = prompt("Motif (facultatif) :") || '';
+      apiRec('POST', `/recensement-declarations/${declId}/demande-modification`, { champ, nouvelle_valeur: val, motif }, declId)
+        .then(() => { const m=document.getElementById('decl-msg'); m.className='rec-msg rec-msg-ok'; m.textContent='Demande envoyée — 🟠 en attente de traitement.'; })
+        .catch(e => { const m=document.getElementById('decl-msg'); m.className='rec-msg rec-msg-err'; m.textContent=e.message; });
+    });
+    document.getElementById('decl-btn-suppr').addEventListener('click', () => {
+      if (!confirm("⚠️ Suppression définitive\n\nVous êtes sur le point de supprimer vos informations de ce dénombrement. Cette action est définitive.\n\nConfirmer ?")) return;
+      apiRec('DELETE', `/recensement-declarations/${declId}`, undefined, declId)
+        .then(() => { alert('Vos informations ont été supprimées.'); location.href = 'recensement.html'; })
+        .catch(e => alert(e.message));
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

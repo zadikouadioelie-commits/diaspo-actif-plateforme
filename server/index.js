@@ -15107,6 +15107,7 @@ async function handleStripeWebhook(req, res) {
            la demande de transfert. Étape 5→6 du protocole : ne rend PAS le transfert effectif
            (seule /finaliser le fait) — juste la condition "identité vérifiée" remplie. */
         const transferId = Number(session.metadata?.diaspoactif_transfer_id);
+        const declarationId = Number(session.metadata?.diaspoactif_recensement_declaration_id);
         if (transferId) {
           await db.prepare("UPDATE manager_transfer_requests SET status='IDENTITY_VERIFIED', identity_verification_status='VERIFIED', identity_verified_at=datetime('now'), updated_at=datetime('now') WHERE id=? AND stripe_identity_session_id=?")
             .run(transferId, session.id);
@@ -15116,12 +15117,20 @@ async function handleStripeWebhook(req, res) {
             creerNotif(Number(t.old_manager_user_id), "transfert_identite_verifiee", "Identité du nouveau gestionnaire vérifiée ✔️",
               "L'identité du nouveau gestionnaire a été vérifiée avec succès. Vous pouvez maintenant finaliser le transfert depuis Confidentialité & Sécurité.", { transfer_id: transferId });
           }
+        } else if (declarationId) {
+          /* Module Recensement (2026-09-07) — même logique que le transfert de gestionnaire :
+             pas de users.id, résultat stocké directement sur la déclaration. Aucun document
+             n'est jamais écrit ici, uniquement le statut (cf. server/db.js, commentaire sur
+             recensement_declarations). */
+          await db.prepare("UPDATE recensement_declarations SET identite_statut='verifie', updated_at=datetime('now') WHERE id=? AND stripe_identity_session_id=?")
+            .run(declarationId, session.id);
         }
       }
     } else if (event.type === "identity.verification_session.requires_input") {
       const session = event.data.object;
       const userId = Number(session.metadata?.diaspoactif_user_id);
       const transferId = Number(session.metadata?.diaspoactif_transfer_id);
+      const declarationId = Number(session.metadata?.diaspoactif_recensement_declaration_id);
       if (userId) {
         await db.prepare(
           "INSERT INTO identity_verifications_log (user_id, stripe_session_id, type, statut) VALUES (?,?,?,?)"
@@ -15129,6 +15138,9 @@ async function handleStripeWebhook(req, res) {
         const reason = session.last_error?.reason || "Document non valide.";
         creerNotif(userId, "identite_echec", "Vérification d'identité incomplète",
           `La vérification n'a pas pu être finalisée : ${reason} Vous pouvez réessayer depuis votre profil.`, {});
+      } else if (declarationId) {
+        await db.prepare("UPDATE recensement_declarations SET identite_statut='echec', updated_at=datetime('now') WHERE id=? AND stripe_identity_session_id=?")
+          .run(declarationId, session.id);
       } else if (transferId) {
         /* Vérification d'identité du NOUVEAU gestionnaire (transfert de gestionnaire,
            2026-08-09) — adaptée de la branche ci-dessus : pas de users.id existant, le
@@ -38606,6 +38618,826 @@ app.get('/api/admin/social/stats', requireAuth, async (req, res) => {
   const reseauTop = parReseau[0]?.reseau || null;
   const parJour = await db.prepare("SELECT date(detected_at) jour, COUNT(*) n FROM social_posts_detectes WHERE detected_at >= datetime('now','-30 days') GROUP BY jour ORDER BY jour DESC").all();
   sendJSON(res, 200, { comptesConnectes, detectees, importees, tauxRepublication, reseauTop, parReseau, parJour });
+});
+
+/* ══════════════════════ MODULE RECENSEMENT (2026-09-07) ══════════════════════
+   Première version : un seul type "denombrement" — colonne recensements.type prête pour
+   d'autres types plus tard (§2 du cahier des charges), tout comme RECENSEMENT_TYPES ci-dessous
+   (un seul tableau, il suffit d'y ajouter une entrée). Règle fondamentale (§22) : une personne
+   = une déclaration, jamais de "fiche famille". Réutilise les patterns déjà en place sur ce
+   dépôt plutôt que d'en inventer de nouveaux : generateDaId (compteur) → ici un identifiant
+   aléatoire avec re-tirage comme generateDsIdUnique ; sanitizeFormulaireChampsCustom → même
+   idée pour les champs personnalisés ; deletion_requests → squelette des demandes de
+   modification ; identity.verification_session Stripe déjà câblé → même appel, juste une
+   métadonnée différente (diaspoactif_recensement_declaration_id) pour distinguer côté webhook. */
+
+const RECENSEMENT_TYPES = ['denombrement']; // futurs types : ajouter ici, rien d'autre à changer pour le routage de base
+
+async function generateRecensementId() {
+  const annee = new Date().getFullYear();
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O/1/I, ambiguïté visuelle
+  for (let tentative = 0; tentative < 8; tentative++) {
+    let suffixe = '';
+    for (let i = 0; i < 6; i++) suffixe += alphabet[crypto.randomInt(alphabet.length)];
+    const id = `DEN-${annee}-${suffixe}`;
+    const existe = await db.prepare('SELECT 1 FROM recensements WHERE identifiant=?').get(id);
+    if (!existe) return id;
+  }
+  return `DEN-${annee}-${Date.now().toString(36).toUpperCase()}`; // repli si 8 collisions improbables
+}
+async function generateDeclarationId() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (let tentative = 0; tentative < 8; tentative++) {
+    let suffixe = '';
+    for (let i = 0; i < 8; i++) suffixe += alphabet[crypto.randomInt(alphabet.length)];
+    const id = `DECL-${suffixe}`;
+    const existe = await db.prepare('SELECT 1 FROM recensement_declarations WHERE identifiant=?').get(id);
+    if (!existe) return id;
+  }
+  return `DECL-${Date.now().toString(36).toUpperCase()}`;
+}
+
+/* Catalogue des champs prédéfinis proposés au créateur (§4) — un simple tableau, activé/
+   obligatoire décidés par le créateur et stockés dans recensements.champs_config_json. */
+const RECENSEMENT_CHAMPS_PREDEFINIS = [
+  { id: 'nom', label: 'Nom', categorie: 'Identité' },
+  { id: 'prenom', label: 'Prénom', categorie: 'Identité' },
+  { id: 'date_naissance', label: 'Date de naissance', categorie: 'Identité' },
+  { id: 'age', label: 'Âge', categorie: 'Identité' },
+  { id: 'pays_origine', label: "Pays d'origine", categorie: 'Origine' },
+  { id: 'pays_residence', label: 'Pays de résidence', categorie: 'Résidence' },
+  { id: 'ville_residence', label: 'Ville de résidence', categorie: 'Résidence' },
+  { id: 'adresse', label: 'Adresse', categorie: 'Résidence' },
+  { id: 'email', label: 'Adresse e-mail', categorie: 'Contact' },
+  { id: 'telephone', label: 'Téléphone', categorie: 'Contact' },
+  { id: 'metier', label: 'Métier / profession', categorie: 'Situation professionnelle' },
+];
+const RECENSEMENT_CHAMPS_MINEUR_PREDEFINIS = [
+  { id: 'nom', label: 'Nom' }, { id: 'prenom', label: 'Prénom' },
+  { id: 'date_naissance', label: 'Date de naissance' }, { id: 'pays_origine', label: "Pays d'origine" },
+  { id: 'pays_residence', label: 'Pays de résidence' }, { id: 'ville_residence', label: 'Ville de résidence' },
+];
+const RECENSEMENT_TYPES_CHAMPS_PERSO = ['texte', 'nombre', 'date', 'oui_non', 'choix_unique', 'choix_multiple', 'liste_deroulante'];
+const RECENSEMENT_TERRITOIRE_TYPES = ['pays', 'region', 'departement', 'ville', 'commune', 'zone_geographique', 'personnalise'];
+
+/* Sanitize la config "informations demandées" envoyée par le créateur : fusionne les champs
+   prédéfinis (activé/obligatoire) ET les champs personnalisés (mêmes bornes que
+   sanitizeFormulaireChampsCustom : 30 champs perso max, libellés bornés, type whitelisté). */
+function sanitizeRecensementChampsConfig(input, predefinis) {
+  const arr = Array.isArray(input) ? input.slice(0, predefinis.length + 30) : [];
+  let idxPerso = 0;
+  return arr.map(c => {
+    if (!c || typeof c !== 'object') return null;
+    if (c.predefini) {
+      const ref = predefinis.find(p => p.id === c.id);
+      if (!ref) return null;
+      return { id: ref.id, label: ref.label, categorie: ref.categorie || null, predefini: true, actif: !!c.actif, obligatoire: !!c.obligatoire };
+    }
+    idxPerso++;
+    const type = RECENSEMENT_TYPES_CHAMPS_PERSO.includes(c.type) ? c.type : 'texte';
+    const label = String(c.label || '').trim().slice(0, 120);
+    if (!label) return null;
+    const id = /^[a-z0-9_]{3,40}$/.test(c.id || '') ? c.id : `champ_${idxPerso}_${Date.now().toString(36)}`;
+    const options = ['choix_unique', 'choix_multiple', 'liste_deroulante'].includes(type)
+      ? (Array.isArray(c.options) ? c.options.slice(0, 20).map(o => String(o).trim().slice(0, 80)).filter(Boolean) : [])
+      : undefined;
+    return { id, label, description: String(c.description || '').trim().slice(0, 300) || null, type, obligatoire: !!c.obligatoire, actif: true, predefini: false, ...(options ? { options } : {}) };
+  }).filter(Boolean);
+}
+
+/* Détection de doublons (§10) — rien d'équivalent n'existe ailleurs sur ce dépôt combinant ces
+   champs (vérifié) : réutilise similariteChaine (déjà utilisé pour les doublons de
+   collectivités) pour nom/prénom, égalité stricte pour date de naissance/email. Une
+   correspondance n'est retenue que si (a) email identique, OU (b) date de naissance identique
+   ET nom+prénom suffisamment proches — jamais nom/prénom seuls (consigne explicite du cahier
+   des charges), pour ne pas bloquer abusivement des homonymes. */
+async function detecterDoublonRecensement(recensementId, { nom, prenom, dateNaissance, email }) {
+  const emailNorm = email ? String(email).trim().toLowerCase() : null;
+  const dnNorm = dateNaissance || null;
+  if (!emailNorm && !dnNorm) return null; // pas assez d'éléments fiables pour comparer
+  const candidats = await db.prepare(
+    `SELECT id, identifiant, match_nom, match_prenom, match_date_naissance, match_email
+     FROM recensement_declarations
+     WHERE recensement_id=? AND supprime_le IS NULL AND (match_email=? OR match_date_naissance=?)`
+  ).all(recensementId, emailNorm, dnNorm);
+  for (const c of candidats) {
+    if (emailNorm && c.match_email && c.match_email === emailNorm) return c;
+    if (dnNorm && c.match_date_naissance && c.match_date_naissance === dnNorm) {
+      const simNom = similariteChaine(nom || '', c.match_nom || '');
+      const simPrenom = similariteChaine(prenom || '', c.match_prenom || '');
+      if (simNom >= 70 && simPrenom >= 70) return c;
+    }
+  }
+  return null;
+}
+
+/* ---- Créer un recensement (brouillon) — réservé aux Initiatives (§1) ---- */
+route('POST', '/api/recensements', async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  if (user.role !== 'initiative') return sendJSON(res, 403, { error: 'Le module Recensement est réservé aux comptes Initiative.' });
+  const init = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=?').get(user.id);
+  if (!init) return sendJSON(res, 400, { error: 'Aucune initiative associée à ce compte.' });
+  const type = RECENSEMENT_TYPES.includes(body.type) ? body.type : 'denombrement';
+  const nom = String(body.nom || '').trim();
+  const description = String(body.description || '').trim();
+  const population = String(body.population_concernee || '').trim();
+  if (!nom || !description || !population) return sendJSON(res, 400, { error: 'Nom, description et population concernée sont obligatoires.' });
+  if (!body.date_debut) return sendJSON(res, 400, { error: 'La date de début est obligatoire.' });
+  const territoire = body.territoire && RECENSEMENT_TERRITOIRE_TYPES.includes(body.territoire.type)
+    ? { type: body.territoire.type, valeur: String(body.territoire.valeur || '').trim().slice(0, 200) } : {};
+  const identifiant = await generateRecensementId();
+  const r = await db.prepare(`
+    INSERT INTO recensements (identifiant, type, initiative_id, owner_user_id, nom, description, population_concernee,
+      territoire_json, date_debut, date_fin, statut)
+    VALUES (?,?,?,?,?,?,?,?,?,?, 'brouillon')
+  `).run(identifiant, type, init.id, user.id, nom, description, population,
+    JSON.stringify(territoire), body.date_debut, body.date_fin || null);
+  sendJSON(res, 201, { id: r.lastInsertRowid, identifiant });
+});
+
+/* ---- Modifier la configuration (créateur uniquement) ---- */
+route('PUT', '/api/recensements/:id', async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if (rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const fields = [], vals = [];
+  if (body.nom !== undefined) { fields.push('nom=?'); vals.push(String(body.nom).trim()); }
+  if (body.description !== undefined) { fields.push('description=?'); vals.push(String(body.description).trim()); }
+  if (body.population_concernee !== undefined) { fields.push('population_concernee=?'); vals.push(String(body.population_concernee).trim()); }
+  if (body.territoire && RECENSEMENT_TERRITOIRE_TYPES.includes(body.territoire.type)) {
+    fields.push('territoire_json=?'); vals.push(JSON.stringify({ type: body.territoire.type, valeur: String(body.territoire.valeur || '').trim().slice(0, 200) }));
+  }
+  if (body.date_debut !== undefined) { fields.push('date_debut=?'); vals.push(body.date_debut); }
+  if (body.date_fin !== undefined) { fields.push('date_fin=?'); vals.push(body.date_fin || null); }
+  if (body.champs_config !== undefined) {
+    fields.push('champs_config_json=?');
+    vals.push(JSON.stringify(sanitizeRecensementChampsConfig(body.champs_config, RECENSEMENT_CHAMPS_PREDEFINIS)));
+  }
+  if (body.mineurs_autorises !== undefined) { fields.push('mineurs_autorises=?'); vals.push(body.mineurs_autorises ? 1 : 0); }
+  if (body.champs_mineur_config !== undefined) {
+    fields.push('champs_mineur_config_json=?');
+    vals.push(JSON.stringify(sanitizeRecensementChampsConfig(body.champs_mineur_config, RECENSEMENT_CHAMPS_MINEUR_PREDEFINIS)));
+  }
+  if (body.verification_identite !== undefined) {
+    fields.push('verification_identite=?'); vals.push(['desactivee', 'activee'].includes(body.verification_identite) ? body.verification_identite : 'desactivee');
+  }
+  if (body.verification_identite_documents !== undefined) {
+    fields.push('verification_identite_documents=?');
+    vals.push(['residence', 'origine', 'les_deux'].includes(body.verification_identite_documents) ? body.verification_identite_documents : 'les_deux');
+  }
+  if (!fields.length) return sendJSON(res, 400, { error: 'Aucune modification fournie.' });
+  fields.push("updated_at=datetime('now')");
+  vals.push(params.id);
+  await db.prepare(`UPDATE recensements SET ${fields.join(',')} WHERE id=?`).run(...vals);
+  sendJSON(res, 200, { ok: true });
+});
+
+route('POST', '/api/recensements/:id/publier', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id, nom, description, date_debut FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if (rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  if (!rec.nom || !rec.description || !rec.date_debut) return sendJSON(res, 400, { error: 'La configuration est incomplète.' });
+  await db.prepare("UPDATE recensements SET statut='actif', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route('POST', '/api/recensements/:id/suspendre', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id, statut FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if (rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const nouveauStatut = rec.statut === 'suspendu' ? 'actif' : 'suspendu';
+  await db.prepare("UPDATE recensements SET statut=?, updated_at=datetime('now') WHERE id=?").run(nouveauStatut, params.id);
+  sendJSON(res, 200, { ok: true, statut: nouveauStatut });
+});
+
+/* ---- Liste (publique : actifs uniquement ; ?mine=1 : tous les siens, tout statut) ---- */
+route('GET', '/api/recensements', async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (query.mine === '1') {
+    if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+    const rows = await db.prepare('SELECT * FROM recensements WHERE owner_user_id=? ORDER BY created_at DESC').all(user.id);
+    return sendJSON(res, 200, { recensements: rows });
+  }
+  const rows = await db.prepare("SELECT * FROM recensements WHERE statut='actif' ORDER BY created_at DESC LIMIT 200").all();
+  sendJSON(res, 200, { recensements: rows });
+});
+
+route('GET', '/api/recensements/:id', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  const estProprietaire = !!(user && user.id === rec.owner_user_id);
+  if (rec.statut !== 'actif' && !estProprietaire) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  sendJSON(res, 200, {
+    recensement: {
+      ...rec,
+      territoire: safeJSON(rec.territoire_json, {}),
+      champs_config: safeJSON(rec.champs_config_json, []),
+      champs_mineur_config: safeJSON(rec.champs_mineur_config_json, []),
+    },
+    est_proprietaire: estProprietaire,
+    champs_predefinis: RECENSEMENT_CHAMPS_PREDEFINIS,
+    champs_mineur_predefinis: RECENSEMENT_CHAMPS_MINEUR_PREDEFINIS,
+    types_champs_perso: RECENSEMENT_TYPES_CHAMPS_PERSO,
+  });
+});
+
+/* ---- Participer : crée une déclaration (compte Diaspo'Actif OU accès email+mot de passe) ----
+   Ne crée JAMAIS de compte Diaspo'Actif pour un participant sans compte (§9) — juste un accès
+   dédié à SA déclaration (mot de passe haché avec la même fonction que les comptes réels). */
+route('POST', '/api/recensements/:id/declarations', async (req, res, params, body) => {
+  const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
+  if (!rec) return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  if (rec.statut !== 'actif') return sendJSON(res, 400, { error: "Ce recensement n'accepte plus de déclarations." });
+
+  const estMineur = !!body.est_mineur;
+  if (estMineur && !rec.mineurs_autorises) return sendJSON(res, 400, { error: "Ce recensement n'autorise pas les déclarations de personnes mineures." });
+
+  const reponses = (body.reponses && typeof body.reponses === 'object') ? body.reponses : {};
+  const nom = String(reponses.nom || '').trim();
+  const prenom = String(reponses.prenom || '').trim();
+  const dateNaissance = reponses.date_naissance || null;
+  const email = reponses.email || null;
+
+  // Détection de doublon AVANT toute création (§10)
+  const doublon = await detecterDoublonRecensement(rec.id, { nom, prenom, dateNaissance, email });
+  if (doublon) {
+    return sendJSON(res, 409, {
+      error: 'doublon',
+      message: 'Vous avez déjà participé à ce recensement. Une déclaration correspondant aux informations renseignées existe déjà dans ce dénombrement. Connectez-vous à votre espace pour consulter votre déclaration.',
+    });
+  }
+
+  const user = await getCurrentUser(req);
+  let userId = null, accesEmail = null, accesHash = null, accesSalt = null, accesToken = null;
+  if (user) {
+    userId = user.id;
+  } else {
+    const email2 = String(body.acces_email || '').trim().toLowerCase();
+    const pwd = String(body.acces_password || '');
+    if (!email2 || !pwd) return sendJSON(res, 400, { error: 'Adresse e-mail et mot de passe requis pour participer sans compte Diaspo\'Actif.' });
+    if (pwd.length < 8) return sendJSON(res, 400, { error: 'Le mot de passe doit comporter au moins 8 caractères.' });
+    const { hash, salt } = hashPassword(pwd);
+    accesEmail = email2; accesHash = hash; accesSalt = salt;
+  }
+
+  const identifiant = await generateDeclarationId();
+  const ins = await db.prepare(`
+    INSERT INTO recensement_declarations (identifiant, recensement_id, est_mineur, user_id, acces_email, acces_password_hash, acces_password_salt,
+      reponses_json, match_nom, match_prenom, match_date_naissance, match_email, match_pays_residence, match_pays_origine,
+      responsable_nom, responsable_prenom, responsable_email, responsable_telephone)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    identifiant, rec.id, estMineur ? 1 : 0, userId, accesEmail, accesHash, accesSalt,
+    JSON.stringify(reponses), nom || null, prenom || null, dateNaissance, email ? String(email).trim().toLowerCase() : null,
+    reponses.pays_residence || null, reponses.pays_origine || null,
+    estMineur ? String(body.responsable?.nom || '').trim() || null : null,
+    estMineur ? String(body.responsable?.prenom || '').trim() || null : null,
+    estMineur ? String(body.responsable?.email || '').trim() || null : null,
+    estMineur ? String(body.responsable?.telephone || '').trim() || null : null,
+  );
+  await db.prepare("UPDATE recensements SET nb_declarations=nb_declarations+1 WHERE id=?").run(rec.id);
+
+  if (!userId) accesToken = signAuthTokenRecensement(ins.lastInsertRowid);
+  sendJSON(res, 201, { id: ins.lastInsertRowid, identifiant, acces_token: accesToken });
+});
+
+/* ---- Voir les déclarations (créateur uniquement) — §14. Jamais les colonnes
+   acces_password_hash/salt, même pour le créateur : aucune raison de les exposer. ---- */
+route('GET', '/api/recensements/:id/declarations', async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const limit = Math.min(Number(query.limit) || 100, 500);
+  const rows = await db.prepare(`
+    SELECT id, identifiant, est_mineur, identite_statut, reponses_json, created_at
+    FROM recensement_declarations WHERE recensement_id=? AND supprime_le IS NULL ORDER BY created_at DESC LIMIT ?
+  `).all(params.id, limit);
+  sendJSON(res, 200, { declarations: rows.map(r => ({ ...r, est_mineur: !!r.est_mineur, reponses: safeJSON(r.reponses_json, {}), reponses_json: undefined })) });
+});
+
+/* Jeton d'accès pour un participant SANS compte Diaspo'Actif — réutilise signAuthToken/
+   verifyAuthToken (server/auth.js), génériques (payload arbitraire + expiration optionnelle),
+   déjà utilisés pour les vrais comptes ; ici le payload porte un declaration_id, jamais un uid. */
+function signAuthTokenRecensement(declarationId) {
+  return signAuthToken({ kind: 'recensement_acces', declaration_id: declarationId, exp: Math.floor(Date.now() / 1000) + 365 * 24 * 3600 });
+}
+function verifyRecensementAcces(req) {
+  const token = req.headers['x-recensement-token'];
+  if (!token) return null;
+  const payload = verifyAuthToken(token);
+  if (!payload || payload.kind !== 'recensement_acces' || !payload.declaration_id) return null;
+  return payload.declaration_id;
+}
+
+route('POST', '/api/recensement-acces/connexion', async (req, res, params, body) => {
+  const email = String(body.email || '').trim().toLowerCase();
+  const pwd = String(body.password || '');
+  if (!email || !pwd) return sendJSON(res, 400, { error: 'Adresse e-mail et mot de passe requis.' });
+  const decl = await db.prepare('SELECT id, acces_password_hash, acces_password_salt FROM recensement_declarations WHERE acces_email=? AND supprime_le IS NULL ORDER BY created_at DESC LIMIT 1').get(email);
+  if (!decl || !decl.acces_password_hash || !verifyPassword(pwd, decl.acces_password_salt, decl.acces_password_hash)) {
+    return sendJSON(res, 401, { error: 'Adresse e-mail ou mot de passe incorrect.' });
+  }
+  sendJSON(res, 200, { acces_token: signAuthTokenRecensement(decl.id), declaration_id: decl.id });
+});
+
+/* ---- Mes recensements (compte Diaspo'Actif connecté) ---- */
+route('GET', '/api/mes-recensements', async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rows = await db.prepare(`
+    SELECT d.id, d.identifiant, d.est_mineur, d.identite_statut, d.created_at, r.id AS recensement_id, r.identifiant AS recensement_identifiant, r.nom AS recensement_nom
+    FROM recensement_declarations d JOIN recensements r ON r.id=d.recensement_id
+    WHERE d.user_id=? AND d.supprime_le IS NULL ORDER BY d.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { declarations: rows });
+});
+
+/* ---- Déclaration : accès par compte OU jeton dédié (jamais aux données d'un autre) ---- */
+async function chargerDeclarationAutorisee(req, declarationId) {
+  const decl = await db.prepare('SELECT * FROM recensement_declarations WHERE id=? AND supprime_le IS NULL').get(declarationId);
+  if (!decl) return { erreur: 404 };
+  const user = await getCurrentUser(req);
+  if (decl.user_id) {
+    if (!user || user.id !== decl.user_id) return { erreur: 403 };
+  } else {
+    const accesId = verifyRecensementAcces(req);
+    if (!accesId || Number(accesId) !== Number(decl.id)) return { erreur: 403 };
+  }
+  return { decl };
+}
+
+route('GET', '/api/recensement-declarations/:id', async (req, res, params) => {
+  const { decl, erreur } = await chargerDeclarationAutorisee(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: erreur === 404 ? 'Déclaration introuvable.' : 'Accès refusé.' });
+  const rec = await db.prepare('SELECT identifiant, nom FROM recensements WHERE id=?').get(decl.recensement_id);
+  /* Ne JAMAIS renvoyer acces_password_hash/salt (même hachés, aucune raison de les exposer
+     au client) ni les colonnes match_* (usage interne détection de doublons uniquement) —
+     bug trouvé en testant ce endpoint en conditions réelles, corrigé avant tout déploiement. */
+  sendJSON(res, 200, {
+    declaration: {
+      id: decl.id, identifiant: decl.identifiant, recensement_id: decl.recensement_id,
+      est_mineur: !!decl.est_mineur, identite_statut: decl.identite_statut,
+      responsable_nom: decl.responsable_nom, responsable_prenom: decl.responsable_prenom,
+      responsable_email: decl.responsable_email, responsable_telephone: decl.responsable_telephone,
+      created_at: decl.created_at, reponses: safeJSON(decl.reponses_json, {}),
+    },
+    recensement: rec,
+  });
+});
+
+route('DELETE', '/api/recensement-declarations/:id', async (req, res, params) => {
+  const { decl, erreur } = await chargerDeclarationAutorisee(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: erreur === 404 ? 'Déclaration introuvable.' : 'Accès refusé.' });
+  /* Suppression contrôlée par la personne concernée — le créateur du recensement ne peut pas
+     l'empêcher (§19/§20) : aucune vérification du côté "créateur" ici, volontairement. */
+  await db.prepare("UPDATE recensement_declarations SET supprime_le=datetime('now'), reponses_json='{}', match_nom=NULL, match_prenom=NULL, match_date_naissance=NULL, match_email=NULL WHERE id=?").run(decl.id);
+  await db.prepare("UPDATE recensements SET nb_declarations=MAX(0,nb_declarations-1) WHERE id=?").run(decl.recensement_id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Demande de modification (§18) — même squelette que deletion_requests ---- */
+route('POST', '/api/recensement-declarations/:id/demande-modification', async (req, res, params, body) => {
+  const { decl, erreur } = await chargerDeclarationAutorisee(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: erreur === 404 ? 'Déclaration introuvable.' : 'Accès refusé.' });
+  const champ = String(body.champ || '').trim();
+  const nouvelleValeur = String(body.nouvelle_valeur ?? '').trim();
+  if (!champ || !nouvelleValeur) return sendJSON(res, 400, { error: "Champ à modifier et nouvelle information sont requis." });
+  const r = await db.prepare(`
+    INSERT INTO recensement_modification_demandes (declaration_id, recensement_id, champ, nouvelle_valeur, motif)
+    VALUES (?,?,?,?,?)
+  `).run(decl.id, decl.recensement_id, champ, nouvelleValeur, String(body.motif || '').trim().slice(0, 500) || null);
+  const rec = await db.prepare('SELECT owner_user_id, nom FROM recensements WHERE id=?').get(decl.recensement_id);
+  if (rec) creerNotif(rec.owner_user_id, 'recensement_demande_modification', 'Demande de modification',
+    `Une demande de modification a été soumise pour une déclaration de « ${rec.nom} ».`, { recensement_id: decl.recensement_id, demande_id: r.lastInsertRowid });
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route('GET', '/api/recensements/:id/modification-demandes', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const rows = await db.prepare("SELECT * FROM recensement_modification_demandes WHERE recensement_id=? ORDER BY created_at DESC").all(params.id);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+route('PATCH', '/api/recensement-modification-demandes/:id', async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const demande = await db.prepare('SELECT * FROM recensement_modification_demandes WHERE id=?').get(params.id);
+  if (!demande) return sendJSON(res, 404, { error: 'Demande introuvable.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(demande.recensement_id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  if (!['acceptee', 'refusee'].includes(body.statut)) return sendJSON(res, 400, { error: 'Statut invalide.' });
+  await db.prepare("UPDATE recensement_modification_demandes SET statut=?, admin_reponse=?, traite_le=datetime('now') WHERE id=?")
+    .run(body.statut, String(body.reponse || '').trim().slice(0, 500) || null, params.id);
+  if (body.statut === 'acceptee') {
+    const decl = await db.prepare('SELECT reponses_json FROM recensement_declarations WHERE id=?').get(demande.declaration_id);
+    const reponses = safeJSON(decl?.reponses_json, {});
+    reponses[demande.champ] = demande.nouvelle_valeur;
+    const upd = { reponses_json: JSON.stringify(reponses) };
+    // Les colonnes de correspondance (doublons) suivent nom/prénom/date de naissance/email si modifiés.
+    const colMatch = { nom: 'match_nom', prenom: 'match_prenom', date_naissance: 'match_date_naissance', email: 'match_email' }[demande.champ];
+    await db.prepare(`UPDATE recensement_declarations SET reponses_json=?${colMatch ? `, ${colMatch}=?` : ''} WHERE id=?`)
+      .run(JSON.stringify(reponses), ...(colMatch ? [demande.champ === 'email' ? demande.nouvelle_valeur.toLowerCase() : demande.nouvelle_valeur] : []), demande.declaration_id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ---- Statistiques (créateur uniquement) — calculées à la volée, aucune donnée nominative ---- */
+route('GET', '/api/recensements/:id/stats', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT owner_user_id FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const rows = await db.prepare("SELECT est_mineur, identite_statut, match_pays_residence, match_pays_origine, reponses_json FROM recensement_declarations WHERE recensement_id=? AND supprime_le IS NULL").all(params.id);
+  const total = rows.length;
+  const adultes = rows.filter(r => !r.est_mineur).length;
+  const mineurs = rows.filter(r => r.est_mineur).length;
+  const verifications = { verifie: 0, en_cours: 0, echec: 0, non_verifie: 0 };
+  rows.forEach(r => { verifications[r.identite_statut || 'non_verifie']++; });
+  const compter = (arr, cle) => { const m = {}; arr.forEach(v => { if (v) m[v] = (m[v] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([valeur, n]) => ({ valeur, n })); };
+  sendJSON(res, 200, {
+    total, adultes, mineurs, verifications,
+    par_pays_residence: compter(rows.map(r => r.match_pays_residence), 'pays_residence'),
+    par_pays_origine: compter(rows.map(r => r.match_pays_origine), 'pays_origine'),
+    par_metier: compter(rows.map(r => safeJSON(r.reponses_json, {}).metier), 'metier'),
+  });
+});
+
+/* ---- Vérification d'identité (Stripe Identity) — même appel que /api/identity/verify,
+   uniquement la métadonnée change pour distinguer côté webhook. Jamais de document stocké
+   (§8/§20) : seul session.id puis le statut résultant sont écrits en base. ---- */
+route('POST', '/api/recensement-declarations/:id/verification-identite', async (req, res, params, body) => {
+  const { decl, erreur } = await chargerDeclarationAutorisee(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: erreur === 404 ? 'Déclaration introuvable.' : 'Accès refusé.' });
+  const rec = await db.prepare('SELECT verification_identite FROM recensements WHERE id=?').get(decl.recensement_id);
+  if (!rec || rec.verification_identite !== 'activee') return sendJSON(res, 400, { error: "La vérification d'identité n'est pas activée pour ce recensement." });
+  try {
+    const { stripe } = require('./stripe-client');
+    if (!stripe) return sendJSON(res, 503, { error: 'Vérification indisponible pour le moment.' });
+    const origin = getOrigin(req);
+    const session = await stripe.identity.verificationSessions.create({
+      type: 'document',
+      options: { document: { require_matching_selfie: true } },
+      metadata: { diaspoactif_recensement_declaration_id: String(decl.id) },
+      return_url: `${origin}/recensement.html?declaration=${decl.identifiant}&identity=retour`,
+    });
+    await db.prepare("UPDATE recensement_declarations SET stripe_identity_session_id=?, identite_statut='en_cours', updated_at=datetime('now') WHERE id=?").run(session.id, decl.id);
+    sendJSON(res, 200, { url: session.url });
+  } catch (e) {
+    await logError(e, 'recensement-identity-verify', req);
+    sendJSON(res, 500, SEC.safeError(e, 'recensement-identity-verify'));
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE CRM (comptes Initiative) — Routes (2026-09-07)
+   Centre de pilotage : rassemble et connecte des données déjà existantes (produits, événements,
+   campagnes, messagerie, demandes de devis) et n'introduit de nouvelles tables que là où rien
+   d'équivalent n'existait (crm_contacts, crm_pipeline, crm_opportunites, crm_taches — voir
+   server/db.js). Toutes les routes vérifient owner_user_id de l'initiative du compte connecté,
+   même pattern que partout ailleurs sur la plateforme (voir ex. /api/dashboard/initiative).
+   Sous-modules Campagnes/Événements/Audiences/Échanges/Demandes : AUCUNE nouvelle table, ces
+   routes lisent directement publicites/events/conversations-messages/devis_demandes. ═══ */
+
+async function crmInitOwner(req) {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "initiative") return { erreur: 403, msg: "Réservé aux comptes Initiative." };
+  const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
+  if (!init) return { erreur: 404, msg: "Aucune initiative associée à ce compte." };
+  return { user, init };
+}
+const CRM_STATUTS_PIPELINE = ["nouveau", "contacte", "interesse", "devis_envoye", "negociation", "gagne", "perdu"];
+
+/* ── Contacts ── */
+route("GET", "/api/crm/contacts", async (req, res, params, body, query) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  let sql = `SELECT c.*, p.statut AS pipeline_statut, p.valeur_potentielle, p.prochaine_action, p.prochaine_action_date, p.derniere_interaction_at,
+    u.photo_url AS linked_photo_url
+    FROM crm_contacts c LEFT JOIN crm_pipeline p ON p.contact_id=c.id LEFT JOIN users u ON u.id=c.linked_user_id
+    WHERE c.initiative_id=?`;
+  const args = [init.id];
+  if (query.relation) { sql += " AND c.relation=?"; args.push(query.relation); }
+  if (query.q) { const like = `%${query.q}%`; sql += " AND (c.nom LIKE ? OR c.prenom LIKE ? OR c.email LIKE ? OR c.societe LIKE ?)"; args.push(like, like, like, like); }
+  sql += " ORDER BY c.updated_at DESC LIMIT 500";
+  const rows = await db.prepare(sql).all(...args);
+  sendJSON(res, 200, { contacts: rows.map(r => ({ ...r, tags: safeParse(r.tags_json || "[]") })) });
+});
+
+route("GET", "/api/crm/contacts/:id", async (req, res, params) => {
+  const { user, init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const c = await db.prepare("SELECT * FROM crm_contacts WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!c) return sendJSON(res, 404, { error: "Contact introuvable." });
+  const pipeline = await db.prepare("SELECT * FROM crm_pipeline WHERE contact_id=?").get(c.id);
+  const opportunites = await db.prepare("SELECT * FROM crm_opportunites WHERE contact_id=? ORDER BY id DESC").all(c.id);
+  const taches = await db.prepare("SELECT * FROM crm_taches WHERE contact_id=? ORDER BY date_echeance ASC").all(c.id);
+  const demande = c.devis_demande_id ? await db.prepare("SELECT id, produit_nom, statut, created_at FROM devis_demandes WHERE id=?").get(c.devis_demande_id) : null;
+  let linkedUser = null, nbMessages = null;
+  if (c.linked_user_id) {
+    linkedUser = await db.prepare("SELECT id, nom, prenom, photo_url, email, ville, pays FROM users WHERE id=?").get(c.linked_user_id);
+    nbMessages = (await db.prepare(
+      "SELECT COUNT(*) n FROM messages m JOIN conversations conv ON conv.id=m.conversation_id WHERE (conv.user1_id=? OR conv.user2_id=?) AND (conv.user1_id=? OR conv.user2_id=?)"
+    ).get(user.id, user.id, c.linked_user_id, c.linked_user_id))?.n || 0;
+  }
+  sendJSON(res, 200, { contact: { ...c, tags: safeParse(c.tags_json || "[]") }, pipeline, opportunites, taches, demande, linked_user: linkedUser, nb_messages: nbMessages });
+});
+
+route("POST", "/api/crm/contacts", async (req, res, params, body) => {
+  const { user, init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const nom = (body.nom || "").trim();
+  if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
+  const relation = ["prospect", "client", "partenaire", "autre"].includes(body.relation) ? body.relation : "autre";
+  const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,ville,pays,societe,fonction,relation,notes,source,tags_json,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    init.id, body.linked_user_id || null, nom, body.prenom || null, body.email || null, body.telephone || null,
+    body.ville || null, body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null,
+    body.source || null, JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []), user.id
+  );
+  if (relation === "prospect") await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut) VALUES (?,?,'nouveau')").run(r.lastInsertRowid, init.id);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/crm/contacts/:id", async (req, res, params, body) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const c = await db.prepare("SELECT id, nom FROM crm_contacts WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!c) return sendJSON(res, 404, { error: "Contact introuvable." });
+  const relation = ["prospect", "client", "partenaire", "autre"].includes(body.relation) ? body.relation : "autre";
+  await db.prepare(`UPDATE crm_contacts SET nom=?,prenom=?,email=?,telephone=?,ville=?,pays=?,societe=?,fonction=?,relation=?,notes=?,source=?,tags_json=?,updated_at=datetime('now') WHERE id=?`).run(
+    (body.nom || "").trim() || c.nom, body.prenom || null, body.email || null, body.telephone || null, body.ville || null,
+    body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null, body.source || null,
+    JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []), params.id
+  );
+  if (relation === "prospect" && !(await db.prepare("SELECT id FROM crm_pipeline WHERE contact_id=?").get(params.id))) {
+    await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut) VALUES (?,?,'nouveau')").run(params.id, init.id);
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/crm/contacts/:id", async (req, res, params) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const c = await db.prepare("SELECT id FROM crm_contacts WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!c) return sendJSON(res, 404, { error: "Contact introuvable." });
+  await db.prepare("DELETE FROM crm_pipeline WHERE contact_id=?").run(params.id);
+  await db.prepare("DELETE FROM crm_taches WHERE contact_id=?").run(params.id);
+  await db.prepare("UPDATE crm_opportunites SET contact_id=NULL WHERE contact_id=?").run(params.id);
+  await db.prepare("DELETE FROM crm_contacts WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Un clic : transforme une demande de devis (devis_demandes, module existant) en fiche Contact
+   + Prospect. Semi-automatique et jamais silencieux (décision actée avec l'utilisateur,
+   2026-09-07) — évite les doublons si la même personne écrit plusieurs fois. */
+route("POST", "/api/crm/contacts/from-devis/:devisId", async (req, res, params) => {
+  const { user, init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const d = await db.prepare("SELECT * FROM devis_demandes WHERE id=? AND vitrine_id=?").get(params.devisId, init.id);
+  if (!d) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const existant = await db.prepare("SELECT id FROM crm_contacts WHERE devis_demande_id=?").get(d.id);
+  if (existant) return sendJSON(res, 200, { id: existant.id, deja_existant: true });
+  const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,relation,source,devis_demande_id,notes,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(
+    init.id, d.requester_user_id || null, d.requester_last_name || d.requester_email, d.requester_first_name || null,
+    d.requester_email, d.requester_phone || null, "prospect", "devis", d.id,
+    d.produit_nom ? `Intéressé par : ${d.produit_nom}` : null, user.id
+  );
+  await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut,produit_service) VALUES (?,?,'nouveau',?)").run(r.lastInsertRowid, init.id, d.produit_nom || null);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+/* ── Prospects (pipeline / kanban) ── */
+route("GET", "/api/crm/pipeline", async (req, res, params) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const rows = await db.prepare(`SELECT p.*, c.nom, c.prenom, c.email, c.telephone, c.societe
+    FROM crm_pipeline p JOIN crm_contacts c ON c.id=p.contact_id WHERE p.initiative_id=? ORDER BY p.ordre ASC, p.updated_at DESC`).all(init.id);
+  sendJSON(res, 200, { pipeline: rows });
+});
+
+route("PATCH", "/api/crm/pipeline/:contactId", async (req, res, params, body) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const c = await db.prepare("SELECT id FROM crm_contacts WHERE id=? AND initiative_id=?").get(params.contactId, init.id);
+  if (!c) return sendJSON(res, 404, { error: "Contact introuvable." });
+  const statut = CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : null;
+  const existe = await db.prepare("SELECT id FROM crm_pipeline WHERE contact_id=?").get(params.contactId);
+  if (!existe) {
+    await db.prepare(`INSERT INTO crm_pipeline (contact_id,initiative_id,statut,valeur_potentielle,produit_service,prochaine_action,prochaine_action_date,ordre)
+      VALUES (?,?,?,?,?,?,?,?)`).run(
+      params.contactId, init.id, statut || "nouveau", body.valeur_potentielle ?? null, body.produit_service || null,
+      body.prochaine_action || null, body.prochaine_action_date || null, body.ordre ?? 0
+    );
+  } else {
+    await db.prepare(`UPDATE crm_pipeline SET
+      statut=COALESCE(?,statut), valeur_potentielle=COALESCE(?,valeur_potentielle), produit_service=COALESCE(?,produit_service),
+      prochaine_action=COALESCE(?,prochaine_action), prochaine_action_date=COALESCE(?,prochaine_action_date),
+      derniere_interaction_at=CASE WHEN ? IS NOT NULL THEN datetime('now') ELSE derniere_interaction_at END,
+      ordre=COALESCE(?,ordre), updated_at=datetime('now') WHERE contact_id=?`).run(
+      statut, body.valeur_potentielle ?? null, body.produit_service ?? null, body.prochaine_action ?? null, body.prochaine_action_date ?? null,
+      statut, body.ordre ?? null, params.contactId
+    );
+  }
+  await db.prepare("UPDATE crm_contacts SET relation='prospect', updated_at=datetime('now') WHERE id=? AND relation NOT IN ('prospect','client')").run(params.contactId);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Opportunités ── */
+route("GET", "/api/crm/opportunites", async (req, res, params) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const rows = await db.prepare(`SELECT o.*, c.nom AS contact_nom, c.prenom AS contact_prenom
+    FROM crm_opportunites o LEFT JOIN crm_contacts c ON c.id=o.contact_id WHERE o.initiative_id=? ORDER BY o.updated_at DESC`).all(init.id);
+  sendJSON(res, 200, { opportunites: rows });
+});
+
+route("POST", "/api/crm/opportunites", async (req, res, params, body) => {
+  const { user, init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const titre = (body.titre || "").trim();
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const r = await db.prepare(`INSERT INTO crm_opportunites (initiative_id,contact_id,titre,valeur,devise,statut,probabilite,date_prevue,prochaine_action,notes,lie_produit_id,lie_event_id,lie_devis_demande_id,lie_campagne_id,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    init.id, body.contact_id || null, titre, body.valeur != null ? Number(body.valeur) : null, body.devise || "EUR",
+    CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : "nouveau", body.probabilite != null ? Number(body.probabilite) : 50,
+    body.date_prevue || null, body.prochaine_action || null, body.notes || null,
+    body.lie_produit_id || null, body.lie_event_id || null, body.lie_devis_demande_id || null, body.lie_campagne_id || null, user.id
+  );
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/crm/opportunites/:id", async (req, res, params, body) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const o = await db.prepare("SELECT id, titre FROM crm_opportunites WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!o) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+  await db.prepare(`UPDATE crm_opportunites SET titre=?, valeur=?, devise=COALESCE(?,devise), statut=COALESCE(?,statut),
+    probabilite=COALESCE(?,probabilite), date_prevue=?, prochaine_action=?, notes=?, contact_id=?, updated_at=datetime('now') WHERE id=?`).run(
+    (body.titre || "").trim() || o.titre, body.valeur != null ? Number(body.valeur) : null, body.devise || null,
+    CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : null, body.probabilite != null ? Number(body.probabilite) : null,
+    body.date_prevue || null, body.prochaine_action || null, body.notes || null, body.contact_id || null, params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/crm/opportunites/:id", async (req, res, params) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const o = await db.prepare("SELECT id FROM crm_opportunites WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!o) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+  await db.prepare("DELETE FROM crm_opportunites WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Tâches ── */
+route("GET", "/api/crm/taches", async (req, res, params, body, query) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  let sql = "SELECT t.*, c.nom AS contact_nom, c.prenom AS contact_prenom FROM crm_taches t LEFT JOIN crm_contacts c ON c.id=t.contact_id WHERE t.initiative_id=?";
+  const args = [init.id];
+  if (query.statut) { sql += " AND t.statut=?"; args.push(query.statut); }
+  sql += " ORDER BY (t.date_echeance IS NULL), t.date_echeance ASC, t.id DESC LIMIT 500";
+  const rows = await db.prepare(sql).all(...args);
+  sendJSON(res, 200, { taches: rows });
+});
+
+route("POST", "/api/crm/taches", async (req, res, params, body) => {
+  const { user, init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const titre = (body.titre || "").trim();
+  if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
+  const PRIORITES = ["basse", "normale", "haute", "urgente"];
+  const r = await db.prepare(`INSERT INTO crm_taches (initiative_id,titre,description,priorite,date_echeance,heure_echeance,contact_id,opportunite_id,devis_demande_id,event_id,campagne_id,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    init.id, titre, body.description || null, PRIORITES.includes(body.priorite) ? body.priorite : "normale",
+    body.date_echeance || null, body.heure_echeance || null, body.contact_id || null, body.opportunite_id || null,
+    body.devis_demande_id || null, body.event_id || null, body.campagne_id || null, user.id
+  );
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/crm/taches/:id", async (req, res, params, body) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const t = await db.prepare("SELECT id, titre FROM crm_taches WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!t) return sendJSON(res, 404, { error: "Tâche introuvable." });
+  const STATUTS = ["a_faire", "en_cours", "terminee", "annulee"];
+  const PRIORITES = ["basse", "normale", "haute", "urgente"];
+  await db.prepare(`UPDATE crm_taches SET titre=?, description=?, priorite=COALESCE(?,priorite), statut=COALESCE(?,statut),
+    date_echeance=?, heure_echeance=?, updated_at=datetime('now') WHERE id=?`).run(
+    (body.titre || "").trim() || t.titre, body.description || null,
+    PRIORITES.includes(body.priorite) ? body.priorite : null, STATUTS.includes(body.statut) ? body.statut : null,
+    body.date_echeance || null, body.heure_echeance || null, params.id
+  );
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/crm/taches/:id", async (req, res, params) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const t = await db.prepare("SELECT id FROM crm_taches WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  if (!t) return sendJSON(res, 404, { error: "Tâche introuvable." });
+  await db.prepare("DELETE FROM crm_taches WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Demandes (lecture seule — module devis_demandes déjà existant, aucune nouvelle table) ── */
+route("GET", "/api/crm/demandes", async (req, res, params) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const rows = await db.prepare(`SELECT d.*, cc.id AS contact_id
+    FROM devis_demandes d LEFT JOIN crm_contacts cc ON cc.devis_demande_id=d.id WHERE d.vitrine_id=? ORDER BY d.created_at DESC LIMIT 200`).all(init.id);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* ── Tableau de bord CRM ── */
+route("GET", "/api/crm/dashboard", async (req, res, params) => {
+  const { user, init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const oid = init.id, uid = user.id;
+  const nbContacts = (await db.prepare("SELECT COUNT(*) n FROM crm_contacts WHERE initiative_id=?").get(oid))?.n || 0;
+  const nbProspects = (await db.prepare("SELECT COUNT(*) n FROM crm_pipeline WHERE initiative_id=? AND statut NOT IN ('gagne','perdu')").get(oid))?.n || 0;
+  const nbOpportunites = (await db.prepare("SELECT COUNT(*) n FROM crm_opportunites WHERE initiative_id=? AND statut NOT IN ('gagne','perdu')").get(oid))?.n || 0;
+  const nbDemandes = (await db.prepare("SELECT COUNT(*) n FROM devis_demandes WHERE vitrine_id=? AND statut NOT IN ('acceptee','cloturee')").get(oid))?.n || 0;
+  const nbCampagnes = (await db.prepare("SELECT COUNT(*) n FROM publicites WHERE user_id=? AND statut='approved'").get(uid))?.n || 0;
+  const nbEvenements = (await db.prepare("SELECT COUNT(*) n FROM events WHERE organisateur_id=? AND date_debut > datetime('now') AND statut='publie'").get(uid))?.n || 0;
+  const nbMessagesNonLus = (await db.prepare(
+    "SELECT COUNT(*) n FROM messages m JOIN conversations c ON c.id=m.conversation_id WHERE m.sender_id!=? AND m.lu=0 AND (c.user1_id=? OR c.user2_id=?)"
+  ).get(uid, uid, uid))?.n || 0;
+  const nbTaches = (await db.prepare("SELECT COUNT(*) n FROM crm_taches WHERE initiative_id=? AND statut='a_faire'").get(oid))?.n || 0;
+
+  const activites = [];
+  (await db.prepare("SELECT id, produit_nom, requester_first_name, requester_last_name, created_at FROM devis_demandes WHERE vitrine_id=? ORDER BY id DESC LIMIT 5").all(oid))
+    .forEach(d => activites.push({ type: "demande", id: d.id, label: `📩 Nouvelle demande de devis${d.produit_nom ? " — " + d.produit_nom : ""}`, sous: `${d.requester_first_name || ""} ${d.requester_last_name || ""}`.trim(), date: d.created_at }));
+  (await db.prepare("SELECT p.id, p.statut, p.updated_at, c.nom, c.prenom FROM crm_pipeline p JOIN crm_contacts c ON c.id=p.contact_id WHERE p.initiative_id=? ORDER BY p.updated_at DESC LIMIT 5").all(oid))
+    .forEach(p => activites.push({ type: "prospect", id: p.id, label: `🎯 Prospect déplacé vers « ${p.statut} »`, sous: `${p.prenom || ""} ${p.nom || ""}`.trim(), date: p.updated_at }));
+  (await db.prepare("SELECT id, titre, created_at FROM crm_taches WHERE initiative_id=? ORDER BY id DESC LIMIT 5").all(oid))
+    .forEach(t => activites.push({ type: "tache", id: t.id, label: `📋 Nouvelle tâche : ${t.titre}`, date: t.created_at }));
+  activites.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const aFaire = [];
+  if (nbDemandes) aFaire.push({ niveau: "rouge", label: `${nbDemandes} demande(s) de devis sans réponse` });
+  const prospectsARelancer = (await db.prepare("SELECT COUNT(*) n FROM crm_pipeline WHERE initiative_id=? AND prochaine_action_date IS NOT NULL AND prochaine_action_date <= date('now')").get(oid))?.n || 0;
+  if (prospectsARelancer) aFaire.push({ niveau: "orange", label: `${prospectsARelancer} prospect(s) à relancer` });
+  const tachesAujourdhui = (await db.prepare("SELECT COUNT(*) n FROM crm_taches WHERE initiative_id=? AND statut='a_faire' AND date_echeance=date('now')").get(oid))?.n || 0;
+  if (tachesAujourdhui) aFaire.push({ niveau: "vert", label: `${tachesAujourdhui} tâche(s) aujourd'hui` });
+
+  sendJSON(res, 200, {
+    compteurs: { contacts: nbContacts, prospects: nbProspects, opportunites: nbOpportunites, demandes: nbDemandes, campagnes: nbCampagnes, evenements: nbEvenements, messages_non_lus: nbMessagesNonLus, taches: nbTaches },
+    activite_recente: activites.slice(0, 10),
+    a_faire: aFaire,
+  });
+});
+
+/* ── Recherche globale CRM ── */
+route("GET", "/api/crm/recherche", async (req, res, params, body, query) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const q = (query.q || "").trim();
+  if (q.length < 2) return sendJSON(res, 200, { contacts: [], opportunites: [], taches: [], demandes: [] });
+  const like = `%${q}%`;
+  const contacts = await db.prepare("SELECT id, nom, prenom, email FROM crm_contacts WHERE initiative_id=? AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ? OR societe LIKE ?) LIMIT 8").all(init.id, like, like, like, like);
+  const opportunites = await db.prepare("SELECT id, titre, valeur, statut FROM crm_opportunites WHERE initiative_id=? AND titre LIKE ? LIMIT 8").all(init.id, like);
+  const taches = await db.prepare("SELECT id, titre, statut FROM crm_taches WHERE initiative_id=? AND titre LIKE ? LIMIT 8").all(init.id, like);
+  const demandes = await db.prepare("SELECT id, produit_nom, requester_first_name, requester_last_name FROM devis_demandes WHERE vitrine_id=? AND (produit_nom LIKE ? OR requester_first_name LIKE ? OR requester_last_name LIKE ?) LIMIT 8").all(init.id, like, like, like);
+  sendJSON(res, 200, { contacts, opportunites, taches, demandes });
+});
+
+/* ── Campagnes : pause/reprise en self-service pour le propriétaire (2026-09-07) — jusqu'ici
+   réservé à l'administrateur (POST /api/admin/ads/:id/pause|resume) ; le CRM doit permettre au
+   professionnel d'agir lui-même sur SES campagnes, sans passer par une demande admin. Même
+   logique que la route admin, contrôle de propriété en plus. */
+route("POST", "/api/ads/:id/pause", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ad = await db.prepare("SELECT user_id, statut FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Campagne introuvable." });
+  if (Number(ad.user_id) !== Number(user.id) && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  if (ad.statut !== "approved") return sendJSON(res, 400, { error: "Seule une campagne active peut être mise en pause." });
+  await db.prepare("UPDATE publicites SET statut='paused', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/ads/:id/resume", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ad = await db.prepare("SELECT user_id, statut FROM publicites WHERE id=?").get(params.id);
+  if (!ad) return sendJSON(res, 404, { error: "Campagne introuvable." });
+  if (Number(ad.user_id) !== Number(user.id) && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au propriétaire de la campagne." });
+  if (ad.statut !== "paused") return sendJSON(res, 400, { error: "Seule une campagne en pause peut être reprise." });
+  await db.prepare("UPDATE publicites SET statut='approved', updated_at=datetime('now') WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */

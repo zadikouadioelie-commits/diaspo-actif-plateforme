@@ -2952,6 +2952,83 @@ db.exec(`
     created_at            TEXT DEFAULT (datetime('now'))
   );
 
+  /* ── Module Recensement (2026-09-07) — première version : type "dénombrement" uniquement,
+     colonne type prête à accueillir d'autres types de recensement plus tard (voir cahier
+     des charges §2 : "prépare l'architecture pour qu'ils puissent être ajoutés ultérieurement").
+     Une campagne est créée par une Initiative (initiative_id) ; chaque personne recensée est
+     UNE déclaration (jamais de "fiche famille" — règle fondamentale du module, §22). */
+  CREATE TABLE IF NOT EXISTS recensements (
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    identifiant                 TEXT UNIQUE NOT NULL,
+    type                        TEXT NOT NULL DEFAULT 'denombrement' CHECK(type IN ('denombrement')),
+    initiative_id                INTEGER NOT NULL,
+    owner_user_id                INTEGER NOT NULL,
+    nom                          TEXT NOT NULL,
+    description                  TEXT NOT NULL,
+    population_concernee         TEXT NOT NULL,
+    territoire_json              TEXT DEFAULT '{}',
+    date_debut                   TEXT NOT NULL,
+    date_fin                     TEXT,
+    champs_config_json           TEXT DEFAULT '[]',
+    mineurs_autorises            INTEGER DEFAULT 0,
+    champs_mineur_config_json    TEXT DEFAULT '[]',
+    verification_identite        TEXT DEFAULT 'desactivee' CHECK(verification_identite IN ('desactivee','activee')),
+    verification_identite_documents TEXT DEFAULT 'les_deux' CHECK(verification_identite_documents IN ('residence','origine','les_deux')),
+    statut                       TEXT DEFAULT 'brouillon' CHECK(statut IN ('brouillon','actif','suspendu','termine')),
+    nb_declarations               INTEGER DEFAULT 0,
+    created_at                   TEXT DEFAULT (datetime('now')),
+    updated_at                   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+    FOREIGN KEY(owner_user_id) REFERENCES users(id)
+  );
+
+  /* Une personne recensée = une ligne, adulte ou mineur (§22). Accès à SA déclaration soit par
+     compte Diaspo'Actif (user_id), soit par accès dédié email+mot de passe (acces_*) — jamais
+     les deux, jamais de création automatique de compte Diaspo'Actif (§9). Les colonnes match_*
+     sont une extraction dénormalisée des réponses servant UNIQUEMENT à la détection de
+     doublons (§10) — jamais affichées publiquement, jamais utilisées comme identifiant (§12,
+     "ne jamais utiliser uniquement le nom/prénom comme identifiant" — identifiant réel = id
+     ci-dessous, cf. identifiant). Aucun document d'identité stocké ici (§8/§20) : seul le
+     statut Stripe Identity l'est. */
+  CREATE TABLE IF NOT EXISTS recensement_declarations (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    identifiant            TEXT UNIQUE NOT NULL,
+    recensement_id          INTEGER NOT NULL,
+    est_mineur              INTEGER DEFAULT 0,
+    user_id                 INTEGER,
+    acces_email              TEXT,
+    acces_password_hash      TEXT,
+    acces_password_salt      TEXT,
+    reponses_json            TEXT DEFAULT '{}',
+    match_nom TEXT, match_prenom TEXT, match_date_naissance TEXT, match_email TEXT,
+    match_pays_residence TEXT, match_pays_origine TEXT,
+    responsable_nom TEXT, responsable_prenom TEXT, responsable_email TEXT, responsable_telephone TEXT,
+    identite_statut          TEXT DEFAULT 'non_verifie' CHECK(identite_statut IN ('non_verifie','en_cours','verifie','echec')),
+    stripe_identity_session_id TEXT,
+    supprime_le              TEXT,
+    created_at               TEXT DEFAULT (datetime('now')),
+    updated_at               TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(recensement_id) REFERENCES recensements(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Demande de modification d'une déclaration (§18) — même squelette que deletion_requests
+     (table demande + statut + réponse admin) déjà éprouvé sur ce dépôt. */
+  CREATE TABLE IF NOT EXISTS recensement_modification_demandes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    declaration_id   INTEGER NOT NULL,
+    recensement_id   INTEGER NOT NULL,
+    champ            TEXT NOT NULL,
+    nouvelle_valeur  TEXT NOT NULL,
+    motif            TEXT,
+    statut           TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee')),
+    admin_reponse    TEXT,
+    created_at       TEXT DEFAULT (datetime('now')),
+    traite_le        TEXT,
+    FOREIGN KEY(declaration_id) REFERENCES recensement_declarations(id),
+    FOREIGN KEY(recensement_id) REFERENCES recensements(id)
+  );
+
   /* ── Cache du indice de fiabilité ── */
   CREATE TABLE IF NOT EXISTS trust_cache (
     user_id     INTEGER PRIMARY KEY,
