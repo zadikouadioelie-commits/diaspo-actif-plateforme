@@ -99,12 +99,17 @@
 
 /* Zone messages */
 .msg-body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;background:var(--bg);}
-.msg-day-sep{text-align:center;font-size:11.5px;color:var(--muted);margin:6px 0;}
+.msg-day-sep{text-align:center;font-size:11.5px;color:var(--muted);margin:6px auto;max-width:760px;width:100%;}
 .msg-day-sep span{background:var(--bg);padding:0 8px;position:relative;}
 .msg-day-sep::before{content:'';display:block;height:1px;background:var(--border);position:absolute;left:0;right:0;top:50%;}
 
 /* Bulles */
-.bubble-row{display:flex;gap:8px;align-items:flex-end;}
+/* max-width + margin:auto : sur un grand écran (ou .msg-left masqué), .msg-body peut s'étirer
+   à toute la largeur de la fenêtre — sans cette limite, les bulles (déjà plafonnées à 68% DE
+   CETTE LARGEUR, voir .bubble-col plus bas) laissaient un vide disproportionné à droite des
+   messages reçus. La colonne de discussion reste lisible, centrée, comme la plupart des
+   messageries. */
+.bubble-row{display:flex;gap:8px;align-items:flex-end;max-width:760px;width:100%;margin:0 auto;}
 .bubble-row.me{flex-direction:row-reverse;}
 .bubble-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0;}
 .bubble{max-width:68%;padding:10px 14px;border-radius:16px;font-size:13.5px;line-height:1.5;position:relative;word-break:break-word;}
@@ -196,6 +201,26 @@
   .msg-back-btn{display:flex !important;}
 }
 .msg-back-btn{display:none;background:none;border:none;font-size:20px;cursor:pointer;padding:4px;}
+
+/* Panneau « À traiter » : réutilise l'espace vide à droite du fil de discussion sur grand
+   écran (voir .bubble-row ci-dessus) pour lister les AUTRES conversations avec des messages
+   non lus — cliquer dessus appelle openConv() directement, sans quitter le module. Masqué
+   sous 1360px : en dessous, l'espace libéré par la colonne de 760px n'est plus suffisant
+   pour un troisième panneau sans écraser le fil de discussion. */
+.msg-notif-panel{display:none;width:280px;flex-shrink:0;border-left:1px solid var(--border);background:#fff;flex-direction:column;overflow-y:auto;}
+.mnp-head{padding:14px 16px;border-bottom:1px solid var(--border);}
+.mnp-head h3{margin:0;font-size:14px;}
+.mnp-head p{margin:3px 0 0;font-size:11.5px;color:var(--muted);}
+.mnp-item{display:flex;gap:9px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;}
+.mnp-item:hover{background:var(--surface2);}
+.mnp-item .mnp-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ffb27a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0;}
+.mnp-item .mnp-info{flex:1;min-width:0;}
+.mnp-item .mnp-name{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mnp-item .mnp-preview{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.mnp-empty{padding:24px 16px;text-align:center;color:var(--muted);font-size:12.5px;}
+@media (min-width:1360px){
+  .msg-notif-panel{display:flex;}
+}
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
@@ -353,6 +378,16 @@
           <div class="attachment-hint">🔒 Échange sécurisé. Aucune coordonnée personnelle n'est partagée automatiquement.</div>
         </div>
       </div>
+    </div>
+
+    <!-- PANNEAU « À TRAITER » : autres conversations avec messages non lus, cliquables sans
+         quitter le module (voir loadMsgNotifPanel/openConv plus bas). Masqué sous 1360px. -->
+    <div class="msg-notif-panel" id="msg-notif-panel">
+      <div class="mnp-head">
+        <h3>📥 À traiter</h3>
+        <p>Conversations avec des messages non lus</p>
+      </div>
+      <div id="mnp-list"><div class="mnp-empty">Chargement…</div></div>
     </div>
   </div><!-- /.msg-shell -->
 
@@ -522,6 +557,7 @@ function cancelAttach(){pendingAttach=null;showAttachPreview();}
 
 /* ---- Chargement conversations ---- */
 async function loadConvList(searchQ){
+  loadMsgNotifPanel(); // panneau "À traiter" (grand écran) — indépendant du filtre/onglet actif ici
   const list=document.getElementById("conv-list");
   const params=new URLSearchParams({filtre});
   if(searchQ) params.set("q",searchQ);
@@ -577,6 +613,35 @@ async function loadConvList(searchQ){
   }
 
   list.querySelectorAll(".msg-conv-item").forEach(item=>{
+    item.addEventListener("click",()=>openConv(Number(item.dataset.id)));
+  });
+}
+
+/* ---- Panneau "À traiter" (grand écran, voir .msg-notif-panel) ----
+   Réutilise l'espace libéré à droite du fil (bulles désormais plafonnées à 760px, voir CSS)
+   pour lister les conversations à messages non lus AUTRES que celle ouverte — clic = openConv()
+   direct, sans quitter le module. Appelée à chaque loadConvList(), donc toujours à jour après
+   l'envoi/réception d'un message ou un changement de conversation. */
+async function loadMsgNotifPanel(){
+  const panel=document.getElementById("mnp-list");
+  if(!panel) return;
+  let data;
+  try{ data=await api("GET","/conversations?filtre=non_lus"); }
+  catch(e){ panel.innerHTML=`<div class="mnp-empty">Erreur de chargement.</div>`; return; }
+  const convs=(data.conversations||[]).filter(c=>c.id!==activeConvId);
+  if(!convs.length){ panel.innerHTML=`<div class="mnp-empty">✅ Aucun message en attente.</div>`; return; }
+  panel.innerHTML=convs.map(c=>{
+    const preview=c.derniere_type==="file"?"📎 Pièce jointe":c.derniere_type==="image"?"🖼 Image":c.derniere_type==="link"?"🔗 Lien":(c.derniere||"Nouveau message");
+    return `
+    <div class="mnp-item" data-id="${c.id}">
+      <div class="mnp-avatar">${avatarLetter(c.avec_nom)}</div>
+      <div class="mnp-info">
+        <div class="mnp-name">${escHtml(c.avec_nom||"Utilisateur")}</div>
+        <div class="mnp-preview">${escHtml(preview)}</div>
+      </div>
+    </div>`;
+  }).join("");
+  panel.querySelectorAll(".mnp-item").forEach(item=>{
     item.addEventListener("click",()=>openConv(Number(item.dataset.id)));
   });
 }

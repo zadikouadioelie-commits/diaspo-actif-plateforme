@@ -88,6 +88,7 @@
       <a href="#obs-coop" data-section="obs-coop">🌍 Observatoire Coopération</a>
       <a href="#obs-instit" data-section="obs-instit">🏛️ Observatoire Institutionnel</a>
       <a href="#revenus-diaspora" data-section="revenus-diaspora">🗺️ Revenus par diaspora</a>
+      <a href="#obs-recensement" data-section="obs-recensement">📋 Observatoire Recensement</a>
       <a href="#finances" data-section="finances">💰 Finances</a>
       <a href="#ventes" data-section="ventes">🛒 Ventes & Transactions</a>
 
@@ -1379,6 +1380,47 @@
           <div class="card"><h3 style="margin:0 0 12px;font-size:15px;">🧾 Par type de revenu</h3><div id="rd-par-type"></div></div>
         </div>
       </section>
+
+      <section id="section-obs-recensement" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:240px;">
+            <h2 style="margin:0;">📋 Observatoire Recensement</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Vue transverse de tous les recensements créés sur la plateforme (tous comptes Initiative), avec possibilité de geler une campagne en cas de besoin.</p>
+          </div>
+          <button class="btn btn-outline" style="font-size:13px;" onclick="loadObsRecensement()">↺ Actualiser</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:16px;" id="or-kpis"></div>
+
+        <div class="card">
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border);">
+                  <th style="padding:8px;">Campagne</th>
+                  <th style="padding:8px;">Créateur</th>
+                  <th style="padding:8px;">Statut</th>
+                  <th style="padding:8px;">Déclarations</th>
+                  <th style="padding:8px;">Créé le</th>
+                  <th style="padding:8px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="or-tbody"><tr><td colspan="6" style="padding:16px;color:var(--muted);">Chargement…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Détail d'un recensement (Observatoire Recensement) -->
+      <div id="modal-obs-recensement-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div class="card" style="max-width:640px;width:100%;margin:40px auto;">
+          <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
+            <h3 style="margin:0;" id="or-modal-titre">Recensement</h3>
+            <button class="btn btn-outline" style="padding:4px 10px;" onclick="document.getElementById('modal-obs-recensement-bg').style.display='none'">✕</button>
+          </div>
+          <div id="or-modal-body"></div>
+        </div>
+      </div>
 
       <section id="section-finances" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
@@ -8254,7 +8296,12 @@ function dsRender(r) {
   const t3 = $('ds-top3-domaines');
   if (t3 && r.par_domaine?.length) {
     const colors = ['#f59e0b','#6366f1','#10b981'];
-    const total  = r.par_domaine.reduce((s, d) => s + d.n, 0) || 1;
+    /* Number(d.n) : PostgreSQL renvoie un COUNT(*) en bigint, décodé en STRING par le driver
+       pg (jamais en Number ni BigInt natif) — un reduce((s,d)=>s+d.n,0) sans coercition fait
+       une concaténation de chaînes ("0"+"2"+"2"+"2" → "0222") au lieu d'une somme, d'où un
+       "total" aberrant et des pourcentages qui s'effondrent tous à 0% (constaté en prod,
+       jamais en local où SQLite renvoie déjà un Number natif). */
+    const total  = r.par_domaine.reduce((s, d) => s + Number(d.n), 0) || 1;
     t3.innerHTML = r.par_domaine.slice(0, 3).map((d, i) => `
       <div style="flex:1;min-width:160px;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center;">
         <div style="font-size:22px;font-weight:800;color:${colors[i]};">${d.n}</div>
@@ -8270,7 +8317,7 @@ function dsRender(r) {
   // Tableau origines
   const tbody = $('ds-tbody-origines');
   if (tbody && r.par_origine?.length) {
-    const tot = r.par_origine.reduce((s,d)=>s+d.n,0)||1;
+    const tot = r.par_origine.reduce((s,d)=>s+Number(d.n),0)||1; // Number() : voir commentaire ds-top3-domaines ci-dessus (bigint PG en string)
     tbody.innerHTML = r.par_origine.map(d => {
       const pct = Math.round(d.n/tot*100);
       return `<tr style="border-bottom:1px solid var(--border);">
@@ -8370,7 +8417,12 @@ function dsRenderBars(containerId, data, keyL, keyV, color) {
 
 function dsRenderEvo(id, data, color) {
   const el = document.getElementById(id);
-  if (!el || !data?.length) return;
+  if (!el) return;
+  /* Sans ce garde-fou, un tableau vide laissait le widget totalement blanc — indiscernable
+     d'un widget cassé ou encore en chargement. « evenements » (Mobiliser la diaspora,
+     evenements.html) est un module distinct des Événements d'agenda.html/events : le voir à
+     0 est une donnée réelle possible, pas une erreur — mais il faut le dire explicitement. */
+  if (!data?.length) { el.innerHTML = '<div style="width:100%;text-align:center;color:var(--muted);font-size:12px;padding:12px 0;">Aucune donnée sur cette période.</div>'; return; }
   const maxV = Math.max(...data.map(d => d.n), 1);
   el.innerHTML = data.map(d => {
     const h = Math.max(6, Math.round((d.n / maxV) * 74));
@@ -8744,6 +8796,7 @@ async function submitAccordDirect(){
     'obs-coop':  () => loadObsCoop(),
     'obs-instit': () => loadObsInstit(),
     'revenus-diaspora': () => loadRevenusDiaspora(),
+    'obs-recensement': () => loadObsRecensement(),
     finances:    () => loadFinances(),
     ventes:      () => loadTransactions(),
     packages:    () => loadPackages(),
@@ -8912,7 +8965,7 @@ async function submitAccordDirect(){
 
   // ── Répartition par rôle
   const ROLE_COLOR = { utilisateur:"#1B3A6B", initiative:"#E87C3E", collectivite:"#7C3AED", administrateur:"#6b7280" };
-  const totalComptes = (data.par_role||[]).reduce((s,r) => s + r.n, 0) || 1;
+  const totalComptes = (data.par_role||[]).reduce((s,r) => s + Number(r.n), 0) || 1; // Number() : bigint PG renvoyé en string, voir ds-top3-domaines
   document.getElementById("stat-par-role").innerHTML = (data.par_role||[]).map(r => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
       <div style="width:10px;height:10px;border-radius:50%;background:${ROLE_COLOR[r.role]||'#ccc'};flex-shrink:0;"></div>
@@ -10428,6 +10481,114 @@ async function submitAccordDirect(){
   window.loadRevenusDiaspora = loadRevenusDiaspora;
   window.rdReset = rdReset;
   window.rdExportCSV = rdExportCSV;
+
+  /* ── Observatoire Recensement ──────────────────────────────────────────────────────────
+     Vue transverse de tous les recensements (tous comptes Initiative) — le gel est un état
+     administratif ORTHOGONAL au statut propre du créateur (jamais de nouvelle valeur ajoutée
+     à son CHECK, voir server/index.js POST /api/admin/recensements/:id/geler). */
+  const OR_STATUT_LABELS = { brouillon: 'Brouillon', actif: 'Actif', suspendu: 'Suspendu', termine: 'Terminé' };
+  const OR_STATUT_COLORS = { brouillon: '#6b7280', actif: '#059669', suspendu: '#d97706', termine: '#2563EB' };
+  let OR_DATA = [];
+
+  async function loadObsRecensement() {
+    const tbody = document.getElementById('or-tbody');
+    const r = await api("GET", "/admin/recensements").catch(() => null);
+    if (!r) { tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;color:#dc2626;">Erreur de chargement.</td></tr>'; return; }
+    OR_DATA = r.recensements || [];
+
+    const nbGeles = OR_DATA.filter(x => x.gele_le).length;
+    const nbActifs = OR_DATA.filter(x => x.statut === 'actif' && !x.gele_le).length;
+    const totalDecl = OR_DATA.reduce((s, x) => s + (Number(x.nb_declarations) || 0), 0);
+    document.getElementById('or-kpis').innerHTML = [
+      ['📋 Recensements créés', OR_DATA.length, '#2563EB'],
+      ['✅ Actifs (non gelés)', nbActifs, '#059669'],
+      ['🧊 Gelés', nbGeles, '#0369a1'],
+      ['👥 Déclarations cumulées', totalDecl, '#7c3aed'],
+    ].map(([lbl, val, col]) => `
+      <div class="card" style="border-left:4px solid ${col};padding:14px 16px;">
+        <div style="font-size:12px;color:var(--muted);font-weight:700;">${lbl}</div>
+        <div style="font-size:22px;font-weight:800;margin-top:4px;">${val}</div>
+      </div>`).join('');
+
+    if (!OR_DATA.length) { tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;color:var(--muted);">Aucun recensement créé pour le moment.</td></tr>'; return; }
+    tbody.innerHTML = OR_DATA.map(x => `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;font-weight:600;">${esc(x.nom)}<br><span style="font-size:11px;color:var(--muted);">${esc(x.identifiant)}</span></td>
+        <td style="padding:8px;">${esc([x.owner_prenom, x.owner_nom].filter(Boolean).join(' ') || x.owner_email || ('#' + x.owner_user_id))}${x.initiative_nom ? `<br><span style="font-size:11px;color:var(--muted);">${esc(x.initiative_nom)}</span>` : ''}</td>
+        <td style="padding:8px;">
+          <span style="background:${(OR_STATUT_COLORS[x.statut] || '#6b7280')}22;color:${OR_STATUT_COLORS[x.statut] || '#6b7280'};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">${OR_STATUT_LABELS[x.statut] || x.statut}</span>
+          ${x.gele_le ? `<br><span style="font-size:11px;color:#0369a1;font-weight:700;">🧊 Gelé</span>` : ''}
+        </td>
+        <td style="padding:8px;">${x.nb_declarations || 0}</td>
+        <td style="padding:8px;font-size:12px;color:var(--muted);">${new Date(x.created_at).toLocaleDateString('fr-FR')}</td>
+        <td style="padding:8px;white-space:nowrap;">
+          <button class="btn btn-outline" style="padding:4px 8px;font-size:12px;" onclick="orVoir(${x.id})">👁️ Voir</button>
+          ${x.gele_le
+            ? `<button class="btn btn-outline" style="padding:4px 8px;font-size:12px;border-color:#059669;color:#059669;" onclick="orDegeler(${x.id})">🔓 Dégeler</button>`
+            : `<button class="btn btn-outline" style="padding:4px 8px;font-size:12px;border-color:#0369a1;color:#0369a1;" onclick="orGeler(${x.id})">🧊 Geler</button>`}
+        </td>
+      </tr>`).join('');
+  }
+
+  async function orVoir(id) {
+    const r = await api("GET", `/admin/recensements/${id}`).catch(e => { alert(e.message || 'Erreur'); return null; });
+    if (!r) return;
+    const x = r.recensement;
+    const decls = r.declarations || [];
+    document.getElementById('or-modal-titre').textContent = x.nom;
+    document.getElementById('or-modal-body').innerHTML = `
+      <p style="font-size:13px;color:var(--muted);margin:0 0 10px;">${esc(x.description || '')}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:14px;">
+        <div><strong>Identifiant :</strong> ${esc(x.identifiant)}</div>
+        <div><strong>Statut :</strong> ${OR_STATUT_LABELS[x.statut] || x.statut}${x.gele_le ? ' · 🧊 Gelé' : ''}</div>
+        <div><strong>Créateur :</strong> ${esc([x.owner_prenom, x.owner_nom].filter(Boolean).join(' ') || x.owner_email || ('#' + x.owner_user_id))}</div>
+        <div><strong>Initiative :</strong> ${esc(x.initiative_nom || '—')}</div>
+        <div><strong>Mineurs autorisés :</strong> ${x.mineurs_autorises ? 'Oui' : 'Non'}</div>
+        <div><strong>Vérification d'identité :</strong> ${x.verification_identite === 'activee' ? 'Activée' : 'Désactivée'}</div>
+        <div><strong>Créé le :</strong> ${new Date(x.created_at).toLocaleString('fr-FR')}</div>
+        <div><strong>Déclarations :</strong> ${decls.length}</div>
+      </div>
+      ${x.gele_motif ? `<div style="background:#EFF6FF;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e3a8a;margin-bottom:12px;"><strong>Motif du gel :</strong> ${esc(x.gele_motif)}</div>` : ''}
+      <h4 style="margin:0 0 8px;font-size:13px;">Dernières déclarations</h4>
+      <div style="max-height:220px;overflow-y:auto;font-size:12px;">
+        ${!decls.length ? '<p style="color:var(--muted);">Aucune déclaration.</p>' : decls.slice(0, 50).map(d => `
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">
+            <span>#${d.id} ${d.est_mineur ? '(mineur)' : ''} ${d.supprime_le ? '<span style="color:#dc2626;">· supprimée</span>' : ''}</span>
+            <span style="color:var(--muted);">${new Date(d.created_at).toLocaleDateString('fr-FR')}</span>
+          </div>`).join('')}
+      </div>
+      <div style="margin-top:14px;text-align:right;">
+        ${x.gele_le
+          ? `<button class="btn btn-outline" style="border-color:#059669;color:#059669;" onclick="orDegeler(${x.id}, true)">🔓 Dégeler ce recensement</button>`
+          : `<button class="btn btn-outline" style="border-color:#0369a1;color:#0369a1;" onclick="orGeler(${x.id}, true)">🧊 Geler ce recensement</button>`}
+      </div>
+    `;
+    document.getElementById('modal-obs-recensement-bg').style.display = 'flex';
+  }
+
+  async function orGeler(id, fromModal) {
+    const motif = prompt("Motif du gel (facultatif, visible par le créateur) :", "");
+    if (motif === null) return; // annulé par l'admin
+    try {
+      await api("POST", `/admin/recensements/${id}/geler`, { motif: motif || undefined });
+      if (fromModal) document.getElementById('modal-obs-recensement-bg').style.display = 'none';
+      await loadObsRecensement();
+    } catch (e) { alert(e.message || 'Erreur lors du gel.'); }
+  }
+
+  async function orDegeler(id, fromModal) {
+    if (!confirm('Dégeler ce recensement ? Il pourra de nouveau recevoir des déclarations.')) return;
+    try {
+      await api("POST", `/admin/recensements/${id}/degeler`);
+      if (fromModal) document.getElementById('modal-obs-recensement-bg').style.display = 'none';
+      await loadObsRecensement();
+    } catch (e) { alert(e.message || 'Erreur lors du dégel.'); }
+  }
+
+  window.loadObsRecensement = loadObsRecensement;
+  window.orVoir = orVoir;
+  window.orGeler = orGeler;
+  window.orDegeler = orDegeler;
 
   async function loadFinances() {
     const r = await api("GET", "/admin/finances").catch(() => ({}));

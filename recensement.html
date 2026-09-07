@@ -535,6 +535,11 @@
         <h1>${esc(rec.nom)} <span class="rec-badge rec-badge-${rec.statut}">${STATUT_LABELS[rec.statut]}</span></h1>
         <p>Identifiant : ${esc(rec.identifiant)}</p>
       </div><a class="rec-btn rec-btn-outline" href="recensement.html?vue=mes-recensements">← Retour</a></div>
+      ${rec.gele_le ? `
+      <div class="rec-card" style="background:#EFF6FF;border-color:#bfdbfe;">
+        <h3 style="margin:0 0 8px;color:#1e3a8a;">🧊 Recensement gelé par l'administration</h3>
+        <p style="font-size:13px;color:#1e3a8a;margin:0;">Cette campagne n'accepte plus de nouvelles déclarations et n'apparaît plus publiquement depuis le ${new Date(rec.gele_le).toLocaleString('fr-FR')}${rec.gele_motif ? ` — motif : « ${esc(rec.gele_motif)} »` : ''}. Vous pouvez toujours consulter et gérer les déclarations déjà reçues. Contactez l'administration pour en savoir plus.</p>
+      </div>` : ''}
       ${rec.suppression_prevue_le ? `
       <div class="rec-card" style="background:#FEF2F2;border-color:#fecaca;">
         <h3 style="margin:0 0 8px;color:#991b1b;">🗑️ Suppression définitive programmée</h3>
