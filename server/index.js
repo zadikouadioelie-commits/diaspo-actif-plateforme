@@ -27801,6 +27801,28 @@ ${jsonLd}
       return sendJSON(res, 200, { ok: true });
     }
 
+    /* ── DELETE /api/events/:id — suppression définitive (2026-09-07, demande explicite).
+       Bloquée s'il existe déjà des billets vendus ou des inscriptions réelles — proposer de
+       fermer (statut='ferme') plutôt, même convention que DELETE /api/formulaires-inscription/:id
+       (server/index.js, plus tôt aujourd'hui). Retire aussi la ligne synchronisée sur
+       "Événements Diaspo'Actif" (source_events_id) et les types de billets non vendus. ── */
+    if (req.method === 'DELETE' && /^\/api\/events\/\d+$/.test(pathname)) {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
+      const eid = parseInt(pathname.split('/')[3]);
+      const ev = await db.prepare(`SELECT * FROM events WHERE id=?`).get(eid);
+      if (!ev) return sendJSON(res, 404, { error: 'Introuvable.' });
+      if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
+      const billetsVendus = (await db.prepare("SELECT COUNT(*) n FROM tickets WHERE event_id=? AND payment_status='paid'").get(eid))?.n || 0;
+      const inscriptions = (await db.prepare("SELECT COUNT(*) n FROM event_inscriptions_securisees WHERE event_id=?").get(eid))?.n || 0;
+      if (billetsVendus > 0 || inscriptions > 0) {
+        return sendJSON(res, 400, { error: `Cet événement a déjà ${billetsVendus} billet(s) vendu(s) et ${inscriptions} inscription(s) — fermez-le plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+      }
+      await db.prepare("DELETE FROM evenements WHERE source_events_id=?").run(eid);
+      await db.prepare("DELETE FROM ticket_types WHERE event_id=?").run(eid);
+      await db.prepare("DELETE FROM events WHERE id=?").run(eid);
+      return sendJSON(res, 200, { ok: true });
+    }
+
     /* ── POST /api/events/:id/ticket-types ── */
     if (req.method === 'POST' && /^\/api\/events\/\d+\/ticket-types$/.test(pathname)) {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });

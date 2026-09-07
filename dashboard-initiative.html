@@ -3426,6 +3426,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               ${e.statut==='publie'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="initCloseEvent(${e.id})">🔒 Fermer</button>`:''}
               <button class="btn btn-sm btn-outline" onclick="initShowEventFinancier(${e.id})">📊 Stats</button>
               ${['publie','ferme'].includes(e.statut) ? `<button class="btn btn-sm btn-outline" onclick="initSyncVersDiaspoActif(${e.id})">📅 Ajouter à Événements Diaspo'Actif</button>` : ''}
+              <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="initDeleteEvent(${e.id})">🗑 Supprimer</button>
               <button class="btn btn-sm btn-outline" onclick="initGererBillets(${e.id})" style="margin-left:auto;">🎟️ Gérer les billets</button>
             </div>
             <div id="fin-panel-${e.id}" style="display:none;margin-top:12px;"></div>
@@ -4400,6 +4401,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       await api('POST', '/events/'+id+'/sync-evenements-diaspoactif');
       alert("Ajouté à « Événements Diaspo'Actif » ✓");
     } catch(e) { alert('Erreur : '+e.message); }
+  };
+  /* Suppression (2026-09-07, demande explicite) — le serveur refuse lui-même si des billets
+     vendus ou des inscriptions existent déjà (voir DELETE /api/events/:id), pour ne jamais
+     perdre un historique réel par erreur ; retire aussi l'événement de "Événements Diaspo'Actif"
+     s'il y avait été synchronisé. */
+  window.initDeleteEvent = async function(id) {
+    if(!confirm('Supprimer définitivement cet événement ?\n\nCette action est irréversible.')) return;
+    try { await api('DELETE','/events/'+id); renderInitBilletterie(); }
+    catch(e){alert('Erreur : '+e.message);}
   };
 
   /* ══ SECTION CAGNOTTES — Phase 1 (création + gestion de base) ══ */
