@@ -284,7 +284,7 @@
           { el:'a[href="dashboard-administrateur.html"]', pos:'bottom', titre:"🖥️ Dashboard principal", voice:"Le dashboard centralise toutes vos actions administratives en temps réel.", desc:"Statistiques globales, alertes, modération, actions rapides.", lien:{href:'dashboard-administrateur.html',label:'Ouvrir le Dashboard'} },
           { el:null, pos:'center', titre:"👥 Gestion des utilisateurs", voice:"Consultez, vérifiez, suspendez ou modifiez les comptes depuis le dashboard.", desc:"Profils, rôles, vérifications, suspensions, historique d'activité.", lien:{href:'dashboard-administrateur.html',label:'Gérer les utilisateurs'} },
           { el:null, pos:'center', titre:"🏅 Partenaires Officiels", voice:"Attribuez et gérez les statuts de Partenaires Officiels et leur visibilité.", desc:"Attribution, niveaux de visibilité, priorité, expiration." },
-          { el:null, pos:'center', titre:"🤝 Deal Master", voice:"Supervisez et validez les deals de la plateforme, gérez les litiges.", desc:"Validation, modération, litiges, règles de la marketplace." },
+          { el:null, pos:'center', titre:"🤝 Modération des Deals", voice:"Supervisez et validez les deals de la plateforme, gérez les litiges.", desc:"Validation, modération, litiges, règles de la marketplace." },
           { el:null, pos:'center', titre:"💬 Modération témoignages", voice:"Approuvez ou refusez les témoignages avant publication avec le score automatique.", desc:"Score pertinence auto, approbation/refus, publication homepage." },
           { el:'#oz-fab,.oz-fab,#chatbot-fab', pos:'top', titre:"🤖 O-Z admin", voice:"O-Z dispose d'une interface admin pour rechercher des utilisateurs et des données.", desc:"Recherche utilisateurs, statistiques rapides, aide à la modération." },
           { el:null, pos:'center', titre:"✅ La plateforme est entre vos mains !", voice:"Votre espace administrateur est prêt.", desc:"Commencez par le Dashboard pour une vue complète de l'activité.", cta:'administrateur' }
@@ -904,11 +904,6 @@
       { el:null, pos:'center', titre:"🎁 Attribuer un deal", voice:"Sélectionnez le compte bénéficiaire et les conditions du deal accordé.", desc:"Suivez l'utilisation des deals attribués.", lien:{href:'dashboard-administrateur.html', label:'Attribution de Deal'} },
       { el:null, pos:'center', titre:"✅ Une marketplace dynamique", voice:"Des deals attractifs stimulent l'engagement des comptes Initiative.", desc:"Analysez régulièrement les deals les plus performants." }
     ]},
-    'f-adm-deal-master': { badge:'⭐ Deal Master', couleur:'#374151', steps:[
-      { el:null, pos:'center', badge:true, titre:"Deal Master", voice:"Gérez le statut et les privilèges du badge Deal Master, réservé aux comptes les plus actifs en collaboration.", desc:"Un badge de reconnaissance visible publiquement sur le profil." },
-      { el:null, pos:'center', titre:"🏅 Attribuer le badge", voice:"Sélectionnez les comptes méritant le statut Deal Master selon leur activité.", desc:"Le badge peut être retiré en cas d'inactivité ou de manquement.", lien:{href:'dashboard-administrateur.html', label:'Deal Master'} },
-      { el:null, pos:'center', titre:"✅ Valoriser l'excellence", voice:"Ce badge encourage une collaboration active et de qualité sur la plateforme.", desc:"Communiquez sur les nouveaux Deal Master pour valoriser la reconnaissance." }
-    ]},
     'f-adm-parametres': { badge:'⚙️ Paramètres plateforme', couleur:'#374151', steps:[
       { el:null, pos:'center', badge:true, titre:"Paramètres plateforme", voice:"Configurez les paramètres généraux de la plateforme Diaspo'Actif.", desc:"Réglages globaux qui impactent l'ensemble des comptes." },
       { el:null, pos:'center', titre:"⚙️ Ajuster les réglages", voice:"Modifiez avec précaution : ces paramètres ont un impact plateforme entière.", desc:"Testez chaque changement important avant de le généraliser.", lien:{href:'dashboard-administrateur.html', label:'Paramètres'} },
@@ -1281,8 +1276,8 @@
           desc:"Validation, modération des contenus inappropriés, gestion des litiges entre parties." },
         { el:null, pos:'center',
           titre:"📋 Liste des Deals",
-          voice:"Accédez à la liste complète des Deals depuis le dashboard admin, section Deal Master.",
-          desc:"Dashboard → Deal Master → filtres par statut (actif / en attente / signalé / clôturé).",
+          voice:"Accédez à la liste complète des Deals depuis le dashboard admin, section Deals.",
+          desc:"Dashboard → Deals → filtres par statut (actif / en attente / signalé / clôturé).",
           lien:{href:'dashboard-administrateur.html', label:'Dashboard Admin'} },
         { el:null, pos:'center',
           titre:"🚩 Traiter les signalements",

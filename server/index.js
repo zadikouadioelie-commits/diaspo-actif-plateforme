@@ -14462,10 +14462,6 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     WHERE p.auteur_id = ?
     GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id);
   const po = await db.prepare("SELECT statut,domaines_expertise,pays_intervention,services,description_complete,site_web,liens_utiles,date_attribution FROM partenaires_officiels WHERE user_id=?").get(u.id);
-  const dmLaureat = await db.prepare(`SELECT dml.rang, dml.score, dme.label AS edition_label, dme.periode_fin
-    FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
-    WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(u.id);
-  const dmHistorique = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?`).get(u.id))?.n;
   /* Affiliations officielles (module Initiative → Utilisateur, 2026-07-27) : uniquement les
      affiliations ACCEPTÉES par le compte, issues d'organisations réellement enregistrées —
      remplace l'ancien mécanisme libre-service (table user_affiliations, désormais inutilisée
@@ -14505,8 +14501,6 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
       liens_utiles: safeParse(po.liens_utiles||'[]'),
       date_attribution: po.date_attribution,
     } : null,
-    is_deal_master: !!dmLaureat,
-    deal_master: dmLaureat ? { ...dmLaureat, nb_editions: dmHistorique } : null,
     /* Profil public enrichi (colonnes gauche/droite, miroir des initiatives) */
     /* Le téléphone du COMPTE est une donnée privée : création, sécurité, vérification
        d'identité, récupération. Il était renvoyé à tout appelant, même non connecté —
@@ -32585,347 +32579,6 @@ ${jsonLd}
     }
 
     /* ═══════════════════════════════════════════════════════════
-       DEAL MASTER — Moteur de distinction d'excellence
-    ═══════════════════════════════════════════════════════════ */
-
-    /* GET /api/deal-master/hall-of-fame — lauréats actuels + anciens */
-    if (req.method === "GET" && pathname === "/api/deal-master/hall-of-fame") {
-      const editions = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' OR statut='archivee' ORDER BY periode_debut DESC").all();
-      const editionIds = editions.map(e => e.id);
-      const activeEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
-      const laureats = editionIds.length
-        ? await db.prepare(`SELECT dml.*, u.nom, u.prenom, u.photo_url, u.banner_url, u.titre_pro, u.ville, u.pays,
-            dme.label AS edition_label, dme.periode_debut, dme.periode_fin
-          FROM deal_master_laureats dml
-          JOIN users u ON u.id = dml.user_id
-          JOIN deal_master_editions dme ON dme.id = dml.edition_id
-          WHERE dml.edition_id IN (${editionIds.join(',')})
-          ORDER BY dml.edition_id DESC, dml.rang ASC`).all()
-        : [];
-      const temoignages = await db.prepare(`SELECT dmt.*, u.nom, u.prenom, u.photo_url, dme.label AS edition_label
-        FROM deal_master_temoignages dmt
-        JOIN users u ON u.id = dmt.user_id
-        LEFT JOIN deal_master_editions dme ON dme.id = dmt.edition_id
-        WHERE dmt.visible=1 ORDER BY dmt.created_at DESC LIMIT 20`).all();
-      return sendJSON(res, 200, {
-        editions,
-        edition_active: activeEd || null,
-        laureats: laureats.map(l => ({ ...l, score_detail: safeParse(l.score_detail || '{}') })),
-        temoignages,
-      });
-    }
-
-    /* GET /api/deal-master/actuel — lauréats de l'édition courante publiée */
-    if (req.method === "GET" && pathname === "/api/deal-master/actuel") {
-      const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
-      if (!ed) return sendJSON(res, 200, { laureats: [], edition: null });
-      const laureats = await db.prepare(`SELECT dml.*, u.nom, u.prenom, u.photo_url, u.titre_pro, u.ville, u.pays
-        FROM deal_master_laureats dml JOIN users u ON u.id=dml.user_id
-        WHERE dml.edition_id=? AND dml.actif=1 ORDER BY dml.rang ASC`).all(ed.id);
-      return sendJSON(res, 200, { laureats, edition: ed });
-    }
-
-    /* GET /api/deal-master/mon-score — score personnel (connecté) */
-    if (req.method === "GET" && pathname === "/api/deal-master/mon-score") {
-      const me = await getCurrentUser(req);
-      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
-      const score = await db.prepare("SELECT * FROM deal_master_scores WHERE user_id=?").get(me.id);
-      const isMaster = await db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
-      const criteres = await db.prepare("SELECT * FROM deal_master_criteres WHERE actif=1 ORDER BY poids DESC").all();
-      const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
-      return sendJSON(res, 200, {
-        score: score ? { ...score, score_detail: safeParse(score.score_detail || '{}') } : null,
-        is_deal_master: !!isMaster,
-        laureat_actuel: isMaster || null,
-        criteres,
-        edition_courante: ed || null,
-      });
-    }
-
-    /* GET /api/deal-master/criteres — liste des critères publics */
-    if (req.method === "GET" && pathname === "/api/deal-master/criteres") {
-      const criteres = await db.prepare("SELECT cle,label,description,poids FROM deal_master_criteres WHERE actif=1 ORDER BY poids DESC").all();
-      return sendJSON(res, 200, { criteres });
-    }
-
-    /* POST /api/deal-master/temoignage — soumettre un témoignage (lauréat) */
-    if (req.method === "POST" && pathname === "/api/deal-master/temoignage") {
-      const me = await getCurrentUser(req);
-      if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
-      const isMaster = await db.prepare("SELECT * FROM deal_master_laureats WHERE user_id=? AND actif=1 ORDER BY edition_id DESC LIMIT 1").get(me.id);
-      if (!isMaster) return sendJSON(res, 403, { error: "Réservé aux Deal Masters actifs." });
-      const { contenu } = body;
-      if (!contenu || contenu.trim().length < 20) return sendJSON(res, 400, { error: "Témoignage trop court (min 20 caractères)." });
-      await db.prepare("INSERT INTO deal_master_temoignages (user_id,edition_id,contenu) VALUES (?,?,?)")
-        .run(me.id, isMaster.edition_id, contenu.trim().slice(0, 1000));
-      return sendJSON(res, 201, { ok: true });
-    }
-
-    /* ── ADMIN DEAL MASTER ── */
-
-    /* GET /api/admin/deal-master/editions */
-    if (req.method === "GET" && pathname === "/api/admin/deal-master/editions") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const eds = await db.prepare("SELECT * FROM deal_master_editions ORDER BY periode_debut DESC").all();
-      return sendJSON(res, 200, { editions: eds });
-    }
-
-    /* POST /api/admin/deal-master/editions — créer une nouvelle édition */
-    if (req.method === "POST" && pathname === "/api/admin/deal-master/editions") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const { label, periode_debut, periode_fin, top_pct = 10 } = body;
-      if (!label || !periode_debut || !periode_fin) return sendJSON(res, 400, { error: "label, periode_debut, periode_fin requis." });
-      const r = await db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'planifiee',?)").run(label, periode_debut, periode_fin, top_pct);
-      return sendJSON(res, 201, { id: r.lastInsertRowid });
-    }
-
-    /* ── DEAL MASTER ENGINE (fonction partagée) ─────────────────
-       Calcule les scores, attribue les badges, publie l'édition.
-       Appelé automatiquement + par le handler admin si besoin.
-    ───────────────────────────────────────────────────────────── */
-    async function _dmScoreEdition(edId) {
-      const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE id=?").get(edId);
-      if (!ed) return null;
-      const criteres = await db.prepare("SELECT * FROM deal_master_criteres WHERE actif=1").all();
-      const poidsTotal = criteres.reduce((s, c) => s + c.poids, 0) || 1;
-      const debut = ed.periode_debut, fin = ed.periode_fin;
-      const initiativesWithDeals = await db.prepare(`
-        SELECT DISTINCT dp.initiative_id FROM deal_participants dp
-        JOIN deals d ON d.id = dp.deal_id
-        WHERE d.created_at BETWEEN ? AND ? AND dp.statut='accepte'`).all(debut+' 00:00:00', fin+' 23:59:59');
-      const scores = [];
-      for (const { initiative_id } of initiativesWithDeals) {
-        const init = await db.prepare("SELECT user_id FROM initiatives WHERE id=?").get(initiative_id);
-        if (!init?.user_id) continue;
-        const uid = init.user_id;
-        const detail = {};
-        const finalises = (await db.prepare(`SELECT COUNT(*) AS n FROM deals d JOIN deal_participants dp ON dp.deal_id=d.id WHERE dp.initiative_id=? AND d.statut='cloture' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59'))?.n;
-        detail.deals_finalises = finalises;
-        const totalDeals = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_participants dp JOIN deals d ON d.id=dp.deal_id WHERE dp.initiative_id=? AND dp.statut='accepte' AND d.created_at BETWEEN ? AND ?`).get(initiative_id, debut+' 00:00:00', fin+' 23:59:59'))?.n || 1;
-        detail.taux_reussite = Math.round((finalises / totalDeals) * 100) / 100;
-        const jalonsTotal = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj JOIN deal_participants dp ON dp.deal_id=dj.deal_id WHERE dp.initiative_id=?`).get(initiative_id))?.n || 1;
-        const jalonsOk = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_jalons dj JOIN deal_participants dp ON dp.deal_id=dj.deal_id WHERE dp.initiative_id=? AND dj.statut='atteint'`).get(initiative_id))?.n;
-        detail.progression_deals = Math.round((jalonsOk / jalonsTotal) * 100) / 100;
-        const noteMoy = await db.prepare(`SELECT AVG(CAST(dn.contenu AS REAL)) AS avg FROM deal_notes dn JOIN deals d ON d.id=dn.deal_id JOIN deal_participants dp ON dp.deal_id=d.id WHERE dp.initiative_id=? AND dn.type='evaluation'`).get(initiative_id).avg || 0;
-        detail.evaluations_recues = Math.min(noteMoy / 5, 1);
-        const partenaires = (await db.prepare(`SELECT COUNT(DISTINCT dp2.initiative_id) AS n FROM deal_participants dp JOIN deal_participants dp2 ON dp2.deal_id=dp.deal_id AND dp2.initiative_id!=dp.initiative_id WHERE dp.initiative_id=? AND dp2.statut='accepte'`).get(initiative_id))?.n;
-        detail.qualite_collaboration = Math.min(partenaires / 10, 1);
-        const tachesTotal = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt JOIN deal_participants dp ON dp.deal_id=dt.deal_id WHERE dp.initiative_id=?`).get(initiative_id))?.n || 1;
-        const tachesOk = (await db.prepare(`SELECT COUNT(*) AS n FROM deal_tasks dt JOIN deal_participants dp ON dp.deal_id=dt.deal_id WHERE dp.initiative_id=? AND dt.statut='terminee'`).get(initiative_id))?.n;
-        detail.respect_engagements = Math.round((tachesOk / tachesTotal) * 100) / 100;
-        detail.diversite_partenaires = Math.min(partenaires / 5, 1);
-        let scoreGlobal = 0;
-        for (const c of criteres) {
-          const val = detail[c.cle] ?? 0;
-          const normalized = c.cle === 'deals_finalises' ? Math.min(val / 10, 1) : val;
-          scoreGlobal += (c.poids / poidsTotal) * normalized * 100;
-        }
-        scores.push({ user_id: uid, initiative_id, score: Math.round(scoreGlobal * 100) / 100, detail });
-      }
-      scores.sort((a, b) => b.score - a.score);
-      const topN = Math.max(1, Math.ceil(scores.length * (ed.top_pct / 100)));
-      const laureats = scores.slice(0, topN);
-      const upsertScore = db.prepare(`INSERT INTO deal_master_scores (user_id,score,score_detail,rang,rang_total,computed_at) VALUES (?,?,?,?,?,datetime('now')) ON CONFLICT(user_id) DO UPDATE SET score=excluded.score,score_detail=excluded.score_detail,rang=excluded.rang,rang_total=excluded.rang_total,computed_at=excluded.computed_at`);
-      scores.forEach((s, i) => upsertScore.run(s.user_id, s.score, JSON.stringify(s.detail), i+1, scores.length));
-      await db.prepare("UPDATE deal_master_laureats SET actif=0 WHERE edition_id=?").run(edId);
-      const insLaureat = db.prepare(`INSERT INTO deal_master_laureats (edition_id,user_id,score,rang,score_detail,date_expiration,actif) VALUES (?,?,?,?,?,?,1) ON CONFLICT(edition_id,user_id) DO UPDATE SET score=excluded.score,rang=excluded.rang,score_detail=excluded.score_detail,actif=1`);
-      laureats.forEach((l, i) => insLaureat.run(edId, l.user_id, l.score, i+1, JSON.stringify(l.detail), ed.periode_fin));
-      await db.prepare("UPDATE users SET is_deal_master=0, deal_master_edition_id=NULL WHERE is_deal_master=1").run();
-      await Promise.all(laureats.map(async l => await db.prepare("UPDATE users SET is_deal_master=1, deal_master_edition_id=? WHERE id=?").run(edId, l.user_id)));
-      await db.prepare("UPDATE deal_master_editions SET statut='calculee', nb_laureats=?, calcule_at=datetime('now'), criteres_json=?, updated_at=datetime('now') WHERE id=?")
-        .run(laureats.length, JSON.stringify(Object.fromEntries(criteres.map(c=>[c.cle,c.poids]))), edId);
-      return { nb_scores: scores.length, nb_laureats: laureats.length, top_pct: ed.top_pct };
-    }
-
-    /* ── AUTO-RECALCUL : vérifie si une édition expirée attend son calcul ── */
-    async function _dmAutoRecalculate() {
-      try {
-        const expired = await db.prepare(`SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee','calculee') AND date(periode_fin) < date('now')`).all();
-        for (const ed of expired) {
-          if (ed.statut !== 'calculee') _dmScoreEdition(ed.id);
-          // Auto-publier
-          await db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
-          await db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=COALESCE(publie_at,datetime('now')), updated_at=datetime('now') WHERE id=?").run(ed.id);
-          // Créer l'édition suivante si elle n'existe pas
-          const nextStart = new Date(ed.periode_fin);
-          nextStart.setDate(nextStart.getDate() + 1);
-          const nextEnd = new Date(nextStart);
-          nextEnd.setMonth(nextEnd.getMonth() + 6);
-          nextEnd.setDate(nextEnd.getDate() - 1);
-          const ns = nextStart.toISOString().slice(0, 10);
-          const ne = nextEnd.toISOString().slice(0, 10);
-          const nextSem = nextStart.getMonth() < 6 ? 1 : 2;
-          const nextLabel = `Semestre ${nextSem} – ${nextStart.getFullYear()}`;
-          const existingNext = await db.prepare("SELECT id FROM deal_master_editions WHERE date(periode_debut)=date(?)").get(ns);
-          if (!existingNext) {
-            await db.prepare("INSERT INTO deal_master_editions (label,periode_debut,periode_fin,statut,top_pct) VALUES (?,?,?,'en_cours',10.0)").run(nextLabel, ns, ne);
-          }
-        }
-      } catch(e) { /* autorecalcul silencieux */ }
-    }
-    _dmAutoRecalculate();
-
-    /* POST /api/admin/deal-master/editions/:id/calculer — déclenché par le moteur (conservé pour rétrocompatibilité) */
-    const dmCalcM = pathname.match(/^\/api\/admin\/deal-master\/editions\/(\d+)\/calculer$/);
-    if (req.method === "POST" && dmCalcM) {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const edId = parseInt(dmCalcM[1]);
-      const result = _dmScoreEdition(edId);
-      if (!result) return sendJSON(res, 404, { error: "Édition introuvable." });
-      return sendJSON(res, 200, { ok: true, ...result });
-    }
-
-    /* POST /api/admin/deal-master/editions/:id/publier */
-    const dmPubM = pathname.match(/^\/api\/admin\/deal-master\/editions\/(\d+)\/publier$/);
-    if (req.method === "POST" && dmPubM) {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const edId = parseInt(dmPubM[1]);
-      const ed = await db.prepare("SELECT * FROM deal_master_editions WHERE id=?").get(edId);
-      if (!ed) return sendJSON(res, 404, { error: "Édition introuvable." });
-      if (ed.statut !== 'calculee') return sendJSON(res, 400, { error: "L'édition doit être calculée avant publication." });
-      // Archiver les autres publiées
-      await db.prepare("UPDATE deal_master_editions SET statut='archivee', updated_at=datetime('now') WHERE statut='publiee'").run();
-      await db.prepare("UPDATE deal_master_editions SET statut='publiee', publie_at=datetime('now'), updated_at=datetime('now') WHERE id=?").run(edId);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* PUT /api/admin/deal-master/criteres/:cle */
-    const dmCritM = pathname.match(/^\/api\/admin\/deal-master\/criteres\/([a-z_]+)$/);
-    if (req.method === "PUT" && dmCritM) {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const { poids, actif, label, description } = body;
-      await db.prepare(`UPDATE deal_master_criteres SET
-        poids=COALESCE(?,poids), actif=COALESCE(?,actif),
-        label=COALESCE(?,label), description=COALESCE(?,description),
-        updated_at=datetime('now') WHERE cle=?`)
-        .run(poids??null, actif??null, label||null, description||null, dmCritM[1]);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* GET /api/admin/deal-master/criteres */
-    if (req.method === "GET" && pathname === "/api/admin/deal-master/criteres") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      return sendJSON(res, 200, { criteres: await db.prepare("SELECT * FROM deal_master_criteres ORDER BY poids DESC").all() });
-    }
-
-    /* GET /api/admin/deal-master/status — état du moteur + prochain recalcul */
-    if (req.method === "GET" && pathname === "/api/admin/deal-master/status") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const activeEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut='publiee' ORDER BY periode_debut DESC LIMIT 1").get();
-      const currentEd = await db.prepare("SELECT * FROM deal_master_editions WHERE statut IN ('en_cours','planifiee') ORDER BY periode_debut DESC LIMIT 1").get();
-      const nbActifs = (await db.prepare("SELECT COUNT(*) AS n FROM users WHERE is_deal_master=1").get())?.n;
-      // Prochain recalcul = fin de l'édition en cours + 1 jour
-      let nextRecalcul = null;
-      if (currentEd) {
-        const d = new Date(currentEd.periode_fin);
-        d.setDate(d.getDate() + 1);
-        nextRecalcul = d.toISOString().slice(0, 10);
-      }
-      return sendJSON(res, 200, {
-        edition_active: activeEd || null,
-        edition_courante: currentEd || null,
-        nb_deal_masters_actifs: nbActifs,
-        prochain_recalcul: nextRecalcul,
-        moteur: 'automatique',
-        periodicite_mois: 6,
-        top_pct: currentEd?.top_pct ?? activeEd?.top_pct ?? 10
-      });
-    }
-
-    /* GET /api/admin/deal-master/classement — classement complet (scores + rangs) */
-    if (req.method === "GET" && pathname === "/api/admin/deal-master/classement") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const rows = await db.prepare(`
-        SELECT dms.user_id, dms.score, dms.rang, dms.rang_total, dms.computed_at,
-               u.nom, u.prenom, u.photo_url, u.titre_pro, u.is_deal_master,
-               i.nom AS initiative_nom, i.domaine
-        FROM deal_master_scores dms
-        JOIN users u ON u.id = dms.user_id
-        LEFT JOIN initiatives i ON i.user_id = dms.user_id
-        ORDER BY dms.rang ASC
-        LIMIT 200`).all();
-      const topPct = (await db.prepare("SELECT top_pct FROM deal_master_editions WHERE statut IN ('en_cours','publiee') ORDER BY periode_debut DESC LIMIT 1").get())?.top_pct ?? 10;
-      return sendJSON(res, 200, { classement: rows, top_pct: topPct });
-    }
-
-    /* GET /api/admin/deal-master/laureats-actuels — Deal Masters actifs */
-    if (req.method === "GET" && pathname === "/api/admin/deal-master/laureats-actuels") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const laureats = await db.prepare(`
-        SELECT dml.user_id, dml.score, dml.rang, dml.date_attribution, dml.date_expiration,
-               dme.label AS edition_label, dme.periode_debut, dme.periode_fin,
-               u.nom, u.prenom, u.photo_url, u.titre_pro,
-               i.nom AS initiative_nom, i.domaine,
-               (SELECT COUNT(*) FROM deal_master_laureats h WHERE h.user_id=dml.user_id) AS nb_editions_total
-        FROM deal_master_laureats dml
-        JOIN deal_master_editions dme ON dme.id = dml.edition_id
-        JOIN users u ON u.id = dml.user_id
-        LEFT JOIN initiatives i ON i.user_id = dml.user_id
-        WHERE dml.actif = 1
-        ORDER BY dml.rang ASC`).all();
-      return sendJSON(res, 200, { laureats });
-    }
-
-    /* GET /api/admin/deal-master/historique — historique complet de tous les Deal Masters */
-    if (req.method === "GET" && pathname === "/api/admin/deal-master/historique") {
-      const me = await getCurrentUser(req);
-      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: "Admin requis." });
-      const historique = await db.prepare(`
-        SELECT dml.id, dml.user_id, dml.score, dml.rang, dml.date_attribution, dml.date_expiration, dml.actif,
-               dme.label AS edition_label, dme.periode_debut, dme.periode_fin,
-               u.nom, u.prenom, u.photo_url, u.titre_pro,
-               i.nom AS initiative_nom
-        FROM deal_master_laureats dml
-        JOIN deal_master_editions dme ON dme.id = dml.edition_id
-        JOIN users u ON u.id = dml.user_id
-        LEFT JOIN initiatives i ON i.user_id = dml.user_id
-        ORDER BY dml.edition_id DESC, dml.rang ASC`).all();
-      return sendJSON(res, 200, { historique });
-    }
-
-    /* GET /api/deal-master/verifier/:userId — vérification publique */
-    const dmVerifM = pathname.match(/^\/api\/deal-master\/verifier\/(\d+)$/);
-    if (req.method === "GET" && dmVerifM) {
-      const uid = parseInt(dmVerifM[1]);
-      const u = await db.prepare("SELECT id,nom,prenom,photo_url,titre_pro FROM users WHERE id=?").get(uid);
-      if (!u) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
-      const laureat = await db.prepare(`SELECT dml.rang, dml.score, dml.date_attribution, dml.date_expiration,
-        dme.label AS edition_label, dme.periode_debut, dme.periode_fin, dme.statut AS edition_statut
-        FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
-        WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(uid);
-      const nb_editions = (await db.prepare("SELECT COUNT(*) AS n FROM deal_master_laureats WHERE user_id=?").get(uid))?.n;
-      return sendJSON(res, 200, {
-        valide: !!laureat,
-        utilisateur: { id: u.id, nom: u.nom, prenom: u.prenom, photo_url: u.photo_url, titre_pro: u.titre_pro },
-        distinction: laureat || null,
-        nb_editions,
-        verifie_le: new Date().toISOString(),
-      });
-    }
-
-    /* GET /api/profil/:id/deal-master — badge info */
-    const dmProfilM = pathname.match(/^\/api\/profil\/(\d+)\/deal-master$/);
-    if (req.method === "GET" && dmProfilM) {
-      const uid = parseInt(dmProfilM[1]);
-      const laureat = await db.prepare(`SELECT dml.*, dme.label AS edition_label, dme.periode_debut, dme.periode_fin
-        FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
-        WHERE dml.user_id=? AND dml.actif=1 ORDER BY dml.edition_id DESC LIMIT 1`).get(uid);
-      const historique = await db.prepare(`SELECT dml.rang, dml.score, dme.label AS edition_label, dme.periode_debut
-        FROM deal_master_laureats dml JOIN deal_master_editions dme ON dme.id=dml.edition_id
-        WHERE dml.user_id=? ORDER BY dml.edition_id DESC`).all(uid);
-      return sendJSON(res, 200, { laureat: laureat || null, historique });
-    }
-
-    /* ═══════════════════════════════════════════════════════════
        TÉMOIGNAGES — ILS ONT REJOINT DIASPO'ACTIF
     ═══════════════════════════════════════════════════════════ */
 
@@ -33143,7 +32796,7 @@ ${jsonLd}
       return sendJSON(res, 200, { ok: true });
     }
 
-    /* GET /api/partenaires — annuaire public (Deal Masters mis en avant) */
+    /* GET /api/partenaires — annuaire public */
     if (req.method === "GET" && pathname === "/api/partenaires") {
       const qs = new URL("http://x" + req.url).searchParams;
       const domaine = qs.get('domaine') || '';
@@ -33152,10 +32805,10 @@ ${jsonLd}
       const page    = Math.max(1, parseInt(qs.get('page') || '1'));
       const LIMIT   = 20, OFFSET = (page - 1) * LIMIT;
       let rows = await db.prepare(`
-        SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays, u.is_deal_master
+        SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays
         FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
         WHERE po.statut = 'active' AND po.niveau_visibilite = 'public'
-        ORDER BY u.is_deal_master DESC, po.nbr_recommandations DESC, po.date_attribution DESC
+        ORDER BY po.nbr_recommandations DESC, po.date_attribution DESC
         LIMIT ? OFFSET ?`).all(LIMIT, OFFSET);
       if (domaine) rows = rows.filter(r => (safeParse(r.domaines_expertise||'[]')).some(d => d.toLowerCase().includes(domaine.toLowerCase())));
       if (pays)    rows = rows.filter(r => (safeParse(r.pays_intervention||'[]')).some(p => p.toLowerCase().includes(pays.toLowerCase())));
