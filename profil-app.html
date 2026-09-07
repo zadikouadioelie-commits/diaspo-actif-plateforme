@@ -3971,6 +3971,13 @@ function pvtProductCardHtml(p, ownerId) {
   else if (statut === 'indisponible') badge = `<span class="pvt-badge stock">Indisponible</span>`;
   else if (statut === 'masque') badge = `<span class="pvt-badge stock">Masqué</span>`;
   const prix = p.prix != null ? Number(p.prix).toFixed(2) + ' ' + (p.devise||'EUR') : 'Prix sur demande';
+  /* Demande de devis (2026-09-07) — priorité au réglage du produit (tri-état : null=hérite,
+     1=forcé actif, 0=forcé inactif), repli sur le réglage par défaut de la vitrine. Même
+     logique que server/index.js POST /api/produits/:id/devis, ne jamais diverger des deux
+     côtés. */
+  const devisResolu = p.devis_active != null ? Number(p.devis_active) : Number(_vitrineInit?.vitrine_devis_active || 0);
+  const devisBtn = (!isOwn && devisResolu === 1)
+    ? `<button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="openDevisModal(${p.id})">📩 Demander un devis</button>` : '';
   const ownerRow = isOwn ? `<div style="display:flex;gap:6px;margin-top:6px;">
       <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="openProductModal(${p.id})">✏️ Modifier</button>
       <button class="pvt-btn" style="flex:1;font-size:12px;padding:7px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
@@ -3981,7 +3988,8 @@ function pvtProductCardHtml(p, ownerId) {
           ? `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">🛒 Commander</button>`
           : `<button class="pvt-prod-buy" style="background:#8794A7;" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
       </div>
-      <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>` : `<div class="pvt-prod-foot"><span class="pvt-prod-price">${prix}</span></div>`;
+      <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>
+      ${devisBtn}` : `<div class="pvt-prod-foot"><span class="pvt-prod-price">${prix}</span></div>`;
   return `<div class="pvt-prod-card" data-pid="${p.id}"${statut==='masque'?' style="opacity:.55;"':''}>
     <div class="pvt-prod-imgwrap">
       ${cover ? `<img loading="lazy" src="${esc(cover)}" alt="">` : `<div class="noimg">🛍️</div>`}
@@ -4554,6 +4562,171 @@ function contacterVendeur(ownerId, produitId) {
   window.location.href = `messagerie.html?with=${ownerId}&produit=${produitId}`;
 }
 
+/* ══════════ Demander un devis (2026-09-07) ══════════
+   Contrairement à contacterVendeur()/openCommanderModal(), n'exige JAMAIS de compte — c'est
+   tout l'objet du module (cahier des charges §2-3) : un visiteur sans compte doit pouvoir
+   demander un devis. Deux écrans dans la même modale (formulaire → récapitulatif), les
+   coordonnées d'un utilisateur connecté (CU) ne sont ni redemandées ni modifiables. */
+let _devisState = null;
+let _devisFormTs = 0;
+
+function openDevisModal(productId) {
+  const prod = _produitsVitrine.find(p => p.id === productId);
+  if (!prod) return;
+  _devisState = { attachment_url: null, attachment_nom: null };
+  _devisFormTs = Date.now();
+  const overlay = document.createElement('div');
+  overlay.id = 'devis-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  devisRenderForm(prod);
+}
+
+function devisRenderForm(prod) {
+  const overlay = document.getElementById('devis-modal-overlay');
+  if (!overlay) return;
+  const telRequis = !!_vitrineInit?.vitrine_devis_tel_requis;
+  const connecte = !!CU;
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
+      <h2 style="margin:0 0 6px;font-size:17px;">📩 Demander un devis</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">« ${esc(prod.nom)} »</p>
+      ${connecte
+        ? `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 14px;font-size:12.5px;color:#166534;margin-bottom:16px;">Votre demande sera envoyée avec les coordonnées enregistrées dans votre profil Diaspo'Actif.</div>`
+        : `<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 14px;font-size:12.5px;color:#9A3412;margin-bottom:16px;">Vous pouvez demander un devis sans créer de compte Diaspo'Actif. Votre adresse e-mail est nécessaire pour recevoir la réponse et le devis.</div>`
+      }
+      ${!connecte ? `
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Nom *</label>
+          <input type="text" id="dv-nom" value="${esc(_devisState.requester_last_name||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+        <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Prénom *</label>
+          <input type="text" id="dv-prenom" value="${esc(_devisState.requester_first_name||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+      </div>
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">E-mail *</label>
+      <input type="email" id="dv-email" value="${esc(_devisState.requester_email||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Téléphone ${telRequis?'*':'(facultatif)'}</label>
+      <input type="tel" id="dv-telephone" value="${esc(_devisState.requester_phone||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      ` : ''}
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Quantité</label>
+          <input type="number" min="1" id="dv-quantite" value="${esc(_devisState.quantity||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+        <div style="flex:1;"><label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Date souhaitée</label>
+          <input type="date" id="dv-date" value="${esc(_devisState.desired_date||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;"></div>
+      </div>
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Décrivez votre besoin</label>
+      <textarea id="dv-description" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;min-height:70px;margin-bottom:12px;">${esc(_devisState.description||'')}</textarea>
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Dimensions / caractéristiques particulières (facultatif)</label>
+      <input type="text" id="dv-dimensions" value="${esc(_devisState.dimensions||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Informations complémentaires (facultatif)</label>
+      <textarea id="dv-infos" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;min-height:50px;margin-bottom:12px;">${esc(_devisState.additional_information||'')}</textarea>
+      <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Pièce jointe (facultatif)</label>
+      <div id="dv-attach-slot" style="border:1.5px dashed #E2E8F0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#94a3b8;cursor:pointer;margin-bottom:8px;" onclick="document.getElementById('dv-file').click()">${_devisState.attachment_nom ? '✅ '+esc(_devisState.attachment_nom) : '＋ Ajouter une image ou un PDF'}</div>
+      <input type="file" id="dv-file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" style="display:none;" onchange="devisHandleFile(this)">
+      <p id="dv-err" style="color:#dc2626;font-size:12px;display:none;margin:8px 0;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="document.getElementById('devis-modal-overlay').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">Annuler</button>
+        <button id="dv-next" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">Vérifier ma demande →</button>
+      </div>
+    </div>`;
+  document.getElementById('dv-next').onclick = () => devisAllerRecap(prod);
+}
+
+async function devisHandleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const slot = document.getElementById('dv-attach-slot');
+  const avant = slot.textContent;
+  slot.textContent = '⏳ Envoi…';
+  try {
+    const fd = new FormData();
+    fd.append('fichier', file, file.name);
+    const res = await fetch('/api/devis-demandes/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erreur upload');
+    _devisState.attachment_url = data.url;
+    _devisState.attachment_nom = data.nom || file.name;
+    slot.textContent = '✅ ' + _devisState.attachment_nom;
+  } catch (e) {
+    slot.textContent = avant;
+    alert('Erreur : ' + e.message);
+  }
+}
+
+function devisAllerRecap(prod) {
+  const err = document.getElementById('dv-err');
+  err.style.display = 'none';
+  const connecte = !!CU;
+  Object.assign(_devisState, {
+    quantity: document.getElementById('dv-quantite').value || null,
+    desired_date: document.getElementById('dv-date').value || null,
+    description: document.getElementById('dv-description').value.trim() || null,
+    dimensions: document.getElementById('dv-dimensions').value.trim() || null,
+    additional_information: document.getElementById('dv-infos').value.trim() || null,
+  });
+  if (!connecte) {
+    Object.assign(_devisState, {
+      requester_first_name: document.getElementById('dv-prenom').value.trim(),
+      requester_last_name: document.getElementById('dv-nom').value.trim(),
+      requester_email: document.getElementById('dv-email').value.trim(),
+      requester_phone: document.getElementById('dv-telephone').value.trim() || null,
+    });
+    if (!_devisState.requester_first_name || !_devisState.requester_last_name) { err.textContent = 'Nom et prénom requis.'; err.style.display = 'block'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(_devisState.requester_email)) { err.textContent = 'Adresse e-mail invalide.'; err.style.display = 'block'; return; }
+    if (telRequisVitrine() && !_devisState.requester_phone) { err.textContent = 'Téléphone requis pour cette boutique.'; err.style.display = 'block'; return; }
+  }
+  devisRenderRecap(prod);
+}
+function telRequisVitrine() { return !!_vitrineInit?.vitrine_devis_tel_requis; }
+
+function devisRenderRecap(prod) {
+  const overlay = document.getElementById('devis-modal-overlay');
+  const d = _devisState;
+  const connecte = !!CU;
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
+      <h2 style="margin:0 0 16px;font-size:17px;">Récapitulatif de votre demande</h2>
+      <div style="background:#F8FAFC;border-radius:10px;padding:14px 16px;font-size:13px;color:#334155;line-height:1.8;margin-bottom:16px;">
+        <div><strong>Produit / service :</strong> ${esc(prod.nom)}</div>
+        ${!connecte
+          ? `<div><strong>Nom :</strong> ${esc(d.requester_first_name)} ${esc(d.requester_last_name)}</div><div><strong>E-mail :</strong> ${esc(d.requester_email)}</div>${d.requester_phone?`<div><strong>Téléphone :</strong> ${esc(d.requester_phone)}</div>`:''}`
+          : `<div><strong>Coordonnées :</strong> celles de votre profil Diaspo'Actif</div>`}
+        ${d.quantity?`<div><strong>Quantité :</strong> ${esc(String(d.quantity))}</div>`:''}
+        ${d.desired_date?`<div><strong>Date souhaitée :</strong> ${esc(d.desired_date)}</div>`:''}
+        ${d.description?`<div><strong>Besoin :</strong> ${esc(d.description)}</div>`:''}
+        ${d.dimensions?`<div><strong>Dimensions :</strong> ${esc(d.dimensions)}</div>`:''}
+        ${d.additional_information?`<div><strong>Compléments :</strong> ${esc(d.additional_information)}</div>`:''}
+        ${d.attachment_nom?`<div><strong>Pièce jointe :</strong> ${esc(d.attachment_nom)}</div>`:''}
+      </div>
+      <p id="dv-recap-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="devisRenderForm(_produitsVitrine.find(p=>p.id===${prod.id}))" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">← Retour</button>
+        <button id="dv-send" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">📩 Envoyer la demande</button>
+      </div>
+    </div>`;
+  document.getElementById('dv-send').onclick = () => devisEnvoyer(prod);
+}
+
+async function devisEnvoyer(prod) {
+  const btn = document.getElementById('dv-send');
+  const err = document.getElementById('dv-recap-err');
+  btn.disabled = true; btn.textContent = '⏳ Envoi…';
+  try {
+    const payload = { ..._devisState, _form_ts: _devisFormTs };
+    const r = await api('POST', `/produits/${prod.id}/devis`, payload);
+    const overlay = document.getElementById('devis-modal-overlay');
+    overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:10px;">✅</div>
+      <h2 style="margin:0 0 8px;font-size:17px;">Votre demande de devis a bien été envoyée.</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Vous recevrez une notification lorsque le professionnel vous répondra.</p>
+      <button onclick="document.getElementById('devis-modal-overlay').remove()" style="padding:9px 20px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">Fermer</button>
+    </div>`;
+  } catch (e) {
+    if (err) { err.textContent = e.message || 'Erreur.'; err.style.display = 'block'; }
+    btn.disabled = false; btn.textContent = '📩 Envoyer la demande';
+  }
+}
+
 async function alerteProduit(produitId) {
   if (!CU) { window.location.href = 'login.html'; return; }
   try {
@@ -4642,6 +4815,12 @@ function openProductModal(productId, presetCatalogueId) {
         <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Date de retour estimée (facultatif)</label>
         <input type="date" id="pf-date-retour" value="${prod&&prod.date_retour?esc(prod.date_retour):''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
       </div>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">📩 Demande de devis</label>
+      <select id="pf-devis-active" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:16px;background:#fff;">
+        <option value="" ${!prod||prod.devis_active==null?'selected':''}>Hériter du réglage de la boutique (${_vitrineInit?.vitrine_devis_active?'activé':'désactivé'} par défaut)</option>
+        <option value="1" ${prod&&prod.devis_active!=null&&Number(prod.devis_active)===1?'selected':''}>☑ Autoriser les demandes de devis</option>
+        <option value="0" ${prod&&prod.devis_active!=null&&Number(prod.devis_active)===0?'selected':''}>☐ Désactiver les demandes de devis</option>
+      </select>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Photos (jusqu'à 4)</label>
       <div class="prod-photo-slots" id="pf-photo-slots" style="margin-bottom:16px;"></div>
       <p id="pf-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
@@ -4701,6 +4880,7 @@ async function saveProduct(productId) {
     date_retour: statut === 'indisponible' ? (document.getElementById('pf-date-retour').value || null) : null,
     photos: _prodPhotoData.filter(Boolean),
     catalogue_id: catSel ? Number(catSel) : null,
+    devis_active: (() => { const v = document.getElementById('pf-devis-active').value; return v === '' ? null : Number(v); })(),
   };
   try {
     if (productId) await api('PUT', `/produits/${productId}`, payload);

@@ -297,6 +297,11 @@
         <!-- Barre messages épinglés -->
         <div class="pinned-bar" id="pinned-bar">📌 <span id="pinned-count">0</span> message(s) épinglé(s) — <span onclick="showPinnedMessages()" style="cursor:pointer;text-decoration:underline;">Voir</span></div>
 
+        <!-- Panneau demande de devis (module « 📩 Demander un devis » — conversation issue d'une
+             fiche produit, voir POST /api/produits/:id/devis). Rempli/affiché par loadMessages()
+             uniquement quand la réponse porte un champ devis non nul. -->
+        <div id="devis-panel" style="display:none;background:#FFF7ED;border-bottom:1.5px solid #FED7AA;padding:12px 16px;font-size:12.5px;color:#334155;"></div>
+
         <!-- Panel recherche dans conv -->
         <div class="msg-search-panel" id="msg-search-panel">
           <div style="display:flex;gap:8px;align-items:center;">
@@ -603,7 +608,7 @@ async function loadMessages(convId){
   try{ data=await api("GET",`/conversations/${convId}/messages`); }
   catch(e){ document.getElementById("msg-body").innerHTML=`<div style="color:#D33;padding:16px;">${e.message}</div>`; return; }
 
-  const {messages,autre,conversation}=data;
+  const {messages,autre,conversation,devis}=data;
 
   // Header
   document.getElementById("hd-avatar").textContent=avatarLetter(autre?.nom);
@@ -616,6 +621,7 @@ async function loadMessages(convId){
   document.getElementById("btn-archive").title=archived?"Désarchiver":"Archiver";
   document.getElementById("btn-archive").textContent=archived?"📂":"📁";
 
+  renderDevisPanel(devis, convId);
   renderMessages(messages);
 
   // Réseau Pro : à la première ouverture d'une conversation issue d'une Mise en relation,
@@ -623,6 +629,41 @@ async function loadMessages(convId){
   if (conversation.sujet === "Demande de contact" && autre?.id && !localStorage.getItem('dc_classe_'+convId)) {
     proposerClassementContact(autre.id, autre.nom, convId);
   }
+}
+
+/* Panneau « 📩 Demande de devis » — affiché quand la conversation est issue d'une demande de
+   devis (voir POST /api/produits/:id/devis, GET /api/conversations/:id/messages étendue). Le
+   propriétaire peut faire avancer le statut ; le demandeur le voit en lecture seule. */
+const DEVIS_STATUT_LABELS = { nouvelle:'🟠 Nouvelle demande', en_cours:'🔵 En cours', devis_envoye:'🟣 Devis envoyé', acceptee:'🟢 Acceptée', cloturee:'⚫ Clôturée' };
+const DEVIS_TRANSITIONS = { nouvelle:['en_cours','cloturee'], en_cours:['devis_envoye','cloturee'], devis_envoye:['acceptee','cloturee'], acceptee:['cloturee'], cloturee:[] };
+function renderDevisPanel(devis, convId){
+  const panel=document.getElementById("devis-panel");
+  if(!devis){ panel.style.display="none"; panel.innerHTML=""; return; }
+  const estProprietaire = devis.owner_id===me.id;
+  const lignes=[
+    `<strong>🟠 DEMANDE DE DEVIS</strong> — ${escHtml(devis.produit_nom)}${devis.produit_reference?` (${escHtml(devis.produit_reference)})`:""}`,
+    devis.quantity?`Quantité : ${escHtml(String(devis.quantity))}`:null,
+    devis.desired_date?`Date souhaitée : ${escHtml(devis.desired_date)}`:null,
+    devis.dimensions?`Dimensions / caractéristiques : ${escHtml(devis.dimensions)}`:null,
+    devis.additional_information?`Compléments : ${escHtml(devis.additional_information)}`:null,
+    devis.attachment_url?`📎 <a href="${devis.attachment_url}" target="_blank" rel="noopener">${escHtml(devis.attachment_nom||"Pièce jointe")}</a>`:null,
+  ].filter(Boolean).map(l=>`<div>${l}</div>`).join("");
+  const transitions = DEVIS_TRANSITIONS[devis.statut]||[];
+  const selecteur = (estProprietaire && transitions.length)
+    ? `<select id="devis-statut-select" onchange="devisChangerStatut(${devis.id}, this.value)" style="margin-top:8px;padding:5px 10px;border-radius:8px;border:1px solid #FED7AA;font-size:12px;background:#fff;">
+         <option value="">${DEVIS_STATUT_LABELS[devis.statut]||devis.statut} — changer le statut…</option>
+         ${transitions.map(t=>`<option value="${t}">${DEVIS_STATUT_LABELS[t]||t}</option>`).join("")}
+       </select>`
+    : `<div style="margin-top:6px;font-weight:700;">${DEVIS_STATUT_LABELS[devis.statut]||devis.statut}</div>`;
+  panel.innerHTML = lignes + selecteur;
+  panel.style.display="block";
+}
+async function devisChangerStatut(devisId, statut){
+  if(!statut) return;
+  try{
+    await api("PATCH", `/devis-demandes/${devisId}/statut`, { statut });
+    await loadMessages(activeConvId);
+  }catch(e){ alert("Erreur : "+e.message); }
 }
 
 function renderMessages(messages){
@@ -1589,7 +1630,7 @@ async function proposerClassementContact(contactId, contactNom, convId){
     return;
   }
 
-  // PRIORITÉ : ouvrir directement la conversation demandée (?with= / ?init=) dès que possible
+  // PRIORITÉ : ouvrir directement la conversation demandée (?with= / ?init= / ?conv=) dès que possible
   {
     const up=new URLSearchParams(location.search);
     /* "user" est accepté comme équivalent de "with" : la majorité des boutons « Contacter »
@@ -1598,6 +1639,11 @@ async function proposerClassementContact(contactId, contactNom, convId){
        VIDE, sans conversation — constaté en production. Les traiter ici les répare tous d'un
        coup, et les fait passer par les règles de mise en relation. */
     const w=up.get("with") || up.get("user"), ini=up.get("init"), prod=up.get("produit"), objet=up.get("objet"), origine=up.get("origine");
+    /* "conv"/"conversation_id" : les liens générés par assets/app.js (notifUrl, clic sur une
+       notification de type message) et reseau.html pointent vers messagerie.html?conv=<id> en
+       supposant que ça ouvre la conversation directement. Ce paramètre n'était jamais lu ici :
+       ces liens n'ouvraient que la liste, jamais la conversation visée. */
+    const convParam = up.get("conv") || up.get("conversation_id");
     if(w){
       openConvWithUser(Number(w), prod?Number(prod):null, objet, origine);
     } else if(ini){
@@ -1607,6 +1653,16 @@ async function proposerClassementContact(contactId, contactNom, convId){
         if(oid) openConvWithUser(oid, prod?Number(prod):null, objet, origine);
         else alert("Impossible d'ouvrir la conversation : propriétaire introuvable.");
       }catch(e){ alert(e.message); } })();
+    } else if(convParam){
+      const cid = Number(convParam);
+      (async()=>{ try{
+        /* On vérifie l'appartenance via la liste des conversations de l'utilisateur avant
+           d'ouvrir : si l'id ne lui appartient pas (ou n'existe plus), on se tait et la liste
+           normale (chargée juste après) reste affichée — pas d'erreur qui bloque la page. */
+        const r=await api("GET","/conversations");
+        const convs=r.conversations||[];
+        if(cid && convs.some(c=>c.id===cid)) openConv(cid);
+      }catch(e){ /* silencieux : fallback sur la liste normale */ } })();
     }
   }
 

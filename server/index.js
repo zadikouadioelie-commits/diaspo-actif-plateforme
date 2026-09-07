@@ -1018,6 +1018,17 @@ async function executerSuppressionCompte(userId, drId) {
     `).run(init.id);
   }
 
+  /* Demandes de devis (module « 📩 Demander un devis ») — même convention que le reste de cette
+     fonction : jamais de suppression de ligne (l'historique du propriétaire doit rester
+     consultable, point 12 du cahier des charges), seules les coordonnées personnelles du
+     demandeur sont anonymisées en place. */
+  await db.prepare(`
+    UPDATE devis_demandes SET requester_first_name=NULL, requester_last_name=NULL,
+      requester_email=?, requester_phone=NULL
+    WHERE requester_user_id=?
+  `).run(anonEmail, userId);
+  await db.prepare("UPDATE devis_reponses SET contenu=NULL WHERE auteur_user_id=?").run(userId);
+
   await db.prepare("DELETE FROM sessions WHERE user_id=?").run(userId);
 
   if (drId) {
@@ -1709,6 +1720,38 @@ route("POST", "/api/upload/document", async (req, res) => {
 const MAX_PRODUITS_VITRINE = 20;
 const MAX_ARTICLES_PAR_CATALOGUE = 5;
 
+/* ── Demandes de devis — machine à statuts (2026-09-07) ──
+   Pas de contrainte CHECK sur devis_demandes.statut (même choix que STATUTS_PROJETS_DA, voir
+   server/db.js) : purement additif, pour pouvoir prolonger un jour vers
+   Devis → Acceptation → Commande → Paiement → Facture sans migration destructive. */
+const STATUTS_DEVIS = ['nouvelle', 'en_cours', 'devis_envoye', 'acceptee', 'cloturee'];
+const STATUT_TRANSITIONS_DEVIS = {
+  nouvelle:      ['en_cours', 'cloturee'],
+  en_cours:      ['devis_envoye', 'cloturee'],
+  devis_envoye:  ['acceptee', 'cloturee'],
+  acceptee:      ['cloturee'],
+  cloturee:      [],
+};
+const STATUT_DEVIS_LABELS = {
+  nouvelle: '🟠 Nouvelle demande', en_cours: '🔵 En cours',
+  devis_envoye: '🟣 Devis envoyé', acceptee: '🟢 Acceptée', cloturee: '⚫ Clôturée',
+};
+
+/* Réutilise exactement le mécanisme de trouverOuCreerConvAssocie (index.js ~9749) mais avec
+   contexte='vitrine' — une demande de devis d'un compte connecté EST un contact vitrine, pas
+   une nouvelle espèce de conversation (voir la note d'architecture du plan). */
+async function trouverOuCreerConvVitrine(userIdA, userIdB) {
+  let conv = await db.prepare(
+    "SELECT * FROM conversations WHERE contexte='vitrine' AND ((user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?))"
+  ).get(userIdA, userIdB, userIdB, userIdA);
+  if (conv) {
+    if (conv.user1_id === userIdA && conv.deleted_u1) await db.prepare("UPDATE conversations SET deleted_u1=0 WHERE id=?").run(conv.id);
+    if (conv.user2_id === userIdA && conv.deleted_u2) await db.prepare("UPDATE conversations SET deleted_u2=0 WHERE id=?").run(conv.id);
+    return conv.id;
+  }
+  return (await db.prepare("INSERT INTO conversations (user1_id, user2_id, contexte) VALUES (?,?,'vitrine')").run(userIdA, userIdB)).lastInsertRowid;
+}
+
 /* ── Catalogues (regroupement des articles de la Vitrine) ── */
 route("GET", "/api/initiatives/:id/catalogues", async (req, res, params) => {
   const me = await getCurrentUser(req);
@@ -1840,7 +1883,7 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const count = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.n || 0;
   if (Number(count) >= MAX_PRODUITS_VITRINE) return sendJSON(res, 400, { error: `Limite de ${MAX_PRODUITS_VITRINE} produits atteinte. Supprimez-en un pour en ajouter un nouveau.` });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom du produit requis." });
   let catId = null;
   if (catalogue_id != null && catalogue_id !== '') {
@@ -1853,12 +1896,14 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : [];
   const st = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : 'disponible';
   const dispo = st === 'disponible' ? 1 : 0;
+  // devis_active : tri-état (null=hérite le réglage de la vitrine, 1=forcé actif, 0=forcé inactif)
+  const devisActiveVal = devis_active === true || devis_active === 1 ? 1 : (devis_active === false || devis_active === 0 ? 0 : null);
   const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.m;
   const ref = (reference && reference.trim()) || ('REF-' + Date.now().toString(36).toUpperCase().slice(-6));
   const id = (await db.prepare(`
-    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId)).lastInsertRowid;
+    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id, devis_active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId, devisActiveVal)).lastInsertRowid;
   // Notifie les abonnés de la vitrine (sauf produit masqué)
   if (st !== 'masque') {
     notifierAbonnes(params.id, "vitrine_produit", "Nouveau produit en boutique",
@@ -1876,7 +1921,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active } = body;
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : safeParse(prod.photos_json || "[]");
   const ancienStatut = prod.statut || 'disponible';
   const nouveauStatut = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : ancienStatut;
@@ -1894,9 +1939,13 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
       catId = Number(catalogue_id);
     }
   }
+  // devis_active : tri-état (null=hérite le réglage de la vitrine, 1=forcé actif, 0=forcé inactif)
+  const devisActiveVal = devis_active !== undefined
+    ? (devis_active === true || devis_active === 1 ? 1 : (devis_active === false || devis_active === 0 ? 0 : null))
+    : prod.devis_active;
 
   await db.prepare(`
-    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=? WHERE id=?
+    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=?, devis_active=? WHERE id=?
   `).run(
     nom || prod.nom, description !== undefined ? description : prod.description,
     prix != null ? Number(prix) : prod.prix, devise || prod.devise, dispo,
@@ -1904,7 +1953,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
     reference !== undefined ? reference : prod.reference,
     categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr),
     prix_promo !== undefined ? (prix_promo === null || prix_promo === '' ? null : Number(prix_promo)) : prod.prix_promo,
-    catId,
+    catId, devisActiveVal,
     params.id
   );
 
@@ -1960,6 +2009,276 @@ route("DELETE", "/api/produits/:id", async (req, res, params) => {
     }
     sendJSON(res, 500, SEC.safeError(e, "delete produit"));
   }
+});
+
+/* POST /api/produits/:id/devis — module « 📩 Demander un devis ».
+   Accessible connecté OU sans compte (getCurrentUser peut renvoyer null, jamais d'exception —
+   voir convention du projet). Deux parcours :
+   - connecté : coordonnées reprises du compte (jamais redemandées), une vraie conversation
+     contexte='vitrine' est créée/retrouvée (trouverOuCreerConvVitrine ci-dessus) et le message
+     initial y est inséré — la messagerie existante reste l'unique fil réel.
+   - invité : conversation_id reste NULL (conversations.user1_id/user2_id sont NOT NULL, aucune
+     place structurelle pour un compte inexistant) ; coordonnées saisies conservées directement
+     sur la ligne devis_demandes ; suivi par e-mail (voir server/mailer.js). */
+route("POST", "/api/produits/:id/devis", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+
+  // Anti-bot : honeypot + délai minimum + rate-limit IP (même trio que /api/auth/signup)
+  if (body.site_perso) {
+    SEC.logSecurity("devis_honeypot", { ip });
+    return sendJSON(res, 400, { error: "Requête invalide." });
+  }
+  const renderedAt = Number(body._form_ts) || 0;
+  if (renderedAt && (Date.now() - renderedAt) < 2000) {
+    SEC.logSecurity("devis_too_fast", { ip });
+    return sendJSON(res, 400, { error: "Veuillez réessayer dans quelques secondes." });
+  }
+  const ipLimit = SEC.rateLimit(`devis:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) {
+    SEC.logSecurity("devis_ratelimited", { ip });
+    return sendJSON(res, 429, { error: `Trop de demandes depuis cette connexion. Réessayez dans ${ipLimit.retryAfter}s.` });
+  }
+
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT id, nom, owner_user_id, vitrine_active, vitrine_devis_active, vitrine_devis_tel_requis FROM initiatives WHERE id=?").get(prod.initiative_id);
+  if (!init || Number(init.vitrine_active) !== 1) return sendJSON(res, 404, { error: "Produit introuvable." });
+
+  // Priorité au réglage du produit (tri-état), repli sur le réglage par défaut de la vitrine.
+  const devisResolu = prod.devis_active != null ? Number(prod.devis_active) : Number(init.vitrine_devis_active || 0);
+  if (devisResolu !== 1) return sendJSON(res, 403, { error: "Les demandes de devis ne sont pas activées pour ce produit." });
+
+  const user = await getCurrentUser(req);
+  let prenom, nom, email, telephone, requesterUserId = null;
+  if (user) {
+    const compte = await db.prepare("SELECT nom, prenom, email, telephone FROM users WHERE id=?").get(user.id);
+    prenom = compte?.prenom || null; nom = compte?.nom || null; email = compte?.email || null; telephone = compte?.telephone || null;
+    requesterUserId = Number(user.id);
+    if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas demander un devis sur votre propre produit." });
+  } else {
+    prenom = String(body.requester_first_name || "").trim().slice(0, 100);
+    nom = String(body.requester_last_name || "").trim().slice(0, 100);
+    email = String(body.requester_email || "").trim().slice(0, 254);
+    telephone = String(body.requester_phone || "").trim().slice(0, 30) || null;
+    if (!nom || !prenom) return sendJSON(res, 400, { error: "Nom et prénom requis." });
+    if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+    if (Number(init.vitrine_devis_tel_requis) === 1 && !telephone) return sendJSON(res, 400, { error: "Numéro de téléphone requis pour cette vitrine." });
+  }
+
+  // Champs de la demande — plafonds pour éviter tout abus, aucun n'est obligatoire hors description
+  const quantity = body.quantity != null && body.quantity !== "" ? parseInt(body.quantity, 10) : null;
+  if (quantity != null && (!Number.isFinite(quantity) || quantity <= 0)) return sendJSON(res, 400, { error: "Quantité invalide." });
+  let desiredDate = body.desired_date ? String(body.desired_date).slice(0, 10) : null;
+  if (desiredDate && !/^\d{4}-\d{2}-\d{2}$/.test(desiredDate)) return sendJSON(res, 400, { error: "Date souhaitée invalide." });
+  const description = String(body.description || "").trim().slice(0, 2000) || null;
+  const dimensions = String(body.dimensions || "").trim().slice(0, 500) || null;
+  const infosComplementaires = String(body.additional_information || "").trim().slice(0, 2000) || null;
+  const attachmentUrl = typeof body.attachment_url === "string" && body.attachment_url.startsWith("https://") ? body.attachment_url.slice(0, 500) : null;
+  const attachmentNom = attachmentUrl ? String(body.attachment_nom || "").trim().slice(0, 200) || null : null;
+  let extraFieldsJson = "{}";
+  if (body.extra_fields && typeof body.extra_fields === "object" && !Array.isArray(body.extra_fields)) {
+    const serialise = JSON.stringify(body.extra_fields);
+    if (serialise.length <= 3000) extraFieldsJson = serialise;
+  }
+
+  // Anti double-soumission (double clic / actualisation) : fenêtre de 30s sur la même demande
+  // exacte — une VRAIE nouvelle demande sur le même produit reste possible juste après.
+  const dedupSince = new Date(Date.now() - 30000).toISOString().slice(0, 19).replace("T", " ");
+  const doublon = await db.prepare(
+    "SELECT id, conversation_id, statut FROM devis_demandes WHERE produit_id=? AND requester_email=? AND COALESCE(description,'')=? AND created_at >= ? ORDER BY id DESC LIMIT 1"
+  ).get(prod.id, email, description || "", dedupSince);
+  if (doublon) return sendJSON(res, 200, { id: doublon.id, conversation_id: doublon.conversation_id, statut: doublon.statut, deja_envoyee: true });
+
+  let conversationId = null;
+  if (user) {
+    conversationId = await trouverOuCreerConvVitrine(Number(user.id), Number(init.owner_user_id));
+    const lignes = [
+      `🟠 DEMANDE DE DEVIS — ${prod.nom}`,
+      quantity ? `Quantité : ${quantity}` : null,
+      desiredDate ? `Date souhaitée : ${desiredDate}` : null,
+      description ? `Besoin : ${description}` : null,
+      dimensions ? `Dimensions / caractéristiques : ${dimensions}` : null,
+      infosComplementaires ? `Informations complémentaires : ${infosComplementaires}` : null,
+    ].filter(Boolean);
+    await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, produit_id) VALUES (?,?,?,?,?)")
+      .run(conversationId, Number(user.id), lignes.join("\n"), "text", prod.id);
+    if (attachmentUrl) {
+      await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json, produit_id) VALUES (?,?,?,?,?,?)")
+        .run(conversationId, Number(user.id), attachmentNom || "Pièce jointe", "file", JSON.stringify({ nom: attachmentNom, url: attachmentUrl }), prod.id);
+    }
+  }
+
+  const demandeId = (await db.prepare(`
+    INSERT INTO devis_demandes (vitrine_id, produit_id, produit_nom, produit_reference, owner_id, conversation_id,
+      requester_user_id, requester_first_name, requester_last_name, requester_email, requester_phone,
+      quantity, desired_date, description, dimensions, additional_information, attachment_url, attachment_nom,
+      extra_fields_json, statut)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'nouvelle')
+  `).run(init.id, prod.id, prod.nom, prod.reference || null, init.owner_user_id, conversationId,
+    requesterUserId, prenom, nom, email, telephone,
+    quantity, desiredDate, description, dimensions, infosComplementaires, attachmentUrl, attachmentNom,
+    extraFieldsJson)).lastInsertRowid;
+
+  creerNotif(init.owner_user_id, "devis_demande", "🟠 Nouvelle demande de devis",
+    `Vous avez reçu une nouvelle demande concernant « ${prod.nom} ».`,
+    conversationId ? { conversation_id: conversationId } : { lien: `dashboard-initiative.html?devis=${demandeId}` });
+
+  if (!user) {
+    try {
+      const { emailDemandeDevisRecue } = require("./mailer");
+      emailDemandeDevisRecue({ to: email, prenom, initiativeNom: init.nom, produitNom: prod.nom })
+        .catch(e => console.error("[devis] envoi e-mail confirmation:", e.message));
+    } catch (e) { console.error("[devis] mailer:", e.message); }
+  }
+
+  SEC.logSecurity("devis_demande_creee", { ip, demandeId: Number(demandeId), produitId: Number(prod.id), connecte: !!user });
+  sendJSON(res, 201, { id: demandeId, conversation_id: conversationId, statut: "nouvelle" });
+});
+
+/* POST /api/devis-demandes/upload — pièce jointe (photo ou PDF) pour une demande de devis, AVANT
+   soumission du formulaire (l'URL renvoyée est ensuite passée dans attachment_url/attachment_nom
+   à POST /api/produits/:id/devis). Accessible sans compte (un invité doit pouvoir joindre un
+   fichier) — mêmes contrôles que /api/formulaires-inscription/public/upload : signature réelle
+   du fichier (jamais l'extension déclarée), taille plafonnée, nom généré côté serveur, dépôt
+   Bunny CDN dans un dossier dédié "devis-demandes". Contrôle d'accès réel : voir §0 du plan —
+   l'URL n'est renvoyée qu'aux personnes autorisées dans les réponses des routes de lecture,
+   jamais affichée publiquement (même posture que le reste de la plateforme). */
+route("POST", "/api/devis-demandes/upload", async (req, res) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`devis_upload:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide." });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const raw = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { files } = parseMultipart(raw, boundaryMatch[1]);
+  const file = files["fichier"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu." });
+  const b = file.buffer;
+
+  const imgType = SEC.isSafeRasterImage(b);
+  const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; // %PDF
+
+  if (imgType) {
+    const MAX = 5 * 1024 * 1024;
+    if (b.length > MAX) return sendJSON(res, 400, { error: "Image trop volumineuse (max 5 Mo)." });
+    try {
+      const url = await uploadToBunny(b, `devis-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${imgType.split("/")[1].replace("jpeg", "jpg")}`, "devis-demandes");
+      SEC.logSecurity("upload", { kind: "devis_image", ip, size: b.length });
+      return sendJSON(res, 200, { url, nom: (file.filename || "image").slice(0, 200) });
+    } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "upload devis image")); }
+  }
+  if (isPdf) {
+    const MAX = 10 * 1024 * 1024;
+    if (b.length > MAX) return sendJSON(res, 400, { error: "Document trop volumineux (max 10 Mo)." });
+    try {
+      const url = await uploadToBunny(b, `devis-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`, "devis-demandes");
+      SEC.logSecurity("upload", { kind: "devis_pdf", ip, size: b.length });
+      return sendJSON(res, 200, { url, nom: (file.filename || "document.pdf").slice(0, 200) });
+    } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "upload devis pdf")); }
+  }
+  return sendJSON(res, 400, { error: "Format non supporté (image JPEG/PNG/WebP/GIF ou PDF requis)." });
+});
+
+/* Garde de permission commune aux routes de lecture/action sur UNE demande de devis — jamais
+   supposé sur la seule base de l'ID (cahier des charges §21) : demandeur OU propriétaire OU
+   administrateur, toujours vérifié côté serveur, jamais côté client. */
+async function devisAccesAutorise(row, req) {
+  const moi = await getCurrentUser(req);
+  const estDemandeur = moi && Number(moi.id) === Number(row.requester_user_id);
+  const estProprietaire = moi && Number(moi.id) === Number(row.owner_id);
+  const estAdmin = moi && moi.role === "administrateur";
+  return { moi, autorise: !!(estDemandeur || estProprietaire || estAdmin), estProprietaire: !!(estProprietaire || estAdmin), estDemandeur };
+}
+
+/* GET /api/initiatives/:id/devis-demandes — propriétaire : demandes SANS compte (conversation_id
+   NULL) uniquement. Les demandes d'un compte connecté apparaissent déjà via la messagerie
+   existante (GET /api/initiatives/:id/vitrine-messages, étendue plus bas avec le produit/devis
+   joint) — cette route ne duplique pas cette liste, elle comble seulement ce qu'elle ne peut pas
+   voir (aucune conversation n'existe pour un invité). */
+route("GET", "/api/initiatives/:id/devis-demandes", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id) && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const rows = await db.prepare("SELECT * FROM devis_demandes WHERE vitrine_id=? AND conversation_id IS NULL ORDER BY id DESC LIMIT 100").all(params.id);
+  sendJSON(res, 200, { demandes: rows });
+});
+
+/* GET /api/devis-demandes/:id — détail complet + historique (fil de la conversation si le
+   demandeur est connecté, sinon journal devis_reponses). */
+route("GET", "/api/devis-demandes/:id", async (req, res, params) => {
+  const row = await db.prepare("SELECT * FROM devis_demandes WHERE id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const { autorise } = await devisAccesAutorise(row, req);
+  if (!autorise) return sendJSON(res, 403, { error: "Accès refusé." });
+  const historique = row.conversation_id
+    ? await db.prepare("SELECT id, sender_id, contenu, type, fichier_json, created_at FROM messages WHERE conversation_id=? ORDER BY id ASC").all(row.conversation_id)
+    : await db.prepare("SELECT id, auteur_role, auteur_user_id, contenu, fichier_url, fichier_nom, created_at FROM devis_reponses WHERE devis_demande_id=? ORDER BY id ASC").all(row.id);
+  sendJSON(res, 200, { demande: { ...row, extra_fields: safeParse(row.extra_fields_json || "{}") }, historique });
+});
+
+/* POST /api/devis-demandes/:id/reponses — réponse du propriétaire à un demandeur SANS compte
+   uniquement (conversation_id IS NULL). Un demandeur connecté est répondu via la messagerie
+   existante (POST /api/conversations/:id/messages), zéro nouveau mécanisme pour ce cas-là. */
+route("POST", "/api/devis-demandes/:id/reponses", async (req, res, params, body) => {
+  const row = await db.prepare("SELECT * FROM devis_demandes WHERE id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const { moi, estProprietaire } = await devisAccesAutorise(row, req);
+  if (!estProprietaire) return sendJSON(res, 403, { error: "Accès refusé." });
+  if (row.conversation_id) return sendJSON(res, 400, { error: "Cette demande a une conversation active — répondez depuis la messagerie." });
+
+  const contenu = String(body.contenu || "").trim().slice(0, 2000) || null;
+  const fichierUrl = typeof body.fichier_url === "string" && body.fichier_url.startsWith("https://") ? body.fichier_url.slice(0, 500) : null;
+  const fichierNom = fichierUrl ? (String(body.fichier_nom || "").trim().slice(0, 200) || null) : null;
+  if (!contenu && !fichierUrl) return sendJSON(res, 400, { error: "Message vide." });
+
+  const id = (await db.prepare("INSERT INTO devis_reponses (devis_demande_id, auteur_role, auteur_user_id, contenu, fichier_url, fichier_nom) VALUES (?,?,?,?,?,?)")
+    .run(row.id, "owner", Number(moi.id), contenu, fichierUrl, fichierNom)).lastInsertRowid;
+  await db.prepare("UPDATE devis_demandes SET updated_at=datetime('now') WHERE id=?").run(row.id);
+
+  try {
+    const { emailDemandeDevisReponse } = require("./mailer");
+    const initNom = (await db.prepare("SELECT nom FROM initiatives WHERE id=?").get(row.vitrine_id))?.nom || "L'initiative";
+    emailDemandeDevisReponse({ to: row.requester_email, prenom: row.requester_first_name, initiativeNom: initNom, produitNom: row.produit_nom, contenu, fichierNom, fichierUrl })
+      .catch(e => console.error("[devis] envoi e-mail réponse:", e.message));
+  } catch (e) { console.error("[devis] mailer:", e.message); }
+
+  sendJSON(res, 201, { id });
+});
+
+/* PATCH /api/devis-demandes/:id/statut — validé contre STATUT_TRANSITIONS_DEVIS (un
+   administrateur peut forcer n'importe quelle transition, pour débloquer un cas particulier). */
+route("PATCH", "/api/devis-demandes/:id/statut", async (req, res, params, body) => {
+  const row = await db.prepare("SELECT * FROM devis_demandes WHERE id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Demande introuvable." });
+  const { moi, estProprietaire } = await devisAccesAutorise(row, req);
+  if (!estProprietaire) return sendJSON(res, 403, { error: "Accès refusé." });
+  const nouveau = body.statut;
+  if (!STATUTS_DEVIS.includes(nouveau)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const admin = moi && moi.role === "administrateur";
+  if (!admin && !(STATUT_TRANSITIONS_DEVIS[row.statut] || []).includes(nouveau)) {
+    return sendJSON(res, 400, { error: `Transition non autorisée depuis « ${STATUT_DEVIS_LABELS[row.statut] || row.statut} ».` });
+  }
+  await db.prepare("UPDATE devis_demandes SET statut=?, updated_at=datetime('now') WHERE id=?").run(nouveau, row.id);
+  sendJSON(res, 200, { ok: true, statut: nouveau });
+});
+
+/* GET /api/mes-devis — demandeur connecté : ses propres demandes, toutes vitrines confondues. */
+route("GET", "/api/mes-devis", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT d.*, i.nom AS vitrine_nom
+    FROM devis_demandes d LEFT JOIN initiatives i ON i.id = d.vitrine_id
+    WHERE d.requester_user_id = ? ORDER BY d.id DESC LIMIT 200
+  `).all(user.id);
+  sendJSON(res, 200, { demandes: rows });
 });
 
 /* PATCH /api/initiatives/:id/produits/reorder — owner only, tableau d'IDs dans le nouvel ordre.
@@ -5799,6 +6118,8 @@ route("GET", "/api/initiatives/:id/vitrine-messages", async (req, res, params) =
     if (prodMsg && prodMsg.produit_id) {
       produit = await db.prepare("SELECT id, nom, reference FROM produits_vitrine WHERE id=?").get(prodMsg.produit_id);
     }
+    // Demande de devis liée (module « 📩 Demander un devis ») — badge/statut, voir messagerie.html
+    const devis = await db.prepare("SELECT id, statut FROM devis_demandes WHERE conversation_id=? ORDER BY id DESC LIMIT 1").get(c.id);
     items.push({
       conversation_id: c.id,
       autre_id: Number(autreId),
@@ -5807,6 +6128,7 @@ route("GET", "/api/initiatives/:id/vitrine-messages", async (req, res, params) =
       date: dernier ? dernier.created_at : c.created_at,
       non_lus: nonLus,
       produit: produit || null,
+      devis: devis ? { id: devis.id, statut: devis.statut } : null,
     });
   }
   sendJSON(res, 200, { messages: items, total_non_lus: totalNonLus });
@@ -11656,7 +11978,14 @@ route("GET", "/api/conversations/:id/messages", async (req, res, params) => {
   const messages = await db.prepare("SELECT m.*, u.nom AS sender_nom, u.role AS sender_role FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.conversation_id = ? ORDER BY m.created_at ASC").all(params.id);
   const autre = await db.prepare("SELECT id, nom, role, ville, pays FROM users WHERE id=?").get(conv.user1_id === user.id ? conv.user2_id : conv.user1_id);
 
-  sendJSON(res, 200, { messages, autre, conversation: conv });
+  // Demande de devis liée (module « 📩 Demander un devis ») — panneau dédié côté messagerie.html,
+  // voir POST /api/produits/:id/devis. Seuls quantity/desired_date/etc. sont utiles ici, pas
+  // les coordonnées (déjà visibles via "autre" pour ce cas connecté).
+  const devis = await db.prepare(
+    "SELECT id, owner_id, produit_nom, produit_reference, quantity, desired_date, description, dimensions, additional_information, attachment_url, attachment_nom, statut FROM devis_demandes WHERE conversation_id=? ORDER BY id DESC LIMIT 1"
+  ).get(params.id);
+
+  sendJSON(res, 200, { messages, autre, conversation: conv, devis: devis || null });
 });
 
 /* POST /api/conversations/:id/messages — envoyer un message */

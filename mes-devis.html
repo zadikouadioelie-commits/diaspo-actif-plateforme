@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Diaspo'Actif — Mes demandes de devis</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.notice{text-align:center;padding:30px;color:var(--muted);}
+.devis-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px;cursor:pointer;transition:box-shadow .15s;}
+.devis-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.devis-statut-pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:11.5px;font-weight:800;}
+.modal-bg{position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:16px;padding:24px;width:480px;max-width:100%;max-height:90vh;overflow-y:auto;}
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="dashboard-utilisateur.html">Mon espace</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:32px;padding-bottom:60px;">
+    <div style="margin-bottom:24px;">
+      <h1 style="margin:0;font-size:24px;">📩 Mes demandes de devis</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Retrouvez ici toutes les demandes de devis que vous avez envoyées sur les vitrines de Diaspo'Actif.</p>
+    </div>
+
+    <div id="mes-devis-list"><div class="notice">Chargement…</div></div>
+  </main>
+
+</div>
+
+<!-- MODAL DÉTAIL -->
+<div class="modal-bg" id="modal-devis-bg" onclick="if(event.target===this)closeMod('modal-devis-bg')">
+  <div class="modal-box" id="modal-devis-content"></div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=11"></script>
+<script>
+let ME = null;
+const DEVIS_STATUT_STYLE = {
+  nouvelle: { label: '🟠 Nouvelle demande', bg: '#FFF7ED', color: '#9A3412' },
+  en_cours: { label: '🔵 En cours', bg: '#EFF6FF', color: '#1D4ED8' },
+  devis_envoye: { label: '🟣 Devis envoyé', bg: '#F5F3FF', color: '#6D28D9' },
+  acceptee: { label: '🟢 Acceptée', bg: '#F0FDF4', color: '#15803D' },
+  cloturee: { label: '⚫ Clôturée', bg: '#F1F5F9', color: '#475569' },
+};
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d){ return d ? new Date(d).toLocaleDateString('fr',{day:'2-digit',month:'short',year:'numeric'}) : ''; }
+function closeMod(id){ document.getElementById(id).classList.remove('open'); }
+
+async function loadMesDevis() {
+  if (!ME) { document.getElementById('mes-devis-list').innerHTML='<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour voir vos demandes de devis.</div>'; return; }
+  try {
+    const r = await api('GET', '/mes-devis');
+    const list = document.getElementById('mes-devis-list');
+    const demandes = r.demandes || [];
+    if (!demandes.length) {
+      list.innerHTML = `<div class="notice">
+        <div style="font-size:48px;margin-bottom:12px;">📩</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text);">Aucune demande de devis pour le moment</div>
+        <p style="font-size:13px;max-width:360px;margin:0 auto 16px;">Le bouton « 📩 Demander un devis » sur une fiche produit/service d'une vitrine créera une demande visible ici.</p>
+        <a class="btn btn-orange" href="vitrines.html">🏬 Découvrir les vitrines</a>
+      </div>`;
+      return;
+    }
+    list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">` +
+      demandes.map(d => {
+        const st = DEVIS_STATUT_STYLE[d.statut] || { label: d.statut, bg: '#F1F5F9', color: '#475569' };
+        return `
+        <div class="devis-card" onclick="openDevisDetail(${d.id})">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;">
+            <div style="font-weight:800;font-size:15px;">${escH(d.produit_nom)}</div>
+            <span class="devis-statut-pill" style="background:${st.bg};color:${st.color};">${st.label}</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--muted);">🏬 ${escH(d.vitrine_nom || 'Vitrine')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">📅 ${fmtDate(d.created_at)}</div>
+        </div>`;
+      }).join('') + `</div>`;
+  } catch (e) {
+    document.getElementById('mes-devis-list').innerHTML = `<div class="notice" style="color:#dc2626;">Erreur de chargement : ${escH(e.message)}</div>`;
+  }
+}
+
+async function openDevisDetail(id) {
+  const box = document.getElementById('modal-devis-content');
+  box.innerHTML = '<div class="notice">Chargement…</div>';
+  document.getElementById('modal-devis-bg').classList.add('open');
+  try {
+    const r = await api('GET', `/devis-demandes/${id}`);
+    const d = r.demande;
+    const st = DEVIS_STATUT_STYLE[d.statut] || { label: d.statut, bg: '#F1F5F9', color: '#475569' };
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <h2 style="margin:0;font-size:17px;">${escH(d.produit_nom)}</h2>
+        <button onclick="closeMod('modal-devis-bg')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
+      </div>
+      <span class="devis-statut-pill" style="background:${st.bg};color:${st.color};margin-bottom:14px;display:inline-block;">${st.label}</span>
+      <div style="background:#F8FAFC;border-radius:10px;padding:14px 16px;font-size:13px;color:#334155;line-height:1.8;margin:12px 0;">
+        ${d.quantity ? `<div><strong>Quantité :</strong> ${escH(String(d.quantity))}</div>` : ''}
+        ${d.desired_date ? `<div><strong>Date souhaitée :</strong> ${fmtDate(d.desired_date)}</div>` : ''}
+        ${d.description ? `<div><strong>Besoin :</strong> ${escH(d.description)}</div>` : ''}
+        ${d.dimensions ? `<div><strong>Dimensions :</strong> ${escH(d.dimensions)}</div>` : ''}
+        ${d.additional_information ? `<div><strong>Compléments :</strong> ${escH(d.additional_information)}</div>` : ''}
+        ${d.attachment_url ? `<div><strong>Pièce jointe :</strong> <a href="${d.attachment_url}" target="_blank" rel="noopener">${escH(d.attachment_nom||'Document')}</a></div>` : ''}
+      </div>
+      <h3 style="font-size:13.5px;margin:16px 0 8px;">💬 Échanges</h3>
+      <div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+        ${(r.historique||[]).length ? r.historique.map(m => {
+          const moi = d.requester_user_id ? m.sender_id === d.requester_user_id : m.auteur_role === 'guest';
+          const contenu = m.contenu || '';
+          const fichier = m.fichier_json ? JSON.parse(m.fichier_json) : (m.fichier_url ? { nom: m.fichier_nom, url: m.fichier_url } : null);
+          return `<div style="align-self:${moi?'flex-end':'flex-start'};max-width:80%;background:${moi?'var(--tp,#2563EB)':'#F1F5F9'};color:${moi?'#fff':'#0D1B2A'};border-radius:12px;padding:8px 12px;font-size:12.5px;">
+            ${escH(contenu)}
+            ${fichier ? `<div style="margin-top:4px;"><a href="${fichier.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">📎 ${escH(fichier.nom||'Pièce jointe')}</a></div>` : ''}
+          </div>`;
+        }).join('') : '<p style="font-size:12.5px;color:var(--muted);">Aucun échange pour le moment.</p>'}
+      </div>
+      ${d.conversation_id ? `<a href="messagerie.html?conv=${d.conversation_id}" class="btn btn-orange" style="display:block;text-align:center;margin-top:16px;text-decoration:none;">💬 Répondre dans la messagerie</a>` : ''}
+    `;
+  } catch (e) {
+    box.innerHTML = `<div class="notice" style="color:#dc2626;">${escH(e.message)}</div>`;
+  }
+}
+
+(async()=>{
+  ME = await fetchCurrentUser();
+  loadMesDevis();
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

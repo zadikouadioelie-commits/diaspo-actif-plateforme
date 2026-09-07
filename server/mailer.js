@@ -657,4 +657,83 @@ function emailAccesCagnottePrivee({ email, cagnotteTitre, createurNom, lien }) {
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee };
+/* Confirmation envoyée à un demandeur de devis SANS compte Diaspo'Actif — c'est sa seule trace
+   écrite (pas d'espace "Mes demandes de devis" possible sans compte), voir server/index.js
+   POST /api/produits/:id/devis. Pour un demandeur connecté, la notification in-app existante
+   (creerNotif) suffit — pas d'e-mail redondant. */
+function emailDemandeDevisRecue({ to, prenom, initiativeNom, produitNom }) {
+  return sendEmail({
+    to,
+    subject: `Votre demande de devis a bien été envoyée — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F8FAFF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(13,27,42,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:21px;font-weight:900;color:#0D1B2A;">✅ Demande envoyée</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">Bonjour ${prenom || ''},</p>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">
+        Votre demande de devis concernant <strong>« ${produitNom} »</strong> a bien été transmise à
+        <strong>${initiativeNom}</strong>. Vous recevrez un e-mail à cette même adresse dès que le
+        professionnel vous aura répondu.
+      </p>
+      <p style="color:#94A3B8;font-size:12px;margin:0;">
+        Aucun compte Diaspo'Actif n'est nécessaire pour recevoir la réponse.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+/* Réponse du propriétaire d'une vitrine à un demandeur de devis SANS compte (voir
+   POST /api/devis-demandes/:id/reponses) — seul canal de suivi possible pour un invité, la
+   ligne devis_reponses n'ayant pas d'espace personnel pour l'afficher. lienDevis reste optionnel
+   (accès sécurisé par lien différé à une évolution future, voir devis_demandes.guest_access_token_hash). */
+function emailDemandeDevisReponse({ to, prenom, initiativeNom, produitNom, contenu, fichierNom, fichierUrl }) {
+  return sendEmail({
+    to,
+    subject: `📩 Nouvelle réponse à votre demande de devis — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F8FAFF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(13,27,42,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.6);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:21px;font-weight:900;color:#0D1B2A;">📩 Nouvelle réponse</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">Bonjour ${prenom || ''},</p>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">
+        <strong>${initiativeNom}</strong> a répondu à votre demande de devis concernant
+        <strong>« ${produitNom} »</strong> :
+      </p>
+      ${contenu ? `<div style="background:#F8FAFF;border-left:3px solid #2563EB;border-radius:8px;padding:14px 16px;margin:16px 0;color:#334155;font-size:14px;line-height:1.6;white-space:pre-wrap;">${contenu}</div>` : ''}
+      ${fichierUrl ? `<p style="margin:0 0 16px;"><a href="${fichierUrl}" style="color:#2563EB;font-weight:700;text-decoration:none;">📄 ${fichierNom || 'Document joint'}</a></p>` : ''}
+      <p style="color:#94A3B8;font-size:12px;margin:0;">
+        Pour répondre, contactez directement ${initiativeNom} via les coordonnées de sa boutique.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse };
