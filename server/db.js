@@ -1693,6 +1693,10 @@ const MIGRATIONS = [
   // URL — un 5e mode à côté de libre/facultative/obligatoire/validation, jamais suivi côté
   // Diaspo'Actif (pas d'ID DA/DS-ID pour ce mode, juste un bouton qui ouvre le lien).
   ["events", "inscription_lien_externe TEXT"],
+  // Chaîne WhatsApp (2026-09-07, demande explicite) : logo/bouton affiché sur la page
+  // publique de l'événement, ouvrant le lien de la chaîne/du groupe renseigné par
+  // l'organisateur — simple lien à coller, même logique qu'inscription_lien_externe.
+  ["events", "whatsapp_lien TEXT"],
   // Agenda events — lien source
   ["agenda_events", "source_type TEXT DEFAULT 'manuel'"],
   ["agenda_events", "source_id INTEGER"],

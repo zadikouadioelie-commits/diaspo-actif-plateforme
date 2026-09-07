@@ -27422,7 +27422,7 @@ ${jsonLd}
         cible_type, cible_liste_ids,
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
         fc_programme_fichier_url, fc_programme_fichier_nom,
-        programmed_at, timezone, billetterie_config, inscription_lien_externe,
+        programmed_at, timezone, billetterie_config, inscription_lien_externe, whatsapp_lien,
         rayon_publication, langue, mode_participation, region, departement, communaute
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
@@ -27450,9 +27450,9 @@ ${jsonLd}
          pdf_url,pdf_nom,pdf_acces,pdf_extra_json,cible_type,cible_liste_ids,
          fc_resume,fc_objectifs,fc_public,fc_programme,fc_partenaires,fc_partenaires_ids,fc_contact,fc_notes,
          fc_programme_fichier_url,fc_programme_fichier_nom,
-         programmed_at,timezone,inscription_lien_externe,
+         programmed_at,timezone,inscription_lien_externe,whatsapp_lien,
          rayon_publication,langue,mode_participation,region,departement,communaute)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
              capacite||0, categorie||'Général', coverImg, finalStatut, PLATFORM_COMMISSION_PCT, ts, ts,
              coverImg, galerie,
@@ -27463,7 +27463,7 @@ ${jsonLd}
              fc_resume||null, fc_objectifs||null, fc_public||null,
              fc_programme||null, fc_partenaires||null, partenairesIdsStr, fc_contact||null, fc_notes||null,
              fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
-             programmed_at||null, timezone||'Europe/Paris', inscription_lien_externe||null,
+             programmed_at||null, timezone||'Europe/Paris', inscription_lien_externe||null, whatsapp_lien||null,
              rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
              region||null, departement||null, communaute||null)).lastInsertRowid;
       // Fixer publie_at et envoyer notifications si publication immédiate
@@ -27506,7 +27506,7 @@ ${jsonLd}
         fc_resume, fc_objectifs, fc_public, fc_programme, fc_partenaires, fc_partenaires_ids, fc_contact, fc_notes,
         fc_programme_fichier_url, fc_programme_fichier_nom,
         programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config,
-        inscription_lien_externe, langue, mode_participation, region, departement, communaute
+        inscription_lien_externe, whatsapp_lien, langue, mode_participation, region, departement, communaute
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
@@ -27538,6 +27538,7 @@ ${jsonLd}
         programmed_at=COALESCE(?,programmed_at), timezone=COALESCE(?,timezone),
         inscription_mode=COALESCE(?,inscription_mode), nb_places=COALESCE(?,nb_places), liste_attente=COALESCE(?,liste_attente),
         rayon_publication=COALESCE(?,rayon_publication), inscription_lien_externe=COALESCE(?,inscription_lien_externe),
+        whatsapp_lien=COALESCE(?,whatsapp_lien),
         langue=COALESCE(?,langue), mode_participation=COALESCE(?,mode_participation),
         region=COALESCE(?,region), departement=COALESCE(?,departement), communaute=COALESCE(?,communaute),
         statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
@@ -27554,7 +27555,7 @@ ${jsonLd}
              fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
              programmed_at||null, timezone||null,
              inscription_mode||null, nb_places!=null?Number(nb_places):null, liste_attente!=null?Number(liste_attente):null,
-             rayon_publication||null, inscription_lien_externe||null,
+             rayon_publication||null, inscription_lien_externe||null, whatsapp_lien||null,
              langue||null, mode_participation||null, region||null, departement||null, communaute||null,
              finalStatut, eid);
       // Fixer publie_at (première publication, ou rétroactivement si publie_at est null)
