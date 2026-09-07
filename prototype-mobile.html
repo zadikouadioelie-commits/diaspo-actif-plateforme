@@ -402,7 +402,7 @@
             </div>
             <p class="p-bio">Traiteur associatif porté par la diaspora sénégalaise. Chaque plat vendu finance une bourse d'étude au pays.</p>
             <div class="chip-row">
-              <span class="subtab" onclick="showTab('vitrine')">🏬 Vitrine</span>
+              <span class="subtab" onclick="showTab('vitrine')">🏬 Boutique</span>
               <span class="subtab" onclick="showTab('billetterie')">🎟️ Billetterie</span>
               <span class="subtab" onclick="showTab('fil')">📰 Publications</span>
             </div>
@@ -412,7 +412,7 @@
             </div>
 
             <div class="own-sec" id="ownVitrineSec">
-              <div class="own-sec-h"><span class="t">🏬 Ma Vitrine</span><button class="more" type="button" onclick="showTab('vitrine')">Voir tout ›</button></div>
+              <div class="own-sec-h"><span class="t">🏬 Ma Boutique</span><button class="more" type="button" onclick="showTab('vitrine')">Voir tout ›</button></div>
               <div class="mv-card">
                 <div class="mv-prod-row" id="ownProdRow"></div>
                 <div class="mv-stats">📈 142 ventes · 1 680 € de CA (30 derniers jours)</div>
@@ -429,7 +429,7 @@
 
           <!-- Vitrine -->
           <div class="tab-panel" id="tab-vitrine">
-            <div class="appbar"><div><h1>Vitrine</h1><div class="sub">Sahel Saveurs</div></div><button class="icon-btn" type="button" onclick="toast(cartCount()+' article(s) au panier')">🛒<span class="badge" id="cartBadge" style="display:none;">0</span></button></div>
+            <div class="appbar"><div><h1>Boutique</h1><div class="sub">Sahel Saveurs</div></div><button class="icon-btn" type="button" onclick="toast(cartCount()+' article(s) au panier')">🛒<span class="badge" id="cartBadge" style="display:none;">0</span></button></div>
             <div class="filter-row" id="filterRow">
               <span class="fchip on" data-cat="tous" onclick="setCat(this)">Tous</span>
               <span class="fchip" data-cat="plats" onclick="setCat(this)">Plats</span>
@@ -545,7 +545,7 @@
 
         <nav class="tabbar" id="tabbar">
           <button data-tab="profil" onclick="showTab('profil')"><span class="ic">👤</span>Profil</button>
-          <button data-tab="vitrine" onclick="showTab('vitrine')"><span class="ic">🏬</span>Vitrine</button>
+          <button data-tab="vitrine" onclick="showTab('vitrine')"><span class="ic">🏬</span>Boutique</button>
           <button data-tab="billetterie" onclick="showTab('billetterie')"><span class="ic">🎟️</span>Billets</button>
           <button data-tab="fil" onclick="showTab('fil')"><span class="ic">📰</span>Fil</button>
           <button data-tab="messages" onclick="showTab('messages')"><span class="ic">💬<span class="dot" id="msgDot"></span></span>Messages</button>

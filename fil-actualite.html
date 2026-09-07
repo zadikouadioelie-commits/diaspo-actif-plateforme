@@ -33,7 +33,7 @@
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
-        <a href="vitrines.html">Vitrines</a>
+        <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html" class="active">Fil d'actualité</a>
         <a href="actualites.html">Actualités</a>
         <a href="evenements.html">Autres événements</a>
@@ -219,7 +219,7 @@ async function loadMeilleuresVentes() {
               <div style="font-size:11px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.initiative_nom||''}</div>
               ${loc ? `<div style="font-size:10.5px;color:#94a3b8;">📍 ${loc}</div>` : ''}
               <div style="font-size:12.5px;font-weight:700;margin:4px 0;">${p.prix!=null ? Number(p.prix).toFixed(2)+' '+(p.devise||'EUR') : 'Prix sur demande'}</div>
-              <button class="btn btn-sm btn-outline" style="width:100%;" onclick="voirVitrineDepuisFil(${p.initiative_id}, 'meilleure_vente', ${p.owner_user_id})">Voir la vitrine</button>
+              <button class="btn btn-sm btn-outline" style="width:100%;" onclick="voirVitrineDepuisFil(${p.initiative_id}, 'meilleure_vente', ${p.owner_user_id})">Voir la boutique</button>
             </div>
           </div>`;
         }).join('')}

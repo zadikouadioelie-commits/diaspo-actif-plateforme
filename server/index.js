@@ -2373,7 +2373,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
      La masquer reste toujours possible, y compris sans Premium. */
   if (body.vitrine_active === true && init.vitrine_active !== 1) {
     const estPremium = await hasAccreditation(user.id, 'initiative_abonne');
-    if (!estPremium) return sendJSON(res, 402, { error: "Rendre votre vitrine visible au public est réservé aux comptes Premium.", accred_type: 'initiative_abonne' });
+    if (!estPremium) return sendJSON(res, 402, { error: "Rendre votre boutique visible au public est réservé aux comptes Premium.", accred_type: 'initiative_abonne' });
   }
 
   const {
@@ -2996,7 +2996,7 @@ route("POST", "/api/initiatives/:id/avis", async (req, res, params, body) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
-  if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 403, { error: "Vous ne pouvez pas laisser d'avis sur votre propre vitrine." });
+  if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 403, { error: "Vous ne pouvez pas laisser d'avis sur votre propre boutique." });
   const note = Number(body.note);
   if (!Number.isInteger(note) || note < 1 || note > 5) return sendJSON(res, 400, { error: "Note invalide (1 à 5)." });
   try {
@@ -3035,7 +3035,7 @@ route("POST", "/api/initiatives/:id/avis/:avisId/signaler", async (req, res, par
     creerNotif(
       (await db.prepare("SELECT id FROM users WHERE role='administrateur' LIMIT 1").get())?.id || 1,
       "signalement", `Avis client signalé par ${user.nom}`,
-      `Avis #${params.avisId} (vitrine #${params.id}) — motif : ${motif}`, { avis_id: Number(params.avisId) }
+      `Avis #${params.avisId} (boutique #${params.id}) — motif : ${motif}`, { avis_id: Number(params.avisId) }
     );
     sendJSON(res, 200, { ok: true });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "signaler-avis")); }
@@ -3232,7 +3232,7 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     /* Vendre réellement (encaisser un paiement) est réservé aux initiatives Abonné —
        configurer produits/prix reste libre, voir GET /api/initiatives/:id/produits. */
     if (!(await hasAccreditation(init.owner_user_id, "initiative_abonne"))) {
-      return sendJSON(res, 402, { error: "Cette vitrine n'est pas encore ouverte à la vente (initiative non Abonné)." });
+      return sendJSON(res, 402, { error: "Cette boutique n'est pas encore ouverte à la vente (initiative non Abonné)." });
     }
     const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
     if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
@@ -6749,7 +6749,7 @@ route("GET", "/api/initiatives/:id/vitrine/analyser-type", async (req, res, para
 
   const nouveau = String(query.type || "");
   const tpl = VITRINE_TEMPLATES[nouveau];
-  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
 
   const draft = safeParse(init.vitrine_draft_json) || {};
   const typeActuel = draft.type !== undefined ? draft.type : init.vitrine_type;
@@ -6810,7 +6810,7 @@ route("POST", "/api/initiatives/:id/vitrine/type/ajouter", async (req, res, para
 
   const type = String(body?.type || "");
   const tpl = VITRINE_TEMPLATES[type];
-  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
 
   const draft = safeParse(init.vitrine_draft_json) || {};
   const typesActuels = getVitrineTypesActifs(init, draft);
@@ -6849,7 +6849,7 @@ route("GET", "/api/initiatives/:id/vitrine/analyser-retrait", async (req, res, p
 
   const type = String(query.type || "");
   const tpl = VITRINE_TEMPLATES[type];
-  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
 
   const draft = safeParse(init.vitrine_draft_json) || {};
   const typesActuels = getVitrineTypesActifs(init, draft);
@@ -6889,7 +6889,7 @@ route("POST", "/api/initiatives/:id/vitrine/type/retirer", async (req, res, para
 
   const type = String(body?.type || "");
   const tpl = VITRINE_TEMPLATES[type];
-  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
   const mode = body?.mode === "zero" ? "zero" : "adapter";
 
   const draft = safeParse(init.vitrine_draft_json) || {};
@@ -7013,7 +7013,7 @@ route("POST", "/api/initiatives/:id/vitrine/changer-type", async (req, res, para
 
   const nouveau = String(body.type || "");
   const tpl = VITRINE_TEMPLATES[nouveau];
-  if (!tpl) return sendJSON(res, 400, { error: "Type de vitrine inconnu." });
+  if (!tpl) return sendJSON(res, 400, { error: "Type de boutique inconnu." });
   const mode = body.mode === "zero" ? "zero" : "adapter";
 
   const draft = safeParse(init.vitrine_draft_json) || {};
@@ -7110,7 +7110,7 @@ route("PUT", "/api/initiatives/:id/vitrine-draft", async (req, res, params, body
   draft.modules = currentModules;
 
   if (body.type !== undefined) {
-    if (body.type !== null && !VITRINE_TEMPLATES[body.type]) return sendJSON(res, 400, { error: "Type de vitrine invalide." });
+    if (body.type !== null && !VITRINE_TEMPLATES[body.type]) return sendJSON(res, 400, { error: "Type de boutique invalide." });
     draft.type = body.type;
     if (body.type && VITRINE_TEMPLATES[body.type]) {
       // Appliquer un modèle est toujours ADDITIF : active ses modules recommandés sans jamais en
@@ -12198,7 +12198,7 @@ async function estEnMaintenancePremium(ownerUserId) {
     if (!premiumApplicationActive()) return null;
     return {
       actif: true,
-      message: "Cette vitrine est temporairement indisponible. Son propriétaire doit renouveler son abonnement Premium afin de réactiver cet espace.",
+      message: "Cette boutique est temporairement indisponible. Son propriétaire doit renouveler son abonnement Premium afin de réactiver cet espace.",
       /* Le contenu est conservé sans limite de durée : aucune échéance à annoncer. */
       conservation_illimitee: true,
     };
@@ -25123,7 +25123,7 @@ async function handleRequest(req, res) {
 
       let title, description, image, noindex = false, jsonLd = '';
       if (init && init.vitrine_active === 1) {
-        title = `${init.nom} — Vitrine | Diaspo'Actif`;
+        title = `${init.nom} — Boutique | Diaspo'Actif`;
         description = (init.description || `Découvrez ${init.nom} et ses produits sur Diaspo'Actif.`).slice(0, 160);
         image = init.vitrine_banniere_url || `${base}/assets/logo.png`;
         const adresseParts = [init.vitrine_ville, init.vitrine_region, init.vitrine_pays].filter(Boolean);

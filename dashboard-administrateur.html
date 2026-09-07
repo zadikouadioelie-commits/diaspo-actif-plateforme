@@ -14424,12 +14424,12 @@ async function diagSchema() {
    un administrateur doit comprendre ce qu'il change avant de le changer. */
 const RC_LIBELLES = {
   vitrine_contact_direct: [
-    'Contact direct depuis une vitrine',
-    "Un visiteur peut écrire au propriétaire d'une vitrine sans demande préalable. Une vitrine est un espace commercial, publiée pour être contactée — la décocher revient à exiger une autorisation avant qu'un client puisse poser une question sur un produit.",
+    'Contact direct depuis une boutique',
+    "Un visiteur peut écrire au propriétaire d'une boutique sans demande préalable. Une boutique est un espace commercial, publiée pour être contactée — la décocher revient à exiger une autorisation avant qu'un client puisse poser une question sur un produit.",
   ],
   collectivite_toujours_demande: [
     'Les collectivités exigent toujours une demande',
-    "Écrire à un compte officiel passe toujours par « Établir contact », quel que soit le point d'entrée. Cette règle l'emporte sur l'exception vitrine, sans quoi elle serait contournable.",
+    "Écrire à un compte officiel passe toujours par « Établir contact », quel que soit le point d'entrée. Cette règle l'emporte sur l'exception boutique, sans quoi elle serait contournable.",
   ],
   administration_directe: [
     "L'administration joint toujours un membre",
@@ -14547,10 +14547,10 @@ async function diagPremium() {
       `<strong>Restrictions ${actif ? 'ACTIVES' : 'désactivées'}</strong><br>`
       + `Comptes : ${s.actif || 0} actifs · ${s.bientot_expire || 0} bientôt expirés · <strong>${bloques} expirés</strong><br>`
       + (actif
-          ? `Vitrines actuellement en maintenance : <strong>${vitrines}</strong><br>`
+          ? `Boutiques actuellement en maintenance : <strong>${vitrines}</strong><br>`
             + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) <strong>sont bloqués en ce moment</strong>.</span>`
                        : `<span style="color:#166534;">Aucun compte n'est bloqué pour l'instant.</span>`)
-          : `Vitrines qui passeraient en maintenance : <strong>${vitrines}</strong><br>`
+          : `Boutiques qui passeraient en maintenance : <strong>${vitrines}</strong><br>`
             + (bloques ? `<span style="color:#92400e;">${bloques} compte(s) seraient bloqués dès l'activation.</span>`
                        : `<span style="color:#166534;">Activer maintenant ne bloquerait personne.</span>`)),
       couleur);

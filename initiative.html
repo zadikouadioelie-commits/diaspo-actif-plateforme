@@ -212,7 +212,7 @@ html, body{overflow-x:clip !important;}
       <nav class="nav">
         <a href="index.html">Accueil</a>
         <a href="annuaire.html">Annuaire</a>
-        <a href="vitrines.html">Vitrines</a>
+        <a href="vitrines.html">Boutiques</a>
         <a href="fil-actualite.html">Fil d'actualité</a>
         <a href="formations.html">Formations</a>
       </nav>
@@ -327,7 +327,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
     <!-- Breadcrumb -->
     <div class="breadcrumb">
       <a href="annuaire.html">Annuaire</a>
-      <a href="vitrines.html">Vitrines</a>
+      <a href="vitrines.html">Boutiques</a>
       <span>›</span>
       <span>${init.nom}</span>
     </div>
@@ -1129,14 +1129,14 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
         <input type="${type || 'text'}" id="${id}" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" value="${esc2(val || '')}" placeholder="${ph}">`;
       openEditModal('📞 Informations pratiques',
         champ('ec-horaires', 'Horaires', init.vitrine_horaires, 'Ex : Lun–Ven, 9h–17h')
-        + champ('ec-tel', 'Téléphone de la vitrine', init.vitrine_tel_pro, '+33 1 23 45 67 89', 'tel')
+        + champ('ec-tel', 'Téléphone de la boutique', init.vitrine_tel_pro, '+33 1 23 45 67 89', 'tel')
         + `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 2px;font-size:12.5px;cursor:pointer;">
              <input type="checkbox" id="ec-tel-visible" ${init.vitrine_tel_visible ? 'checked' : ''} style="width:16px;height:16px;">
              <span>Afficher ce numéro publiquement</span>
            </label>
            <p style="font-size:11.5px;color:var(--muted);margin:0 0 4px;">Décoché, le numéro reste masqué aux visiteurs. Le téléphone de votre compte n'est jamais publié.</p>`
         + champ('ec-wa', 'WhatsApp (optionnel)', init.vitrine_whatsapp, '+33 6 12 34 56 78', 'tel')
-        + champ('ec-email', 'E-mail de la vitrine', init.vitrine_email_pro, 'contact@exemple.org', 'email')
+        + champ('ec-email', 'E-mail de la boutique', init.vitrine_email_pro, 'contact@exemple.org', 'email')
         + champ('ec-web', 'Site web', init.site_web, 'https://exemple.org', 'url')
         + champ('ec-adresse', 'Adresse', init.adresse, '12 rue des Diasporas')
         + champ('ec-ville', 'Ville', init.vitrine_ville || init.ville, 'Paris'),

@@ -59,7 +59,7 @@
       texteEngageant: "Donnez à votre initiative les moyens de ses ambitions. Développez votre visibilité, votre réseau de partenaires et professionnalisez votre gestion grâce à un seul abonnement Premium.",
       retourUrl: 'dashboard-initiative.html',
       fonctionnalites: [
-        { icon: '🏬', titre: 'Vitrine & Visibilité', items: ['Vitrine publique personnalisée', 'Publications mises en avant', 'Statistiques de visibilité', 'Thèmes premium'] },
+        { icon: '🏬', titre: 'Boutique & Visibilité', items: ['Boutique publique personnalisée', 'Publications mises en avant', 'Statistiques de visibilité', 'Thèmes premium'] },
         { icon: '🎫', titre: 'Cotisations & Adhésions', items: ['Formules d’adhésion illimitées', 'Encaissement des cotisations', 'Registre des membres', 'Relances automatiques'] },
         { icon: '🗳️', titre: 'Votes sécurisés', items: ['Organisation de scrutins', 'Assemblées générales', 'Émargement QR code', 'Comptes rendus automatiques'] },
         { icon: '💼', titre: 'Recrutement', items: ['Publication d’offres illimitée', 'Suivi des candidatures', 'Mise en avant des offres'] },
@@ -73,7 +73,7 @@
         { icon: '🎯', titre: "Accédez aux meilleurs outils de Diaspo'Actif" },
       ],
       comparatif: [
-        { label: 'Vitrine premium', gratuit: false, premium: true },
+        { label: 'Boutique premium', gratuit: false, premium: true },
         { label: 'Cotisations & Adhésions', gratuit: false, premium: true },
         { label: 'Votes sécurisés', gratuit: false, premium: true },
         { label: 'Recrutement illimité', gratuit: false, premium: true },

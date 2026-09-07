@@ -258,7 +258,7 @@ function renderVitrineCard(card) {
         <div style="font-size:12.5px;color:#6B7686;margin:2px 0 4px;">${escHtml(card.initiative_nom||'')}</div>
         ${card.description ? `<div style="font-size:12.5px;color:#374151;margin-bottom:4px;">${escHtml((card.description||'').slice(0,90))}${(card.description||'').length>90?'…':''}</div>` : ''}
         ${prixHtml ? `<div style="font-size:13px;margin-bottom:6px;">${prixHtml}</div>` : ''}
-        <button class="btn btn-sm btn-outline" onclick="voirVitrineDepuisFil(${card.initiative_id}, '${card.sous_type}', ${card.owner_user_id})">Voir la vitrine →</button>
+        <button class="btn btn-sm btn-outline" onclick="voirVitrineDepuisFil(${card.initiative_id}, '${card.sous_type}', ${card.owner_user_id})">Voir la boutique →</button>
       </div>
     </div>
   </div>`;

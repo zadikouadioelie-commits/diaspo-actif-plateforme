@@ -20,17 +20,17 @@ window.MODULE_AIDE = {
   support_pilote: { titre: "🖥️ Support Pilote", texte: "Demandez qu'un administrateur voie votre écran en direct et agisse à votre place pour une manipulation, uniquement sur les pages de Diaspo'Actif." },
 
   /* ── Dashboard Initiative — Premium ── */
-  paiement_initiative: { titre: "💳 Module paiement", texte: "Configurez l'encaissement des paiements pour votre initiative (Vitrine, adhésions, billetterie)." },
+  paiement_initiative: { titre: "💳 Module paiement", texte: "Configurez l'encaissement des paiements pour votre initiative (Boutique, adhésions, billetterie)." },
   publicites: { titre: "📣 Publicités", texte: "Créez des campagnes publicitaires pour mettre en avant votre initiative sur la plateforme." },
   evenements: { titre: "📅 Événements", texte: "Créez et gérez vos propres événements, avec inscriptions et suivi des participants." },
   cotisations_adhesions: { titre: "🎫 Cotisations & Adhésions", texte: "Créez des formules d'adhésion et encaissez réellement les cotisations de vos membres, avec registre et campagnes de relance." },
   votes_securises: { titre: "🗳️ Votes sécurisés", texte: "Organisez des assemblées, élections ou consultations avec bulletin anonyme signé par le Code de Sécurité Diaspo'Actif (DS-ID)." },
-  parametres_vitrine: { titre: "⭐ Paramètres Vitrine", texte: "Configurez votre boutique en ligne (Vitrine) : produits, apparence et modalités de vente." },
+  parametres_vitrine: { titre: "⭐ Paramètres Boutique", texte: "Configurez votre boutique en ligne : produits, apparence et modalités de vente." },
   profil_public: { titre: "👤 Mon profil public", texte: "La fiche visible par les autres membres et visiteurs : présentation, coordonnées et activités de votre initiative." },
   billetterie: { titre: "🎟️ Billetterie", texte: "Vendez des billets pour vos événements directement depuis la plateforme." },
   affiliation: { titre: "🔗 Affiliation", texte: "Identifiez officiellement les comptes utilisateurs qui font partie de votre organisation." },
   stats_impact: { titre: "🟪 Stats & Impact", texte: "Visualisez les statistiques et l'impact mesurable de votre initiative (portée, engagement, résultats)." },
-  messages_vitrine: { titre: "🛍️ Messages de la vitrine", texte: "Les messages reçus de clients ou prospects intéressés par les produits de votre Vitrine." },
+  messages_vitrine: { titre: "🛍️ Messages de la boutique", texte: "Les messages reçus de clients ou prospects intéressés par les produits de votre Boutique." },
   liste_partenaires: { titre: "🤝 Liste des partenaires", texte: "Retrouvez et gérez les organisations partenaires associées à votre initiative." },
   candidatures: { titre: "📋 Candidatures", texte: "Consultez et traitez les candidatures reçues pour vos offres d'emploi ou de stage." },
   centre_financier: { titre: "💰 Centre Financier", texte: "Suivez vos revenus, gérez vos comptes de réception et effectuez des retraits vers votre compte bancaire." },
@@ -40,7 +40,7 @@ window.MODULE_AIDE = {
   /* ── Dashboard Utilisateur ── */
   cv_lettres: { titre: "📄 CV, Lettres, Candidatures", texte: "Créez et gérez vos CV, lettres de motivation et suivez vos candidatures à des offres." },
   mes_billets: { titre: "🎟 Mes Billets", texte: "Retrouvez tous les billets que vous avez achetés pour des événements sur la plateforme." },
-  paiements_utilisateur: { titre: "💳 Paiements", texte: "Enregistrez vos cartes bancaires pour accélérer vos achats dans la Vitrine et vos autres paiements." },
+  paiements_utilisateur: { titre: "💳 Paiements", texte: "Enregistrez vos cartes bancaires pour accélérer vos achats dans la Boutique et vos autres paiements." },
   ma_localisation: { titre: "🟨 Ma localisation", texte: "Indiquez votre position géographique pour être visible dans les recherches locales et l'annuaire." },
 
   /* ── Dashboard Collectivité ── */

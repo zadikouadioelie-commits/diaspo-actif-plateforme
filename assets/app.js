@@ -1507,7 +1507,7 @@ function renderInitiativeCard(it){
   const profilHref = it.owner_user_id ? `profil.html?id=${encodeURIComponent(it.owner_user_id)}` : initHref;
   const vitrineHref = it.owner_user_id ? `profil.html?id=${encodeURIComponent(it.owner_user_id)}&vitrine=1` : null;
   const vitrineBtn = (it.vitrine_active && vitrineHref)
-    ? `<a href="${vitrineHref}" class="ann-card-btn ann-card-btn-vitrine" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>` : '';
+    ? `<a href="${vitrineHref}" class="ann-card-btn ann-card-btn-vitrine" onclick="event.stopPropagation()">🏬 Voir la boutique</a>` : '';
 
   return `
   <div class="ann-card" onclick="window.location.href='${profilHref}'" style="cursor:pointer;">
@@ -2105,7 +2105,7 @@ function renderVitrineCard(v) {
       ${v.description ? `<div class="vit-card-desc">${escapeHtml(v.description)}</div>` : ''}
       ${noteHtml}
       <div class="vit-card-foot">
-        <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la vitrine</a>
+        <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la boutique</a>
         ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer</button>` : ''}
       </div>
     </div>
@@ -2152,7 +2152,7 @@ async function initVitrines(){
     if (countEl) countEl.textContent = rows.length;
     list.innerHTML = rows.length
       ? rows.map(renderVitrineCard).join("")
-      : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucune vitrine ne correspond à ces critères.</div>`;
+      : `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Aucune boutique ne correspond à ces critères.</div>`;
   }
 
   /* Recherche temps réel — même pattern que l'Annuaire (debounce 350ms). */
@@ -4268,7 +4268,7 @@ async function renderMobileBottomNavAuto() {
       { icon: "📅", label: "Événements", href: "evenements.html", active: on("evenements.html") },
       { icon: "📰", label: "Fil", href: "fil-actualite.html", active: on("fil-actualite.html") },
       { icon: "💎", label: "Mon Associé", href: "mon-associe.html", active: on("mon-associe.html") },
-      { icon: "🏪", label: "Vitrines", href: "vitrines.html", active: on("vitrines.html") },
+      { icon: "🏪", label: "Boutiques", href: "vitrines.html", active: on("vitrines.html") },
     ];
   } else {
     items = [
@@ -4277,7 +4277,7 @@ async function renderMobileBottomNavAuto() {
       // dans cette même fonction pour cette raison précise.
       { icon: "☰", label: "Menu", toggleId: "mobile-nav-menu-toggle" },
       { icon: "🔍", label: "Annuaire", href: "annuaire.html", active: on("annuaire.html") },
-      { icon: "🏪", label: "Vitrines", href: "vitrines.html", active: on("vitrines.html") },
+      { icon: "🏪", label: "Boutiques", href: "vitrines.html", active: on("vitrines.html") },
       { icon: "📰", label: "Fil", href: "fil-actualite.html", active: on("fil-actualite.html") },
       // Pas de profil public sans compte — mène à la connexion plutôt que de dupliquer
       // la modale de connexion du prototype (celui-ci est une SPA, pas ce site).
@@ -5300,7 +5300,7 @@ const PREMIUM_AVANTAGES = [
   '🎓 Création de formations',
   '🎫 Cotisations et adhésions',
   '🗳️ Votes sécurisés',
-  '⭐ Vitrine publique personnalisable',
+  '⭐ Boutique publique personnalisable',
 ];
 
 window.fermerAlertePremium = function () {

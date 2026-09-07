@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Diaspo'Actif — Aperçu Profil & Vitrine</title>
+<title>Diaspo'Actif — Aperçu Profil & Boutique</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
@@ -110,7 +110,7 @@ body[data-owner="1"] .dc-owner{display:inline-flex!important}
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(18,32,56,.07)">
       <div style="display:inline-flex;background:#F2F5FA;border-radius:11px;padding:4px">
         <span class="dc-seg" data-seg="profil" onclick="dcTab('profil')">🪪 Profil</span>
-        <span class="dc-seg" data-seg="vitrine" onclick="dcTab('vitrine')">🏬 Vitrine</span>
+        <span class="dc-seg" data-seg="vitrine" onclick="dcTab('vitrine')">🏬 Boutique</span>
       </div>
       <div style="display:flex;gap:30px">
         <div style="text-align:center"><div style="font-family:'Bricolage Grotesque';font-size:20px;font-weight:700;color:#F4A62A">4,9</div><div style="font-size:11.5px;color:#8794A7">note</div></div>
@@ -251,7 +251,7 @@ body[data-owner="1"] .dc-owner{display:inline-flex!important}
 
     <!-- PRÉSENTATION -->
     <section id="v-presentation" style="background:#fff;border:1px solid var(--vsoftbd);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
-      <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:14px 24px"><h3 style="font-size:17px;font-weight:700;color:#fff">Présentation de la vitrine</h3></div>
+      <div style="background:linear-gradient(90deg,var(--v1),var(--v2));padding:14px 24px"><h3 style="font-size:17px;font-weight:700;color:#fff">Présentation de la boutique</h3></div>
       <div style="padding:20px 24px">
         <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#3B4658;text-wrap:pretty">Sahel Saveurs valorise le terroir guinéen : miels, épices, cafés et céréales issus des coopératives de la Fouta-Djalon. Transformation locale, circuits courts et savoir-faire artisanal, au service d'une diaspora qui investit chez elle. Chaque produit est sélectionné avec soin auprès de productrices et producteurs partenaires.</p>
         <span style="display:inline-block;font-size:12.5px;font-weight:700;letter-spacing:.03em;color:var(--v1);border:1px solid var(--v1);padding:9px 18px;border-radius:8px">EN SAVOIR PLUS</span>
@@ -456,7 +456,7 @@ body[data-owner="1"] .dc-owner{display:inline-flex!important}
           </div>
         </div>
         <div style="text-align:center">
-          <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:12px">Partager la vitrine</div>
+          <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:12px">Partager la boutique</div>
           <div id="dc-vitrine-qr" style="width:140px;margin:0 auto;display:flex;align-items:center;justify-content:center;"></div>
           <div style="display:flex;justify-content:center;gap:7px;margin-top:12px"><span style="font-size:12px;font-weight:600;color:var(--v4);background:#fff;padding:7px 12px;border-radius:8px">🔗 Copier</span><span style="font-size:12px;font-weight:600;background:rgba(255,255,255,.14);padding:7px 12px;border-radius:8px">↗ Partager</span></div>
         </div>
@@ -522,7 +522,7 @@ function dcAddVitrineAvatar(){
   av.id = 'da-vitrine-avatar';
   av.className = 'imgslot';
   av.style.cssText = 'position:absolute;left:22px;bottom:16px;width:92px;height:92px;border-radius:50%;border:4px solid #fff;box-shadow:0 6px 18px -6px rgba(0,0,0,.5);z-index:3;font-size:10px;background:#e8ecf1';
-  av.textContent = 'Logo vitrine';
+  av.textContent = 'Logo boutique';
   sec.appendChild(av);
 }
 
@@ -925,7 +925,7 @@ function dcRenderQR(){
   if(!window.ProfileQR) return;
   const base = location.origin + location.pathname;
   const vq = document.getElementById('dc-vitrine-qr');
-  if(vq && !vq.dataset.done){ vq.dataset.done='1'; ProfileQR.render(vq, { url: base + '#vitrine', userName:'Sahel Saveurs', userRole:'Vitrine', size:130, showActions:false }); }
+  if(vq && !vq.dataset.done){ vq.dataset.done='1'; ProfileQR.render(vq, { url: base + '#vitrine', userName:'Sahel Saveurs', userRole:'Boutique', size:130, showActions:false }); }
   const pq = document.getElementById('dc-profil-qr');
   if(pq && !pq.dataset.done){ pq.dataset.done='1'; ProfileQR.render(pq, { url: base, userName:'Fatoumata Bah', userRole:'Profil', size:140, showActions:false }); }
 }
@@ -977,7 +977,7 @@ function dcBuildOwnerUI(){
   const noteCands = [...document.querySelectorAll('div,section')].filter(d=>(d.textContent||'').includes('120 avis') && (d.getAttribute('style')||'').includes('display:flex'));
   const noteBar = noteCands.sort((a,b)=>a.textContent.length-b.textContent.length)[0];
   if(noteBar && !noteBar.querySelector('.dc-owner')){
-    noteBar.appendChild(dcOwnerBtn('✏️ Gérer la vitrine'));
+    noteBar.appendChild(dcOwnerBtn('✏️ Gérer la boutique'));
     const dash = dcOwnerBtn('📊 Tableau de bord'); dash.onclick = (e)=>{ e.stopPropagation(); dcDashboard(); }; noteBar.appendChild(dash);
     const pay = dcOwnerBtn('💳 Encaissement'); pay.onclick = (e)=>{ e.stopPropagation(); dcPayoutForm(); }; noteBar.appendChild(pay);
   }
@@ -1105,8 +1105,8 @@ dcBuildProfilFab();       // sélecteur de thème du profil
 dcAddVitrineAvatar();
 dcUploadable('da-cover', 'Bannière profil');
 dcUploadable('da-avatar', 'Photo profil');
-dcUploadable('da-ad', 'Bannière vitrine');
-dcUploadable('da-vitrine-avatar', 'Photo vitrine');
+dcUploadable('da-ad', 'Bannière boutique');
+dcUploadable('da-vitrine-avatar', 'Photo boutique');
 dcWireProfilLinks();
 dcTab('profil');
 dcTheme('bordeaux');

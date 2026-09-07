@@ -61,7 +61,7 @@
       steps: {
         fr: [
           { el:null, pos:'center', titre:"Votre espace Membre", voice:"Bienvenue dans votre espace Diaspo Actif. Voici votre guide de démarrage.", desc:"Découvrez en 1 minute les fonctionnalités essentielles de votre compte Membre.", badge:true },
-          { el:'.user-chip,.avatar', pos:'bottom', titre:"🪪 Votre profil public", voice:"Votre profil public est votre vitrine. Ajoutez une photo, une biographie et vos compétences.", desc:"Ajoutez photo, biographie, titre pro. Un profil complet est 5× plus visible.", lien:{href:'profil.html',label:'Mon profil'} },
+          { el:'.user-chip,.avatar', pos:'bottom', titre:"🪪 Votre profil public", voice:"Votre profil public est votre boutique. Ajoutez une photo, une biographie et vos compétences.", desc:"Ajoutez photo, biographie, titre pro. Un profil complet est 5× plus visible.", lien:{href:'profil.html',label:'Mon profil'} },
           { el:'a[href="fil-actualite.html"]', pos:'bottom', titre:"📰 Le Fil d'actualité", voice:"Le fil d'actualité est le cœur de la communauté. Publiez, commentez, réagissez.", desc:"Publiez vos actualités, commentez, réagissez. Renforcez votre visibilité.", lien:{href:'fil-actualite.html',label:'Ouvrir le Fil'} },
           { el:'a[href="messagerie.html"]', pos:'bottom', titre:"💬 Messagerie privée", voice:"Contactez directement n'importe quel membre ou initiative avec la messagerie privée.", desc:"Contactez membres et initiatives. Démarrez une collaboration en privé.", lien:{href:'messagerie.html',label:'Messagerie'} },
           { el:'a[href="evenements.html"]', pos:'bottom', titre:"📅 Événements", voice:"Découvrez et participez aux événements organisés par la diaspora partout dans le monde.", desc:"Participez aux événements diaspora près de chez vous ou en ligne.", lien:{href:'evenements.html',label:'Voir les événements'} },
@@ -234,10 +234,10 @@
       steps: {
         fr: [
           { el:null, pos:'center', titre:"Votre espace Équipementier", voice:"Bienvenue dans votre espace Équipementier sur Diaspo Actif.", desc:"Présentez vos solutions aux marchés diaspora et aux pays en développement.", badge:true },
-          { el:'.user-chip,.avatar', pos:'bottom', titre:"🏗️ Votre vitrine", voice:"Présentez vos équipements, solutions et références projets à la communauté.", desc:"Catalogue produits, références projets, domaines d'intervention.", lien:{href:'profil.html',label:'Ma vitrine'} },
+          { el:'.user-chip,.avatar', pos:'bottom', titre:"🏗️ Votre boutique", voice:"Présentez vos équipements, solutions et références projets à la communauté.", desc:"Catalogue produits, références projets, domaines d'intervention.", lien:{href:'profil.html',label:'Ma boutique'} },
           { el:'a[href="offres.html"]', pos:'bottom', titre:"📢 Appels d'offres", voice:"Répondez aux appels d'offres publiés par les initiatives et les collectivités.", desc:"Appels d'offres publics et privés de la diaspora et des institutions." },
           { el:'a[href="messagerie.html"]', pos:'bottom', titre:"💼 Développement commercial", voice:"Échangez directement avec vos prospects et partenaires potentiels.", desc:"Discussions commerciales, partenariats, négociations directes." },
-          { el:null, pos:'center', titre:"✅ Développez vos marchés !", voice:"Votre espace équipementier est prêt.", desc:"Commencez par votre vitrine et répondez aux premiers appels d'offres.", cta:'entrepreneur' }
+          { el:null, pos:'center', titre:"✅ Développez vos marchés !", voice:"Votre espace équipementier est prêt.", desc:"Commencez par votre boutique et répondez aux premiers appels d'offres.", cta:'entrepreneur' }
         ]
       }
     },
@@ -336,7 +336,7 @@
       steps:[
         { el:null, pos:'center', badge:true,
           titre:"Compléter votre profil public",
-          voice:"Votre profil public est votre vitrine sur Diaspo Actif. Voyons comment le rendre percutant.",
+          voice:"Votre profil public est votre boutique sur Diaspo Actif. Voyons comment le rendre percutant.",
           desc:"Un profil complet est 5× plus visible dans l'annuaire. Suivez ce guide pas à pas." },
         { el:'.user-chip,.avatar,.profile-head', pos:'bottom',
           titre:"📸 Photo & Nom d'affichage",
@@ -656,8 +656,8 @@
       { el:null, pos:'center', titre:"✏️ Éditez chaque section", voice:"Cliquez sur le crayon à côté de chaque rubrique pour la modifier directement.", desc:"Chaque section (mission, équipe, zones d'action...) s'édite en ligne, sans quitter la page.", lien:{href:'dashboard-initiative.html', label:'Ma fiche initiative'} },
       { el:null, pos:'center', cta:'initiative', titre:"✅ Une fiche complète, plus de confiance", voice:"Une fiche bien remplie augmente votre score d'activité et votre crédibilité.", desc:"Revenez régulièrement mettre à jour vos informations." }
     ]},
-    'f-init-publications': { badge:'📰 Publications vitrine', couleur:'#15803d', steps:[
-      { el:null, pos:'center', badge:true, titre:"Publier sur votre vitrine", voice:"Annoncez vos actualités, offres et nouveautés directement sur votre vitrine publique.", desc:"Vos publications apparaissent dans l'onglet Vitrine de votre profil, visibles par tous vos abonnés." },
+    'f-init-publications': { badge:'📰 Publications boutique', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Publier sur votre vitrine", voice:"Annoncez vos actualités, offres et nouveautés directement sur votre vitrine publique.", desc:"Vos publications apparaissent dans l'onglet Boutique de votre profil, visibles par tous vos abonnés." },
       { el:null, pos:'center', titre:"🖼️ Texte, image, promotion", voice:"Ajoutez une image, un prix promotionnel ou un appel à l'action à chaque publication.", desc:"• Titre et description\n• Image de mise en avant\n• Prix / promotion optionnels\n• Bouton d'action (contacter, commander...)", lien:{href:'dashboard-initiative.html', label:'Publications'} },
       { el:null, pos:'center', titre:"✅ Suivez l'engagement", voice:"Vues, partages, réactions et commentaires sont mesurés sur chaque publication.", desc:"Utilisez ces statistiques pour savoir ce qui intéresse le plus votre communauté." }
     ]},
@@ -671,15 +671,15 @@
       { el:null, pos:'center', titre:"📈 Comprendre votre impact", voice:"Ajoutez aussi des statistiques déclaratives : projets menés, bénéficiaires, pays couverts.", desc:"Ces chiffres renforcent la crédibilité de votre fiche auprès des visiteurs.", lien:{href:'dashboard-initiative.html', label:'Stats & Impact'} },
       { el:null, pos:'center', titre:"✅ Un tableau de bord clair", voice:"Revenez régulièrement pour suivre votre progression.", desc:"Le score d'activité se calcule automatiquement à partir de ces données." }
     ]},
-    'f-init-messages-vitrine': { badge:'🛍️ Messages de la vitrine', couleur:'#15803d', steps:[
-      { el:null, pos:'center', badge:true, titre:"Messages de la vitrine", voice:"Les visiteurs de votre vitrine peuvent vous écrire directement — retrouvez leurs messages ici.", desc:"Un espace dédié, séparé de votre messagerie personnelle, pour les demandes commerciales." },
-      { el:null, pos:'center', titre:"💬 Répondre rapidement", voice:"Chaque message affiche le produit ou la publication concernée pour répondre avec le bon contexte.", desc:"Un badge signale les messages non lus.", lien:{href:'dashboard-initiative.html', label:'Messages de la vitrine'} },
+    'f-init-messages-vitrine': { badge:'🛍️ Messages de la boutique', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Messages de la boutique", voice:"Les visiteurs de votre boutique peuvent vous écrire directement — retrouvez leurs messages ici.", desc:"Un espace dédié, séparé de votre messagerie personnelle, pour les demandes commerciales." },
+      { el:null, pos:'center', titre:"💬 Répondre rapidement", voice:"Chaque message affiche le produit ou la publication concernée pour répondre avec le bon contexte.", desc:"Un badge signale les messages non lus.", lien:{href:'dashboard-initiative.html', label:'Messages de la boutique'} },
       { el:null, pos:'center', titre:"✅ Ne manquez aucune opportunité", voice:"Une réponse rapide augmente vos chances de convertir un visiteur en client ou en membre.", desc:"Activez les notifications pour être alerté en temps réel." }
     ]},
-    'f-init-vitrine': { badge:'⭐ Paramètres de la vitrine', couleur:'#15803d', steps:[
-      { el:null, pos:'center', badge:true, titre:"Paramètres de la vitrine", voice:"Personnalisez l'apparence de votre vitrine publique pour qu'elle vous ressemble.", desc:"Thème de couleur, bannière, sections mises en avant — votre vitrine, votre identité." },
-      { el:null, pos:'center', titre:"🎨 Choisissez votre thème", voice:"Un sélecteur de thème flottant vous permet de prévisualiser instantanément le rendu.", desc:"Le choix est sauvegardé automatiquement pour tous vos visiteurs.", lien:{href:'dashboard-initiative.html', label:'Paramètres Vitrine'} },
-      { el:null, pos:'center', titre:"✅ Une vitrine professionnelle", voice:"Une belle vitrine inspire confiance et encourage les abonnements.", desc:"Mettez régulièrement à jour votre bannière et vos sections mises en avant." }
+    'f-init-vitrine': { badge:'⭐ Paramètres de la boutique', couleur:'#15803d', steps:[
+      { el:null, pos:'center', badge:true, titre:"Paramètres de la boutique", voice:"Personnalisez l'apparence de votre boutique publique pour qu'elle vous ressemble.", desc:"Thème de couleur, bannière, sections mises en avant — votre boutique, votre identité." },
+      { el:null, pos:'center', titre:"🎨 Choisissez votre thème", voice:"Un sélecteur de thème flottant vous permet de prévisualiser instantanément le rendu.", desc:"Le choix est sauvegardé automatiquement pour tous vos visiteurs.", lien:{href:'dashboard-initiative.html', label:'Paramètres Boutique'} },
+      { el:null, pos:'center', titre:"✅ Une boutique professionnelle", voice:"Une belle boutique inspire confiance et encourage les abonnements.", desc:"Mettez régulièrement à jour votre bannière et vos sections mises en avant." }
     ]},
     'f-init-partenaires': { badge:'🤝 Liste des partenaires', couleur:'#15803d', steps:[
       { el:null, pos:'center', badge:true, titre:"Liste des partenaires", voice:"Mettez en avant les organisations qui soutiennent ou collaborent avec votre initiative.", desc:"Logos cliquables affichés sur votre profil public, dans l'ordre de votre choix." },
@@ -845,7 +845,7 @@
       { el:null, pos:'center', titre:"✅ Un canal maîtrisé", voice:"Suivez les taux d'ouverture et ajustez votre stratégie de communication.", desc:"Espacez vos envois pour ne pas lasser vos membres." }
     ]},
     'f-adm-publications': { badge:'📢 Publications (modération)', couleur:'#374151', steps:[
-      { el:null, pos:'center', badge:true, titre:"Publications (modération)", voice:"Supervisez et modérez l'ensemble des publications diffusées sur la plateforme.", desc:"Fil d'actualité, vitrines, publications d'événements — une vue centralisée." },
+      { el:null, pos:'center', badge:true, titre:"Publications (modération)", voice:"Supervisez et modérez l'ensemble des publications diffusées sur la plateforme.", desc:"Fil d'actualité, boutiques, publications d'événements — une vue centralisée." },
       { el:null, pos:'center', titre:"🛡️ Modérer un contenu", voice:"Retirez ou signalez un contenu qui ne respecte pas les règles de la plateforme.", desc:"Les publications signalées par les membres apparaissent en priorité.", lien:{href:'dashboard-administrateur.html', label:'Publications'} },
       { el:null, pos:'center', titre:"✅ Un espace sain", voice:"Une modération réactive préserve la qualité de la plateforme.", desc:"Documentez vos décisions pour rester cohérent dans le temps." }
     ]},

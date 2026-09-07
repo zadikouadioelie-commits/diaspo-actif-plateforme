@@ -1253,8 +1253,8 @@ async function migratePg(pool) {
        ON CONFLICT (type) DO NOTHING RETURNING id`,
       [
         'initiative_abonne', 'Initiative Abonnée', '⭐',
-        "Abonnement qui débloque le module paiement, la publicité, les événements, les business plans, les cotisations & adhésions, les votes sécurisés et la visibilité publique de la vitrine.",
-        JSON.stringify(['Module paiement (Stripe Connect)','Publicités','Événements','Business Plans','Cotisations & Adhésions','Votes sécurisés','Vitrine visible au public']),
+        "Abonnement qui débloque le module paiement, la publicité, les événements, les business plans, les cotisations & adhésions, les votes sécurisés et la visibilité publique de la boutique.",
+        JSON.stringify(['Module paiement (Stripe Connect)','Publicités','Événements','Business Plans','Cotisations & Adhésions','Votes sécurisés','Boutique visible au public']),
         '#c8960c', '#fffbeb', '#f2c94c', '#8a6400', 'compte_initiative', 1,
       ]
     );
