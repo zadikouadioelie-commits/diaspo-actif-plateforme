@@ -18,6 +18,8 @@ window.MODULE_AIDE = {
   publications: { titre: "📰 Publications", texte: "Publiez des actualités, annonces ou contenus qui apparaissent dans le fil d'actualité de la plateforme." },
   accreditations_da: { titre: "🎖 Accréditations DA", texte: "Demandez des accréditations officielles Diaspo'Actif qui débloquent des droits ou fonctionnalités spécifiques." },
   support_pilote: { titre: "🖥️ Support Pilote", texte: "Demandez qu'un administrateur voie votre écran en direct et agisse à votre place pour une manipulation, uniquement sur les pages de Diaspo'Actif." },
+  formations: { titre: "🎓 Formations", texte: "Consultez le catalogue de formations disponibles sur la plateforme et suivez celles auxquelles vous êtes inscrit(e)." },
+  comptes_lies: { titre: "🔗 Liaison de comptes", texte: "Reliez plusieurs de vos comptes Diaspo'Actif entre eux pour basculer de l'un à l'autre sans vous reconnecter." },
 
   /* ── Dashboard Initiative — Premium ── */
   paiement_initiative: { titre: "💳 Module paiement", texte: "Configurez l'encaissement des paiements pour votre initiative (Boutique, adhésions, billetterie)." },
@@ -36,12 +38,18 @@ window.MODULE_AIDE = {
   centre_financier: { titre: "💰 Centre Financier", texte: "Suivez vos revenus, gérez vos comptes de réception et effectuez des retraits vers votre compte bancaire." },
   asso_documents: { titre: "📁 Documents", texte: "Centralisez les documents officiels de votre association : statuts, procès-verbaux, contrats." },
   zones_action: { titre: "🟨 Zones d'action", texte: "Délimitez les territoires géographiques où votre initiative intervient concrètement." },
+  crm: { titre: "🤝 CRM", texte: "Suivez vos contacts, prospects et membres dans un fichier relationnel centralisé, propre à votre initiative." },
+  cagnottes: { titre: "🪙 Mes Cagnottes", texte: "Créez des cagnottes de collecte pour vos projets et suivez les dons reçus en temps réel." },
+  recensement: { titre: "📋 Recensement", texte: "Lancez une campagne de dénombrement auprès de la diaspora (identité, mineurs déclarés, vérification d'identité en option) et suivez les déclarations reçues. Réservé aux Initiatives Premium pour la création." },
+  avancement_initiative: { titre: "📈 Avancement de mon initiative", texte: "Suivez la progression de votre initiative sur la plateforme : étapes complétées, indicateurs et prochaines actions." },
 
   /* ── Dashboard Utilisateur ── */
   cv_lettres: { titre: "📄 CV, Lettres, Candidatures", texte: "Créez et gérez vos CV, lettres de motivation et suivez vos candidatures à des offres." },
   mes_billets: { titre: "🎟 Mes Billets", texte: "Retrouvez tous les billets que vous avez achetés pour des événements sur la plateforme." },
   paiements_utilisateur: { titre: "💳 Paiements", texte: "Enregistrez vos cartes bancaires pour accélérer vos achats dans la Boutique et vos autres paiements." },
   ma_localisation: { titre: "🟨 Ma localisation", texte: "Indiquez votre position géographique pour être visible dans les recherches locales et l'annuaire." },
+  mes_devis: { titre: "📩 Mes demandes de devis", texte: "Retrouvez les demandes de devis que vous avez envoyées et suivez les réponses reçues." },
+  soumission_da: { titre: "📤 Soumettre à Diaspo'Actif", texte: "Proposez une information, un contenu ou un signalement directement à l'équipe Diaspo'Actif." },
 
   /* ── Dashboard Collectivité ── */
   identite_territoriale: { titre: "🔐 Identité Territoriale", texte: "Gérez les informations officielles rattachant votre institution à son territoire d'origine." },
