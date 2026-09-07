@@ -5613,6 +5613,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   SoumissionDA.render(document.getElementById('da-sda-mount'), { accredType: 'initiative_abonne' });
   openFromHash();
   window.addEventListener('hashchange', openFromHash);
+  /* Ouverture directe de la fiche "Modifier" d'un événement (2026-09-07) — arrivée depuis le
+     bouton ✏️ Modifier de la page publique "Événements Diaspo'Actif" (evenements.html),
+     via ?modifier_evenement=<id events>#evenements. Nettoie l'URL pour ne pas rouvrir la
+     modale à un simple rechargement de page. */
+  (function() {
+    const idAModifier = new URLSearchParams(location.search).get('modifier_evenement');
+    if (idAModifier) {
+      history.replaceState(null, '', location.pathname + location.hash);
+      if (typeof window.openInitEvtModal === 'function') window.openInitEvtModal(Number(idAModifier));
+    }
+  })();
   window.initPremiumGates && window.initPremiumGates();
 
   /* Style commun projets */
