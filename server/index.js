@@ -17019,6 +17019,12 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   if (query.type) rows = rows.filter(r => r.type_evt === query.type);
   /* Filtre par organisateur — alimente le module "Événements" de la vitrine. */
   if (query.owner) rows = rows.filter(r => Number(r.owner_user_id) === Number(query.owner));
+  // Filtre "📅 Date" (2026-09-07) — événements à partir de cette date (une affiche
+  // d'événements à venir, pas une recherche d'un jour précis dans le passé).
+  if (query.date) rows = rows.filter(r => r.date_evt && r.date_evt >= query.date);
+  // Filtre "🎟️ Gratuit / payant" (2026-09-07) — prix_min NULL ou 0 = gratuit.
+  if (query.gratuit === '1') rows = rows.filter(r => !r.prix_min);
+  else if (query.gratuit === '0') rows = rows.filter(r => r.prix_min > 0);
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
   sendJSON(res, 200, { evenements: withCounts });
@@ -27519,6 +27525,10 @@ ${jsonLd}
       if (global.__evenementsSourceColEnsured) return;
       try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS source_events_id INTEGER`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol]', e.message); }
+      // Filtre "Gratuit / payant" (2026-09-07) — même filet auto-réparateur, même colonne
+      // ajoutée aux deux migrations standard (server/db.js + server/pg-init.js).
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS prix_min REAL`).run(); }
+      catch (e) { console.error('[ensureEvenementsSourceCol/prix_min]', e.message); }
       global.__evenementsSourceColEnsured = true;
     }
     async function syncEvenementVersProgrammation(eventId) {
@@ -27541,6 +27551,9 @@ ${jsonLd}
         // date + heure séparées, format attendu par `evenements` (date_evt/heure_debut/heure_fin).
         const [dateEvt, heureDebut] = String(ev.date_debut || '').split('T');
         const heureFin = ev.date_fin ? String(ev.date_fin).split('T')[1] : null;
+        // Filtre "Gratuit / payant" — prix le plus bas des types de billets actifs, NULL si
+        // aucun (événement gratuit ou billetterie pas encore configurée).
+        const prixMin = (await db.prepare("SELECT MIN(prix) AS m FROM ticket_types WHERE event_id=? AND actif=1").get(eventId))?.m ?? null;
 
         const champs = {
           titre: ev.titre, description: ev.description,
@@ -27558,7 +27571,7 @@ ${jsonLd}
           region: ev.region || null, departement: ev.departement || null,
           visibilite: 'public', inscription_ouverte: 1,
           lien_inscription: ev.inscription_lien_externe || null,
-          statut: 'ouvert',
+          statut: 'ouvert', prix_min: prixMin,
         };
         const colonnes = Object.keys(champs);
         const valeurs = Object.values(champs);

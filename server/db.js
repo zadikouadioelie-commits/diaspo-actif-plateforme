@@ -1472,6 +1472,9 @@ const MIGRATIONS = [
   // "evenements" à l'événement Billetterie ("events") qui l'a générée, pour la mettre à jour
   // ou la supprimer au lieu d'en recréer une à chaque synchronisation.
   ["evenements", "source_events_id INTEGER"],
+  // Filtre "Gratuit / payant" de la page Événements (2026-09-07) — prix le plus bas des
+  // billets de l'événement source, NULL/0 = gratuit.
+  ["evenements", "prix_min REAL"],
   // Formations — ajout du niveau Chapitre entre Module et Leçon
   ["formation_lecons", "chapitre_id INTEGER"],
   // Formations — permission de téléchargement par ressource + nombre de pages (PDF)

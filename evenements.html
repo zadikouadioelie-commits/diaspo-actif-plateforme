@@ -118,7 +118,7 @@
 
 <!-- IDENTITY BANNER -->
 <div id="evt-identity">
-  <span class="evt-pill">📢 Mobiliser la diaspora</span>
+  <span class="evt-pill">📅 Tous les événements de la plateforme</span>
   <span class="evt-pill">🌍 Public ou privé</span>
   <span class="evt-pill">🎟️ Billetterie & QR Codes</span>
   <span class="evt-pill">📊 Statistiques & rappels</span>
@@ -130,21 +130,22 @@
 <main class="container" style="max-width:1100px;padding-top:28px;padding-bottom:48px">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
-      <h2 style="margin:0 0 4px">📢 Mobiliser la diaspora — Événements</h2>
-      <p class="sub" style="margin:0">Le seul espace pour créer et diffuser un événement communautaire sur Diaspo'Actif</p>
+      <h2 style="margin:0 0 4px">📅 Événements Diaspo'Actif</h2>
+      <p class="sub" style="margin:0">Tous les événements présents sur la plateforme Diaspo'Actif, réunis au même endroit — affinez avec les filtres ci-dessous.</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">⚙️ Programmation</a>
-      <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Mobiliser la diaspora</button>
+      <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
   </div>
   <div class="filters">
-    <input type="text" id="q" placeholder="Rechercher..." style="min-width:180px">
-    <select id="f-domaine"><option value="">Tous les domaines</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option></select>
-    <select id="f-type"><option value="">Tous types</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select>
-    <select id="f-pays"><option value="">Tous pays</option></select>
-    <input type="text" id="f-ville" placeholder="Ville..." style="min-width:140px">
-    <select id="f-origine"><option value="">Toutes origines</option></select>
+    <input type="text" id="q" placeholder="🔎 Mot-clé..." style="min-width:180px">
+    <select id="f-pays" title="Localisation / territoire"><option value="">🌍 Tous pays</option></select>
+    <input type="text" id="f-ville" placeholder="📍 Ville..." style="min-width:140px">
+    <input type="date" id="f-date" title="À partir de cette date" style="min-width:150px">
+    <select id="f-domaine" title="Catégorie / domaine"><option value="">🏷️ Toutes catégories</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option></select>
+    <select id="f-type" title="Type d'événement"><option value="">👥 Tous types</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select>
+    <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">Gratuit</option><option value="0">Payant</option></select>
     <button class="btn btn-orange" id="btn-search" style="font-size:12px;padding:0 14px">🔍 Rechercher</button>
     <button class="btn" id="btn-search-global" style="font-size:12px;padding:0 14px">🌍 Rechercher sur tout Diaspo'Actif</button>
     <button class="btn" id="btn-reset" style="font-size:12px;padding:0 12px">Réinitialiser</button>
@@ -327,7 +328,8 @@ async function loadEvts() {
   const type   = document.getElementById('f-type').value;
   const pays   = document.getElementById('f-pays').value;
   const ville  = document.getElementById('f-ville').value.trim();
-  const origine= document.getElementById('f-origine').value;
+  const date   = document.getElementById('f-date').value;
+  const gratuit= document.getElementById('f-gratuit').value;
   try {
     const params = new URLSearchParams();
     if(q)      params.set('q',q);
@@ -335,8 +337,9 @@ async function loadEvts() {
     if(type)   params.set('type',type);
     if(pays)   params.set('pays',pays);
     if(ville)  params.set('ville',ville);
-    if(origine)params.set('origine',origine);
-    const usePrefs = !q && !domaine && !type && !pays && !ville && !origine;
+    if(date)   params.set('date',date);
+    if(gratuit)params.set('gratuit',gratuit);
+    const usePrefs = !q && !domaine && !type && !pays && !ville && !date && !gratuit;
     const r = usePrefs
       ? await api('GET', '/evenements/recommandes')
       : await api('GET', '/evenements?' + params);
@@ -379,6 +382,7 @@ function renderEvts() {
           ${evt.origine ? '<span>👥 Origine : '+esc(evt.origine)+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
+          ${evt.prix_min ? '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>' : '<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>'}
           ${visiBadge}
           ${evt.nb_participants ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
         </div>
@@ -480,21 +484,20 @@ async function quitter(id, btn) {
   catch(e) { btn.disabled=false; }
 }
 
-/* ─── Pays & Origines ─── */
+/* ─── Pays (origine retirée du filtre Événements, 2026-09-07 — hors du set de filtres
+   demandé : Localisation, Date, Catégorie, Type, Mot-clé, Gratuit/payant) ─── */
 (function() {
   if (typeof PAYS_DU_MONDE === 'undefined') return;
   const selPays = document.getElementById('f-pays');
-  const selOrig = document.getElementById('f-origine');
   const selFormOrig = document.getElementById('e-origine');
   PAYS_DU_MONDE.forEach(p => {
     if (selPays)     { const o=document.createElement('option'); o.value=p; o.textContent=p; selPays.appendChild(o); }
-    if (selOrig)     { const o=document.createElement('option'); o.value=p; o.textContent=p; selOrig.appendChild(o); }
     if (selFormOrig) { const o=document.createElement('option'); o.value=p; o.textContent=p; selFormOrig.appendChild(o); }
   });
 })();
 
-/* ─── Filtres ─── */
-['f-domaine','f-type','f-pays','f-origine'].forEach(id => document.getElementById(id).addEventListener('change', loadEvts));
+/* ─── Filtres — mise à jour automatique à chaque changement (2026-09-07, demande explicite) ─── */
+['f-domaine','f-type','f-pays','f-date','f-gratuit'].forEach(id => document.getElementById(id).addEventListener('change', loadEvts));
 document.getElementById('q').addEventListener('input', () => setTimeout(loadEvts, 300));
 document.getElementById('f-ville').addEventListener('input', () => setTimeout(loadEvts, 300));
 // Bouton « Rechercher » : lance la recherche locale (événements), même avec un seul filtre saisi
@@ -506,7 +509,6 @@ document.getElementById('btn-search-global').addEventListener('click', () => {
   const termes = [
     document.getElementById('q').value.trim(),
     document.getElementById('f-ville').value.trim(),
-    document.getElementById('f-origine').value,
     document.getElementById('f-pays').value,
     document.getElementById('f-domaine').value,
   ].filter(Boolean).join(' ').trim();
@@ -514,7 +516,7 @@ document.getElementById('btn-search-global').addEventListener('click', () => {
   window.location.href = '/recherche.html?q=' + encodeURIComponent(termes);
 });
 document.getElementById('btn-reset').addEventListener('click', () => {
-  ['q','f-domaine','f-type','f-pays','f-ville','f-origine'].forEach(id => document.getElementById(id).value='');
+  ['q','f-domaine','f-type','f-pays','f-ville','f-date','f-gratuit'].forEach(id => document.getElementById(id).value='');
   loadEvts();
 });
 
@@ -790,6 +792,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.ville ? `<span>🏙️ ${esc(evt.ville)}</span>` : ''}
         ${evt.pays ? `<span>🌍 ${esc(evt.pays)}</span>` : ''}
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
+        ${evt.prix_min ? `<span class="evt-tag">💶 À partir de ${Number(evt.prix_min).toLocaleString('fr-FR')} €</span>` : `<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>`}
       </div>
       ${evt.description ? `<p style="font-size:14px;line-height:1.65;color:#444;margin:0 0 12px;">${mdBold(esc(evt.description))}</p>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
