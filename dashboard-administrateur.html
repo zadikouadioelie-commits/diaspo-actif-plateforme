@@ -1576,6 +1576,18 @@
         </div>
       </section>
 
+      <!-- OBSERVER UN ÉVÉNEMENT — aperçu complet (image + toutes les infos), 2026-09-08,
+           demande explicite : voir la fiche telle qu'elle apparaît publiquement avant de
+           décider de la suspendre ou de la supprimer. -->
+      <div id="evt-observer-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div style="background:#fff;border-radius:14px;width:100%;max-width:560px;overflow:hidden;opacity:1 !important;">
+          <div style="display:flex;justify-content:flex-end;padding:8px 8px 0;">
+            <button onclick="document.getElementById('evt-observer-modal-bg').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <div id="evt-observer-content" style="padding:0 24px 24px;"></div>
+        </div>
+      </div>
+
       <!-- MÉMOIRE CHATBOT -->
       <section id="section-chatbot" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
@@ -12852,6 +12864,7 @@ async function loadAdminBilletterie() {
               <td style="padding:10px;text-align:right;font-weight:700;">${estBillet?(e.revenu||0).toFixed(2)+' €':'—'}</td>
               <td style="padding:10px;text-align:right;color:#8b5cf6;">${estBillet?((e.revenu||0)*0.05).toFixed(2)+' €':'—'}</td>
               <td style="padding:10px;text-align:center;white-space:nowrap;">
+                <button class="btn btn-sm btn-outline" onclick="adminObserverEvent(${e.id},'${e.source_table}')" title="Aperçu complet — image, description, toutes les informations, telles qu'affichées publiquement">👁️ Observer</button>
                 ${estBillet && e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="adminPublishEvent(${e.id})">Publier</button>`:''}
                 ${suspendu
                   ? `<button class="btn btn-sm" style="color:#16a34a;border-color:#16a34a;" onclick="adminToggleSuspension(${e.id},'${e.source_table}',false)" title="Réactiver — remet l'événement en ligne et rouvre la vente/les inscriptions">✅ Réactiver</button>`
@@ -12898,6 +12911,62 @@ window.adminForceDeleteEvent = async function(id, sourceTable, titre) {
     await api('DELETE', base + id);
     loadAdminBilletterie();
   } catch(e) { alert('Erreur : ' + e.message); }
+};
+/* Aperçu complet d'un événement (image + toutes les infos), 2026-09-08, demande explicite :
+   « montre les événements avec leurs cartouches de présentation complète, image et
+   informations » — avant de décider de suspendre/supprimer. Les deux tables (events =
+   Billetterie, evenements = créé directement) ont des noms de champs différents, normalisés
+   ici plutôt que de dupliquer le template pour chacune. */
+window.adminObserverEvent = async function(id, sourceTable) {
+  const modal = document.getElementById('evt-observer-modal-bg');
+  const content = document.getElementById('evt-observer-content');
+  content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>';
+  modal.style.display = 'flex';
+  try {
+    let e;
+    if (sourceTable === 'events') {
+      const r = await api('GET', '/events/' + id);
+      const ev = r.event;
+      e = {
+        image: ev.image_couverture || ev.image_b64 || null,
+        titre: ev.titre, description: ev.description,
+        date: ev.date_debut, ville: ev.ville, pays: ev.pays, lieu: ev.adresse,
+        badge: ev.categorie, statut: ev.statut,
+        gratuit_ou_prix: (r.ticket_types||[]).length ? Math.min(...r.ticket_types.map(t=>Number(t.prix)||0)) : null,
+        organisateur: ev.organisateur_nom,
+      };
+    } else {
+      const r = await api('GET', '/evenements/' + id);
+      const ev = r.evenement;
+      e = {
+        image: ev.image_couverture || ev.image_url || null,
+        titre: ev.titre, description: ev.description,
+        date: ev.date_evt, ville: ev.ville, pays: ev.pays, lieu: ev.lieu,
+        badge: ev.domaine || ev.type_evt, statut: ev.statut,
+        gratuit_ou_prix: ev.prix_min,
+        organisateur: ev.organisateur_nom || ev.organisateur,
+      };
+    }
+    const fmtD = s => { if(!s) return ''; const d=new Date(s); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'}); };
+    const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Portée locale : STATUTS est déclaré dans loadAdminBilletterie(), inaccessible ici.
+    const STATUTS_OBS = { brouillon:'📝 Brouillon', publie:'🟢 Publié', ferme:'🔒 Fermé', archive:'📁 Archivé', suspendu:'⛔ Suspendu (admin)', ouvert:'🟢 Ouvert' };
+    content.innerHTML = `
+      <div style="margin:0 -24px 16px;height:220px;background:${e.image?`url('${esc(e.image)}') center/cover no-repeat`:'linear-gradient(135deg,#ff6b00,#ff9f43)'};display:flex;align-items:center;justify-content:center;font-size:56px;color:#fff;">${e.image?'':'📢'}</div>
+      <div style="font-size:11px;color:#2563EB;font-weight:700;text-transform:uppercase;margin-bottom:4px;">${esc(e.badge||'Événement')}</div>
+      <h2 style="margin:0 0 10px;font-size:20px;">${esc(e.titre)}</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--muted);margin-bottom:14px;">
+        ${e.date?`<span>📅 ${fmtD(e.date)}</span>`:''}
+        ${e.lieu?`<span>📍 ${esc(e.lieu)}</span>`:''}
+        ${e.ville?`<span>🏙️ ${esc(e.ville)}</span>`:''}
+        ${e.pays?`<span>🌍 ${esc(e.pays)}</span>`:''}
+        <span>${STATUTS_OBS[e.statut]||e.statut}</span>
+        <span style="color:${e.gratuit_ou_prix?'#000':'#16a34a'};">${e.gratuit_ou_prix ? '💶 À partir de '+Number(e.gratuit_ou_prix).toLocaleString('fr-FR')+' €' : '🎟️ Gratuit'}</span>
+      </div>
+      ${e.organisateur?`<div style="font-size:12.5px;margin-bottom:10px;"><strong>Organisateur :</strong> ${esc(e.organisateur)}</div>`:''}
+      ${e.description?`<p style="font-size:13.5px;line-height:1.6;color:#333;white-space:pre-wrap;">${esc(e.description)}</p>`:'<p style="font-size:13px;color:var(--muted);font-style:italic;">Aucune description.</p>'}
+    `;
+  } catch(err) { content.innerHTML = '<div style="color:#ef4444;padding:20px;">Erreur : ' + err.message + '</div>'; }
 };
 </script>
 <script src="assets/posts.js"></script>
