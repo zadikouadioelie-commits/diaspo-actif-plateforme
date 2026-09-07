@@ -38736,6 +38736,13 @@ route('POST', '/api/recensements', async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
   if (user.role !== 'initiative') return sendJSON(res, 403, { error: 'Le module Recensement est réservé aux comptes Initiative.' });
+  /* Réservé aux Initiatives Premium (2026-09-07, précision explicite) — même gate que la
+     création de formations (hasAccreditation('initiative_abonne'), server/index.js:12785).
+     Consulter/participer à un recensement déjà publié reste ouvert à tous : le gate ne
+     s'applique qu'à LA CRÉATION d'une campagne, pas à sa consultation. */
+  if (!(await hasAccreditation(user.id, 'initiative_abonne'))) {
+    return sendJSON(res, 402, { error: 'La création de recensements est réservée aux comptes Initiative Premium.', accred_type: 'initiative_abonne' });
+  }
   const init = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=?').get(user.id);
   if (!init) return sendJSON(res, 400, { error: 'Aucune initiative associée à ce compte.' });
   const type = RECENSEMENT_TYPES.includes(body.type) ? body.type : 'denombrement';
