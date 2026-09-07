@@ -1475,6 +1475,9 @@ const MIGRATIONS = [
   // Filtre "Gratuit / payant" de la page Événements (2026-09-07) — prix le plus bas des
   // billets de l'événement source, NULL/0 = gratuit.
   ["evenements", "prix_min REAL"],
+  // Chaîne WhatsApp affichée sur la page publique (2026-09-07, demande explicite) — synchronisée
+  // depuis events.whatsapp_lien par le pont Billetterie, comme prix_min ci-dessus.
+  ["evenements", "whatsapp_lien TEXT"],
   // Formations — ajout du niveau Chapitre entre Module et Leçon
   ["formation_lecons", "chapitre_id INTEGER"],
   // Formations — permission de téléchargement par ressource + nombre de pages (PDF)

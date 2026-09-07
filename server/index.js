@@ -27529,6 +27529,9 @@ ${jsonLd}
       // ajoutée aux deux migrations standard (server/db.js + server/pg-init.js).
       try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS prix_min REAL`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol/prix_min]', e.message); }
+      // Chaîne WhatsApp (2026-09-07) — même filet auto-réparateur.
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS whatsapp_lien TEXT`).run(); }
+      catch (e) { console.error('[ensureEvenementsSourceCol/whatsapp_lien]', e.message); }
       global.__evenementsSourceColEnsured = true;
     }
     async function syncEvenementVersProgrammation(eventId) {
@@ -27559,7 +27562,8 @@ ${jsonLd}
           titre: ev.titre, description: ev.description,
           date_evt: dateEvt || ev.date_debut, heure_debut: heureDebut || null,
           date_fin: ev.date_fin ? String(ev.date_fin).split('T')[0] : null, heure_fin: heureFin,
-          pays: ev.pays, ville: ev.ville,
+          pays: ev.pays, ville: ev.ville, lieu: ev.adresse || null,
+          places_max: ev.nb_places || ev.capacite || null,
           domaine: ev.categorie || null, type_evt: 'evenement',
           organisateur: initiative?.nom || null, owner_user_id: ev.organisateur_id,
           image_url: ev.image_couverture || ev.image_b64 || null,
@@ -27571,7 +27575,7 @@ ${jsonLd}
           region: ev.region || null, departement: ev.departement || null,
           visibilite: 'public', inscription_ouverte: 1,
           lien_inscription: ev.inscription_lien_externe || null,
-          statut: 'ouvert', prix_min: prixMin,
+          statut: 'ouvert', prix_min: prixMin, whatsapp_lien: ev.whatsapp_lien || null,
         };
         const colonnes = Object.keys(champs);
         const valeurs = Object.values(champs);

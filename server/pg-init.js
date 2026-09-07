@@ -394,6 +394,8 @@ const COLONNES_MIGRATION = [
     /* Filtre "Gratuit / payant" de la page Événements (2026-09-07) — prix le plus bas des
        billets de l'événement source, NULL/0 = gratuit. Miroir exact de l'ALTER db.js. */
     ['evenements', 'prix_min', 'REAL'],
+    // Chaîne WhatsApp affichée sur la page publique (2026-09-07) — miroir exact de l'ALTER db.js.
+    ['evenements', 'whatsapp_lien', 'TEXT'],
     /* Module d'affiliation Initiative → Utilisateur (2026-07-27) — miroir de l'ALTER db.js. */
     ['initiative_membres', 'message', 'TEXT'],
     /* Rencontres Diaspo'Actif — miroir de l'ALTER ajouté dans db.js. Sans cette ligne,
