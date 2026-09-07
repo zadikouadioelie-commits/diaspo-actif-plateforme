@@ -6434,32 +6434,77 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   if (query.type) rows = rows.filter(r => r.type === query.type);
   if (query.nationalite_unique === "1") rows = rows.filter(r => r.nationalite_unique === 1);
-  // Filtre par accréditation DA
+  /* Filtre par accréditation DA — requête GROUPÉE (IN (...)) plutôt qu'une requête par ligne :
+     avant, filtrer 90 initiatives faisait 90 allers-retours vers Postgres. */
   if (query.accreditation) {
     const type = query.accreditation;
-    const keeps = await Promise.all(rows.map(async r => {
-      if (!r.owner_user_id) return false;
-      return !!await db.prepare("SELECT 1 FROM compte_accreditations WHERE user_id=? AND type=? AND statut='active'").get(r.owner_user_id, type);
-    }));
-    rows = rows.filter((_, i) => keeps[i]);
+    const ownerIdsFiltre = [...new Set(rows.map(r => r.owner_user_id).filter(Boolean).map(Number))];
+    let autorises = new Set();
+    if (ownerIdsFiltre.length) {
+      const ph = ownerIdsFiltre.map(() => "?").join(",");
+      const actifs = await db.prepare(`SELECT DISTINCT user_id FROM compte_accreditations WHERE user_id IN (${ph}) AND type=? AND statut='active'`).all(...ownerIdsFiltre, type);
+      autorises = new Set(actifs.map(a => Number(a.user_id)));
+    }
+    rows = rows.filter(r => r.owner_user_id && autorises.has(Number(r.owner_user_id)));
   }
   /* Liste PUBLIQUE : aucune coordonnée privée n'y a sa place, et le numéro de vitrine ne
      s'affiche que si son propriétaire l'a autorisé. Contrairement à la fiche détaillée, il
      n'y a pas de cas « je suis le propriétaire » à traiter ici — cette liste sert à parcourir
      l'annuaire, pas à gérer son compte. */
   const moiListe = await getCurrentUser(req);
-  rows = await Promise.all(rows.map(async r => {
-    const accreds = r.owner_user_id
-      ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(r.owner_user_id)).map(a => a.type)
-      : [];
-    const decouverte_premium = r.owner_user_id ? await getDecouvertePremium(r.owner_user_id) : null;
-    const sien = moiListe && Number(moiListe.id) === Number(r.owner_user_id);
+
+  /* Enrichissement en 4 requêtes GROUPÉES (IN (...)) plutôt que 4×N requêtes individuelles —
+     avant cette correction (2026-09-07), afficher ~90 initiatives déclenchait ~360 allers-
+     retours vers Postgres/Neon, limité à 5 connexions simultanées (server/db-pg.js), d'où
+     plusieurs secondes de chargement pour l'Annuaire. Même résultat, un seul aller-retour par
+     type de donnée, quel que soit le nombre d'initiatives affichées. */
+  const ownerIds = [...new Set(rows.map(r => r.owner_user_id).filter(Boolean).map(Number))];
+  const initIds = rows.map(r => Number(r.id));
+
+  const accredsParOwner = {};
+  if (ownerIds.length) {
+    const ph = ownerIds.map(() => "?").join(",");
+    (await db.prepare(`SELECT user_id, type FROM compte_accreditations WHERE user_id IN (${ph}) AND statut='active'`).all(...ownerIds))
+      .forEach(a => { const uid = Number(a.user_id); (accredsParOwner[uid] = accredsParOwner[uid] || []).push(a.type); });
+  }
+  const decouverteParOwner = {};
+  if (ownerIds.length) {
+    const ph = ownerIds.map(() => "?").join(",");
+    (await db.prepare(`SELECT user_id, date_expiration FROM user_accreditations WHERE user_id IN (${ph}) AND statut='active' AND type_tarif='decouverte' ORDER BY date_expiration DESC`).all(...ownerIds))
+      .forEach(row => { const uid = Number(row.user_id); if (!(uid in decouverteParOwner)) decouverteParOwner[uid] = row.date_expiration; });
+  }
+  const certifParInit = {};
+  if (initIds.length) {
+    const ph = initIds.map(() => "?").join(",");
+    (await db.prepare(`SELECT initiative_id, niveau, statut, date_attribution FROM certifications WHERE initiative_id IN (${ph}) AND statut='actif'`).all(...initIds))
+      .forEach(c => { certifParInit[Number(c.initiative_id)] = { niveau: c.niveau, statut: c.statut, date_attribution: c.date_attribution }; });
+  }
+  const identiteParOwner = {};
+  if (ownerIds.length) {
+    const ph = ownerIds.map(() => "?").join(",");
+    (await db.prepare(`SELECT id, identite_verifiee, identite_expire_le FROM users WHERE id IN (${ph})`).all(...ownerIds))
+      .forEach(u => { identiteParOwner[Number(u.id)] = !!(u.identite_verifiee && u.identite_expire_le && new Date(u.identite_expire_le) > new Date()); });
+  }
+
+  rows = rows.map(r => {
+    const oid = r.owner_user_id ? Number(r.owner_user_id) : null;
+    const dateExp = oid ? decouverteParOwner[oid] : null;
+    const decouverte_premium = (dateExp && new Date(dateExp).getTime() >= Date.now()) ? { date_expiration: dateExp } : null;
+    const sien = moiListe && Number(moiListe.id) === oid;
     const contacts = sien ? {} : {
       tel_responsable: null, email_responsable: null,
       ...(Number(r.vitrine_tel_visible) === 1 ? {} : { vitrine_tel_pro: null, vitrine_whatsapp: null }),
     };
-    return { ...r, ...contacts, nationalites_concernees: safeParse(r.nationalites_concernees), nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif, certif: await getCertif(r.id), accreditations: accreds, decouverte_premium, owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id) };
-  }));
+    return {
+      ...r, ...contacts,
+      nationalites_concernees: safeParse(r.nationalites_concernees),
+      nationalite_unique: !!r.nationalite_unique, abonnement_actif: !!r.abonnement_actif,
+      certif: certifParInit[Number(r.id)] || null,
+      accreditations: oid ? (accredsParOwner[oid] || []) : [],
+      decouverte_premium,
+      owner_identite_verifiee: oid ? !!identiteParOwner[oid] : false,
+    };
+  });
   sendJSON(res, 200, { initiatives: rows });
 });
 
