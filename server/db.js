@@ -1468,6 +1468,10 @@ const MIGRATIONS = [
   // E-mail de bienvenue "Sceau" (Initiative/Utilisateur, 2026-09-07) — horodatage pour
   // déclencher une fois par compte (création ET rattrapage rétroactif), jamais deux fois.
   ["users", "bienvenue_envoyee_at TEXT"],
+  // Pont Billetterie → Mobiliser la diaspora (2026-09-07, demande explicite) : relie une ligne
+  // "evenements" à l'événement Billetterie ("events") qui l'a générée, pour la mettre à jour
+  // ou la supprimer au lieu d'en recréer une à chaque synchronisation.
+  ["evenements", "source_events_id INTEGER"],
   // Formations — ajout du niveau Chapitre entre Module et Leçon
   ["formation_lecons", "chapitre_id INTEGER"],
   // Formations — permission de téléchargement par ressource + nombre de pages (PDF)

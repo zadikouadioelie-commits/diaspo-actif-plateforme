@@ -140,7 +140,7 @@
   </div>
   <div class="filters">
     <input type="text" id="q" placeholder="Rechercher..." style="min-width:180px">
-    <select id="f-domaine"><option value="">Tous les domaines</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Autre</option></select>
+    <select id="f-domaine"><option value="">Tous les domaines</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option></select>
     <select id="f-type"><option value="">Tous types</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select>
     <select id="f-pays"><option value="">Tous pays</option></select>
     <input type="text" id="f-ville" placeholder="Ville..." style="min-width:140px">
@@ -162,7 +162,7 @@
     <div class="grid-2">
       <div style="grid-column:1/-1"><label>Titre <span style="color:#2563EB">*</span></label><input type="text" id="e-titre" placeholder="Titre de l'événement"></div>
       <div><label>Type d'événement</label><select id="e-type"><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala / Soirée</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select></div>
-      <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Autre</option></select></div>
+      <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option></select></div>
       <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="e-date"></div>
       <div><label>Heure de début</label><input type="time" id="e-heure" value="09:00"></div>
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
@@ -310,7 +310,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=11"></script>
 <script>
-const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Autre:'📅'};
+const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Autre:'📅'};
 
 function fmtDate(d){
   if(!d) return '';
@@ -843,7 +843,11 @@ window.carouselGo = function(id, idx) {
 (async () => {
   await applyAuthState();
   if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER &&
-      ['initiative','administrateur','collectivite','professionnel'].includes(CURRENT_USER.role)) {
+      /* 'professionnel' retiré (2026-09-07) : affiché ici mais rejeté en 403 côté serveur
+         (POST /api/evenements n'autorise que initiative/administrateur/collectivite) — le
+         bouton n'a jamais fonctionné pour ce rôle, incohérence corrigée en même temps que le
+         pont Billetterie. */
+      ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role)) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
   }
   await Promise.all([loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve()]);

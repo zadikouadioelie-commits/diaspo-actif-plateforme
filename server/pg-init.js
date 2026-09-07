@@ -388,6 +388,9 @@ const COLONNES_MIGRATION = [
     /* E-mail de bienvenue "Sceau" (Initiative/Utilisateur, 2026-09-07) — miroir exact de
        l'ALTER db.js, voir le commentaire équivalent là-bas. */
     ['users', 'bienvenue_envoyee_at', 'TEXT'],
+    /* Pont Billetterie → Mobiliser la diaspora (2026-09-07) — miroir exact de l'ALTER db.js,
+       voir le commentaire équivalent là-bas. */
+    ['evenements', 'source_events_id', 'INTEGER'],
     /* Module d'affiliation Initiative → Utilisateur (2026-07-27) — miroir de l'ALTER db.js. */
     ['initiative_membres', 'message', 'TEXT'],
     /* Rencontres Diaspo'Actif — miroir de l'ALTER ajouté dans db.js. Sans cette ligne,

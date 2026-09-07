@@ -12574,6 +12574,19 @@ async function getPremiumStatut(userId, role) {
    Passer en application = une seule variable d'environnement, réversible immédiatement. */
 function premiumApplicationActive() { return process.env.PREMIUM_APPLICATION === '1'; }
 
+/* Version booléenne pure de la même condition que exigerPremium() (administrateur exempté,
+   période d'essai/abonnement actif, mode observation), pour un usage interne (ex: décider si
+   un événement Billetterie doit rester synchronisé sur "Mobiliser la diaspora") où il n'y a ni
+   requête HTTP à bloquer ni erreur 402 à renvoyer. exigerPremium() reste volontairement
+   intacte (garde déjà en production sur un mécanisme de paiement réel) plutôt que refactorée
+   pour appeler celle-ci — zéro risque de régression sur elle. */
+async function estPremiumActif(userId, role) {
+  if (role === 'administrateur') return true;
+  const st = await getPremiumStatut(userId, role);
+  if (!st.concerne || st.actif) return true;
+  return premiumApplicationActive();
+}
+
 /* Point de contrôle UNIQUE pour tout module réservé à l'abonnement.
    Retourne true si l'accès est autorisé. Sinon répond 402 et retourne false.
    Toute route Premium doit passer par ici — c'est ce qui évite que chaque module
@@ -27495,12 +27508,83 @@ ${jsonLd}
       global.__eventGeoColsEnsured = true;
     }
 
+    /* Pont Billetterie → Mobiliser la diaspora (2026-09-07, demande explicite de l'utilisateur :
+       "je veux lier les deux, un événement créé dans créer un événement doit apparaître ici").
+       Sens unique : events (Billetterie) → evenements (Mobiliser la diaspora), jamais l'inverse.
+       Appelée après chaque POST/PUT réussi sur /api/events. `evenements` n'a pas de vrai cycle
+       de vie (statut toujours 'ouvert', aucune route PUT/DELETE n'existe pour elle) — on
+       n'invente pas ce cycle de vie ici : la ligne synchronisée est simplement supprimée quand
+       la source n'est plus éligible (brouillon, ou Premium expiré), et recréée sinon. */
+    async function ensureEvenementsSourceCol() {
+      if (global.__evenementsSourceColEnsured) return;
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS source_events_id INTEGER`).run(); }
+      catch (e) { console.error('[ensureEvenementsSourceCol]', e.message); }
+      global.__evenementsSourceColEnsured = true;
+    }
+    async function syncEvenementVersProgrammation(eventId) {
+      try {
+        await ensureEvenementsSourceCol();
+        const ev = await db.prepare("SELECT * FROM events WHERE id=?").get(eventId);
+        if (!ev) return;
+        const organisateur = await db.prepare("SELECT role FROM users WHERE id=?").get(ev.organisateur_id);
+        const initiative = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(ev.organisateur_id);
+        const eligible = ['publie', 'ferme'].includes(ev.statut)
+          && organisateur && (await estPremiumActif(ev.organisateur_id, organisateur.role));
+
+        const existant = await db.prepare("SELECT id FROM evenements WHERE source_events_id=?").get(eventId);
+        if (!eligible) {
+          if (existant) await db.prepare("DELETE FROM evenements WHERE source_events_id=?").run(eventId);
+          return;
+        }
+
+        // Découpe date_debut/date_fin ("2026-10-03T09:28" côté formulaire Billetterie) en
+        // date + heure séparées, format attendu par `evenements` (date_evt/heure_debut/heure_fin).
+        const [dateEvt, heureDebut] = String(ev.date_debut || '').split('T');
+        const heureFin = ev.date_fin ? String(ev.date_fin).split('T')[1] : null;
+
+        const champs = {
+          titre: ev.titre, description: ev.description,
+          date_evt: dateEvt || ev.date_debut, heure_debut: heureDebut || null,
+          date_fin: ev.date_fin ? String(ev.date_fin).split('T')[0] : null, heure_fin: heureFin,
+          pays: ev.pays, ville: ev.ville,
+          domaine: ev.categorie || null, type_evt: 'evenement',
+          organisateur: initiative?.nom || null, owner_user_id: ev.organisateur_id,
+          image_url: ev.image_couverture || ev.image_b64 || null,
+          image_couverture: ev.image_couverture || null, galerie_photos: ev.galerie_photos || '[]',
+          video1_url: ev.video1_url || null, video1_titre: ev.video1_titre || null,
+          video2_url: ev.video2_url || null, video2_titre: ev.video2_titre || null,
+          pdf_url: ev.pdf_url || null, pdf_nom: ev.pdf_nom || null, pdf_acces: ev.pdf_acces || 'public',
+          langue: ev.langue || 'francais', mode_participation: ev.mode_participation || 'presentiel',
+          region: ev.region || null, departement: ev.departement || null,
+          visibilite: 'public', inscription_ouverte: 1,
+          lien_inscription: ev.inscription_lien_externe || null,
+          statut: 'ouvert',
+        };
+        const colonnes = Object.keys(champs);
+        const valeurs = Object.values(champs);
+        if (existant) {
+          await db.prepare(`UPDATE evenements SET ${colonnes.map(c => `${c}=?`).join(',')} WHERE id=?`)
+            .run(...valeurs, existant.id);
+        } else {
+          await db.prepare(`INSERT INTO evenements (${colonnes.join(',')}, source_events_id) VALUES (${colonnes.map(() => '?').join(',')}, ?)`)
+            .run(...valeurs, eventId);
+        }
+      } catch (e) { console.error('[syncEvenementVersProgrammation]', eventId, e.message); }
+    }
+
     /* ── POST /api/events — créer un événement ── */
     if (req.method === 'POST' && pathname === '/api/events') {
       const me = await getCurrentUser(req);
       /* 'partenaire' ouvert à l'incrément 6 du module Partenariat — un partenaire peut organiser
          ses propres événements sur la plateforme, comme une initiative. */
       if (!me || !['initiative','administrateur','partenaire'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé aux initiatives.' });
+      /* Création réservée aux comptes Premium (2026-09-07, décision explicite de l'utilisateur —
+         jusqu'ici seul le module "Mobiliser la diaspora" l'exigeait). L'édition d'un événement
+         déjà créé (PUT ci-dessous) n'est volontairement PAS bloquée par cette même garde : un
+         Premium expiré après coup garde la main sur ce qu'il a déjà publié, mais perd sa
+         visibilité "Mobiliser la diaspora" via syncEvenementVersProgrammation() à la prochaine
+         modification. */
+      if (!(await exigerPremium(me, res, "events"))) return;
       await ensureEventGeoColumns();
       const {
         titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
@@ -27567,6 +27651,7 @@ ${jsonLd}
         }
       }
       if (billetterie_config && typeof billetterie_config === "object") await upsertBilletterieConfig(eid, billetterie_config);
+      await syncEvenementVersProgrammation(eid);
       return sendJSON(res, 201, { id: eid });
     }
 
@@ -27656,6 +27741,7 @@ ${jsonLd}
         }
       }
       if (billetterie_config && typeof billetterie_config === "object") await upsertBilletterieConfig(eid, billetterie_config);
+      await syncEvenementVersProgrammation(eid);
       return sendJSON(res, 200, { ok: true });
     }
 
