@@ -18963,6 +18963,36 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
   sendJSON(res, 200, { evenement: row, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
 });
 
+/* DELETE /api/evenements/:id — suppression depuis la page publique elle-même (2026-09-07,
+   demande explicite : l'organisateur revient naturellement sur "Événements Diaspo'Actif" plutôt
+   que sur son tableau de bord pour retrouver un événement). Réservée au propriétaire ou à
+   l'admin. Si l'événement provient du pont Billetterie (source_events_id renseigné), supprime
+   aussi l'événement source côté events/tickets — sinon, ligne "evenements" native, supprimée
+   seule. Bloquée s'il existe déjà de vrais participants, même logique que
+   DELETE /api/events/:id (server/index.js, plus tôt aujourd'hui). */
+route("DELETE", "/api/evenements/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (row.owner_user_id !== user.id && user.role !== "administrateur") return sendJSON(res, 403, { error: "Accès refusé." });
+  const nbParticipants = (await db.prepare("SELECT COUNT(*) n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n || 0;
+  if (nbParticipants > 0) {
+    return sendJSON(res, 400, { error: `Cet événement a déjà ${nbParticipants} participant(s) — contactez l'administration plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+  }
+  if (row.source_events_id) {
+    const billetsVendus = (await db.prepare("SELECT COUNT(*) n FROM tickets WHERE event_id=? AND payment_status='paid'").get(row.source_events_id))?.n || 0;
+    const inscriptions = (await db.prepare("SELECT COUNT(*) n FROM event_inscriptions_securisees WHERE event_id=?").get(row.source_events_id))?.n || 0;
+    if (billetsVendus > 0 || inscriptions > 0) {
+      return sendJSON(res, 400, { error: `Cet événement a déjà ${billetsVendus} billet(s) vendu(s) et ${inscriptions} inscription(s) — fermez-le plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+    }
+    await db.prepare("DELETE FROM ticket_types WHERE event_id=?").run(row.source_events_id);
+    await db.prepare("DELETE FROM events WHERE id=?").run(row.source_events_id);
+  }
+  await db.prepare("DELETE FROM evenements WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });

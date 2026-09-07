@@ -378,6 +378,7 @@ function renderEvts() {
         <div class="evt-title">${esc(evt.titre)}</div>
         <div class="evt-meta">
           ${evt.lieu ? '<span>📍 '+esc(evt.lieu)+'</span>' : ''}
+          ${evt.ville ? '<span>🏙️ '+esc(evt.ville)+'</span>' : ''}
           ${evt.pays ? '<span>🌍 '+esc(evt.pays)+'</span>' : ''}
           ${evt.origine ? '<span>🎯 '+[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
@@ -400,6 +401,10 @@ function renderEvts() {
             )
           }
           ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;"><svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
+          ${(typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur')) ? `
+            <a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="dashboard-initiative.html#evenements" title="Gérer cet événement (modifier, billets, statistiques…)">⚙️ Gérer</a>
+            <button class="btn btn-outline" style="font-size:12px;color:#dc2626;border-color:#dc2626;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>
+          ` : ''}
         </div>
       </div>
     </div>`;
@@ -486,6 +491,19 @@ async function quitter(id, btn) {
   btn.disabled=true;
   try { await api('DELETE','/evenements/'+id+'/quitter'); inscritSet.delete(id); renderEvts(); }
   catch(e) { btn.disabled=false; }
+}
+
+/* Suppression depuis la page publique (2026-09-07, demande explicite) — visible uniquement au
+   propriétaire (voir la condition côté rendu de la carte), mais le serveur revérifie de toute
+   façon l'accès. */
+async function supprimerEvenement(id, btn) {
+  if (!confirm('Supprimer définitivement cet événement ?\n\nCette action est irréversible.')) return;
+  btn.disabled = true;
+  try {
+    await api('DELETE', '/evenements/'+id);
+    allEvts = allEvts.filter(e => e.id !== id);
+    renderEvts();
+  } catch(e) { alert('Erreur : '+e.message); btn.disabled = false; }
 }
 
 /* ─── Pays (origine retirée du filtre Événements, 2026-09-07 — hors du set de filtres
@@ -810,6 +828,10 @@ function renderEventDetail(evt, isPreview) {
           : (!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>')
         }
         <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
+        ${(typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur')) ? `
+          <a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="dashboard-initiative.html#evenements" title="Gérer cet événement (modifier, billets, statistiques…)">⚙️ Gérer</a>
+          <button class="btn btn-outline" style="font-size:13px;color:#dc2626;border-color:#dc2626;" onclick="supprimerEvenement(${evt.id},this)">🗑 Supprimer</button>
+        ` : ''}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
