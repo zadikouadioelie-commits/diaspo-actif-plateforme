@@ -4671,6 +4671,7 @@
             <button class="btn btn-sm btn-outline" onclick="diagPremium()">👑 Impact des restrictions Premium</button>
             <button class="btn btn-sm btn-outline" onclick="diagEmail()">✉️ Tester l'envoi d'e-mail</button>
             <button class="btn btn-sm btn-outline" onclick="diagReparer()">🔧 Réparer la base</button>
+            <button class="btn btn-sm btn-outline" onclick="diagSyncEvenements()">📅 Rattraper les événements manquants sur "Événements Diaspo'Actif"</button>
           </div>
           <div id="diag-resultat" style="margin-top:14px;"></div>
         </div>
@@ -14755,6 +14756,20 @@ async function diagReparer() {
     if (probleme)                               diagAfficher(html, '#dc2626');
     else if (creees.length || colonnes.length)  diagAfficher(`✅ <strong>Base réparée</strong><br>${html}`, '#16a34a');
     else                                        diagAfficher(`✅ <strong>Rien à réparer</strong> — ${html}`, '#16a34a');
+  } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
+}
+
+/* Le pont Billetterie → "Événements Diaspo'Actif" (2026-09-07) ne synchronise qu'à la création
+   ou modification d'un événement — un événement publié AVANT la mise en place du pont ne
+   rejoint jamais la page publique tout seul. Ce bouton rejoue la synchronisation sur tous les
+   événements déjà publiés/fermés, une fois, pour rattraper l'historique. Sans risque : ne fait
+   que mettre à jour/créer les lignes déjà prévues par le pont, rien d'autre n'est touché. */
+async function diagSyncEvenements() {
+  if (!confirm("Rattraper les événements déjà publiés qui n'apparaissent pas encore sur \"Événements Diaspo'Actif\" ?\n\nAucune donnée existante n'est modifiée en dehors de cette synchronisation.")) return;
+  diagPatiente('Synchronisation en cours');
+  try {
+    const d = await api('POST', '/admin/evenements/sync-retroactif');
+    diagAfficher(`✅ <strong>${d.synchronises}</strong> événement(s) publié(s) vérifié(s)/synchronisé(s) sur "Événements Diaspo'Actif".`, '#16a34a');
   } catch (e) { diagAfficher(`❌ ${diagMessageErreur(e)}`, '#dc2626'); }
 }
 

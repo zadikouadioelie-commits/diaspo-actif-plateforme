@@ -27585,6 +27585,25 @@ ${jsonLd}
       } catch (e) { console.error('[syncEvenementVersProgrammation]', eventId, e.message); }
     }
 
+    /* ── POST /api/admin/evenements/sync-retroactif — rattrapage (2026-09-07, demande explicite :
+       "lie ces deux modules pour que les créations d'événement dans cet endroit s'affichent").
+       Le pont Billetterie → Mobiliser la diaspora ne se déclenche qu'à la création/modification
+       d'un événement (POST/PUT /api/events) — un événement publié AVANT la mise en place du pont
+       ne se synchronise jamais tout seul. Cette route rejoue syncEvenementVersProgrammation()
+       sur tous les événements déjà publiés/fermés, une fois, pour rattraper l'historique.
+       Idempotente (met à jour la ligne existante au lieu d'en recréer une). */
+    if (req.method === 'POST' && pathname === '/api/admin/evenements/sync-retroactif') {
+      const me = await getCurrentUser(req);
+      if (!me || me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé à l\'administration.' });
+      const events = await db.prepare("SELECT id FROM events WHERE statut IN ('publie','ferme')").all();
+      let synced = 0;
+      for (const e of events) {
+        await syncEvenementVersProgrammation(e.id);
+        synced++;
+      }
+      return sendJSON(res, 200, { total_events_eligibles: events.length, synchronises: synced });
+    }
+
     /* ── POST /api/events — créer un événement ── */
     if (req.method === 'POST' && pathname === '/api/events') {
       const me = await getCurrentUser(req);
