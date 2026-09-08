@@ -8756,10 +8756,13 @@ const MODE_LBL = { gratuit:'Gratuit (0%)', payant:'Payant (5%)', payant_sauf_mem
    défaut et ne réapparaissent dans la sidebar qu'une fois activés. */
 const EXPANSION_MODULES_PAR_TYPE = {
   Association: ['emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','accreditations_da'],
-  Entreprise:  ['zones_action','stats_impact','visioconference','evaluation_projet','centre_financier','accreditations_da'],
+  /* centre_financier retiré (2026-09-08, demande explicite) — accessible à tous les comptes
+     Initiative désormais, ni Premium ni Expansion : il ne permet pas à lui seul de recevoir
+     des paiements (l'activation réelle passe par Stripe Connect, contrôlée séparément). */
+  Entreprise:  ['zones_action','stats_impact','visioconference','evaluation_projet','accreditations_da'],
   ONG:         ['candidatures','visioconference','evaluation_projet','accreditations_da'],
 };
-const EXPANSION_MODULES_TOUS = ['zones_action','emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','centre_financier','accreditations_da'];
+const EXPANSION_MODULES_TOUS = ['zones_action','emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','accreditations_da'];
 
 /* Masque les libellés de rubrique (ex. "05 — INTELLIGENCE") dont tous les liens
    sont actuellement cachés — évite les en-têtes de section vides quand aucun
@@ -9079,7 +9082,6 @@ const PREMIUM_UPSELL_CONTEXTS = {
   expansion_module: { title:'Activez ce module', intro:"L'activation des modules Expansion est réservée aux comptes Abonné — l'abonnement inclut l'activation de tous les modules disponibles pour votre type d'initiative." },
   messages_vitrine: { title:'Consultez les messages de votre boutique', intro:"Les messages reçus via votre Boutique sont réservés aux comptes Premium." },
   billetterie: { title:'Vendez des billets', intro:"La billetterie est réservée aux comptes Premium." },
-  centre_financier: { title:'Gérez vos finances', intro:"Le Centre Financier (revenus, comptes de réception, retraits) est réservé aux comptes Premium." },
   emplois_stages: { title:'Publiez vos offres', intro:"La publication d'offres d'emploi et de stage est réservée aux comptes Premium." },
   candidatures: { title:'Consultez les candidatures', intro:"La gestion des candidatures reçues est réservée aux comptes Premium." },
 };
@@ -9169,12 +9171,10 @@ async function initPremiumGates() {
     Association: [
       { href: '#adhesions-init', context: 'adhesions', intercept: true },
       { href: '#votes-init', context: 'votes', intercept: true },
-      { href: 'centre-financier.html', context: 'centre_financier', intercept: true },
     ],
     ONG: [
       { href: '#adhesions-init', context: 'adhesions', intercept: true },
       { href: '#votes-init', context: 'votes', intercept: true },
-      { href: 'centre-financier.html', context: 'centre_financier', intercept: true },
     ],
     Entreprise: [
       { href: '#offres-emploi', context: 'emplois_stages', intercept: true },
