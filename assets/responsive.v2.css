@@ -148,6 +148,12 @@ body {
 .mobile-bottom-nav__arrow--left { box-shadow: 4px 0 10px -4px rgba(0,0,0,.2); }
 .mobile-bottom-nav__arrow--right { box-shadow: -4px 0 10px -4px rgba(0,0,0,.2); }
 .mobile-bottom-nav__arrow[hidden] { display: none; }
+/* Même nécessité que la règle ci-dessus : .mobile-bottom-nav__item fixe display:flex sans
+   condition, ce qui l'emporterait sur le display:none par défaut du navigateur pour [hidden]
+   (spécificité égale, le fichier chargé après gagne) — l'item "Comptes" (bascule de comptes
+   liés, révélé par JS uniquement si le compte en a au moins un autre) resterait visible même
+   masqué sans cette règle. */
+.mobile-bottom-nav__item[hidden] { display: none; }
 .mobile-bottom-nav__item {
   display: flex;
   flex-direction: column;

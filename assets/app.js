@@ -1047,7 +1047,12 @@ function injectComptesLiesSwitcherStyles() {
 .cl-switch-info{display:flex;flex-direction:column;line-height:1.3;}
 .cl-switch-nom{font-weight:700;color:#111;}
 .cl-switch-role{font-size:10.5px;color:#6b7280;}
-.cl-switch-manage{display:block;text-align:center;font-size:11.5px;font-weight:600;color:var(--navy,#0D2B4E);text-decoration:none;padding:8px 4px 2px;margin-top:4px;border-top:1px solid #e5e7eb;}`;
+.cl-switch-manage{display:block;text-align:center;font-size:11.5px;font-weight:600;color:var(--navy,#0D2B4E);text-decoration:none;padding:8px 4px 2px;margin-top:4px;border-top:1px solid #e5e7eb;}
+/* Déplacé vers la barre du bas sous 768px (#mobile-nav-comptes-toggle, voir
+   renderMobileBottomNavAuto()) : le ▾ de la topbar y était difficile à atteindre (défilement
+   horizontal de .topbar-right) et source de plusieurs bugs. Un seul déclencheur visible à la
+   fois évite aussi deux boutons redondants pour la même action. */
+@media(max-width:768px){.cl-switch-wrap{display:none!important;}}`;
   document.head.appendChild(st);
 }
 async function initComptesLiesSwitcher(user) {
@@ -1063,6 +1068,14 @@ async function initComptesLiesSwitcher(user) {
   if (!wrap || !btn || !dd) return;
   injectComptesLiesSwitcherStyles();
   wrap.style.display = 'inline-flex';
+  /* Bouton mobile (barre du bas, après "Boutiques") : voir renderMobileBottomNavAuto(). Sur
+     mobile, .cl-switch-wrap (topbar) est masqué en CSS — ce bouton-ci prend le relais, seul
+     déclencheur visible sous 768px. Absent si la page n'a pas de barre du bas (rare). */
+  const btnMobile = document.getElementById('mobile-nav-comptes-toggle');
+  if (btnMobile) {
+    btnMobile.hidden = false;
+    window.__majFlechesBottomNav?.();
+  }
   const ROLE_LABELS_CL = { utilisateur:'Utilisateur', initiative:'Initiative', administrateur:'Administrateur', collectivite:'Collectivité' };
   dd.innerHTML = comptes.map(c => {
     const estActuel = c.id === user.id;
@@ -1071,26 +1084,27 @@ async function initComptesLiesSwitcher(user) {
       <span class="cl-switch-info"><span class="cl-switch-nom">${escH(c.nom)}${estActuel ? ' · actuel' : ''}</span><span class="cl-switch-role">${escH(ROLE_LABELS_CL[c.role] || c.role)}</span></span>
     </button>`;
   }).join('') + `<a href="comptes-lies.html" class="cl-switch-manage">🔗 Gérer mes comptes liés</a>`;
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  // Logique d'ouverture commune aux deux déclencheurs (▾ topbar desktop, "Comptes" barre du
+  // bas mobile) — seules les coordonnées de positionnement changent selon celui qui a été
+  // cliqué (position:fixed, voir le commentaire sur .cl-switch-dd plus haut).
+  function ouvrirClDd(triggerBtn) {
     const open = dd.classList.contains('open');
     document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
-    if (!open) {
-      // Coordonnées calculées ici (position:fixed) plutôt qu'en CSS pur : voir le commentaire
-      // sur .cl-switch-dd (échappe au rognage par un ancêtre overflow-x:auto).
-      const r = btn.getBoundingClientRect();
-      dd.style.top = Math.round(r.bottom + 8) + 'px';
-      dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
-      dd.classList.add('open');
-      /* Activé avec un léger délai plutôt qu'immédiatement : le bouton n'est souvent visible
-         qu'après défilement horizontal de .topbar-right (overflow-x:auto sous 768px), et le
-         navigateur ajuste parfois lui-même ce défilement juste après le clic pour garder
-         l'élément mis au point visible — un scroll listener actif dès l'ouverture refermait
-         alors le menu à l'instant même où il apparaissait (« le bouton ne fonctionne plus »,
-         signalé par capture d'écran). */
-      setTimeout(() => window.addEventListener('scroll', fermerAuScroll, true), 200);
-    }
-  });
+    if (open) return;
+    const r = triggerBtn.getBoundingClientRect();
+    dd.style.top = Math.round(r.bottom + 8) + 'px';
+    dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
+    dd.classList.add('open');
+    /* Activé avec un léger délai plutôt qu'immédiatement : le bouton n'est souvent visible
+       qu'après défilement horizontal de son conteneur (topbar-right ou barre du bas sous
+       768px), et le navigateur ajuste parfois lui-même ce défilement juste après le clic pour
+       garder l'élément mis au point visible — un scroll listener actif dès l'ouverture
+       refermait alors le menu à l'instant même où il apparaissait (« le bouton ne fonctionne
+       plus », signalé par capture d'écran, desktop et mobile). */
+    setTimeout(() => window.addEventListener('scroll', fermerAuScroll, true), 200);
+  }
+  btn.addEventListener('click', (e) => { e.stopPropagation(); ouvrirClDd(btn); });
+  if (btnMobile) btnMobile.addEventListener('click', (e) => { e.stopPropagation(); ouvrirClDd(btnMobile); });
   dd.addEventListener('click', async (e) => {
     const item = e.target.closest('.cl-switch-item');
     if (!item || item.disabled) return;
@@ -4306,6 +4320,13 @@ async function renderMobileBottomNavAuto() {
       { icon: "📰", label: "Fil", href: "fil-actualite.html", active: on("fil-actualite.html") },
       { icon: "💎", label: "Mon Associé", href: "mon-associe.html", active: on("mon-associe.html") },
       { icon: "🏪", label: "Boutiques", href: "vitrines.html", active: on("vitrines.html") },
+      /* Bascule entre comptes liés (2026-09-08, demande explicite) : déplacé ici depuis le
+         bouton ▾ de la topbar, dont le défilement horizontal sous 768px (voir .cl-switch-wrap,
+         masqué en CSS sur mobile) causait plusieurs bugs difficiles à atteindre au doigt.
+         Cette entrée reste cachée par défaut : initComptesLiesSwitcher() (plus bas dans ce
+         fichier) la révèle uniquement si le compte a au moins un autre compte lié, exactement
+         comme pour le bouton ▾ qu'elle remplace sur mobile. */
+      { icon: "🔄", label: "Comptes", toggleId: "mobile-nav-comptes-toggle", hidden: true },
     ];
   } else {
     items = [
@@ -4337,8 +4358,9 @@ async function renderMobileBottomNavAuto() {
   nav.setAttribute("aria-label", "Navigation mobile");
   const itemsHtml = items.map(it => {
     const cls = "mobile-bottom-nav__item" + (it.active ? " active" : "");
-    if (it.toggleId) return `<button type="button" class="${cls}" id="${it.toggleId}"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></button>`;
-    return `<a class="${cls}" href="${it.href}"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></a>`;
+    const hiddenAttr = it.hidden ? " hidden" : "";
+    if (it.toggleId) return `<button type="button" class="${cls}" id="${it.toggleId}"${hiddenAttr}><span class="nav-icon">${it.icon}</span><span>${it.label}</span></button>`;
+    return `<a class="${cls}" href="${it.href}"${hiddenAttr}><span class="nav-icon">${it.icon}</span><span>${it.label}</span></a>`;
   }).join("");
   // Boutons ‹ › pour faire défiler explicitement la barre (2026-08-24, demande explicite —
   // capture utilisateur montrant la barre à 9 items avec sa barre de défilement native,
@@ -4363,6 +4385,10 @@ async function renderMobileBottomNavAuto() {
   arrowRight.addEventListener("click", () => scrollEl.scrollBy({ left: scrollEl.clientWidth * 0.7, behavior: "smooth" }));
   scrollEl.addEventListener("scroll", majFleches, { passive: true });
   window.addEventListener("resize", majFleches);
+  // Exposé pour initComptesLiesSwitcher() : révéler l'item "Comptes" (masqué par défaut,
+  // voir items ci-dessus) change la largeur totale du contenu défilable, les flèches doivent
+  // être recalculées à ce moment précis plutôt qu'attendre le prochain resize.
+  window.__majFlechesBottomNav = majFleches;
   // Layout pas encore calculé au moment de ce return (juste après l'insertion dans le DOM) —
   // scrollWidth/clientWidth ne sont fiables qu'après le prochain repaint. Un seul
   // requestAnimationFrame s'est avéré parfois trop tôt en pratique (testé : scrollWidth
