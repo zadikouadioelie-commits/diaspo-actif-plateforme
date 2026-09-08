@@ -189,6 +189,12 @@
       </div>
       <div><label>Places max</label><input type="number" id="e-places" min="1" placeholder="Illimitées"></div>
     </div>
+    <div style="margin-bottom:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
+        <input type="checkbox" id="e-masquer-inscrits" style="width:16px;height:16px;">
+        🙈 Masquer le nombre d'inscrits sur la fiche publique
+      </label>
+    </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
 
     <!-- ── MULTIMÉDIA ── -->
@@ -395,7 +401,7 @@ function renderEvts() {
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
           ${evt.prix_min ? '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>' : '<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>'}
           ${visiBadge}
-          ${evt.nb_participants ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
+          ${(evt.nb_participants && !evt.masquer_inscrits) ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
         </div>
         ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+mdBold(esc(evt.description.slice(0,120)))+(evt.description.length>120?'…':'')+'</p>' : ''}
         <div class="evt-actions">
@@ -660,6 +666,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       origine:       document.getElementById('e-origine').value,
       description:   document.getElementById('e-desc').value,
       places_max:    document.getElementById('e-places').value || null,
+      masquer_inscrits: document.getElementById('e-masquer-inscrits').checked,
       visibilite:    document.getElementById('e-visibilite').value,
       lien_visio:    document.getElementById('e-visio-evt').value || null,
       image_couverture: coverData,

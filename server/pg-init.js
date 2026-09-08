@@ -446,6 +446,9 @@ const COLONNES_MIGRATION = [
     ['events', 'origine1', 'TEXT'],
     ['events', 'origine2', 'TEXT'],
     ['evenements', 'origine2', 'TEXT'],
+    // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08) — miroir exact de l'ALTER db.js.
+    ['events', 'masquer_inscrits', 'INTEGER DEFAULT 0'],
+    ['evenements', 'masquer_inscrits', 'INTEGER DEFAULT 0'],
     // evenements (module Programmation — moteur de priorité, table réellement utilisée par evenements.html)
     ['evenements', 'langue', "TEXT DEFAULT 'francais'"],
     ['evenements', 'mode_participation', "TEXT DEFAULT 'presentiel'"],

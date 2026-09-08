@@ -1731,6 +1731,10 @@ const MIGRATIONS = [
   ["events", "origine1 TEXT"],
   ["events", "origine2 TEXT"],
   ["evenements", "origine2 TEXT"],
+  // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08, demande explicite) —
+  // les deux tables, comme prix_min/whatsapp_lien/origine plus haut.
+  ["events", "masquer_inscrits INTEGER DEFAULT 0"],
+  ["evenements", "masquer_inscrits INTEGER DEFAULT 0"],
   // Agenda events — lien source
   ["agenda_events", "source_type TEXT DEFAULT 'manuel'"],
   ["agenda_events", "source_id INTEGER"],

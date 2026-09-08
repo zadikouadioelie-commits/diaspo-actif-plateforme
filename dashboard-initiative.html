@@ -3503,6 +3503,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <label>Capacité</label>
           <input type="number" id="iev-capacite" value="${v(e?.capacite||0)}" min="0" placeholder="0 = illimité" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
         </div>
+        <div class="form-row" style="grid-column:1/-1;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
+            <input type="checkbox" id="iev-masquer-inscrits"${e?.masquer_inscrits?' checked':''} style="width:16px;height:16px;">
+            🙈 Masquer le nombre d'inscrits sur la fiche publique
+          </label>
+        </div>
       </div>
 
       <!-- IMAGE DE COUVERTURE -->
@@ -4130,6 +4136,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       adresse: document.getElementById('iev-adresse').value||null,
       categorie: document.getElementById('iev-cat').value||'Général',
       capacite: parseInt(document.getElementById('iev-capacite').value)||0,
+      masquer_inscrits: document.getElementById('iev-masquer-inscrits').checked,
       statut: modePub==='publie' ? 'publie' : modePub==='programme' ? 'brouillon_programme' : 'brouillon',
       image_couverture: initEvtCoverB64||null,
       galerie_photos: galerie,
