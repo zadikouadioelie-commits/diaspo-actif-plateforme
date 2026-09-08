@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Inscription — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<meta name="theme-color" content="#0D2B4E">
+<style>
+.ip-wrap{max-width:720px;margin:0 auto;padding:24px 16px 60px;}
+.ip-affiche{width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:18px;}
+.ip-titre{font-size:24px;font-weight:900;color:#0D2B4E;margin:0 0 6px;}
+.ip-desc{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 20px;}
+.ip-types{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;}
+.ip-type-card{border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;background:var(--card,#fff);}
+.ip-type-card.complet{opacity:.55;}
+.ip-type-label{font-weight:800;font-size:15px;margin-bottom:4px;}
+.ip-type-prix{font-size:13px;color:var(--muted);margin-bottom:4px;}
+.ip-type-places{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.ip-champ{margin-bottom:16px;}
+.ip-champ label{display:block;font-size:13px;font-weight:700;color:#0D2B4E;margin-bottom:5px;}
+.ip-champ .aide{font-size:11.5px;color:var(--muted);margin-top:3px;}
+.ip-champ input[type=text],.ip-champ input[type=email],.ip-champ input[type=tel],.ip-champ input[type=number],
+.ip-champ input[type=date],.ip-champ input[type=time],.ip-champ input[type=url],.ip-champ textarea,.ip-champ select{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;}
+.ip-champ textarea{min-height:90px;}
+.ip-oblig{color:#dc2626;}
+.ip-confirmation{text-align:center;padding:30px 20px;}
+.ip-confirmation .grand{font-size:48px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="topbar">
+  <div class="topbar-inner">
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav"><a href="index.html">Accueil</a><a href="evenements.html">Événements</a></nav>
+    <div class="topbar-right"><div id="auth-area" class="auth-area"></div></div>
+  </div>
+</header>
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<aside class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+  <div class="brand">Diaspo'Actif</div>
+  <a href="index.html">🏠 Accueil</a>
+  <a href="evenements.html">📅 Événements</a>
+  <div id="hb-account-section"></div>
+</aside>
+
+<main class="ip-wrap" id="ip-root">
+  <div style="text-align:center;padding:60px 0;color:var(--muted);">Chargement…</div>
+</main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=12"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
+let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null;
+
+function ipConditionRemplie(cond, reponses) {
+  if (!cond) return true;
+  const v = reponses[cond.champ_source];
+  if (cond.operateur === 'different') return String(v ?? '') !== String(cond.valeur ?? '');
+  if (cond.operateur === 'coche') return v === true || v === 'oui' || v === 'true';
+  return String(v ?? '') === String(cond.valeur ?? '');
+}
+
+function ipChampHtml(c) {
+  const req = c.obligatoire ? '<span class="ip-oblig">*</span>' : '';
+  const aide = c.description_aide ? `<div class="aide">${escH(c.description_aide)}</div>` : '';
+  let options = []; try { options = JSON.parse(c.options_json || '[]'); } catch(e) {}
+  let champHtml = '';
+  if (c.type_champ === 'texte_long') champHtml = `<textarea name="${escH(c.nom)}" placeholder="${escH(c.placeholder||'')}">${escH(c.valeur_defaut||'')}</textarea>`;
+  else if (c.type_champ === 'liste_deroulante' || c.type_champ === 'choix_unique') {
+    champHtml = `<select name="${escH(c.nom)}"><option value="">-- Choisir --</option>${options.map(o=>`<option value="${escH(o)}">${escH(o)}</option>`).join('')}</select>`;
+  } else if (c.type_champ === 'choix_multiple') {
+    champHtml = options.map(o=>`<label style="display:block;font-weight:400;font-size:13px;margin:4px 0;"><input type="checkbox" name="${escH(c.nom)}[]" value="${escH(o)}"> ${escH(o)}</label>`).join('');
+  } else if (c.type_champ === 'oui_non') {
+    champHtml = `<select name="${escH(c.nom)}"><option value="">-- Choisir --</option><option value="oui">Oui</option><option value="non">Non</option></select>`;
+  } else if (c.type_champ === 'case_a_cocher') {
+    champHtml = `<label style="font-weight:400;"><input type="checkbox" name="${escH(c.nom)}" value="oui"> ${escH(c.placeholder||'')}</label>`;
+  } else if (c.type_champ === 'upload_photo' || c.type_champ === 'upload_fichier') {
+    champHtml = `<input type="file" name="${escH(c.nom)}" accept="${c.type_champ==='upload_photo'?'image/*':'*'}" onchange="ipUploadChamp(this,'${escH(c.nom)}')"><div id="ip-upload-${escH(c.nom)}" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>`;
+  } else {
+    const type = IP_TYPE_ICONS[c.type_champ] || 'text';
+    champHtml = `<input type="${type}" name="${escH(c.nom)}" placeholder="${escH(c.placeholder||'')}" value="${escH(c.valeur_defaut||'')}">`;
+  }
+  return `<div class="ip-champ" data-champ="${escH(c.nom)}" data-condition='${c.condition_json?escH(c.condition_json):''}'>
+    <label>${escH(c.libelle)} ${req}</label>${champHtml}${aide}
+  </div>`;
+}
+
+window.ipUploadValues = {};
+async function ipUploadChamp(input, nom) {
+  const file = input.files[0]; if (!file) return;
+  const statusEl = document.getElementById('ip-upload-' + nom);
+  statusEl.textContent = '⏳ Envoi…';
+  try {
+    const fd = new FormData(); fd.append('fichier', file);
+    const res = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Erreur');
+    window.ipUploadValues[nom] = d.url;
+    statusEl.textContent = '✅ ' + file.name;
+  } catch (e) { statusEl.textContent = '❌ ' + e.message; }
+}
+
+function ipReevaluerConditions() {
+  const reponses = {};
+  document.querySelectorAll('#ip-form-champs [name]').forEach(el => {
+    if (el.type === 'checkbox') { if (el.checked) reponses[el.name] = el.value || true; }
+    else reponses[el.name] = el.value;
+  });
+  document.querySelectorAll('#ip-form-champs .ip-champ[data-condition]').forEach(div => {
+    const cond = div.dataset.condition ? JSON.parse(div.dataset.condition) : null;
+    div.style.display = ipConditionRemplie(cond, reponses) ? '' : 'none';
+  });
+}
+
+function ipOuvrirType(typeId) {
+  const type = IP_TYPES.find(t => t.id === typeId);
+  if (!type || type.complet || type.periode_ouverte === false) return;
+  IP_TYPE_ACTIF = type;
+  window.ipUploadValues = {};
+  const evtChoix = IP_EVENEMENTS.length > 1 ? `
+    <div class="ip-champ">
+      <label>À quel événement souhaitez-vous participer ? <span class="ip-oblig">*</span></label>
+      <select name="__evenement_id" required>
+        <option value="">-- Choisir --</option>
+        ${IP_EVENEMENTS.map(e => `<option value="${e.id}">${escH(e.titre)}${e.date_evt?' — '+escH(e.date_evt):''}</option>`).join('')}
+      </select>
+    </div>` : '';
+  document.getElementById('ip-root').innerHTML = `
+    <button class="btn btn-outline" style="margin-bottom:16px;" onclick="ipRenderAccueil()">← Retour</button>
+    <h2 style="font-size:19px;font-weight:900;color:#0D2B4E;">${escH(type.label)}</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">${escH(type.description||'')}</p>
+    <form id="ip-form-champs" onsubmit="return ipSoumettre(event)">
+      ${evtChoix}
+      <div class="ip-champ"><label>Nom <span class="ip-oblig">*</span></label><input type="text" name="__nom" required></div>
+      <div class="ip-champ"><label>Prénom <span class="ip-oblig">*</span></label><input type="text" name="__prenom" required></div>
+      <div class="ip-champ"><label>E-mail</label><input type="email" name="__email"></div>
+      <div class="ip-champ"><label>Téléphone</label><input type="tel" name="__telephone"></div>
+      ${type.champs.map(ipChampHtml).join('')}
+      <div id="ip-erreur" style="color:#dc2626;font-size:13px;margin-bottom:12px;display:none;"></div>
+      <button type="submit" class="btn btn-orange" style="width:100%;padding:13px;font-size:15px;">✅ Confirmer mon inscription</button>
+    </form>`;
+  document.getElementById('ip-form-champs').addEventListener('input', ipReevaluerConditions);
+  document.getElementById('ip-form-champs').addEventListener('change', ipReevaluerConditions);
+  ipReevaluerConditions();
+}
+
+async function ipSoumettre(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const errEl = document.getElementById('ip-erreur');
+  errEl.style.display = 'none';
+  const reponses = {};
+  let evenementId = null, nom, prenom, email, telephone;
+  form.querySelectorAll('[name]').forEach(el => {
+    if (el.name === '__evenement_id') { evenementId = el.value; return; }
+    if (el.name === '__nom') { nom = el.value; return; }
+    if (el.name === '__prenom') { prenom = el.value; return; }
+    if (el.name === '__email') { email = el.value; return; }
+    if (el.name === '__telephone') { telephone = el.value; return; }
+    const div = el.closest('.ip-champ');
+    if (div && div.style.display === 'none') return; // champ masqué par condition, non soumis
+    const baseName = el.name.replace(/\[\]$/, '');
+    if (el.type === 'checkbox') {
+      if (el.name.endsWith('[]')) { if (el.checked) { reponses[baseName] = reponses[baseName] || []; reponses[baseName].push(el.value); } }
+      else reponses[baseName] = el.checked ? 'oui' : '';
+    } else if (window.ipUploadValues[baseName]) {
+      reponses[baseName] = window.ipUploadValues[baseName];
+    } else reponses[baseName] = el.value;
+  });
+  const btn = form.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = '⏳ Envoi…';
+  try {
+    const payload = { type_id: IP_TYPE_ACTIF.id, evenement_id: evenementId || null, nom, prenom, email: email || null, telephone: telephone || null, reponses };
+    const r = await fetch(`/api/insc/public/${IP_SLUG}/inscriptions`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Erreur');
+    ipRenderConfirmation(d);
+  } catch (e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = '✅ Confirmer mon inscription';
+  }
+}
+
+function ipRenderConfirmation(d) {
+  const icon = d.statut === 'liste_attente' ? '🟠' : '✅';
+  const titre = d.statut === 'liste_attente' ? 'Vous êtes en liste d\'attente' : 'Inscription confirmée !';
+  document.getElementById('ip-root').innerHTML = `
+    <div class="ip-confirmation">
+      <div class="grand">${icon}</div>
+      <h2 style="font-size:20px;font-weight:900;color:#0D2B4E;">${titre}</h2>
+      <p style="color:var(--muted);">Numéro d'inscription : <strong>${escH(d.reference)}</strong></p>
+      ${d.statut !== 'liste_attente' ? `<a class="btn btn-orange" style="text-decoration:none;display:inline-block;margin-top:14px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>` : `<p style="font-size:13px;color:var(--muted);">Vous serez averti automatiquement si une place se libère.</p>`}
+    </div>`;
+}
+
+function ipRenderAccueil() {
+  const f = IP_FICHE;
+  document.getElementById('ip-root').innerHTML = `
+    ${f.affiche_url ? `<img class="ip-affiche" src="${escH(f.affiche_url)}" alt="">` : ''}
+    <h1 class="ip-titre">${escH(f.nom)}</h1>
+    ${f.description ? `<p class="ip-desc">${escH(f.description)}</p>` : ''}
+    <div class="ip-types">
+      ${IP_TYPES.map(t => `
+        <div class="ip-type-card ${t.complet?'complet':''}">
+          <div class="ip-type-label">${escH(t.label)}</div>
+          <div class="ip-type-prix">${t.gratuit ? 'Gratuit' : (t.prix != null ? t.prix.toFixed(2) + ' €' : '')}</div>
+          ${t.places_max != null ? `<div class="ip-type-places">${t.places_restantes} / ${t.places_max} places</div>` : ''}
+          <button class="btn ${t.complet?'btn-outline':'btn-orange'}" ${t.complet||t.periode_ouverte===false?'disabled':''} onclick="ipOuvrirType(${t.id})">
+            ${t.complet ? (t.liste_attente_active ? 'Rejoindre la liste d\'attente' : 'Complet') : (t.periode_ouverte===false ? 'Fermé' : 'Je m\'inscris')}
+          </button>
+        </div>`).join('')}
+    </div>`;
+}
+
+const IP_SLUG = new URLSearchParams(location.search).get('slug') || location.pathname.split('/').pop();
+(async function initInscriptionPublique() {
+  try {
+    const d = await api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG));
+    if (d.fermee || d.pas_encore_ouverte) {
+      document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--muted);"><div style="font-size:40px;">⏳</div><p>${escH(d.message)}</p></div>`;
+      return;
+    }
+    IP_FICHE = d.fiche; IP_TYPES = d.types; IP_EVENEMENTS = d.evenements;
+    ipRenderAccueil();
+  } catch (e) {
+    document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:#dc2626;">Fiche introuvable.</div>`;
+  }
+})();
+</script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

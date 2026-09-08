@@ -465,6 +465,10 @@ const NOTIF_ICONS = {
   initiative_devenir_benevole: "🙋",
   initiative_devenir_partenaire: "🤝",
   bienvenue: "🎉",
+  inscription_confirmee: "🎟️",
+  insc_nouvelle: "📝",
+  insc_fiche_gelee: "🔒",
+  insc_fiche_degelee: "🔓",
 };
 
 // Destinations pour les data.cta envoyés par certains types de notifications

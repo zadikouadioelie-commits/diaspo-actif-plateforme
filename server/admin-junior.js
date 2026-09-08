@@ -72,6 +72,10 @@ const CATALOGUE_ADMIN_JUNIOR = [
   { id: 'suppression_comptes.consulter', module: 'suppression_comptes', numero: 1, description: 'Consulter les demandes de suppression de compte',                  capability: 'suppression_comptes.consulter' },
   { id: 'suppression_comptes.traiter',   module: 'suppression_comptes', numero: 2, description: "Changer le statut d'une demande (discussion, validation, refus)",  capability: 'suppression_comptes.traiter' },
   { id: 'suppression_comptes.repondre',  module: 'suppression_comptes', numero: 3, description: "Répondre dans l'espace de discussion d'une demande de suppression", capability: 'suppression_comptes.repondre' },
+
+  // ── Module: formulaires_inscription (2026-09-08) ──
+  { id: 'formulaires_inscription.consulter', module: 'formulaires_inscription', numero: 1, description: 'Consulter toutes les fiches et inscriptions (lecture seule)', capability: 'formulaires_inscription.consulter' },
+  { id: 'formulaires_inscription.gerer',     module: 'formulaires_inscription', numero: 2, description: "Gérer les fiches d'inscription (créer, modifier, valider les inscrits)", capability: 'formulaires_inscription.gerer' },
 ];
 
 function catalogueIdsPourCapacite(capabiliteKey) {

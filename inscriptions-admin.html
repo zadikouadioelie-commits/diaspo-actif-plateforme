@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Formulaires & Inscriptions — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<meta name="theme-color" content="#0D2B4E">
+<style>
+.ia-wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px;}
+.ia-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px;}
+.ia-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--card,#fff);}
+.ia-badge{display:inline-block;border-radius:99px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:8px;}
+.ia-badge-brouillon{background:#F1F5F9;color:#64748b;} .ia-badge-publiee{background:#F0FDF4;color:#16a34a;}
+.ia-badge-suspendue{background:#FEF2F2;color:#dc2626;} .ia-badge-fermee{background:#FFF7ED;color:#c2410c;}
+.ia-badge-archivee{background:#F1F5F9;color:#94a3b8;} .ia-badge-programmee{background:#F0F4FF;color:#1B3A6B;}
+.ia-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin:20px 0;overflow-x:auto;}
+.ia-tab{padding:9px 16px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;white-space:nowrap;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;}
+.ia-tab.active{color:#0D2B4E;border-bottom-color:#F26422;}
+.ia-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.ia-form-row label{display:block;font-size:12px;font-weight:700;color:#0D2B4E;margin-bottom:4px;}
+.ia-form-row input,.ia-form-row select,.ia-form-row textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;box-sizing:border-box;font-family:inherit;}
+.ia-type-block{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;}
+.ia-champ-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:13px;}
+table.ia-table{width:100%;border-collapse:collapse;font-size:13px;}
+table.ia-table th{text-align:left;padding:8px;background:#F8FAFC;border-bottom:2px solid var(--border);}
+table.ia-table td{padding:8px;border-bottom:1px solid #F1F5F9;}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="topbar">
+  <div class="topbar-inner">
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav"><a href="index.html">Accueil</a><a href="evenements.html">Événements</a></nav>
+    <div class="topbar-right"><div id="auth-area" class="auth-area"></div></div>
+  </div>
+</header>
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<aside class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+  <div class="brand">Diaspo'Actif</div>
+  <a href="index.html">🏠 Accueil</a>
+  <a href="dashboard-initiative.html">📊 Mon tableau de bord</a>
+  <a href="inscriptions-admin.html">📝 Formulaires & Inscriptions</a>
+  <div id="hb-account-section"></div>
+</aside>
+
+<main class="ia-wrap" id="ia-root">
+  <div style="text-align:center;padding:60px 0;color:var(--muted);">Chargement…</div>
+</main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=12"></script>
+<script>
+const IA_STATUTS = { brouillon:'📝 Brouillon', programmee:'⏰ Programmée', publiee:'🟢 Publiée', suspendue:'🔒 Suspendue', fermee:'🚪 Fermée', archivee:'📦 Archivée' };
+let IA_ME = null, IA_FICHE_ACTIVE = null, IA_ONGLET = 'general';
+
+function ia_toast(msg, ok) {
+  if (typeof showToast === 'function') return showToast(msg, ok ? 'success' : 'error');
+  alert(msg);
+}
+
+async function iaRenderListe() {
+  const el = document.getElementById('ia-root');
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div><h1 style="font-size:20px;font-weight:900;color:#0D2B4E;margin:0;">📝 Formulaires & Inscriptions</h1>
+      <p style="color:var(--muted);font-size:13px;margin:4px 0 0;">Créez et gérez vos fiches d'inscription événementielles.</p></div>
+      <button class="btn btn-orange" onclick="iaCreerFiche()">＋ Créer une fiche d'inscription</button>
+    </div>
+    <div id="ia-liste-fiches" class="ia-grid"><div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>`;
+  try {
+    const { fiches } = await api('GET', '/insc/fiches');
+    const listeEl = document.getElementById('ia-liste-fiches');
+    if (!fiches.length) { listeEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Aucune fiche pour le moment.</div>'; return; }
+    listeEl.innerHTML = fiches.map(f => `
+      <div class="ia-card">
+        <div class="ia-badge ia-badge-${f.statut}">${IA_STATUTS[f.statut]}</div>
+        ${f.gele_le ? '<div class="ia-badge" style="background:#FEF2F2;color:#dc2626;">🔒 Gelée</div>' : ''}
+        <div style="font-weight:800;font-size:15px;margin-bottom:6px;">${escH(f.nom)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${f.nb_inscriptions} inscription(s)</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-orange" onclick="iaOuvrirFiche(${f.id})">Gérer</button>
+          <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="inscription-publique.html?slug=${f.slug}" target="_blank">Voir la page publique ↗</a>
+        </div>
+      </div>`).join('');
+  } catch (e) { ia_toast(e.message, false); }
+}
+
+async function iaCreerFiche() {
+  const nom = prompt('Nom de la fiche d\'inscription :');
+  if (!nom || !nom.trim()) return;
+  try {
+    const { fiche } = await api('POST', '/insc/fiches', { nom: nom.trim() });
+    ia_toast('Fiche créée.', true);
+    iaOuvrirFiche(fiche.id);
+  } catch (e) { ia_toast(e.message, false); }
+}
+
+async function iaOuvrirFiche(id) {
+  IA_FICHE_ACTIVE = id; IA_ONGLET = 'general';
+  await iaRenderFiche();
+}
+
+async function iaRenderFiche() {
+  const el = document.getElementById('ia-root');
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>';
+  let data;
+  try { data = await api('GET', '/insc/fiches/' + IA_FICHE_ACTIVE); } catch (e) { ia_toast(e.message, false); return iaRenderListe(); }
+  const { fiche, evenements, types } = data;
+  el.innerHTML = `
+    <button class="btn btn-outline" style="margin-bottom:10px;" onclick="iaRenderListe()">← Toutes les fiches</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div><h1 style="font-size:19px;font-weight:900;color:#0D2B4E;margin:0;">${escH(fiche.nom)}</h1>
+      <div class="ia-badge ia-badge-${fiche.statut}" style="margin-top:6px;">${IA_STATUTS[fiche.statut]}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${fiche.statut === 'brouillon' || fiche.statut === 'suspendue' ? `<button class="btn btn-sm btn-orange" onclick="iaChangerStatut('publiee')">🚀 Publier</button>` : ''}
+        ${fiche.statut === 'publiee' ? `<button class="btn btn-sm btn-outline" onclick="iaChangerStatut('fermee')">🚪 Fermer les inscriptions</button>` : ''}
+        <button class="btn btn-sm btn-outline" onclick="iaDupliquer()">📑 Dupliquer</button>
+      </div>
+    </div>
+    <div class="ia-tabs">
+      <button class="ia-tab ${IA_ONGLET==='general'?'active':''}" onclick="iaChangerOnglet('general')">⚙️ Général</button>
+      <button class="ia-tab ${IA_ONGLET==='types'?'active':''}" onclick="iaChangerOnglet('types')">🎫 Types & Champs</button>
+      <button class="ia-tab ${IA_ONGLET==='inscriptions'?'active':''}" onclick="iaChangerOnglet('inscriptions')">📋 Inscriptions</button>
+      <button class="ia-tab ${IA_ONGLET==='stats'?'active':''}" onclick="iaChangerOnglet('stats')">📊 Statistiques</button>
+    </div>
+    <div id="ia-onglet-contenu"></div>`;
+  if (IA_ONGLET === 'general') iaRenderGeneral(fiche, evenements);
+  else if (IA_ONGLET === 'types') iaRenderTypes(fiche, types);
+  else if (IA_ONGLET === 'inscriptions') iaRenderInscriptions(fiche);
+  else if (IA_ONGLET === 'stats') iaRenderStats(fiche);
+}
+
+function iaChangerOnglet(o) { IA_ONGLET = o; iaRenderFiche(); }
+
+async function iaChangerStatut(statut) {
+  try { await api('PATCH', `/insc/fiches/${IA_FICHE_ACTIVE}/statut`, { statut }); ia_toast('Statut mis à jour.', true); iaRenderFiche(); }
+  catch (e) { ia_toast(e.message, false); }
+}
+async function iaDupliquer() {
+  try { const r = await api('POST', `/insc/fiches/${IA_FICHE_ACTIVE}/dupliquer`, {}); ia_toast('Fiche dupliquée.', true); iaOuvrirFiche(r.fiche_id); }
+  catch (e) { ia_toast(e.message, false); }
+}
+
+async function iaRenderGeneral(fiche, evenementsLies) {
+  const cont = document.getElementById('ia-onglet-contenu');
+  let mesEvenements = [];
+  try { const r = await api('GET', '/evenements?owner=' + IA_ME.id); mesEvenements = r.evenements; } catch (e) {}
+  const liesIds = new Set(evenementsLies.map(e => e.id));
+  cont.innerHTML = `
+    <form id="ia-form-general" onsubmit="return iaSauverGeneral(event)">
+      <div class="ia-form-row"><div><label>Nom de la fiche</label><input name="nom" value="${escH(fiche.nom)}" required></div>
+      <div><label>Organisateur</label><input name="organisateur" value="${escH(fiche.organisateur||'')}"></div></div>
+      <div class="ia-form-row"><label style="grid-column:1/-1;">Description</label><textarea name="description" style="grid-column:1/-1;min-height:70px;">${escH(fiche.description||'')}</textarea></div>
+      <div class="ia-form-row"><div><label>URL de l'affiche</label><input name="affiche_url" value="${escH(fiche.affiche_url||'')}"></div>
+      <div><label>Visibilité</label><select name="visibilite">
+        ${['public','membres','prive','invitation'].map(v=>`<option value="${v}" ${fiche.visibilite===v?'selected':''}>${v}</option>`).join('')}
+      </select></div></div>
+      <div class="ia-form-row"><div><label>Ouverture des inscriptions</label><input type="datetime-local" name="date_ouverture_inscriptions" value="${fiche.date_ouverture_inscriptions?fiche.date_ouverture_inscriptions.replace(' ','T').slice(0,16):''}"></div>
+      <div><label>Fermeture des inscriptions</label><input type="datetime-local" name="date_fermeture_inscriptions" value="${fiche.date_fermeture_inscriptions?fiche.date_fermeture_inscriptions.replace(' ','T').slice(0,16):''}"></div></div>
+      <div class="ia-form-row"><div><label>Contact e-mail</label><input name="contact_email" value="${escH(fiche.contact_email||'')}"></div>
+      <div><label>Contact téléphone</label><input name="contact_telephone" value="${escH(fiche.contact_telephone||'')}"></div></div>
+      <label style="display:block;font-size:12px;font-weight:700;color:#0D2B4E;margin:14px 0 6px;">Événement(s) lié(s) — sélectionnez un ou plusieurs de vos événements</label>
+      <select name="evenement_ids" multiple size="5" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:7px;">
+        ${mesEvenements.map(e => `<option value="${e.id}" ${liesIds.has(e.id)?'selected':''}>${escH(e.titre)}${e.date_evt?' — '+escH(e.date_evt):''}</option>`).join('')}
+      </select>
+      <p style="font-size:11px;color:var(--muted);">Ctrl/Cmd + clic pour sélectionner plusieurs événements. Si aucun événement n'est lié, la fiche fonctionne de façon autonome.</p>
+      <button type="submit" class="btn btn-orange" style="margin-top:14px;">💾 Enregistrer</button>
+    </form>`;
+}
+async function iaSauverGeneral(ev) {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  const evenement_ids = Array.from(ev.target.evenement_ids.selectedOptions).map(o => parseInt(o.value));
+  const body = { nom: fd.get('nom'), organisateur: fd.get('organisateur'), description: fd.get('description'),
+    affiche_url: fd.get('affiche_url'), visibilite: fd.get('visibilite'),
+    date_ouverture_inscriptions: fd.get('date_ouverture_inscriptions') || null, date_fermeture_inscriptions: fd.get('date_fermeture_inscriptions') || null,
+    contact_email: fd.get('contact_email'), contact_telephone: fd.get('contact_telephone'), evenement_ids };
+  try { await api('PUT', '/insc/fiches/' + IA_FICHE_ACTIVE, body); ia_toast('Enregistré.', true); }
+  catch (e) { ia_toast(e.message, false); }
+  return false;
+}
+
+async function iaRenderTypes(fiche, types) {
+  const cont = document.getElementById('ia-onglet-contenu');
+  cont.innerHTML = `
+    <div style="margin-bottom:14px;"><button class="btn btn-sm btn-orange" onclick="iaAjouterType()">＋ Ajouter un type d'inscription</button></div>
+    <div id="ia-types-liste">${types.map(iaTypeBlockHtml).join('') || '<p style="color:var(--muted);">Aucun type pour le moment.</p>'}</div>`;
+}
+function iaTypeBlockHtml(t) {
+  return `<div class="ia-type-block" id="ia-type-${t.id}">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div><strong>${escH(t.label)}</strong> <span style="font-size:12px;color:var(--muted);">(${t.gratuit?'Gratuit':(t.prix||0)+' €'}${t.places_max!=null?' · '+t.nb_inscrits+'/'+t.places_max+' places':''})</span></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm btn-outline" onclick="iaModifierType(${t.id})">✏️ Modifier</button>
+        <button class="btn btn-sm btn-outline" onclick="iaAjouterChamp(${t.id})">＋ Champ</button>
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      ${(t.champs||[]).map(c => `<div class="ia-champ-row">
+        <span style="flex:1;">${escH(c.libelle)} <span style="color:var(--muted);">(${c.type_champ}${c.obligatoire?', obligatoire':''}${c.condition_json?', conditionnel':''})</span></span>
+        <button class="btn btn-sm btn-outline" onclick="iaSupprimerChamp(${c.id})">✕</button>
+      </div>`).join('') || '<p style="color:var(--muted);font-size:12px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone seront demandés.</p>'}
+    </div>
+  </div>`;
+}
+async function iaAjouterType() {
+  const label = prompt('Nom du type d\'inscription (ex: Participant, Exposant, Bénévole…) :');
+  if (!label || !label.trim()) return;
+  const gratuit = confirm('Ce type est-il gratuit ? OK = Gratuit, Annuler = Payant');
+  let prix = null;
+  if (!gratuit) prix = parseFloat(prompt('Prix en euros :', '0')) || 0;
+  const placesTxt = prompt('Nombre de places maximum (laisser vide = illimité) :');
+  try {
+    await api('POST', `/insc/fiches/${IA_FICHE_ACTIVE}/types`, { label: label.trim(), gratuit, prix, places_max: placesTxt ? parseInt(placesTxt) : null, liste_attente_active: !!placesTxt });
+    ia_toast('Type ajouté.', true); iaRenderFiche();
+  } catch (e) { ia_toast(e.message, false); }
+}
+async function iaModifierType(id) {
+  const nouveauLabel = prompt('Nouveau nom du type :');
+  if (!nouveauLabel) return;
+  try { await api('PUT', '/insc/types/' + id, { label: nouveauLabel }); ia_toast('Modifié.', true); iaRenderFiche(); }
+  catch (e) { ia_toast(e.message, false); }
+}
+const IA_TYPES_CHAMP = ['texte_court','texte_long','nombre','email','telephone','date','heure','adresse','liste_deroulante','choix_unique','choix_multiple','oui_non','case_a_cocher','upload_photo','upload_fichier','url'];
+async function iaAjouterChamp(typeId) {
+  const libelle = prompt('Libellé du champ (ex: Nom de l\'entreprise) :');
+  if (!libelle || !libelle.trim()) return;
+  const type_champ = prompt('Type de champ (' + IA_TYPES_CHAMP.join(', ') + ') :', 'texte_court');
+  if (!IA_TYPES_CHAMP.includes(type_champ)) { ia_toast('Type de champ invalide.', false); return; }
+  const obligatoire = confirm('Ce champ est-il obligatoire ? OK = Oui, Annuler = Non');
+  let condition = null;
+  if (confirm('Ce champ doit-il n\'apparaître que sous une condition (logique conditionnelle) ?')) {
+    const champSource = prompt('Nom technique du champ source (ex: est_entreprise) :');
+    const valeur = prompt('Valeur qui déclenche l\'affichage (ex: oui) :');
+    if (champSource && valeur) condition = { champ_source: champSource, operateur: 'egal', valeur };
+  }
+  let options = [];
+  if (['liste_deroulante','choix_unique','choix_multiple'].includes(type_champ)) {
+    const opt = prompt('Options séparées par des virgules :');
+    options = (opt || '').split(',').map(s => s.trim()).filter(Boolean);
+  }
+  try {
+    await api('POST', `/insc/types/${typeId}/champs`, { libelle: libelle.trim(), type_champ, obligatoire, condition, options });
+    ia_toast('Champ ajouté.', true); iaRenderFiche();
+  } catch (e) { ia_toast(e.message, false); }
+}
+async function iaSupprimerChamp(id) {
+  if (!confirm('Supprimer ce champ ?')) return;
+  try { await api('DELETE', '/insc/champs/' + id); iaRenderFiche(); } catch (e) { ia_toast(e.message, false); }
+}
+
+async function iaRenderInscriptions(fiche) {
+  const cont = document.getElementById('ia-onglet-contenu');
+  cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
+  try {
+    const { inscriptions } = await api('GET', `/insc/fiches/${IA_FICHE_ACTIVE}/inscriptions`);
+    if (!inscriptions.length) { cont.innerHTML = '<p style="color:var(--muted);">Aucune inscription pour le moment.</p>'; return; }
+    cont.innerHTML = `<div style="overflow-x:auto;"><table class="ia-table">
+      <thead><tr><th>Nom</th><th>Type</th><th>E-mail</th><th>Statut</th><th>Référence</th><th>Actions</th></tr></thead>
+      <tbody>${inscriptions.map(i => `<tr>
+        <td>${escH(i.prenom)} ${escH(i.nom)}</td><td>${escH(i.type_label)}</td><td>${escH(i.email||'')}</td>
+        <td>${escH(i.statut)}</td><td style="font-size:11px;">${escH(i.reference||'')}</td>
+        <td><select onchange="iaChangerStatutInsc(${i.id}, this.value)">
+          ${['inscrit','confirme','present','absent','annule','liste_attente'].map(s=>`<option value="${s}" ${i.statut===s?'selected':''}>${s}</option>`).join('')}
+        </select></td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } catch (e) { cont.innerHTML = `<p style="color:#dc2626;">${escH(e.message)}</p>`; }
+}
+async function iaChangerStatutInsc(id, statut) {
+  try { await api('PATCH', `/insc/inscriptions/${id}/statut`, { statut }); ia_toast('Statut mis à jour.', true); }
+  catch (e) { ia_toast(e.message, false); }
+}
+
+async function iaRenderStats(fiche) {
+  const cont = document.getElementById('ia-onglet-contenu');
+  try {
+    const s = await api('GET', `/insc/fiches/${IA_FICHE_ACTIVE}/stats`);
+    cont.innerHTML = `
+      <div style="font-size:32px;font-weight:900;color:#0D2B4E;">${s.total}</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:16px;">inscription(s) au total</div>
+      <h3 style="font-size:14px;">Par type</h3>
+      <ul>${s.par_type.map(t => `<li>${escH(t.label)} : ${t.nb}${t.places_max!=null?' / '+t.places_max:''}</li>`).join('')}</ul>
+      <h3 style="font-size:14px;">Par statut</h3>
+      <ul>${s.par_statut.map(t => `<li>${escH(t.statut)} : ${t.n}</li>`).join('')}</ul>
+      ${s.par_evenement.length ? `<h3 style="font-size:14px;">Par événement</h3><ul>${s.par_evenement.map(e => `<li>${escH(e.titre)} : ${e.nb}</li>`).join('')}</ul>` : ''}`;
+  } catch (e) { cont.innerHTML = `<p style="color:#dc2626;">${escH(e.message)}</p>`; }
+}
+
+(async function initInscriptionsAdmin() {
+  IA_ME = await fetchCurrentUser();
+  if (!IA_ME || !['initiative','administrateur','collectivite'].includes(IA_ME.role)) {
+    document.getElementById('ia-root').innerHTML = '<div style="text-align:center;padding:60px;color:var(--muted);">Cette page est réservée aux comptes Initiative.</div>';
+    return;
+  }
+  iaRenderListe();
+})();
+</script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

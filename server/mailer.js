@@ -615,6 +615,58 @@ function emailConfirmationBillets({ email, prenom, eventTitre, dateEvenement, li
   });
 }
 
+/* Confirmation d'inscription (module Formulaires & Inscriptions Événementielles, 2026-09-08) —
+   annexe §2 du cahier des charges : n'affiche la section Programme QUE si l'événement en a un
+   renseigné, jamais de section vide. Le QR n'est jamais embarqué en image dans l'e-mail (poids,
+   fiabilité de rendu) — un lien vers la confirmation imprimable (contenant le QR, rendu côté
+   client via qrcodejs comme partout ailleurs sur la plateforme) est fourni à la place. */
+function emailConfirmationInscription({ email, prenom, evenementNom, typeLabel, reference, dateEvt, heureDebut, lieu, ville, pays, programme, inscriptionId }) {
+  const lieuTxt = [lieu, ville, pays].filter(Boolean).join(', ');
+  return sendEmail({
+    to: email,
+    subject: `Confirmation de votre inscription — ${evenementNom} — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <div style="display:inline-block;background:#10B981;color:#fff;font-weight:800;font-size:13px;padding:6px 16px;border-radius:99px;margin-bottom:16px;">
+        Inscription confirmée ✅
+      </div>
+      <h1 style="margin:0 0 16px;font-size:20px;font-weight:900;color:#0D1B2A;">
+        ${prenom ? `Bonjour ${prenom},` : "Bonjour,"}<br>votre inscription à « ${evenementNom} » est confirmée
+      </h1>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 20px;font-size:14px;">
+        <tr><td style="padding:6px 0;color:#64748B;">Type d'inscription</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#0D1B2A;">${typeLabel || ''}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748B;">Numéro d'inscription</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#0D1B2A;">${reference || ''}</td></tr>
+        ${dateEvt ? `<tr><td style="padding:6px 0;color:#64748B;">Date</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#0D1B2A;">${dateEvt}${heureDebut ? ' · ' + heureDebut : ''}</td></tr>` : ''}
+        ${lieuTxt ? `<tr><td style="padding:6px 0;color:#64748B;">Lieu</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#0D1B2A;">${lieuTxt}</td></tr>` : ''}
+      </table>
+      ${programme ? `
+      <div style="background:#F0F4FF;border-left:4px solid #2563EB;border-radius:0 10px 10px 0;padding:14px 18px;margin:0 0 20px;">
+        <div style="font-weight:800;color:#1B3A6B;font-size:13px;margin-bottom:6px;">📋 Programme de l'événement</div>
+        <div style="color:#374151;font-size:13px;line-height:1.7;white-space:pre-line;">${programme}</div>
+      </div>` : ''}
+      <div style="text-align:center;margin:24px 0;">
+        <a href="https://diaspoactif.com/api/insc/inscriptions/${inscriptionId}/confirmation.pdf?ref=${encodeURIComponent(reference || "")}" style="display:inline-block;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;text-decoration:none;font-weight:800;padding:14px 32px;border-radius:12px;">
+          Voir ma confirmation + QR Code →
+        </a>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;line-height:1.6;margin-top:24px;">
+        Retrouvez cette inscription à tout moment dans « Mes inscriptions » sur votre espace Diaspo'Actif.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
 /* Invitation par e-mail à une cagnotte (module Cagnotte, invitation externe) — le lien mène à
    la page publique de la cagnotte avec le token en paramètre ; la durée de validité est
    affichée en toutes lettres, même convention que emailVerification/emailSuppressionProgrammee.
@@ -856,4 +908,4 @@ function emailDemandeDevisReponse({ to, prenom, initiativeNom, produitNom, conte
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse };
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription };

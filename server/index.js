@@ -1039,6 +1039,14 @@ async function executerSuppressionCompte(userId, drId) {
   `).run(anonEmail, userId);
   await db.prepare("UPDATE devis_reponses SET contenu=NULL WHERE auteur_user_id=?").run(userId);
 
+  /* Formulaires & Inscriptions Événementielles — même convention : la ligne d'inscription
+     reste (l'organisateur doit garder son historique de participants/quotas), seules les
+     coordonnées personnelles du participant sont anonymisées en place. */
+  await db.prepare(`
+    UPDATE insc_inscriptions SET nom='Compte', prenom='supprimé', email=?, telephone=NULL, reponses_json='{}'
+    WHERE user_id=?
+  `).run(anonEmail, userId);
+
   await db.prepare("DELETE FROM sessions WHERE user_id=?").run(userId);
 
   if (drId) {
@@ -39161,6 +39169,640 @@ route("POST", "/api/ads/:id/resume", async (req, res, params) => {
   if (ad.statut !== "paused") return sendJSON(res, 400, { error: "Seule une campagne en pause peut être reprise." });
   await db.prepare("UPDATE publicites SET statut='approved', updated_at=datetime('now') WHERE id=?").run(params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORMULAIRES & INSCRIPTIONS ÉVÉNEMENTIELLES v2 (2026-09-08)
+   Passe 1 — fondations + confirmation/QR. Cahier des charges complet fourni par
+   l'utilisateur (124 points). Architecture : Fiche → (N événements liés via `evenements`,
+   jamais `events`/Billetterie) → N Types d'inscription → N Champs par type → Inscriptions.
+   Paiement réel, gel financier J+5, contrôle entrée/sortie par QR, communication ciblée :
+   passes suivantes, une fois cette base validée en conditions réelles.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const INSC_QR_SECRET = process.env.INSC_QR_SECRET || "diaspoactif-insc-2026-secret";
+/* Jamais le même secret que TICKET_SECRET (Billetterie) — compartimentage volontaire :
+   un QR d'inscription ne doit jamais pouvoir être confondu avec un billet payant. */
+async function signInscription(inscriptionId, evenementId, ts) {
+  return crypto.createHmac("sha256", INSC_QR_SECRET)
+    .update(`${inscriptionId}:${evenementId || 0}:${ts}`).digest("hex").slice(0, 40);
+}
+
+function inscSlugify(nom) {
+  return String(nom || "").toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+}
+async function inscSlugUnique(nom, id) {
+  const base = inscSlugify(nom) || "fiche";
+  for (let i = 0; i < 30; i++) {
+    const candidat = i === 0 ? base : `${base}-${i}`;
+    const existe = await db.prepare("SELECT id FROM insc_fiches WHERE slug=? AND id!=?").get(candidat, id || 0);
+    if (!existe) return candidat;
+  }
+  return `${base}-${crypto.randomBytes(3).toString("hex")}`;
+}
+async function inscGenererReference() {
+  const annee = new Date().getFullYear();
+  for (let i = 0; i < 40; i++) {
+    const num = crypto.randomInt(1000000);
+    const ref = `DA-${annee}-${String(num).padStart(6, "0")}`;
+    const existe = await db.prepare("SELECT id FROM insc_inscriptions WHERE reference=?").get(ref);
+    if (!existe) return ref;
+  }
+  return `DA-${annee}-${Date.now()}`;
+}
+
+/* Charge une fiche et vérifie que l'appelant est son propriétaire ou un administrateur —
+   même idiome que crmInitOwner()/tgChargerTransfert() ailleurs dans ce fichier. */
+async function inscFicheProprietaire(req, ficheId) {
+  const user = await getCurrentUser(req);
+  if (!user) return { erreur: 401, msg: "Connexion requise." };
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(ficheId);
+  if (!fiche) return { erreur: 404, msg: "Fiche introuvable." };
+  const estProprio = Number(fiche.owner_user_id) === Number(user.id);
+  const estAdmin = user.role === "administrateur" || (await AdminJunior.hasAdminPermission(user, "formulaires_inscription.gerer", db));
+  if (!estProprio && !estAdmin) return { erreur: 403, msg: "Accès refusé." };
+  return { user, fiche };
+}
+
+async function inscJournaliser(ficheId, acteur, action, details) {
+  try {
+    await db.prepare("INSERT INTO insc_historique (fiche_id, acteur_id, acteur_nom, action, details) VALUES (?,?,?,?,?)")
+      .run(ficheId, acteur?.id || null, acteur ? `${acteur.prenom || ""} ${acteur.nom || ""}`.trim() : "Système", action, details || null);
+  } catch (e) { console.error("[insc-journal]", e.message); }
+}
+
+/* Évalue une condition d'affichage simple {champ_source, operateur, valeur} par rapport aux
+   réponses déjà soumises — même logique côté serveur (revalidation) que côté client (affichage). */
+function inscConditionRemplie(conditionJson, reponses) {
+  if (!conditionJson) return true;
+  let cond; try { cond = JSON.parse(conditionJson); } catch (e) { return true; }
+  if (!cond || !cond.champ_source) return true;
+  const valSource = reponses?.[cond.champ_source];
+  if (cond.operateur === "different") return String(valSource ?? "") !== String(cond.valeur ?? "");
+  if (cond.operateur === "coche") return valSource === true || valSource === "true" || valSource === "1";
+  return String(valSource ?? "") === String(cond.valeur ?? ""); // "egal" par défaut
+}
+
+/* Confirmation automatique (annexe §1-8) : QR + notification + e-mail, toujours best-effort,
+   jamais bloquant pour la réponse de soumission. */
+async function envoyerConfirmationInscription(inscriptionId) {
+  try {
+    const insc = await db.prepare("SELECT * FROM insc_inscriptions WHERE id=?").get(inscriptionId);
+    if (!insc) return;
+    const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(insc.fiche_id);
+    const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(insc.type_id);
+    const evt = insc.evenement_id ? await db.prepare("SELECT * FROM evenements WHERE id=?").get(insc.evenement_id) : null;
+
+    let qrToken = insc.qr_token;
+    if (!qrToken) {
+      qrToken = await signInscription(insc.id, insc.evenement_id, insc.created_at);
+      await db.prepare("UPDATE insc_inscriptions SET qr_token=? WHERE id=?").run(qrToken, insc.id);
+    }
+
+    if (insc.user_id) {
+      creerNotif(insc.user_id, "inscription_confirmee", "✅ Inscription confirmée",
+        `Votre inscription à « ${fiche?.nom || "l'événement"} » (${type?.label || ""}) est confirmée.`,
+        { lien: `mes-inscriptions-evt.html#insc-${insc.id}` });
+    }
+
+    if (insc.email) {
+      try {
+        const { emailConfirmationInscription } = require("./mailer");
+        await emailConfirmationInscription({
+          email: insc.email, prenom: insc.prenom,
+          evenementNom: evt?.titre || fiche?.nom, typeLabel: type?.label,
+          reference: insc.reference,
+          dateEvt: evt?.date_evt || fiche?.date_ouverture_inscriptions,
+          heureDebut: evt?.heure_debut, lieu: evt?.lieu || fiche?.lieu, ville: evt?.ville, pays: evt?.pays,
+          programme: evt?.programme || null,
+          inscriptionId: insc.id,
+        });
+      } catch (e) { console.error("[insc-email-confirmation]", e.message); }
+    }
+  } catch (e) { console.error("[envoyerConfirmationInscription]", inscriptionId, e.message); }
+}
+
+/* ── ADMIN : Fiches ── */
+route("GET", "/api/insc/fiches", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const estAdmin = user.role === "administrateur" || (await AdminJunior.hasAdminPermission(user, "formulaires_inscription.consulter", db));
+  const fiches = estAdmin
+    ? await db.prepare("SELECT * FROM insc_fiches ORDER BY id DESC").all()
+    : await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? ORDER BY id DESC").all(user.id);
+  const enrichies = [];
+  for (const f of fiches) {
+    const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(f.id))?.n || 0;
+    enrichies.push({ ...f, nb_inscriptions: nb });
+  }
+  sendJSON(res, 200, { fiches: enrichies });
+});
+
+route("POST", "/api/insc/fiches", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
+  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  const slug = await inscSlugUnique(body.nom);
+  const id = (await db.prepare(`
+    INSERT INTO insc_fiches (owner_user_id, initiative_id, nom, slug, description, affiche_url, organisateur,
+      contact_nom, contact_email, contact_telephone, date_ouverture_inscriptions, date_fermeture_inscriptions,
+      visibilite, code_acces)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    user.id, init?.id || null, String(body.nom).trim(), slug, body.description || null, body.affiche_url || null,
+    body.organisateur || null, body.contact_nom || null, body.contact_email || null, body.contact_telephone || null,
+    body.date_ouverture_inscriptions || null, body.date_fermeture_inscriptions || null,
+    ["public", "membres", "prive", "invitation"].includes(body.visibilite) ? body.visibilite : "public",
+    body.code_acces || null
+  )).lastInsertRowid;
+  if (Array.isArray(body.evenement_ids)) {
+    for (const eid of body.evenement_ids) {
+      try { await db.prepare("INSERT OR IGNORE INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(id, eid); } catch (e) {}
+    }
+  }
+  await inscJournaliser(id, user, "creation", `Fiche « ${body.nom} » créée.`);
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(id);
+  sendJSON(res, 201, { fiche });
+});
+
+route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const evenements = await db.prepare(`
+    SELECT e.id, e.titre, e.date_evt, e.ville, e.pays FROM insc_fiches_evenements fe
+    JOIN evenements e ON e.id = fe.evenement_id WHERE fe.fiche_id=?`).all(fiche.id);
+  const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? ORDER BY ordre ASC, id ASC").all(fiche.id);
+  for (const t of types) {
+    t.champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? ORDER BY position ASC, id ASC").all(t.id);
+    t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
+  }
+  sendJSON(res, 200, { fiche, evenements, types });
+});
+
+route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const champs = ["nom","description","affiche_url","organisateur","contact_nom","contact_email","contact_telephone",
+    "date_ouverture_inscriptions","date_fermeture_inscriptions","visibilite","code_acces"];
+  const set = [], vals = [];
+  for (const c of champs) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] || null); }
+  if (set.length) {
+    set.push("updated_at=datetime('now')");
+    await db.prepare(`UPDATE insc_fiches SET ${set.join(",")} WHERE id=?`).run(...vals, fiche.id);
+  }
+  if (Array.isArray(body.evenement_ids)) {
+    await db.prepare("DELETE FROM insc_fiches_evenements WHERE fiche_id=?").run(fiche.id);
+    for (const eid of body.evenement_ids) {
+      try { await db.prepare("INSERT OR IGNORE INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(fiche.id, eid); } catch (e) {}
+    }
+  }
+  await inscJournaliser(fiche.id, user, "modification", "Fiche modifiée.");
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=?").get(fiche.id))?.n || 0;
+  if (nb > 0) return sendJSON(res, 400, { error: "Cette fiche contient des inscriptions. Archivez-la plutôt que de la supprimer (§47)." });
+  await db.prepare("DELETE FROM insc_champs WHERE type_id IN (SELECT id FROM insc_types WHERE fiche_id=?)").run(fiche.id);
+  await db.prepare("DELETE FROM insc_types WHERE fiche_id=?").run(fiche.id);
+  await db.prepare("DELETE FROM insc_fiches_evenements WHERE fiche_id=?").run(fiche.id);
+  await db.prepare("DELETE FROM insc_historique WHERE fiche_id=?").run(fiche.id);
+  await db.prepare("DELETE FROM insc_fiches WHERE id=?").run(fiche.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/insc/fiches/:id/statut", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const valides = ["brouillon","programmee","publiee","suspendue","fermee","archivee"];
+  if (!valides.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE insc_fiches SET statut=?, updated_at=datetime('now') WHERE id=?").run(body.statut, fiche.id);
+  await inscJournaliser(fiche.id, user, "changement_statut", `${fiche.statut} → ${body.statut}`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const nomCopie = (body?.nom || `${fiche.nom} (copie)`).slice(0, 200);
+  const slug = await inscSlugUnique(nomCopie);
+  const newId = (await db.prepare(`
+    INSERT INTO insc_fiches (owner_user_id, initiative_id, nom, slug, description, affiche_url, organisateur,
+      contact_nom, contact_email, contact_telephone, visibilite)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+  `).run(fiche.owner_user_id, fiche.initiative_id, nomCopie, slug, fiche.description, fiche.affiche_url,
+    fiche.organisateur, fiche.contact_nom, fiche.contact_email, fiche.contact_telephone, fiche.visibilite)).lastInsertRowid;
+  const evenements = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
+  for (const e of evenements) await db.prepare("INSERT INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(newId, e.evenement_id);
+  const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=?").all(fiche.id);
+  for (const t of types) {
+    const newTypeId = (await db.prepare(`
+      INSERT INTO insc_types (fiche_id, cle, label, description, icone, actif, gratuit, prix, places_max,
+        liste_attente_active, validation_auto, date_ouverture, date_fermeture, ordre)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run(newId, t.cle, t.label, t.description, t.icone, t.actif, t.gratuit, t.prix, t.places_max,
+      t.liste_attente_active, t.validation_auto, null, null, t.ordre)).lastInsertRowid;
+    const champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=?").all(t.id);
+    for (const c of champs) {
+      await db.prepare(`
+        INSERT INTO insc_champs (type_id, nom, libelle, description_aide, type_champ, obligatoire, actif,
+          position, valeur_defaut, placeholder, options_json, regle_validation, condition_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `).run(newTypeId, c.nom, c.libelle, c.description_aide, c.type_champ, c.obligatoire, c.actif,
+        c.position, c.valeur_defaut, c.placeholder, c.options_json, c.regle_validation, c.condition_json);
+    }
+  }
+  await inscJournaliser(newId, user, "duplication", `Dupliquée depuis « ${fiche.nom} » (#${fiche.id}).`);
+  sendJSON(res, 201, { fiche_id: newId });
+});
+
+route("POST", "/api/insc/fiches/:id/geler", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(params.id);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable." });
+  if (fiche.gele_le) return sendJSON(res, 400, { error: "Cette fiche est déjà gelée." });
+  const motif = (body?.motif || "").trim();
+  if (!motif) return sendJSON(res, 400, { error: "Un motif est requis." });
+  await db.prepare("UPDATE insc_fiches SET gele_le=datetime('now'), gele_motif=? WHERE id=?").run(motif, fiche.id);
+  await inscJournaliser(fiche.id, user, "gel", motif);
+  creerNotif(fiche.owner_user_id, "insc_fiche_gelee", "Fiche gelée par l'administration",
+    `Votre fiche « ${fiche.nom} » a été gelée par l'administration : ${motif}. Elle n'accepte plus de nouvelles inscriptions tant que le gel n'est pas levé.`,
+    { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/insc/fiches/:id/degeler", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(params.id);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable." });
+  if (!fiche.gele_le) return sendJSON(res, 400, { error: "Cette fiche n'est pas gelée." });
+  await db.prepare("UPDATE insc_fiches SET gele_le=NULL, gele_motif=NULL WHERE id=?").run(fiche.id);
+  await inscJournaliser(fiche.id, user, "degel", null);
+  creerNotif(fiche.owner_user_id, "insc_fiche_degelee", "Fiche dégelée", `Votre fiche « ${fiche.nom} » est de nouveau active.`, { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── ADMIN : Types d'inscription ── */
+route("GET", "/api/insc/fiches/:id/types", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? ORDER BY ordre ASC, id ASC").all(fiche.id);
+  sendJSON(res, 200, { types });
+});
+route("POST", "/api/insc/fiches/:id/types", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!body?.label || !String(body.label).trim()) return sendJSON(res, 400, { error: "Le nom du type est requis." });
+  const cle = inscSlugify(body.cle || body.label) || `type-${Date.now()}`;
+  try {
+    const id = (await db.prepare(`
+      INSERT INTO insc_types (fiche_id, cle, label, description, icone, gratuit, prix, places_max,
+        liste_attente_active, validation_auto, date_ouverture, date_fermeture, ordre)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run(fiche.id, cle, String(body.label).trim(), body.description || null, body.icone || null,
+      body.gratuit === false ? 0 : 1, body.prix != null ? Number(body.prix) : null,
+      body.places_max != null && body.places_max !== "" ? parseInt(body.places_max) : null,
+      body.liste_attente_active ? 1 : 0, body.validation_auto === false ? 0 : 1,
+      body.date_ouverture || null, body.date_fermeture || null, parseInt(body.ordre) || 0
+    )).lastInsertRowid;
+    await inscJournaliser(fiche.id, user, "ajout_type", `Type « ${body.label} » ajouté.`);
+    sendJSON(res, 201, { id });
+  } catch (e) { sendJSON(res, 400, { error: "Un type avec cette clé existe déjà sur cette fiche." }); }
+});
+route("PUT", "/api/insc/types/:id", async (req, res, params, body) => {
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
+  if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, type.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const champs = ["label","description","icone","actif","gratuit","prix","places_max","liste_attente_active",
+    "validation_auto","date_ouverture","date_fermeture","ordre"];
+  const set = [], vals = [];
+  for (const c of champs) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
+  if (set.length) { set.push("updated_at=datetime('now')"); await db.prepare(`UPDATE insc_types SET ${set.join(",")} WHERE id=?`).run(...vals, type.id); }
+  await inscJournaliser(type.fiche_id, user, "modification_type", `Type « ${type.label} » modifié.`);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/insc/types/:id", async (req, res, params) => {
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
+  if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, type.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=?").get(type.id))?.n || 0;
+  if (nb > 0) return sendJSON(res, 400, { error: "Ce type a déjà des inscriptions — désactivez-le plutôt que de le supprimer." });
+  await db.prepare("DELETE FROM insc_champs WHERE type_id=?").run(type.id);
+  await db.prepare("DELETE FROM insc_types WHERE id=?").run(type.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── ADMIN : Champs (formulaire dynamique par type) ── */
+route("GET", "/api/insc/types/:id/champs", async (req, res, params) => {
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
+  if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, type.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? ORDER BY position ASC, id ASC").all(type.id);
+  sendJSON(res, 200, { champs });
+});
+const INSC_TYPES_CHAMP = ["texte_court","texte_long","nombre","email","telephone","date","heure","adresse",
+  "liste_deroulante","choix_unique","choix_multiple","oui_non","case_a_cocher","upload_photo","upload_fichier","url"];
+route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
+  if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, type.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!body?.libelle || !String(body.libelle).trim()) return sendJSON(res, 400, { error: "Le libellé est requis." });
+  if (!INSC_TYPES_CHAMP.includes(body.type_champ)) return sendJSON(res, 400, { error: "Type de champ invalide." });
+  const nom = inscSlugify(body.nom || body.libelle).replace(/-/g, "_") || `champ_${Date.now()}`;
+  const maxPos = (await db.prepare("SELECT MAX(position) m FROM insc_champs WHERE type_id=?").get(type.id))?.m;
+  const id = (await db.prepare(`
+    INSERT INTO insc_champs (type_id, nom, libelle, description_aide, type_champ, obligatoire, position,
+      valeur_defaut, placeholder, options_json, regle_validation, condition_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(type.id, nom, String(body.libelle).trim(), body.description_aide || null, body.type_champ,
+    body.obligatoire ? 1 : 0, (maxPos != null ? maxPos + 1 : 0), body.valeur_defaut || null, body.placeholder || null,
+    Array.isArray(body.options) ? JSON.stringify(body.options) : "[]", body.regle_validation || null,
+    body.condition ? JSON.stringify(body.condition) : null
+  )).lastInsertRowid;
+  sendJSON(res, 201, { id });
+});
+route("PUT", "/api/insc/champs/:id", async (req, res, params, body) => {
+  const champ = await db.prepare("SELECT c.*, t.fiche_id FROM insc_champs c JOIN insc_types t ON t.id=c.type_id WHERE c.id=?").get(params.id);
+  if (!champ) return sendJSON(res, 404, { error: "Champ introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, champ.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const cols = ["libelle","description_aide","obligatoire","actif","valeur_defaut","placeholder","regle_validation"];
+  const set = [], vals = [];
+  for (const c of cols) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
+  if (body.options !== undefined) { set.push("options_json=?"); vals.push(JSON.stringify(body.options || [])); }
+  if (body.condition !== undefined) { set.push("condition_json=?"); vals.push(body.condition ? JSON.stringify(body.condition) : null); }
+  if (set.length) await db.prepare(`UPDATE insc_champs SET ${set.join(",")} WHERE id=?`).run(...vals, champ.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/insc/champs/:id", async (req, res, params) => {
+  const champ = await db.prepare("SELECT c.*, t.fiche_id FROM insc_champs c JOIN insc_types t ON t.id=c.type_id WHERE c.id=?").get(params.id);
+  if (!champ) return sendJSON(res, 404, { error: "Champ introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, champ.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("DELETE FROM insc_champs WHERE id=?").run(champ.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("PATCH", "/api/insc/champs/:id/position", async (req, res, params, body) => {
+  const champ = await db.prepare("SELECT c.*, t.fiche_id FROM insc_champs c JOIN insc_types t ON t.id=c.type_id WHERE c.id=?").get(params.id);
+  if (!champ) return sendJSON(res, 404, { error: "Champ introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, champ.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("UPDATE insc_champs SET position=? WHERE id=?").run(parseInt(body?.position) || 0, champ.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── ADMIN : Inscriptions + stats ── */
+route("GET", "/api/insc/fiches/:id/inscriptions", async (req, res, params, body, query) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  let sql = "SELECT i.*, t.label AS type_label, e.titre AS evenement_titre FROM insc_inscriptions i JOIN insc_types t ON t.id=i.type_id LEFT JOIN evenements e ON e.id=i.evenement_id WHERE i.fiche_id=?";
+  const args = [fiche.id];
+  if (query?.type_id) { sql += " AND i.type_id=?"; args.push(query.type_id); }
+  if (query?.evenement_id) { sql += " AND i.evenement_id=?"; args.push(query.evenement_id); }
+  if (query?.statut) { sql += " AND i.statut=?"; args.push(query.statut); }
+  sql += " ORDER BY i.id DESC";
+  const inscriptions = await db.prepare(sql).all(...args);
+  sendJSON(res, 200, { inscriptions });
+});
+route("PATCH", "/api/insc/inscriptions/:id/statut", async (req, res, params, body) => {
+  const insc = await db.prepare("SELECT i.*, f.owner_user_id, f.nom AS fiche_nom FROM insc_inscriptions i JOIN insc_fiches f ON f.id=i.fiche_id WHERE i.id=?").get(params.id);
+  if (!insc) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, insc.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const valides = ["inscrit","confirme","present","absent","annule","liste_attente"];
+  if (!valides.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE insc_inscriptions SET statut=?, updated_at=datetime('now') WHERE id=?").run(body.statut, insc.id);
+  await inscJournaliser(insc.fiche_id, user, "statut_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) : ${insc.statut} → ${body.statut}`);
+  if (body.statut === "confirme") await envoyerConfirmationInscription(insc.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("GET", "/api/insc/fiches/:id/stats", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const parType = await db.prepare(`
+    SELECT t.id, t.label, t.places_max, COUNT(i.id) AS nb
+    FROM insc_types t LEFT JOIN insc_inscriptions i ON i.type_id=t.id AND i.statut NOT IN ('annule')
+    WHERE t.fiche_id=? GROUP BY t.id`).all(fiche.id);
+  const parStatut = await db.prepare("SELECT statut, COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? GROUP BY statut").all(fiche.id);
+  const parEvenement = await db.prepare(`
+    SELECT e.id, e.titre, COUNT(i.id) AS nb FROM insc_fiches_evenements fe
+    JOIN evenements e ON e.id=fe.evenement_id
+    LEFT JOIN insc_inscriptions i ON i.evenement_id=e.id AND i.fiche_id=fe.fiche_id AND i.statut NOT IN ('annule')
+    WHERE fe.fiche_id=? GROUP BY e.id`).all(fiche.id);
+  const total = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(fiche.id))?.n || 0;
+  sendJSON(res, 200, { total, par_type: parType, par_statut: parStatut, par_evenement: parEvenement });
+});
+
+/* ── PUBLIC : lecture, soumission, upload ── */
+route("GET", "/api/insc/public/:slug", async (req, res, params) => {
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);
+  if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche a été temporairement suspendue par l'administration." });
+  const now = new Date();
+  if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) {
+    return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées." });
+  }
+  if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
+    return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes." });
+  }
+  const evenements = await db.prepare(`
+    SELECT e.id, e.titre, e.date_evt, e.heure_debut, e.ville, e.pays, e.lieu FROM insc_fiches_evenements fe
+    JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC`).all(fiche.id);
+  const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC").all(fiche.id);
+  for (const t of types) {
+    t.champs = await db.prepare("SELECT id,nom,libelle,description_aide,type_champ,obligatoire,position,valeur_defaut,placeholder,options_json,condition_json FROM insc_champs WHERE type_id=? AND actif=1 ORDER BY position ASC, id ASC").all(t.id);
+    const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
+    t.places_restantes = t.places_max != null ? Math.max(0, t.places_max - nb) : null;
+    t.complet = t.places_max != null && nb >= t.places_max;
+    let ouvert = true;
+    if (t.date_ouverture && new Date(t.date_ouverture) > now) ouvert = false;
+    if (t.date_fermeture && new Date(t.date_fermeture) < now) ouvert = false;
+    t.periode_ouverte = ouvert;
+  }
+  sendJSON(res, 200, { fiche, evenements, types });
+});
+
+route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  if (body?.site_perso) return sendJSON(res, 400, { error: "Requête invalide." }); // honeypot
+
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);
+  if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
+  const now = new Date();
+  if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
+  if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
+
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=? AND fiche_id=? AND actif=1").get(body?.type_id, fiche.id);
+  if (!type) return sendJSON(res, 400, { error: "Type d'inscription invalide." });
+  if (type.date_ouverture && new Date(type.date_ouverture) > now) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » ne sont pas encore ouvertes.` });
+  if (type.date_fermeture && new Date(type.date_fermeture) < now) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » sont fermées.` });
+
+  let evenementId = null;
+  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
+  if (liaisons.length === 1) evenementId = liaisons[0].evenement_id;
+  else if (liaisons.length > 1) {
+    if (!body?.evenement_id || !liaisons.some(l => Number(l.evenement_id) === Number(body.evenement_id))) {
+      return sendJSON(res, 400, { error: "Veuillez sélectionner à quel événement vous souhaitez participer." });
+    }
+    evenementId = body.evenement_id;
+  }
+
+  if (!body?.nom || !String(body.nom).trim() || !body?.prenom || !String(body.prenom).trim()) return sendJSON(res, 400, { error: "Nom et prénom sont requis." });
+  if (!body?.email && !body?.telephone) return sendJSON(res, 400, { error: "Un e-mail ou un téléphone est requis." });
+
+  // Champs dynamiques du type : validation obligatoire/facultatif + logique conditionnelle revalidée serveur
+  const champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? AND actif=1").all(type.id);
+  const reponses = (body?.reponses && typeof body.reponses === "object") ? body.reponses : {};
+  for (const c of champs) {
+    if (!c.obligatoire) continue;
+    if (!inscConditionRemplie(c.condition_json, reponses)) continue; // masqué par la logique conditionnelle
+    const v = reponses[c.nom];
+    if (v === undefined || v === null || v === "") return sendJSON(res, 400, { error: `Le champ « ${c.libelle} » est obligatoire.` });
+  }
+
+  // Quota / liste d'attente
+  const nbActuel = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(type.id))?.n || 0;
+  let statutInitial = type.validation_auto ? "confirme" : "inscrit";
+  if (type.places_max != null && nbActuel >= type.places_max) {
+    if (!type.liste_attente_active) return sendJSON(res, 400, { error: "Cette catégorie est complète." });
+    statutInitial = "liste_attente";
+  }
+
+  // Anti-doublon léger (même e-mail sur le même type, hors annulés)
+  if (body.email) {
+    const doublon = await db.prepare("SELECT id FROM insc_inscriptions WHERE type_id=? AND LOWER(email)=? AND statut!='annule'").get(type.id, String(body.email).toLowerCase().trim());
+    if (doublon) return sendJSON(res, 400, { error: "Une inscription existe déjà avec cette adresse e-mail pour cette catégorie." });
+  }
+
+  const user = await getCurrentUser(req);
+  const reference = await inscGenererReference();
+  const id = (await db.prepare(`
+    INSERT INTO insc_inscriptions (fiche_id, type_id, evenement_id, user_id, reference, nom, prenom, email, telephone,
+      reponses_json, statut, statut_paiement, consentements_json, ip_creation)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(fiche.id, type.id, evenementId, user?.id || null, reference,
+    String(body.nom).trim(), String(body.prenom).trim(), body.email || null, body.telephone || null,
+    JSON.stringify(reponses), statutInitial, type.gratuit ? "non_concerne" : "non_paye",
+    JSON.stringify(body.consentements || {}), ip
+  )).lastInsertRowid;
+
+  if (statutInitial === "confirme") await envoyerConfirmationInscription(id);
+  creerNotif(fiche.owner_user_id, "insc_nouvelle", "📝 Nouvelle inscription",
+    `${body.prenom} ${body.nom} vient de s'inscrire (${type.label}) à « ${fiche.nom} ».`,
+    { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+
+  sendJSON(res, 201, { id, reference, statut: statutInitial });
+});
+
+route("POST", "/api/insc/public/upload", async (req, res) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc_upload:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide." });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const raw = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { files } = parseMultipart(raw, boundaryMatch[1]);
+  const file = files["fichier"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu." });
+  const b = file.buffer;
+  const imgType = SEC.isSafeRasterImage(b);
+  const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+  if (!imgType && !isPdf) return sendJSON(res, 400, { error: "Format non supporté (image JPEG/PNG/WebP/GIF ou PDF requis)." });
+  const MAX = 8 * 1024 * 1024;
+  if (b.length > MAX) return sendJSON(res, 400, { error: "Fichier trop volumineux (max 8 Mo)." });
+  try {
+    const ext = imgType ? imgType.split("/")[1].replace("jpeg", "jpg") : "pdf";
+    const url = await uploadToBunny(b, `insc-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${ext}`, "insc-inscriptions");
+    SEC.logSecurity("upload", { kind: "insc", ip, size: b.length });
+    sendJSON(res, 200, { url, nom: (file.filename || "fichier").slice(0, 200) });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload insc")); }
+});
+
+/* ── ESPACE PERSONNEL ── */
+route("GET", "/api/mes-inscriptions-evt", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const inscriptions = await db.prepare(`
+    SELECT i.*, f.nom AS fiche_nom, t.label AS type_label, e.titre AS evenement_titre, e.date_evt, e.heure_debut, e.ville, e.pays
+    FROM insc_inscriptions i JOIN insc_fiches f ON f.id=i.fiche_id JOIN insc_types t ON t.id=i.type_id
+    LEFT JOIN evenements e ON e.id=i.evenement_id
+    WHERE i.user_id=? ORDER BY i.id DESC`).all(user.id);
+  sendJSON(res, 200, { inscriptions });
+});
+
+/* `ref` (query) permet l'accès à un participant SANS compte : c'est la référence unique
+   (DA-YYYY-NNNNNN) reçue uniquement par e-mail privé à la confirmation — fait office de secret
+   partagé, même logique que le lien de confirmation billet envoyé par e-mail ailleurs sur la
+   plateforme. Un compte connecté et propriétaire (ou gestionnaire de la fiche) passe toujours. */
+async function inscAccesAutorise(req, params, insc) {
+  const user = await getCurrentUser(req);
+  const estProprio = user && Number(insc.user_id) === Number(user.id);
+  const ficheOwner = await db.prepare("SELECT owner_user_id FROM insc_fiches WHERE id=?").get(insc.fiche_id);
+  const estGestionnaire = user && (Number(ficheOwner?.owner_user_id) === Number(user.id) || user.role === "administrateur");
+  const refFournie = (params.ref || "").trim();
+  const refValide = !!refFournie && insc.reference && refFournie === insc.reference;
+  return estProprio || estGestionnaire || refValide;
+}
+route("GET", "/api/insc/inscriptions/:id/qr", async (req, res, params, body, query) => {
+  const insc = await db.prepare("SELECT * FROM insc_inscriptions WHERE id=?").get(params.id);
+  if (!insc) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  if (!(await inscAccesAutorise(req, { ref: query?.ref }, insc))) return sendJSON(res, 403, { error: "Accès refusé." });
+  if (!insc.qr_token) return sendJSON(res, 400, { error: "QR non encore généré — inscription pas encore confirmée." });
+  const qrPayload = Buffer.from(JSON.stringify({ iid: insc.id, eid: insc.evenement_id, sig: insc.qr_token })).toString("base64");
+  sendJSON(res, 200, { qr_payload: qrPayload, reference: insc.reference });
+});
+
+/* Page de confirmation imprimable (A4, window.print()) — même pattern que l'ancien module et
+   business-plan-simulation.html/lettre-builder.html : aucune dépendance PDF serveur. */
+route("GET", "/api/insc/inscriptions/:id/confirmation.pdf", async (req, res, params, body, query) => {
+  const insc = await db.prepare("SELECT * FROM insc_inscriptions WHERE id=?").get(params.id);
+  if (!insc) return send(res, 404, "Introuvable");
+  const ficheOwner = await db.prepare("SELECT owner_user_id, nom FROM insc_fiches WHERE id=?").get(insc.fiche_id);
+  if (!(await inscAccesAutorise(req, { ref: query?.ref }, insc))) return send(res, 403, "Accès refusé");
+  const type = await db.prepare("SELECT label FROM insc_types WHERE id=?").get(insc.type_id);
+  const evt = insc.evenement_id ? await db.prepare("SELECT * FROM evenements WHERE id=?").get(insc.evenement_id) : null;
+  const esc = s => String(s || "").replace(/</g, "&lt;");
+  let qrPayload = "";
+  if (insc.qr_token) qrPayload = Buffer.from(JSON.stringify({ iid: insc.id, eid: insc.evenement_id, sig: insc.qr_token })).toString("base64");
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    <title>Confirmation d'inscription — ${esc(ficheOwner?.nom)}</title>
+    <style>@page{size:A4;margin:20mm} body{font-family:Arial,sans-serif;color:#20242E;max-width:700px;margin:0 auto;padding:20px}
+    h1{color:#0D2B4E;font-size:22px} .badge{display:inline-block;background:#F0F4FF;color:#1B3A6B;border-radius:99px;padding:4px 14px;font-size:12px;font-weight:700;margin-bottom:16px}
+    .ligne{padding:8px 0;border-bottom:1px solid #E2E8F0;} .label{color:#64748B;font-size:12px;} .valeur{font-weight:700;}
+    #insc-qr{margin:20px 0;text-align:center;}</style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    </head><body>
+    <div class="badge">✅ Inscription confirmée</div>
+    <h1>${esc(ficheOwner?.nom)}</h1>
+    <div class="ligne"><div class="label">Nom</div><div class="valeur">${esc(insc.prenom)} ${esc(insc.nom)}</div></div>
+    <div class="ligne"><div class="label">Type d'inscription</div><div class="valeur">${esc(type?.label)}</div></div>
+    <div class="ligne"><div class="label">Numéro d'inscription</div><div class="valeur">${esc(insc.reference)}</div></div>
+    <div class="ligne"><div class="label">Statut</div><div class="valeur">${esc(insc.statut)}</div></div>
+    ${evt ? `<div class="ligne"><div class="label">Événement</div><div class="valeur">${esc(evt.titre)}</div></div>
+    <div class="ligne"><div class="label">Date</div><div class="valeur">${esc(evt.date_evt)} ${esc(evt.heure_debut||"")}</div></div>
+    <div class="ligne"><div class="label">Lieu</div><div class="valeur">${esc(evt.lieu||"")} ${esc(evt.ville||"")} ${esc(evt.pays||"")}</div></div>` : ""}
+    ${evt?.programme ? `<div class="ligne"><div class="label">Programme</div><div class="valeur" style="white-space:pre-line;">${esc(evt.programme)}</div></div>` : ""}
+    ${qrPayload ? `<div id="insc-qr"></div><script>try{new QRCode(document.getElementById('insc-qr'),{text:${JSON.stringify(qrPayload)},width:180,height:180,colorDark:'#0D2B4E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}catch(e){}</script>` : ""}
+    <script>setTimeout(()=>window.print(), 350)</script>
+    </body></html>`);
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */

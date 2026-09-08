@@ -498,6 +498,129 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_form_insc_formulaire ON formulaire_inscriptions(formulaire_id);
   CREATE INDEX IF NOT EXISTS idx_form_insc_reference ON formulaire_inscriptions(reference);
   CREATE INDEX IF NOT EXISTS idx_form_insc_statut ON formulaire_inscriptions(statut);
+  /* ⚠️ Les deux tables ci-dessus (formulaires_inscription / formulaire_inscriptions) sont
+     INERTES depuis le 2026-09-08 (commit 213ab1d) : plus aucune route ni page ne les utilise.
+     Conservées uniquement pour ne pas perdre d'éventuelles inscriptions déjà enregistrées.
+     Le module "Formulaires & Inscriptions Événementielles" est reconstruit ci-dessous avec un
+     schéma volontairement différent (multi-types, multi-événements, tarifs/quotas/champs par
+     type) — voir le cahier des charges complet fourni par l'utilisateur le 2026-09-08. */
+
+  /* ===== FORMULAIRES & INSCRIPTIONS ÉVÉNEMENTIELLES v2 (2026-09-08) =====
+     Architecture : Fiche → (N événements liés) → N Types d'inscription → N Champs par type →
+     Inscriptions. Rattachement à la table evenements (module Programmation), jamais events
+     (Billetterie) — même choix que l'ancien module, pour ne pas mélanger deux logiques de
+     paiement distinctes. Priorité 1 (fondations) + confirmation/QR ; paiement réel, gel J+5,
+     contrôle entrée/sortie, communication ciblée : passes suivantes. */
+  CREATE TABLE IF NOT EXISTS insc_fiches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    initiative_id INTEGER,
+    nom TEXT NOT NULL,
+    slug TEXT UNIQUE,
+    description TEXT,
+    affiche_url TEXT,
+    organisateur TEXT,
+    contact_nom TEXT, contact_email TEXT, contact_telephone TEXT,
+    statut TEXT NOT NULL DEFAULT 'brouillon' CHECK(statut IN ('brouillon','programmee','publiee','suspendue','fermee','archivee')),
+    date_ouverture_inscriptions TEXT, date_fermeture_inscriptions TEXT,
+    visibilite TEXT NOT NULL DEFAULT 'public' CHECK(visibilite IN ('public','membres','prive','invitation')),
+    code_acces TEXT,
+    gele_le TEXT, gele_motif TEXT,
+    created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(owner_user_id) REFERENCES users(id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_fiches_owner ON insc_fiches(owner_user_id);
+  CREATE INDEX IF NOT EXISTS idx_insc_fiches_statut ON insc_fiches(statut);
+
+  /* Une fiche peut couvrir plusieurs événements (cahier des charges, annexe §9-14) */
+  CREATE TABLE IF NOT EXISTS insc_fiches_evenements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    evenement_id INTEGER NOT NULL,
+    UNIQUE(fiche_id, evenement_id),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS insc_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    cle TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT,
+    icone TEXT,
+    actif INTEGER NOT NULL DEFAULT 1,
+    gratuit INTEGER NOT NULL DEFAULT 1,
+    prix REAL,
+    places_max INTEGER,
+    liste_attente_active INTEGER NOT NULL DEFAULT 0,
+    validation_auto INTEGER NOT NULL DEFAULT 1,
+    date_ouverture TEXT, date_fermeture TEXT,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(fiche_id, cle),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_types_fiche ON insc_types(fiche_id);
+
+  /* Formulaire dynamique propre à CHAQUE type (cahier des charges §10). condition_json permet
+     la logique conditionnelle (§12) : {champ_source, operateur, valeur} évaluée côté client
+     (affichage) ET revalidée côté serveur à la soumission. */
+  CREATE TABLE IF NOT EXISTS insc_champs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL,
+    nom TEXT NOT NULL,
+    libelle TEXT NOT NULL,
+    description_aide TEXT,
+    type_champ TEXT NOT NULL,
+    obligatoire INTEGER NOT NULL DEFAULT 0,
+    actif INTEGER NOT NULL DEFAULT 1,
+    position INTEGER DEFAULT 0,
+    valeur_defaut TEXT, placeholder TEXT,
+    options_json TEXT DEFAULT '[]',
+    regle_validation TEXT,
+    condition_json TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(type_id) REFERENCES insc_types(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_champs_type ON insc_champs(type_id);
+
+  CREATE TABLE IF NOT EXISTS insc_inscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    type_id INTEGER NOT NULL,
+    evenement_id INTEGER,
+    user_id INTEGER,
+    reference TEXT UNIQUE,
+    nom TEXT NOT NULL, prenom TEXT NOT NULL, email TEXT, telephone TEXT,
+    reponses_json TEXT DEFAULT '{}',
+    statut TEXT NOT NULL DEFAULT 'inscrit' CHECK(statut IN ('inscrit','confirme','present','absent','annule','liste_attente')),
+    statut_paiement TEXT NOT NULL DEFAULT 'non_concerne' CHECK(statut_paiement IN ('non_concerne','non_paye','en_attente','paye','echec','rembourse','partiellement_rembourse','litige','annule')),
+    qr_token TEXT UNIQUE,
+    consentements_json TEXT DEFAULT '{}',
+    ip_creation TEXT,
+    created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id),
+    FOREIGN KEY(type_id) REFERENCES insc_types(id),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_inscriptions_fiche ON insc_inscriptions(fiche_id);
+  CREATE INDEX IF NOT EXISTS idx_insc_inscriptions_type ON insc_inscriptions(type_id);
+  CREATE INDEX IF NOT EXISTS idx_insc_inscriptions_reference ON insc_inscriptions(reference);
+  CREATE INDEX IF NOT EXISTS idx_insc_inscriptions_user ON insc_inscriptions(user_id);
+
+  /* Journal d'audit — même esprit que da_codes_audit_log (qui/quand/quoi) */
+  CREATE TABLE IF NOT EXISTS insc_historique (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    acteur_id INTEGER, acteur_nom TEXT,
+    action TEXT NOT NULL, details TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_historique_fiche ON insc_historique(fiche_id);
 
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
