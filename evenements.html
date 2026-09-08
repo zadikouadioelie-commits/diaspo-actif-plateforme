@@ -459,10 +459,6 @@ function rejoindre(id, btn) {
       <label style="font-size:12.5px;font-weight:700;color:#374151;">Message (facultatif)
         <textarea id="ins-msg" rows="2" placeholder="Une question, un besoin particulier…" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;resize:vertical;"></textarea>
       </label>
-      <label style="font-size:12.5px;font-weight:700;color:#16233D;">🔐 Code de Sécurité Diaspo'Actif (DS-ID) *
-        <input required id="ins-dsid" placeholder="Ex : DS-XXXXXX" autocomplete="off" style="width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1.5px solid #2563EB;border-radius:8px;font-size:14px;letter-spacing:1px;text-transform:uppercase;">
-        <span style="display:block;font-weight:400;font-size:11px;color:#6B7280;margin-top:4px;">Votre signature personnelle qui valide l'inscription. Vous pouvez le générer/retrouver dans <a href="confidentialite.html" target="_blank" style="color:#2563EB;">Confidentialité</a>.</span>
-      </label>
       <div id="ins-err" style="display:none;color:#D33;font-size:12.5px;"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
         <button type="button" onclick="document.getElementById('evt-inscr-overlay').remove()" class="btn" style="font-size:13px;padding:0 16px;">Annuler</button>
@@ -480,11 +476,7 @@ function rejoindre(id, btn) {
       telephone: document.getElementById('ins-tel').value.trim(),
       nb_personnes: parseInt(document.getElementById('ins-nb').value) || 1,
       message: document.getElementById('ins-msg').value.trim(),
-      ds_id: document.getElementById('ins-dsid').value.trim(),
     };
-    if (!payload.ds_id) {
-      const eb = document.getElementById('ins-err'); eb.textContent = 'Le Code de Sécurité Diaspo\'Actif (DS-ID) est requis.'; eb.style.display = 'block'; return;
-    }
     const submitBtn = ev.target.querySelector('button[type=submit]');
     submitBtn.disabled = true; submitBtn.textContent = '…';
     try {

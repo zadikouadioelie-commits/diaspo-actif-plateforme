@@ -19009,9 +19009,6 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
   const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
-  // Validation par le Code de Sécurité Diaspo'Actif (DS-ID) de l'inscrit
-  const dsOk = await verifyVoteDsId(user.id, body?.ds_id);
-  if (!dsOk.ok) return sendJSON(res, 401, { error: dsOk.error });
   const nbPers = Math.max(1, Math.min(20, parseInt(body?.nb_personnes) || 1));
   if (evt.places_max) {
     const nb = (await db.prepare("SELECT COALESCE(SUM(nb_personnes),COUNT(*)) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n || 0;
