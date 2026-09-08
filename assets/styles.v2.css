@@ -26,7 +26,11 @@ html,body{background:var(--bg)!important;}
 }
 .content{background:var(--bg)!important;}
 .topbar{background:var(--navy)!important; color:#fff!important;}
-.topbar .nav a:not(.active),.topbar a:not(.active){color:rgba(255,255,255,.85)!important;}
+/* :not(.cl-switch-manage) : lien "Gérer mes comptes liés" dans le menu de bascule de compte
+   (fond clair, assets/app.js) — sans cette exclusion, ce lien <a> ressortait blanc sur blanc
+   comme le reste du menu, même après avoir exclu ses autres éléments de la règle equivalente
+   dans design-upgrade.v2.css (celle-ci ne cible que les <a>, distincte). */
+.topbar .nav a:not(.active),.topbar a:not(.active):not(.cl-switch-manage){color:rgba(255,255,255,.85)!important;}
 .topbar .nav a:hover:not(.active){color:#fff!important;}
 .topbar .nav a.active{color:var(--navy)!important;}
 /* :not([type=checkbox]):not([type=radio]) — sans cette exclusion, la règle ci-dessous

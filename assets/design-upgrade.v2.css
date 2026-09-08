@@ -100,8 +100,14 @@ a.btn-deconnexion,
 /* Tous les textes dans la topbar en blanc — SAUF le contenu du menu déroulant des
    notifications (fond clair), qui doit garder ses propres couleurs sombres lisibles, ET
    SAUF le lien de nav actif (.nav a.active) depuis la refonte "onglets segmentés" : ce
-   lien se détache sur un fond blanc plein, son texte doit rester en encre foncée. */
-.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img):not(.notif-dropdown):not(.notif-item):not(.notif-titre):not(.notif-contenu):not(.notif-date):not(.notif-dd-title):not(.notif-empty):not(.active) {
+   lien se détache sur un fond blanc plein, son texte doit rester en encre foncée, ET
+   SAUF le menu de bascule entre comptes liés (.cl-switch-dd, assets/app.js) — même
+   raisonnement que .notif-dropdown : fond clair propre, malgré une position:fixed qui le
+   sort visuellement de la topbar, il en reste un descendant DOM et était donc capturé par
+   cette règle (texte forcé blanc sur son propre fond blanc, bug signalé début 2026-09-08,
+   jamais identifié malgré plusieurs correctifs de couleur côté app.js — la cause était ici :
+   un !important externe bat toujours un style inline sans !important). */
+.topbar *:not(.btn-orange):not(.btn-primary):not(.pill):not(img):not(.notif-dropdown):not(.notif-item):not(.notif-titre):not(.notif-contenu):not(.notif-date):not(.notif-dd-title):not(.notif-empty):not(.active):not(.cl-switch-dd):not(.cl-switch-item):not(.cl-switch-avatar):not(.cl-switch-info):not(.cl-switch-nom):not(.cl-switch-role):not(.cl-switch-manage) {
   color: #fff !important;
 }
 .topbar .notif-dropdown, .topbar .notif-dropdown * { color: #0D1B2A !important; }
