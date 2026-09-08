@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Mon Abonnement — Diaspo'Actif</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0D2B4E">
+<style>
+.abo-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:20px;}
+.abo-hero{background:linear-gradient(135deg,#0D2B4E,#16233D);border-radius:14px;padding:24px;color:#fff;margin-bottom:20px;}
+.abo-hero .prix{font-size:32px;font-weight:800;}
+.abo-hero .prix span{font-size:15px;font-weight:400;opacity:.8;}
+.abo-pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase;}
+.abo-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+.abo-row:last-child{border-bottom:none;}
+.abo-row .lbl{color:var(--muted);}
+.abo-row .val{font-weight:700;text-align:right;}
+.abo-empty{text-align:center;padding:60px 20px;color:var(--muted);}
+table.abo-hist{width:100%;border-collapse:collapse;font-size:13px;}
+table.abo-hist th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;}
+table.abo-hist td{padding:8px 10px;border-bottom:1px solid var(--border);}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-bg.open{display:flex;}
+.modal-box{background:#fff;border-radius:16px;padding:24px;width:440px;max-width:100%;}
+</style>
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:32px;padding-bottom:60px;max-width:760px;">
+    <div style="margin-bottom:24px;">
+      <h1 style="margin:0;font-size:24px;">👑 Mon Abonnement</h1>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Consultez votre abonnement Premium, gérez sa facturation et son historique de paiements.</p>
+    </div>
+    <div id="abo-content"><div class="abo-empty">Chargement…</div></div>
+  </main>
+</div>
+
+<!-- MODAL RÉSILIATION -->
+<div class="modal-bg" id="modal-resilier-bg" onclick="if(event.target===this)document.getElementById('modal-resilier-bg').classList.remove('open')">
+  <div class="modal-box">
+    <h3 style="margin:0 0 12px;">Résilier mon abonnement</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin:0 0 14px;">Vous gardez l'accès Premium jusqu'à la fin de la période déjà payée (<strong id="resil-date-fin">—</strong>). Aucun remboursement au prorata, aucun autre prélèvement après cette date.</p>
+    <label style="font-size:12.5px;font-weight:700;color:#374151;">Pourquoi partez-vous ? (facultatif, nous aide à nous améliorer)
+      <textarea id="resil-motif" rows="3" style="width:100%;box-sizing:border-box;margin-top:6px;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+    </label>
+    <div id="resil-err" style="display:none;color:#D33;font-size:12.5px;margin-top:8px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-resilier-bg').classList.remove('open')">Annuler</button>
+      <button class="btn" style="background:#dc2626;color:#fff;border:none;" id="resil-confirm-btn" onclick="confirmerResiliation()">Résilier mon abonnement</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js?v=12"></script>
+<script>
+let ME = null;
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d){ if(!d) return '—'; try{ return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}); }catch(e){ return '—'; } }
+function fmtPrix(m, dev){ const n = Number(m)||0; return `${n.toFixed(2).replace(/\.00$/,'')} ${dev==='EUR'||!dev?'€':dev}`; }
+const INTERVALLE_LBL = { month: '/ mois', year: '/ an' };
+
+let _accredIdCourant = null;
+
+async function loadAbonnement() {
+  if (!ME) { document.getElementById('abo-content').innerHTML = '<div class="abo-empty">🔐 <a href="login.html">Connectez-vous</a> pour voir votre abonnement.</div>'; return; }
+  try {
+    const r = await api('GET', '/mon-abonnement');
+    const el = document.getElementById('abo-content');
+    if (!r.abonnements.length) {
+      el.innerHTML = `<div class="abo-card abo-empty">
+        <div style="font-size:44px;margin-bottom:10px;">👑</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Vous n'avez pas d'abonnement Premium actif</div>
+        <p style="font-size:13px;max-width:380px;margin:0 auto 18px;">Débloquez toutes les fonctionnalités Premium de votre compte.</p>
+        <a class="btn btn-orange" href="premium.html">👑 Découvrir Premium</a>
+      </div>`;
+      return;
+    }
+    el.innerHTML = r.abonnements.map(a => {
+      const s = a.stripe;
+      const enResiliation = s?.annulation_programmee;
+      const pillLabel = enResiliation ? 'Résiliation programmée' : (a.statut === 'active' ? 'Actif' : a.statut);
+      const pillColor = enResiliation ? '#f59e0b' : (a.statut === 'active' ? '#22c55e' : '#94a3b8');
+      return `
+      <div class="abo-hero">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">${escH(a.emoji||'👑')} Abonnement</div>
+            <div style="font-size:19px;font-weight:800;">${escH(a.label)}</div>
+          </div>
+          <span class="abo-pill" style="background:${pillColor};color:#fff;">${escH(pillLabel)}</span>
+        </div>
+        ${s?.montant != null ? `<div class="prix" style="margin-top:14px;">${fmtPrix(s.montant, s.devise)} <span>${INTERVALLE_LBL[s.intervalle]||''}</span></div>` : ''}
+        <div style="font-size:12.5px;opacity:.85;margin-top:6px;">
+          ${enResiliation
+            ? `Accès Premium jusqu'au ${fmtDate(s.periode_fin)}, puis non renouvelé.`
+            : (s?.periode_fin ? `Prochain renouvellement le ${fmtDate(s.periode_fin)}.` : (a.date_expiration ? `Valable jusqu'au ${fmtDate(a.date_expiration)}.` : ''))}
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+          <a class="btn btn-outline" href="premium.html?type=${escH((a.type||'').replace('_abonne',''))}" style="background:#fff;text-decoration:none;">Voir tous les avantages</a>
+          ${enResiliation
+            ? `<button class="btn" style="background:#fff;color:#0D2B4E;" onclick="reactiverAbonnement(${a.accred_id})">↺ Annuler la résiliation</button>`
+            : `<button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4);" onclick="ouvrirResiliation(${a.accred_id}, '${escH(s?.periode_fin ? fmtDate(s.periode_fin) : (a.date_expiration ? fmtDate(a.date_expiration) : 'la fin de la période en cours'))}')">Résilier</button>`}
+        </div>
+      </div>
+      <div class="abo-card">
+        <h3 style="margin:0 0 10px;font-size:14px;">📋 Détails</h3>
+        <div class="abo-row"><span class="lbl">Formule</span><span class="val">${a.type_tarif === 'annuel' ? 'Annuelle' : 'Mensuelle'}</span></div>
+        <div class="abo-row"><span class="lbl">Souscrit le</span><span class="val">${fmtDate(a.date_attribution)}</span></div>
+        ${a.reduction_pct_appliquee ? `<div class="abo-row"><span class="lbl">Réduction appliquée</span><span class="val">-${a.reduction_pct_appliquee}%</span></div>` : ''}
+      </div>`;
+    }).join('') + `
+      <div class="abo-card">
+        <h3 style="margin:0 0 12px;font-size:14px;">🧾 Historique de paiements</h3>
+        ${r.paiements.length ? `<div style="overflow-x:auto;"><table class="abo-hist"><thead><tr>
+          <th>Date</th><th>Abonnement</th><th>Formule</th><th>Statut</th><th style="text-align:right;">Montant</th>
+        </tr></thead><tbody>${r.paiements.map(p => `<tr>
+          <td>${fmtDate(p.created_at)}</td>
+          <td>${escH(p.emoji||'')} ${escH(p.label)}</td>
+          <td>${p.type_tarif === 'annuel' ? 'Annuelle' : 'Mensuelle'}</td>
+          <td>${p.statut === 'paye' ? '✅ Payé' : p.statut === 'en_attente' ? '⏳ En attente' : '❌ Échoué'}</td>
+          <td style="text-align:right;font-weight:700;">${fmtPrix(p.montant, p.devise)}</td>
+        </tr>`).join('')}</tbody></table></div>` : '<p style="color:var(--muted);font-size:13px;margin:0;">Aucun paiement enregistré.</p>'}
+      </div>`;
+  } catch(e) { document.getElementById('abo-content').innerHTML = '<div class="abo-empty">Erreur de chargement.</div>'; }
+}
+
+function ouvrirResiliation(accredId, dateFinTxt) {
+  _accredIdCourant = accredId;
+  document.getElementById('resil-date-fin').textContent = dateFinTxt;
+  document.getElementById('resil-motif').value = '';
+  document.getElementById('resil-err').style.display = 'none';
+  document.getElementById('modal-resilier-bg').classList.add('open');
+}
+
+async function confirmerResiliation() {
+  const btn = document.getElementById('resil-confirm-btn');
+  const errBox = document.getElementById('resil-err');
+  btn.disabled = true; btn.textContent = 'Résiliation…';
+  try {
+    await api('POST', '/mon-abonnement/' + _accredIdCourant + '/resilier', { motif: document.getElementById('resil-motif').value.trim() });
+    document.getElementById('modal-resilier-bg').classList.remove('open');
+    loadAbonnement();
+  } catch(e) {
+    errBox.textContent = e.message || 'Impossible de résilier pour le moment.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Résilier mon abonnement';
+  }
+}
+
+async function reactiverAbonnement(accredId) {
+  if (!confirm('Annuler la résiliation et poursuivre votre abonnement Premium normalement ?')) return;
+  try {
+    await api('POST', '/mon-abonnement/' + accredId + '/reactiver');
+    loadAbonnement();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+(async()=>{
+  ME = await fetchCurrentUser();
+  loadAbonnement();
+})();
+</script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

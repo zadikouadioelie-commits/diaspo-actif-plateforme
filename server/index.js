@@ -21018,6 +21018,101 @@ route("GET", "/api/accreditations/mes", async (req, res) => {
   sendJSON(res, 200, { accreditations: [...anciens, ...nouveaux.filter(n => !types.has(n.type))] });
 });
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   MODULE ABONNEMENT — voir/payer/résilier (2026-09-08, demande explicite)
+   "Payer" existe déjà (premium.html → POST /api/accreditations/:type/payer, mode Stripe
+   subscription réel). Ce qui manquait : "voir" l'état de facturation réel (Stripe est
+   l'autorité, jamais seulement la base locale) et "résilier" — absent de toute l'API
+   jusqu'ici. Le webhook customer.subscription.deleted (server/index.js, plus haut) gère
+   déjà la bascule user_accreditations.statut='expiree' quand Stripe confirme la fin
+   effective : ces routes n'ont donc qu'à programmer/annuler l'arrêt côté Stripe.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* GET /api/mon-abonnement — mes abonnements Premium réellement payés (avec un
+   stripe_subscription_id, donc jamais une accréditation gratuite/offerte par un admin),
+   enrichis en direct depuis Stripe (source de vérité de la facturation, jamais seulement
+   la base locale qui ne se met à jour qu'au passage des webhooks), + historique paiements. */
+route("GET", "/api/mon-abonnement", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const lignes = await db.prepare(`
+    SELECT ua.*, d.type AS type, d.label, d.emoji, d.couleur, d.module
+    FROM user_accreditations ua JOIN accred_definitions d ON d.id = ua.accred_id
+    WHERE ua.user_id=? AND ua.stripe_subscription_id IS NOT NULL
+    ORDER BY ua.created_at DESC
+  `).all(user.id);
+
+  const { stripe } = require("./stripe-client");
+  const abonnements = [];
+  for (const l of lignes) {
+    let stripeInfo = null;
+    if (stripe) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(l.stripe_subscription_id);
+        const price = sub.items?.data?.[0]?.price;
+        stripeInfo = {
+          statut_stripe: sub.status,
+          periode_fin: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+          annulation_programmee: !!sub.cancel_at_period_end,
+          montant: price?.unit_amount != null ? price.unit_amount / 100 : null,
+          devise: price?.currency ? price.currency.toUpperCase() : null,
+          intervalle: price?.recurring?.interval || null,
+        };
+      } catch (e) { console.error('[mon-abonnement] stripe.subscriptions.retrieve', l.stripe_subscription_id, e.message); }
+    }
+    abonnements.push({
+      accred_id: l.accred_id, type: l.type, label: l.label, emoji: l.emoji, couleur: l.couleur, module: l.module,
+      statut: l.statut, date_attribution: l.date_attribution, date_expiration: l.date_expiration,
+      type_tarif: l.type_tarif, montant_paye: l.montant_paye, reduction_pct_appliquee: l.reduction_pct_appliquee,
+      stripe: stripeInfo,
+    });
+  }
+
+  const paiements = await db.prepare(`
+    SELECT ap.id, ap.type_tarif, ap.montant, ap.devise, ap.statut, ap.reduction_pct_appliquee, ap.created_at, d.label, d.emoji
+    FROM accred_paiements ap JOIN accred_definitions d ON d.id = ap.accred_id
+    WHERE ap.user_id=? ORDER BY ap.created_at DESC LIMIT 50
+  `).all(user.id);
+
+  sendJSON(res, 200, { abonnements, paiements });
+});
+
+/* POST /api/mon-abonnement/:id/resilier — programme l'arrêt à la fin de la période déjà
+   payée (jamais immédiat : l'abonné garde l'accès jusqu'au terme de ce qu'il a réglé,
+   pratique standard e-commerce). :id = accred_id (un seul abonnement actif possible par
+   type d'accréditation, cf. contrainte UNIQUE(user_id, accred_id) sur user_accreditations). */
+route("POST", "/api/mon-abonnement/:id/resilier", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ligne = await db.prepare("SELECT * FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(user.id, params.id);
+  if (!ligne || !ligne.stripe_subscription_id) return sendJSON(res, 404, { error: "Abonnement actif introuvable." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Service de paiement momentanément indisponible." });
+  try {
+    const sub = await stripe.subscriptions.update(ligne.stripe_subscription_id, { cancel_at_period_end: true });
+    SEC.logSecurity('abonnement_resilie', { user_id: user.id, accred_id: Number(params.id), motif: (body?.motif || '').toString().trim().slice(0, 500) || null });
+    sendJSON(res, 200, { ok: true, periode_fin: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "résiliation abonnement")); }
+});
+
+/* POST /api/mon-abonnement/:id/reactiver — annule une résiliation programmée tant que la
+   période déjà payée n'est pas terminée (Stripe accepte cette bascule à tout moment avant
+   l'échéance ; au-delà, l'abonnement est déjà résilié et il faut simplement se réabonner
+   via premium.html). */
+route("POST", "/api/mon-abonnement/:id/reactiver", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ligne = await db.prepare("SELECT * FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'").get(user.id, params.id);
+  if (!ligne || !ligne.stripe_subscription_id) return sendJSON(res, 404, { error: "Abonnement actif introuvable." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Service de paiement momentanément indisponible." });
+  try {
+    await stripe.subscriptions.update(ligne.stripe_subscription_id, { cancel_at_period_end: false });
+    SEC.logSecurity('abonnement_reactive', { user_id: user.id, accred_id: Number(params.id) });
+    sendJSON(res, 200, { ok: true });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "réactivation abonnement")); }
+});
+
 /* GET /api/accreditations/demandes — mes propres demandes (ancien + nouveau système) */
 route("GET", "/api/accreditations/demandes", async (req, res) => {
   const user = await getCurrentUser(req);
