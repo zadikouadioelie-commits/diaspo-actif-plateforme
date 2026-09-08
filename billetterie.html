@@ -166,7 +166,7 @@
   <div class="billet-section" id="sec-organisateur">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
       <h2 style="margin:0;">📊 Mes événements</h2>
-      <button class="btn btn-orange" onclick="openCreateEvent()">＋ Créer un événement</button>
+      <a class="btn btn-orange" href="dashboard-initiative.html#evenements" style="text-decoration:none;" title="La création d'événement se fait désormais depuis le module Événements">＋ Créer un événement</a>
     </div>
     <div id="org-events-list"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
   </div>
@@ -1440,7 +1440,7 @@ async function loadOrgEvents() {
     const r = await api('GET', '/events?organisateur_id='+ME.id+'&all=1');
     const events = r.events || [];
     const el = document.getElementById('org-events-list');
-    if (!events.length) { el.innerHTML='<div class="notice">Vous n\'avez pas encore créé d\'événement. <button class="btn btn-sm btn-orange" onclick="openCreateEvent()">Créer</button></div>'; return; }
+    if (!events.length) { el.innerHTML='<div class="notice">Vous n\'avez pas encore créé d\'événement. <a class="btn btn-sm btn-orange" href="dashboard-initiative.html#evenements" style="text-decoration:none;">Créer</a></div>'; return; }
     el.innerHTML = events.map(e => `
       <div class="card" style="margin-bottom:12px;padding:16px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
@@ -1888,7 +1888,7 @@ function escH(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,
     if (ME.role === 'initiative') {
       document.getElementById('tab-scanner').style.display = '';
       document.getElementById('tab-organisateur').style.display = '';
-      document.getElementById('top-actions').innerHTML = '<button class="btn btn-orange" onclick="switchTab(\'organisateur\');openCreateEvent()">＋ Créer un événement</button>'
+      document.getElementById('top-actions').innerHTML = '<a class="btn btn-orange" href="dashboard-initiative.html#evenements" style="text-decoration:none;" title="La création d\'événement se fait désormais depuis le module Événements">＋ Créer un événement</a>'
         + '<button type="button" class="gt-launch-btn" style="margin-top:0;margin-left:8px;width:auto;display:inline-flex;" onclick="window.GuidedTour && GuidedTour.start(\'evenement\')">🎥 Tutoriel</button>';
       /* Charger événements de l'init pour le scanner */
       try {

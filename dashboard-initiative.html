@@ -4220,9 +4220,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <div>
             <h2 style="margin:0;">🎟️ Billetterie</h2>
-            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Créez et gérez vos événements, vendez des billets, scannez les QR codes</p>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Suivez vos ventes de billets, vos revenus et scannez les QR codes — création d'événement désormais dans le module « Événements ».</p>
           </div>
-          <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer un événement</button>
+          <a class="btn btn-outline" href="#evenements" onclick="initShowSection('evenements')" style="text-decoration:none;">📅 Aller au module Événements</a>
         </div>
 
         <!-- WALLET INITIATIVE -->
@@ -4287,7 +4287,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <!-- Tableau des événements avec stats -->
         <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
           <strong style="font-size:14px;">Vos événements</strong>
-          <button class="btn btn-sm btn-orange" onclick="openInitEvtModal()">＋ Créer</button>
+          <a class="btn btn-sm btn-outline" href="#evenements" onclick="initShowSection('evenements')" style="text-decoration:none;">📅 Module Événements</a>
         </div>
         ${events.length ? events.map(e=>`
           <div class="card" style="margin-bottom:10px;padding:14px;">
@@ -4319,7 +4319,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             </div>
             <!-- Panel stats financier (affiché sur demande) -->
             <div id="fin-panel-${e.id}" style="display:none;margin-top:12px;"></div>
-          </div>`).join('') : `<div class="notice">Vous n'avez pas encore d'événements. <a href="billetterie.html" target="_blank">Créer depuis la billetterie →</a></div>`}`;
+          </div>`).join('') : `<div class="notice">Vous n'avez pas encore d'événements. <a href="#evenements" onclick="initShowSection('evenements')">Créer depuis le module Événements →</a></div>`}`;
     } catch(e) { document.getElementById('billetterie-init').innerHTML = '<div class="notice">Erreur chargement billetterie.</div>'; }
   }
 
