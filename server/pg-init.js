@@ -650,6 +650,8 @@ const COLONNES_MIGRATION = [
     ['evenements_participants', 'telephone', "TEXT"],
     ['evenements_participants', 'nb_personnes', "INTEGER DEFAULT 1"],
     ['evenements_participants', 'message', "TEXT"],
+    // Miroir exact de l'ALTER db.js (2026-09-08) — QR code d'inscription pour "Mes Billets".
+    ['evenements_participants', 'qr_token', "TEXT"],
     ['evenements', 'inscription_ouverte', "INTEGER DEFAULT 1"],
     ['evenements', 'lien_inscription', "TEXT"],
     ['evenements', 'heure_debut', "TEXT"],

@@ -96,23 +96,48 @@ function calculerStatutBillet(t) {
   return { label: 'À venir', color: '#2563EB' };
 }
 
+/* Normalise une inscription gratuite (evenements_participants, jointe à evenements) dans le
+   MÊME format qu'un ticket payé (tickets, joint à events) — tout le reste du fichier (carte,
+   modal, PDF, Google Agenda, partage) travaille ensuite sans distinguer les deux sources.
+   2026-09-08, demande explicite : "Mes Billets" doit garder automatiquement tout ce que le
+   compte a reçu (billet payé OU simple inscription gratuite), pas seulement les achats. */
+function normaliserInscription(ins) {
+  const dateDebut = ins.date_evt ? `${ins.date_evt}T${ins.heure_debut || '00:00'}:00` : null;
+  const dateFin = ins.date_fin ? `${ins.date_fin}T${ins.heure_fin || '23:59'}:00` : null;
+  return {
+    id: ins.id, _kind: 'inscription',
+    event_titre: ins.event_titre, date_debut: dateDebut, date_fin: dateFin,
+    ville: ins.ville, pays: ins.pays, adresse: ins.adresse,
+    type_nom: 'Inscription gratuite', type_cat: 'standard',
+    prix_paye: 0, payment_status: 'paid', statut: 'valid', validation_manuelle_statut: null,
+    titulaire_nom: ins.nom_complet || null, titulaire_prenom: null, user_nom: ins.nom_complet || ME?.nom,
+    created_at: ins.created_at, organisateur_id: ins.organisateur_id, autoriser_partage_billet: 1,
+  };
+}
+
 async function loadMesBillets() {
   if (!ME) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">🔐 <a href="login.html">Connectez-vous</a> pour voir vos billets.</div>'; return; }
   try {
-    const r = await api('GET', '/tickets/mes');
+    const [rTickets, rInsc] = await Promise.all([
+      api('GET', '/tickets/mes'),
+      api('GET', '/evenements/participants/mine').catch(() => ({ inscriptions: [] })),
+    ]);
+    const billets = (rTickets.tickets || []).map(t => ({ ...t, _kind: 'billet' }));
+    const inscriptions = (rInsc.inscriptions || []).map(normaliserInscription);
+    const tous = [...billets, ...inscriptions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const list = document.getElementById('mes-billets-list');
-    if (!r.tickets.length) {
+    if (!tous.length) {
       list.innerHTML = `<div class="notice">
         <div style="font-size:48px;margin-bottom:12px;">🎟</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text);">Aucun billet pour le moment</div>
-        <p style="font-size:13px;max-width:360px;margin:0 auto 16px;">Vos billets achetés sur des événements d'initiatives apparaîtront ici.</p>
+        <p style="font-size:13px;max-width:360px;margin:0 auto 16px;">Vos billets achetés et vos inscriptions à des événements apparaîtront ici automatiquement.</p>
         <a class="btn btn-orange" href="agenda.html">📅 Découvrir les événements</a>
       </div>`;
       return;
     }
     list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">` +
-      r.tickets.map(t => { const st = calculerStatutBillet(t); return `
-        <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket(${t.id})">
+      tous.map(t => { const st = calculerStatutBillet(t); return `
+        <div class="ticket-card" style="max-width:none;cursor:pointer;" onclick="openTicket('${t._kind}',${t.id})">
           <div style="background:${st.color};border-radius:10px;padding:14px;color:#fff;margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
               <div><div style="font-weight:800;font-size:15px;">${escH(t.event_titre)}</div>
@@ -126,7 +151,7 @@ async function loadMesBillets() {
             <div class="ticket-info-row"><span class="lbl">💶 Prix</span><span class="val">${t.prix_paye===0?'Gratuit':t.prix_paye.toFixed(2)+' €'}</span></div>
           </div>
           <div style="text-align:center;margin-top:12px;">
-            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket(${t.id})">🔍 Voir le billet</button>
+            <button class="btn btn-sm btn-orange" onclick="event.stopPropagation();openTicket('${t._kind}',${t.id})">🔍 Voir le billet</button>
           </div>
         </div>`; }).join('') + '</div>';
   } catch(e) { document.getElementById('mes-billets-list').innerHTML='<div class="notice">Erreur chargement billets.</div>'; }
@@ -134,11 +159,19 @@ async function loadMesBillets() {
 
 /* ══ MODAL QR TICKET ══ */
 let _ticketDetail = null;
-async function openTicket(tid) {
+async function openTicket(kind, tid) {
   try {
-    const r = await api('GET', '/tickets/'+tid);
-    const t = r.ticket;
-    _ticketDetail = { t, qr_payload: r.qr_payload };
+    let t, qr_payload;
+    if (kind === 'inscription') {
+      const r = await api('GET', '/evenements/participants/'+tid);
+      t = normaliserInscription(r.inscription);
+      qr_payload = r.qr_payload;
+    } else {
+      const r = await api('GET', '/tickets/'+tid);
+      t = r.ticket;
+      qr_payload = r.qr_payload;
+    }
+    _ticketDetail = { t, qr_payload };
     const st = calculerStatutBillet(t);
     const qrOk = t.payment_status === 'paid' && t.statut !== 'cancelled' && !t.validation_manuelle_statut;
     const titulaire = t.titulaire_nom ? `${escH(t.titulaire_prenom||'')} ${escH(t.titulaire_nom)}`.trim() : escH(t.user_nom);
@@ -175,11 +208,11 @@ async function openTicket(tid) {
         ${t.autoriser_partage_billet ? `<button class="btn btn-sm btn-outline" onclick="shareTicket()">🔗 Partager</button>` : ''}
       </div>`;
     document.getElementById('modal-ticket-bg').classList.add('open');
-    if (qrOk && r.qr_payload) {
+    if (qrOk && qr_payload) {
       setTimeout(() => {
         const el = document.getElementById('qr-container-'+tid);
         if (el && typeof QRCode !== 'undefined') {
-          new QRCode(el, { text: r.qr_payload, width: 220, height: 220, colorDark: '#1a1a2e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+          new QRCode(el, { text: qr_payload, width: 220, height: 220, colorDark: '#1a1a2e', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
         }
       }, 100);
     }

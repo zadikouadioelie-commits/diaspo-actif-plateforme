@@ -22,6 +22,16 @@ async function signTicket(ticketId, eventId, ts) {
     .update(`${ticketId}:${eventId}:${ts}`).digest("hex").slice(0, 40);
 }
 
+/* Même secret que signTicket() ci-dessus, mais namespace "participant:" distinct pour ne
+   jamais confondre un QR d'inscription gratuite (evenements_participants) avec un QR de
+   billet payé (tickets) même si les deux ids numériques venaient à coïncider (2026-09-08,
+   demande explicite : "Mes Billets" doit garder automatiquement toute preuve de
+   participation reçue, pas seulement les billets payés de la Billetterie). */
+async function signParticipation(participantId, evenementId, ts) {
+  return crypto.createHmac("sha256", TICKET_SECRET)
+    .update(`participant:${participantId}:${evenementId}:${ts}`).digest("hex").slice(0, 40);
+}
+
 /* ── Codes promo billetterie (event_codes_promo) — validation en lecture seule, ne consomme jamais le quota.
    La consommation réelle (nb_utilisations + event_codes_promo_usages) se fait uniquement au paiement confirmé
    (webhook) ou à la validation immédiate d'une commande gratuite, jamais à la simple création d'un ticket 'pending'. */
@@ -18046,8 +18056,12 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
   const tel = (body?.telephone || "").toString().trim().slice(0, 40);
   const message = (body?.message || "").toString().trim().slice(0, 500);
   try {
-    await db.prepare("INSERT INTO evenements_participants (evenement_id,user_id,nom_complet,email,telephone,nb_personnes,message) VALUES (?,?,?,?,?,?,?)")
-      .run(params.id, user.id, nomComplet || null, email || null, tel || null, nbPers, message || null);
+    const insertId = (await db.prepare("INSERT INTO evenements_participants (evenement_id,user_id,nom_complet,email,telephone,nb_personnes,message) VALUES (?,?,?,?,?,?,?)")
+      .run(params.id, user.id, nomComplet || null, email || null, tel || null, nbPers, message || null)).lastInsertRowid;
+    // QR code d'inscription (2026-09-08) — même schéma "INSERT d'abord, signer ensuite" que
+    // signTicket() : la signature couvre l'id réellement attribué, jamais deviné à l'avance.
+    const qrToken = await signParticipation(insertId, params.id, evt.created_at || '');
+    await db.prepare("UPDATE evenements_participants SET qr_token=? WHERE id=?").run(qrToken, insertId);
     if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${nomComplet || user.nom} s'est inscrit à « ${evt.titre} »${nbPers > 1 ? ` (${nbPers} pers.)` : ''}`, { evenement_id: evt.id });
     sendJSON(res, 201, { ok: true, inscrit: true });
   } catch(e) {
@@ -18055,9 +18069,50 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
     try {
       await db.prepare("UPDATE evenements_participants SET nom_complet=?,email=?,telephone=?,nb_personnes=?,message=? WHERE evenement_id=? AND user_id=?")
         .run(nomComplet || null, email || null, tel || null, nbPers, message || null, params.id, user.id);
+      // Réparation d'un éventuel qr_token manquant (inscription faite avant ce champ).
+      const existant = await db.prepare("SELECT id, qr_token FROM evenements_participants WHERE evenement_id=? AND user_id=?").get(params.id, user.id);
+      if (existant && !existant.qr_token) {
+        const qrToken = await signParticipation(existant.id, params.id, evt.created_at || '');
+        await db.prepare("UPDATE evenements_participants SET qr_token=? WHERE id=?").run(qrToken, existant.id);
+      }
     } catch(_) {}
     sendJSON(res, 200, { ok: true, inscrit: true, message: "Inscription mise à jour." });
   }
+});
+
+/* GET /api/evenements/participants/mine — mes inscriptions gratuites (evenements_participants),
+   unifiées avec GET /api/tickets/mes côté client dans "Mes Billets" (2026-09-08, demande
+   explicite : la billetterie doit garder automatiquement tout ce que le compte a reçu, pas
+   seulement les billets payés de la Billetterie). */
+route("GET", "/api/evenements/participants/mine", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT ep.*, e.titre AS event_titre, e.date_evt, e.heure_debut, e.heure_fin, e.date_fin,
+      e.ville, e.pays, e.lieu AS adresse, e.image_couverture, e.image_url, e.owner_user_id AS organisateur_id
+    FROM evenements_participants ep JOIN evenements e ON e.id = ep.evenement_id
+    WHERE ep.user_id=? ORDER BY ep.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { inscriptions: rows });
+});
+
+/* GET /api/evenements/participants/:id — détail + QR d'une inscription (propriétaire uniquement,
+   même convention d'accès que GET /api/tickets/:id). */
+route("GET", "/api/evenements/participants/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const row = await db.prepare(`
+    SELECT ep.*, e.titre AS event_titre, e.description AS event_description, e.date_evt, e.heure_debut,
+      e.heure_fin, e.date_fin, e.ville, e.pays, e.lieu AS adresse, e.owner_user_id AS organisateur_id,
+      u.nom AS organisateur_nom
+    FROM evenements_participants ep JOIN evenements e ON e.id = ep.evenement_id
+    LEFT JOIN users u ON u.id = e.owner_user_id
+    WHERE ep.id=?
+  `).get(params.id);
+  if (!row) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  if (row.user_id !== user.id && !['administrateur','collectivite'].includes(user.role)) return sendJSON(res, 403, { error: "Accès refusé." });
+  const qrPayload = Buffer.from(JSON.stringify({ pid: row.id, eid: row.evenement_id, sig: row.qr_token })).toString('base64');
+  sendJSON(res, 200, { inscription: row, qr_payload: qrPayload });
 });
 
 route("DELETE", "/api/evenements/:id/quitter", async (req, res, params) => {

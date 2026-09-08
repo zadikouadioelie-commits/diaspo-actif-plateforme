@@ -1746,6 +1746,10 @@ const MIGRATIONS = [
   ["evenements_participants", "telephone TEXT"],
   ["evenements_participants", "nb_personnes INTEGER DEFAULT 1"],
   ["evenements_participants", "message TEXT"],
+  // QR code d'inscription (2026-09-08, demande explicite) — "Mes Billets" doit garder
+  // automatiquement toute preuve de participation, pas seulement les billets payés de la
+  // Billetterie. Même secret HMAC que signTicket() (server/index.js), namespace distinct.
+  ["evenements_participants", "qr_token TEXT"],
   ["evenements", "inscription_ouverte INTEGER DEFAULT 1"],
   ["evenements", "lien_inscription TEXT"],
   // Événements v2 — champs complémentaires
