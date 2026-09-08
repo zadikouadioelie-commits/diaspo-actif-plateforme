@@ -1029,7 +1029,9 @@ function injectComptesLiesSwitcherStyles() {
 /* Pastille dorée pleine (plutôt qu'un simple ▾ transparent hérité de la couleur du texte) :
    le bouton doit rester repérable quel que soit le fond de la topbar (navy sur certaines
    pages, blanc sur d'autres) — un fond transparent à opacité réduite s'y fondait trop. */
-.cl-switch-btn{background:linear-gradient(135deg,#c8960c,#f2c94c);border:none;cursor:pointer;color:#2a1e00;font-size:12px;font-weight:800;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;box-shadow:0 1px 4px rgba(0,0,0,.3);transition:transform .15s;}
+/* Carré (coins arrondis) plutôt que rond : présentation demandée explicitement, distingue
+   aussi mieux ce bouton des icônes rondes (avatar, notifications) qui l'entourent. */
+.cl-switch-btn{background:linear-gradient(135deg,#c8960c,#f2c94c);border:none;cursor:pointer;color:#2a1e00;font-size:12px;font-weight:800;width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;box-shadow:0 1px 4px rgba(0,0,0,.3);transition:transform .15s;}
 .cl-switch-btn:hover{transform:scale(1.1);}
 /* color-scheme:light + color explicite sur chaque item : un <button> n'hérite pas toujours
    du color du parent (il applique le rendu "form control" du thème système) — en mode sombre
@@ -1081,11 +1083,20 @@ async function initComptesLiesSwitcher(user) {
     window.__majFlechesBottomNav?.();
   }
   const ROLE_LABELS_CL = { utilisateur:'Utilisateur', initiative:'Initiative', administrateur:'Administrateur', collectivite:'Collectivité' };
+  /* style="" inline sur le nom/rôle plutôt que compter sur la classe CSS : malgré color:#111
+     explicite sur .cl-switch-nom/.cl-switch-item, le texte restait invisible chez au moins un
+     utilisateur (capture d'écran répétée, cause jamais identifiée avec certitude — aucun
+     !important concurrent trouvé après recherche exhaustive dans toutes les feuilles de style
+     chargées). Un style inline gagne sur toute règle externe non-!important, quelle qu'en soit
+     la source — filet de sécurité définitif, indépendant de la cause exacte. */
   dd.innerHTML = comptes.map(c => {
     const estActuel = c.id === user.id;
-    return `<button type="button" class="cl-switch-item" data-user-id="${c.id}" ${estActuel ? 'disabled' : ''}>
+    return `<button type="button" class="cl-switch-item" data-user-id="${c.id}" ${estActuel ? 'disabled' : ''} style="color:#111;">
       <span class="cl-switch-avatar">${c.photo_url ? `<img src="${c.photo_url}" alt="">` : '👤'}</span>
-      <span class="cl-switch-info"><span class="cl-switch-nom">${escH(c.nom)}${estActuel ? ' · actuel' : ''}</span><span class="cl-switch-role">${escH(ROLE_LABELS_CL[c.role] || c.role)}</span></span>
+      <span class="cl-switch-info">
+        <span class="cl-switch-nom" style="color:#111;">${escH(c.nom)}${estActuel ? ' · actuel' : ''}</span>
+        <span class="cl-switch-role" style="color:#6b7280;">${escH(ROLE_LABELS_CL[c.role] || c.role)}</span>
+      </span>
     </button>`;
   }).join('') + `<a href="comptes-lies.html" class="cl-switch-manage">🔗 Gérer mes comptes liés</a>`;
   // Logique d'ouverture commune aux deux déclencheurs (▾ topbar desktop, "Comptes" barre du
