@@ -39450,9 +39450,19 @@ route("GET", "/api/insc/fiches", async (req, res) => {
   sendJSON(res, 200, { fiches: enrichies });
 });
 
+/* Restriction temporaire de vérification (2026-09-09, demande explicite de l'utilisateur) :
+   seul le compte diaspo.actif@gmail.com (Initiative officielle) peut créer une fiche pendant
+   la phase de test, avant d'ouvrir le module aux autres comptes Initiative. Les administrateurs
+   restent toujours autorisés (ils supervisent déjà tout le module). À retirer sur demande —
+   une seule condition à supprimer. */
+const INSC_BETA_EMAIL = "diaspo.actif@gmail.com";
+function inscBetaAutorise(user) {
+  return user.role === "administrateur" || String(user.email || "").toLowerCase() === INSC_BETA_EMAIL;
+}
 route("POST", "/api/insc/fiches", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est en cours de vérification, réservé pour l'instant à un compte pilote." });
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = await inscSlugUnique(body.nom);
@@ -39953,6 +39963,216 @@ route("GET", "/api/insc/inscriptions/:id/confirmation.pdf", async (req, res, par
     ${qrPayload ? `<div id="insc-qr"></div><script>try{new QRCode(document.getElementById('insc-qr'),{text:${JSON.stringify(qrPayload)},width:180,height:180,colorDark:'#0D2B4E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}catch(e){}</script>` : ""}
     <script>setTimeout(()=>window.print(), 350)</script>
     </body></html>`);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORMULAIRES & INSCRIPTIONS ÉVÉNEMENTIELLES — Passe 2 (2026-09-09)
+   Communication ciblée, Contrôle QR (liens temporaires + entrée/sortie), Présences.
+   Finances/paiement réel restent hors de cette passe (voir plan) — seul un gel
+   administratif SANS logique de paiement est ajouté (fonds_geles_le/fonds_geles_motif).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Communication ciblée ── */
+function inscSubstituerVariables(texte, vars) {
+  return String(texte || "").replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null) ? String(vars[k]) : m);
+}
+route("POST", "/api/insc/fiches/:id/communications", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!body?.message || !String(body.message).trim()) return sendJSON(res, 400, { error: "Le message est requis." });
+  const canal = ["email", "notification", "les_deux"].includes(body.canal) ? body.canal : "les_deux";
+  const destinataireType = body.destinataire_type || "tous";
+
+  let sql = "SELECT i.*, t.label AS type_label, e.titre AS evenement_titre, e.date_evt, e.heure_debut, e.lieu FROM insc_inscriptions i JOIN insc_types t ON t.id=i.type_id LEFT JOIN evenements e ON e.id=i.evenement_id WHERE i.fiche_id=? AND i.statut NOT IN ('annule')";
+  const args = [fiche.id];
+  if (destinataireType !== "tous") { sql += " AND t.cle=?"; args.push(destinataireType); }
+  const destinataires = await db.prepare(sql).all(...args);
+
+  let nbEmail = 0, nbNotif = 0;
+  for (const d of destinataires) {
+    const vars = { prenom: d.prenom, nom: d.nom, evenement: d.evenement_titre || fiche.nom, type_inscription: d.type_label, date_evenement: d.date_evt || "", lieu: d.lieu || "" };
+    const objetFinal = inscSubstituerVariables(body.objet || `${fiche.nom} — nouvelle communication`, vars);
+    const messageFinal = inscSubstituerVariables(body.message, vars);
+    if ((canal === "email" || canal === "les_deux") && d.email) {
+      try {
+        const { emailCommunicationInscription } = require("./mailer");
+        await emailCommunicationInscription({ email: d.email, prenom: d.prenom, objet: objetFinal, message: messageFinal, evenementNom: vars.evenement });
+        nbEmail++;
+      } catch (e) { console.error("[insc-communication-email]", e.message); }
+    }
+    if ((canal === "notification" || canal === "les_deux") && d.user_id) {
+      creerNotif(d.user_id, "insc_communication", objetFinal, messageFinal, { lien: `mes-inscriptions-evt.html#insc-${d.id}` });
+      nbNotif++;
+    }
+  }
+  await db.prepare(`
+    INSERT INTO insc_communications (fiche_id, expediteur_id, destinataire_type, canal, objet, message, nb_email, nb_notif)
+    VALUES (?,?,?,?,?,?,?,?)
+  `).run(fiche.id, user.id, destinataireType, canal, body.objet || null, body.message, nbEmail, nbNotif);
+  await inscJournaliser(fiche.id, user, "communication", `Communication envoyée à « ${destinataireType} » (${destinataires.length} destinataires, ${nbEmail} e-mails, ${nbNotif} notifications).`);
+  sendJSON(res, 200, { ok: true, nb_destinataires: destinataires.length, nb_email: nbEmail, nb_notif: nbNotif });
+});
+route("GET", "/api/insc/fiches/:id/communications", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const communications = await db.prepare("SELECT * FROM insc_communications WHERE fiche_id=? ORDER BY id DESC").all(fiche.id);
+  sendJSON(res, 200, { communications });
+});
+
+/* ── Contrôle QR : liens temporaires + entrée/sortie ── */
+function inscCalculerValideJusqua(duree, evenement, fiche) {
+  const now = Date.now();
+  const heures = { "1h": 1, "3h": 3, "6h": 6, "12h": 12, "24h": 24, "48h": 48 };
+  if (heures[duree]) return new Date(now + heures[duree] * 3600000).toISOString();
+  if (duree === "event") {
+    const dateRef = evenement?.date_evt || fiche?.date_fermeture_inscriptions;
+    if (dateRef) { const d = new Date(dateRef); if (!isNaN(d.getTime())) return d.toISOString(); }
+  }
+  return new Date(now + 24 * 3600000).toISOString(); // repli raisonnable
+}
+route("POST", "/api/insc/fiches/:id/liens-controle", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const evenementId = body?.evenement_id || null;
+  const evenement = evenementId ? await db.prepare("SELECT * FROM evenements WHERE id=?").get(evenementId) : null;
+  const duree = body?.duree || "24h";
+  await db.prepare("UPDATE insc_liens_controle SET actif=0 WHERE fiche_id=? AND (evenement_id=? OR (evenement_id IS NULL AND ? IS NULL)) AND actif=1").run(fiche.id, evenementId, evenementId);
+  const token = "CTRL-" + crypto.randomBytes(6).toString("hex").toUpperCase();
+  const valideJusqua = inscCalculerValideJusqua(duree, evenement, fiche);
+  const id = (await db.prepare(`
+    INSERT INTO insc_liens_controle (fiche_id, evenement_id, token, duree_choisie, valide_jusqua, cree_par_admin_id)
+    VALUES (?,?,?,?,?,?)
+  `).run(fiche.id, evenementId, token, duree, valideJusqua, user.id)).lastInsertRowid;
+  await inscJournaliser(fiche.id, user, "lien_controle_cree", `Lien de contrôle créé (valide jusqu'au ${valideJusqua}).`);
+  sendJSON(res, 201, { id, token, valide_jusqua: valideJusqua });
+});
+route("GET", "/api/insc/fiches/:id/liens-controle", async (req, res, params, body, query) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const evenementId = query?.evenement_id || null;
+  const lien = evenementId
+    ? await db.prepare("SELECT * FROM insc_liens_controle WHERE fiche_id=? AND evenement_id=? AND actif=1 ORDER BY id DESC LIMIT 1").get(fiche.id, evenementId)
+    : await db.prepare("SELECT * FROM insc_liens_controle WHERE fiche_id=? AND evenement_id IS NULL AND actif=1 ORDER BY id DESC LIMIT 1").get(fiche.id);
+  sendJSON(res, 200, { lien: lien || null });
+});
+route("POST", "/api/insc/fiches/:id/liens-controle/revoquer", async (req, res, params) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("UPDATE insc_liens_controle SET actif=0 WHERE fiche_id=? AND actif=1").run(fiche.id);
+  await inscJournaliser(fiche.id, user, "liens_controle_revoques", "Tous les liens de contrôle ont été désactivés.");
+  sendJSON(res, 200, { ok: true });
+});
+
+async function inscChargerLienActif(token) {
+  const lien = await db.prepare("SELECT * FROM insc_liens_controle WHERE token=?").get(token);
+  if (!lien) return { erreur: 404, msg: "Lien de contrôle introuvable." };
+  if (!lien.actif) return { erreur: 403, msg: "Ce lien de contrôle n'est plus valide." };
+  if (new Date(lien.valide_jusqua).getTime() < Date.now()) return { erreur: 403, msg: "Ce lien de contrôle n'est plus valide." };
+  return { lien };
+}
+async function inscStatsCheckin(ficheId, evenementId) {
+  let sql = "SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut NOT IN ('annule')";
+  const args = [ficheId];
+  if (evenementId) { sql += " AND evenement_id=?"; args.push(evenementId); }
+  const totalInscrits = (await db.prepare(sql).get(...args))?.n || 0;
+  const entrees = (await db.prepare("SELECT COUNT(*) n FROM insc_checkins WHERE fiche_id=? AND direction='entree' AND resultat='accepted'").get(ficheId))?.n || 0;
+  const sorties = (await db.prepare("SELECT COUNT(*) n FROM insc_checkins WHERE fiche_id=? AND direction='sortie' AND resultat='accepted'").get(ficheId))?.n || 0;
+  const presentsActuellement = Math.max(0, entrees - sorties);
+  return { presents_actuellement: presentsActuellement, entrees, sorties, total_inscrits: totalInscrits, non_entres: Math.max(0, totalInscrits - entrees) };
+}
+route("GET", "/api/controle/:token", async (req, res, params) => {
+  const { erreur, msg, lien } = await inscChargerLienActif(params.token);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const fiche = await db.prepare("SELECT nom FROM insc_fiches WHERE id=?").get(lien.fiche_id);
+  const evenement = lien.evenement_id ? await db.prepare("SELECT titre FROM evenements WHERE id=?").get(lien.evenement_id) : null;
+  const stats = await inscStatsCheckin(lien.fiche_id, lien.evenement_id);
+  sendJSON(res, 200, { fiche_nom: fiche?.nom, evenement_titre: evenement?.titre, valide_jusqua: lien.valide_jusqua, stats });
+});
+route("POST", "/api/controle/:token/scanner", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc_scan:ip:${ip}`, 60, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de scans. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const { erreur, msg, lien } = await inscChargerLienActif(params.token);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const direction = body?.direction;
+  if (!["entree", "sortie"].includes(direction)) return sendJSON(res, 400, { error: "Direction invalide (entree ou sortie attendu)." });
+
+  let parsed;
+  try { parsed = JSON.parse(Buffer.from(body?.qr_payload || "", "base64").toString()); } catch (e) { return sendJSON(res, 400, { valid: false, error: "QR Code invalide." }); }
+  const { iid, eid, sig } = parsed || {};
+  if (!iid || !sig) return sendJSON(res, 400, { valid: false, error: "QR Code incomplet." });
+
+  const inscrit = async (motif) => {
+    try { await db.prepare("INSERT INTO insc_checkins (inscription_id, fiche_id, evenement_id, lien_controle_id, direction, resultat, motif_rejet) VALUES (?,?,?,?,?,'rejected',?)").run(iid, lien.fiche_id, lien.evenement_id, lien.id, direction, motif); } catch (e) {}
+    return sendJSON(res, 200, { valid: false, error: motif });
+  };
+
+  const insc = await db.prepare("SELECT * FROM insc_inscriptions WHERE id=?").get(iid);
+  if (!insc) return inscrit("QR Code invalide — inscription introuvable.");
+  const expectedSig = await signInscription(insc.id, insc.evenement_id, insc.created_at);
+  if (sig !== expectedSig) return inscrit("QR Code invalide — signature incorrecte.");
+  if (insc.fiche_id !== lien.fiche_id || (lien.evenement_id && insc.evenement_id !== lien.evenement_id)) {
+    return inscrit("Cette inscription ne correspond pas à cet événement.");
+  }
+  if (insc.statut === "annule") return inscrit("Cette inscription a été annulée.");
+
+  const dernier = await db.prepare("SELECT direction FROM insc_checkins WHERE inscription_id=? AND resultat='accepted' ORDER BY id DESC LIMIT 1").get(iid);
+  const estDedans = dernier && dernier.direction === "entree";
+  if (direction === "entree" && estDedans) return inscrit("Cette personne est déjà à l'intérieur de l'événement.");
+  if (direction === "sortie" && !estDedans) return inscrit(dernier ? "Cette personne est déjà à l'extérieur de l'événement." : "Sortie impossible : cette personne n'a pas été enregistrée comme entrée.");
+
+  await db.prepare("INSERT INTO insc_checkins (inscription_id, fiche_id, evenement_id, lien_controle_id, direction, resultat) VALUES (?,?,?,?,?,'accepted')").run(iid, lien.fiche_id, lien.evenement_id, lien.id, direction);
+  const type = await db.prepare("SELECT label FROM insc_types WHERE id=?").get(insc.type_id);
+  sendJSON(res, 200, { valid: true, direction, nom: insc.nom, prenom: insc.prenom, type_label: type?.label });
+});
+
+/* ── Présences ── */
+route("GET", "/api/insc/fiches/:id/presences", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const inscriptions = await db.prepare("SELECT i.*, t.label AS type_label FROM insc_inscriptions i JOIN insc_types t ON t.id=i.type_id WHERE i.fiche_id=? AND i.statut NOT IN ('annule') ORDER BY i.nom ASC").all(fiche.id);
+  const presences = [];
+  for (const insc of inscriptions) {
+    const scans = await db.prepare("SELECT direction, created_at FROM insc_checkins WHERE inscription_id=? AND resultat='accepted' ORDER BY id ASC").all(insc.id);
+    const entree = scans.find(s => s.direction === "entree");
+    const sortie = [...scans].reverse().find(s => s.direction === "sortie");
+    const dernier = scans[scans.length - 1];
+    const statut = !dernier ? "⚪ Absent" : dernier.direction === "entree" ? "🟢 Intérieur" : "🔵 Extérieur";
+    presences.push({ ...insc, entree_at: entree?.created_at || null, sortie_at: (dernier?.direction === "sortie") ? dernier.created_at : null, statut_presence: statut });
+  }
+  sendJSON(res, 200, { presences });
+});
+route("GET", "/api/insc/fiches/:id/checkin-stats", async (req, res, params, body, query) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const stats = await inscStatsCheckin(fiche.id, query?.evenement_id || null);
+  sendJSON(res, 200, { stats });
+});
+
+/* ── Finances : squelette de gel des fonds, sans paiement réel derrière ── */
+route("POST", "/api/insc/fiches/:id/geler-fonds", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(params.id);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable." });
+  if (fiche.fonds_geles_le) return sendJSON(res, 400, { error: "Les fonds sont déjà gelés." });
+  const motif = (body?.motif || "").trim();
+  if (!motif) return sendJSON(res, 400, { error: "Un motif est requis." });
+  await db.prepare("UPDATE insc_fiches SET fonds_geles_le=datetime('now'), fonds_geles_motif=? WHERE id=?").run(motif, fiche.id);
+  await inscJournaliser(fiche.id, user, "gel_fonds", motif);
+  creerNotif(fiche.owner_user_id, "insc_fonds_geles", "Fonds gelés par l'administration", `Les fonds de « ${fiche.nom} » ont été gelés : ${motif}.`, { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/insc/fiches/:id/degeler-fonds", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(params.id);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable." });
+  if (!fiche.fonds_geles_le) return sendJSON(res, 400, { error: "Les fonds ne sont pas gelés." });
+  await db.prepare("UPDATE insc_fiches SET fonds_geles_le=NULL, fonds_geles_motif=NULL WHERE id=?").run(fiche.id);
+  await inscJournaliser(fiche.id, user, "degel_fonds", null);
+  creerNotif(fiche.owner_user_id, "insc_fonds_degeles", "Fonds débloqués", `Les fonds de « ${fiche.nom} » sont de nouveau disponibles.`, { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ═══════════════════════════════════════════════════════════════════ */

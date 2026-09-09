@@ -622,6 +622,56 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_insc_historique_fiche ON insc_historique(fiche_id);
 
+  /* Formulaires & Inscriptions v2 -- Passe 2 (2026-09-09) : Communication ciblee, Controle QR
+     (liens temporaires + entree/sortie), Presences. Finances/paiement reel restent hors de
+     cette passe (voir plan) -- seules 2 colonnes de gel administratif des fonds sont ajoutees
+     plus bas via MIGRATIONS, sans logique de paiement derriere. */
+  CREATE TABLE IF NOT EXISTS insc_liens_controle (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    evenement_id INTEGER,
+    token TEXT UNIQUE NOT NULL,
+    duree_choisie TEXT NOT NULL,
+    valide_jusqua TEXT NOT NULL,
+    actif INTEGER NOT NULL DEFAULT 1,
+    cree_par_admin_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_liens_fiche ON insc_liens_controle(fiche_id);
+  CREATE INDEX IF NOT EXISTS idx_insc_liens_token ON insc_liens_controle(token);
+
+  CREATE TABLE IF NOT EXISTS insc_checkins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    inscription_id INTEGER NOT NULL,
+    fiche_id INTEGER NOT NULL,
+    evenement_id INTEGER,
+    lien_controle_id INTEGER,
+    direction TEXT NOT NULL CHECK(direction IN ('entree','sortie')),
+    resultat TEXT NOT NULL CHECK(resultat IN ('accepted','rejected')),
+    motif_rejet TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(inscription_id) REFERENCES insc_inscriptions(id),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_checkins_inscription ON insc_checkins(inscription_id);
+  CREATE INDEX IF NOT EXISTS idx_insc_checkins_fiche ON insc_checkins(fiche_id);
+
+  CREATE TABLE IF NOT EXISTS insc_communications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    expediteur_id INTEGER,
+    destinataire_type TEXT NOT NULL,
+    canal TEXT NOT NULL CHECK(canal IN ('email','notification','les_deux')),
+    objet TEXT, message TEXT NOT NULL,
+    nb_email INTEGER DEFAULT 0, nb_notif INTEGER DEFAULT 0,
+    statut TEXT NOT NULL DEFAULT 'termine',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_comm_fiche ON insc_communications(fiche_id);
+
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user1_id INTEGER NOT NULL,
@@ -1593,6 +1643,11 @@ const MIGRATIONS = [
   // "evenements" à l'événement Billetterie ("events") qui l'a générée, pour la mettre à jour
   // ou la supprimer au lieu d'en recréer une à chaque synchronisation.
   ["evenements", "source_events_id INTEGER"],
+  // Formulaires & Inscriptions v2 -- Passe 2 (2026-09-09) : gel administratif des fonds,
+  // orthogonal au gel de fiche deja existant (gele_le/gele_motif) -- aucune logique de
+  // paiement reel derriere pour l'instant, juste le drapeau + motif.
+  ["insc_fiches", "fonds_geles_le TEXT"],
+  ["insc_fiches", "fonds_geles_motif TEXT"],
   // Filtre "Gratuit / payant" de la page Événements (2026-09-07) — prix le plus bas des
   // billets de l'événement source, NULL/0 = gratuit.
   ["evenements", "prix_min REAL"],

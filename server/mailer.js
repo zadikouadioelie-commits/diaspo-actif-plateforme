@@ -908,4 +908,33 @@ function emailDemandeDevisReponse({ to, prenom, initiativeNom, produitNom, conte
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription };
+/* Communication ciblée depuis une fiche d'inscription (module Formulaires & Inscriptions,
+   Passe 2, 2026-09-09) — objet/message déjà substitués par l'appelant (variables {prenom}
+   etc.), cette fonction ne fait que les afficher. */
+function emailCommunicationInscription({ email, prenom, objet, message, evenementNom }) {
+  return sendEmail({
+    to: email,
+    subject: objet || `${evenementNom} — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 16px;font-size:18px;font-weight:900;color:#0D1B2A;">${prenom ? `Bonjour ${prenom},` : "Bonjour,"}</h1>
+      <p style="color:#374151;font-size:14px;line-height:1.75;white-space:pre-wrap;">${message}</p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
