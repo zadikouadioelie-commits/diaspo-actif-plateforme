@@ -106,6 +106,21 @@
   // avec inscription.html et le filtre annuaire, pour que les groupes ne divergent jamais.
   const domaineOptions = window.domaineActiviteOptionsHTML ? domaineActiviteOptionsHTML(profil.domaine_principal) : '';
 
+  /* Zones géographiques d'intervention (2026-09-09, demande explicite : « déclarer des zones
+     géographiques supplémentaires en cas d'expansion d'activité ») — champ initiatives.pays_intervention,
+     déjà existant et modifiable depuis initiative.html (icône crayon « 🌍 Zones d'intervention »)
+     et affiché en lecture seule dans le dashboard Initiative (« 🟨 Zones d'action »). Réutilisé tel
+     quel ici (même route PUT /api/initiatives/:id/profil-public) plutôt que de recréer un champ —
+     ça le rend juste modifiable aussi depuis Paramètres du compte, comme demandé. Réservé aux
+     comptes Initiative (seule table à porter ce champ) ayant déjà créé leur fiche initiative. */
+  let zonesInitiative = [];
+  if (profil.role === 'initiative' && profil.initiative_id) {
+    try {
+      const ri = await api('GET', `/initiatives/${profil.initiative_id}`);
+      zonesInitiative = ri.initiative?.pays_intervention_arr || [];
+    } catch (e) { /* fiche pas encore accessible — carte simplement masquée plus bas */ }
+  }
+
   wrap.innerHTML = `
     <div class="pc-card">
       <h2>👤 Identité</h2>
@@ -139,6 +154,18 @@
       <button type="button" class="pc-btn pc-btn-save" id="pc-btn-domaine">Enregistrer</button>
       <p class="pc-msg" id="pc-msg-domaine"></p>
     </div>
+
+    ${profil.role === 'initiative' && profil.initiative_id ? `
+    <div class="pc-card">
+      <h2>🗺️ Zones géographiques d'intervention</h2>
+      <p class="pc-desc">En cas d'expansion de votre activité, déclarez ici les zones supplémentaires (pays, régions ou villes) où vous intervenez désormais — affichées sur votre profil public et l'annuaire.</p>
+      <div class="pc-field"><label>Zones (séparées par des virgules)</label>
+        <input id="pc-zones" type="text" placeholder="France, Côte d'Ivoire, Dakar…" value="${esc(zonesInitiative.join(', '))}">
+      </div>
+      <button type="button" class="pc-btn pc-btn-save" id="pc-btn-zones">Enregistrer</button>
+      <p class="pc-msg" id="pc-msg-zones"></p>
+    </div>
+    ` : ''}
 
     <div class="pc-card">
       <h2>✉️ Adresse e-mail</h2>
@@ -220,6 +247,18 @@
     } catch(e) { showMsg('pc-msg-domaine', e.message || 'Erreur.', false); }
     finally { btn.disabled = false; }
   });
+
+  if (document.getElementById('pc-btn-zones')) {
+    document.getElementById('pc-btn-zones').addEventListener('click', async () => {
+      const btn = document.getElementById('pc-btn-zones'); btn.disabled = true;
+      try {
+        const zones = document.getElementById('pc-zones').value.split(',').map(s => s.trim()).filter(Boolean);
+        await api('PUT', `/initiatives/${profil.initiative_id}/profil-public`, { pays_intervention: zones });
+        showMsg('pc-msg-zones', 'Enregistré ✓', true);
+      } catch(e) { showMsg('pc-msg-zones', e.message || 'Erreur.', false); }
+      finally { btn.disabled = false; }
+    });
+  }
 
   document.getElementById('pc-btn-email').addEventListener('click', async () => {
     const val = document.getElementById('pc-email').value.trim();
