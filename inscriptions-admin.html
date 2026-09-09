@@ -39,7 +39,17 @@
   <div class="topbar-inner">
     <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
     <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
-    <nav class="nav"><a href="index.html">Accueil</a><a href="evenements.html">Événements</a></nav>
+    <!-- Nav reduite a 2 liens jusqu'ici (2026-09-09, demande explicite : "affiche tous les
+         elements du bandeau") -- alignee sur le bandeau standard des autres pages (voir
+         dashboard-initiative.html), memes 6 liens. -->
+    <nav class="nav">
+      <a href="index.html">Accueil</a>
+      <a href="annuaire.html">Annuaire</a>
+      <a href="vitrines.html">Boutiques</a>
+      <a href="fil-actualite.html">Fil d'actualité</a>
+      <a href="formations.html">Formations</a>
+      <a href="evenements.html">Événements</a>
+    </nav>
     <div class="topbar-right"><div id="auth-area" class="auth-area"></div></div>
   </div>
 </header>
@@ -50,6 +60,12 @@
   <a href="index.html">🏠 Accueil</a>
   <a href="dashboard-initiative.html">📊 Mon tableau de bord</a>
   <a href="inscriptions-admin.html">📝 Formulaires & Inscriptions</a>
+  <!-- Cette page a son propre tiroir minimal (3 liens), pas le menu complet des modules
+       (~30, celui de dashboard-initiative.html) -- même convention que profil-app.html et les
+       autres pages sans tiroir riche (voir assets/app.js, commentaire sur #da-menu) : navigue
+       vers le tableau de bord avec ce repère dans l'URL, qui y ouvre automatiquement le vrai
+       menu complet (2026-09-09, demande explicite : "un bouton retour au menu classique"). -->
+  <a href="dashboard-initiative.html#da-menu" style="border-top:1px solid rgba(255,255,255,.15);margin-top:6px;padding-top:16px;">🗂️ Tous les modules</a>
   <div id="hb-account-section"></div>
 </aside>
 
