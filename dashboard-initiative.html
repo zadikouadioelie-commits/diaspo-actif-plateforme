@@ -3394,17 +3394,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       const badge = document.getElementById('init-billets-badge');
       if (badge && pubCount > 0) { badge.textContent = pubCount; badge.style.display = ''; }
       el.innerHTML = `
-        <div class="card" style="margin-bottom:20px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
-            <div>
-              <h2 style="margin:0;font-size:1.1rem;">📅 Mes événements</h2>
-              <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">${events.length} événement(s) · ${pubCount} publié(s)</p>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">🎟️ Billetterie & Wallet</button>
-              <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer un événement</button>
-              <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="if(window._daPremiumInitiative||window.daBypassActive?.('evenements')){window.GuidedTour&&GuidedTour.start('evenement-dashboard');}else{openPremiumUpsell('evenements');}">🎥 Tutoriel</button>
-            </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <h2 style="margin:0;font-size:1.1rem;">📅 Événements</h2>
+          <!-- 4 boutons indépendants (2026-09-09, demande explicite) : "Mes événements" n'est
+               qu'UNE option de ce module, pas son titre — Créer/Billetterie/Tutoriel ne sont
+               plus des sous-actions rattachées à une carte "Mes événements", ce sont des
+               entrées autonomes au même niveau. -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="openMesEvenementsModal()">📋 Mes événements${events.length ? ` <span class="pill">${events.length}</span>` : ''}</button>
+            <button class="btn btn-orange" onclick="openInitEvtModal()">＋ Créer un événement</button>
+            <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">🎟️ Billetterie & Wallet</button>
+            <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="if(window._daPremiumInitiative||window.daBypassActive?.('evenements')){window.GuidedTour&&GuidedTour.start('evenement-dashboard');}else{openPremiumUpsell('evenements');}">🎥 Tutoriel</button>
           </div>
         </div>
         ${!events.length ? `
@@ -3446,6 +3446,67 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </div>`).join('')}`;
     } catch(e) { document.getElementById('evenements').innerHTML = '<div class="notice">Erreur chargement.</div>'; }
   }
+
+  /* ══ "Mes événements" (2026-09-09) : vue combinée — ce que j'ai créé (organisateur, table
+     events déjà chargée par renderInitEvenements ci-dessus) + ce à quoi je suis inscrit en
+     tant que participant (table tickets, GET /tickets/mes déjà existante — mes-billets.html
+     fait la même chose pour les billets, mais fusionne aussi le module "Mobiliser la
+     diaspora" en plus, hors périmètre ici puisque ce bouton vit dans le module Billetterie/
+     Programmation). Deux onglets plutôt qu'une fusion unique : organisateur et participant
+     sont deux rôles différents, pas deux sources équivalentes d'une même chose. */
+  window.openMesEvenementsModal = async function() {
+    const modal = document.getElementById('mes-evt-modal-bg');
+    const body = document.getElementById('mes-evt-modal-body');
+    modal.style.display = 'flex';
+    body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+    try {
+      const [r1, r2] = await Promise.all([
+        api('GET', '/events?organisateur_id='+me.id+'&all=1').catch(() => ({ events: [] })),
+        api('GET', '/tickets/mes').catch(() => ({ tickets: [] })),
+      ]);
+      window._mesEvtCrees = r1.events || [];
+      window._mesEvtBillets = r2.tickets || [];
+      renderMesEvtTab('crees');
+    } catch (e) {
+      body.innerHTML = '<div style="color:#ef4444;padding:20px;text-align:center;">Erreur de chargement.</div>';
+    }
+  };
+  window.closeMesEvenementsModal = function() {
+    document.getElementById('mes-evt-modal-bg').style.display = 'none';
+  };
+  window.renderMesEvtTab = function(tab) {
+    const body = document.getElementById('mes-evt-modal-body');
+    const crees = window._mesEvtCrees || [];
+    const billets = window._mesEvtBillets || [];
+    const tabBtn = (id, label, n, active) => `<button onclick="renderMesEvtTab('${id}')" style="padding:8px 14px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:700;color:${active ? 'var(--orange)' : 'var(--muted)'};border-bottom:2px solid ${active ? 'var(--orange)' : 'transparent'};">${label} (${n})</button>`;
+    const tabsHtml = `<div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);">
+      ${tabBtn('crees', '📋 Créés par moi', crees.length, tab === 'crees')}
+      ${tabBtn('inscrit', '🎟️ Mes inscriptions', billets.length, tab === 'inscrit')}
+    </div>`;
+    let listHtml;
+    if (tab === 'crees') {
+      listHtml = !crees.length
+        ? `<p style="color:var(--muted);text-align:center;padding:24px 0;">Vous n'avez créé aucun événement.</p>`
+        : crees.map(e => `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="min-width:0;">
+              <div style="font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(e.titre)}</div>
+              <div style="font-size:12px;color:var(--muted);">${e.date_debut ? new Date(e.date_debut).toLocaleDateString('fr-FR') : 'Date à définir'} · ${e.statut === 'publie' ? '✅ Publié' : e.statut === 'ferme' ? '🔒 Fermé' : '📝 Brouillon'}</div>
+            </div>
+            <button class="btn btn-sm btn-outline" style="flex:none;" onclick="closeMesEvenementsModal();openInitEvtModal(${e.id});">Gérer</button>
+          </div>`).join('');
+    } else {
+      listHtml = (!billets.length
+        ? `<p style="color:var(--muted);text-align:center;padding:24px 0;">Vous n'êtes inscrit(e) à aucun événement pour le moment.</p>`
+        : billets.map(t => `
+          <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="font-weight:700;font-size:13.5px;">${escH(t.event_titre || 'Événement')}</div>
+            <div style="font-size:12px;color:var(--muted);">${t.date_debut ? new Date(t.date_debut).toLocaleDateString('fr-FR') : ''} · ${escH(t.type_nom || 'Billet')}</div>
+          </div>`).join('')
+      ) + `<div style="text-align:center;margin-top:14px;"><a href="mes-billets.html" class="btn btn-outline" style="font-size:12.5px;">🎟️ Voir tous mes billets →</a></div>`;
+    }
+    body.innerHTML = tabsHtml + `<div>${listHtml}</div>`;
+  };
 
   window.openInitEvtModal = async function(id) {
     if (!id && !window._daPremiumInitiative && !window.daBypassActive?.('evenements')) { openPremiumUpsell('evenements'); return; }
@@ -9271,6 +9332,18 @@ initPremiumGates();
       <button onclick="closeInitEvtModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
     </div>
     <div id="init-evt-form-content"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL "MES ÉVÉNEMENTS" (2026-09-09) : vue combinée créés + inscriptions, distincte du
+     formulaire de création — voir openMesEvenementsModal() ══ -->
+<div id="mes-evt-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;overflow-y:auto;padding:20px;align-items:flex-start;justify-content:center;">
+  <div style="background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:600px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 style="margin:0;font-size:1.1rem;">📋 Mes événements</h3>
+      <button onclick="closeMesEvenementsModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+    </div>
+    <div id="mes-evt-modal-body"></div>
   </div>
 </div>
   <script src="/assets/theme-manager.js"></script>
