@@ -572,6 +572,9 @@ function renderFields() {
         <div style="display:flex; gap:8px; flex-wrap:wrap;">${cats}</div>
         ${panelSuggestions}
       </div>
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30); display:flex; justify-content:flex-end;">
+        <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 22px; border-radius:8px; cursor:pointer;" data-action="enregistrerFormulaire">Enregistrer</button>
+      </div>
     </div>`;
 }
 
@@ -826,6 +829,11 @@ const actions = {
   async selectTab(el) { state.activeTab = el.dataset.tab; try { await iaChargerOnglet(state.activeTab); } catch (e) { ia_toast(e.message, false); } },
   async goToPublic() { state.activeTab = 'public'; state.publicSelectedTypeId = null; await iaChargerPublic(); },
   goToFields() { state.activeTab = 'fields'; },
+  /* Chaque champ est déjà enregistré instantanément à l'ajout/modification/suppression — ce
+     bouton n'a donc rien à sauvegarder. Il existe uniquement parce qu'un organisateur cherche
+     par réflexe un "Enregistrer" avant de continuer (demande explicite du 2026-09-09) ; le
+     ramener aux types évite qu'il se sente bloqué sans action à faire. */
+  enregistrerFormulaire() { ia_toast('Formulaire enregistré.', true); state.activeTab = 'types'; },
   selectType(el) { state.selectedTypeId = parseInt(el.dataset.id); },
   async publierFiche() {
     try { await api('PATCH', `/insc/fiches/${state.selectedFicheId}/statut`, { statut: 'publiee' }); ia_toast('Fiche publiée.', true); await iaChargerFiche(state.selectedFicheId); }
