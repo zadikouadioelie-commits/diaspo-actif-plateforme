@@ -71,7 +71,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
-let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null;
+let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false;
+const IP_BANDEAU_APERCU = `<div style="background:oklch(0.95 0.04 85); border:1px solid oklch(0.8 0.08 85); color:oklch(0.4 0.13 85); font-size:12.5px; font-weight:600; text-align:center; padding:9px 12px; border-radius:8px; margin-bottom:16px;">🔍 Aperçu en temps réel — cette fiche est encore en brouillon, seul le propriétaire peut voir cette page. Elle se met à jour à chaque modification.</div>`;
 
 function ipConditionRemplie(cond, reponses) {
   if (!cond) return true;
@@ -147,6 +148,7 @@ function ipOuvrirType(typeId) {
       </select>
     </div>` : '';
   document.getElementById('ip-root').innerHTML = `
+    ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
     <button class="ip-btn outline" style="margin-bottom:18px;" onclick="ipRenderAccueil()">← Retour</button>
     <h2 style="font-size:18px;font-weight:700;margin:0 0 4px;">${escH(type.label)}</h2>
     <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:20px;">${type.gratuit ? 'Gratuit' : (type.prix != null ? type.prix.toFixed(2) + ' €' : '')}</div>
@@ -159,7 +161,9 @@ function ipOuvrirType(typeId) {
       <div class="ip-champ"><label>Téléphone</label><input type="tel" name="__telephone"></div>
       ${type.champs.map(ipChampHtml).join('')}
       <div id="ip-erreur" style="color:oklch(0.5 0.16 20);font-size:13px;margin-bottom:12px;display:none;"></div>
-      <button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">Confirmer mon inscription</button>
+      ${IP_APERCU
+        ? `<div style="background:oklch(0.95 0.04 85); border:1px solid oklch(0.8 0.08 85); color:oklch(0.4 0.13 85); font-size:12.5px; padding:10px 12px; border-radius:8px;">🔍 Fiche non publiée — ce bouton s'activera une fois la fiche publiée.</div>`
+        : `<button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">Confirmer mon inscription</button>`}
     </form>`;
   document.getElementById('ip-form-champs').addEventListener('input', ipReevaluerConditions);
   document.getElementById('ip-form-champs').addEventListener('change', ipReevaluerConditions);
@@ -218,6 +222,7 @@ function ipRenderConfirmation(d) {
 function ipRenderAccueil() {
   const f = IP_FICHE;
   document.getElementById('ip-root').innerHTML = `
+    ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
     ${f.affiche_url ? `<img class="ip-affiche" src="${escH(f.affiche_url)}" alt="">` : ''}
     <h1 class="ip-titre">${escH(f.nom)}</h1>
     ${f.description ? `<p class="ip-desc">${escH(f.description)}</p>` : ''}
@@ -243,7 +248,7 @@ const IP_SLUG = new URLSearchParams(location.search).get('slug') || location.pat
       document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:oklch(0.55 0.006 30);"><div style="font-size:40px;">⏳</div><p>${escH(d.message)}</p></div>`;
       return;
     }
-    IP_FICHE = d.fiche; IP_TYPES = d.types; IP_EVENEMENTS = d.evenements;
+    IP_FICHE = d.fiche; IP_TYPES = d.types; IP_EVENEMENTS = d.evenements; IP_APERCU = !!d.apercu;
     ipRenderAccueil();
   } catch (e) {
     document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:oklch(0.5 0.16 20);">Fiche introuvable.</div>`;

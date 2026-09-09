@@ -39786,15 +39786,28 @@ route("GET", "/api/insc/fiches/:id/historique", async (req, res, params) => {
 /* ── PUBLIC : lecture, soumission, upload ── */
 route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);
-  if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
-  if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche a été temporairement suspendue par l'administration." });
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+
+  /* Aperçu en temps réel (2026-09-09, demande explicite) : le propriétaire (ou un admin) peut
+     visualiser le formulaire à tout moment pendant la construction, sans attendre la publication
+     - contrairement à un visiteur public, qui reste bloqué exactement comme avant tant que la
+     fiche n'est pas réellement publiée. inscFicheProprietaire() ne renvoie PAS d'erreur ici : un
+     visiteur non autorisé retombe simplement dans le parcours public normal ci-dessous. */
+  const { erreur: erreurProprio } = await inscFicheProprietaire(req, fiche.id);
+  const modeApercu = !erreurProprio && fiche.statut !== "publiee";
+
+  if (!modeApercu) {
+    if (fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+    if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche a été temporairement suspendue par l'administration." });
+    const now = new Date();
+    if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) {
+      return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées." });
+    }
+    if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
+      return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes." });
+    }
+  }
   const now = new Date();
-  if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) {
-    return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées." });
-  }
-  if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
-    return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes." });
-  }
   const evenements = await db.prepare(`
     SELECT e.id, e.titre, e.date_evt, e.heure_debut, e.ville, e.pays, e.lieu FROM insc_fiches_evenements fe
     JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC`).all(fiche.id);
@@ -39809,7 +39822,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     if (t.date_fermeture && new Date(t.date_fermeture) < now) ouvert = false;
     t.periode_ouverte = ouvert;
   }
-  sendJSON(res, 200, { fiche, evenements, types });
+  sendJSON(res, 200, { fiche, evenements, types, apercu: modeApercu });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {
