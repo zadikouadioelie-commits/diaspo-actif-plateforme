@@ -9572,6 +9572,7 @@ const CRM_PIPELINE_STATUTS = [
 function crmStatutLabel(k) { return (CRM_PIPELINE_STATUTS.find(s => s[0] === k) || [null, k])[1]; }
 let CRM_TAB = 'dashboard';
 let CRM_CONTACTS_CACHE = [];
+let CRM_LISTES_CACHE = [];
 let CRM_ME_ID = null;
 async function crmMyId() {
   if (CRM_ME_ID) return CRM_ME_ID;
@@ -9642,6 +9643,74 @@ function crmOpenModal(title, bodyHtml) {
   document.getElementById('crm-modal-backdrop').style.display = 'flex';
 }
 function crmCloseModal() { const el = document.getElementById('crm-modal-backdrop'); if (el) el.style.display = 'none'; }
+
+/* ── Pièces jointes CRM (2026-09-09, demande explicite) — 2 photos max + 3 PDF max, partagées
+   par les 3 formulaires (Contact/Prospect, Opportunité, Tâche) : un seul état en mémoire, réinitialisé
+   à chaque ouverture de formulaire (pré-rempli si modification), relu à l'enregistrement. */
+let crmAttachState = { photos: [], documents: [] };
+function crmAttachmentsHtml() {
+  const photosHtml = [0, 1].map(i => {
+    const p = crmAttachState.photos[i];
+    return `<div style="width:64px;height:64px;border:1.5px dashed var(--border);border-radius:8px;position:relative;overflow:hidden;cursor:${p ? 'default' : 'pointer'};display:flex;align-items:center;justify-content:center;background:var(--bg);flex-shrink:0;" ${p ? '' : `onclick="crmPickPhoto(${i})"`}>
+      ${p ? `<img src="${crmEsc(p)}" style="width:100%;height:100%;object-fit:cover;">
+             <button type="button" onclick="crmRemovePhoto(${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;">✕</button>`
+        : `<span style="font-size:22px;color:var(--muted);">＋</span>`}
+    </div>`;
+  }).join('');
+  const docsHtml = [0, 1, 2].map(i => {
+    const d = crmAttachState.documents[i];
+    return d
+      ? `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--bg);">
+          <span style="flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${crmEsc(d.nom)}</span>
+          <button type="button" onclick="crmRemoveDoc(${i})" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;">✕</button>
+        </div>`
+      : `<button type="button" onclick="crmPickDoc(${i})" style="display:block;width:100%;text-align:left;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;margin-bottom:6px;background:none;color:var(--orange);cursor:pointer;font-size:12.5px;font-weight:600;">＋ Ajouter un PDF</button>`;
+  }).join('');
+  return `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+      <label>📷 Photos <span style="font-weight:400;color:var(--muted);text-transform:none;">(2 max)</span></label>
+      <div style="display:flex;gap:8px;margin-top:6px;">${photosHtml}</div>
+    </div>
+    <div style="margin-top:12px;">
+      <label>📄 Documents PDF <span style="font-weight:400;color:var(--muted);text-transform:none;">(3 max)</span></label>
+      <div style="margin-top:6px;">${docsHtml}</div>
+    </div>`;
+}
+function crmRerenderAttachments() {
+  const el = document.getElementById('crm-attach-zone');
+  if (el) el.innerHTML = crmAttachmentsHtml();
+}
+async function crmPickPhoto(i) {
+  if (typeof pickAndUpload !== 'function') { alert('Module de téléversement indisponible.'); return; }
+  const url = await pickAndUpload('post', { maxW: 1000, maxH: 1000, maxMo: 10 });
+  if (!url) return;
+  crmAttachState.photos[i] = url;
+  crmRerenderAttachments();
+}
+function crmRemovePhoto(i) { crmAttachState.photos[i] = null; crmRerenderAttachments(); }
+function crmPickDoc(i) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/pdf'; input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const file = input.files[0]; document.body.removeChild(input);
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { alert('PDF trop volumineux (max 15 Mo).'); return; }
+    try {
+      const url = await uploadMedia(file, 'document');
+      crmAttachState.documents[i] = { url, nom: file.name };
+      crmRerenderAttachments();
+    } catch (e) { alert(e.message || 'Erreur lors du téléversement.'); }
+  };
+  input.click();
+}
+function crmRemoveDoc(i) { crmAttachState.documents[i] = null; crmRerenderAttachments(); }
+function crmResetAttachState(source) {
+  crmAttachState = {
+    photos: [0, 1].map(i => (source?.photos || [])[i] || null),
+    documents: [0, 1, 2].map(i => (source?.documents || [])[i] || null),
+  };
+}
 
 /* ── Recherche globale CRM ── */
 function crmWireSearch() {
@@ -9760,6 +9829,7 @@ async function crmOpenContactForm(id, defaultRelation) {
   let extra = null;
   if (id) { const r = await api('GET', `/crm/contacts/${id}`); c = r.contact; extra = r; }
   const relOpts = { prospect: 'Prospect', client: 'Client', partenaire: 'Partenaire', autre: 'Autre' };
+  crmResetAttachState(c);
   const historiqueHtml = extra ? `
     <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
       <h5 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Historique</h5>
@@ -9784,9 +9854,13 @@ async function crmOpenContactForm(id, defaultRelation) {
       <select id="crm-c-relation">${Object.entries(relOpts).map(([v, l]) => `<option value="${v}" ${c.relation === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
     </div>
     <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-c-notes" rows="3" style="width:100%;">${crmEsc(c.notes)}</textarea></div>
+    <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
     <div style="display:flex;justify-content:space-between;margin-top:16px;">
       ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteContact(${id})">🗑 Supprimer</button>` : '<span></span>'}
-      <button class="btn" onclick="crmSaveContact(${id || 'null'})">Enregistrer</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-outline" onclick="crmCloseModal()">✕ Fermer</button>
+        <button class="btn" onclick="crmSaveContact(${id || 'null'})">Enregistrer</button>
+      </div>
     </div>
     ${historiqueHtml}
   `);
@@ -9803,6 +9877,8 @@ async function crmSaveContact(id) {
     fonction: document.getElementById('crm-c-fonction').value.trim(),
     relation: document.getElementById('crm-c-relation').value,
     notes: document.getElementById('crm-c-notes').value.trim(),
+    photos: crmAttachState.photos.filter(Boolean),
+    documents: crmAttachState.documents.filter(Boolean),
   };
   if (!body.nom) { alert('Le nom est requis.'); return; }
   try {
@@ -9879,6 +9955,7 @@ async function crmOpenOppForm(id) {
   let o = { titre: '', valeur: '', statut: 'nouveau', probabilite: 50, date_prevue: '', prochaine_action: '', notes: '', contact_id: null };
   if (id) { const { opportunites } = await api('GET', '/crm/opportunites'); o = opportunites.find(x => x.id === id) || o; }
   if (!CRM_CONTACTS_CACHE.length) CRM_CONTACTS_CACHE = (await api('GET', '/crm/contacts')).contacts;
+  crmResetAttachState(o);
   crmOpenModal(id ? '✏️ Modifier l’opportunité' : '➕ Nouvelle opportunité', `
     <div><label>Titre *</label><input id="crm-o-titre" value="${crmEsc(o.titre)}"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
@@ -9890,9 +9967,13 @@ async function crmOpenOppForm(id) {
     <div style="margin-top:10px;"><label>Contact lié</label><select id="crm-o-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${o.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select></div>
     <div style="margin-top:10px;"><label>Prochaine action</label><input id="crm-o-action" value="${crmEsc(o.prochaine_action || '')}"></div>
     <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-o-notes" rows="3" style="width:100%;">${crmEsc(o.notes || '')}</textarea></div>
+    <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
     <div style="display:flex;justify-content:space-between;margin-top:16px;">
       ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteOpp(${id})">🗑 Supprimer</button>` : '<span></span>'}
-      <button class="btn" onclick="crmSaveOpp(${id || 'null'})">Enregistrer</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-outline" onclick="crmCloseModal()">✕ Fermer</button>
+        <button class="btn" onclick="crmSaveOpp(${id || 'null'})">Enregistrer</button>
+      </div>
     </div>
   `);
 }
@@ -9906,6 +9987,8 @@ async function crmSaveOpp(id) {
     contact_id: document.getElementById('crm-o-contact').value || null,
     prochaine_action: document.getElementById('crm-o-action').value.trim(),
     notes: document.getElementById('crm-o-notes').value.trim(),
+    photos: crmAttachState.photos.filter(Boolean),
+    documents: crmAttachState.documents.filter(Boolean),
   };
   if (!body.titre) { alert('Le titre est requis.'); return; }
   try {
@@ -10037,7 +10120,7 @@ async function crmRenderTaches(statut) {
           <input type="checkbox" ${t.statut === 'terminee' ? 'checked' : ''} onchange="crmToggleTache(${t.id}, this.checked)" style="margin-top:3px;">
           <div style="flex:1;cursor:pointer;" onclick="crmOpenTacheForm(${t.id})">
             <div style="font-weight:700;font-size:13.5px;${t.statut === 'terminee' ? 'text-decoration:line-through;' : ''}">${crmEsc(t.titre)}</div>
-            <div style="font-size:11.5px;color:var(--muted);">${t.date_echeance ? '📅 ' + t.date_echeance : ''}${t.contact_nom ? ' · 👤 ' + crmEsc(t.contact_prenom || '') + ' ' + crmEsc(t.contact_nom) : ''}</div>
+            <div style="font-size:11.5px;color:var(--muted);">${t.date_echeance ? '📅 ' + t.date_echeance : ''}${t.contact_nom ? ' · 👤 ' + crmEsc(t.contact_prenom || '') + ' ' + crmEsc(t.contact_nom) : ''}${t.liste_nom ? ' · ' + crmEsc(t.liste_icone || '📋') + ' ' + crmEsc(t.liste_nom) : ''}${t.compte_nom ? ' · 🔗 ' + crmEsc(t.compte_prenom || '') + ' ' + crmEsc(t.compte_nom) : ''}${t.email_libre ? ' · ✉️ ' + crmEsc(t.email_libre) : ''}</div>
           </div>
           <span style="width:8px;height:8px;border-radius:50%;background:${PRIORITE_COULEUR[t.priorite] || '#94a3b8'};margin-top:5px;flex-shrink:0;"></span>
         </div>
@@ -10049,31 +10132,100 @@ async function crmToggleTache(id, done) {
   try { await api('PUT', `/crm/taches/${id}`, { statut: done ? 'terminee' : 'a_faire' }); crmRenderTaches(); }
   catch (e) { alert(e.message || 'Erreur.'); }
 }
+/* ── Lien d'une tâche (2026-09-09, demande explicite) : une seule cible parmi contact CRM /
+   liste de diffusion Réseau Pro / compte Diaspo'Actif / adresse e-mail libre — voir
+   crmResoudreLienTache() côté serveur qui applique la même exclusivité à l'écriture. Le sous-
+   champ "compte" réutilise le principe déjà éprouvé de recherche-suggestion du module
+   Affiliation (affChargerSuggestions) plutôt qu'un simple select, une liste de tous les comptes
+   de la plateforme n'étant pas exploitable. */
+function crmTacheLienSubHtml(type, t) {
+  if (type === 'contact') {
+    return `<select id="crm-t-lien-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${t.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select>`;
+  }
+  if (type === 'liste') {
+    return `<select id="crm-t-lien-liste"><option value="">—</option>${CRM_LISTES_CACHE.map(l => `<option value="${l.id}" ${t.liste_id === l.id ? 'selected' : ''}>${crmEsc(l.icone || '📋')} ${crmEsc(l.nom)}</option>`).join('')}</select>`;
+  }
+  if (type === 'compte') {
+    const nomInitial = t.linked_user_id ? `${t.compte_prenom || ''} ${t.compte_nom || ''}`.trim() : '';
+    return `
+      <input type="text" id="crm-t-lien-compte-q" placeholder="Rechercher un compte par nom ou e-mail…" autocomplete="off" value="${crmEsc(nomInitial)}" oninput="crmTacheChercherCompte(this.value.trim())" onblur="setTimeout(()=>{const b=document.getElementById('crm-t-lien-compte-results'); if(b) b.style.display='none';},150)" style="width:100%;box-sizing:border-box;">
+      <input type="hidden" id="crm-t-lien-compte-id" value="${t.linked_user_id || ''}">
+      <div id="crm-t-lien-compte-results" style="display:none;position:relative;z-index:20;max-height:220px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;"></div>`;
+  }
+  if (type === 'email') {
+    return `<input type="email" id="crm-t-lien-email" placeholder="adresse@exemple.com" value="${crmEsc(t.email_libre || '')}" style="width:100%;box-sizing:border-box;">`;
+  }
+  return '';
+}
+function crmTacheLienChange(t) {
+  const type = document.getElementById('crm-t-lien-type').value;
+  document.getElementById('crm-t-lien-sub').innerHTML = crmTacheLienSubHtml(type, t || {});
+}
+async function crmTacheChercherCompte(q) {
+  const box = document.getElementById('crm-t-lien-compte-results');
+  if (!q) { box.style.display = 'none'; return; }
+  try {
+    const { users } = await api('GET', `/users/search?q=${encodeURIComponent(q)}`);
+    box.innerHTML = (users || []).map(u => `
+      <div style="padding:8px 12px;font-size:13px;cursor:pointer;" onmousedown="event.preventDefault(); crmTacheChoisirCompte(${u.id}, ${JSON.stringify(crmEsc((u.prenom ? u.prenom + ' ' : '') + u.nom)).replace(/"/g,'&quot;')})">
+        ${crmEsc((u.prenom ? u.prenom + ' ' : '') + u.nom)} <span style="color:var(--muted);font-size:11.5px;">${crmEsc(u.email || '')}</span>
+      </div>`).join('') || `<div style="padding:8px 12px;font-size:12.5px;color:var(--muted);">Aucun compte trouvé.</div>`;
+    box.style.display = 'block';
+  } catch (e) { box.style.display = 'none'; }
+}
+window.crmTacheChoisirCompte = function(id, nom) {
+  document.getElementById('crm-t-lien-compte-id').value = id;
+  document.getElementById('crm-t-lien-compte-q').value = nom;
+  document.getElementById('crm-t-lien-compte-results').style.display = 'none';
+};
 async function crmOpenTacheForm(id) {
-  let t = { titre: '', description: '', priorite: 'normale', date_echeance: '', contact_id: null };
+  let t = { titre: '', description: '', priorite: 'normale', date_echeance: '', contact_id: null, liste_id: null, linked_user_id: null, email_libre: null };
   if (id) { const { taches } = await api('GET', '/crm/taches'); t = taches.find(x => x.id === id) || t; }
   if (!CRM_CONTACTS_CACHE.length) CRM_CONTACTS_CACHE = (await api('GET', '/crm/contacts')).contacts;
+  if (!CRM_LISTES_CACHE.length) CRM_LISTES_CACHE = (await api('GET', '/listes-diffusion')).listes;
+  crmResetAttachState(t);
+  const lienType = t.liste_id ? 'liste' : t.linked_user_id ? 'compte' : t.email_libre ? 'email' : t.contact_id ? 'contact' : 'aucun';
   crmOpenModal(id ? '✏️ Modifier la tâche' : '➕ Nouvelle tâche', `
     <div><label>Titre *</label><input id="crm-t-titre" value="${crmEsc(t.titre)}"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
       <div><label>Priorité</label><select id="crm-t-priorite">${['basse', 'normale', 'haute', 'urgente'].map(p => `<option value="${p}" ${t.priorite === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
       <div><label>Échéance</label><input type="date" id="crm-t-date" value="${t.date_echeance || ''}"></div>
     </div>
-    <div style="margin-top:10px;"><label>Lié à un contact</label><select id="crm-t-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${t.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select></div>
+    <div style="margin-top:10px;">
+      <label>Lié à</label>
+      <select id="crm-t-lien-type" onchange="crmTacheLienChange()">
+        <option value="aucun" ${lienType === 'aucun' ? 'selected' : ''}>— Aucun —</option>
+        <option value="contact" ${lienType === 'contact' ? 'selected' : ''}>Contact CRM</option>
+        <option value="liste" ${lienType === 'liste' ? 'selected' : ''}>Liste de diffusion (Réseau Pro)</option>
+        <option value="compte" ${lienType === 'compte' ? 'selected' : ''}>Compte Diaspo'Actif</option>
+        <option value="email" ${lienType === 'email' ? 'selected' : ''}>Adresse e-mail</option>
+      </select>
+      <div id="crm-t-lien-sub" style="margin-top:8px;">${crmTacheLienSubHtml(lienType, t)}</div>
+    </div>
     <div style="margin-top:10px;"><label>Description</label><textarea id="crm-t-desc" rows="3" style="width:100%;">${crmEsc(t.description || '')}</textarea></div>
+    <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
     <div style="display:flex;justify-content:space-between;margin-top:16px;">
       ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteTache(${id})">🗑 Supprimer</button>` : '<span></span>'}
-      <button class="btn" onclick="crmSaveTache(${id || 'null'})">Enregistrer</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm btn-outline" onclick="crmCloseModal()">✕ Fermer</button>
+        <button class="btn" onclick="crmSaveTache(${id || 'null'})">Enregistrer</button>
+      </div>
     </div>
   `);
 }
 async function crmSaveTache(id) {
+  const lienType = document.getElementById('crm-t-lien-type').value;
+  const LIEN_CHAMP = { contact: 'crm-t-lien-contact', liste: 'crm-t-lien-liste', compte: 'crm-t-lien-compte-id', email: 'crm-t-lien-email' };
+  const lienValeur = LIEN_CHAMP[lienType] ? (document.getElementById(LIEN_CHAMP[lienType])?.value.trim() || null) : null;
   const body = {
     titre: document.getElementById('crm-t-titre').value.trim(),
     priorite: document.getElementById('crm-t-priorite').value,
     date_echeance: document.getElementById('crm-t-date').value || null,
-    contact_id: document.getElementById('crm-t-contact').value || null,
+    lien_type: lienType,
+    lien_valeur: lienValeur,
     description: document.getElementById('crm-t-desc').value.trim(),
+    photos: crmAttachState.photos.filter(Boolean),
+    documents: crmAttachState.documents.filter(Boolean),
   };
   if (!body.titre) { alert('Le titre est requis.'); return; }
   try {

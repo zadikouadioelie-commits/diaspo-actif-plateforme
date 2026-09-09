@@ -1938,6 +1938,22 @@ const MIGRATIONS = [
   // publique de l'événement, ouvrant le lien de la chaîne/du groupe renseigné par
   // l'organisateur — simple lien à coller, même logique qu'inscription_lien_externe.
   ["events", "whatsapp_lien TEXT"],
+  // CRM — pièces jointes (2026-09-09, demande explicite) : jusqu'à 2 photos + 3 PDF par fiche
+  // Contact/Prospect, Opportunité ou Tâche. Tableaux JSON d'URLs Bunny (photos) / {url,nom}
+  // (documents), même stockage que pdf_extra_json des événements — pas de table séparée.
+  ["crm_contacts", "photos_json TEXT DEFAULT '[]'"],
+  ["crm_contacts", "documents_json TEXT DEFAULT '[]'"],
+  ["crm_opportunites", "photos_json TEXT DEFAULT '[]'"],
+  ["crm_opportunites", "documents_json TEXT DEFAULT '[]'"],
+  ["crm_taches", "photos_json TEXT DEFAULT '[]'"],
+  ["crm_taches", "documents_json TEXT DEFAULT '[]'"],
+  // Lien de la tâche étendu au-delà du seul contact CRM (2026-09-09, demande explicite) :
+  // une tâche peut désormais être liée à UNE SEULE de ces 4 cibles (contact_id déjà existant,
+  // ou l'une des 3 colonnes suivantes) — jamais plusieurs à la fois, voir crmResoudreLienTache()
+  // dans server/index.js qui applique cette exclusivité à l'écriture.
+  ["crm_taches", "liste_id INTEGER"],
+  ["crm_taches", "linked_user_id INTEGER"],
+  ["crm_taches", "email_libre TEXT"],
   // Pays cible / origine diaspora visée (2026-09-07, demande explicite) — jusqu'à deux pays,
   // distincts du pays/lieu physique de l'événement (pays/ville déjà existants). Nommage
   // origine1/origine2 aligné sur la convention déjà utilisée ailleurs sur la plateforme

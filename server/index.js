@@ -39296,6 +39296,46 @@ async function crmInitOwner(req) {
 }
 const CRM_STATUTS_PIPELINE = ["nouveau", "contacte", "interesse", "devis_envoye", "negociation", "gagne", "perdu"];
 
+/* Pièces jointes CRM (2026-09-09, demande explicite) : 2 photos max (tableau d'URLs Bunny) +
+   3 documents PDF max (tableau {url,nom}) — mêmes limites appliquées ici qu'à l'affichage
+   (jamais fait confiance au seul client), réutilisées par contacts/opportunités/tâches. */
+function crmSanitizePhotos(arr) {
+  if (!Array.isArray(arr)) return "[]";
+  return JSON.stringify(arr.filter(u => typeof u === "string" && u.trim()).slice(0, 2));
+}
+function crmSanitizeDocuments(arr) {
+  if (!Array.isArray(arr)) return "[]";
+  return JSON.stringify(arr.filter(d => d && typeof d.url === "string" && d.url.trim())
+    .map(d => ({ url: d.url, nom: (d.nom || "document.pdf").toString().slice(0, 200) })).slice(0, 3));
+}
+
+/* Lien d'une tâche (2026-09-09, demande explicite) : une tâche pointe vers UNE SEULE cible parmi
+   contact CRM / liste de diffusion Réseau Pro / compte Diaspo'Actif / adresse e-mail libre —
+   jamais plusieurs à la fois. `lien_type` dit laquelle des 4 colonnes recevoir, les 3 autres sont
+   explicitement remises à null (sinon un changement de type laisserait l'ancienne valeur en
+   base, invisible côté formulaire mais toujours active côté serveur). userId = le responsable
+   de l'initiative courant, pour vérifier qu'une liste de diffusion choisie lui appartient bien
+   (listes_diffusion est scopée à un compte utilisateur, pas à une initiative). */
+async function crmResoudreLienTache(body, userId) {
+  const cible = { contact_id: null, liste_id: null, linked_user_id: null, email_libre: null };
+  const valeur = body.lien_valeur;
+  if (body.lien_type === "contact" && valeur) {
+    cible.contact_id = valeur;
+  } else if (body.lien_type === "liste" && valeur) {
+    const liste = await db.prepare("SELECT id FROM listes_diffusion WHERE id=? AND proprietaire_id=?").get(valeur, userId);
+    if (!liste) throw Object.assign(new Error("Liste de diffusion introuvable."), { statut: 404 });
+    cible.liste_id = valeur;
+  } else if (body.lien_type === "compte" && valeur) {
+    const compte = await db.prepare("SELECT id FROM users WHERE id=?").get(valeur);
+    if (!compte) throw Object.assign(new Error("Compte introuvable."), { statut: 404 });
+    cible.linked_user_id = valeur;
+  } else if (body.lien_type === "email" && valeur) {
+    if (!SEC.isValidEmail(valeur)) throw Object.assign(new Error("Adresse e-mail invalide."), { statut: 400 });
+    cible.email_libre = valeur.trim().toLowerCase();
+  }
+  return cible;
+}
+
 /* ── Contacts ── */
 route("GET", "/api/crm/contacts", async (req, res, params, body, query) => {
   const { init, erreur, msg } = await crmInitOwner(req);
@@ -39328,7 +39368,7 @@ route("GET", "/api/crm/contacts/:id", async (req, res, params) => {
       "SELECT COUNT(*) n FROM messages m JOIN conversations conv ON conv.id=m.conversation_id WHERE (conv.user1_id=? OR conv.user2_id=?) AND (conv.user1_id=? OR conv.user2_id=?)"
     ).get(user.id, user.id, c.linked_user_id, c.linked_user_id))?.n || 0;
   }
-  sendJSON(res, 200, { contact: { ...c, tags: safeParse(c.tags_json || "[]") }, pipeline, opportunites, taches, demande, linked_user: linkedUser, nb_messages: nbMessages });
+  sendJSON(res, 200, { contact: { ...c, tags: safeParse(c.tags_json || "[]"), photos: safeParse(c.photos_json || "[]"), documents: safeParse(c.documents_json || "[]") }, pipeline, opportunites, taches, demande, linked_user: linkedUser, nb_messages: nbMessages });
 });
 
 route("POST", "/api/crm/contacts", async (req, res, params, body) => {
@@ -39337,11 +39377,12 @@ route("POST", "/api/crm/contacts", async (req, res, params, body) => {
   const nom = (body.nom || "").trim();
   if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
   const relation = ["prospect", "client", "partenaire", "autre"].includes(body.relation) ? body.relation : "autre";
-  const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,ville,pays,societe,fonction,relation,notes,source,tags_json,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,ville,pays,societe,fonction,relation,notes,source,tags_json,photos_json,documents_json,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, body.linked_user_id || null, nom, body.prenom || null, body.email || null, body.telephone || null,
     body.ville || null, body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null,
-    body.source || null, JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []), user.id
+    body.source || null, JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []),
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id
   );
   if (relation === "prospect") await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut) VALUES (?,?,'nouveau')").run(r.lastInsertRowid, init.id);
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -39353,10 +39394,11 @@ route("PUT", "/api/crm/contacts/:id", async (req, res, params, body) => {
   const c = await db.prepare("SELECT id, nom FROM crm_contacts WHERE id=? AND initiative_id=?").get(params.id, init.id);
   if (!c) return sendJSON(res, 404, { error: "Contact introuvable." });
   const relation = ["prospect", "client", "partenaire", "autre"].includes(body.relation) ? body.relation : "autre";
-  await db.prepare(`UPDATE crm_contacts SET nom=?,prenom=?,email=?,telephone=?,ville=?,pays=?,societe=?,fonction=?,relation=?,notes=?,source=?,tags_json=?,updated_at=datetime('now') WHERE id=?`).run(
+  await db.prepare(`UPDATE crm_contacts SET nom=?,prenom=?,email=?,telephone=?,ville=?,pays=?,societe=?,fonction=?,relation=?,notes=?,source=?,tags_json=?,photos_json=?,documents_json=?,updated_at=datetime('now') WHERE id=?`).run(
     (body.nom || "").trim() || c.nom, body.prenom || null, body.email || null, body.telephone || null, body.ville || null,
     body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null, body.source || null,
-    JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []), params.id
+    JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []),
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), params.id
   );
   if (relation === "prospect" && !(await db.prepare("SELECT id FROM crm_pipeline WHERE contact_id=?").get(params.id))) {
     await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut) VALUES (?,?,'nouveau')").run(params.id, init.id);
@@ -39438,7 +39480,7 @@ route("GET", "/api/crm/opportunites", async (req, res, params) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const rows = await db.prepare(`SELECT o.*, c.nom AS contact_nom, c.prenom AS contact_prenom
     FROM crm_opportunites o LEFT JOIN crm_contacts c ON c.id=o.contact_id WHERE o.initiative_id=? ORDER BY o.updated_at DESC`).all(init.id);
-  sendJSON(res, 200, { opportunites: rows });
+  sendJSON(res, 200, { opportunites: rows.map(o => ({ ...o, photos: safeParse(o.photos_json || "[]"), documents: safeParse(o.documents_json || "[]") })) });
 });
 
 route("POST", "/api/crm/opportunites", async (req, res, params, body) => {
@@ -39446,12 +39488,13 @@ route("POST", "/api/crm/opportunites", async (req, res, params, body) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const titre = (body.titre || "").trim();
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-  const r = await db.prepare(`INSERT INTO crm_opportunites (initiative_id,contact_id,titre,valeur,devise,statut,probabilite,date_prevue,prochaine_action,notes,lie_produit_id,lie_event_id,lie_devis_demande_id,lie_campagne_id,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const r = await db.prepare(`INSERT INTO crm_opportunites (initiative_id,contact_id,titre,valeur,devise,statut,probabilite,date_prevue,prochaine_action,notes,lie_produit_id,lie_event_id,lie_devis_demande_id,lie_campagne_id,photos_json,documents_json,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, body.contact_id || null, titre, body.valeur != null ? Number(body.valeur) : null, body.devise || "EUR",
     CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : "nouveau", body.probabilite != null ? Number(body.probabilite) : 50,
     body.date_prevue || null, body.prochaine_action || null, body.notes || null,
-    body.lie_produit_id || null, body.lie_event_id || null, body.lie_devis_demande_id || null, body.lie_campagne_id || null, user.id
+    body.lie_produit_id || null, body.lie_event_id || null, body.lie_devis_demande_id || null, body.lie_campagne_id || null,
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id
   );
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
@@ -39462,10 +39505,11 @@ route("PUT", "/api/crm/opportunites/:id", async (req, res, params, body) => {
   const o = await db.prepare("SELECT id, titre FROM crm_opportunites WHERE id=? AND initiative_id=?").get(params.id, init.id);
   if (!o) return sendJSON(res, 404, { error: "Opportunité introuvable." });
   await db.prepare(`UPDATE crm_opportunites SET titre=?, valeur=?, devise=COALESCE(?,devise), statut=COALESCE(?,statut),
-    probabilite=COALESCE(?,probabilite), date_prevue=?, prochaine_action=?, notes=?, contact_id=?, updated_at=datetime('now') WHERE id=?`).run(
+    probabilite=COALESCE(?,probabilite), date_prevue=?, prochaine_action=?, notes=?, contact_id=?, photos_json=?, documents_json=?, updated_at=datetime('now') WHERE id=?`).run(
     (body.titre || "").trim() || o.titre, body.valeur != null ? Number(body.valeur) : null, body.devise || null,
     CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : null, body.probabilite != null ? Number(body.probabilite) : null,
-    body.date_prevue || null, body.prochaine_action || null, body.notes || null, body.contact_id || null, params.id
+    body.date_prevue || null, body.prochaine_action || null, body.notes || null, body.contact_id || null,
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), params.id
   );
   sendJSON(res, 200, { ok: true });
 });
@@ -39483,12 +39527,19 @@ route("DELETE", "/api/crm/opportunites/:id", async (req, res, params) => {
 route("GET", "/api/crm/taches", async (req, res, params, body, query) => {
   const { init, erreur, msg } = await crmInitOwner(req);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  let sql = "SELECT t.*, c.nom AS contact_nom, c.prenom AS contact_prenom FROM crm_taches t LEFT JOIN crm_contacts c ON c.id=t.contact_id WHERE t.initiative_id=?";
+  let sql = `SELECT t.*, c.nom AS contact_nom, c.prenom AS contact_prenom,
+      l.nom AS liste_nom, l.icone AS liste_icone,
+      u2.nom AS compte_nom, u2.prenom AS compte_prenom
+    FROM crm_taches t
+    LEFT JOIN crm_contacts c ON c.id=t.contact_id
+    LEFT JOIN listes_diffusion l ON l.id=t.liste_id
+    LEFT JOIN users u2 ON u2.id=t.linked_user_id
+    WHERE t.initiative_id=?`;
   const args = [init.id];
   if (query.statut) { sql += " AND t.statut=?"; args.push(query.statut); }
   sql += " ORDER BY (t.date_echeance IS NULL), t.date_echeance ASC, t.id DESC LIMIT 500";
   const rows = await db.prepare(sql).all(...args);
-  sendJSON(res, 200, { taches: rows });
+  sendJSON(res, 200, { taches: rows.map(t => ({ ...t, photos: safeParse(t.photos_json || "[]"), documents: safeParse(t.documents_json || "[]") })) });
 });
 
 route("POST", "/api/crm/taches", async (req, res, params, body) => {
@@ -39497,27 +39548,43 @@ route("POST", "/api/crm/taches", async (req, res, params, body) => {
   const titre = (body.titre || "").trim();
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   const PRIORITES = ["basse", "normale", "haute", "urgente"];
-  const r = await db.prepare(`INSERT INTO crm_taches (initiative_id,titre,description,priorite,date_echeance,heure_echeance,contact_id,opportunite_id,devis_demande_id,event_id,campagne_id,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  let lien;
+  try { lien = await crmResoudreLienTache(body, user.id); }
+  catch (e) { return sendJSON(res, e.statut || 400, { error: e.message }); }
+  const r = await db.prepare(`INSERT INTO crm_taches (initiative_id,titre,description,priorite,date_echeance,heure_echeance,contact_id,liste_id,linked_user_id,email_libre,opportunite_id,devis_demande_id,event_id,campagne_id,photos_json,documents_json,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, titre, body.description || null, PRIORITES.includes(body.priorite) ? body.priorite : "normale",
-    body.date_echeance || null, body.heure_echeance || null, body.contact_id || null, body.opportunite_id || null,
-    body.devis_demande_id || null, body.event_id || null, body.campagne_id || null, user.id
+    body.date_echeance || null, body.heure_echeance || null,
+    lien.contact_id, lien.liste_id, lien.linked_user_id, lien.email_libre,
+    body.opportunite_id || null, body.devis_demande_id || null, body.event_id || null, body.campagne_id || null,
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id
   );
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
 route("PUT", "/api/crm/taches/:id", async (req, res, params, body) => {
-  const { init, erreur, msg } = await crmInitOwner(req);
+  const { user, init, erreur, msg } = await crmInitOwner(req);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const t = await db.prepare("SELECT id, titre FROM crm_taches WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  const t = await db.prepare("SELECT id, titre, contact_id, liste_id, linked_user_id, email_libre FROM crm_taches WHERE id=? AND initiative_id=?").get(params.id, init.id);
   if (!t) return sendJSON(res, 404, { error: "Tâche introuvable." });
   const STATUTS = ["a_faire", "en_cours", "terminee", "annulee"];
   const PRIORITES = ["basse", "normale", "haute", "urgente"];
+  /* lien_type n'est envoye que par le formulaire complet (titre + tous les champs) — le simple
+     bascule de statut (crmToggleTache, case cochee) n'envoie que {statut} et ne doit pas effacer
+     le lien existant. COALESCE via un flag explicite plutot que "valeur presente ou pas", pour
+     ne pas confondre "aucun lien voulu" (lien_type:'aucun', valide) et "champ non envoye". */
+  let lien = { contact_id: t.contact_id, liste_id: t.liste_id, linked_user_id: t.linked_user_id, email_libre: t.email_libre };
+  if (body.lien_type !== undefined) {
+    try { lien = await crmResoudreLienTache(body, user.id); }
+    catch (e) { return sendJSON(res, e.statut || 400, { error: e.message }); }
+  }
   await db.prepare(`UPDATE crm_taches SET titre=?, description=?, priorite=COALESCE(?,priorite), statut=COALESCE(?,statut),
-    date_echeance=?, heure_echeance=?, updated_at=datetime('now') WHERE id=?`).run(
+    date_echeance=?, heure_echeance=?, contact_id=?, liste_id=?, linked_user_id=?, email_libre=?, photos_json=?, documents_json=?, updated_at=datetime('now') WHERE id=?`).run(
     (body.titre || "").trim() || t.titre, body.description || null,
     PRIORITES.includes(body.priorite) ? body.priorite : null, STATUTS.includes(body.statut) ? body.statut : null,
-    body.date_echeance || null, body.heure_echeance || null, params.id
+    body.date_echeance || null, body.heure_echeance || null,
+    lien.contact_id, lien.liste_id, lien.linked_user_id, lien.email_libre,
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), params.id
   );
   sendJSON(res, 200, { ok: true });
 });
