@@ -90,14 +90,58 @@ const IA_STATUS_STYLES = {
   'programmee':['oklch(0.94 0.04 258)','oklch(0.4 0.1 258)'],
 };
 const IA_TYPES_CHAMP = ['texte_court','texte_long','nombre','email','telephone','date','heure','adresse','liste_deroulante','choix_unique','choix_multiple','oui_non','case_a_cocher','upload_photo','upload_fichier','url'];
+/* Suggestions génériques par catégorie (2026-09-09, demande explicite) — Nom/Prénom apparaissent
+   ici aussi bien qu'ils soient déjà demandés par défaut sur la fiche : un organisateur peut vouloir
+   les redemander pour un accompagnant, un second contact, etc. "Personnalisé" reste un champ libre
+   (prompt), pas une liste — il n'a donc pas de suggestions. */
+const IA_FIELD_SUGGESTIONS = {
+  'Identité': [
+    { libelle: 'Nom', type_champ: 'texte_court' },
+    { libelle: 'Prénom', type_champ: 'texte_court' },
+    { libelle: 'Genre', type_champ: 'choix_unique', options: ['Homme', 'Femme'] },
+    { libelle: 'Date de naissance', type_champ: 'date' },
+    { libelle: "Nombre d'enfants", type_champ: 'nombre' },
+    { libelle: 'Nationalité', type_champ: 'texte_court' },
+  ],
+  'Contact': [
+    { libelle: 'Adresse e-mail', type_champ: 'email' },
+    { libelle: 'Numéro de téléphone', type_champ: 'telephone' },
+    { libelle: 'Site internet', type_champ: 'url' },
+    { libelle: 'LinkedIn', type_champ: 'url' },
+    { libelle: "Identifiant de compte Diaspo'Actif", type_champ: 'texte_court' },
+    { libelle: 'Adresse postale', type_champ: 'adresse' },
+  ],
+  'Profession': [
+    { libelle: 'Fonction / Poste', type_champ: 'texte_court' },
+    { libelle: "Secteur d'activité", type_champ: 'texte_court' },
+    { libelle: 'Entreprise / Organisation', type_champ: 'texte_court' },
+    { libelle: "Années d'expérience", type_champ: 'nombre' },
+    { libelle: 'Statut professionnel', type_champ: 'choix_unique', options: ['Salarié', 'Indépendant', 'Étudiant', 'Sans emploi', 'Retraité'] },
+  ],
+  'Diaspora': [
+    { libelle: "Pays d'origine", type_champ: 'texte_court' },
+    { libelle: 'Pays de résidence actuelle', type_champ: 'texte_court' },
+    { libelle: 'Ville de résidence', type_champ: 'texte_court' },
+    { libelle: "Communauté / région d'origine", type_champ: 'texte_court' },
+    { libelle: "Année d'arrivée dans le pays de résidence", type_champ: 'nombre' },
+  ],
+  'Événement': [
+    { libelle: 'Attentes pour cet événement', type_champ: 'texte_long' },
+    { libelle: 'Comment avez-vous connu cet événement ?', type_champ: 'choix_unique', options: ['Réseaux sociaux', 'Bouche à oreille', 'E-mail', 'Autre'] },
+    { libelle: 'Accompagnant(e)', type_champ: 'oui_non' },
+    { libelle: 'Régime alimentaire particulier', type_champ: 'texte_court' },
+    { libelle: "Besoin d'accessibilité", type_champ: 'texte_long' },
+  ],
+  'Médias': [
+    { libelle: 'Photo de profil', type_champ: 'upload_photo' },
+    { libelle: "Pièce d'identité", type_champ: 'upload_fichier' },
+    { libelle: 'CV', type_champ: 'upload_fichier' },
+    { libelle: 'Vidéo de présentation', type_champ: 'upload_fichier' },
+  ],
+};
 const IA_FIELD_CATEGORIES = [
-  { name: 'Identité', champ: { libelle: 'Nom complet', type_champ: 'texte_court' } },
-  { name: 'Contact', champ: { libelle: 'Téléphone WhatsApp', type_champ: 'telephone' } },
-  { name: 'Profession', champ: { libelle: 'Fonction', type_champ: 'texte_court' } },
-  { name: 'Diaspora', champ: { libelle: "Pays d'origine", type_champ: 'texte_court' } },
-  { name: 'Événement', champ: { libelle: 'Attentes', type_champ: 'texte_long' } },
-  { name: 'Médias', champ: { libelle: 'Photo', type_champ: 'upload_photo' } },
-  { name: 'Personnalisé', champ: { libelle: 'Nouveau champ', type_champ: 'texte_court' } },
+  { name: 'Identité' }, { name: 'Contact' }, { name: 'Profession' }, { name: 'Diaspora' },
+  { name: 'Événement' }, { name: 'Médias' }, { name: 'Personnalisé' },
 ];
 
 let IA_ME = null;
@@ -109,6 +153,7 @@ const state = {
   mesEvenements: [],
   activeTab: 'overview',
   selectedTypeId: null,
+  champCategorieOuverte: null,
   publicData: null,
   publicSelectedTypeId: null,
   publicReponses: {},
@@ -428,7 +473,20 @@ function renderFields() {
       <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="removeField" data-id="${f.id}">✕</button>
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone sont demandés.</div>';
 
-  const cats = IA_FIELD_CATEGORIES.map(c => `<button style="background:#fff; border:1px solid oklch(0.85 0.004 30); color:oklch(0.3 0.006 30); font-size:12.5px; font-weight:500; padding:7px 13px; border-radius:8px; cursor:pointer;" data-action="addField" data-category="${escH(c.name)}">${escH(c.name)}</button>`).join('');
+  const catOuverte = state.champCategorieOuverte;
+  const cats = IA_FIELD_CATEGORIES.map(c => {
+    const actif = catOuverte === c.name;
+    return `<button style="background:${actif ? 'oklch(0.32 0.09 258)' : '#fff'}; border:1px solid ${actif ? 'oklch(0.32 0.09 258)' : 'oklch(0.85 0.004 30)'}; color:${actif ? '#fff' : 'oklch(0.3 0.006 30)'}; font-size:12.5px; font-weight:500; padding:7px 13px; border-radius:8px; cursor:pointer;" data-action="toggleChampCategorie" data-category="${escH(c.name)}">${escH(c.name)}</button>`;
+  }).join('');
+
+  const suggestions = catOuverte && catOuverte !== 'Personnalisé' ? (IA_FIELD_SUGGESTIONS[catOuverte] || []) : [];
+  const panelSuggestions = suggestions.length ? `
+    <div style="margin-top:10px; padding:14px; background:oklch(0.97 0.004 30); border:1px solid oklch(0.9 0.004 30); border-radius:10px;">
+      <div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:10px; text-transform:uppercase; letter-spacing:.03em;">Suggestions — ${escH(catOuverte)}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${suggestions.map((s, idx) => `<button style="background:#fff; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:500; padding:7px 13px; border-radius:20px; cursor:pointer;" data-action="ajouterChampSuggere" data-categorie="${escH(catOuverte)}" data-idx="${idx}">+ ${escH(s.libelle)}</button>`).join('')}
+      </div>
+    </div>` : '';
 
   return `
     <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">${chips}</div>
@@ -439,8 +497,9 @@ function renderFields() {
       </div>
       <div style="display:flex; flex-direction:column; gap:8px;">${fieldsHtml}</div>
       <div style="margin-top:16px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30);">
-        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:10px;">+ Ajouter un champ</div>
+        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:10px;">+ Ajouter un champ — choisissez une catégorie pour voir des suggestions prêtes à l'emploi</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">${cats}</div>
+        ${panelSuggestions}
       </div>
     </div>`;
 }
@@ -728,11 +787,29 @@ const actions = {
     try { await api('DELETE', '/insc/champs/' + el.dataset.id); await iaChargerFiche(state.selectedFicheId); }
     catch (e) { ia_toast(e.message, false); }
   },
-  async addField(el) {
-    const libelle = prompt('Libellé du champ :', 'Nouveau champ (' + el.dataset.category + ')');
-    if (!libelle || !libelle.trim()) return;
+  async toggleChampCategorie(el) {
+    const cat = el.dataset.category;
+    if (cat === 'Personnalisé') {
+      state.champCategorieOuverte = null;
+      const libelle = prompt('Libellé du champ personnalisé :');
+      if (!libelle || !libelle.trim()) return;
+      try {
+        await api('POST', `/insc/types/${state.selectedTypeId}/champs`, { libelle: libelle.trim(), type_champ: 'texte_court', obligatoire: false });
+        await iaChargerFiche(state.selectedFicheId);
+      } catch (e) { ia_toast(e.message, false); }
+      return;
+    }
+    state.champCategorieOuverte = state.champCategorieOuverte === cat ? null : cat;
+  },
+  async ajouterChampSuggere(el) {
+    const suggestion = (IA_FIELD_SUGGESTIONS[el.dataset.categorie] || [])[parseInt(el.dataset.idx)];
+    if (!suggestion) return;
     try {
-      await api('POST', `/insc/types/${state.selectedTypeId}/champs`, { libelle: libelle.trim(), type_champ: 'texte_court', obligatoire: false });
+      await api('POST', `/insc/types/${state.selectedTypeId}/champs`, {
+        libelle: suggestion.libelle, type_champ: suggestion.type_champ, obligatoire: false,
+        options: suggestion.options || undefined,
+      });
+      ia_toast(`Champ « ${suggestion.libelle} » ajouté.`, true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
