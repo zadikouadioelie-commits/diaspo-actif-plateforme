@@ -14437,11 +14437,17 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
       responsable = { prenom: u.prenom, nom: u.nom, fonction: u.fonction_responsable_etatique };
     }
   }
-  const nbAbonnes    = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(u.id))?.n;
-  const nbSuivis     = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE follower_id=?").get(u.id))?.n;
+  /* Compte réel de followers/suivis (2026-09-09, demande explicite : "le nombre d'abonnés
+     est-il réel ?") — un compte supprimé (anonymisation RGPD, nom='Compte supprimé') laisse
+     sa ligne user_follows intacte pour toujours (la suppression ne la nettoie pas), donc un
+     COUNT(*) brut continue de compter des comptes qui n'existent plus. Vérifié en prod sur ce
+     compte précis : 69 des 103 "abonnés" affichés étaient des comptes supprimés (67%). Jointe
+     sur users pour exclure ces lignes fantômes, comme partout ailleurs sur la plateforme. */
+  const nbAbonnes    = (await db.prepare("SELECT COUNT(*) n FROM user_follows uf JOIN users u2 ON u2.id=uf.follower_id WHERE uf.followed_id=? AND u2.nom!='Compte supprimé'").get(u.id))?.n;
+  const nbSuivis     = (await db.prepare("SELECT COUNT(*) n FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé'").get(u.id))?.n;
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
   const initiativesSuivies = await db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
-  const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? LIMIT 12").all(u.id);
+  const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé' LIMIT 12").all(u.id);
   const publications = await db.prepare(`
     SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, p.medias, p.media_url, p.media_type,
       COUNT(DISTINCT r.id) AS nb_reactions,
@@ -14561,8 +14567,9 @@ route("GET", "/api/profil/:id/score-activite", async (req, res, params) => {
   const u = await db.prepare("SELECT * FROM users WHERE id=?").get(params.id);
   if (!u) return sendJSON(res, 404, { error: "Profil introuvable." });
   const pubs30j = (await db.prepare("SELECT COUNT(*) c FROM fil_posts WHERE auteur_id=? AND created_at > datetime('now','-30 days')").get(u.id)).c;
-  const nbAbonnes = (await db.prepare("SELECT COUNT(*) c FROM user_follows WHERE followed_id=?").get(u.id)).c;
-  const nbSuivis = (await db.prepare("SELECT COUNT(*) c FROM user_follows WHERE follower_id=?").get(u.id)).c;
+  // Comptes supprimés exclus (2026-09-09) — même correction que nbAbonnes/nbSuivis de GET /api/profil/:id.
+  const nbAbonnes = (await db.prepare("SELECT COUNT(*) c FROM user_follows uf JOIN users u2 ON u2.id=uf.follower_id WHERE uf.followed_id=? AND u2.nom!='Compte supprimé'").get(u.id)).c;
+  const nbSuivis = (await db.prepare("SELECT COUNT(*) c FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé'").get(u.id)).c;
   const champsProfil = ['bio','titre_pro','photo_url','competences','experiences','centres_interet',
                         'publics_json','besoins_json','realisations_json','services_perso','reseaux_json','annee_debut'];
   const remplis = champsProfil.filter(c => u[c] != null && String(u[c]).trim() !== '' && String(u[c]) !== '[]' && String(u[c]) !== '{}').length;
@@ -14814,9 +14821,10 @@ route("GET", "/api/profil/:id/suivis", async (req, res, params) => {
   let rows = await db.prepare(`
     SELECT u2.id, u2.nom, u2.prenom, u2.role, u2.ville, u2.pays, u2.titre_pro, u2.bio, u2.photo_url
     FROM user_follows uf JOIN users u2 ON u2.id = uf.followed_id
-    WHERE uf.follower_id = ? ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+    WHERE uf.follower_id = ? AND u2.nom!='Compte supprimé' ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   if (q) rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.pays||''}`.toLowerCase().includes(q));
-  const total = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE follower_id=?").get(uid))?.n;
+  // Exclut les comptes supprimés (2026-09-09) — même raison que nbAbonnes/nbSuivis plus haut.
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé'").get(uid))?.n;
   sendJSON(res, 200, { suivis: rows, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
@@ -14837,9 +14845,10 @@ route("GET", "/api/profil/:id/abonnes", async (req, res, params) => {
   let rows = await db.prepare(`
     SELECT u2.id, u2.nom, u2.prenom, u2.role, u2.ville, u2.pays, u2.titre_pro, u2.bio, u2.photo_url
     FROM user_follows uf JOIN users u2 ON u2.id = uf.follower_id
-    WHERE uf.followed_id = ? ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+    WHERE uf.followed_id = ? AND u2.nom!='Compte supprimé' ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   if (q) rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.pays||''}`.toLowerCase().includes(q));
-  const total = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows WHERE followed_id=?").get(uid))?.n;
+  // Exclut les comptes supprimés (2026-09-09) — même raison que nbAbonnes/nbSuivis plus haut.
+  const total = (await db.prepare("SELECT COUNT(*) AS n FROM user_follows uf JOIN users u2 ON u2.id=uf.follower_id WHERE uf.followed_id=? AND u2.nom!='Compte supprimé'").get(uid))?.n;
   sendJSON(res, 200, { abonnes: rows, total, page, pages: Math.ceil(total/LIMIT) });
 });
 
