@@ -967,6 +967,14 @@ window.carouselGo = function(id, idx) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
   }
   await Promise.all([loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve()]);
+  /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
+     "En savoir plus" depuis la mini-fenêtre "Événements" de l'annuaire) — reprend le format
+     d'ancre déjà utilisé par notifUrl() (assets/app.js) pour les notifications liées à un
+     événement, jusqu'ici jamais exploité par cette page (le lien menait juste ici, sans ouvrir
+     la fiche). Ouvre directement la modale de détail existante (openDetail), sans dupliquer son
+     contenu. */
+  const m = location.hash.match(/^#evt-(\d+)$/);
+  if (m) openDetail(parseInt(m[1]));
 })();
 </script>
 

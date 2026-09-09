@@ -1686,7 +1686,10 @@ function annEvtRow(e, inscrit){
       <div style="font-size:14px;font-weight:700;color:#0D1B2A;">${(e.titre||'').replace(/</g,'&lt;')}</div>
       <div style="font-size:12px;color:#6B7280;margin-top:3px;">📆 ${dt}${lieu ? ' · 📍 '+lieu.replace(/</g,'&lt;') : ''}${e.heure_debut ? ' · '+e.heure_debut : ''}</div>
     </div>
-    <div style="flex-shrink:0;">${btn}</div>
+    <div style="flex-shrink:0;display:flex;gap:8px;align-items:center;">
+      <a href="evenements.html#evt-${e.id}" style="background:#F3F4F6;color:#374151;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:700;text-decoration:none;white-space:nowrap;">En savoir plus</a>
+      ${btn}
+    </div>
   </div>`;
 }
 
