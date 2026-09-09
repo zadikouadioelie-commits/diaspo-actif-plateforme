@@ -3578,8 +3578,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <input type="number" id="iev-capacite" value="${v(e?.capacite||0)}" min="0" placeholder="0 = illimité" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
         </div>
         <div class="form-row" style="grid-column:1/-1;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;">
-            <input type="checkbox" id="iev-masquer-inscrits"${e?.masquer_inscrits?' checked':''} style="width:16px;height:16px;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:13px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;">
+            <input type="checkbox" id="iev-masquer-inscrits"${e?.masquer_inscrits?' checked':''} style="width:20px;height:20px;flex-shrink:0;accent-color:#F26422;border:2px solid #94A3B8;border-radius:4px;cursor:pointer;">
             🙈 Masquer le nombre d'inscrits sur la fiche publique
           </label>
         </div>
