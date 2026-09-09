@@ -281,7 +281,7 @@
   window.showToast = function (message, type = 'info', duration = 3500) {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️', danger: '❌' };
     toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${message}</span>`;
     document.body.appendChild(toast);
 

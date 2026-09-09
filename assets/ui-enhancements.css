@@ -196,6 +196,8 @@ input::placeholder { color: var(--muted); opacity: .7; }
 .toast.toast-success { background: #15803d; }
 .toast.toast-error   { background: #dc2626; }
 .toast.toast-info    { background: #1d4ed8; }
+.toast.toast-warning { background: #b45309; }
+.toast.toast-danger  { background: #dc2626; }
 .toast.toast-out     { animation: toastOut .18s ease-in forwards; }
 
 @keyframes toastIn  { from { opacity:0; transform:translateY(12px) scale(.95); } to { opacity:1; transform:none; } }
