@@ -118,13 +118,21 @@
       handle.style.cssText = 'display:none;margin-right:8px;cursor:grab;opacity:.65;touch-action:none;flex-shrink:0;';
       a.insertBefore(handle, a.firstChild);
       handle.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
-      handle.addEventListener('pointerdown', (e) => {
+      /* Écouteur posé sur TOUTE la carte (a), pas seulement sur la petite icône ⠿ — signalé
+         par l'utilisateur ("je n'arrive pas à déplacer les modules") : la poignée, collée au
+         bord gauche, est une cible trop petite/imprécise à attraper alors que toute la carte a
+         l'air cliquable (cadre plein, coins arrondis). L'icône ⠿ reste comme indice visuel,
+         mais on peut désormais saisir n'importe où sur la carte, sauf le bouton d'aide "?"
+         (.module-aide-btn, assets/module-aide-ui.js), qui doit rester cliquable seul en mode
+         réorganisation. */
+      a.addEventListener('pointerdown', (e) => {
         if (!mode) return;
+        if (e.target.closest('.module-aide-btn')) return;
         e.preventDefault();
         dragEl = a;
         dragGroup = getGroups(sidebar).find(g => g.includes(a)) || [];
         dragEl.classList.add('sb-dragging');
-        try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+        try { a.setPointerCapture(e.pointerId); } catch (err) {}
       });
     });
   }
@@ -141,7 +149,10 @@
     const st = document.createElement('style');
     st.id = 'sb-reorder-style';
     st.textContent = '.sb-dragging{opacity:.5;background:rgba(255,255,255,.08);}' +
-      '.sb-reorder-mode>a[href]{cursor:default;}' +
+      /* cursor:grab sur toute la carte (pas seulement la poignée) : le glisser fonctionne
+         désormais depuis n'importe où sur la carte, le curseur doit le signaler partout. */
+      '.sb-reorder-mode>a[href]{cursor:grab;touch-action:none;}' +
+      '.sb-reorder-mode>a[href]:active{cursor:grabbing;}' +
       '.sb-drag-handle:active{cursor:grabbing;}';
     document.head.appendChild(st);
   }

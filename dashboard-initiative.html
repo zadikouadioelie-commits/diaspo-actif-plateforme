@@ -43,7 +43,7 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar">
       <button class="sidebar-close" id="sidebar-close">×</button>
-      <div class="brand" id="sidebar-brand">Mon espace initiative</div>
+      <div class="brand" id="sidebar-brand">Menu des Modules</div>
 
       <!-- Ajouté (2026-08-25) : formations.html (recherche/achat, catalogue public — pas
            réservé Premium) n'existait que dans .topbar .nav, masquée sur mobile — absente du
@@ -536,8 +536,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     return;
   }
 
-  /* Mise à jour du nom dans la sidebar */
-  document.getElementById("sidebar-brand").textContent = init.sigle || init.nom;
+  /* En-tête de la sidebar (2026-09-10, demande explicite) : "Menu des Modules" plutôt que le
+     nom de l'organisation — ce dernier est déjà affiché en permanence dans le bandeau du haut
+     (pastille de compte), le répéter ici n'indiquait pas ce à quoi sert ce panneau. */
+  document.getElementById("sidebar-brand").textContent = "Menu des Modules";
 
   /* Abonnement — état initial depuis l'API */
   let abonneActif = !!init.abonnement_actif;
