@@ -385,6 +385,8 @@ async function pgInit() {
 /* Liste unique des colonnes attendues — partagee entre la migration et le controle
    post-deploiement, pour qu'elles ne puissent jamais diverger. */
 const COLONNES_MIGRATION = [
+    /* Adresse exacte / GPS événement (2026-09-09) — miroir exact de l'ALTER db.js. */
+    ['evenements', 'lieu_gps', 'TEXT'],
     /* E-mail de bienvenue "Sceau" (Initiative/Utilisateur, 2026-09-07) — miroir exact de
        l'ALTER db.js, voir le commentaire équivalent là-bas. */
     ['users', 'bienvenue_envoyee_at', 'TEXT'],

@@ -17040,7 +17040,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
     pdf_url, pdf_nom, pdf_acces,
-    langue, mode_participation, region, departement, masquer_inscrits
+    langue, mode_participation, region, departement, masquer_inscrits,
+    whatsapp_lien, lieu_gps
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   const coverImg = image_couverture || image_url || null;
@@ -17051,8 +17052,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
-     langue,mode_participation,region,departement,masquer_inscrits)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || user.nom, date_evt, lieu||null, pays||null, ville||null, origine||null,
       description||null, type_evt||"evenement", domaine||null, places_max||null,
@@ -17062,7 +17063,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
-      masquer_inscrits?1:0
+      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
@@ -17077,7 +17078,22 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      /api/insc/modele-standard), et la réponse ici renvoie ce qui a été fait pour que le
      front puisse en informer l'organisateur après coup aussi. */
   let ficheAppliquee = null;
-  if (body.appliquer_fiche_standard !== false) {
+  /* Fiche choisie explicitement via le bouton « 📝 Fiche d'inscription » (2026-09-09, demande
+     explicite) — prioritaire sur le modèle standard : on LIE la fiche existante telle quelle
+     (pas de copie, contrairement au modèle standard ci-dessous), l'organisateur a délibérément
+     choisi CETTE fiche pour CET événement. */
+  if (body.fiche_choisie_id) {
+    const fiche = await db.prepare("SELECT id, nom, slug, statut FROM insc_fiches WHERE id=? AND owner_user_id=?").get(body.fiche_choisie_id, user.id);
+    if (fiche) {
+      try {
+        await db.prepare("INSERT OR IGNORE INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(fiche.id, id);
+        await db.prepare("UPDATE evenements SET lien_inscription=? WHERE id=?")
+          .run(`${process.env.PUBLIC_ORIGIN || "https://diaspoactif.com"}/inscription-publique.html?slug=${fiche.slug}`, id);
+        await inscJournaliser(fiche.id, user, "liaison", `Liée manuellement à l'événement « ${titre} ».`);
+        ficheAppliquee = fiche;
+      } catch (e) { console.error("[evenement-fiche-choisie]", e.message); }
+    }
+  } else if (body.appliquer_fiche_standard !== false) {
     const modele = await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? AND est_modele_standard=1").get(user.id);
     if (modele) {
       try {

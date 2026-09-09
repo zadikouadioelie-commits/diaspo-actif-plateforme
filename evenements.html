@@ -149,8 +149,8 @@
     <select id="f-pays" title="Localisation / territoire"><option value="">🌍 Tous pays</option></select>
     <input type="text" id="f-ville" placeholder="📍 Ville..." style="min-width:140px">
     <input type="date" id="f-date" title="À partir de cette date" style="min-width:150px">
-    <select id="f-domaine" title="Catégorie / domaine"><option value="">🏷️ Toutes catégories</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option></select>
-    <select id="f-type" title="Type d'événement"><option value="">👥 Tous types</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select>
+    <select id="f-domaine" title="Catégorie / domaine"><option value="">🏷️ Toutes catégories</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select>
+    <select id="f-type" title="Type d'événement"><option value="">👥 Tous types</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="autre">Autre</option></select>
     <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">Gratuit</option><option value="0">Payant</option></select>
     <button class="btn btn-orange" id="btn-search" style="font-size:12px;padding:0 14px">🔍 Rechercher</button>
     <button class="btn" id="btn-search-global" style="font-size:12px;padding:0 14px">🌍 Rechercher sur tout Diaspo'Actif</button>
@@ -168,13 +168,14 @@
     <div class="section-divider">Informations principales</div>
     <div class="grid-2">
       <div style="grid-column:1/-1"><label>Titre <span style="color:#2563EB">*</span></label><input type="text" id="e-titre" placeholder="Titre de l'événement"></div>
-      <div><label>Type d'événement</label><select id="e-type"><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala / Soirée</option><option value="marche">Marché / Foire</option><option value="autre">Autre</option></select></div>
-      <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Autre</option></select></div>
+      <div><label>Type d'événement</label><select id="e-type"><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala / Soirée</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="autre">Autre</option></select></div>
+      <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select></div>
       <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="e-date"></div>
       <div><label>Heure de début</label><input type="time" id="e-heure" value="09:00"></div>
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
       <div><label>Ville / Lieu</label><input type="text" id="e-lieu" placeholder="Paris, salle X"></div>
       <div><label>Origine (diaspora ciblée)</label><select id="e-origine"><option value="">-- Origine --</option></select></div>
+      <div style="grid-column:1/-1"><label>📍 Adresse exacte / GPS</label><input type="text" id="e-lieu-gps" placeholder="Adresse complète, coordonnées GPS ou lien Google Maps collé (ex: depuis WhatsApp)"></div>
     </div>
     <div style="margin-bottom:10px;"><label>Description <span style="color:#2563EB">*</span></label><textarea id="e-desc" rows="3" style="width:100%;resize:vertical;box-sizing:border-box" placeholder="Décrivez l'événement : programme, objectifs, public cible…"></textarea></div>
 
@@ -196,6 +197,7 @@
       </label>
     </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
+    <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
 
     <!-- Modèle standard de fiche d'inscription (2026-09-09) : rempli/affiché dynamiquement à
          l'ouverture du formulaire (voir GET /api/insc/modele-standard) uniquement si un modèle
@@ -208,6 +210,19 @@
           <a id="modele-standard-lien" href="#" target="_blank" style="color:#2563EB;">Voir la fiche →</a>
         </span>
       </label>
+    </div>
+
+    <!-- Fiche d'inscription — bouton de gestion (2026-09-09, demande explicite) : permet de
+         choisir une fiche EXISTANTE précise plutôt que de s'en remettre au modèle standard
+         ci-dessus (les deux sont mutuellement exclusifs, voir e-fiche-choisie-id et le bloc
+         "fiche_choisie_id" de POST /api/evenements). -->
+    <div style="margin-bottom:10px;">
+      <button type="button" class="btn btn-outline" id="btn-fiche-inscription" style="font-size:12.5px;">📝 Fiche d'inscription</button>
+      <span id="fiche-choisie-resume" style="font-size:12.5px;color:#1B3A6B;margin-left:8px;"></span>
+      <div id="fiche-picker-panel" style="display:none;margin-top:8px;padding:12px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+        <div id="fiche-picker-liste" style="font-size:13px;color:var(--muted);">Chargement…</div>
+        <a href="inscriptions-admin.html" target="_blank" style="display:inline-block;margin-top:10px;font-size:12.5px;color:#2563EB;">➕ Créer une nouvelle fiche →</a>
+      </div>
     </div>
 
     <!-- ── MULTIMÉDIA ── -->
@@ -336,7 +351,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=12"></script>
 <script>
-const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Autre:'📅'};
+const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Economique:'📈',Politique:'🏛️',Panafricanisme:'✊',Autre:'📅'};
 
 function fmtDate(d){
   if(!d) return '';
@@ -409,6 +424,7 @@ function renderEvts() {
           ${evt.lieu ? '<span>📍 '+esc(evt.lieu)+'</span>' : ''}
           ${evt.ville ? '<span>🏙️ '+esc(evt.ville)+'</span>' : ''}
           ${evt.pays ? '<span>🌍 '+esc(evt.pays)+'</span>' : ''}
+          ${evt.lieu_gps ? '<a href="'+esc(mapsLienItineraire(evt.lieu_gps))+'" target="_blank" rel="noopener" style="text-decoration:none;color:#2563EB;">🧭 Itinéraire</a>' : ''}
           ${evt.origine ? '<span>🎯 '+[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
@@ -437,6 +453,14 @@ function renderEvts() {
 }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* Adresse exacte / GPS → lien Google Maps (2026-09-09). Accepte indifféremment une adresse
+   complète, des coordonnées "lat,lng", ou un lien déjà tout fait (ex: collé depuis WhatsApp) —
+   même logique que mapsQuery dans profil-app.html. */
+function mapsLienItineraire(v) {
+  if (!v) return null;
+  return /^https?:\/\//i.test(v) ? v : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(v);
+}
 
 /* Ouvre le formulaire d'inscription à un événement */
 function rejoindre(id, btn) {
@@ -562,6 +586,9 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 /* ─── Création événement ─── */
 document.getElementById('btn-creer').addEventListener('click', async () => {
   document.getElementById('modal-bg').classList.add('open');
+  ficheChoisie = null;
+  document.getElementById('fiche-choisie-resume').textContent = '';
+  document.getElementById('fiche-picker-panel').style.display = 'none';
   try {
     const { fiche } = await api('GET', '/insc/modele-standard');
     const notice = document.getElementById('modele-standard-notice');
@@ -576,6 +603,41 @@ document.getElementById('btn-creer').addEventListener('click', async () => {
   } catch (e) { document.getElementById('modele-standard-notice').style.display = 'none'; }
 });
 document.getElementById('btn-cancel').addEventListener('click', () => document.getElementById('modal-bg').classList.remove('open'));
+
+/* ─── Fiche d'inscription — choix explicite d'une fiche existante (2026-09-09) ───
+   Mutuellement exclusif avec le modèle standard ci-dessus : choisir une fiche ici décoche
+   automatiquement "Appliquer ma fiche standard" (le serveur applique de toute façon la même
+   priorité, voir POST /api/evenements — cette synchronisation est juste pour que l'affichage
+   ne mente jamais sur ce qui va réellement se passer à l'enregistrement). */
+let ficheChoisie = null;
+document.getElementById('btn-fiche-inscription').addEventListener('click', async () => {
+  const panel = document.getElementById('fiche-picker-panel');
+  const ouvert = panel.style.display !== 'none';
+  if (ouvert) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  const liste = document.getElementById('fiche-picker-liste');
+  liste.textContent = 'Chargement…';
+  try {
+    const { fiches } = await api('GET', '/insc/fiches');
+    if (!fiches || !fiches.length) {
+      liste.innerHTML = `<p style="margin:0;">Aucune fiche d'inscription pour l'instant.</p>`;
+      return;
+    }
+    liste.innerHTML = fiches.map(f => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #E2E8F0;">
+        <span>${esc(f.nom)} <span style="color:#94A3B8;font-size:11.5px;">(${esc(f.statut||'brouillon')})</span></span>
+        <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:4px 10px;" onclick="choisirFiche(${f.id},'${esc(f.nom).replace(/'/g,"\\'")}')">${ficheChoisie && ficheChoisie.id===f.id ? '✅ Choisie' : 'Choisir'}</button>
+      </div>`).join('');
+  } catch (e) { liste.innerHTML = `<p style="margin:0;color:#dc2626;">Erreur de chargement.</p>`; }
+});
+window.choisirFiche = function(id, nom) {
+  ficheChoisie = { id, nom };
+  document.getElementById('fiche-choisie-resume').textContent = '📝 ' + nom;
+  document.getElementById('fiche-picker-panel').style.display = 'none';
+  // Mutuellement exclusif avec le modèle standard, voir commentaire ci-dessus.
+  const modele = document.getElementById('e-appliquer-modele');
+  if (modele) modele.checked = false;
+};
 
 /* ══════════════════════════════════════════
    MULTIMÉDIA — gestion photos, PDF, vidéos
@@ -680,12 +742,14 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       pays:          document.getElementById('e-pays').value,
       lieu:          document.getElementById('e-lieu').value,
       ville:         document.getElementById('e-lieu').value,
+      lieu_gps:      document.getElementById('e-lieu-gps').value || null,
       origine:       document.getElementById('e-origine').value,
       description:   document.getElementById('e-desc').value,
       places_max:    document.getElementById('e-places').value || null,
       masquer_inscrits: document.getElementById('e-masquer-inscrits').checked,
       visibilite:    document.getElementById('e-visibilite').value,
       lien_visio:    document.getElementById('e-visio-evt').value || null,
+      whatsapp_lien: document.getElementById('e-whatsapp').value || null,
       image_couverture: coverData,
       galerie_photos:   galerie,
       video1_url:    document.getElementById('e-video1').value || null,
@@ -695,8 +759,11 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       pdf_url:       pdfData,
       pdf_nom:       pdfNom,
       pdf_acces:     document.getElementById('e-pdf-acces').value,
-      appliquer_fiche_standard: document.getElementById('modele-standard-notice').style.display !== 'none'
-        ? document.getElementById('e-appliquer-modele').checked : false,
+      fiche_choisie_id: ficheChoisie ? ficheChoisie.id : null,
+      appliquer_fiche_standard: ficheChoisie ? false : (
+        document.getElementById('modele-standard-notice').style.display !== 'none'
+          ? document.getElementById('e-appliquer-modele').checked : false
+      ),
     });
     document.getElementById('modal-bg').classList.remove('open');
     if (r.fiche_appliquee && typeof showToast === 'function') {
@@ -715,10 +782,12 @@ window.previewEvent = function() {
     date_evt:    document.getElementById('e-date').value,
     heure_debut: document.getElementById('e-heure').value,
     lieu:        document.getElementById('e-lieu').value,
+    lieu_gps:    document.getElementById('e-lieu-gps').value,
     pays:        document.getElementById('e-pays').value,
     description: document.getElementById('e-desc').value,
     type_evt:    document.getElementById('e-type').value,
     domaine:     document.getElementById('e-domaine').value,
+    whatsapp_lien: document.getElementById('e-whatsapp').value,
     image_couverture: cover,
     galerie_photos: galerie,
     video1_url:   document.getElementById('e-video1').value,
@@ -851,6 +920,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.lieu ? `<span>📍 ${esc(evt.lieu)}</span>` : ''}
         ${evt.ville ? `<span>🏙️ ${esc(evt.ville)}</span>` : ''}
         ${evt.pays ? `<span>🌍 ${esc(evt.pays)}</span>` : ''}
+        ${evt.lieu_gps ? `<a href="${esc(mapsLienItineraire(evt.lieu_gps))}" target="_blank" rel="noopener" style="text-decoration:none;color:#2563EB;">🧭 Itinéraire</a>` : ''}
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
         ${evt.origine ? `<span class="evt-tag">🎯 ${[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')}</span>` : ''}
         ${evt.prix_min ? `<span class="evt-tag">💶 À partir de ${Number(evt.prix_min).toLocaleString('fr-FR')} €</span>` : `<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>`}

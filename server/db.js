@@ -1649,6 +1649,11 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // Adresse exacte / coordonnées GPS d'un événement (2026-09-09, demande explicite) — texte
+  // libre : adresse complète, "lat,lng" ou lien Google Maps collé (ex: depuis WhatsApp).
+  // Distinct de evenements.ville/lieu (repères courts) — voir aussi le lien Itinéraire généré
+  // côté evenements.html sur le même modèle que profil-app.html (mapsQuery).
+  ["evenements", "lieu_gps TEXT"],
   // E-mail de bienvenue "Sceau" (Initiative/Utilisateur, 2026-09-07) — horodatage pour
   // déclencher une fois par compte (création ET rattrapage rétroactif), jamais deux fois.
   ["users", "bienvenue_envoyee_at TEXT"],
