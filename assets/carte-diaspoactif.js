@@ -78,6 +78,15 @@
       .cda-headtext{padding-top:62px;flex:1;min-width:220px;}
       .cda-name{font-size:20px;font-weight:800;color:#0D1B2A;display:flex;align-items:center;gap:7px;}
       .cda-verified{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:#2563EB;color:#fff;font-size:11px;}
+      .cda-officiel-badge{display:inline-flex;align-items:center;gap:5px;background:#0D2B4E;color:#fff;font-size:11px;font-weight:800;padding:4px 10px 4px 6px;border-radius:99px;white-space:nowrap;}
+      .cda-officiel-badge img{width:16px;height:16px;border-radius:50%;background:#fff;object-fit:cover;}
+      .cda-name-badges{display:inline-flex;flex-wrap:wrap;gap:6px;vertical-align:middle;}
+      .cda-affil-badge{background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE;}
+      .cda-affil-badge span.cda-affil-badge-emoji{font-size:12px;}
+      .cda-partenaire-badge{background:#FFF4EC;color:#B8460E;border:1px solid #F9C6A3;}
+      .cda-affil-item.cda-affil-officiel .cda-affil-logo{border:2px solid #F26422;box-shadow:0 0 0 3px rgba(242,100,34,.15);}
+      .cda-affil-item.cda-affil-officiel .cda-affil-nom{color:#0D2B4E;font-weight:800;}
+      .cda-affil-officiel-tag{display:block;font-size:9px;color:#F26422;font-weight:800;text-transform:uppercase;margin-top:1px;}
       .cda-actions{padding-top:62px;margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
       .cda-btn{text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:12px;font-weight:700;font-size:13px;white-space:nowrap;}
       .cda-info-row{display:flex;flex-wrap:wrap;gap:18px;margin-top:10px;position:relative;padding-right:26px;}
@@ -145,6 +154,39 @@
     const verified = !!profil.identite_verifiee;
     const competences = Array.isArray(profil.competences) ? profil.competences : [];
     const affiliations = Array.isArray(profil.affiliations) ? profil.affiliations : [];
+    /* Badges d'affiliation automatiques (2026-09-09, demande explicite) : un badge par
+       affiliation acceptée, affiché près du nom — pas seulement celle à Diaspo'Actif. L'image
+       du badge est celle de l'organisation affiliée (badge_image, calculé côté serveur avec le
+       même repli que partout ailleurs sur la plateforme). L'affiliation à l'initiative
+       officielle D'A (est_officielle, voir server/index.js) reste visuellement distinguée —
+       triée en tête par le serveur, elle apparaît donc toujours en premier ici. */
+    function badgeAffiliation(a) {
+      const officiel = !!a.est_officielle;
+      const label = officiel ? "Membre de Diaspo'Actif" : `Membre de ${esc(a.nom)}`;
+      const titreInfobulle = officiel
+        ? "Adhérent officiel de l'association Diaspo'Actif"
+        : `Affilié à ${esc(a.nom)}${a.fonction ? ' — ' + esc(a.fonction) : ''}`;
+      const icone = a.badge_image
+        ? `<img src="${esc(a.badge_image)}" alt="" onerror="this.remove()">`
+        : officiel
+        ? `<img src="assets/logo.png" alt="" onerror="this.remove()">`
+        : `<span class="cda-affil-badge-emoji">🏢</span>`;
+      return `<span class="cda-officiel-badge${officiel ? '' : ' cda-affil-badge'}" title="${titreInfobulle}">${icone}${label}</span>`;
+    }
+    const badgesAffiliations = affiliations.map(badgeAffiliation).join('');
+    /* Badges "Partenaire de X" (2026-09-09, demande explicite) : réciproques et automatiques,
+       dérivés du module "liste des partenaires" (partenaires_officiels) — voir
+       server/index.js /api/profil/:id, tableau `partenariats`. Distincts sémantiquement des
+       badges d'affiliation ("membre" vs "partenaire") donc couleur propre (cda-partenaire-badge),
+       même principe de badge sinon (image de l'organisation + libellé). */
+    const partenariats = Array.isArray(profil.partenariats) ? profil.partenariats : [];
+    function badgePartenariat(p) {
+      const icone = p.badge_image
+        ? `<img src="${esc(p.badge_image)}" alt="" onerror="this.remove()">`
+        : `<span class="cda-affil-badge-emoji">🤝</span>`;
+      return `<span class="cda-officiel-badge cda-partenaire-badge" title="Partenariat officiel avec ${esc(p.nom)}">${icone}Partenaire de ${esc(p.nom)}</span>`;
+    }
+    const badgesPartenariats = partenariats.map(badgePartenariat).join('');
     const statutActuel = profil.situation_pro || '';
     const bio = profil.bio || '';
     /* Bannière personnalisée : remplace le visuel par défaut (assets/banner-default.svg,
@@ -162,7 +204,7 @@
             ${isOwner ? `<button type="button" class="cda-avatar-edit" id="cda-avatar-edit" title="Changer la photo">📷</button>` : ''}
           </div>
           <div class="cda-headtext">
-            <div class="cda-name">${esc(nom)} ${verified ? '<span class="cda-verified" title="Identité vérifiée">✔</span>' : ''}</div>
+            <div class="cda-name">${esc(nom)} ${verified ? '<span class="cda-verified" title="Identité vérifiée">✔</span>' : ''}${(badgesAffiliations || badgesPartenariats) ? `<span class="cda-name-badges">${badgesAffiliations}${badgesPartenariats}</span>` : ''}</div>
             <div class="cda-info-row">
               ${chipPays(profil.pays, 'Pays de résidence', profil.pays)}
               ${chipInfo('📍', 'Ville de résidence', profil.ville)}
@@ -200,11 +242,12 @@
           <div class="cda-box-head"><span>🤝 Affiliations</span></div>
           <div class="cda-affiliations" id="cda-affiliations">
             ${affiliations.length ? affiliations.map(a => `
-              <a class="cda-affil-item" href="initiative.html?id=${esc(a.slug || a.initiative_id)}" data-initiative-id="${a.initiative_id}" title="${esc(a.nom)}${a.fonction ? ' — ' + esc(a.fonction) : ''}">
+              <a class="cda-affil-item${a.est_officielle ? ' cda-affil-officiel' : ''}" href="initiative.html?id=${esc(a.slug || a.initiative_id)}" data-initiative-id="${a.initiative_id}" title="${esc(a.nom)}${a.fonction ? ' — ' + esc(a.fonction) : ''}">
                 ${isOwner ? `<button type="button" class="cda-affil-remove" data-remove-aff="${a.initiative_id}" title="Mettre fin à cette affiliation">✕</button>` : ''}
-                <div class="cda-affil-logo">${a.logo_url ? `<img src="${esc(a.logo_url)}" alt="${esc(a.nom)}">` : '🏢'}</div>
+                <div class="cda-affil-logo">${a.badge_image ? `<img src="${esc(a.badge_image)}" alt="${esc(a.nom)}">` : '🏢'}</div>
                 <div class="cda-affil-nom">${esc(a.nom)}</div>
                 ${a.fonction ? `<div class="cda-affil-poste">${esc(a.fonction)}</div>` : ''}
+                ${a.est_officielle ? '<span class="cda-affil-officiel-tag">Officiel</span>' : ''}
               </a>`).join('') : '<span class="cda-muted">Aucune affiliation officielle pour l\'instant — une organisation enregistrée sur Diaspo\'Actif peut vous en proposer une.</span>'}
           </div>
         </div>

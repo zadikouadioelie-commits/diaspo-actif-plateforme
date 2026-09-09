@@ -14515,12 +14515,62 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
      voit toujours toutes ses affiliations (y compris masquées) ; un visiteur ne voit que
      celles que le membre a choisi de rendre publiques (visible_publiquement). */
   const estProprietaireProfil = me && Number(me.id) === Number(u.id);
-  const affiliations = await db.prepare(`
-    SELECT im.id, im.fonction, im.visible_publiquement, i.nom, i.slug, i.logo_url, i.id AS initiative_id
+  const affiliationsBrutes = await db.prepare(`
+    SELECT im.id, im.fonction, im.visible_publiquement, i.nom, i.slug, i.logo_url, i.vitrine_banniere_url, i.id AS initiative_id
     FROM initiative_membres im JOIN initiatives i ON i.id = im.initiative_id
     WHERE im.user_id = ? AND im.statut = 'accepte' ${estProprietaireProfil ? '' : 'AND im.visible_publiquement = 1'}
     ORDER BY im.created_at ASC
   `).all(u.id);
+  /* Badges d'affiliation automatiques (2026-09-09, demande explicite : "crée un système
+     automatique qui identifiera les affiliations et créera les badges... utilise les images
+     des profils des comptes qui font l'affiliation") : CHAQUE affiliation acceptée devient un
+     badge affiché sur la cartouche et le profil public — pas seulement celle à Diaspo'Actif.
+     badge_image reprend la même règle de repli que photoFallbackInitiative ci-dessus
+     (vitrine_banniere_url || logo_url) pour que le badge montre toujours la même image que le
+     reste de la plateforme pour cette organisation. L'affiliation à l'initiative officielle de
+     la plateforme elle-même (adhésion réelle et payante à D'A — voir syncAffiliationDepuisAdhesion,
+     déjà utilisée pour l'indice de fiabilité via getInitiativeOfficielleId) reste en plus
+     distinguée par est_officielle et triée en tête. */
+  const officielleId = await getInitiativeOfficielleId();
+  const affiliations = affiliationsBrutes
+    .map(a => ({
+      ...a,
+      badge_image: a.vitrine_banniere_url || a.logo_url || null,
+      est_officielle: officielleId != null && Number(a.initiative_id) === Number(officielleId),
+    }))
+    .sort((a, b) => (b.est_officielle - a.est_officielle));
+  const membreOfficielDiaspoActif = affiliations.some(a => a.est_officielle);
+  /* Badges "Partenaire de X" (2026-09-09, demande explicite : module "liste des partenaires" =
+     partenaires_officiels, pas "Mon Associé") — réciproque et entièrement automatique, dérivé
+     de partenaires_officiels.statut='active', jamais saisi à la main :
+       - sur le profil d'un partenaire actif : un badge "Partenaire de Diaspo'Actif" ;
+       - sur le(s) compte(s) officiel(s) de la plateforme elle-même (même double condition que
+         computeTrustScore : administrateur OU propriétaire de l'initiative officielle) : un
+         badge "Partenaire de X" par partenaire actif, avec sa photo.
+     Volontairement distinct du tableau affiliations (sémantique différente : "partenaire",
+     pas "membre"), même si le rendu carte-diaspoactif.js réutilise le même principe de badge. */
+  let partenariats = [];
+  if (po && po.statut === 'active') {
+    const initOfficielle = officielleId != null ? await db.prepare("SELECT nom, logo_url, vitrine_banniere_url FROM initiatives WHERE id=?").get(officielleId) : null;
+    partenariats.push({
+      nom: "Diaspo'Actif",
+      badge_image: initOfficielle ? (initOfficielle.vitrine_banniere_url || initOfficielle.logo_url || null) : null,
+    });
+  } else {
+    const initOfficielle = officielleId != null ? await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId) : null;
+    const estCompteOfficielPlateforme = u.role === 'administrateur' || (initOfficielle && Number(initOfficielle.owner_user_id) === Number(u.id));
+    if (estCompteOfficielPlateforme) {
+      const partenairesActifs = await db.prepare(`
+        SELECT u2.nom, u2.prenom, u2.nom_institution, u2.photo_url
+        FROM partenaires_officiels po2 JOIN users u2 ON u2.id = po2.user_id
+        WHERE po2.statut = 'active'
+      `).all();
+      partenariats = partenairesActifs.map(p => ({
+        nom: p.nom_institution || [p.prenom, p.nom].filter(Boolean).join(' '),
+        badge_image: p.photo_url || null,
+      }));
+    }
+  }
   sendJSON(res, 200, { profil: {
     ...publicUser(u),
     bio: u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
@@ -14571,6 +14621,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     notif_emails_non_essentiels: u.notif_emails_non_essentiels==null ? true : !!u.notif_emails_non_essentiels,
     type_organisme: u.type_organisme,
     affiliations,
+    membre_officiel_diaspoactif: membreOfficielDiaspoActif,
+    partenariats,
     initiative_id: initiativeId,
     initiative_type: initiativeType,
     adhesions_ouvertes: adhesionsOuvertes,

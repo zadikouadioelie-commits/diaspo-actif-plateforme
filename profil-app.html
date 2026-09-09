@@ -712,6 +712,8 @@ html, body { overflow-x:clip; }
 .pvz-name { font-size:28px; font-weight:700; color:#122A4D; line-height:1.1; }
 .pvz-verified { display:inline-flex; align-items:center; gap:5px; background-color:var(--tp-light,#E4F0FB); color:var(--tp,#2F6BED); font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:999px; }
 .pvz-premium-badge { display:inline-flex; align-items:center; gap:4px; background:linear-gradient(135deg,#F5D061,#C9971C); color:#3A2600; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.pvz-partenaire-badge { display:inline-flex; align-items:center; gap:5px; background:#FFF4EC; color:#B8460E; border:1px solid #F9C6A3; font-size:11.5px; font-weight:700; padding:4px 10px 4px 6px; border-radius:999px; }
+.pvz-partenaire-badge img { width:16px; height:16px; border-radius:50%; object-fit:cover; background:#fff; }
 .pvz-verified .dot { width:15px; height:15px; border-radius:50%; background-color:var(--tp,#2F6BED); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }
 .pvz-sub { font-size:13.5px; color:#6B7686; margin-top:5px; }
 .pvz-responsable { font-size:12px; color:#8A93A3; margin-top:4px; }
@@ -1917,6 +1919,7 @@ function renderVisitorProfile() {
               ${isPremium ? `<span class="pvz-premium-badge" title="Membre Premium">👑 Premium</span>` : ''}
               ${(!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBadgeHtml(profil._decouverte_premium.date_expiration) : ''}
               ${profil.role === 'partenaire' ? `<span class="pvz-premium-badge" title="Compte Partenaire Diaspo'Actif" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);">🤝 Partenaire</span>` : ''}
+              ${(Array.isArray(profil.partenariats) ? profil.partenariats : []).map(p => `<span class="pvz-partenaire-badge" title="Partenariat officiel avec ${esc(p.nom)}">${p.badge_image ? `<img src="${esc(p.badge_image)}" alt="" onerror="this.remove()">` : '🤝'}Partenaire de ${esc(p.nom)}</span>`).join('')}
               ${verified ? `<span class="pvz-verified"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
             </div>
             <div class="pvz-sub">${esc(sub)}</div>
