@@ -194,6 +194,7 @@ function buildTypeVM(t) {
     fillWidth: t.places_max ? Math.min(100, Math.round((t.nb_inscrits / t.places_max) * 100)) + '%' : '4%',
     barWidthPct: t.places_max ? Math.min(100, Math.round((t.nb_inscrits / t.places_max) * 100)) : Math.min(100, t.nb_inscrits * 4),
     validationLabel: t.validation_auto ? 'Validation automatique' : 'Validation manuelle',
+    validationAuto: !!t.validation_auto,
     periodLabel: (t.date_ouverture || t.date_fermeture) ? `${t.date_ouverture ? t.date_ouverture.slice(0,10) : '…'} → ${t.date_fermeture ? t.date_fermeture.slice(0,10) : '…'}` : 'Période générale de la fiche',
     waitlist: !!t.liste_attente_active,
     isOpen: !!t.actif, isClosed: !t.actif,
@@ -571,6 +572,10 @@ function renderTypes() {
           <input type="checkbox" ${selected.waitlist ? 'checked' : ''} data-action="toggleWaitlist" data-id="${selected.id}" style="width:16px; height:16px; accent-color:oklch(0.32 0.09 258);"/>
           Activer la liste d'attente une fois complet
         </label>
+        <label style="display:flex; align-items:center; gap:10px; margin-top:12px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" ${!selected.validationAuto ? 'checked' : ''} data-action="toggleValidationAuto" data-id="${selected.id}" style="width:16px; height:16px; accent-color:oklch(0.32 0.09 258);"/>
+          Inscription avec validation — chaque demande reste en attente jusqu'à ce que vous l'approuviez (notification envoyée)
+        </label>
       </div>` : `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:40px;text-align:center;color:oklch(0.55 0.006 30);">Ajoutez un type d'inscription pour commencer.</div>`;
 
   return `
@@ -786,22 +791,29 @@ function renderPresences() {
   const selected = state.presences.find(p => p.id === state.selectedPresenceId) || null;
   const rowsHtml = state.presences.map(p => `
     <tr style="border-top:1px solid oklch(0.93 0.004 30);cursor:pointer;background:${state.selectedPresenceId===p.id ? 'oklch(0.97 0.03 30)' : 'transparent'};" data-action="selectPresence" data-id="${p.id}">
-      <td style="padding:10px;font-weight:600;">${escH(p.prenom)} ${escH(p.nom)}</td>
+      <td style="padding:10px;font-weight:600;">${escH(p.prenom)} ${escH(p.nom)}${p.statut === 'inscrit' ? ' <span style="font-size:11px;font-weight:600;color:oklch(0.42 0.13 85);">⏳ en attente</span>' : ''}</td>
       <td style="padding:10px;color:oklch(0.5 0.006 30);">${escH(p.type_label)}</td>
       <td style="padding:10px;font-family:'IBM Plex Mono',monospace;">${p.entree_at ? escH(p.entree_at.slice(11,16)) : '—'}</td>
       <td style="padding:10px;font-family:'IBM Plex Mono',monospace;">${p.sortie_at ? escH(p.sortie_at.slice(11,16)) : '—'}</td>
       <td style="padding:10px;font-weight:600;">${p.statut_presence}</td>
     </tr>`).join('') || `<tr><td colspan="5" style="padding:20px;text-align:center;color:oklch(0.55 0.006 30);">Aucune inscription.</td></tr>`;
 
+  const IA_STATUT_INSC_LABEL = { inscrit: '⏳ En attente de validation', confirme: '✅ Confirmée', present: '✅ Confirmée', absent: '✅ Confirmée', liste_attente: '🟠 Liste d\'attente', annule: '❌ Annulée' };
   const detail = selected ? `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
       <div><h3 style="margin:0;font-size:16px;font-weight:700;">${escH(selected.prenom)} ${escH(selected.nom)}</h3><div style="font-size:12.5px;color:oklch(0.55 0.006 30);margin-top:2px;">${escH(selected.type_label)}</div></div>
       <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:oklch(0.96 0.004 30);white-space:nowrap;">${selected.statut_presence}</span>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;margin-bottom:${selected.statut === 'inscrit' ? '16px' : '0'};">
       <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">E-mail</span><span style="font-weight:600;">${escH(selected.email||'—')}</span></div>
       <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">Référence</span><span style="font-weight:600;font-family:'IBM Plex Mono',monospace;">${escH(selected.reference||'—')}</span></div>
-    </div>`
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">Statut d'inscription</span><span style="font-weight:600;">${IA_STATUT_INSC_LABEL[selected.statut] || selected.statut}</span></div>
+    </div>
+    ${selected.statut === 'inscrit' ? `
+    <div style="display:flex;gap:8px;padding-top:16px;border-top:1px solid oklch(0.92 0.004 30);">
+      <button style="flex:1;background:oklch(0.4 0.13 150);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="validerInscription" data-id="${selected.id}">✅ Confirmer</button>
+      <button style="flex:1;background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="refuserInscription" data-id="${selected.id}">❌ Refuser</button>
+    </div>` : ''}`
     : `<div style="text-align:center;color:oklch(0.55 0.006 30);font-size:13px;padding:40px 10px;">Cliquez sur un participant pour voir sa fiche.</div>`;
 
   return `
@@ -1009,6 +1021,15 @@ const actions = {
     try { await api('PUT', '/insc/types/' + id, { liste_attente_active: el.checked ? 1 : 0 }); await iaChargerFiche(state.selectedFicheId); }
     catch (e) { ia_toast(e.message, false); }
   },
+  async toggleValidationAuto(el) {
+    const id = parseInt(el.dataset.id);
+    // La case coche "avec validation" -> validation_auto est l'inverse de ce qui est coché.
+    try {
+      await api('PUT', '/insc/types/' + id, { validation_auto: el.checked ? 0 : 1 });
+      ia_toast(el.checked ? 'Inscription avec validation activée.' : 'Validation automatique rétablie.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
   async toggleFieldRequired(el) {
     const id = parseInt(el.dataset.id);
     try { await api('PUT', '/insc/champs/' + id, { obligatoire: el.checked ? 1 : 0 }); await iaChargerFiche(state.selectedFicheId); }
@@ -1097,6 +1118,21 @@ const actions = {
     catch (e) { ia_toast(e.message, false); }
   },
   selectPresence(el) { state.selectedPresenceId = parseInt(el.dataset.id); },
+  async validerInscription(el) {
+    try {
+      await api('PATCH', `/insc/inscriptions/${el.dataset.id}/statut`, { statut: 'confirme' });
+      ia_toast('Inscription confirmée — e-mail de confirmation envoyé.', true);
+      await iaChargerPresences();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async refuserInscription(el) {
+    if (!confirm('Refuser cette inscription ? La personne ne sera pas notifiée automatiquement.')) return;
+    try {
+      await api('PATCH', `/insc/inscriptions/${el.dataset.id}/statut`, { statut: 'annule' });
+      ia_toast('Inscription refusée.', true);
+      await iaChargerPresences();
+    } catch (e) { ia_toast(e.message, false); }
+  },
   async toggleFreezeFonds() {
     const fiche = selectedFiche();
     try {

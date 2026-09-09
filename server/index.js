@@ -40135,8 +40135,14 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   )).lastInsertRowid;
 
   if (statutInitial === "confirme") await envoyerConfirmationInscription(id);
-  creerNotif(fiche.owner_user_id, "insc_nouvelle", "📝 Nouvelle inscription",
-    `${body.prenom} ${body.nom} vient de s'inscrire (${type.label}) à « ${fiche.nom} ».`,
+  /* Texte de notification distinct pour "inscrit" (validation_auto désactivé, demande
+     explicite du 2026-09-09) : l'organisateur doit comprendre qu'une action de sa part est
+     attendue, pas seulement être informé d'une inscription déjà confirmée. */
+  const notifTitre = statutInitial === "inscrit" ? "⏳ Inscription en attente de validation" : "📝 Nouvelle inscription";
+  const notifContenu = statutInitial === "inscrit"
+    ? `${body.prenom} ${body.nom} s'est inscrit·e (${type.label}) à « ${fiche.nom} » — en attente de votre validation.`
+    : `${body.prenom} ${body.nom} vient de s'inscrire (${type.label}) à « ${fiche.nom} ».`;
+  creerNotif(fiche.owner_user_id, "insc_nouvelle", notifTitre, notifContenu,
     { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
 
   sendJSON(res, 201, { id, reference, statut: statutInitial });
