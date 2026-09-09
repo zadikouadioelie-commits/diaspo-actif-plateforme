@@ -572,9 +572,9 @@ function renderTypes() {
           <input type="checkbox" ${selected.waitlist ? 'checked' : ''} data-action="toggleWaitlist" data-id="${selected.id}" style="width:16px; height:16px; accent-color:oklch(0.32 0.09 258);"/>
           Activer la liste d'attente une fois complet
         </label>
-        <label style="display:flex; align-items:center; gap:10px; margin-top:12px; font-size:13px; cursor:pointer;">
-          <input type="checkbox" ${!selected.validationAuto ? 'checked' : ''} data-action="toggleValidationAuto" data-id="${selected.id}" style="width:16px; height:16px; accent-color:oklch(0.32 0.09 258);"/>
-          Inscription avec validation — chaque demande reste en attente jusqu'à ce que vous l'approuviez (notification envoyée)
+        <label style="display:flex; align-items:center; gap:10px; margin-top:12px; font-size:13px; cursor:pointer; padding:10px 12px; background:oklch(0.97 0.004 30); border-radius:8px;">
+          <input type="checkbox" ${selected.validationAuto ? 'checked' : ''} data-action="toggleValidationAuto" data-id="${selected.id}" style="width:17px; height:17px; accent-color:oklch(0.32 0.09 258); flex-shrink:0;"/>
+          <span><strong>Validation automatique</strong> — coché : l'inscription est prise en compte dès son émission, sans action de votre part. Décoché : chaque demande reste en attente jusqu'à ce que vous l'approuviez (vous recevez une notification).</span>
         </label>
       </div>` : `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:40px;text-align:center;color:oklch(0.55 0.006 30);">Ajoutez un type d'inscription pour commencer.</div>`;
 
@@ -1023,10 +1023,10 @@ const actions = {
   },
   async toggleValidationAuto(el) {
     const id = parseInt(el.dataset.id);
-    // La case coche "avec validation" -> validation_auto est l'inverse de ce qui est coché.
+    // Coché = validation automatique (validation_auto=1) ; décoché = validation manuelle requise.
     try {
-      await api('PUT', '/insc/types/' + id, { validation_auto: el.checked ? 0 : 1 });
-      ia_toast(el.checked ? 'Inscription avec validation activée.' : 'Validation automatique rétablie.', true);
+      await api('PUT', '/insc/types/' + id, { validation_auto: el.checked ? 1 : 0 });
+      ia_toast(el.checked ? 'Validation automatique activée.' : 'Inscription avec validation activée — chaque demande attendra votre approbation.', true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },

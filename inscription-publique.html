@@ -231,14 +231,23 @@ async function ipSoumettre(ev) {
 }
 
 function ipRenderConfirmation(d) {
-  const icon = d.statut === 'liste_attente' ? '🟠' : '✅';
-  const titre = d.statut === 'liste_attente' ? "Vous êtes en liste d'attente" : 'Inscription confirmée !';
+  /* Statut "inscrit" = validation manuelle activée par l'organisateur (validation_auto=0,
+     demande explicite du 2026-09-09) : ne JAMAIS afficher "Inscription confirmée" ni un lien
+     QR dans ce cas — l'inscription n'est pas encore réellement confirmée, le QR ne serait pas
+     pertinent avant validation. */
+  const parStatut = {
+    liste_attente: { icon: '🟠', titre: "Vous êtes en liste d'attente", note: 'Vous serez averti automatiquement si une place se libère.' },
+    inscrit: { icon: '⏳', titre: 'Inscription soumise à validation', note: "Votre inscription sera examinée par l'organisateur. Vous recevrez un e-mail avec votre billet dès qu'elle sera validée." },
+  };
+  const info = parStatut[d.statut] || { icon: '✅', titre: 'Inscription confirmée !', note: null };
   document.getElementById('ip-root').innerHTML = `
     <div class="ip-confirmation">
-      <div class="grand">${icon}</div>
-      <h2 style="font-size:19px;font-weight:700;margin:0 0 8px;">${titre}</h2>
+      <div class="grand">${info.icon}</div>
+      <h2 style="font-size:19px;font-weight:700;margin:0 0 8px;">${info.titre}</h2>
       <p style="color:oklch(0.5 0.006 30);font-size:13.5px;">Numéro d'inscription : <strong style="font-family:'IBM Plex Mono',monospace;">${escH(d.reference)}</strong></p>
-      ${d.statut !== 'liste_attente' ? `<a class="ip-btn" style="text-decoration:none;display:inline-block;margin-top:16px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>` : `<p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">Vous serez averti automatiquement si une place se libère.</p>`}
+      ${info.note
+        ? `<p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">${info.note}</p>`
+        : `<a class="ip-btn" style="text-decoration:none;display:inline-block;margin-top:16px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>`}
     </div>`;
 }
 
