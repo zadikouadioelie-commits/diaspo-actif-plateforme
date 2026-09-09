@@ -1151,6 +1151,21 @@ function fermerAuScroll() {
 }
 
 async function applyAuthState() {
+  /* Garde de ré-entrance (2026-09-09, bug réel : bouton "Changer de compte" inutilisable sur
+     profil.html) — cette fonction est appelée deux fois sur certaines pages : une fois par
+     l'auto-init générique en bas de ce fichier (document.addEventListener("DOMContentLoaded",
+     ...) → applyAuthState() inconditionnel), et une seconde fois explicitement par la page
+     elle-même (ex: profil-app.html:1087, dashboard-utilisateur.html). Chaque appel refait
+     el.innerHTML = ... PUIS appelle initComptesLiesSwitcher(user), qui attache SES PROPRES
+     écouteurs 'click' sur #cl-switch-btn/#cl-switch-dd. Si les deux appels retombent sur les
+     mêmes nœuds DOM (l'un des deux innerHTML n'a pas eu lieu entre-temps), le bouton se
+     retrouve avec deux écouteurs qui appellent tous deux ouvrirClDd() : le premier ouvre le
+     menu, le second (même clic, même tick) le referme aussitôt car dd.classList déjà 'open' —
+     net effet visible : le clic ne fait rien. Poser le drapeau AVANT tout await, de façon
+     synchrone, garantit qu'un second appel concurrent ressort immédiatement, quel que soit
+     l'ordre d'exécution entre l'auto-init et l'appel explicite de la page. */
+  if (window.__authStateApplied) return;
+  window.__authStateApplied = true;
   const el = document.getElementById("auth-area");
   if (!el) return;
   const user = await fetchCurrentUser();
