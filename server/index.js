@@ -39525,10 +39525,10 @@ async function inscFicheProprietaire(req, ficheId) {
   return { user, fiche };
 }
 
-async function inscJournaliser(ficheId, acteur, action, details) {
+async function inscJournaliser(ficheId, acteur, action, details, evenementId = null) {
   try {
-    await db.prepare("INSERT INTO insc_historique (fiche_id, acteur_id, acteur_nom, action, details) VALUES (?,?,?,?,?)")
-      .run(ficheId, acteur?.id || null, acteur ? `${acteur.prenom || ""} ${acteur.nom || ""}`.trim() : "Système", action, details || null);
+    await db.prepare("INSERT INTO insc_historique (fiche_id, acteur_id, acteur_nom, action, details, evenement_id) VALUES (?,?,?,?,?,?)")
+      .run(ficheId, acteur?.id || null, acteur ? `${acteur.prenom || ""} ${acteur.nom || ""}`.trim() : "Système", action, details || null, evenementId || null);
   } catch (e) { console.error("[insc-journal]", e.message); }
 }
 
@@ -40045,7 +40045,7 @@ route("PATCH", "/api/insc/inscriptions/:id/statut", async (req, res, params, bod
   const valides = ["inscrit","confirme","present","absent","annule","liste_attente"];
   if (!valides.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
   await db.prepare("UPDATE insc_inscriptions SET statut=?, updated_at=datetime('now') WHERE id=?").run(body.statut, insc.id);
-  await inscJournaliser(insc.fiche_id, user, "statut_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) : ${insc.statut} → ${body.statut}`);
+  await inscJournaliser(insc.fiche_id, user, "statut_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) : ${insc.statut} → ${body.statut}`, insc.evenement_id);
   if (body.statut === "confirme") await envoyerConfirmationInscription(insc.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -40065,11 +40065,27 @@ route("GET", "/api/insc/fiches/:id/stats", async (req, res, params) => {
   const total = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(fiche.id))?.n || 0;
   sendJSON(res, 200, { total, par_type: parType, par_statut: parStatut, par_evenement: parEvenement });
 });
-route("GET", "/api/insc/fiches/:id/historique", async (req, res, params) => {
+route("GET", "/api/insc/fiches/:id/historique", async (req, res, params, body, query) => {
   const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const historique = await db.prepare("SELECT * FROM insc_historique WHERE fiche_id=? ORDER BY id DESC").all(fiche.id);
+  let sql = "SELECT * FROM insc_historique WHERE fiche_id=?";
+  const args = [fiche.id];
+  if (query?.evenement_id) { sql += " AND evenement_id=?"; args.push(query.evenement_id); }
+  sql += " ORDER BY id DESC";
+  const historique = await db.prepare(sql).all(...args);
   sendJSON(res, 200, { historique });
+});
+
+/* Suppression d'une entrée d'historique (2026-09-09, demande explicite : "un historique
+   supprimable par fiche par événements") — même garde de propriété que le reste du module,
+   irréversible, jamais d'archivage caché : une entrée supprimée disparaît réellement. */
+route("DELETE", "/api/insc/historique/:id", async (req, res, params) => {
+  const entree = await db.prepare("SELECT fiche_id FROM insc_historique WHERE id=?").get(params.id);
+  if (!entree) return sendJSON(res, 404, { error: "Entrée introuvable." });
+  const { erreur, msg } = await inscFicheProprietaire(req, entree.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("DELETE FROM insc_historique WHERE id=?").run(params.id);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* ── PUBLIC : lecture, soumission, upload ── */

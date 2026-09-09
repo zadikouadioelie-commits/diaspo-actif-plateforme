@@ -1649,6 +1649,10 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // Historique fiche d'inscription — rattache une entrée à un événement précis quand la fiche
+  // en couvre plusieurs (2026-09-09, demande explicite : "historique supprimable par fiche par
+  // événements"). NULL pour les entrées non liées à une inscription (édition de fiche, gel...).
+  ["insc_historique", "evenement_id INTEGER"],
   // Adresse exacte / coordonnées GPS d'un événement (2026-09-09, demande explicite) — texte
   // libre : adresse complète, "lat,lng" ou lien Google Maps collé (ex: depuis WhatsApp).
   // Distinct de evenements.ville/lieu (repères courts) — voir aussi le lien Itinéraire généré

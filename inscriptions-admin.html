@@ -73,6 +73,7 @@
 const IA_TABS = [
   { key: 'overview', label: "Vue d'ensemble", emoji: '📊' },
   { key: 'types', label: "Types d'inscription", emoji: '🏷️' },
+  { key: 'validation', label: 'Validation', emoji: '✅' },
   { key: 'fields', label: 'Formulaire', emoji: '📝' },
   { key: 'public', label: 'Aperçu public', emoji: '🌐' },
   { key: 'communication', label: 'Communication', emoji: '📧' },
@@ -174,6 +175,7 @@ const state = {
   presences: [],
   selectedPresenceId: null,
   historique: [],
+  historiqueFiltreEvenement: '',
   busy: false,
 };
 
@@ -253,13 +255,15 @@ async function iaChargerPresences() {
   state.presences = presences;
 }
 async function iaChargerHistorique() {
-  const { historique } = await api('GET', `/insc/fiches/${state.selectedFicheId}/historique`);
+  const q = state.historiqueFiltreEvenement ? `?evenement_id=${state.historiqueFiltreEvenement}` : '';
+  const { historique } = await api('GET', `/insc/fiches/${state.selectedFicheId}/historique${q}`);
   state.historique = historique;
 }
 async function iaChargerOnglet(tab) {
   if (tab === 'public') return iaChargerPublic();
   if (tab === 'communication') return iaChargerCommunications();
   if (tab === 'qr' || tab === 'presences') return Promise.all([iaChargerLienEtStats(), iaChargerPresences()]);
+  if (tab === 'validation') return iaChargerInscriptions();
   if (tab === 'historique') return iaChargerHistorique();
 }
 
@@ -347,6 +351,7 @@ function renderTabContent() {
   switch (state.activeTab) {
     case 'overview': return renderOverview();
     case 'types': return renderTypes();
+    case 'validation': return renderValidation();
     case 'fields': return renderFields();
     case 'public': return renderPublic();
     case 'communication': return renderCommunication();
@@ -786,6 +791,55 @@ function renderQr() {
     </div>`;
 }
 
+// ---- Validation (2026-09-09, demande explicite) ----
+// Liste les demandes d'inscription en attente (statut='inscrit' = validation manuelle requise
+// pour ce type, voir "Validation automatique" dans l'onglet Types d'inscription) avec les
+// réponses du formulaire, pour Valider/Refuser sans devoir chercher la personne dans Présences.
+function iaLibellesChamps(typeId) {
+  const type = (state.ficheDetail?.types || []).find(t => t.id === typeId);
+  const map = {};
+  (type?.champs || []).forEach(c => { map[c.nom] = c.libelle || c.nom; });
+  return map;
+}
+function renderValidation() {
+  const enAttente = (state.inscriptions || []).filter(i => i.statut === 'inscrit');
+  const cartes = enAttente.map(i => {
+    const libelles = iaLibellesChamps(i.type_id);
+    let reponses = {};
+    try { reponses = JSON.parse(i.reponses_json || '{}'); } catch (e) {}
+    const reponsesHtml = Object.entries(reponses).filter(([,v]) => v !== '' && v != null).map(([k,v]) =>
+      `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid oklch(0.95 0.004 30);"><span style="color:oklch(0.55 0.006 30);">${escH(libelles[k]||k)}</span><span style="font-weight:600;text-align:right;">${escH(Array.isArray(v)?v.join(', '):String(v))}</span></div>`
+    ).join('') || '<div style="color:oklch(0.6 0.006 30);font-size:12.5px;padding:5px 0;">Aucune réponse au formulaire.</div>';
+    return `
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;">
+        <div>
+          <h4 style="margin:0;font-size:14.5px;font-weight:700;">${escH(i.prenom)} ${escH(i.nom)}</h4>
+          <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-top:2px;">${escH(i.type_label)}${i.evenement_titre ? ' · ' + escH(i.evenement_titre) : ''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:oklch(0.96 0.07 85);color:oklch(0.42 0.13 85);white-space:nowrap;">⏳ En attente</span>
+      </div>
+      <div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin:8px 0;">${i.email ? '✉️ '+escH(i.email) : ''}${i.email && i.telephone ? ' · ' : ''}${i.telephone ? '📞 '+escH(i.telephone) : ''}</div>
+      <div style="margin:10px 0;">${reponsesHtml}</div>
+      <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid oklch(0.92 0.004 30);">
+        <button style="flex:1;background:oklch(0.4 0.13 150);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="validerInscription" data-id="${i.id}">✅ Valider</button>
+        <button style="flex:1;background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="refuserInscription" data-id="${i.id}">❌ Refuser</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:15px;font-weight:700;">Demandes en attente de validation</h3>
+        <span style="font-size:12.5px;color:oklch(0.55 0.006 30);">${enAttente.length} demande${enAttente.length>1?'s':''}</span>
+      </div>
+      ${enAttente.length
+        ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">${cartes}</div>`
+        : `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:40px 20px;text-align:center;color:oklch(0.55 0.006 30);font-size:13px;">Aucune demande en attente — les inscriptions dont le type a « Validation automatique » activée n'apparaissent pas ici, elles sont déjà confirmées.</div>`
+      }
+    </div>`;
+}
+
 // ---- Présences ----
 function renderPresences() {
   const selected = state.presences.find(p => p.id === state.selectedPresenceId) || null;
@@ -876,14 +930,26 @@ function renderStats() {
 
 // ---- Historique ----
 function renderHistorique() {
+  const evenementsLies = state.ficheDetail?.evenements || [];
   const rows = state.historique.map(a => `
-    <div style="border-bottom:1px solid oklch(0.93 0.004 30);padding-bottom:12px;">
-      <div style="font-size:12.5px;font-weight:600;">${escH(a.created_at)} — ${escH(a.acteur_nom || 'Système')}</div>
-      <div style="font-size:13px;color:oklch(0.3 0.006 30);margin-top:3px;">${escH(a.action)}${a.details ? ' — ' + escH(a.details) : ''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1px solid oklch(0.93 0.004 30);padding-bottom:12px;">
+      <div>
+        <div style="font-size:12.5px;font-weight:600;">${escH(a.created_at)} — ${escH(a.acteur_nom || 'Système')}</div>
+        <div style="font-size:13px;color:oklch(0.3 0.006 30);margin-top:3px;">${escH(a.action)}${a.details ? ' — ' + escH(a.details) : ''}</div>
+      </div>
+      <button title="Supprimer cette entrée" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:oklch(0.6 0.006 30);font-size:14px;padding:2px 4px;" data-action="supprimerHistorique" data-id="${a.id}">🗑</button>
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun historique pour le moment.</div>';
+  const filtreHtml = evenementsLies.length > 1 ? `
+    <select data-action="filtrerHistorique" style="padding:6px 10px;border:1px solid oklch(0.85 0.006 30);border-radius:8px;font-size:12.5px;font-family:inherit;">
+      <option value="">Tous les événements</option>
+      ${evenementsLies.map(e => `<option value="${e.id}" ${String(state.historiqueFiltreEvenement)===String(e.id)?'selected':''}>${escH(e.titre)}</option>`).join('')}
+    </select>` : '';
   return `
     <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
-      <h3 style="margin:0 0 16px;font-size:15px;font-weight:700;">Historique / audit</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:15px;font-weight:700;">Historique / audit</h3>
+        ${filtreHtml}
+      </div>
       <div style="display:flex;flex-direction:column;gap:14px;">${rows}</div>
     </div>`;
 }
@@ -1122,7 +1188,7 @@ const actions = {
     try {
       await api('PATCH', `/insc/inscriptions/${el.dataset.id}/statut`, { statut: 'confirme' });
       ia_toast('Inscription confirmée — e-mail de confirmation envoyé.', true);
-      await iaChargerPresences();
+      await Promise.all([iaChargerPresences(), iaChargerInscriptions()]);
     } catch (e) { ia_toast(e.message, false); }
   },
   async refuserInscription(el) {
@@ -1130,7 +1196,19 @@ const actions = {
     try {
       await api('PATCH', `/insc/inscriptions/${el.dataset.id}/statut`, { statut: 'annule' });
       ia_toast('Inscription refusée.', true);
-      await iaChargerPresences();
+      await Promise.all([iaChargerPresences(), iaChargerInscriptions()]);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async filtrerHistorique(el) {
+    state.historiqueFiltreEvenement = el.value;
+    await iaChargerHistorique();
+  },
+  async supprimerHistorique(el) {
+    if (!confirm('Supprimer définitivement cette entrée d\'historique ?')) return;
+    try {
+      await api('DELETE', `/insc/historique/${el.dataset.id}`);
+      state.historique = state.historique.filter(h => String(h.id) !== el.dataset.id);
+      ia_toast('Entrée supprimée.', true);
     } catch (e) { ia_toast(e.message, false); }
   },
   async toggleFreezeFonds() {
@@ -1164,7 +1242,8 @@ root.addEventListener('click', function (e) {
 root.addEventListener('change', function (e) {
   const el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'file')) dispatch(el.dataset.action, el);
+  if (el.tagName === 'SELECT') dispatch(el.dataset.action, el);
+  else if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'file')) dispatch(el.dataset.action, el);
 });
 
 (async function initInscriptionsAdmin() {
