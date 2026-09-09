@@ -52,6 +52,13 @@
            PROPRES formations, réservé Premium) — ceci est le catalogue pour en ACHETER. -->
       <a href="formations.html" data-aide="formations">🎓 Catalogue Formations</a>
 
+      <!-- Ajouté (2026-09-09) : module "Formulaires & Inscriptions Événementielles", en cours
+           de vérification (§ beta) — réservé à diaspo.actif@gmail.com + administrateur, masqué
+           par défaut ci-dessous, affiché seulement pour ce compte via JS (voir inscBetaAutorise()
+           côté serveur, même condition reproduite ici). Pas un module Premium (aucun rapport avec
+           l'abonnement), donc placé hors du groupe ⭐ MODULES PREMIUM. -->
+      <a href="inscriptions-admin.html" id="sb-inscriptions-evt" data-aide="formulaires_inscription" style="display:none;">📝 Formulaires &amp; Inscriptions</a>
+
       <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
       <a href="#crm" data-section="crm" data-aide="crm">🤝 CRM</a>
       <a href="#paiement" data-section="paiement" data-aide="paiement_initiative">💳 Module paiement</a>
@@ -165,6 +172,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     return;
   }
   if (window.Posts) Posts.init(me.id);
+
+  /* Formulaires & Inscriptions — visible seulement pour le compte pilote de la vérification
+     bêta (même condition que inscBetaAutorise() côté serveur, à retirer en même temps que la
+     restriction serveur une fois le module ouvert à tous les comptes Initiative). */
+  const sbInscEvt = document.getElementById('sb-inscriptions-evt');
+  if (sbInscEvt && (me.role === 'administrateur' || String(me.email||'').toLowerCase() === 'diaspo.actif@gmail.com')) {
+    sbInscEvt.style.display = '';
+  }
 
   /* Statut Premium — déterminé tôt pour que le premier rendu (paiement, etc.) soit déjà correctement gaté. */
   try {
