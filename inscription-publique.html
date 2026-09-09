@@ -74,11 +74,18 @@ const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',
 let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false, IP_MEDIAS=[];
 function ipRenderMedias() {
   if (!IP_MEDIAS.length) return '';
+  const videos = IP_MEDIAS.filter(m => m.type === 'video');
+  const autres = IP_MEDIAS.filter(m => m.type !== 'video');
   return `
     <div style="margin:22px 0; padding-top:18px; border-top:1px solid oklch(0.92 0.004 30);">
       <div style="font-size:12px; font-weight:600; color:oklch(0.5 0.006 30); margin-bottom:10px; text-transform:uppercase; letter-spacing:.03em;">Documents &amp; médias</div>
+      ${videos.map(m => `
+        <div style="margin-bottom:10px;">
+          ${m.libelle ? `<div style="font-size:12.5px; font-weight:600; margin-bottom:6px;">${escH(m.libelle)}</div>` : ''}
+          <video src="${escH(m.url)}" controls preload="metadata" style="width:100%; border-radius:10px; background:#000; display:block;"></video>
+        </div>`).join('')}
       <div style="display:flex; flex-direction:column; gap:8px;">
-        ${IP_MEDIAS.map(m => `
+        ${autres.map(m => `
           <a href="${escH(m.url)}" target="_blank" rel="noopener" style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:8px; padding:8px 10px; text-decoration:none;">
             ${m.type === 'photo'
               ? `<img src="${escH(m.url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">`

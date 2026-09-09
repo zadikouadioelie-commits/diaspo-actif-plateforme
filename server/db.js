@@ -675,9 +675,10 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS insc_fiches_medias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fiche_id INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('photo','pdf')),
+    type TEXT NOT NULL CHECK(type IN ('photo','pdf','video')),
     url TEXT NOT NULL,
     libelle TEXT,
+    duree_sec INTEGER,
     position INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
@@ -1660,6 +1661,9 @@ const MIGRATIONS = [
   // paiement reel derriere pour l'instant, juste le drapeau + motif.
   ["insc_fiches", "fonds_geles_le TEXT"],
   ["insc_fiches", "fonds_geles_motif TEXT"],
+  // Documents & médias -- ajout de la vidéo (2026-09-09) : durée en secondes, vérifiée
+  // réellement via ffprobe à l'upload, jamais déduite ou acceptée sans preuve.
+  ["insc_fiches_medias", "duree_sec INTEGER"],
   // Filtre "Gratuit / payant" de la page Événements (2026-09-07) — prix le plus bas des
   // billets de l'événement source, NULL/0 = gratuit.
   ["evenements", "prix_min REAL"],

@@ -448,7 +448,28 @@ function renderInfosGenerales(fiche) {
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture des inscriptions</label><input id="ia-infos-ouverture" type="datetime-local" value="${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture des inscriptions</label><input id="ia-infos-fermeture" type="datetime-local" value="${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
         </div>
+        ${renderLiaisonEvenements()}
         <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; margin-top:4px;" data-action="enregistrerInfos">Enregistrer</button>
+      </div>
+    </div>`;
+}
+
+function renderLiaisonEvenements() {
+  const evenementsLies = new Set((state.ficheDetail?.evenements || []).map(e => e.id));
+  const mesEvenements = state.mesEvenements || [];
+  if (!mesEvenements.length) {
+    return `<div style="font-size:12px; color:oklch(0.55 0.006 30); padding-top:6px; border-top:1px solid oklch(0.92 0.004 30);">Aucun événement créé sur votre compte — <a href="evenements.html" style="color:oklch(0.32 0.09 258);">créez-en un</a> pour pouvoir le lier à cette fiche.</div>`;
+  }
+  return `
+    <div style="padding-top:10px; border-top:1px solid oklch(0.92 0.004 30);">
+      <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px;">Lier à un événement</label>
+      <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-bottom:8px;">Le bouton "S'inscrire" de l'événement coché redirigera vers cette fiche au lieu du parcours d'inscription classique.</div>
+      <div style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;">
+        ${mesEvenements.map(e => `
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" data-evt-id="${e.id}" ${evenementsLies.has(e.id) ? 'checked' : ''} style="width:15px; height:15px; accent-color:oklch(0.32 0.09 258);" class="ia-evt-checkbox">
+            ${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}
+          </label>`).join('')}
       </div>
     </div>`;
 }
@@ -456,25 +477,32 @@ function renderInfosGenerales(fiche) {
 // ---- Documents & médias (photos/PDF consultables par inscrits ET non-inscrits) ----
 function renderMedias() {
   const medias = (state.ficheDetail && state.ficheDetail.medias) || [];
+  const nbPhotos = medias.filter(m => m.type === 'photo').length;
+  const nbVideos = medias.filter(m => m.type === 'video').length;
+  const iconePour = (m) => {
+    if (m.type === 'photo') return `<img src="${escH(m.url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;">`;
+    if (m.type === 'video') return `<video src="${escH(m.url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;" muted></video>`;
+    return `<div style="width:36px; height:36px; border-radius:6px; background:oklch(0.94 0.05 20); color:oklch(0.42 0.16 20); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;">📄</div>`;
+  };
+  const libelleParDefaut = (m) => m.type === 'photo' ? 'Photo' : (m.type === 'video' ? 'Vidéo' : 'Document PDF');
   const liste = medias.map(m => `
     <div style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; padding:8px 10px;">
-      ${m.type === 'photo'
-        ? `<img src="${escH(m.url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;">`
-        : `<div style="width:36px; height:36px; border-radius:6px; background:oklch(0.94 0.05 20); color:oklch(0.42 0.16 20); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;">📄</div>`}
-      <a href="${escH(m.url)}" target="_blank" rel="noopener" style="flex:1; font-size:13px; color:oklch(0.2 0.006 30); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escH(m.libelle || (m.type === 'photo' ? 'Photo' : 'Document PDF'))}</a>
+      ${iconePour(m)}
+      <a href="${escH(m.url)}" target="_blank" rel="noopener" style="flex:1; font-size:13px; color:oklch(0.2 0.006 30); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escH(m.libelle || libelleParDefaut(m))}${m.type === 'video' && m.duree_sec ? ` <span style="color:oklch(0.55 0.006 30);font-family:'IBM Plex Mono',monospace;font-size:11px;">(${Math.floor(m.duree_sec/60)}:${String(m.duree_sec%60).padStart(2,'0')})</span>` : ''}</a>
       <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="supprimerMedia" data-id="${m.id}">✕</button>
-    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun document ajouté — photos ou PDF consultables par tous, inscrits ou non.</div>';
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun document ajouté — photos, vidéos ou PDF consultables par tous, inscrits ou non.</div>';
 
   return `
     <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px; margin-top:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <h3 style="margin:0; font-size:15px; font-weight:700;">Documents &amp; médias</h3>
         <span style="font-size:12px; color:oklch(0.55 0.006 30);">Visibles par tous sur la page publique</span>
       </div>
+      <div style="font-size:11.5px; color:oklch(0.55 0.006 30); margin-bottom:14px;">📷 ${nbPhotos}/7 photos &nbsp;·&nbsp; 🎬 ${nbVideos}/4 vidéos (3 min et 100 Mo max chacune) &nbsp;·&nbsp; 📄 PDF sans limite (15 Mo max)</div>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">${liste}</div>
       <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
-        + Ajouter une photo ou un PDF
-        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" data-action="ajouterMedia" style="display:none;">
+        + Ajouter une photo, une vidéo ou un PDF
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm" data-action="ajouterMedia" style="display:none;">
       </label>
     </div>`;
 }
@@ -856,6 +884,12 @@ const actions = {
       date_ouverture_inscriptions: document.getElementById('ia-infos-ouverture')?.value || null,
       date_fermeture_inscriptions: document.getElementById('ia-infos-fermeture')?.value || null,
     };
+    /* N'envoie evenement_ids QUE si la liste des événements a réellement pu être chargée —
+       sinon les cases seraient toutes vides et on écraserait une vraie liaison existante
+       avec un tableau vide par accident (voir data-evt-id / .ia-evt-checkbox). */
+    if (state.mesEvenements.length) {
+      payload.evenement_ids = Array.from(document.querySelectorAll('.ia-evt-checkbox:checked')).map(el => parseInt(el.dataset.evtId));
+    }
     try {
       await api('PUT', `/insc/fiches/${state.selectedFicheId}`, payload);
       ia_toast('Informations enregistrées.', true);
@@ -877,17 +911,16 @@ const actions = {
   },
   async ajouterMedia(el) {
     const file = el.files[0]; if (!file) return;
+    const libelle = prompt('Nom de ce document (affiché aux visiteurs) :', file.name) || '';
     try {
-      const fd = new FormData(); fd.append('fichier', file);
-      const r = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
+      const fd = new FormData(); fd.append('fichier', file); fd.append('libelle', libelle);
+      const r = await fetch(`/api/insc/fiches/${state.selectedFicheId}/medias`, { method: 'POST', credentials: 'include', body: fd });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Erreur');
-      const type = file.type === 'application/pdf' ? 'pdf' : 'photo';
-      const libelle = prompt('Nom de ce document (affiché aux visiteurs) :', d.nom || (type === 'pdf' ? 'Document' : 'Photo')) || '';
-      await api('POST', `/insc/fiches/${state.selectedFicheId}/medias`, { type, url: d.url, libelle });
       ia_toast('Document ajouté.', true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
+    el.value = '';
   },
   async supprimerMedia(el) {
     if (!confirm('Supprimer ce document ?')) return;

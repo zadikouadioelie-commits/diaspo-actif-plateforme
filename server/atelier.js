@@ -75,6 +75,30 @@ async function probeDuration(file) {
   } catch { return null; }
 }
 
+/* Durée + résolution en un seul appel ffprobe — réutilisé pour valider un upload vidéo
+   (Formulaires & Inscriptions, 2026-09-09) : durée max, largeur/hauteur max, et le simple
+   fait que ffprobe arrive à lire le fichier prouve qu'il s'agit d'une vidéo décodable, pas
+   d'un fichier renommé. Retourne null si ffprobe est indisponible ou échoue — jamais de
+   valeur déduite ou acceptée sans preuve. */
+async function probeVideoInfo(file) {
+  try {
+    const out = await run(FFPROBE, [
+      "-v", "error", "-select_streams", "v:0",
+      "-show_entries", "stream=width,height:format=duration",
+      "-of", "default=nw=1", file
+    ], { capture: true });
+    const info = {};
+    for (const line of out.split("\n")) {
+      const [k, v] = line.split("=");
+      if (k === "width") info.width = parseInt(v);
+      else if (k === "height") info.height = parseInt(v);
+      else if (k === "duration") info.duration = parseFloat(v);
+    }
+    if (!Number.isFinite(info.duration)) return null;
+    return info;
+  } catch { return null; }
+}
+
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 function outPath(ext) { return path.join(FILES_DIR, uid() + "." + ext); }
 
@@ -359,7 +383,7 @@ function assetPath(folder, id) { return LIB_DIRS[folder] ? fileFor(folder, id) :
 
 module.exports = {
   ffmpegAvailable, FILES_DIR,
-  probeDuration, writeDataUrl, outPath,
+  probeDuration, probeVideoInfo, writeDataUrl, outPath,
   opTrim, opFormat, opConcat, opExtractAudio, opAddMusic, opExport,
   opSpeed, opBlur, opFilter, opColor, opEnhance, opReplaceAudio, opVolume, opTitle,
   ensureLibraries, ensureMusicLibrary, listLibrary, listMusic, musicPath, assetPath,

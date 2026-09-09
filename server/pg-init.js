@@ -1433,6 +1433,10 @@ async function migratePg(pool) {
        remplaçant de toute façon immédiatement après dans la boucle. */
     { table: 'users', constraint: 'users_role_check',
       addBack: "CHECK (role IN ('utilisateur','initiative','administrateur','collectivite','administrateur_junior','partenaire'))" },
+    /* Formulaires & Inscriptions -- Documents & médias : ajout de la vidéo (2026-09-09),
+       la table avait déjà été créée en production avec seulement 'photo'/'pdf'. */
+    { table: 'insc_fiches_medias', constraint: 'insc_fiches_medias_type_check',
+      addBack: "CHECK (type IN ('photo','pdf','video'))" },
   ];
   for (const { table, constraint, addBack } of checkFixes) {
     try { await pool.query(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`); } catch (e) {

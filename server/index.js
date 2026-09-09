@@ -39529,28 +39529,115 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     await db.prepare(`UPDATE insc_fiches SET ${set.join(",")} WHERE id=?`).run(...vals, fiche.id);
   }
   if (Array.isArray(body.evenement_ids)) {
-    await db.prepare("DELETE FROM insc_fiches_evenements WHERE fiche_id=?").run(fiche.id);
+    /* Lier un événement redirige automatiquement son bouton "S'inscrire" vers cette fiche
+       (evenements.lien_inscription, mécanisme déjà existant sur evenements.html) — demande
+       explicite du 2026-09-09. Restreint aux événements du même propriétaire que la fiche
+       (sauf admin) pour qu'une Initiative ne puisse pas détourner le bouton d'un événement
+       qui ne lui appartient pas. Déliage : lien_inscription n'est effacé QUE s'il pointait
+       encore vers cette fiche précise, pour ne jamais écraser un lien externe indépendant. */
+    const ancienIds = (await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id)).map(r => r.evenement_id);
+    const estAdmin = user.role === "administrateur" || (await AdminJunior.hasAdminPermission(user, "formulaires_inscription.gerer", db));
+    const nouveauxIds = [];
     for (const eid of body.evenement_ids) {
+      const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(eid);
+      if (evt && (estAdmin || Number(evt.owner_user_id) === Number(fiche.owner_user_id))) nouveauxIds.push(evt.id);
+    }
+    await db.prepare("DELETE FROM insc_fiches_evenements WHERE fiche_id=?").run(fiche.id);
+    const lienFiche = `${process.env.PUBLIC_ORIGIN || "https://diaspoactif.com"}/inscription-publique.html?slug=${fiche.slug}`;
+    for (const eid of nouveauxIds) {
       try { await db.prepare("INSERT OR IGNORE INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(fiche.id, eid); } catch (e) {}
+      await db.prepare("UPDATE evenements SET lien_inscription=? WHERE id=?").run(lienFiche, eid);
+    }
+    for (const eid of ancienIds) {
+      if (nouveauxIds.includes(eid)) continue;
+      await db.prepare("UPDATE evenements SET lien_inscription=NULL WHERE id=? AND lien_inscription=?").run(eid, lienFiche);
     }
   }
   await inscJournaliser(fiche.id, user, "modification", "Fiche modifiée.");
   sendJSON(res, 200, { ok: true });
 });
 
-/* Documents & médias de la fiche (photo/PDF) — consultables par tout le monde sur la page
-   publique, inscrits ou non (demande explicite du 2026-09-09), pas seulement par les inscrits.
-   Réutilise l'upload déjà durci de POST /api/insc/public/upload (image ou PDF, magic-bytes,
-   8 Mo max) côté front — ces routes ne font qu'enregistrer l'URL déjà téléversée. */
-route("POST", "/api/insc/fiches/:id/medias", async (req, res, params, body) => {
+/* Documents & médias de la fiche (photo/PDF/vidéo) — consultables par tout le monde sur la
+   page publique, inscrits ou non (demande explicite du 2026-09-09), pas seulement par les
+   inscrits. Upload direct en multipart (pas un simple enregistrement d'URL déjà téléversée) :
+   c'est ICI que les limites sont réellement imposées, jamais côté client seul.
+   Règles (demande explicite, précisée après une recommandation ChatGPT jugée pertinente) :
+   - Photo : 7 maximum par fiche, 8 Mo chacune.
+   - PDF : pas de limite de nombre, 15 Mo chacun.
+   - Vidéo : 4 maximum par fiche, 100 Mo chacune, 3 minutes maximum, largeur/hauteur ≤ 3840 px
+     (filet anti-8K, sans gêner une vidéo filmée normalement au téléphone). Le plafond global
+     (4 × 100 Mo = 400 Mo) découle mécaniquement des deux limites ci-dessus, pas besoin d'une
+     troisième vérification séparée.
+   Vérifications réelles, jamais déduites : taille en octets du buffer reçu (pas une valeur
+   déclarée par le client), type par signature binaire (magic bytes), durée + résolution via
+   ffprobe (server/atelier.js, déjà installé sur la plateforme) — un fichier que ffprobe ne
+   sait pas lire est un fichier non lisible, point final, jamais accepté "au cas où". Le
+   fichier temporaire nécessaire à ffprobe est systématiquement supprimé, succès ou échec. */
+route("POST", "/api/insc/fiches/:id/medias", async (req, res, params) => {
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  if (!body?.url || !["photo", "pdf"].includes(body?.type)) return sendJSON(res, 400, { error: "url et type (photo|pdf) requis." });
+
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide." });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const raw = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { fields, files } = parseMultipart(raw, boundaryMatch[1]);
+  const file = files["fichier"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu." });
+  const b = file.buffer;
+  const libelle = fields?.libelle ? String(fields.libelle).slice(0, 200) : null;
+
+  const compterExistants = async (type) => (await db.prepare(
+    "SELECT COUNT(*) n FROM insc_fiches_medias WHERE fiche_id=? AND type=?").get(fiche.id, type))?.n || 0;
+
+  const vidType = SEC.isSafeVideo(b);
+  let type, url, dureeSec = null;
+
+  if (vidType) {
+    type = "video";
+    const MAX_VIDEO = 100 * 1024 * 1024;
+    if (b.length > MAX_VIDEO) return sendJSON(res, 400, { error: "Vidéo trop volumineuse (max 100 Mo)." });
+    if ((await compterExistants("video")) >= 4) return sendJSON(res, 400, { error: "Maximum 4 vidéos par fiche." });
+    const { outPath, probeVideoInfo } = require("./atelier");
+    const tmp = outPath(vidType.split("/")[1]);
+    try {
+      const fs = require("fs");
+      fs.writeFileSync(tmp, b);
+      const info = await probeVideoInfo(tmp);
+      if (!info) return sendJSON(res, 400, { error: "Impossible de lire cette vidéo — fichier corrompu ou format non supporté." });
+      if (info.duration > 180) return sendJSON(res, 400, { error: `Vidéo trop longue (${Math.round(info.duration)}s) — 3 minutes maximum.` });
+      if ((info.width || 0) > 3840 || (info.height || 0) > 3840) return sendJSON(res, 400, { error: "Résolution vidéo trop élevée (max 3840 px de large ou de haut)." });
+      dureeSec = Math.round(info.duration);
+    } finally {
+      try { require("fs").unlinkSync(tmp); } catch (e) {}
+    }
+    url = await uploadToBunny(b, `insc-media-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${vidType.split("/")[1]}`, "insc-medias");
+  } else {
+    const imgType = SEC.isSafeRasterImage(b);
+    const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+    if (imgType) {
+      type = "photo";
+      if (b.length > 8 * 1024 * 1024) return sendJSON(res, 400, { error: "Photo trop volumineuse (max 8 Mo)." });
+      if ((await compterExistants("photo")) >= 7) return sendJSON(res, 400, { error: "Maximum 7 photos par fiche." });
+      url = await uploadToBunny(b, `insc-media-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${imgType.split("/")[1].replace("jpeg", "jpg")}`, "insc-medias");
+    } else if (isPdf) {
+      type = "pdf";
+      if (b.length > 15 * 1024 * 1024) return sendJSON(res, 400, { error: "PDF trop volumineux (max 15 Mo)." });
+      url = await uploadToBunny(b, `insc-media-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.pdf`, "insc-medias");
+    } else {
+      return sendJSON(res, 400, { error: "Format non supporté (photo JPEG/PNG/WebP/GIF, PDF, ou vidéo MP4/WebM requis)." });
+    }
+  }
+
   const maxPos = (await db.prepare("SELECT MAX(position) m FROM insc_fiches_medias WHERE fiche_id=?").get(fiche.id))?.m;
-  const id = (await db.prepare("INSERT INTO insc_fiches_medias (fiche_id, type, url, libelle, position) VALUES (?,?,?,?,?)")
-    .run(fiche.id, body.type, body.url, body.libelle ? String(body.libelle).slice(0, 200) : null, (maxPos != null ? maxPos + 1 : 0))).lastInsertRowid;
-  await inscJournaliser(fiche.id, user, "ajout_media", `Document ajouté : ${body.libelle || body.url}`);
-  sendJSON(res, 201, { id });
+  const id = (await db.prepare("INSERT INTO insc_fiches_medias (fiche_id, type, url, libelle, duree_sec, position) VALUES (?,?,?,?,?,?)")
+    .run(fiche.id, type, url, libelle, dureeSec, (maxPos != null ? maxPos + 1 : 0))).lastInsertRowid;
+  SEC.logSecurity("upload", { uid: Number(user.id), kind: "insc_media", type, size: b.length });
+  await inscJournaliser(fiche.id, user, "ajout_media", `Document ajouté : ${libelle || type}`);
+  sendJSON(res, 201, { id, type, url, duree_sec: dureeSec });
 });
 route("DELETE", "/api/insc/medias/:id", async (req, res, params) => {
   const media = await db.prepare("SELECT * FROM insc_fiches_medias WHERE id=?").get(params.id);
