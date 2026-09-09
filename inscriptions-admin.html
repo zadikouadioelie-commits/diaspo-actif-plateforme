@@ -183,12 +183,17 @@ function ia_toast(msg, ok) { if (typeof showToast === 'function') return showToa
 function isAdmin() { return IA_ME && IA_ME.role === 'administrateur'; }
 function selectedFiche() { return state.ficheDetail ? state.ficheDetail.fiche : null; }
 function currentTypes() { return state.ficheDetail ? state.ficheDetail.types : []; }
-function selectedType() { return currentTypes().find(t => t.id === state.selectedTypeId) || currentTypes()[0] || null; }
+/* Number(...) des deux côtés : PostgreSQL renvoie les id en chaîne (même cause que
+   project_bug_bigserial_types.md), alors que selectType() stocke state.selectedTypeId en
+   nombre (parseInt sur dataset.id) — une comparaison stricte échouait donc toujours,
+   bloquant le panneau de détail sur le premier type quel que soit le clic (signalé par
+   capture d'écran, 2026-09-09). */
+function selectedType() { return currentTypes().find(t => Number(t.id) === Number(state.selectedTypeId)) || currentTypes()[0] || null; }
 
 function buildTypeVM(t) {
   const priceLabel = t.gratuit ? 'Gratuit' : `${(t.prix || 0)} €`;
   const capacityLabel = t.places_max != null ? `${t.nb_inscrits}/${t.places_max} places` : 'Illimité';
-  const isSelected = state.selectedTypeId === t.id;
+  const isSelected = Number(state.selectedTypeId) === Number(t.id);
   return {
     id: t.id, name: t.label, priceLabel, capacityLabel,
     capacityDisplay: t.places_max ?? '∞',
@@ -223,7 +228,7 @@ async function iaChargerListe() {
 async function iaChargerFiche(id) {
   const data = await api('GET', '/insc/fiches/' + id);
   state.ficheDetail = data;
-  if (!state.selectedTypeId || !data.types.some(t => t.id === state.selectedTypeId)) {
+  if (!state.selectedTypeId || !data.types.some(t => Number(t.id) === Number(state.selectedTypeId))) {
     state.selectedTypeId = data.types[0]?.id || null;
   }
   if (!state.mesEvenements.length) {
@@ -654,7 +659,7 @@ function renderPublic() {
   const modeApercu = !!d.apercu;
   let body;
   const types = (d.types || []);
-  const pubType = state.publicSelectedTypeId ? types.find(t => t.id === state.publicSelectedTypeId) : null;
+  const pubType = state.publicSelectedTypeId ? types.find(t => Number(t.id) === Number(state.publicSelectedTypeId)) : null;
   if (!pubType) {
     body = `<div style="display:flex; flex-direction:column; gap:10px;">${types.map(t => `
       <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:14px 16px; gap:12px;">
@@ -842,7 +847,7 @@ function renderValidation() {
 
 // ---- Présences ----
 function renderPresences() {
-  const selected = state.presences.find(p => p.id === state.selectedPresenceId) || null;
+  const selected = state.presences.find(p => Number(p.id) === Number(state.selectedPresenceId)) || null;
   const rowsHtml = state.presences.map(p => `
     <tr style="border-top:1px solid oklch(0.93 0.004 30);cursor:pointer;background:${state.selectedPresenceId===p.id ? 'oklch(0.97 0.03 30)' : 'transparent'};" data-action="selectPresence" data-id="${p.id}">
       <td style="padding:10px;font-weight:600;">${escH(p.prenom)} ${escH(p.nom)}${p.statut === 'inscrit' ? ' <span style="font-size:11px;font-weight:600;color:oklch(0.42 0.13 85);">⏳ en attente</span>' : ''}</td>
