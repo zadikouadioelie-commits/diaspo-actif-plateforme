@@ -197,6 +197,19 @@
     </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
 
+    <!-- Modèle standard de fiche d'inscription (2026-09-09) : rempli/affiché dynamiquement à
+         l'ouverture du formulaire (voir GET /api/insc/modele-standard) uniquement si un modèle
+         est actif sur ce compte — jamais une application silencieuse, toujours visible et
+         décochable avant la création de l'événement. -->
+    <div id="modele-standard-notice" style="display:none;margin-bottom:10px;padding:12px 14px;background:#F0F4FF;border:1px solid #C7D7FE;border-radius:10px;">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-weight:400;">
+        <input type="checkbox" id="e-appliquer-modele" checked style="width:17px;height:17px;margin-top:2px;flex-shrink:0;">
+        <span style="font-size:13px;color:#1B3A6B;">⭐ Appliquer automatiquement ma fiche d'inscription standard : <strong id="modele-standard-nom"></strong> — une copie sera créée pour ce nouvel événement.
+          <a id="modele-standard-lien" href="#" target="_blank" style="color:#2563EB;">Voir la fiche →</a>
+        </span>
+      </label>
+    </div>
+
     <!-- ── MULTIMÉDIA ── -->
     <div class="section-divider">📎 Contenus multimédias</div>
 
@@ -547,8 +560,20 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 });
 
 /* ─── Création événement ─── */
-document.getElementById('btn-creer').addEventListener('click', () => {
+document.getElementById('btn-creer').addEventListener('click', async () => {
   document.getElementById('modal-bg').classList.add('open');
+  try {
+    const { fiche } = await api('GET', '/insc/modele-standard');
+    const notice = document.getElementById('modele-standard-notice');
+    if (fiche) {
+      document.getElementById('modele-standard-nom').textContent = fiche.nom;
+      document.getElementById('modele-standard-lien').href = 'inscriptions-admin.html?fiche=' + fiche.id;
+      document.getElementById('e-appliquer-modele').checked = true;
+      notice.style.display = '';
+    } else {
+      notice.style.display = 'none';
+    }
+  } catch (e) { document.getElementById('modele-standard-notice').style.display = 'none'; }
 });
 document.getElementById('btn-cancel').addEventListener('click', () => document.getElementById('modal-bg').classList.remove('open'));
 
@@ -646,7 +671,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   if (!titre || !date) { errBox.textContent='Titre et date requis.'; errBox.style.display='block'; return; }
   try {
     const galerie = galleryData.filter(Boolean);
-    await api('POST', '/evenements', {
+    const r = await api('POST', '/evenements', {
       titre,
       date_evt:      date,
       heure_debut:   document.getElementById('e-heure').value || null,
@@ -670,8 +695,13 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       pdf_url:       pdfData,
       pdf_nom:       pdfNom,
       pdf_acces:     document.getElementById('e-pdf-acces').value,
+      appliquer_fiche_standard: document.getElementById('modele-standard-notice').style.display !== 'none'
+        ? document.getElementById('e-appliquer-modele').checked : false,
     });
     document.getElementById('modal-bg').classList.remove('open');
+    if (r.fiche_appliquee && typeof showToast === 'function') {
+      showToast(`⭐ Fiche d'inscription « ${r.fiche_appliquee.nom} » créée automatiquement pour cet événement.`, 'success');
+    }
     loadEvts();
   } catch(e) { errBox.textContent=e.message||'Erreur.'; errBox.style.display='block'; }
 });

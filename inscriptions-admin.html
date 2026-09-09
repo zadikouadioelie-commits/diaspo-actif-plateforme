@@ -19,6 +19,9 @@
 #ia-root { font-family:'IBM Plex Sans', sans-serif; background:oklch(0.965 0.002 30); color:oklch(0.2 0.006 30); min-height:60vh; }
 #ia-root button, #ia-root input, #ia-root select, #ia-root textarea { font-family:inherit; }
 #ia-root a { color:oklch(0.25 0.09 258); }
+.ia-evt-ligne { border:1.5px solid oklch(0.88 0.004 30); background:#fff; border-radius:8px; padding:9px 12px; transition:background .1s,border-color .1s; }
+.ia-evt-ligne:has(.ia-evt-checkbox:checked) { border-color:oklch(0.32 0.09 258); background:oklch(0.95 0.03 258); }
+.ia-evt-checkbox { width:19px; height:19px; accent-color:oklch(0.32 0.09 258); flex-shrink:0; }
 @media (max-width: 720px) {
   #ia-root [style*="grid-template-columns:1fr 1fr"],
   #ia-root [style*="grid-template-columns: 1fr 1fr"],
@@ -370,6 +373,7 @@ function renderOverview() {
 
   const publicUrl = location.origin + '/inscription-publique.html?slug=' + fiche.slug;
   return `
+    ${renderModeleStandard(fiche)}
     ${renderInfosGenerales(fiche)}
     <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:24px;">
       <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px;">
@@ -413,6 +417,22 @@ function renderOverview() {
 }
 
 // ---- Informations générales & photo de couverture (édition) ----
+// ---- Modèle standard : cette fiche appliquée automatiquement à chaque nouvel événement ----
+function renderModeleStandard(fiche) {
+  const actif = !!fiche.est_modele_standard;
+  return `
+    <div style="background:${actif ? 'oklch(0.95 0.03 258)' : '#fff'}; border:1px solid ${actif ? 'oklch(0.32 0.09 258)' : 'oklch(0.9 0.004 30)'}; border-radius:12px; padding:14px 20px; margin-bottom:16px; display:flex; align-items:center; gap:14px;">
+      <div style="font-size:22px;">⭐</div>
+      <div style="flex:1;">
+        <div style="font-size:13.5px; font-weight:700;">${actif ? 'Modèle standard actif' : 'Appliquer comme modèle standard'}</div>
+        <div style="font-size:11.5px; color:oklch(0.5 0.006 30); margin-top:2px;">${actif
+          ? "Chaque nouvel événement que vous créez dupliquera automatiquement cette fiche (types, champs), sauf si vous décochez l'option au moment de la créer."
+          : "Marquez cette fiche pour qu'elle soit dupliquée automatiquement à chaque nouvel événement, avec le nom du nouvel événement — évite de reconstruire un formulaire chaque fois."}</div>
+      </div>
+      <button style="background:${actif ? '#fff' : 'oklch(0.32 0.09 258)'}; border:1px solid ${actif ? 'oklch(0.7 0.006 30)' : 'oklch(0.32 0.09 258)'}; color:${actif ? 'oklch(0.3 0.006 30)' : '#fff'}; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="toggleModeleStandard" data-actif="${actif ? '0' : '1'}">${actif ? 'Retirer' : 'Définir comme modèle'}</button>
+    </div>`;
+}
+
 function renderInfosGenerales(fiche) {
   if (!state.editionInfosOuverte) {
     return `
@@ -458,18 +478,22 @@ function renderInfosGenerales(fiche) {
 function renderLiaisonEvenements() {
   const evenementsLies = new Set((state.ficheDetail?.evenements || []).map(e => e.id));
   const mesEvenements = state.mesEvenements || [];
+  const lienCreation = `<a href="evenements.html" target="_blank" rel="noopener" style="font-size:12px; font-weight:600; color:oklch(0.32 0.09 258); text-decoration:none;">+ Créer un nouvel événement →</a>`;
   if (!mesEvenements.length) {
-    return `<div style="font-size:12px; color:oklch(0.55 0.006 30); padding-top:6px; border-top:1px solid oklch(0.92 0.004 30);">Aucun événement créé sur votre compte — <a href="evenements.html" style="color:oklch(0.32 0.09 258);">créez-en un</a> pour pouvoir le lier à cette fiche.</div>`;
+    return `<div style="font-size:12px; color:oklch(0.55 0.006 30); padding-top:6px; border-top:1px solid oklch(0.92 0.004 30);">Aucun événement créé sur votre compte — ${lienCreation} pour pouvoir le lier à cette fiche.</div>`;
   }
   return `
     <div style="padding-top:10px; border-top:1px solid oklch(0.92 0.004 30);">
-      <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px;">Lier à un événement</label>
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+        <label style="display:block; font-size:12px; font-weight:600;">Lier à un événement</label>
+        ${lienCreation}
+      </div>
       <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-bottom:8px;">Le bouton "S'inscrire" de l'événement coché redirigera vers cette fiche au lieu du parcours d'inscription classique.</div>
-      <div style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto;">
+      <div style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;">
         ${mesEvenements.map(e => `
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-            <input type="checkbox" data-evt-id="${e.id}" ${evenementsLies.has(e.id) ? 'checked' : ''} style="width:15px; height:15px; accent-color:oklch(0.32 0.09 258);" class="ia-evt-checkbox">
-            ${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}
+          <label class="ia-evt-ligne" style="display:flex; align-items:center; gap:10px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" data-evt-id="${e.id}" ${evenementsLies.has(e.id) ? 'checked' : ''} class="ia-evt-checkbox">
+            <span>${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}</span>
           </label>`).join('')}
       </div>
     </div>`;
@@ -893,6 +917,15 @@ const actions = {
     catch (e) { ia_toast(e.message, false); }
   },
   toggleEditionInfos() { state.editionInfosOuverte = !state.editionInfosOuverte; },
+  async toggleModeleStandard(el) {
+    const actif = el.dataset.actif === '1';
+    if (actif && !confirm("Définir cette fiche comme modèle standard ? Elle sera dupliquée automatiquement à chaque nouvel événement créé (remplace le modèle précédent s'il y en avait un).")) return;
+    try {
+      await api('PATCH', `/insc/fiches/${state.selectedFicheId}/modele-standard`, { actif });
+      ia_toast(actif ? 'Définie comme modèle standard.' : 'Retirée comme modèle standard.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
   async enregistrerInfos() {
     const payload = {
       description: document.getElementById('ia-infos-description')?.value || '',
@@ -921,7 +954,23 @@ const actions = {
       const r = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Erreur');
-      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { affiche_url: d.url });
+      /* Inclut les autres champs actuellement dans le formulaire (même s'ils n'ont pas encore
+         été enregistrés) — sinon changer la photo recharge la fiche depuis le serveur et
+         efface silencieusement tout ce que l'utilisateur avait tapé mais pas encore cliqué
+         "Enregistrer" (bug réel signalé le 2026-09-09). */
+      const payload = { affiche_url: d.url };
+      const description = document.getElementById('ia-infos-description');
+      if (description) {
+        payload.description = description.value || '';
+        payload.organisateur = document.getElementById('ia-infos-organisateur')?.value || '';
+        payload.contact_email = document.getElementById('ia-infos-contact-email')?.value || '';
+        payload.date_ouverture_inscriptions = document.getElementById('ia-infos-ouverture')?.value || null;
+        payload.date_fermeture_inscriptions = document.getElementById('ia-infos-fermeture')?.value || null;
+        if (state.mesEvenements.length) {
+          payload.evenement_ids = Array.from(document.querySelectorAll('.ia-evt-checkbox:checked')).map(c => parseInt(c.dataset.evtId));
+        }
+      }
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, payload);
       ia_toast('Photo de couverture mise à jour.', true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
@@ -1088,7 +1137,17 @@ root.addEventListener('change', function (e) {
     document.getElementById('ia-root').innerHTML = '<div style="text-align:center;padding:60px;color:oklch(0.55 0.006 30);">Cette page est réservée aux comptes Initiative.</div>';
     return;
   }
-  try { await iaChargerListe(); render(); }
+  try {
+    await iaChargerListe();
+    /* Lien direct depuis evenements.html (aperçu du modèle standard avant création d'un
+       événement) — ?fiche=<id> ouvre directement le détail plutôt que la liste. */
+    const ficheIdParam = new URLSearchParams(location.search).get('fiche');
+    if (ficheIdParam && state.fiches.some(f => f.id === parseInt(ficheIdParam))) {
+      state.selectedFicheId = parseInt(ficheIdParam); state.view = 'detail';
+      await iaChargerFiche(state.selectedFicheId);
+    }
+    render();
+  }
   catch (e) { root.innerHTML = `<div style="text-align:center;padding:60px;color:oklch(0.5 0.16 20);">${escH(e.message)}</div>`; }
 })();
 </script>

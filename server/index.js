@@ -17070,7 +17070,28 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     const abonnes = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(init.id);
     abonnes.forEach(a => creerNotif(a.user_id, "evenement", "Nouvel événement", `${user.nom} organise : ${titre}`, { evenement_id: id }));
   }
-  sendJSON(res, 201, { id });
+
+  /* Modèle standard de fiche d'inscription (demande explicite du 2026-09-09) : appliqué par
+     défaut sauf refus explicite du front (appliquer_fiche_standard === false), jamais en
+     silence — evenements.html montre et laisse décocher AVANT l'envoi (voir GET
+     /api/insc/modele-standard), et la réponse ici renvoie ce qui a été fait pour que le
+     front puisse en informer l'organisateur après coup aussi. */
+  let ficheAppliquee = null;
+  if (body.appliquer_fiche_standard !== false) {
+    const modele = await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? AND est_modele_standard=1").get(user.id);
+    if (modele) {
+      try {
+        const newFicheId = await dupliquerFicheStructure(modele, { nom: titre, copierEvenements: false });
+        await db.prepare("INSERT INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(newFicheId, id);
+        const ficheCree = await db.prepare("SELECT id, nom, slug, statut FROM insc_fiches WHERE id=?").get(newFicheId);
+        await db.prepare("UPDATE evenements SET lien_inscription=? WHERE id=?")
+          .run(`${process.env.PUBLIC_ORIGIN || "https://diaspoactif.com"}/inscription-publique.html?slug=${ficheCree.slug}`, id);
+        await inscJournaliser(newFicheId, user, "creation", `Créée automatiquement depuis le modèle standard « ${modele.nom} » pour l'événement « ${titre} ».`);
+        ficheAppliquee = ficheCree;
+      } catch (e) { console.error("[evenement-fiche-standard]", e.message); }
+    }
+  }
+  sendJSON(res, 201, { id, fiche_appliquee: ficheAppliquee });
 });
 
 
@@ -26547,11 +26568,13 @@ ${jsonLd}
         COALESCE(tkc.billets_vendus,0) AS billets_vendus,
         COALESCE(ttc.nb_types,0) AS nb_types,
         ttc.prix_min AS prix_min,
+        f.slug AS insc_fiche_slug,
         ${expositionExpr} AS statut_exposition
         FROM events e
         LEFT JOIN users u ON u.id=e.organisateur_id
         LEFT JOIN (SELECT event_id, COUNT(*) AS billets_vendus FROM tickets WHERE payment_status='paid' GROUP BY event_id) tkc ON tkc.event_id=e.id
         LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types, MIN(prix) AS prix_min FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
+        LEFT JOIN insc_fiches f ON f.id=e.insc_fiche_id
         WHERE 1=1`;
       const args = [];
       if (q.statut) { sql += ' AND e.statut=?'; args.push(q.statut); }
@@ -26895,6 +26918,7 @@ ${jsonLd}
         programmed_at, timezone, billetterie_config, inscription_lien_externe, whatsapp_lien,
         rayon_publication, langue, mode_participation, region, departement, communaute,
         origine1, origine2, masquer_inscrits,
+        inscription_mode, nb_places, liste_attente, appliquer_fiche_standard, fiche_choisie_id,
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
       const ts = new Date().toISOString();
@@ -26950,14 +26974,41 @@ ${jsonLd}
         }
       }
       if (billetterie_config && typeof billetterie_config === "object") await upsertBilletterieConfig(eid, billetterie_config);
+      /* inscription_mode/nb_places/liste_attente n'étaient pas dans l'INSERT ci-dessus (colonnes
+         absentes de la liste, 52 positions déjà) -- corrigé ici plutôt que de risquer un décalage
+         de position dans une requête aussi longue. Sans ce correctif, "Pré-inscription obligatoire"
+         choisi à la création n'était JAMAIS enregistré (silencieusement perdu). */
+      if (inscription_mode) {
+        await db.prepare("UPDATE events SET inscription_mode=?, nb_places=?, liste_attente=? WHERE id=?")
+          .run(inscription_mode, nb_places || null, liste_attente ? 1 : 0, eid);
+      }
+      /* Modèle standard de fiche d'inscription (demande explicite du 2026-09-09) : remplace le
+         parcours natif ID DA + DS-ID pour les modes qui nécessitent réellement une inscription
+         ("obligatoire","validation") -- jamais les deux méthodes actives en même temps pour un
+         même événement, conformément à la demande explicite de ne pas superposer les systèmes. */
+      let ficheAppliqueeEvt = null;
+      if (["obligatoire", "validation"].includes(inscription_mode)) {
+        let ficheSource = null;
+        if (fiche_choisie_id) ficheSource = await db.prepare("SELECT * FROM insc_fiches WHERE id=? AND owner_user_id=?").get(fiche_choisie_id, me.id);
+        else if (appliquer_fiche_standard !== false) ficheSource = await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? AND est_modele_standard=1").get(me.id);
+        if (ficheSource) {
+          try {
+            const newFicheId = await dupliquerFicheStructure(ficheSource, { nom: titre, copierEvenements: false });
+            await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(newFicheId, eid);
+            await inscJournaliser(newFicheId, me, "creation", `Créée automatiquement pour l'événement Billetterie « ${titre} ».`);
+            ficheAppliqueeEvt = await db.prepare("SELECT id, nom, slug FROM insc_fiches WHERE id=?").get(newFicheId);
+          } catch (e) { console.error("[event-fiche-standard]", e.message); }
+        }
+      }
       await syncEvenementVersProgrammation(eid);
-      return sendJSON(res, 201, { id: eid });
+      return sendJSON(res, 201, { id: eid, fiche_appliquee: ficheAppliqueeEvt });
     }
 
     /* ── GET /api/events/:id ── */
     if (req.method === 'GET' && /^\/api\/events\/\d+$/.test(pathname)) {
       const eid = parseInt(pathname.split('/')[3]);
-      const ev = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom FROM events e LEFT JOIN users u ON u.id=e.organisateur_id WHERE e.id=?`).get(eid);
+      const ev = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom, f.slug AS insc_fiche_slug, f.nom AS insc_fiche_nom
+        FROM events e LEFT JOIN users u ON u.id=e.organisateur_id LEFT JOIN insc_fiches f ON f.id=e.insc_fiche_id WHERE e.id=?`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
       const types = await db.prepare(`SELECT tt.*, (tt.quantite_totale - tt.quantite_vendue) AS dispo FROM ticket_types tt WHERE tt.event_id=? AND tt.actif=1`).all(eid);
       const stats = await db.prepare(`SELECT COUNT(*) nb, COALESCE(SUM(prix_paye),0) revenu FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
@@ -26982,6 +27033,7 @@ ${jsonLd}
         programmed_at, timezone, inscription_mode, nb_places, liste_attente, rayon_publication, billetterie_config,
         inscription_lien_externe, whatsapp_lien, langue, mode_participation, region, departement, communaute,
         origine1, origine2, masquer_inscrits,
+        appliquer_fiche_standard, fiche_choisie_id, detacher_fiche,
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
@@ -27045,8 +27097,30 @@ ${jsonLd}
         }
       }
       if (billetterie_config && typeof billetterie_config === "object") await upsertBilletterieConfig(eid, billetterie_config);
+      /* Modèle standard de fiche d'inscription : même logique qu'à la création (voir POST
+         /api/events ci-dessus) -- gère aussi le détachement explicite ("Détacher" côté front)
+         et le remplacement par une fiche précise ("Remplacer la fiche"). Jamais les deux
+         méthodes (fiche personnalisée + ID DA/DS-ID natif) actives ensemble sur le même
+         événement. */
+      let ficheAppliqueeEvt = null;
+      if (detacher_fiche) {
+        await db.prepare("UPDATE events SET insc_fiche_id=NULL WHERE id=?").run(eid);
+      } else if (fiche_choisie_id) {
+        const fiche = await db.prepare("SELECT id FROM insc_fiches WHERE id=? AND owner_user_id=?").get(fiche_choisie_id, me.id);
+        if (fiche) await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(fiche.id, eid);
+      } else if (["obligatoire", "validation"].includes(inscription_mode) && !ev.insc_fiche_id && appliquer_fiche_standard !== false) {
+        const modele = await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? AND est_modele_standard=1").get(me.id);
+        if (modele) {
+          try {
+            const newFicheId = await dupliquerFicheStructure(modele, { nom: titre || ev.titre, copierEvenements: false });
+            await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(newFicheId, eid);
+            await inscJournaliser(newFicheId, me, "creation", `Créée automatiquement pour l'événement Billetterie « ${titre || ev.titre} ».`);
+            ficheAppliqueeEvt = await db.prepare("SELECT id, nom, slug FROM insc_fiches WHERE id=?").get(newFicheId);
+          } catch (e) { console.error("[event-fiche-standard-put]", e.message); }
+        }
+      }
       await syncEvenementVersProgrammation(eid);
-      return sendJSON(res, 200, { ok: true });
+      return sendJSON(res, 200, { ok: true, fiche_appliquee: ficheAppliqueeEvt });
     }
 
     /* ── DELETE /api/events/:id — suppression définitive (2026-09-07, demande explicite).
@@ -39672,10 +39746,12 @@ route("PATCH", "/api/insc/fiches/:id/statut", async (req, res, params, body) => 
   sendJSON(res, 200, { ok: true });
 });
 
-route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) => {
-  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
-  if (erreur) return sendJSON(res, erreur, { error: msg });
-  const nomCopie = (body?.nom || `${fiche.nom} (copie)`).slice(0, 200);
+/* Copie structurelle d'une fiche (nom, types, champs) — factorisée (2026-09-09) pour être
+   partagée entre la duplication manuelle (bouton "Dupliquer") ET l'application automatique
+   du modèle standard à la création d'un événement (copierEvenements:false dans ce second cas,
+   la copie sera liée UNIQUEMENT au nouvel événement, jamais aux anciens liens de la source). */
+async function dupliquerFicheStructure(fiche, { nom, copierEvenements = true } = {}) {
+  const nomCopie = (nom || `${fiche.nom} (copie)`).slice(0, 200);
   const slug = await inscSlugUnique(nomCopie);
   const newId = (await db.prepare(`
     INSERT INTO insc_fiches (owner_user_id, initiative_id, nom, slug, description, affiche_url, organisateur,
@@ -39683,8 +39759,10 @@ route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) =
     VALUES (?,?,?,?,?,?,?,?,?,?,?)
   `).run(fiche.owner_user_id, fiche.initiative_id, nomCopie, slug, fiche.description, fiche.affiche_url,
     fiche.organisateur, fiche.contact_nom, fiche.contact_email, fiche.contact_telephone, fiche.visibilite)).lastInsertRowid;
-  const evenements = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
-  for (const e of evenements) await db.prepare("INSERT INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(newId, e.evenement_id);
+  if (copierEvenements) {
+    const evenements = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
+    for (const e of evenements) await db.prepare("INSERT INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(newId, e.evenement_id);
+  }
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=?").all(fiche.id);
   for (const t of types) {
     const newTypeId = (await db.prepare(`
@@ -39703,8 +39781,41 @@ route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) =
         c.position, c.valeur_defaut, c.placeholder, c.options_json, c.regle_validation, c.condition_json);
     }
   }
+  return newId;
+}
+
+route("POST", "/api/insc/fiches/:id/dupliquer", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const newId = await dupliquerFicheStructure(fiche, { nom: body?.nom });
   await inscJournaliser(newId, user, "duplication", `Dupliquée depuis « ${fiche.nom} » (#${fiche.id}).`);
   sendJSON(res, 201, { fiche_id: newId });
+});
+
+/* Modèle standard : une fiche par compte peut être marquée comme référence — appliquée
+   automatiquement (sauf refus explicite) à chaque nouvel événement créé (demande explicite
+   du 2026-09-09). Un seul modèle actif à la fois par compte (en marquer un nouveau désactive
+   l'ancien). */
+route("PATCH", "/api/insc/fiches/:id/modele-standard", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (body?.actif) {
+    await db.prepare("UPDATE insc_fiches SET est_modele_standard=0 WHERE owner_user_id=?").run(fiche.owner_user_id);
+    await db.prepare("UPDATE insc_fiches SET est_modele_standard=1 WHERE id=?").run(fiche.id);
+    await inscJournaliser(fiche.id, user, "modele_standard", "Définie comme modèle standard.");
+  } else {
+    await db.prepare("UPDATE insc_fiches SET est_modele_standard=0 WHERE id=?").run(fiche.id);
+    await inscJournaliser(fiche.id, user, "modele_standard", "Retirée comme modèle standard.");
+  }
+  sendJSON(res, 200, { ok: true });
+});
+/* Consultée par evenements.html avant la création d'un événement, pour afficher (et laisser
+   décocher) l'application automatique du modèle standard, avant même que l'événement existe. */
+route("GET", "/api/insc/modele-standard", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const fiche = await db.prepare("SELECT id, nom, slug FROM insc_fiches WHERE owner_user_id=? AND est_modele_standard=1").get(user.id);
+  sendJSON(res, 200, { fiche: fiche || null });
 });
 
 route("POST", "/api/insc/fiches/:id/geler", async (req, res, params, body) => {

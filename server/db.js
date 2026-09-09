@@ -1664,6 +1664,12 @@ const MIGRATIONS = [
   // Documents & médias -- ajout de la vidéo (2026-09-09) : durée en secondes, vérifiée
   // réellement via ffprobe à l'upload, jamais déduite ou acceptée sans preuve.
   ["insc_fiches_medias", "duree_sec INTEGER"],
+  // Modèle standard (2026-09-09) : une fiche par compte peut être appliquée automatiquement
+  // a chaque nouvel événement créé -- un seul modèle actif a la fois par compte.
+  ["insc_fiches", "est_modele_standard INTEGER DEFAULT 0"],
+  // Remplace le parcours natif ID DA + DS-ID pour les modes obligatoire/validation (2026-09-09,
+  // demande explicite : ne pas superposer les deux methodes sur un meme evenement).
+  ["events", "insc_fiche_id INTEGER"],
   // Filtre "Gratuit / payant" de la page Événements (2026-09-07) — prix le plus bas des
   // billets de l'événement source, NULL/0 = gratuit.
   ["evenements", "prix_min REAL"],

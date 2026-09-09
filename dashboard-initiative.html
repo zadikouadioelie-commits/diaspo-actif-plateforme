@@ -3525,9 +3525,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         initEvtProgrammeFichierB64 = e.fc_programme_fichier_url || null;
         initEvtProgrammeFichierNom = e.fc_programme_fichier_nom || null;
         renderInitEvtForm(e);
+        await ievRafraichirFicheNotice(e);
       } catch(err) { form.innerHTML = '<div style="color:#ef4444;">Erreur : '+err.message+'</div>'; }
     } else {
       renderInitEvtForm(null);
+      await ievRafraichirFicheNotice(null);
     }
   };
   window.closeInitEvtModal = function() {
@@ -3814,8 +3816,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <input type="url" id="iev-lien-externe-url" value="${v(e?.inscription_lien_externe)}" placeholder="https://forms.gle/…" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #93C5FD;border-radius:6px;font-size:13px;font-family:inherit;">
           <div style="font-size:11px;color:var(--muted);margin-top:6px;">Un bouton « S'inscrire » sur la page publique de l'événement ouvrira ce lien dans un nouvel onglet — aucun suivi côté Diaspo'Actif pour ce mode.</div>
         </div>
-        <div style="margin-top:10px;background:rgba(255,107,0,0.05);border:1px solid rgba(255,107,0,0.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.5;">
+        <div id="iev-daid-warning" style="display:none;margin-top:10px;background:rgba(255,107,0,0.05);border:1px solid rgba(255,107,0,0.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.5;">
           💡 Avec l'inscription obligatoire, les participants s'identifient avec leur <strong>Identifiant Diaspo'Actif (ID DA)</strong> et signent avec leur <strong>Code de Sécurité (DS-ID)</strong>. Chaque inscription est tracée et sécurisée.
+        </div>
+
+        <!-- FICHE D'INSCRIPTION PERSONNALISÉE (module Formulaires & Inscriptions, 2026-09-09) —
+             remplace le parcours ID DA + DS-ID ci-dessus pour "obligatoire"/"validation" (demande
+             explicite : ne pas superposer les deux méthodes). Rempli/affiché dynamiquement via
+             ievRafraichirFicheNotice(), jamais un rechargement de page — rien de ce formulaire
+             n'est perdu quoi qu'on clique dans ce bloc. -->
+        <div id="iev-fiche-notice" style="display:none;margin-top:10px;padding:12px 14px;background:#F0F4FF;border:1px solid #C7D7FE;border-radius:10px;">
+          <div id="iev-fiche-notice-contenu" style="font-size:12.5px;color:#1B3A6B;"></div>
         </div>
       </div>
 
@@ -4151,7 +4162,74 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if(panel) panel.style.display = (mode!=='libre' && mode!=='lien_externe') ? '' : 'none';
     const panelExt = document.getElementById('iev-lien-externe-panel');
     if(panelExt) panelExt.style.display = mode==='lien_externe' ? '' : 'none';
+    ievRafraichirFicheNotice();
   };
+
+  /* ── Fiche d'inscription personnalisée pour les modes "obligatoire"/"validation" ──
+     Remplace le parcours ID DA + DS-ID (demande explicite du 2026-09-09 : ne pas superposer
+     les deux méthodes). État suivi en mémoire (ievFicheEtat), jamais un rechargement de page
+     -- Voir / Détacher / Remplacer restent de simples changements d'affichage, le formulaire
+     d'événement en cours (titre, date, etc.) n'est jamais perdu quoi qu'on clique ici. */
+  let ievFicheEtat = { mode: 'standard', fiche: null, charge: false };
+  window.ievRafraichirFicheNotice = async function(eExistant) {
+    const modeInsc = document.querySelector('input[name="iev-insc-mode"]:checked')?.value || 'libre';
+    const notice = document.getElementById('iev-fiche-notice');
+    const warning = document.getElementById('iev-daid-warning');
+    if (!notice) return;
+    if (!['obligatoire','validation'].includes(modeInsc)) { notice.style.display='none'; if(warning) warning.style.display='none'; return; }
+    if (!ievFicheEtat.charge) {
+      // Événement déjà lié à une fiche (édition) : priorité à l'existant plutôt qu'au modèle standard.
+      if (eExistant && eExistant.insc_fiche_slug) {
+        ievFicheEtat = { mode: 'choisie', fiche: { id: eExistant.insc_fiche_id, nom: eExistant.insc_fiche_nom, slug: eExistant.insc_fiche_slug }, charge: true };
+      } else {
+        try {
+          const { fiche } = await api('GET', '/insc/modele-standard');
+          ievFicheEtat = { mode: fiche ? 'standard' : 'aucune', fiche: fiche || null, charge: true };
+        } catch (e) { ievFicheEtat = { mode: 'aucune', fiche: null, charge: true }; }
+      }
+    }
+    ievRenderFicheNotice();
+  };
+  function ievRenderFicheNotice() {
+    const notice = document.getElementById('iev-fiche-notice');
+    const contenu = document.getElementById('iev-fiche-notice-contenu');
+    const warning = document.getElementById('iev-daid-warning');
+    notice.style.display = '';
+    if (ievFicheEtat.mode === 'aucune' || !ievFicheEtat.fiche) {
+      if(warning) warning.style.display='';
+      contenu.innerHTML = `⭐ Aucune fiche d'inscription ne sera créée pour cet événement — vous pourrez en choisir une plus tard.
+        <button type="button" class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="ievChoisirFiche()">🔄 Choisir une fiche</button>`;
+      return;
+    }
+    if(warning) warning.style.display='none';
+    const f = ievFicheEtat.fiche;
+    const label = ievFicheEtat.mode === 'standard' ? "votre fiche d'inscription standard" : `la fiche « ${escH(f.nom)} »`;
+    const explication = ievFicheEtat.mode === 'standard'
+      ? 'une copie nommée d\'après cet événement sera créée à l\'enregistrement.'
+      : 'cette fiche sera directement liée à l\'événement (aucune copie).';
+    contenu.innerHTML = `⭐ Sera appliqué automatiquement : ${label} — ${explication}
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="inscriptions-admin.html?fiche=${f.id}" target="_blank" style="font-size:12px;">👁 Voir la fiche →</a>
+        <button type="button" class="btn btn-sm btn-outline" onclick="ievDetacherFiche()">✕ Détacher</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="ievChoisirFiche()">🔄 Remplacer la fiche</button>
+      </div>`;
+  }
+  window.ievDetacherFiche = function() { ievFicheEtat = { mode: 'aucune', fiche: null, charge: true }; ievRenderFicheNotice(); };
+  window.ievChoisirFiche = async function() {
+    const contenu = document.getElementById('iev-fiche-notice-contenu');
+    contenu.innerHTML = '<div style="font-size:12px;color:var(--muted);">Chargement de vos fiches…</div>';
+    try {
+      const { fiches } = await api('GET', '/insc/fiches');
+      if (!fiches.length) { contenu.innerHTML = `<div style="font-size:12px;color:var(--muted);">Aucune autre fiche disponible. <a href="inscriptions-admin.html" target="_blank">En créer une →</a></div><button type="button" class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="ievRenderFicheNoticeAnnuler()">← Retour</button>`; return; }
+      contenu.innerHTML = `<div style="font-size:12px;font-weight:700;margin-bottom:6px;">Choisir une fiche pour cet événement :</div>
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;">
+          ${fiches.map(f => `<button type="button" class="btn btn-sm btn-outline" style="text-align:left;" onclick='ievSelectionnerFiche(${f.id},${JSON.stringify(f.nom)})'>${escH(f.nom)}</button>`).join('')}
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="ievRenderFicheNoticeAnnuler()">← Annuler</button>`;
+    } catch (e) { contenu.innerHTML = `<div style="font-size:12px;color:#ef4444;">Erreur : ${escH(e.message)}</div>`; }
+  };
+  window.ievSelectionnerFiche = function(id, nom) { ievFicheEtat = { mode: 'choisie', fiche: { id, nom }, charge: true }; ievRenderFicheNotice(); };
+  window.ievRenderFicheNoticeAnnuler = function() { ievRenderFicheNotice(); };
 
   // ── PDF supplémentaires de la fiche conceptuelle ("+ Ajouter un autre PDF") ──
   function ievRenderPdfExtraListHTML() {
@@ -4247,18 +4325,28 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       liste_attente: document.getElementById('iev-liste-attente')?.checked ? 1 : 0,
       rayon_publication: document.querySelector('input[name="iev-rayon"]:checked')?.value||'international'
     };
+    // Fiche d'inscription (modes obligatoire/validation uniquement — voir ievFicheEtat).
+    if (['obligatoire','validation'].includes(data.inscription_mode)) {
+      if (ievFicheEtat.mode === 'aucune') data.detacher_fiche = true;
+      else if (ievFicheEtat.mode === 'choisie') data.fiche_choisie_id = ievFicheEtat.fiche?.id;
+      else data.appliquer_fiche_standard = true;
+    }
 
     const btn = document.getElementById('iev-btn-save');
     const origLabel = btn.textContent;
     btn.disabled=true; btn.textContent='⏳ Enregistrement…';
     try {
+      let r;
       if(initEvtEditingId) {
-        await api('PUT','/events/'+initEvtEditingId, data);
+        r = await api('PUT','/events/'+initEvtEditingId, data);
         showToast('Événement mis à jour !','success');
       } else {
-        await api('POST','/events', data);
+        r = await api('POST','/events', data);
         const msgs = {publie:'🚀 Événement publié avec succès !', brouillon_programme:'⏰ Publication programmée !', brouillon:'💾 Brouillon enregistré.'};
         showToast(msgs[data.statut]||'Événement créé !','success');
+      }
+      if (r?.fiche_appliquee) {
+        setTimeout(() => showToast(`⭐ Fiche d'inscription « ${r.fiche_appliquee.nom} » créée automatiquement.`, 'success'), 600);
       }
       closeInitEvtModal();
       renderInitEvenements();
