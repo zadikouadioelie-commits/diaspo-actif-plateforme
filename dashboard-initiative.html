@@ -1751,7 +1751,14 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div class="card" style="margin-bottom:20px;">
         <h3 style="margin:0 0 12px;">Inviter un compte</h3>
         <div style="position:relative;max-width:420px;">
-          <input type="text" id="aff-search-input" placeholder="Rechercher un membre par nom ou email…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="if(!this.value.trim()) affChargerSuggestions('')" onblur="setTimeout(()=>{const b=document.getElementById('aff-search-results'); if(b) b.style.display='none';},150)">
+          <!-- readonly retire au focus (2026-09-09, demande explicite : la suggestion d'adresse
+               native du navigateur recouvrait la liste de comptes Diaspo'Actif) — astuce fiable
+               pour empêcher Chrome de proposer son propre autofill "Adresses" : un champ marqué
+               readonly au chargement de la page n'est jamais candidat à l'autofill, contrairement
+               à autocomplete="off" seul, que Chrome ignore couramment sur les champs qu'il devine
+               liés à un contact/e-mail (ex: le mot "email" dans le placeholder). name neutre et
+               placeholder reformulé en complément, pour ne rien laisser deviner à Chrome. -->
+          <input type="text" id="aff-search-input" name="q_membre" placeholder="Rechercher un membre par nom ou coordonnée…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="this.removeAttribute('readonly'); if(!this.value.trim()) affChargerSuggestions('')" onblur="setTimeout(()=>{const b=document.getElementById('aff-search-results'); if(b) b.style.display='none';},150)">
           <div id="aff-search-results" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
         </div>
       </div>
