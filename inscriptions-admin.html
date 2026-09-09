@@ -154,6 +154,7 @@ const state = {
   activeTab: 'overview',
   selectedTypeId: null,
   champCategorieOuverte: null,
+  editionInfosOuverte: false,
   publicData: null,
   publicSelectedTypeId: null,
   publicReponses: {},
@@ -368,6 +369,7 @@ function renderOverview() {
 
   const publicUrl = location.origin + '/inscription-publique.html?slug=' + fiche.slug;
   return `
+    ${renderInfosGenerales(fiche)}
     <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:24px;">
       <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px;">
         <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:500; margin-bottom:6px;">Total inscriptions</div>
@@ -405,6 +407,75 @@ function renderOverview() {
           </div>
         </div>
       </div>
+    </div>
+    ${renderMedias()}`;
+}
+
+// ---- Informations générales & photo de couverture (édition) ----
+function renderInfosGenerales(fiche) {
+  if (!state.editionInfosOuverte) {
+    return `
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px 20px; margin-bottom:16px; display:flex; gap:16px; align-items:center;">
+        <div style="width:64px; height:64px; border-radius:8px; flex-shrink:0; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)'};"></div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; color:oklch(0.5 0.006 30); overflow:hidden; text-overflow:ellipsis;">${escH(fiche.description || 'Aucune description.')}</div>
+          <div style="font-size:11.5px; color:oklch(0.6 0.006 30); margin-top:2px;">Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}${fiche.contact_email ? ' · ' + escH(fiche.contact_email) : ''}</div>
+        </div>
+        <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="toggleEditionInfos">✏️ Modifier</button>
+      </div>`;
+  }
+  return `
+    <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="margin:0; font-size:15px; font-weight:700;">Informations générales</h3>
+        <button style="background:none; border:none; color:oklch(0.55 0.006 30); font-size:13px; cursor:pointer;" data-action="toggleEditionInfos">Fermer</button>
+      </div>
+      <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:16px;">
+        <div style="width:100px; height:100px; border-radius:10px; flex-shrink:0; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)'}; display:flex; align-items:center; justify-content:center; color:oklch(0.6 0.006 30); font-size:11px;">${fiche.affiche_url ? '' : 'Aucune photo'}</div>
+        <div>
+          <label style="display:inline-block; background:oklch(0.32 0.09 258); color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">
+            📷 Changer la photo de couverture
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-action="changerPhotoCouverture" style="display:none;">
+          </label>
+          <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-top:6px;">JPEG, PNG, WebP ou GIF — 8 Mo max.</div>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Description</label><textarea id="ia-infos-description" style="width:100%; min-height:70px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit; box-sizing:border-box;">${escH(fiche.description || '')}</textarea></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Organisateur</label><input id="ia-infos-organisateur" type="text" value="${escH(fiche.organisateur || '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">E-mail de contact</label><input id="ia-infos-contact-email" type="email" value="${escH(fiche.contact_email || '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture des inscriptions</label><input id="ia-infos-ouverture" type="datetime-local" value="${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture des inscriptions</label><input id="ia-infos-fermeture" type="datetime-local" value="${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+        </div>
+        <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; margin-top:4px;" data-action="enregistrerInfos">Enregistrer</button>
+      </div>
+    </div>`;
+}
+
+// ---- Documents & médias (photos/PDF consultables par inscrits ET non-inscrits) ----
+function renderMedias() {
+  const medias = (state.ficheDetail && state.ficheDetail.medias) || [];
+  const liste = medias.map(m => `
+    <div style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; padding:8px 10px;">
+      ${m.type === 'photo'
+        ? `<img src="${escH(m.url)}" style="width:36px; height:36px; border-radius:6px; object-fit:cover; flex-shrink:0;">`
+        : `<div style="width:36px; height:36px; border-radius:6px; background:oklch(0.94 0.05 20); color:oklch(0.42 0.16 20); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0;">📄</div>`}
+      <a href="${escH(m.url)}" target="_blank" rel="noopener" style="flex:1; font-size:13px; color:oklch(0.2 0.006 30); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escH(m.libelle || (m.type === 'photo' ? 'Photo' : 'Document PDF'))}</a>
+      <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="supprimerMedia" data-id="${m.id}">✕</button>
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun document ajouté — photos ou PDF consultables par tous, inscrits ou non.</div>';
+
+  return `
+    <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px; margin-top:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:15px; font-weight:700;">Documents &amp; médias</h3>
+        <span style="font-size:12px; color:oklch(0.55 0.006 30);">Visibles par tous sur la page publique</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">${liste}</div>
+      <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
+        + Ajouter une photo ou un PDF
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" data-action="ajouterMedia" style="display:none;">
+      </label>
     </div>`;
 }
 
@@ -768,6 +839,53 @@ const actions = {
     try { const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/dupliquer`, {}); ia_toast('Fiche dupliquée.', true); state.selectedFicheId = r.fiche_id; await iaChargerFiche(r.fiche_id); }
     catch (e) { ia_toast(e.message, false); }
   },
+  toggleEditionInfos() { state.editionInfosOuverte = !state.editionInfosOuverte; },
+  async enregistrerInfos() {
+    const payload = {
+      description: document.getElementById('ia-infos-description')?.value || '',
+      organisateur: document.getElementById('ia-infos-organisateur')?.value || '',
+      contact_email: document.getElementById('ia-infos-contact-email')?.value || '',
+      date_ouverture_inscriptions: document.getElementById('ia-infos-ouverture')?.value || null,
+      date_fermeture_inscriptions: document.getElementById('ia-infos-fermeture')?.value || null,
+    };
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, payload);
+      ia_toast('Informations enregistrées.', true);
+      state.editionInfosOuverte = false;
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async changerPhotoCouverture(el) {
+    const file = el.files[0]; if (!file) return;
+    try {
+      const fd = new FormData(); fd.append('fichier', file);
+      const r = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { affiche_url: d.url });
+      ia_toast('Photo de couverture mise à jour.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async ajouterMedia(el) {
+    const file = el.files[0]; if (!file) return;
+    try {
+      const fd = new FormData(); fd.append('fichier', file);
+      const r = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+      const type = file.type === 'application/pdf' ? 'pdf' : 'photo';
+      const libelle = prompt('Nom de ce document (affiché aux visiteurs) :', d.nom || (type === 'pdf' ? 'Document' : 'Photo')) || '';
+      await api('POST', `/insc/fiches/${state.selectedFicheId}/medias`, { type, url: d.url, libelle });
+      ia_toast('Document ajouté.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async supprimerMedia(el) {
+    if (!confirm('Supprimer ce document ?')) return;
+    try { await api('DELETE', '/insc/medias/' + el.dataset.id); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
   async addType() {
     const label = prompt("Nom du type d'inscription (ex : Participant, Exposant, Bénévole…) :");
     if (!label || !label.trim()) return;
@@ -892,7 +1010,7 @@ root.addEventListener('click', function (e) {
 root.addEventListener('change', function (e) {
   const el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.tagName === 'INPUT' && el.type === 'checkbox') dispatch(el.dataset.action, el);
+  if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'file')) dispatch(el.dataset.action, el);
 });
 
 (async function initInscriptionsAdmin() {

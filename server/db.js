@@ -672,6 +672,18 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_insc_comm_fiche ON insc_communications(fiche_id);
 
+  CREATE TABLE IF NOT EXISTS insc_fiches_medias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('photo','pdf')),
+    url TEXT NOT NULL,
+    libelle TEXT,
+    position INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_medias_fiche ON insc_fiches_medias(fiche_id);
+
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user1_id INTEGER NOT NULL,

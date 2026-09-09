@@ -39513,7 +39513,8 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
     t.champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? ORDER BY position ASC, id ASC").all(t.id);
     t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
   }
-  sendJSON(res, 200, { fiche, evenements, types });
+  const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+  sendJSON(res, 200, { fiche, evenements, types, medias });
 });
 
 route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
@@ -39534,6 +39535,30 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     }
   }
   await inscJournaliser(fiche.id, user, "modification", "Fiche modifiée.");
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Documents & médias de la fiche (photo/PDF) — consultables par tout le monde sur la page
+   publique, inscrits ou non (demande explicite du 2026-09-09), pas seulement par les inscrits.
+   Réutilise l'upload déjà durci de POST /api/insc/public/upload (image ou PDF, magic-bytes,
+   8 Mo max) côté front — ces routes ne font qu'enregistrer l'URL déjà téléversée. */
+route("POST", "/api/insc/fiches/:id/medias", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!body?.url || !["photo", "pdf"].includes(body?.type)) return sendJSON(res, 400, { error: "url et type (photo|pdf) requis." });
+  const maxPos = (await db.prepare("SELECT MAX(position) m FROM insc_fiches_medias WHERE fiche_id=?").get(fiche.id))?.m;
+  const id = (await db.prepare("INSERT INTO insc_fiches_medias (fiche_id, type, url, libelle, position) VALUES (?,?,?,?,?)")
+    .run(fiche.id, body.type, body.url, body.libelle ? String(body.libelle).slice(0, 200) : null, (maxPos != null ? maxPos + 1 : 0))).lastInsertRowid;
+  await inscJournaliser(fiche.id, user, "ajout_media", `Document ajouté : ${body.libelle || body.url}`);
+  sendJSON(res, 201, { id });
+});
+route("DELETE", "/api/insc/medias/:id", async (req, res, params) => {
+  const media = await db.prepare("SELECT * FROM insc_fiches_medias WHERE id=?").get(params.id);
+  if (!media) return sendJSON(res, 404, { error: "Document introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, media.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("DELETE FROM insc_fiches_medias WHERE id=?").run(media.id);
+  await inscJournaliser(media.fiche_id, user, "suppression_media", `Document supprimé : ${media.libelle || media.url}`);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -39801,10 +39826,12 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche a été temporairement suspendue par l'administration." });
     const now = new Date();
     if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) {
-      return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées." });
+      const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+      return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias });
     }
     if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
-      return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes." });
+      const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+      return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias });
     }
   }
   const now = new Date();
@@ -39822,7 +39849,8 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     if (t.date_fermeture && new Date(t.date_fermeture) < now) ouvert = false;
     t.periode_ouverte = ouvert;
   }
-  sendJSON(res, 200, { fiche, evenements, types, apercu: modeApercu });
+  const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {
