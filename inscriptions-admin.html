@@ -164,6 +164,7 @@ const state = {
   commChannelNotif: true,
   commObjet: '',
   commMessage: '',
+  commPiecesJointes: [],
   communications: [],
   lienControle: null,
   checkinStats: null,
@@ -694,7 +695,20 @@ function renderCommunication() {
         <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Message</label>
         <textarea id="ia-comm-message" placeholder="Bonjour {prenom}, nous vous rappelons que votre participation à {evenement} est prévue le {date_evenement} à {lieu}." style="width:100%;min-height:100px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;background:oklch(0.99 0.001 30);padding:10px 12px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;box-sizing:border-box;">${escH(state.commMessage)}</textarea>
         <div style="font-size:11px;color:oklch(0.55 0.006 30);margin:8px 0 16px;">Variables disponibles : {prenom} {nom} {evenement} {type_inscription} {date_evenement} {lieu}</div>
-        <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 18px;border-radius:8px;cursor:pointer;" data-action="envoyerCommunication">Envoyer</button>
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Pièces jointes (photo ou PDF, 3 maximum)</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+          ${state.commPiecesJointes.map((p, idx) => `
+            <div style="display:flex;align-items:center;gap:8px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;padding:6px 10px;font-size:12.5px;">
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escH(p.nom)}</span>
+              <button style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:14px;cursor:pointer;" data-action="retirerPieceJointeComm" data-idx="${idx}">✕</button>
+            </div>`).join('')}
+        </div>
+        ${state.commPiecesJointes.length < 3 ? `
+          <label style="display:inline-block;background:#fff;border:1.5px dashed oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;margin-bottom:16px;">
+            + Ajouter une pièce jointe
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" data-action="ajouterPieceJointeComm" style="display:none;">
+          </label>` : ''}
+        <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 18px;border-radius:8px;cursor:pointer;display:block;margin-top:4px;" data-action="envoyerCommunication">Envoyer</button>
       </div>
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
         <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Historique des communications</h3>
@@ -1000,15 +1014,26 @@ const actions = {
   selectCommRecipient(el) { state.commRecipient = el.dataset.id; },
   toggleCommEmail() { state.commChannelEmail = !state.commChannelEmail; },
   toggleCommNotif() { state.commChannelNotif = !state.commChannelNotif; },
+  async ajouterPieceJointeComm(el) {
+    const file = el.files[0]; if (!file) return;
+    try {
+      const fd = new FormData(); fd.append('fichier', file);
+      const r = await fetch(`/api/insc/fiches/${state.selectedFicheId}/communications/upload`, { method: 'POST', credentials: 'include', body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Erreur');
+      state.commPiecesJointes.push({ url: d.url, nom: d.nom });
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  retirerPieceJointeComm(el) { state.commPiecesJointes.splice(parseInt(el.dataset.idx), 1); },
   async envoyerCommunication() {
     const objet = document.getElementById('ia-comm-objet')?.value || '';
     const message = document.getElementById('ia-comm-message')?.value || '';
     if (!message.trim()) return ia_toast('Le message est requis.', false);
     const canal = state.commChannelEmail && state.commChannelNotif ? 'les_deux' : state.commChannelEmail ? 'email' : 'notification';
     try {
-      const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/communications`, { destinataire_type: state.commRecipient, canal, objet, message });
+      const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/communications`, { destinataire_type: state.commRecipient, canal, objet, message, pieces_jointes: state.commPiecesJointes });
       ia_toast(`Envoyé à ${r.nb_destinataires} destinataire(s) (${r.nb_email} e-mails, ${r.nb_notif} notifications).`, true);
-      state.commObjet = ''; state.commMessage = '';
+      state.commObjet = ''; state.commMessage = ''; state.commPiecesJointes = [];
       await iaChargerCommunications();
     } catch (e) { ia_toast(e.message, false); }
   },

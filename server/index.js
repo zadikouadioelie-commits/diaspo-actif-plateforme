@@ -40160,12 +40160,56 @@ route("GET", "/api/insc/types/:id/apercu-billet", async (req, res, params) => {
 function inscSubstituerVariables(texte, vars) {
   return String(texte || "").replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined && vars[k] !== null) ? String(vars[k]) : m);
 }
+/* Pièce jointe d'une communication (photo ou PDF, pas de vidéo — un e-mail n'est pas fait
+   pour ça) — demande explicite du 2026-09-09. Upload direct, retourne l'URL ; le vrai envoi
+   se fait ensuite via POST .../communications avec pieces_jointes. Même plafonds que
+   Documents & médias (8 Mo photo / 15 Mo PDF), pas de compteur persistant ici (ce n'est pas
+   un document permanent de la fiche, juste une pièce jointe d'un envoi ponctuel). */
+route("POST", "/api/insc/fiches/:id/communications/upload", async (req, res, params) => {
+  const { erreur, msg } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide." });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const raw = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { files } = parseMultipart(raw, boundaryMatch[1]);
+  const file = files["fichier"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu." });
+  const b = file.buffer;
+  const imgType = SEC.isSafeRasterImage(b);
+  const isPdf = b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+  if (!imgType && !isPdf) return sendJSON(res, 400, { error: "Format non supporté (photo JPEG/PNG/WebP/GIF ou PDF requis)." });
+  const MAX = imgType ? 8 * 1024 * 1024 : 15 * 1024 * 1024;
+  if (b.length > MAX) return sendJSON(res, 400, { error: `Fichier trop volumineux (max ${imgType ? 8 : 15} Mo).` });
+  try {
+    const ext = imgType ? imgType.split("/")[1].replace("jpeg", "jpg") : "pdf";
+    const url = await uploadToBunny(b, `insc-comm-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${ext}`, "insc-medias");
+    sendJSON(res, 200, { url, nom: (file.filename || "Document").slice(0, 120) });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload insc communication")); }
+});
+
 route("POST", "/api/insc/fiches/:id/communications", async (req, res, params, body) => {
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
   if (!body?.message || !String(body.message).trim()) return sendJSON(res, 400, { error: "Le message est requis." });
   const canal = ["email", "notification", "les_deux"].includes(body.canal) ? body.canal : "les_deux";
   const destinataireType = body.destinataire_type || "tous";
+
+  /* Pièces jointes : le téléversement a déjà eu lieu (route .../communications/upload
+     ci-dessus, qui vérifie déjà les octets et plafonne la taille) — on ne reçoit ici que des
+     URL. On les filtre malgré tout : n'accepter que notre propre stockage évite qu'une URL
+     quelconque, pointant vers n'importe quoi, soit envoyée comme si elle venait de la
+     plateforme (même précaution que rencontres_diaspoactif.pieces_json). */
+  const HOTES_MEDIA = ["diaspoactif-media.b-cdn.net"];
+  const piecesJointes = (Array.isArray(body.pieces_jointes) ? body.pieces_jointes : []).slice(0, 3).map(p => {
+    let hote = null;
+    try { hote = new URL(String(p?.url || "")).hostname; } catch (e) { return null; }
+    if (!HOTES_MEDIA.includes(hote)) return null;
+    return { url: String(p.url), nom: String(p?.nom || "Document").trim().slice(0, 120) };
+  }).filter(Boolean);
 
   let sql = "SELECT i.*, t.label AS type_label, e.titre AS evenement_titre, e.date_evt, e.heure_debut, e.lieu FROM insc_inscriptions i JOIN insc_types t ON t.id=i.type_id LEFT JOIN evenements e ON e.id=i.evenement_id WHERE i.fiche_id=? AND i.statut NOT IN ('annule')";
   const args = [fiche.id];
@@ -40180,12 +40224,13 @@ route("POST", "/api/insc/fiches/:id/communications", async (req, res, params, bo
     if ((canal === "email" || canal === "les_deux") && d.email) {
       try {
         const { emailCommunicationInscription } = require("./mailer");
-        await emailCommunicationInscription({ email: d.email, prenom: d.prenom, objet: objetFinal, message: messageFinal, evenementNom: vars.evenement });
+        await emailCommunicationInscription({ email: d.email, prenom: d.prenom, objet: objetFinal, message: messageFinal, evenementNom: vars.evenement, piecesJointes });
         nbEmail++;
       } catch (e) { console.error("[insc-communication-email]", e.message); }
     }
     if ((canal === "notification" || canal === "les_deux") && d.user_id) {
-      creerNotif(d.user_id, "insc_communication", objetFinal, messageFinal, { lien: `mes-inscriptions-evt.html#insc-${d.id}` });
+      const contenuNotif = piecesJointes.length ? `${messageFinal}\n\n📎 ${piecesJointes.map(p => p.nom).join(", ")}` : messageFinal;
+      creerNotif(d.user_id, "insc_communication", objetFinal, contenuNotif, { lien: `mes-inscriptions-evt.html#insc-${d.id}` });
       nbNotif++;
     }
   }

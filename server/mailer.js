@@ -911,7 +911,12 @@ function emailDemandeDevisReponse({ to, prenom, initiativeNom, produitNom, conte
 /* Communication ciblée depuis une fiche d'inscription (module Formulaires & Inscriptions,
    Passe 2, 2026-09-09) — objet/message déjà substitués par l'appelant (variables {prenom}
    etc.), cette fonction ne fait que les afficher. */
-function emailCommunicationInscription({ email, prenom, objet, message, evenementNom }) {
+function emailCommunicationInscription({ email, prenom, objet, message, evenementNom, piecesJointes }) {
+  const piecesHtml = (piecesJointes || []).length ? `
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid #E8EFFE;">
+        <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.03em;">Pièce(s) jointe(s)</p>
+        ${piecesJointes.map(p => `<a href="${p.url}" style="display:inline-block;margin:0 8px 8px 0;padding:8px 14px;background:#F0F4FF;color:#1B3A6B;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;">📎 ${p.nom}</a>`).join("")}
+      </div>` : "";
   return sendEmail({
     to: email,
     subject: objet || `${evenementNom} — Diaspo'Actif`,
@@ -927,6 +932,7 @@ function emailCommunicationInscription({ email, prenom, objet, message, evenemen
     <div style="padding:36px 32px;">
       <h1 style="margin:0 0 16px;font-size:18px;font-weight:900;color:#0D1B2A;">${prenom ? `Bonjour ${prenom},` : "Bonjour,"}</h1>
       <p style="color:#374151;font-size:14px;line-height:1.75;white-space:pre-wrap;">${message}</p>
+      ${piecesHtml}
     </div>
     <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
       <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
