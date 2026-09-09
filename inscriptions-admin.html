@@ -364,7 +364,15 @@ function renderDetailView() {
     return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; border-bottom:2px solid ${active ? 'oklch(0.32 0.09 258)' : 'transparent'}; color:${active ? 'oklch(0.2 0.006 30)' : 'oklch(0.5 0.006 30)'};" data-action="selectTab" data-tab="${t.key}">${t.emoji} ${t.label}</button>`;
   }).join('');
   const nav = `<nav style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:0 28px; display:flex; gap:2px; overflow-x:auto;">${tabsHtml}</nav>`;
-  const main = `<main style="max-width:1180px; margin:0 auto; padding:28px;">${renderTabContent()}</main>`;
+  // Bouton "Précédent" (2026-09-09, demande explicite) — les onglets se parcourent surtout dans
+  // l'ordre (Vue d'ensemble → Types d'inscription → Validation → Formulaire → …), certains
+  // renvoyant même déjà vers "l'onglet précédent" en texte (ex. renderFields ci-dessous) sans
+  // qu'aucun bouton ne le fasse réellement. Absent sur le tout premier onglet — le fil d'Ariane
+  // "Formulaires & Inscriptions" au-dessus sert déjà de retour à ce niveau-là.
+  const tabIndex = IA_TABS.findIndex(t => t.key === state.activeTab);
+  const prevTab = tabIndex > 0 ? IA_TABS[tabIndex - 1] : null;
+  const prevBtn = prevTab ? `<div style="margin-bottom:14px;"><button style="background:#fff; border:1px solid oklch(0.85 0.004 30); color:oklch(0.3 0.006 30); font-size:13px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" data-action="selectTab" data-tab="${prevTab.key}">◀ Précédent — ${prevTab.emoji} ${prevTab.label}</button></div>` : '';
+  const main = `<main style="max-width:1180px; margin:0 auto; padding:28px;">${prevBtn}${renderTabContent()}</main>`;
   return suspendedBanner + header + nav + main;
 }
 
