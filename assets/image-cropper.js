@@ -4,6 +4,10 @@
    export en haute résolution via canvas.
    =========================================================== */
 (function () {
+  /* Palette (2026-09-09, demande explicite : "tout est trop pâle et non délimité") — chaque
+     bloc de contrôle (indice, zoom, fond) est désormais une carte distincte sur un fond gris-
+     bleu très légèrement teinté (--icrop-alt), avec une vraie bordure et un libellé en
+     majuscules, plutôt que de flotter directement sur le blanc de la modale sans séparation. */
   const STYLE = `
     .icrop-overlay {
       position:fixed; inset:0; background:rgba(13,27,42,.82); z-index:99999;
@@ -12,35 +16,41 @@
     }
     .icrop-overlay.show { opacity:1; }
     .icrop-box {
+      --icrop-alt:#F1F5F9; --icrop-border:#CBD5E1; --icrop-ink:#0D1B2A; --icrop-muted:#475569;
       background:#fff; border-radius:16px; width:100%; max-width:560px;
       box-shadow:0 20px 60px rgba(0,0,0,.35); overflow:hidden;
       transform:scale(.94); transition:transform .18s;
     }
     .icrop-overlay.show .icrop-box { transform:scale(1); }
-    .icrop-head { padding:16px 20px; border-bottom:1px solid #eee; font-weight:800; font-size:15px; color:#0D1B2A; display:flex; justify-content:space-between; align-items:center; }
+    .icrop-head { padding:16px 20px; border-bottom:1px solid #E2E8F0; font-weight:800; font-size:15px; color:var(--icrop-ink); display:flex; justify-content:space-between; align-items:center; }
     .icrop-close { background:none; border:none; font-size:20px; cursor:pointer; color:#64748b; line-height:1; padding:4px; }
     .icrop-stage { position:relative; width:100%; overflow:hidden; background:#111; touch-action:none; cursor:grab; }
     .icrop-stage.dragging { cursor:grabbing; }
     .icrop-stage canvas { display:block; width:100%; height:100%; }
     .icrop-mask { position:absolute; inset:0; pointer-events:none; box-shadow:0 0 0 9999px rgba(0,0,0,.55); }
     .icrop-mask.circle { border-radius:50%; }
-    .icrop-controls { padding:16px 20px; display:flex; align-items:center; gap:12px; }
+    .icrop-hint {
+      margin:14px 20px 0; padding:9px 12px; font-size:12px; line-height:1.5; color:#1E3A5F;
+      background:#EAF2FE; border:1px solid #BFDBFE; border-left:3px solid #1565C0; border-radius:0 8px 8px 0;
+    }
+    .icrop-section { margin:12px 20px 0; padding:12px 14px; background:var(--icrop-alt); border:1px solid var(--icrop-border); border-radius:10px; }
+    .icrop-section-label { font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--icrop-muted); margin-bottom:9px; display:block; }
+    .icrop-controls { display:flex; align-items:center; gap:12px; }
     .icrop-controls input[type=range] { flex:1; accent-color:#1565C0; }
-    .icrop-zoom-label { font-size:18px; color:#64748b; user-select:none; }
-    .icrop-actions { padding:12px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
-    .icrop-btn { padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; border:none; }
-    .icrop-btn-cancel { background:#f1f5f9; color:#334155; }
-    .icrop-btn-cancel:hover { background:#e2e8f0; }
-    .icrop-btn-ok { background:#1565C0; color:#fff; }
+    .icrop-zoom-label { font-size:16px; color:var(--icrop-muted); user-select:none; }
+    .icrop-actions { padding:18px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
+    .icrop-btn { padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid transparent; }
+    .icrop-btn-cancel { background:#fff; color:var(--icrop-ink); border-color:var(--icrop-border); }
+    .icrop-btn-cancel:hover { background:#F8FAFC; border-color:#94A3B8; }
+    .icrop-btn-ok { background:#1565C0; color:#fff; box-shadow:0 2px 8px rgba(21,101,192,.3); }
     .icrop-btn-ok:hover { background:#0D47A1; }
-    .icrop-btn-reset { background:none; color:#1565C0; padding:6px 10px; font-size:12px; white-space:nowrap; }
-    .icrop-btn-reset:hover { text-decoration:underline; }
-    .icrop-hint { font-size:11.5px; color:#94a3b8; padding:0 20px 4px; }
-    .icrop-fillrow { padding:2px 20px 14px; display:flex; align-items:center; gap:10px; }
-    .icrop-fillrow-label { font-size:12px; color:#64748b; white-space:nowrap; }
-    .icrop-swatches { display:flex; gap:8px; }
-    .icrop-swatch { width:24px; height:24px; border-radius:50%; border:2px solid #e2e8f0; cursor:pointer; padding:0; box-shadow:0 0 0 1px rgba(0,0,0,.06) inset; }
-    .icrop-swatch.active { border-color:#1565C0; box-shadow:0 0 0 2px rgba(21,101,192,.25); }
+    .icrop-btn-reset { background:#fff; color:#1565C0; border-color:#BFDBFE; padding:6px 12px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+    .icrop-btn-reset:hover { background:#EAF2FE; }
+    .icrop-fillrow { display:flex; align-items:center; gap:10px; }
+    .icrop-swatches { display:flex; gap:9px; }
+    .icrop-swatch { width:28px; height:28px; border-radius:50%; border:2px solid var(--icrop-border); cursor:pointer; padding:0; box-shadow:0 0 0 1px rgba(0,0,0,.05) inset; transition:transform .1s; }
+    .icrop-swatch:hover { transform:scale(1.08); }
+    .icrop-swatch.active { border-color:#1565C0; box-shadow:0 0 0 3px rgba(21,101,192,.22); }
   `;
 
   function ensureStyle() {
@@ -77,25 +87,30 @@
             <span>${shape === 'circle' ? '🖼️ Recadrer la photo' : '🖼️ Recadrer la bannière'}</span>
             <button class="icrop-close" type="button" aria-label="Fermer">✕</button>
           </div>
-          <div class="icrop-hint">Image complète affichée par défaut. Faites glisser pour repositionner, utilisez le curseur pour zoomer (dans les deux sens).</div>
+          <div class="icrop-hint">💡 Image complète affichée par défaut. Faites glisser pour repositionner, utilisez le curseur pour zoomer (dans les deux sens).</div>
           <div class="icrop-stage" style="aspect-ratio:${aspect}">
             <canvas></canvas>
             <div class="icrop-mask ${shape === 'circle' ? 'circle' : ''}"></div>
           </div>
-          <div class="icrop-controls">
-            <span class="icrop-zoom-label">🔍</span>
-            <input type="range" min="50" max="400" value="100" step="1">
-            <span class="icrop-zoom-label" style="font-size:15px;">🔍</span>
-            <button class="icrop-btn icrop-btn-reset" type="button" title="Revenir à l'image complète">↺ Réinitialiser</button>
+          <div class="icrop-section">
+            <span class="icrop-section-label">Zoom</span>
+            <div class="icrop-controls">
+              <span class="icrop-zoom-label">🔍</span>
+              <input type="range" min="50" max="400" value="100" step="1">
+              <span class="icrop-zoom-label" style="font-size:15px;">🔍</span>
+              <button class="icrop-btn icrop-btn-reset" type="button" title="Revenir à l'image complète">↺ Réinitialiser</button>
+            </div>
           </div>
-          <div class="icrop-fillrow">
-            <span class="icrop-fillrow-label">Fond :</span>
-            <div class="icrop-swatches">
-              <button type="button" class="icrop-swatch active" data-color="#FFFFFF" style="background:#FFFFFF" title="Blanc"></button>
-              <button type="button" class="icrop-swatch" data-color="#F1E4CB" style="background:#F1E4CB" title="Beige"></button>
-              <button type="button" class="icrop-swatch" data-color="#E2E8F0" style="background:#E2E8F0" title="Gris clair"></button>
-              <button type="button" class="icrop-swatch" data-color="#0D2B4E" style="background:#0D2B4E" title="Bleu marine"></button>
-              <button type="button" class="icrop-swatch" data-color="#F26422" style="background:#F26422" title="Orange"></button>
+          <div class="icrop-section">
+            <span class="icrop-section-label">Fond</span>
+            <div class="icrop-fillrow">
+              <div class="icrop-swatches">
+                <button type="button" class="icrop-swatch active" data-color="#FFFFFF" style="background:#FFFFFF" title="Blanc"></button>
+                <button type="button" class="icrop-swatch" data-color="#F1E4CB" style="background:#F1E4CB" title="Beige"></button>
+                <button type="button" class="icrop-swatch" data-color="#E2E8F0" style="background:#E2E8F0" title="Gris clair"></button>
+                <button type="button" class="icrop-swatch" data-color="#0D2B4E" style="background:#0D2B4E" title="Bleu marine"></button>
+                <button type="button" class="icrop-swatch" data-color="#F26422" style="background:#F26422" title="Orange"></button>
+              </div>
             </div>
           </div>
           <div class="icrop-actions">
