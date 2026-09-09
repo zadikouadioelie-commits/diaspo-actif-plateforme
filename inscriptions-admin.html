@@ -11,25 +11,23 @@
 <link rel="stylesheet" href="/assets/theme-manager.css">
 <link rel="apple-touch-icon" href="assets/logo.png">
 <meta name="theme-color" content="#0D2B4E">
+<!-- Design validé (Claude Design, 2026-09-08) — typographies dédiées à ce module, ne pas
+     réinterpréter : voir design_handoff_formulaires_inscriptions/README.md. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-.ia-wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px;}
-.ia-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px;}
-.ia-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--card,#fff);}
-.ia-badge{display:inline-block;border-radius:99px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:8px;}
-.ia-badge-brouillon{background:#F1F5F9;color:#64748b;} .ia-badge-publiee{background:#F0FDF4;color:#16a34a;}
-.ia-badge-suspendue{background:#FEF2F2;color:#dc2626;} .ia-badge-fermee{background:#FFF7ED;color:#c2410c;}
-.ia-badge-archivee{background:#F1F5F9;color:#94a3b8;} .ia-badge-programmee{background:#F0F4FF;color:#1B3A6B;}
-.ia-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin:20px 0;overflow-x:auto;}
-.ia-tab{padding:9px 16px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;white-space:nowrap;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;}
-.ia-tab.active{color:#0D2B4E;border-bottom-color:#F26422;}
-.ia-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
-.ia-form-row label{display:block;font-size:12px;font-weight:700;color:#0D2B4E;margin-bottom:4px;}
-.ia-form-row input,.ia-form-row select,.ia-form-row textarea{width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;box-sizing:border-box;font-family:inherit;}
-.ia-type-block{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;}
-.ia-champ-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:13px;}
-table.ia-table{width:100%;border-collapse:collapse;font-size:13px;}
-table.ia-table th{text-align:left;padding:8px;background:#F8FAFC;border-bottom:2px solid var(--border);}
-table.ia-table td{padding:8px;border-bottom:1px solid #F1F5F9;}
+#ia-root { font-family:'IBM Plex Sans', sans-serif; background:oklch(0.965 0.002 30); color:oklch(0.2 0.006 30); min-height:60vh; }
+#ia-root button, #ia-root input, #ia-root select, #ia-root textarea { font-family:inherit; }
+#ia-root a { color:oklch(0.25 0.09 258); }
+@media (max-width: 720px) {
+  #ia-root [style*="grid-template-columns:1fr 1fr"],
+  #ia-root [style*="grid-template-columns: 1fr 1fr"],
+  #ia-root [style*="grid-template-columns:1fr 1.3fr"],
+  #ia-root [style*="grid-template-columns: 1fr 1.3fr"],
+  #ia-root [style*="grid-template-columns:1.3fr 1fr"],
+  #ia-root [style*="grid-template-columns:1.4fr 1fr"] { grid-template-columns: 1fr !important; }
+  #ia-root [style*="repeat(4"] { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+}
 </style>
 </head>
 <body>
@@ -52,8 +50,8 @@ table.ia-table td{padding:8px;border-bottom:1px solid #F1F5F9;}
   <div id="hb-account-section"></div>
 </aside>
 
-<main class="ia-wrap" id="ia-root">
-  <div style="text-align:center;padding:60px 0;color:var(--muted);">Chargement…</div>
+<main id="ia-root">
+  <div style="text-align:center;padding:60px 0;color:oklch(0.55 0.006 30);">Chargement…</div>
 </main>
 </div>
 
@@ -61,249 +59,766 @@ table.ia-table td{padding:8px;border-bottom:1px solid #F1F5F9;}
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=12"></script>
 <script>
-const IA_STATUTS = { brouillon:'📝 Brouillon', programmee:'⏰ Programmée', publiee:'🟢 Publiée', suspendue:'🔒 Suspendue', fermee:'🚪 Fermée', archivee:'📦 Archivée' };
-let IA_ME = null, IA_FICHE_ACTIVE = null, IA_ONGLET = 'general';
+/* ==========================================================================
+   Formulaires & Inscriptions — Diaspo'Actif
+   Habillage : design validé par Claude Design (design_handoff_formulaires_inscriptions/
+   vanilla/diaspo-app.js), structure state/render/dispatch reprise à l'identique.
+   Toutes les données ci-dessous sont réelles, chargées via l'API du module
+   (server/index.js, routes /api/insc/*) construite et vérifiée les 2026-09-08/09.
+   ========================================================================== */
 
-function ia_toast(msg, ok) {
-  if (typeof showToast === 'function') return showToast(msg, ok ? 'success' : 'error');
-  alert(msg);
-}
+const IA_TABS = [
+  { key: 'overview', label: "Vue d'ensemble", emoji: '📊' },
+  { key: 'types', label: "Types d'inscription", emoji: '🏷️' },
+  { key: 'fields', label: 'Formulaire', emoji: '📝' },
+  { key: 'public', label: 'Aperçu public', emoji: '🌐' },
+  { key: 'communication', label: 'Communication', emoji: '📧' },
+  { key: 'qr', label: 'Contrôle QR', emoji: '🎟️' },
+  { key: 'presences', label: 'Présences', emoji: '👥' },
+  { key: 'finances', label: 'Finances', emoji: '💰' },
+  { key: 'stats', label: 'Statistiques', emoji: '📈' },
+  { key: 'historique', label: 'Historique', emoji: '📜' },
+];
 
-async function iaRenderListe() {
-  const el = document.getElementById('ia-root');
-  el.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-      <div><h1 style="font-size:20px;font-weight:900;color:#0D2B4E;margin:0;">📝 Formulaires & Inscriptions</h1>
-      <p style="color:var(--muted);font-size:13px;margin:4px 0 0;">Créez et gérez vos fiches d'inscription événementielles.</p></div>
-      <button class="btn btn-orange" onclick="iaCreerFiche()">＋ Créer une fiche d'inscription</button>
-    </div>
-    <div id="ia-liste-fiches" class="ia-grid"><div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>`;
-  try {
-    const { fiches } = await api('GET', '/insc/fiches');
-    const listeEl = document.getElementById('ia-liste-fiches');
-    if (!fiches.length) { listeEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">Aucune fiche pour le moment.</div>'; return; }
-    listeEl.innerHTML = fiches.map(f => `
-      <div class="ia-card">
-        <div class="ia-badge ia-badge-${f.statut}">${IA_STATUTS[f.statut]}</div>
-        ${f.gele_le ? '<div class="ia-badge" style="background:#FEF2F2;color:#dc2626;">🔒 Gelée</div>' : ''}
-        <div style="font-weight:800;font-size:15px;margin-bottom:6px;">${escH(f.nom)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${f.nb_inscriptions} inscription(s)</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-orange" onclick="iaOuvrirFiche(${f.id})">Gérer</button>
-          <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="inscription-publique.html?slug=${f.slug}" target="_blank">Voir la page publique ↗</a>
-        </div>
-      </div>`).join('');
-  } catch (e) { ia_toast(e.message, false); }
-}
-
-async function iaCreerFiche() {
-  const nom = prompt('Nom de la fiche d\'inscription :');
-  if (!nom || !nom.trim()) return;
-  try {
-    const { fiche } = await api('POST', '/insc/fiches', { nom: nom.trim() });
-    ia_toast('Fiche créée.', true);
-    iaOuvrirFiche(fiche.id);
-  } catch (e) { ia_toast(e.message, false); }
-}
-
-async function iaOuvrirFiche(id) {
-  IA_FICHE_ACTIVE = id; IA_ONGLET = 'general';
-  await iaRenderFiche();
-}
-
-async function iaRenderFiche() {
-  const el = document.getElementById('ia-root');
-  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Chargement…</div>';
-  let data;
-  try { data = await api('GET', '/insc/fiches/' + IA_FICHE_ACTIVE); } catch (e) { ia_toast(e.message, false); return iaRenderListe(); }
-  const { fiche, evenements, types } = data;
-  el.innerHTML = `
-    <button class="btn btn-outline" style="margin-bottom:10px;" onclick="iaRenderListe()">← Toutes les fiches</button>
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-      <div><h1 style="font-size:19px;font-weight:900;color:#0D2B4E;margin:0;">${escH(fiche.nom)}</h1>
-      <div class="ia-badge ia-badge-${fiche.statut}" style="margin-top:6px;">${IA_STATUTS[fiche.statut]}</div></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${fiche.statut === 'brouillon' || fiche.statut === 'suspendue' ? `<button class="btn btn-sm btn-orange" onclick="iaChangerStatut('publiee')">🚀 Publier</button>` : ''}
-        ${fiche.statut === 'publiee' ? `<button class="btn btn-sm btn-outline" onclick="iaChangerStatut('fermee')">🚪 Fermer les inscriptions</button>` : ''}
-        <button class="btn btn-sm btn-outline" onclick="iaDupliquer()">📑 Dupliquer</button>
-      </div>
-    </div>
-    <div class="ia-tabs">
-      <button class="ia-tab ${IA_ONGLET==='general'?'active':''}" onclick="iaChangerOnglet('general')">⚙️ Général</button>
-      <button class="ia-tab ${IA_ONGLET==='types'?'active':''}" onclick="iaChangerOnglet('types')">🎫 Types & Champs</button>
-      <button class="ia-tab ${IA_ONGLET==='inscriptions'?'active':''}" onclick="iaChangerOnglet('inscriptions')">📋 Inscriptions</button>
-      <button class="ia-tab ${IA_ONGLET==='stats'?'active':''}" onclick="iaChangerOnglet('stats')">📊 Statistiques</button>
-    </div>
-    <div id="ia-onglet-contenu"></div>`;
-  if (IA_ONGLET === 'general') iaRenderGeneral(fiche, evenements);
-  else if (IA_ONGLET === 'types') iaRenderTypes(fiche, types);
-  else if (IA_ONGLET === 'inscriptions') iaRenderInscriptions(fiche);
-  else if (IA_ONGLET === 'stats') iaRenderStats(fiche);
-}
-
-function iaChangerOnglet(o) { IA_ONGLET = o; iaRenderFiche(); }
-
-async function iaChangerStatut(statut) {
-  try { await api('PATCH', `/insc/fiches/${IA_FICHE_ACTIVE}/statut`, { statut }); ia_toast('Statut mis à jour.', true); iaRenderFiche(); }
-  catch (e) { ia_toast(e.message, false); }
-}
-async function iaDupliquer() {
-  try { const r = await api('POST', `/insc/fiches/${IA_FICHE_ACTIVE}/dupliquer`, {}); ia_toast('Fiche dupliquée.', true); iaOuvrirFiche(r.fiche_id); }
-  catch (e) { ia_toast(e.message, false); }
-}
-
-async function iaRenderGeneral(fiche, evenementsLies) {
-  const cont = document.getElementById('ia-onglet-contenu');
-  let mesEvenements = [];
-  try { const r = await api('GET', '/evenements?owner=' + IA_ME.id); mesEvenements = r.evenements; } catch (e) {}
-  const liesIds = new Set(evenementsLies.map(e => e.id));
-  cont.innerHTML = `
-    <form id="ia-form-general" onsubmit="return iaSauverGeneral(event)">
-      <div class="ia-form-row"><div><label>Nom de la fiche</label><input name="nom" value="${escH(fiche.nom)}" required></div>
-      <div><label>Organisateur</label><input name="organisateur" value="${escH(fiche.organisateur||'')}"></div></div>
-      <div class="ia-form-row"><label style="grid-column:1/-1;">Description</label><textarea name="description" style="grid-column:1/-1;min-height:70px;">${escH(fiche.description||'')}</textarea></div>
-      <div class="ia-form-row"><div><label>URL de l'affiche</label><input name="affiche_url" value="${escH(fiche.affiche_url||'')}"></div>
-      <div><label>Visibilité</label><select name="visibilite">
-        ${['public','membres','prive','invitation'].map(v=>`<option value="${v}" ${fiche.visibilite===v?'selected':''}>${v}</option>`).join('')}
-      </select></div></div>
-      <div class="ia-form-row"><div><label>Ouverture des inscriptions</label><input type="datetime-local" name="date_ouverture_inscriptions" value="${fiche.date_ouverture_inscriptions?fiche.date_ouverture_inscriptions.replace(' ','T').slice(0,16):''}"></div>
-      <div><label>Fermeture des inscriptions</label><input type="datetime-local" name="date_fermeture_inscriptions" value="${fiche.date_fermeture_inscriptions?fiche.date_fermeture_inscriptions.replace(' ','T').slice(0,16):''}"></div></div>
-      <div class="ia-form-row"><div><label>Contact e-mail</label><input name="contact_email" value="${escH(fiche.contact_email||'')}"></div>
-      <div><label>Contact téléphone</label><input name="contact_telephone" value="${escH(fiche.contact_telephone||'')}"></div></div>
-      <label style="display:block;font-size:12px;font-weight:700;color:#0D2B4E;margin:14px 0 6px;">Événement(s) lié(s) — sélectionnez un ou plusieurs de vos événements</label>
-      <select name="evenement_ids" multiple size="5" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:7px;">
-        ${mesEvenements.map(e => `<option value="${e.id}" ${liesIds.has(e.id)?'selected':''}>${escH(e.titre)}${e.date_evt?' — '+escH(e.date_evt):''}</option>`).join('')}
-      </select>
-      <p style="font-size:11px;color:var(--muted);">Ctrl/Cmd + clic pour sélectionner plusieurs événements. Si aucun événement n'est lié, la fiche fonctionne de façon autonome.</p>
-      <button type="submit" class="btn btn-orange" style="margin-top:14px;">💾 Enregistrer</button>
-    </form>`;
-}
-async function iaSauverGeneral(ev) {
-  ev.preventDefault();
-  const fd = new FormData(ev.target);
-  const evenement_ids = Array.from(ev.target.evenement_ids.selectedOptions).map(o => parseInt(o.value));
-  const body = { nom: fd.get('nom'), organisateur: fd.get('organisateur'), description: fd.get('description'),
-    affiche_url: fd.get('affiche_url'), visibilite: fd.get('visibilite'),
-    date_ouverture_inscriptions: fd.get('date_ouverture_inscriptions') || null, date_fermeture_inscriptions: fd.get('date_fermeture_inscriptions') || null,
-    contact_email: fd.get('contact_email'), contact_telephone: fd.get('contact_telephone'), evenement_ids };
-  try { await api('PUT', '/insc/fiches/' + IA_FICHE_ACTIVE, body); ia_toast('Enregistré.', true); }
-  catch (e) { ia_toast(e.message, false); }
-  return false;
-}
-
-async function iaRenderTypes(fiche, types) {
-  const cont = document.getElementById('ia-onglet-contenu');
-  cont.innerHTML = `
-    <div style="margin-bottom:14px;"><button class="btn btn-sm btn-orange" onclick="iaAjouterType()">＋ Ajouter un type d'inscription</button></div>
-    <div id="ia-types-liste">${types.map(iaTypeBlockHtml).join('') || '<p style="color:var(--muted);">Aucun type pour le moment.</p>'}</div>`;
-}
-function iaTypeBlockHtml(t) {
-  return `<div class="ia-type-block" id="ia-type-${t.id}">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-      <div><strong>${escH(t.label)}</strong> <span style="font-size:12px;color:var(--muted);">(${t.gratuit?'Gratuit':(t.prix||0)+' €'}${t.places_max!=null?' · '+t.nb_inscrits+'/'+t.places_max+' places':''})</span></div>
-      <div style="display:flex;gap:6px;">
-        <button class="btn btn-sm btn-outline" onclick="iaModifierType(${t.id})">✏️ Modifier</button>
-        <button class="btn btn-sm btn-outline" onclick="iaAjouterChamp(${t.id})">＋ Champ</button>
-      </div>
-    </div>
-    <div style="margin-top:10px;">
-      ${(t.champs||[]).map(c => `<div class="ia-champ-row">
-        <span style="flex:1;">${escH(c.libelle)} <span style="color:var(--muted);">(${c.type_champ}${c.obligatoire?', obligatoire':''}${c.condition_json?', conditionnel':''})</span></span>
-        <button class="btn btn-sm btn-outline" onclick="iaSupprimerChamp(${c.id})">✕</button>
-      </div>`).join('') || '<p style="color:var(--muted);font-size:12px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone seront demandés.</p>'}
-    </div>
-  </div>`;
-}
-async function iaAjouterType() {
-  const label = prompt('Nom du type d\'inscription (ex: Participant, Exposant, Bénévole…) :');
-  if (!label || !label.trim()) return;
-  const gratuit = confirm('Ce type est-il gratuit ? OK = Gratuit, Annuler = Payant');
-  let prix = null;
-  if (!gratuit) prix = parseFloat(prompt('Prix en euros :', '0')) || 0;
-  const placesTxt = prompt('Nombre de places maximum (laisser vide = illimité) :');
-  try {
-    await api('POST', `/insc/fiches/${IA_FICHE_ACTIVE}/types`, { label: label.trim(), gratuit, prix, places_max: placesTxt ? parseInt(placesTxt) : null, liste_attente_active: !!placesTxt });
-    ia_toast('Type ajouté.', true); iaRenderFiche();
-  } catch (e) { ia_toast(e.message, false); }
-}
-async function iaModifierType(id) {
-  const nouveauLabel = prompt('Nouveau nom du type :');
-  if (!nouveauLabel) return;
-  try { await api('PUT', '/insc/types/' + id, { label: nouveauLabel }); ia_toast('Modifié.', true); iaRenderFiche(); }
-  catch (e) { ia_toast(e.message, false); }
-}
+const IA_STATUS_LABEL = { brouillon: 'Brouillon', programmee: 'Programmée', publiee: 'Publiée', suspendue: 'Suspendue', fermee: 'Fermée', archivee: 'Archivée' };
+const IA_STATUS_STYLES = {
+  'publiee':   ['oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
+  'brouillon': ['oklch(0.93 0.004 30)', 'oklch(0.4 0.006 30)'],
+  'suspendue': ['oklch(0.94 0.05 20)', 'oklch(0.42 0.16 20)'],
+  'fermee':    ['oklch(0.94 0.05 85)', 'oklch(0.42 0.13 85)'],
+  'archivee':  ['oklch(0.93 0.004 30)', 'oklch(0.5 0.006 30)'],
+  'programmee':['oklch(0.94 0.04 258)','oklch(0.4 0.1 258)'],
+};
 const IA_TYPES_CHAMP = ['texte_court','texte_long','nombre','email','telephone','date','heure','adresse','liste_deroulante','choix_unique','choix_multiple','oui_non','case_a_cocher','upload_photo','upload_fichier','url'];
-async function iaAjouterChamp(typeId) {
-  const libelle = prompt('Libellé du champ (ex: Nom de l\'entreprise) :');
-  if (!libelle || !libelle.trim()) return;
-  const type_champ = prompt('Type de champ (' + IA_TYPES_CHAMP.join(', ') + ') :', 'texte_court');
-  if (!IA_TYPES_CHAMP.includes(type_champ)) { ia_toast('Type de champ invalide.', false); return; }
-  const obligatoire = confirm('Ce champ est-il obligatoire ? OK = Oui, Annuler = Non');
-  let condition = null;
-  if (confirm('Ce champ doit-il n\'apparaître que sous une condition (logique conditionnelle) ?')) {
-    const champSource = prompt('Nom technique du champ source (ex: est_entreprise) :');
-    const valeur = prompt('Valeur qui déclenche l\'affichage (ex: oui) :');
-    if (champSource && valeur) condition = { champ_source: champSource, operateur: 'egal', valeur };
-  }
-  let options = [];
-  if (['liste_deroulante','choix_unique','choix_multiple'].includes(type_champ)) {
-    const opt = prompt('Options séparées par des virgules :');
-    options = (opt || '').split(',').map(s => s.trim()).filter(Boolean);
-  }
-  try {
-    await api('POST', `/insc/types/${typeId}/champs`, { libelle: libelle.trim(), type_champ, obligatoire, condition, options });
-    ia_toast('Champ ajouté.', true); iaRenderFiche();
-  } catch (e) { ia_toast(e.message, false); }
-}
-async function iaSupprimerChamp(id) {
-  if (!confirm('Supprimer ce champ ?')) return;
-  try { await api('DELETE', '/insc/champs/' + id); iaRenderFiche(); } catch (e) { ia_toast(e.message, false); }
+const IA_FIELD_CATEGORIES = [
+  { name: 'Identité', champ: { libelle: 'Nom complet', type_champ: 'texte_court' } },
+  { name: 'Contact', champ: { libelle: 'Téléphone WhatsApp', type_champ: 'telephone' } },
+  { name: 'Profession', champ: { libelle: 'Fonction', type_champ: 'texte_court' } },
+  { name: 'Diaspora', champ: { libelle: "Pays d'origine", type_champ: 'texte_court' } },
+  { name: 'Événement', champ: { libelle: 'Attentes', type_champ: 'texte_long' } },
+  { name: 'Médias', champ: { libelle: 'Photo', type_champ: 'upload_photo' } },
+  { name: 'Personnalisé', champ: { libelle: 'Nouveau champ', type_champ: 'texte_court' } },
+];
+
+let IA_ME = null;
+const state = {
+  view: 'list',
+  fiches: [],
+  selectedFicheId: null,
+  ficheDetail: null,        // { fiche, evenements, types } — GET /insc/fiches/:id
+  mesEvenements: [],
+  activeTab: 'overview',
+  selectedTypeId: null,
+  publicData: null,
+  publicSelectedTypeId: null,
+  publicReponses: {},
+  inscriptions: [],
+  commRecipient: 'tous',
+  commChannelEmail: true,
+  commChannelNotif: true,
+  commObjet: '',
+  commMessage: '',
+  communications: [],
+  lienControle: null,
+  checkinStats: null,
+  presences: [],
+  selectedPresenceId: null,
+  historique: [],
+  busy: false,
+};
+
+function ia_toast(msg, ok) { if (typeof showToast === 'function') return showToast(msg, ok ? 'success' : 'error'); alert(msg); }
+function isAdmin() { return IA_ME && IA_ME.role === 'administrateur'; }
+function selectedFiche() { return state.ficheDetail ? state.ficheDetail.fiche : null; }
+function currentTypes() { return state.ficheDetail ? state.ficheDetail.types : []; }
+function selectedType() { return currentTypes().find(t => t.id === state.selectedTypeId) || currentTypes()[0] || null; }
+
+function buildTypeVM(t) {
+  const priceLabel = t.gratuit ? 'Gratuit' : `${(t.prix || 0)} €`;
+  const capacityLabel = t.places_max != null ? `${t.nb_inscrits}/${t.places_max} places` : 'Illimité';
+  const isSelected = state.selectedTypeId === t.id;
+  return {
+    id: t.id, name: t.label, priceLabel, capacityLabel,
+    capacityDisplay: t.places_max ?? '∞',
+    registered: t.nb_inscrits || 0,
+    fillWidth: t.places_max ? Math.min(100, Math.round((t.nb_inscrits / t.places_max) * 100)) + '%' : '4%',
+    barWidthPct: t.places_max ? Math.min(100, Math.round((t.nb_inscrits / t.places_max) * 100)) : Math.min(100, t.nb_inscrits * 4),
+    validationLabel: t.validation_auto ? 'Validation automatique' : 'Validation manuelle',
+    periodLabel: (t.date_ouverture || t.date_fermeture) ? `${t.date_ouverture ? t.date_ouverture.slice(0,10) : '…'} → ${t.date_fermeture ? t.date_fermeture.slice(0,10) : '…'}` : 'Période générale de la fiche',
+    waitlist: !!t.liste_attente_active,
+    isOpen: !!t.actif, isClosed: !t.actif,
+    ctaLabel: "S'inscrire",
+    cardBorder: isSelected ? 'oklch(0.32 0.09 258)' : 'oklch(0.9 0.004 30)',
+    statusBg: t.actif ? 'oklch(0.94 0.05 150)' : 'oklch(0.93 0.004 30)',
+    statusColor: t.actif ? 'oklch(0.4 0.13 150)' : 'oklch(0.5 0.006 30)',
+    statusLabel: t.actif ? 'Ouvert' : 'Fermé',
+    chipBg: isSelected ? 'oklch(0.32 0.09 258)' : '#fff',
+    chipColor: isSelected ? '#fff' : 'oklch(0.3 0.006 30)',
+    chipBorder: isSelected ? 'oklch(0.32 0.09 258)' : 'oklch(0.85 0.004 30)',
+    complet: t.places_max != null && t.nb_inscrits >= t.places_max,
+  };
 }
 
-async function iaRenderInscriptions(fiche) {
-  const cont = document.getElementById('ia-onglet-contenu');
-  cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
-  try {
-    const { inscriptions } = await api('GET', `/insc/fiches/${IA_FICHE_ACTIVE}/inscriptions`);
-    if (!inscriptions.length) { cont.innerHTML = '<p style="color:var(--muted);">Aucune inscription pour le moment.</p>'; return; }
-    cont.innerHTML = `<div style="overflow-x:auto;"><table class="ia-table">
-      <thead><tr><th>Nom</th><th>Type</th><th>E-mail</th><th>Statut</th><th>Référence</th><th>Actions</th></tr></thead>
-      <tbody>${inscriptions.map(i => `<tr>
-        <td>${escH(i.prenom)} ${escH(i.nom)}</td><td>${escH(i.type_label)}</td><td>${escH(i.email||'')}</td>
-        <td>${escH(i.statut)}</td><td style="font-size:11px;">${escH(i.reference||'')}</td>
-        <td><select onchange="iaChangerStatutInsc(${i.id}, this.value)">
-          ${['inscrit','confirme','present','absent','annule','liste_attente'].map(s=>`<option value="${s}" ${i.statut===s?'selected':''}>${s}</option>`).join('')}
-        </select></td>
-      </tr>`).join('')}</tbody></table></div>`;
-  } catch (e) { cont.innerHTML = `<p style="color:#dc2626;">${escH(e.message)}</p>`; }
+// ---------------------------------------------------------------------------
+// Chargement des données (remplace les constantes fictives du prototype)
+// ---------------------------------------------------------------------------
+
+async function iaChargerListe() {
+  const { fiches } = await api('GET', '/insc/fiches');
+  state.fiches = fiches;
 }
-async function iaChangerStatutInsc(id, statut) {
-  try { await api('PATCH', `/insc/inscriptions/${id}/statut`, { statut }); ia_toast('Statut mis à jour.', true); }
-  catch (e) { ia_toast(e.message, false); }
+async function iaChargerFiche(id) {
+  const data = await api('GET', '/insc/fiches/' + id);
+  state.ficheDetail = data;
+  if (!state.selectedTypeId || !data.types.some(t => t.id === state.selectedTypeId)) {
+    state.selectedTypeId = data.types[0]?.id || null;
+  }
+  if (!state.mesEvenements.length) {
+    try { const r = await api('GET', '/evenements?owner=' + IA_ME.id); state.mesEvenements = r.evenements || []; } catch (e) {}
+  }
+}
+async function iaChargerPublic() {
+  const fiche = selectedFiche(); if (!fiche) return;
+  try { state.publicData = await api('GET', '/insc/public/' + fiche.slug); }
+  catch (e) { state.publicData = { erreur: e.message }; }
+}
+async function iaChargerInscriptions() {
+  const { inscriptions } = await api('GET', `/insc/fiches/${state.selectedFicheId}/inscriptions`);
+  state.inscriptions = inscriptions;
+}
+async function iaChargerCommunications() {
+  const { communications } = await api('GET', `/insc/fiches/${state.selectedFicheId}/communications`);
+  state.communications = communications;
+}
+async function iaChargerLienEtStats() {
+  const [{ lien }, { stats }] = await Promise.all([
+    api('GET', `/insc/fiches/${state.selectedFicheId}/liens-controle`),
+    api('GET', `/insc/fiches/${state.selectedFicheId}/checkin-stats`),
+  ]);
+  state.lienControle = lien; state.checkinStats = stats;
+}
+async function iaChargerPresences() {
+  const { presences } = await api('GET', `/insc/fiches/${state.selectedFicheId}/presences`);
+  state.presences = presences;
+}
+async function iaChargerHistorique() {
+  const { historique } = await api('GET', `/insc/fiches/${state.selectedFicheId}/historique`);
+  state.historique = historique;
+}
+async function iaChargerOnglet(tab) {
+  if (tab === 'public') return iaChargerPublic();
+  if (tab === 'communication') return iaChargerCommunications();
+  if (tab === 'qr' || tab === 'presences') return Promise.all([iaChargerLienEtStats(), iaChargerPresences()]);
+  if (tab === 'historique') return iaChargerHistorique();
 }
 
-async function iaRenderStats(fiche) {
-  const cont = document.getElementById('ia-onglet-contenu');
-  try {
-    const s = await api('GET', `/insc/fiches/${IA_FICHE_ACTIVE}/stats`);
-    cont.innerHTML = `
-      <div style="font-size:32px;font-weight:900;color:#0D2B4E;">${s.total}</div>
-      <div style="color:var(--muted);font-size:13px;margin-bottom:16px;">inscription(s) au total</div>
-      <h3 style="font-size:14px;">Par type</h3>
-      <ul>${s.par_type.map(t => `<li>${escH(t.label)} : ${t.nb}${t.places_max!=null?' / '+t.places_max:''}</li>`).join('')}</ul>
-      <h3 style="font-size:14px;">Par statut</h3>
-      <ul>${s.par_statut.map(t => `<li>${escH(t.statut)} : ${t.n}</li>`).join('')}</ul>
-      ${s.par_evenement.length ? `<h3 style="font-size:14px;">Par événement</h3><ul>${s.par_evenement.map(e => `<li>${escH(e.titre)} : ${e.nb}</li>`).join('')}</ul>` : ''}`;
-  } catch (e) { cont.innerHTML = `<p style="color:#dc2626;">${escH(e.message)}</p>`; }
+// ---------------------------------------------------------------------------
+// Rendu — Liste des fiches
+// ---------------------------------------------------------------------------
+
+function renderListView() {
+  const cards = state.fiches.map(f => {
+    const [bg, color] = IA_STATUS_STYLES[f.statut] || IA_STATUS_STYLES['brouillon'];
+    return `
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px;cursor:pointer;" data-action="selectFiche" data-id="${f.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;">
+          <div style="font-weight:700;font-size:15px;">${escH(f.nom)}</div>
+          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;background:${bg};color:${color};">${IA_STATUS_LABEL[f.statut]}${f.gele_le ? ' · 🔒' : ''}</span>
+        </div>
+        <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:14px;">📅 ${escH(f.apercu_date || 'Date à définir')} &nbsp;·&nbsp; 📍 ${escH(f.apercu_lieu || 'Lieu à définir')}</div>
+        <div style="display:flex;gap:18px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);">
+          <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="max-width:1180px;margin:0 auto;padding:40px 28px;">
+      <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:8px;">Événements &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30);font-weight:500;">Formulaires &amp; Inscriptions</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:14px;">
+        <h1 style="margin:0;font-size:24px;font-weight:700;">Formulaires &amp; Inscriptions</h1>
+        <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 20px;border-radius:8px;cursor:pointer;" data-action="createFiche">+ Créer une fiche d'inscription</button>
+      </div>
+      ${state.fiches.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">${cards}</div>` : `<div style="text-align:center;padding:50px 0;color:oklch(0.55 0.006 30);">Aucune fiche pour le moment — créez la première.</div>`}
+    </div>`;
 }
+
+// ---------------------------------------------------------------------------
+// Rendu — Détail d'une fiche (en-tête + onglets + contenu)
+// ---------------------------------------------------------------------------
+
+function renderDetailView() {
+  const fiche = selectedFiche();
+  if (!fiche) return '<div style="text-align:center;padding:60px;color:oklch(0.55 0.006 30);">Chargement…</div>';
+  const status = fiche.statut;
+
+  const suspendedBanner = (status === 'suspendue' || fiche.gele_le) ? `
+    <div style="background:oklch(0.94 0.05 20); border-bottom:1px solid oklch(0.8 0.1 20); color:oklch(0.4 0.16 20); padding:10px 24px; font-size:14px; font-weight:500; text-align:center;">
+      🔒 Cette fiche a été suspendue par l'administration Diaspo'Actif${fiche.gele_motif ? ' : ' + escH(fiche.gele_motif) : '.'} Les nouvelles inscriptions sont bloquées.
+    </div>` : '';
+
+  const [bg, color] = IA_STATUS_STYLES[status] || IA_STATUS_STYLES['brouillon'];
+  const badge = `<span style="background:${bg};color:${color};font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;">● ${IA_STATUS_LABEL[status]}</span>`;
+
+  const publierBtn = (status === 'brouillon' || status === 'fermee') ? `<button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:600; padding:9px 18px; border-radius:8px; cursor:pointer;" data-action="publierFiche">Publier la fiche</button>` :
+    status === 'publiee' ? `<button style="background:#fff; border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="fermerFiche">Fermer les inscriptions</button>` : '';
+
+  const header = `
+    <header style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:16px 28px;">
+      <div style="font-size:12px; color:oklch(0.55 0.006 30); margin-bottom:8px;"><a href="javascript:void(0)" data-action="backToList">Formulaires &amp; Inscriptions</a> &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30); font-weight:500;">${escH(fiche.nom)}</span></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <h1 style="margin:0; font-size:22px; font-weight:700;">${escH(fiche.nom)}</h1>
+          ${badge}
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button style="background:oklch(0.96 0.004 30); border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="goToPublic">Prévisualiser</button>
+          ${publierBtn}
+          <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="dupliquerFiche">📑 Dupliquer</button>
+        </div>
+      </div>
+      <div style="display:flex; gap:20px; margin-top:10px; font-size:13px; color:oklch(0.5 0.006 30); flex-wrap:wrap;">
+        <span>📅 ${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,10) : 'Ouverture à définir')} → ${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,10) : 'fermeture à définir')}</span>
+        <span>👤 Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}</span>
+      </div>
+    </header>`;
+
+  const tabsHtml = IA_TABS.map(t => {
+    const active = state.activeTab === t.key;
+    return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; border-bottom:2px solid ${active ? 'oklch(0.32 0.09 258)' : 'transparent'}; color:${active ? 'oklch(0.2 0.006 30)' : 'oklch(0.5 0.006 30)'};" data-action="selectTab" data-tab="${t.key}">${t.emoji} ${t.label}</button>`;
+  }).join('');
+  const nav = `<nav style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:0 28px; display:flex; gap:2px; overflow-x:auto;">${tabsHtml}</nav>`;
+  const main = `<main style="max-width:1180px; margin:0 auto; padding:28px;">${renderTabContent()}</main>`;
+  return suspendedBanner + header + nav + main;
+}
+
+function renderTabContent() {
+  switch (state.activeTab) {
+    case 'overview': return renderOverview();
+    case 'types': return renderTypes();
+    case 'fields': return renderFields();
+    case 'public': return renderPublic();
+    case 'communication': return renderCommunication();
+    case 'qr': return renderQr();
+    case 'presences': return renderPresences();
+    case 'finances': return renderFinances();
+    case 'stats': return renderStats();
+    case 'historique': return renderHistorique();
+    default: return '';
+  }
+}
+
+// ---- Vue d'ensemble ----
+function renderOverview() {
+  const fiche = selectedFiche();
+  const types = currentTypes().map(buildTypeVM);
+  const totalInscriptions = types.reduce((s, t) => s + t.registered, 0);
+  const placesRestantes = types.filter(t => t.capacityDisplay !== '∞').reduce((s, t) => s + Math.max(0, (t.capacityDisplay - t.registered)), 0);
+  const bars = types.map(rt => `
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:110px; font-size:13px; font-weight:600;">${escH(rt.name)}</div>
+      <div style="flex:1; height:8px; background:oklch(0.93 0.004 30); border-radius:4px; overflow:hidden;"><div style="height:100%; background:oklch(0.45 0.09 258); border-radius:4px; width:${rt.barWidthPct}%;"></div></div>
+      <div style="width:36px; text-align:right; font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:600;">${rt.registered}</div>
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun type créé pour le moment.</div>';
+
+  const publicUrl = location.origin + '/inscription-publique.html?slug=' + fiche.slug;
+  return `
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:24px;">
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px;">
+        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:500; margin-bottom:6px;">Total inscriptions</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:26px; font-weight:600;">${totalInscriptions}</div>
+      </div>
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px;">
+        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:500; margin-bottom:6px;">Types actifs</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:26px; font-weight:600;">${types.filter(t=>t.isOpen).length}</div>
+      </div>
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px;">
+        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:500; margin-bottom:6px;">Fonds gelés (J+5)</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:26px; font-weight:600; color:oklch(0.42 0.13 85);">— €</div>
+      </div>
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px;">
+        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:500; margin-bottom:6px;">Places restantes</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:26px; font-weight:600;">${placesRestantes}</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.4fr 1fr; gap:16px;">
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
+        <h3 style="margin:0 0 14px; font-size:15px; font-weight:700;">Répartition par type d'inscription</h3>
+        <div style="display:flex; flex-direction:column; gap:10px;">${bars}</div>
+      </div>
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
+        <h3 style="margin:0 0 14px; font-size:15px; font-weight:700;">Calendrier</h3>
+        <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+          <div style="display:flex; justify-content:space-between;"><span style="color:oklch(0.55 0.006 30);">Ouverture inscriptions</span><span style="font-weight:600;">${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.replace('T',' · ').slice(0,16) : '—')}</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:oklch(0.55 0.006 30);">Fermeture inscriptions</span><span style="font-weight:600;">${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.replace('T',' · ').slice(0,16) : '—')}</span></div>
+        </div>
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30);">
+          <div style="font-size:12px; color:oklch(0.55 0.006 30); margin-bottom:8px;">Lien public</div>
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:oklch(0.97 0.002 30); border:1px solid oklch(0.9 0.004 30); border-radius:6px; padding:8px 10px; font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:oklch(0.5 0.006 30); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escH(publicUrl)}</div>
+            <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:12px; font-weight:600; padding:0 12px; border-radius:6px; cursor:pointer;" data-action="copierLienPublic" data-url="${escH(publicUrl)}">Copier</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---- Types d'inscription ----
+function renderTypes() {
+  const types = currentTypes().map(buildTypeVM);
+  const selected = selectedType() ? buildTypeVM(selectedType()) : null;
+
+  const list = types.map(rt => `
+    <div style="background:#fff; border:1.5px solid ${rt.cardBorder}; border-radius:12px; padding:14px 16px; cursor:pointer;" data-action="selectType" data-id="${rt.id}">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="font-weight:700; font-size:14.5px;">${escH(rt.name)}</div>
+        <span style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; background:${rt.statusBg}; color:${rt.statusColor};">${rt.statusLabel}</span>
+      </div>
+      <div style="display:flex; gap:14px; margin-top:8px; font-size:12.5px; color:oklch(0.5 0.006 30);">
+        <span>${rt.priceLabel}</span><span>${rt.capacityLabel}</span><span>${rt.validationLabel}</span>
+      </div>
+    </div>`).join('');
+
+  const detail = selected ? `
+      <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:22px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+          <h3 style="margin:0; font-size:16px; font-weight:700;">${escH(selected.name)}</h3>
+          <button style="background:none; border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="goToFields">Personnaliser les éléments d'inscription →</button>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px 20px;">
+          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Tarif</div><div style="font-family:'IBM Plex Mono', monospace; font-size:18px; font-weight:600;">${selected.priceLabel}</div></div>
+          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Places</div><div style="font-size:14px; font-weight:600;">${selected.capacityLabel}</div></div>
+          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Validation</div><div style="font-size:14px; font-weight:600;">${selected.validationLabel}</div></div>
+          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Période d'inscription</div><div style="font-size:14px; font-weight:600;">${escH(selected.periodLabel)}</div></div>
+        </div>
+        <div style="margin-top:20px; padding-top:18px; border-top:1px solid oklch(0.92 0.004 30);">
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span style="color:oklch(0.55 0.006 30);">Places utilisées</span><span style="font-weight:600;">${selected.registered} / ${selected.capacityDisplay}</span></div>
+          <div style="height:8px; background:oklch(0.93 0.004 30); border-radius:4px; overflow:hidden;"><div style="height:100%; background:oklch(0.45 0.09 258); width:${selected.fillWidth};"></div></div>
+        </div>
+        <label style="display:flex; align-items:center; gap:10px; margin-top:20px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" ${selected.waitlist ? 'checked' : ''} data-action="toggleWaitlist" data-id="${selected.id}" style="width:16px; height:16px; accent-color:oklch(0.32 0.09 258);"/>
+          Activer la liste d'attente une fois complet
+        </label>
+      </div>` : `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:40px;text-align:center;color:oklch(0.55 0.006 30);">Ajoutez un type d'inscription pour commencer.</div>`;
+
+  return `
+    <div style="display:grid; grid-template-columns:1fr 1.3fr; gap:20px;">
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button style="background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:12px; border-radius:10px; cursor:pointer;" data-action="addType">+ Ajouter un type d'inscription</button>
+        ${list}
+      </div>
+      ${detail}
+    </div>`;
+}
+
+// ---- Formulaire (champs) ----
+function renderFields() {
+  const types = currentTypes().map(buildTypeVM);
+  const chips = types.map(rt => `<button style="background:${rt.chipBg}; color:${rt.chipColor}; border:1px solid ${rt.chipBorder}; font-size:13px; font-weight:600; padding:8px 16px; border-radius:20px; cursor:pointer;" data-action="selectType" data-id="${rt.id}">${escH(rt.name)}</button>`).join('');
+  const type = selectedType();
+  if (!type) return `<div style="color:oklch(0.55 0.006 30);">Créez d'abord un type d'inscription (onglet précédent).</div>`;
+  const fields = type.champs || [];
+  const fieldsHtml = fields.map((f, i) => `
+    <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
+      <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:oklch(0.5 0.006 30); cursor:pointer;">
+        <input type="checkbox" ${f.obligatoire ? 'checked' : ''} data-action="toggleFieldRequired" data-id="${f.id}" style="width:14px; height:14px; accent-color:oklch(0.32 0.09 258);"/>
+        Obligatoire
+      </label>
+      <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="removeField" data-id="${f.id}">✕</button>
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone sont demandés.</div>';
+
+  const cats = IA_FIELD_CATEGORIES.map(c => `<button style="background:#fff; border:1px solid oklch(0.85 0.004 30); color:oklch(0.3 0.006 30); font-size:12.5px; font-weight:500; padding:7px 13px; border-radius:8px; cursor:pointer;" data-action="addField" data-category="${escH(c.name)}">${escH(c.name)}</button>`).join('');
+
+  return `
+    <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">${chips}</div>
+    <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="margin:0; font-size:15px; font-weight:700;">Formulaire — ${escH(type.name)}</h3>
+        <span style="font-size:12px; color:oklch(0.55 0.006 30);">${fields.length} champ(s)</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">${fieldsHtml}</div>
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30);">
+        <div style="font-size:12px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:10px;">+ Ajouter un champ</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">${cats}</div>
+      </div>
+    </div>`;
+}
+
+// ---- Aperçu public (vraie donnée, via l'API publique) ----
+function renderPublic() {
+  const fiche = selectedFiche();
+  const d = state.publicData;
+  if (!d) return '<div style="text-align:center;padding:40px;color:oklch(0.55 0.006 30);">Chargement…</div>';
+  if (d.erreur) return `<div style="max-width:640px;margin:0 auto;text-align:center;padding:30px;color:oklch(0.5 0.16 20);">${escH(d.erreur)}<br><span style="font-size:12px;color:oklch(0.55 0.006 30);">La fiche doit être publiée pour que l'aperçu public reflète son vrai statut.</span></div>`;
+
+  let body;
+  const types = (d.types || []);
+  const pubType = state.publicSelectedTypeId ? types.find(t => t.id === state.publicSelectedTypeId) : null;
+  if (!pubType) {
+    body = `<div style="display:flex; flex-direction:column; gap:10px;">${types.map(t => `
+      <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:14px 16px; gap:12px;">
+        <div><div style="font-weight:700; font-size:14.5px;">${escH(t.label)}</div><div style="font-size:12.5px; color:oklch(0.5 0.006 30); margin-top:2px;">${t.gratuit ? 'Gratuit' : (t.prix||0)+' €'} &nbsp;·&nbsp; ${t.places_restantes != null ? t.places_restantes + ' places restantes' : 'Illimité'}</div></div>
+        ${t.complet ? '<span style="font-size:12px;font-weight:600;color:oklch(0.6 0.006 30);">Complet</span>' : (t.periode_ouverte === false ? '<span style="font-size:12px;font-weight:600;color:oklch(0.6 0.006 30);">Fermé</span>' : `<button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="selectPublicType" data-id="${t.id}">S'inscrire</button>`)}
+      </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);text-align:center;">Aucun type d\'inscription disponible.</div>'}</div>`;
+  } else {
+    const fieldsHtml = (pubType.champs || []).map(f => `
+      <div>
+        <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:5px;">${escH(f.libelle)}${f.obligatoire ? '<span style="color:oklch(0.5 0.16 20);"> *</span>' : ''}</label>
+        <input data-champ="${escH(f.nom)}" placeholder="${escH(f.placeholder||'')}" style="width:100%;height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30); padding:0 10px; font-size:13px; box-sizing:border-box;">
+      </div>`).join('');
+    body = `
+      <button style="background:none; border:none; color:oklch(0.5 0.006 30); font-size:13px; cursor:pointer; padding:0; margin-bottom:14px;" data-action="backToPublicTypes">← Retour aux types d'inscription</button>
+      <h3 style="margin:0 0 4px; font-size:16px; font-weight:700;">Inscription — ${escH(pubType.label)}</h3>
+      <div style="font-size:12.5px; color:oklch(0.5 0.006 30); margin-bottom:16px;">${pubType.gratuit ? 'Gratuit' : (pubType.prix||0)+' €'}</div>
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div><label style="display:block;font-size:12.5px;font-weight:600;margin-bottom:5px;">Prénom <span style="color:oklch(0.5 0.16 20);">*</span></label><input data-champ="__prenom" style="width:100%;height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12.5px;font-weight:600;margin-bottom:5px;">Nom <span style="color:oklch(0.5 0.16 20);">*</span></label><input data-champ="__nom" style="width:100%;height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12.5px;font-weight:600;margin-bottom:5px;">E-mail</label><input data-champ="__email" style="width:100%;height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;"></div>
+        ${fieldsHtml}
+        <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:14px; font-weight:700; padding:12px; border-radius:8px; cursor:pointer; margin-top:6px;" data-action="soumettreApercu">Confirmer mon inscription (test — n'envoie rien de réel)</button>
+      </div>`;
+  }
+
+  return `
+    <div style="max-width:640px;margin:0 auto 14px;font-size:12px;color:oklch(0.55 0.006 30);text-align:center;">Aperçu — reflète la vraie page publique de cette fiche.</div>
+    <div style="max-width:640px; margin:0 auto; background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:16px; overflow:hidden;">
+      <div style="height:120px; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'repeating-linear-gradient(45deg, oklch(0.94 0.01 30), oklch(0.94 0.01 30) 10px, oklch(0.97 0.004 30) 10px, oklch(0.97 0.004 30) 20px)'};"></div>
+      <div style="padding:24px;">
+        <h2 style="margin:0 0 6px; font-size:20px; font-weight:700;">${escH(fiche.nom)}</h2>
+        ${fiche.description ? `<p style="font-size:14px; line-height:1.6; color:oklch(0.3 0.006 30); margin:0 0 18px;">${escH(fiche.description)}</p>` : ''}
+        ${body}
+      </div>
+    </div>`;
+}
+
+// ---- Communication ----
+function renderCommunication() {
+  const types = currentTypes().map(buildTypeVM);
+  const recipients = [{ id: 'tous', label: 'Toute la fiche', count: types.reduce((s,t)=>s+t.registered,0) },
+    ...currentTypes().map(t => ({ id: t.cle, label: t.label, count: t.nb_inscrits }))].map(r => {
+    const sel = state.commRecipient === r.id;
+    return `<button style="background:${sel ? 'oklch(0.32 0.09 258)' : '#fff'};color:${sel ? '#fff' : 'oklch(0.3 0.006 30)'};border:1px solid ${sel ? 'oklch(0.32 0.09 258)' : 'oklch(0.85 0.004 30)'};font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:20px;cursor:pointer;" data-action="selectCommRecipient" data-id="${escH(r.id)}">${escH(r.label)} (${r.count})</button>`;
+  }).join('');
+
+  const history = state.communications.map(h => `
+    <div style="border-bottom:1px solid oklch(0.93 0.004 30);padding-bottom:12px;">
+      <div style="font-size:12.5px;font-weight:600;">${escH(h.created_at)} — ${escH(h.destinataire_type)}</div>
+      <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-top:3px;">E-mail : ${h.nb_email} · Notification : ${h.nb_notif} · <span style="color:oklch(0.4 0.13 150);font-weight:600;">${escH(h.statut)}</span></div>
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucune communication envoyée pour le moment.</div>';
+
+  return `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Nouvelle communication</h3>
+        <div style="font-size:12px;color:oklch(0.55 0.006 30);font-weight:600;margin-bottom:8px;">Destinataires</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">${recipients}</div>
+        <div style="font-size:12px;color:oklch(0.55 0.006 30);font-weight:600;margin-bottom:8px;">Canal</div>
+        <div style="display:flex;gap:16px;margin-bottom:18px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" ${state.commChannelEmail ? 'checked' : ''} data-action="toggleCommEmail" style="accent-color:oklch(0.32 0.09 258);"/> E-mail</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" ${state.commChannelNotif ? 'checked' : ''} data-action="toggleCommNotif" style="accent-color:oklch(0.32 0.09 258);"/> Notification Diaspo'Actif</label>
+        </div>
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Objet</label>
+        <input id="ia-comm-objet" type="text" placeholder="Rappel de votre inscription" value="${escH(state.commObjet)}" style="width:100%;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;box-sizing:border-box;"/>
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Message</label>
+        <textarea id="ia-comm-message" placeholder="Bonjour {prenom}, nous vous rappelons que votre participation à {evenement} est prévue le {date_evenement} à {lieu}." style="width:100%;min-height:100px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;background:oklch(0.99 0.001 30);padding:10px 12px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;box-sizing:border-box;">${escH(state.commMessage)}</textarea>
+        <div style="font-size:11px;color:oklch(0.55 0.006 30);margin:8px 0 16px;">Variables disponibles : {prenom} {nom} {evenement} {type_inscription} {date_evenement} {lieu}</div>
+        <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 18px;border-radius:8px;cursor:pointer;" data-action="envoyerCommunication">Envoyer</button>
+      </div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Historique des communications</h3>
+        <div style="display:flex;flex-direction:column;gap:14px;">${history}</div>
+      </div>
+    </div>`;
+}
+
+// ---- Contrôle QR ----
+function renderQr() {
+  const lien = state.lienControle;
+  const stats = state.checkinStats || { presents_actuellement:0, entrees:0, sorties:0, non_entres:0 };
+  const controlUrl = lien ? (location.origin + '/controle.html?token=' + lien.token) : null;
+  return `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">🎟️ Lien de contrôle</h3>
+        ${lien ? `
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <div style="flex:1;background:oklch(0.97 0.002 30);border:1px solid oklch(0.9 0.004 30);border-radius:6px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:oklch(0.5 0.006 30);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(controlUrl)}</div>
+          <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:12px;font-weight:600;padding:0 12px;border-radius:6px;cursor:pointer;" data-action="copierLienControle" data-url="${escH(controlUrl)}">Copier</button>
+        </div>
+        <div style="font-size:12.5px;color:oklch(0.55 0.006 30);margin-bottom:14px;">Valide jusqu'au ${escH(new Date(lien.valide_jusqua).toLocaleString('fr-FR'))}</div>` : `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);margin-bottom:14px;">Aucun lien de contrôle actif.</div>`}
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:oklch(0.55 0.006 30);margin-bottom:5px;">Durée de validité du nouveau lien</label>
+          <select id="ia-qr-duree" style="border:1px solid oklch(0.85 0.004 30);border-radius:6px;padding:7px 10px;font-size:12.5px;background:#fff;color:oklch(0.2 0.006 30);">
+            <option value="1h">1 heure</option><option value="3h">3 heures</option><option value="6h">6 heures</option>
+            <option value="12h">12 heures</option><option value="24h" selected>24 heures</option><option value="48h">48 heures</option>
+            <option value="event">Jusqu'à la fin de l'événement</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;" data-action="rafraichirLienControle">${lien ? 'Rafraîchir le lien et le QR Code' : 'Créer le lien de contrôle'}</button>
+          ${lien ? `<button style="background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;" data-action="revoquerLiensControle">Désactiver tous les liens</button>` : ''}
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Statistiques en temps réel</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><div style="font-size:11.5px;color:oklch(0.55 0.006 30);">Présents actuellement</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:oklch(0.4 0.13 150);">${stats.presents_actuellement}</div></div>
+          <div><div style="font-size:11.5px;color:oklch(0.55 0.006 30);">Entrées</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;">${stats.entrees}</div></div>
+          <div><div style="font-size:11.5px;color:oklch(0.55 0.006 30);">Sorties</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;">${stats.sorties}</div></div>
+          <div><div style="font-size:11.5px;color:oklch(0.55 0.006 30);">Non encore entrés</div><div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;">${stats.non_entres}</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---- Présences ----
+function renderPresences() {
+  const selected = state.presences.find(p => p.id === state.selectedPresenceId) || null;
+  const rowsHtml = state.presences.map(p => `
+    <tr style="border-top:1px solid oklch(0.93 0.004 30);cursor:pointer;background:${state.selectedPresenceId===p.id ? 'oklch(0.97 0.03 30)' : 'transparent'};" data-action="selectPresence" data-id="${p.id}">
+      <td style="padding:10px;font-weight:600;">${escH(p.prenom)} ${escH(p.nom)}</td>
+      <td style="padding:10px;color:oklch(0.5 0.006 30);">${escH(p.type_label)}</td>
+      <td style="padding:10px;font-family:'IBM Plex Mono',monospace;">${p.entree_at ? escH(p.entree_at.slice(11,16)) : '—'}</td>
+      <td style="padding:10px;font-family:'IBM Plex Mono',monospace;">${p.sortie_at ? escH(p.sortie_at.slice(11,16)) : '—'}</td>
+      <td style="padding:10px;font-weight:600;">${p.statut_presence}</td>
+    </tr>`).join('') || `<tr><td colspan="5" style="padding:20px;text-align:center;color:oklch(0.55 0.006 30);">Aucune inscription.</td></tr>`;
+
+  const detail = selected ? `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+      <div><h3 style="margin:0;font-size:16px;font-weight:700;">${escH(selected.prenom)} ${escH(selected.nom)}</h3><div style="font-size:12.5px;color:oklch(0.55 0.006 30);margin-top:2px;">${escH(selected.type_label)}</div></div>
+      <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:oklch(0.96 0.004 30);white-space:nowrap;">${selected.statut_presence}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">E-mail</span><span style="font-weight:600;">${escH(selected.email||'—')}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">Référence</span><span style="font-weight:600;font-family:'IBM Plex Mono',monospace;">${escH(selected.reference||'—')}</span></div>
+    </div>`
+    : `<div style="text-align:center;color:oklch(0.55 0.006 30);font-size:13px;padding:40px 10px;">Cliquez sur un participant pour voir sa fiche.</div>`;
+
+  return `
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;">
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;overflow-x:auto;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Présences</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="text-align:left;color:oklch(0.55 0.006 30);font-size:12px;"><th style="padding:8px 10px;font-weight:600;">Participant</th><th style="padding:8px 10px;font-weight:600;">Type</th><th style="padding:8px 10px;font-weight:600;">Entrée</th><th style="padding:8px 10px;font-weight:600;">Sortie</th><th style="padding:8px 10px;font-weight:600;">Statut</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:22px;">${detail}</div>
+    </div>`;
+}
+
+// ---- Finances (squelette, aucun paiement réel derrière — voir plan) ----
+function renderFinances() {
+  const fiche = selectedFiche();
+  const gele = !!fiche.fonds_geles_le;
+  const freezeControls = isAdmin() ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:16px;">
+      <button style="background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px 16px;border-radius:8px;cursor:pointer;" data-action="toggleFreezeFonds">${gele ? '🔓 Débloquer les fonds' : '🔒 Geler les fonds'}</button>
+    </div>`
+    : `<div style="font-size:11px;color:oklch(0.6 0.006 30);margin-top:12px;">🔒 Seul le compte administrateur Diaspo'Actif peut geler ou débloquer les fonds.</div>`;
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Finances de la fiche</h3>
+        <div style="background:oklch(0.95 0.02 258);border:1px solid oklch(0.78 0.05 258);border-radius:8px;padding:10px 12px;font-size:12px;color:oklch(0.28 0.08 258);line-height:1.5;margin-bottom:14px;">ℹ️ La collecte de paiement réel n'est pas encore active sur ce module — tous les montants sont à 0 pour le moment.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13.5px;">
+          <div style="display:flex;justify-content:space-between;"><span style="color:oklch(0.55 0.006 30);">Recettes inscriptions</span><span style="font-weight:600;font-family:'IBM Plex Mono',monospace;">0 €</span></div>
+          <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid oklch(0.93 0.004 30);"><span style="font-weight:600;">Net</span><span style="font-weight:700;font-family:'IBM Plex Mono',monospace;">0 €</span></div>
+        </div>
+        ${gele ? `<div style="margin-top:14px;background:oklch(0.94 0.05 20);color:oklch(0.42 0.16 20);font-size:12.5px;font-weight:600;padding:9px 12px;border-radius:8px;">🔒 Fonds gelés par l'administration${fiche.fonds_geles_motif ? '<div style="font-weight:500;margin-top:4px;">Motif : '+escH(fiche.fonds_geles_motif)+'</div>' : ''}</div>` : ''}
+        ${freezeControls}
+      </div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Règle des 5 jours</h3>
+        <div style="font-size:12.5px;color:oklch(0.55 0.006 30);line-height:1.6;">Une fois la collecte de paiement activée, les fonds d'un événement resteront bloqués jusqu'à 5 jours après sa date, avant libération automatique.</div>
+      </div>
+    </div>`;
+}
+
+// ---- Statistiques ----
+function renderStats() {
+  const types = currentTypes().map(buildTypeVM);
+  const totalConfirmes = types.reduce((s,t)=>s+t.registered,0);
+  const entrees = state.checkinStats?.entrees || 0;
+  const tauxPresence = totalConfirmes ? Math.round((entrees / totalConfirmes) * 100) : 0;
+  const placesRestantes = types.filter(t => t.capacityDisplay !== '∞').reduce((s, t) => s + Math.max(0, (t.capacityDisplay - t.registered)), 0);
+  return `
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px;">
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Taux de présence</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;">${tauxPresence}%</div></div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Places restantes</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;">${placesRestantes}</div></div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Don moyen</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:oklch(0.6 0.006 30);">—</div></div>
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Total inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;">${totalConfirmes}</div></div>
+    </div>
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;color:oklch(0.55 0.006 30);font-size:12.5px;">La répartition par pays et le don moyen nécessitent le module Finances (à venir).</div>`;
+}
+
+// ---- Historique ----
+function renderHistorique() {
+  const rows = state.historique.map(a => `
+    <div style="border-bottom:1px solid oklch(0.93 0.004 30);padding-bottom:12px;">
+      <div style="font-size:12.5px;font-weight:600;">${escH(a.created_at)} — ${escH(a.acteur_nom || 'Système')}</div>
+      <div style="font-size:13px;color:oklch(0.3 0.006 30);margin-top:3px;">${escH(a.action)}${a.details ? ' — ' + escH(a.details) : ''}</div>
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun historique pour le moment.</div>';
+  return `
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
+      <h3 style="margin:0 0 16px;font-size:15px;font-weight:700;">Historique / audit</h3>
+      <div style="display:flex;flex-direction:column;gap:14px;">${rows}</div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Actions — branchées sur l'API réelle du module
+// ---------------------------------------------------------------------------
+
+const actions = {
+  async selectFiche(el) {
+    state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
+    await iaChargerFiche(state.selectedFicheId);
+  },
+  async createFiche() {
+    const nom = prompt("Nom de la fiche d'inscription :");
+    if (!nom || !nom.trim()) return;
+    try {
+      const { fiche } = await api('POST', '/insc/fiches', { nom: nom.trim() });
+      state.selectedFicheId = fiche.id; state.view = 'detail'; state.activeTab = 'overview';
+      await iaChargerFiche(fiche.id);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async backToList() { state.view = 'list'; await iaChargerListe(); },
+  async selectTab(el) { state.activeTab = el.dataset.tab; try { await iaChargerOnglet(state.activeTab); } catch (e) { ia_toast(e.message, false); } },
+  async goToPublic() { state.activeTab = 'public'; state.publicSelectedTypeId = null; await iaChargerPublic(); },
+  goToFields() { state.activeTab = 'fields'; },
+  selectType(el) { state.selectedTypeId = parseInt(el.dataset.id); },
+  async publierFiche() {
+    try { await api('PATCH', `/insc/fiches/${state.selectedFicheId}/statut`, { statut: 'publiee' }); ia_toast('Fiche publiée.', true); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async fermerFiche() {
+    try { await api('PATCH', `/insc/fiches/${state.selectedFicheId}/statut`, { statut: 'fermee' }); ia_toast('Inscriptions fermées.', true); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async dupliquerFiche() {
+    try { const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/dupliquer`, {}); ia_toast('Fiche dupliquée.', true); state.selectedFicheId = r.fiche_id; await iaChargerFiche(r.fiche_id); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async addType() {
+    const label = prompt("Nom du type d'inscription (ex : Participant, Exposant, Bénévole…) :");
+    if (!label || !label.trim()) return;
+    const gratuit = confirm('Ce type est-il gratuit ? OK = Gratuit, Annuler = Payant');
+    let prix = null; if (!gratuit) prix = parseFloat(prompt('Prix en euros :', '0')) || 0;
+    const placesTxt = prompt('Nombre de places maximum (laisser vide = illimité) :');
+    try {
+      await api('POST', `/insc/fiches/${state.selectedFicheId}/types`, { label: label.trim(), gratuit, prix, places_max: placesTxt ? parseInt(placesTxt) : null, liste_attente_active: !!placesTxt });
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async toggleWaitlist(el) {
+    const id = parseInt(el.dataset.id);
+    try { await api('PUT', '/insc/types/' + id, { liste_attente_active: el.checked ? 1 : 0 }); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async toggleFieldRequired(el) {
+    const id = parseInt(el.dataset.id);
+    try { await api('PUT', '/insc/champs/' + id, { obligatoire: el.checked ? 1 : 0 }); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async removeField(el) {
+    if (!confirm('Supprimer ce champ ?')) return;
+    try { await api('DELETE', '/insc/champs/' + el.dataset.id); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async addField(el) {
+    const libelle = prompt('Libellé du champ :', 'Nouveau champ (' + el.dataset.category + ')');
+    if (!libelle || !libelle.trim()) return;
+    try {
+      await api('POST', `/insc/types/${state.selectedTypeId}/champs`, { libelle: libelle.trim(), type_champ: 'texte_court', obligatoire: false });
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  selectPublicType(el) { state.publicSelectedTypeId = parseInt(el.dataset.id); },
+  backToPublicTypes() { state.publicSelectedTypeId = null; },
+  async soumettreApercu() {
+    const inputs = document.querySelectorAll('#ia-root [data-champ]');
+    const reponses = {}; let prenom = '', nom = '', email = '';
+    inputs.forEach(i => { if (i.dataset.champ === '__prenom') prenom = i.value; else if (i.dataset.champ === '__nom') nom = i.value; else if (i.dataset.champ === '__email') email = i.value; else reponses[i.dataset.champ] = i.value; });
+    if (!prenom.trim() || !nom.trim()) return ia_toast('Prénom et nom sont requis.', false);
+    try {
+      const r = await api('POST', `/insc/public/${selectedFiche().slug}/inscriptions`, { type_id: state.publicSelectedTypeId, nom, prenom, email, reponses });
+      ia_toast(`Inscription test créée (référence ${r.reference}) — visible dans l'onglet Inscriptions.`, true);
+      state.publicSelectedTypeId = null; await iaChargerPublic();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  copierLienPublic(el) { navigator.clipboard?.writeText(el.dataset.url); ia_toast('Lien copié.', true); },
+  copierLienControle(el) { navigator.clipboard?.writeText(el.dataset.url); ia_toast('Lien copié.', true); },
+  selectCommRecipient(el) { state.commRecipient = el.dataset.id; },
+  toggleCommEmail() { state.commChannelEmail = !state.commChannelEmail; },
+  toggleCommNotif() { state.commChannelNotif = !state.commChannelNotif; },
+  async envoyerCommunication() {
+    const objet = document.getElementById('ia-comm-objet')?.value || '';
+    const message = document.getElementById('ia-comm-message')?.value || '';
+    if (!message.trim()) return ia_toast('Le message est requis.', false);
+    const canal = state.commChannelEmail && state.commChannelNotif ? 'les_deux' : state.commChannelEmail ? 'email' : 'notification';
+    try {
+      const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/communications`, { destinataire_type: state.commRecipient, canal, objet, message });
+      ia_toast(`Envoyé à ${r.nb_destinataires} destinataire(s) (${r.nb_email} e-mails, ${r.nb_notif} notifications).`, true);
+      state.commObjet = ''; state.commMessage = '';
+      await iaChargerCommunications();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async rafraichirLienControle() {
+    const duree = document.getElementById('ia-qr-duree')?.value || '24h';
+    try { await api('POST', `/insc/fiches/${state.selectedFicheId}/liens-controle`, { duree }); ia_toast('Lien créé.', true); await iaChargerLienEtStats(); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async revoquerLiensControle() {
+    if (!confirm('Désactiver tous les liens de contrôle actifs ?')) return;
+    try { await api('POST', `/insc/fiches/${state.selectedFicheId}/liens-controle/revoquer`, {}); ia_toast('Liens désactivés.', true); await iaChargerLienEtStats(); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  selectPresence(el) { state.selectedPresenceId = parseInt(el.dataset.id); },
+  async toggleFreezeFonds() {
+    const fiche = selectedFiche();
+    try {
+      if (fiche.fonds_geles_le) { await api('POST', `/insc/fiches/${state.selectedFicheId}/degeler-fonds`, {}); ia_toast('Fonds débloqués.', true); }
+      else { const motif = prompt('Motif du gel (obligatoire) :'); if (!motif || !motif.trim()) return; await api('POST', `/insc/fiches/${state.selectedFicheId}/geler-fonds`, { motif: motif.trim() }); ia_toast('Fonds gelés.', true); }
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+};
+
+async function dispatch(name, el) {
+  if (!actions[name]) return;
+  state.busy = true;
+  try { await actions[name](el); } catch (e) { ia_toast(e.message || String(e), false); }
+  state.busy = false;
+  render();
+}
+
+const root = document.getElementById('ia-root');
+function render() {
+  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}</div>`;
+}
+root.addEventListener('click', function (e) {
+  const el = e.target.closest('[data-action]');
+  if (!el || !root.contains(el)) return;
+  if (el.tagName === 'INPUT') return;
+  dispatch(el.dataset.action, el);
+});
+root.addEventListener('change', function (e) {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  if (el.tagName === 'INPUT' && el.type === 'checkbox') dispatch(el.dataset.action, el);
+});
 
 (async function initInscriptionsAdmin() {
   IA_ME = await fetchCurrentUser();
-  if (!IA_ME || !['initiative','administrateur','collectivite'].includes(IA_ME.role)) {
-    document.getElementById('ia-root').innerHTML = '<div style="text-align:center;padding:60px;color:var(--muted);">Cette page est réservée aux comptes Initiative.</div>';
+  if (!IA_ME || !['initiative', 'administrateur', 'collectivite'].includes(IA_ME.role)) {
+    document.getElementById('ia-root').innerHTML = '<div style="text-align:center;padding:60px;color:oklch(0.55 0.006 30);">Cette page est réservée aux comptes Initiative.</div>';
     return;
   }
-  iaRenderListe();
+  try { await iaChargerListe(); render(); }
+  catch (e) { root.innerHTML = `<div style="text-align:center;padding:60px;color:oklch(0.5 0.16 20);">${escH(e.message)}</div>`; }
 })();
 </script>
 <script src="/assets/cookies-banner.js"></script>

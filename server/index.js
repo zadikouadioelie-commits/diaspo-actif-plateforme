@@ -39454,7 +39454,12 @@ route("GET", "/api/insc/fiches", async (req, res) => {
   const enrichies = [];
   for (const f of fiches) {
     const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(f.id))?.n || 0;
-    enrichies.push({ ...f, nb_inscriptions: nb });
+    // Aperçu date/lieu depuis le premier événement lié, uniquement pour l'affichage de la carte —
+    // la fiche peut être liée à plusieurs événements (voir l'onglet Vue d'ensemble pour le détail).
+    const evtApercu = await db.prepare(`
+      SELECT e.date_evt, e.ville, e.pays FROM insc_fiches_evenements fe
+      JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC LIMIT 1`).get(f.id);
+    enrichies.push({ ...f, nb_inscriptions: nb, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null });
   }
   sendJSON(res, 200, { fiches: enrichies });
 });
@@ -39770,6 +39775,12 @@ route("GET", "/api/insc/fiches/:id/stats", async (req, res, params) => {
     WHERE fe.fiche_id=? GROUP BY e.id`).all(fiche.id);
   const total = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(fiche.id))?.n || 0;
   sendJSON(res, 200, { total, par_type: parType, par_statut: parStatut, par_evenement: parEvenement });
+});
+route("GET", "/api/insc/fiches/:id/historique", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const historique = await db.prepare("SELECT * FROM insc_historique WHERE fiche_id=? ORDER BY id DESC").all(fiche.id);
+  sendJSON(res, 200, { historique });
 });
 
 /* ── PUBLIC : lecture, soumission, upload ── */

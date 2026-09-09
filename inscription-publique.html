@@ -11,26 +11,33 @@
 <link rel="stylesheet" href="/assets/theme-manager.css">
 <link rel="apple-touch-icon" href="assets/logo.png">
 <meta name="theme-color" content="#0D2B4E">
+<!-- Habillage Claude Design (2026-09-08/09) — mêmes tokens que inscriptions-admin.html, ne pas réinterpréter. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-.ip-wrap{max-width:720px;margin:0 auto;padding:24px 16px 60px;}
-.ip-affiche{width:100%;max-height:280px;object-fit:cover;border-radius:14px;margin-bottom:18px;}
-.ip-titre{font-size:24px;font-weight:900;color:#0D2B4E;margin:0 0 6px;}
-.ip-desc{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 20px;}
-.ip-types{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;}
-.ip-type-card{border:2px solid var(--border);border-radius:12px;padding:16px;text-align:center;background:var(--card,#fff);}
-.ip-type-card.complet{opacity:.55;}
-.ip-type-label{font-weight:800;font-size:15px;margin-bottom:4px;}
-.ip-type-prix{font-size:13px;color:var(--muted);margin-bottom:4px;}
-.ip-type-places{font-size:12px;color:var(--muted);margin-bottom:10px;}
+#ip-root { font-family:'IBM Plex Sans', sans-serif; color:oklch(0.2 0.006 30); }
+#ip-root button, #ip-root input, #ip-root select, #ip-root textarea { font-family:inherit; }
+.ip-wrap{max-width:640px;margin:0 auto;padding:32px 16px 60px;}
+.ip-affiche{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-bottom:18px;}
+.ip-titre{font-size:22px;font-weight:700;margin:0 0 6px;}
+.ip-desc{color:oklch(0.5 0.006 30);font-size:14px;line-height:1.6;margin:0 0 22px;}
+.ip-types{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
+.ip-type-card{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;background:#fff;}
+.ip-type-card.complet{opacity:.6;}
+.ip-type-label{font-weight:700;font-size:15px;}
+.ip-type-prix,.ip-type-places{font-size:12.5px;color:oklch(0.5 0.006 30);}
+.ip-btn{background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+.ip-btn.outline{background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.3 0.006 30);}
+.ip-btn:disabled{opacity:.5;cursor:not-allowed;}
 .ip-champ{margin-bottom:16px;}
-.ip-champ label{display:block;font-size:13px;font-weight:700;color:#0D2B4E;margin-bottom:5px;}
-.ip-champ .aide{font-size:11.5px;color:var(--muted);margin-top:3px;}
+.ip-champ label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;}
+.ip-champ .aide{font-size:11.5px;color:oklch(0.55 0.006 30);margin-top:4px;}
 .ip-champ input[type=text],.ip-champ input[type=email],.ip-champ input[type=tel],.ip-champ input[type=number],
 .ip-champ input[type=date],.ip-champ input[type=time],.ip-champ input[type=url],.ip-champ textarea,.ip-champ select{
-  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;}
-.ip-champ textarea{min-height:90px;}
-.ip-oblig{color:#dc2626;}
-.ip-confirmation{text-align:center;padding:30px 20px;}
+  width:100%;height:42px;padding:0 12px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box;background:oklch(0.99 0.001 30);}
+.ip-champ textarea{height:auto;min-height:90px;padding:10px 12px;}
+.ip-oblig{color:oklch(0.5 0.16 20);}
+.ip-confirmation{text-align:center;padding:40px 20px;}
 .ip-confirmation .grand{font-size:48px;margin-bottom:10px;}
 </style>
 </head>
@@ -54,7 +61,7 @@
 </aside>
 
 <main class="ip-wrap" id="ip-root">
-  <div style="text-align:center;padding:60px 0;color:var(--muted);">Chargement…</div>
+  <div style="text-align:center;padding:60px 0;color:oklch(0.55 0.006 30);">Chargement…</div>
 </main>
 </div>
 
@@ -89,7 +96,7 @@ function ipChampHtml(c) {
   } else if (c.type_champ === 'case_a_cocher') {
     champHtml = `<label style="font-weight:400;"><input type="checkbox" name="${escH(c.nom)}" value="oui"> ${escH(c.placeholder||'')}</label>`;
   } else if (c.type_champ === 'upload_photo' || c.type_champ === 'upload_fichier') {
-    champHtml = `<input type="file" name="${escH(c.nom)}" accept="${c.type_champ==='upload_photo'?'image/*':'*'}" onchange="ipUploadChamp(this,'${escH(c.nom)}')"><div id="ip-upload-${escH(c.nom)}" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>`;
+    champHtml = `<input type="file" name="${escH(c.nom)}" accept="${c.type_champ==='upload_photo'?'image/*':'*'}" onchange="ipUploadChamp(this,'${escH(c.nom)}')"><div id="ip-upload-${escH(c.nom)}" style="font-size:12px;color:oklch(0.55 0.006 30);margin-top:4px;"></div>`;
   } else {
     const type = IP_TYPE_ICONS[c.type_champ] || 'text';
     champHtml = `<input type="${type}" name="${escH(c.nom)}" placeholder="${escH(c.placeholder||'')}" value="${escH(c.valeur_defaut||'')}">`;
@@ -140,9 +147,10 @@ function ipOuvrirType(typeId) {
       </select>
     </div>` : '';
   document.getElementById('ip-root').innerHTML = `
-    <button class="btn btn-outline" style="margin-bottom:16px;" onclick="ipRenderAccueil()">← Retour</button>
-    <h2 style="font-size:19px;font-weight:900;color:#0D2B4E;">${escH(type.label)}</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;">${escH(type.description||'')}</p>
+    <button class="ip-btn outline" style="margin-bottom:18px;" onclick="ipRenderAccueil()">← Retour</button>
+    <h2 style="font-size:18px;font-weight:700;margin:0 0 4px;">${escH(type.label)}</h2>
+    <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:20px;">${type.gratuit ? 'Gratuit' : (type.prix != null ? type.prix.toFixed(2) + ' €' : '')}</div>
+    ${type.description ? `<p style="color:oklch(0.5 0.006 30);font-size:13px;margin-bottom:20px;">${escH(type.description)}</p>` : ''}
     <form id="ip-form-champs" onsubmit="return ipSoumettre(event)">
       ${evtChoix}
       <div class="ip-champ"><label>Nom <span class="ip-oblig">*</span></label><input type="text" name="__nom" required></div>
@@ -150,8 +158,8 @@ function ipOuvrirType(typeId) {
       <div class="ip-champ"><label>E-mail</label><input type="email" name="__email"></div>
       <div class="ip-champ"><label>Téléphone</label><input type="tel" name="__telephone"></div>
       ${type.champs.map(ipChampHtml).join('')}
-      <div id="ip-erreur" style="color:#dc2626;font-size:13px;margin-bottom:12px;display:none;"></div>
-      <button type="submit" class="btn btn-orange" style="width:100%;padding:13px;font-size:15px;">✅ Confirmer mon inscription</button>
+      <div id="ip-erreur" style="color:oklch(0.5 0.16 20);font-size:13px;margin-bottom:12px;display:none;"></div>
+      <button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">Confirmer mon inscription</button>
     </form>`;
   document.getElementById('ip-form-champs').addEventListener('input', ipReevaluerConditions);
   document.getElementById('ip-form-champs').addEventListener('change', ipReevaluerConditions);
@@ -182,7 +190,7 @@ async function ipSoumettre(ev) {
     } else reponses[baseName] = el.value;
   });
   const btn = form.querySelector('button[type=submit]');
-  btn.disabled = true; btn.textContent = '⏳ Envoi…';
+  btn.disabled = true; btn.textContent = 'Envoi…';
   try {
     const payload = { type_id: IP_TYPE_ACTIF.id, evenement_id: evenementId || null, nom, prenom, email: email || null, telephone: telephone || null, reponses };
     const r = await fetch(`/api/insc/public/${IP_SLUG}/inscriptions`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
@@ -191,19 +199,19 @@ async function ipSoumettre(ev) {
     ipRenderConfirmation(d);
   } catch (e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
-    btn.disabled = false; btn.textContent = '✅ Confirmer mon inscription';
+    btn.disabled = false; btn.textContent = 'Confirmer mon inscription';
   }
 }
 
 function ipRenderConfirmation(d) {
   const icon = d.statut === 'liste_attente' ? '🟠' : '✅';
-  const titre = d.statut === 'liste_attente' ? 'Vous êtes en liste d\'attente' : 'Inscription confirmée !';
+  const titre = d.statut === 'liste_attente' ? "Vous êtes en liste d'attente" : 'Inscription confirmée !';
   document.getElementById('ip-root').innerHTML = `
     <div class="ip-confirmation">
       <div class="grand">${icon}</div>
-      <h2 style="font-size:20px;font-weight:900;color:#0D2B4E;">${titre}</h2>
-      <p style="color:var(--muted);">Numéro d'inscription : <strong>${escH(d.reference)}</strong></p>
-      ${d.statut !== 'liste_attente' ? `<a class="btn btn-orange" style="text-decoration:none;display:inline-block;margin-top:14px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>` : `<p style="font-size:13px;color:var(--muted);">Vous serez averti automatiquement si une place se libère.</p>`}
+      <h2 style="font-size:19px;font-weight:700;margin:0 0 8px;">${titre}</h2>
+      <p style="color:oklch(0.5 0.006 30);font-size:13.5px;">Numéro d'inscription : <strong style="font-family:'IBM Plex Mono',monospace;">${escH(d.reference)}</strong></p>
+      ${d.statut !== 'liste_attente' ? `<a class="ip-btn" style="text-decoration:none;display:inline-block;margin-top:16px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>` : `<p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">Vous serez averti automatiquement si une place se libère.</p>`}
     </div>`;
 }
 
@@ -216,11 +224,12 @@ function ipRenderAccueil() {
     <div class="ip-types">
       ${IP_TYPES.map(t => `
         <div class="ip-type-card ${t.complet?'complet':''}">
-          <div class="ip-type-label">${escH(t.label)}</div>
-          <div class="ip-type-prix">${t.gratuit ? 'Gratuit' : (t.prix != null ? t.prix.toFixed(2) + ' €' : '')}</div>
-          ${t.places_max != null ? `<div class="ip-type-places">${t.places_restantes} / ${t.places_max} places</div>` : ''}
-          <button class="btn ${t.complet?'btn-outline':'btn-orange'}" ${t.complet||t.periode_ouverte===false?'disabled':''} onclick="ipOuvrirType(${t.id})">
-            ${t.complet ? (t.liste_attente_active ? 'Rejoindre la liste d\'attente' : 'Complet') : (t.periode_ouverte===false ? 'Fermé' : 'Je m\'inscris')}
+          <div>
+            <div class="ip-type-label">${escH(t.label)}</div>
+            <div class="ip-type-prix">${t.gratuit ? 'Gratuit' : (t.prix != null ? t.prix.toFixed(2) + ' €' : '')}${t.places_max != null ? ` · ${t.places_restantes}/${t.places_max} places` : ''}</div>
+          </div>
+          <button class="ip-btn ${t.complet?'outline':''}" ${t.complet && !t.liste_attente_active || t.periode_ouverte===false?'disabled':''} onclick="ipOuvrirType(${t.id})">
+            ${t.complet ? (t.liste_attente_active ? "Liste d'attente" : 'Complet') : (t.periode_ouverte===false ? 'Fermé' : "S'inscrire")}
           </button>
         </div>`).join('')}
     </div>`;
@@ -231,13 +240,13 @@ const IP_SLUG = new URLSearchParams(location.search).get('slug') || location.pat
   try {
     const d = await api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG));
     if (d.fermee || d.pas_encore_ouverte) {
-      document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--muted);"><div style="font-size:40px;">⏳</div><p>${escH(d.message)}</p></div>`;
+      document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:oklch(0.55 0.006 30);"><div style="font-size:40px;">⏳</div><p>${escH(d.message)}</p></div>`;
       return;
     }
     IP_FICHE = d.fiche; IP_TYPES = d.types; IP_EVENEMENTS = d.evenements;
     ipRenderAccueil();
   } catch (e) {
-    document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:#dc2626;">Fiche introuvable.</div>`;
+    document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:oklch(0.5 0.16 20);">Fiche introuvable.</div>`;
   }
 })();
 </script>
