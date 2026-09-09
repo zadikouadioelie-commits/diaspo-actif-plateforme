@@ -218,7 +218,24 @@
          "fiche_choisie_id" de POST /api/evenements). -->
     <div style="margin-bottom:10px;">
       <button type="button" class="btn btn-outline" id="btn-fiche-inscription" style="font-size:12.5px;">📝 Fiche d'inscription</button>
-      <span id="fiche-choisie-resume" style="font-size:12.5px;color:#1B3A6B;margin-left:8px;"></span>
+      <!-- Cartouche de la fiche choisie (2026-09-10, demande explicite : "présente une cartouche
+           des fiches pour mieux visualiser ce qui est choisi, pas juste un bouton") — remplace
+           l'ancien résumé en simple texte (#fiche-choisie-resume) par une vraie carte (nom,
+           statut, lien de consultation, bouton Détacher), même langage visuel que la notice du
+           modèle standard juste au-dessus. -->
+      <div id="fiche-choisie-cartouche" style="display:none;margin-top:8px;padding:12px 14px;background:#F0F4FF;border:1px solid #C7D7FE;border-radius:10px;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <span style="font-size:20px;flex-shrink:0;">📝</span>
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:#1B3A6B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="fiche-choisie-nom"></div>
+            <div style="font-size:11.5px;color:#64748B;" id="fiche-choisie-statut"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <a id="fiche-choisie-voir" href="#" target="_blank" style="font-size:11.5px;color:#2563EB;align-self:center;">👁 Voir</a>
+          <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:4px 10px;color:#dc2626;border-color:#FCA5A5;" onclick="detacherFiche()">✕ Détacher</button>
+        </div>
+      </div>
       <div id="fiche-picker-panel" style="display:none;margin-top:8px;padding:12px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
         <div id="fiche-picker-liste" style="font-size:13px;color:var(--muted);">Chargement…</div>
         <a href="inscriptions-admin.html" target="_blank" style="display:inline-block;margin-top:10px;font-size:12.5px;color:#2563EB;">➕ Créer une nouvelle fiche →</a>
@@ -542,7 +559,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 document.getElementById('btn-creer').addEventListener('click', async () => {
   document.getElementById('modal-bg').classList.add('open');
   ficheChoisie = null;
-  document.getElementById('fiche-choisie-resume').textContent = '';
+  document.getElementById('fiche-choisie-cartouche').style.display = 'none';
   document.getElementById('fiche-picker-panel').style.display = 'none';
   try {
     const { fiche } = await api('GET', '/insc/modele-standard');
@@ -581,17 +598,27 @@ document.getElementById('btn-fiche-inscription').addEventListener('click', async
     liste.innerHTML = fiches.map(f => `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #E2E8F0;">
         <span>${esc(f.nom)} <span style="color:#94A3B8;font-size:11.5px;">(${esc(f.statut||'brouillon')})</span></span>
-        <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:4px 10px;" onclick="choisirFiche(${f.id},'${esc(f.nom).replace(/'/g,"\\'")}')">${ficheChoisie && ficheChoisie.id===f.id ? '✅ Choisie' : 'Choisir'}</button>
+        <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:4px 10px;" onclick="choisirFiche(${f.id},'${esc(f.nom).replace(/'/g,"\\'")}','${esc(f.statut||'brouillon')}')">${ficheChoisie && ficheChoisie.id===f.id ? '✅ Choisie' : 'Choisir'}</button>
       </div>`).join('');
   } catch (e) { liste.innerHTML = `<p style="margin:0;color:#dc2626;">Erreur de chargement.</p>`; }
 });
-window.choisirFiche = function(id, nom) {
+window.choisirFiche = function(id, nom, statut) {
   ficheChoisie = { id, nom };
-  document.getElementById('fiche-choisie-resume').textContent = '📝 ' + nom;
+  document.getElementById('fiche-choisie-nom').textContent = nom;
+  document.getElementById('fiche-choisie-statut').textContent = statut ? statut.charAt(0).toUpperCase() + statut.slice(1) : '';
+  document.getElementById('fiche-choisie-voir').href = 'inscriptions-admin.html?fiche=' + id;
+  document.getElementById('fiche-choisie-cartouche').style.display = 'flex';
   document.getElementById('fiche-picker-panel').style.display = 'none';
   // Mutuellement exclusif avec le modèle standard, voir commentaire ci-dessus.
   const modele = document.getElementById('e-appliquer-modele');
   if (modele) modele.checked = false;
+};
+/* Détacher (2026-09-10, demande explicite) : retire la fiche choisie sans en reproposer une
+   autre automatiquement — l'utilisateur peut soit recocher "Appliquer ma fiche standard" (si
+   proposée plus haut) soit rouvrir "📝 Fiche d'inscription" pour en choisir une autre. */
+window.detacherFiche = function() {
+  ficheChoisie = null;
+  document.getElementById('fiche-choisie-cartouche').style.display = 'none';
 };
 
 /* ══════════════════════════════════════════
