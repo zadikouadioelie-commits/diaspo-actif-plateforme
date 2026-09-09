@@ -210,7 +210,14 @@ body {
 
 /* ─── FORMULAIRES MOBILE-FIRST ───────────────────────────────────── */
 /* Taille minimale des inputs pour le confort tactile */
-input, select, textarea,
+/* :not([type=checkbox]):not([type=radio]) — sans cette exclusion, appearance:none retire le
+   rendu natif de TOUTE case à cocher/bouton radio du site sans jamais lui redonner de visuel
+   de remplacement (aucun ::before/::after ici, cette règle vise les champs texte) : la case
+   reste cliquable mais totalement invisible. Bug réel trouvé sur inscriptions-admin.html
+   ("Validation automatique", "Activer la liste d'attente") — signalé à tort comme des boutons
+   manquants alors qu'ils existaient, invisibles ; affecte potentiellement toute case à cocher
+   du site sans style personnalisé propre par-dessus cette règle générique. */
+input:not([type=checkbox]):not([type=radio]), select, textarea,
 .da-input, .da-select, .da-textarea,
 .geo-input, .chat-input input,
 .auth-form-card input, .auth-form-card select,
