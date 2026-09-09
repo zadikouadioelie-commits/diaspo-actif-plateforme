@@ -1783,6 +1783,11 @@ const MIGRATIONS = [
   // Affichage public des membres, choisi par l'association (incrément 6) : 'tous' (défaut,
   // comportement historique inchangé) / 'dirigeants' / 'nombre' / 'masque'.
   ["initiatives", "affichage_membres TEXT DEFAULT 'tous'"],
+  // Demande d'affiliation à l'initiative du côté du compte utilisateur (2026-09-09) :
+  // distingue qui a lancé la relation. 'invitation' (défaut, comportement historique
+  // inchangé) = l'initiative a invité le compte. 'demande' = le compte a lui-même demandé
+  // à être affilié, en attente d'acceptation/refus par le responsable de l'initiative.
+  ["initiative_membres", "origine TEXT DEFAULT 'invitation'"],
   // Liste de diffusion générale "Tous les membres" (2026-08-08) : alimentée à la fois par le
   // module Adhésions (formules payantes) et par la demande d'adhésion simple (sans formule),
   // pour que les deux chemins nourrissent la même fiche Réseau Pro — jamais deux contacts

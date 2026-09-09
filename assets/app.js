@@ -454,6 +454,9 @@ const NOTIF_ICONS = {
   affiliation_refusee: "🚫",
   affiliation_fonction_modifiee: "🔗",
   affiliation_terminee: "🔗",
+  affiliation_demandee: "📥",
+  affiliation_demande_acceptee: "🤝",
+  affiliation_demande_refusee: "🚫",
   initiative_expansion: "🌍",
   responsable_a_revalider: "🪪",
   responsable_verifie: "✅",
@@ -1622,6 +1625,7 @@ function renderInitiativeCard(it){
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
+        ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); demanderAffiliation(${it.id}, this)">🔗 Demander une affiliation</button>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 Événements</button>` : ''}
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
@@ -1747,6 +1751,24 @@ async function demanderAdhesion(initiativeId, btn){
   }
 }
 window.demanderAdhesion = demanderAdhesion;
+
+/* ── Bouton "Demander une affiliation" — cartouches Annuaire (initiatives). Sens inverse du
+   module Affiliation existant (dashboard-initiative.html) : ici c'est le compte qui sollicite
+   l'initiative pour être identifié comme membre, pas l'initiative qui invite. Même comportement
+   que demanderAdhesion() ci-dessus : le bouton passe en "Demande envoyée" après l'envoi. */
+async function demanderAffiliation(initiativeId, btn){
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await api('POST', `/initiatives/${initiativeId}/demande-affiliation`);
+    if (btn) { btn.textContent = '⏳ Demande envoyée'; btn.style.opacity = '.8'; }
+    if (typeof showToast === 'function') showToast("✅ Demande d'affiliation envoyée !");
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔗 Demander une affiliation'; }
+    alert(e.message || "Erreur lors de l'envoi de la demande.");
+  }
+}
+window.demanderAffiliation = demanderAffiliation;
 
 function populateSelect(id, values){
   const sel = document.getElementById(id);

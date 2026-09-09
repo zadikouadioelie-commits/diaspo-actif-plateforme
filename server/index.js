@@ -10305,7 +10305,7 @@ route("GET", "/api/initiatives/:id/membres", async (req, res, params) => {
      n'avait jamais été exercée jusqu'ici (jamais branchée à une interface), le bug était
      invisible. Alias conservé pour ne pas changer la forme de la réponse. */
   const membres = await db.prepare(`
-    SELECT im.id, im.user_id, im.fonction, im.statut, im.created_at,
+    SELECT im.id, im.user_id, im.fonction, im.statut, im.message, im.origine, im.created_at,
            u.nom, u.prenom, u.email, u.photo_url AS avatar_url, u.role
     FROM initiative_membres im
     JOIN users u ON u.id = im.user_id
@@ -10313,6 +10313,35 @@ route("GET", "/api/initiatives/:id/membres", async (req, res, params) => {
     ORDER BY im.created_at ASC
   `).all(params.id);
   sendJSON(res, 200, { membres });
+});
+
+/* Demande d'affiliation lancée par le compte utilisateur lui-même (2026-09-09, bouton
+   "Demander une affiliation" sur les cartouches initiatives de l'annuaire) — sens inverse de
+   la route d'invitation ci-dessous : ici c'est le compte qui sollicite l'initiative, pas
+   l'inverse. Même table `initiative_membres`, distinguée par `origine='demande'` : décide qui
+   a le droit d'accepter/refuser plus bas dans PUT /membres/:userId. */
+route("POST", "/api/initiatives/:id/demande-affiliation", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (init.owner_user_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas demander une affiliation à votre propre initiative." });
+  try {
+    await db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, statut, origine) VALUES (?, ?, 'en_attente', 'demande')").run(params.id, user.id);
+  } catch(e) {
+    if (e.message.includes("UNIQUE")) return sendJSON(res, 409, { error: "Vous avez déjà une affiliation ou une demande en cours avec cette initiative." });
+    throw e;
+  }
+  if (init.owner_user_id) {
+    try {
+      await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
+        init.owner_user_id, 'affiliation_demandee',
+        `Nouvelle demande d'affiliation`,
+        `${user.prenom || ''} ${user.nom || ''} souhaite rejoindre officiellement « ${init.nom} » en tant que membre affilié.`,
+        JSON.stringify({ initiative_id: params.id, user_id: user.id, lien: 'dashboard-initiative.html#affiliation' }));
+    } catch(_) {}
+  }
+  sendJSON(res, 201, { ok: true });
 });
 
 route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => {
@@ -10349,12 +10378,33 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   const membre = await db.prepare("SELECT * FROM initiative_membres WHERE initiative_id = ? AND user_id = ?").get(params.id, params.userId);
   if (!membre) return sendJSON(res, 404, { error: "Membre introuvable." });
-  /* Accepter/refuser : seul le membre concerné peut changer son statut */
+  /* Accepter/refuser : selon qui a lancé la relation (membre.origine, 2026-09-09).
+     - 'invitation' (l'initiative a invité ce compte, comportement historique) : seul le
+       membre concerné peut changer son statut, et le responsable est notifié du résultat.
+     - 'demande' (le compte a lui-même demandé l'affiliation) : c'est l'inverse, seul le
+       responsable de l'initiative peut accepter/refuser, et c'est le demandeur qui est
+       notifié du résultat. */
   if (statut && ['accepte','refuse'].includes(statut)) {
-    if (user.id !== parseInt(params.userId)) return sendJSON(res, 403, { error: "Vous ne pouvez modifier que votre propre affiliation." });
+    const estDemande = membre.origine === 'demande';
+    const autorise = estDemande
+      ? (init.owner_user_id === user.id || user.role === 'administrateur')
+      : (user.id === parseInt(params.userId));
+    if (!autorise) return sendJSON(res, 403, { error: estDemande ? "Seul le responsable de l'initiative peut répondre à cette demande." : "Vous ne pouvez modifier que votre propre affiliation." });
     await db.prepare("UPDATE initiative_membres SET statut = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(statut, params.id, params.userId);
     const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
-    if (statut === 'refuse') {
+    if (estDemande) {
+      const msgs = {
+        accepte: `Votre demande d'affiliation à « ${init.nom} » a été acceptée. Vous êtes désormais membre affilié.`,
+        refuse:  `Votre demande d'affiliation à « ${init.nom} » a été déclinée.`,
+      };
+      try {
+        await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
+          parseInt(params.userId), statut === 'accepte' ? 'affiliation_demande_acceptee' : 'affiliation_demande_refusee',
+          `Affiliation ${statut === 'accepte' ? 'acceptée' : 'déclinée'}`,
+          msgs[statut],
+          JSON.stringify({ initiative_id: params.id }));
+      } catch(_) {}
+    } else if (statut === 'refuse') {
       try {
         await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
           init.owner_user_id, 'affiliation_refusee',

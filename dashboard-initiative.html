@@ -1763,6 +1763,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
       </div>
 
+      <!-- Demandes reçues des comptes eux-mêmes (2026-09-09, bouton "Demander une affiliation"
+           sur les cartouches Annuaire) — sens inverse des invitations ci-dessous : ici c'est le
+           compte qui sollicite l'initiative, le responsable doit accepter ou décliner. Placée en
+           premier : c'est la seule liste qui attend une action du responsable. -->
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin:0 0 12px;">📥 Affiliations demandées</h3>
+        <div id="affiliation-list-demandes"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+      </div>
+
       <!-- 3 listes distinctes par statut (2026-09-09, demande explicite), chaque compte affiché
            dans une petite cartouche identique (voir affCartoucheHtml() / renderAffiliation()). -->
       <div class="card" style="margin-bottom:20px;">
@@ -8729,11 +8738,15 @@ function affCartoucheHtml(m) {
     : `<div style="width:38px;height:38px;border-radius:50%;background:var(--navy,#0D2B4E);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none;">${initiales}</div>`;
   const actions = m.statut === 'accepte' ? `
         <div style="display:flex;gap:6px;flex:none;">
-          <button class="btn btn-outline btn-sm" onclick="affEditFonction(${m.user_id}, ${JSON.stringify(m.fonction||'')})">Modifier le poste</button>
-          <button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444;" onclick="affTerminer(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom))})">Mettre fin</button>
+          <button class="btn btn-outline btn-sm" onclick="affEditFonction(${m.user_id}, ${JSON.stringify(m.fonction||'').replace(/"/g,'&quot;')})">Modifier le poste</button>
+          <button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444;" onclick="affTerminer(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom)).replace(/"/g,'&quot;')})">Mettre fin</button>
+        </div>` : (m.statut === 'en_attente' && m.origine === 'demande') ? `
+        <div style="display:flex;gap:6px;flex:none;">
+          <button class="btn btn-orange btn-sm" onclick="affAccepterDemande(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom)).replace(/"/g,'&quot;')})">Accepter</button>
+          <button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444;" onclick="affRefuserDemande(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom)).replace(/"/g,'&quot;')})">Décliner</button>
         </div>` : m.statut === 'en_attente' ? `
         <div style="display:flex;gap:6px;flex:none;">
-          <button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444;" onclick="affTerminer(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom))}, true)">Annuler l'invitation</button>
+          <button class="btn btn-outline btn-sm" style="color:#EF4444;border-color:#EF4444;" onclick="affTerminer(${m.user_id}, ${JSON.stringify(assoEsc(m.prenom+' '+m.nom)).replace(/"/g,'&quot;')}, true)">Annuler l'invitation</button>
         </div>` : '';
   return `
       <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;flex-wrap:wrap;">
@@ -8749,22 +8762,30 @@ function affCartoucheHtml(m) {
 }
 async function renderAffiliation() {
   const zones = {
+    demandes:   document.getElementById('affiliation-list-demandes'),
     en_attente: document.getElementById('affiliation-list-attente'),
     accepte:    document.getElementById('affiliation-list-accepte'),
     refuse:     document.getElementById('affiliation-list-refuse'),
   };
-  if (!window.__vitrineInitId) { zones.en_attente.innerHTML = '<div class="notice">Créez votre initiative pour utiliser ce module.</div>'; return; }
+  if (!window.__vitrineInitId) { zones.demandes.innerHTML = '<div class="notice">Créez votre initiative pour utiliser ce module.</div>'; return; }
   Object.values(zones).forEach(z => z.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>');
   try {
     const { membres } = await api('GET', `/initiatives/${window.__vitrineInitId}/membres`);
+    // "Affiliations demandées" (origine='demande', en attente) : à part, car c'est le
+    // responsable qui doit répondre, contrairement aux 3 listes ci-dessous où l'action
+    // attendue vient de l'autre côté (le compte invité, pas le responsable).
+    const demandes = membres.filter(m => m.statut === 'en_attente' && m.origine === 'demande');
+    zones.demandes.innerHTML = demandes.length
+      ? `<div style="display:grid;gap:10px;">${demandes.map(affCartoucheHtml).join('')}</div>`
+      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Aucune demande en attente.</div>`;
     const VIDE = { en_attente: 'Aucune invitation en attente.', accepte: 'Aucun membre affilié pour l\'instant.', refuse: 'Aucune invitation refusée.' };
     ['en_attente','accepte','refuse'].forEach(statut => {
-      const liste = membres.filter(m => m.statut === statut);
+      const liste = membres.filter(m => m.statut === statut && !(statut === 'en_attente' && m.origine === 'demande'));
       zones[statut].innerHTML = liste.length
         ? `<div style="display:grid;gap:10px;">${liste.map(affCartoucheHtml).join('')}</div>`
         : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">${VIDE[statut]}</div>`;
     });
-  } catch (e) { zones.en_attente.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
+  } catch (e) { zones.demandes.innerHTML = '<div class="notice">Erreur de chargement.</div>'; }
 }
 
 /* Suggestions "commençant par les contacts du compte" (demande utilisateur, 2026-08-25) :
@@ -8826,6 +8847,21 @@ window.affEditFonction = async function(userId, fonctionActuelle) {
   if (nouvelle === null) return;
   try {
     await api('PUT', `/initiatives/${window.__vitrineInitId}/membres/${userId}`, { fonction: nouvelle.trim() });
+    renderAffiliation();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+};
+
+window.affAccepterDemande = async function(userId, nom) {
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/membres/${userId}`, { statut: 'accepte' });
+    renderAffiliation();
+  } catch (e) { alert(e.message || 'Erreur.'); }
+};
+
+window.affRefuserDemande = async function(userId, nom) {
+  if (!confirm(`Décliner la demande d'affiliation de ${nom} ?`)) return;
+  try {
+    await api('PUT', `/initiatives/${window.__vitrineInitId}/membres/${userId}`, { statut: 'refuse' });
     renderAffiliation();
   } catch (e) { alert(e.message || 'Erreur.'); }
 };
