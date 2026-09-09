@@ -29422,13 +29422,33 @@ ${jsonLd}
          part ("Compte Officiel"), jamais en gonflant le score habituel avec de fausses
          publications/abonnés/accréditations/rencontre : ce serait un vrai faux signal de
          confiance, pas ce qui est fait ici. */
-      if (user.role === 'administrateur') {
+      /* Deuxième compte officiel (2026-09-09, demande explicite) : le compte administrateur
+         (ci-dessus) N'EST PAS le seul — l'initiative "Diaspo'Actif Officiel" elle-même
+         (dashboard-initiative.html, compte "Zadi Initiative") est tout aussi officielle, juste
+         portée par un compte de rôle 'initiative' plutôt que 'administrateur'. Réutilise
+         getInitiativeOfficielleId(), déjà la source de vérité pour "quelle initiative est
+         officielle" ailleurs sur la plateforme (Premium à vie, abonnement automatique au
+         signup...), plutôt que de re-coder une deuxième détection. */
+      let estCompteOfficielInitiative = false;
+      if (user.role !== 'administrateur') {
+        try {
+          const officielleId = await getInitiativeOfficielleId();
+          if (officielleId) {
+            const initOfficielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+            estCompteOfficielInitiative = Number(initOfficielle?.owner_user_id) === Number(userId);
+          }
+        } catch (e) {}
+      }
+
+      if (user.role === 'administrateur' || estCompteOfficielInitiative) {
         const resultatOfficiel = {
           score: 100, points: 100, sur: 100,
           detail: [{ cle:'officiel', icon:'🛡️', label:'Compte Officiel Diaspo’Actif', pts:100, max:100, applicable:true,
-            aide: "Ce compte est le compte administrateur de la plateforme elle-même — les critères habituels (ancienneté, activité, rencontre avec un agent Diaspo'Actif...) ne s'appliquent pas à Diaspo'Actif.", action: null }],
+            aide: user.role === 'administrateur'
+              ? "Ce compte est le compte administrateur de la plateforme elle-même — les critères habituels (ancienneté, activité, rencontre avec un agent Diaspo'Actif...) ne s'appliquent pas à Diaspo'Actif."
+              : "Ce compte porte l'initiative officielle Diaspo'Actif elle-même — les critères habituels ne s'appliquent pas à Diaspo'Actif.", action: null }],
           label: 'Compte Officiel', couleur: '#0D2B4E',
-          sens: "Compte administrateur officiel de la plateforme Diaspo'Actif.",
+          sens: "Compte officiel de la plateforme Diaspo'Actif.",
           color: '#0D2B4E',
         };
         try {
