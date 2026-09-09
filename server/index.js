@@ -29413,6 +29413,32 @@ ${jsonLd}
         FROM users WHERE id=?`).get(userId);
       if (!user) return { score: 0, detail: [], label: 'Inconnu', sur: 0, couleur: '#D1D5DB' };
 
+      /* Compte officiel de la plateforme (2026-09-09, demande explicite, discussion actée avec
+         l'utilisateur) : le barème habituel suppose un compte TIERS dont la confiance se
+         construit progressivement (ancienneté, activité, accréditations, rencontre avec un
+         agent Diaspo'Actif...). Il ne s'applique pas au compte administrateur de Diaspo'Actif
+         lui-même — on ne peut par exemple pas "rencontrer Diaspo'Actif" quand on EST Diaspo'Actif
+         (remarque exacte de l'utilisateur). Affiché de façon transparente comme un statut à
+         part ("Compte Officiel"), jamais en gonflant le score habituel avec de fausses
+         publications/abonnés/accréditations/rencontre : ce serait un vrai faux signal de
+         confiance, pas ce qui est fait ici. */
+      if (user.role === 'administrateur') {
+        const resultatOfficiel = {
+          score: 100, points: 100, sur: 100,
+          detail: [{ cle:'officiel', icon:'🛡️', label:'Compte Officiel Diaspo’Actif', pts:100, max:100, applicable:true,
+            aide: "Ce compte est le compte administrateur de la plateforme elle-même — les critères habituels (ancienneté, activité, rencontre avec un agent Diaspo'Actif...) ne s'appliquent pas à Diaspo'Actif.", action: null }],
+          label: 'Compte Officiel', couleur: '#0D2B4E',
+          sens: "Compte administrateur officiel de la plateforme Diaspo'Actif.",
+          color: '#0D2B4E',
+        };
+        try {
+          await db.prepare(`INSERT OR REPLACE INTO trust_cache (user_id,score,detail_json,label,computed_at) VALUES (?,?,?,?,datetime('now'))`)
+            .run(userId, 100, JSON.stringify(resultatOfficiel), 'Compte Officiel');
+          await db.prepare(`UPDATE users SET trust_score=100, trust_computed_at=datetime('now') WHERE id=?`).run(userId);
+        } catch (e) {}
+        return resultatOfficiel;
+      }
+
       const init = await db.prepare(`SELECT numero_immatriculation, organisation_verifiee FROM initiatives WHERE owner_user_id=?`).get(userId);
       /* Les deux critères de structure ne concernent que les comptes qui portent une
          initiative. Un particulier ne les verra même pas : une ligne qu'on ne peut
