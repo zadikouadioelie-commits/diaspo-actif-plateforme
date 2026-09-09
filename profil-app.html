@@ -941,7 +941,7 @@ html, body { overflow-x:clip; }
          choisie (voir applyTheme/renderBanner). Remplace l'ancien bouton "🎨 Thème" caché
          parmi les actions du profil, jamais très visible. -->
     <div id="theme-swatches" class="p-theme-swatches-banner"></div>
-    <button class="p-banner-edit" onclick="pickBannerFile()">📷 Modifier la bannière</button>
+    <button class="p-banner-edit" onclick="repositionBanner()">📷 Modifier la bannière</button>
   </div>
 </div>
 <input type="file" id="banner-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleBannerFile(this)">
@@ -1652,6 +1652,26 @@ async function handleBannerFile(input) {
     profil.banner_url = url;
     renderBanner();
   } catch(err) { alert('Erreur lors du chargement de la bannière : ' + err.message); }
+}
+
+/* "Modifier la bannière" (2026-09-09, demande explicite) : réajuster le cadrage/zoom de la
+   PHOTO DÉJÀ EN PLACE, sans repasser par le sélecteur de fichier — distinct de "Changer la
+   bannière" (pickBannerFile) qui choisit une toute nouvelle image. On récupère l'image
+   existante en Blob (fetch, jamais de tainting canvas : le blob: URL qui en résulte appartient
+   à notre propre origine, peu importe que le CDN d'origine soit cross-origin) puis on relance
+   le même recadreur qu'à l'upload initial, déjà pensé pour glisser/zoomer. */
+async function repositionBanner() {
+  if (!isOwn) return;
+  if (!profil.banner_url) { pickBannerFile(); return; } // rien à réajuster, propose d'en choisir une
+  try {
+    const blob = await fetch(profil.banner_url).then(r => r.blob());
+    const cropped = await openImageCropper(blob, { shape: 'rect', aspect: 16/6, outW: 2000, outH: 750 });
+    if (!cropped) return; // annulé par l'utilisateur
+    const url = await uploadMedia(cropped, 'banner');
+    await api('PUT', '/profil', { banner_url: url });
+    profil.banner_url = url;
+    renderBanner();
+  } catch(err) { alert('Erreur lors du réajustement de la bannière : ' + err.message); }
 }
 
 async function removeBanner() {
