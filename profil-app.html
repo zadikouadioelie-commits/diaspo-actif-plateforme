@@ -4104,7 +4104,13 @@ function isCatalogueCoverVideo(url) {
 let _catalogueCoverUrl = null;
 function openCatalogueModal(catalogueId) {
   const editing = !!catalogueId;
-  const cat = editing ? _cataloguesVitrine.find(c => c.id === catalogueId) : null;
+  /* Number() sur les deux côtés (2026-09-10, bug trouvé par exécution réelle : "modifier" un
+     catalogue ouvrait le formulaire vide, texte et photo perdus) — même cause que le bug
+     BIGSERIAL déjà documenté ailleurs sur ce projet : Postgres renvoie souvent un id en chaîne,
+     alors que ${cat.id} interpolé dans l'attribut onclick (voir le bouton ✏️ plus bas) redevient
+     un nombre JS. c.id === catalogueId comparait donc "5" === 5 → jamais vrai → cat toujours
+     introuvable, le formulaire s'affichait donc systématiquement vide même en édition. */
+  const cat = editing ? _cataloguesVitrine.find(c => Number(c.id) === Number(catalogueId)) : null;
   _catalogueCoverUrl = cat ? cat.image_url : null;
 
   const overlay = document.createElement('div');
