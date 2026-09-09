@@ -454,7 +454,11 @@ function renderOverview() {
         </div>
       </div>
     </div>
-    ${renderMedias()}`;
+    ${renderMedias()}
+    ${state.editionInfosOuverte ? `
+    <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+      <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 24px; border-radius:8px; cursor:pointer;" data-action="enregistrerInfos">Enregistrer</button>
+    </div>` : ''}`;
 }
 
 // ---- Informations générales & photo de couverture (édition) ----
