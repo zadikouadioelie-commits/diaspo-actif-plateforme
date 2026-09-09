@@ -393,13 +393,18 @@ const LANGUES = [
   { code: "hi", label: "हिंदी" }
 ];
 
+/* actualites : renommé "Projets diasporas" (2026-09-10, demande explicite) — cette clé pilote
+   le libellé du lien de nav dans TOUTES les langues via applyTranslations() (voir assets/app.js),
+   qui réécrit le texte de <a href="actualites.html"> au chargement de chaque page : modifier le
+   texte statique dans les fichiers HTML seul ne suffit pas, il est systématiquement remplacé
+   par la valeur d'ici pour la langue active. */
 const NAV_LABELS = {
-  fr: { accueil:"Accueil", annuaire:"Annuaire", fil:"Fil d'actualité", actualites:"Actualités", evenements:"Événements" },
-  en: { accueil:"Home", annuaire:"Directory", fil:"News Feed", actualites:"News", evenements:"Events" },
-  es: { accueil:"Inicio", annuaire:"Directorio", fil:"Novedades", actualites:"Noticias", evenements:"Eventos" },
-  de: { accueil:"Start", annuaire:"Verzeichnis", fil:"Newsfeed", actualites:"Nachrichten", evenements:"Veranstaltungen" },
-  zh: { accueil:"首页", annuaire:"名录", fil:"动态", actualites:"新闻", evenements:"活动" },
-  hi: { accueil:"होम", annuaire:"निर्देशिका", fil:"न्यूज़ फ़ीड", actualites:"समाचार", evenements:"कार्यक्रम" }
+  fr: { accueil:"Accueil", annuaire:"Annuaire", fil:"Fil d'actualité", actualites:"Projets diasporas", evenements:"Événements" },
+  en: { accueil:"Home", annuaire:"Directory", fil:"News Feed", actualites:"Diaspora Projects", evenements:"Events" },
+  es: { accueil:"Inicio", annuaire:"Directorio", fil:"Novedades", actualites:"Proyectos de la diáspora", evenements:"Eventos" },
+  de: { accueil:"Start", annuaire:"Verzeichnis", fil:"Newsfeed", actualites:"Diaspora-Projekte", evenements:"Veranstaltungen" },
+  zh: { accueil:"首页", annuaire:"名录", fil:"动态", actualites:"侨民项目", evenements:"活动" },
+  hi: { accueil:"होम", annuaire:"निर्देशिका", fil:"न्यूज़ फ़ीड", actualites:"प्रवासी परियोजनाएं", evenements:"कार्यक्रम" }
 };
 
 const ROLE_LABELS = {

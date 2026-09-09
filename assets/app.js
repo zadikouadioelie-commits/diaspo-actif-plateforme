@@ -2568,18 +2568,26 @@ async function initDashboardUtilisateur(){
 }
 
 /* ---------- Actualités / Événements ---------- */
-function initActualites(){
+/* Branché sur la vraie route /api/actualites (2026-09-10, demande explicite : "ces informations
+   sont fictives, retire-les") — remplace l'ancien tableau statique ACTUALITES (assets/data.js),
+   qui n'avait jamais de lien avec la base et affichait toujours les mêmes exemples de démo,
+   même en production. Aucune route de création n'existe encore pour cette table : l'état vide
+   est donc le cas normal aujourd'hui, pas une erreur. */
+async function initActualites(){
   const el = document.getElementById("actu-list");
-  if(!el || typeof ACTUALITES === "undefined") return;
-  el.innerHTML = ACTUALITES.map(a=>`
-    <div class="card" style="margin-bottom:14px;">
-      <div class="flex-between">
-        <h3>${a.titre}</h3>
-        <span style="color:var(--muted);font-size:12px;">${a.date}</span>
-      </div>
-      <p>${a.resume}</p>
-      <p style="margin-top:8px;color:var(--orange);font-weight:700;font-size:12.5px;">${a.source}</p>
-    </div>`).join("");
+  if(!el) return;
+  try{
+    const { actualites } = await api("GET", "/actualites");
+    el.innerHTML = actualites.length ? actualites.map(a=>`
+      <div class="card" style="margin-bottom:14px;">
+        <div class="flex-between">
+          <h3>${escH(a.titre)}</h3>
+          <span style="color:var(--muted);font-size:12px;">${escH(a.date_pub||"")}</span>
+        </div>
+        <p>${escH(a.resume||"")}</p>
+        <p style="margin-top:8px;color:var(--orange);font-weight:700;font-size:12.5px;">${escH(a.source||"")}</p>
+      </div>`).join("") : `<div class="empty">Aucun projet publié pour l'instant.</div>`;
+  } catch(e){ el.innerHTML = `<div class="empty">Aucun projet publié pour l'instant.</div>`; }
 }
 function initEvenements(){
   const el = document.getElementById("evt-list");

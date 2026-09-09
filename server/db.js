@@ -277,6 +277,12 @@ db.exec(`
     owner_user_id INTEGER,
     created_at TEXT DEFAULT (datetime('now'))
   );
+  /* Purge des lignes de démonstration (2026-09-10, demande explicite : "ces informations sont
+     fictives, retire-les") — aucune route de création n'existe pour cette table (confirmé par
+     recherche dans server/index.js) : les seules lignes jamais insérées viennent de server/seed.js,
+     jamais d'un vrai utilisateur. Vide la table à chaque démarrage plutôt qu'un DELETE ponctuel
+     manuel sur la base de production — self-healing, sans effet dès la première exécution. */
+  DELETE FROM actualites;
 
   CREATE TABLE IF NOT EXISTS evenements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
