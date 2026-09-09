@@ -3376,7 +3376,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* ══ MODULE ÉVÉNEMENTS INLINE ══ */
   const EVT_STATUTS = {brouillon:'🟡 Brouillon', publie:'🟢 Publié', ferme:'🔴 Fermé', archive:'⬛ Archivé'};
   let initEvtEditingId = null;
-  let initEvtCoverB64 = null, initEvtGallery = [null,null,null,null], initEvtPdfB64 = null, initEvtPdfNom = null;
+  let initEvtCoverB64 = null, initEvtGallery = [null], initEvtPdfB64 = null, initEvtPdfNom = null;
   let initEvtPdfExtra = [], initEvtProgrammeFichierB64 = null, initEvtProgrammeFichierNom = null;
   /* Malgré leur nom hérité (`...B64`), ces variables contiennent désormais des URL Bunny CDN
      retournées par uploadMedia() — plus jamais du base64 embarqué dans le JSON de l'événement
@@ -3511,7 +3511,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.openInitEvtModal = async function(id) {
     if (!id && !window._daPremiumInitiative && !window.daBypassActive?.('evenements')) { openPremiumUpsell('evenements'); return; }
     initEvtEditingId = id || null;
-    initEvtCoverB64 = null; initEvtGallery = [null,null,null,null]; initEvtPdfB64 = null; initEvtPdfNom = null;
+    initEvtCoverB64 = null; initEvtGallery = [null]; initEvtPdfB64 = null; initEvtPdfNom = null;
     initEvtPdfExtra = []; initEvtProgrammeFichierB64 = null; initEvtProgrammeFichierNom = null;
     const modal = document.getElementById('init-evt-modal-bg');
     const form = document.getElementById('init-evt-form-content');
@@ -3594,73 +3594,25 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
       <input type="file" id="iev-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
 
-      <!-- GALERIE 4 PHOTOS -->
-      <div style="margin:16px 0 6px;font-size:13px;font-weight:700;color:#555;">🖼️ Galerie photos <span style="font-weight:400;color:var(--muted);">(4 max)</span></div>
-      <div style="display:flex;gap:6px;">
-        ${[0,1,2,3].map(i=>`<div id="iev-gs-${i}" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('iev-gf-${i}').click()"><span id="iev-gph-${i}" style="font-size:18px;color:#ccc;">＋</span><img id="iev-gi-${i}" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="iev-gd-${i}" onclick="event.stopPropagation();ievClearPhoto(${i})" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="iev-gf-${i}" accept="image/jpeg,image/png,image/webp" style="display:none"></div>`).join('')}
+      <!-- PHOTO SUPPLÉMENTAIRE (2026-09-09 : réduite de 4 à 1 + couverture — le reste des
+           photos/vidéos/documents vit désormais sur la fiche d'inscription liée, visible
+           automatiquement sur la fiche publique de l'événement). -->
+      <div style="margin:16px 0 6px;font-size:13px;font-weight:700;color:#555;">🖼️ Photo supplémentaire</div>
+      <div style="display:flex;gap:6px;max-width:76px;">
+        ${[0].map(i=>`<div id="iev-gs-${i}" style="flex:1;min-width:0;aspect-ratio:1;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:#FAFAFA;position:relative;" onclick="document.getElementById('iev-gf-${i}').click()"><span id="iev-gph-${i}" style="font-size:18px;color:#ccc;">＋</span><img id="iev-gi-${i}" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" alt=""><button id="iev-gd-${i}" onclick="event.stopPropagation();ievClearPhoto(${i})" style="display:none;position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;z-index:2;">×</button><input type="file" id="iev-gf-${i}" accept="image/jpeg,image/png,image/webp" style="display:none"></div>`).join('')}
       </div>
+      <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;">Besoin de plus de photos, d'une vidéo ou d'un document (programme, affiche…) ? Ajoutez-les depuis la fiche d'inscription liée à l'événement — ils s'afficheront automatiquement sur la fiche publique.</p>
 
-      <!-- VIDÉOS MP4 -->
-      <div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:#555;">🎬 Vidéos <span style="font-weight:400;color:var(--muted);">(2 max · MP4 · max 1 min)</span></div>
-      ${[1,2].map(n=>`
-      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:#FAFAFA;" id="iev-vid${n}-wrap">
-        <div style="display:flex;gap:10px;align-items:flex-start;">
-          <div id="iev-vid${n}-thumb-wrap" style="width:72px;height:52px;border-radius:6px;overflow:hidden;background:#e2e8f0;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-            ${e?.[`video${n}_thumb`] ? `<img src="${escH(e[`video${n}_thumb`])}" style="width:100%;height:100%;object-fit:cover;" alt="">` : `<span style="font-size:20px;color:#94a3b8;">🎬</span>`}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <input type="text" id="iev-video${n}-titre" value="${v(e?.[`video${n}_titre`])}" placeholder="Titre de la vidéo (facultatif)" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;margin-bottom:6px;">
-            <div style="display:flex;gap:6px;align-items:center;">
-              <button type="button" onclick="document.getElementById('iev-vf${n}').click()" style="padding:6px 12px;border:1px solid var(--orange);border-radius:6px;background:var(--card);color:#2563EB;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">${e?.[`video${n}_url`]?'🔄 Remplacer':'📁 Choisir un MP4'}</button>
-              ${e?.[`video${n}_url`]?`<span style="font-size:11px;color:#22c55e;font-weight:700;">✅ Vidéo enregistrée</span>`:'<span id="iev-vid'+n+'-name" style="font-size:11px;color:var(--muted);">Aucun fichier · max 1 min · MP4</span>'}
-            </div>
-            <div id="iev-vid${n}-progress-wrap" style="display:none;margin-top:6px;">
-              <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
-                <div id="iev-vid${n}-bar" style="height:6px;background:linear-gradient(135deg,#2563EB,#1d4ed8);width:0%;transition:width .2s;border-radius:4px;"></div>
-              </div>
-              <span id="iev-vid${n}-pct" style="font-size:11px;color:#2563EB;">0%</span>
-            </div>
-          </div>
-        </div>
-        <input type="file" id="iev-vf${n}" accept="video/mp4" style="display:none">
-        <input type="hidden" id="iev-video${n}-url" value="${v(e?.[`video${n}_url`])}">
-        <input type="hidden" id="iev-video${n}-thumb" value="${v(e?.[`video${n}_thumb`])}">
-      </div>`).join('')}
-
-      <!-- FICHE CONCEPTUELLE / PDF -->
+      <!-- FICHE CONCEPTUELLE -->
       <div style="margin:16px 0 10px;border-top:1px solid var(--border);padding-top:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
           <span style="font-size:13px;font-weight:700;color:#555;">📋 Fiche conceptuelle</span>
-          <select id="iev-pdf-acces" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;">
-            <option value="public"${e?.pdf_acces==='public'?' selected':''}>🌍 Public</option>
-            <option value="inscrits"${e?.pdf_acces==='inscrits'?' selected':''}>🎟️ Inscrits seulement</option>
-          </select>
         </div>
 
-        <!-- Onglets PDF / Fiche structurée -->
-        <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px;">
-          <button type="button" id="iev-fc-tab-pdf" onclick="ievSwitchFcTab('pdf')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;">📎 Importer un PDF</button>
-          <button type="button" id="iev-fc-tab-fiche" onclick="ievSwitchFcTab('fiche')" style="flex:1;padding:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;background:#f1f5f9;color:#64748b;">📝 Créer la fiche ici</button>
-        </div>
-
-        <!-- Panel PDF -->
-        <div id="iev-fc-panel-pdf">
-          <div id="iev-pdf-drop" style="border:2px dashed var(--border);border-radius:8px;padding:14px;cursor:pointer;background:#FAFAFA;display:flex;align-items:center;gap:10px;" onclick="document.getElementById('iev-pdf-file').click()">
-            <span style="font-size:24px;">📄</span>
-            <div>
-              <div id="iev-pdf-label" style="font-size:13px;font-weight:600;color:#334155;">${e?.pdf_nom ? '✅ '+escH(e.pdf_nom) : 'Glisser ou cliquer pour choisir un PDF'}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Max 5 Mo — visible par les participants selon l'accès choisi</div>
-            </div>
-          </div>
-          <input type="file" id="iev-pdf-file" accept="application/pdf" style="display:none">
-
-          <div id="iev-pdf-extra-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">${ievRenderPdfExtraListHTML()}</div>
-          <button type="button" onclick="ievAjouterPdfExtra()" style="margin-top:8px;padding:8px 12px;border:1px dashed var(--border);border-radius:8px;background:none;cursor:pointer;font-size:12.5px;font-weight:700;color:#2563EB;width:100%;">➕ Ajouter un autre PDF</button>
-          <input type="file" id="iev-pdf-extra-file" accept="application/pdf" style="display:none">
-        </div>
-
-        <!-- Panel Fiche structurée -->
-        <div id="iev-fc-panel-fiche" style="display:none;">
+        <!-- Panel Fiche structurée (2026-09-09 : le panel "Importer un PDF" a été retiré — les
+             documents vivent désormais sur la fiche d'inscription liée, voir ci-dessus — celui-ci
+             devient le seul panel, plus besoin d'onglets pour choisir entre les deux). -->
+        <div id="iev-fc-panel-fiche">
           <div style="display:flex;flex-direction:column;gap:10px;">
 
             <div>
@@ -3784,11 +3736,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <!-- GESTION DES INSCRIPTIONS -->
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px;">📋 Gestion des inscriptions</div>
+        <!-- "Pré-inscription obligatoire" (ID DA + DS-ID natif) retirée de ce module (2026-09-09,
+             demande explicite) : cette possibilité sera reconstruite directement dans le module
+             Fiche d'inscription plutôt que dans le module Événement. Les routes serveur natives
+             (/api/events/:id/inscription/identify, /sign, /status, /export-ics) restent en place
+             pour ne rien casser sur d'éventuels événements déjà créés avec ce mode -- seule
+             l'option de CRÉATION est retirée ici. -->
         <div style="display:flex;flex-direction:column;gap:7px;" id="iev-inscription-radios">
           ${[
             ['libre','📭 Événement sans inscription','Participation libre, aucun suivi'],
             ['facultative','📝 Pré-inscription facultative','Facultative — les participants peuvent s\'inscrire en avance'],
-            ['obligatoire','✅ Pré-inscription obligatoire','Requiert une inscription avec ID DA + DS-ID'],
             ['validation','🔍 Inscription avec validation','L\'organisateur valide chaque demande'],
             ['lien_externe','🔗 Lien d\'inscription externe','Vous avez déjà votre propre liste (Google Forms…)'],
           ].map(([val,lbl,desc])=>`
@@ -3816,10 +3773,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <input type="url" id="iev-lien-externe-url" value="${v(e?.inscription_lien_externe)}" placeholder="https://forms.gle/…" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #93C5FD;border-radius:6px;font-size:13px;font-family:inherit;">
           <div style="font-size:11px;color:var(--muted);margin-top:6px;">Un bouton « S'inscrire » sur la page publique de l'événement ouvrira ce lien dans un nouvel onglet — aucun suivi côté Diaspo'Actif pour ce mode.</div>
         </div>
-        <div id="iev-daid-warning" style="display:none;margin-top:10px;background:rgba(255,107,0,0.05);border:1px solid rgba(255,107,0,0.2);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.5;">
-          💡 Avec l'inscription obligatoire, les participants s'identifient avec leur <strong>Identifiant Diaspo'Actif (ID DA)</strong> et signent avec leur <strong>Code de Sécurité (DS-ID)</strong>. Chaque inscription est tracée et sécurisée.
-        </div>
-
         <!-- FICHE D'INSCRIPTION PERSONNALISÉE (module Formulaires & Inscriptions, 2026-09-09) —
              remplace le parcours ID DA + DS-ID ci-dessus pour "obligatoire"/"validation" (demande
              explicite : ne pas superposer les deux méthodes). Rempli/affiché dynamiquement via
@@ -3889,8 +3842,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         drop.innerHTML = `<div id="iev-cover-img-wrap"><span id="iev-cover-ph" style="font-size:13px;color:var(--muted);">📷 Cliquer pour choisir · JPG PNG WebP · max 2 Mo</span></div>`;
       } finally { initEvtUploadsPending--; }
     });
-    // Galerie
-    for(let i=0;i<4;i++){
+    // Galerie (1 seul emplacement, voir plus haut)
+    for(let i=0;i<1;i++){
       document.getElementById('iev-gf-'+i).addEventListener('change', async ev => {
         const file = ev.target.files[0]; if(!file) return;
         initEvtUploadsPending++;
@@ -3987,63 +3940,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       });
     });
 
-    // ── Vidéos MP4 upload
-    for(const n of [1,2]){
-      document.getElementById(`iev-vf${n}`).addEventListener('change', ev => {
-        const file = ev.target.files[0]; if(!file) return;
-        if(!file.type.includes('mp4') && !file.name.endsWith('.mp4')){showToast('Format MP4 uniquement.','warning');return;}
-        // Vérifier durée via HTMLVideoElement
-        const blobUrl = URL.createObjectURL(file);
-        const tmpVid = document.createElement('video');
-        tmpVid.src = blobUrl;
-        tmpVid.onloadedmetadata = async () => {
-          if(tmpVid.duration > 62){
-            URL.revokeObjectURL(blobUrl);
-            showToast(`Vidéo ${n} trop longue (max 1 minute, durée : ${Math.round(tmpVid.duration)}s).`,'warning');
-            return;
-          }
-          // Générer thumbnail à la 1ère seconde
-          tmpVid.currentTime = Math.min(1, tmpVid.duration * 0.1);
-          tmpVid.onseeked = () => {
-            try {
-              const c = document.createElement('canvas'); c.width=160; c.height=90;
-              c.getContext('2d').drawImage(tmpVid, 0, 0, 160, 90);
-              const thumbB64 = c.toDataURL('image/jpeg', 0.7);
-              document.getElementById(`iev-video${n}-thumb`).value = thumbB64;
-              const tw = document.getElementById(`iev-vid${n}-thumb-wrap`);
-              if(tw) tw.innerHTML = `<img src="${thumbB64}" style="width:100%;height:100%;object-fit:cover;" alt="">`;
-            } catch(_){}
-            URL.revokeObjectURL(blobUrl);
-          };
-          // Upload XHR avec progress
-          const pw = document.getElementById(`iev-vid${n}-progress-wrap`);
-          const bar = document.getElementById(`iev-vid${n}-bar`);
-          const pct = document.getElementById(`iev-vid${n}-pct`);
-          const nameEl = document.getElementById(`iev-vid${n}-name`);
-          if(pw) pw.style.display='';
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', '/api/upload/video');
-          xhr.upload.onprogress = ev2 => {
-            if(ev2.lengthComputable){const p=Math.round(ev2.loaded/ev2.total*100);if(bar)bar.style.width=p+'%';if(pct)pct.textContent=p+'%';}
-          };
-          xhr.onload = () => {
-            if(pw) pw.style.display='none';
-            if(xhr.status===200){
-              const r=JSON.parse(xhr.responseText);
-              document.getElementById(`iev-video${n}-url`).value = r.url;
-              if(nameEl) nameEl.textContent = '✅ '+file.name;
-              showToast(`Vidéo ${n} téléversée.`,'success');
-            } else {
-              const err=JSON.parse(xhr.responseText||'{}');
-              showToast(err.error||'Erreur upload vidéo.','error');
-            }
-          };
-          xhr.onerror = () => { if(pw)pw.style.display='none'; showToast('Erreur réseau upload vidéo.','error'); };
-          xhr.send(file);
-        };
-        tmpVid.onerror = () => { URL.revokeObjectURL(blobUrl); showToast('Fichier vidéo invalide.','warning'); };
-      });
-    }
+    // (Upload vidéo MP4 retiré du module Événement le 2026-09-09 — vit désormais sur la fiche
+    // d'inscription liée, voir plus haut.)
 
     // ── Autocomplete partenaires
     let ievPartTimer = null;
@@ -4091,16 +3989,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.ievRemovePartenaire = function(btn) { btn.closest('.iev-part-chip').remove(); };
   window.ievGetPartenaires = function ievGetPartenaires() {
     return [...document.querySelectorAll('.iev-part-chip')].map(c=>({id:parseInt(c.dataset.id)||c.dataset.id, source:c.dataset.source, nom:c.dataset.nom, role:c.dataset.role}));
-  };
-
-  window.ievSwitchFcTab = function(tab) {
-    const isPdf = tab === 'pdf';
-    document.getElementById('iev-fc-panel-pdf').style.display   = isPdf ? '' : 'none';
-    document.getElementById('iev-fc-panel-fiche').style.display = isPdf ? 'none' : '';
-    document.getElementById('iev-fc-tab-pdf').style.background   = isPdf ? 'var(--orange)' : '#f1f5f9';
-    document.getElementById('iev-fc-tab-pdf').style.color        = isPdf ? '#fff' : '#64748b';
-    document.getElementById('iev-fc-tab-fiche').style.background = isPdf ? '#f1f5f9' : 'var(--orange)';
-    document.getElementById('iev-fc-tab-fiche').style.color      = isPdf ? '#64748b' : '#fff';
   };
 
   // Initialiser les styles rayon au rendu du formulaire

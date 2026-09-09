@@ -16926,6 +16926,49 @@ route("POST", "/api/push/unsubscribe", async (req, res, params, body) => {
 });
 
 /* ---------- Événements (complet) ---------- */
+
+/* Médias de la fiche d'inscription liée à un événement (2026-09-09, demande explicite :
+   "tu t'appropries les éléments des fiches et tu les présentes au public depuis la cartouche
+   de l'événement") — un événement n'a plus sa propre banque de vidéos/PDF (voir POST
+   /api/evenements, la galerie photo elle-même est réduite à 1), il affiche celle de sa fiche
+   d'inscription si une est liée. Deux mécanismes de liaison coexistent et sont gérés ici :
+   insc_fiches_evenements (événement créé nativement sur evenements.html) ET events.insc_fiche_id
+   (événement créé sur dashboard-initiative.html, jamais recopié dans insc_fiches_evenements
+   lors de la synchronisation vers evenements — voir syncEvenementVersProgrammation ci-dessus).
+   Batché : un nombre fixe de requêtes quel que soit le nombre de lignes, jamais une par ligne. */
+async function enrichirAvecFicheMedia(rows) {
+  if (!rows.length) return rows;
+  const ids = rows.map(r => r.id);
+  const ph = ids.map(() => '?').join(',');
+  const liensNatifs = await db.prepare(`SELECT evenement_id, fiche_id FROM insc_fiches_evenements WHERE evenement_id IN (${ph})`).all(...ids);
+  const ficheParEvt = {};
+  liensNatifs.forEach(l => { ficheParEvt[l.evenement_id] = l.fiche_id; });
+
+  const sourcesASonder = [...new Set(rows.filter(r => !ficheParEvt[r.id] && r.source_events_id).map(r => r.source_events_id))];
+  if (sourcesASonder.length) {
+    const ph2 = sourcesASonder.map(() => '?').join(',');
+    const eventsAvecFiche = await db.prepare(`SELECT id, insc_fiche_id FROM events WHERE id IN (${ph2}) AND insc_fiche_id IS NOT NULL`).all(...sourcesASonder);
+    const ficheParSource = {};
+    eventsAvecFiche.forEach(e => { ficheParSource[e.id] = e.insc_fiche_id; });
+    rows.forEach(r => { if (!ficheParEvt[r.id] && r.source_events_id && ficheParSource[r.source_events_id]) ficheParEvt[r.id] = ficheParSource[r.source_events_id]; });
+  }
+
+  const ficheIds = [...new Set(Object.values(ficheParEvt))];
+  const fichesById = {};
+  if (ficheIds.length) {
+    const ph3 = ficheIds.map(() => '?').join(',');
+    const fiches = await db.prepare(`SELECT id, affiche_url FROM insc_fiches WHERE id IN (${ph3})`).all(...ficheIds);
+    const medias = await db.prepare(`SELECT fiche_id, type, url, libelle FROM insc_fiches_medias WHERE fiche_id IN (${ph3}) ORDER BY position ASC`).all(...ficheIds);
+    fiches.forEach(f => { fichesById[f.id] = { affiche_url: f.affiche_url, medias: [] }; });
+    medias.forEach(m => { if (fichesById[m.fiche_id]) fichesById[m.fiche_id].medias.push({ type: m.type, url: m.url, libelle: m.libelle }); });
+  }
+
+  return rows.map(r => {
+    const fid = ficheParEvt[r.id];
+    return { ...r, fiche_media: (fid && fichesById[fid]) ? fichesById[fid] : null };
+  });
+}
+
 route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
   let prefs = {};
@@ -16941,7 +16984,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 
   if (!hasPrefs) {
     const rows = await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all();
-    return sendJSON(res, 200, { evenements: await withCounts(rows), niveau_priorite: null });
+    return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: null });
   }
 
   const filtresBase = [];
@@ -17000,7 +17043,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
     rows = await db.prepare(baseSelect + (filtresBase.length ? ' AND ' + filtresBase.join(' AND ') : '') + ' ORDER BY e.date_evt ASC LIMIT 60').all(...argsBase);
     niveauRetenu = rows.length ? 'aucun_filtre_geo' : null;
   }
-  return sendJSON(res, 200, { evenements: await withCounts(rows), niveau_priorite: niveauRetenu });
+  return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: niveauRetenu });
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
@@ -17025,7 +17068,7 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   else if (query.gratuit === '0') rows = rows.filter(r => r.prix_min > 0);
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
-  sendJSON(res, 200, { evenements: withCounts });
+  sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(withCounts) });
 });
 
 route("POST", "/api/evenements", async (req, res, params, body) => {
@@ -17045,7 +17088,10 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   const coverImg = image_couverture || image_url || null;
-  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || '[]');
+  // Galerie réduite à 1 photo + couverture (2026-09-09, demande explicite) — le reste des
+  // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
+  // enrichirAvecFicheMedia() plus haut.
+  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || '[]');
   const id = (await db.prepare(`INSERT INTO evenements
     (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
@@ -18038,7 +18084,8 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
   const cagnottesLiees = (await db.prepare(
     "SELECT id, slug, titre, image_url, objectif_montant, montant_collecte, devise, statut_manuel, est_publiee, date_fin FROM cagnottes WHERE evenement_id=? AND est_publiee=1 AND visibilite='publique'"
   ).all(params.id)).map(cagnotteAvecStatut);
-  sendJSON(res, 200, { evenement: row, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
+  const [rowAvecFiche] = await enrichirAvecFicheMedia([row]);
+  sendJSON(res, 200, { evenement: rowAvecFiche, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
 });
 
 /* DELETE /api/evenements/:id — suppression depuis la page publique elle-même (2026-09-07,
@@ -26946,7 +26993,10 @@ ${jsonLd}
          (Formations, palier payant). */
       const PLATFORM_COMMISSION_PCT = 3;
       const coverImg = image_couverture || image_b64 || null;
-      const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || '[]');
+      // Galerie réduite à 1 photo + couverture (2026-09-09, demande explicite) — le reste des
+  // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
+  // enrichirAvecFicheMedia() plus haut.
+  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || '[]');
       const cibleListeStr = Array.isArray(cible_liste_ids) ? JSON.stringify(cible_liste_ids) : (cible_liste_ids || '[]');
       const partenairesIdsStr = Array.isArray(fc_partenaires_ids) ? JSON.stringify(fc_partenaires_ids) : (fc_partenaires_ids || '[]');
       const pdfExtraStr = Array.isArray(pdf_extra) ? JSON.stringify(pdf_extra.slice(0,10)) : (pdf_extra || '[]');
@@ -27052,7 +27102,7 @@ ${jsonLd}
         appliquer_fiche_standard, fiche_choisie_id, detacher_fiche,
       } = body;
       const coverUpd = image_couverture || image_b64 || null;
-      const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,4)) : (galerie_photos || null);
+      const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || null);
       const cibleListeUpd = Array.isArray(cible_liste_ids) ? JSON.stringify(cible_liste_ids) : (cible_liste_ids || null);
       const partenairesUpd = Array.isArray(fc_partenaires_ids) ? JSON.stringify(fc_partenaires_ids) : (fc_partenaires_ids || null);
       const pdfExtraUpd = Array.isArray(pdf_extra) ? JSON.stringify(pdf_extra.slice(0,10)) : (pdf_extra || null);
