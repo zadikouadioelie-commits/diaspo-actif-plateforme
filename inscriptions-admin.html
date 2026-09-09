@@ -525,9 +525,12 @@ function renderTypes() {
 
   const detail = selected ? `
       <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:22px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:8px;">
           <h3 style="margin:0; font-size:16px; font-weight:700;">${escH(selected.name)}</h3>
-          <button style="background:none; border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="goToFields">Personnaliser les éléments d'inscription →</button>
+          <div style="display:flex; gap:8px;">
+            <a href="/api/insc/types/${selected.id}/apercu-billet" target="_blank" rel="noopener" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer; text-decoration:none;">🎫 Aperçu du billet</a>
+            <button style="background:none; border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="goToFields">Personnaliser les éléments d'inscription →</button>
+          </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px 20px;">
           <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Tarif</div><div style="font-family:'IBM Plex Mono', monospace; font-size:18px; font-weight:600;">${selected.priceLabel}</div></div>

@@ -40077,6 +40077,37 @@ route("GET", "/api/insc/inscriptions/:id/qr", async (req, res, params, body, que
   sendJSON(res, 200, { qr_payload: qrPayload, reference: insc.reference });
 });
 
+/* Gabarit HTML du billet de confirmation — factorisé (2026-09-09) pour être partagé entre la
+   vraie confirmation envoyée aux inscrits ET l'aperçu (sans inscription réelle) demandé pour
+   chaque type, afin que l'aperçu montre EXACTEMENT le même rendu que ce qui part par e-mail,
+   jamais une reconstruction approximative qui pourrait diverger. */
+function genererHtmlBillet({ ficheNom, prenom, nom, typeLabel, reference, statut, evt, qrPayload, apercu }) {
+  const esc = s => String(s || "").replace(/</g, "&lt;");
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+    <title>Confirmation d'inscription — ${esc(ficheNom)}</title>
+    <style>@page{size:A4;margin:20mm} body{font-family:Arial,sans-serif;color:#20242E;max-width:700px;margin:0 auto;padding:20px}
+    h1{color:#0D2B4E;font-size:22px} .badge{display:inline-block;background:#F0F4FF;color:#1B3A6B;border-radius:99px;padding:4px 14px;font-size:12px;font-weight:700;margin-bottom:16px}
+    .ligne{padding:8px 0;border-bottom:1px solid #E2E8F0;} .label{color:#64748B;font-size:12px;} .valeur{font-weight:700;}
+    #insc-qr{margin:20px 0;text-align:center;}
+    .bandeau-apercu{background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;font-size:13px;font-weight:700;text-align:center;padding:10px 14px;border-radius:8px;margin-bottom:18px;}</style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    </head><body>
+    ${apercu ? `<div class="bandeau-apercu">🔍 Aperçu — ceci n'est pas une vraie inscription, juste un exemple du rendu envoyé par e-mail.</div>` : ""}
+    <div class="badge">✅ Inscription confirmée</div>
+    <h1>${esc(ficheNom)}</h1>
+    <div class="ligne"><div class="label">Nom</div><div class="valeur">${esc(prenom)} ${esc(nom)}</div></div>
+    <div class="ligne"><div class="label">Type d'inscription</div><div class="valeur">${esc(typeLabel)}</div></div>
+    <div class="ligne"><div class="label">Numéro d'inscription</div><div class="valeur">${esc(reference)}</div></div>
+    <div class="ligne"><div class="label">Statut</div><div class="valeur">${esc(statut)}</div></div>
+    ${evt ? `<div class="ligne"><div class="label">Événement</div><div class="valeur">${esc(evt.titre)}</div></div>
+    <div class="ligne"><div class="label">Date</div><div class="valeur">${esc(evt.date_evt)} ${esc(evt.heure_debut||"")}</div></div>
+    <div class="ligne"><div class="label">Lieu</div><div class="valeur">${esc(evt.lieu||"")} ${esc(evt.ville||"")} ${esc(evt.pays||"")}</div></div>` : ""}
+    ${evt?.programme ? `<div class="ligne"><div class="label">Programme</div><div class="valeur" style="white-space:pre-line;">${esc(evt.programme)}</div></div>` : ""}
+    ${qrPayload ? `<div id="insc-qr"></div><script>try{new QRCode(document.getElementById('insc-qr'),{text:${JSON.stringify(qrPayload)},width:180,height:180,colorDark:'#0D2B4E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}catch(e){}</script>` : ""}
+    ${apercu ? "" : `<script>setTimeout(()=>window.print(), 350)</script>`}
+    </body></html>`;
+}
+
 /* Page de confirmation imprimable (A4, window.print()) — même pattern que l'ancien module et
    business-plan-simulation.html/lettre-builder.html : aucune dépendance PDF serveur. */
 route("GET", "/api/insc/inscriptions/:id/confirmation.pdf", async (req, res, params, body, query) => {
@@ -40086,31 +40117,36 @@ route("GET", "/api/insc/inscriptions/:id/confirmation.pdf", async (req, res, par
   if (!(await inscAccesAutorise(req, { ref: query?.ref }, insc))) return send(res, 403, "Accès refusé");
   const type = await db.prepare("SELECT label FROM insc_types WHERE id=?").get(insc.type_id);
   const evt = insc.evenement_id ? await db.prepare("SELECT * FROM evenements WHERE id=?").get(insc.evenement_id) : null;
-  const esc = s => String(s || "").replace(/</g, "&lt;");
   let qrPayload = "";
   if (insc.qr_token) qrPayload = Buffer.from(JSON.stringify({ iid: insc.id, eid: insc.evenement_id, sig: insc.qr_token })).toString("base64");
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
-    <title>Confirmation d'inscription — ${esc(ficheOwner?.nom)}</title>
-    <style>@page{size:A4;margin:20mm} body{font-family:Arial,sans-serif;color:#20242E;max-width:700px;margin:0 auto;padding:20px}
-    h1{color:#0D2B4E;font-size:22px} .badge{display:inline-block;background:#F0F4FF;color:#1B3A6B;border-radius:99px;padding:4px 14px;font-size:12px;font-weight:700;margin-bottom:16px}
-    .ligne{padding:8px 0;border-bottom:1px solid #E2E8F0;} .label{color:#64748B;font-size:12px;} .valeur{font-weight:700;}
-    #insc-qr{margin:20px 0;text-align:center;}</style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    </head><body>
-    <div class="badge">✅ Inscription confirmée</div>
-    <h1>${esc(ficheOwner?.nom)}</h1>
-    <div class="ligne"><div class="label">Nom</div><div class="valeur">${esc(insc.prenom)} ${esc(insc.nom)}</div></div>
-    <div class="ligne"><div class="label">Type d'inscription</div><div class="valeur">${esc(type?.label)}</div></div>
-    <div class="ligne"><div class="label">Numéro d'inscription</div><div class="valeur">${esc(insc.reference)}</div></div>
-    <div class="ligne"><div class="label">Statut</div><div class="valeur">${esc(insc.statut)}</div></div>
-    ${evt ? `<div class="ligne"><div class="label">Événement</div><div class="valeur">${esc(evt.titre)}</div></div>
-    <div class="ligne"><div class="label">Date</div><div class="valeur">${esc(evt.date_evt)} ${esc(evt.heure_debut||"")}</div></div>
-    <div class="ligne"><div class="label">Lieu</div><div class="valeur">${esc(evt.lieu||"")} ${esc(evt.ville||"")} ${esc(evt.pays||"")}</div></div>` : ""}
-    ${evt?.programme ? `<div class="ligne"><div class="label">Programme</div><div class="valeur" style="white-space:pre-line;">${esc(evt.programme)}</div></div>` : ""}
-    ${qrPayload ? `<div id="insc-qr"></div><script>try{new QRCode(document.getElementById('insc-qr'),{text:${JSON.stringify(qrPayload)},width:180,height:180,colorDark:'#0D2B4E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});}catch(e){}</script>` : ""}
-    <script>setTimeout(()=>window.print(), 350)</script>
-    </body></html>`);
+  res.end(genererHtmlBillet({
+    ficheNom: ficheOwner?.nom, prenom: insc.prenom, nom: insc.nom, typeLabel: type?.label,
+    reference: insc.reference, statut: insc.statut, evt, qrPayload, apercu: false,
+  }));
+});
+
+/* Aperçu du billet SANS inscription réelle, spécifique à chaque type — demande explicite du
+   2026-09-09 : permettre de voir le rendu exact reçu par e-mail avant que qui que ce soit ne
+   s'inscrive. Réservé au propriétaire/admin de la fiche (inscFicheProprietaire). Le QR de
+   l'aperçu est signé contre un identifiant d'inscription qui n'existera jamais (0) : si
+   quelqu'un le scannait quand même via /api/controle, il serait rejeté "inscription
+   introuvable" comme n'importe quel QR invalide — jamais un vrai accès. */
+route("GET", "/api/insc/types/:id/apercu-billet", async (req, res, params) => {
+  const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
+  if (!type) return send(res, 404, "Type introuvable.");
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, type.fiche_id);
+  if (erreur) return send(res, erreur, msg);
+  const evtLien = await db.prepare(`
+    SELECT e.* FROM insc_fiches_evenements fe JOIN evenements e ON e.id=fe.evenement_id
+    WHERE fe.fiche_id=? ORDER BY e.date_evt ASC LIMIT 1`).get(fiche.id);
+  const sigApercu = await signInscription(0, evtLien?.id || null, new Date().toISOString());
+  const qrPayload = Buffer.from(JSON.stringify({ iid: 0, eid: evtLien?.id || null, sig: sigApercu })).toString("base64");
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(genererHtmlBillet({
+    ficheNom: fiche.nom, prenom: "Prénom", nom: "Nom (exemple)", typeLabel: type.label,
+    reference: "DA-2026-000000", statut: "confirme", evt: evtLien, qrPayload, apercu: true,
+  }));
 });
 
 /* ═══════════════════════════════════════════════════════════════════
