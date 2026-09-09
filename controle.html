@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contrôle d'accès — Diaspo'Actif</title>
+<link rel="apple-touch-icon" href="assets/logo.png">
+<link rel="icon" href="assets/logo.png">
+<meta name="theme-color" content="#0D2B4E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans',sans-serif;background:oklch(0.18 0.02 258);color:#fff;min-height:100dvh;overscroll-behavior:none;}
+.top-bar{display:flex;align-items:center;gap:10px;padding:14px 16px;background:oklch(0.14 0.02 258);border-bottom:1px solid oklch(0.28 0.02 258);position:sticky;top:0;z-index:50;}
+.top-title{font-weight:700;font-size:15px;flex:1;}
+.top-badge{background:oklch(0.5 0.14 150);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;}
+#etat-chargement,#etat-erreur{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80dvh;text-align:center;padding:24px;gap:12px;}
+#etat-erreur span{font-size:44px;}
+#etat-erreur h2{font-size:17px;font-weight:700;}
+#etat-erreur p{color:oklch(0.7 0.006 30);font-size:13.5px;}
+
+.fiche-info{padding:16px;text-align:center;border-bottom:1px solid oklch(0.28 0.02 258);}
+.fiche-info .nom{font-weight:700;font-size:15px;}
+.fiche-info .evt{font-size:12.5px;color:oklch(0.7 0.006 30);margin-top:2px;}
+
+.direction-toggle{display:flex;gap:8px;padding:14px 16px;}
+.direction-btn{flex:1;padding:14px 8px;border-radius:12px;border:2px solid oklch(0.3 0.02 258);background:oklch(0.22 0.02 258);color:oklch(0.75 0.006 30);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.direction-btn .ic{font-size:22px;}
+.direction-btn.actif{border-color:oklch(0.55 0.12 150);background:oklch(0.24 0.06 150);color:#fff;}
+.direction-btn.actif.sortie{border-color:oklch(0.6 0.14 45);background:oklch(0.26 0.06 45);}
+
+.stats-bar{display:flex;gap:0;margin:0 16px 14px;border-radius:10px;overflow:hidden;border:1px solid oklch(0.3 0.02 258);}
+.stat-chip{flex:1;background:oklch(0.22 0.02 258);padding:10px;text-align:center;font-size:11px;color:oklch(0.7 0.006 30);}
+.stat-chip strong{display:block;font-size:19px;font-weight:700;color:#fff;font-family:'IBM Plex Mono',monospace;}
+.stat-chip.ok strong{color:oklch(0.65 0.14 150);}
+
+#scanner-area{padding:0 16px 16px;}
+.cam-wrap{position:relative;width:100%;max-width:480px;margin:0 auto;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;}
+#video{width:100%;height:100%;object-fit:cover;display:block;}
+#canvas{display:none;}
+.scan-guide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.scan-frame{width:200px;height:200px;position:relative;}
+.scan-frame::before,.scan-frame::after{content:'';position:absolute;width:36px;height:36px;border-color:oklch(0.6 0.09 258);border-style:solid;}
+.scan-frame::before{top:0;left:0;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}
+.scan-frame::after{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}
+.scan-frame .c2,.scan-frame .c3{position:absolute;width:36px;height:36px;border-color:oklch(0.6 0.09 258);border-style:solid;}
+.scan-frame .c2{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}
+.scan-frame .c3{bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}
+.cam-status{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.7);}
+.cam-disabled{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:oklch(0.6 0.006 30);}
+.cam-disabled span{font-size:2.6rem;}
+.cam-controls{display:flex;gap:8px;margin-top:12px;justify-content:center;}
+.cam-btn{background:oklch(0.24 0.02 258);border:1px solid oklch(0.32 0.02 258);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;}
+.cam-btn.primary{background:oklch(0.4 0.1 258);border-color:oklch(0.4 0.1 258);}
+.cam-btn.danger{background:oklch(0.45 0.14 20);border-color:oklch(0.45 0.14 20);}
+
+.manual-section{padding:0 16px 20px;}
+.select-label{font-size:11px;color:oklch(0.65 0.006 30);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;}
+.manual-row{display:flex;gap:8px;}
+.manual-input{flex:1;background:oklch(0.22 0.02 258);border:1px solid oklch(0.32 0.02 258);color:#fff;padding:10px 12px;border-radius:10px;font-size:13.5px;}
+.manual-btn{background:oklch(0.4 0.1 258);border:none;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;}
+
+#result-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:100;align-items:center;justify-content:center;padding:24px;}
+#result-overlay.show{display:flex;}
+.result-card{background:oklch(0.2 0.02 258);border-radius:20px;padding:34px 24px;max-width:360px;width:100%;text-align:center;border:2px solid oklch(0.3 0.02 258);}
+.result-card.ok{border-color:oklch(0.55 0.14 150);}
+.result-card.fail{border-color:oklch(0.5 0.16 20);}
+.result-icon{font-size:4rem;margin-bottom:12px;}
+.result-label{font-size:1.3rem;font-weight:700;margin-bottom:6px;}
+.result-label.ok{color:oklch(0.65 0.14 150);}
+.result-label.fail{color:oklch(0.62 0.16 20);}
+.result-sub{font-size:14px;color:oklch(0.75 0.006 30);margin-bottom:22px;}
+.result-close{width:100%;background:oklch(0.28 0.02 258);border:1px solid oklch(0.34 0.02 258);color:#fff;padding:12px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <span class="top-title">🎟️ Contrôle d'accès</span>
+  <span id="badge-en-ligne" class="top-badge" style="display:none;">EN LIGNE</span>
+</div>
+
+<div id="etat-chargement">Chargement…</div>
+
+<div id="etat-erreur" style="display:none;">
+  <span id="erreur-icone">🔒</span>
+  <h2 id="erreur-titre">Lien invalide</h2>
+  <p id="erreur-message"></p>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="fiche-info">
+    <div class="nom" id="info-fiche"></div>
+    <div class="evt" id="info-evenement"></div>
+  </div>
+
+  <div class="direction-toggle">
+    <button class="direction-btn actif" id="btn-dir-entree" onclick="choisirDirection('entree')">
+      <span class="ic">➡️</span> Je scanne une entrée
+    </button>
+    <button class="direction-btn sortie" id="btn-dir-sortie" onclick="choisirDirection('sortie')">
+      <span class="ic">⬅️</span> Je scanne une sortie
+    </button>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-chip ok"><strong id="stat-presents">0</strong>Présents</div>
+    <div class="stat-chip"><strong id="stat-entrees">0</strong>Entrées</div>
+    <div class="stat-chip"><strong id="stat-sorties">0</strong>Sorties</div>
+  </div>
+
+  <div id="scanner-area">
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="scan-guide">
+        <div class="scan-frame"><div class="c2"></div><div class="c3"></div></div>
+      </div>
+      <div class="cam-status" id="cam-status">Pointez vers le QR code</div>
+      <div class="cam-disabled" id="cam-disabled">
+        <span>📷</span>
+        <p style="font-size:13px;text-align:center;">Caméra inactive</p>
+      </div>
+    </div>
+    <div class="cam-controls">
+      <button class="cam-btn primary" id="btn-start" onclick="demarrerCamera()">▶ Démarrer la caméra</button>
+      <button class="cam-btn danger" id="btn-stop" onclick="arreterCamera()" style="display:none;">⏹ Arrêter</button>
+      <button class="cam-btn" onclick="changerCamera()" id="btn-switch" style="display:none;">🔄 Caméra</button>
+    </div>
+  </div>
+
+  <div class="manual-section">
+    <div class="select-label">Saisie manuelle du code QR</div>
+    <div class="manual-row">
+      <input class="manual-input" id="saisie-manuelle" placeholder="Collez le contenu du QR…" type="text">
+      <button class="manual-btn" onclick="validerManuel()">Valider</button>
+    </div>
+  </div>
+</div>
+
+<div id="result-overlay">
+  <div class="result-card" id="result-card">
+    <div class="result-icon" id="result-icon">✅</div>
+    <div class="result-label" id="result-label">ENTRÉE VALIDÉE</div>
+    <div class="result-sub" id="result-sub"></div>
+    <button class="result-close" onclick="fermerResultat()">Continuer</button>
+  </div>
+</div>
+
+<script>
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+const CTRL_TOKEN = new URLSearchParams(location.search).get('token');
+let direction = 'entree';
+let stream = null, scanInterval = null, facingMode = 'environment', dernierScan = 0;
+
+async function init() {
+  if (!CTRL_TOKEN) { afficherErreur('❓', 'Aucun jeton fourni', "Ce lien de contrôle est incomplet — demandez à l'organisateur de le régénérer."); return; }
+  try {
+    const r = await fetch('/api/controle/' + encodeURIComponent(CTRL_TOKEN));
+    const d = await r.json();
+    if (!r.ok) { afficherErreur('🔒', 'Lien invalide ou expiré', d.error || "Demandez à l'organisateur un nouveau lien."); return; }
+    document.getElementById('etat-chargement').style.display = 'none';
+    document.getElementById('badge-en-ligne').style.display = '';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('info-fiche').textContent = d.fiche_nom || '';
+    document.getElementById('info-evenement').textContent = d.evenement_titre || '';
+    majStats(d.stats);
+  } catch (e) {
+    afficherErreur('⚠️', 'Erreur de connexion', 'Vérifiez votre connexion internet et rechargez la page.');
+  }
+}
+function afficherErreur(icone, titre, message) {
+  document.getElementById('etat-chargement').style.display = 'none';
+  document.getElementById('etat-erreur').style.display = 'flex';
+  document.getElementById('erreur-icone').textContent = icone;
+  document.getElementById('erreur-titre').textContent = titre;
+  document.getElementById('erreur-message').textContent = message;
+}
+function majStats(stats) {
+  if (!stats) return;
+  document.getElementById('stat-presents').textContent = stats.presents_actuellement ?? 0;
+  document.getElementById('stat-entrees').textContent = stats.entrees ?? 0;
+  document.getElementById('stat-sorties').textContent = stats.sorties ?? 0;
+}
+async function rafraichirStats() {
+  try { const r = await fetch('/api/controle/' + encodeURIComponent(CTRL_TOKEN)); const d = await r.json(); if (r.ok) majStats(d.stats); } catch(e) {}
+}
+
+function choisirDirection(d) {
+  direction = d;
+  document.getElementById('btn-dir-entree').classList.toggle('actif', d === 'entree');
+  document.getElementById('btn-dir-sortie').classList.toggle('actif', d === 'sortie');
+}
+
+async function demarrerCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    await video.play();
+    document.getElementById('cam-disabled').style.display = 'none';
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('btn-stop').style.display = '';
+    document.getElementById('btn-switch').style.display = '';
+    document.getElementById('cam-status').textContent = 'Recherche de QR code…';
+    lancerScan();
+  } catch (e) {
+    document.getElementById('cam-status').textContent = 'Caméra inaccessible : ' + e.message;
+  }
+}
+function arreterCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  document.getElementById('video').srcObject = null;
+  document.getElementById('cam-disabled').style.display = 'flex';
+  document.getElementById('btn-start').style.display = '';
+  document.getElementById('btn-stop').style.display = 'none';
+  document.getElementById('btn-switch').style.display = 'none';
+  document.getElementById('cam-status').textContent = 'Caméra arrêtée';
+}
+async function changerCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  arreterCamera();
+  await demarrerCamera();
+}
+function lancerScan() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  scanInterval = setInterval(() => {
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    if (Date.now() - dernierScan < 2500) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if (code && code.data) { dernierScan = Date.now(); traiterQr(code.data); }
+  }, 200);
+}
+
+async function traiterQr(payloadBrut) {
+  document.getElementById('cam-status').textContent = '⏳ Vérification…';
+  try {
+    const r = await fetch('/api/controle/' + encodeURIComponent(CTRL_TOKEN) + '/scanner', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qr_payload: payloadBrut, direction })
+    });
+    const d = await r.json();
+    afficherResultat(d);
+    rafraichirStats();
+  } catch (e) {
+    afficherResultat({ valid: false, error: 'Erreur de connexion.' });
+  }
+  document.getElementById('cam-status').textContent = 'Recherche de QR code…';
+}
+
+function afficherResultat(r) {
+  const overlay = document.getElementById('result-overlay');
+  const card = document.getElementById('result-card');
+  const icon = document.getElementById('result-icon');
+  const label = document.getElementById('result-label');
+  const sub = document.getElementById('result-sub');
+  card.className = 'result-card'; label.className = 'result-label';
+  if (r.valid) {
+    card.classList.add('ok'); label.classList.add('ok');
+    icon.textContent = r.direction === 'sortie' ? '⬅️' : '✅';
+    label.textContent = r.direction === 'sortie' ? 'SORTIE VALIDÉE' : 'ENTRÉE VALIDÉE';
+    sub.textContent = `${escH(r.prenom || '')} ${escH(r.nom || '')} — ${escH(r.type_label || '')}`;
+    if (navigator.vibrate) navigator.vibrate(120);
+    setTimeout(fermerResultat, 2200);
+  } else {
+    card.classList.add('fail'); label.classList.add('fail');
+    icon.textContent = '❌';
+    label.textContent = 'REFUSÉ';
+    sub.textContent = r.error || 'QR Code non valide.';
+    if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+  }
+  overlay.classList.add('show');
+}
+function fermerResultat() {
+  document.getElementById('result-overlay').classList.remove('show');
+  dernierScan = Date.now();
+}
+async function validerManuel() {
+  const v = document.getElementById('saisie-manuelle').value.trim();
+  if (!v) return;
+  await traiterQr(v);
+  document.getElementById('saisie-manuelle').value = '';
+}
+
+init();
+</script>
+</body>
+</html>

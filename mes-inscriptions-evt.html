@@ -12,19 +12,25 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D2B4E">
 <link rel="apple-touch-icon" href="assets/logo.png">
+<!-- Habillage Claude Design (2026-09-09) — mêmes tokens que inscriptions-admin.html / inscription-publique.html. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-.mi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:20px}
-.mi-card{border:1px solid var(--border);border-radius:12px;padding:18px;background:var(--card,#fff);}
-.mi-fiche{font-size:12px;color:var(--muted);margin-bottom:4px;}
-.mi-titre{font-weight:800;font-size:15px;margin-bottom:8px;}
-.mi-meta{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
-.mi-badge{display:inline-block;border-radius:99px;padding:3px 12px;font-size:11px;font-weight:700;margin-bottom:10px;}
-.mi-badge-confirme{background:#F0FDF4;color:#16a34a;}
-.mi-badge-inscrit{background:#F0F4FF;color:#1B3A6B;}
-.mi-badge-liste_attente{background:#FFF7ED;color:#c2410c;}
-.mi-badge-annule{background:#FEF2F2;color:#dc2626;}
-.mi-badge-present{background:#EFF6FF;color:#1d4ed8;}
-.mi-badge-absent{background:#F1F5F9;color:#64748b;}
+#mi-root { font-family:'IBM Plex Sans', sans-serif; color:oklch(0.2 0.006 30); }
+.mi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:22px}
+.mi-card{border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px;background:#fff;display:flex;flex-direction:column;}
+.mi-fiche{font-size:11.5px;color:oklch(0.55 0.006 30);margin-bottom:4px;}
+.mi-titre{font-weight:700;font-size:15px;margin-bottom:10px;}
+.mi-meta{font-size:12.5px;color:oklch(0.5 0.006 30);display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.mi-meta .ref{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+.mi-badge{display:inline-flex;align-self:flex-start;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;margin-bottom:12px;}
+.mi-badge-confirme{background:oklch(0.94 0.05 150);color:oklch(0.4 0.13 150);}
+.mi-badge-inscrit{background:oklch(0.94 0.04 258);color:oklch(0.4 0.1 258);}
+.mi-badge-liste_attente{background:oklch(0.94 0.05 85);color:oklch(0.42 0.13 85);}
+.mi-badge-annule{background:oklch(0.94 0.05 20);color:oklch(0.42 0.16 20);}
+.mi-badge-present{background:oklch(0.94 0.04 258);color:oklch(0.4 0.1 258);}
+.mi-badge-absent{background:oklch(0.93 0.004 30);color:oklch(0.5 0.006 30);}
+.mi-qr-link{background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:8px;text-decoration:none;text-align:center;margin-top:auto;}
 </style>
 </head>
 <body>
@@ -53,10 +59,11 @@
   <div id="hb-account-section"></div>
 </aside>
 
-<main class="container" style="max-width:1000px;margin:0 auto;padding:24px 16px;">
-  <h1 style="font-size:22px;font-weight:900;color:#0D2B4E;margin:0 0 6px;">🎟️ Mes inscriptions</h1>
-  <p style="color:var(--muted);font-size:14px;margin:0 0 8px;">Retrouvez toutes vos inscriptions à des événements Diaspo'Actif.</p>
-  <div id="mi-list" class="mi-grid"><div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div></div>
+<main id="mi-root" style="max-width:1000px;margin:0 auto;padding:32px 16px 60px;">
+  <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:8px;">Événements &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30);font-weight:500;">Mes inscriptions</span></div>
+  <h1 style="font-size:22px;font-weight:700;margin:0 0 6px;">🎟️ Mes inscriptions</h1>
+  <p style="color:oklch(0.5 0.006 30);font-size:14px;margin:0 0 8px;">Retrouvez toutes vos inscriptions à des événements Diaspo'Actif.</p>
+  <div id="mi-list" class="mi-grid"><div style="grid-column:1/-1;text-align:center;padding:40px;color:oklch(0.55 0.006 30);">Chargement…</div></div>
 </main>
 </div>
 
@@ -64,7 +71,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=12"></script>
 <script>
-const MI_STATUT_LABEL = { inscrit:'🔵 Inscrit', confirme:'🟢 Confirmé', present:'✅ Présent', absent:'⬛ Absent', annule:'❌ Annulé', liste_attente:'🟠 Liste d\'attente' };
+const MI_STATUT_LABEL = { inscrit:'🔵 Inscrit', confirme:'🟢 Confirmé', present:'✅ Présent', absent:'⬛ Absent', annule:'❌ Annulé', liste_attente:"🟠 Liste d'attente" };
 (async function initMesInscriptions() {
   const me = await fetchCurrentUser();
   if (!me) { window.location.href = 'login.html?next=mes-inscriptions-evt.html'; return; }
@@ -72,7 +79,10 @@ const MI_STATUT_LABEL = { inscrit:'🔵 Inscrit', confirme:'🟢 Confirmé', pre
     const { inscriptions } = await api('GET', '/mes-inscriptions-evt');
     const el = document.getElementById('mi-list');
     if (!inscriptions.length) {
-      el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Vous n\'avez pas encore d\'inscription à un événement.<br><a href="evenements.html" class="btn btn-orange" style="margin-top:14px;display:inline-block;">Voir les événements →</a></div>';
+      el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:oklch(0.55 0.006 30);">
+        Vous n'avez pas encore d'inscription à un événement.<br>
+        <a href="evenements.html" style="display:inline-block;margin-top:16px;background:oklch(0.32 0.09 258);color:#fff;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:8px;text-decoration:none;">Voir les événements →</a>
+      </div>`;
       return;
     }
     el.innerHTML = inscriptions.map(i => `
@@ -84,12 +94,12 @@ const MI_STATUT_LABEL = { inscrit:'🔵 Inscrit', confirme:'🟢 Confirmé', pre
           ${i.date_evt ? `<span>📅 ${escH(i.date_evt)}${i.heure_debut ? ' · ' + escH(i.heure_debut) : ''}</span>` : ''}
           ${i.ville || i.pays ? `<span>📍 ${escH([i.ville, i.pays].filter(Boolean).join(', '))}</span>` : ''}
           <span>🎫 ${escH(i.type_label)}</span>
-          <span style="font-size:11px;">N° ${escH(i.reference || '')}</span>
+          <span class="ref">N° ${escH(i.reference || '')}</span>
         </div>
-        ${i.statut === 'confirme' || i.statut === 'present' ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="/api/insc/inscriptions/${i.id}/confirmation.pdf" target="_blank" rel="noopener">Voir mon QR Code →</a>` : ''}
+        ${i.statut === 'confirme' || i.statut === 'present' ? `<a class="mi-qr-link" href="/api/insc/inscriptions/${i.id}/confirmation.pdf" target="_blank" rel="noopener">Voir mon QR Code →</a>` : ''}
       </div>`).join('');
   } catch (e) {
-    document.getElementById('mi-list').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#dc2626;">Erreur : ${escH(e.message)}</div>`;
+    document.getElementById('mi-list').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:oklch(0.5 0.16 20);">Erreur : ${escH(e.message)}</div>`;
   }
 })();
 </script>
