@@ -1758,9 +1758,23 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                à autocomplete="off" seul, que Chrome ignore couramment sur les champs qu'il devine
                liés à un contact/e-mail (ex: le mot "email" dans le placeholder). name neutre et
                placeholder reformulé en complément, pour ne rien laisser deviner à Chrome. -->
-          <input type="text" id="aff-search-input" name="q_membre" placeholder="Rechercher un membre par nom ou coordonnée…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="this.removeAttribute('readonly'); if(!this.value.trim()) affChargerSuggestions('')" onblur="setTimeout(()=>{const b=document.getElementById('aff-search-results'); if(b) b.style.display='none';},150)">
-          <div id="aff-search-results" style="display:none;position:absolute;z-index:20;top:100%;left:0;right:0;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
+          <input type="text" id="aff-search-input" name="q_membre" placeholder="Rechercher un membre par nom ou coordonnée…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="this.removeAttribute('readonly'); if(!this.value.trim()) affChargerSuggestions('')">
+          <!-- position:fixed (coordonnées calculées en JS, voir affChargerSuggestions) plutôt que
+               absolute : en absolute, la boîte flottait sur toute sa hauteur fixe (260px) sans
+               tenir compte du contenu réel ni de la carte suivante — une ligne de suggestion se
+               retrouvait parfois coupée pile à la frontière visuelle avec "Invitations en
+               attente", donnant l'impression que les deux blocs fusionnaient (signalé par capture
+               d'écran, 2026-09-10). En fixed, la boîte est positionnée par rapport au champ, pas
+               à la carte qui la contient, et se referme au défilement (voir plus bas) au lieu de
+               rester visuellement détachée. -->
+          <div id="aff-search-results" onmousedown="affDelegateSuggestionClick(event)" style="display:none;position:fixed;z-index:20;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
         </div>
+        <!-- Sélection multiple (2026-09-09, demande explicite : "permet de sélectionner plusieurs
+             comptes" avant l'envoi) : chaque compte coché dans les suggestions ci-dessus devient
+             une puce ici, retirable individuellement ; le bouton n'apparaît que si au moins un
+             compte est sélectionné. -->
+        <div id="aff-selection-chips" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+        <button type="button" id="aff-envoyer-btn" class="btn btn-orange btn-sm" style="display:none;margin-top:10px;" onclick="affOuvrirInviteMultiple()">Envoyer l'affiliation</button>
       </div>
 
       <!-- Demandes reçues des comptes eux-mêmes (2026-09-09, bouton "Demander une affiliation"
@@ -1796,7 +1810,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <h3 style="margin:0 0 4px;">Proposer une affiliation</h3>
         <p id="aff-invite-nom" style="margin:0 0 16px;color:var(--muted);font-size:13px;"></p>
         <label style="font-size:12.5px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Poste / fonction</label>
-        <select id="aff-invite-poste" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:12px;">
+        <select id="aff-invite-poste" onchange="affPosteAutreToggle(this)" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:12px;">
           <option value="">— Choisir —</option>
           <option>Président</option><option>Vice-président</option><option>Directeur</option>
           <option>Responsable communication</option><option>Responsable financier</option>
@@ -1810,7 +1824,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div id="aff-invite-error" style="display:none;color:#EF4444;font-size:12.5px;margin-top:8px;"></div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('aff-invite-modal').style.display='none';">Annuler</button>
-          <button class="btn btn-orange btn-sm" id="aff-invite-send">Envoyer la demande</button>
+          <button class="btn btn-orange btn-sm" id="aff-invite-send" onclick="affEnvoyerInvitation()">Envoyer la demande</button>
         </div>
       </div>
     </div>
@@ -8720,7 +8734,12 @@ async function supprimerAssoDoc(id) {
 /* ══════════════════════════════════════════════════════════
    MODULE AFFILIATION — identifier officiellement des membres
    ══════════════════════════════════════════════════════════ */
-let affPendingUser = null;
+/* Sélection multiple avant envoi (2026-09-09, demande explicite : "crée un bouton envoyer
+   l'affiliation une fois le compte sélectionné, et permet de sélectionner plusieurs comptes") :
+   remplace l'ancien envoi immédiat au clic (affOuvrirInvite, un seul compte à la fois) par une
+   sélection cumulative (affSelection, {userId: nom}) affichée en puces sous le champ de
+   recherche, envoyée en une fois via le bouton "Envoyer l'affiliation". */
+let affSelection = {};
 
 /* Cartouche compte affilié (2026-09-09, demande explicite : "une liste ... avec une petite
    cartouche pour les identifier", puis "crée une liste [pour les refusés] avec une cartouche
@@ -8792,32 +8811,117 @@ async function renderAffiliation() {
    prioriser_abonnes=1 fait remonter en premier les comptes déjà abonnés à cette initiative sur
    le Réseau Pro (voir server/index.js, route /api/users/search). Champ vide → la liste des
    abonnés s'affiche directement, sans attendre une frappe : "commencer par eux" au sens propre. */
+function affPositionnerSuggestions() {
+  const box = document.getElementById('aff-search-results');
+  const input = document.getElementById('aff-search-input');
+  if (!box || !input) return;
+  const r = input.getBoundingClientRect();
+  box.style.top = Math.round(r.bottom + 4) + 'px';
+  box.style.left = Math.round(r.left) + 'px';
+  box.style.width = Math.round(r.width) + 'px';
+  box.style.maxHeight = Math.max(120, Math.min(260, window.innerHeight - r.bottom - 16)) + 'px';
+}
+/* Ferme au défilement plutôt que de laisser une boîte position:fixed suivre visuellement le
+   scroll sans bouger (elle resterait figée à l'écran, détachée du champ) — même filet de
+   sécurité que .cl-switch-dd (assets/app.js), retiré à chaque fermeture plutôt que permanent. */
+function affFermerAuScroll() {
+  const box = document.getElementById('aff-search-results');
+  if (box) box.style.display = 'none';
+  window.removeEventListener('scroll', affFermerAuScroll, true);
+}
 async function affChargerSuggestions(q) {
   const box = document.getElementById('aff-search-results');
   try {
     const { users } = await api('GET', `/users/search?q=${encodeURIComponent(q)}&prioriser_abonnes=1`);
     const candidats = (users || []).filter(u => u.role === 'utilisateur');
+    /* Bug trouvé par exécution réelle le 2026-09-09 en construisant la sélection multiple :
+       l'ancien onmousedown="affOuvrirInvite(id, JSON.stringify(nom))" imbriquait des guillemets
+       doubles (ceux de JSON.stringify) DANS un attribut HTML lui-même délimité par des guillemets
+       doubles — le navigateur tronquait l'attribut au premier guillemet rencontré, rendant le
+       clic silencieusement inopérant pour tout nom de plus d'un mot (donc quasi tous les noms).
+       Remplacé par des attributs data-* (échappés par assoEsc, donc sans ce piège) lus par un
+       seul écouteur délégué ci-dessous — plus de JS généré dans une chaîne HTML. */
     box.innerHTML = candidats.length
-      ? candidats.map(u => `<div style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;" onmousedown="affOuvrirInvite(${u.id}, ${JSON.stringify(assoEsc((u.prenom?u.prenom+' ':'')+u.nom))})">
-          <span>${assoEsc((u.prenom?u.prenom+' ':'')+u.nom)} <span style="color:var(--muted);font-size:11.5px;">${assoEsc(u.email)}</span></span>
-          ${u.abonne ? '<span style="flex:none;font-size:10.5px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:99px;padding:1px 8px;">🔗 Contact</span>' : ''}
-        </div>`).join('')
+      ? candidats.map(u => {
+          const nomComplet = (u.prenom ? u.prenom + ' ' : '') + u.nom;
+          const coche = !!affSelection[u.id];
+          return `<div class="aff-suggestion-row" data-user-id="${u.id}" data-user-nom="${assoEsc(nomComplet)}" style="padding:9px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;${coche ? 'background:var(--bg);' : ''}">
+          <span style="display:flex;align-items:center;gap:8px;pointer-events:none;"><input type="checkbox" ${coche ? 'checked' : ''} style="width:15px;height:15px;accent-color:#F26422;">${assoEsc(nomComplet)} <span style="color:var(--muted);font-size:11.5px;">${assoEsc(u.email)}</span></span>
+          ${u.abonne ? '<span style="flex:none;font-size:10.5px;font-weight:700;color:#1d4ed8;background:#eff6ff;border-radius:99px;padding:1px 8px;pointer-events:none;">🔗 Contact</span>' : ''}
+        </div>`;
+        }).join('')
       : (q ? '<div style="padding:9px 12px;font-size:12.5px;color:var(--muted);">Aucun compte utilisateur trouvé.</div>'
            : '<div style="padding:9px 12px;font-size:12.5px;color:var(--muted);">Aucun contact abonné pour l\'instant — tapez un nom pour chercher dans tout Diaspo\'Actif.</div>');
+    affPositionnerSuggestions();
     box.style.display = 'block';
+    setTimeout(() => window.addEventListener('scroll', affFermerAuScroll, true), 200);
   } catch (e) { box.style.display = 'none'; }
 }
+/* Bug trouvé par exécution réelle le 2026-09-09 en testant la sélection multiple : un
+   document.getElementById('aff-search-results')?.addEventListener('mousedown', ...) posé ici
+   (même endroit que ce bloc) ne s'attachait JAMAIS — même cause exacte que le bug du
+   2026-08-30 ci-dessous pour #aff-search-input : ce script s'exécute avant que #aff-search-results
+   existe dans le DOM, le ?. avale l'échec silencieusement. Confirmé en le ré-attachant à la main
+   dans la console après chargement : ça fonctionnait alors instantanément. Corrigé en attribut
+   HTML onmousedown="affDelegateSuggestionClick(event)" directement sur la div (voir plus haut) —
+   fiable quel que soit le moment où l'élément apparaît réellement, comme oninput/onfocus
+   ci-dessous. affDelegateSuggestionClick est une fonction globale, jamais concernée par ce
+   problème de timing (elle n'a besoin d'exister qu'au moment du clic, pas au chargement). */
+window.affDelegateSuggestionClick = function(ev) {
+  const row = ev.target.closest('.aff-suggestion-row');
+  if (!row) return;
+  ev.preventDefault();
+  affToggleSelection(Number(row.dataset.userId), row.dataset.userNom);
+};
 /* Bug trouvé par exécution réelle le 2026-08-30 (signalé : "je commence à écrire un nom...
    propose moi des correspondances" — ne s'affichait jamais) : ce bloc s'exécutait AVANT que
    #aff-search-input existe dans le DOM (getElementById renvoyait null ici, confirmé par log),
    donc addEventListener ne s'attachait jamais, silencieusement (?. avale l'échec sans erreur).
-   Les gestionnaires input/focus/blur sont donc désormais posés en attributs HTML directement
-   sur le champ ci-dessus (oninput/onfocus/onblur) — fiables quel que soit le moment où l'élément
-   apparaît réellement dans le DOM, contrairement à une attache imposée depuis ce script global. */
+   Les gestionnaires input/focus posés en attributs HTML directement sur le champ ci-dessus
+   (oninput/onfocus) — fiables quel que soit le moment où l'élément apparaît réellement dans le
+   DOM, contrairement à une attache imposée depuis ce script global. Le blur ne ferme plus la
+   liste lui-même (2026-09-09) : avec la sélection multiple, il faut pouvoir cocher plusieurs
+   suggestions sans que la liste ne se referme entre chaque clic — voir le clic-extérieur
+   document ci-dessous, qui la referme seulement quand on clique vraiment ailleurs. */
+document.addEventListener('mousedown', (ev) => {
+  const box = document.getElementById('aff-search-results');
+  const input = document.getElementById('aff-search-input');
+  if (!box || box.style.display === 'none') return;
+  if (box.contains(ev.target) || ev.target === input) return;
+  box.style.display = 'none';
+});
 
-window.affOuvrirInvite = function(userId, nom) {
-  affPendingUser = userId;
-  document.getElementById('aff-invite-nom').textContent = 'Pour : ' + nom;
+window.affToggleSelection = function(userId, nom) {
+  if (affSelection[userId]) delete affSelection[userId];
+  else affSelection[userId] = nom;
+  affRenderChips();
+  affChargerSuggestions(document.getElementById('aff-search-input').value.trim());
+};
+window.affRetirerSelection = function(userId) {
+  delete affSelection[userId];
+  affRenderChips();
+};
+function affRenderChips() {
+  const chips = document.getElementById('aff-selection-chips');
+  const btn = document.getElementById('aff-envoyer-btn');
+  const ids = Object.keys(affSelection);
+  chips.style.display = ids.length ? 'flex' : 'none';
+  btn.style.display = ids.length ? '' : 'none';
+  btn.textContent = ids.length > 1 ? `Envoyer l'affiliation (${ids.length})` : `Envoyer l'affiliation`;
+  chips.innerHTML = ids.map(id => `
+    <span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:4px 6px 4px 12px;font-size:12.5px;font-weight:600;">
+      ${assoEsc(affSelection[id])}
+      <button type="button" onclick="affRetirerSelection(${id})" style="border:none;background:#EF4444;color:#fff;width:18px;height:18px;border-radius:50%;font-size:11px;cursor:pointer;line-height:1;">✕</button>
+    </span>`).join('');
+}
+
+window.affOuvrirInviteMultiple = function() {
+  const ids = Object.keys(affSelection);
+  if (!ids.length) return;
+  const noms = Object.values(affSelection);
+  document.getElementById('aff-invite-nom').textContent = ids.length > 1
+    ? `Pour ${ids.length} comptes : ${noms.join(', ')}`
+    : `Pour : ${noms[0]}`;
   document.getElementById('aff-invite-poste').value = '';
   document.getElementById('aff-invite-poste-autre').value = '';
   document.getElementById('aff-invite-poste-autre').style.display = 'none';
@@ -8827,20 +8931,48 @@ window.affOuvrirInvite = function(userId, nom) {
   document.getElementById('aff-search-results').style.display = 'none';
   document.getElementById('aff-invite-modal').style.display = 'flex';
 };
-document.getElementById('aff-invite-poste')?.addEventListener('change', function() {
-  document.getElementById('aff-invite-poste-autre').style.display = this.value === '__autre' ? '' : 'none';
-});
-document.getElementById('aff-invite-send')?.addEventListener('click', async () => {
+/* Bug trouvé par exécution réelle le 2026-09-09 (en testant l'envoi de la sélection multiple) :
+   les DEUX gestionnaires ci-dessous, posés en document.getElementById(...)?.addEventListener(...)
+   à ce même endroit du script, ne s'attachaient JAMAIS — exactement la même cause que le bug du
+   2026-08-30 documenté plus haut pour #aff-search-input (ce script s'exécute avant que ces
+   éléments de la modale n'existent dans le DOM). Confirmé : le bouton "Envoyer la demande"
+   n'avait donc jamais réellement envoyé aucune invitation, ni en sélection simple ni multiple.
+   Corrigés en attributs HTML onchange/onclick appelant ces fonctions globales (voir le select et
+   le bouton plus haut) — comme #aff-search-results ci-dessus, une fonction globale n'a besoin
+   d'exister qu'au moment du clic, jamais concernée par ce problème de timing. */
+window.affPosteAutreToggle = function(select) {
+  document.getElementById('aff-invite-poste-autre').style.display = select.value === '__autre' ? '' : 'none';
+};
+window.affEnvoyerInvitation = async function() {
   const errEl = document.getElementById('aff-invite-error'); errEl.style.display = 'none';
   const posteSel = document.getElementById('aff-invite-poste').value;
   const fonction = posteSel === '__autre' ? document.getElementById('aff-invite-poste-autre').value.trim() : posteSel;
   const message = document.getElementById('aff-invite-message').value.trim();
-  try {
-    await api('POST', `/initiatives/${window.__vitrineInitId}/membres`, { userId: affPendingUser, fonction: fonction || null, message: message || null });
+  const ids = Object.keys(affSelection);
+  if (!ids.length) return;
+  /* Envoi en lot (2026-09-09) : la route /initiatives/:id/membres n'accepte qu'un userId à la
+     fois — pas de changement serveur nécessaire, on l'appelle une fois par compte sélectionné.
+     allSettled plutôt que Promise.all : un compte déjà invité ne doit pas empêcher l'envoi aux
+     autres — les échecs sont listés à l'utilisateur, les réussites restent acquises. */
+  const resultats = await Promise.allSettled(ids.map(id =>
+    api('POST', `/initiatives/${window.__vitrineInitId}/membres`, { userId: Number(id), fonction: fonction || null, message: message || null })
+  ));
+  const echecs = resultats
+    .map((r, i) => r.status === 'rejected' ? affSelection[ids[i]] : null)
+    .filter(Boolean);
+  if (echecs.length) {
+    errEl.textContent = `Échec pour : ${echecs.join(', ')}.`;
+    errEl.style.display = 'block';
+    // Ne retire de la sélection que les envois réussis — les échecs restent pour un nouvel essai.
+    resultats.forEach((r, i) => { if (r.status === 'fulfilled') delete affSelection[ids[i]]; });
+    affRenderChips();
+  } else {
+    affSelection = {};
+    affRenderChips();
     document.getElementById('aff-invite-modal').style.display = 'none';
-    renderAffiliation();
-  } catch (e) { errEl.textContent = e.message || 'Erreur.'; errEl.style.display = 'block'; }
-});
+  }
+  renderAffiliation();
+};
 
 window.affEditFonction = async function(userId, fonctionActuelle) {
   const nouvelle = prompt('Nouveau poste :', fonctionActuelle || '');
