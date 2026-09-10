@@ -383,9 +383,12 @@ let docsLinks = [];
 
 async function loadSelfUser() {
   try {
-    const r = await fetch('/api/me', { credentials:'include' });
+    // Bug reel trouve par execution (2026-09-10) : /api/me n'existe pas (404, jamais signale
+    // car l'echec est avale silencieusement ci-dessous) -- la vraie route est /api/auth/me,
+    // qui renvoie l'utilisateur imbrique dans { user: ... }, pas a plat.
+    const r = await fetch('/api/auth/me', { credentials:'include' });
     if (!r.ok) return;
-    const me = await r.json();
+    const { user: me } = await r.json();
     if (me && me.prenom) {
       document.getElementById('part-self-name').textContent = `${me.prenom} ${me.nom} (vous)`;
       document.getElementById('part-self-avatar').textContent = (me.prenom[0]||'?').toUpperCase();
