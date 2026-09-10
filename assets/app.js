@@ -4768,6 +4768,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // y donne accès une fois cette page rendue), pour ne pas la dupliquer. Réutilise l'API de
     // déconnexion déjà en place (POST /auth/logout) plutôt que de dupliquer cette logique.
     if (!document.getElementById("da-sidebar-logout")) {
+      // Doublon réel signalé le 2026-09-10 : certaines pages (ex. index.html, via
+      // #hb-account-section) posent DÉJÀ leur propre lien "Déconnexion" en dur dans ce même
+      // tiroir, avant que ce bloc partagé ne pose le sien — deux liens "Déconnexion" visibles
+      // à l'écran malgré le commentaire ci-dessus qui affirmait l'inverse. On retire donc ici
+      // tout lien "Déconnexion" préexistant (quelle que soit son origine) avant de poser
+      // celui-ci, désormais le seul et unique de ce tiroir.
+      sidebar.querySelectorAll("a, button").forEach(el => {
+        if (/déconnexion/i.test(el.textContent || "")) el.remove();
+      });
       const logoutItem = document.createElement("a");
       logoutItem.id = "da-sidebar-logout";
       logoutItem.href = "#";
@@ -4952,13 +4961,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const user = await fetchCurrentUser();
     const isAdmin = user?.role === "administrateur";
 
+    // Accueil / Annuaire / Fil d'actualité RETIRÉS d'ici (doublon réel signalé le 2026-09-10) :
+    // ces 3 liens de navigation sont déjà présents dans le vrai tiroir de chaque page qui en
+    // a un (ex. index.html) — ce groupe ne doit reprendre QUE ce qui n'a effectivement plus
+    // de place ailleurs sur mobile (recherche/langue/notifications/messages), comme le dit le
+    // commentaire de initSidebarBandeau() ci-dessus, pas des liens de page déjà présents.
     const wrap = document.createElement("div");
     wrap.className = "sb-bandeau-group";
     wrap.innerHTML = `
       <span class="sb-group-lbl" style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);padding:4px 8px 4px;">📱 Bandeau</span>
-      <a href="index.html">🏠 Accueil</a>
-      <a href="annuaire.html">🔍 Annuaire</a>
-      <a href="fil-actualite.html">📰 Fil d'actualité</a>
       <a href="messagerie.html">💬 Messages</a>
       <a href="#" id="sb-bandeau-notifs">🔔 Notifications</a>
       <div id="sb-bandeau-lang-wrap" style="margin-bottom:4px;"></div>
