@@ -1625,7 +1625,7 @@ function renderInitiativeCard(it){
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
-        ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" onclick="event.stopPropagation(); demanderAffiliation(${it.id}, this)">🔗 Demande d'affiliation</button>` : ''}
+        ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" onclick="event.stopPropagation(); demanderAffiliation(${it.id}, this)">🔗 Affiliation</button>` : ''}
         ${it.owner_user_id ? `<button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openAnnuaireEvents(${it.owner_user_id}, ${JSON.stringify(it.nom||'').replace(/"/g,'&quot;')})">📅 Événements</button>` : ''}
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
@@ -1767,7 +1767,7 @@ async function demanderAffiliation(initiativeId, btn){
     if (btn) { btn.textContent = '⏳ Demande envoyée'; btn.style.opacity = '.8'; }
     if (typeof showToast === 'function') showToast("✅ Demande d'affiliation envoyée !");
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = "🔗 Demande d'affiliation"; }
+    if (btn) { btn.disabled = false; btn.textContent = "🔗 Affiliation"; }
     alert(e.message || "Erreur lors de l'envoi de la demande.");
   }
 }
