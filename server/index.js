@@ -40303,6 +40303,21 @@ route("DELETE", "/api/insc/historique/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* Suppression en masse (2026-09-10, demande explicite : "sélection multiple et un bouton tout
+   supprimer") — même garde de propriété et même irréversibilité que la suppression unitaire
+   ci-dessus, réutilise le même filtre optionnel par événement que la lecture (GET juste
+   au-dessus) pour que "Tout supprimer" respecte le filtre actif à l'écran plutôt que de
+   toujours tout effacer même quand un seul événement est affiché. */
+route("DELETE", "/api/insc/fiches/:id/historique", async (req, res, params, body, query) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  let sql = "DELETE FROM insc_historique WHERE fiche_id=?";
+  const args = [fiche.id];
+  if (query?.evenement_id) { sql += " AND evenement_id=?"; args.push(query.evenement_id); }
+  const r = await db.prepare(sql).run(...args);
+  sendJSON(res, 200, { ok: true, supprimees: r.changes });
+});
+
 /* ── PUBLIC : lecture, soumission, upload ── */
 route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=?").get(params.slug);

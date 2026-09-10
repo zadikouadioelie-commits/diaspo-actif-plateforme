@@ -192,6 +192,7 @@ const state = {
   selectedPresenceId: null,
   historique: [],
   historiqueFiltreEvenement: '',
+  historiqueSelection: [],
   busy: false,
 };
 
@@ -971,11 +972,15 @@ function renderStats() {
 // ---- Historique ----
 function renderHistorique() {
   const evenementsLies = state.ficheDetail?.evenements || [];
+  const selection = new Set(state.historiqueSelection);
   const rows = state.historique.map(a => `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:1px solid oklch(0.93 0.004 30);padding-bottom:12px;">
-      <div>
-        <div style="font-size:12.5px;font-weight:600;">${escH(a.created_at)} — ${escH(a.acteur_nom || 'Système')}</div>
-        <div style="font-size:13px;color:oklch(0.3 0.006 30);margin-top:3px;">${escH(a.action)}${a.details ? ' — ' + escH(a.details) : ''}</div>
+      <div style="display:flex;gap:10px;align-items:flex-start;min-width:0;">
+        <input type="checkbox" data-action="toggleSelectionHistorique" data-id="${a.id}" ${selection.has(a.id) ? 'checked' : ''} style="margin-top:3px;flex-shrink:0;">
+        <div>
+          <div style="font-size:12.5px;font-weight:600;">${escH(a.created_at)} — ${escH(a.acteur_nom || 'Système')}</div>
+          <div style="font-size:13px;color:oklch(0.3 0.006 30);margin-top:3px;">${escH(a.action)}${a.details ? ' — ' + escH(a.details) : ''}</div>
+        </div>
       </div>
       <button title="Supprimer cette entrée" style="flex-shrink:0;background:none;border:none;cursor:pointer;color:oklch(0.6 0.006 30);font-size:14px;padding:2px 4px;" data-action="supprimerHistorique" data-id="${a.id}">🗑</button>
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun historique pour le moment.</div>';
@@ -984,11 +989,16 @@ function renderHistorique() {
       <option value="">Tous les événements</option>
       ${evenementsLies.map(e => `<option value="${e.id}" ${String(state.historiqueFiltreEvenement)===String(e.id)?'selected':''}>${escH(e.titre)}</option>`).join('')}
     </select>` : '';
+  const actionsMasseHtml = state.historique.length ? `
+    <div style="display:flex;gap:8px;align-items:center;">
+      ${selection.size ? `<button data-action="supprimerSelectionHistorique" style="background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;">🗑 Supprimer la sélection (${selection.size})</button>` : ''}
+      <button data-action="supprimerToutHistorique" style="background:#dc2626;border:none;color:#fff;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;">🗑 Tout supprimer</button>
+    </div>` : '';
   return `
     <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <h3 style="margin:0;font-size:15px;font-weight:700;">Historique / audit</h3>
-        ${filtreHtml}
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">${filtreHtml}${actionsMasseHtml}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;">${rows}</div>
     </div>`;
@@ -1288,6 +1298,38 @@ const actions = {
       await api('DELETE', `/insc/historique/${el.dataset.id}`);
       state.historique = state.historique.filter(h => String(h.id) !== el.dataset.id);
       ia_toast('Entrée supprimée.', true);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  toggleSelectionHistorique(el) {
+    const id = parseInt(el.dataset.id);
+    const i = state.historiqueSelection.indexOf(id);
+    if (el.checked) { if (i === -1) state.historiqueSelection.push(id); }
+    else if (i !== -1) state.historiqueSelection.splice(i, 1);
+    render();
+  },
+  async supprimerSelectionHistorique() {
+    const ids = state.historiqueSelection.slice();
+    if (!ids.length) return;
+    if (!confirm(`Supprimer définitivement ${ids.length} entrée(s) d'historique sélectionnée(s) ?`)) return;
+    try {
+      await Promise.all(ids.map(id => api('DELETE', `/insc/historique/${id}`)));
+      state.historique = state.historique.filter(h => !ids.includes(h.id));
+      state.historiqueSelection = [];
+      ia_toast('Entrées supprimées.', true);
+      render();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async supprimerToutHistorique() {
+    if (!state.historique.length) return;
+    const suffixe = state.historiqueFiltreEvenement ? " (pour l'événement filtré)" : '';
+    if (!confirm(`Supprimer DÉFINITIVEMENT tout l'historique affiché${suffixe} (${state.historique.length} entrée(s)) ? Cette action est irréversible.`)) return;
+    try {
+      const q = state.historiqueFiltreEvenement ? `?evenement_id=${state.historiqueFiltreEvenement}` : '';
+      await api('DELETE', `/insc/fiches/${state.selectedFicheId}/historique${q}`);
+      state.historique = [];
+      state.historiqueSelection = [];
+      ia_toast('Historique supprimé.', true);
+      render();
     } catch (e) { ia_toast(e.message, false); }
   },
   async toggleFreezeFonds() {
