@@ -9584,8 +9584,8 @@ async function crmMyId() {
 const CRM_TABS = [
   ['dashboard', '🏠 Tableau de bord'], ['contacts', '👥 Contacts'], ['prospects', '🎯 Prospects'],
   ['opportunites', '💼 Opportunités'], ['demandes', '📩 Demandes'], ['campagnes', '📢 Campagnes'],
-  ['evenements', '🎟️ Événements'], ['echanges', '💬 Échanges'], ['taches', '📋 Tâches'],
-  ['stats', '📊 Statistiques'], ['parametres', '⚙️ Paramètres'],
+  ['evenements', '🎟️ Événements'], ['echanges', '💬 Échanges'], ['reseau-pro', '🌐 Réseau Pro'],
+  ['taches', '📋 Tâches'], ['stats', '📊 Statistiques'], ['parametres', '⚙️ Paramètres'],
 ];
 
 function crmSwitchTab(tab) {
@@ -9601,6 +9601,7 @@ function crmSwitchTab(tab) {
           </div>
           <div style="position:relative;min-width:240px;">
             <input type="search" id="crm-search-input" placeholder="🔍 Rechercher dans le CRM…" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;">Cherche par nom, e-mail ou société (contacts), titre (opportunités, tâches), produit ou demandeur (demandes de devis).</div>
             <div id="crm-search-results" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border-radius:10px;box-shadow:0 14px 30px rgba(0,0,0,.18);z-index:60;max-height:360px;overflow-y:auto;border:1px solid var(--border);"></div>
           </div>
         </div>
@@ -9634,7 +9635,7 @@ function crmRenderTab(tab) {
   const fns = {
     dashboard: crmRenderDashboard, contacts: () => crmRenderContacts(), prospects: crmRenderProspects,
     opportunites: crmRenderOpportunites, demandes: crmRenderDemandes, campagnes: crmRenderCampagnes,
-    evenements: crmRenderEvenements, echanges: crmRenderEchanges, taches: () => crmRenderTaches(),
+    evenements: crmRenderEvenements, echanges: crmRenderEchanges, 'reseau-pro': crmRenderReseauPro, taches: () => crmRenderTaches(),
     stats: crmRenderStats, parametres: crmRenderParametres,
   };
   (fns[tab] || crmRenderDashboard)();
@@ -10104,6 +10105,40 @@ async function crmRenderEchanges() {
           </div>
         </a>`;
       }).join('') || '<p style="color:var(--muted);">Aucune conversation pour l’instant.</p>'}
+    `;
+  } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
+}
+
+/* ── 🌐 Réseau Pro (lien — module reseau.html existant, 2026-09-10 demande explicite : « lier le
+   CRM au module Mon Réseau Pro pour atteindre facilement abonnés/abonnements/listes, sans
+   surcharger la page ») — aucune donnée dupliquée ici, juste des compteurs réels + accès direct
+   à l'onglet correspondant de reseau.html (voir ?tab=... ajouté à reseau.html pour ce lien). ── */
+async function crmRenderReseauPro() {
+  const c = document.getElementById('crm-tab-content');
+  try {
+    const myId = await crmMyId();
+    const [abonnesR, abonnementsR, listesR] = await Promise.all([
+      api('GET', `/profil/${myId}/abonnes`).catch(() => ({ total: 0 })),
+      api('GET', `/profil/${myId}/suivis`).catch(() => ({ total: 0 })),
+      api('GET', '/listes-diffusion').catch(() => ({ listes: [] })),
+    ]);
+    const items = [
+      { icon: '❤️', label: 'Abonnés', count: abonnesR.total || 0, tab: 'abonnes' },
+      { icon: '👥', label: 'Abonnements', count: abonnementsR.total || 0, tab: 'abonnements' },
+      { icon: '📋', label: 'Listes de diffusion', count: (listesR.listes || []).length, tab: 'listes' },
+      { icon: '🏢', label: 'Mon réseau (affiliations)', count: null, tab: 'mon-reseau' },
+    ];
+    c.innerHTML = `
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Vos abonnés, abonnements et listes de diffusion vivent dans le module Réseau Pro — accès rapide ci-dessous, sans dupliquer les données ici.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;">
+        ${items.map(it => `
+          <a href="reseau.html?tab=${it.tab}" target="_blank" class="card" style="padding:16px;text-decoration:none;color:inherit;display:block;">
+            <div style="font-size:22px;">${it.icon}</div>
+            ${it.count != null ? `<div style="font-size:22px;font-weight:800;margin-top:6px;">${it.count}</div>` : ''}
+            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${it.label}</div>
+          </a>`).join('')}
+      </div>
+      <div style="margin-top:16px;"><a class="btn btn-sm btn-outline" href="reseau.html" target="_blank">🌐 Ouvrir Mon Réseau Pro</a></div>
     `;
   } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
 }

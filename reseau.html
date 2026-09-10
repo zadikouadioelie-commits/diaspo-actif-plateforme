@@ -598,6 +598,11 @@ async function init(){
     await loadMyState();
     loadDemandesTab();
   }
+  /* Lien direct depuis un autre module (CRM, 2026-09-10, demande explicite) : reseau.html?tab=abonnes
+     ouvre directement l'onglet demandé au lieu d'atterrir systématiquement sur l'Annuaire — valeurs
+     valides : mon-reseau, abonnes, abonnements, demandes, listes, stats, profil-reseau. */
+  const tabDemande=new URLSearchParams(location.search).get('tab');
+  if(tabDemande){ const btn=document.querySelector(`.rtab[data-tab="${tabDemande}"]`); if(btn) btn.click(); }
 }
 
 function populateFilters(){
