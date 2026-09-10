@@ -432,14 +432,24 @@ button{font-family:inherit;cursor:pointer;}
    pensé pour le mobile où la nav horizontale disparaît, ne s'applique plus qu'en dessous de
    768px (règle déplacée dans la media query plus bas) : avant ce correctif, il s'appliquait
    à TOUS les formats et le bouton flottait par-dessus le contenu même sur grand écran. */
+/* Bouton doré + libellé (2026-09-10, demande explicite : "crée un bouton afficher le menu des
+   modules, mets ce bouton en doré") — l'icône seule ☰, discrète sur fond translucide, passait
+   inaperçue sur desktop (signalé par capture d'écran). Reprend le dégradé doré déjà utilisé pour
+   le badge Premium (.pvz-premium-badge) plutôt qu'une nouvelle couleur, pour rester dans le
+   langage visuel existant de la plateforme. Le libellé est ajouté en ::after (pas dans le HTML)
+   pour s'appliquer d'un coup à toutes les pages qui partagent ce bouton, sans les modifier une
+   par une. La variante mobile ci-dessous (ronde, orange, ::after "Menu") reste inchangée — elle
+   redéfinit déjà toutes ces propriétés à son propre point de rupture. */
 .sidebar-toggle{
-  display:flex;align-items:center;justify-content:center;
-  width:34px;height:34px;border-radius:10px;flex:none;
-  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
-  color:#fff;cursor:pointer;font-size:18px;
-  transition:background .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:auto;height:36px;padding:0 14px;border-radius:10px;flex:none;
+  background:linear-gradient(135deg,#F5D061,#C9971C);border:1px solid rgba(0,0,0,.08);
+  color:#3A2600;cursor:pointer;font-size:17px;font-weight:800;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+  transition:box-shadow .15s,transform .15s;
 }
-.sidebar-toggle:hover{background:rgba(255,255,255,.16);}
+.sidebar-toggle::after{content:"Menu des modules";font-size:13px;font-weight:700;white-space:nowrap;}
+.sidebar-toggle:hover{box-shadow:0 2px 7px rgba(0,0,0,.28);transform:translateY(-1px);}
 /* Fond sombre derrière le tiroir */
 .sidebar-backdrop{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:199;
@@ -463,9 +473,9 @@ button{font-family:inherit;cursor:pointer;}
      seul accès à la sidebar et doit rester repérable en permanence, quel que soit le défilement. */
   .sidebar-toggle{
     position:fixed;left:14px;top:74px;z-index:210;
-    width:50px;height:50px;border-radius:50%;
+    width:50px;height:50px;padding:0;gap:0;border-radius:50%;
     background:var(--orange);border:3px solid #fff;color:#fff;
-    font-size:22px;box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 0 2px rgba(242,100,34,.25);
+    font-size:22px;font-weight:400;box-shadow:0 4px 16px rgba(0,0,0,.35),0 0 0 2px rgba(242,100,34,.25);
     transition:background .15s,transform .15s;
   }
   .sidebar-toggle:hover{background:#d9551a;transform:scale(1.06);}
