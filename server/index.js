@@ -3313,10 +3313,17 @@ function getVitrineModulesState(init, { draft = false } = {}) {
   }
   const hasContenu = {
     a_propos: !!init.description,
-    // Organigramme (2026-09-10, demande explicite : "Équipe c'est un organigramme") --
-    // remplace l'ancien repli sur nom_responsable/prenom_responsable (un seul nom ne fait
-    // pas une équipe), voir vitrine_equipe_json / pvtBuildOrgTree() côté profil-app.html.
-    equipe: !!(init.vitrine_equipe_json && init.vitrine_equipe_json !== "[]" && init.vitrine_equipe_json !== "null"),
+    /* Organigramme (2026-09-10, demande explicite : "Équipe c'est un organigramme") --
+       remplace l'ancien repli sur nom_responsable/prenom_responsable (un seul nom ne fait pas
+       une équipe), voir vitrine_equipe_json / pvtBuildOrgTree() côté profil-app.html.
+       true fixe (pas conditionné au contenu) -- bug réel trouvé par exécution : une initiative
+       n'ayant JAMAIS explicitement basculé ce module dans "Personnaliser ma boutique" retombe
+       sur cette valeur par défaut (voir la boucle juste plus bas, branche "else"). Un module
+       tout juste introduit, sans membre ajouté nulle part, se serait donc trouvé invisible
+       PARTOUT y compris pour son propre propriétaire -- aucun moyen de jamais découvrir le
+       bouton "Modifier" pour ajouter un premier membre. Cohérent avec avis/contact/produits/
+       catalogue ci-dessous, déjà à true fixe pour la même raison. */
+    equipe: true,
     expertise: !!(init.vitrine_expertise_json && init.vitrine_expertise_json !== "[]" && init.vitrine_expertise_json !== "null"),
     certifications: !!(init.vitrine_certifications_json && init.vitrine_certifications_json !== "[]" && init.vitrine_certifications_json !== "null"),
     galerie_photos: !!(init.galerie_json && init.galerie_json !== "[]" && init.galerie_json !== "null"),

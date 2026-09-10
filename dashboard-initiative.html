@@ -1660,7 +1660,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <div class="card" style="margin-bottom:20px;">
             <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
+            <!-- Barre de recherche (2026-09-10, demande explicite) -- une trentaine de modules
+                 repartis en 6 categories rendait un module precis long a retrouver en defilant. -->
+            <input type="text" id="pv-modules-search" placeholder="🔍 Rechercher un module…" autocomplete="off" oninput="pvFilterModulesLib(this.value)" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:14px;">
             <div id="pv-modules-lib"><div class="notice">Chargement…</div></div>
+            <div id="pv-modules-empty" class="notice" style="display:none;">Aucun module ne correspond à « <span id="pv-modules-empty-q"></span> ».</div>
           </div>
 
           <div class="card" style="margin-bottom:20px;" id="pv-order-card">
@@ -6400,6 +6404,43 @@ function renderPvModulesLib() {
         }).join('')}
       </div>
     </div>`).join('');
+  pvApplyModulesFilter(); // ré-applique le filtre en cours : un toggle/re-rendu ne doit pas le perdre
+}
+
+/* Filtre de la bibliothèque de modules (2026-09-10, demande explicite) — filtre le DOM déjà
+   rendu plutôt que de reconstruire renderPvModulesLib() différemment : une seule logique de
+   rendu, le filtre n'agit qu'en affichage/masquage par-dessus. Insensible aux accents (un
+   utilisateur tapant "reseaux" doit retrouver "Réseaux sociaux"). */
+let __pvModulesFilter = '';
+function pvNormaliserRecherche(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+function pvFilterModulesLib(q) {
+  __pvModulesFilter = pvNormaliserRecherche(q);
+  pvApplyModulesFilter();
+}
+function pvApplyModulesFilter() {
+  const box = document.getElementById('pv-modules-lib');
+  const emptyBox = document.getElementById('pv-modules-empty');
+  if (!box) return;
+  const q = __pvModulesFilter;
+  let visibles = 0;
+  box.querySelectorAll(':scope > div').forEach(catDiv => {
+    let catVisibles = 0;
+    catDiv.querySelectorAll('[data-module-key]').forEach(row => {
+      const label = pvNormaliserRecherche(row.querySelector('span')?.textContent);
+      const match = !q || label.includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) catVisibles++;
+    });
+    catDiv.style.display = catVisibles ? '' : 'none';
+    visibles += catVisibles;
+  });
+  if (emptyBox) {
+    emptyBox.style.display = (q && !visibles) ? '' : 'none';
+    const qSpan = document.getElementById('pv-modules-empty-q');
+    if (qSpan) qSpan.textContent = document.getElementById('pv-modules-search')?.value || '';
+  }
 }
 
 async function pvToggleModule(key, actif) {
