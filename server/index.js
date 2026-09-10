@@ -2744,8 +2744,9 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     nom, domaine, domaines_secondaires, logo_url, reseaux_sociaux, slogan,
     // Villes/pays d'implantation (2026-08-30, demande explicite)
     villes_implantation, pays_implantation,
-    // Modules "Galerie vidéos", "Portfolio", "Réservation"
-    vitrine_videos_json, vitrine_portfolio_json, vitrine_reservation_json,
+    // Modules "Galerie vidéos", "Portfolio", "Réservation", "Équipe", "Réalisations"
+    vitrine_videos_json, vitrine_portfolio_json, vitrine_reservation_json, vitrine_equipe_json,
+    realisations_json,
   } = body;
   const THEMES_VALIDES = ['bordeaux', 'ocean', 'emeraude', 'prune', 'or'];
   await db.prepare(`
@@ -2819,6 +2820,13 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     ['vitrine_videos_json', vitrine_videos_json],
     ['vitrine_portfolio_json', vitrine_portfolio_json],
     ['vitrine_reservation_json', vitrine_reservation_json],
+    ['vitrine_equipe_json', vitrine_equipe_json],
+    /* realisations_json existait déjà (écrite par PUT /api/initiatives/:id/profil-public,
+       jamais par aucun éditeur front) -- module "Réalisations / Projets" affiché nulle part
+       sur la vitrine publique jusqu'ici (2026-09-10, audit demandé explicitement : "vérifie que
+       toutes ces options sont réellement appliquées"). Rejoint ici le même mécanisme de
+       sauvegarde que Portfolio pour que pvtEditRealisations() (profil-app.html) fonctionne. */
+    ['realisations_json', realisations_json],
     /* Domaines secondaires (0 à 2) — le domaine principal reste porté par la colonne
        `domaine` existante ; jusqu'à 3 domaines au total pour une vitrine. */
     ['domaines_secondaires_json', domaines_secondaires !== undefined
@@ -2832,7 +2840,17 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       : undefined],
   ]) {
     if (valeur === undefined) continue;
-    try { await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(valeur, params.id); }
+    /* Bug réel trouvé par exécution (2026-09-10, audit demandé explicitement : "je veux des
+       options qui fonctionnent réellement") : un tableau/objet passé tel quel comme paramètre
+       positionnel fait échouer node:sqlite ("Unknown named parameter '0'") -- il l'interprète
+       comme des paramètres NOMMÉS plutôt qu'une valeur unique à lier. La sauvegarde échouait
+       silencieusement (catch ci-dessous, jamais remonté à l'utilisateur) à chaque fois qu'un
+       vrai tableau était envoyé -- Portfolio, Réservation et Galerie vidéos étaient concernés
+       depuis leur création, pas seulement les modules ajoutés aujourd'hui (Équipe, Réalisations).
+       vitrineSave() (profil-app.html) envoie les tableaux/objets tels quels, jamais pré-
+       sérialisés côté client -- normaliser ici, une fois, protège tout ajout futur à cette liste. */
+    const val = (valeur !== null && typeof valeur === 'object') ? JSON.stringify(valeur) : valeur;
+    try { await db.prepare(`UPDATE initiatives SET ${champ}=? WHERE id=?`).run(val, params.id); }
     catch (e) { console.error('[vitrine] colonne indisponible', champ, e.message); }
   }
 
@@ -3150,6 +3168,7 @@ const VITRINE_MODULES_REGISTRY = {
 const VITRINE_CONTENU_MODULE = {
   a_propos:         { champs: ["description", "mission"], label: "Présentation" },
   portfolio:        { champs: ["vitrine_portfolio_json"], label: "Portfolio" },
+  equipe:           { champs: ["vitrine_equipe_json"], label: "Équipe" },
   galerie_photos:   { champs: ["galerie_json"], label: "Galerie photos" },
   galerie_videos:   { champs: ["vitrine_videos_json"], label: "Galerie vidéos" },
   realisations:     { champs: ["realisations_json"], label: "Réalisations" },
@@ -3255,7 +3274,8 @@ const VITRINE_CHAMPS_BROUILLON = [
   "vitrine_banniere_url", "galerie_json",
   "vitrine_objectif_cible", "vitrine_objectif_libelle",
   "vitrine_offre_flash_titre", "vitrine_offre_flash_fin",
-  "vitrine_videos_json", "vitrine_portfolio_json", "vitrine_reservation_json",
+  "vitrine_videos_json", "vitrine_portfolio_json", "vitrine_reservation_json", "vitrine_equipe_json",
+  "realisations_json",
 ];
 
 /* Modules toujours actifs par défaut pour toute vitrine, indépendamment du type choisi
@@ -3292,7 +3312,11 @@ function getVitrineModulesState(init, { draft = false } = {}) {
     try { stored = JSON.parse(init.vitrine_modules_json || "{}") || {}; } catch (_) { stored = {}; }
   }
   const hasContenu = {
-    a_propos: !!init.description, equipe: !!(init.nom_responsable || init.prenom_responsable),
+    a_propos: !!init.description,
+    // Organigramme (2026-09-10, demande explicite : "Équipe c'est un organigramme") --
+    // remplace l'ancien repli sur nom_responsable/prenom_responsable (un seul nom ne fait
+    // pas une équipe), voir vitrine_equipe_json / pvtBuildOrgTree() côté profil-app.html.
+    equipe: !!(init.vitrine_equipe_json && init.vitrine_equipe_json !== "[]" && init.vitrine_equipe_json !== "null"),
     expertise: !!(init.vitrine_expertise_json && init.vitrine_expertise_json !== "[]" && init.vitrine_expertise_json !== "null"),
     certifications: !!(init.vitrine_certifications_json && init.vitrine_certifications_json !== "[]" && init.vitrine_certifications_json !== "null"),
     galerie_photos: !!(init.galerie_json && init.galerie_json !== "[]" && init.galerie_json !== "null"),

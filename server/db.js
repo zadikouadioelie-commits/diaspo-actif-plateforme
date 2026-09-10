@@ -1655,6 +1655,10 @@ db.exec(`
 
 /* -- Migration douce : ajoute les colonnes si elles n'existent pas encore -- */
 const MIGRATIONS = [
+  // Module "Équipe" de la vitrine (2026-09-10, demande explicite : "Équipe c'est un
+  // organigramme") — tableau de {nom, fonction, rattache_a, photo}, l'arbre hiérarchique est
+  // reconstruit à l'affichage à partir de rattache_a (nom du responsable), voir profil-app.html.
+  ["initiatives", "vitrine_equipe_json TEXT DEFAULT '[]'"],
   // Historique fiche d'inscription — rattache une entrée à un événement précis quand la fiche
   // en couvre plusieurs (2026-09-09, demande explicite : "historique supprimable par fiche par
   // événements"). NULL pour les entrées non liées à une inscription (édition de fiche, gel...).

@@ -385,6 +385,9 @@ async function pgInit() {
 /* Liste unique des colonnes attendues — partagee entre la migration et le controle
    post-deploiement, pour qu'elles ne puissent jamais diverger. */
 const COLONNES_MIGRATION = [
+    /* Module "Équipe" de la vitrine (2026-09-10) — miroir exact de l'ALTER db.js, voir le
+       commentaire équivalent là-bas. */
+    ['initiatives', 'vitrine_equipe_json', "TEXT DEFAULT '[]'"],
     /* Historique fiche d'inscription — rattachement événement (2026-09-09) — miroir exact de
        l'ALTER db.js, voir le commentaire équivalent là-bas. */
     ['insc_historique', 'evenement_id', 'INTEGER'],

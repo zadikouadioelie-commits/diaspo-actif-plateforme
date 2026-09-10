@@ -901,6 +901,26 @@ html, body { overflow-x:clip; }
   .pvt-hero-title { font-size:28px; }
   .pvt-actionbar { flex-direction:column; align-items:stretch; }
 }
+
+/* Organigramme du module "Équipe" (2026-09-10, demande explicite : "Équipe c'est un
+   organigramme") — technique CSS classique à base de <ul>/<li> imbriqués : chaque niveau
+   dessine ses propres traits de connexion via ::before/::after, sans JS de mise en page ni
+   dépendance externe. Voir pvtBuildOrgTree()/pvtOrgCard() plus bas dans ce fichier. */
+.pvt-orgchart, .pvt-orgchart ul { list-style:none; margin:0; padding:0; }
+.pvt-orgchart { display:inline-flex; padding-top:20px; }
+.pvt-orgchart li { position:relative; padding:20px 10px 0; display:flex; flex-direction:column; align-items:center; }
+.pvt-orgchart li::before, .pvt-orgchart li::after {
+  content:''; position:absolute; top:0; right:50%; border-top:2px solid #D8DEE8; width:50%; height:20px;
+}
+.pvt-orgchart li::after { right:auto; left:50%; border-left:2px solid #D8DEE8; }
+.pvt-orgchart li:only-child::after, .pvt-orgchart li:only-child::before { display:none; }
+.pvt-orgchart li:only-child { padding-top:0; }
+.pvt-orgchart li:first-child::before, .pvt-orgchart li:last-child::after { border:0 none; }
+.pvt-orgchart li:last-child::before { border-right:2px solid #D8DEE8; border-radius:0 6px 0 0; }
+.pvt-orgchart li:first-child::after { border-radius:6px 0 0 0; }
+.pvt-orgchart ul { display:flex; padding-top:20px; position:relative; }
+.pvt-orgchart ul::before { content:''; position:absolute; top:0; left:50%; border-left:2px solid #D8DEE8; width:0; height:20px; }
+.pvt-orgchart > li { padding-top:0; }
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
@@ -3098,7 +3118,12 @@ async function renderVitrineVisitor(init) {
   if (modOn('demande_partenariat') && (init.vitrine_partenariat_active || isOwn)) dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId},'partenariat')">🤝 Demande de partenariat</a>`);
   dynBtns.push(`<a class="pvt-contact-btn" href="javascript:void(0)" onclick="contacterBoutique(${ownerId})">💬 Message</a>`);
 
-  const contactSec = `<section id="pv-contact" class="pvt-contact">
+  /* Corrigé (2026-09-10, audit demandé explicitement) : cette section s'affichait auparavant
+     inconditionnellement, sans jamais vérifier modOn('contact') -- réglé sur "Masqué" dans les
+     paramètres, elle continuait de s'afficher exactement comme si "Actif". Gardé accessible au
+     propriétaire (isOwn) même masqué publiquement : sinon il perdrait tout accès à ses propres
+     boutons de gestion (partage, coordonnées) depuis sa propre page. */
+  const contactSec = (modOn('contact') || isOwn) ? `<section id="pv-contact" class="pvt-contact">
     <div>
       <h4>Coordonnées</h4>
       ${coordsBody}
@@ -3111,7 +3136,7 @@ async function renderVitrineVisitor(init) {
       <h4 style="text-align:center;">Partager la boutique</h4>
       <div id="pvt-qr" style="display:flex;justify-content:center;"></div>
     </div>
-  </section>`;
+  </section>` : '';
 
   const vitrineVisible = init.vitrine_active !== 0;
   const masqueeBanner = isOwn ? `<div style="background:${vitrineVisible?'#F0FDF4':'#1F2937'};color:${vitrineVisible?'#166534':'#FBBF24'};padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
@@ -3174,6 +3199,52 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>` : '';
 
+  /* Module "Équipe" (2026-09-10, demande explicite : "Équipe c'est un organigramme") — un
+     membre se rattache à un autre PAR SON NOM (rattache_a), pas par un identifiant technique :
+     pas de sélecteur dédié à construire, l'éditeur générique pvtOpenListEditor (simples champs
+     texte) suffit tel quel. pvtBuildOrgTree() reconstruit l'arbre à l'affichage. */
+  function pvtOrgCard(m) {
+    const initiale = ((m.nom || '?').trim()[0] || '?').toUpperCase();
+    const avatar = m.photo
+      ? `<img loading="lazy" src="${esc(m.photo)}" alt="" style="width:52px;height:52px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px;">`
+      : `<div style="width:52px;height:52px;border-radius:50%;background:#122A4D;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;margin:0 auto 8px;">${esc(initiale)}</div>`;
+    return `<div style="background:#F6F1EE;border-radius:12px;padding:12px 14px;min-width:128px;max-width:158px;text-align:center;">
+      ${avatar}
+      <div style="font-size:13px;font-weight:700;color:#122A4D;line-height:1.3;">${esc(m.nom||'')}</div>
+      ${m.fonction ? `<div style="font-size:11.5px;color:#6B7686;margin-top:2px;line-height:1.3;">${esc(m.fonction)}</div>` : ''}
+    </div>`;
+  }
+  function pvtBuildOrgTree(members) {
+    const byName = {};
+    members.forEach(m => { if (m.nom && m.nom.trim()) byName[m.nom.trim().toLowerCase()] = m; });
+    const childrenOf = {};
+    const roots = [];
+    members.forEach(m => {
+      const parentKey = (m.rattache_a || '').trim().toLowerCase();
+      const monKey = (m.nom || '').trim().toLowerCase();
+      const parent = (parentKey && byName[parentKey] && parentKey !== monKey) ? byName[parentKey] : null;
+      if (parent) (childrenOf[parentKey] = childrenOf[parentKey] || []).push(m);
+      else roots.push(m);
+    });
+    // Garde anti-boucle : un rattachement circulaire (A -> B -> A, saisie manuelle) ne doit
+    // jamais bloquer l'affichage — un nœud déjà vu sur SA propre branche s'affiche sans enfants.
+    function renderNode(m, dejaVus) {
+      const key = (m.nom || '').trim().toLowerCase();
+      if (dejaVus.has(key)) return `<li>${pvtOrgCard(m)}</li>`;
+      const suite = new Set(dejaVus); suite.add(key);
+      const enfants = childrenOf[key] || [];
+      return `<li>${pvtOrgCard(m)}${enfants.length ? `<ul>${enfants.map(e => renderNode(e, suite)).join('')}</ul>` : ''}</li>`;
+    }
+    return `<ul class="pvt-orgchart">${roots.map(r => renderNode(r, new Set())).join('')}</ul>`;
+  }
+  const equipe = safeParseJson(init.vitrine_equipe_json, []);
+  const equipeSec = ((equipe.length || isOwn) && modOn('equipe')) ? `<section id="pv-equipe" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🧑‍🤝‍🧑 Équipe</h3>${isOwn?`<button onclick="pvtEditEquipe()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:20px;overflow-x:auto;">
+      ${equipe.length ? pvtBuildOrgTree(equipe) : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun membre. Cliquez sur Modifier pour construire votre organigramme.':''}</span>`}
+    </div>
+  </section>` : '';
+
   const portfolio = safeParseJson(init.vitrine_portfolio_json, []);
   const portfolioSec = ((portfolio.length || isOwn) && modOn('portfolio')) ? `<section id="pv-portfolio" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🗂️ Portfolio</h3>${isOwn?`<button onclick="pvtEditPortfolio()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
@@ -3188,6 +3259,42 @@ async function renderVitrineVisitor(init) {
           ? `<a href="${esc(p.lien)}" target="_blank" rel="noopener" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">${inner}</a>`
           : `<div style="background:#F6F1EE;border-radius:12px;overflow:hidden;">${inner}</div>`;
       }).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun projet. Cliquez sur Modifier pour en ajouter.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  /* Module "Réalisations / Projets" (2026-09-10, audit demandé explicitement : "vérifie que
+     toutes ces options sont réellement appliquées") — realisations_json existait déjà côté
+     serveur (écrite par PUT .../profil-public) mais n'était affichée nulle part sur la vitrine
+     publique : le bouton "Actif" des paramètres n'avait donc jamais aucun effet visible. */
+  const realisations = safeParseJson(init.realisations_json, []);
+  const realisationsSec = ((realisations.length || isOwn) && modOn('realisations')) ? `<section id="pv-realisations" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>📌 Réalisations / Projets</h3>${isOwn?`<button onclick="pvtEditRealisations()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
+      ${realisations.length ? realisations.map(p => {
+        const inner = `${p.image?`<img loading="lazy" src="${esc(p.image)}" alt="" style="width:100%;height:130px;object-fit:cover;display:block;">`:''}
+          <div style="padding:12px;">
+            <div style="font-size:13.5px;font-weight:700;color:#122A4D;line-height:1.35;">${esc(p.titre||'')}</div>
+            ${p.description?`<div style="font-size:12px;color:#6B7686;margin-top:4px;line-height:1.5;">${esc(p.description)}</div>`:''}
+          </div>`;
+        return p.lien
+          ? `<a href="${esc(p.lien)}" target="_blank" rel="noopener" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">${inner}</a>`
+          : `<div style="background:#F6F1EE;border-radius:12px;overflow:hidden;">${inner}</div>`;
+      }).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucune réalisation. Cliquez sur Modifier pour en ajouter.':''}</span>`}
+    </div>
+  </section>` : '';
+
+  /* Module "Réseaux sociaux" (même audit) — init.reseaux_sociaux existe et se sauvegarde déjà
+     (route PUT .../vitrine principale), mais aucune section publique ne l'affichait. Même
+     mapping icônes/libellés que la version "profil personnel" (pvzEditReseaux, plus haut dans
+     ce fichier) pour rester cohérent visuellement entre les deux types de fiche. */
+  const rsInit = (() => { try { return typeof init.reseaux_sociaux === 'object' && init.reseaux_sociaux ? init.reseaux_sociaux : JSON.parse(init.reseaux_sociaux || '{}'); } catch (e) { return {}; } })();
+  const RS_ICONS = { linkedin:'💼', facebook:'📘', instagram:'📷', x:'🐦', youtube:'▶️', site_web:'🔗' };
+  const RS_LABELS = { linkedin:'LinkedIn', facebook:'Facebook', instagram:'Instagram', x:'X / Twitter', youtube:'YouTube', site_web:'Site web' };
+  const rsLinksInit = Object.entries(rsInit).filter(([,v]) => v);
+  const reseauxSociauxSec = ((rsLinksInit.length || isOwn) && modOn('reseaux_sociaux')) ? `<section id="pv-reseaux-sociaux" class="pvt-section">
+    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>🌐 Réseaux sociaux</h3>${isOwn?`<button onclick="pvtEditReseaux()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
+    <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;">
+      ${rsLinksInit.length ? rsLinksInit.map(([k,v]) => `<a href="${esc(v.startsWith('http')?v:'https://'+v)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:7px;background:#F6F1EE;border-radius:10px;padding:9px 14px;text-decoration:none;color:#122A4D;font-size:13px;font-weight:600;">${RS_ICONS[k]||'🔗'} ${esc(RS_LABELS[k]||k)}</a>`).join('') : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">${isOwn?'Aucun réseau renseigné. Cliquez sur Modifier pour en ajouter.':''}</span>`}
     </div>
   </section>` : '';
 
@@ -3209,7 +3316,8 @@ async function renderVitrineVisitor(init) {
   const MODULE_SECTIONS = [
     ['evenements', evenementsSec], ['formations_catalogue', formationsSec],
     ['actualites', actualitesSec], ['galerie_videos', videosSec],
-    ['portfolio', portfolioSec], ['reservation', reservationSec],
+    ['portfolio', portfolioSec], ['reservation', reservationSec], ['equipe', equipeSec],
+    ['realisations', realisationsSec], ['reseaux_sociaux', reseauxSociauxSec],
     ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
@@ -3564,6 +3672,53 @@ function pvtEditPortfolio() {
   pvtOpenListEditor({ field:'vitrine_portfolio_json', title:'Portfolio', itemLabel:'une réalisation',
     itemFields:[{key:'titre',label:'Titre du projet'},{key:'description',label:'Description courte'},
                 {key:'image',label:"Lien de l'image (facultatif)"},{key:'lien',label:'Lien externe (facultatif)'}] });
+}
+function pvtEditEquipe() {
+  pvtOpenListEditor({ field:'vitrine_equipe_json', title:'Équipe (organigramme)', itemLabel:'un membre',
+    itemFields:[{key:'nom',label:'Nom complet'},{key:'fonction',label:'Fonction / rôle'},
+                {key:'rattache_a',label:"Rattaché(e) à (nom exact d'un autre membre, vide = sommet)"},
+                {key:'photo',label:'Lien de la photo (facultatif)'}] });
+}
+function pvtEditRealisations() {
+  pvtOpenListEditor({ field:'realisations_json', title:'Réalisations / Projets', itemLabel:'une réalisation',
+    itemFields:[{key:'titre',label:'Titre du projet'},{key:'description',label:'Description courte'},
+                {key:'image',label:"Lien de l'image (facultatif)"},{key:'lien',label:'Lien externe (facultatif)'}] });
+}
+/* Réseaux sociaux — objet {cle: url}, pas une liste : ne rentre pas dans pvtOpenListEditor
+   (conçu pour des tableaux), petite modale dédiée sur le même modèle visuel. */
+function pvtEditReseaux() {
+  if (!isOwn || !_vitrineInit) return;
+  let r = {};
+  try { r = typeof _vitrineInit.reseaux_sociaux === 'object' && _vitrineInit.reseaux_sociaux ? _vitrineInit.reseaux_sociaux : JSON.parse(_vitrineInit.reseaux_sociaux || '{}'); } catch (e) {}
+  document.getElementById('pvt-list-modal')?.remove();
+  const fields = [['site_web','Site web'],['linkedin','LinkedIn'],['instagram','Instagram'],['facebook','Facebook'],['x','X / Twitter'],['youtube','YouTube']];
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-list-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:22px;max-height:85vh;overflow-y:auto;">
+    <h2 style="margin:0 0 14px;font-size:16px;">✏️ Réseaux sociaux</h2>
+    ${fields.map(([k,l]) => `<div style="margin-bottom:10px;">
+      <label style="font-size:11px;font-weight:700;color:#8794A7;text-transform:uppercase;display:block;margin-bottom:3px;">${esc(l)}</label>
+      <input id="pvt-rs-${k}" value="${esc(r[k]||'')}" placeholder="https://…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;">
+    </div>`).join('')}
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+      <button onclick="document.getElementById('pvt-list-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtSaveReseaux()" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+async function pvtSaveReseaux() {
+  const keys = ['site_web','linkedin','instagram','facebook','x','youtube'];
+  const reseaux = {};
+  keys.forEach(k => { const v = document.getElementById('pvt-rs-'+k)?.value.trim(); if (v) reseaux[k] = v; });
+  try {
+    await vitrineSave({ reseaux_sociaux: reseaux });
+    _vitrineInit.reseaux_sociaux = JSON.stringify(reseaux);
+    document.getElementById('pvt-list-modal')?.remove();
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 function pvtEditReservation() {
   pvtOpenListEditor({ field:'vitrine_reservation_json', title:'Réservation', itemLabel:'une prestation réservable',
