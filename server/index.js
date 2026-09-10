@@ -632,6 +632,37 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   } catch (_) {}
 
+  /* Message de bienvenue dans la messagerie interne (2026-09-10, demande explicite : la
+     notification-cloche seule ne suffisait pas — "le mail et la messagerie" à chaque fois).
+     Envoyé par le propriétaire de l'Initiative officielle (getInitiativeOfficielleId(),
+     "Diaspo'Actif Officiel") plutôt que le compte administrateur générique : c'est l'identité
+     publique que les nouveaux comptes voient déjà (posts, profil) et suivent automatiquement
+     dès l'inscription (voir plus bas), pas un compte invisible côté utilisateur. IIFE non
+     attendue, comme le reste de ce bloc : un souci ici ne doit jamais retarder ni casser
+     l'inscription. Insertion directe conversations/messages plutôt que via les routes HTTP
+     (qui appliquent peutEcrireDirectement) : sans incidence puisque l'abonnement automatique
+     à l'Initiative officielle (plus bas dans ce handler) fait de toute façon passer ce filtre
+     si jamais on rejouait ce message via ces routes plus tard. */
+  (async () => {
+    try {
+      if (!["initiative", "utilisateur", "collectivite"].includes(user.role)) return;
+      const officielleId = await getInitiativeOfficielleId();
+      if (!officielleId) return;
+      const officielle = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(officielleId);
+      const expediteurId = officielle?.owner_user_id;
+      if (!expediteurId || Number(expediteurId) === Number(id)) return;
+      let conv = await db.prepare("SELECT id FROM conversations WHERE (user1_id=? AND user2_id=?) OR (user1_id=? AND user2_id=?)").get(expediteurId, id, id, expediteurId);
+      let convId = conv?.id;
+      if (!convId) {
+        convId = (await db.prepare("INSERT INTO conversations (user1_id, user2_id) VALUES (?,?)").run(expediteurId, id)).lastInsertRowid;
+      }
+      const nomAfficheMsg = [user.prenom, user.nom].filter(Boolean).join(" ") || user.email;
+      const texteMsg = `Bonjour ${nomAfficheMsg} 👋\n\nBienvenue sur Diaspo'Actif ! Je suis ravi(e) de vous compter parmi nous.\n\nN'hésitez pas à m'écrire ici si vous avez la moindre question pour bien démarrer.\n\nL'équipe Diaspo'Actif`;
+      await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?,?,?,'text')").run(convId, expediteurId, texteMsg);
+      creerNotif(id, "message", "Nouveau message", "Diaspo'Actif Officiel vous a envoyé un message", { conversation_id: convId });
+    } catch (_) {}
+  })();
+
   // Email de vérification d'adresse (non bloquant — soft gate, ne bloque pas la connexion)
   try {
     const verifToken = crypto.randomBytes(32).toString("hex");
