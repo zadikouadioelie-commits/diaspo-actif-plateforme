@@ -604,10 +604,10 @@ function renderTypes() {
           </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px 20px;">
-          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Tarif</div><div style="font-family:'IBM Plex Mono', monospace; font-size:18px; font-weight:600;">${selected.priceLabel}</div></div>
-          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Places</div><div style="font-size:14px; font-weight:600;">${selected.capacityLabel}</div></div>
+          <div data-action="editTarif" data-id="${selected.id}" style="cursor:pointer;" title="Cliquer pour modifier"><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Tarif ✏️</div><div style="font-family:'IBM Plex Mono', monospace; font-size:18px; font-weight:600;">${selected.priceLabel}</div></div>
+          <div data-action="editPlaces" data-id="${selected.id}" style="cursor:pointer;" title="Cliquer pour modifier"><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Places ✏️</div><div style="font-size:14px; font-weight:600;">${selected.capacityLabel}</div></div>
           <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Validation</div><div style="font-size:14px; font-weight:600;">${selected.validationLabel}</div></div>
-          <div><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Période d'inscription</div><div style="font-size:14px; font-weight:600;">${escH(selected.periodLabel)}</div></div>
+          <div data-action="editPeriode" data-id="${selected.id}" style="cursor:pointer;" title="Cliquer pour modifier"><div style="font-size:11.5px; color:oklch(0.55 0.006 30); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">Période d'inscription ✏️</div><div style="font-size:14px; font-weight:600;">${escH(selected.periodLabel)}</div></div>
         </div>
         <div style="margin-top:20px; padding-top:18px; border-top:1px solid oklch(0.92 0.004 30);">
           <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span style="color:oklch(0.55 0.006 30);">Places utilisées</span><span style="font-weight:600;">${selected.registered} / ${selected.capacityDisplay}</span></div>
@@ -1124,6 +1124,40 @@ const actions = {
     const placesTxt = prompt('Nombre de places maximum (laisser vide = illimité) :');
     try {
       await api('POST', `/insc/fiches/${state.selectedFicheId}/types`, { label: label.trim(), gratuit, prix, places_max: placesTxt ? parseInt(placesTxt) : null, liste_attente_active: !!placesTxt });
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async editTarif(el) {
+    const id = parseInt(el.dataset.id);
+    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const gratuit = confirm('Ce type est-il gratuit ? OK = Gratuit, Annuler = Payant');
+    let prix = 0;
+    if (!gratuit) {
+      const saisie = prompt('Prix en euros :', type.prix != null ? String(type.prix) : '0');
+      if (saisie === null) return;
+      prix = parseFloat(saisie) || 0;
+    }
+    try { await api('PUT', '/insc/types/' + id, { gratuit, prix }); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async editPlaces(el) {
+    const id = parseInt(el.dataset.id);
+    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const saisie = prompt('Nombre de places maximum (laisser vide = illimité) :', type.places_max != null ? String(type.places_max) : '');
+    if (saisie === null) return;
+    const places_max = saisie.trim() ? parseInt(saisie.trim()) : null;
+    try { await api('PUT', '/insc/types/' + id, { places_max }); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
+  async editPeriode(el) {
+    const id = parseInt(el.dataset.id);
+    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const ouverture = prompt("Date d'ouverture de ce type (AAAA-MM-JJ, laisser vide pour reprendre la période générale de la fiche) :", type.date_ouverture ? type.date_ouverture.slice(0,10) : '');
+    if (ouverture === null) return;
+    const fermeture = prompt('Date de fermeture (AAAA-MM-JJ, laisser vide = pas de fermeture spécifique) :', type.date_fermeture ? type.date_fermeture.slice(0,10) : '');
+    if (fermeture === null) return;
+    try {
+      await api('PUT', '/insc/types/' + id, { date_ouverture: ouverture.trim() || null, date_fermeture: fermeture.trim() || null });
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
