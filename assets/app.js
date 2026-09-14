@@ -1110,9 +1110,24 @@ async function initComptesLiesSwitcher(user) {
     document.querySelectorAll('.cl-switch-dd.open').forEach(x => x.classList.remove('open'));
     if (open) return;
     const r = triggerBtn.getBoundingClientRect();
-    dd.style.top = Math.round(r.bottom + 8) + 'px';
     dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
+    /* Révélé AVANT de mesurer sa hauteur (offsetHeight vaut 0 tant que display:none) — se
+       passe dans le même tick JS que la suite, donc sans flash de mauvais positionnement à
+       l'écran. */
     dd.classList.add('open');
+    const ddHeight = dd.offsetHeight;
+    /* Ouvre vers le HAUT plutôt que vers le bas si la place manque en dessous du déclencheur
+       (le bouton "Comptes" de la barre du bas mobile est collé au bord de l'écran — ouvrir
+       systématiquement vers le bas, comme pour le ▾ de la topbar desktop, poussait le menu
+       entièrement sous la ligne visible : la classe .open était bien posée, mais le menu
+       restait invisible et inatteignable — signalé « ne fonctionne pas sur téléphone »). */
+    if (window.innerHeight - r.bottom < ddHeight + 8 && r.top > ddHeight + 8) {
+      dd.style.bottom = Math.round(window.innerHeight - r.top + 8) + 'px';
+      dd.style.top = 'auto';
+    } else {
+      dd.style.top = Math.round(r.bottom + 8) + 'px';
+      dd.style.bottom = 'auto';
+    }
     /* Activé avec un léger délai plutôt qu'immédiatement : le bouton n'est souvent visible
        qu'après défilement horizontal de son conteneur (topbar-right ou barre du bas sous
        768px), et le navigateur ajuste parfois lui-même ce défilement juste après le clic pour
