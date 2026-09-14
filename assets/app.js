@@ -4771,6 +4771,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const close    = document.getElementById("sidebar-close");
     const backdrop = document.getElementById("sidebar-backdrop");
     const LS_KEY = "da_sidebar_collapsed";
+    // Bouton "retour" du téléphone (2026-09-14, demande explicite) : sans ceci, "retour"
+    // sur mobile navigue dans l'historique du navigateur (page précédente, voire hors du
+    // site) au lieu de simplement refermer ce menu plein écran — aucune gestion de
+    // popstate n'existait avant. Technique standard : on pousse une entrée d'historique
+    // factice (même URL) à l'ouverture ; "retour" la dépile, déclenche popstate, on se
+    // contente alors de refermer le menu sans rien recharger.
+    let sidebarHistoryPushed = false;
 
     // Recherche dans le menu : une seule barre "Rechercher un module…" désormais, celle avec
     // suggestions (initSidebarSearch, insérée juste après .brand). Une première version plus
@@ -4815,8 +4822,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (navToggleIcon) navToggleIcon.textContent = "✕";
       if (navToggle) navToggle.classList.add("active");
       if (persist) localStorage.setItem(LS_KEY, "0");
+      if (!sidebarHistoryPushed) {
+        history.pushState({ daMenuOpen: true }, "", location.href);
+        sidebarHistoryPushed = true;
+      }
     }
-    function closeSidebar(persist) {
+    // viaNavigation: fermeture parce qu'un lien du menu vient d'être cliqué — une vraie
+    // navigation de page est sur le point de se produire, donc on NE dépile PAS l'entrée
+    // factice ici (un history.back() en concurrence avec la navigation du lien casserait
+    // ou annulerait cette dernière) ; elle sera simplement remplacée par la nouvelle page.
+    function closeSidebar(persist, viaNavigation) {
       sidebar.classList.remove("open");
       if (backdrop) backdrop.classList.remove("open");
       document.body.style.overflow = "";
@@ -4824,7 +4839,23 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (navToggleIcon) navToggleIcon.textContent = "☰";
       if (navToggle) navToggle.classList.remove("active");
       if (persist) localStorage.setItem(LS_KEY, "1");
+      if (sidebarHistoryPushed && !viaNavigation) {
+        sidebarHistoryPushed = false;
+        history.back();
+      } else if (viaNavigation) {
+        sidebarHistoryPushed = false;
+      }
     }
+    // "Retour" du téléphone pendant que le menu est ouvert : dépile l'entrée factice
+    // ci-dessus sans rien recharger (même URL) — on se contente de refermer le menu.
+    // sidebarHistoryPushed est remis à false AVANT closeSidebar() pour que celle-ci ne
+    // déclenche pas un second history.back() (l'entrée vient déjà d'être consommée).
+    window.addEventListener("popstate", () => {
+      if (sidebar.classList.contains("open")) {
+        sidebarHistoryPushed = false;
+        closeSidebar(true);
+      }
+    });
 
     // Le bouton bascule : ouvre si repliée, replie si ouverte.
     function toggleSidebar() {
@@ -4838,7 +4869,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
     // Se replie automatiquement dès qu'un module est sélectionné, sur tous les formats
     sidebar.querySelectorAll("a").forEach(a => {
-      a.addEventListener("click", () => closeSidebar(true));
+      a.addEventListener("click", () => closeSidebar(true, true));
     });
 
     // Fermer avec Échap

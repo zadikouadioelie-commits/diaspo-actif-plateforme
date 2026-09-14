@@ -598,6 +598,36 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   }
   .sidebar .brand { display: none; } /* redondant avec le logo du bandeau, visible derrière une fois le tiroir fermé */
   .sidebar a[hidden] { display: none; }
+  /* Bug réel signalé (2026-09-14) : le × de fermeture (.sidebar-close, styles.v2.css) est en
+     position:absolute par rapport à .sidebar, qui est justement la zone qui défile
+     (overflow-y:auto) — un enfant absolute reste rattaché au flux scrollable de son ancêtre
+     positionné, donc le × ne restait visible qu'en haut du menu et disparaissait dès qu'on
+     faisait défiler la liste des ~30 modules. Seul repli possible à ce moment-là : le clic
+     "en dehors" (#sidebar-backdrop) — inutilisable aussi en plein écran, il n'y a plus de
+     zone hors du tiroir à cet endroit.
+     Un premier essai en position:fixed (coin haut-droit de l'écran) a été testé puis écarté :
+     le × est bien le premier enfant de .sidebar, mais la barre de recherche des modules
+     (#sb-search-wrap, ajoutée par assets/app.js juste après lui) occupe déjà toute la largeur
+     du haut du tiroir — le × en fixed se retrouvait posé PAR-DESSUS elle, quasi invisible
+     (fond translucide clair sur fond blanc de la recherche), vérifié à l'exécution
+     (elementFromPoint confirmait qu'il était bien cliquable, mais illisible à l'écran).
+     position:sticky corrige les deux problèmes à la fois : le × reste dans le flux normal
+     (sa propre ligne, avant la recherche — aucun chevauchement) tout en se figeant en haut du
+     tiroir dès qu'on scrolle, exactement comme un position:fixed, mais sans sortir du
+     contexte de .sidebar ni recouvrir quoi que ce soit posé au-dessus de lui dans le DOM. */
+  .sidebar-close {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    width: 40px;
+    height: 40px;
+    margin: 0 0 10px auto;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   /* "Déconnexion" en pied de menu (voir assets/app.js) : texte simple centré en rouge,
      sans le fond blanc des autres items — cohérent avec la référence fournie et distinct
      visuellement d'une action de navigation normale. */
