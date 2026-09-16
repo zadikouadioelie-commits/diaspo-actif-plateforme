@@ -19213,11 +19213,21 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       // Priorité 4 : proximité géographique
       if (meVillePays.ville && p.localisation_ville && p.localisation_ville === meVillePays.ville) score += 400;
       else if (meVillePays.pays && p.localisation_pays && p.localisation_pays === meVillePays.pays) score += 150;
-      // Priorité 5 : fraîcheur (tie-break infinitésimal, ne dépasse jamais un écart de score entier)
-      score += (new Date(p.created_at).getTime() || 0) / 1e15;
       return { p, score };
     });
-    scored.sort((a, b) => b.score - a.score);
+    // Fraîcheur (2026-09-16, demande explicite : "les nouvelles actualités au-dessus des
+    // anciennes", comparé à LinkedIn) : la date de publication passe AVANT le score de
+    // pertinence, plutôt que d'être un simple tie-break infinitésimal noyé dans les autres
+    // priorités (bug réel constaté — un post plus ancien mais mieux noté restait au-dessus
+    // d'un post plus récent). Le score de la "loi de priorité" (préférences, habitudes,
+    // géo) garde son utilité mais seulement pour départager des posts publiés au même
+    // instant — en pratique un cas rarissime, donc l'ordre perçu redevient chronologique.
+    scored.sort((a, b) => {
+      const tA = new Date(a.p.created_at).getTime() || 0;
+      const tB = new Date(b.p.created_at).getTime() || 0;
+      if (tA !== tB) return tB - tA;
+      return b.score - a.score;
+    });
     scored.forEach(({ p }) => { if (!orderedIds.has(p.id)) { orderedIds.add(p.id); allPosts.push({ ...p, source: "fil" }); } });
   }
 

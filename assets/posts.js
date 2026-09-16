@@ -195,9 +195,14 @@ function renderMedias(post) {
 
   if (imgs.length) {
     const cols = imgs.length === 1 ? 1 : imgs.length === 2 ? 2 : 3;
-    html += `<div class="post-media-grid" style="grid-template-columns:repeat(${cols},1fr);">`;
+    // "post-media-grid--single" vs "--multi" (2026-09-16, demande explicite : "les photos
+    // entierres" comme sur LinkedIn) : une seule image s'affiche désormais à sa taille
+    // naturelle, jamais recadrée (voir la CSS) — avant, height:200px + object-fit:cover
+    // coupait systématiquement le haut/bas de toute image qui n'était pas déjà au format
+    // 100%/200px, ce qui tronquait par exemple le texte visible sur une bannière.
+    html += `<div class="post-media-grid post-media-grid--${cols === 1 ? 'single' : 'multi'}" style="grid-template-columns:repeat(${cols},1fr);">`;
     imgs.forEach(m => {
-      html += `<div class="post-media-item"><img src="${escHtml(m.url)}" alt="Média" loading="lazy" onclick="window.open('${escHtml(m.url)}','_blank')" style="cursor:zoom-in;"></div>`;
+      html += `<div class="post-media-item"><img src="${escHtml(m.url)}" alt="Média" loading="lazy" onclick="window.open('${escHtml(m.url)}','_blank')"></div>`;
     });
     html += `</div>`;
   }
@@ -549,9 +554,20 @@ function injectStyles() {
 .post-hashtag:hover{text-decoration:underline;}
 .post-mention{color:#0284c7;}
 .post-hashtags{padding:4px 16px 8px;display:flex;flex-wrap:wrap;gap:6px;}
-/* Médias */
+/* Médias (2026-09-16, demande explicite : photos affichées entières, jamais coupées,
+   à l'image de LinkedIn) */
 .post-media-grid{display:grid;gap:4px;padding:0 16px 12px;}
-.post-media-item img{width:100%;height:200px;object-fit:cover;border-radius:8px;display:block;}
+.post-media-item{background:#f1f5f9;border-radius:8px;overflow:hidden;cursor:zoom-in;}
+.post-media-item img{width:100%;display:block;}
+/* Une seule image : hauteur naturelle (aucun recadrage) — juste plafonnée pour qu'une image
+   très haute n'envahisse pas tout le fil ; au-delà du plafond elle est "contenue" (image
+   entière rétrécie, jamais tronquée) plutôt que recadrée. */
+.post-media-grid--single .post-media-item img{height:auto;max-height:520px;object-fit:contain;}
+/* Plusieurs images : grille carrée pour un alignement propre, mais chaque image reste
+   entièrement visible dedans (object-fit:contain sur fond neutre) au lieu d'être recadrée
+   pour remplir la case (cover) comme c'était le cas avant. */
+.post-media-grid--multi .post-media-item{aspect-ratio:1/1;}
+.post-media-grid--multi .post-media-item img{height:100%;object-fit:contain;}
 .post-media-video{padding:0 16px 12px;}
 .post-media-audio{padding:0 16px;}
 .post-media-docs{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px;}
