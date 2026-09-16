@@ -19072,6 +19072,12 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   const page  = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(Number(query.limit) || 20, 50);
   const offset = (page - 1) * limit;
+  // Filtre par catégorie (onglets du fil) — auparavant reçu par le serveur mais jamais
+  // appliqué dans aucun des 4 modes ci-dessous : cliquer sur un onglet de catégorie ne
+  // changeait donc jamais la liste affichée. Corrigé le 2026-09-16.
+  const catFiltre = query.categorie ? String(query.categorie) : null;
+  const catClause = catFiltre ? " AND p.categorie=?" : "";
+  const catArgs = catFiltre ? [catFiltre] : [];
 
   // ─── MODE SUIVIS ───────────────────────────────────────────────────────────
   if (mode === "suivis" && cu) {
@@ -19088,8 +19094,8 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
       return sendJSON(res, 200, { posts: [], total: 0, page, pages: 0, mode, conseil: "Suivez des personnes et des initiatives pour voir leurs publications ici." });
     }
     const placeholders = allIds.map(()=>"?").join(",");
-    const total = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(...allIds))?.n;
-    const posts = await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...allIds, limit, offset);
+    const total = (await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}`).get(...allIds, ...catArgs))?.n;
+    const posts = await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${placeholders}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(...allIds, ...catArgs, limit, offset);
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "suivi" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
@@ -19104,11 +19110,11 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
         (SELECT COUNT(*) FROM fil_posts rp WHERE rp.original_post_id=p.id) AS score_calc
       FROM fil_posts p JOIN users u ON u.id=p.auteur_id
       WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (p.type IS NULL OR p.type != 'repost')
-        AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+        AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}
       ORDER BY score_calc DESC, p.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(since, limit, offset);
-    const _totalPop = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)`).get(since);
+    `).all(since, ...catArgs, limit, offset);
+    const _totalPop = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.created_at >= ? AND (p.pub_type IS NULL OR p.pub_type != 'repost') AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}`).get(since, ...catArgs);
     const total = _totalPop ? _totalPop.n : 0;
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "populaire" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
@@ -19117,10 +19123,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   if (mode === "articles") {
     const posts = await db.prepare(`
       SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
-      WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}
       ORDER BY p.created_at DESC LIMIT ? OFFSET ?
-    `).all(limit, offset);
-    const _totalArt = await db.prepare("SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)").get();
+    `).all(...catArgs, limit, offset);
+    const _totalArt = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE (p.pub_type='article' OR p.type='article') AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}`).get(...catArgs);
     const total = _totalArt ? _totalArt.n : 0;
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "article" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
@@ -19140,7 +19146,7 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const followedAll = [...new Set([...followedUsers, ...initOwners])];
     if (followedAll.length) {
       const ph = followedAll.map(()=>"?").join(",");
-      (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${ph}) AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY p.created_at DESC LIMIT 10`).all(...followedAll))
+      (await db.prepare(`SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE p.auteur_id IN (${ph}) AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause} ORDER BY p.created_at DESC LIMIT 10`).all(...followedAll, ...catArgs))
         .forEach(p => { if(!orderedIds.has(p.id)){ orderedIds.add(p.id); allPosts.push({ ...p, source:"suivi" }); } });
     }
   }
@@ -19152,9 +19158,9 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     const since90 = new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,19).replace("T"," ");
     const candidats = await db.prepare(`
       SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
-      WHERE p.created_at >= ? ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      WHERE p.created_at >= ? ${excludeClause} AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}
       ORDER BY p.created_at DESC LIMIT 200
-    `).all(since90, ...excludeArgs);
+    `).all(since90, ...excludeArgs, ...catArgs);
 
     let filPrefs = {};
     let behaviorMap = {};
@@ -19232,7 +19238,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   }
 
   // 5) Cartes vitrine (vitrines/catalogues/promotions/meilleures ventes) — intercalées, plafonnées à ~30%
+  // Ignorées quand un filtre de catégorie est actif : ce ne sont pas des fil_posts et
+  // elles n'ont pas de catégorie à faire correspondre au filtre choisi.
   try {
+    if (catFiltre) throw null;
     const capCount = Math.max(1, Math.floor(allPosts.length * 0.3));
     const vitrineCards = await buildVitrineCards(cu, capCount);
     const merged = [];

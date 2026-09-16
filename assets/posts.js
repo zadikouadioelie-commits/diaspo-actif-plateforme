@@ -8,8 +8,8 @@
 
 /* ── Constantes ── */
 const CATEGORIES = [
-  'Actualité','Investissement',
-  'Emploi','Succès','Témoignage','Appel à bénévoles',
+  'Actualité','Projet','Investissement',
+  'Emploi','Formation','Événement','Succès','Témoignage','Appel à bénévoles',
   'Culture','Diaspora','Innovation','Autre'
 ];
 const VISIBILITES = [
