@@ -1485,7 +1485,7 @@ route("POST", "/api/upload/avatar", async (req, res) => {
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
 
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["avatar"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1496,7 +1496,8 @@ route("POST", "/api/upload/avatar", async (req, res) => {
 
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "avatars");
+    const compressed = await compressImage(file.buffer, "avatar");
+    const url = await uploadToBunny(compressed, filename, "avatars");
     await db.prepare("UPDATE users SET photo_url=? WHERE id=?").run(url, user.id);
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "avatar", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
@@ -1519,7 +1520,7 @@ route("POST", "/api/upload/banner", async (req, res) => {
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
 
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["banner"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1530,7 +1531,8 @@ route("POST", "/api/upload/banner", async (req, res) => {
 
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "banners");
+    const compressed = await compressImage(file.buffer, "banner");
+    const url = await uploadToBunny(compressed, filename, "banners");
     await db.prepare("UPDATE users SET banner_url=? WHERE id=?").run(url, user.id);
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "banner", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
@@ -1561,7 +1563,7 @@ route("POST", "/api/upload/vitrine-banniere", async (req, res) => {
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
 
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["vitrine-banner"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1572,7 +1574,8 @@ route("POST", "/api/upload/vitrine-banniere", async (req, res) => {
 
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "banners");
+    const compressed = await compressImage(file.buffer, "vitrine-banniere");
+    const url = await uploadToBunny(compressed, filename, "banners");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "vitrine-banniere", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) {
@@ -1590,7 +1593,7 @@ route("POST", "/api/upload/logo", async (req, res) => {
   const chunks = []; req.on("data", c => chunks.push(c));
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["logo"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1599,7 +1602,8 @@ route("POST", "/api/upload/logo", async (req, res) => {
   if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "logos");
+    const compressed = await compressImage(file.buffer, "logo");
+    const url = await uploadToBunny(compressed, filename, "logos");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "logo", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload logo")); }
@@ -1615,7 +1619,7 @@ route("POST", "/api/upload/post", async (req, res) => {
   const chunks = []; req.on("data", c => chunks.push(c));
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["post"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1624,7 +1628,8 @@ route("POST", "/api/upload/post", async (req, res) => {
   if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "posts");
+    const compressed = await compressImage(file.buffer, "post");
+    const url = await uploadToBunny(compressed, filename, "posts");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "post", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload post")); }
@@ -1645,7 +1650,7 @@ route("POST", "/api/upload/produit", async (req, res) => {
   const chunks = []; req.on("data", c => chunks.push(c));
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["produit"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1667,7 +1672,8 @@ route("POST", "/api/upload/produit", async (req, res) => {
   if (!imgType) return sendJSON(res, 400, { error: "Format non valide (JPEG, PNG, GIF, WebP ou vidéo MP4/WebM requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "produits");
+    const compressed = await compressImage(file.buffer, "produit");
+    const url = await uploadToBunny(compressed, filename, "produits");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "produit", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload produit")); }
@@ -1690,7 +1696,7 @@ route("POST", "/api/upload/evenement", async (req, res) => {
   const chunks = []; req.on("data", c => chunks.push(c));
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["evenement"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1699,7 +1705,8 @@ route("POST", "/api/upload/evenement", async (req, res) => {
   if (!imgType) return sendJSON(res, 400, { error: "Format non valide (JPEG, PNG ou WebP requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "evenements");
+    const compressed = await compressImage(file.buffer, "evenement");
+    const url = await uploadToBunny(compressed, filename, "evenements");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "evenement", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload evenement")); }
@@ -1721,7 +1728,7 @@ route("POST", "/api/upload/cagnotte", async (req, res) => {
   const chunks = []; req.on("data", c => chunks.push(c));
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["cagnotte"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1730,7 +1737,8 @@ route("POST", "/api/upload/cagnotte", async (req, res) => {
   if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
   try {
     const filename = uniqueFilename(file.filename, user.id);
-    const url = await uploadToBunny(file.buffer, filename, "cagnottes");
+    const compressed = await compressImage(file.buffer, "cagnotte");
+    const url = await uploadToBunny(compressed, filename, "cagnottes");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "cagnotte", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload cagnotte")); }
@@ -1749,7 +1757,7 @@ route("POST", "/api/upload/document", async (req, res) => {
   const chunks = []; req.on("data", c => chunks.push(c));
   await new Promise(r => req.on("end", r));
   const body = Buffer.concat(chunks);
-  const { uploadToBunny, parseMultipart, uniqueFilename } = require("./upload");
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
   const { files } = parseMultipart(body, boundaryMatch[1]);
   const file = files["document"] || files["file"] || files[Object.keys(files)[0]];
   if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
@@ -1773,7 +1781,8 @@ route("POST", "/api/upload/document", async (req, res) => {
        On construit ici un nom de fichier dédié qui préserve la véritable extension. */
     const realExt = isPdf ? "pdf" : (imgType ? imgType.split("/")[1].replace("jpeg", "jpg") : ext);
     const filename = `${user.id}-${Date.now()}.${realExt}`;
-    const url = await uploadToBunny(b, filename, "documents");
+    const toUpload = imgType ? await compressImage(b, "document") : b;
+    const url = await uploadToBunny(toUpload, filename, "documents");
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "document", type: imgType || (isPdf ? "pdf" : ext), size: b.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload document")); }

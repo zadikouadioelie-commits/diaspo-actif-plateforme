@@ -1,6 +1,51 @@
 /* ── Upload Bunny.net — Diaspo'Actif ── */
 const https = require("https");
 const { URL } = require("url");
+const sharp = require("sharp");
+
+/* Compression/redimensionnement à l'upload (2026-09-17, demande explicite : "compresser
+   partout pareil"). Avant ceci, chaque route d'upload stockait le fichier reçu tel quel sur
+   Bunny CDN, quelle que soit sa résolution d'origine — un avatar uploadé en 4000x3000 était
+   par exemple servi intégralement pour un cercle de 40 à 90px affiché partout sur la
+   plateforme (bandeau, posts, annuaire...). Choix délibérés pour ne JAMAIS changer le rendu
+   visuel :
+   - fit:"inside" partout (jamais "cover") : l'image est seulement réduite si elle dépasse la
+     taille max, en conservant tout son cadrage d'origine — aucun recadrage serveur qui
+     pourrait différer du object-fit:cover déjà appliqué côté client sur certaines vignettes.
+   - withoutEnlargement:true : une image déjà plus petite que la limite n'est jamais agrandie.
+   - qualité 85 (JPEG/WebP) : seuil standard où la perte est imperceptible à l'usage normal
+     (zoom raisonnable inclus), pour un gain de poids substantiel.
+   - GIF jamais retouché : sharp ne préserve l'animation qu'avec un traitement dédié plus
+     lourd (option animated:true) — un GIF statique reste petit par nature, donc on privilégie
+     ici la sûreté (ne jamais casser une animation) à un gain marginal.
+   - Échec de compression (fichier corrompu, format exotique...) → on stocke l'original tel
+     quel plutôt que de faire échouer tout l'upload : cette étape ne doit jamais être un point
+     de blocage supplémentaire. */
+const IMAGE_MAX_DIMENSION = {
+  avatar: 600, banner: 1600, "vitrine-banniere": 1600, logo: 800,
+  post: 1600, produit: 1600, evenement: 1600, cagnotte: 1600, document: 1600,
+};
+
+async function compressImage(buffer, kind) {
+  const maxDim = IMAGE_MAX_DIMENSION[kind];
+  if (!maxDim) return buffer; // kind inconnu : on ne touche à rien plutôt que de deviner
+  try {
+    const meta = await sharp(buffer).metadata();
+    if (meta.format === "gif") return buffer;
+    let img = sharp(buffer).rotate(); // applique l'orientation EXIF puis la retire (photos prises verticalement au téléphone)
+    img = img.resize({ width: maxDim, height: maxDim, fit: "inside", withoutEnlargement: true });
+    if (meta.format === "png") img = img.png({ quality: 85, palette: true, compressionLevel: 9 });
+    else if (meta.format === "webp") img = img.webp({ quality: 85 });
+    else img = img.jpeg({ quality: 85, mozjpeg: true });
+    const out = await img.toBuffer();
+    // Filet de sécurité : si le résultat est plus lourd que l'original (arrive sur de petites
+    // images déjà bien compressées), on garde l'original plutôt que d'empirer les choses.
+    return out.length < buffer.length ? out : buffer;
+  } catch (e) {
+    console.error("[compressImage]", kind, e.message);
+    return buffer;
+  }
+}
 
 const BUNNY_API_KEY    = process.env.BUNNY_API_KEY;
 const BUNNY_ZONE       = process.env.BUNNY_STORAGE_ZONE || "diaspoactif-media";
@@ -93,4 +138,4 @@ function uniqueFilename(originalName, userId) {
   return `${userId}-${Date.now()}.${safe}`;
 }
 
-module.exports = { uploadToBunny, parseMultipart, uniqueFilename };
+module.exports = { uploadToBunny, parseMultipart, uniqueFilename, compressImage };
