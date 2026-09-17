@@ -5,13 +5,26 @@
 (function () {
   'use strict';
 
+  /* Couleurs --orange et --muted assombries le 2026-09-17 (audit de contraste demandé) :
+     l'orange de chacun des 5 thèmes échouait le seuil WCAG AA (2.6 à 3.2:1 selon le thème,
+     requis 4.5:1) à la fois en texte sur carte ET en texte blanc sur bouton orange (les deux
+     ratios sont mathématiquement identiques quand la carte est blanche). Chaque valeur est
+     assombrie en conservant exactement teinte et saturation (les 3 canaux RGB réduits du même
+     facteur, ce qui ne change que la luminosité en HSL) — reste immédiatement reconnaissable
+     comme la même couleur, mais lisible. Seule exception : "ardoise" (thème sombre), où
+     assombrir l'orange aide le texte blanc dessus mais dégraderait l'orange-sur-carte-sombre
+     déjà confortable (6.8:1) — arbitrage choisi en faveur des boutons (texte blanc dessus,
+     l'usage le plus visible/critique), l'orange en texte simple y reste correct pour du grand
+     texte/icônes (3:1) sans atteindre le seuil texte normal (4.5:1) sur ce thème précis.
+     "muted" n'était à corriger que sur institutionnel2 (limite, 4.30:1 sur le fond) et
+     émeraude (4.46:1) — les 3 autres passaient déjà. */
   const THEMES = {
     classique: {
       label: 'Classique',
       vars: {
         '--navy':        '#1B3A6B',
         '--navy-light':  '#24487E',
-        '--orange':      '#E87722',
+        '--orange':      '#B75E1B',
         '--orange-light':'#FFF4EC',
         '--bg':          '#F5F7FA',
         '--card':        '#FFFFFF',
@@ -28,12 +41,12 @@
       vars: {
         '--navy':        '#0D2B4E',
         '--navy-light':  '#1E4F8A',
-        '--orange':      '#F26422',
+        '--orange':      '#B84C1A',
         '--orange-light':'#FFF0E8',
         '--bg':          '#EEF2F8',
         '--card':        '#FFFFFF',
         '--text':        '#102A43',
-        '--muted':       '#6B7280',
+        '--muted':       '#676F77',
         '--border':      '#D6DEE8',
         '--green':       '#1A7A52',
         '--radius':      '12px',
@@ -45,12 +58,12 @@
       vars: {
         '--navy':        '#065F46',
         '--navy-light':  '#0D9668',
-        '--orange':      '#D97706',
+        '--orange':      '#B26205',
         '--orange-light':'#FEF3E2',
         '--bg':          '#F0FBF6',
         '--card':        '#FFFFFF',
         '--text':        '#0F2E22',
-        '--muted':       '#5B7A6D',
+        '--muted':       '#5A796C',
         '--border':      '#D3EBE0',
         '--green':       '#0D9668',
         '--radius':      '10px',
@@ -62,7 +75,7 @@
       vars: {
         '--navy':        '#7A1E32',
         '--navy-light':  '#9C2B44',
-        '--orange':      '#E8874B',
+        '--orange':      '#AC6437',
         '--orange-light':'#FCEFE7',
         '--bg':          '#FBF3F4',
         '--card':        '#FFFFFF',
@@ -79,7 +92,7 @@
       vars: {
         '--navy':        '#1E293B',
         '--navy-light':  '#334155',
-        '--orange':      '#F59E0B',
+        '--orange':      '#A26807',
         '--orange-light':'#3A2F1A',
         '--bg':          '#0F172A',
         '--card':        '#1E293B',

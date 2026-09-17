@@ -6,12 +6,12 @@
   --navy:#0D2B4E;          /* Bleu institutionnel */
   --navy-light:#1E4F8A;    /* Bleu profond */
   --blue-clair:#4490E2;    /* Bleu clair */
-  --orange:#F26422;        /* Orange impact */
+  --orange:#B84C1A;        /* Orange impact (assombri le 2026-09-17 pour l'accessibilite, meme teinte que #F26422 -- voir styles.v2.css) */
   --orange-light:#FFF0E8;  /* Orange teinté clair */
   --bg:#EEF2F8;            /* Fond page — gris-bleu doux */
   --card:#F9F8F3;          /* Cartes — ivoire doux */
   --text:#0D2B4E;          /* Texte principal */
-  --muted:#6C757D;         /* Gris neutre */
+  --muted:#676F77;         /* Gris neutre (assombri le 2026-09-17 pour l'accessibilite -- voir styles.v2.css) */
   --border:#DCE4EF;        /* Bordures */
   --green:#1A7A52;
   --radius:10px;

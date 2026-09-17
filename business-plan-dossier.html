@@ -38,7 +38,7 @@ html,body{background:#EDEFF3;}
 
 :root{
   --dp-paper:#F7F5F0; --dp-ink:#181B20; --dp-ink-soft:#4B5160; --dp-line:#DBD6C8;
-  --dp-navy:#0D2B4E; --dp-orange:#F26422; --dp-blue:#1E4F8A; --dp-green:#1A7A52;
+  --dp-navy:#0D2B4E; --dp-orange:#B84C1A; --dp-blue:#1E4F8A; --dp-green:#1A7A52;
   --dp-mono:"JetBrains Mono",Consolas,monospace;
   --dp-display:"Space Grotesk",Arial,sans-serif; --dp-body:"Public Sans",Arial,sans-serif;
 }
@@ -190,9 +190,9 @@ const STATUTS = { brouillon:'Brouillon', complet:'Dossier complet', archive:'Arc
    composition de couverture et le degré de sobriété (cf. maquette validée). Le logo reste
    toujours celui de Diaspo'Actif, jamais recoloré. */
 const TEMPLATES = {
-  premium:   { label:'🟣 Premium — investisseurs', navy:'#0D2B4E', orange:'#F26422', blue:'#1E4F8A', paper:'#F7F5F0', ink:'#181B20', inkSoft:'#4B5160', line:'#DBD6C8', cover:'dark', coverBg:'radial-gradient(ellipse 900px 500px at 15% 8%, rgba(242,100,34,.14), transparent 60%), linear-gradient(165deg,#14171C 0%,#0D2B4E 130%)' },
-  corporate: { label:'🟦 Corporate — institutions', navy:'#0D2B4E', orange:'#F26422', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#DDE3EE', cover:'light' },
-  moderne:   { label:'🟢 Moderne — entrepreneurial', navy:'#0D2B4E', orange:'#F26422', blue:'#1E4F8A', paper:'#EEF2F8', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#D7DFEC', cover:'dark', coverBg:'linear-gradient(135deg,#0D2B4E,#1E4F8A)' },
+  premium:   { label:'🟣 Premium — investisseurs', navy:'#0D2B4E', orange:'#B84C1A', blue:'#1E4F8A', paper:'#F7F5F0', ink:'#181B20', inkSoft:'#4B5160', line:'#DBD6C8', cover:'dark', coverBg:'radial-gradient(ellipse 900px 500px at 15% 8%, rgba(242,100,34,.14), transparent 60%), linear-gradient(165deg,#14171C 0%,#0D2B4E 130%)' },
+  corporate: { label:'🟦 Corporate — institutions', navy:'#0D2B4E', orange:'#B84C1A', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#DDE3EE', cover:'light' },
+  moderne:   { label:'🟢 Moderne — entrepreneurial', navy:'#0D2B4E', orange:'#B84C1A', blue:'#1E4F8A', paper:'#EEF2F8', ink:'#0D2B4E', inkSoft:'#5A6B85', line:'#D7DFEC', cover:'dark', coverBg:'linear-gradient(135deg,#0D2B4E,#1E4F8A)' },
   impact:    { label:'🌍 Impact — social & territorial', navy:'#0D2B4E', orange:'#1A7A52', blue:'#1E4F8A', paper:'#F4F0E6', ink:'#0D2B4E', inkSoft:'#6B6250', line:'#E4DCC8', cover:'impact' },
   finance:   { label:'🏦 Finance — banques & financeurs', navy:'#14171C', orange:'#8A6D3F', blue:'#1E4F8A', paper:'#FFFFFF', ink:'#14171C', inkSoft:'#5B5F66', line:'#E2E4E8', cover:'light' },
 };
@@ -501,7 +501,7 @@ function pageSWOT(bp){
 function pagePESTEL(bp){
   const m = (bp.sections||{}).marche || {};
   const cells = [
-    ['pestel_politique','Politique','#0D2B4E'],['pestel_economique','Économique','#F26422'],
+    ['pestel_politique','Politique','#0D2B4E'],['pestel_economique','Économique','#B84C1A'],
     ['pestel_social','Social','#1E4F8A'],['pestel_technologique','Technologique','#1A7A52'],
     ['pestel_environnemental','Environnemental','#1A7A52'],['pestel_legal','Légal','#4B5160'],
   ];
@@ -548,7 +548,7 @@ function pageBCG(bp){
   if (!items.length) return '';
   const quads = [
     ['vedette','⭐ Vedettes','Forte croissance, forte part de marché','#1A7A52','rgba(26,122,82,.07)'],
-    ['dilemme','❓ Dilemmes','Forte croissance, faible part de marché','#F26422','rgba(242,100,34,.07)'],
+    ['dilemme','❓ Dilemmes','Forte croissance, faible part de marché','#B84C1A','rgba(242,100,34,.07)'],
     ['vache_lait','🐄 Vaches à lait','Faible croissance, forte part de marché','#1E4F8A','rgba(30,79,138,.07)'],
     ['poids_mort','⚓ Poids morts','Faible croissance, faible part de marché','#4B5160','rgba(75,81,96,.09)'],
   ];
@@ -883,7 +883,7 @@ function pageEquipe(bp){
   const ig = (bp.sections||{}).infos_generales || {};
   const membres = Array.isArray(ig.membres_equipe) ? ig.membres_equipe.filter(m=>has(m.nom)) : [];
   if (!membres.length && !has(ig.equipe_fondatrice)) return '';
-  const colors = ['#0D2B4E','#F26422','#1E4F8A','#1A7A52'];
+  const colors = ['#0D2B4E','#B84C1A','#1E4F8A','#1A7A52'];
   let content;
   if (membres.length) {
     content = `<div class="card-grid">${membres.map((m,i)=>{

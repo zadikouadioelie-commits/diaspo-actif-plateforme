@@ -4805,8 +4805,8 @@ async function ajOuvrirCreation() {
       ${entries.map(e => `
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 8px;border-radius:8px;border:1.5px solid transparent;transition:background .12s,border-color .12s;">
           <input type="checkbox" value="${esc(e.id)}" class="aj-cb-catalogue"
-                 style="width:18px;height:18px;accent-color:var(--orange,#F26422);border:1.5px solid #94A3B8;border-radius:4px;flex-shrink:0;"
-                 onchange="this.closest('label').style.background = this.checked ? '#FFF3EC' : ''; this.closest('label').style.borderColor = this.checked ? '#F26422' : 'transparent';">
+                 style="width:18px;height:18px;accent-color:var(--orange,#B84C1A);border:1.5px solid #94A3B8;border-radius:4px;flex-shrink:0;"
+                 onchange="this.closest('label').style.background = this.checked ? '#FFF3EC' : ''; this.closest('label').style.borderColor = this.checked ? '#B84C1A' : 'transparent';">
           <span>${esc(e.description)}</span>
         </label>
       `).join('')}

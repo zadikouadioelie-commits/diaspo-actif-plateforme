@@ -690,7 +690,7 @@ html, body { overflow-x:clip; }
 /* Rappel « ajoutez votre photo » — affiché au seul propriétaire, jamais aux visiteurs. */
 .pvz-rappel-photo { display:flex; align-items:center; gap:11px; width:calc(100% + 52px); margin:0 -26px 4px; padding:13px 26px; background:#FFF7ED; border:0; border-bottom:1px solid #FED7AA; border-radius:14px 14px 0 0; font-size:13.5px; color:#7C2D12; text-align:left; cursor:pointer; font-family:inherit; transition:background .18s; }
 .pvz-rappel-photo:hover { background:#FFEDD5; }
-.pvz-rappel-photo:focus-visible { outline:3px solid var(--orange,#F26422); outline-offset:-3px; }
+.pvz-rappel-photo:focus-visible { outline:3px solid var(--orange,#B84C1A); outline-offset:-3px; }
 .pvz-rappel-photo strong { font-weight:800; }
 .pvz-rappel-photo > span:nth-child(2) { flex:1; min-width:0; }
 .pvz-rappel-fleche { font-size:16px; flex-shrink:0; }
@@ -2591,7 +2591,7 @@ async function renderVitrine() {
        ses contenus sont conservés — c'est le point le plus anxiogène d'une expiration. */
     /* Aucun compte à rebours : les contenus sont conservés sans limite de durée. Annoncer
        une échéance inexistante inquiéterait pour rien. */
-    el.insertAdjacentHTML('afterbegin', `<div style="margin:0 0 16px;padding:14px 16px;background:#FFF7ED;border:1.5px solid #F26422;border-radius:12px;">
+    el.insertAdjacentHTML('afterbegin', `<div style="margin:0 0 16px;padding:14px 16px;background:#FFF7ED;border:1.5px solid #B84C1A;border-radius:12px;">
       <div style="font-weight:800;color:#9a3412;font-size:13.5px;">🛠️ Votre boutique n'est plus visible du public</div>
       <div style="font-size:12.5px;color:#9a3412;margin-top:4px;line-height:1.6;">
         Votre abonnement Premium est arrivé à expiration. <strong>Rien n'est supprimé :</strong> vos contenus sont conservés et réapparaîtront intacts dès le renouvellement.

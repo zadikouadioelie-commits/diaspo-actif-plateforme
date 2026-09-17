@@ -49,7 +49,7 @@
 }
 .nav a.active, .nav a:hover {
   color: #fff !important;
-  border-bottom-color: #F26422 !important;
+  border-bottom-color: #B84C1A !important;
 }
 
 /* ── Boutons ── */
@@ -220,7 +220,7 @@ tbody td {
 .sidebar-link.active,
 .sidebar a.active,
 .side-nav a.active {
-  background: #F26422 !important;
+  background: #B84C1A !important;
   color: #fff !important;
   font-weight: 700 !important;
 }

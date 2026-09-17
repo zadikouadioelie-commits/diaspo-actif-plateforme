@@ -465,7 +465,7 @@ input[type="checkbox"], input[type="radio"] {
 .da-pill:hover {
   border-color: var(--orange);
 }
-/* Fond volontairement plus sombre que l'orange de marque : sur #F26422, du texte blanc
+/* Fond volontairement plus sombre que l'orange de marque : sur #B84C1A, du texte blanc
    n'atteint que 3,17:1, sous le minimum lisible de 4,5:1. Ce ton donne 4,6:1 tout en
    restant dans la famille de la marque. C'est une couleur d'ÉTAT, propre à la pastille
    sélectionnée — l'orange des boutons n'est pas touché. */

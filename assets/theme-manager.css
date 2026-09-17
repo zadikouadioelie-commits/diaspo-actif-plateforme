@@ -29,7 +29,7 @@
   flex-wrap: wrap;
 }
 .da-tb-msg { flex: 1; min-width: 200px; }
-.da-tb-msg strong { color: #F26422; }
+.da-tb-msg strong { color: #B84C1A; }
 .da-tb-actions {
   display: flex;
   align-items: center;
@@ -57,7 +57,7 @@
 }
 .da-tb-btn:hover { opacity: .88; transform: translateY(-1px); }
 .da-tb-confirm {
-  background: #F26422;
+  background: #B84C1A;
   color: #fff;
 }
 .da-tb-revert {
@@ -150,7 +150,7 @@
 }
 .da-theme-preview-btn {
   margin-top: 4px;
-  background: #F26422;
+  background: #B84C1A;
   color: #fff;
   border: none;
   border-radius: 7px;
