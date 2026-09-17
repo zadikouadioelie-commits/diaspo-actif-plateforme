@@ -9904,7 +9904,7 @@ async function crmOpenContactForm(id, defaultRelation) {
       ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteContact(${id})">🗑 Supprimer</button>` : '<span></span>'}
       <div style="display:flex;gap:8px;">
         <button class="btn btn-sm btn-outline" onclick="crmCloseModal()">✕ Fermer</button>
-        <button class="btn" onclick="crmSaveContact(${id || 'null'})">Enregistrer</button>
+        <button class="btn btn-orange" onclick="crmSaveContact(${id || 'null'})">Enregistrer</button>
       </div>
     </div>
     ${historiqueHtml}
@@ -10017,7 +10017,7 @@ async function crmOpenOppForm(id) {
       ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteOpp(${id})">🗑 Supprimer</button>` : '<span></span>'}
       <div style="display:flex;gap:8px;">
         <button class="btn btn-sm btn-outline" onclick="crmCloseModal()">✕ Fermer</button>
-        <button class="btn" onclick="crmSaveOpp(${id || 'null'})">Enregistrer</button>
+        <button class="btn btn-orange" onclick="crmSaveOpp(${id || 'null'})">Enregistrer</button>
       </div>
     </div>
   `);
@@ -10287,7 +10287,7 @@ async function crmOpenTacheForm(id) {
       ${id ? `<button class="btn btn-sm" style="color:#dc2626;border-color:#dc2626;background:none;" onclick="crmDeleteTache(${id})">🗑 Supprimer</button>` : '<span></span>'}
       <div style="display:flex;gap:8px;">
         <button class="btn btn-sm btn-outline" onclick="crmCloseModal()">✕ Fermer</button>
-        <button class="btn" onclick="crmSaveTache(${id || 'null'})">Enregistrer</button>
+        <button class="btn btn-orange" onclick="crmSaveTache(${id || 'null'})">Enregistrer</button>
       </div>
     </div>
   `);
