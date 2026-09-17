@@ -13537,6 +13537,13 @@ route("DELETE", "/api/formations/:id/programmer-suppression", async (req, res, p
 route("GET", "/api/formations/:id/modules", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  /* Réservé au créateur de la formation (constructeur formations.html) — cette route renvoie
+     le contenu intégral des leçons (contenu_url/contenu_texte). N'importe quel compte connecté
+     pouvait auparavant lire une formation payante entière sans y être inscrit ; les élèves
+     passent par GET /api/formations/:id/suivre, qui vérifie déjà correctement l'inscription. */
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   const modules = await db.prepare("SELECT * FROM formation_modules WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(params.id);
   for (const m of modules) {
     const chapitres = await db.prepare("SELECT * FROM formation_chapitres WHERE module_id=? ORDER BY ordre ASC, id ASC").all(m.id);
@@ -13763,6 +13770,13 @@ route("PUT", "/api/formations/:id/chapitres/:chapitreId/lecons/reorder", async (
 route("GET", "/api/formations/:id/quiz", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  /* Réservé au créateur de la formation (constructeur formations.html) — les questions
+     incluent reponse_correcte. Le passage de quiz côté élève n'est pas encore implémenté
+     (suivre-formation.html affiche "Quiz — bientôt disponible"), donc aucun usage légitime
+     élève à préserver ici ; n'importe quel compte connecté pouvait sinon lire le corrigé. */
+  const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
+  if (!checkFormationOwner(f, user)) return sendJSON(res, 403, { error: "Interdit." });
   const quiz = await db.prepare("SELECT * FROM formation_quiz WHERE formation_id=? ORDER BY ordre ASC, id ASC").all(params.id);
   for (const q of quiz) { q.questions = await db.prepare("SELECT * FROM formation_quiz_questions WHERE quiz_id=? ORDER BY ordre ASC, id ASC").all(q.id); }
   sendJSON(res, 200, { quiz });
@@ -18367,7 +18381,10 @@ route("GET", "/api/evenements/participants/:id", async (req, res, params) => {
     WHERE ep.id=?
   `).get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Inscription introuvable." });
-  if (row.user_id !== user.id && !['administrateur','collectivite'].includes(user.role)) return sendJSON(res, 403, { error: "Accès refusé." });
+  /* L'inscrit lui-même, l'organisateur DE CET événement précis (row.organisateur_id), ou un
+     administrateur — pas n'importe quel compte "collectivite", qui pouvait auparavant consulter
+     l'inscription/QR de n'importe quel participant à n'importe quel événement. */
+  if (row.user_id !== user.id && row.organisateur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
   const qrPayload = Buffer.from(JSON.stringify({ pid: row.id, eid: row.evenement_id, sig: row.qr_token })).toString('base64');
   sendJSON(res, 200, { inscription: row, qr_payload: qrPayload });
 });
@@ -18887,7 +18904,14 @@ route("POST", "/api/collaborations", async (req, res, params, body) => {
 route("GET", "/api/collaborations/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT c.*,u.nom AS auteur_nom,i.nom AS initiative_nom FROM collaborations c LEFT JOIN users u ON u.id=c.user_id LEFT JOIN initiatives i ON i.id=c.initiative_id WHERE c.id=?").get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Collaboration introuvable." });
-  const candidatures = await db.prepare("SELECT ca.*,u.nom AS candidat_nom FROM candidatures ca JOIN users u ON u.id=ca.user_id WHERE ca.collaboration_id=? ORDER BY ca.created_at DESC").all(params.id);
+  /* L'appel à collaboration lui-même reste public (cohérent avec la liste GET /api/collaborations),
+     mais les candidatures (nom + message des candidats) ne regardent que l'auteur de l'appel ou un
+     administrateur — n'importe quel visiteur, même non connecté, pouvait auparavant les lire. */
+  const user = await getCurrentUser(req);
+  const isOwner = !!user && (row.user_id === user.id || user.role === "administrateur");
+  const candidatures = isOwner
+    ? await db.prepare("SELECT ca.*,u.nom AS candidat_nom FROM candidatures ca JOIN users u ON u.id=ca.user_id WHERE ca.collaboration_id=? ORDER BY ca.created_at DESC").all(params.id)
+    : [];
   sendJSON(res, 200, { collaboration: { ...row, competences: safeParse(row.competences||"[]") }, candidatures });
 });
 
@@ -20980,8 +21004,28 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
   route("GET", "/api/consultations/:id", async (req, res, params) => {
     const user = await getCurrentUser(req);
     if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-    const c = await db.prepare("SELECT c.*,u.nom AS emetteur_nom FROM consultations c JOIN users u ON u.id=c.emetteur_id WHERE c.id=?").get(params.id);
+    const c = await db.prepare(`
+      SELECT c.*, u.nom AS emetteur_nom, u.role AS emetteur_role,
+             u.type_organisme, u.type_institution, u.pays_exercice, u.region_exercice,
+             u.departement_exercice, u.ville_exercice, u.pays AS e_pays, u.region AS e_region,
+             u.departement AS e_departement, u.ville AS e_ville
+      FROM consultations c JOIN users u ON u.id=c.emetteur_id WHERE c.id=?`).get(params.id);
     if (!c) return sendJSON(res, 404, { error: "Consultation introuvable." });
+    /* Même périmètre que la liste (GET /api/consultations, principe 4) : l'émetteur et un
+       administrateur voient tout (y compris brouillon/close) ; un simple membre ne peut ouvrir
+       par id qu'une consultation OUVERTE émanant d'une collectivité dont il relève. Auparavant,
+       n'importe quel compte connecté pouvait lire n'importe quelle consultation par id, y compris
+       en brouillon et hors de son périmètre. */
+    const estEmetteur = c.emetteur_id === user.id || user.role === "administrateur";
+    if (!estEmetteur) {
+      const dansPerimetre = c.emetteur_role === "administrateur" || membreDansPerimetre({
+        type_organisme: c.type_organisme, type_institution: c.type_institution,
+        pays_exercice: c.pays_exercice, region_exercice: c.region_exercice,
+        departement_exercice: c.departement_exercice, ville_exercice: c.ville_exercice,
+        pays: c.e_pays, region: c.e_region, departement: c.e_departement, ville: c.e_ville,
+      }, user);
+      if (c.statut !== "ouverte" || !dansPerimetre) return sendJSON(res, 403, { error: "Accès refusé." });
+    }
     const questions = await db.prepare("SELECT * FROM consultation_questions WHERE consultation_id=? ORDER BY ordre").all(params.id);
     const dejaRepondu = user ? !!await db.prepare("SELECT 1 FROM consultation_reponses WHERE consultation_id=? AND user_id=?").get(params.id, user.id) : false;
     sendJSON(res, 200, { consultation: c, questions, deja_repondu: dejaRepondu });
@@ -27721,7 +27765,11 @@ ${jsonLd}
         LEFT JOIN event_billetterie_config c ON c.event_id=e.id
         WHERE t.id=?`).get(tid);
       if (!t) return sendJSON(res, 404, { error: 'Billet introuvable.' });
-      if (t.user_id !== me.id && !['administrateur','collectivite'].includes(me.role)) return sendJSON(res, 403, { error: 'Accès refusé.' });
+      /* Le titulaire du billet, l'organisateur DE CET événement précis (t.organisateur_id, déjà
+         sélectionné via le JOIN events), ou un administrateur — pas n'importe quel compte
+         "collectivite", qui pouvait auparavant consulter le billet/QR de n'importe quel inscrit
+         à n'importe quel événement. Même logique que POST /api/tickets/:id/refund ci-dessous. */
+      if (t.user_id !== me.id && t.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
       /* Payload QR encodé en base64 pour le frontend */
       const qrPayload = Buffer.from(JSON.stringify({ tid, eid: t.event_id, sig: t.qr_token })).toString('base64');
       return sendJSON(res, 200, { ticket: t, qr_payload: qrPayload });
