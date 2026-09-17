@@ -25196,6 +25196,20 @@ ${jsonLd}
   }
 
   if (pathname.startsWith("/api/")) {
+    /* ── Rate-limit générique par IP, sur TOUTE l'API ──────────────────────────
+       Avant ce filet, seules ~30 routes sensibles (login, signup, devis, codes
+       de parrainage…) avaient leur propre limite. Les 900+ autres routes — dont
+       toutes les listes publiques (fil, annuaire, initiatives, produits…) —
+       n'étaient protégées par aucune limite : un script appelant l'API en boucle
+       pouvait aspirer tout le contenu sans la moindre friction. Plafond
+       volontairement large (ne gêne jamais une navigation normale, y compris
+       avec pagination) mais suffisant pour casser un scraping naïf. */
+    const _apiIp = SEC.clientIp(req);
+    const _apiGlobalLimit = SEC.rateLimit(`api:global:${_apiIp}`, 240, 60 * 1000);
+    if (!_apiGlobalLimit.allowed) {
+      return sendJSON(res, 429, { error: "Trop de requêtes, réessayez dans quelques instants." }, { "Retry-After": String(_apiGlobalLimit.retryAfter) });
+    }
+
     // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
     if (req.method === "GET") trackActivity(req);
 
