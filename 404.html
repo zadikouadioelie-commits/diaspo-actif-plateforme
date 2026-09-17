@@ -16,7 +16,9 @@
     padding: 24px;
   }
   .wrap { text-align: center; max-width: 480px; }
-  .logo { font-size: 18px; font-weight: 900; letter-spacing: -.02em; color: #94A3B8; margin-bottom: 48px; }
+  .logo { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 18px; font-weight: 900; letter-spacing: -.02em; color: #94A3B8; margin-bottom: 48px; }
+  .logo img { width: 32px; height: 32px; border-radius: 50%; }
+  .reassure { display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25); color: #86EFAC; font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 10px; margin-bottom: 28px; }
   .code {
     font-size: 120px; font-weight: 900; line-height: 1;
     background: linear-gradient(135deg, #2563EB, #60A5FA);
@@ -53,13 +55,15 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="logo">DIASPO'ACTIF</div>
+  <div class="logo"><img src="/assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
   <div class="code">404</div>
   <h1>Cette page est introuvable</h1>
-  <p>La page que vous cherchez a peut-être été déplacée,<br>supprimée, ou n'a jamais existé.</p>
+  <p>Le lien suivi est erroné, ou la page a été déplacée ou supprimée.<br>Le reste de Diaspo'Actif fonctionne normalement.</p>
+  <div class="reassure">✅ Pas de panique — ce n'est pas une panne du site, juste cette page précise qui n'existe pas.</div>
   <div class="actions">
-    <a href="index.html" class="btn-primary">Retour à l'accueil →</a>
-    <a href="fil-actualite.html" class="btn-secondary">Fil d'actualité</a>
+    <a href="index.html" class="btn-primary">🏠 Retour à l'accueil</a>
+    <a href="annuaire.html" class="btn-secondary">🔍 Rechercher dans l'annuaire</a>
+    <a href="fil-actualite.html" class="btn-secondary">📰 Fil d'actualité</a>
   </div>
   <button class="history-btn" onclick="history.back()">← Page précédente</button>
 </div>
