@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#F26422">
+<meta name="theme-color" content="#B84C1A">
 <style>
 .pe-nav{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;}
 .pe-tab{padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;color:var(--muted);}
@@ -25,7 +25,7 @@
 /* Actions de carte : modifier, archiver, supprimer */
 .pe-act{padding:6px 11px;border:1.5px solid var(--border);background:#fff;border-radius:8px;font-size:12px;font-weight:700;color:#334155;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s;}
 .pe-act:hover{border-color:#94A3B8;background:#F8FAFC;}
-.pe-act:focus-visible{outline:3px solid #F26422;outline-offset:2px;}
+.pe-act:focus-visible{outline:3px solid #B84C1A;outline-offset:2px;}
 .pe-act-danger{color:#B91C1C;border-color:#FECACA;}
 .pe-act-danger:hover{background:#FEF2F2;border-color:#EF4444;}
 .pe-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.08);}
@@ -62,7 +62,41 @@
 </style>
 </head>
 <body>
-<div id="header-container"></div>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="actualites.html">Projets diasporas</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="vitrines.html">🏪 Boutiques</a>
+    <a href="fil-actualite.html">📰 Fil d'actualité</a>
+    <a href="actualites.html">Projets diasporas</a>
+    <a href="evenements.html">📅 Événements</a>
+    <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+    <a href="premium.html">⭐ Passer Premium</a>
+    <div id="hb-account-section"></div>
+  </aside>
 
 <div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px 60px;">
   <h1 style="font-size:26px;font-weight:800;margin:0 0 4px;">📁 Évaluation de Projet</h1>
@@ -168,8 +202,9 @@
   </div>
 </div>
 
+</div>
+
 <script src="assets/app.js?v=12"></script>
-<script src="assets/header.js"></script>
 <script>
 let ME = null;
 let peSelectedDestinataires = [];
