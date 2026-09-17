@@ -18458,6 +18458,364 @@ route("DELETE", "/api/admin/tutoriels/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* ══ VIDÉOS TUTORIELS — bandeau accueil + page dédiée + commentaires/réactions ══
+   Cahier des charges du 2026-09-18 : tout le monde regarde, seuls les connectés
+   commentent/réagissent, l'Administrateur Junior peut gérer ce module SEUL (voir
+   server/admin-junior.js, module 'videos_tutoriels' — jamais un contrôle de rôle
+   'administrateur' en dur ici, toujours AdminJunior.hasAdminPermission). */
+
+const VT_CATEGORIES = ["Bien démarrer", "Compte Diaspo'Actif", "Recensement", "Réseau Pro", "Carnet professionnel", "Initiatives", "Événements", "Services", "Tutoriels plateforme", "Autres"];
+const VT_REACTIONS = ["jaime", "jadore", "bravo", "utile"];
+
+async function vtEstAdmin(userId) {
+  const u = await db.prepare("SELECT role FROM users WHERE id=?").get(userId);
+  return !!u && (u.role === "administrateur" || u.role === "administrateur_junior");
+}
+
+async function vtChargerCommentaires(videoId, { inclureMasques = false } = {}) {
+  const rows = await db.prepare(`
+    SELECT c.*, u.nom, u.prenom, u.role AS auteur_role
+    FROM da_videos_tutoriels_commentaires c
+    JOIN users u ON u.id = c.auteur_id
+    WHERE c.video_id=? ${inclureMasques ? "" : "AND c.statut='visible'"}
+    ORDER BY c.created_at ASC
+  `).all(videoId);
+  const parAuteur = rows.map(r => ({
+    id: r.id, parent_id: r.parent_id, contenu: r.contenu, statut: r.statut,
+    created_at: r.created_at, auteur_id: r.auteur_id,
+    auteur_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur',
+    est_admin: r.auteur_role === 'administrateur' || r.auteur_role === 'administrateur_junior',
+  }));
+  const racines = parAuteur.filter(c => !c.parent_id);
+  racines.forEach(r => { r.reponses = parAuteur.filter(c => c.parent_id === r.id); });
+  return racines;
+}
+
+/* GET /api/videos-tutoriels — publique, vidéos publiées triées par ordre.
+   ?limit=N (bandeau accueil), ?categorie=X, ?q=recherche, ?tri=date|popularite|ordre (défaut). */
+route("GET", "/api/videos-tutoriels", async (req, res, params, body, query) => {
+  let sql = "SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at FROM da_videos_tutoriels WHERE statut='publie'";
+  const args = [];
+  if (query.categorie) { sql += " AND categorie=?"; args.push(query.categorie); }
+  if (query.q) { sql += " AND (titre LIKE ? OR description LIKE ?)"; args.push(`%${query.q}%`, `%${query.q}%`); }
+  sql += query.tri === 'popularite' ? " ORDER BY vues DESC, id DESC"
+       : query.tri === 'date' ? " ORDER BY created_at DESC"
+       : " ORDER BY ordre ASC, id ASC";
+  const rows = await db.prepare(sql).all(...args);
+  const limit = parseInt(query?.limit, 10);
+  sendJSON(res, 200, { videos: (limit > 0) ? rows.slice(0, limit) : rows, categories: VT_CATEGORIES });
+});
+
+route("GET", "/api/videos-tutoriels/:id", async (req, res, params) => {
+  const v = await db.prepare("SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at FROM da_videos_tutoriels WHERE id=? AND statut='publie'").get(params.id);
+  if (!v) return sendJSON(res, 404, { error: "Vidéo introuvable." });
+  sendJSON(res, 200, { video: v });
+});
+
+/* POST /api/videos-tutoriels/:id/vue — dédupliquée par (vidéo, visiteur, jour), même
+   principe de hachage IP+jour que POST /api/analytics/vue : l'incrément n'a lieu que si
+   l'INSERT du log réussit (donc une seule fois par visiteur et par jour). */
+route("POST", "/api/videos-tutoriels/:id/vue", async (req, res, params) => {
+  const ip = SEC.clientIp(req);
+  const jour = new Date().toISOString().slice(0, 10);
+  const visiteur_hash = crypto.createHash("sha256").update(`${ip}|${req.headers["user-agent"] || ""}|${jour}|${process.env.AUTH_SECRET || "diaspo-actif-2026-secret"}`).digest("hex");
+  try {
+    await db.prepare("INSERT INTO da_videos_tutoriels_vues_log (video_id, visiteur_hash, jour) VALUES (?,?,?)").run(params.id, visiteur_hash, jour);
+    await db.prepare("UPDATE da_videos_tutoriels SET vues=vues+1 WHERE id=?").run(params.id);
+  } catch (e) { /* déjà comptée aujourd'hui pour ce visiteur — ignoré volontairement */ }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Commentaires & réponses (public en lecture, connectés en écriture) ── */
+route("GET", "/api/videos-tutoriels/:id/commentaires", async (req, res, params) => {
+  sendJSON(res, 200, { commentaires: await vtChargerCommentaires(params.id) });
+});
+
+route("POST", "/api/videos-tutoriels/:id/commentaires", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connectez-vous à votre compte Diaspo'Actif pour commenter." });
+  const contenu = String(body?.contenu || "").trim().slice(0, 2000);
+  if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
+  let parentId = body?.parent_id ? Number(body.parent_id) : null;
+  if (parentId) {
+    const parent = await db.prepare("SELECT id, video_id, parent_id FROM da_videos_tutoriels_commentaires WHERE id=?").get(parentId);
+    // Un seul niveau de réponse : si on répond à une réponse, on rattache à SA racine.
+    if (!parent || parent.video_id != params.id) return sendJSON(res, 400, { error: "Commentaire parent introuvable." });
+    parentId = parent.parent_id || parent.id;
+  }
+  const r = await db.prepare("INSERT INTO da_videos_tutoriels_commentaires (video_id, parent_id, auteur_id, contenu) VALUES (?,?,?,?)").run(params.id, parentId, user.id, contenu);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/videos-tutoriels/commentaires/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié." });
+  const c = await db.prepare("SELECT auteur_id FROM da_videos_tutoriels_commentaires WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Commentaire introuvable." });
+  if (c.auteur_id !== user.id) return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres commentaires." });
+  const contenu = String(body?.contenu || "").trim().slice(0, 2000);
+  if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
+  await db.prepare("UPDATE da_videos_tutoriels_commentaires SET contenu=?, updated_at=datetime('now') WHERE id=?").run(contenu, params.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/videos-tutoriels/commentaires/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié." });
+  const c = await db.prepare("SELECT auteur_id FROM da_videos_tutoriels_commentaires WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Commentaire introuvable." });
+  const estProprietaire = c.auteur_id === user.id;
+  const peutModerer = await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db);
+  if (!estProprietaire && !peutModerer) return sendJSON(res, 403, { error: "Vous ne pouvez supprimer que vos propres commentaires." });
+  await db.prepare("DELETE FROM da_videos_tutoriels_commentaires WHERE id=? OR parent_id=?").run(params.id, params.id);
+  if (!estProprietaire) await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.moderer', `Commentaire #${params.id} supprimé (modération)`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/videos-tutoriels/commentaires/:id/signaler", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connectez-vous pour signaler un commentaire." });
+  const motif = String(body?.motif || "").trim().slice(0, 200);
+  if (!motif) return sendJSON(res, 400, { error: "Motif obligatoire." });
+  await db.prepare("INSERT INTO da_videos_tutoriels_signalements (commentaire_id, signale_par_id, motif) VALUES (?,?,?)").run(params.id, user.id, motif);
+  sendJSON(res, 201, { ok: true });
+});
+
+/* ── Réactions (connectés uniquement) — bascule (POST relance = retire la réaction) ── */
+route("GET", "/api/videos-tutoriels/:id/reactions", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  const counts = await db.prepare("SELECT type, COUNT(*) n FROM da_videos_tutoriels_reactions WHERE video_id=? GROUP BY type").all(params.id);
+  const mesReactions = user
+    ? (await db.prepare("SELECT type FROM da_videos_tutoriels_reactions WHERE video_id=? AND user_id=?").all(params.id, user.id)).map(r => r.type)
+    : [];
+  sendJSON(res, 200, { counts, mesReactions });
+});
+
+route("POST", "/api/videos-tutoriels/:id/reactions", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connectez-vous à Diaspo'Actif pour réagir à cette vidéo." });
+  const type = String(body?.type || "");
+  if (!VT_REACTIONS.includes(type)) return sendJSON(res, 400, { error: "Réaction invalide." });
+  const existe = await db.prepare("SELECT id FROM da_videos_tutoriels_reactions WHERE video_id=? AND user_id=? AND type=?").get(params.id, user.id, type);
+  if (existe) await db.prepare("DELETE FROM da_videos_tutoriels_reactions WHERE id=?").run(existe.id);
+  else await db.prepare("INSERT INTO da_videos_tutoriels_reactions (video_id, user_id, type) VALUES (?,?,?)").run(params.id, user.id, type);
+  sendJSON(res, 200, { ok: true, actif: !existe });
+});
+
+/* ── Administration (Administrateur principal ou Administrateur Junior autorisé) ── */
+
+route("GET", "/api/admin/videos-tutoriels", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const rows = await db.prepare(`
+    SELECT v.*,
+      (SELECT COUNT(*) FROM da_videos_tutoriels_commentaires c WHERE c.video_id=v.id) AS nb_commentaires,
+      (SELECT COUNT(*) FROM da_videos_tutoriels_reactions r WHERE r.video_id=v.id) AS nb_reactions
+    FROM da_videos_tutoriels v ORDER BY v.ordre ASC, v.id ASC
+  `).all();
+  sendJSON(res, 200, { videos: rows, categories: VT_CATEGORIES });
+});
+
+route("GET", "/api/admin/videos-tutoriels/stats", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db)) && !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const parStatut = await db.prepare("SELECT statut, COUNT(*) n FROM da_videos_tutoriels GROUP BY statut").all();
+  const totalVues = (await db.prepare("SELECT COALESCE(SUM(vues),0) n FROM da_videos_tutoriels").get())?.n || 0;
+  const totalCommentaires = (await db.prepare("SELECT COUNT(*) n FROM da_videos_tutoriels_commentaires").get())?.n || 0;
+  const totalReactions = (await db.prepare("SELECT COUNT(*) n FROM da_videos_tutoriels_reactions").get())?.n || 0;
+  const total = (await db.prepare("SELECT COUNT(*) n FROM da_videos_tutoriels").get())?.n || 0;
+  const g = s => parStatut.find(p => p.statut === s)?.n || 0;
+  sendJSON(res, 200, { total, publiees: g('publie'), brouillons: g('brouillon'), depubliees: g('depublie'), totalVues, totalCommentaires, totalReactions });
+});
+
+route("POST", "/api/admin/videos-tutoriels", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const { titre, description, icone = "🎬", type_source, url, duree_secondes = 0, categorie, miniature_url, statut = 'brouillon' } = body;
+  if (!titre || !url) return sendJSON(res, 400, { error: "Titre et vidéo obligatoires." });
+  if (!["youtube", "mp4"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
+  if (!VT_CATEGORIES.includes(categorie)) return sendJSON(res, 400, { error: "Catégorie obligatoire et invalide." });
+  if (!["brouillon", "publie", "depublie"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const maxOrdre = (await db.prepare("SELECT COALESCE(MAX(ordre),-1) m FROM da_videos_tutoriels").get())?.m ?? -1;
+  const r = await db.prepare("INSERT INTO da_videos_tutoriels (titre,description,icone,type_source,url,duree_secondes,categorie,miniature_url,statut,actif,ordre) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
+    titre, description || null, icone, type_source, url, duree_secondes | 0, categorie, miniature_url || null, statut, statut === 'publie' ? 1 : 0, maxOrdre + 1
+  );
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo ajoutée : ${titre}`);
+  sendJSON(res, 201, { id: r.lastInsertRowid });
+});
+
+route("PUT", "/api/admin/videos-tutoriels/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const { titre, description, icone, type_source, url, duree_secondes, categorie, miniature_url, statut } = body;
+  if (type_source && !["youtube", "mp4"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
+  if (categorie && !VT_CATEGORIES.includes(categorie)) return sendJSON(res, 400, { error: "Catégorie invalide." });
+  if (statut && !["brouillon", "publie", "depublie"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare(`UPDATE da_videos_tutoriels SET
+      titre=COALESCE(?,titre), description=COALESCE(?,description), icone=COALESCE(?,icone),
+      type_source=COALESCE(?,type_source), url=COALESCE(?,url), categorie=COALESCE(?,categorie),
+      miniature_url=COALESCE(?,miniature_url), statut=COALESCE(?,statut),
+      actif=COALESCE(?,actif), duree_secondes=COALESCE(?,duree_secondes), updated_at=datetime('now')
+    WHERE id=?`)
+    .run(titre || null, description ?? null, icone || null, type_source || null, url || null, categorie || null,
+         miniature_url ?? null, statut || null, statut ? (statut === 'publie' ? 1 : 0) : null,
+         (duree_secondes === undefined || duree_secondes === null) ? null : (duree_secondes | 0), params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} modifiée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/videos-tutoriels/:id/publier", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE da_videos_tutoriels SET statut='publie', actif=1, updated_at=datetime('now') WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} publiée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/videos-tutoriels/:id/depublier", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE da_videos_tutoriels SET statut='depublie', actif=0, updated_at=datetime('now') WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} dépubliée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/videos-tutoriels/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("DELETE FROM da_videos_tutoriels_reactions WHERE video_id=?").run(params.id);
+  const comms = await db.prepare("SELECT id FROM da_videos_tutoriels_commentaires WHERE video_id=?").all(params.id);
+  for (const c of comms) await db.prepare("DELETE FROM da_videos_tutoriels_signalements WHERE commentaire_id=?").run(c.id);
+  await db.prepare("DELETE FROM da_videos_tutoriels_commentaires WHERE video_id=?").run(params.id);
+  await db.prepare("DELETE FROM da_videos_tutoriels WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} supprimée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/admin/videos-tutoriels/:id/deplacer — échange l'ordre avec le voisin
+   immédiat (direction 'haut'|'bas'), pour un tri simple par flèches côté admin. */
+route("POST", "/api/admin/videos-tutoriels/:id/deplacer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const courant = await db.prepare("SELECT id,ordre FROM da_videos_tutoriels WHERE id=?").get(params.id);
+  if (!courant) return sendJSON(res, 404, { error: "Vidéo introuvable." });
+  const voisin = body?.direction === "haut"
+    ? await db.prepare("SELECT id,ordre FROM da_videos_tutoriels WHERE ordre < ? ORDER BY ordre DESC LIMIT 1").get(courant.ordre)
+    : await db.prepare("SELECT id,ordre FROM da_videos_tutoriels WHERE ordre > ? ORDER BY ordre ASC LIMIT 1").get(courant.ordre);
+  if (!voisin) return sendJSON(res, 200, { ok: true });
+  await db.prepare("UPDATE da_videos_tutoriels SET ordre=? WHERE id=?").run(voisin.ordre, courant.id);
+  await db.prepare("UPDATE da_videos_tutoriels SET ordre=? WHERE id=?").run(courant.ordre, voisin.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Modération (comment un signalement.moderer) ── */
+route("GET", "/api/admin/videos-tutoriels/commentaires", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  let sql = `SELECT c.*, u.nom, u.prenom, v.titre AS video_titre,
+      (SELECT COUNT(*) FROM da_videos_tutoriels_signalements s WHERE s.commentaire_id=c.id AND s.statut='nouveau') AS nb_signalements
+    FROM da_videos_tutoriels_commentaires c
+    JOIN users u ON u.id = c.auteur_id
+    JOIN da_videos_tutoriels v ON v.id = c.video_id`;
+  if (query.signales === '1') sql += " WHERE EXISTS (SELECT 1 FROM da_videos_tutoriels_signalements s WHERE s.commentaire_id=c.id AND s.statut='nouveau')";
+  sql += " ORDER BY c.created_at DESC LIMIT 200";
+  const rows = await db.prepare(sql).all();
+  sendJSON(res, 200, { commentaires: rows.map(r => ({ ...r, auteur_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur' })) });
+});
+
+route("POST", "/api/admin/videos-tutoriels/commentaires/:id/masquer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE da_videos_tutoriels_commentaires SET statut='masque' WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.moderer', `Commentaire #${params.id} masqué`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/videos-tutoriels/commentaires/:id/restaurer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE da_videos_tutoriels_commentaires SET statut='visible' WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.moderer', `Commentaire #${params.id} restauré`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/videos-tutoriels/signalements", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const rows = await db.prepare(`
+    SELECT s.*, c.contenu AS commentaire_contenu, c.video_id, u.nom, u.prenom
+    FROM da_videos_tutoriels_signalements s
+    JOIN da_videos_tutoriels_commentaires c ON c.id = s.commentaire_id
+    JOIN users u ON u.id = s.signale_par_id
+    WHERE s.statut='nouveau' ORDER BY s.created_at DESC
+  `).all();
+  sendJSON(res, 200, { signalements: rows.map(r => ({ ...r, signale_par_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur' })) });
+});
+
+route("POST", "/api/admin/videos-tutoriels/signalements/:id/traiter", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE da_videos_tutoriels_signalements SET statut='traite' WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.moderer', `Signalement #${params.id} traité`);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/upload/video-tutoriel — upload MP4 (magic-bytes + taille max). La limite de
+   15 minutes annoncée aux admins est vérifiée côté client (durée réelle non vérifiable
+   sans ffprobe, absent de ce serveur) — même mécanique que POST /api/upload/produit. */
+route("POST", "/api/upload/video-tutoriel", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["video"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+
+  const vidType = SEC.isSafeVideo(file.buffer);
+  if (!vidType) return sendJSON(res, 400, { error: "Format non valide (MP4 ou WebM requis)." });
+  const MAX_VIDEO = 300 * 1024 * 1024;
+  if (file.buffer.length > MAX_VIDEO) return sendJSON(res, 400, { error: "Vidéo trop volumineuse (max 300 Mo)." });
+  try {
+    const filename = `${user.id}-${Date.now()}.${vidType.split("/")[1]}`;
+    const url = await uploadToBunny(file.buffer, filename, "videos-tutoriels");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "video_tutoriel", type: vidType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload video tutoriel")); }
+});
+
+/* POST /api/upload/video-tutoriel-miniature — miniature facultative (image), même
+   mécanique que POST /api/upload/post (magic-bytes + compression). */
+route("POST", "/api/upload/video-tutoriel-miniature", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["miniature"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Image trop grande (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const compressed = await compressImage(file.buffer, "post");
+    const url = await uploadToBunny(compressed, filename, "videos-tutoriels");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "video_tutoriel_miniature", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload miniature video tutoriel")); }
+});
+
 route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
@@ -22938,6 +23296,88 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   } catch (e) {
     console.error('[schema-modules] non marqué (sera rejoué au prochain démarrage) :', e.message);
   }
+})();
+
+/* ──────── VIDÉOS TUTORIELS (bandeau accueil + page dédiée, 2026-09-18) ────────
+   IIFE indépendante du marqueur SCHEMA_MODULES_VERSION ci-dessus (celui-ci était déjà posé
+   sur cette base, donc migrateChatbot() ressort immédiatement sans rejouer son contenu) —
+   CREATE TABLE IF NOT EXISTS est sans risque à rejouer à chaque démarrage, donc pas besoin
+   de gating par marqueur ici. */
+(async function migrateVideosTutoriels() {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS da_videos_tutoriels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      titre TEXT NOT NULL,
+      description TEXT,
+      icone TEXT DEFAULT '🎬',
+      type_source TEXT NOT NULL DEFAULT 'youtube',
+      url TEXT NOT NULL,
+      duree_secondes INTEGER DEFAULT 0,
+      ordre INTEGER DEFAULT 0,
+      actif INTEGER DEFAULT 1,
+      vues INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+
+    /* Extension 2026-09-18 (cahier des charges "Vidéos Tuto" : catégories, statut éditorial,
+       miniature, commentaires, réactions, signalements, dédup des vues). ALTER TABLE ADD COLUMN
+       idempotent via PRAGMA table_info, même idiome que migrateChatbot() plus haut. "actif" est
+       conservé tel quel (colonne existante, inoffensive) : "statut" le remplace pour tout nouveau
+       code, plus expressif (brouillon/publie/depublie vs simple booléen). */
+    const colsVT = (await db.prepare("PRAGMA table_info(da_videos_tutoriels)").all()).map(c => c.name);
+    const addVT = async (col, def) => { if (!colsVT.includes(col)) { try { await db.prepare(`ALTER TABLE da_videos_tutoriels ADD COLUMN ${col} ${def}`).run(); } catch (e) {} } };
+    await addVT("categorie", "TEXT DEFAULT 'Autres'");
+    await addVT("statut", "TEXT DEFAULT 'brouillon'");
+    await addVT("miniature_url", "TEXT");
+    // Les lignes déjà actives avant cette extension deviennent "publie" (comportement inchangé pour l'existant).
+    try { await db.prepare("UPDATE da_videos_tutoriels SET statut='publie' WHERE actif=1 AND (statut IS NULL OR statut='brouillon')").run(); } catch (e) {}
+
+    await db.prepare(`CREATE TABLE IF NOT EXISTS da_videos_tutoriels_commentaires (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      video_id INTEGER NOT NULL,
+      parent_id INTEGER,
+      auteur_id INTEGER NOT NULL,
+      contenu TEXT NOT NULL,
+      statut TEXT NOT NULL DEFAULT 'visible',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(video_id) REFERENCES da_videos_tutoriels(id),
+      FOREIGN KEY(parent_id) REFERENCES da_videos_tutoriels_commentaires(id)
+    )`).run();
+    try { await db.prepare("CREATE INDEX IF NOT EXISTS idx_vt_comm_video ON da_videos_tutoriels_commentaires(video_id)").run(); } catch (e) {}
+
+    await db.prepare(`CREATE TABLE IF NOT EXISTS da_videos_tutoriels_reactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      video_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(video_id, user_id, type)
+    )`).run();
+
+    await db.prepare(`CREATE TABLE IF NOT EXISTS da_videos_tutoriels_signalements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commentaire_id INTEGER NOT NULL,
+      signale_par_id INTEGER NOT NULL,
+      motif TEXT NOT NULL,
+      statut TEXT NOT NULL DEFAULT 'nouveau',
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(commentaire_id) REFERENCES da_videos_tutoriels_commentaires(id)
+    )`).run();
+
+    /* Dédup des vues : une ligne par (vidéo, visiteur, jour) — même principe de hachage IP+jour
+       que POST /api/analytics/vue. L'incrément de da_videos_tutoriels.vues n'a lieu que si cet
+       INSERT réussit (voir la route), donc un rafraîchissement répété le même jour par la même
+       personne ne recompte pas. */
+    await db.prepare(`CREATE TABLE IF NOT EXISTS da_videos_tutoriels_vues_log (
+      video_id INTEGER NOT NULL,
+      visiteur_hash TEXT NOT NULL,
+      jour TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY(video_id, visiteur_hash, jour)
+    )`).run();
+  } catch (e) { console.error('[migrateVideosTutoriels]', e.message); }
 })();
 
 /* ── Codes Adhésion D'A : paramètres standards, semés une seule fois ──

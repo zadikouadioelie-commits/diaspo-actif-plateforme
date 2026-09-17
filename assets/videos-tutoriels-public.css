@@ -1,0 +1,48 @@
+/* ── Cartes vidéos tutoriels — partagé entre l'accueil et videos-tutoriels.html ── */
+.dvt-card{background:#fff;color:#102A43;border-radius:12px;overflow:hidden;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.14);transition:transform .15s;}
+.dvt-card:hover{transform:translateY(-3px);}
+.dvt-thumb{position:relative;aspect-ratio:16/10;background:var(--navy,#0D2B4E);}
+.dvt-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.dvt-duree{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.7);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;}
+.dvt-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.dvt-play span{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--navy,#0D2B4E);box-shadow:0 3px 10px rgba(0,0,0,.25);}
+.dvt-body{padding:12px 14px;}
+.dvt-badge-categorie{display:inline-block;background:#FFF0E8;color:#B84C1A;font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:99px;margin-bottom:6px;}
+.dvt-card-titre{font-weight:700;font-size:13.5px;margin:4px 0 3px;}
+.dvt-card-desc{font-size:12px;color:#676F77;line-height:1.4;}
+.dvt-card-meta{font-size:11px;color:#676F77;margin-top:8px;}
+
+/* ── Page vidéo individuelle ── */
+.dvt-player{aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 6px 20px rgba(0,0,0,.18);}
+.dvt-page-titre{font-size:22px;font-weight:800;margin:18px 0 6px;color:#102A43;}
+.dvt-page-meta{font-size:13px;color:#676F77;margin-bottom:12px;}
+.dvt-page-desc{font-size:14.5px;line-height:1.6;color:#102A43;max-width:760px;}
+
+/* ── Réactions ── */
+.dvt-reactions{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;}
+.dvt-reaction-btn{display:flex;align-items:center;gap:6px;background:#F5F7FA;border:1.5px solid #D6DEE8;border-radius:99px;padding:7px 14px;font-size:13px;cursor:pointer;color:#102A43;}
+.dvt-reaction-btn:hover{border-color:#B84C1A;}
+.dvt-reaction-btn.actif{background:#FFF0E8;border-color:#B84C1A;color:#B84C1A;font-weight:700;}
+.dvt-reaction-btn strong{font-weight:700;}
+
+/* ── Invitation compte (visiteur non connecté) ── */
+.dvt-invite{background:#EEF2F8;border:1px solid #D6DEE8;border-radius:12px;padding:16px;margin:16px 0;}
+.dvt-invite p{margin:0 0 10px;font-size:13.5px;color:#102A43;}
+.dvt-btn-primary{display:inline-block;background:#B84C1A;color:#fff;font-weight:700;font-size:13px;padding:9px 18px;border-radius:8px;text-decoration:none;border:none;cursor:pointer;}
+.dvt-btn-outline{display:inline-block;background:#fff;color:#102A43;font-weight:700;font-size:13px;padding:9px 18px;border-radius:8px;text-decoration:none;border:1.5px solid #D6DEE8;cursor:pointer;}
+
+/* ── Commentaires ── */
+.dvt-textarea{width:100%;min-height:70px;border:1.5px solid #D6DEE8;border-radius:8px;padding:10px 12px;font-size:13.5px;font-family:inherit;resize:vertical;}
+.dvt-commentaire{padding:12px 0;border-top:1px solid #EEF2F8;}
+.dvt-commentaire-tete{font-size:13px;}
+.dvt-badge-admin{background:#0D2B4E;color:#fff;font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:99px;margin-left:4px;letter-spacing:.03em;}
+.dvt-commentaire-date{color:#9AA5B1;font-size:11.5px;margin-left:8px;}
+.dvt-commentaire-texte{font-size:13.5px;margin:6px 0;color:#102A43;}
+.dvt-commentaire-actions{display:flex;gap:12px;}
+.dvt-commentaire-actions button{background:none;border:none;color:#B84C1A;font-size:12px;font-weight:700;cursor:pointer;padding:0;}
+.dvt-reponses{margin-left:24px;border-left:2px solid #EEF2F8;padding-left:14px;}
+
+@media(max-width:600px){
+  .dvt-page-titre{font-size:18px;}
+  .dvt-reponses{margin-left:12px;padding-left:10px;}
+}

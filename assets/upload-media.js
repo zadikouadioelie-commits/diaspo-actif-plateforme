@@ -20,7 +20,8 @@ async function uploadMedia(file, type = 'avatar') {
     cagnotte:    '/api/upload/cagnotte',
     evenement:   '/api/upload/evenement',
     publication: '/api/upload/post',
-    document:    '/api/upload/document'
+    document:    '/api/upload/document',
+    'video-tutoriel': '/api/upload/video-tutoriel'
   }[type] || '/api/upload/avatar';
 
   const formData = new FormData();

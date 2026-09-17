@@ -76,6 +76,10 @@ const CATALOGUE_ADMIN_JUNIOR = [
   // ── Module: formulaires_inscription (2026-09-08) ──
   { id: 'formulaires_inscription.consulter', module: 'formulaires_inscription', numero: 1, description: 'Consulter toutes les fiches et inscriptions (lecture seule)', capability: 'formulaires_inscription.consulter' },
   { id: 'formulaires_inscription.gerer',     module: 'formulaires_inscription', numero: 2, description: "Gérer les fiches d'inscription (créer, modifier, valider les inscrits)", capability: 'formulaires_inscription.gerer' },
+
+  // ── Module: videos_tutoriels (2026-09-18, cahier des charges "Vidéos Tuto") ──
+  { id: 'videos_tutoriels.gerer',   module: 'videos_tutoriels', numero: 1, description: "Ajouter, modifier, publier/dépublier, réordonner et supprimer les vidéos tutoriels", capability: 'videos_tutoriels.gerer' },
+  { id: 'videos_tutoriels.moderer', module: 'videos_tutoriels', numero: 2, description: "Modérer les commentaires (répondre officiellement, masquer, supprimer) et traiter les signalements", capability: 'videos_tutoriels.moderer' },
 ];
 
 function catalogueIdsPourCapacite(capabiliteKey) {

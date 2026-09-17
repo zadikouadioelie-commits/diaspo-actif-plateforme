@@ -283,7 +283,11 @@ footer.footer a { color: rgba(255,255,255,.5) !important; }
     errBox.style.display = "none";
     try {
       const r = await api("POST", "/auth/login", { email, password });
-      window.location.href = loginLandingUrl(r.user);
+      /* Retour à la page d'origine (ex: vidéo Vidéos Tuto) si ?redirect=... est présent et
+         reste un chemin relatif du site — jamais une URL absolue/externe (anti-open-redirect). */
+      const redirect = new URLSearchParams(location.search).get("redirect");
+      const redirectSur = (redirect && !redirect.includes("://") && !redirect.startsWith("//")) ? redirect : null;
+      window.location.href = redirectSur || loginLandingUrl(r.user);
     } catch (err) {
       errBox.textContent = err.message || "Connexion impossible.";
       errBox.style.display = "block";

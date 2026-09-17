@@ -8,6 +8,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="La plateforme qui connecte les initiatives des diasporas du monde entier. Découvrez, rejoignez et soutenez les actions qui changent le monde.">
 <link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap">
   <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="manifest" href="manifest.json">
@@ -1010,6 +1011,51 @@
     <div id="hb-account-section"></div>
   </aside>
 
+  <!-- ===== BANDEAU VIDÉOS TUTORIELS ===== -->
+  <section class="dvt-banner" id="dvt-banner" style="display:none;">
+    <style>
+      .dvt-banner{background:linear-gradient(135deg,var(--navy,#0D2B4E) 0%,#123a63 100%);color:#fff;padding:32px 24px;}
+      .dvt-inner{max-width:1200px;margin:0 auto;}
+      .dvt-top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:22px;}
+      .dvt-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:12px;}
+      .dvt-title{font-size:26px;font-weight:800;line-height:1.25;margin:0;max-width:520px;}
+      .dvt-title em{font-style:normal;color:#F59E0B;}
+      .dvt-right{display:flex;align-items:center;gap:20px;flex:1;min-width:240px;justify-content:flex-end;}
+      .dvt-desc{font-size:14px;line-height:1.55;color:rgba(255,255,255,.85);max-width:340px;margin:0;}
+      .dvt-cursive{font-family:'Caveat',cursive;font-size:23px;line-height:1.2;color:#F59E0B;transform:rotate(-3deg);flex-shrink:0;}
+      .dvt-grid{display:flex;gap:16px;overflow-x:auto;padding-bottom:6px;}
+      .dvt-grid .dvt-card{width:210px;flex:0 0 210px;}
+      .dvt-more-wrap{text-align:center;margin-top:22px;}
+      .dvt-more-btn{display:inline-flex;align-items:center;gap:8px;background:#F59E0B;color:#1A2332;font-weight:800;font-size:13.5px;padding:11px 22px;border-radius:99px;text-decoration:none;}
+      .dvt-more-btn:hover{filter:brightness(1.06);}
+      @media(max-width:820px){ .dvt-cursive{display:none;} .dvt-right{justify-content:flex-start;} }
+      @media(max-width:600px){
+        .dvt-banner{padding:20px 16px;}
+        .dvt-title{font-size:19px;}
+        .dvt-desc{display:none;}
+        .dvt-grid .dvt-card{width:150px;flex:0 0 150px;}
+        .dvt-card-titre{font-size:12.5px;}
+        .dvt-card-desc{display:none;}
+        .dvt-more-btn{font-size:12.5px;padding:9px 18px;}
+      }
+    </style>
+    <div class="dvt-inner">
+      <div class="dvt-top">
+        <div>
+          <div class="dvt-badge">▶ Tutoriels vidéo</div>
+          <h2 class="dvt-title">Découvrez Diaspo'Actif <em>en quelques minutes !</em></h2>
+        </div>
+        <div class="dvt-right">
+          <p class="dvt-desc">Nos courtes vidéos vous guident pas à pas pour profiter pleinement de la plateforme : créer votre profil, publier vos initiatives, trouver des opportunités et bien plus encore.</p>
+          <div class="dvt-cursive">Apprendre c'est avancer<br>ensemble !</div>
+        </div>
+      </div>
+      <div class="dvt-grid" id="dvt-grid-accueil"></div>
+      <div class="dvt-more-wrap">
+        <a class="dvt-more-btn" href="videos-tutoriels.html">+ Voir toutes les autres vidéos →</a>
+      </div>
+    </div>
+  </section>
   <!-- ===== SECTION 1 : HERO ===== -->
   <section class="hp-hero">
     <div class="hp-hero-inner">
@@ -2406,6 +2452,12 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
 <script src="assets/gsap-animations.js" defer></script>
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
+  <script src="/assets/videos-tutoriels-public.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      dvtCharger('dvt-grid-accueil', { limit: 5, sectionIdSiVide: 'dvt-banner', compact: true });
+    });
+  </script>
 </body>
 </html>
 

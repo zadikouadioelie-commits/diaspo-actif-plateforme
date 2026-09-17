@@ -146,6 +146,105 @@
         <div id="delreq-dossier" style="display:none;margin-top:16px;"></div>
       </section>
 
+      <!-- VIDÉOS TUTORIELS — markup identique à dashboard-administrateur.html (assets/admin-videos-tutoriels-panel.js) -->
+      <section id="section-videos-tutoriels" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <h2 style="margin:0;">🎬 Vidéos Tuto</h2>
+            <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Vidéos pédagogiques : accueil (5 premières publiées), page dédiée, commentaires et réactions des utilisateurs connectés.</p>
+          </div>
+          <button class="btn-primary" style="padding:9px 18px;border-radius:8px;font-size:13px;" onclick="vtOuvrirForm()">+ Ajouter une vidéo</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-orange" id="vt-tab-videos" onclick="vtOuvrirOnglet('videos')">🎬 Vidéos</button>
+          <button class="btn btn-outline" id="vt-tab-commentaires" onclick="vtOuvrirOnglet('commentaires')">💬 Commentaires</button>
+          <button class="btn btn-outline" id="vt-tab-signalements" onclick="vtOuvrirOnglet('signalements')">🚩 Signalements</button>
+        </div>
+
+        <div id="vt-panel-videos">
+          <div id="vt-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;"></div>
+          <div id="vt-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+
+        <div id="vt-panel-commentaires" style="display:none;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer;">
+            <input type="checkbox" id="vt-filtre-signales" onchange="vtChargerCommentaires()"> N'afficher que les commentaires signalés
+          </label>
+          <div id="vt-commentaires-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+
+        <div id="vt-panel-signalements" style="display:none;">
+          <div id="vt-signalements-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+      </section>
+
+      <!-- Modale ajout/édition vidéo tutoriel -->
+      <div id="vt-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+        <div class="card" style="width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+          <h3 id="vt-modal-titre" style="margin:0 0 16px;">Ajouter une vidéo</h3>
+          <input type="hidden" id="vt-id">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div>
+              <label style="font-size:12.5px;font-weight:700;">Titre *</label>
+              <input id="vt-titre" class="input-field" style="width:100%;margin-top:4px;" placeholder="Ex: Créer votre profil">
+            </div>
+            <div>
+              <label style="font-size:12.5px;font-weight:700;">Description courte</label>
+              <textarea id="vt-description" class="input-field" style="width:100%;margin-top:4px;min-height:60px;" placeholder="Ex: Présentez-vous et mettez en valeur votre parcours."></textarea>
+            </div>
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;">
+                <label style="font-size:12.5px;font-weight:700;">Catégorie *</label>
+                <select id="vt-categorie" class="input-field" style="width:100%;margin-top:4px;"></select>
+              </div>
+              <div>
+                <label style="font-size:12.5px;font-weight:700;">Icône</label>
+                <input id="vt-icone" class="input-field" style="width:70px;margin-top:4px;" value="🎬" maxlength="4">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12.5px;font-weight:700;">Statut</label>
+              <select id="vt-statut" class="input-field" style="width:100%;margin-top:4px;">
+                <option value="brouillon">📝 Brouillon</option>
+                <option value="publie">✅ Publiée</option>
+                <option value="depublie">🚫 Dépubliée</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12.5px;font-weight:700;">Source de la vidéo *</label>
+              <div style="display:flex;gap:14px;margin-top:6px;font-size:13px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="vt-type" value="youtube" checked onchange="vtChangerType()"> Lien YouTube</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="vt-type" value="mp4" onchange="vtChangerType()"> Fichier MP4</label>
+              </div>
+            </div>
+            <div id="vt-champ-youtube">
+              <label style="font-size:12.5px;font-weight:700;">URL YouTube</label>
+              <input id="vt-url-youtube" class="input-field" style="width:100%;margin-top:4px;" placeholder="https://www.youtube.com/watch?v=...">
+            </div>
+            <div id="vt-champ-mp4" style="display:none;">
+              <label style="font-size:12.5px;font-weight:700;">Fichier vidéo (MP4/WebM, 15 min max, 300 Mo max)</label>
+              <input id="vt-fichier-mp4" type="file" accept="video/mp4,video/webm" class="input-field" style="width:100%;margin-top:4px;" onchange="vtFichierChoisi(this)">
+              <p id="vt-upload-statut" style="font-size:12px;color:var(--muted);margin:6px 0 0;"></p>
+              <input type="hidden" id="vt-url-mp4">
+            </div>
+            <div>
+              <label style="font-size:12.5px;font-weight:700;">Durée (mm:ss)</label>
+              <input id="vt-duree" class="input-field" style="width:110px;margin-top:4px;" placeholder="1:24">
+            </div>
+            <div>
+              <label style="font-size:12.5px;font-weight:700;">Miniature (facultative — sinon icône par défaut)</label>
+              <input id="vt-fichier-miniature" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="input-field" style="width:100%;margin-top:4px;" onchange="vtMiniatureChoisie(this)">
+              <p id="vt-miniature-statut" style="font-size:12px;color:var(--muted);margin:6px 0 0;"></p>
+              <input type="hidden" id="vt-miniature-url">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+            <button onclick="vtFermerForm()" style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;">Annuler</button>
+            <button onclick="vtSauver()" class="btn-primary" style="padding:8px 20px;border-radius:8px;font-size:13px;">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- MES DROITS -->
       <section id="section-mes-droits" style="display:none;">
         <h2>📋 Mes droits</h2>
@@ -172,15 +271,18 @@
 
 <script src="assets/app.js?v=12"></script>
 <script src="assets/admin-moderation-panels.js"></script>
+<script src="/assets/upload-media.js"></script>
+<script src="/assets/admin-videos-tutoriels-panel.js"></script>
 <script>
 function esc(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression' };
+const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression', videos_tutoriels: '🎬 Vidéos Tuto' };
 const AJ_SIDEBAR_LINKS = {
   moderation: '<a href="#moderation" data-section="moderation">🛡 Modération</a>',
   suppression_comptes: '<a href="#suppression-comptes" data-section="suppression-comptes">🗑 Demandes de suppression</a>',
+  videos_tutoriels: '<a href="#videos-tutoriels" data-section="videos-tutoriels">🎬 Vidéos Tuto</a>',
 };
 
 async function loadMesDroits() {
@@ -257,6 +359,7 @@ async function loadMessagerie() {
   const SECTION_LOADERS = { 'mes-droits': loadMesDroits, 'mon-activite': loadMonActivite, 'messagerie': loadMessagerie };
   if (modulesAccordes.includes('moderation')) SECTION_LOADERS['moderation'] = () => switchModeTab('comptes');
   if (modulesAccordes.includes('suppression_comptes')) SECTION_LOADERS['suppression-comptes'] = () => loadDelReqList();
+  if (modulesAccordes.includes('videos_tutoriels')) SECTION_LOADERS['videos-tutoriels'] = () => vtOuvrirOnglet('videos');
 
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -272,7 +375,7 @@ async function loadMessagerie() {
   document.getElementById('aj-chargement').style.display = 'none';
   // Ouvre la première section disponible.
   const premier = modulesAccordes.length ? modulesAccordes[0] : 'mes-droits';
-  const premierSlug = premier === 'moderation' ? 'moderation' : premier === 'suppression_comptes' ? 'suppression-comptes' : 'mes-droits';
+  const premierSlug = premier === 'moderation' ? 'moderation' : premier === 'suppression_comptes' ? 'suppression-comptes' : premier === 'videos_tutoriels' ? 'videos-tutoriels' : 'mes-droits';
   document.querySelector(`.sidebar a[data-section="${premierSlug}"]`)?.click();
 })();
 </script>

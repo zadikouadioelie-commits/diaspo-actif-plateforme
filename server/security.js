@@ -25,6 +25,10 @@ const CSP = [
      des données topojson elles-mêmes. */
   "connect-src 'self' https://diaspoactif-media.b-cdn.net https://cdn.jsdelivr.net",
   "media-src 'self' data: blob: https:",
+  /* frame-src : lecteur YouTube intégré dans la modale des vidéos tutoriels (2026-09-18) —
+     sans cette directive, "default-src 'self'" bloque silencieusement tout <iframe> vers un
+     domaine externe, y compris youtube.com. */
+  "frame-src 'self' https://www.youtube.com",
   "frame-ancestors 'self'",
   "base-uri 'self'",
   "form-action 'self'",
