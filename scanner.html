@@ -208,7 +208,7 @@ select:focus{outline:none;border-color:var(--accent);}
 <script src="assets/chatbot.js"></script>
 <script>
 (async function init() {
-  const me = await DA.me().catch(() => null);
+  const me = await fetchCurrentUser().catch(() => null);
   if (!me || !['initiative','administrateur','collectivite'].includes(me.role)) {
     document.getElementById('auth-gate').style.display = 'flex';
     return;

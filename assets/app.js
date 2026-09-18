@@ -68,15 +68,28 @@ async function api(method, path, body) {
 }
 
 let CURRENT_USER = null;
+/* Mutualise les appels concurrents : au chargement d'une page, plusieurs scripts
+   indépendants (assistance.js, back-button.js, signalement.js, etc.) appellent
+   chacun fetchCurrentUser() de leur côté — sans ce partage, ça déclenchait 6 à 8
+   requêtes /api/auth/me identiques en quelques millisecondes sur une seule page
+   (constaté lors du balayage plateforme du 2026-09-18). Une fois la requête en
+   cours terminée, l'appel suivant repart bien sur le réseau (pas de cache figé). */
+let _fetchCurrentUserPromise = null;
 async function fetchCurrentUser() {
-  try {
-    const r = await api("GET", "/auth/me");
-    CURRENT_USER = r.user;
-    return r.user;
-  } catch (e) {
-    CURRENT_USER = null;
-    return null;
-  }
+  if (_fetchCurrentUserPromise) return _fetchCurrentUserPromise;
+  _fetchCurrentUserPromise = (async () => {
+    try {
+      const r = await api("GET", "/auth/me");
+      CURRENT_USER = r.user;
+      return r.user;
+    } catch (e) {
+      CURRENT_USER = null;
+      return null;
+    } finally {
+      _fetchCurrentUserPromise = null;
+    }
+  })();
+  return _fetchCurrentUserPromise;
 }
 
 const ROLE_DASHBOARD = { utilisateur: "dashboard-utilisateur.html", initiative: "dashboard-initiative.html", administrateur: "dashboard-administrateur.html", collectivite: "dashboard-collectivite.html", administrateur_junior: "dashboard-administrateur-junior.html", partenaire: "dashboard-partenaire.html" };
@@ -1977,7 +1990,8 @@ async function initAnnuaire(){
     ].sort((a, b) => a.rang - b.rang);
     const cartes = entites.map(e => e.html);
     filtered_count = r.total || 0;
-    document.getElementById("result-count").textContent = filtered_count;
+    const resultCountEl = document.getElementById("result-count");
+    if (resultCountEl) resultCountEl.textContent = filtered_count;
     list.innerHTML = cartes.length ? cartes.join("") : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
         <div style="font-size:2rem;margin-bottom:12px;">🔍</div>
         <p style="font-weight:700;margin-bottom:6px;">Aucun résultat pour « ${state.motCle} »</p>
@@ -2018,7 +2032,8 @@ async function initAnnuaire(){
         return true;
       });
       filtered_count = filtered.length;
-      document.getElementById("result-count").textContent = filtered.length;
+      const resultCountEl2 = document.getElementById("result-count");
+      if (resultCountEl2) resultCountEl2.textContent = filtered.length;
       list.innerHTML = filtered.length
         ? filtered.map(renderPersonCard).join("")
         : `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">

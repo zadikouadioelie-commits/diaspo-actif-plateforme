@@ -201,7 +201,7 @@ function initials(prenom,nom){return((prenom||'?')[0]+(nom||'?')[0]).toUpperCase
    INIT
 ============================================================ */
 async function init() {
-  ME = await fetch('/api/me',{credentials:'include'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  ME = await fetch('/api/auth/me',{credentials:'include'}).then(r=>r.ok?r.json():null).then(d=>d?.user||null).catch(()=>null);
 
   if (!JITSI_ROOM && !REUNION_ID) {
     showError('Lien de réunion invalide.');
