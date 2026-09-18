@@ -416,6 +416,32 @@
     sidebar.addEventListener('pointercancel', finirDrag);
   }
 
+  /* En-tête fixe du menu (2026-09-18, demande explicite, capture à l'appui : "même en défilant
+     les modules, garde ceci toujours visible" — recherche + boutons Réorganiser/Valise).
+     .sidebar est le conteneur qui défile lui-même (overflow-y:auto, voir styles.v2.css) et le
+     logo/la recherche/ces boutons ne sont que des enfants directs comme les liens de module —
+     rien ne les gardait visibles au défilement. Regroupe tout ce qui précède le premier lien
+     ou intitulé de groupe dans un conteneur position:sticky;top:0 — sans déplacer les liens
+     eux-mêmes, qui doivent rester des enfants DIRECTS de .sidebar (poserPoignees/getGroups
+     plus haut les sélectionnent via ":scope > a[href]"). Idempotent et rejoué à chaque rescan
+     ci-dessous : peu importe que la recherche (assets/app.js) ou ces boutons soient injectés
+     en premier, le prochain passage les regroupe de toute façon. */
+  function applyStickyHeader(sidebar) {
+    let header = sidebar.querySelector('.sb-sticky-header');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'sb-sticky-header';
+      header.style.cssText = 'position:sticky;top:0;z-index:20;background:var(--navy);';
+      sidebar.insertBefore(header, sidebar.firstChild);
+    }
+    let node = header.nextSibling;
+    while (node && !(node.nodeType === 1 && (node.matches('a[href]') || node.classList.contains('sb-group-lbl')))) {
+      const suivant = node.nextSibling;
+      header.appendChild(node);
+      node = suivant;
+    }
+  }
+
   function init() {
     const sidebar = document.querySelector('aside.sidebar');
     if (!sidebar) return;
@@ -428,6 +454,7 @@
     poserPoignees(sidebar); // pose aussi les poignées des liens révélés après coup (Premium, association...)
     poserBoutonsValise(sidebar); // idem pour le bouton 🧳 de rangement
     if (utilisateurCourant()) applyValiseHidden(sidebar); // masque aussi les modules révélés après coup si déjà rangés
+    applyStickyHeader(sidebar);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
