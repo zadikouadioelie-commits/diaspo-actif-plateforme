@@ -6166,7 +6166,17 @@ db.exec(`
     const ancienneTable = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='adhesion_relances'").get();
     if (ancienneTable && /CHECK\(niveau IN/.test(ancienneTable.sql)) {
       db.exec("ALTER TABLE adhesion_relances RENAME TO adhesion_relances_migration_tmp");
-      db.exec(`CREATE TABLE adhesion_relances (
+      /* IF NOT EXISTS ajouté (2026-09-18, bug trouvé par exécution réelle : "🔧 Réparer la
+         base" échouait avec "relation adhesion_relances already exists") — createMissingTables()
+         (server/pg-init.js) scrute TOUT db.js par regex et rejoue CHAQUE `db.exec(\`CREATE
+         TABLE...\`)` trouvé contre Postgres, sans savoir que celui-ci n'est censé s'exécuter
+         qu'après le RENAME ci-dessus, et seulement sur SQLite (la garde ancienneTable/
+         sqlite_master n'a aucun sens sur Postgres). Résultat : à chaque clic sur "Réparer la
+         base" en production, ce CREATE sans garde percutait la vraie table (créée par la
+         version IF NOT EXISTS plus bas, ligne ~6333) qui existe déjà et n'a jamais été
+         renommée. Sans effet sur le chemin SQLite réel : à cet endroit, l'ancienne table vient
+         d'être renommée, IF NOT EXISTS ne change donc rien pour elle. */
+      db.exec(`CREATE TABLE IF NOT EXISTS adhesion_relances (
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
         membre_id           INTEGER NOT NULL,
         niveau              TEXT NOT NULL,
@@ -8017,7 +8027,14 @@ db.exec(`
   });
 })();
 
-/* Migration : offres — colonne recruteur_contact + statut 'suspendue' (rebuild pour lever l'ancien CHECK). */
+/* Migration : offres — colonne recruteur_contact + statut 'suspendue' (rebuild pour lever l'ancien CHECK).
+   Les 4 CREATE TABLE *_new de ce fichier (ici et les 3 migrations de rebuild suivantes) portent
+   IF NOT EXISTS depuis le 2026-09-18 (même cause que le correctif adhesion_relances plus haut,
+   bug trouvé par exécution réelle sur "🔧 Réparer la base" en production : "relation ... already
+   exists") — createMissingTables() (server/pg-init.js) scrute tout ce fichier par regex et
+   rejoue CHAQUE `db.exec` CREATE TABLE trouvé contre Postgres, sans savoir qu'il ne devrait
+   s'exécuter que dans le flux SQLite ci-dessous, après un DROP TABLE IF EXISTS juste avant. Sans
+   effet sur le rebuild réel : à cet endroit la table *_new vient d'être vidée par ce DROP. */
 ;(function migrateOffresSuspendueEtContact() {
   const cols = db.prepare("PRAGMA table_info(offres)").all().map(c => c.name);
   if (!cols.includes("recruteur_contact")) db.exec("ALTER TABLE offres ADD COLUMN recruteur_contact TEXT");
@@ -8026,7 +8043,7 @@ db.exec(`
     db.exec(`PRAGMA foreign_keys=OFF;`);
     db.exec(`DROP TABLE IF EXISTS offres_new;`);
     db.exec(`
-      CREATE TABLE offres_new (
+      CREATE TABLE IF NOT EXISTS offres_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         createur_id INTEGER NOT NULL,
         titre TEXT NOT NULL,
@@ -8073,7 +8090,7 @@ db.exec(`
   db.exec(`PRAGMA foreign_keys=OFF;`);
   db.exec(`DROP TABLE IF EXISTS cagnotte_contributions_new;`);
   db.exec(`
-    CREATE TABLE cagnotte_contributions_new (
+    CREATE TABLE IF NOT EXISTS cagnotte_contributions_new (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cagnotte_id INTEGER NOT NULL,
       user_id INTEGER,
@@ -8109,7 +8126,7 @@ db.exec(`
   db.exec(`PRAGMA foreign_keys=OFF;`);
   db.exec(`DROP TABLE IF EXISTS initiative_membres_new;`);
   db.exec(`
-    CREATE TABLE initiative_membres_new (
+    CREATE TABLE IF NOT EXISTS initiative_membres_new (
       id                    INTEGER PRIMARY KEY AUTOINCREMENT,
       initiative_id         INTEGER NOT NULL,
       user_id               INTEGER NOT NULL,
@@ -8146,7 +8163,7 @@ db.exec(`
   db.exec(`PRAGMA foreign_keys=OFF;`);
   db.exec(`DROP TABLE IF EXISTS adhesion_membres_new;`);
   db.exec(`
-    CREATE TABLE adhesion_membres_new (
+    CREATE TABLE IF NOT EXISTS adhesion_membres_new (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       formule_id          INTEGER NOT NULL,
       initiative_id       INTEGER NOT NULL,
