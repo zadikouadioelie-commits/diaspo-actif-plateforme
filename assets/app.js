@@ -1603,7 +1603,10 @@ function renderInitiativeCard(it){
   const photo   = it.vitrine_banniere_url || it.logo_url || '';
   const initiales = String(it.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
     .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
-  const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && CURRENT_USER.id === it.owner_user_id);
+  /* Number() des deux côtés : l'API renvoie parfois les id en texte (BIGSERIAL Postgres),
+     une comparaison stricte les manque alors silencieusement — bug déjà rencontré sur ce
+     projet, cf. mémoire "Bug types BIGSERIAL". */
+  const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && Number(CURRENT_USER.id) === Number(it.owner_user_id));
   const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
   const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
   const origs   = daOrigineDeclaree(it);
@@ -1873,7 +1876,7 @@ async function initAnnuaire(){
     const loc = [u.ville, u.pays].filter(Boolean).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
     const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
-    const isOwn = !!(ME && ME.id === u.id);
+    const isOwn = !!(ME && Number(ME.id) === Number(u.id));
     // Nationalité/origine : renseignees via le module Confidentialite du profil (users.*) —
     // toujours affichees ensemble avec le lieu (meme convention que les cartes initiative) :
     // nationalite avec repli "-", origine seulement si l'information existe reellement.
@@ -1912,7 +1915,7 @@ async function initAnnuaire(){
     const loc = [o.ville, o.pays].filter(Boolean).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(o.id)}`;
     const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : (o.role === 'institutionnel' || o.role === 'officiel') ? 'INSTITUTION' : 'COLLECTIVITÉ';
-    const isOwn = !!(ME && ME.id === o.id);
+    const isOwn = !!(ME && Number(ME.id) === Number(o.id));
     const abonnementType = o.role === 'collectivite' ? 'collectivite' : 'user';
     const abonnerBtn = (!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER)
       ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('${abonnementType}', ${o.id}, this)">🔔 S'abonner</button>` : '';
@@ -5666,6 +5669,12 @@ window.initBoutonsRelation = async function (racine) {
     el.setAttribute('data-relation-prete', '1');
     const userId = el.getAttribute('data-relation-user');
     const classe = el.getAttribute('data-relation-classe') || 'pvz-btn';
+    /* Garde-fou centralisé : le serveur refuse déjà une relation avec soi-même (400), mais
+       ne pas même tenter l'appel si un appelant a oublié son propre filtre "isOwn" —
+       Number() des deux côtés car l'id peut arriver en texte (BIGSERIAL Postgres). */
+    if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && Number(CURRENT_USER.id) === Number(userId)) {
+      el.innerHTML = ''; continue;
+    }
     let st = null;
     try { st = await api('GET', `/relation-statut?user_id=${encodeURIComponent(userId)}`); }
     catch (e) { el.innerHTML = ''; continue; }   // non connecté : on n'affiche rien
