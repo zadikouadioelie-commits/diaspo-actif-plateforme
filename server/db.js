@@ -5808,6 +5808,25 @@ db.exec(`
     FOREIGN KEY(visiteur_id) REFERENCES users(id) ON DELETE SET NULL
   );
 
+  /* ===== ANALYTICS MAISON — compteur de pages vues (2026-09-17, demande explicite) =====
+     Sans dépendance externe (pas de Google Analytics/Plausible/Umami) : la plateforme
+     affirme déjà en politique de confidentialité n'utiliser "aucun cookie tiers de traçage" —
+     ceci reste cohérent avec cette position : premier acteur, sans cookie, IP jamais stockée
+     en clair (voir visiteur_hash, calculé côté serveur dans la route POST /api/analytics/vue,
+     hachage salé qui change chaque jour — impossible de reconstituer l'IP, et impossible de
+     suivre un même visiteur au-delà d'une journée). Sert uniquement à estimer les pages vues
+     et un ordre de grandeur de visiteurs distincts par jour, pas à profiler qui que ce soit. */
+  CREATE TABLE IF NOT EXISTS page_vues (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    page           TEXT NOT NULL,
+    visiteur_hash  TEXT NOT NULL,
+    referrer       TEXT,
+    created_at     TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_page_vues_page ON page_vues(page, created_at);
+  CREATE INDEX IF NOT EXISTS idx_page_vues_date ON page_vues(created_at);
+  CREATE INDEX IF NOT EXISTS idx_page_vues_visiteur ON page_vues(visiteur_hash, created_at);
+
   CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     admin_id INTEGER NOT NULL,

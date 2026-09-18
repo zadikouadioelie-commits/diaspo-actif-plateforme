@@ -10597,6 +10597,51 @@ route("GET", "/api/actualites", async (req, res) => {
   sendJSON(res, 200, { actualites: await db.prepare("SELECT * FROM actualites ORDER BY created_at DESC").all() });
 });
 
+/* ---------- Analytics maison (2026-09-17, demande explicite : "avons-nous un outil
+   d'analytics ?") — compteur de pages vues sans dépendance externe, cohérent avec la position
+   déjà affichée en politique de confidentialité ("aucun cookie tiers de traçage"). Aucune
+   authentification requise (les pages publiques doivent aussi être comptées), mais rate-limité
+   par IP pour empêcher un script de gonfler artificiellement les compteurs. */
+route("POST", "/api/analytics/vue", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const limite = SEC.rateLimit(`analytics:vue:${ip}`, 120, 60000); // 120 vues/minute/IP largement au-dessus d'un usage humain normal
+  if (!limite.allowed) return sendJSON(res, 429, { ok: false });
+  const page = String(body?.page || "").slice(0, 200);
+  if (!page) return sendJSON(res, 400, { error: "page requise" });
+  /* visiteur_hash : jamais l'IP en clair — un salage journalier (date du jour dans le sel)
+     rend le hachage impossible à relier au même visiteur le lendemain, et impossible à
+     reverse-matcher à une IP réelle sans le secret serveur. Assez stable sur 24h pour compter
+     des visiteurs distincts approximatifs, sans être un identifiant de suivi persistant. */
+  const jour = new Date().toISOString().slice(0, 10);
+  const visiteur_hash = crypto.createHash("sha256").update(`${ip}|${req.headers["user-agent"] || ""}|${jour}|${process.env.AUTH_SECRET || "diaspo-actif-2026-secret"}`).digest("hex");
+  const referrer = body?.referrer ? String(body.referrer).slice(0, 300) : null;
+  try {
+    await db.prepare("INSERT INTO page_vues (page, visiteur_hash, referrer) VALUES (?,?,?)").run(page, visiteur_hash, referrer);
+  } catch (e) {}
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/analytics", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const jours = Math.min(Math.max(Number(query.jours) || 14, 1), 90);
+  const depuis = new Date(Date.now() - jours * 86400000).toISOString();
+  const totalPeriode = (await db.prepare("SELECT COUNT(*) n FROM page_vues WHERE created_at >= ?").get(depuis))?.n || 0;
+  const total24h = (await db.prepare("SELECT COUNT(*) n FROM page_vues WHERE created_at >= datetime('now','-1 day')").get())?.n || 0;
+  const total7j = (await db.prepare("SELECT COUNT(*) n FROM page_vues WHERE created_at >= datetime('now','-7 days')").get())?.n || 0;
+  const visiteurs24h = (await db.prepare("SELECT COUNT(DISTINCT visiteur_hash) n FROM page_vues WHERE created_at >= datetime('now','-1 day')").get())?.n || 0;
+  const topPages = await db.prepare(`
+    SELECT page, COUNT(*) AS vues FROM page_vues WHERE created_at >= ?
+    GROUP BY page ORDER BY vues DESC LIMIT 15`).all(depuis);
+  /* Regroupement par jour calendaire — substr(created_at,1,10) plutôt que date() : identique
+     en SQLite, et toPg (server/pg-init.js) sait déjà traduire substr, pas nécessairement les
+     fonctions de date SQLite spécifiques (voir le bug toPg déjà rencontré sur ce projet). */
+  const parJour = await db.prepare(`
+    SELECT substr(created_at,1,10) AS jour, COUNT(*) AS vues, COUNT(DISTINCT visiteur_hash) AS visiteurs
+    FROM page_vues WHERE created_at >= ? GROUP BY jour ORDER BY jour ASC`).all(depuis);
+  sendJSON(res, 200, { total24h, total7j, totalPeriode, visiteurs24h, topPages, parJour, jours });
+});
+
 const TYPE_PAR_ROLE = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Compte Étatique", collectivite: "Compte Étatique" };
 
 route("POST", "/api/fil", async (req, res, params, body) => {
