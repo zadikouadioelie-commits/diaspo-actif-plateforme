@@ -5675,3 +5675,20 @@ window.initBoutonsRelation = async function (racine) {
 document.addEventListener('DOMContentLoaded', function () {
   setTimeout(function () { window.initBoutonsRelation(); }, 400);
 });
+
+/* ---------- Analytics maison — compteur de pages vues (2026-09-17, demande explicite) ----------
+   Sans dépendance externe (pas de Google Analytics/Plausible/Umami), sans cookie : une seule
+   requête fire-and-forget par chargement de page vers /api/analytics/vue (voir server/index.js,
+   qui calcule un hachage journalier de l'IP côté serveur — jamais stocké en clair). Respecte
+   Do Not Track quand le navigateur l'annonce : le visiteur qui l'a explicitement demandé n'est
+   pas compté, même de façon anonyme. */
+(function () {
+  try {
+    if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return;
+    fetch(API_BASE + '/analytics/vue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: location.pathname, referrer: document.referrer || null }),
+    }).catch(function () {});
+  } catch (e) {}
+})();
