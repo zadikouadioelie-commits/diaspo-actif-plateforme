@@ -127,6 +127,30 @@
   // reste donc un simple marqueur visuel (pas de logique posée dessus) ; le clic réel est
   // géré une seule fois par délégation sur .sidebar lui-même (jamais reconstruit), voir
   // injectValiseToggle().
+  // Logique partagée entre le clic sur 🧳 (délégation ci-dessous) et le glisser-déposer
+  // d'un module directement sur le bouton "La Valise" (voir pointermove/pointerup dans
+  // injectToggle) : mêmes effets de bord dans les deux cas, un seul endroit à maintenir.
+  //
+  // Bug réel trouvé en testant en conditions réelles (déjà présent avant ce fichier, dans
+  // l'ancien code du clic 🧳) : scheduleSaveValise() était appelée APRÈS applyValiseHidden(),
+  // alors que c'est elle qui met à jour l'état local (CURRENT_USER.profil.sidebar_valise) —
+  // applyValiseHidden() relisait donc encore l'ancienne liste via getValise(), n'y trouvait
+  // pas la clé qu'on venait d'ajouter, prenait la branche "valiseHiddenBy sans être dans la
+  // valise" et remettait aussitôt le module visible. Le module ne restait masqué que grâce au
+  // rescan automatique (setInterval, jusqu'à 500ms plus tard) qui rappelait applyValiseHidden()
+  // une fois l'état enfin à jour — un filet de sécurité accidentel, pas une vraie correction.
+  // scheduleSaveValise() doit donc être appelée AVANT applyValiseHidden(), pas après.
+  function rangerDansValise(sidebar, a, btn) {
+    const key = stableKey(a);
+    const valise = getValise();
+    if (!valise.includes(key)) valise.push(key);
+    a.style.display = 'none';
+    a.dataset.valiseHiddenBy = '1';
+    scheduleSaveValise(valise);
+    applyValiseHidden(sidebar);
+    if (btn) majBadgeValise(btn);
+  }
+
   function poserBoutonsValise(sidebar) {
     sidebar.querySelectorAll(':scope > a[href]').forEach(a => {
       if (a.querySelector('.sb-valise-btn')) return;
@@ -232,14 +256,7 @@
         e.preventDefault(); e.stopPropagation();
         const a = archiveBtn.closest('a[href]');
         if (!a) return;
-        const key = stableKey(a);
-        const valise = getValise();
-        if (!valise.includes(key)) valise.push(key);
-        a.style.display = 'none';
-        a.dataset.valiseHiddenBy = '1';
-        applyValiseHidden(sidebar);
-        scheduleSaveValise(valise);
-        majBadgeValise(btn);
+        rangerDansValise(sidebar, a, btn);
         return;
       }
       const restoreBtn = e.target.closest('.sb-valise-restore');
@@ -368,7 +385,10 @@
          désormais depuis n'importe où sur la carte, le curseur doit le signaler partout. */
       '.sb-reorder-mode>a[href]{cursor:grab;touch-action:none;}' +
       '.sb-reorder-mode>a[href]:active{cursor:grabbing;}' +
-      '.sb-drag-handle:active{cursor:grabbing;}';
+      '.sb-drag-handle:active{cursor:grabbing;}' +
+      /* Retour visuel quand un module glissé survole le bouton Valise : signale que le
+         relâcher ici va le ranger, avant même d'y arriver (pas seulement après coup). */
+      '.sb-valise-drop-hover{outline:2px dashed #C9A27A;outline-offset:2px;background:#dfc7a8 !important;color:#3A2415 !important;transform:scale(1.03);transition:transform .1s;}';
     document.head.appendChild(st);
   }
 
@@ -392,8 +412,27 @@
       if (a && sidebar.contains(a) && !e.target.closest('.sb-drag-handle')) e.preventDefault();
     }, true);
 
+    // Glisser un module jusque sur le bouton "🧳 La Valise" le range directement, sans
+    // repasser par l'icône 🧳 de la carte (demande explicite : "permettre un glissé déposer
+    // des modules dans la valise une fois le bouton réorganiser cliqué"). Détection par
+    // coordonnées du pointeur (pas elementFromPoint : le pointeur est capturé sur dragEl via
+    // setPointerCapture dans poserPoignees(), elementFromPoint y renverrait toujours dragEl).
+    function survoleValise(e) {
+      const valiseBtn = sidebar.querySelector('.sb-valise-toggle');
+      if (!valiseBtn) return null;
+      const r = valiseBtn.getBoundingClientRect();
+      const dedans = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      return dedans ? valiseBtn : null;
+    }
+
     sidebar.addEventListener('pointermove', (e) => {
       if (!dragEl || !dragGroup) return;
+      const valiseBtn = sidebar.querySelector('.sb-valise-toggle');
+      const survole = survoleValise(e);
+      if (valiseBtn) valiseBtn.classList.toggle('sb-valise-drop-hover', !!survole);
+      // Au-dessus de la Valise : on suspend le réordonnement (la carte reste à sa place,
+      // seul le bouton s'illumine) plutôt que de la faire sauter dans le groupe en même temps.
+      if (survole) return;
       const y = e.clientY;
       for (const sib of dragGroup) {
         if (sib === dragEl) continue;
@@ -406,14 +445,24 @@
         }
       }
     });
-    const finirDrag = () => {
+    const finirDrag = (e) => {
       if (!dragEl) return;
+      const valiseBtn = sidebar.querySelector('.sb-valise-toggle');
+      const dropeSurValise = e && valiseBtn && survoleValise(e);
       dragEl.classList.remove('sb-dragging');
+      if (valiseBtn) valiseBtn.classList.remove('sb-valise-drop-hover');
+      if (dropeSurValise) {
+        rangerDansValise(sidebar, dragEl, valiseBtn);
+      } else {
+        scheduleSave(sidebar);
+      }
       dragEl = null; dragGroup = null;
-      scheduleSave(sidebar);
     };
     sidebar.addEventListener('pointerup', finirDrag);
-    sidebar.addEventListener('pointercancel', finirDrag);
+    // pointercancel n'a pas de coordonnées de dépose fiables (interruption externe : le
+    // système reprend le pointeur) — jamais traité comme un dépôt dans la Valise, seulement
+    // comme une fin de glisser normale, pour ne jamais ranger un module par accident.
+    sidebar.addEventListener('pointercancel', () => finirDrag(null));
   }
 
   /* En-tête fixe du menu (2026-09-18, demande explicite, capture à l'appui : "même en défilant
