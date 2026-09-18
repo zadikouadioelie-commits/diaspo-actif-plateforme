@@ -1270,7 +1270,13 @@ async function submitForm(btnId,errId,body){
     document.getElementById("success-icon").textContent=icons[role]||"🎉";
     document.getElementById("success-title").textContent=titles[role]||"Compte cree !";
     document.getElementById("success-msg").textContent=msgs[role]||"";
-    document.getElementById("success-btn").onclick=()=>window.location.href=ROLE_DASHBOARD[role]||"index.html";
+    // ?redirect=... (2026-09-18, Carnet professionnel §35 : "retour automatique au formulaire
+    // après création de compte") — voir assets/app.js:loginLandingUrl pour le même mécanisme
+    // côté connexion ; ici dupliqué en 3 lignes plutôt que réutilisé car la destination par
+    // défaut d'une INSCRIPTION reussie (le tableau de bord ROLE_DASHBOARD) diffère
+    // volontairement de celle d'une simple connexion (le profil public, voir loginLandingUrl).
+    const redirectApres = (() => { try { const r = new URLSearchParams(location.search).get("redirect"); return (r && /^\/[^/\\]|^[a-z0-9_-]+\.html/i.test(r) && !/^\/\//.test(r)) ? r : null; } catch(e) { return null; } })();
+    document.getElementById("success-btn").onclick=()=>window.location.href=redirectApres||ROLE_DASHBOARD[role]||"index.html";
     document.getElementById("success-identity-box").style.display = (role==="utilisateur") ? "block" : "none";
     goToStep(3);
   }catch(err){

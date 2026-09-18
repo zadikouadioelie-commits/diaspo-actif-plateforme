@@ -102,6 +102,8 @@
 
 <script src="assets/data.js"></script>
 <script src="assets/domaines-activite.js"></script>
+<script src="/assets/upload-media.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=12"></script>
 <script src="/assets/cookies-banner.js"></script>
@@ -139,8 +141,11 @@
   const RECENSEMENT_TYPES_UI = [
     { id: 'denombrement', icone: '👥', label: 'Dénombrement',
       description: "Recenser une population afin d'en déterminer le nombre et d'obtenir les informations nécessaires à sa connaissance, son organisation et sa représentativité." },
-    // Futurs types de recensement : ajouter une entrée ici suffit pour qu'elle apparaisse
-    // sur l'écran de sélection (vueTypeRecensement ci-dessous n'a rien à changer).
+    // Carnet professionnel (2026-09-18, cahier des charges §1-35) — second type de recensement,
+    // ajouté ici comme prévu par le commentaire d'origine : une seule entrée suffit pour que la
+    // carte apparaisse sur l'écran de sélection, vueTypeRecensement() n'a rien à changer.
+    { id: 'carnet_professionnel', icone: '💼', label: 'Carnet professionnel',
+      description: "Recenser les métiers, compétences, entreprises et activités professionnelles afin de constituer une base professionnelle exploitable." },
   ];
 
   const STATUT_LABELS = { brouillon: '⚪ Brouillon', actif: '🟢 Actif', suspendu: '🟠 Suspendu', termine: '🔵 Terminé' };
@@ -166,6 +171,8 @@
     if (vue === 'declarations') return vueDeclarations(params.get('id'));
     if (vue === 'participer') return vueParticiper(params.get('id'));
     if (vue === 'declaration') return vueDeclaration(params.get('decl'));
+    if (vue === 'fiche') return vueFichePublique(params.get('decl'));
+    if (vue === 'annuaire') return vueAnnuaire(params.get('id'));
     vueAccueil();
   }
 
@@ -266,9 +273,9 @@
         `).join('')}
       </div>
     `;
-    window.__recCreer = async (type) => {
+    window.__recCreer = async (modele) => {
       try {
-        const r = await apiRec('POST', '/recensements', { type, nom: 'Nouveau recensement', description: '.', population_concernee: '.', date_debut: new Date().toISOString().slice(0,10) });
+        const r = await apiRec('POST', '/recensements', { modele, nom: 'Nouveau recensement', description: '.', population_concernee: '.', date_debut: new Date().toISOString().slice(0,10) });
         location.href = `recensement.html?vue=creation&id=${r.id}`;
       } catch(e) { alert(e.message); }
     };
@@ -287,6 +294,14 @@
     let champsMineurConfig = rec.champs_mineur_config.length ? rec.champs_mineur_config : data.champs_mineur_predefinis.map(p => ({ ...p, predefini: true, actif: true, obligatoire: false }));
     let etape = Number(params.get('etape')) || 1;
     const territoire = rec.territoire || {};
+    const estPro = rec.modele === 'carnet_professionnel';
+    const libelleType = estPro ? 'carnet professionnel' : 'dénombrement';
+    // Accès à la campagne (§15-17, Carnet professionnel uniquement) — configuré ici, étape 2,
+    // sous la liste des champs plutôt qu'une 6e étape séparée : évite de retoucher tout le
+    // squelette du stepper (render()/sauvegarderEtape() ci-dessous) pour une section qui ne
+    // concerne qu'un seul des deux modèles.
+    let accesConfig = Object.assign({ publique: false, membres: false, emails_autorises: [], listes_ids: [] }, rec.acces_config || {});
+    let mesListes = [];
 
     function renderStepper(){
       const noms = ['Informations générales', 'Informations demandées', 'Personnes mineures', "Vérification d'identité", 'Résumé'];
@@ -295,7 +310,7 @@
 
     function render(){
       wrap.innerHTML = `
-        <div class="rec-hero"><div><h1>Créer un nouveau recensement</h1><p>${esc(rec.identifiant)} — Dénombrement</p></div>
+        <div class="rec-hero"><div><h1>Créer un nouveau recensement</h1><p>${esc(rec.identifiant)} — ${esc(RECENSEMENT_TYPES_UI.find(t=>t.id===rec.modele)?.label || 'Dénombrement')}</p></div>
           <a class="rec-btn rec-btn-outline" href="recensement.html?vue=mes-recensements">Enregistrer et quitter</a></div>
         ${renderStepper()}
         <div class="rec-card" id="rec-etape-body"></div>
@@ -324,7 +339,7 @@
           <input type="file" id="ce-image-file" accept="image/jpeg,image/png,image/webp,image/gif">
           <p class="rec-msg" id="ce-image-msg" style="margin-top:6px;"></p>
         </div>
-        <div class="rec-field"><label>Nom du dénombrement *</label><input id="ce-nom" value="${esc(rec.nom==='Nouveau recensement'?'':rec.nom)}"></div>
+        <div class="rec-field"><label>Nom du ${libelleType} *</label><input id="ce-nom" value="${esc(rec.nom==='Nouveau recensement'?'':rec.nom)}"></div>
         <div class="rec-field"><label>Description / objectif *</label><textarea id="ce-desc" rows="3">${esc(rec.description==='.'?'':rec.description)}</textarea></div>
         <div class="rec-field"><label>Population concernée *</label><input id="ce-population" value="${esc(rec.population_concernee==='.'?'':rec.population_concernee)}"></div>
         <div class="rec-field"><label>Territoire concerné *</label>
@@ -376,15 +391,57 @@
       `).join('');
     }
 
-    function renderEtape2(body){
+    async function renderEtape2(body){
       body.innerHTML = `
         <h3 style="margin:0 0 4px;">Informations demandées</h3>
         <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">Activez les champs à demander aux participants, et décidez lesquels sont obligatoires.</p>
         <div id="ce-champs-liste">${renderChampsListe(champsConfig)}</div>
         <button type="button" class="rec-btn rec-btn-outline" style="margin-top:14px;" id="ce-btn-ajouter-champ">➕ Ajouter une information</button>
+        ${estPro ? '<div id="ce-acces-zone"></div>' : ''}
       `;
       wireChampsListe(document.getElementById('ce-champs-liste'), champsConfig);
       document.getElementById('ce-btn-ajouter-champ').addEventListener('click', () => ouvrirModaleChampPerso(champsConfig, () => renderEtape2(body)));
+      if (estPro) await renderAccesZone();
+    }
+
+    /* « Qui peut voir cette fiche ? » (§15-17, Carnet professionnel uniquement) — la visibilité
+       PAR CHAMP individuel (§18) est choisie par chaque personne recensée à SA propre déclaration
+       (voir vueParticiper), pas ici : ceci ne règle que l'accès à la CAMPAGNE/aux fiches en bloc. */
+    async function renderAccesZone(){
+      const zone = document.getElementById('ce-acces-zone');
+      if (!zone) return;
+      if (!mesListes.length) { try { const r = await apiRec('GET', '/listes-diffusion'); mesListes = r.listes || []; } catch(e){} }
+      zone.innerHTML = `
+        <h3 style="margin:20px 0 4px;">🔒 Qui peut voir cette fiche ?</h3>
+        <p style="margin:0 0 12px;font-size:12.5px;color:var(--muted);">Réglage global de la campagne — chaque personne recensée choisira en plus, pour chacune de ses propres informations, jusqu'où elle veut la diffuser.</p>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13.5px;cursor:pointer;margin-bottom:8px;"><input type="checkbox" id="ac-publique" ${accesConfig.publique?'checked':''}> 🌐 Publique — consultable par tous, selon les champs autorisés</label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13.5px;cursor:pointer;margin-bottom:14px;"><input type="checkbox" id="ac-membres" ${accesConfig.membres?'checked':''}> 👥 Membres Diaspo'Actif connectés</label>
+        <div class="rec-field"><label>🎯 Personnes autorisées (adresses e-mail)</label>
+          <div style="display:flex;gap:8px;"><input id="ac-email-ajout" type="email" placeholder="exemple@email.com" style="flex:1;"><button type="button" class="rec-btn rec-btn-outline" id="ac-email-btn">+ Autoriser</button></div>
+          <div id="ac-email-liste" style="margin-top:8px;"></div>
+        </div>
+        <div class="rec-field"><label>📋 Listes de diffusion autorisées (Réseau Pro)</label>
+          <div id="ac-listes">${mesListes.length ? mesListes.map(l => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px;"><input type="checkbox" data-liste="${l.id}" ${accesConfig.listes_ids.includes(l.id)?'checked':''}> ${esc(l.icone||'📋')} ${esc(l.nom)} <span class="rec-champ-cat">(${l.nb_contacts||0})</span></label>`).join('') : '<p style="font-size:12.5px;color:var(--muted);">Aucune liste de diffusion — créez-en depuis le Réseau Pro.</p>'}</div>
+        </div>
+      `;
+      document.getElementById('ac-publique').addEventListener('change', e => accesConfig.publique = e.target.checked);
+      document.getElementById('ac-membres').addEventListener('change', e => accesConfig.membres = e.target.checked);
+      zone.querySelectorAll('[data-liste]').forEach(cb => cb.addEventListener('change', () => {
+        const lid = +cb.dataset.liste;
+        accesConfig.listes_ids = cb.checked ? [...new Set([...accesConfig.listes_ids, lid])] : accesConfig.listes_ids.filter(x => x !== lid);
+      }));
+      function renderEmails(){
+        document.getElementById('ac-email-liste').innerHTML = accesConfig.emails_autorises.length
+          ? accesConfig.emails_autorises.map(em => `<div class="rec-champ-row"><span class="rec-champ-nom">${esc(em)}</span><button type="button" class="rec-btn rec-btn-outline" style="padding:4px 9px;font-size:11px;" data-retirer="${esc(em)}">✕</button></div>`).join('')
+          : '<p style="font-size:12px;color:var(--muted);">Aucune adresse autorisée pour l’instant.</p>';
+        document.querySelectorAll('[data-retirer]').forEach(btn => btn.addEventListener('click', () => { accesConfig.emails_autorises = accesConfig.emails_autorises.filter(x => x !== btn.dataset.retirer); renderEmails(); }));
+      }
+      renderEmails();
+      document.getElementById('ac-email-btn').addEventListener('click', () => {
+        const inp = document.getElementById('ac-email-ajout');
+        const v = inp.value.trim().toLowerCase();
+        if (v && v.includes('@') && !accesConfig.emails_autorises.includes(v)) { accesConfig.emails_autorises.push(v); inp.value = ''; renderEmails(); }
+      });
     }
     function wireChampsListe(el, liste){
       el.querySelectorAll('[data-actif]').forEach(inp => inp.addEventListener('change', () => { liste[+inp.dataset.actif].actif = inp.checked; el.querySelector(`[data-oblig="${inp.dataset.actif}"]`).disabled = !inp.checked; if(!inp.checked) liste[+inp.dataset.actif].obligatoire=false; }));
@@ -467,8 +524,14 @@
     function renderEtape5(body){
       const territoireLabel = territoire.type ? `${{pays:'Pays',region:'Région',departement:'Département',ville:'Ville',commune:'Commune',zone_geographique:'Zone géographique',personnalise:'Personnalisé'}[territoire.type]} — ${esc(territoire.valeur||'')}` : '—';
       const actifsChamps = champsConfig.filter(c=>c.actif).map(c=>c.label).join(', ') || '—';
+      const accesLabel = !estPro ? null : [
+        accesConfig.publique ? '🌐 Publique' : null,
+        accesConfig.membres ? "👥 Membres Diaspo'Actif" : null,
+        accesConfig.emails_autorises.length ? `🎯 ${accesConfig.emails_autorises.length} adresse(s) autorisée(s)` : null,
+        accesConfig.listes_ids.length ? `📋 ${accesConfig.listes_ids.length} liste(s) de diffusion` : null,
+      ].filter(Boolean).join(' · ') || '🔒 Privée (personne d’autre que vous)';
       body.innerHTML = `
-        <h3 style="margin:0 0 16px;">Vérifiez votre dénombrement</h3>
+        <h3 style="margin:0 0 16px;">Vérifiez votre ${libelleType}</h3>
         <div class="rec-resume-row"><span class="k">Nom</span><span class="v">${esc(document.getElementById('ce-nom')?.value || rec.nom)}</span></div>
         <div class="rec-resume-row"><span class="k">Objectif</span><span class="v">${esc(rec.description)}</span></div>
         <div class="rec-resume-row"><span class="k">Population</span><span class="v">${esc(rec.population_concernee)}</span></div>
@@ -479,10 +542,11 @@
         <div class="rec-resume-row"><span class="k">Vérification d'identité</span><span class="v">${rec.verification_identite==='activee'?'Activée':'Désactivée'}</span></div>
         <div class="rec-resume-row"><span class="k">Détection des doublons</span><span class="v">Activée</span></div>
         <div class="rec-resume-row"><span class="k">Participation sans compte</span><span class="v">Activée</span></div>
+        ${estPro ? `<div class="rec-resume-row"><span class="k">Qui peut voir cette fiche</span><span class="v">${accesLabel}</span></div>` : ''}
         <div class="rec-resume-row"><span class="k">Informations demandées</span><span class="v" style="text-align:right;max-width:60%;">${esc(actifsChamps)}</span></div>
         <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
           <button class="rec-btn rec-btn-outline" id="rec-btn-brouillon">Enregistrer comme brouillon</button>
-          <button class="rec-btn rec-btn-primary" id="rec-btn-publier">Publier le dénombrement</button>
+          <button class="rec-btn rec-btn-primary" id="rec-btn-publier">Publier le ${libelleType}</button>
         </div>
       `;
       document.getElementById('rec-btn-prev').style.display = 'none';
@@ -503,7 +567,7 @@
       if (document.getElementById('ce-territoire-type')) { territoire.type = document.getElementById('ce-territoire-type').value; territoire.valeur = document.getElementById('ce-territoire-valeur').value.trim(); if (territoire.type) body.territoire = territoire; }
       if (document.getElementById('ce-date-debut')) body.date_debut = document.getElementById('ce-date-debut').value;
       if (document.getElementById('ce-date-fin')) body.date_fin = document.getElementById('ce-pas-date-fin').checked ? null : document.getElementById('ce-date-fin').value;
-      if (etape === 2) body.champs_config = champsConfig;
+      if (etape === 2) { body.champs_config = champsConfig; if (estPro) body.acces_config = accesConfig; }
       if (etape === 3) { rec.mineurs_autorises = document.getElementById('ce-mineurs').checked; body.mineurs_autorises = rec.mineurs_autorises; body.champs_mineur_config = champsMineurConfig; }
       if (etape === 4) { rec.verification_identite = document.getElementById('ce-verif').checked ? 'activee' : 'desactivee'; body.verification_identite = rec.verification_identite; body.verification_identite_documents = document.getElementById('ce-verif-docs')?.value || 'les_deux'; }
       Object.assign(rec, body);
@@ -566,6 +630,8 @@
           <a class="rec-btn rec-btn-outline" href="recensement.html?vue=creation&id=${id}&etape=1">✏️ Modifier</a>
           <button class="rec-btn rec-btn-outline" onclick="window.__recSuspendre(${id})">${rec.statut==='suspendu'?'▶️ Réactiver':'⏸️ Suspendre'}</button>
           <a class="rec-btn rec-btn-outline" href="recensement.html?vue=participer&id=${id}" target="_blank">Voir le formulaire</a>
+          ${rec.modele==='carnet_professionnel' ? `<a class="rec-btn rec-btn-outline" href="recensement.html?vue=annuaire&id=${id}" target="_blank">🔎 Annuaire</a>` : ''}
+          <a class="rec-btn rec-btn-outline" href="/api/recensements/${id}/export">⬇️ Exporter (CSV)</a>
           ${!rec.suppression_prevue_le ? `<button class="rec-btn rec-btn-danger" id="rec-btn-supprimer-campagne">🗑️ Supprimer la campagne</button>` : ''}
         </div>
         <p style="font-size:12px;color:var(--muted);margin:0;">Statistiques par pays de résidence, pays d'origine et métier : disponibles dès qu'il y a des déclarations.</p>
@@ -616,8 +682,17 @@
     let data;
     try { data = await apiRec('GET', `/recensements/${id}`); } catch(e) { wrap.innerHTML = `<div class="rec-empty">Recensement introuvable ou clos.</div>`; return; }
     const rec = data.recensement;
+    const estPro = rec.modele === 'carnet_professionnel';
     const champsActifs = rec.champs_config.filter(c => c.actif);
+    // Brouillon sauvegardé avant un aller-retour "créer un compte" (§35) — restauré plus bas.
+    const cleBrouillon = `da_rec_brouillon_${id}`;
+    let visibiliteChamps = {};
 
+    /* Types 'tags'/'domaine_activite'/'upload_photo' ajoutés pour le Carnet professionnel
+       (§9, §7, §6) — champHtml()/lireChamps() restent la seule fonction de rendu du
+       formulaire, réutilisée telle quelle par le Dénombrement (aucun de ces types n'y est
+       proposé, donc aucun changement de comportement pour lui). */
+    const tagsState = {}; // { fid: [valeurs] }
     function champHtml(c, prefix){
       const fid = `${prefix}-${c.id}`;
       const oblig = c.obligatoire ? ' *' : '';
@@ -626,17 +701,55 @@
       if (c.type === 'choix_multiple') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label>${(c.options||[]).map(o=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:4px;"><input type="checkbox" class="cm-${fid}" value="${esc(o)}"> ${esc(o)}</label>`).join('')}</div>`;
       if (c.type === 'nombre') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="number" id="${fid}"></div>`;
       if (c.type === 'date' || c.id === 'date_naissance') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="date" id="${fid}"></div>`;
-      if (c.id === 'email') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="email" id="${fid}"></div>`;
-      return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="text" id="${fid}"></div>`;
+      if (c.type === 'texte_long') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><textarea id="${fid}" rows="3"></textarea></div>`;
+      if (c.type === 'domaine_activite') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><select id="${fid}"><option value="">— Sélectionner —</option>${window.domaineActiviteOptionsHTML ? domaineActiviteOptionsHTML() : ''}</select></div>`;
+      if (c.type === 'upload_photo') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><div id="${fid}-preview" style="margin-bottom:6px;"></div><button type="button" class="rec-btn rec-btn-outline" data-photo-btn="${fid}">📷 Choisir une photo</button><input type="hidden" id="${fid}"></div>`;
+      if (c.type === 'tags') { tagsState[fid] = tagsState[fid] || []; return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label>
+        <div style="display:flex;gap:8px;"><input type="text" id="${fid}-ajout" placeholder="Tapez puis Entrée..."><button type="button" class="rec-btn rec-btn-outline" data-tag-btn="${fid}">+ Ajouter</button></div>
+        <div id="${fid}-liste" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div></div>`; }
+      if (c.id === 'email' || c.type === 'email') return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="email" id="${fid}"></div>`;
+      return `<div class="rec-field"><label>${esc(c.label)}${oblig}</label><input type="text" id="${fid}" ${c.type==='texte_suggere'?'list="'+fid+'-suggestions"':''}></div>`;
+    }
+    function wireChampSpeciaux(liste, prefix){
+      liste.forEach(c => {
+        const fid = `${prefix}-${c.id}`;
+        if (c.type === 'tags') {
+          const rerender = () => { document.getElementById(`${fid}-liste`).innerHTML = tagsState[fid].map((t,i) => `<span style="background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:4px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">${esc(t)}<button type="button" data-tag-del="${fid}:${i}" style="background:none;border:none;cursor:pointer;color:#dc2626;">✕</button></span>`).join(''); document.querySelectorAll(`[data-tag-del^="${fid}:"]`).forEach(b => b.addEventListener('click', () => { tagsState[fid].splice(+b.dataset.tagDel.split(':')[1], 1); rerender(); })); };
+          const ajouter = () => { const inp = document.getElementById(`${fid}-ajout`); const v = inp.value.trim(); if (v) { tagsState[fid].push(v); inp.value = ''; rerender(); } };
+          document.querySelector(`[data-tag-btn="${fid}"]`)?.addEventListener('click', ajouter);
+          document.getElementById(`${fid}-ajout`)?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ajouter(); } });
+          rerender();
+        }
+        if (c.type === 'upload_photo') {
+          document.querySelector(`[data-photo-btn="${fid}"]`)?.addEventListener('click', async () => {
+            if (typeof pickAndUpload !== 'function') return;
+            const url = await pickAndUpload('post', { maxW: 800, maxH: 800 });
+            if (!url) return;
+            document.getElementById(fid).value = url;
+            document.getElementById(`${fid}-preview`).innerHTML = `<img src="${esc(url)}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;">`;
+          });
+        }
+      });
     }
 
+    const accesConfigCampagne = rec.acces_config || {}; // exposé seulement si on est propriétaire, sinon undefined — normal, sans effet ici (participant ≠ propriétaire)
     wrap.innerHTML = `
       ${rec.image_url ? `<img src="${esc(rec.image_url)}" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px;margin-bottom:18px;">` : ''}
       <div class="rec-hero"><div><h1>${esc(rec.nom)}</h1><p>${esc(rec.description)}</p></div>
         <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      ${!moi ? `
+      <div class="rec-card" style="background:#EFF6FF;border-color:#BFDBFE;">
+        <h3 style="margin:0 0 10px;color:#1e40af;">Accéder au formulaire</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a class="rec-btn rec-btn-outline" href="login.html?redirect=${encodeURIComponent(location.href)}">J'ai déjà un compte Diaspo'Actif → Se connecter</a>
+          <button type="button" class="rec-btn rec-btn-primary" id="part-btn-creer-compte">Je n'ai pas de compte → Créer mon compte Diaspo'Actif</button>
+        </div>
+        <p style="font-size:12px;color:#1e40af;margin:10px 0 0;">Créer un compte gratuit permet de retrouver et mettre à jour votre fiche, développer votre réseau professionnel, découvrir des initiatives et recevoir des opportunités correspondant à votre profil. Vous pouvez aussi <strong>continuer sans compte</strong> ci-dessous si vous préférez.</p>
+      </div>` : ''}
       <div class="rec-card">
         <h3 style="margin:0 0 14px;">Vos informations</h3>
         <div id="part-champs-adulte">${champsActifs.map(c => champHtml(c, 'pa')).join('')}</div>
+        ${estPro ? `<div id="part-visibilite-zone"></div>` : ''}
         ${rec.mineurs_autorises ? `
           <label style="display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:700;cursor:pointer;margin:18px 0 10px;background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:9px;padding:13px 14px;color:#9A3412;">
             <input type="checkbox" id="part-est-mineur" style="width:18px;height:18px;flex:none;"> 🧒 Je déclare une personne mineure (au lieu de moi-même)
@@ -654,7 +767,7 @@
           </div>` : ''}
         <div id="part-acces-wrap" style="${moi ? 'display:none;' : ''}">
           <h4 style="margin:18px 0 8px;">Pour retrouver votre déclaration</h4>
-          <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">${moi ? 'Vous êtes connecté — votre déclaration sera associée à votre compte.' : "Vous n'êtes pas connecté : cette adresse e-mail et ce mot de passe vous permettront de retrouver votre déclaration."}</p>
+          <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">${moi ? 'Vous êtes connecté — votre déclaration sera associée à votre compte.' : "Continuer sans compte : cette adresse e-mail et ce mot de passe vous permettront de retrouver votre déclaration."}</p>
           <div class="rec-field"><label>Adresse e-mail</label><input type="email" id="part-acces-email"></div>
           <div class="rec-field"><label>Mot de passe</label><input type="password" id="part-acces-pwd"></div>
         </div>
@@ -662,14 +775,43 @@
         <p class="rec-msg" id="part-msg"></p>
       </div>
     `;
+    wireChampSpeciaux(champsActifs, 'pa');
+    if (rec.mineurs_autorises) wireChampSpeciaux(rec.champs_mineur_config.filter(c=>c.actif), 'pm');
+
+    /* §18 — la personne recensée choisit, pour chacun de SES champs actifs, jusqu'où elle veut
+       le diffuser (jamais le créateur de la campagne, qui ne règle que l'accès global §15-17). */
+    if (estPro) {
+      const zone = document.getElementById('part-visibilite-zone');
+      const NIVEAUX = [['prive','🔒 Privé'],['autorises','🎯 Autorisés'],['membres','👥 Membres'],['public','🌐 Public']];
+      zone.innerHTML = `<div class="rec-card" style="background:var(--bg);border:none;margin-top:6px;">
+        <h4 style="margin:0 0 4px;">Visibilité de vos informations</h4>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Pour chaque information, choisissez qui peut la voir. Une donnée renseignée n'est jamais automatiquement publiée.</p>
+        ${champsActifs.map(c => `<div class="rec-champ-row"><span class="rec-champ-nom">${esc(c.label)}</span><select data-vis="${c.id}" style="width:auto;">${NIVEAUX.map(([v,l])=>`<option value="${v}" ${v==='prive'?'selected':''}>${l}</option>`).join('')}</select></div>`).join('')}
+      </div>`;
+      zone.querySelectorAll('[data-vis]').forEach(sel => sel.addEventListener('change', () => { visibiliteChamps[sel.dataset.vis] = sel.value; }));
+    }
+
     const chk = document.getElementById('part-est-mineur');
     if (chk) chk.addEventListener('change', (e) => { document.getElementById('part-mineur-detail').style.display = e.target.checked ? '' : 'none'; document.getElementById('part-acces-wrap').style.display = (moi || e.target.checked) ? 'none' : ''; });
+
+    // §35 — brouillon restauré après un retour depuis la création de compte (voir plus bas).
+    (function restaurerBrouillon(){
+      let brouillon; try { brouillon = JSON.parse(localStorage.getItem(cleBrouillon) || 'null'); } catch(e) { brouillon = null; }
+      if (!brouillon) return;
+      localStorage.removeItem(cleBrouillon);
+      Object.entries(brouillon.reponses || {}).forEach(([k,v]) => { const el = document.getElementById(`pa-${k}`); if (el && typeof v === 'string') el.value = v; else if (Array.isArray(v) && tagsState[`pa-${k}`]) { tagsState[`pa-${k}`] = v; wireChampSpeciaux(champsActifs, 'pa'); } });
+    })();
+    document.getElementById('part-btn-creer-compte')?.addEventListener('click', () => {
+      try { localStorage.setItem(cleBrouillon, JSON.stringify({ reponses: lireChamps(champsActifs, 'pa') })); } catch(e) {}
+      location.href = `inscription.html?redirect=${encodeURIComponent(location.href)}`;
+    });
 
     function lireChamps(liste, prefix){
       const out = {};
       liste.forEach(c => {
         const fid = `${prefix}-${c.id}`;
         if (c.type === 'choix_multiple') { out[c.id] = [...document.querySelectorAll(`.cm-${fid}:checked`)].map(x=>x.value); return; }
+        if (c.type === 'tags') { out[c.id] = tagsState[fid] || []; return; }
         const el = document.getElementById(fid);
         if (el) out[c.id] = el.value;
       });
@@ -680,8 +822,9 @@
       const msg = document.getElementById('part-msg');
       const estMineur = chk && chk.checked;
       const reponses = lireChamps(champsActifs, 'pa');
-      for (const c of champsActifs) if (c.obligatoire && !reponses[c.id]) { msg.className='rec-msg rec-msg-err'; msg.textContent = `Le champ « ${c.label} » est obligatoire.`; return; }
+      for (const c of champsActifs) if (c.obligatoire && !(Array.isArray(reponses[c.id]) ? reponses[c.id].length : reponses[c.id])) { msg.className='rec-msg rec-msg-err'; msg.textContent = `Le champ « ${c.label} » est obligatoire.`; return; }
       const body = { est_mineur: !!estMineur, reponses };
+      if (estPro) body.visibilite_champs = visibiliteChamps;
       if (estMineur) {
         body.reponses = lireChamps(rec.champs_mineur_config.filter(c=>c.actif), 'pm');
         body.responsable = { nom: document.getElementById('resp-nom').value.trim(), prenom: document.getElementById('resp-prenom').value.trim(), email: document.getElementById('resp-email').value.trim(), telephone: document.getElementById('resp-tel').value.trim() };
@@ -695,6 +838,10 @@
       try {
         const r = await apiRec('POST', `/recensements/${id}/declarations`, body);
         if (r.acces_token) setToken(r.id, r.acces_token);
+        if (!moi) {
+          // §35 — fin du parcours sans compte : proposer la création plutôt que de l'imposer.
+          try { localStorage.setItem('da_rec_invite_' + r.id, '1'); } catch(e) {}
+        }
         location.href = `recensement.html?vue=declaration&decl=${r.id}`;
       } catch(e) {
         msg.className = 'rec-msg rec-msg-err';
@@ -718,14 +865,32 @@
        session — jamais envoyé comme une preuve, seul le document réel scanné par Stripe fait foi. */
     const peutVerifier = recMeta.verification_identite === 'activee' && !['verifie','en_cours'].includes(d.identite_statut);
     const docsAcceptes = recMeta.verification_identite_documents || 'les_deux';
+    const visLabels = { prive: '🔒 Privé', autorises: '🎯 Autorisés', membres: '👥 Membres', public: '🌐 Public' };
+    const visChamps = d.visibilite_champs || {};
+    // §35, dernière étape — invite (pas d'obligation) à créer un compte, une seule fois après
+    // une déclaration faite sans compte (marqueur posé par vueParticiper à l'envoi).
+    let inviteCompte = '';
+    if (!moi) { try { if (localStorage.getItem('da_rec_invite_' + declId)) { localStorage.removeItem('da_rec_invite_' + declId); inviteCompte = `
+      <div class="rec-card" style="background:#EFF6FF;border-color:#BFDBFE;margin-bottom:16px;">
+        <h3 style="margin:0 0 8px;color:#1e40af;">✅ Votre ${recMeta.modele==='carnet_professionnel'?'Carnet professionnel a été enregistré':'déclaration a été enregistrée'}.</h3>
+        <p style="font-size:13px;color:#1e40af;margin:0 0 12px;">Créez maintenant votre compte Diaspo'Actif pour retrouver votre fiche, la mettre à jour et profiter des services de la plateforme.</p>
+        <a class="rec-btn rec-btn-primary" href="inscription.html">Créer mon compte Diaspo'Actif</a>
+      </div>`; } } catch(e){} }
+    const lienPartage = `${location.origin}/recensement.html?vue=fiche&decl=${declId}`;
     wrap.innerHTML = `
+      ${inviteCompte}
       <div class="rec-hero"><div><h1>Ma déclaration</h1><p>${esc(recMeta.nom||'')} — ${esc(d.identifiant)}</p></div>
         <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
       <div class="rec-card">
         <span class="rec-badge rec-badge-${d.identite_statut}">${IDENTITE_LABELS[d.identite_statut]||d.identite_statut}</span>
         <div style="margin-top:14px;">
-          ${Object.entries(rep).map(([k,v]) => v ? `<div class="rec-resume-row"><span class="k">${esc(k.replace(/_/g,' '))}</span><span class="v">🔒 ${esc(Array.isArray(v)?v.join(', '):v)}</span></div>` : '').join('')}
+          ${Object.entries(rep).map(([k,v]) => v && (typeof v !== 'object' || (Array.isArray(v)&&v.length)) ? `<div class="rec-resume-row"><span class="k">${esc(k.replace(/_/g,' '))}</span><span class="v">${recMeta.modele==='carnet_professionnel'?esc(visLabels[visChamps[k]||'prive']):'🔒'} ${esc(Array.isArray(v)?v.join(', '):v)}</span></div>` : '').join('')}
         </div>
+        ${recMeta.modele==='carnet_professionnel' ? `
+        <div class="rec-actions" style="margin-top:14px;">
+          <button class="rec-btn rec-btn-outline" id="decl-btn-partager">🔗 Partager ma fiche</button>
+        </div>
+        <p class="rec-msg" id="decl-partage-msg"></p>` : ''}
         ${peutVerifier ? `
         <div class="rec-card" style="background:#EFF6FF;border-color:#BFDBFE;margin-top:16px;">
           <h4 style="margin:0 0 8px;color:#1e40af;">🪪 Vérification d'identité</h4>
@@ -759,6 +924,25 @@
         }
       });
     }
+    document.getElementById('decl-btn-partager')?.addEventListener('click', () => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+      overlay.innerHTML = `<div class="rec-card" style="max-width:340px;width:100%;margin:0;text-align:center;">
+        <h3 style="margin:0 0 14px;">🔗 Partager ma fiche</h3>
+        <div id="decl-qr" style="display:flex;justify-content:center;margin-bottom:14px;"></div>
+        <input readonly value="${esc(lienPartage)}" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);font-size:12px;margin-bottom:10px;" onclick="this.select()">
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <button type="button" class="rec-btn rec-btn-primary" id="decl-copier-lien">Copier le lien</button>
+          <button type="button" class="rec-btn rec-btn-outline" id="decl-fermer-partage">Fermer</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:12px 0 0;">Seuls les champs que vous avez rendus visibles apparaîtront à la personne qui ouvre ce lien.</p>
+      </div>`;
+      document.body.appendChild(overlay);
+      if (window.QRCode) new QRCode(document.getElementById('decl-qr'), { text: lienPartage, width: 160, height: 160 });
+      document.getElementById('decl-copier-lien').addEventListener('click', () => { navigator.clipboard?.writeText(lienPartage); document.getElementById('decl-copier-lien').textContent = 'Copié ✓'; });
+      document.getElementById('decl-fermer-partage').addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    });
     document.getElementById('decl-btn-modif').addEventListener('click', () => {
       const champ = prompt("Quel champ souhaitez-vous modifier ? (ex : email, telephone, adresse...)");
       if (!champ) return;
@@ -775,6 +959,101 @@
         .then(() => { alert('Vos informations ont été supprimées.'); location.href = 'recensement.html'; })
         .catch(e => alert(e.message));
     });
+  }
+
+  /* ══════════ FICHE PUBLIQUE — Carnet professionnel (§23-24) ══════════
+     Distincte de vueDeclaration() : ici un TIERS consulte la fiche de quelqu'un d'autre — accès
+     et visibilité par champ vérifiés côté serveur à chaque appel, jamais côté client (§18/§32). */
+  async function vueFichePublique(declId){
+    if (!declId) { location.href = 'recensement.html'; return; }
+    let data, emailVisiteur = null;
+    async function charger(){
+      const opts = { credentials: 'same-origin', headers: {} };
+      if (emailVisiteur) opts.headers['X-Visiteur-Email'] = emailVisiteur;
+      const res = await fetch(`/api/recensement-declarations/${declId}/fiche-publique`, opts);
+      const j = await res.json();
+      if (!res.ok) throw Object.assign(new Error(j.error || 'Erreur'), { status: res.status });
+      return j;
+    }
+    try { data = await charger(); }
+    catch(e) {
+      if (e.status === 403) {
+        wrap.innerHTML = `<div class="rec-card" style="max-width:420px;margin:40px auto;text-align:center;">
+          <div style="font-size:32px;">🔒</div>
+          <h3 style="margin:10px 0;">Fiche non accessible</h3>
+          <p style="font-size:13px;color:var(--muted);">Cette fiche est réservée à certaines personnes. Si vous avez été autorisé par adresse e-mail, saisissez-la ci-dessous.</p>
+          <div class="rec-field"><input type="email" id="fp-email" placeholder="votre@email.com"></div>
+          <button class="rec-btn rec-btn-primary" id="fp-retry">Vérifier mon accès</button>
+        </div>`;
+        document.getElementById('fp-retry').addEventListener('click', () => { emailVisiteur = document.getElementById('fp-email').value.trim(); vueFichePublique(declId); });
+        return;
+      }
+      wrap.innerHTML = `<div class="rec-empty">Fiche introuvable.</div>`; return;
+    }
+    const rep = data.fiche.reponses;
+    const nomComplet = [rep.prenom, rep.nom_professionnel || rep.nom].filter(Boolean).join(' ') || 'Fiche professionnelle';
+    const ligne = (label, val) => val ? `<div class="rec-resume-row"><span class="k">${esc(label)}</span><span class="v">${esc(Array.isArray(val)?val.join(' · '):val)}</span></div>` : '';
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>${esc(nomComplet)}</h1><p>${esc([rep.metier_principal, rep.domaine_principal].filter(Boolean).join(' — '))}</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      <div class="rec-card">
+        ${rep.photo ? `<img src="${esc(rep.photo)}" alt="" style="width:88px;height:88px;border-radius:50%;object-fit:cover;margin-bottom:14px;">` : ''}
+        ${rep.presentation ? `<p style="font-size:13.5px;line-height:1.6;margin:0 0 16px;">${esc(rep.presentation)}</p>` : ''}
+        ${ligne('Fonction', rep.fonction_poste)}${ligne('Statut', rep.statut_professionnel)}
+        ${ligne('Compétences', rep.competences)}${ligne('Services proposés', rep.services_proposes)}
+        ${ligne('Entreprise', rep.entreprise_nom)}${ligne('Secteur', rep.entreprise_secteur)}
+        ${ligne('Ville', rep.entreprise_ville)}${ligne('Pays', rep.entreprise_pays)}
+        ${ligne('SIRET', rep.entreprise_siret)}
+        <div class="rec-actions" style="margin-top:16px;">
+          ${rep.email_pro ? `<a class="rec-btn rec-btn-outline" href="mailto:${esc(rep.email_pro)}">✉️ Contacter</a>` : ''}
+          ${rep.site_web ? `<a class="rec-btn rec-btn-outline" href="${esc(rep.site_web)}" target="_blank" rel="noopener">🌐 Voir le site</a>` : ''}
+          <button class="rec-btn rec-btn-outline" id="fp-partager">🔗 Partager</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('fp-partager').addEventListener('click', () => { navigator.clipboard?.writeText(location.href); alert('Lien copié.'); });
+  }
+
+  /* ══════════ ANNUAIRE — recherche dans la base professionnelle (§22) ══════════ */
+  async function vueAnnuaire(id){
+    if (!id) { location.href = 'recensement.html'; return; }
+    let rec;
+    try { rec = (await apiRec('GET', `/recensements/${id}`)).recensement; } catch(e) { wrap.innerHTML = `<div class="rec-empty">Recensement introuvable.</div>`; return; }
+    wrap.innerHTML = `
+      <div class="rec-hero"><div><h1>🔎 Annuaire professionnel</h1><p>${esc(rec.nom)}</p></div>
+        <a class="rec-btn rec-btn-outline" href="recensement.html">← Retour</a></div>
+      <div class="rec-card">
+        <div class="rec-row2">
+          <div class="rec-field"><label>Métier</label><input id="an-metier"></div>
+          <div class="rec-field"><label>Domaine</label><input id="an-domaine"></div>
+          <div class="rec-field"><label>Entreprise</label><input id="an-entreprise"></div>
+          <div class="rec-field"><label>Compétence</label><input id="an-competence"></div>
+          <div class="rec-field"><label>Ville</label><input id="an-ville"></div>
+          <div class="rec-field"><label>Pays</label><input id="an-pays"></div>
+        </div>
+        <button class="rec-btn rec-btn-primary" id="an-btn-rechercher">🔎 Rechercher</button>
+      </div>
+      <div id="an-resultats"></div>
+    `;
+    async function rechercher(){
+      const q = new URLSearchParams();
+      [['metier','an-metier'],['domaine','an-domaine'],['entreprise','an-entreprise'],['competence','an-competence'],['ville','an-ville'],['pays','an-pays']]
+        .forEach(([k,fid]) => { const v = document.getElementById(fid).value.trim(); if (v) q.set(k, v); });
+      const zone = document.getElementById('an-resultats');
+      zone.innerHTML = `<div class="rec-empty">Recherche…</div>`;
+      try {
+        const r = await apiRec('GET', `/recensements/${id}/annuaire?${q.toString()}`);
+        const resultats = r.resultats || [];
+        zone.innerHTML = !resultats.length ? `<div class="rec-empty">Aucun résultat.</div>` : `<div class="rec-grid">${resultats.map(f => `
+          <div class="rec-card rec-campagne-card" onclick="location.href='recensement.html?vue=fiche&decl=${f.id}'">
+            <h3 style="margin:0 0 6px;font-size:15px;">${esc([f.reponses.prenom, f.reponses.nom_professionnel||f.reponses.nom].filter(Boolean).join(' ')||'Fiche')}</h3>
+            <p style="margin:0;font-size:12.5px;color:var(--muted);">${esc([f.reponses.metier_principal, f.reponses.domaine_principal].filter(Boolean).join(' — '))}</p>
+            ${f.reponses.entreprise_nom ? `<p style="margin:4px 0 0;font-size:12px;color:var(--muted);">🏢 ${esc(f.reponses.entreprise_nom)}</p>` : ''}
+          </div>`).join('')}</div>`;
+      } catch(e) { zone.innerHTML = `<div class="rec-empty">${esc(e.message)}</div>`; }
+    }
+    document.getElementById('an-btn-rechercher').addEventListener('click', rechercher);
+    rechercher();
   }
 
   init();

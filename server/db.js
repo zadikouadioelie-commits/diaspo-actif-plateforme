@@ -2345,6 +2345,21 @@ const MIGRATIONS = [
   // du créateur (actif/suspendu/...), qui reprend son cours normal dès le dégel.
   ["recensements", "gele_le TEXT"],
   ["recensements", "gele_motif TEXT"],
+  // Carnet professionnel (2026-09-18, cahier des charges §1-35) — second type de recensement.
+  // `type` reste verrouillé CHECK(type IN ('denombrement')) — jamais touché (voir commentaire
+  // ci-dessus). `modele` est le VRAI discriminant applicatif pour tout code écrit depuis cette
+  // extension ('denombrement'|'carnet_professionnel'), en colonne libre donc sans ce risque.
+  ["recensements", "modele TEXT DEFAULT 'denombrement'"],
+  // Qui peut voir la campagne/ses fiches (§15-17) : { publique:bool, membres:bool,
+  // emails_autorises:[...], listes_ids:[...] } — JSON libre, indépendant du champs_config_json
+  // existant qui ne porte que la LISTE des champs, pas les règles d'accès à la fiche.
+  ["recensements", "acces_config_json TEXT DEFAULT '{}'"],
+  // Déclarations Carnet professionnel (§18) : visibilité PAR CHAMP, orthogonale à
+  // acces_config_json ci-dessus qui régit l'accès à LA FICHE. "Une donnée collectée n'est pas
+  // nécessairement une donnée publiée" (§32) — appliquée en la stockant par déclaration (pas
+  // par recensement) : deux personnes du même carnet peuvent choisir des niveaux différents
+  // pour le même champ. { [champ_id]: 'prive'|'autorises'|'membres'|'public' }, absent = privé.
+  ["recensement_declarations", "visibilite_champs_json TEXT DEFAULT '{}'"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

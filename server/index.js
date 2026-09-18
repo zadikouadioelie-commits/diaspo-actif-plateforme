@@ -39219,21 +39219,44 @@ app.get('/api/admin/social/stats', requireAuth, async (req, res) => {
    modification ; identity.verification_session Stripe déjà câblé → même appel, juste une
    métadonnée différente (diaspoactif_recensement_declaration_id) pour distinguer côté webhook. */
 
-const RECENSEMENT_TYPES = ['denombrement']; // futurs types : ajouter ici, rien d'autre à changer pour le routage de base
+const RECENSEMENT_TYPES = ['denombrement']; // validation historique — voir RECENSEMENT_MODELES ci-dessous pour le vrai discriminant
+/* Carnet professionnel (2026-09-18, cahier des charges §1-35) : `type` reste verrouillé côté
+   base à 'denombrement' (CHECK non modifiable, voir server/db.js) — le VRAI discriminant
+   applicatif est désormais `modele` (colonne libre). RECENSEMENT_TYPES ci-dessus n'est plus
+   utilisé pour la validation (voir POST /api/recensements) mais laissé en place : d'anciens
+   appels pourraient encore le lire. */
+const RECENSEMENT_MODELES = ['denombrement', 'carnet_professionnel'];
 
-async function generateRecensementId() {
+async function generateRecensementId(modele) {
+  const prefixe = modele === 'carnet_professionnel' ? 'CAR' : 'DEN';
   const annee = new Date().getFullYear();
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O/1/I, ambiguïté visuelle
   for (let tentative = 0; tentative < 8; tentative++) {
     let suffixe = '';
     for (let i = 0; i < 6; i++) suffixe += alphabet[crypto.randomInt(alphabet.length)];
-    const id = `DEN-${annee}-${suffixe}`;
+    const id = `${prefixe}-${annee}-${suffixe}`;
     const existe = await db.prepare('SELECT 1 FROM recensements WHERE identifiant=?').get(id);
     if (!existe) return id;
   }
-  return `DEN-${annee}-${Date.now().toString(36).toUpperCase()}`; // repli si 8 collisions improbables
+  return `${prefixe}-${annee}-${Date.now().toString(36).toUpperCase()}`; // repli si 8 collisions improbables
 }
-async function generateDeclarationId() {
+async function generateDeclarationId(modele) {
+  /* Carnet professionnel (§29) : identifiant séquentiel DA-PRO-NNNNNN explicitement demandé par
+     le cahier des charges, distinct du format aléatoire DECL-XXXXXXXX du Dénombrement (conservé
+     tel quel pour ce type, aucune régression). Compteur dérivé du nombre de fiches DA-PRO déjà
+     émises plutôt qu'un vrai compteur SQL dédié (aucune table de séquence n'existe sur ce
+     dépôt) — avec la même boucle de nouvelle tentative en cas de collision (insertions
+     concurrentes) que le reste du module. */
+  if (modele === 'carnet_professionnel') {
+    const { n } = await db.prepare("SELECT COUNT(*) n FROM recensement_declarations WHERE identifiant LIKE 'DA-PRO-%'").get();
+    for (let tentative = 0; tentative < 8; tentative++) {
+      const num = Number(n) + 1 + tentative;
+      const id = `DA-PRO-${String(num).padStart(6, '0')}`;
+      const existe = await db.prepare('SELECT 1 FROM recensement_declarations WHERE identifiant=?').get(id);
+      if (!existe) return id;
+    }
+    return `DA-PRO-${Date.now().toString().slice(-6)}`;
+  }
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   for (let tentative = 0; tentative < 8; tentative++) {
     let suffixe = '';
@@ -39265,12 +39288,98 @@ const RECENSEMENT_CHAMPS_MINEUR_PREDEFINIS = [
   { id: 'date_naissance', label: 'Date de naissance' }, { id: 'pays_origine', label: "Pays d'origine" },
   { id: 'pays_residence', label: 'Pays de résidence' }, { id: 'ville_residence', label: 'Ville de résidence' },
 ];
-const RECENSEMENT_TYPES_CHAMPS_PERSO = ['texte', 'nombre', 'date', 'oui_non', 'choix_unique', 'choix_multiple', 'liste_deroulante'];
+
+/* Catalogue Carnet professionnel (§6-14) — chaque entrée porte ici son `type` de rendu (repris
+   tel quel par champHtml()/lireChamps() côté recensement.html, aucune logique nouvelle côté
+   front à écrire pour les types déjà supportés : texte/nombre/date/choix_unique/choix_multiple ;
+   3 types réellement nouveaux introduits pour ce catalogue : 'tags' (compétences/métiers
+   secondaires/langues/logiciels/services, §9), 'texte_long' (présentation/diplômes...) et
+   'domaine_activite' (réutilise TEL QUEL assets/domaines-activite.js — même taxonomie que
+   users/initiatives, §7 du rapport d'exploration, pas de nouvelle liste inventée). §5 : chaque
+   champ démarre volontairement au niveau de visibilité le plus restrictif ('prive') — appliqué
+   dans sanitizeRecensementChampsConfig ci-dessous, jamais côté client seul (§32). */
+const RECENSEMENT_CHAMPS_PREDEFINIS_PRO = [
+  // Identité professionnelle (§6)
+  { id: 'nom', label: 'Nom', categorie: 'Identité professionnelle' },
+  { id: 'prenom', label: 'Prénom', categorie: 'Identité professionnelle' },
+  { id: 'nom_professionnel', label: 'Nom professionnel (si différent)', categorie: 'Identité professionnelle' },
+  { id: 'photo', label: 'Photo', categorie: 'Identité professionnelle', type: 'upload_photo' },
+  { id: 'fonction_poste', label: 'Fonction / poste', categorie: 'Identité professionnelle' },
+  { id: 'statut_professionnel', label: 'Statut professionnel', categorie: 'Identité professionnelle', type: 'choix_unique',
+    options: ['Salarié', 'Indépendant', 'Entrepreneur', 'Dirigeant', 'Profession libérale', 'Artisan', 'Commerçant', 'Étudiant', "Demandeur d'emploi", 'Retraité', 'Autre'] },
+  // Métier (§7)
+  { id: 'metier_principal', label: 'Métier principal', categorie: 'Métier', type: 'texte_suggere' },
+  { id: 'metiers_secondaires', label: 'Métiers secondaires', categorie: 'Métier', type: 'tags' },
+  // Domaine professionnel (§8) — réutilise la taxonomie unifiée existante
+  { id: 'domaine_principal', label: 'Domaine professionnel', categorie: 'Domaine professionnel', type: 'domaine_activite' },
+  { id: 'sous_domaine_1', label: 'Sous-domaine 1', categorie: 'Domaine professionnel', type: 'texte_suggere' },
+  { id: 'sous_domaine_2', label: 'Sous-domaine 2', categorie: 'Domaine professionnel', type: 'texte_suggere' },
+  // Compétences (§9)
+  { id: 'competences', label: 'Compétences', categorie: 'Compétences', type: 'tags' },
+  // Expérience et qualifications (§10)
+  { id: 'annees_experience', label: "Années d'expérience", categorie: 'Expérience et qualifications', type: 'nombre' },
+  { id: 'diplomes', label: 'Diplômes', categorie: 'Expérience et qualifications', type: 'texte_long' },
+  { id: 'certifications', label: 'Certifications', categorie: 'Expérience et qualifications', type: 'texte_long' },
+  { id: 'qualifications_professionnelles', label: 'Qualifications professionnelles', categorie: 'Expérience et qualifications', type: 'texte_long' },
+  { id: 'formations_suivies', label: 'Formations suivies', categorie: 'Expérience et qualifications', type: 'texte_long' },
+  { id: 'langues', label: 'Langues', categorie: 'Expérience et qualifications', type: 'tags' },
+  { id: 'logiciels_maitrises', label: 'Logiciels maîtrisés', categorie: 'Expérience et qualifications', type: 'tags' },
+  { id: 'permis_habilitations', label: 'Permis / habilitations', categorie: 'Expérience et qualifications', type: 'tags' },
+  { id: 'autres_competences', label: 'Autres compétences', categorie: 'Expérience et qualifications', type: 'texte_long' },
+  // Entreprise (§11) — le SIRET est un identifiant professionnel, jamais public par défaut
+  { id: 'entreprise_nom', label: "Nom de l'entreprise", categorie: 'Entreprise' },
+  { id: 'entreprise_nom_commercial', label: 'Nom commercial', categorie: 'Entreprise' },
+  { id: 'entreprise_siret', label: 'SIRET', categorie: 'Entreprise' },
+  { id: 'entreprise_siren', label: 'SIREN', categorie: 'Entreprise' },
+  { id: 'entreprise_forme_juridique', label: 'Forme juridique', categorie: 'Entreprise' },
+  { id: 'entreprise_fonction', label: "Fonction dans l'entreprise", categorie: 'Entreprise' },
+  { id: 'entreprise_secteur', label: "Secteur d'activité", categorie: 'Entreprise' },
+  { id: 'entreprise_domaine', label: 'Domaine', categorie: 'Entreprise' },
+  { id: 'entreprise_description', label: "Description de l'activité", categorie: 'Entreprise', type: 'texte_long' },
+  { id: 'entreprise_adresse', label: 'Adresse professionnelle', categorie: 'Entreprise' },
+  { id: 'entreprise_code_postal', label: 'Code postal', categorie: 'Entreprise' },
+  { id: 'entreprise_ville', label: 'Ville', categorie: 'Entreprise' },
+  { id: 'entreprise_pays', label: 'Pays', categorie: 'Entreprise' },
+  { id: 'entreprise_zone_intervention', label: "Zone d'intervention", categorie: 'Entreprise' },
+  // Coordonnées professionnelles (§12) — jamais publiées automatiquement (§32)
+  { id: 'email_pro', label: 'E-mail professionnel', categorie: 'Coordonnées professionnelles', type: 'email' },
+  { id: 'telephone_pro', label: 'Téléphone professionnel', categorie: 'Coordonnées professionnelles' },
+  { id: 'site_web', label: 'Site internet', categorie: 'Coordonnées professionnelles' },
+  { id: 'linkedin', label: 'LinkedIn', categorie: 'Coordonnées professionnelles' },
+  { id: 'autre_reseau_pro', label: 'Autre réseau professionnel', categorie: 'Coordonnées professionnelles' },
+  { id: 'adresse_pro', label: 'Adresse professionnelle', categorie: 'Coordonnées professionnelles' },
+  { id: 'contact_commercial', label: 'Contact commercial', categorie: 'Coordonnées professionnelles' },
+  // Présentation professionnelle (§13)
+  { id: 'presentation', label: 'Présentation', categorie: 'Présentation professionnelle', type: 'texte_long' },
+  { id: 'services_proposes', label: 'Services proposés', categorie: 'Présentation professionnelle', type: 'tags' },
+  // Relation avec le réseau Diaspo'Actif (§14)
+  { id: 'relation_reseau', label: 'Je souhaite', categorie: "Relation avec le réseau Diaspo'Actif", type: 'choix_multiple',
+    options: ['Développer mon réseau professionnel', 'Trouver des clients', 'Trouver des partenaires', 'Trouver des fournisseurs',
+      'Trouver des investisseurs', 'Trouver un emploi', 'Proposer mes compétences', 'Participer à des projets',
+      "Accompagner d'autres professionnels", 'Répondre à des missions', 'Développer une activité en Afrique',
+      'Développer une activité en Europe', 'Autre'] },
+];
+const RECENSEMENT_CHAMPS_PREDEFINIS_PAR_MODELE = { denombrement: RECENSEMENT_CHAMPS_PREDEFINIS, carnet_professionnel: RECENSEMENT_CHAMPS_PREDEFINIS_PRO };
+/* Champs à ne jamais laisser en visibilité 'public' par défaut même si le créateur active la
+   fiche publique sans tout reconfigurer un par un (§12, §18 exemple) — un filet de sécurité,
+   pas une règle bloquante : le créateur peut toujours repasser un champ sensible en public
+   explicitement, sanitizeRecensementChampsConfig ne fait que choisir le NIVEAU DE DÉPART. */
+const RECENSEMENT_CHAMPS_SENSIBLES_PRO = new Set(['telephone_pro', 'adresse_pro', 'entreprise_siret', 'entreprise_siren', 'entreprise_adresse', 'email_pro']);
+
+const RECENSEMENT_TYPES_CHAMPS_PERSO = ['texte', 'texte_long', 'nombre', 'date', 'oui_non', 'choix_unique', 'choix_multiple', 'liste_deroulante', 'tags'];
 const RECENSEMENT_TERRITOIRE_TYPES = ['pays', 'region', 'departement', 'ville', 'commune', 'zone_geographique', 'personnalise'];
+const RECENSEMENT_VISIBILITES_CHAMP = ['prive', 'autorises', 'membres', 'public'];
 
 /* Sanitize la config "informations demandées" envoyée par le créateur : fusionne les champs
    prédéfinis (activé/obligatoire) ET les champs personnalisés (mêmes bornes que
-   sanitizeFormulaireChampsCustom : 30 champs perso max, libellés bornés, type whitelisté). */
+   sanitizeFormulaireChampsCustom : 30 champs perso max, libellés bornés, type whitelisté).
+   `type`/`options` sont désormais copiés depuis le catalogue prédéfini (§6-14 : statut pro,
+   tags, domaine...) — absents jusqu'ici car le seul catalogue existant (Dénombrement) n'avait
+   besoin que de champs texte simples. `visibilite` (§18, Carnet professionnel uniquement) :
+   toujours 'prive' au départ, jamais lue depuis l'entrée du créateur ici — c'est la PERSONNE
+   recensée qui choisit sa propre visibilité par champ au moment de sa déclaration (§18 exemple :
+   deux personnes du même carnet peuvent faire des choix différents), pas le créateur de la
+   campagne ; voir sanitizeRecensementVisibiliteChamps plus bas pour ce second réglage. */
 function sanitizeRecensementChampsConfig(input, predefinis) {
   const arr = Array.isArray(input) ? input.slice(0, predefinis.length + 30) : [];
   let idxPerso = 0;
@@ -39279,7 +39388,8 @@ function sanitizeRecensementChampsConfig(input, predefinis) {
     if (c.predefini) {
       const ref = predefinis.find(p => p.id === c.id);
       if (!ref) return null;
-      return { id: ref.id, label: ref.label, categorie: ref.categorie || null, predefini: true, actif: !!c.actif, obligatoire: !!c.obligatoire };
+      return { id: ref.id, label: ref.label, categorie: ref.categorie || null, predefini: true, actif: !!c.actif, obligatoire: !!c.obligatoire,
+        type: ref.type || 'texte', ...(ref.options ? { options: ref.options } : {}) };
     }
     idxPerso++;
     const type = RECENSEMENT_TYPES_CHAMPS_PERSO.includes(c.type) ? c.type : 'texte';
@@ -39293,27 +39403,122 @@ function sanitizeRecensementChampsConfig(input, predefinis) {
   }).filter(Boolean);
 }
 
-/* Détection de doublons (§10) — rien d'équivalent n'existe ailleurs sur ce dépôt combinant ces
-   champs (vérifié) : réutilise similariteChaine (déjà utilisé pour les doublons de
-   collectivités) pour nom/prénom, égalité stricte pour date de naissance/email. Une
-   correspondance n'est retenue que si (a) email identique, OU (b) date de naissance identique
-   ET nom+prénom suffisamment proches — jamais nom/prénom seuls (consigne explicite du cahier
-   des charges), pour ne pas bloquer abusivement des homonymes. */
-async function detecterDoublonRecensement(recensementId, { nom, prenom, dateNaissance, email }) {
+/* Visibilité PAR CHAMP d'une déclaration (§18, Carnet professionnel uniquement) — choisie par
+   la personne recensée elle-même à la validation de SA fiche (§19), jamais par le créateur de
+   la campagne (celui-ci configure QUELS champs sont collectés, pas leur diffusion). Toujours
+   'prive' par défaut pour tout champ non explicitement réglé (§32 : collecter ≠ publier). */
+function sanitizeRecensementVisibiliteChamps(input, champsActifs) {
+  const out = {};
+  if (!input || typeof input !== 'object') return out;
+  for (const c of champsActifs) {
+    const v = input[c.id];
+    out[c.id] = RECENSEMENT_VISIBILITES_CHAMP.includes(v) ? v : 'prive';
+  }
+  return out;
+}
+
+/* Accès à LA FICHE/CAMPAGNE (§15-17, Carnet professionnel) — distinct de la visibilité par champ
+   ci-dessus : détermine QUI peut même consulter une déclaration (avant de regarder si tel champ
+   précis lui est montré). `emails_autorises` et `listes_ids` sont vérifiés au moment de la
+   lecture (jamais figés à la sauvegarde) — §17 : ajouter/retirer quelqu'un d'une liste change
+   son accès automatiquement, sans resynchronisation manuelle. */
+function sanitizeRecensementAccesConfig(input) {
+  const o = (input && typeof input === 'object') ? input : {};
+  return {
+    publique: !!o.publique,
+    membres: !!o.membres,
+    emails_autorises: Array.isArray(o.emails_autorises) ? o.emails_autorises.map(e => String(e).trim().toLowerCase()).filter(Boolean).slice(0, 200) : [],
+    listes_ids: Array.isArray(o.listes_ids) ? o.listes_ids.map(n => parseInt(n)).filter(n => Number.isInteger(n)).slice(0, 30) : [],
+  };
+}
+
+/* Un visiteur (identifié par son compte `user` éventuel, ou juste son email pour un accès sans
+   compte) a-t-il accès à LA FICHE (avant filtrage champ par champ) ? Le PROPRIÉTAIRE de la
+   déclaration et le CRÉATEUR de la campagne ont toujours accès (ils gèrent déjà la fiche). Pour
+   un tiers : accès public global, ou membre connecté si 'membres' activé, ou email explicitement
+   autorisé, ou membre d'une des listes de diffusion autorisées (vérifié en direct, §17). */
+async function aAccesFicheRecensement(rec, decl, user, emailVisiteur) {
+  if (user && (Number(user.id) === Number(decl.user_id) || Number(user.id) === Number(rec.owner_user_id) || user.role === 'administrateur')) return true;
+  const acces = safeJSON(rec.acces_config_json, {});
+  if (acces.publique) return true;
+  if (acces.membres && user) return true;
+  const email = (emailVisiteur || (user && user.email) || '').trim().toLowerCase();
+  if (email && Array.isArray(acces.emails_autorises) && acces.emails_autorises.includes(email)) return true;
+  if (user && Array.isArray(acces.listes_ids) && acces.listes_ids.length) {
+    const placeholders = acces.listes_ids.map(() => '?').join(',');
+    const dansListe = await db.prepare(
+      `SELECT 1 FROM listes_diffusion_contacts WHERE liste_id IN (${placeholders}) AND user_id=? LIMIT 1`
+    ).get(...acces.listes_ids, user.id);
+    if (dansListe) return true;
+  }
+  return false;
+}
+
+/* Filtre les réponses d'une déclaration Carnet professionnel selon la visibilité par champ
+   (§18) ET l'accès à la fiche elle-même (§15-17) — utilisé par la fiche publique et l'annuaire
+   de recherche (§22-23). N'affecte jamais la vue du propriétaire/créateur/admin (accès complet,
+   cf. aAccesFicheRecensement ci-dessus qui court-circuite déjà ce cas). */
+function filtrerReponsesParVisibilite(reponses, visibiliteChamps, niveauVisiteur) {
+  // niveauVisiteur: 'public' (anonyme), 'membre' (connecté), 'autorise' (accès fiche accordé), 'proprietaire' (accès total, ne passe pas ici)
+  // rang = niveau de clairance REQUIS pour voir le champ (0 = accessible à tous, 3 = titulaire
+  // seul) — et, symétriquement, la clairance dont dispose CE visiteur. Un champ est visible si
+  // la clairance du visiteur couvre au moins celle requise par le champ (clairanceVisiteur >=
+  // rangChamp). Bug trouvé en testant réellement (2026-09-18) : la table était inversée
+  // (public=3, prive=0) ET comparée avec `niveauChamp <= rangVisiteur` en prenant le PLUS
+  // PERMISSIF comme repli par défaut — un visiteur anonyme voyait alors TOUS les champs, y
+  // compris ceux réglés 'prive'/'autorises'/'membres'. Corrigé avant tout déploiement.
+  const rang = { public: 0, membres: 1, autorises: 2, prive: 3 };
+  const clairanceVisiteur = niveauVisiteur === 'autorise' ? rang.autorises : niveauVisiteur === 'membre' ? rang.membres : rang.public;
+  const out = {};
+  for (const [champId, valeur] of Object.entries(reponses || {})) {
+    const rangChamp = rang[(visibiliteChamps || {})[champId]] ?? rang.prive; // absent = le plus restrictif
+    if (rangChamp <= clairanceVisiteur) out[champId] = valeur;
+  }
+  return out;
+}
+
+/* Détection de doublons (§10, §21) — rien d'équivalent n'existe ailleurs sur ce dépôt combinant
+   ces champs (vérifié) : réutilise similariteChaine (déjà utilisé pour les doublons de
+   collectivités) pour nom/prénom, égalité stricte pour date de naissance/email/SIRET/SIREN. Une
+   correspondance n'est retenue que si (a) email identique, (b) SIRET/SIREN identique (Carnet
+   professionnel, §21), OU (c) date de naissance identique ET nom+prénom suffisamment proches —
+   jamais nom/prénom seuls (consigne explicite du cahier des charges), pour ne pas bloquer
+   abusivement des homonymes.
+   Bug corrigé au passage (trouvé en relisant ce code pour l'étendre) : similariteChaine()
+   retourne un flottant 0..1 (jamais >1), mais ce code comparait `simNom >= 70` sans le *100
+   utilisé partout ailleurs sur ce dépôt (ex. index.js doublons collectivités) — la branche
+   "même date de naissance + nom/prénom proches" ne pouvait donc jamais se déclencher, seule la
+   correspondance email stricte fonctionnait réellement. Corrigé ici (*100, comme le reste du
+   dépôt) plutôt que reconduit tel quel dans l'extension. */
+async function detecterDoublonRecensement(recensementId, { nom, prenom, dateNaissance, email, siret, siren }) {
   const emailNorm = email ? String(email).trim().toLowerCase() : null;
   const dnNorm = dateNaissance || null;
-  if (!emailNorm && !dnNorm) return null; // pas assez d'éléments fiables pour comparer
+  const siretNorm = siret ? String(siret).replace(/\s+/g, '') : null;
+  const sirenNorm = siren ? String(siren).replace(/\s+/g, '') : null;
+  if (!emailNorm && !dnNorm && !siretNorm && !sirenNorm) return null; // pas assez d'éléments fiables pour comparer
   const candidats = await db.prepare(
-    `SELECT id, identifiant, match_nom, match_prenom, match_date_naissance, match_email
+    `SELECT id, identifiant, match_nom, match_prenom, match_date_naissance, match_email, reponses_json
      FROM recensement_declarations
      WHERE recensement_id=? AND supprime_le IS NULL AND (match_email=? OR match_date_naissance=?)`
   ).all(recensementId, emailNorm, dnNorm);
   for (const c of candidats) {
     if (emailNorm && c.match_email && c.match_email === emailNorm) return c;
     if (dnNorm && c.match_date_naissance && c.match_date_naissance === dnNorm) {
-      const simNom = similariteChaine(nom || '', c.match_nom || '');
-      const simPrenom = similariteChaine(prenom || '', c.match_prenom || '');
+      const simNom = similariteChaine(nom || '', c.match_nom || '') * 100;
+      const simPrenom = similariteChaine(prenom || '', c.match_prenom || '') * 100;
       if (simNom >= 70 && simPrenom >= 70) return c;
+    }
+  }
+  if (siretNorm || sirenNorm) {
+    const proCandidats = await db.prepare(
+      `SELECT id, identifiant, reponses_json FROM recensement_declarations WHERE recensement_id=? AND supprime_le IS NULL`
+    ).all(recensementId);
+    for (const c of proCandidats) {
+      const rep = safeJSON(c.reponses_json, {});
+      const cSiret = rep.entreprise_siret ? String(rep.entreprise_siret).replace(/\s+/g, '') : null;
+      const cSiren = rep.entreprise_siren ? String(rep.entreprise_siren).replace(/\s+/g, '') : null;
+      if (siretNorm && cSiret && cSiret === siretNorm) return c;
+      if (sirenNorm && cSiren && cSiren === sirenNorm) return c;
     }
   }
   return null;
@@ -39333,7 +39538,9 @@ route('POST', '/api/recensements', async (req, res, params, body) => {
   }
   const init = await db.prepare('SELECT id FROM initiatives WHERE owner_user_id=?').get(user.id);
   if (!init) return sendJSON(res, 400, { error: 'Aucune initiative associée à ce compte.' });
-  const type = RECENSEMENT_TYPES.includes(body.type) ? body.type : 'denombrement';
+  // `type` reste toujours 'denombrement' côté base (CHECK verrouillé) — `modele` porte le vrai
+  // choix (Carnet professionnel, §1-2).
+  const modele = RECENSEMENT_MODELES.includes(body.modele) ? body.modele : 'denombrement';
   const nom = String(body.nom || '').trim();
   const description = String(body.description || '').trim();
   const population = String(body.population_concernee || '').trim();
@@ -39341,12 +39548,12 @@ route('POST', '/api/recensements', async (req, res, params, body) => {
   if (!body.date_debut) return sendJSON(res, 400, { error: 'La date de début est obligatoire.' });
   const territoire = body.territoire && RECENSEMENT_TERRITOIRE_TYPES.includes(body.territoire.type)
     ? { type: body.territoire.type, valeur: String(body.territoire.valeur || '').trim().slice(0, 200) } : {};
-  const identifiant = await generateRecensementId();
+  const identifiant = await generateRecensementId(modele);
   const r = await db.prepare(`
-    INSERT INTO recensements (identifiant, type, initiative_id, owner_user_id, nom, description, population_concernee,
+    INSERT INTO recensements (identifiant, type, modele, initiative_id, owner_user_id, nom, description, population_concernee,
       territoire_json, date_debut, date_fin, statut)
-    VALUES (?,?,?,?,?,?,?,?,?,?, 'brouillon')
-  `).run(identifiant, type, init.id, user.id, nom, description, population,
+    VALUES (?,'denombrement',?,?,?,?,?,?,?,?,?, 'brouillon')
+  `).run(identifiant, modele, init.id, user.id, nom, description, population,
     JSON.stringify(territoire), body.date_debut, body.date_fin || null);
   sendJSON(res, 201, { id: r.lastInsertRowid, identifiant });
 });
@@ -39368,8 +39575,9 @@ route('PUT', '/api/recensements/:id', async (req, res, params, body) => {
   if (body.date_debut !== undefined) { fields.push('date_debut=?'); vals.push(body.date_debut); }
   if (body.date_fin !== undefined) { fields.push('date_fin=?'); vals.push(body.date_fin || null); }
   if (body.champs_config !== undefined) {
+    const predefinis = RECENSEMENT_CHAMPS_PREDEFINIS_PAR_MODELE[rec.modele || 'denombrement'] || RECENSEMENT_CHAMPS_PREDEFINIS;
     fields.push('champs_config_json=?');
-    vals.push(JSON.stringify(sanitizeRecensementChampsConfig(body.champs_config, RECENSEMENT_CHAMPS_PREDEFINIS)));
+    vals.push(JSON.stringify(sanitizeRecensementChampsConfig(body.champs_config, predefinis)));
   }
   if (body.mineurs_autorises !== undefined) { fields.push('mineurs_autorises=?'); vals.push(body.mineurs_autorises ? 1 : 0); }
   if (body.champs_mineur_config !== undefined) {
@@ -39382,6 +39590,12 @@ route('PUT', '/api/recensements/:id', async (req, res, params, body) => {
   if (body.verification_identite_documents !== undefined) {
     fields.push('verification_identite_documents=?');
     vals.push(['residence', 'origine', 'les_deux'].includes(body.verification_identite_documents) ? body.verification_identite_documents : 'les_deux');
+  }
+  // Accès à la campagne/aux fiches (§15-17, Carnet professionnel) — sans effet pour un
+  // Dénombrement classique (jamais lu par ses routes), donc rien à protéger côté `modele` ici.
+  if (body.acces_config !== undefined) {
+    fields.push('acces_config_json=?');
+    vals.push(JSON.stringify(sanitizeRecensementAccesConfig(body.acces_config)));
   }
   if (!fields.length) return sendJSON(res, 400, { error: 'Aucune modification fournie.' });
   fields.push("updated_at=datetime('now')");
@@ -39437,11 +39651,13 @@ route('GET', '/api/recensements/:id', async (req, res, params) => {
       territoire: safeJSON(rec.territoire_json, {}),
       champs_config: safeJSON(rec.champs_config_json, []),
       champs_mineur_config: safeJSON(rec.champs_mineur_config_json, []),
+      acces_config: estProprietaire ? safeJSON(rec.acces_config_json, {}) : undefined,
     },
     est_proprietaire: estProprietaire,
-    champs_predefinis: RECENSEMENT_CHAMPS_PREDEFINIS,
+    champs_predefinis: RECENSEMENT_CHAMPS_PREDEFINIS_PAR_MODELE[rec.modele || 'denombrement'] || RECENSEMENT_CHAMPS_PREDEFINIS,
     champs_mineur_predefinis: RECENSEMENT_CHAMPS_MINEUR_PREDEFINIS,
     types_champs_perso: RECENSEMENT_TYPES_CHAMPS_PERSO,
+    visibilites_champ: RECENSEMENT_VISIBILITES_CHAMP,
   });
 });
 
@@ -39461,14 +39677,26 @@ route('POST', '/api/recensements/:id/declarations', async (req, res, params, bod
   const nom = String(reponses.nom || '').trim();
   const prenom = String(reponses.prenom || '').trim();
   const dateNaissance = reponses.date_naissance || null;
-  const email = reponses.email || null;
+  const email = reponses.email || reponses.email_pro || null;
+  const siret = reponses.entreprise_siret || null;
+  const siren = reponses.entreprise_siren || null;
 
-  // Détection de doublon AVANT toute création (§10)
-  const doublon = await detecterDoublonRecensement(rec.id, { nom, prenom, dateNaissance, email });
+  // Champs obligatoires (§19 "informations manquantes/obligatoires") — validés ici pour les
+  // DEUX modèles (absent jusqu'ici, pas seulement pour le Carnet professionnel : une déclaration
+  // de Dénombrement ne vérifiait aucun champ marqué obligatoire par le créateur avant ce
+  // correctif — comportement conservé à l'identique pour les deux, juste rendu réel).
+  const champsConfig = safeJSON(rec.champs_config_json, []);
+  const manquants = champsConfig.filter(c => c.actif && c.obligatoire && !String(reponses[c.id] ?? '').trim()).map(c => c.label);
+  if (manquants.length) return sendJSON(res, 400, { error: `Champ(s) obligatoire(s) manquant(s) : ${manquants.join(', ')}` });
+
+  // Détection de doublon AVANT toute création (§10, §21 — SIRET/SIREN pour le Carnet pro)
+  const doublon = await detecterDoublonRecensement(rec.id, { nom, prenom, dateNaissance, email, siret, siren });
   if (doublon) {
     return sendJSON(res, 409, {
       error: 'doublon',
-      message: 'Vous avez déjà participé à ce recensement. Une déclaration correspondant aux informations renseignées existe déjà dans ce dénombrement. Connectez-vous à votre espace pour consulter votre déclaration.',
+      message: rec.modele === 'carnet_professionnel'
+        ? "Une fiche professionnelle semble déjà exister pour ces informations. Connectez-vous à votre espace pour la consulter."
+        : 'Vous avez déjà participé à ce recensement. Une déclaration correspondant aux informations renseignées existe déjà dans ce dénombrement. Connectez-vous à votre espace pour consulter votre déclaration.',
     });
   }
 
@@ -39485,12 +39713,19 @@ route('POST', '/api/recensements/:id/declarations', async (req, res, params, bod
     accesEmail = email2; accesHash = hash; accesSalt = salt;
   }
 
-  const identifiant = await generateDeclarationId();
+  // Visibilité par champ (§18, Carnet professionnel uniquement — sans effet pour un
+  // Dénombrement, jamais lu par ses vues) : choisie par la personne recensée elle-même à cette
+  // même étape de validation (§19), toujours 'prive' pour tout champ non explicitement réglé.
+  const visibiliteChamps = rec.modele === 'carnet_professionnel'
+    ? sanitizeRecensementVisibiliteChamps(body.visibilite_champs, champsConfig.filter(c => c.actif))
+    : {};
+
+  const identifiant = await generateDeclarationId(rec.modele);
   const ins = await db.prepare(`
     INSERT INTO recensement_declarations (identifiant, recensement_id, est_mineur, user_id, acces_email, acces_password_hash, acces_password_salt,
       reponses_json, match_nom, match_prenom, match_date_naissance, match_email, match_pays_residence, match_pays_origine,
-      responsable_nom, responsable_prenom, responsable_email, responsable_telephone)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      responsable_nom, responsable_prenom, responsable_email, responsable_telephone, visibilite_champs_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     identifiant, rec.id, estMineur ? 1 : 0, userId, accesEmail, accesHash, accesSalt,
     JSON.stringify(reponses), nom || null, prenom || null, dateNaissance, email ? String(email).trim().toLowerCase() : null,
@@ -39499,6 +39734,7 @@ route('POST', '/api/recensements/:id/declarations', async (req, res, params, bod
     estMineur ? String(body.responsable?.prenom || '').trim() || null : null,
     estMineur ? String(body.responsable?.email || '').trim() || null : null,
     estMineur ? String(body.responsable?.telephone || '').trim() || null : null,
+    JSON.stringify(visibiliteChamps),
   );
   await db.prepare("UPDATE recensements SET nb_declarations=nb_declarations+1 WHERE id=?").run(rec.id);
 
@@ -39603,9 +39839,92 @@ route('GET', '/api/recensement-declarations/:id', async (req, res, params) => {
       responsable_nom: decl.responsable_nom, responsable_prenom: decl.responsable_prenom,
       responsable_email: decl.responsable_email, responsable_telephone: decl.responsable_telephone,
       created_at: decl.created_at, reponses: safeJSON(decl.reponses_json, {}),
+      visibilite_champs: safeJSON(decl.visibilite_champs_json, {}),
     },
     recensement: rec,
   });
+});
+
+/* ── Carnet professionnel — fiche PUBLIQUE (§23-24) et annuaire de recherche (§22) ──
+   Distinctes à dessein de GET /api/recensement-declarations/:id ci-dessus (réservée au
+   titulaire de la fiche) : ici un TIERS (visiteur anonyme ou membre) consulte la fiche de
+   QUELQU'UN D'AUTRE — l'accès à la fiche (§15-17) ET la visibilité par champ (§18) sont donc
+   vérifiés à chaque appel, jamais mis en cache côté serveur (§17 : ajouter/retirer une personne
+   d'une liste change son accès immédiatement). Sans effet pour un Dénombrement (statut 404
+   volontaire — cette notion de fiche publique n'existe pas pour ce modèle, §22 ne concerne que
+   le Carnet professionnel). */
+async function niveauVisiteurRecensement(rec, decl, req) {
+  const user = await getCurrentUser(req);
+  if (user && (Number(user.id) === Number(decl.user_id) || Number(user.id) === Number(rec.owner_user_id) || user.role === 'administrateur')) {
+    return { niveau: 'proprietaire', user };
+  }
+  const emailVisiteur = String(req.headers['x-visiteur-email'] || '').trim().toLowerCase() || null;
+  const accorde = await aAccesFicheRecensement(rec, decl, user, emailVisiteur);
+  if (!accorde) return { niveau: null, user };
+  const acces = safeJSON(rec.acces_config_json, {});
+  if (user) return { niveau: 'membre', user };
+  if (emailVisiteur && Array.isArray(acces.emails_autorises) && acces.emails_autorises.includes(emailVisiteur)) return { niveau: 'autorise', user };
+  return { niveau: 'public', user };
+}
+
+route('GET', '/api/recensement-declarations/:id/fiche-publique', async (req, res, params) => {
+  const decl = await db.prepare('SELECT * FROM recensement_declarations WHERE id=? AND supprime_le IS NULL').get(params.id);
+  if (!decl) return sendJSON(res, 404, { error: 'Fiche introuvable.' });
+  const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(decl.recensement_id);
+  if (!rec || rec.modele !== 'carnet_professionnel') return sendJSON(res, 404, { error: 'Fiche introuvable.' });
+  const { niveau } = await niveauVisiteurRecensement(rec, decl, req);
+  if (!niveau) return sendJSON(res, 403, { error: "Cette fiche n'est pas accessible." });
+  const reponses = safeJSON(decl.reponses_json, {});
+  const visibilite = safeJSON(decl.visibilite_champs_json, {});
+  const reponsesFiltrees = niveau === 'proprietaire' ? reponses : filtrerReponsesParVisibilite(reponses, visibilite, niveau);
+  sendJSON(res, 200, {
+    fiche: { id: decl.id, identifiant: decl.identifiant, created_at: decl.created_at, reponses: reponsesFiltrees },
+    recensement: { id: rec.id, identifiant: rec.identifiant, nom: rec.nom },
+    mon_niveau: niveau,
+  });
+});
+
+/* Recherche dans la base professionnelle (§22) — un recensement précis (id), critères
+   combinables. Ne renvoie que les fiches accessibles au visiteur (§15-17), et pour chacune
+   uniquement les champs qu'elle a choisi de rendre visibles à SON niveau (§18) — jamais un
+   filtrage a posteriori côté client : les données non autorisées ne quittent jamais le serveur. */
+route('GET', '/api/recensements/:id/annuaire', async (req, res, params, body, query) => {
+  const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.modele !== 'carnet_professionnel') return sendJSON(res, 404, { error: 'Recensement introuvable.' });
+  const user = await getCurrentUser(req);
+  const emailVisiteur = String(req.headers['x-visiteur-email'] || '').trim().toLowerCase() || null;
+  const rows = await db.prepare(
+    `SELECT * FROM recensement_declarations WHERE recensement_id=? AND supprime_le IS NULL ORDER BY created_at DESC LIMIT 500`
+  ).all(rec.id);
+  const q = {
+    metier: (query.metier || '').toLowerCase(),
+    domaine: (query.domaine || '').toLowerCase(),
+    entreprise: (query.entreprise || '').toLowerCase(),
+    competence: (query.competence || '').toLowerCase(),
+    ville: (query.ville || '').toLowerCase(),
+    pays: (query.pays || '').toLowerCase(),
+    siret: (query.siret || '').replace(/\s+/g, ''),
+  };
+  const resultats = [];
+  for (const decl of rows) {
+    const reponses = safeJSON(decl.reponses_json, {});
+    if (q.metier && !String(reponses.metier_principal || '').toLowerCase().includes(q.metier)) continue;
+    if (q.domaine && !String(reponses.domaine_principal || '').toLowerCase().includes(q.domaine)) continue;
+    if (q.entreprise && !String(reponses.entreprise_nom || '').toLowerCase().includes(q.entreprise)) continue;
+    if (q.competence && !(Array.isArray(reponses.competences) ? reponses.competences : []).some(c => String(c).toLowerCase().includes(q.competence))) continue;
+    if (q.ville && !String(reponses.entreprise_ville || '').toLowerCase().includes(q.ville)) continue;
+    if (q.pays && !String(reponses.entreprise_pays || '').toLowerCase().includes(q.pays)) continue;
+    if (q.siret && String(reponses.entreprise_siret || '').replace(/\s+/g, '') !== q.siret) continue;
+    const { niveau } = await niveauVisiteurRecensement(rec, decl, req);
+    if (!niveau) continue;
+    const visibilite = safeJSON(decl.visibilite_champs_json, {});
+    const reponsesFiltrees = niveau === 'proprietaire' ? reponses : filtrerReponsesParVisibilite(reponses, visibilite, niveau);
+    // Une fiche n'apparaît dans les résultats de recherche que si elle montre au moins un champ
+    // utile à ce visiteur (nom/métier) — sinon la lister sans rien afficher n'aiderait personne.
+    if (!reponsesFiltrees.nom && !reponsesFiltrees.metier_principal && niveau !== 'proprietaire') continue;
+    resultats.push({ id: decl.id, identifiant: decl.identifiant, reponses: reponsesFiltrees });
+  }
+  sendJSON(res, 200, { resultats });
 });
 
 route('DELETE', '/api/recensement-declarations/:id', async (req, res, params) => {
@@ -39689,8 +40008,43 @@ route('GET', '/api/recensements/:id/stats', async (req, res, params) => {
     total, adultes, mineurs, verifications,
     par_pays_residence: compter(rows.map(r => r.match_pays_residence), 'pays_residence'),
     par_pays_origine: compter(rows.map(r => r.match_pays_origine), 'pays_origine'),
-    par_metier: compter(rows.map(r => safeJSON(r.reponses_json, {}).metier), 'metier'),
+    par_metier: compter(rows.map(r => safeJSON(r.reponses_json, {}).metier || safeJSON(r.reponses_json, {}).metier_principal), 'metier'),
+    // §26 : présents aussi pour un Dénombrement (tableaux vides, sans effet côté affichage) —
+    // pas de branche par `modele` ici, reponses_json n'a simplement pas ces clés dans ce cas.
+    par_domaine: compter(rows.map(r => safeJSON(r.reponses_json, {}).domaine_principal), 'domaine'),
+    par_entreprise: compter(rows.map(r => safeJSON(r.reponses_json, {}).entreprise_nom), 'entreprise'),
   });
+});
+
+/* ── Export CSV (§27) — créateur uniquement (il a de toute façon accès à 100% des réponses,
+   voir GET .../declarations ci-dessus ; aucun autre rôle ne peut exporter dans cette première
+   version — voir le récapitulatif final pour cette limite assumée). "Une donnée privée ne doit
+   jamais apparaître dans un export destiné à un utilisateur qui n'est pas autorisé" (§27) est
+   donc respecté par construction : seul celui qui peut déjà tout voir peut exporter. Colonnes
+   dérivées du catalogue de champs ACTIFS de la campagne (pas de colonnes fixes) pour que
+   Dénombrement et Carnet professionnel produisent chacun un CSV pertinent à leurs propres
+   champs, sans rien de câblé en dur par modèle ici. ── */
+route('GET', '/api/recensements/:id/export', async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: 'Connexion requise.' });
+  const rec = await db.prepare('SELECT * FROM recensements WHERE id=?').get(params.id);
+  if (!rec || rec.owner_user_id !== user.id) return sendJSON(res, 403, { error: 'Accès refusé.' });
+  const champs = safeJSON(rec.champs_config_json, []).filter(c => c.actif);
+  const rows = await db.prepare(
+    "SELECT identifiant, est_mineur, identite_statut, reponses_json, created_at FROM recensement_declarations WHERE recensement_id=? AND supprime_le IS NULL ORDER BY created_at ASC"
+  ).all(params.id);
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const entetes = ['Identifiant', 'Mineur', 'Statut identité', 'Date', ...champs.map(c => c.label)];
+  const lignes = [entetes.map(esc).join(',')];
+  for (const r of rows) {
+    const rep = safeJSON(r.reponses_json, {});
+    const valeurs = [r.identifiant, r.est_mineur ? 'Oui' : 'Non', r.identite_statut, r.created_at,
+      ...champs.map(c => Array.isArray(rep[c.id]) ? rep[c.id].join(' / ') : (rep[c.id] ?? ''))];
+    lignes.push(valeurs.map(esc).join(','));
+  }
+  const csv = '﻿' + lignes.join('\r\n'); // BOM : accents lisibles à l'ouverture Excel
+  res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${rec.identifiant}.csv"` });
+  res.end(csv);
 });
 
 /* ---- Vérification d'identité (Stripe Identity) — même appel que /api/identity/verify,

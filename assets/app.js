@@ -92,6 +92,16 @@ const ROLE_LABEL_FR = { utilisateur: "Utilisateur", initiative: "Initiative", ad
    atterrissent toujours sur leur tableau de bord. */
 function loginLandingUrl(user) {
   if (!user) return "index.html";
+  /* ?redirect=... (2026-09-18, Carnet professionnel §35 : "retour automatique au formulaire
+     après création de compte") — un paramètre générique, réutilisable par n'importe quelle
+     page qui a besoin de ramener l'utilisateur exactement là où il était avant de devoir se
+     connecter/s'inscrire, plutôt qu'un mécanisme propre au seul module Recensement. N'existait
+     nulle part sur ce dépôt avant cette extension (vérifié). Seule une URL du même site est
+     honorée (jamais de redirection ouverte vers un domaine externe). */
+  try {
+    const redirect = new URLSearchParams(location.search).get("redirect");
+    if (redirect && /^\/[^/\\]|^[a-z0-9_-]+\.html/i.test(redirect) && !/^\/\//.test(redirect)) return redirect;
+  } catch (e) {}
   if (user.role === "utilisateur" || user.role === "initiative") return "profil.html";
   if (user.role === "collectivite") return "profil-collectivite.html?id=" + user.id;
   return ROLE_DASHBOARD[user.role] || "index.html";
