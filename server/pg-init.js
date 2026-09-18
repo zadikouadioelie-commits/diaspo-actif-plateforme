@@ -44,7 +44,19 @@ async function createMissingTables(pool) {
     // CREATE, sinon un commentaire juste avant CREATE TABLE fait échouer le filtre (table jamais créée
     // sur Postgres). Bug réel observé sur abonnements_collectivite (commentaire /* */ non filtré).
     const stripLeadingComments = s => s.replace(/^(\s*(--[^\n]*\n|\/\*[\s\S]*?\*\/))+/g, '').trim();
-    const createOnly = statements.filter(s => /^CREATE (TABLE|INDEX|UNIQUE INDEX)/i.test(stripLeadingComments(s)));
+    /* Exclut aussi les CREATE TABLE ciblant un nom en "_new" (2026-09-18, bug trouvé par
+       exécution réelle : "relation offres_new/cagnotte_contributions_new/initiative_membres_new/
+       adhesion_membres_new already exists" sur "🔧 Réparer la base" en production) — ce suffixe
+       n'est utilisé dans tout ce fichier QUE comme table de travail éphémère d'un rebuild SQLite
+       (CHECK trop restrictif, colonne à rendre nullable...), toujours recréée puis renommée dans
+       la MÊME transaction JS, jamais dans le flux réel exécuté sur Postgres (ce flux ne se
+       déclenche que via une lecture de sqlite_master, absente sur Postgres). Les rejouer ici,
+       hors contexte, créait au mieux une table permanente et inutile, au pire une erreur
+       "already exists" dès le second clic — voir aussi le commentaire devant
+       migrateOffresSuspendueEtContact() dans server/db.js. */
+    const createOnly = statements
+      .filter(s => /^CREATE (TABLE|INDEX|UNIQUE INDEX)/i.test(stripLeadingComments(s)))
+      .filter(s => !/^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[a-zA-Z0-9_]*_new\b/i.test(stripLeadingComments(s)));
     if (!createOnly.length) continue;
     for (const stmt of createOnly) {
       try {

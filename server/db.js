@@ -8028,13 +8028,25 @@ db.exec(`
 })();
 
 /* Migration : offres — colonne recruteur_contact + statut 'suspendue' (rebuild pour lever l'ancien CHECK).
-   Les 4 CREATE TABLE *_new de ce fichier (ici et les 3 migrations de rebuild suivantes) portent
-   IF NOT EXISTS depuis le 2026-09-18 (même cause que le correctif adhesion_relances plus haut,
-   bug trouvé par exécution réelle sur "🔧 Réparer la base" en production : "relation ... already
-   exists") — createMissingTables() (server/pg-init.js) scrute tout ce fichier par regex et
-   rejoue CHAQUE `db.exec` CREATE TABLE trouvé contre Postgres, sans savoir qu'il ne devrait
-   s'exécuter que dans le flux SQLite ci-dessous, après un DROP TABLE IF EXISTS juste avant. Sans
-   effet sur le rebuild réel : à cet endroit la table *_new vient d'être vidée par ce DROP. */
+   Les 4 CREATE TABLE *_new de ce fichier (ici et les 3 migrations de rebuild suivantes) ne
+   portent délibérément PAS IF NOT EXISTS (2026-09-18, bug trouvé par exécution réelle sur
+   "🔧 Réparer la base" en production, en deux temps) :
+   - 1er correctif tenté : ajouter IF NOT EXISTS, comme pour adhesion_relances plus haut — a
+     bien supprimé l'erreur "relation ... already exists" (createMissingTables(), server/
+     pg-init.js, qui scrute tout ce fichier par regex et rejoue CHAQUE `db.exec` CREATE TABLE
+     trouvé contre Postgres sans savoir qu'il ne devrait s'exécuter que dans le flux SQLite
+     ci-dessous, après un DROP TABLE IF EXISTS juste avant).
+   - Mais a introduit un second problème : colonnesDeclareesParTable() (même fichier) exige
+     justement la présence de "IF NOT EXISTS" dans son regex pour reconnaître une table comme
+     déclarée — ces 4 tables *_new, jamais censées exister de façon permanente, se sont donc
+     mises à apparaître comme "déclarées mais absentes" dans le rapport, alors qu'elles
+     n'avaient simplement jamais eu besoin d'exister sur Postgres.
+   Revert : sans IF NOT EXISTS, ni createMissingTables() ni colonnesDeclareesParTable() ne les
+   reconnaissent plus comme de vraies tables à créer/attendre — cohérent avec leur rôle réel de
+   table de travail éphémère, jamais recréée telle quelle sur Postgres (le flux SQLite qui les
+   utilise n'y est jamais atteint). Seul adhesion_relances (nom final réel, pas suffixé _new)
+   garde IF NOT EXISTS : lui doit rester reconnu comme table déclarée, ce qu'il était déjà via
+   sa définition correctement gardée plus bas dans ce fichier. */
 ;(function migrateOffresSuspendueEtContact() {
   const cols = db.prepare("PRAGMA table_info(offres)").all().map(c => c.name);
   if (!cols.includes("recruteur_contact")) db.exec("ALTER TABLE offres ADD COLUMN recruteur_contact TEXT");
@@ -8043,7 +8055,7 @@ db.exec(`
     db.exec(`PRAGMA foreign_keys=OFF;`);
     db.exec(`DROP TABLE IF EXISTS offres_new;`);
     db.exec(`
-      CREATE TABLE IF NOT EXISTS offres_new (
+      CREATE TABLE offres_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         createur_id INTEGER NOT NULL,
         titre TEXT NOT NULL,
@@ -8090,7 +8102,7 @@ db.exec(`
   db.exec(`PRAGMA foreign_keys=OFF;`);
   db.exec(`DROP TABLE IF EXISTS cagnotte_contributions_new;`);
   db.exec(`
-    CREATE TABLE IF NOT EXISTS cagnotte_contributions_new (
+    CREATE TABLE cagnotte_contributions_new (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cagnotte_id INTEGER NOT NULL,
       user_id INTEGER,
@@ -8126,7 +8138,7 @@ db.exec(`
   db.exec(`PRAGMA foreign_keys=OFF;`);
   db.exec(`DROP TABLE IF EXISTS initiative_membres_new;`);
   db.exec(`
-    CREATE TABLE IF NOT EXISTS initiative_membres_new (
+    CREATE TABLE initiative_membres_new (
       id                    INTEGER PRIMARY KEY AUTOINCREMENT,
       initiative_id         INTEGER NOT NULL,
       user_id               INTEGER NOT NULL,
@@ -8163,7 +8175,7 @@ db.exec(`
   db.exec(`PRAGMA foreign_keys=OFF;`);
   db.exec(`DROP TABLE IF EXISTS adhesion_membres_new;`);
   db.exec(`
-    CREATE TABLE IF NOT EXISTS adhesion_membres_new (
+    CREATE TABLE adhesion_membres_new (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       formule_id          INTEGER NOT NULL,
       initiative_id       INTEGER NOT NULL,
