@@ -21,6 +21,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap">
   <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/videos-tutoriels-public.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1565C0">
 <style>
@@ -1116,44 +1117,47 @@
   <!-- ===== BANDEAU VIDÉOS TUTORIELS ===== -->
   <section class="dvt-banner" id="dvt-banner" style="display:none;">
     <style>
-      .dvt-banner{background:linear-gradient(135deg,var(--navy,#0D2B4E) 0%,#123a63 100%);color:#fff;padding:32px 24px;}
-      .dvt-inner{max-width:1200px;margin:0 auto;}
-      .dvt-top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:22px;}
-      .dvt-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:5px 14px;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:12px;}
-      .dvt-title{font-size:26px;font-weight:800;line-height:1.25;margin:0;max-width:520px;}
-      .dvt-title em{font-style:normal;color:#F59E0B;}
-      .dvt-right{display:flex;align-items:center;gap:20px;flex:1;min-width:240px;justify-content:flex-end;}
-      .dvt-desc{font-size:14px;line-height:1.55;color:rgba(255,255,255,.85);max-width:340px;margin:0;}
-      .dvt-cursive{font-family:'Caveat',cursive;font-size:23px;line-height:1.2;color:#F59E0B;transform:rotate(-3deg);flex-shrink:0;}
-      .dvt-grid{display:flex;align-items:center;gap:22px;overflow-x:auto;padding-bottom:6px;}
-      .dvt-grid .dvt-card{width:105px;flex:0 0 105px;}
-      .dvt-grid .dvt-thumb{aspect-ratio:1/1;}
+      .dvt-banner{background:linear-gradient(135deg,var(--navy,#0D2B4E) 0%,#123a63 100%);color:#fff;padding:22px 24px;}
+      .dvt-inner{max-width:1280px;margin:0 auto;}
+      .dvt-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px;}
+      .dvt-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff;}
+      .dvt-title, .dvt-right, .dvt-desc, .dvt-cursive { display: none; }
+      .dvt-seeall{font-size:13px;font-weight:700;color:#F5B94D;text-decoration:none;white-space:nowrap;}
+      .dvt-seeall:hover{text-decoration:underline;}
+      .dvt-row{display:flex;align-items:center;gap:10px;}
+      .dvt-arrow{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+      .dvt-arrow:hover{background:rgba(255,255,255,.2);}
+      .dvt-grid{display:flex;align-items:stretch;gap:18px;overflow-x:auto;scroll-behavior:smooth;padding-bottom:4px;flex:1;scrollbar-width:none;}
+      .dvt-grid::-webkit-scrollbar{display:none;}
+      .dvt-grid .dvt-card{width:250px;flex:0 0 250px;position:relative;}
+      .dvt-grid .dvt-thumb{aspect-ratio:16/10;}
+      .dvt-grid .dvt-badge-categorie{position:absolute;top:10px;left:10px;margin:0;background:#F59E0B;color:#1A2332;z-index:2;}
+      .dvt-grid .dvt-body{padding:10px 12px 14px;}
+      /* dvtCardHtml() (assets/videos-tutoriels-public.js) met "color:inherit" en inline sur
+         .dvt-card : sur fond sombre (bandeau accueil), ça hérite du blanc ambiant au lieu du
+         texte foncé prévu par videos-tutoriels-public.css — on le refixe ici explicitement. */
+      .dvt-grid .dvt-card-titre{font-size:13.5px;color:#102A43;}
+      .dvt-grid .dvt-card-plus{display:none;}
       .dvt-more-wrap{display:none;}
       .dvt-more-btn{display:inline-flex;align-items:center;gap:8px;background:#F59E0B;color:#1A2332;font-weight:800;font-size:13.5px;padding:11px 22px;border-radius:99px;text-decoration:none;white-space:nowrap;flex:0 0 auto;}
       .dvt-more-btn:hover{filter:brightness(1.06);}
-      @media(max-width:820px){ .dvt-cursive{display:none;} .dvt-right{justify-content:flex-start;} }
+      @media(max-width:820px){ .dvt-arrow{display:none;} }
       @media(max-width:600px){
-        .dvt-banner{padding:20px 16px;}
-        .dvt-title{font-size:19px;}
-        .dvt-desc{display:none;}
-        .dvt-grid .dvt-card{width:75px;flex:0 0 75px;}
-        .dvt-card-titre{font-size:12.5px;}
-        .dvt-card-desc{display:none;}
-        .dvt-more-btn{font-size:12.5px;padding:9px 18px;}
+        .dvt-banner{padding:16px;}
+        .dvt-grid .dvt-card{width:180px;flex:0 0 180px;}
+        .dvt-grid .dvt-card-titre{font-size:12.5px;}
       }
     </style>
     <div class="dvt-inner">
       <div class="dvt-top" id="dvt-top-accueil">
-        <div>
-          <div class="dvt-badge">▶ Tutoriels vidéo</div>
-          <h2 class="dvt-title">Découvrez Diaspo'Actif <em>en quelques minutes !</em></h2>
-        </div>
-        <div class="dvt-right">
-          <p class="dvt-desc">Nos courtes vidéos vous guident pas à pas pour profiter pleinement de la plateforme : créer votre profil, publier vos initiatives, trouver des opportunités et bien plus encore.</p>
-          <div class="dvt-cursive">Apprendre c'est avancer<br>ensemble !</div>
-        </div>
+        <div class="dvt-badge">▶ Tutoriels vidéo</div>
+        <a class="dvt-seeall" href="videos-tutoriels.html">Voir toutes les vidéos →</a>
       </div>
-      <div class="dvt-grid" id="dvt-grid-accueil"></div>
+      <div class="dvt-row">
+        <button type="button" class="dvt-arrow" aria-label="Précédent" onclick="document.getElementById('dvt-grid-accueil').scrollBy({left:-270,behavior:'smooth'})">‹</button>
+        <div class="dvt-grid" id="dvt-grid-accueil"></div>
+        <button type="button" class="dvt-arrow" aria-label="Suivant" onclick="document.getElementById('dvt-grid-accueil').scrollBy({left:270,behavior:'smooth'})">›</button>
+      </div>
       <div class="dvt-more-wrap" id="dvt-more-accueil">
         <a class="dvt-more-btn" href="videos-tutoriels.html">+ Voir toutes les autres vidéos →</a>
       </div>
