@@ -2935,7 +2935,13 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
    couvre que les modules dont la visibilité VARIE selon le type. */
 const EXPANSION_MODULES_PAR_TYPE = {
   Association: ["emplois_stages", "candidatures", "stats_impact", "visioconference", "evaluation_projet", "accreditations_da"],
-  Entreprise: ["zones_action", "stats_impact", "visioconference", "evaluation_projet", "centre_financier", "accreditations_da"],
+  /* cotisations_adhesions/votes_securises ajoutés le 2026-09-19 (demande explicite) : ces deux
+     modules restaient toujours cachés pour Entreprise (aucune colonne ni socle ni Premium ni
+     Expansion, cf. dashboard-initiative.html:initPremiumGates) — pas de restriction serveur
+     empêchant leur usage (exigerPremium ne vérifie que l'abonnement, jamais le type), il
+     manquait juste un chemin d'accès. Rangés ici pour rester cohérent avec l'objectif du
+     module Expansion : ne pas surcharger le menu par défaut. */
+  Entreprise: ["zones_action", "stats_impact", "visioconference", "evaluation_projet", "centre_financier", "accreditations_da", "cotisations_adhesions", "votes_securises"],
   ONG: ["candidatures", "visioconference", "evaluation_projet", "accreditations_da"],
 };
 
