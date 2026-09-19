@@ -66,8 +66,12 @@ function dvtCardHtml(v, { compact } = {}) {
 }
 
 /* Charge les vidéos actives dans #<gridId>. Si sectionIdSiVide est fourni, la section
-   parente entière reste masquée tant qu'aucune vidéo n'est encore publiée. */
-async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri } = {}) {
+   parente entière reste masquée tant qu'aucune vidéo n'est encore publiée — SAUF si
+   posterSiVide est fourni (bandeau accueil, 2026-09-19, demande explicite : aucune vidéo
+   prête pour l'instant, afficher l'affiche officielle "Bientôt disponible" à la place plutôt
+   que de masquer toute la rubrique) : la section reste visible, l'en-tête/le bouton "voir
+   plus" (masquerIdsSiVide) disparaissent, et l'affiche seule occupe la grille. */
+async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide } = {}) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
   try {
@@ -79,7 +83,12 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
     const { videos } = await fetch('/api/videos-tutoriels?' + qs.toString()).then(r => r.json());
     const section = sectionIdSiVide ? document.getElementById(sectionIdSiVide) : null;
     if (!videos || !videos.length) {
-      if (section) section.style.display = 'none';
+      if (posterSiVide) {
+        (masquerIdsSiVide || []).forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        grid.style.cssText = 'display:flex;justify-content:center;';
+        grid.innerHTML = `<img src="/assets/videos-bientot-disponible.jpg" alt="Bientôt disponible" style="max-width:280px;width:100%;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);">`;
+        if (section) section.style.display = '';
+      } else if (section) section.style.display = 'none';
       else grid.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune vidéo pour le moment.</p>';
       return;
     }

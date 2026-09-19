@@ -1050,7 +1050,7 @@
       }
     </style>
     <div class="dvt-inner">
-      <div class="dvt-top">
+      <div class="dvt-top" id="dvt-top-accueil">
         <div>
           <div class="dvt-badge">▶ Tutoriels vidéo</div>
           <h2 class="dvt-title">Découvrez Diaspo'Actif <em>en quelques minutes !</em></h2>
@@ -1061,7 +1061,7 @@
         </div>
       </div>
       <div class="dvt-grid" id="dvt-grid-accueil"></div>
-      <div class="dvt-more-wrap">
+      <div class="dvt-more-wrap" id="dvt-more-accueil">
         <a class="dvt-more-btn" href="videos-tutoriels.html">+ Voir toutes les autres vidéos →</a>
       </div>
     </div>
@@ -2465,7 +2465,7 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
   <script src="/assets/videos-tutoriels-public.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      dvtCharger('dvt-grid-accueil', { limit: 5, sectionIdSiVide: 'dvt-banner', compact: true });
+      dvtCharger('dvt-grid-accueil', { limit: 5, sectionIdSiVide: 'dvt-banner', compact: true, posterSiVide: true, masquerIdsSiVide: ['dvt-top-accueil', 'dvt-more-accueil'] });
     });
   </script>
 </body>
