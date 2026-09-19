@@ -18756,6 +18756,21 @@ async function vtChargerCommentaires(videoId, { inclureMasques = false } = {}) {
 
 /* GET /api/videos-tutoriels — publique, vidéos publiées triées par ordre.
    ?limit=N (bandeau accueil), ?categorie=X, ?q=recherche, ?tri=date|popularite|ordre (défaut). */
+/* Compte commentaires/réactions pour un lot de vidéos, en 2 requêtes GROUPÉES (IN (...))
+   plutôt que 2×N requêtes par vidéo — même convention que les enrichissements de
+   GET /api/initiatives (accredsParOwner, certifParInit, etc.). */
+async function vtAttacherStatsInteraction(rows) {
+  const ids = rows.map(r => Number(r.id));
+  if (!ids.length) return rows;
+  const ph = ids.map(() => '?').join(',');
+  const commParVideo = {}, reacParVideo = {};
+  (await db.prepare(`SELECT video_id, COUNT(*) n FROM da_videos_tutoriels_commentaires WHERE statut='visible' AND video_id IN (${ph}) GROUP BY video_id`).all(...ids))
+    .forEach(r => { commParVideo[Number(r.video_id)] = r.n; });
+  (await db.prepare(`SELECT video_id, COUNT(*) n FROM da_videos_tutoriels_reactions WHERE video_id IN (${ph}) GROUP BY video_id`).all(...ids))
+    .forEach(r => { reacParVideo[Number(r.video_id)] = r.n; });
+  return rows.map(r => ({ ...r, nb_commentaires: commParVideo[Number(r.id)] || 0, nb_reactions: reacParVideo[Number(r.id)] || 0 }));
+}
+
 route("GET", "/api/videos-tutoriels", async (req, res, params, body, query) => {
   let sql = "SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at FROM da_videos_tutoriels WHERE statut='publie'";
   const args = [];
@@ -18764,9 +18779,11 @@ route("GET", "/api/videos-tutoriels", async (req, res, params, body, query) => {
   sql += query.tri === 'popularite' ? " ORDER BY vues DESC, id DESC"
        : query.tri === 'date' ? " ORDER BY created_at DESC"
        : " ORDER BY ordre ASC, id ASC";
-  const rows = await db.prepare(sql).all(...args);
+  let rows = await db.prepare(sql).all(...args);
   const limit = parseInt(query?.limit, 10);
-  sendJSON(res, 200, { videos: (limit > 0) ? rows.slice(0, limit) : rows, categories: VT_CATEGORIES });
+  if (limit > 0) rows = rows.slice(0, limit);
+  rows = await vtAttacherStatsInteraction(rows);
+  sendJSON(res, 200, { videos: rows, categories: VT_CATEGORIES });
 });
 
 route("GET", "/api/videos-tutoriels/:id", async (req, res, params) => {

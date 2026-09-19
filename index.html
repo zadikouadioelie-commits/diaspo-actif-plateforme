@@ -1033,17 +1033,18 @@
       .dvt-right{display:flex;align-items:center;gap:20px;flex:1;min-width:240px;justify-content:flex-end;}
       .dvt-desc{font-size:14px;line-height:1.55;color:rgba(255,255,255,.85);max-width:340px;margin:0;}
       .dvt-cursive{font-family:'Caveat',cursive;font-size:23px;line-height:1.2;color:#F59E0B;transform:rotate(-3deg);flex-shrink:0;}
-      .dvt-grid{display:flex;gap:16px;overflow-x:auto;padding-bottom:6px;}
-      .dvt-grid .dvt-card{width:210px;flex:0 0 210px;}
-      .dvt-more-wrap{text-align:center;margin-top:22px;}
-      .dvt-more-btn{display:inline-flex;align-items:center;gap:8px;background:#F59E0B;color:#1A2332;font-weight:800;font-size:13.5px;padding:11px 22px;border-radius:99px;text-decoration:none;}
+      .dvt-grid{display:flex;align-items:center;gap:22px;overflow-x:auto;padding-bottom:6px;}
+      .dvt-grid .dvt-card{width:105px;flex:0 0 105px;}
+      .dvt-grid .dvt-thumb{aspect-ratio:1/1;}
+      .dvt-more-wrap{display:none;}
+      .dvt-more-btn{display:inline-flex;align-items:center;gap:8px;background:#F59E0B;color:#1A2332;font-weight:800;font-size:13.5px;padding:11px 22px;border-radius:99px;text-decoration:none;white-space:nowrap;flex:0 0 auto;}
       .dvt-more-btn:hover{filter:brightness(1.06);}
       @media(max-width:820px){ .dvt-cursive{display:none;} .dvt-right{justify-content:flex-start;} }
       @media(max-width:600px){
         .dvt-banner{padding:20px 16px;}
         .dvt-title{font-size:19px;}
         .dvt-desc{display:none;}
-        .dvt-grid .dvt-card{width:150px;flex:0 0 150px;}
+        .dvt-grid .dvt-card{width:75px;flex:0 0 75px;}
         .dvt-card-titre{font-size:12.5px;}
         .dvt-card-desc{display:none;}
         .dvt-more-btn{font-size:12.5px;padding:9px 18px;}
@@ -2465,7 +2466,11 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
   <script src="/assets/videos-tutoriels-public.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      dvtCharger('dvt-grid-accueil', { limit: 5, sectionIdSiVide: 'dvt-banner', compact: true, posterSiVide: true, masquerIdsSiVide: ['dvt-top-accueil', 'dvt-more-accueil'] });
+      dvtCharger('dvt-grid-accueil', {
+        limit: 5, sectionIdSiVide: 'dvt-banner', compact: true, posterSiVide: true,
+        masquerIdsSiVide: ['dvt-top-accueil', 'dvt-more-accueil'],
+        plusBoutonInline: { href: 'videos-tutoriels.html', label: '+ Voir toutes les autres vidéos →' },
+      });
     });
   </script>
 </body>

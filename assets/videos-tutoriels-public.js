@@ -59,7 +59,11 @@ function dvtCardHtml(v, { compact } = {}) {
         ${v.categorie ? `<div class="dvt-badge-categorie">${dvtEsc(v.categorie)}</div>` : ''}
         <div class="dvt-card-titre">${dvtEsc(v.titre)}</div>
         ${!compact ? `<div class="dvt-card-desc">${dvtEsc(v.description || '')}</div>
-        <div class="dvt-card-meta">${bientot ? 'Bientôt disponible' : `${v.vues || 0} vues · ${dvtFormatDate(v.created_at)}`}</div>` : ''}
+        <div class="dvt-card-meta">${bientot ? 'Bientôt disponible' : `${v.vues || 0} vues · ${dvtFormatDate(v.created_at)}`}</div>
+        <div class="dvt-card-stats">
+          <span>${v.nb_commentaires || 0} commentaire${(v.nb_commentaires || 0) > 1 ? 's' : ''}</span>
+          <span>${v.nb_reactions || 0} réaction${(v.nb_reactions || 0) > 1 ? 's' : ''}</span>
+        </div>` : ''}
         <div class="dvt-card-plus">En savoir plus →</div>
       </div>
     </a>`;
@@ -71,7 +75,7 @@ function dvtCardHtml(v, { compact } = {}) {
    prête pour l'instant, afficher l'affiche officielle "Bientôt disponible" à la place plutôt
    que de masquer toute la rubrique) : la section reste visible, l'en-tête/le bouton "voir
    plus" (masquerIdsSiVide) disparaissent, et l'affiche seule occupe la grille. */
-async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide } = {}) {
+async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide, plusBoutonInline } = {}) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
   try {
@@ -92,7 +96,8 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
       else grid.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune vidéo pour le moment.</p>';
       return;
     }
-    grid.innerHTML = videos.map(v => dvtCardHtml(v, { compact })).join('');
+    grid.innerHTML = videos.map(v => dvtCardHtml(v, { compact })).join('')
+      + (plusBoutonInline ? `<a class="dvt-more-btn" href="${plusBoutonInline.href}">${plusBoutonInline.label}</a>` : '');
     if (section) section.style.display = '';
   } catch (e) { console.error('[videos-tutoriels]', e); }
 }
