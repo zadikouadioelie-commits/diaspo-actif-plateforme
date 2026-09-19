@@ -1101,6 +1101,107 @@ function injectComptesLiesSwitcherStyles() {
 @media(max-width:768px){.cl-switch-wrap{display:none!important;}}`;
   document.head.appendChild(st);
 }
+
+/* ── Menu compact "plus d'options" (2026-09-19, demande explicite, capture à l'appui) ──────
+   Sous 768px, .nav/.logo/.lang-select disparaissent déjà (styles.v2.css) au profit du tiroir
+   latéral — ce n'est PAS le problème signalé. La capture montrait un bandeau encore complet
+   (nav + langue visibles) mais trop étroit pour caser en plus tous les boutons du compte :
+   une zone INTERMÉDIAIRE, au-dessus de 768px, jamais traitée jusqu'ici. Seuil choisi assez
+   large (1180px) pour couvrir ce cas réel plutôt qu'un simple mobile-first classique.
+   Deux techniques selon le bouton :
+   - Fil d'actualité / Accueil / Projets diasporas (nav), langue, Passer Premium, Déconnexion :
+     DÉPLACÉS tels quels (même noeud DOM, mêmes écouteurs) — ils portent déjà un texte lisible.
+   - Tableau de bord / Paramètres / Notifications (icônes seules, sans texte) : un lien NEUF
+     est ajouté avec libellé, qui déclenche la même action (même href, ou clic proxy sur le
+     vrai bouton pour Notifications) — les repositionner tels quels donnerait des icônes nues
+     sans étiquette dans un menu, illisible. Les icônes d'origine sont masquées en CSS au même
+     seuil pour ne pas les dupliquer visuellement. */
+function injectCompactMenuStyles() {
+  if (document.getElementById("compact-menu-style")) return;
+  const st = document.createElement("style");
+  st.id = "compact-menu-style";
+  st.textContent = `
+.compact-menu-toggle{display:none;}
+.compact-menu-dd{display:none;position:fixed;background:#0F2A50;border:1px solid rgba(255,255,255,.14);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.28);min-width:220px;max-width:calc(100vw - 16px);padding:8px;z-index:2000;flex-direction:column;gap:3px;}
+.compact-menu-dd.open{display:flex;}
+.compact-menu-dd a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;color:#fff!important;text-decoration:none;font-size:13.5px;font-weight:600;white-space:nowrap;}
+.compact-menu-dd a:hover{background:rgba(255,255,255,.1);}
+/* Éléments déplacés tels quels (icônes rondes .topbar-icon-btn, sélecteur de langue, pastille
+   Premium, bouton Déconnexion) : gardent leur propre habillage, juste alignés en colonne. */
+.compact-menu-dd > *{flex:none;}
+@media(max-width:1180px){
+  .compact-menu-toggle{display:flex!important;}
+  #topbar-dashboard-btn,#topbar-parametres-btn,.notif-bell-wrap{display:none!important;}
+}`;
+  document.head.appendChild(st);
+}
+
+/* Positionnement identique à ouvrirClDd() (compte-lié) : position:fixed calculée en JS pour
+   échapper au overflow-x:auto de .topbar-right (sinon le menu est rogné, bug déjà rencontré),
+   et bascule vers le haut si la place manque en dessous du bouton. */
+function toggleCompactMenu(triggerBtn) {
+  const dd = document.getElementById('compact-menu-dd');
+  if (!dd) return;
+  const open = dd.classList.contains('open');
+  document.querySelectorAll('.compact-menu-dd.open, .cl-switch-dd.open').forEach(x => x.classList.remove('open'));
+  if (open) return;
+  const r = triggerBtn.getBoundingClientRect();
+  dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
+  dd.classList.add('open');
+  const ddHeight = dd.offsetHeight;
+  if (window.innerHeight - r.bottom < ddHeight + 8 && r.top > ddHeight + 8) {
+    dd.style.bottom = Math.round(window.innerHeight - r.top + 8) + 'px';
+    dd.style.top = 'auto';
+  } else {
+    dd.style.top = Math.round(r.bottom + 8) + 'px';
+    dd.style.bottom = 'auto';
+  }
+  const fermer = (e) => {
+    if (dd.contains(e.target) || triggerBtn.contains(e.target)) return;
+    dd.classList.remove('open');
+    document.removeEventListener('click', fermer, true);
+    window.removeEventListener('scroll', fermer, true);
+  };
+  setTimeout(() => { document.addEventListener('click', fermer, true); window.addEventListener('scroll', fermer, true); }, 0);
+}
+
+function initCompactMenu() {
+  const dd = document.getElementById('compact-menu-dd');
+  if (!dd) return;
+  injectCompactMenuStyles();
+  // Ancrage stable dans le menu : les éléments déplacés sont insérés juste avant, dans cet
+  // ordre — les 4 liens neufs (Tableau de bord/Paramètres/Notifications/Site Diaspo'Actif),
+  // déjà dans le HTML, restent en dernier.
+  const ancre = dd.firstElementChild;
+  const cibles = [
+    document.querySelector('.topbar .nav a[href="fil-actualite.html"]'),
+    document.querySelector('.topbar .nav a[href="index.html"]'),
+    document.querySelector('.topbar .nav a[href="actualites.html"]'),
+    document.getElementById('lang-select'),
+    document.getElementById('premium-topbar-btn'),
+    document.getElementById('logout-link'),
+  ].filter(Boolean);
+  if (!cibles.length) return; // page sans le bandeau standard (nav absente) — rien à déplacer
+  const emplacements = cibles.map(el => ({ el, parent: el.parentNode, suivant: el.nextSibling }));
+  const mq = window.matchMedia('(max-width:1180px)');
+  function appliquer(etroit) {
+    if (etroit) {
+      emplacements.forEach(({ el }) => dd.insertBefore(el, ancre));
+    } else {
+      [...emplacements].reverse().forEach(({ el, parent, suivant }) => {
+        if (suivant && suivant.parentNode === parent) parent.insertBefore(el, suivant);
+        else parent.appendChild(el);
+      });
+      // Repasser en grand écran pendant que le menu est ouvert (redimensionnement de fenêtre)
+      // laissait le panneau flottant à l'écran alors que son bouton déclencheur venait de
+      // disparaître — plus aucun moyen de le refermer autrement qu'en rechargeant la page.
+      dd.classList.remove('open');
+    }
+  }
+  appliquer(mq.matches);
+  mq.addEventListener('change', e => appliquer(e.matches));
+}
+
 async function initComptesLiesSwitcher(user) {
   let comptes;
   try {
@@ -1333,7 +1434,20 @@ async function applyAuthState() {
       <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>
       <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
         <span style="font-size:14px;">💎</span> Mon Associé
-      </a>`;
+      </a>
+      <!-- Menu compact "plus d'options" (2026-09-19, demande explicite, capture à l'appui) —
+           voir initCompactMenu() ci-dessous pour le détail de ce qui y est déplacé/dupliqué et pourquoi. -->
+      <span class="compact-menu-wrap" id="compact-menu-wrap" style="position:relative;">
+        <button type="button" class="compact-menu-toggle topbar-icon-btn" id="compact-menu-toggle" title="Plus d'options" onclick="toggleCompactMenu(this)">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+        </button>
+        <div class="compact-menu-dd" id="compact-menu-dd">
+          <a href="${ROLE_DASHBOARD[user.role] || '#'}">📊 Tableau de bord</a>
+          <a href="parametres-compte.html">⚙️ Paramètres</a>
+          <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;">🔔 Notifications</a>
+          <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+        </div>
+      </span>`;
     const logout = document.getElementById("logout-link");
     if (logout) logout.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -1341,6 +1455,7 @@ async function applyAuthState() {
       window.location.href = "index.html";
     });
     initComptesLiesSwitcher(user);
+    initCompactMenu();
     // Bouton "Passer à Premium" : visible seulement si pas déjà abonné — retiré pour le
     // rôle utilisateur (2026-07-26, voir module "Bientôt disponible"), gardé pour initiative
     if (user.role === 'initiative') {
