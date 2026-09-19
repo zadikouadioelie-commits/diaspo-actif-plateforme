@@ -201,6 +201,25 @@ a.btn-deconnexion,
   color: #0D2B4E !important;
 }
 
+/* Entre 1024px et 1535px, le rail public (Accueil…Événements…Site internet) partage le
+   topbar avec le bouton doré "Menu des modules" (icône seule sur cette tranche, voir
+   responsive.v2.css) : même allégé, il reste trop étroit pour les 7 liens à taille normale,
+   et le dernier ("Événements") se faisait couper par le clip du défilement horizontal
+   interne (overflow-x:auto, styles.v2.css) — capture utilisateur, 2026-09-19. Rail
+   légèrement plus compact sur cette tranche seulement, jamais de lien supprimé ni de
+   passage à la ligne (contrainte déjà actée plus haut). */
+@media (min-width: 1024px) and (max-width: 1535px) {
+  .nav a {
+    font-size: 12px !important;
+    padding: 8px 7px !important;
+  }
+  /* Coussin encore trop juste au ras de 1024px (434px de rail pour 648px de contenu même
+     compact) : le rail seul ne peut pas descendre plus bas sans devenir illisible, donc on
+     va chercher le reste de la marge dans l'entrefer entre logo/rail/bloc compte — 28px de
+     chaque côté du rail (.topbar-inner{gap}) est un luxe que cette tranche n'a plus. */
+  .topbar-inner { gap: 12px !important; }
+}
+
 /* ── Boutons ── */
 .btn {
   border-radius: 10px !important;

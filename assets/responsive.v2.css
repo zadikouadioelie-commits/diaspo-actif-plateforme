@@ -484,6 +484,23 @@ img[loading="lazy"].loaded { background: none; animation: none; }
   .sidebar-toggle.sidebar-toggle--has-mobile-nav-alt { display: none; }
 }
 
+/* Entre 1024px et 1535px, le bouton doré "Menu des modules" (168px avec son texte,
+   styles.v2.css) prend une bonne partie du topbar face au rail de nav public, dont le
+   dernier lien ("Événements") se retrouve alors coupé — voir la même explication détaillée
+   dans design-upgrade.v2.css. Bouton en icône seule sur cette tranche uniquement : toujours
+   fonctionnel (même clic, même destination), juste plus compact. Texte réaffiché dès
+   1536px, où .topbar-inner passe à 2000px (responsive.v2.css ci-dessous) et la place ne
+   manque plus. */
+@media (min-width: 1024px) and (max-width: 1535px) {
+  .sidebar-toggle::after { display: none; }
+  .sidebar-toggle { padding: 0 10px; gap: 0; }
+}
+/* NOTE (2026-09-19) : le même écrasement existe aussi entre 769px et 1023px (mesuré à
+   375px de large pour 634px de contenu même avec un rail compact) — pas corrigé ici, cette
+   tranche demanderait un traitement différent (le bouton "Menu des modules" est déjà masqué,
+   il ne reste que le logo + langue/compte à réduire, ou repasser sur une nav en tiroir comme
+   en dessous de 768px) : hors du correctif ciblé ci-dessus, à traiter à part si besoin. */
+
 /* Dropdown Notifications (assets/app.js, #notif-dropdown) : ancré en position:absolute avec
    right:0 par rapport au bouton cloche et une largeur fixe de 340px — sur mobile, ce bouton
    est proche du bord gauche du topbar (peu d'espace après lui), donc le dropdown déborde très
