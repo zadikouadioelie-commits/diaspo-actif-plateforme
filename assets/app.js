@@ -1122,16 +1122,30 @@ function injectCompactMenuStyles() {
   st.id = "compact-menu-style";
   st.textContent = `
 .compact-menu-toggle{display:none;}
-.compact-menu-dd{display:none;position:fixed;background:#0F2A50;border:1px solid rgba(255,255,255,.14);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.28);min-width:220px;max-width:calc(100vw - 16px);padding:8px;z-index:2000;flex-direction:column;gap:3px;}
+/* Bordure/ombre volontairement marquées (pas la discrète rgba(255,255,255,.14) d'origine) :
+   sur une page dont le hero est déjà bleu marine (ex. annuaire.html : même famille de bleu
+   que ce menu), un liseré trop discret rend le panneau quasiment invisible à l'ouverture —
+   signalé "le bouton ne fonctionne pas" alors qu'il s'ouvrait bien, juste indétectable à
+   l'œil. Doit rester lisible quel que soit le fond de la page en dessous. */
+.compact-menu-dd{display:none;position:fixed;background:#0F2A50;border:2px solid rgba(255,255,255,.4);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.45);min-width:220px;max-width:calc(100vw - 16px);padding:8px;z-index:2000;flex-direction:column;gap:3px;}
 .compact-menu-dd.open{display:flex;}
 .compact-menu-dd a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;color:#fff!important;text-decoration:none;font-size:13.5px;font-weight:600;white-space:nowrap;}
 .compact-menu-dd a:hover{background:rgba(255,255,255,.1);}
 /* Éléments déplacés tels quels (icônes rondes .topbar-icon-btn, sélecteur de langue, pastille
    Premium, bouton Déconnexion) : gardent leur propre habillage, juste alignés en colonne. */
 .compact-menu-dd > *{flex:none;}
-@media(max-width:1180px){
-  .compact-menu-toggle{display:flex!important;}
+@media(max-width:1180px){ .compact-menu-toggle{display:flex!important;} }
+/* Tableau de bord/Paramètres restent dans le menu compact jusqu'en dessous de 768px aussi
+   (icônes seules, pas la place). Notifications, en revanche, redevient visible directement
+   sur téléphone (2026-09-19, demande explicite "utilise mieux l'espace du hero... rajoute
+   notification") : en dessous de 768px .nav est déjà masquée (styles.v2.css), ce qui libère
+   assez de place dans le bandeau pour la vraie cloche (avec son vrai badge de notifs non
+   lues) plutôt que de la reléguer dans le menu. */
+@media(min-width:769px) and (max-width:1180px){
   #topbar-dashboard-btn,#topbar-parametres-btn,.notif-bell-wrap{display:none!important;}
+}
+@media(max-width:768px){
+  #topbar-dashboard-btn,#topbar-parametres-btn{display:none!important;}
 }`;
   document.head.appendChild(st);
 }
@@ -1378,6 +1392,13 @@ async function applyAuthState() {
       ${demoBtnHtml}
       ${premiumBtnHtml}
       ${apercuBtnHtml}
+      <!-- Raccourci Annuaire (2026-09-19, demande explicite : sous 768px, .nav (donc le lien
+           "Annuaire" du menu principal) est déjà masquée par styles.v2.css — seul le tiroir
+           latéral y menait encore, plus rien dans le bandeau lui-même. Espace libéré par ce
+           même masquage réutilisé pour ce raccourci direct. -->
+      <a href="annuaire.html" class="topbar-icon-btn" title="Annuaire">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </a>
       <a href="messagerie.html" class="topbar-icon-btn" title="Messagerie">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>

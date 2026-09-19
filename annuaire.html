@@ -262,8 +262,15 @@
 @media(max-width:680px){
   .ann-filters-inner{flex-direction:column;}
   .ann-filters-inner select,.ann-filters-inner input{min-width:100%;}
+  /* Bandeau réduit (320px hérité du desktop, bien trop haut une fois le titre à 28px) +
+     éléments recentrés (demande explicite) : le titre/sous-titre étaient calés à gauche,
+     hérité d'une mise en page pensée large-écran où le texte partage l'espace avec le
+     visuel de fond ; sur téléphone, tout l'espace lui revient, centrer se lit mieux. */
+  .ann-hero{height:200px;}
+  .ann-hero-text{text-align:center;}
+  .ann-hero-text p{margin:0 auto;}
   .ann-hero-text h1{font-size:28px;}
-  .ann-stat-band-inner{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .ann-stat-band-inner{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;justify-content:center;}
   .ann-stat-band-inner::-webkit-scrollbar{display:none;}
   .ann-stat-chip{padding:12px 16px;font-size:12.5px;flex:none;}
   .topbar-inner{justify-content:space-between;}
