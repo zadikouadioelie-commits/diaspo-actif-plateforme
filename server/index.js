@@ -3393,20 +3393,140 @@ function getVitrineModulesState(init, { draft = false } = {}) {
   return state;
 }
 
-/* GET /api/initiatives/:id/avis — public, liste des avis + moyenne */
+/* ════════════════════════════════════════════════════════════════════════════════════════
+   AVIS UNIFIÉS — famille générique /api/profil/:id/avis..., cahier des charges "Avis + droit
+   de réponse" (2026-09-19). Cible canonique = users.id (couvre Initiative/Utilisateur/
+   Organisme). Étend la famille /api/profil/:id/... déjà existante (voir GET /api/profil/:id
+   plus bas) plutôt que d'introduire un nouveau préfixe /api/profils/.
+   Les anciennes routes /api/initiatives/:id/avis... juste après restent en place (compat) mais
+   ne sont plus appelées par le frontend après ce chantier — voir leur filtre statut ajouté. */
+const AVIS_MOTIFS_SIGNALEMENT = ['contenu_inapproprie', 'propos_insultants', 'spam', 'faux_avis_presume', 'conflit_ou_autre', 'autre'];
+
+route("GET", "/api/profil/:id/avis", async (req, res, params) => {
+  const me = await getCurrentUser(req).catch(() => null);
+  const targetId = Number(params.id);
+  const isOwner = me && Number(me.id) === targetId;
+  const isAdmin = me && me.role === 'administrateur';
+  const rows = await db.prepare(`
+    SELECT va.id, va.note, va.commentaire, va.created_at, va.modifie_le,
+           va.reponse_texte, va.reponse_date, va.reponse_masquee, va.user_id, u.nom, u.prenom
+    FROM vitrine_avis va JOIN users u ON u.id = va.user_id
+    WHERE va.profil_user_id=? AND (va.statut IS NULL OR va.statut='visible')
+    ORDER BY va.created_at DESC LIMIT 50
+  `).all(targetId);
+  const avisPublic = rows.map(a => ({
+    ...a,
+    // Révélé au propriétaire du profil, à un admin, OU à l'auteur de CET avis précis (pour que
+    // le frontend puisse détecter "c'est mon avis" et proposer sa modification, cahier §7).
+    user_id: (isOwner || isAdmin || (me && Number(me.id) === Number(a.user_id))) ? a.user_id : undefined,
+    reponse_texte: (a.reponse_masquee && !isOwner && !isAdmin) ? null : a.reponse_texte,
+  }));
+  const stats = await db.prepare("SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible')").get(targetId);
+  const repartitionRows = await db.prepare("SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible') GROUP BY note").all(targetId);
+  const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+  repartitionRows.forEach(r => { repartition[r.note] = r.n; });
+  sendJSON(res, 200, { avis: avisPublic, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null, repartition });
+});
+
+route("POST", "/api/profil/:id/avis", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const targetId = Number(params.id);
+  if (Number(user.id) === targetId) return sendJSON(res, 403, { error: "Vous ne pouvez pas laisser d'avis sur votre propre profil." });
+  const target = await db.prepare("SELECT id, role FROM users WHERE id=?").get(targetId);
+  if (!target) return sendJSON(res, 404, { error: "Profil introuvable." });
+  const note = Number(body.note);
+  if (!Number.isInteger(note) || note < 1 || note > 5) return sendJSON(res, 400, { error: "Note invalide (1 à 5)." });
+  const commentaire = (body.commentaire || '').trim() || null;
+  // Rattache à l'initiative si la cible en a une (compat avec /api/initiatives/:id/avis et
+  // /api/vitrines, qui continuent de lire cette colonne).
+  const initRow = target.role === 'initiative'
+    ? await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(targetId) : null;
+  const existant = await db.prepare("SELECT id, reponse_texte FROM vitrine_avis WHERE profil_user_id=? AND user_id=?").get(targetId, user.id);
+  try {
+    if (existant) {
+      await db.prepare("UPDATE vitrine_avis SET note=?, commentaire=?, modifie_le=datetime('now'), statut='visible' WHERE id=?")
+        .run(note, commentaire, existant.id);
+      // Cahier §7 : si une réponse existe déjà, le propriétaire du profil est informé de la modification.
+      if (existant.reponse_texte) {
+        creerNotif(targetId, "avis_modifie", "Un avis a été modifié",
+          `${user.prenom || ''} ${user.nom || ''} a modifié son avis.`.trim(), { lien: `profil.html?id=${targetId}#avis-${existant.id}` });
+      }
+      sendJSON(res, 200, { ok: true, id: existant.id, modifie: true });
+    } else {
+      const r = await db.prepare(`
+        INSERT INTO vitrine_avis (initiative_id, profil_user_id, user_id, note, commentaire, statut)
+        VALUES (?,?,?,?,?, 'visible')
+      `).run(initRow ? initRow.id : null, targetId, user.id, note, commentaire);
+      creerNotif(targetId, "nouvel_avis", "Vous avez reçu un nouvel avis",
+        `${user.prenom || ''} ${user.nom || ''} a laissé un avis ${'★'.repeat(note)}.`.trim(),
+        { lien: `profil.html?id=${targetId}#avis-${r.lastInsertRowid}` });
+      sendJSON(res, 201, { ok: true, id: r.lastInsertRowid, modifie: false });
+    }
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "avis")); }
+});
+
+async function checkAvisReponseAuth(user, params) {
+  if (!user) return false;
+  if (user.role === 'administrateur') return true;
+  return Number(params.id) === Number(user.id); // le profil évalué lui-même
+}
+
+route("PUT", "/api/profil/:id/avis/:avisId/reponse", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!(await checkAvisReponseAuth(user, params))) return sendJSON(res, 403, { error: "Réservé au profil évalué." });
+  const avis = await db.prepare("SELECT id, user_id FROM vitrine_avis WHERE id=? AND profil_user_id=?").get(params.avisId, params.id);
+  if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
+  const texte = (body.reponse_texte || '').trim();
+  if (!texte) return sendJSON(res, 400, { error: "Réponse vide." });
+  await db.prepare("UPDATE vitrine_avis SET reponse_texte=?, reponse_date=datetime('now'), reponse_masquee=0 WHERE id=?").run(texte, params.avisId);
+  creerNotif(avis.user_id, "avis_reponse", "Réponse à votre avis",
+    "Le profil a répondu à votre avis.", { lien: `profil.html?id=${params.id}#avis-${avis.id}` });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/profil/:id/avis/:avisId/reponse", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!(await checkAvisReponseAuth(user, params))) return sendJSON(res, 403, { error: "Réservé au profil évalué." });
+  const avis = await db.prepare("SELECT id FROM vitrine_avis WHERE id=? AND profil_user_id=?").get(params.avisId, params.id);
+  if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
+  await db.prepare("UPDATE vitrine_avis SET reponse_texte=NULL, reponse_date=NULL WHERE id=?").run(params.avisId);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/profil/:id/avis/:avisId/signaler", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const motif = (body.motif || "").trim();
+  if (!AVIS_MOTIFS_SIGNALEMENT.includes(motif)) return sendJSON(res, 400, { error: "Motif invalide." });
+  const avis = await db.prepare("SELECT id FROM vitrine_avis WHERE id=? AND profil_user_id=?").get(params.avisId, params.id);
+  if (!avis) return sendJSON(res, 404, { error: "Avis introuvable." });
+  try {
+    await db.prepare("INSERT INTO vitrine_avis_signalements (avis_id, reporter_id, motif, statut) VALUES (?,?,?,'nouveau')").run(params.avisId, user.id, motif);
+    creerNotif(
+      (await db.prepare("SELECT id FROM users WHERE role='administrateur' LIMIT 1").get())?.id || 1,
+      "signalement", "Avis signalé", `Avis #${params.avisId} — motif : ${motif}`,
+      { lien: "dashboard-administrateur.html#avis-moderation" }
+    );
+    sendJSON(res, 200, { ok: true });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "signaler-avis")); }
+});
+
+/* GET /api/initiatives/:id/avis — legacy (lu par initiative.html) : public, liste des avis + moyenne.
+   Filtré statut='visible' pour que les avis masqués par la modération en sortent aussi ici. */
 route("GET", "/api/initiatives/:id/avis", async (req, res, params) => {
   const me = await getCurrentUser(req).catch(() => null);
   const avis = await db.prepare(`
     SELECT va.id, va.note, va.titre, va.commentaire, va.created_at, va.reponse_texte, va.reponse_date, va.user_id, u.nom, u.prenom
     FROM vitrine_avis va JOIN users u ON u.id = va.user_id
-    WHERE va.initiative_id=? ORDER BY va.created_at DESC LIMIT 50
+    WHERE va.initiative_id=? AND (va.statut IS NULL OR va.statut='visible') ORDER BY va.created_at DESC LIMIT 50
   `).all(params.id);
   // Ne pas exposer l'identifiant interne de l'auteur (sauf au propriétaire, utile pour modération)
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
   const isOwner = me && init && Number(init.owner_user_id) === Number(me.id);
   const avisPublic = avis.map(a => isOwner ? a : { ...a, user_id: undefined });
-  const stats = await db.prepare(`SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE initiative_id=?`).get(params.id);
-  const repartitionRows = await db.prepare(`SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE initiative_id=? GROUP BY note`).all(params.id);
+  const stats = await db.prepare(`SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE initiative_id=? AND (statut IS NULL OR statut='visible')`).get(params.id);
+  const repartitionRows = await db.prepare(`SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE initiative_id=? AND (statut IS NULL OR statut='visible') GROUP BY note`).all(params.id);
   const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
   repartitionRows.forEach(r => { repartition[r.note] = r.n; });
   sendJSON(res, 200, { avis: avisPublic, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null, repartition });
@@ -6583,6 +6703,21 @@ function annuaireEstInvisible(row) {
 }
 
 /* GET /api/annuaire/recherche — recherche par mots-clés combinable avec les filtres existants (pays/ville/type/domaine) */
+/* Agrégat "avis" (note moyenne + total) pour un lot de profils, en une seule requête groupée
+   (même convention que les agrégats groupés déjà en place plus bas pour certifParInit etc.) —
+   jamais de sous-requête corrélée par ligne. idField est le nom de la clé, dans chaque objet de
+   `rows`, qui porte le users.id cible (owner_user_id pour une initiative, id pour un utilisateur
+   ou un organisme). */
+async function attachAvisAggregate(rows, idField) {
+  const ids = [...new Set(rows.map(r => Number(r[idField])).filter(Boolean))];
+  if (!ids.length) return rows;
+  const ph = ids.map(() => '?').join(',');
+  const agg = {};
+  (await db.prepare(`SELECT profil_user_id, AVG(note) moyenne, COUNT(*) total FROM vitrine_avis WHERE (statut IS NULL OR statut='visible') AND profil_user_id IN (${ph}) GROUP BY profil_user_id`).all(...ids))
+    .forEach(a => { agg[Number(a.profil_user_id)] = { avis_moyenne: Number(a.moyenne).toFixed(1), avis_total: a.total }; });
+  return rows.map(r => ({ ...r, ...(agg[Number(r[idField])] || { avis_moyenne: null, avis_total: 0 }) }));
+}
+
 route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) => {
   const qRaw = (query.q || '').trim();
   const termesOriginaux = qRaw ? ANNUAIRE_NORMALISE(qRaw).split(/\s+/).filter(w => w.length >= 2) : [];
@@ -6750,9 +6885,9 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   sendJSON(res, 200, {
     q: qRaw,
     total: resultats.length,
-    initiatives: resultats.filter(r => r.type === 'initiative').map(r => r.data),
-    utilisateurs: resultats.filter(r => r.type === 'utilisateur').map(r => r.data),
-    organismes: resultats.filter(r => r.type === 'organisme').map(r => r.data),
+    initiatives: await attachAvisAggregate(resultats.filter(r => r.type === 'initiative').map(r => r.data), 'owner_user_id'),
+    utilisateurs: await attachAvisAggregate(resultats.filter(r => r.type === 'utilisateur').map(r => r.data), 'id'),
+    organismes: await attachAvisAggregate(resultats.filter(r => r.type === 'organisme').map(r => r.data), 'id'),
   });
 });
 
@@ -6780,6 +6915,7 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }
   if (query.ville) { const q = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(q)); }
+  rows = await attachAvisAggregate(rows, 'id');
   sendJSON(res, 200, { users: rows });
 });
 
@@ -6953,6 +7089,7 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
       owner_identite_verifiee: oid ? !!identiteParOwner[oid] : false,
     };
   });
+  rows = await attachAvisAggregate(rows, 'owner_user_id');
   sendJSON(res, 200, { initiatives: rows });
 });
 
@@ -6967,7 +7104,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
     LEFT JOIN users u ON u.id = i.owner_user_id
     LEFT JOIN (
       SELECT initiative_id, AVG(note) note_moyenne, COUNT(*) nb_avis
-      FROM vitrine_avis GROUP BY initiative_id
+      FROM vitrine_avis WHERE (statut IS NULL OR statut='visible') GROUP BY initiative_id
     ) av ON av.initiative_id = i.id
     WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND i.vitrine_active=1
   `).all();
@@ -18860,6 +18997,104 @@ route("POST", "/api/admin/videos-tutoriels/signalements/:id/traiter", async (req
   sendJSON(res, 200, { ok: true });
 });
 
+/* ══════════ Modération des avis (cahier des charges "Avis + droit de réponse", §9) ══════════
+   Même précédent que la modération Vidéos Tuto ci-dessus. */
+route("GET", "/api/admin/avis", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  let sql = `SELECT va.*, u.nom, u.prenom, cible.nom AS cible_nom, cible.prenom AS cible_prenom,
+      (SELECT COUNT(*) FROM vitrine_avis_signalements s WHERE s.avis_id=va.id AND s.statut='nouveau') AS nb_signalements
+    FROM vitrine_avis va JOIN users u ON u.id=va.user_id JOIN users cible ON cible.id=va.profil_user_id`;
+  const clauses = [];
+  if (query.statut === 'masque') clauses.push("va.statut='masque'"); else if (query.statut === 'visible') clauses.push("(va.statut IS NULL OR va.statut='visible')");
+  if (query.signales === '1') clauses.push("EXISTS (SELECT 1 FROM vitrine_avis_signalements s WHERE s.avis_id=va.id AND s.statut='nouveau')");
+  if (clauses.length) sql += " WHERE " + clauses.join(" AND ");
+  sql += " ORDER BY va.created_at DESC LIMIT 200";
+  const rows = await db.prepare(sql).all();
+  sendJSON(res, 200, { avis: rows.map(r => ({ ...r, auteur_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur', cible_nom: `${r.cible_prenom || ''} ${r.cible_nom || ''}`.trim() || 'Profil' })) });
+});
+
+route("POST", "/api/admin/avis/:id/masquer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE vitrine_avis SET statut='masque' WHERE id=?").run(params.id);
+  await db.prepare("INSERT INTO vitrine_avis_moderation_log (avis_id, admin_id, action, motif) VALUES (?,?,?,?)").run(params.id, user.id, 'masquer_avis', body?.motif || null);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Avis #${params.id} masqué`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/avis/:id/restaurer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE vitrine_avis SET statut='visible' WHERE id=?").run(params.id);
+  await db.prepare("INSERT INTO vitrine_avis_moderation_log (avis_id, admin_id, action) VALUES (?,?,?)").run(params.id, user.id, 'restaurer_avis');
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Avis #${params.id} restauré`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/avis/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("INSERT INTO vitrine_avis_moderation_log (avis_id, admin_id, action) VALUES (?,?,?)").run(params.id, user.id, 'supprimer_avis');
+  await db.prepare("DELETE FROM vitrine_avis WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Avis #${params.id} supprimé`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/avis/:id/reponse/masquer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE vitrine_avis SET reponse_masquee=1 WHERE id=?").run(params.id);
+  await db.prepare("INSERT INTO vitrine_avis_moderation_log (avis_id, admin_id, action) VALUES (?,?,?)").run(params.id, user.id, 'masquer_reponse');
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Réponse de l'avis #${params.id} masquée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/avis/:id/reponse/restaurer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE vitrine_avis SET reponse_masquee=0 WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Réponse de l'avis #${params.id} restaurée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/admin/avis/:id/reponse", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE vitrine_avis SET reponse_texte=NULL, reponse_date=NULL, reponse_masquee=0 WHERE id=?").run(params.id);
+  await db.prepare("INSERT INTO vitrine_avis_moderation_log (avis_id, admin_id, action) VALUES (?,?,?)").run(params.id, user.id, 'supprimer_reponse');
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Réponse de l'avis #${params.id} supprimée`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/avis/signalements", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const rows = await db.prepare(`
+    SELECT s.*, va.commentaire AS avis_commentaire, va.profil_user_id, u.nom, u.prenom
+    FROM vitrine_avis_signalements s
+    JOIN vitrine_avis va ON va.id = s.avis_id
+    JOIN users u ON u.id = s.reporter_id
+    WHERE s.statut='nouveau' ORDER BY s.created_at DESC
+  `).all();
+  sendJSON(res, 200, { signalements: rows.map(r => ({ ...r, signale_par_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur' })) });
+});
+
+route("POST", "/api/admin/avis/signalements/:id/traiter", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.moderer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  await db.prepare("UPDATE vitrine_avis_signalements SET statut='traite' WHERE id=?").run(params.id);
+  await AdminJunior.journaliserActionSiJunior(db, user, 'avis.moderer', `Signalement avis #${params.id} traité`);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/admin/avis/:id/historique", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user || !(await AdminJunior.hasAdminPermission(user, 'avis.consulter', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
+  const rows = await db.prepare("SELECT l.*, u.nom, u.prenom FROM vitrine_avis_moderation_log l JOIN users u ON u.id=l.admin_id WHERE l.avis_id=? ORDER BY l.created_at DESC").all(params.id);
+  sendJSON(res, 200, { historique: rows });
+});
+
 /* POST /api/upload/video-tutoriel — upload MP4 (magic-bytes + taille max). La limite de
    15 minutes annoncée aux admins est vérifiée côté client (durée réelle non vérifiable
    sans ffprobe, absent de ce serveur) — même mécanique que POST /api/upload/produit. */
@@ -23554,6 +23789,111 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       PRIMARY KEY(video_id, visiteur_hash, jour)
     )`).run();
   } catch (e) { console.error('[migrateVideosTutoriels]', e.message); }
+})();
+
+/* ──────── AVIS UNIFIÉS (annuaire — Initiative/Utilisateur/Organisme, cahier des charges
+   "Avis + droit de réponse", 2026-09-19) ────────
+   Même idiome que migrateVideosTutoriels() ci-dessus : CREATE TABLE IF NOT EXISTS / ALTER
+   TABLE ADD COLUMN idempotent, rejouable sans risque à chaque démarrage. vitrine_avis existe
+   déjà en production (server/db.js) — jamais toucher son CHECK existant sur `note` (voir la
+   convention documentée dans server/db.js : ne jamais élargir un CHECK déployé). Toutes les
+   colonnes ajoutées ici sont nouvelles et sans contrainte sur l'existant. */
+(async function migrateAvisUnifies() {
+  try {
+    const colsAvis = (await db.prepare("PRAGMA table_info(vitrine_avis)").all()).map(c => c.name);
+    const addAvisCol = async (col, def) => { if (!colsAvis.includes(col)) { try { await db.prepare(`ALTER TABLE vitrine_avis ADD COLUMN ${col} ${def}`).run(); } catch (e) {} } };
+    // Cible canonique : users.id, pour couvrir Initiative/Utilisateur/Organisme d'un seul
+    // système (pour une initiative, égal à initiatives.owner_user_id — cf. GET /api/profil/:id).
+    await addAvisCol("profil_user_id", "INTEGER");
+    // Convention copiée telle quelle de catalogues_vitrine.statut.
+    await addAvisCol("statut", "TEXT DEFAULT 'visible' CHECK(statut IN ('visible','masque'))");
+    // Distinct de created_at, qui reste la date de première publication (cahier §7 : "Avis
+    // modifié le [date]").
+    await addAvisCol("modifie_le", "TEXT");
+    // Masquage de la SEULE réponse par la modération, indépendant du masquage de l'avis lui-même
+    // (cahier §9 : deux actions distinctes).
+    await addAvisCol("reponse_masquee", "INTEGER DEFAULT 0");
+
+    // vitrine_avis.initiative_id était NOT NULL à l'origine (table scopée aux seules
+    // initiatives) — incompatible avec des avis sur un profil Utilisateur/Organisme, qui n'ont
+    // pas d'initiative_id. Ni SQLite ni la reconstruction ci-dessous ne permettent un simple
+    // ALTER pour assouplir un NOT NULL : reconstruction de table (technique standard), gatée
+    // par un marqueur dans parametres_plateforme plutôt que par PRAGMA table_info(...).notnull
+    // — ce dernier n'est PAS porté par le traducteur Postgres (server/db-pg.js ne renvoie que
+    // `name` pour PRAGMA table_info, jamais la nullabilité), donc invisible en production.
+    // Aucune donnée existante n'est perdue (copie intégrale avant suppression de l'ancienne table).
+    const AVIS_NOTNULL_MARQUEUR = 'avis_initiative_id_nullable';
+    try {
+      let dejaFait = false;
+      try { const r = await db.prepare("SELECT valeur FROM parametres_plateforme WHERE cle=?").get(AVIS_NOTNULL_MARQUEUR); dejaFait = !!r; } catch (e) {}
+      if (!dejaFait) {
+        // Nettoie un éventuel résidu d'une tentative précédente interrompue en cours de route.
+        try { await db.prepare("DROP TABLE IF EXISTS vitrine_avis_new").run(); } catch (e) {}
+        await db.prepare(`CREATE TABLE vitrine_avis_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          initiative_id INTEGER,
+          profil_user_id INTEGER,
+          user_id INTEGER NOT NULL,
+          note INTEGER NOT NULL CHECK(note BETWEEN 1 AND 5),
+          titre TEXT,
+          commentaire TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          reponse_texte TEXT,
+          reponse_date TEXT,
+          statut TEXT DEFAULT 'visible' CHECK(statut IN ('visible','masque')),
+          modifie_le TEXT,
+          reponse_masquee INTEGER DEFAULT 0,
+          UNIQUE(initiative_id, user_id),
+          FOREIGN KEY(initiative_id) REFERENCES initiatives(id),
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )`).run();
+        await db.prepare(`INSERT INTO vitrine_avis_new
+          (id, initiative_id, profil_user_id, user_id, note, titre, commentaire, created_at, reponse_texte, reponse_date, statut, modifie_le, reponse_masquee)
+          SELECT id, initiative_id, profil_user_id, user_id, note, titre, commentaire, created_at, reponse_texte, reponse_date, statut, modifie_le, reponse_masquee
+          FROM vitrine_avis`).run();
+        await db.prepare("DROP TABLE vitrine_avis").run();
+        await db.prepare("ALTER TABLE vitrine_avis_new RENAME TO vitrine_avis").run();
+        // Marqueur posé seulement après succès complet — un passage partiel (crash en cours de
+        // route) doit pouvoir être rejoué intégralement au prochain démarrage.
+        try {
+          await db.prepare("INSERT INTO parametres_plateforme (cle, valeur, type, description) VALUES (?,?,?,?)")
+            .run(AVIS_NOTNULL_MARQUEUR, 'fait', 'texte', "vitrine_avis.initiative_id rendu nullable (cahier des charges Avis + droit de réponse) — évite de rejouer la reconstruction de table à chaque démarrage");
+        } catch (e) {}
+      }
+    } catch (e) { console.error('[migrateAvisUnifies] reconstruction vitrine_avis', e.message); }
+
+    // Backfill idempotent : les avis existants (initiative uniquement) reçoivent leur
+    // profil_user_id à partir du propriétaire de l'initiative.
+    try {
+      await db.prepare(`
+        UPDATE vitrine_avis SET profil_user_id = (
+          SELECT owner_user_id FROM initiatives WHERE initiatives.id = vitrine_avis.initiative_id
+        ) WHERE profil_user_id IS NULL AND initiative_id IS NOT NULL
+      `).run();
+    } catch (e) {}
+
+    // Un seul avis par profil et par utilisateur (cahier §11) — remplace, pour tout nouveau
+    // code, l'ancien UNIQUE(initiative_id, user_id) de la table (jamais retiré d'une table en
+    // prod, mais plus le garde-fou actif pour les nouvelles écritures).
+    try { await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_vitrine_avis_profil_user ON vitrine_avis(profil_user_id, user_id)").run(); } catch (e) {}
+    try { await db.prepare("CREATE INDEX IF NOT EXISTS idx_vitrine_avis_profil_statut ON vitrine_avis(profil_user_id, statut)").run(); } catch (e) {}
+
+    // vitrine_avis_signalements : écriture seule jusqu'ici, aucune route admin ne le lisait.
+    // Ajout d'un workflow statut, même convention que da_videos_tutoriels_signalements.statut.
+    const colsSig = (await db.prepare("PRAGMA table_info(vitrine_avis_signalements)").all()).map(c => c.name);
+    if (!colsSig.includes("statut")) { try { await db.prepare("ALTER TABLE vitrine_avis_signalements ADD COLUMN statut TEXT DEFAULT 'nouveau'").run(); } catch (e) {} }
+
+    // Historique de modération (cahier §9).
+    await db.prepare(`CREATE TABLE IF NOT EXISTS vitrine_avis_moderation_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      avis_id INTEGER NOT NULL,
+      admin_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      motif TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+    try { await db.prepare("CREATE INDEX IF NOT EXISTS idx_avis_modlog_avis ON vitrine_avis_moderation_log(avis_id)").run(); } catch (e) {}
+  } catch (e) { console.error('[migrateAvisUnifies]', e.message); }
 })();
 
 /* ── Codes Adhésion D'A : paramètres standards, semés une seule fois ──

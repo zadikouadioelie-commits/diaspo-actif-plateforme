@@ -251,6 +251,8 @@
               </a>`).join('') : '<span class="cda-muted">Aucune affiliation officielle pour l\'instant — une organisation enregistrée sur Diaspo\'Actif peut vous en proposer une.</span>'}
           </div>
         </div>
+
+        <div class="cda-box" style="margin:14px 20px 20px;" id="cda-avis-mount"></div>
       </div>`;
 
     if (isOwner) {
@@ -303,6 +305,14 @@
         zone.innerHTML = `<span data-relation-user="${profil.id}" data-relation-origine="carte_diaspoactif" data-relation-classe="cda-btn"></span>`;
         if (window.initBoutonsRelation) window.initBoutonsRelation();
       }
+    }
+
+    // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — même composant
+    // que sur les profils Initiative/Organisme (profil-app.html), monté ici pour le rôle
+    // utilisateur puisque ces profils contournent renderVisitorProfile().
+    const avisMount = container.querySelector('#cda-avis-mount');
+    if (avisMount && window.AvisSection) {
+      window.AvisSection.mount(avisMount, { profilId: profil.id, profilNom: nom, isOwner, isAdmin: !!opts.isAdmin, cu: opts.cu || null });
     }
   }
 

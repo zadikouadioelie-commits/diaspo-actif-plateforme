@@ -1291,7 +1291,7 @@ async function applyAuthState() {
       <!-- Bouton dédié vers le tableau de bord (engrenage seul) : la pastille d'identité
            juste après y mène déjà, mais rien n'indiquait visuellement que ce lien existait
            (demandé le 2026-08-19, capture à l'appui). -->
-      <a href="${ROLE_DASHBOARD[user.role] || '#'}" class="topbar-icon-btn" title="Tableau de bord">
+      <a href="${ROLE_DASHBOARD[user.role] || '#'}" id="topbar-dashboard-btn" class="topbar-icon-btn" title="Tableau de bord">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
       </a>
       <!-- Bouton profil public (2026-08-31, demande explicite) : accès rapide depuis le bandeau
@@ -1305,7 +1305,7 @@ async function applyAuthState() {
            notifications — module unique, distinct du tableau de bord et du profil public.
            Icône "curseurs de réglage", volontairement différente de l'engrenage du tableau
            de bord juste au-dessus pour ne pas dupliquer visuellement la même icône. -->
-      <a href="parametres-compte.html" class="topbar-icon-btn" title="Paramètres du compte">
+      <a href="parametres-compte.html" id="topbar-parametres-btn" class="topbar-icon-btn" title="Paramètres du compte">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
       </a>
       <!-- Identité fusionnée (refonte "onglets segmentés") : avatar + nom + rôle dans une
@@ -1713,6 +1713,15 @@ window.adminAnnuaireSupprimer = async function (cibleId, bouton) {
   }
 };
 
+/* Badge étoiles "Avis" (cahier des charges "Avis + droit de réponse") — alimenté par
+   avis_moyenne/avis_total, calculés côté serveur (attachAvisAggregate, server/index.js) sur
+   les 3 routes de listing de l'annuaire. Absent (chaîne vide) tant qu'aucun avis n'existe. */
+function annAvisBadgeHtml(it) {
+  if (!it.avis_total) return '';
+  const r = Math.round(Number(it.avis_moyenne) || 0);
+  return `<span class="ann-avis-badge" title="${it.avis_total} avis">${'★'.repeat(r)}${'☆'.repeat(5 - r)} ${it.avis_moyenne} · ${it.avis_total} avis</span>`;
+}
+
 function renderInitiativeCard(it){
   /* Domaine d'activité unifié (2026-09-04) : prime sur l'ancien it.domaine quand renseigné —
      migration "self-service", les deux champs coexistent tant qu'un compte n'a pas rouvert
@@ -1779,6 +1788,7 @@ function renderInitiativeCard(it){
     <div class="ann-card-body">
       <div class="ann-card-title">${it.nom}</div>
       ${badgeVerifications(it, { small: true })}
+      ${annAvisBadgeHtml(it)}
       ${(!(it.accreditations||[]).includes('initiative_abonne') && it.decouverte_premium && window.decouvertePremiumBadgeHtml) ? `<div>${window.decouvertePremiumBadgeHtml(it.decouverte_premium.date_expiration, { showDate: true })}</div>` : ''}
       <div class="ann-card-meta-row">
         <span class="ann-card-loc">📍 ${loc}</span>
@@ -1795,6 +1805,7 @@ function renderInitiativeCard(it){
       ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
       <div class="ann-card-foot" onclick="event.stopPropagation()">
         <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
+        <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
@@ -2089,6 +2100,7 @@ async function initAnnuaire(){
       ${annCardCoverHtml(u.id, nom, u.banner_url, u.photo_url, badgeUser, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nom}</div>
+        ${annAvisBadgeHtml(u)}
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${origs ? `<div class="ann-card-origs">🌍 <strong>Origines :</strong> ${origs}</div>` : ''}
         <div class="ann-card-nats">🏛 <strong>Nationalités :</strong> ${nats}</div>
@@ -2097,6 +2109,7 @@ async function initAnnuaire(){
         ${u.titre_pro ? `<div class="ann-card-desc">${u.titre_pro}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
+          <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" data-affilier-nom="${nom.replace(/"/g,'&quot;')}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${u.id}, this)">🔗 Affiliation</button>` : ''}
           ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
@@ -2122,12 +2135,14 @@ async function initAnnuaire(){
       ${annCardCoverHtml(o.id, nomAffiche, o.banner_url, o.photo_url, `<span class="ann-cat-badge" style="background:#0D2B4E;">${badge}</span>`, isOwn)}
       <div class="ann-card-body ann-card-body-profile">
         <div class="ann-card-title">${nomAffiche}</div>
+        ${annAvisBadgeHtml(o)}
         <div class="ann-card-meta-row" style="justify-content:center;"><span class="ann-card-loc">📍 ${loc}</span></div>
         ${daOrigineDeclaree(o) ? `<div class="ann-card-origs">🌍 <strong>Origine :</strong> ${daOrigineDeclaree(o)}</div>` : ''}
         ${responsableNom ? `<div class="ann-card-responsable">👤 Responsable : ${responsableNom}${o.fonction_responsable_etatique ? ` — ${o.fonction_responsable_etatique}` : ''}</div>` : ''}
         ${o.bio ? `<div class="ann-card-desc">${o.bio}</div>` : ''}
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
+          <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
           ${abonnerBtn}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${o.id}" data-relation-classe="ann-card-btn"></span>` : ''}
           ${adminAnnuaireBoutonsHtml(o.id, isOwn)}

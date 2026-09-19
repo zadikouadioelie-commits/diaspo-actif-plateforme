@@ -255,6 +255,29 @@
         </div>
       </div>
 
+      <!-- AVIS & RÉPONSES — markup identique à dashboard-administrateur.html (assets/admin-avis-panel.js) -->
+      <section id="section-avis-moderation" style="display:none;">
+        <div style="margin-bottom:16px;">
+          <h2 style="margin:0;">⭐ Avis & réponses</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Avis déposés sur les profils de l'annuaire (Initiatives, Utilisateurs, Organismes), réponses officielles et signalements.</p>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-orange" id="av-tab-avis" onclick="avOuvrirOnglet('avis')">⭐ Avis</button>
+          <button class="btn btn-outline" id="av-tab-signalements" onclick="avOuvrirOnglet('signalements')">🚩 Signalements</button>
+        </div>
+
+        <div id="av-panel-avis">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer;">
+            <input type="checkbox" id="av-filtre-signales" onchange="avCharger()"> N'afficher que les avis signalés
+          </label>
+          <div id="av-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+
+        <div id="av-panel-signalements" style="display:none;">
+          <div id="av-signalements-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+      </section>
+
       <!-- MES DROITS -->
       <section id="section-mes-droits" style="display:none;">
         <h2>📋 Mes droits</h2>
@@ -283,16 +306,18 @@
 <script src="assets/admin-moderation-panels.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script src="/assets/admin-videos-tutoriels-panel.js"></script>
+<script src="/assets/admin-avis-panel.js"></script>
 <script>
 function esc(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression', videos_tutoriels: '🎬 Vidéos Tuto' };
+const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression', videos_tutoriels: '🎬 Vidéos Tuto', avis: '⭐ Avis clients' };
 const AJ_SIDEBAR_LINKS = {
   moderation: '<a href="#moderation" data-section="moderation">🛡 Modération</a>',
   suppression_comptes: '<a href="#suppression-comptes" data-section="suppression-comptes">🗑 Demandes de suppression</a>',
   videos_tutoriels: '<a href="#videos-tutoriels" data-section="videos-tutoriels">🎬 Vidéos Tuto</a>',
+  avis: '<a href="#avis-moderation" data-section="avis-moderation">⭐ Avis & réponses</a>',
 };
 
 async function loadMesDroits() {
@@ -370,6 +395,7 @@ async function loadMessagerie() {
   if (modulesAccordes.includes('moderation')) SECTION_LOADERS['moderation'] = () => switchModeTab('comptes');
   if (modulesAccordes.includes('suppression_comptes')) SECTION_LOADERS['suppression-comptes'] = () => loadDelReqList();
   if (modulesAccordes.includes('videos_tutoriels')) SECTION_LOADERS['videos-tutoriels'] = () => vtOuvrirOnglet('videos');
+  if (modulesAccordes.includes('avis')) SECTION_LOADERS['avis-moderation'] = () => avOuvrirOnglet('avis');
 
   const links = document.querySelectorAll(".sidebar a[data-section]");
   links.forEach(a => a.addEventListener("click", e => {
@@ -385,7 +411,7 @@ async function loadMessagerie() {
   document.getElementById('aj-chargement').style.display = 'none';
   // Ouvre la première section disponible.
   const premier = modulesAccordes.length ? modulesAccordes[0] : 'mes-droits';
-  const premierSlug = premier === 'moderation' ? 'moderation' : premier === 'suppression_comptes' ? 'suppression-comptes' : premier === 'videos_tutoriels' ? 'videos-tutoriels' : 'mes-droits';
+  const premierSlug = premier === 'moderation' ? 'moderation' : premier === 'suppression_comptes' ? 'suppression-comptes' : premier === 'videos_tutoriels' ? 'videos-tutoriels' : premier === 'avis' ? 'avis-moderation' : 'mes-droits';
   document.querySelector(`.sidebar a[data-section="${premierSlug}"]`)?.click();
 })();
 </script>

@@ -80,6 +80,10 @@ const CATALOGUE_ADMIN_JUNIOR = [
   // ── Module: videos_tutoriels (2026-09-18, cahier des charges "Vidéos Tuto") ──
   { id: 'videos_tutoriels.gerer',   module: 'videos_tutoriels', numero: 1, description: "Ajouter, modifier, publier/dépublier, réordonner et supprimer les vidéos tutoriels", capability: 'videos_tutoriels.gerer' },
   { id: 'videos_tutoriels.moderer', module: 'videos_tutoriels', numero: 2, description: "Modérer les commentaires (répondre officiellement, masquer, supprimer) et traiter les signalements", capability: 'videos_tutoriels.moderer' },
+
+  // ── Module: avis (2026-09-19, cahier des charges "Avis + droit de réponse") ──
+  { id: 'avis.consulter', module: 'avis', numero: 1, description: "Consulter tous les avis, réponses et signalements", capability: 'avis.consulter' },
+  { id: 'avis.moderer',   module: 'avis', numero: 2, description: "Masquer/supprimer un avis ou une réponse, traiter les signalements", capability: 'avis.moderer' },
 ];
 
 function catalogueIdsPourCapacite(capabiliteKey) {

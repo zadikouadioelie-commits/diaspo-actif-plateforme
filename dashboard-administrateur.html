@@ -61,6 +61,7 @@
       <a href="#oz-admin" data-section="oz-admin">🤖 O-Z Intelligence</a>
       <a href="#onboarding" data-section="onboarding">🎓 Tutoriels d'accueil</a>
       <a href="#videos-tutoriels" data-section="videos-tutoriels">🎬 Vidéos tutoriels</a>
+      <a href="#avis-moderation" data-section="avis-moderation">⭐ Avis & réponses</a>
       <a href="#packages" data-section="packages" style="display:none;">📦 Package Diaspo'Actif</a>
       <a href="#deals-admin" data-section="deals-admin" style="display:none;">🎖 Attribution de Deal</a>
       <a href="#diaspoactif-deals" data-section="diaspoactif-deals" style="display:none;">🤝 Deals Diaspo'Actif</a>
@@ -2447,6 +2448,29 @@
           </div>
         </div>
       </div>
+
+      <!-- AVIS & RÉPONSES (modération, cahier des charges "Avis + droit de réponse") -->
+      <section id="section-avis-moderation" style="display:none;">
+        <div style="margin-bottom:16px;">
+          <h2 style="margin:0;">⭐ Avis & réponses</h2>
+          <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Avis déposés sur les profils de l'annuaire (Initiatives, Utilisateurs, Organismes), réponses officielles et signalements.</p>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn btn-orange" id="av-tab-avis" onclick="avOuvrirOnglet('avis')">⭐ Avis</button>
+          <button class="btn btn-outline" id="av-tab-signalements" onclick="avOuvrirOnglet('signalements')">🚩 Signalements</button>
+        </div>
+
+        <div id="av-panel-avis">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer;">
+            <input type="checkbox" id="av-filtre-signales" onchange="avCharger()"> N'afficher que les avis signalés
+          </label>
+          <div id="av-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+
+        <div id="av-panel-signalements" style="display:none;">
+          <div id="av-signalements-liste"><p style="color:var(--muted);font-size:13px;">Chargement…</p></div>
+        </div>
+      </section>
 
       <!-- PARAMÈTRES -->
       <!-- ATTRIBUTION DE DEAL — ADMIN -->
@@ -4905,7 +4929,7 @@ function esc(s) {
 /* ===== Administrateurs Junior ===== */
 let ajCatalogueCache = null;
 
-const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression', videos_tutoriels: '🎬 Vidéos Tuto' };
+const AJ_LABELS_MODULE = { moderation: '🛡 Modération', suppression_comptes: '🗑 Demandes de suppression', videos_tutoriels: '🎬 Vidéos Tuto', avis: '⭐ Avis clients' };
 
 async function ajChargerCatalogue() {
   if (ajCatalogueCache) return ajCatalogueCache;
@@ -8917,6 +8941,7 @@ async function submitAccordDirect(){
     'oz-admin':  () => loadOzAdmin(),
     onboarding:  () => loadObAdmin(),
     'videos-tutoriels': () => vtOuvrirOnglet('videos'),
+    'avis-moderation': () => avOuvrirOnglet('avis'),
     'error-logs': () => loadErrorLogs(),
     'analytics-trafic': () => loadAnalytics(),
     ads: () => loadAdsAdmin(),
@@ -14010,6 +14035,7 @@ async function diagEmail() {
   <script src="/assets/theme-manager.js"></script>
   <script src="/assets/upload-media.js"></script>
   <script src="/assets/admin-videos-tutoriels-panel.js"></script>
+  <script src="/assets/admin-avis-panel.js"></script>
 </body>
 </html>
 

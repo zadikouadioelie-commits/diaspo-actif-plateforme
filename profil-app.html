@@ -1801,7 +1801,7 @@ function render() {
   // Carte Diaspo'Actif : remplace le profil public pour le rôle utilisateur uniquement
   // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
   if (profil.role === 'utilisateur' && window.CarteDiaspoActif) {
-    CarteDiaspoActif.render(document.getElementById('pvz-visitor'), profil, { isOwner: isOwn });
+    CarteDiaspoActif.render(document.getElementById('pvz-visitor'), profil, { isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU });
     return;
   }
   renderVisitorProfile();
@@ -2033,6 +2033,7 @@ function renderVisitorProfile() {
       ${isOwn ? `<button class="pvz-btn primary" style="width:100%;justify-content:center;margin-bottom:14px;" onclick="window.Posts&&Posts.openModal()">✍️ Créer une publication</button>` : ''}
       ${pubsInner}
     </section>
+    <div id="pvz-avis-mount"></div>
   </main>`;
 
   const confidentialiteCard = isOwn ? `<section class="pvz-card" id="pvz-confidentialite-card" style="margin-top:22px;">
@@ -2052,6 +2053,14 @@ function renderVisitorProfile() {
   /* Le profil est rendu APRÈS le chargement de la page : sans cet appel, l'emplacement du
      bouton de mise en relation resterait vide, le composant ne balayant le DOM qu'au démarrage. */
   window.initBoutonsRelation && window.initBoutonsRelation(root);
+
+  // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — visible sur
+  // l'onglet Profil pour tout type de compte non-Utilisateur (Initiative/Collectivité/
+  // Administrateur/Partenaire), indépendamment du toggle Vitrine modOn('avis').
+  const avisMount = document.getElementById('pvz-avis-mount');
+  if (avisMount && window.AvisSection) {
+    window.AvisSection.mount(avisMount, { profilId: profil.id, profilNom: nom, isOwner: isOwn, isAdmin: CU && CU.role === 'administrateur', cu: CU });
+  }
   if (dpBlock) window.startDecouvertePremiumCountdown();
 
   if (isOwn && isInit) pvzInitVitrineToggleBtn();
@@ -2437,9 +2446,8 @@ async function renderVitrineCols() {
   const initId = _vitrineInit ? _vitrineInit.id : null;
   if (!initId) { left.innerHTML = ''; return; }
 
-  let produits = [], avis = null;
+  let produits = [];
   try { const r = await api('GET', `/initiatives/${initId}/produits`); produits = r.produits || []; } catch (e) {}
-  try { avis = await api('GET', `/initiatives/${initId}/avis`); } catch (e) {}
 
   const dispo = produits.filter(p => (p.statut || 'disponible') === 'disponible');
   const prix = dispo.map(p => Number(p.prix)).filter(v => v > 0);
@@ -2461,17 +2469,6 @@ async function renderVitrineCols() {
         ${prixMin != null ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:18px;font-weight:800;">${prixMin}<span style="font-size:11px;">${esc2(devise)}</span></div><div style="font-size:10px;color:var(--muted);">À partir de</div></div>` : ''}
       </div>
     </div>
-    ${avis ? `<div class="pp-side-card">
-      <h4>⭐ Avis clients</h4>
-      <div style="font-size:20px;font-weight:800;color:#f59e0b;">${'★'.repeat(Math.round(Number(avis.moyenne)||0))}${'☆'.repeat(5 - Math.round(Number(avis.moyenne)||0))} <span style="color:var(--text);font-size:15px;">${(Number(avis.moyenne)||0).toFixed(1)}/5</span></div>
-      <div style="font-size:12px;color:var(--muted);">Basé sur ${avis.total||0} avis</div>
-      <!-- Bouton ajouté le 2026-08-30 (demande explicite) : ce cartouche-résumé n'offrait
-           jusqu'ici aucune action, contrairement aux autres colonnes de la boutique — même
-           logique canReview/pvtWriteAvis que la vraie section "Avis" (onglet), pour ne pas
-           dupliquer les règles d'éligibilité (pas le propriétaire, connecté). -->
-      ${!isOwn && CU ? `<button onclick="pvtWriteAvis(${_vitrineInit.id})" style="margin-top:10px;width:100%;font-size:12.5px;font-weight:700;color:#fff;background:var(--v1,#8E1B2E);border:none;border-radius:8px;padding:8px;cursor:pointer;">✍️ Laisser un avis</button>`
-        : (!CU ? `<a href="login.html" style="display:block;margin-top:10px;text-align:center;font-size:12px;color:var(--v1,#8E1B2E);">Connectez-vous pour laisser un avis</a>` : '')}
-    </div>` : ''}
     <div class="pp-side-card">
       <h4>🔒 Acheter en confiance</h4>
       <div class="pp-list-item"><span>💳</span><span style="flex:1;">Paiement 100% sécurisé (Stripe)</span></div>
@@ -2797,7 +2794,8 @@ async function renderVitrineVisitor(init) {
   if ((init.vitrine_vision_objectifs || isOwn) && modOn('vision_objectifs')) navItems.push(['vision','Vision']);
   if ((init.vitrine_resultats_impact_json || isOwn) && modOn('resultats_impact')) navItems.push(['impact','Impact']);
   if ((init.besoins_json || isOwn) && modOn('besoins_projet')) navItems.push(['besoins','Besoins']);
-  if (modOn('avis')) navItems.push(['avis','Avis']);
+  // "Avis" a migré vers l'onglet Profil (composant partagé AvisSection, visible pour tout
+  // type de compte) — plus de doublon d'UI ici (voir renderVisitorProfile()).
   if ((init.vitrine_temoignages_json || isOwn) && modOn('temoignages')) navItems.push(['temoignages','Témoignages']);
   if ((init.vitrine_partenaires_json || init.vitrine_objectif_cible || isOwn) && (modOn('partenaires') || modOn('objectif_jauge'))) navItems.push(['partenaires','Partenaires']);
   if ((init.vitrine_documents_json || isOwn) && modOn('documents')) navItems.push(['telechargements','Téléchargements']);
@@ -2903,12 +2901,6 @@ async function renderVitrineVisitor(init) {
   const pourquoiSec = modOn('pourquoi_choisir') ? `<section id="pv-pourquoi" class="pvt-section">
     <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;"><h3>✔ Pourquoi nous choisir</h3>${isOwn?`<button onclick="pvtOpenArgumentModal()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un argument</button>`:''}</div>
     <div id="pvt-pourquoi-body" style="padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12.5px;color:#3B4658;"><div class="pvz-empty">Chargement…</div></div>
-  </section>` : '';
-
-  // Avis clients
-  const avisSec = modOn('avis') ? `<section id="pv-avis" class="pvt-section">
-    <div class="pvt-section-head sm"><h3>⭐ Avis clients</h3></div>
-    <div id="pvt-avis-body" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
   </section>` : '';
 
   // Témoignages (curés par le titulaire — distinct des Avis clients notés)
@@ -3333,7 +3325,7 @@ async function renderVitrineVisitor(init) {
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
     ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
     ['galerie_photos', galerieSec], ['resultats_impact', impactSec], ['besoins_projet', besoinsSec],
-    ['avis', avisSec], ['temoignages', temoignagesSec], ['partenaires', partenairesObjectifSec],
+    ['temoignages', temoignagesSec], ['partenaires', partenairesObjectifSec],
     ['documents', telechargementsSec],
   ];
   const sortedModuleSections = MODULE_SECTIONS
@@ -3413,41 +3405,8 @@ async function renderVitrineVisitor(init) {
     _pvtFlashTimer = setInterval(tick, 1000);
   }
 
-  // Avis clients (note + titre + commentaire + réponse du propriétaire + signalement + répartition)
-  try {
-    const av = await api('GET', `/initiatives/${init.id}/avis`);
-    const avBody = document.getElementById('pvt-avis-body');
-    if (avBody) {
-      const canReview = !isOwn && CU;
-      const maxN = Math.max(1, ...Object.values(av.repartition||{1:0,2:0,3:0,4:0,5:0}));
-      const breakdown = av.total ? `<div style="flex:1;min-width:140px;display:flex;flex-direction:column;gap:3px;">
-        ${[5,4,3,2,1].map(n=>{ const c=(av.repartition||{})[n]||0; const pct = Math.round(c/maxN*100); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8794A7;"><span style="width:14px;">${n}★</span><div style="flex:1;height:6px;background:#F1E4E6;border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:#F4A62A;"></div></div><span style="width:18px;text-align:right;">${c}</span></div>`; }).join('')}
-      </div>` : '';
-      avBody.innerHTML = `
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;">
-          ${av.moyenne ? `<div style="font-family:'Bricolage Grotesque';font-size:34px;font-weight:700;color:#122A4D;line-height:1;">${av.moyenne}</div><div><div style="color:#F4A62A;font-size:15px;letter-spacing:2px;">${'★'.repeat(Math.round(av.moyenne))}${'☆'.repeat(5-Math.round(av.moyenne))}</div><div style="font-size:11.5px;color:#8794A7;margin-top:2px;">${av.total} avis</div></div>${breakdown}` : `<span class="pvz-empty">Aucun avis pour le moment.</span>`}
-        </div>
-        ${(av.avis||[]).slice(0,10).map((a,i)=>`<div style="border-top:1px solid var(--vsoftbd);padding:12px 0${i===0?';border-top:none':''};font-size:12.5px;color:#3B4658;line-height:1.5;" id="pvt-avis-${a.id}">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-            <div>
-              <div style="color:#F4A62A;font-size:12px;letter-spacing:1px;">${'★'.repeat(a.note)}${'☆'.repeat(5-a.note)}</div>
-              ${a.titre?`<div style="font-weight:700;color:#122A4D;margin-top:3px;">${esc(a.titre)}</div>`:''}
-              ${a.commentaire?`<div style="margin-top:3px;">${esc(a.commentaire)}</div>`:''}
-              <div style="font-size:11.5px;color:#8794A7;margin-top:4px;">— ${esc([a.prenom,a.nom].filter(Boolean).join(' ')||'Client')} · ${fmtDateFrCourt(a.created_at)}</div>
-            </div>
-            ${(!isOwn && CU) ? `<button onclick="pvtSignalerAvis(${init.id},${a.id})" title="Signaler cet avis" style="background:none;border:none;color:#8794A7;font-size:11px;cursor:pointer;white-space:nowrap;">🚩 Signaler</button>` : ''}
-          </div>
-          ${a.reponse_texte ? `<div style="margin:10px 0 0 16px;padding:9px 12px;background:var(--vsoft);border-radius:9px;border-left:3px solid var(--v1);">
-              <div style="font-size:11px;font-weight:700;color:var(--v1);">Réponse de ${esc(init.nom||'la boutique')}</div>
-              <div style="margin-top:3px;">${esc(a.reponse_texte)}</div>
-              ${isOwn?`<div style="margin-top:6px;display:flex;gap:10px;"><span onclick="pvtReplyAvis(${init.id},${a.id})" style="font-size:11px;color:var(--v1);font-weight:600;cursor:pointer;">✏️ Modifier</span><span onclick="pvtDeleteReplyAvis(${init.id},${a.id})" style="font-size:11px;color:#B91C1C;font-weight:600;cursor:pointer;">🗑️ Supprimer</span></div>`:''}
-            </div>`
-            : (isOwn ? `<button onclick="pvtReplyAvis(${init.id},${a.id})" style="margin:8px 0 0 16px;font-size:11.5px;font-weight:600;color:var(--v1);background:none;border:1px solid var(--v1);border-radius:7px;padding:5px 10px;cursor:pointer;">💬 Répondre</button>` : '')}
-        </div>`).join('')}
-        ${canReview ? `<button onclick="pvtWriteAvis(${init.id})" style="margin-top:14px;width:100%;font-size:13px;font-weight:700;color:#fff;background:var(--v1);border:none;border-radius:10px;padding:11px;cursor:pointer;">✍️ Écrire un avis</button>` : (!CU ? `<a href="login.html" style="display:block;margin-top:14px;text-align:center;font-size:12.5px;color:var(--v1);">Connectez-vous pour laisser un avis</a>` : '')}
-      `;
-    }
-  } catch (e) {}
+  // Avis clients : migré vers le composant partagé AvisSection, monté sur l'onglet Profil
+  // (voir renderVisitorProfile()) — plus de rendu dédié ici.
 
   // Pourquoi nous choisir (arguments — CRUD + glisser-déposer pour le titulaire)
   await renderPvtArguments(init);
@@ -3763,49 +3722,9 @@ async function pvtRemoveDocument(i) {
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
-/* Visiteur : écrire un avis (note + commentaire) */
-async function pvtWriteAvis(initId) {
-  if (!CU) { window.location.href = 'login.html'; return; }
-  const note = prompt('Votre note (1 à 5) :', '5');
-  if (note === null) return;
-  const n = Number(note);
-  if (!Number.isInteger(n) || n < 1 || n > 5) { alert('Note invalide (1 à 5).'); return; }
-  const titre = prompt('Titre de votre avis (facultatif) :', '') || '';
-  const commentaire = prompt('Votre commentaire (facultatif) :', '') || '';
-  try {
-    await api('POST', `/initiatives/${initId}/avis`, { note: n, titre, commentaire });
-    if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
-  } catch (e) { alert('Erreur : ' + (e.message||'')); }
-}
-
-/* Titulaire : répondre / modifier sa réponse à un avis */
-async function pvtReplyAvis(initId, avisId) {
-  if (!isOwn) return;
-  const texte = prompt('Votre réponse à cet avis :', '');
-  if (texte === null) return;
-  try {
-    await api('PUT', `/initiatives/${initId}/avis/${avisId}/reponse`, { reponse_texte: texte });
-    if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
-  } catch (e) { alert('Erreur : ' + (e.message||'')); }
-}
-async function pvtDeleteReplyAvis(initId, avisId) {
-  if (!isOwn || !confirm('Supprimer votre réponse ?')) return;
-  try {
-    await api('PUT', `/initiatives/${initId}/avis/${avisId}/reponse`, { reponse_texte: null });
-    if (_vitrineInit) renderVitrineVisitor(_vitrineInit);
-  } catch (e) { alert('Erreur : ' + (e.message||'')); }
-}
-
-/* Visiteur : signaler un avis abusif */
-async function pvtSignalerAvis(initId, avisId) {
-  if (!CU) { window.location.href = 'login.html'; return; }
-  const motif = prompt('Pourquoi signalez-vous cet avis ?');
-  if (!motif) return;
-  try {
-    await api('POST', `/initiatives/${initId}/avis/${avisId}/signaler`, { motif });
-    alert('Merci, cet avis a été signalé à la modération.');
-  } catch (e) { alert('Erreur : ' + (e.message||'')); }
-}
+// pvtWriteAvis / pvtReplyAvis / pvtDeleteReplyAvis / pvtSignalerAvis (prompt()-based) ont été
+// remplacées par le composant partagé assets/avis-section.js (window.AvisSection), monté sur
+// l'onglet Profil — voir renderVisitorProfile().
 
 /* ══════════ Pourquoi nous choisir — arguments (CRUD + glisser-déposer + icônes) ══════════ */
 let _pvtArguments = [];
@@ -8201,6 +8120,7 @@ init();
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="assets/avis-section.js"></script>
 <script src="assets/carte-diaspoactif.js"></script>
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
