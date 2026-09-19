@@ -1098,7 +1098,12 @@ function injectComptesLiesSwitcherStyles() {
    renderMobileBottomNavAuto()) : le ▾ de la topbar y était difficile à atteindre (défilement
    horizontal de .topbar-right) et source de plusieurs bugs. Un seul déclencheur visible à la
    fois évite aussi deux boutons redondants pour la même action. */
-@media(max-width:768px){.cl-switch-wrap{display:none!important;}}`;
+/* Remis visible sur mobile (2026-09-19, demande explicite "déplace changement de compte à cet
+   endroit également") : masqué depuis le 2026-09-08 au profit du seul bouton "Comptes" de la
+   barre du bas, par crainte de deux déclencheurs redondants pour le même menu — mais le vrai
+   bug alors rencontré (piège de z-index de .topbar, voir ouvrirClDd()) est corrigé depuis
+   (document.body.appendChild(dd) ci-dessus), donc plus de raison technique de le masquer ici.
+   Les deux déclencheurs restent volontairement actifs : demande explicite de l'utilisateur. */`;
   document.head.appendChild(st);
 }
 
@@ -1183,6 +1188,20 @@ function initCompactMenu() {
   const dd = document.getElementById('compact-menu-dd');
   if (!dd) return;
   injectCompactMenuStyles();
+  /* Bug réel trouvé le 2026-09-19 (signalé "le bouton ne fonctionne pas" sur téléphone réel,
+     invérifiable en local par capture d'écran malgré un état DOM parfaitement correct) :
+     .topbar est position:sticky + z-index:50 (styles.v2.css) — cela crée un CONTEXTE
+     D'EMPILEMENT que ses descendants position:fixed ne peuvent jamais dépasser, quel que
+     soit leur propre z-index (2000 ici ne sert à rien tant qu'on reste dans ce sous-arbre).
+     Exactement le même piège déjà documenté plus haut dans ce fichier pour le bandeau de
+     vérification d'e-mail et #sidebar-toggle. Le menu s'ouvrait donc réellement (DOM, classe
+     .open, position calculée : tout correct) mais pouvait rester peint SOUS un autre élément
+     fixed du site (chatbot O-Z, bannière...) sans que rien ne le révèle en inspectant l'état
+     seul — d'où l'échec de diagnostic initial. Corrigé en sortant le panneau du sous-arbre
+     .topbar : rattaché directement à <body>, il rivalise enfin sur un pied d'égalité avec
+     tout le reste de la page. Le bouton déclencheur, lui, reste en place (rien à corriger,
+     ce n'est pas un élément position:fixed). */
+  if (dd.parentNode !== document.body) document.body.appendChild(dd);
   // Ancrage stable dans le menu : les éléments déplacés sont insérés juste avant, dans cet
   // ordre — les 4 liens neufs (Tableau de bord/Paramètres/Notifications/Site Diaspo'Actif),
   // déjà dans le HTML, restent en dernier.

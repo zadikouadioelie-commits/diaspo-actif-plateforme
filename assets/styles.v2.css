@@ -518,6 +518,11 @@ button{font-family:inherit;cursor:pointer;}
   .topbar-right{
     gap:8px;flex-wrap:nowrap;min-width:0;overflow-x:auto;
     -webkit-overflow-scrolling:touch;
+    /* Recentré (2026-09-19, demande explicite "recentre les boutons du haut si il y a de la
+       place") : par défaut les icônes restaient calées à droite dès qu'il restait de l'espace
+       libre — centré, ce même espace se répartit des deux côtés. Sans effet quand le contenu
+       déborde déjà (le défilement horizontal ci-dessus prend le relais normalement). */
+    justify-content:center;
     /* Barre de defilement VISIBLE : cette zone deborde volontairement sur petit ecran,
        mais la masquer rendait inatteignable tout ce qui depasse (Deconnexion coupe).
        Une barre visible est le seul moyen d'aller chercher ces elements. */
