@@ -24006,11 +24006,23 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       PRIMARY KEY(invitation_id, visiteur_hash, jour)
     )`).run();
 
-    // Seed des 31 domaines — copie figée de window.DOMAINES_ACTIVITE (assets/domaines-activite.js)
-    // au moment de l'écriture de ce module ; une clé n'est jamais renommée une fois publiée, donc
-    // aucune dépendance runtime au fichier front-end n'est nécessaire ici.
-    const nbDomaines = (await db.prepare("SELECT COUNT(*) n FROM parrainage_domaines").get())?.n || 0;
-    if (!nbDomaines) {
+    /* Index d'unicité nécessaire pour que INSERT OR IGNORE (ci-dessous) déduplique vraiment —
+       sans contrainte, SQLite comme Postgres se contentent d'insérer une ligne de plus à
+       chaque nouvel appel. */
+    try { await db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_parr_sous_domaines_uniq ON parrainage_sous_domaines(domaine_id, nom)").run(); } catch (e) {}
+
+    /* Seed des 32 domaines — copie figée de window.DOMAINES_ACTIVITE (assets/domaines-activite.js)
+       au moment de l'écriture de ce module ; une clé n'est jamais renommée une fois publiée, donc
+       aucune dépendance runtime au fichier front-end n'est nécessaire ici.
+       INSERT OR IGNORE ligne par ligne (jamais un gate "if table vide") : un cold start
+       serverless (Vercel) peut démarrer plusieurs instances concurrentes qui exécutent toutes
+       cette IIFE en même temps — la première voit la table vide, insère quelques lignes, une
+       autre instance simultanée obtient une erreur de clé dupliquée sur la même ligne et
+       plantait alors TOUT LE RESTE de sa propre boucle (avant ce correctif, un `if (!nbDomaines)`
+       ne retentait plus jamais une fois la table non vide) — bug réel constaté en production
+       le 2026-09-19 : table créée mais 0 ligne. Idempotent ligne par ligne, donc rejouable sans
+       risque à chaque démarrage, quel que soit l'état de départ. */
+    {
       const DOMAINES_SEED = [
         ['agriculture', '🌾', 'Agriculture'],
         ['associations_vie_citoyenne', '🏛️', 'Associations & Vie citoyenne'],
@@ -24047,7 +24059,8 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       ];
       for (let i = 0; i < DOMAINES_SEED.length; i++) {
         const [cle, icone, nom] = DOMAINES_SEED[i];
-        await db.prepare("INSERT INTO parrainage_domaines (cle, nom, icone, ordre) VALUES (?,?,?,?)").run(cle, nom, icone, i);
+        try { await db.prepare("INSERT OR IGNORE INTO parrainage_domaines (cle, nom, icone, ordre) VALUES (?,?,?,?)").run(cle, nom, icone, i); }
+        catch (e) { console.error('[migrateParrainageInvitations] seed domaine', cle, e.message); }
       }
       // Preuve de concept de la hiérarchie domaine → sous-domaines (cahier des charges, exemple
       // « Santé ») — les autres domaines restent sans sous-domaine prédéfini tant qu'un futur
@@ -24057,7 +24070,8 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       if (sante) {
         const SOUS_DOMAINES_SANTE = ['Médecine', 'Pharmacie', 'Soins infirmiers', 'Kinésithérapie', 'Dentaire', 'Vétérinaire', 'Recherche médicale', 'Autre'];
         for (let i = 0; i < SOUS_DOMAINES_SANTE.length; i++) {
-          await db.prepare("INSERT INTO parrainage_sous_domaines (domaine_id, nom, ordre) VALUES (?,?,?)").run(sante.id, SOUS_DOMAINES_SANTE[i], i);
+          try { await db.prepare("INSERT OR IGNORE INTO parrainage_sous_domaines (domaine_id, nom, ordre) VALUES (?,?,?)").run(sante.id, SOUS_DOMAINES_SANTE[i], i); }
+          catch (e) { console.error('[migrateParrainageInvitations] seed sous-domaine', SOUS_DOMAINES_SANTE[i], e.message); }
         }
       }
     }
