@@ -3425,7 +3425,12 @@ route("GET", "/api/profil/:id/avis", async (req, res, params) => {
   const repartitionRows = await db.prepare("SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible') GROUP BY note").all(targetId);
   const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
   repartitionRows.forEach(r => { repartition[r.note] = r.n; });
-  sendJSON(res, 200, { avis: avisPublic, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null, repartition });
+  // Number(...) explicite : sur Postgres, COUNT(*) revient en chaîne ("0"), toujours "truthy"
+  // en JS — sans cette coercion, un profil sans aucun avis affichait quand même "0.0 ★"
+  // (bug constaté en production le 2026-09-19, absent en local/SQLite où COUNT(*) est déjà
+  // un nombre).
+  const totalAvis = Number(stats?.n) || 0;
+  sendJSON(res, 200, { avis: avisPublic, total: totalAvis, moyenne: totalAvis ? Number(stats.moyenne).toFixed(1) : null, repartition });
 });
 
 route("POST", "/api/profil/:id/avis", async (req, res, params, body) => {
@@ -3529,7 +3534,12 @@ route("GET", "/api/initiatives/:id/avis", async (req, res, params) => {
   const repartitionRows = await db.prepare(`SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE initiative_id=? AND (statut IS NULL OR statut='visible') GROUP BY note`).all(params.id);
   const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
   repartitionRows.forEach(r => { repartition[r.note] = r.n; });
-  sendJSON(res, 200, { avis: avisPublic, total: stats?.n || 0, moyenne: stats?.n ? Number(stats.moyenne).toFixed(1) : null, repartition });
+  // Number(...) explicite : sur Postgres, COUNT(*) revient en chaîne ("0"), toujours "truthy"
+  // en JS — sans cette coercion, un profil sans aucun avis affichait quand même "0.0 ★"
+  // (bug constaté en production le 2026-09-19, absent en local/SQLite où COUNT(*) est déjà
+  // un nombre).
+  const totalAvis = Number(stats?.n) || 0;
+  sendJSON(res, 200, { avis: avisPublic, total: totalAvis, moyenne: totalAvis ? Number(stats.moyenne).toFixed(1) : null, repartition });
 });
 
 /* POST /api/initiatives/:id/avis — visiteur connecté (non propriétaire), un avis par personne */
