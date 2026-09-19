@@ -362,6 +362,22 @@ html, body { overflow-x:clip; }
   .p-col-sticky { position:static; }
 }
 
+/* Présentation de la boutique tronquée sur mobile (2026-09-19, demande explicite : "reduit
+   de moitier avec un bouton en savoir plus sinon ca fait trop long") — un texte long occupait
+   tout l'écran avant même d'atteindre le catalogue. Line-clamp CSS pur (même technique que
+   .pub-text ailleurs dans ce fichier) ; le bouton lui-même reste caché sur desktop, où le
+   texte s'affiche déjà en entier sans ce problème de longueur d'écran. */
+.pvt-desc-more { display:none; margin-top:8px; background:none; border:none; color:var(--tp); font-weight:700; font-size:13px; cursor:pointer; padding:0; }
+/* Règle de base (display:none) déclarée AVANT le media query : une règle non conditionnelle
+   placée APRÈS gagnerait toujours le cascade à spécificité égale, quelle que soit la largeur
+   d'écran — bug réel constaté à l'exécution (le bouton restait display:none même à 375px de
+   large tant que l'ordre était inversé). */
+@media(max-width:760px){
+  .pvt-desc-clamp { display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; }
+  .pvt-desc-clamp.pvt-desc-expanded { display:block; -webkit-line-clamp:unset; overflow:visible; }
+  .pvt-desc-more { display:inline-block; }
+}
+
 /* ===== CARTE ÉVÉNEMENT (repris de evenements.html) ===== */
 .evt-card { border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:box-shadow .15s; background:#fff; }
 .evt-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.1); }
@@ -2836,7 +2852,10 @@ async function renderVitrineVisitor(init) {
 
   const presentation = ((init.description || isOwn) && modOn('a_propos')) ? `<section id="pv-presentation" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la boutique</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
-    <div class="pvt-section-body"><p style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</p></div>
+    <div class="pvt-section-body">
+      <p id="pvt-desc-text" class="${init.description ? 'pvt-desc-clamp' : ''}" style="margin:0;font-size:14px;line-height:1.7;color:#3B4658;">${init.description ? esc(init.description).replace(/\n/g,'<br>') : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</p>
+      ${init.description ? `<button type="button" class="pvt-desc-more" onclick="pvtToggleDescription(this)">En savoir plus ▾</button>` : ''}
+    </div>
   </section>` : '';
 
   const collectionsSec = ((catalogues.length || isOwn) && modOn('catalogue')) ? `<section id="pv-collections" class="pvt-section">
@@ -4320,13 +4339,59 @@ async function deleteCatalogue(id) {
   } catch (e) { alert('Erreur : ' + e.message); }
 }
 
+/* Bascule "En savoir plus / Réduire" du texte de présentation tronqué sur mobile (voir la
+   règle CSS .pvt-desc-clamp) — un simple toggle de classe, aucune logique côté serveur. */
+function pvtToggleDescription(btn) {
+  const p = document.getElementById('pvt-desc-text');
+  if (!p) return;
+  const expanded = p.classList.toggle('pvt-desc-expanded');
+  btn.textContent = expanded ? 'Réduire ▴' : 'En savoir plus ▾';
+}
+
+/* Pagination "3 par 3" (2026-09-19, demande explicite : "presente les articles 3 par 3 pour
+   diminuer la longueure de scrool") — affiche un premier lot de 3 cartes plutôt que tout
+   empiler d'un coup ; un bouton "Voir plus" en révèle 3 de plus à chaque clic. Le nombre déjà
+   révélé est mémorisé sur la grille elle-même (dataset), donc un rechargement ultérieur de la
+   même grille (ajout/suppression d'un article) ne fait pas retomber l'affichage à 3 si le
+   propriétaire avait déjà cliqué "Voir plus". */
+function pvtRenderProduitsPage(grid, items, ownerId, pageSize) {
+  const shown = Math.min(Number(grid.dataset.pvtShown) || pageSize, items.length);
+  grid.dataset.pvtShown = shown;
+  grid.innerHTML = items.slice(0, shown).map(p => pvtProductCardHtml(p, ownerId)).join('');
+  let btn = grid.nextElementSibling;
+  if (!btn || !btn.classList || !btn.classList.contains('pvt-voir-plus')) btn = null;
+  if (shown < items.length) {
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pvt-btn soft pvt-voir-plus';
+      btn.style.cssText = 'margin-top:12px;';
+      grid.insertAdjacentElement('afterend', btn);
+    }
+    const reste = items.length - shown;
+    btn.textContent = `Voir plus (${reste} article${reste > 1 ? 's' : ''})`;
+    btn.onclick = () => {
+      grid.dataset.pvtShown = shown + pageSize;
+      pvtRenderProduitsPage(grid, items, ownerId, pageSize);
+      if (isOwn) wireProductDrag(grid, _vitrineInit.id, null);
+    };
+  } else if (btn) {
+    btn.remove();
+  }
+}
+
 function renderPvtProducts(produits, ownerId) {
   const grid = document.getElementById('pvt-prodgrid');
   if (!grid) return;
   // Le propriétaire voit aussi ses produits masqués (pour pouvoir les réactiver)
   const visibles = isOwn ? produits : produits.filter(p => (p.statut||'disponible') !== 'masque');
-  if (!visibles.length) { grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.</div>`; return; }
-  grid.innerHTML = visibles.map(p => pvtProductCardHtml(p, ownerId)).join('');
+  if (!visibles.length) {
+    grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.</div>`;
+    const btn = grid.nextElementSibling;
+    if (btn && btn.classList && btn.classList.contains('pvt-voir-plus')) btn.remove();
+    return;
+  }
+  pvtRenderProduitsPage(grid, visibles, ownerId, 3);
   if (isOwn) wireProductDrag(grid, _vitrineInit.id, null);
 }
 
