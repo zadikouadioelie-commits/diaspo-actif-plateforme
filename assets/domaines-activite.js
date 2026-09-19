@@ -26,6 +26,7 @@ window.DOMAINES_ACTIVITE = [
   ['elevage_peche',              '🐄', 'Élevage & Pêche'],
   ['energie_environnement',      '⚡', 'Énergie & Environnement'],
   ['environnement',              '🌱', 'Environnement'],
+  ['evenementiel',               '🎉', 'Événementiel'],
   ['finance_investissement',     '💰', 'Finance & Investissement'],
   ['industrie_production',       '📦', 'Industrie & Production'],
   ['medecine_sante',             '🏥', 'Médecine & Santé'],
