@@ -34,6 +34,9 @@ function dvtVignetteHtml(v) {
   const ytId = v.type_source === 'youtube' ? dvtYoutubeId(v.url) : null;
   if (v.miniature_url) return `<img src="${v.miniature_url}" alt="" loading="lazy">`;
   if (ytId) return `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy">`;
+  // "bientot" (aucune vidéo réelle) : visuel officiel "Bientôt disponible" fourni par Diaspo'Actif,
+  // affiché en entier (jamais recadré) car c'est une affiche verticale, pas une vignette 16/9.
+  if (v.type_source === 'bientot') return `<img src="/assets/videos-bientot-disponible.jpg" alt="Bientôt disponible" loading="lazy" style="object-fit:contain;background:#EEF2F8;">`;
   return `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;">${v.icone || '🎬'}</div>`;
 }
 
