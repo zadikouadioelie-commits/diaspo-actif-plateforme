@@ -6573,6 +6573,15 @@ function annuaireScorerEntite(champsParPriorite, termesOriginaux, termesEtendus)
   return score;
 }
 
+/* Un compte rendu invisible par un administrateur (POST /api/admin/comptes/:id/invisibilite)
+   ne doit plus apparaître dans l'Annuaire, pour personne, tant que la durée choisie n'est pas
+   écoulée — même logique temporelle que la suspension (suspendu_definitif/suspendu_jusqu_au),
+   jamais comparée en SQL brut (portabilité SQLite/Postgres) mais en JS après lecture, comme
+   partout ailleurs sur ce projet pour ces deux colonnes miroir. */
+function annuaireEstInvisible(row) {
+  return !!(row.invisible_annuaire_definitif || (row.invisible_annuaire_jusqu_au && new Date(row.invisible_annuaire_jusqu_au) > new Date()));
+}
+
 /* GET /api/annuaire/recherche — recherche par mots-clés combinable avec les filtres existants (pays/ville/type/domaine) */
 route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) => {
   const qRaw = (query.q || '').trim();
@@ -6587,7 +6596,12 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
    repli, la cartouche retombait sur la nationalité et affichait « France » pour une
    initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
-"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
+  /* Une Initiative est un profil d'organisation, mais son "compte" au sens administrateur est
+     celui de son propriétaire (owner_user_id) — l'invisibilité s'applique donc via celle DU
+     PROPRIÉTAIRE, pas d'un champ propre à la table initiatives. */
+  initiatives = initiatives.filter(r => !annuaireEstInvisible({ invisible_annuaire_definitif: r.owner_invisible_definitif, invisible_annuaire_jusqu_au: r.owner_invisible_jusqu_au }));
+  initiatives.forEach(r => { delete r.owner_invisible_definitif; delete r.owner_invisible_jusqu_au; });
   if (query.pays) initiatives = initiatives.filter(r => r.pays === query.pays);
   if (query.domaine) initiatives = initiatives.filter(r => r.domaine === query.domaine);
   /* "Initiative" est un filtre générique (toutes les initiatives, quel que soit leur
@@ -6596,10 +6610,12 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   if (query.ville) { const v = query.ville.toLowerCase(); initiatives = initiatives.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
   let utilisateurs = (query.type && query.type !== 'Utilisateurs') ? [] : await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, bio, competences, experiences, centres_interet, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500"
   ).all();
   if (query.pays) utilisateurs = utilisateurs.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); utilisateurs = utilisateurs.filter(r => (r.ville||'').toLowerCase().includes(v)); }
+  utilisateurs = utilisateurs.filter(r => !annuaireEstInvisible(r));
+  utilisateurs.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });
 
   // Collectivités, comptes Institutionnel/Officiel et Diaspo'Actif (Administrateur) — organismes
   // institutionnels, absents de la table initiatives. Les rôles 'institutionnel'/'officiel'
@@ -6611,9 +6627,12 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
        est obligatoire et validée à leur accréditation. */
     `SELECT id, nom, nom_institution, type_organisme, ville, pays, photo_url, banner_url, bio, role,
        nom_responsable_etatique, prenom_responsable_etatique, fonction_responsable_etatique,
-       origine1, origine2, pays_origine_institution, nationalite1, nationalite2, domaine_principal
+       origine1, origine2, pays_origine_institution, nationalite1, nationalite2, domaine_principal,
+       invisible_annuaire_definitif, invisible_annuaire_jusqu_au
      FROM users WHERE role IN ('collectivite','administrateur','institutionnel','officiel') AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) LIMIT 500`
   ).all();
+  organismes = organismes.filter(r => !annuaireEstInvisible(r));
+  organismes.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });
   if (query.pays) organismes = organismes.filter(r => r.pays === query.pays);
   if (query.ville) { const v = query.ville.toLowerCase(); organismes = organismes.filter(r => (r.ville||'').toLowerCase().includes(v)); }
 
@@ -6754,8 +6773,10 @@ route("GET", "/api/annuaire/suggestions", async (req, res, params, body, query) 
 /* GET /api/annuaire/utilisateurs — liste publique des comptes Utilisateur (annuaire), filtrable par nom/prénom/ville */
 route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query) => {
   let rows = await db.prepare(
-    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2 FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
+    "SELECT id, nom, prenom, ville, pays, photo_url, banner_url, titre_pro, nationalite1, nationalite2, origine1, origine2, domaine_principal, sous_domaine_1, sous_domaine_2, invisible_annuaire_definitif, invisible_annuaire_jusqu_au FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE) ORDER BY nom ASC LIMIT 200"
   ).all();
+  rows = rows.filter(r => !annuaireEstInvisible(r));
+  rows.forEach(r => { delete r.invisible_annuaire_definitif; delete r.invisible_annuaire_jusqu_au; });
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }
   if (query.ville) { const q = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(q)); }
@@ -6852,7 +6873,9 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce
    repli, la cartouche retombait sur la nationalité et affichait « France » pour une
    initiative d'origine ivoirienne — un pays FAUX, ce qui est pire qu'une absence. */
-"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2 FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
+"SELECT i.*, u.origine1 AS owner_origine1, u.origine2 AS owner_origine2, u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au FROM initiatives i LEFT JOIN users u ON u.id=i.owner_user_id WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid') ORDER BY i.created_at DESC").all();
+  rows = rows.filter(r => !annuaireEstInvisible({ invisible_annuaire_definitif: r.owner_invisible_definitif, invisible_annuaire_jusqu_au: r.owner_invisible_jusqu_au }));
+  rows.forEach(r => { delete r.owner_invisible_definitif; delete r.owner_invisible_jusqu_au; });
   const q = (query.q || "").toLowerCase();
   if (q) rows = rows.filter(r => r.nom.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q));
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
@@ -10533,6 +10556,38 @@ route("DELETE", "/api/initiatives/:id/membres/:userId", async (req, res, params)
   }
   if (membre && membre.statut === 'accepte') journalInit(params.id, 'fin_affiliation', `Fin de l'affiliation avec le membre #${params.userId}`);
   sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/annuaire/inviter-affiliation/:userId — entrée pratique depuis une carte "Utilisateur"
+   de l'annuaire (2026-09-19, demande explicite : un utilisateur peut être affilié PAR une
+   Initiative). Fait exactement ce que POST /api/initiatives/:id/membres fait déjà depuis
+   dashboard-initiative.html, mais résout l'initiative de l'appelant CÔTÉ SERVEUR (via
+   owner_user_id) au lieu d'exiger que le front connaisse son propre id d'initiative — l'annuaire
+   sert tous les types de comptes, inutile de lui faire porter cette donnée pour les 99% de
+   visiteurs qui ne sont pas des Initiatives. */
+route("POST", "/api/annuaire/inviter-affiliation/:userId", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role !== 'initiative') return sendJSON(res, 403, { error: "Seul un compte Initiative peut affilier un utilisateur." });
+  const init = await db.prepare("SELECT id, nom FROM initiatives WHERE owner_user_id = ?").get(user.id);
+  if (!init) return sendJSON(res, 404, { error: "Aucune initiative associée à ce compte." });
+  const target = await db.prepare("SELECT id, nom, prenom FROM users WHERE id = ?").get(params.userId);
+  if (!target) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
+  const { fonction, message } = body;
+  try {
+    await db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, fonction, message, statut) VALUES (?, ?, ?, ?, 'en_attente')").run(init.id, params.userId, fonction || null, message || null);
+  } catch(e) {
+    if (e.message.includes("UNIQUE")) return sendJSON(res, 409, { error: "Ce membre a déjà été invité ou est déjà affilié." });
+    throw e;
+  }
+  try {
+    await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
+      params.userId, 'affiliation_initiative',
+      `Invitation à rejoindre une initiative`,
+      `Vous avez été identifié comme membre de l'initiative « ${init.nom} »${fonction ? `, en tant que ${fonction}` : ''}. Souhaitez-vous accepter cette affiliation ?${message ? `\n« ${message} »` : ''}`,
+      JSON.stringify({ initiative_id: init.id, nom: init.nom, fonction: fonction || null }));
+  } catch(_) {}
+  sendJSON(res, 201, { ok: true });
 });
 
 /* ---------- Recommandations post-inscription ---------- */
@@ -18905,6 +18960,82 @@ route("DELETE", "/api/admin/membres/:id", async (req, res, params, body) => {
     VALUES (?,?,?,?,?,?,?,?,?)
   `).run(Number(params.id), cible.role, cible.nom, cible.prenom, cible.email, cible.created_at, motif, user.id, user.nom);
   SEC.logSecurity("admin_membre_supprime", { admin_id: user.id, cible_id: Number(params.id) });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Actions administrateur directes depuis l'annuaire (2026-09-19) ──
+   Suspension et invisibilité temporaire/définitive, SANS passer par le circuit de dossier de
+   signalement (POST /api/admin/dossiers-signalement/:id/decision) : celui-ci reste le
+   workflow normal pour une décision issue d'un signalement déposé, ce qui suit est une action
+   rapide directe de l'administrateur depuis une fiche annuaire. Journalisées dans audit_log
+   (table générique déjà existante, voir POST/GET /api/audit-log) plutôt que dans
+   sanctions_disciplinaires, qui reste scopée au workflow de signalement (impact sur le score
+   de confiance notamment) pour ne pas mélanger les deux origines. */
+const DUREES_ACTION_ANNUAIRE = { '24h': 1, '7j': 7, '30j': 30 };
+function calculerDateFinAction(duree) {
+  if (duree === 'definitif') return { estDefinitif: true, dateFin: null };
+  const jours = DUREES_ACTION_ANNUAIRE[duree];
+  if (!jours) return null;
+  return { estDefinitif: false, dateFin: new Date(Date.now() + jours * 86400000).toISOString() };
+}
+
+route("POST", "/api/admin/comptes/:id/suspendre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de suspendre votre propre compte." });
+  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const periode = calculerDateFinAction(body?.duree);
+  if (!periode) return sendJSON(res, 400, { error: "Durée invalide (24h, 7j, 30j ou definitif)." });
+  const motif = (body?.motif || "").trim() || null;
+  if (periode.estDefinitif) {
+    await db.prepare("UPDATE users SET suspendu_definitif=1, suspendu_jusqu_au=NULL WHERE id=?").run(params.id);
+  } else {
+    await db.prepare("UPDATE users SET suspendu_jusqu_au=?, suspendu_definitif=0 WHERE id=?").run(periode.dateFin, params.id);
+  }
+  await db.prepare("INSERT INTO audit_log (admin_id, action, cible_type, cible_id, detail) VALUES (?,?,?,?,?)")
+    .run(user.id, "suspension_directe", cible.role, Number(params.id), JSON.stringify({ duree: body?.duree, motif, date_fin: periode.dateFin }));
+  SEC.logSecurity("admin_compte_suspendu", { admin_id: user.id, cible_id: Number(params.id), duree: body?.duree });
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/admin/comptes/:id/invisibilite", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  if (Number(params.id) === user.id) return sendJSON(res, 400, { error: "Impossible de vous rendre invisible vous-même." });
+  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const periode = calculerDateFinAction(body?.duree);
+  if (!periode) return sendJSON(res, 400, { error: "Durée invalide (24h, 7j, 30j ou definitif)." });
+  const motif = (body?.motif || "").trim() || null;
+  if (periode.estDefinitif) {
+    await db.prepare("UPDATE users SET invisible_annuaire_definitif=1, invisible_annuaire_jusqu_au=NULL WHERE id=?").run(params.id);
+  } else {
+    await db.prepare("UPDATE users SET invisible_annuaire_jusqu_au=?, invisible_annuaire_definitif=0 WHERE id=?").run(periode.dateFin, params.id);
+  }
+  await db.prepare("INSERT INTO audit_log (admin_id, action, cible_type, cible_id, detail) VALUES (?,?,?,?,?)")
+    .run(user.id, "invisibilite_annuaire", cible.role, Number(params.id), JSON.stringify({ duree: body?.duree, motif, date_fin: periode.dateFin }));
+  SEC.logSecurity("admin_compte_invisible", { admin_id: user.id, cible_id: Number(params.id), duree: body?.duree });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Lève une invisibilité/suspension avant échéance (ex: erreur de manipulation) — un seul point
+   d'entrée pour les deux, la colonne à toucher dépend de `type`. */
+route("POST", "/api/admin/comptes/:id/lever-action", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const type = body?.type;
+  if (type === "suspension") {
+    await db.prepare("UPDATE users SET suspendu_definitif=0, suspendu_jusqu_au=NULL WHERE id=?").run(params.id);
+  } else if (type === "invisibilite") {
+    await db.prepare("UPDATE users SET invisible_annuaire_definitif=0, invisible_annuaire_jusqu_au=NULL WHERE id=?").run(params.id);
+  } else {
+    return sendJSON(res, 400, { error: "type invalide (suspension ou invisibilite)." });
+  }
+  await db.prepare("INSERT INTO audit_log (admin_id, action, cible_type, cible_id, detail) VALUES (?,?,?,?,?)")
+    .run(user.id, `${type}_levee`, cible.role, Number(params.id), null);
   sendJSON(res, 200, { ok: true });
 });
 

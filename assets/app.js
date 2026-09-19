@@ -1616,6 +1616,103 @@ async function daToggleSuivre(type, id, btn){
 }
 window.daToggleSuivre = daToggleSuivre;
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ACTIONS ADMINISTRATEUR DIRECTES DEPUIS L'ANNUAIRE (2026-09-19)
+   ──────────────────────────────────────────────────────────────────────────
+   Supprimer / Suspendre / Rendre invisible un compte, sans quitter la fiche.
+   Visible uniquement si CURRENT_USER.role === 'administrateur'. Le menu de
+   durée (Suspendre/Invisibilité) est en position:fixed, ajouté directement
+   sous <body> à l'ouverture — jamais imbriqué dans la carte elle-même : une
+   carte d'annuaire est dans un conteneur qui peut défiler/se redécouper,
+   exactement le piège qui rendait le bouton "changer de compte" inopérant
+   sur mobile (voir commentaire sur initComptesLiesSwitcher un peu plus haut
+   dans ce fichier) — même cause, même correctif appliqué ici dès le départ.
+   ══════════════════════════════════════════════════════════════════════════ */
+function injectAdminAnnuaireStyles() {
+  if (document.getElementById('admin-ann-style')) return;
+  const st = document.createElement('style');
+  st.id = 'admin-ann-style';
+  st.textContent = `
+.admin-ann-btn{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;font-weight:700;}
+.admin-ann-btn:hover{background:#fee2e2;}
+.admin-ann-btn.admin-ann-suspendre{background:#fffbeb;color:#92400e;border-color:#fde68a;}
+.admin-ann-btn.admin-ann-suspendre:hover{background:#fef3c7;}
+.admin-ann-btn.admin-ann-invisible{background:#eff6ff;color:#1e3a8a;border-color:#bfdbfe;}
+.admin-ann-btn.admin-ann-invisible:hover{background:#dbeafe;}
+.admin-ann-dd{display:none;position:fixed;background:#fff;color:#111;color-scheme:light;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.2);min-width:180px;padding:6px;z-index:2100;}
+.admin-ann-dd.open{display:block;}
+.admin-ann-dd button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#111;}
+.admin-ann-dd button:hover{background:#f3f4f6;}`;
+  document.head.appendChild(st);
+}
+
+function adminAnnuaireBoutonsHtml(cibleId, estMoi) {
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER || CURRENT_USER.role !== 'administrateur' || estMoi || !cibleId) return '';
+  return `
+    <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireSupprimer(${cibleId}, this)">🗑️ Supprimer</button>
+    <button type="button" class="ann-card-btn admin-ann-btn admin-ann-suspendre" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'suspendre', ${cibleId})">⛔ Suspendre</button>
+    <button type="button" class="ann-card-btn admin-ann-btn admin-ann-invisible" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'invisibilite', ${cibleId})">🙈 Invisibilité</button>`;
+}
+
+const ADMIN_ANN_DUREES = [['24h','24 heures'], ['7j','7 jours'], ['30j','30 jours'], ['definitif','Définitif']];
+
+window.adminAnnuaireOuvrirDuree = function (bouton, action, cibleId) {
+  injectAdminAnnuaireStyles();
+  document.querySelectorAll('.admin-ann-dd').forEach(dd => dd.remove());
+  const dd = document.createElement('div');
+  dd.className = 'admin-ann-dd';
+  dd.innerHTML = ADMIN_ANN_DUREES.map(([val, label]) =>
+    `<button type="button" onclick="event.stopPropagation(); adminAnnuaireConfirmerDuree(${cibleId}, '${action}', '${val}', this)">${label}</button>`
+  ).join('');
+  document.body.appendChild(dd);
+  const r = bouton.getBoundingClientRect();
+  dd.style.right = Math.round(window.innerWidth - r.right) + 'px';
+  dd.classList.add('open');
+  const ddHeight = dd.offsetHeight;
+  if (window.innerHeight - r.bottom < ddHeight + 8 && r.top > ddHeight + 8) {
+    dd.style.bottom = Math.round(window.innerHeight - r.top + 8) + 'px'; dd.style.top = 'auto';
+  } else {
+    dd.style.top = Math.round(r.bottom + 8) + 'px'; dd.style.bottom = 'auto';
+  }
+  const fermer = (e) => { if (!dd.contains(e.target) && e.target !== bouton) { dd.remove(); document.removeEventListener('click', fermer, true); } };
+  setTimeout(() => document.addEventListener('click', fermer, true), 0);
+};
+
+window.adminAnnuaireConfirmerDuree = async function (cibleId, action, duree, item) {
+  const dd = item.closest('.admin-ann-dd');
+  const libelle = action === 'suspendre' ? 'suspendre' : 'rendre invisible dans l\'annuaire';
+  const dureeLabel = ADMIN_ANN_DUREES.find(d => d[0] === duree)?.[1] || duree;
+  if (!confirm(`Confirmer : ${libelle} ce compte pour "${dureeLabel}" ?`)) { if (dd) dd.remove(); return; }
+  try {
+    await api('POST', `/admin/comptes/${cibleId}/${action}`, { duree });
+    if (dd) dd.remove();
+    alert(action === 'suspendre' ? '✅ Compte suspendu.' : '✅ Compte rendu invisible dans l\'annuaire.');
+    /* apply() (la fonction de recherche annuaire) est enfermée dans la closure de
+       initAnnuaire() — inaccessible depuis cette fonction globale. Rechargement complet,
+       plus simple et fiable qu'exposer apply() juste pour ce cas : le compte disparaît
+       de la liste dès le prochain chargement de la page. */
+    if (action === 'invisibilite') location.reload();
+  } catch (e) {
+    if (dd) dd.remove();
+    alert(e.message || 'Erreur.');
+  }
+};
+
+window.adminAnnuaireSupprimer = async function (cibleId, bouton) {
+  if (!confirm('Supprimer définitivement ce compte ? Cette action anonymise le compte (RGPD) et est irréversible.')) return;
+  const motif = prompt('Motif de la suppression (facultatif) :') || '';
+  bouton.disabled = true;
+  try {
+    await api('DELETE', `/admin/membres/${cibleId}`, { motif });
+    alert('✅ Compte supprimé.');
+    const carte = bouton.closest('.ann-card');
+    if (carte) carte.remove();
+  } catch (e) {
+    bouton.disabled = false;
+    alert(e.message || 'Erreur lors de la suppression.');
+  }
+};
+
 function renderInitiativeCard(it){
   /* Domaine d'activité unifié (2026-09-04) : prime sur l'ancien it.domaine quand renseigné —
      migration "self-service", les deux champs coexistent tant qu'un compte n'a pas rouvert
@@ -1708,6 +1805,7 @@ function renderInitiativeCard(it){
             ? `<a href="dashboard-initiative.html#adhesions-init" class="ann-card-btn ann-card-btn-adherer" onclick="event.stopPropagation()">⚙️ Gérer les adhésions</a>`
             : `<button type="button" class="ann-card-btn ann-card-btn-adherer" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer</button>`
         ) : ''}
+        ${adminAnnuaireBoutonsHtml(it.owner_user_id, isOwnInit)}
       </div>
     </div>
   </div>`;
@@ -1849,6 +1947,65 @@ async function demanderAffiliation(initiativeId, btn){
 }
 window.demanderAffiliation = demanderAffiliation;
 
+/* Affiliation d'un utilisateur PAR une Initiative (2026-09-19, sens inverse de demanderAffiliation
+   ci-dessus) : depuis une carte "Utilisateur" de l'annuaire, un compte Initiative invite ce
+   compte à rejoindre officiellement son organisation. Réutilise la même mécanique que le module
+   Affiliation de dashboard-initiative.html (poste + message), simplifiée pour un seul compte
+   ciblé — POST /api/annuaire/inviter-affiliation/:userId résout l'initiative de l'appelant
+   côté serveur, le front n'a pas besoin de connaître son propre id d'initiative. */
+function ouvrirAffiliationUtilisateur(userId, btn) {
+  const nom = btn?.dataset?.affilierNom || 'ce compte';
+  document.getElementById('aff-user-modal-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'aff-user-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div class="card" style="width:100%;max-width:420px;background:#fff;border-radius:12px;padding:20px;">
+      <h3 style="margin:0 0 6px;">🔗 Affilier ${nom}</h3>
+      <p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;">Invitez ce compte à rejoindre officiellement votre initiative en tant que membre affilié.</p>
+      <label style="font-size:12.5px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Poste / fonction (optionnel)</label>
+      <select id="aff-user-poste" onchange="document.getElementById('aff-user-poste-autre').style.display=this.value==='__autre'?'':'none';" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:10px;">
+        <option value="">— Choisir —</option>
+        <option>Président</option><option>Vice-président</option><option>Directeur</option>
+        <option>Responsable communication</option><option>Responsable financier</option>
+        <option>Coordinateur</option><option>Chef de projet</option><option>Consultant</option>
+        <option>Développeur</option><option>Membre</option><option>Bénévole</option>
+        <option>Partenaire</option><option>Ambassadeur</option><option value="__autre">Autre (préciser)…</option>
+      </select>
+      <input type="text" id="aff-user-poste-autre" placeholder="Préciser le poste…" style="display:none;width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;margin-bottom:10px;">
+      <label style="font-size:12.5px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">Message (optionnel)</label>
+      <textarea id="aff-user-message" rows="3" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;resize:vertical;"></textarea>
+      <div id="aff-user-error" style="display:none;color:#EF4444;font-size:12.5px;margin-top:8px;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('aff-user-modal-overlay').remove()">Annuler</button>
+        <button class="btn btn-orange btn-sm" id="aff-user-send" onclick="envoyerAffiliationUtilisateur(${userId})">Envoyer l'invitation</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+window.ouvrirAffiliationUtilisateur = ouvrirAffiliationUtilisateur;
+
+async function envoyerAffiliationUtilisateur(userId) {
+  const errEl = document.getElementById('aff-user-error');
+  const sendBtn = document.getElementById('aff-user-send');
+  errEl.style.display = 'none';
+  const posteSel = document.getElementById('aff-user-poste').value;
+  const fonction = posteSel === '__autre' ? document.getElementById('aff-user-poste-autre').value.trim() : posteSel;
+  const message = document.getElementById('aff-user-message').value.trim();
+  sendBtn.disabled = true; sendBtn.textContent = '…';
+  try {
+    await api('POST', `/annuaire/inviter-affiliation/${userId}`, { fonction: fonction || null, message: message || null });
+    document.getElementById('aff-user-modal-overlay')?.remove();
+    if (typeof showToast === 'function') showToast('✅ Invitation envoyée !');
+  } catch (e) {
+    sendBtn.disabled = false; sendBtn.textContent = "Envoyer l'invitation";
+    errEl.textContent = e.message || "Erreur lors de l'envoi de l'invitation.";
+    errEl.style.display = 'block';
+  }
+}
+window.envoyerAffiliationUtilisateur = envoyerAffiliationUtilisateur;
+
 function populateSelect(id, values){
   const sel = document.getElementById(id);
   if(!sel) return;
@@ -1941,6 +2098,8 @@ async function initAnnuaire(){
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
+          ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" data-affilier-nom="${nom.replace(/"/g,'&quot;')}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${u.id}, this)">🔗 Affiliation</button>` : ''}
+          ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
         </div>
       </div>
     </div>`;
@@ -1971,6 +2130,7 @@ async function initAnnuaire(){
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
           ${abonnerBtn}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${o.id}" data-relation-classe="ann-card-btn"></span>` : ''}
+          ${adminAnnuaireBoutonsHtml(o.id, isOwn)}
         </div>
       </div>
     </div>`;

@@ -2360,6 +2360,12 @@ const MIGRATIONS = [
   // par recensement) : deux personnes du même carnet peuvent choisir des niveaux différents
   // pour le même champ. { [champ_id]: 'prive'|'autorises'|'membres'|'public' }, absent = privé.
   ["recensement_declarations", "visibilite_champs_json TEXT DEFAULT '{}'"],
+  // Action administrateur directe depuis l'annuaire (2026-09-19) — invisibilité temporaire ou
+  // définitive dans les résultats de recherche, même modèle que suspendu_jusqu_au/definitif
+  // ci-dessus mais ORTHOGONALE à la suspension : un compte invisible reste pleinement
+  // fonctionnel (connexion, messages...), juste absent de l'annuaire public le temps choisi.
+  ["users", "invisible_annuaire_jusqu_au TEXT"],
+  ["users", "invisible_annuaire_definitif INTEGER DEFAULT 0"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
