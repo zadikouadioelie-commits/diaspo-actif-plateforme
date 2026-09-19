@@ -3407,30 +3407,39 @@ route("GET", "/api/profil/:id/avis", async (req, res, params) => {
   const targetId = Number(params.id);
   const isOwner = me && Number(me.id) === targetId;
   const isAdmin = me && me.role === 'administrateur';
-  const rows = await db.prepare(`
-    SELECT va.id, va.note, va.commentaire, va.created_at, va.modifie_le,
-           va.reponse_texte, va.reponse_date, va.reponse_masquee, va.user_id, u.nom, u.prenom
-    FROM vitrine_avis va JOIN users u ON u.id = va.user_id
-    WHERE va.profil_user_id=? AND (va.statut IS NULL OR va.statut='visible')
-    ORDER BY va.created_at DESC LIMIT 50
-  `).all(targetId);
-  const avisPublic = rows.map(a => ({
-    ...a,
-    // Révélé au propriétaire du profil, à un admin, OU à l'auteur de CET avis précis (pour que
-    // le frontend puisse détecter "c'est mon avis" et proposer sa modification, cahier §7).
-    user_id: (isOwner || isAdmin || (me && Number(me.id) === Number(a.user_id))) ? a.user_id : undefined,
-    reponse_texte: (a.reponse_masquee && !isOwner && !isAdmin) ? null : a.reponse_texte,
-  }));
-  const stats = await db.prepare("SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible')").get(targetId);
-  const repartitionRows = await db.prepare("SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible') GROUP BY note").all(targetId);
-  const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
-  repartitionRows.forEach(r => { repartition[r.note] = r.n; });
-  // Number(...) explicite : sur Postgres, COUNT(*) revient en chaîne ("0"), toujours "truthy"
-  // en JS — sans cette coercion, un profil sans aucun avis affichait quand même "0.0 ★"
-  // (bug constaté en production le 2026-09-19, absent en local/SQLite où COUNT(*) est déjà
-  // un nombre).
-  const totalAvis = Number(stats?.n) || 0;
-  sendJSON(res, 200, { avis: avisPublic, total: totalAvis, moyenne: totalAvis ? Number(stats.moyenne).toFixed(1) : null, repartition });
+  /* Bug réel trouvé en production le 2026-09-19 : une erreur sur profil_user_id (colonne
+     posant problème sur Postgres) faisait tomber toute la fiche profil en 500 alors que les
+     avis ne sont qu'un encart secondaire de la page — dégradation silencieuse ("aucun avis")
+     plutôt que de bloquer l'affichage du profil entier ; l'erreur réelle reste journalisée. */
+  try {
+    const rows = await db.prepare(`
+      SELECT va.id, va.note, va.commentaire, va.created_at, va.modifie_le,
+             va.reponse_texte, va.reponse_date, va.reponse_masquee, va.user_id, u.nom, u.prenom
+      FROM vitrine_avis va JOIN users u ON u.id = va.user_id
+      WHERE va.profil_user_id=? AND (va.statut IS NULL OR va.statut='visible')
+      ORDER BY va.created_at DESC LIMIT 50
+    `).all(targetId);
+    const avisPublic = rows.map(a => ({
+      ...a,
+      // Révélé au propriétaire du profil, à un admin, OU à l'auteur de CET avis précis (pour que
+      // le frontend puisse détecter "c'est mon avis" et proposer sa modification, cahier §7).
+      user_id: (isOwner || isAdmin || (me && Number(me.id) === Number(a.user_id))) ? a.user_id : undefined,
+      reponse_texte: (a.reponse_masquee && !isOwner && !isAdmin) ? null : a.reponse_texte,
+    }));
+    const stats = await db.prepare("SELECT COUNT(*) AS n, AVG(note) AS moyenne FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible')").get(targetId);
+    const repartitionRows = await db.prepare("SELECT note, COUNT(*) AS n FROM vitrine_avis WHERE profil_user_id=? AND (statut IS NULL OR statut='visible') GROUP BY note").all(targetId);
+    const repartition = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+    repartitionRows.forEach(r => { repartition[r.note] = r.n; });
+    // Number(...) explicite : sur Postgres, COUNT(*) revient en chaîne ("0"), toujours "truthy"
+    // en JS — sans cette coercion, un profil sans aucun avis affichait quand même "0.0 ★"
+    // (bug constaté en production le 2026-09-19, absent en local/SQLite où COUNT(*) est déjà
+    // un nombre).
+    const totalAvis = Number(stats?.n) || 0;
+    sendJSON(res, 200, { avis: avisPublic, total: totalAvis, moyenne: totalAvis ? Number(stats.moyenne).toFixed(1) : null, repartition });
+  } catch (e) {
+    console.error('[GET /api/profil/:id/avis]', e.message);
+    sendJSON(res, 200, { avis: [], total: 0, moyenne: null, repartition: { 1:0, 2:0, 3:0, 4:0, 5:0 } });
+  }
 });
 
 route("POST", "/api/profil/:id/avis", async (req, res, params, body) => {
@@ -6723,8 +6732,15 @@ async function attachAvisAggregate(rows, idField) {
   if (!ids.length) return rows;
   const ph = ids.map(() => '?').join(',');
   const agg = {};
-  (await db.prepare(`SELECT profil_user_id, AVG(note) moyenne, COUNT(*) total FROM vitrine_avis WHERE (statut IS NULL OR statut='visible') AND profil_user_id IN (${ph}) GROUP BY profil_user_id`).all(...ids))
-    .forEach(a => { agg[Number(a.profil_user_id)] = { avis_moyenne: Number(a.moyenne).toFixed(1), avis_total: a.total }; });
+  /* Bug réel trouvé en production le 2026-09-19 : cet agrégat cassait TOUTE la liste appelante
+     (annuaire Initiatives + Utilisateurs) dès que la colonne profil_user_id posait problème sur
+     la base de prod (Postgres) — une donnée accessoire (note moyenne) ne doit jamais pouvoir
+     faire tomber la liste entière. Dégradation silencieuse en absence de note plutôt qu'un 500 ;
+     l'erreur réelle reste journalisée pour diagnostic. */
+  try {
+    (await db.prepare(`SELECT profil_user_id, AVG(note) moyenne, COUNT(*) total FROM vitrine_avis WHERE (statut IS NULL OR statut='visible') AND profil_user_id IN (${ph}) GROUP BY profil_user_id`).all(...ids))
+      .forEach(a => { agg[Number(a.profil_user_id)] = { avis_moyenne: Number(a.moyenne).toFixed(1), avis_total: a.total }; });
+  } catch (e) { console.error('[attachAvisAggregate]', e.message); }
   return rows.map(r => ({ ...r, ...(agg[Number(r[idField])] || { avis_moyenne: null, avis_total: 0 }) }));
 }
 
