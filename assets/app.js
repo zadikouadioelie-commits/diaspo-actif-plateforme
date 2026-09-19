@@ -682,6 +682,18 @@ async function openNotifDropdown(btn) {
   // Ferme tous les dropdowns ouverts
   document.querySelectorAll(".notif-dropdown.open").forEach(el => el.classList.remove("open"));
   if (isOpen) return;
+  // Sur mobile, le dropdown passe en position:fixed plein écran (responsive.v2.css) ; mais tant
+  // qu'il reste un descendant de <header class="topbar"> (position:sticky, qui crée son propre
+  // contexte d'empilement), il ne s'affiche jamais au-dessus des bandeaux de la page (ex. bandeau
+  // de vérification d'e-mail) même avec un z-index très élevé, car son empilement reste local au
+  // topbar. On le détache donc de <body> directement sur mobile pour qu'il s'affiche réellement
+  // au-dessus de tout (bug signalé par un utilisateur sur téléphone le 2026-09-19).
+  const bellWrap = btn && btn.closest(".notif-bell-wrap");
+  if (window.innerWidth <= 767) {
+    if (dd.parentElement !== document.body) document.body.appendChild(dd);
+  } else if (bellWrap && dd.parentElement !== bellWrap) {
+    bellWrap.appendChild(dd);
+  }
   dd.classList.add("open");
   dd.innerHTML = `<div class="notif-dd-head"><span class="notif-dd-title">Notifications</span></div>
     <div class="notif-list"><div class="notif-empty">Chargement…</div></div>`;
@@ -705,7 +717,9 @@ async function openNotifDropdown(btn) {
 
 // Ferme le dropdown au clic extérieur
 document.addEventListener("click", e => {
-  if (!e.target.closest(".notif-bell-wrap")) {
+  // Le dropdown peut désormais être détaché de .notif-bell-wrap (voir openNotifDropdown, mobile) :
+  // un clic à l'intérieur du dropdown lui-même ne doit pas non plus être considéré comme "extérieur".
+  if (!e.target.closest(".notif-bell-wrap") && !e.target.closest("#notif-dropdown")) {
     document.querySelectorAll(".notif-dropdown.open").forEach(el => el.classList.remove("open"));
   }
 });
