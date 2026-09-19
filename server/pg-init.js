@@ -1156,6 +1156,16 @@ const COLONNES_MIGRATION = [
        documenté plus haut pour d'autres tables (demandes_contact). */
     ['produits_vitrine', 'devis_active', 'INTEGER'],
     ['initiatives', 'vitrine_devis_tel_requis', 'INTEGER DEFAULT 0'],
+    /* Invisibilité annuaire (miroir des 2 entrées de server/db.js) — bug réel constaté en
+       production le 2026-09-19 : ces colonnes n'existaient QUE dans le tableau MIGRATIONS de
+       server/db.js (SQLite), jamais mirées ici. GET /api/initiatives et /api/annuaire/recherche
+       les lisent directement dans leur SELECT principal (u.invisible_annuaire_definitif /
+       u.invisible_annuaire_jusqu_au) sans aucun try/catch possible autour d'un SELECT unique —
+       "column does not exist" sur Postgres faisait tomber l'annuaire public entier en 500.
+       Sans lien avec le correctif try/catch d'attachAvisAggregate (bug voisin, même déploiement,
+       cause distincte). */
+    ['users', 'invisible_annuaire_jusqu_au', 'TEXT'],
+    ['users', 'invisible_annuaire_definitif', 'INTEGER DEFAULT 0'],
 ];
 
 async function migratePg(pool) {
