@@ -27,7 +27,6 @@
     actualites:      { label: 'Actualités',      url: '/fil-actualite.html',           icon: '📰' },
     recherche:       { label: 'Recherche',       url: '/recherche.html',               icon: '🔍' },
     dashboard:       { label: 'Tableau de bord', url: '/dashboard-utilisateur.html',   icon: '🏠' },
-    visio:           { label: 'Visioconférence', url: '/reunions.html',                icon: '📹' },
     contrats:        { label: 'Contrats',        url: '/contrats.html',                icon: '📄' },
     billetterie:     { label: 'Billetterie',     url: '/billetterie.html',             icon: '🎟️' },
     statistiques:    { label: 'Statistiques',    url: '/statistiques.html',            icon: '📊' },
@@ -40,7 +39,6 @@
     offres:          { label: 'Offres',          url: '/offres.html',                  icon: '💼' },
     sondages:        { label: 'Sondages',        url: '/sondages.html',                icon: '📊' },
     scanner:         { label: 'Scanner QR',      url: '/scanner.html',                 icon: '📷' },
-    reunions:        { label: 'Réunions',        url: '/reunions.html',                icon: '🤝' },
     collaborations:  { label: 'Collaborations',  url: '/collaborations.html',          icon: '🤝' },
     support_pilote:  { label: 'Support Pilote',  url: '/support-pilote.html',          icon: '🖥️' },
   };
@@ -120,10 +118,6 @@
     // ── Navigation : Sondages
     { re: _nav('(les?\s+)?sondages?'), id: 'nav_sondages' },
     { re: /\bsondages?\b/i, id: 'nav_sondages' },
-
-    // ── Navigation : Réunions / Visio
-    { re: _nav('(mes?\s+|les?\s+)?r[eé]unions?|conf[eé]rences?\s+vid[eé]o|visio'), id: 'nav_reunions' },
-    { re: /\br[eé]unions?\b|visioconf[eé]rence|r[eé]union\s+en\s+ligne/i, id: 'nav_reunions' },
 
     // ── Navigation : Annuaire
     { re: _nav('(l[e\']\s*)?annuaire|membres?'), id: 'nav_annuaire' },
@@ -1005,8 +999,6 @@
       case 'nav_tutoriels':     await navTo('tutoriels');     break;
       case 'nav_faq':            await navTo('faq');            break;
       case 'nav_actualites':     await navTo('actualites');     break;
-      case 'nav_reunions':       await navTo('reunions');       break;
-      case 'nav_visio':          await navTo('reunions');       break;
       case 'nav_contrats':       await navTo('contrats');       break;
       case 'nav_billetterie':    await navTo('billetterie');    break;
       case 'nav_statistiques':   await navTo('statistiques');   break;

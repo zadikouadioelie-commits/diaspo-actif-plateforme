@@ -199,10 +199,10 @@ async function sendJSON(res, status, obj, extraHeaders = {}) {
 async function readBody(req) {
   // Idempotent : si le corps a déjà été bufferisé (cold-start Vercel), on le retourne directement
   if (req._bodyPromise) return req._bodyPromise;
-  // Certains chemins envoient des médias en base64 (atelier, messages vocaux/pièces jointes) → plafond élargi
+  // Certains chemins envoient des médias en base64 (messages vocaux/pièces jointes) → plafond élargi
   const u = req.url || "";
-  const bigPath = u.startsWith("/api/atelier/upload") || /^\/api\/conversations\/\d+\/messages$/.test(u);
-  const maxBody = bigPath ? (u.includes("/atelier/") ? 300e6 : 25e6) : 1e6;
+  const bigPath = /^\/api\/conversations\/\d+\/messages$/.test(u);
+  const maxBody = bigPath ? 25e6 : 1e6;
   req._bodyPromise = new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
@@ -3118,15 +3118,15 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
    (toujours visible) n'a pas besoin d'être listé ici — cette table ne
    couvre que les modules dont la visibilité VARIE selon le type. */
 const EXPANSION_MODULES_PAR_TYPE = {
-  Association: ["emplois_stages", "candidatures", "stats_impact", "visioconference", "evaluation_projet", "accreditations_da"],
+  Association: ["emplois_stages", "candidatures", "stats_impact", "evaluation_projet", "accreditations_da"],
   /* cotisations_adhesions/votes_securises ajoutés le 2026-09-19 (demande explicite) : ces deux
      modules restaient toujours cachés pour Entreprise (aucune colonne ni socle ni Premium ni
      Expansion, cf. dashboard-initiative.html:initPremiumGates) — pas de restriction serveur
      empêchant leur usage (exigerPremium ne vérifie que l'abonnement, jamais le type), il
      manquait juste un chemin d'accès. Rangés ici pour rester cohérent avec l'objectif du
      module Expansion : ne pas surcharger le menu par défaut. */
-  Entreprise: ["zones_action", "stats_impact", "visioconference", "evaluation_projet", "centre_financier", "accreditations_da", "cotisations_adhesions", "votes_securises"],
-  ONG: ["candidatures", "visioconference", "evaluation_projet", "accreditations_da"],
+  Entreprise: ["zones_action", "stats_impact", "evaluation_projet", "centre_financier", "accreditations_da", "cotisations_adhesions", "votes_securises"],
+  ONG: ["candidatures", "evaluation_projet", "accreditations_da"],
 };
 
 /* GET /api/initiatives/:id/modules-actifs — owner only */
@@ -15635,174 +15635,6 @@ route("GET", "/api/uploads/:id", async (req, res, params) => {
   res.end(row.data);
 });
 
-/* ══════════════ ATELIER AUDIOVISUEL — traitement vidéo réel (ffmpeg) ══════════════ */
-const AV = require("./atelier");
-const AV_MIME = { mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg", m4a: "audio/mp4", jpg: "image/jpeg", png: "image/png" };
-function avFolderFor(type) {
-  if ((type||"").startsWith("video")) return "videos";
-  if ((type||"").startsWith("image")) return "images";
-  if ((type||"").startsWith("audio")) return "musiques";
-  return "videos";
-}
-function avMediaDto(m) {
-  return { id: m.id, folder: m.folder, nom: m.nom, type: m.type, duree: m.duree, source: m.source, url: "/api/atelier/file/" + m.id };
-}
-
-/* Import d'un média (data-URL base64) → fichier disque + ffprobe */
-route("POST", "/api/atelier/upload", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!AV.ffmpegAvailable()) return sendJSON(res, 503, { error: "Moteur vidéo (ffmpeg) indisponible sur le serveur." });
-  try {
-    const { file, mime } = AV.writeDataUrl(body.dataUrl);
-    const duree = mime.startsWith("image") ? null : await AV.probeDuration(file);
-    const folder = body.folder || avFolderFor(mime);
-    const id = (await db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'upload')")
-      .run(user.id, folder, (body.nom || "media").slice(0, 120), mime, file, duree)).lastInsertRowid;
-    const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
-    sendJSON(res, 201, { media: avMediaDto(m) });
-  } catch (e) { sendJSON(res, 400, { error: e.message }); }
-});
-
-/* Liste des médias de l'utilisateur */
-route("GET", "/api/atelier/media", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const rows = await db.prepare("SELECT * FROM av_media WHERE user_id=? ORDER BY id DESC").all(user.id);
-  sendJSON(res, 200, { media: rows.map(avMediaDto) });
-});
-
-/* Bibliothèque musicale libre de droits (générée) */
-route("GET", "/api/atelier/musiques", async (req, res) => {
-  sendJSON(res, 200, { musiques: AV.listMusic() });
-});
-route("GET", "/api/atelier/musique/:id", async (req, res, params) => {
-  const p = AV.musicPath(params.id);
-  if (!p) return send(res, 404, "Not found");
-  res.writeHead(200, { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400" });
-  require("fs").createReadStream(p).pipe(res);
-});
-
-/* Bibliothèques libres de droits : musiques, effets sonores, génériques, animations */
-route("GET", "/api/atelier/library", async (req, res) => {
-  sendJSON(res, 200, { library: AV.listLibrary() });
-});
-route("GET", "/api/atelier/asset/:folder/:id", async (req, res, params) => {
-  const p = AV.assetPath(params.folder, params.id);
-  if (!p) return send(res, 404, "Not found");
-  const ext = p.split(".").pop().toLowerCase();
-  res.writeHead(200, { "Content-Type": AV_MIME[ext] || "application/octet-stream", "Cache-Control": "public, max-age=86400" });
-  require("fs").createReadStream(p).pipe(res);
-});
-
-/* Sert un fichier média de l'utilisateur (propriétaire uniquement) */
-route("GET", "/api/atelier/file/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return send(res, 401, "Auth");
-  const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(params.id);
-  if (!m || Number(m.user_id) !== Number(user.id)) return send(res, 404, "Not found");
-  const fs2 = require("fs");
-  if (!fs2.existsSync(m.chemin)) return send(res, 404, "Fichier absent");
-  const ext = m.chemin.split(".").pop().toLowerCase();
-  res.writeHead(200, { "Content-Type": AV_MIME[ext] || "application/octet-stream" });
-  fs2.createReadStream(m.chemin).pipe(res);
-});
-
-/* Traitement : découpe / format / fusion / extraction audio / musique / export */
-route("POST", "/api/atelier/process", async (req, res, params, body) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!AV.ffmpegAvailable()) return sendJSON(res, 503, { error: "Moteur vidéo (ffmpeg) indisponible." });
-
-  const own = async (id) => {
-    const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
-    if (!m || Number(m.user_id) !== Number(user.id)) throw new Error("Média introuvable.");
-    return m;
-  };
-  try {
-    const op = body.op;
-    let outFile, nom, folder = "videos", type = "video/mp4";
-    if (op === "trim") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opTrim(m.chemin, body.start, body.end);
-      nom = "Découpe · " + m.nom;
-    } else if (op === "format") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opFormat(m.chemin, body.ratio || "9/16");
-      nom = "Format " + (body.ratio || "9/16") + " · " + m.nom;
-    } else if (op === "concat") {
-      const ms = []; for (const id of (body.mediaIds || [])) ms.push(await own(id));
-      if (ms.length < 2) return sendJSON(res, 400, { error: "Sélectionnez au moins 2 séquences." });
-      outFile = await AV.opConcat(ms.map(m => m.chemin));
-      nom = "Fusion (" + ms.length + " séquences)";
-    } else if (op === "extract-audio") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opExtractAudio(m.chemin);
-      nom = "Audio · " + m.nom; folder = "musiques"; type = "audio/mpeg";
-    } else if (op === "add-music") {
-      const m = await own(body.mediaId);
-      const music = AV.musicPath(body.musique);
-      if (!music) return sendJSON(res, 400, { error: "Musique introuvable." });
-      outFile = await AV.opAddMusic(m.chemin, music, body.volVideo ?? 1, body.volMusic ?? 0.5);
-      nom = "Avec musique · " + m.nom;
-    } else if (op === "export") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opExport(m.chemin, body.format || "mp4");
-      nom = "Export " + (body.format || "mp4").toUpperCase() + " · " + m.nom;
-      type = body.format === "webm" ? "video/webm" : "video/mp4";
-    } else if (op === "enhance") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opEnhance(m.chemin); nom = "✨ Amélioré · " + m.nom;
-    } else if (op === "speed") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opSpeed(m.chemin, body.factor); nom = "Vitesse ×" + (body.factor || 1) + " · " + m.nom;
-    } else if (op === "blur") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opBlur(m.chemin); nom = "Flou · " + m.nom;
-    } else if (op === "filter") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opFilter(m.chemin, body.preset); nom = "Filtre " + (body.preset || "vif") + " · " + m.nom;
-    } else if (op === "color") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opColor(m.chemin, { brightness: body.brightness, contrast: body.contrast, saturation: body.saturation });
-      nom = "Colorimétrie · " + m.nom;
-    } else if (op === "replace-audio") {
-      const m = await own(body.mediaId); const music = AV.musicPath(body.musique);
-      if (!music) return sendJSON(res, 400, { error: "Musique introuvable." });
-      outFile = await AV.opReplaceAudio(m.chemin, music); nom = "Piste remplacée · " + m.nom;
-    } else if (op === "volume") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opVolume(m.chemin, body.vol); nom = "Volume ×" + (body.vol ?? 1) + " · " + m.nom;
-    } else if (op === "title") {
-      const m = await own(body.mediaId);
-      outFile = await AV.opTitle(m.chemin, body.texte, body.position); nom = "Titre · " + m.nom;
-    } else if (op === "generique") {
-      const m = await own(body.mediaId); const gen = AV.assetPath("generiques", body.generique);
-      if (!gen) return sendJSON(res, 400, { error: "Générique introuvable." });
-      const inputs = body.position === "fin" ? [m.chemin, gen] : [gen, m.chemin];
-      outFile = await AV.opConcat(inputs); nom = "Générique " + (body.position || "début") + " · " + m.nom;
-    } else {
-      return sendJSON(res, 400, { error: "Opération inconnue." });
-    }
-    const duree = type.startsWith("audio") || type.startsWith("video") ? await AV.probeDuration(outFile) : null;
-    const id = (await db.prepare("INSERT INTO av_media (user_id,folder,nom,type,chemin,duree,source) VALUES (?,?,?,?,?,?, 'render')")
-      .run(user.id, folder, nom.slice(0, 120), type, outFile, duree)).lastInsertRowid;
-    const out = await db.prepare("SELECT * FROM av_media WHERE id=?").get(id);
-    sendJSON(res, 200, { media: avMediaDto(out) });
-  } catch (e) { logError(e, "atelier_process", req); sendJSON(res, 500, { error: e.message }); }
-});
-
-/* Suppression d'un média */
-route("DELETE", "/api/atelier/media/:id", async (req, res, params) => {
-  const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const m = await db.prepare("SELECT * FROM av_media WHERE id=?").get(params.id);
-  if (!m || Number(m.user_id) !== Number(user.id)) return sendJSON(res, 404, { error: "Introuvable." });
-  try { require("fs").unlinkSync(m.chemin); } catch {}
-  await db.prepare("DELETE FROM av_media WHERE id=?").run(params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
 /* ---------- Recherche globale ---------- */
 /* ---------- Autocomplete @mentions ---------- */
 route("GET", "/api/mentions", async (req, res, params, body, query) => {
@@ -23482,7 +23314,6 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       { nom: 'Publications',    slug: 'publications',      icone: '📝', ordre: 2 },
       { nom: 'Recrutement',     slug: 'recrutement',       icone: '💼', ordre: 3 },
       { nom: 'Événements',      slug: 'evenements',        icone: '📅', ordre: 4 },
-      { nom: 'Visioconférence', slug: 'visioconference',   icone: '📹', ordre: 5 },
       { nom: 'Vérification',    slug: 'verification',      icone: '✅', ordre: 6 },
       { nom: 'Messagerie',      slug: 'messagerie',        icone: '✉️',  ordre: 7 },
       { nom: 'Annuaire',        slug: 'annuaire',          icone: '🔍', ordre: 8 },
@@ -23612,22 +23443,6 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         kw:'["scanner","billet","qr code","entrée","validation"]',
         steps:'["Dashboard → Événements","Sélectionner votre événement","Cliquer sur Scanner les entrées","Autoriser l\'accès à la caméra","Scanner les QR codes des participants"]',
         lien:'scanner.html', lbl:'Ouvrir le scanner' },
-
-      /* ── VISIOCONFÉRENCE ── */
-      { cat:'visioconference', types:'["tous"]',
-        q:'Comment démarrer une réunion vidéo ?',
-        r:'<p>Vous pouvez démarrer une réunion depuis :</p><ul><li><strong>Messagerie → bouton 📹</strong> dans une conversation</li><li><strong>Dashboard → Réunions → Nouvelle réunion</strong></li><li><strong>Réunions.html</strong> directement</li></ul><p>La réunion s\'ouvre en peer-to-peer sécurisé. Vous pouvez inviter des participants par lien.</p>',
-        syn:'["visio","videoconférence","appel vidéo","zoom","meeting","réunion en ligne"]',
-        kw:'["réunion","visio","vidéo","conférence"]',
-        steps:'["Ouvrir la Messagerie ou le Dashboard","Cliquer sur l\'icône 📹","Créer la réunion","Partager le lien aux participants","Démarrer la réunion"]',
-        lien:'reunions.html', lbl:'Ouvrir Réunions' },
-      { cat:'visioconference', types:'["initiative","entreprise","association","organisation","commune","region"]',
-        q:'Comment planifier une réunion à l\'avance ?',
-        r:'<p>Depuis <strong>Dashboard → Réunions → Planifier une réunion</strong>, choisissez la date, l\'heure, la durée et les participants. Un lien de réunion est généré et des rappels automatiques sont envoyés aux participants. Vous pouvez ajouter des notes d\'ordre du jour.</p>',
-        syn:'["planifier réunion","programmer","agenda","calendrier visio"]',
-        kw:'["planifier","réunion","agenda","rappel"]',
-        steps:'["Dashboard → Réunions → Planifier","Choisir date et heure","Ajouter les participants","Écrire l\'ordre du jour (optionnel)","Envoyer les invitations"]',
-        lien:'reunions.html', lbl:'Planifier une réunion' },
 
       /* ── ANNUAIRE ── */
       { cat:'annuaire', types:'["tous"]',
@@ -23814,8 +23629,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         { ordre:2, titre:"📊 Votre Tableau de Bord", contenu:"<p>Votre tableau de bord centralise toutes vos activités :</p><ul><li>📈 Statistiques en temps réel</li><li>💬 Messages reçus</li><li>👥 Nouvelles candidatures</li><li>📅 Événements à venir</li><li>💰 Wallet et transactions</li></ul>", type:'demo', illus:'📊', nar:"Votre tableau de bord est votre centre de commande. Toutes vos activités y sont centralisées.", lien:'dashboard-initiative.html', lbl:'Mon dashboard', sel:null, albl:null },
         { ordre:3, titre:"📢 Publications & Annonces", contenu:"<p>Depuis votre dashboard, publiez des annonces qui touchent toute la diaspora :</p><ul><li>📰 Actualités de votre initiative</li><li>📣 Communications officielles ciblées</li><li>🎯 Ciblage par pays, région, profil</li></ul><p>Vos annonces sont mises en avant sur le fil d'actualité des membres ciblés.</p>", type:'action', illus:'📢', nar:"Publiez des annonces officielles et ciblez précisément les membres que vous souhaitez atteindre.", lien:'dashboard-initiative.html', lbl:'Publier une annonce', sel:null, albl:'Créer une annonce' },
         { ordre:4, titre:"💼 Recrutement & Offres", contenu:"<p>Recrutez des profils qualifiés de la diaspora :</p><ul><li>👔 Offres d'emploi et stages</li><li>🤝 Missions bénévoles</li><li>💡 Appels à projet</li><li>💰 Recherche de financement</li></ul><p>Les candidatures arrivent directement dans votre tableau de bord.</p>", type:'action', illus:'💼', nar:"Publiez des offres d'emploi, de stage ou de bénévolat et recevez des candidatures directement dans votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Publier une offre', sel:null, albl:null },
-        { ordre:5, titre:"📅 Créer un Événement", contenu:"<p>Organisez des événements présentiel ou en ligne :</p><ul><li>🎫 Billetterie intégrée (gratuite ou payante)</li><li>📷 Scanner QR pour valider les entrées</li><li>📹 Visioconférence intégrée</li><li>📊 Rapport de participation</li></ul>", type:'action', illus:'📅', nar:"Créez des événements avec billetterie intégrée, scanner QR et visioconférence. Tout est disponible depuis votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Créer un événement', sel:null, albl:null },
-        { ordre:6, titre:"📹 Réunions & Visioconférences", contenu:"<p>Organisez des réunions sécurisées avec vos équipes et partenaires :</p><ul><li>🎥 Visioconférence peer-to-peer</li><li>📝 Notes de réunion intégrées</li><li>📋 Compte-rendu automatique</li><li>📅 Planification avec rappels</li></ul>", type:'demo', illus:'📹', nar:"Les réunions vidéo sont intégrées directement dans la plateforme. Planifiez, invitez et démarrez en quelques clics.", lien:'reunions.html', lbl:'Ouvrir Réunions', sel:null, albl:null },
+        { ordre:5, titre:"📅 Créer un Événement", contenu:"<p>Organisez des événements présentiel ou en ligne :</p><ul><li>🎫 Billetterie intégrée (gratuite ou payante)</li><li>📷 Scanner QR pour valider les entrées</li><li>📊 Rapport de participation</li></ul>", type:'action', illus:'📅', nar:"Créez des événements avec billetterie intégrée et scanner QR. Tout est disponible depuis votre tableau de bord.", lien:'dashboard-initiative.html', lbl:'Créer un événement', sel:null, albl:null },
         { ordre:7, titre:"🎴 QR Code & Vérification", contenu:"<p>Chaque initiative dispose d'un <strong>QR Code unique</strong> :</p><ul><li>📥 Téléchargeable en PNG ou SVG</li><li>🖨️ Carte de visite imprimable</li><li>🔗 Lien direct vers votre profil</li></ul><p>Faites également vérifier votre initiative pour obtenir le badge <strong>✅ Vérifié</strong> et booster votre indice de fiabilité.</p>", type:'info', illus:'🎴', nar:"Votre QR code unique vous permet de partager votre initiative instantanément. La vérification de compte renforce votre crédibilité.", lien:'dashboard-initiative.html', lbl:'Mon QR Code', sel:null, albl:null },
         { ordre:8, titre:"📈 Statistiques & Observatoire", contenu:"<p>Suivez l'impact de votre initiative en temps réel :</p><ul><li>👁️ Vues de profil et publications</li><li>👥 Évolution des abonnés</li><li>📊 Engagement et interactions</li><li>🌍 Répartition géographique</li></ul><p>Exportez vos données en CSV ou PDF.</p>", type:'demo', illus:'📈', nar:"Vos statistiques sont disponibles en temps réel depuis votre tableau de bord. Analysez votre impact et exportez vos données.", lien:'statistiques.html', lbl:'Voir l\'Observatoire', sel:null, albl:null },
       ],
@@ -23919,7 +23733,6 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       ['partenariat', "Pour trouver des partenaires, utilisez l'Annuaire et filtrez par type de compte, pays ou secteur d'activité.", 'partenariat,annuaire,recherche'],
       ["Diaspo'Actif", "Diaspo'Actif est la plateforme officielle de la diaspora africaine. Elle connecte membres, initiatives, collectivités et institutions pour faciliter le développement.", 'diaspoactif,plateforme,diaspora'],
       ['formation', "Le module Formations permet d'accéder à des contenus pédagogiques et d'organiser des sessions de formation pour la diaspora.", 'formation,education,apprentissage'],
-      ['visioconférence', "La visioconférence permet d'organiser des réunions en ligne avec des membres de la diaspora partout dans le monde.", 'visio,reunion,conference,video'],
       ['statistiques', "Le module Statistiques donne accès aux indicateurs clés de la plateforme : membres actifs, événements, initiatives, engagement.", 'statistiques,analytics,donnees'],
       ['annuaire', "L'annuaire recense tous les membres, initiatives, entreprises et associations présents sur Diaspo'Actif. Filtrez par pays, secteur ou type de compte.", 'annuaire,membres,recherche,repertoire'],
     ];
@@ -27202,18 +27015,10 @@ ${jsonLd}
       if (action === 'accepte') {
         const debut = `${rdv.date_proposee}T${rdv.heure_debut}:00`;
         const fin   = `${rdv.date_proposee}T${rdv.heure_fin}:00`;
-        let meetingId = null;
-        // Salle de réunion si virtuel
-        if (rdv.lieu_type === 'virtuel' || !rdv.lieu) {
-          const roomId = genId(12);
-          const tokenHost  = genId(16);
-          const tokenGuest = genId(16);
-          const mr = await db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
-            .run(roomId, tokenHost, tokenGuest, rdv.titre, rdv.proposeur_id, rdvId);
-          meetingId = mr.lastInsertRowid;
-          await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.proposeur_id, 'host');
-          try { await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, rdv.destinataire_id, 'guest'); } catch(e) {}
-        }
+        // Module visioconférence retiré : plus de création de salle automatique pour les RDV
+        // virtuels — meetingId reste toujours null (colonnes agenda_events.meeting_id et
+        // rdv_proposals.meeting_id conservées mais inutilisées désormais).
+        const meetingId = null;
         // Créer agenda_events pour l'organisateur
         const evP = await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
           .run(rdv.proposeur_id, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
@@ -27227,11 +27032,10 @@ ${jsonLd}
           try {
             await db.prepare(`INSERT INTO agenda_events(user_id,titre,description,date_debut,date_fin,lieu,lieu_type,couleur,rdv_id,meeting_id) VALUES(?,?,?,?,?,?,?,?,?,?)`)
               .run(pid, rdv.titre, rdv.description||null, debut, fin, rdv.lieu||null, rdv.lieu_type||'physique', '#27ae60', rdvId, meetingId);
-            if (meetingId) try { await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(meetingId, pid, 'guest'); } catch(e) {}
           } catch(e) {}
         }
-        (await db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
-          .run(evP.lastInsertRowid, evD).lastInsertRowid, meetingId, message_reponse||null, rdvId);
+        await db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
+          .run(evP.lastInsertRowid, evD.lastInsertRowid, meetingId, message_reponse||null, rdvId);
         try {
           const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
           await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
@@ -27240,8 +27044,7 @@ ${jsonLd}
             JSON.stringify({ rdv_id: rdvId, meeting_id: meetingId })
           );
         } catch(e) {}
-        const meeting = meetingId ? await db.prepare(`SELECT * FROM meetings WHERE id=?`).get(meetingId) : null;
-        return sendJSON(res, 200, { statut: 'accepte', meeting });
+        return sendJSON(res, 200, { statut: 'accepte', meeting: null });
 
       } else if (action === 'refuse') {
         await db.prepare(`UPDATE rdv_proposals SET statut='refuse',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
@@ -27275,7 +27078,6 @@ ${jsonLd}
         // Supprimer les événements liés
         if (rdv.event_proposeur_id) await db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_proposeur_id);
         if (rdv.event_destinataire_id) await db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_destinataire_id);
-        if (rdv.meeting_id) await db.prepare(`UPDATE meetings SET statut='expire' WHERE id=?`).run(rdv.meeting_id);
         const autreUser = me.id === rdv.proposeur_id ? rdv.destinataire_id : rdv.proposeur_id;
         try {
           const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
@@ -27336,113 +27138,6 @@ ${jsonLd}
       // Marquer le RDV comme converti
       try { await (await db.prepare(`UPDATE rdv_proposals SET converted_event_id=?,statut='annule',updated_at=datetime('now') WHERE id=?`).run(r).lastInsertRowid, rdvId); } catch(e) {}
       return sendJSON(res, 201, { event_id: r.lastInsertRowid, titre: titreF });
-    }
-
-    /* ================================================================
-       MEETINGS (VISIOCONFÉRENCE)
-    ================================================================ */
-
-    /* POST /api/meetings — créer une salle de réunion directe */
-    if (req.method === "POST" && pathname === "/api/meetings") {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { titre, destinataire_id, rdv_id } = body;
-      const roomId = genId(12);
-      const tokenHost  = genId(16);
-      const tokenGuest = genId(16);
-      const r = await db.prepare(`INSERT INTO meetings(room_id,token_host,token_guest,titre,host_id,rdv_id,duree_max_minutes) VALUES(?,?,?,?,?,?,40)`)
-        .run(roomId, tokenHost, tokenGuest, titre||'Réunion', me.id, rdv_id||null);
-      await (await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r).lastInsertRowid, me.id, 'host');
-      if (destinataire_id) {
-        try { await (await db.prepare(`INSERT INTO meeting_participants(meeting_id,user_id,role) VALUES(?,?,?)`).run(r).lastInsertRowid, destinataire_id, 'guest'); } catch(e) {}
-        const moi = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
-        try {
-          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
-            destinataire_id, 'meeting_invite', 'Invitation à une réunion',
-            `${moi.prenom} ${moi.nom} vous invite à rejoindre une réunion : "${titre||'Réunion'}"`,
-            JSON.stringify({ meeting_id: r.lastInsertRowid, room_id: roomId, token: tokenGuest })
-          );
-        } catch(e) {}
-      }
-      return sendJSON(res, 201, { id: r.lastInsertRowid, room_id: roomId, token_host: tokenHost, token_guest: tokenGuest });
-    }
-
-    /* GET /api/meetings/:id — infos salle (par id ou room_id) */
-    if (req.method === "GET" && /^\/api\/meetings\/[^/]+$/.test(pathname)) {
-      const idOrRoom = pathname.split('/')[3];
-      const meeting = await db.prepare(`SELECT m.*, u.prenom AS host_prenom, u.nom AS host_nom FROM meetings m LEFT JOIN users u ON m.host_id = u.id WHERE m.id=? OR m.room_id=?`).get(idOrRoom, idOrRoom);
-      if (!meeting) return sendJSON(res, 404, { error: "Salle introuvable" });
-      const participants = await db.prepare(`SELECT mp.*, u.prenom, u.nom, u.photo_url FROM meeting_participants mp LEFT JOIN users u ON mp.user_id = u.id WHERE mp.meeting_id=?`).all(meeting.id);
-      return sendJSON(res, 200, { ...meeting, participants });
-    }
-
-    /* PATCH /api/meetings/:id/start — démarrer la réunion */
-    if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/start$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const meetId = parseInt(pathname.split('/')[3]);
-      await db.prepare(`UPDATE meetings SET statut='actif', started_at=datetime('now') WHERE id=? AND host_id=?`).run(meetId, me.id);
-      return sendJSON(res, 200, { started: true });
-    }
-
-    /* PATCH /api/meetings/:id/end — terminer la réunion */
-    if (req.method === "PATCH" && /^\/api\/meetings\/\d+\/end$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const meetId = parseInt(pathname.split('/')[3]);
-      const m = await db.prepare(`SELECT * FROM meetings WHERE id=?`).get(meetId);
-      if (!m) return sendJSON(res, 404, { error: "Salle introuvable" });
-      await db.prepare(`UPDATE meetings SET statut='termine', ended_at=datetime('now') WHERE id=?`).run(meetId);
-      if (m.started_at) {
-        const duree = Math.round((Date.now() - new Date(m.started_at).getTime()) / 60000);
-        const parts = await db.prepare(`SELECT user_id FROM meeting_participants WHERE meeting_id=?`).all(meetId);
-        for (const p of parts) {
-          try { await db.prepare(`INSERT INTO meeting_history(meeting_id,user_id,duree_effective_minutes,statut) VALUES(?,?,?,?)`).run(meetId, p.user_id, duree, 'termine'); } catch(e) {}
-        }
-      }
-      return sendJSON(res, 200, { ended: true });
-    }
-
-    /* POST /api/meetings/:room_id/signal — envoyer signal WebRTC */
-    if (req.method === "POST" && /^\/api\/meetings\/[^/]+\/signal$/.test(pathname)) {
-      const roomId = pathname.split('/')[3];
-      const { from_peer, to_peer, type, data } = body;
-      if (!from_peer || !type || !data) return sendJSON(res, 400, { error: "Manque from_peer/type/data" });
-      await db.prepare(`INSERT INTO meeting_signals(room_id,from_peer,to_peer,type,data) VALUES(?,?,?,?,?)`)
-        .run(roomId, from_peer, to_peer||null, type, JSON.stringify(data));
-      // Purger les vieux signaux (>5 min)
-      try { await db.prepare(`DELETE FROM meeting_signals WHERE room_id=? AND datetime(created_at) < datetime('now','-5 minutes')`).run(roomId); } catch(e) {}
-      return sendJSON(res, 200, { sent: true });
-    }
-
-    /* GET /api/meetings/:room_id/signal — polling signaux WebRTC */
-    if (req.method === "GET" && /^\/api\/meetings\/[^/]+\/signal$/.test(pathname)) {
-      const roomId = pathname.split('/')[3];
-      const p = new URLSearchParams(parsed.search || "");
-      const peer = p.get("peer");
-      const after = parseInt(p.get("after") || "0");
-      const signals = await db.prepare(`
-        SELECT * FROM meeting_signals
-        WHERE room_id=? AND id > ? AND consumed=0
-        AND (to_peer IS NULL OR to_peer=?)
-        ORDER BY id ASC LIMIT 50
-      `).all(roomId, after, peer||'');
-      // Marquer comme consommés pour ce peer
-      if (signals.length > 0 && peer) {
-        const ids = signals.map(s=>s.id).join(',');
-        try { await db.prepare(`UPDATE meeting_signals SET consumed=1 WHERE id IN (${ids}) AND (to_peer=? OR to_peer IS NULL)`).run(peer); } catch(e) {}
-      }
-      return sendJSON(res, 200, signals.map(s => ({ ...s, data: JSON.parse(s.data) })));
-    }
-
-    /* GET /api/meetings/:room_id/validate-token — vérifier accès */
-    if (req.method === "GET" && /^\/api\/meetings\/[^/]+\/validate-token$/.test(pathname)) {
-      const roomId = pathname.split('/')[3];
-      const p = new URLSearchParams(parsed.search || "");
-      const token = p.get("token");
-      const meeting = await db.prepare(`SELECT * FROM meetings WHERE room_id=?`).get(roomId);
-      if (!meeting) return sendJSON(res, 404, { error: "Salle introuvable" });
-      if (meeting.statut === 'termine') return sendJSON(res, 410, { error: "Réunion terminée" });
-      if (token !== meeting.token_host && token !== meeting.token_guest) return sendJSON(res, 403, { error: "Token invalide" });
-      const role = token === meeting.token_host ? 'host' : 'guest';
-      return sendJSON(res, 200, { valid: true, role, meeting: { id: meeting.id, room_id: meeting.room_id, titre: meeting.titre, duree_max_minutes: meeting.duree_max_minutes, statut: meeting.statut, started_at: meeting.started_at } });
     }
 
     /* GET /api/agenda/reminders — check & envoyer rappels dus */
@@ -31938,8 +31633,6 @@ ${jsonLd}
           billets_vendus:   (await db.prepare(`SELECT COUNT(*) n FROM tickets WHERE payment_status='paid' ${sw}`).get())?.n,
           qr_codes:         (await db.prepare(`SELECT COUNT(*) n FROM tickets ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           initiatives_pub:  (await db.prepare(`SELECT COUNT(*) n FROM initiatives ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
-          reunions:         (await db.prepare(`SELECT COUNT(*) n FROM reunions ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
-          resumes_ia:       (await db.prepare(`SELECT COUNT(*) n FROM reunions WHERE enregistrement_active=1 ${sw}`).get())?.n,
           candidatures:     (await db.prepare(`SELECT COUNT(*) n FROM candidatures ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           collaborations:   (await db.prepare(`SELECT COUNT(*) n FROM collaborations ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
           posts:            (await db.prepare(`SELECT COUNT(*) n FROM fil_posts ${sw?'WHERE 1=1 '+sw:''}`).get())?.n,
@@ -32572,307 +32265,6 @@ ${jsonLd}
         myInit.id
       );
       return sendJSON(res, 200, { ok: true });
-    }
-
-    /* ============================================================
-       MODULE RÉUNIONS COLLABORATIVES
-    ============================================================ */
-
-    /* POST /api/reunions — créer une réunion */
-    if (req.method === "POST" && pathname === "/api/reunions") {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { titre, description, type, acces, date_debut, date_fin, ordre_du_jour, enregistrement_active } = body;
-      if (!titre || !date_debut) return sendJSON(res, 400, { error: "Titre et date de début requis." });
-      const jitsi_room = `diaspoactif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const r = await db.prepare(`INSERT INTO reunions(titre,description,type,acces,date_debut,date_fin,ordre_du_jour,enregistrement_active,jitsi_room,organisateur_id)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
-        titre.trim(), description||null, type||'reunion', acces||'prive',
-        date_debut, date_fin||null, ordre_du_jour||null, enregistrement_active?1:0, jitsi_room, me.id
-      );
-      /* L'organisateur est invité comme coorganisateur + accepté */
-      await (await db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role,statut) VALUES(?,?,?,?)`).run(r).lastInsertRowid, me.id, 'coorganisateur', 'accepte');
-      return sendJSON(res, 201, { id: r.lastInsertRowid, jitsi_room });
-    }
-
-    /* GET /api/reunions — liste des réunions */
-    if (req.method === "GET" && pathname === "/api/reunions") {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const query = new URL("http://x" + req.url).searchParams;
-      const statut = query.get('statut');
-      const search = query.get('search');
-      // Note : ri sert uniquement à filtrer "suis-je invité", ri2 (jointure identique) fournit mon statut/rôle — fusionnés en une seule jointure pour éviter tout risque de requête lente.
-      let where = `WHERE (r.organisateur_id=? OR ri2.user_id IS NOT NULL)`;
-      const params = [me.id];
-      if (statut) { where += ` AND r.statut=?`; params.push(statut); }
-      if (search) { where += ` AND (r.titre LIKE ? OR r.description LIKE ?)`; params.push(`%${search}%`, `%${search}%`); }
-      try {
-        const rows = await db.prepare(`
-          SELECT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo,
-            ri2.statut AS mon_statut, ri2.role AS mon_role,
-            (SELECT COUNT(*) FROM reunion_invites WHERE reunion_id=r.id AND statut='accepte') AS nb_participants
-          FROM reunions r
-          LEFT JOIN reunion_invites ri2 ON ri2.reunion_id=r.id AND ri2.user_id=?
-          JOIN users u ON u.id=r.organisateur_id
-          ${where}
-          ORDER BY r.date_debut DESC LIMIT 100
-        `).all(me.id, ...params);
-        return sendJSON(res, 200, { reunions: rows });
-      } catch (e) {
-        return sendJSON(res, 500, SEC.safeError(e, "reunions-list"));
-      }
-    }
-
-    /* GET /api/reunions/decisions — toutes mes décisions */
-    if (req.method === "GET" && pathname === "/api/reunions/decisions") {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const decisions = await db.prepare(`
-        SELECT d.*, r.titre AS reunion_titre, r.date_debut, u.prenom, u.nom, u.photo_url
-        FROM reunion_decisions d
-        JOIN reunions r ON r.id=d.reunion_id
-        LEFT JOIN users u ON u.id=d.responsable_id
-        WHERE d.responsable_id=? OR r.organisateur_id=?
-        ORDER BY d.echeance ASC, d.created_at DESC LIMIT 200
-      `).all(me.id, me.id);
-      return sendJSON(res, 200, { decisions });
-    }
-
-    /* GET /api/reunions/:id — détail réunion */
-    if (req.method === "GET" && /^\/api\/reunions\/\d+$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const reunion = await db.prepare(`
-        SELECT r.*, u.prenom AS org_prenom, u.nom AS org_nom, u.photo_url AS org_photo
-        FROM reunions r JOIN users u ON u.id=r.organisateur_id WHERE r.id=?
-      `).get(rid);
-      if (!reunion) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      const invites = await db.prepare(`
-        SELECT ri.*, u.prenom, u.nom, u.photo_url, u.role AS user_role
-        FROM reunion_invites ri JOIN users u ON u.id=ri.user_id WHERE ri.reunion_id=?
-        ORDER BY ri.role DESC, u.prenom ASC
-      `).all(rid);
-      const myInvite = invites.find(i => i.user_id === me.id);
-      const canAccess = reunion.organisateur_id === me.id || myInvite || me.role === 'administrateur';
-      if (!canAccess) return sendJSON(res, 403, { error: "Accès refusé." });
-      return sendJSON(res, 200, { reunion, invites, myInvite: myInvite || null });
-    }
-
-    /* PATCH /api/reunions/:id — modifier */
-    if (req.method === "PATCH" && /^\/api\/reunions\/\d+$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
-      const { titre, description, date_debut, date_fin, ordre_du_jour, statut } = body;
-      await db.prepare(`UPDATE reunions SET titre=COALESCE(?,titre),description=COALESCE(?,description),date_debut=COALESCE(?,date_debut),date_fin=COALESCE(?,date_fin),ordre_du_jour=COALESCE(?,ordre_du_jour),statut=COALESCE(?,statut) WHERE id=?`)
-        .run(titre||null, description||null, date_debut||null, date_fin||null, ordre_du_jour||null, statut||null, rid);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* PATCH /api/reunions/:id/start — démarrer */
-    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/start$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
-      await db.prepare(`UPDATE reunions SET statut='en_cours', started_at=datetime('now') WHERE id=?`).run(rid);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* PATCH /api/reunions/:id/end — terminer */
-    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/end$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
-      const now = new Date().toISOString();
-      let duree = null;
-      if (r.started_at) { duree = Math.round((new Date(now) - new Date(r.started_at)) / 60000); }
-      await db.prepare(`UPDATE reunions SET statut='terminee', ended_at=?, duree_minutes=? WHERE id=?`).run(now, duree, rid);
-      /* Marquer quitte_at pour les présents */
-      await db.prepare(`UPDATE reunion_invites SET quitte_at=? WHERE reunion_id=? AND quitte_at IS NULL AND rejoint_at IS NOT NULL`).run(now, rid);
-      /* Créer résumé brouillon si pas encore */
-      try { await db.prepare(`INSERT OR IGNORE INTO reunion_resumes(reunion_id,redacteur_id) VALUES(?,?)`).run(rid, me.id); } catch(e) {}
-      return sendJSON(res, 200, { ok: true, duree_minutes: duree });
-    }
-
-    /* POST /api/reunions/:id/invites — inviter des participants */
-    if (req.method === "POST" && /^\/api\/reunions\/\d+\/invites$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      if (r.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
-      const { users: userIds, role } = body; // userIds: array of user IDs
-      if (!Array.isArray(userIds) || userIds.length === 0) return sendJSON(res, 400, { error: "Liste d'utilisateurs requise." });
-      let added = 0;
-      for (const uid of userIds) {
-        try {
-          await db.prepare(`INSERT OR IGNORE INTO reunion_invites(reunion_id,user_id,role) VALUES(?,?,?)`).run(rid, uid, role||'participant');
-          /* Notification */
-          const org = await db.prepare(`SELECT prenom,nom FROM users WHERE id=?`).get(me.id);
-          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
-            uid, 'reunion_invite', `Invitation à une réunion`,
-            `${org?.prenom||''} ${org?.nom||''} vous invite à "${r.titre}"`,
-            JSON.stringify({ reunion_id: rid })
-          );
-          added++;
-        } catch(e) {}
-      }
-      return sendJSON(res, 200, { added });
-    }
-
-    /* PATCH /api/reunions/:id/invites/me — accepter ou refuser */
-    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/invites\/me$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const { statut } = body;
-      if (!['accepte','refuse'].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
-      await db.prepare(`UPDATE reunion_invites SET statut=? WHERE reunion_id=? AND user_id=?`).run(statut, rid, me.id);
-      if (statut === 'accepte') {
-        /* Ajouter à l'agenda */
-        const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-        if (r) {
-          try {
-            await db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,description,date_debut,date_fin,couleur,type,source_id,source_type)
-              VALUES(?,?,?,?,?,?,?,?,?)`).run(
-              me.id, `📹 ${r.titre}`, r.description||`Réunion ${r.type}`,
-              r.date_debut, r.date_fin||r.date_debut, '#7c3aed', 'reunion', rid, 'reunion'
-            );
-          } catch(e) {}
-        }
-      }
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* POST /api/reunions/:id/presence — pointer arrivée */
-    if (req.method === "POST" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      await db.prepare(`UPDATE reunion_invites SET rejoint_at=COALESCE(rejoint_at,datetime('now')),statut='accepte' WHERE reunion_id=? AND user_id=?`).run(rid, me.id);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* PATCH /api/reunions/:id/presence — pointer départ */
-    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/presence$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const inv = await db.prepare(`SELECT * FROM reunion_invites WHERE reunion_id=? AND user_id=?`).get(rid, me.id);
-      const now = new Date().toISOString();
-      let duree = null;
-      if (inv?.rejoint_at) { duree = Math.round((new Date(now) - new Date(inv.rejoint_at)) / 60000); }
-      await db.prepare(`UPDATE reunion_invites SET quitte_at=?, duree_presence_minutes=? WHERE reunion_id=? AND user_id=?`).run(now, duree, rid, me.id);
-      return sendJSON(res, 200, { ok: true, duree_minutes: duree });
-    }
-
-    /* GET /api/reunions/:id/resume — obtenir le résumé */
-    if (req.method === "GET" && /^\/api\/reunions\/\d+\/resume$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const resume = await db.prepare(`SELECT rr.*, u.prenom AS red_prenom, u.nom AS red_nom FROM reunion_resumes rr LEFT JOIN users u ON u.id=rr.redacteur_id WHERE rr.reunion_id=?`).get(rid);
-      const decisions = await db.prepare(`SELECT d.*, u.prenom, u.nom FROM reunion_decisions d LEFT JOIN users u ON u.id=d.responsable_id WHERE d.reunion_id=? ORDER BY d.created_at ASC`).all(rid);
-      return sendJSON(res, 200, { resume: resume || null, decisions });
-    }
-
-    /* PUT /api/reunions/:id/resume — sauvegarder le résumé */
-    if (req.method === "PUT" && /^\/api\/reunions\/\d+\/resume$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      const canEdit = r.organisateur_id === me.id || me.role === 'administrateur';
-      if (!canEdit) return sendJSON(res, 403, { error: "Accès refusé." });
-      const { sujets, decisions: decisionsData, actions, notes } = body;
-      await db.prepare(`INSERT INTO reunion_resumes(reunion_id,redacteur_id,sujets,decisions,actions,notes,updated_at)
-        VALUES(?,?,?,?,?,?,datetime('now'))
-        ON CONFLICT(reunion_id) DO UPDATE SET sujets=excluded.sujets,decisions=excluded.decisions,actions=excluded.actions,notes=excluded.notes,redacteur_id=excluded.redacteur_id,updated_at=datetime('now')
-      `).run(rid, me.id, JSON.stringify(sujets||[]), JSON.stringify(decisionsData||[]), JSON.stringify(actions||[]), notes||null);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* PATCH /api/reunions/:id/resume/valider — valider le résumé */
-    if (req.method === "PATCH" && /^\/api\/reunions\/\d+\/resume\/valider$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r || (r.organisateur_id !== me.id && me.role !== 'administrateur')) return sendJSON(res, 403, { error: "Accès refusé." });
-      await db.prepare(`UPDATE reunion_resumes SET statut='valide',valide_at=datetime('now'),valide_par=? WHERE reunion_id=?`).run(me.id, rid);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* POST /api/reunions/:id/resume/partager — envoyer résumé via messagerie */
-    if (req.method === "POST" && /^\/api\/reunions\/\d+\/resume\/partager$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-      if (!r) return sendJSON(res, 404, { error: "Réunion introuvable." });
-      const resume = await db.prepare(`SELECT * FROM reunion_resumes WHERE reunion_id=?`).get(rid);
-      const { user_ids } = body; // array of user IDs to send to
-      if (!Array.isArray(user_ids) || user_ids.length === 0) return sendJSON(res, 400, { error: "Destinataires requis." });
-      const contenu = `📋 Résumé de réunion : **${r.titre}**\n\nDate : ${r.date_debut ? r.date_debut.slice(0,10) : '—'}\n\n${resume?.notes || 'Aucune note.'}\n\n_Consultez le résumé complet sur Diaspo'Actif_`;
-      let sent = 0;
-      for (const uid of user_ids) {
-        try {
-          await db.prepare(`INSERT INTO messages(expediteur_id,destinataire_id,contenu) VALUES(?,?,?)`).run(me.id, uid, contenu);
-          sent++;
-        } catch(e) {}
-      }
-      return sendJSON(res, 200, { sent });
-    }
-
-    /* POST /api/reunions/:id/decisions — ajouter une décision */
-    if (req.method === "POST" && /^\/api\/reunions\/\d+\/decisions$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const rid = parseInt(pathname.split('/')[3]);
-      const { titre, description, responsable_id, type_suivi, echeance } = body;
-      if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-      const d = await db.prepare(`INSERT INTO reunion_decisions(reunion_id,titre,description,responsable_id,type_suivi,echeance) VALUES(?,?,?,?,?,?)`)
-        .run(rid, titre.trim(), description||null, responsable_id||null, type_suivi||'action', echeance||null);
-      if (responsable_id) {
-        const r = await db.prepare(`SELECT * FROM reunions WHERE id=?`).get(rid);
-        try {
-          await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
-            responsable_id, 'reunion_decision', `Action assignée`,
-            `Vous avez été désigné responsable de : "${titre}" (réunion "${r?.titre||'—'}")`,
-            JSON.stringify({ reunion_id: rid, decision_id: d.lastInsertRowid })
-          );
-          if (echeance) {
-            await db.prepare(`INSERT OR IGNORE INTO agenda_events(user_id,titre,date_debut,couleur,type) VALUES(?,?,?,?,?)`).run(
-              responsable_id, `✅ ${titre}`, echeance.slice(0,10), '#10b981', 'tache'
-            );
-          }
-        } catch(e) {}
-      }
-      return sendJSON(res, 201, { id: d.lastInsertRowid });
-    }
-
-    /* PATCH /api/decisions/:id — modifier statut d'une décision */
-    if (req.method === "PATCH" && /^\/api\/decisions\/\d+$/.test(pathname)) {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const did = parseInt(pathname.split('/')[3]);
-      const { statut, echeance } = body;
-      await db.prepare(`UPDATE reunion_decisions SET statut=COALESCE(?,statut),echeance=COALESCE(?,echeance) WHERE id=?`).run(statut||null, echeance||null, did);
-      return sendJSON(res, 200, { ok: true });
-    }
-
-    /* GET /api/reunions/search — recherche avancée */
-    if (req.method === "GET" && pathname === "/api/reunions/search") {
-      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise" });
-      const { q } = qs;
-      if (!q) return sendJSON(res, 200, { reunions: [] });
-      const rows = await db.prepare(`
-        SELECT DISTINCT r.*, u.prenom AS org_prenom, u.nom AS org_nom
-        FROM reunions r
-        LEFT JOIN reunion_invites ri ON ri.reunion_id=r.id
-        LEFT JOIN reunion_resumes rr ON rr.reunion_id=r.id
-        JOIN users u ON u.id=r.organisateur_id
-        WHERE (r.organisateur_id=? OR ri.user_id=?)
-          AND (r.titre LIKE ? OR r.description LIKE ? OR rr.notes LIKE ?)
-        ORDER BY r.date_debut DESC LIMIT 50
-      `).all(me.id, me.id, `%${q}%`, `%${q}%`, `%${q}%`);
-      return sendJSON(res, 200, { reunions: rows });
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -36292,7 +35684,6 @@ async function _generateRecommendations(userId, userRole) {
       if (userRole === 'initiative') {
         if (f.slug === 'createur_formations') { raison = 'Partagez votre expertise en créant des formations pour la diaspora'; score = 0.9; }
         else if (f.slug === 'billetterie') { raison = 'Vous organisez des événements — la billetterie vous permettra de les monétiser'; score = 0.8; }
-        else if (f.slug === 'reunions') { raison = 'Organisez vos réunions directement sur la plateforme'; score = 0.75; }
       } else if (userRole === 'collectivite') {
         if (f.slug === 'observatoire') { raison = 'Accédez aux données statistiques de la diaspora'; score = 0.95; }
         if (f.slug === 'signature_electronique') { raison = 'Simplifiez la signature de vos documents officiels'; score = 0.85; }
@@ -39586,288 +38977,6 @@ app.get('/api/bp-simulations/:id/rapport', requireAuth, async (req, res) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
-   MODULE AUDIOVISUEL
-   ═══════════════════════════════════════════════════════════════════ */
-
-/* ── Helpers ── */
-async function genResumeIA(titre, description, type) {
-  const types = { conference:'conférence', ag:'assemblée générale', formation:'formation', evenement:'événement', podcast:'podcast', interview:'interview' };
-  const t = types[type] || type;
-  return `Résumé de la ${t} "${titre}" : ${description ? description.slice(0,200) : 'Contenu audiovisuel produit par l\'initiative.'} Points abordés : vision stratégique, actualités de l'initiative, échanges avec les participants. Ce contenu est disponible en replay dans la bibliothèque audiovisuelle.`;
-}
-function genMomentsClés(titre) {
-  return [
-    { time:'00:00', label:'Introduction et accueil' },
-    { time:'05:30', label:'Présentation du sujet' },
-    { time:'20:00', label:'Développement et analyses' },
-    { time:'45:00', label:'Questions du public' },
-    { time:'55:00', label:'Synthèse et conclusions' },
-  ];
-}
-
-/* ── LIVES ── */
-
-/* Lister les lives d'une initiative */
-app.get('/api/audiovisuel/lives', requireAuth, async (req, res) => {
-  const initiativeId = req.query.initiative_id || req.user.id;
-  const statut = req.query.statut;
-  let q = 'SELECT l.*, u.nom as initiative_nom FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.initiative_id=?';
-  const params = [initiativeId];
-  if (statut) { q += ' AND l.statut=?'; params.push(statut); }
-  q += ' ORDER BY l.date_debut DESC LIMIT 50';
-  sendJSON(res, 200, await db.prepare(q).all(...params));
-});
-
-/* Créer un live */
-app.post('/api/audiovisuel/lives', requireAuth, async (req, res) => {
-  if (req.user.role !== 'initiative' && req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux initiatives' });
-  const body = await parseBody(req);
-  const { titre, description='', type='conference', acces='public', prix=0, code_acces='', url_stream='', vignette_url='', date_debut, date_fin, tags=[] } = body;
-  if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const r = await db.prepare('INSERT INTO av_lives (initiative_id,titre,description,type,acces,prix,code_acces,url_stream,vignette_url,date_debut,date_fin,tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, titre, description, type, acces, prix, code_acces, url_stream, vignette_url, date_debut||null, date_fin||null, JSON.stringify(tags));
-  sendJSON(res, 201, { id: r.lastInsertRowid });
-});
-
-/* Obtenir un live */
-app.get('/api/audiovisuel/lives/:id', async (req, res) => {
-  const live = await db.prepare('SELECT l.*, u.nom as initiative_nom, u.avatar as initiative_avatar FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.id=?').get(req.params.id);
-  if (!live) return sendJSON(res, 404, { error: 'Live introuvable' });
-  sendJSON(res, 200, { ...live, tags: safeJSON(live.tags, []), moments_cles: safeJSON(live.moments_cles, []), decisions: safeJSON(live.decisions, []), actions: safeJSON(live.actions, []) });
-});
-
-/* Modifier un live */
-app.put('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
-  const live = await db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
-  if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
-  const body = await parseBody(req);
-  const fields = ['titre','description','type','acces','prix','code_acces','url_stream','url_replay','vignette_url','date_debut','date_fin','statut','enregistrement_url','transcription','resume_ia','tags','moments_cles','decisions','actions'];
-  const sets = []; const vals = [];
-  fields.forEach(async f => { if (body[f] !== undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
-  sets.push("updated_at=datetime('now')");
-  await db.prepare(`UPDATE av_lives SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* Supprimer un live */
-app.delete('/api/audiovisuel/lives/:id', requireAuth, async (req, res) => {
-  const live = await db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
-  if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
-  await db.prepare('DELETE FROM av_lives WHERE id=?').run(req.params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* Démarrer / terminer un live */
-app.post('/api/audiovisuel/lives/:id/statut', requireAuth, async (req, res) => {
-  const live = await db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
-  if (!live) return sendJSON(res, 404, { error: 'Introuvable' });
-  const body = await parseBody(req);
-  const { statut } = body;
-  if (!['programme','en_cours','termine','annule'].includes(statut)) return sendJSON(res, 400, { error: 'Statut invalide' });
-  // Si on termine, générer le résumé IA
-  let extra = {};
-  if (statut === 'termine') {
-    extra.resume_ia = genResumeIA(live.titre, live.description, live.type);
-    extra.moments_cles = JSON.stringify(genMomentsClés(live.titre));
-  }
-  const extraSets = Object.keys(extra).map(k=>`${k}=?`).join(',');
-  const q = `UPDATE av_lives SET statut=?${extraSets?','+extraSets:''} WHERE id=?`;
-  await db.prepare(q).run(statut, ...Object.values(extra), req.params.id);
-  sendJSON(res, 200, { ok: true, statut, resume_ia: extra.resume_ia });
-});
-
-/* Incrémenter vues */
-app.post('/api/audiovisuel/lives/:id/vue', async (req, res) => {
-  await db.prepare('UPDATE av_lives SET nb_vues=nb_vues+1 WHERE id=?').run(req.params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* ── CHAT LIVE ── */
-
-app.get('/api/audiovisuel/lives/:id/chat', async (req, res) => {
-  const since = req.query.since || '1970-01-01';
-  const msgs = await db.prepare("SELECT c.*, u.nom as user_nom, u.avatar as user_avatar FROM av_live_chat c LEFT JOIN users u ON u.id=c.user_id WHERE c.live_id=? AND c.created_at>? ORDER BY c.created_at ASC LIMIT 100").all(req.params.id, since);
-  sendJSON(res, 200, msgs);
-});
-
-app.post('/api/audiovisuel/lives/:id/chat', requireAuth, async (req, res) => {
-  const body = await parseBody(req);
-  const { message } = body;
-  if (!message?.trim()) return sendJSON(res, 400, { error: 'Message vide' });
-  const pseudo = `${req.user.prenom||''} ${req.user.nom||''}`.trim() || 'Anonyme';
-  const r = await db.prepare('INSERT INTO av_live_chat (live_id, user_id, pseudo, message) VALUES (?,?,?,?)').run(req.params.id, req.user.id, pseudo, message.trim().slice(0,500));
-  sendJSON(res, 201, { id: r.lastInsertRowid });
-});
-
-app.delete('/api/audiovisuel/lives/:id/chat/:msgId', requireAuth, async (req, res) => {
-  await db.prepare('UPDATE av_live_chat SET type=? WHERE id=? AND live_id=?').run('modere', req.params.msgId, req.params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* ── SONDAGES ── */
-
-app.get('/api/audiovisuel/lives/:id/sondages', async (req, res) => {
-  const sondages = await db.prepare('SELECT * FROM av_sondages WHERE live_id=? AND actif=1').all(req.params.id);
-  const result = await Promise.all(sondages.map(async s => {
-    const options = safeJSON(s.options_json, []);
-    const votes = await db.prepare('SELECT option_index, COUNT(*) as cnt FROM av_votes WHERE sondage_id=? GROUP BY option_index').all(s.id);
-    const totaux = {}; votes.forEach(v => { totaux[v.option_index] = v.cnt; });
-    const total = votes.reduce((a,v)=>a+v.cnt,0);
-    return { ...s, options: options.map((o,i)=>({ label:o, votes:totaux[i]||0, pct:total?(((totaux[i]||0)/total)*100).toFixed(1):0 })), total };
-  }));
-  sendJSON(res, 200, result);
-});
-
-app.post('/api/audiovisuel/lives/:id/sondages', requireAuth, async (req, res) => {
-  const live = await db.prepare('SELECT * FROM av_lives WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
-  if (!live) return sendJSON(res, 403, { error: 'Accès refusé' });
-  const body = await parseBody(req);
-  const { question, options=[] } = body;
-  if (!question || options.length < 2) return sendJSON(res, 400, { error: 'Question et min 2 options requises' });
-  const r = await db.prepare('INSERT INTO av_sondages (live_id, question, options_json) VALUES (?,?,?)').run(req.params.id, question, JSON.stringify(options));
-  sendJSON(res, 201, { id: r.lastInsertRowid });
-});
-
-app.post('/api/audiovisuel/sondages/:id/voter', requireAuth, async (req, res) => {
-  const body = await parseBody(req);
-  const { option_index } = body;
-  try {
-    await db.prepare('INSERT INTO av_votes (sondage_id, user_id, option_index) VALUES (?,?,?)').run(req.params.id, req.user.id, option_index);
-    sendJSON(res, 201, { ok: true });
-  } catch(e) { sendJSON(res, 409, { error: 'Vous avez déjà voté' }); }
-});
-
-/* ── RÉACTIONS ── */
-
-app.post('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
-  const body = await parseBody(req);
-  const { emoji='❤️', user_id=null } = body;
-  await db.prepare('INSERT INTO av_reactions (live_id, user_id, emoji) VALUES (?,?,?)').run(req.params.id, user_id||null, emoji);
-  const total = await db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji').all(req.params.id);
-  sendJSON(res, 200, { ok: true, reactions: total });
-});
-
-app.get('/api/audiovisuel/lives/:id/reactions', async (req, res) => {
-  const total = await db.prepare('SELECT emoji, COUNT(*) as cnt FROM av_reactions WHERE live_id=? GROUP BY emoji ORDER BY cnt DESC').all(req.params.id);
-  sendJSON(res, 200, total);
-});
-
-/* ── PODCASTS / SÉRIES ── */
-
-app.get('/api/audiovisuel/series', async (req, res) => {
-  const initiativeId = req.query.initiative_id;
-  let q = 'SELECT s.*, u.nom as initiative_nom, (SELECT COUNT(*) FROM av_episodes e WHERE e.serie_id=s.id) as nb_episodes FROM av_series s JOIN users u ON u.id=s.initiative_id';
-  const params = [];
-  if (initiativeId) { q += ' WHERE s.initiative_id=?'; params.push(initiativeId); }
-  q += ' ORDER BY s.created_at DESC LIMIT 50';
-  sendJSON(res, 200, await db.prepare(q).all(...params));
-});
-
-app.post('/api/audiovisuel/series', requireAuth, async (req, res) => {
-  if (req.user.role !== 'initiative' && req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux initiatives' });
-  const body = await parseBody(req);
-  const { titre, description='', categorie='general', image_url='' } = body;
-  if (!titre) return sendJSON(res, 400, { error: 'Titre requis' });
-  const r = await db.prepare('INSERT INTO av_series (initiative_id, titre, description, categorie, image_url) VALUES (?,?,?,?,?)').run(req.user.id, titre, description, categorie, image_url);
-  sendJSON(res, 201, { id: r.lastInsertRowid });
-});
-
-/* ── ÉPISODES ── */
-
-app.get('/api/audiovisuel/episodes', async (req, res) => {
-  const initiativeId = req.query.initiative_id;
-  const serieId = req.query.serie_id;
-  let q = 'SELECT e.*, u.nom as initiative_nom, s.titre as serie_titre FROM av_episodes e JOIN users u ON u.id=e.initiative_id LEFT JOIN av_series s ON s.id=e.serie_id WHERE e.is_public=1';
-  const params = [];
-  if (initiativeId) { q += ' AND e.initiative_id=?'; params.push(initiativeId); }
-  if (serieId) { q += ' AND e.serie_id=?'; params.push(serieId); }
-  q += ' ORDER BY e.published_at DESC LIMIT 50';
-  sendJSON(res, 200, await db.prepare(q).all(...params));
-});
-
-app.get('/api/audiovisuel/episodes/:id', async (req, res) => {
-  const ep = await db.prepare('SELECT e.*, u.nom as initiative_nom, s.titre as serie_titre FROM av_episodes e JOIN users u ON u.id=e.initiative_id LEFT JOIN av_series s ON s.id=e.serie_id WHERE e.id=?').get(req.params.id);
-  if (!ep) return sendJSON(res, 404, { error: 'Épisode introuvable' });
-  await db.prepare('UPDATE av_episodes SET nb_ecoutes=nb_ecoutes+1 WHERE id=?').run(req.params.id);
-  sendJSON(res, 200, { ...ep, intervenants: safeJSON(ep.intervenants, []), chapitres: safeJSON(ep.chapitres, []), mots_cles: safeJSON(ep.mots_cles, []) });
-});
-
-app.post('/api/audiovisuel/episodes', requireAuth, async (req, res) => {
-  if (req.user.role !== 'initiative' && req.user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Réservé aux initiatives' });
-  const body = await parseBody(req);
-  const { titre, description='', url_audio, serie_id=null, duree_secondes=0, intervenants=[], categorie='general', image_url='', is_public=1, published_at=null, tags=[], mots_cles=[] } = body;
-  if (!titre || !url_audio) return sendJSON(res, 400, { error: 'Titre et URL audio requis' });
-  const resume = await genResumeIA(titre, description, categorie);
-  const chapitres = duree_secondes > 600 ? [{ time:'0:00', titre:'Introduction' }, { time:`${Math.floor(duree_secondes/3/60)}:${String(Math.floor((duree_secondes/3)%60)).padStart(2,'0')}`, titre:'Développement' }, { time:`${Math.floor(duree_secondes*2/3/60)}:${String(Math.floor((duree_secondes*2/3)%60)).padStart(2,'0')}`, titre:'Conclusion' }] : [];
-  const r = await db.prepare('INSERT INTO av_episodes (initiative_id, serie_id, titre, description, url_audio, duree_secondes, intervenants, categorie, image_url, is_public, published_at, resume_ia, chapitres, mots_cles) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(req.user.id, serie_id||null, titre, description, url_audio, duree_secondes, JSON.stringify(intervenants), categorie, image_url, is_public?1:0, published_at||new Date().toISOString().slice(0,10), resume, JSON.stringify(chapitres), JSON.stringify(mots_cles));
-  sendJSON(res, 201, { id: r.lastInsertRowid });
-});
-
-app.put('/api/audiovisuel/episodes/:id', requireAuth, async (req, res) => {
-  const ep = await db.prepare('SELECT * FROM av_episodes WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
-  if (!ep) return sendJSON(res, 404, { error: 'Introuvable' });
-  const body = await parseBody(req);
-  const fields = ['titre','description','url_audio','serie_id','duree_secondes','intervenants','categorie','image_url','is_public','published_at','transcription','resume_ia','chapitres','mots_cles'];
-  const sets=[]; const vals=[];
-  fields.forEach(f => { if (body[f]!==undefined) { sets.push(`${f}=?`); vals.push(typeof body[f]==='object'?JSON.stringify(body[f]):body[f]); } });
-  await db.prepare(`UPDATE av_episodes SET ${sets.join(',')} WHERE id=?`).run(...vals, req.params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-app.delete('/api/audiovisuel/episodes/:id', requireAuth, async (req, res) => {
-  const ep = await db.prepare('SELECT * FROM av_episodes WHERE id=? AND initiative_id=?').get(req.params.id, req.user.id);
-  if (!ep) return sendJSON(res, 404, { error: 'Introuvable' });
-  await db.prepare('DELETE FROM av_episodes WHERE id=?').run(req.params.id);
-  sendJSON(res, 200, { ok: true });
-});
-
-/* Commenter un épisode */
-app.get('/api/audiovisuel/episodes/:id/commentaires', async (req, res) => {
-  const coms = await db.prepare('SELECT c.*, u.nom as user_nom, u.avatar as user_avatar FROM av_commentaires c JOIN users u ON u.id=c.user_id WHERE c.episode_id=? ORDER BY c.created_at DESC LIMIT 50').all(req.params.id);
-  sendJSON(res, 200, coms);
-});
-app.post('/api/audiovisuel/episodes/:id/commentaires', requireAuth, async (req, res) => {
-  const body = await parseBody(req);
-  const { contenu, note=null } = body;
-  if (!contenu?.trim()) return sendJSON(res, 400, { error: 'Contenu requis' });
-  const r = await db.prepare('INSERT INTO av_commentaires (episode_id, user_id, contenu, note) VALUES (?,?,?,?)').run(req.params.id, req.user.id, contenu.trim(), note||null);
-  if (note) await db.prepare('UPDATE av_episodes SET note=ROUND((note*nb_notes+?)/(nb_notes+1),1), nb_notes=nb_notes+1 WHERE id=?').run(note, req.params.id);
-  sendJSON(res, 201, { id: r.lastInsertRowid });
-});
-
-/* ── BIBLIOTHÈQUE (mixte lives + épisodes) ── */
-app.get('/api/audiovisuel/bibliotheque', async (req, res) => {
-  const initiativeId = req.query.initiative_id;
-  const type = req.query.type; // 'live' | 'episode' | null (tous)
-  let lives = [], episodes = [];
-  if (!type || type === 'live') {
-    let q = "SELECT 'live' as content_type, l.id, l.titre, l.description, l.vignette_url, l.nb_vues as nb_vues, l.date_debut as date_ref, l.statut, l.type, u.nom as initiative_nom FROM av_lives l JOIN users u ON u.id=l.initiative_id WHERE l.statut='termine'";
-    const p = [];
-    if (initiativeId) { q += ' AND l.initiative_id=?'; p.push(initiativeId); }
-    lives = await db.prepare(q + ' ORDER BY l.date_debut DESC LIMIT 30').all(...p);
-  }
-  if (!type || type === 'episode') {
-    let q = "SELECT 'episode' as content_type, e.id, e.titre, e.description, e.image_url as vignette_url, e.nb_ecoutes as nb_vues, e.published_at as date_ref, 'publie' as statut, e.categorie as type, u.nom as initiative_nom FROM av_episodes e JOIN users u ON u.id=e.initiative_id WHERE e.is_public=1";
-    const p = [];
-    if (initiativeId) { q += ' AND e.initiative_id=?'; p.push(initiativeId); }
-    episodes = await db.prepare(q + ' ORDER BY e.published_at DESC LIMIT 30').all(...p);
-  }
-  const all = [...lives, ...episodes].sort((a,b) => new Date(b.date_ref) - new Date(a.date_ref));
-  sendJSON(res, 200, all);
-});
-
-/* ── STATS AUDIOVISUEL ── */
-app.get('/api/audiovisuel/stats', requireAuth, async (req, res) => {
-  const id = req.user.id;
-  const totalLives = (await db.prepare('SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=?').get(id))?.n;
-  const totalVuesLive = await db.prepare('SELECT COALESCE(SUM(nb_vues),0) as n FROM av_lives WHERE initiative_id=?').get(id).n;
-  const livesEnCours = (await db.prepare("SELECT COUNT(*) as n FROM av_lives WHERE initiative_id=? AND statut='en_cours'").get(id))?.n;
-  const totalEpisodes = (await db.prepare('SELECT COUNT(*) as n FROM av_episodes WHERE initiative_id=?').get(id))?.n;
-  const totalEcoutes = await db.prepare('SELECT COALESCE(SUM(nb_ecoutes),0) as n FROM av_episodes WHERE initiative_id=?').get(id).n;
-  const totalSeries = (await db.prepare('SELECT COUNT(*) as n FROM av_series WHERE initiative_id=?').get(id))?.n;
-  sendJSON(res, 200, { totalLives, totalVuesLive, livesEnCours, totalEpisodes, totalEcoutes, totalSeries });
-});
-
-/* ═══════════════════════════════════════════════════════════════════
    SYNCHRONISATION DES RÉSEAUX SOCIAUX
    ═══════════════════════════════════════════════════════════════════
    IMPORTANT — aucune clé API officielle (LinkedIn/Meta/X/YouTube/TikTok)
@@ -42677,8 +41786,6 @@ if (require.main === module) {
   const server = http.createServer(handleRequest);
   server.listen(PORT, () => {
     console.log(`Diaspo'Actif — serveur démarré sur http://localhost:${PORT}`);
-    // Atelier audiovisuel : génère la bibliothèque musicale libre de droits si absente
-    try { require("./atelier").ensureLibraries().then(() => console.log("Atelier: bibliothèques (musiques/sons/génériques/animations) prêtes (ffmpeg " + (require("./atelier").ffmpegAvailable() ? "OK" : "absent") + ")")); } catch (e) { console.error("Atelier init:", e.message); }
   });
 }
 

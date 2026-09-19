@@ -1038,31 +1038,6 @@
       ]
     },
 
-    /* ── VISIOCONFÉRENCE ── */
-    'f-visio': {
-      badge:'📹 Visioconférence', couleur:'#0369a1',
-      steps:[
-        { el:null, pos:'center', badge:true,
-          titre:"Organiser une visioconférence",
-          voice:"Lancez des appels vidéo directs ou planifiez des réunions avec plusieurs membres diaspora.",
-          desc:"Appels vidéo HD, réunions de groupe, partage d'écran — directement intégrés à la plateforme." },
-        { el:'a[href="messagerie.html"]', pos:'bottom',
-          titre:"📹 Lancer un appel vidéo",
-          voice:"Dans la messagerie, cliquez sur l'icône caméra pour démarrer un appel vidéo direct.",
-          desc:"Messagerie → ouvrez une conversation → icône 📹 → appel vidéo HD lancé instantanément.",
-          lien:{href:'messagerie.html', label:'Messagerie'} },
-        { el:null, pos:'center',
-          titre:"📅 Planifier une réunion",
-          voice:"Planifiez une réunion avec plusieurs participants et envoyez les invitations automatiquement.",
-          desc:"Agenda → Nouvelle réunion → invitez jusqu'à 50 participants → lien de réunion généré automatiquement.",
-          lien:{href:'reunions.html', label:'Mes réunions'} },
-        { el:null, pos:'center', cta:'utilisateur',
-          titre:"✅ Réunissez votre réseau !",
-          voice:"Les réunions sont enregistrables et les liens restent actifs pour les absents.",
-          desc:"Partage d'écran, tableau blanc, chat en direct — tout ce qu'il faut pour une réunion productive." }
-      ]
-    },
-
     /* ── RECHERCHE ── */
     'f-recherche': {
       badge:'🔍 Recherche', couleur:'#6366f1',

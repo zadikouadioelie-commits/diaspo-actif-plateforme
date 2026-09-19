@@ -10,7 +10,6 @@ window.MODULE_AIDE = {
   business_plans: { titre: "📋 Business Plans", texte: "Rédigez et structurez vos plans d'affaires ou de projet directement depuis la plateforme." },
   evaluation_projet: { titre: "📁 Évaluation de Projet", texte: "Faites évaluer un projet ou une initiative selon des critères structurés, utile pour convaincre partenaires et financeurs." },
   mon_agenda: { titre: "📅 Mon Agenda", texte: "Centralisez vos rendez-vous, événements et échéances liés à votre activité sur Diaspo'Actif." },
-  visioconference: { titre: "📹 Visioconférence", texte: "Organisez ou rejoignez des réunions en ligne directement depuis votre espace, sans outil externe." },
   emplois_stages: { titre: "💼 Emplois & Stages", texte: "Publiez des offres d'emploi ou de stage, ou consultez les candidatures reçues." },
   reseau_pro: { titre: "🌐 Mon Réseau Pro", texte: "Développez votre réseau professionnel : contacts, mises en relation et recommandations au sein de la diaspora." },
   indice_fiabilite: { titre: "🛡️ Mon indice de fiabilité", texte: "Votre score de confiance sur la plateforme, calculé à partir de votre activité, vos vérifications et les avis reçus." },

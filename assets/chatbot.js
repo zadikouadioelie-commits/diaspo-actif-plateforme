@@ -143,10 +143,6 @@
       return null;
     },
 
-    openMeeting() {
-      window.open('reunions.html', '_blank');
-    },
-
     async getUserStats() {
       try {
         const r = await fetch('/api/dashboard/utilisateur', { credentials: 'include' });
@@ -171,7 +167,6 @@
     2: [
       { id: 'publish_post',   label: '📢 Publier une annonce',       handler: () => ACTIONS.navigate('dashboard-initiative.html') },
       { id: 'create_event',   label: '📅 Créer un événement',        handler: () => ACTIONS.navigate('dashboard-initiative.html#events') },
-      { id: 'open_meeting',   label: '📹 Démarrer une réunion',      handler: () => ACTIONS.openMeeting() },
       { id: 'generate_qr',    label: '🎴 Générer mon QR code',       handler: () => ACTIONS.navigate('dashboard-initiative.html') },
       { id: 'my_stats',       label: '📊 Voir mes statistiques',     handler: () => ACTIONS.navigate('dashboard-initiative.html') },
     ],

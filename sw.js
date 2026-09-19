@@ -52,7 +52,6 @@ function pushClickUrl(d) {
   if (d.conversation_id)  return `messagerie.html?conv=${d.conversation_id}`;
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
   if (d.event_id)         return `evenements.html#evt-${d.event_id}`;
-  if (d.reunion_id)       return `reunions.html?reunion=${d.reunion_id}`;
   if (d.with_user_id)     return `messagerie.html?with=${d.with_user_id}`;
   if (d.follower_id)      return `profil.html?id=${d.follower_id}`;
   if (d.initiative_id)    return `initiative.html?id=${d.initiative_id}`;

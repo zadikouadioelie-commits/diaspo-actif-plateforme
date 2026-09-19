@@ -849,20 +849,6 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
-  -- Atelier audiovisuel : médias importés et rendus produits par ffmpeg
-  CREATE TABLE IF NOT EXISTS av_media (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    folder TEXT DEFAULT 'videos',
-    nom TEXT NOT NULL,
-    type TEXT,
-    chemin TEXT NOT NULL,
-    duree REAL,
-    source TEXT DEFAULT 'upload',
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
   CREATE TABLE IF NOT EXISTS counters (
     key TEXT PRIMARY KEY,
     value INTEGER NOT NULL DEFAULT 0
@@ -2869,60 +2855,6 @@ db.exec(`
     FOREIGN KEY(bloque_id) REFERENCES users(id)
   );
 
-  /* ===== SALLES DE RÉUNION VIRTUELLE ===== */
-  CREATE TABLE IF NOT EXISTS meetings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id TEXT UNIQUE NOT NULL,
-    token_host TEXT NOT NULL,
-    token_guest TEXT NOT NULL,
-    titre TEXT,
-    host_id INTEGER NOT NULL,
-    rdv_id INTEGER,
-    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','actif','termine','expire')),
-    duree_max_minutes INTEGER DEFAULT 40,
-    started_at TEXT,
-    ended_at TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(host_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS meeting_participants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    meeting_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    role TEXT DEFAULT 'guest',
-    rejoint_at TEXT,
-    quitte_at TEXT,
-    UNIQUE(meeting_id, user_id),
-    FOREIGN KEY(meeting_id) REFERENCES meetings(id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  /* Signaux WebRTC (offres, réponses, ICE candidates) via polling */
-  CREATE TABLE IF NOT EXISTS meeting_signals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id TEXT NOT NULL,
-    from_peer TEXT NOT NULL,
-    to_peer TEXT,
-    type TEXT NOT NULL,
-    data TEXT NOT NULL,
-    consumed INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  /* Historique des réunions */
-  CREATE TABLE IF NOT EXISTS meeting_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    meeting_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    duree_effective_minutes INTEGER DEFAULT 0,
-    statut TEXT DEFAULT 'termine',
-    notes TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(meeting_id) REFERENCES meetings(id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
   /* Rappels programmés */
   CREATE TABLE IF NOT EXISTS agenda_reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2966,76 +2898,6 @@ db.exec(`
     FOREIGN KEY(auteur_initiative_id) REFERENCES initiatives(id)
   );
 
-  /* ============================================================
-     MODULE RÉUNIONS COLLABORATIVES
-  ============================================================ */
-
-  CREATE TABLE IF NOT EXISTS reunions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    titre TEXT NOT NULL,
-    description TEXT,
-    organisateur_id INTEGER NOT NULL,
-    type TEXT DEFAULT 'reunion' CHECK(type IN ('reunion','rdv','conference','webinaire')),
-    acces TEXT DEFAULT 'prive' CHECK(acces IN ('prive','public')),
-    statut TEXT DEFAULT 'planifiee' CHECK(statut IN ('planifiee','en_cours','terminee','annulee')),
-    date_debut TEXT NOT NULL,
-    date_fin TEXT,
-    duree_minutes INTEGER,
-    jitsi_room TEXT UNIQUE,
-    enregistrement_active INTEGER DEFAULT 0,
-    ordre_du_jour TEXT,
-    started_at TEXT,
-    ended_at TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(organisateur_id) REFERENCES users(id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_reunions_organisateur ON reunions(organisateur_id);
-
-  CREATE TABLE IF NOT EXISTS reunion_invites (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    reunion_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    role TEXT DEFAULT 'participant' CHECK(role IN ('participant','moderateur','coorganisateur')),
-    statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse')),
-    rejoint_at TEXT,
-    quitte_at TEXT,
-    duree_presence_minutes INTEGER,
-    invited_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(reunion_id, user_id),
-    FOREIGN KEY(reunion_id) REFERENCES reunions(id),
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_reunion_invites_user ON reunion_invites(user_id);
-
-  CREATE TABLE IF NOT EXISTS reunion_resumes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    reunion_id INTEGER NOT NULL UNIQUE,
-    redacteur_id INTEGER,
-    sujets TEXT DEFAULT '[]',
-    decisions TEXT DEFAULT '[]',
-    actions TEXT DEFAULT '[]',
-    notes TEXT,
-    statut TEXT DEFAULT 'brouillon' CHECK(statut IN ('brouillon','valide','archive')),
-    valide_at TEXT,
-    valide_par INTEGER,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(reunion_id) REFERENCES reunions(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS reunion_decisions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    reunion_id INTEGER NOT NULL,
-    titre TEXT NOT NULL,
-    description TEXT,
-    responsable_id INTEGER,
-    type_suivi TEXT DEFAULT 'action' CHECK(type_suivi IN ('action','tache','projet','rappel','initiative')),
-    echeance TEXT,
-    statut TEXT DEFAULT 'ouvert' CHECK(statut IN ('ouvert','en_cours','termine')),
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(reunion_id) REFERENCES reunions(id),
-    FOREIGN KEY(responsable_id) REFERENCES users(id)
-  );
 `);
 /* Applique les colonnes MIGRATIONS dont la table existe déjà à cet instant — no-op silencieux
    pour toute table pas encore créée (ALTER TABLE sur une table absente échoue, capturé par le
@@ -7247,9 +7109,8 @@ db.exec(`
 
   /* Tâches professionnelles (sous-module "📋 Tâches") — aucun système générique équivalent
      ailleurs sur la plateforme (deal_tasks est scopé aux espaces "Deal" inter-initiatives,
-     agenda_reminders aux événements d'agenda, reunion_decisions aux comptes-rendus de
-     réunion — confirmé avant construction). Liens optionnels vers les autres sous-modules
-     CRM, jamais de duplication de leurs champs. */
+     agenda_reminders aux événements d'agenda — confirmé avant construction). Liens
+     optionnels vers les autres sous-modules CRM, jamais de duplication de leurs champs. */
   CREATE TABLE IF NOT EXISTS crm_taches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     initiative_id INTEGER NOT NULL,
@@ -7574,156 +7435,6 @@ db.exec(`
    initiative_membres.message) et plantaient sinon au tout premier démarrage sur une base vide. */
 appliquerMigrations();
 
-/* ═══════════════════════════════════════════════════════════
-   MODULE AUDIOVISUEL
-   ═══════════════════════════════════════════════════════════ */
-db.exec(`
-  -- Lives / diffusions
-  CREATE TABLE IF NOT EXISTS av_lives (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    initiative_id INTEGER NOT NULL,
-    titre TEXT NOT NULL,
-    description TEXT,
-    type TEXT DEFAULT 'conference',
-    statut TEXT DEFAULT 'programme',   -- programme | en_cours | termine | annule
-    acces TEXT DEFAULT 'public',       -- public | prive | membres | payant
-    prix REAL DEFAULT 0,
-    code_acces TEXT,
-    url_stream TEXT,                   -- URL YouTube Live / Zoom / Meet fournie par l'organisateur
-    url_replay TEXT,
-    vignette_url TEXT,
-    date_debut TEXT,
-    date_fin TEXT,
-    nb_vues INTEGER DEFAULT 0,
-    pic_audience INTEGER DEFAULT 0,
-    duree_secondes INTEGER DEFAULT 0,
-    enregistrement_url TEXT,
-    transcription TEXT,
-    resume_ia TEXT,
-    moments_cles TEXT DEFAULT '[]',
-    decisions TEXT DEFAULT '[]',
-    actions TEXT DEFAULT '[]',
-    tags TEXT DEFAULT '[]',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
-  -- Chat live
-  CREATE TABLE IF NOT EXISTS av_live_chat (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    live_id INTEGER NOT NULL,
-    user_id INTEGER,
-    pseudo TEXT,
-    message TEXT NOT NULL,
-    type TEXT DEFAULT 'chat',          -- chat | question | modere
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(live_id) REFERENCES av_lives(id) ON DELETE CASCADE
-  );
-
-  -- Sondages live
-  CREATE TABLE IF NOT EXISTS av_sondages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    live_id INTEGER NOT NULL,
-    question TEXT NOT NULL,
-    options_json TEXT DEFAULT '[]',
-    actif INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(live_id) REFERENCES av_lives(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS av_votes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sondage_id INTEGER NOT NULL,
-    user_id INTEGER,
-    option_index INTEGER NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(sondage_id) REFERENCES av_sondages(id) ON DELETE CASCADE
-  );
-
-  -- Réactions live
-  CREATE TABLE IF NOT EXISTS av_reactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    live_id INTEGER NOT NULL,
-    user_id INTEGER,
-    emoji TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  -- Podcasts / séries
-  CREATE TABLE IF NOT EXISTS av_series (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    initiative_id INTEGER NOT NULL,
-    titre TEXT NOT NULL,
-    description TEXT,
-    categorie TEXT DEFAULT 'general',
-    image_url TEXT,
-    nb_abonnes INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
-  -- Épisodes podcast
-  CREATE TABLE IF NOT EXISTS av_episodes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    serie_id INTEGER,
-    initiative_id INTEGER NOT NULL,
-    titre TEXT NOT NULL,
-    description TEXT,
-    image_url TEXT,
-    url_audio TEXT NOT NULL,           -- URL SoundCloud / Spotify / hébergement audio
-    duree_secondes INTEGER DEFAULT 0,
-    intervenants TEXT DEFAULT '[]',
-    categorie TEXT DEFAULT 'general',
-    nb_ecoutes INTEGER DEFAULT 0,
-    taux_completion REAL DEFAULT 0,
-    note REAL DEFAULT 0,
-    nb_notes INTEGER DEFAULT 0,
-    transcription TEXT,
-    resume_ia TEXT,
-    chapitres TEXT DEFAULT '[]',       -- [{time, titre}]
-    mots_cles TEXT DEFAULT '[]',
-    is_public INTEGER DEFAULT 1,
-    published_at TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(serie_id) REFERENCES av_series(id) ON DELETE SET NULL,
-    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-
-  -- Commentaires podcasts
-  CREATE TABLE IF NOT EXISTS av_commentaires (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    episode_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    contenu TEXT NOT NULL,
-    note INTEGER,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(episode_id) REFERENCES av_episodes(id) ON DELETE CASCADE
-  );
-
-  -- Participants live (pour accès privé/payant)
-  CREATE TABLE IF NOT EXISTS av_participants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    live_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    statut TEXT DEFAULT 'invite',      -- invite | confirme | bloque
-    token TEXT,
-    joined_at TEXT,
-    UNIQUE(live_id, user_id),
-    FOREIGN KEY(live_id) REFERENCES av_lives(id) ON DELETE CASCADE
-  );
-
-  -- Playlists
-  CREATE TABLE IF NOT EXISTS av_playlists (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    initiative_id INTEGER NOT NULL,
-    titre TEXT NOT NULL,
-    description TEXT,
-    items_json TEXT DEFAULT '[]',      -- [{type:'live'|'episode', id}]
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY(initiative_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-`);
 
 /* Remplace l'ANCIENNE table demandes_contact par celle du module « Établir contact ».
    L'ancienne portait motif NOT NULL, que le nouveau module n'enregistre pas : ses

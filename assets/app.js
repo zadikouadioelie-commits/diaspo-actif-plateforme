@@ -468,7 +468,6 @@ const NOTIF_ICONS = {
   nouvelle_publication: "📰",
   pub_commentaire: "💬",
   pub_like: "❤️",
-  reunion_invite: "📹",
   demande_contact: "📩",
   demande_contact_acceptee: "🤝",
   demande_contact_refusee: "🚫",
@@ -513,7 +512,6 @@ function notifUrl(n) {
   // (evenement_id est le nom historique, les notifs billetterie utilisent event_id).
   if (d.evenement_id)     return `evenements.html#evt-${d.evenement_id}`;
   if (d.event_id)         return `evenements.html#evt-${d.event_id}`;
-  if (d.reunion_id)       return `reunions.html?reunion=${d.reunion_id}`;
   // Priorité sur initiative_id : une notif "Rejoindre l'initiative" porte les deux clés,
   // et doit amener directement dans la conversation avec le demandeur, pas sur la fiche.
   if (d.with_user_id)     return `messagerie.html?with=${d.with_user_id}`;

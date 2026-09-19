@@ -166,7 +166,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
   <button class="ag-nav-btn" onclick="navNext()">›</button>
   <button class="ag-nav-btn" onclick="goToday()">Aujourd'hui</button>
   <button class="ag-nav-btn accent" onclick="openNewRdv()">+ Rendez-vous</button>
-  <button class="ag-nav-btn orange" onclick="location.href='/meeting.html'">📹 Réunion</button>
   <button class="ag-nav-btn" id="btn-google-agenda" onclick="openModal('modal-google')">🔗 Google Agenda</button>
 </header>
 
@@ -615,7 +614,6 @@ function renderRdvPanel() {
         ${rdv.statut==='contre_proposition'?`<div style="font-size:.7rem;color:var(--purple);">Contre-prop. : ${rdv.contre_date} ${rdv.contre_heure_debut}</div>`:''}
       </div>
       <span class="rdv-badge" style="background:${COLORS[rdv.statut]||'#e0e8f0'};">${LABELS[rdv.statut]||rdv.statut}</span>
-      ${rdv.meeting_id?`<button class="btn btn-orange" style="font-size:.7rem;padding:4px 8px;" onclick="event.stopPropagation();joinMeetingByRdv(${rdv.meeting_id})">📹</button>`:''}
     </div>`;
   });
   html+='</div>';
@@ -691,7 +689,6 @@ function openEventDetail(id) {
   const actions=document.createElement('div');
   actions.className='modal-actions';
   actions.innerHTML=`<button class="btn btn-outline" onclick="editBloc(${id})">✏️ Modifier</button>`;
-  if(ev.meeting_id) actions.innerHTML+=`<button class="btn btn-orange" onclick="joinMeeting(${ev.meeting_id})">📹 Réunion</button>`;
   actions.innerHTML+=`<button class="btn btn-outline" onclick="closeModal('modal-event-detail')">Fermer</button>`;
   document.getElementById('event-detail-content').appendChild(actions);
   openModal('modal-event-detail');
@@ -950,21 +947,10 @@ async function respondRdv(action) {
   if(r.ok){
     closeModal('modal-rdv-respond');
     await loadRdv();await loadAndRender();
-    if(action==='accepte'&&j.meeting){
-      if(confirm(`✅ RDV accepté ! Une salle de réunion a été créée.\nRejoindre maintenant ?`))
-        joinMeetingByRoomId(j.meeting.room_id,j.meeting.token_host||j.meeting.token_guest);
-    } else {
-      const msgs={accepte:'✅ RDV accepté — ajouté à votre agenda !',peut_etre:'🤔 Réponse "Peut-être" envoyée.',refuse:'RDV refusé.',contre_proposition:'Contre-proposition envoyée.'};
-      showMsg(msgs[action]||'Action effectuée', action==='refuse'?'warning':'success');
-    }
+    const msgs={accepte:'✅ RDV accepté — ajouté à votre agenda !',peut_etre:'🤔 Réponse "Peut-être" envoyée.',refuse:'RDV refusé.',contre_proposition:'Contre-proposition envoyée.'};
+    showMsg(msgs[action]||'Action effectuée', action==='refuse'?'warning':'success');
   } else showMsg('Erreur : '+(j.error||'inconnue'),'danger');
 }
-
-async function joinMeeting(meetingId) {
-  try{const r=await fetch(`/api/meetings/${meetingId}`,{credentials:'include'});const m=await r.json();if(m.room_id)location.href=`/meeting.html?room=${m.room_id}&token=${m.token_host||m.token_guest}`;}catch(e){}
-}
-function joinMeetingByRdv(meetingId){joinMeeting(meetingId);}
-function joinMeetingByRoomId(roomId,token){location.href=`/meeting.html?room=${roomId}&token=${token}`;}
 
 /* ═══════════ UTILS ═══════════ */
 function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
