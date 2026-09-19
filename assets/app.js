@@ -1098,6 +1098,18 @@ async function initComptesLiesSwitcher(user) {
   const btn = document.getElementById('cl-switch-btn');
   const dd = document.getElementById('cl-switch-dd');
   if (!wrap || !btn || !dd) return;
+  /* Déplacé directement sous <body> (2026-09-19, bug réel, reproduit avec deux comptes de
+     test réellement liés) : le sortir de .cl-switch-wrap suffisait à échapper au display:none
+     mobile, mais pas au piège de z-index — .cl-switch-dd reste alors descendant de <header
+     class="topbar"> (position:sticky + z-index:50), qui crée SON PROPRE contexte
+     d'empilement ; le z-index:2000 du menu n'y gagne plus que contre ses frères DANS le
+     header, pas contre le reste de la page. Sur mobile, le menu s'ouvre souvent au-dessus du
+     contenu principal (près du bouton "Comptes" de la barre du bas, loin du header) : du
+     contenu de page ordinaire passait alors PAR-DESSUS un menu pourtant correctement "ouvert"
+     (confirmé par elementFromPoint : un autre élément répondait au point exact du menu).
+     Sous <body>, le menu échappe à tout contexte d'empilement ancêtre — son z-index redevient
+     comparé au niveau racine, comme un vrai menu "portail". */
+  document.body.appendChild(dd);
   injectComptesLiesSwitcherStyles();
   wrap.style.display = 'inline-flex';
   /* Bouton mobile (barre du bas, après "Boutiques") : voir renderMobileBottomNavAuto(). Sur
@@ -1293,8 +1305,17 @@ async function applyAuthState() {
       </a>
       <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
         <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte">▾</button>
-        <div class="cl-switch-dd" id="cl-switch-dd"></div>
       </span>
+      <!-- Sorti de .cl-switch-wrap (2026-09-19, bug réel) : ce menu est en position:fixed et
+           partagé par le déclencheur desktop (▾ ci-dessus) ET le bouton "Comptes" de la barre
+           du bas mobile (#mobile-nav-comptes-toggle, voir renderMobileBottomNavAuto). Mais
+           .cl-switch-wrap est masqué en display:none sous 768px (règle CSS plus haut) — et un
+           display:none sur un ancêtre masque tout son sous-arbre quelle que soit la position de
+           l'élément, fixed y compris. Le menu restait donc de taille nulle (offsetWidth/Height
+           à 0) sur mobile même correctement marqué "open" en JS : le clic fonctionnait, mais
+           rien n'était visible ("le bouton ne fonctionne pas sur téléphone", signalé et
+           reproduit avec deux comptes liés réels). -->
+      <div class="cl-switch-dd" id="cl-switch-dd"></div>
       <a href="#" id="logout-link" class="btn btn-sm btn-outline" style="color:#000;">Déconnexion</a>
       <a href="mon-associe.html" id="mon-associe-btn" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:5px;background:#0F2A50;color:#fff;font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:14px;white-space:nowrap;border:1px solid rgba(255,255,255,.25);box-shadow:0 1px 4px rgba(0,0,0,.25);" title="Mon Associé">
         <span style="font-size:14px;">💎</span> Mon Associé
