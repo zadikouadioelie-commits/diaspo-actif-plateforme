@@ -1075,6 +1075,35 @@ document.getElementById("btn-next-1").addEventListener("click",()=>{if(currentRo
   const champ = document.getElementById(roleInvite === 'utilisateur' ? 'u-email' : roleInvite === 'initiative' ? 'i-email' : 'ce-email-resp');
   if (champ) champ.value = emailInvite;
 })();
+
+/* Parrainage & Invitations, Phase 1 (2026-09-19) : ?invitation=CODE&role=...&via=link|qr, posé
+   par join.html. INVITATION_CODE_ACTIVE/INVITATION_VIA_ACTIVE sont lus par submitForm()
+   ci-dessus pour transmettre le code au moment de l'inscription — voir POST /api/auth/signup
+   (server/index.js) qui préremplit le domaine/sous-domaine à partir de l'invitation et journalise
+   l'inscription dans le Centre de vision de l'inviteur une fois le compte créé. Enregistré dans
+   un DOMContentLoaded (et non un IIFE immédiat comme preremplirDepuisInvitation ci-dessus) parce
+   qu'il doit s'exécuter APRÈS l'insertion des <option> de u-domaine/i-domaine, faite par les
+   scripts inline plus haut dans le document — l'ordre d'exécution des listeners DOMContentLoaded
+   suit leur ordre d'enregistrement, jamais leur ordre d'apparition dans le HTML final. */
+let INVITATION_CODE_ACTIVE = null, INVITATION_VIA_ACTIVE = null;
+document.addEventListener('DOMContentLoaded', function preremplirDepuisInvitationParrainage(){
+  const p = new URLSearchParams(location.search);
+  const code = p.get('invitation');
+  const roleInvite = p.get('role');
+  if (!code || !['utilisateur', 'initiative'].includes(roleInvite)) return;
+  INVITATION_CODE_ACTIVE = code;
+  INVITATION_VIA_ACTIVE = p.get('via') === 'qr' ? 'qr' : 'link';
+  const card = document.querySelector(`.type-card[data-role="${roleInvite}"]`);
+  if (card) card.click();
+  goToStep(2);
+  api('GET', `/parrainage/invitations/${encodeURIComponent(code)}`).then(inv => {
+    if (!inv.actif) return;
+    const selDomaine = document.getElementById(roleInvite === 'utilisateur' ? 'u-domaine' : 'i-domaine');
+    const selSousDomaine = document.getElementById(roleInvite === 'utilisateur' ? 'u-sous-domaine-1' : 'i-sous-domaine-1');
+    if (selDomaine && inv.domaine_cle && !selDomaine.value) selDomaine.value = inv.domaine_cle;
+    if (selSousDomaine && inv.sous_domaine_nom && !selSousDomaine.value) selSousDomaine.value = inv.sous_domaine_nom;
+  }).catch(() => {});
+});
 function updateStrength(input,barId,hintId){
   const v=input.value;let s=0;
   if(v.length>=8)s++;if(v.length>=12)s++;
@@ -1265,6 +1294,7 @@ async function submitForm(btnId,errId,body){
   btn.disabled=true;btn.textContent="Creation en cours…";
   body.site_perso = document.getElementById("site_perso")?.value || "";
   body._form_ts = PAGE_LOAD_TS;
+  if (INVITATION_CODE_ACTIVE) { body.invitation_code = INVITATION_CODE_ACTIVE; body.via = INVITATION_VIA_ACTIVE; }
   try{
     const r=await api("POST","/auth/signup",body);
     await uploadPhotosApresInscription();

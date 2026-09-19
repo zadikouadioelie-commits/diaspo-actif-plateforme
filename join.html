@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<!-- Cette page est servie sur un chemin "joli" imbriqué (/join/CODE, voir server/index.js) :
+     sans cette balise, TOUTE URL relative de la page — y compris celles injectées
+     dynamiquement par des scripts partagés du site (ex. assets/app.js) — se résoudrait contre
+     /join/ au lieu de la racine du site, et casserait silencieusement (bug réel constaté en
+     testant : /join/assets/app.js au lieu de /assets/app.js). -->
+<base href="/">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Vous êtes invité(e)</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Vous êtes invité(e)">
+<meta property="og:description" content="La plateforme mondiale de la diaspora engagée — actions locales, impact global.">
+<meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .jn-wrap{min-height:calc(100vh - 160px);display:flex;align-items:center;justify-content:center;padding:30px 16px;}
+  .jn-card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:36px 30px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.08);}
+  .jn-avatar{width:78px;height:78px;border-radius:50%;object-fit:cover;margin:0 auto 16px;display:block;background:var(--bg);border:3px solid var(--border);}
+  .jn-avatar-fallback{width:78px;height:78px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:34px;background:linear-gradient(135deg,#0D2B4E,#1B4B8C);color:#fff;}
+  .jn-titre{font-size:19px;font-weight:800;margin:0 0 6px;}
+  .jn-sous{font-size:13.5px;color:var(--muted);margin:0 0 18px;line-height:1.5;}
+  .jn-domaine{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1.5px solid var(--border);border-radius:99px;padding:6px 14px;font-size:12.5px;font-weight:700;margin-bottom:22px;}
+  .jn-actions{display:flex;flex-direction:column;gap:10px;}
+  .jn-btn{border:none;border-radius:12px;padding:14px 18px;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .jn-btn-utilisateur{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;}
+  .jn-btn-utilisateur:hover{filter:brightness(1.06);}
+  .jn-btn-initiative{background:var(--bg);color:var(--text);border:1.5px solid var(--border) !important;}
+  .jn-btn-initiative:hover{border-color:#2563EB;color:#2563EB;}
+  .jn-deja{margin-top:18px;font-size:12.5px;color:var(--muted);}
+  .jn-deja a{color:#2563EB;font-weight:700;}
+  .jn-inactive{padding:10px 14px;background:#fef3c7;border:1px solid #fde68a;color:#92400e;border-radius:10px;font-size:13px;margin-bottom:18px;}
+  .jn-loading{color:var(--muted);font-size:13.5px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="/assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+      </div>
+    </div>
+  </header>
+
+  <main class="jn-wrap">
+    <div class="jn-card" id="jn-card">
+      <p class="jn-loading">Chargement de l'invitation…</p>
+    </div>
+  </main>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="/mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="/charte.html" class="footer-link">Charte</a> · <a href="/politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
+</div>
+
+<script src="/assets/data.js"></script>
+<script src="/assets/demo.js?v=2"></script>
+<script src="/assets/app.js?v=12"></script>
+<script src="/assets/theme-manager.js"></script>
+<script>
+(async function initJoin(){
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const card = document.getElementById('jn-card');
+
+  // Le code vient de /join/CODE (route "jolie" côté serveur) — ?code=... en repli.
+  const path = location.pathname.replace(/\/+$/, '');
+  const codeFromPath = path.startsWith('/join/') ? decodeURIComponent(path.slice('/join/'.length)) : null;
+  const code = codeFromPath || new URLSearchParams(location.search).get('code');
+  const via = new URLSearchParams(location.search).get('via') === 'qr' ? 'qr' : 'link';
+
+  if (!code) {
+    card.innerHTML = `<div class="jn-avatar-fallback">🔗</div><h1 class="jn-titre">Lien d'invitation invalide</h1><p class="jn-sous">Ce lien ne contient aucun code d'invitation.</p>`;
+    return;
+  }
+
+  // Un visiteur déjà connecté a déjà un compte : pas d'appel signup, juste une redirection.
+  try {
+    const me = await api('GET', '/auth/me');
+    if (me.user) {
+      card.innerHTML = `<div class="jn-avatar-fallback">👋</div><h1 class="jn-titre">Vous avez déjà un compte</h1><p class="jn-sous">Vous êtes déjà connecté(e) sur Diaspo'Actif.</p>
+        <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/index.html">Aller à mon tableau de bord</a></div>`;
+      return;
+    }
+  } catch (e) { /* pas connecté — poursuite normale du parcours d'invitation */ }
+
+  let invitation;
+  try {
+    invitation = await api('GET', `/parrainage/invitations/${encodeURIComponent(code)}`);
+  } catch (e) {
+    card.innerHTML = `<div class="jn-avatar-fallback">🔗</div><h1 class="jn-titre">Invitation introuvable</h1><p class="jn-sous">Ce lien d'invitation n'existe plus ou a expiré.</p>`;
+    return;
+  }
+
+  if (via === 'qr') { try { await api('POST', `/parrainage/invitations/${encodeURIComponent(code)}/scan`); } catch (e) {} }
+
+  const avatarHtml = invitation.inviteur_photo
+    ? `<img class="jn-avatar" src="${esc(invitation.inviteur_photo)}" alt="">`
+    : `<div class="jn-avatar-fallback">🤝</div>`;
+  const domaineHtml = invitation.domaine_nom
+    ? `<div class="jn-domaine">${esc(invitation.domaine_icone || '')} ${esc(invitation.domaine_nom)}${invitation.sous_domaine_nom ? ' · ' + esc(invitation.sous_domaine_nom) : ''}</div>`
+    : '';
+
+  if (!invitation.actif) {
+    card.innerHTML = `${avatarHtml}
+      <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite</h1>
+      ${domaineHtml}
+      <div class="jn-inactive">⏸️ Cette invitation n'est plus active.</div>
+      <p class="jn-sous">Vous pouvez tout de même découvrir Diaspo'Actif et créer votre compte librement.</p>
+      <div class="jn-actions">
+        <a class="jn-btn jn-btn-utilisateur" href="/inscription.html">Créer un compte</a>
+      </div>`;
+    return;
+  }
+
+  const suite = `&via=${via}`;
+  card.innerHTML = `${avatarHtml}
+    <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite sur Diaspo'Actif</h1>
+    <p class="jn-sous">La plateforme mondiale de la diaspora engagée — actions locales, impact global.</p>
+    ${domaineHtml}
+    <div class="jn-actions">
+      <a class="jn-btn jn-btn-utilisateur" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=utilisateur${suite}">👤 Créer un compte Utilisateur</a>
+      <a class="jn-btn jn-btn-initiative" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=initiative${suite}">🏢 Créer un compte Initiative</a>
+    </div>
+    <p class="jn-deja">Déjà inscrit(e) ? <a href="/login.html">Se connecter</a></p>`;
+})();
+</script>
+</body>
+</html>

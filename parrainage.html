@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Parrainage & Invitations</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Parrainage & Invitations">
+<meta property="og:description" content="La plateforme mondiale de la diaspora engagée — actions locales, impact global.">
+<meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+  .pa-tabs{display:flex;gap:6px;border-bottom:1.5px solid var(--border);margin-bottom:22px;flex-wrap:wrap;}
+  .pa-tab{background:none;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;}
+  .pa-tab.active{color:#2563EB;border-bottom-color:#2563EB;}
+  .pa-pane{display:none;}
+  .pa-pane.active{display:block;}
+  .pa-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;}
+  .pa-stat-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px 18px;}
+  .pa-stat-val{font-size:24px;font-weight:800;line-height:1.1;}
+  .pa-stat-lbl{font-size:11.5px;color:var(--muted);margin-top:4px;font-weight:600;}
+  .pa-form{background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:24px;max-width:560px;}
+  .pa-form label{display:block;font-size:12.5px;font-weight:700;margin-bottom:5px;}
+  .pa-form input, .pa-form select{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);font-size:13.5px;margin-bottom:16px;color:var(--text);}
+  .pa-btn-creer{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border:none;border-radius:11px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;}
+  .pa-btn-creer:disabled{opacity:.6;cursor:default;}
+  .pa-liste{display:flex;flex-direction:column;gap:10px;}
+  .pa-inv-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .pa-inv-info{flex:1;min-width:200px;}
+  .pa-inv-nom{font-weight:700;font-size:14px;}
+  .pa-inv-meta{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .pa-inv-code{font-family:monospace;font-size:12px;background:var(--bg);border-radius:6px;padding:2px 7px;}
+  .pa-badge{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:99px;}
+  .pa-badge-active{background:rgba(21,128,61,.12);color:#15803d;}
+  .pa-badge-inactive{background:rgba(220,38,38,.12);color:#dc2626;}
+  .pa-inv-actions{display:flex;gap:6px;}
+  .pa-icon-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text);}
+  .pa-icon-btn:hover{border-color:#2563EB;color:#2563EB;}
+  .pa-empty{text-align:center;padding:50px 20px;color:var(--muted);}
+  .pa-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+  .pa-modal{background:var(--card);border-radius:18px;padding:28px;max-width:400px;width:100%;text-align:center;}
+  .pa-modal h3{margin:0 0 4px;font-size:16px;}
+  .pa-modal p{font-size:12.5px;color:var(--muted);margin:0 0 16px;}
+  .pa-qr-wrap{width:200px;height:200px;margin:0 auto 16px;border-radius:14px;overflow:hidden;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;background:#fff;}
+  .pa-lien-box{display:flex;gap:6px;margin-bottom:16px;}
+  .pa-lien-box input{flex:1;font-size:11.5px;padding:9px 10px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);}
+  .pa-modal-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .pa-modal-close{margin-top:14px;background:none;border:none;color:var(--muted);font-size:12.5px;cursor:pointer;text-decoration:underline;}
+  .pa-vc-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;}
+  .pa-vc-avatar{width:38px;height:38px;border-radius:10px;object-fit:cover;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;}
+  .pa-vc-info{flex:1;min-width:0;}
+  .pa-vc-nom{font-weight:700;font-size:13.5px;}
+  .pa-vc-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .pa-source-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--border);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil d'actualité</a>
+        <a href="evenements.html">Autres événements</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:30px;padding-bottom:40px;">
+    <h1 style="margin:0 0 4px;">🤝 Parrainage & Invitations</h1>
+    <p class="sub" style="margin:0 0 20px;">Faites découvrir Diaspo'Actif autour de vous et suivez les comptes créés grâce à vos invitations.</p>
+
+    <div class="pa-tabs">
+      <button type="button" class="pa-tab active" data-tab="dashboard">📊 Tableau de bord</button>
+      <button type="button" class="pa-tab" data-tab="creer">➕ Créer une invitation</button>
+      <button type="button" class="pa-tab" data-tab="mes-invitations">🔗 Mes invitations</button>
+      <button type="button" class="pa-tab" data-tab="centre-vision">👁️ Centre de vision</button>
+    </div>
+
+    <div class="pa-pane active" id="pane-dashboard">
+      <div class="pa-stats" id="pa-stats">
+        <div class="pa-stat-card"><div class="pa-stat-val">…</div></div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);max-width:600px;">Chaque invitation porte un domaine et, quand il en existe un, un sous-domaine — cela permet à la personne invitée d'arriver directement dans le bon contexte, sans ressaisir ce qu'elle a déjà indiqué à travers vous.</p>
+    </div>
+
+    <div class="pa-pane" id="pane-creer">
+      <div class="pa-form">
+        <label>Nom de l'invitation <span style="font-weight:400;color:var(--muted);">(facultatif, pour vous y retrouver)</span></label>
+        <input type="text" id="pa-c-nom" placeholder="Ex. Rencontre du 20 septembre">
+        <label>Domaine d'activité *</label>
+        <select id="pa-c-domaine"><option value="">— Sélectionner —</option></select>
+        <div id="pa-c-sous-domaine-zone"></div>
+        <button type="button" class="pa-btn-creer" id="pa-c-btn">Créer l'invitation</button>
+        <div id="pa-c-err" style="color:#dc2626;font-size:12.5px;margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="pa-pane" id="pane-mes-invitations">
+      <div class="pa-liste" id="pa-liste-invitations"><div class="notice">Chargement…</div></div>
+    </div>
+
+    <div class="pa-pane" id="pane-centre-vision">
+      <div id="pa-centre-vision-zone"><div class="notice">Chargement…</div></div>
+    </div>
+  </main>
+
+  <div class="pa-modal-overlay" id="pa-modal-overlay" style="display:none;">
+    <div class="pa-modal">
+      <h3 id="pa-modal-titre">Invitation créée</h3>
+      <p id="pa-modal-sous">Partagez ce lien ou ce QR Code.</p>
+      <div class="pa-qr-wrap" id="pa-modal-qr"></div>
+      <div class="pa-lien-box">
+        <input type="text" id="pa-modal-lien" readonly>
+        <button type="button" class="pa-icon-btn" id="pa-modal-copier">Copier</button>
+      </div>
+      <div class="pa-modal-actions">
+        <button type="button" class="pa-icon-btn" id="pa-modal-partager">📤 Partager</button>
+        <button type="button" class="pa-icon-btn" id="pa-modal-whatsapp">💬 WhatsApp</button>
+        <button type="button" class="pa-icon-btn" id="pa-modal-telecharger">⬇️ QR Code</button>
+      </div>
+      <button type="button" class="pa-modal-close" id="pa-modal-close">Fermer</button>
+    </div>
+  </div>
+
+  <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=12"></script>
+<script src="assets/domaines-activite.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+<script src="assets/gsap-animations.js" defer></script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="/assets/back-button.js"></script>
+<script>
+(async function initParrainage(){
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const QRCODE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  let qrLibReady = null;
+  function chargerQrLib() {
+    if (window.QRCode) return Promise.resolve();
+    if (qrLibReady) return qrLibReady;
+    qrLibReady = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = QRCODE_CDN; s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    return qrLibReady;
+  }
+
+  let moi = null;
+  try {
+    const me = await api('GET', '/auth/me');
+    if (!me.user) { location.href = 'login.html'; return; }
+    moi = me.user;
+  } catch (e) { location.href = 'login.html'; return; }
+
+  let DOMAINES = [];
+  try { DOMAINES = (await api('GET', '/parrainage/domaines')).domaines || []; } catch (e) {}
+  const selDomaine = document.getElementById('pa-c-domaine');
+  DOMAINES.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = `${d.icone} ${d.nom}`;
+    opt.dataset.sousDomaines = JSON.stringify(d.sous_domaines || []);
+    selDomaine.appendChild(opt);
+  });
+  const sousDomaineZone = document.getElementById('pa-c-sous-domaine-zone');
+  selDomaine.addEventListener('change', () => {
+    const opt = selDomaine.selectedOptions[0];
+    const sousDomaines = opt ? JSON.parse(opt.dataset.sousDomaines || '[]') : [];
+    if (sousDomaines.length) {
+      sousDomaineZone.innerHTML = `<label>Sous-domaine</label>
+        <select id="pa-c-sous-domaine">
+          <option value="">— Aucun —</option>
+          ${sousDomaines.map(sd => `<option value="${sd.id}">${esc(sd.nom)}</option>`).join('')}
+        </select>`;
+    } else if (opt && opt.value) {
+      sousDomaineZone.innerHTML = `<label>Sous-domaine <span style="font-weight:400;color:var(--muted);">(facultatif — aucune liste prédéfinie pour ce domaine)</span></label>
+        <input type="text" id="pa-c-sous-domaine-libre" placeholder="Précisez si utile">`;
+    } else {
+      sousDomaineZone.innerHTML = '';
+    }
+  });
+
+  /* ── Onglets ── */
+  document.querySelectorAll('.pa-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.pa-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.pa-pane').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+      if (tab.dataset.tab === 'mes-invitations') chargerInvitations();
+      if (tab.dataset.tab === 'centre-vision') chargerCentreVision();
+    });
+  });
+
+  /* ── Tableau de bord ── */
+  async function chargerDashboard() {
+    try {
+      const s = await api('GET', '/parrainage/mon-tableau-de-bord');
+      document.getElementById('pa-stats').innerHTML = `
+        <div class="pa-stat-card"><div class="pa-stat-val">${s.nb_actives}</div><div class="pa-stat-lbl">Invitations actives</div></div>
+        <div class="pa-stat-card"><div class="pa-stat-val">${s.total_vues}</div><div class="pa-stat-lbl">Vues cumulées</div></div>
+        <div class="pa-stat-card"><div class="pa-stat-val">${s.total_scans}</div><div class="pa-stat-lbl">Scans QR Code</div></div>
+        <div class="pa-stat-card"><div class="pa-stat-val">${s.total_inscriptions}</div><div class="pa-stat-lbl">Comptes créés</div></div>`;
+    } catch (e) {
+      document.getElementById('pa-stats').innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
+    }
+  }
+  await chargerDashboard();
+
+  /* ── Créer une invitation ── */
+  document.getElementById('pa-c-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('pa-c-btn');
+    const err = document.getElementById('pa-c-err');
+    err.textContent = '';
+    const domaineId = selDomaine.value;
+    if (!domaineId) { err.textContent = 'Veuillez sélectionner un domaine.'; return; }
+    const sousDomaineSel = document.getElementById('pa-c-sous-domaine');
+    const sousDomaineLibre = document.getElementById('pa-c-sous-domaine-libre');
+    btn.disabled = true; btn.textContent = 'Création…';
+    try {
+      const { invitation } = await api('POST', '/parrainage/invitations', {
+        nom: document.getElementById('pa-c-nom').value.trim() || null,
+        domaine_id: domaineId,
+        sous_domaine_id: sousDomaineSel ? sousDomaineSel.value || null : null,
+        sous_domaine_libre: sousDomaineLibre ? sousDomaineLibre.value.trim() || null : null,
+      });
+      ouvrirModalInvitation(invitation);
+      document.getElementById('pa-c-nom').value = '';
+      selDomaine.value = ''; sousDomaineZone.innerHTML = '';
+      if (typeof showToast === 'function') showToast('Invitation créée !', 'success');
+    } catch (e) {
+      err.textContent = (e && e.message) || "Impossible de créer l'invitation.";
+    } finally {
+      btn.disabled = false; btn.textContent = "Créer l'invitation";
+    }
+  });
+
+  /* ── Modale QR / lien ── */
+  const overlay = document.getElementById('pa-modal-overlay');
+  async function ouvrirModalInvitation(invitation) {
+    const lien = `${location.origin}/join/${invitation.code}`;
+    document.getElementById('pa-modal-titre').textContent = invitation.nom || 'Invitation créée';
+    document.getElementById('pa-modal-lien').value = lien;
+    overlay.style.display = 'flex';
+    const qrZone = document.getElementById('pa-modal-qr');
+    qrZone.innerHTML = '';
+    try {
+      await chargerQrLib();
+      const div = document.createElement('div');
+      qrZone.appendChild(div);
+      new window.QRCode(div, { text: `${lien}?via=qr`, width: 196, height: 196, colorDark: '#0F2A50', colorLight: '#ffffff', correctLevel: window.QRCode.CorrectLevel.H });
+    } catch (e) { qrZone.textContent = 'QR indisponible'; }
+
+    document.getElementById('pa-modal-copier').onclick = () => {
+      navigator.clipboard.writeText(lien).then(() => { if (typeof showToast === 'function') showToast('Lien copié !', 'success'); });
+    };
+    document.getElementById('pa-modal-partager').onclick = () => {
+      if (navigator.share) navigator.share({ title: 'Diaspo\'Actif', url: lien }).catch(() => {});
+      else navigator.clipboard.writeText(lien).then(() => { if (typeof showToast === 'function') showToast('Lien copié !', 'success'); });
+    };
+    document.getElementById('pa-modal-whatsapp').onclick = () => {
+      window.open(`https://wa.me/?text=${encodeURIComponent('Rejoignez-moi sur Diaspo\'Actif : ' + lien)}`, '_blank');
+    };
+    document.getElementById('pa-modal-telecharger').onclick = () => {
+      const canvas = qrZone.querySelector('canvas');
+      if (!canvas) return;
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png'); a.download = `invitation-${invitation.code}.png`; a.click();
+    };
+  }
+  document.getElementById('pa-modal-close').addEventListener('click', () => { overlay.style.display = 'none'; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
+
+  /* ── Mes invitations ── */
+  let invitationsChargees = false;
+  async function chargerInvitations() {
+    if (invitationsChargees) return;
+    invitationsChargees = true;
+    const zone = document.getElementById('pa-liste-invitations');
+    try {
+      const { invitations } = await api('GET', '/parrainage/invitations');
+      if (!invitations.length) {
+        zone.innerHTML = `<div class="pa-empty"><div style="font-size:34px;margin-bottom:10px;">🤝</div><p>Aucune invitation créée pour l'instant.</p></div>`;
+        return;
+      }
+      zone.innerHTML = invitations.map(inv => {
+        const actif = inv.statut === 'active';
+        return `<div class="pa-inv-card">
+          <div class="pa-inv-info">
+            <div class="pa-inv-nom">${esc(inv.nom || inv.domaine_nom)} <span class="pa-badge ${actif ? 'pa-badge-active' : 'pa-badge-inactive'}">${actif ? 'Active' : 'Désactivée'}</span></div>
+            <div class="pa-inv-meta">${esc(inv.domaine_icone || '')} ${esc(inv.domaine_nom)}${inv.sous_domaine_nom ? ' · ' + esc(inv.sous_domaine_nom) : ''} · <span class="pa-inv-code">${esc(inv.code)}</span></div>
+            <div class="pa-inv-meta">👁️ ${inv.visit_count} vues · 📷 ${inv.qr_scan_count} scans · ✅ ${inv.registration_count} comptes créés</div>
+          </div>
+          <div class="pa-inv-actions">
+            <button type="button" class="pa-icon-btn pa-voir" data-code="${esc(inv.code)}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🔗 Voir</button>
+            ${actif ? `<button type="button" class="pa-icon-btn pa-desactiver" data-id="${inv.id}">⏸️ Désactiver</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      zone.innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
+    }
+  }
+  document.getElementById('pa-liste-invitations').addEventListener('click', async (e) => {
+    const voir = e.target.closest('.pa-voir');
+    if (voir) { ouvrirModalInvitation({ code: voir.dataset.code, nom: voir.dataset.nom }); return; }
+    const desact = e.target.closest('.pa-desactiver');
+    if (desact) {
+      desact.disabled = true;
+      try {
+        await api('PATCH', `/parrainage/invitations/${desact.dataset.id}/desactiver`);
+        invitationsChargees = false;
+        chargerInvitations();
+        if (typeof showToast === 'function') showToast('Invitation désactivée.', 'success');
+      } catch (e2) {
+        if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de désactiver.', 'error');
+        desact.disabled = false;
+      }
+    }
+  });
+
+  /* ── Centre de vision ── */
+  const ROLE_LABELS = { utilisateur: 'Utilisateur', initiative: 'Initiative', collectivite: 'Compte Étatique' };
+  let centreVisionCharge = false;
+  async function chargerCentreVision() {
+    if (centreVisionCharge) return;
+    centreVisionCharge = true;
+    const zone = document.getElementById('pa-centre-vision-zone');
+    try {
+      const { inscrits } = await api('GET', '/parrainage/centre-vision');
+      if (!inscrits.length) {
+        zone.innerHTML = `<div class="pa-empty"><div style="font-size:34px;margin-bottom:10px;">👁️</div><p>Aucun compte créé via vos invitations pour l'instant.</p></div>`;
+        return;
+      }
+      zone.innerHTML = inscrits.map(i => {
+        const nomComplet = [i.prenom, i.nom].filter(Boolean).join(' ');
+        const date = i.registered_at ? new Date((i.registered_at || '').replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : '—';
+        return `<div class="pa-vc-card">
+          ${i.photo_url ? `<img class="pa-vc-avatar" src="${esc(i.photo_url)}" alt="">` : `<div class="pa-vc-avatar">👤</div>`}
+          <div class="pa-vc-info">
+            <div class="pa-vc-nom">${esc(nomComplet)} <span class="pa-source-pill">${i.source === 'qr_code' ? '📷 QR Code' : '🔗 Lien'}</span></div>
+            <div class="pa-vc-meta">${esc(ROLE_LABELS[i.role] || i.role)}${i.domaine_nom ? ' · ' + esc(i.domaine_icone || '') + ' ' + esc(i.domaine_nom) : ''} · inscrit le ${date}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      zone.innerHTML = '<div class="notice" style="color:#dc2626;">Erreur de chargement.</div>';
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -309,7 +309,9 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     return sendJSON(res, 429, { error: `Trop d'inscriptions depuis cette connexion. Réessayez dans ${ipSignupLimit.retryAfter}s.` });
   }
 
-  const {
+  /* let (pas const) : domaine_principal/sous_domaine_1 sont réassignés plus bas quand une
+     invitation de parrainage en fournit un repli — voir plus bas. */
+  let {
     nom, prenom, email, password, role,
     date_naissance, nationalite1, nationalite2, nationalite3,
     pays, region, departement, ville, adresse, code_postal, telephone,
@@ -346,10 +348,35 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     email_responsable_etatique, tel_responsable_etatique,
     service_direction_responsable, adresse_pro_responsable,
     date_prise_fonction, date_fin_mandat,
-    declaration_officielle, statut_etatique
+    declaration_officielle, statut_etatique,
+    // Parrainage & Invitations (Phase 1) — code d'invitation optionnel + canal d'arrivée
+    invitation_code, via,
   } = body;
 
   if (!nom || !email || !password || !role) return sendJSON(res, 400, { error: "Champs requis manquants (nom, email, password, role)." });
+
+  /* Parrainage & Invitations (Phase 1) : une invitation active préremplit le domaine/sous-
+     domaine si le formulaire ne les a pas fournis (§12-13 du cahier — "la personne ne doit pas
+     avoir à sélectionner à nouveau", tout en restant modifiable puisque le formulaire envoie
+     toujours ce que l'utilisateur a effectivement choisi en priorité). Résolu ici, AVANT la
+     validation du domaine obligatoire juste en dessous, pour que le repli marche aussi côté
+     validation serveur (pas seulement côté formulaire). */
+  let invitationActive = null;
+  if (invitation_code) {
+    try {
+      invitationActive = await db.prepare(`
+        SELECT i.id, i.statut, i.inviter_user_id, i.domaine_id, i.sous_domaine_id, pd.cle AS domaine_cle, psd.nom AS sous_domaine_nom, i.sous_domaine_libre
+        FROM invitations i
+        JOIN parrainage_domaines pd ON pd.id = i.domaine_id
+        LEFT JOIN parrainage_sous_domaines psd ON psd.id = i.sous_domaine_id
+        WHERE i.code = ? AND i.statut = 'active'
+      `).get(String(invitation_code).trim());
+    } catch (e) { console.error('[signup-invitation-lookup]', e.message); }
+  }
+  if (invitationActive) {
+    if (!domaine_principal) domaine_principal = invitationActive.domaine_cle;
+    if (!sous_domaine_1) sous_domaine_1 = invitationActive.sous_domaine_nom || invitationActive.sous_domaine_libre || null;
+  }
   /* Sécurité : le rôle "administrateur" ne peut PAS être créé via l'inscription publique.
      Un admin ne peut être promu que manuellement en base (ou par un admin existant). */
   if (!["utilisateur", "initiative", "collectivite"].includes(role)) return sendJSON(res, 400, { error: "Rôle invalide." });
@@ -727,7 +754,164 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   } catch (e) { console.error('[abonnement-officiel-signup]', e.message); }
 
+  /* Parrainage & Invitations (Phase 1) : la ligne du Centre de vision de l'inviteur n'est posée
+     qu'une fois le compte réellement créé (jamais à la simple ouverture du lien). `via` vient
+     de join.html → inscription.html : 'qr' si l'arrivée s'est faite en scannant le QR Code du
+     lien encodé, sinon un lien copié/partagé classique. Best-effort : ne doit jamais faire
+     échouer l'inscription elle-même (§27 : le parrainage n'est jamais obligatoire). */
+  if (invitationActive) {
+    try {
+      await db.prepare(`
+        INSERT INTO invitation_registrations (invitation_id, inviter_user_id, registered_user_id, account_type, domaine_id, sous_domaine_id, source)
+        VALUES (?,?,?,?,?,?,?)
+      `).run(invitationActive.id, invitationActive.inviter_user_id || null, id, role, invitationActive.domaine_id || null, invitationActive.sous_domaine_id || null, via === 'qr' ? 'qr_code' : 'link');
+      await db.prepare("UPDATE invitations SET registration_count = registration_count + 1 WHERE id=?").run(invitationActive.id);
+    } catch (e) { console.error('[signup-invitation-registration]', e.message); }
+  }
+
   { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
+});
+
+/* ════════════════ PARRAINAGE & INVITATIONS — Phase 1 ════════════════
+   Cahier des charges complet (2026-09-19). Tables créées par migrateParrainageInvitations()
+   (fin de fichier). Code d'invitation sur le patron de sharedGenerateDsId()/generateDsIdUnique()
+   (server/db.js:19-25,5497-5504) — alphabet A-Z0-9, vérification d'unicité en base. */
+const INVITATION_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function genererCodeInvitation() {
+  let suffixe = '';
+  for (let i = 0; i < 6; i++) suffixe += INVITATION_ALPHABET[crypto.randomInt(INVITATION_ALPHABET.length)];
+  return 'INV-DA-' + suffixe;
+}
+async function genererCodeInvitationUnique() {
+  for (let essai = 0; essai < 5; essai++) {
+    const candidat = genererCodeInvitation();
+    const existe = await db.prepare('SELECT 1 FROM invitations WHERE code=?').get(candidat);
+    if (!existe) return candidat;
+  }
+  return genererCodeInvitation() + Date.now().toString(36).toUpperCase(); // improbable : on cède plutôt que de bloquer
+}
+
+route("GET", "/api/parrainage/domaines", async (req, res) => {
+  const domaines = await db.prepare("SELECT id, cle, nom, icone FROM parrainage_domaines WHERE actif=1 ORDER BY ordre, nom").all();
+  const sousDomaines = await db.prepare("SELECT id, domaine_id, nom FROM parrainage_sous_domaines WHERE actif=1 ORDER BY ordre, nom").all();
+  sendJSON(res, 200, {
+    domaines: domaines.map(d => ({
+      ...d,
+      sous_domaines: sousDomaines.filter(sd => Number(sd.domaine_id) === Number(d.id)),
+    })),
+  });
+});
+
+route("POST", "/api/parrainage/invitations", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise pour créer une invitation." });
+  const domaineId = Number(body.domaine_id) || null;
+  if (!domaineId) return sendJSON(res, 400, { error: "Le domaine est obligatoire." });
+  const domaine = await db.prepare("SELECT id FROM parrainage_domaines WHERE id=? AND actif=1").get(domaineId);
+  if (!domaine) return sendJSON(res, 400, { error: "Domaine invalide." });
+  const sousDomaineId = Number(body.sous_domaine_id) || null;
+  const sousDomaineLibre = sousDomaineId ? null : (String(body.sous_domaine_libre || "").trim() || null);
+  const code = await genererCodeInvitationUnique();
+  const id = (await db.prepare(`
+    INSERT INTO invitations (code, inviter_user_id, nom, domaine_id, sous_domaine_id, sous_domaine_libre)
+    VALUES (?,?,?,?,?,?)
+  `).run(code, user.id, String(body.nom || "").trim() || null, domaineId, sousDomaineId, sousDomaineLibre)).lastInsertRowid;
+  const invitation = await db.prepare("SELECT * FROM invitations WHERE id=?").get(id);
+  sendJSON(res, 201, { invitation });
+});
+
+route("GET", "/api/parrainage/invitations", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const invitations = await db.prepare(`
+    SELECT i.*, pd.nom AS domaine_nom, pd.icone AS domaine_icone, psd.nom AS sous_domaine_nom
+    FROM invitations i
+    JOIN parrainage_domaines pd ON pd.id = i.domaine_id
+    LEFT JOIN parrainage_sous_domaines psd ON psd.id = i.sous_domaine_id
+    WHERE i.inviter_user_id = ?
+    ORDER BY i.created_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { invitations });
+});
+
+route("GET", "/api/parrainage/invitations/:code", async (req, res, params) => {
+  const invitation = await db.prepare(`
+    SELECT i.id, i.code, i.statut, i.inviter_user_id, pd.cle AS domaine_cle, pd.nom AS domaine_nom, pd.icone AS domaine_icone,
+      COALESCE(psd.nom, i.sous_domaine_libre) AS sous_domaine_nom
+    FROM invitations i
+    JOIN parrainage_domaines pd ON pd.id = i.domaine_id
+    LEFT JOIN parrainage_sous_domaines psd ON psd.id = i.sous_domaine_id
+    WHERE i.code = ?
+  `).get(params.code);
+  if (!invitation) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  const inviteur = await db.prepare("SELECT id, nom, prenom, role, photo_url FROM users WHERE id=?").get(invitation.inviter_user_id);
+  let nomAffiche = inviteur ? [inviteur.prenom, inviteur.nom].filter(Boolean).join(" ") : "";
+  let photoAffichee = inviteur?.photo_url || null;
+  if (inviteur?.role === "initiative") {
+    const init = await db.prepare("SELECT nom, logo_url, photo_url FROM initiatives WHERE owner_user_id=?").get(inviteur.id);
+    if (init) { nomAffiche = init.nom; photoAffichee = init.logo_url || init.photo_url || photoAffichee; }
+  }
+  // Anti-doublon (même principe que POST /api/analytics/vue) : une vue par visiteur/jour.
+  try {
+    const ip = SEC.clientIp(req);
+    const jour = new Date().toISOString().slice(0, 10);
+    const visiteur_hash = crypto.createHash("sha256").update(`${ip}|${req.headers["user-agent"] || ""}|${jour}|${process.env.AUTH_SECRET || "diaspo-actif-2026-secret"}`).digest("hex");
+    await db.prepare("INSERT INTO invitations_vues_log (invitation_id, visiteur_hash, jour) VALUES (?,?,?)").run(invitation.id, visiteur_hash, jour);
+    await db.prepare("UPDATE invitations SET visit_count = visit_count + 1 WHERE id=?").run(invitation.id);
+  } catch (e) { /* déjà comptée aujourd'hui pour ce visiteur — ignoré volontairement */ }
+  sendJSON(res, 200, {
+    code: invitation.code, actif: invitation.statut === 'active',
+    inviteur_nom: nomAffiche, inviteur_photo: photoAffichee,
+    domaine_cle: invitation.domaine_cle, domaine_nom: invitation.domaine_nom, domaine_icone: invitation.domaine_icone,
+    sous_domaine_nom: invitation.sous_domaine_nom,
+  });
+});
+
+route("POST", "/api/parrainage/invitations/:code/scan", async (req, res, params) => {
+  try { await db.prepare("UPDATE invitations SET qr_scan_count = qr_scan_count + 1 WHERE code=?").run(params.code); } catch (e) {}
+  sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/parrainage/invitations/:id/desactiver", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const invitation = await db.prepare("SELECT * FROM invitations WHERE id=?").get(params.id);
+  if (!invitation) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (Number(invitation.inviter_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez désactiver que vos propres invitations." });
+  }
+  await db.prepare("UPDATE invitations SET statut='desactivee' WHERE id=?").run(invitation.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("GET", "/api/parrainage/centre-vision", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  // Sécurité (cahier §34) : toujours filtré par l'inviteur CONNECTÉ, jamais un id d'URL/query.
+  const inscrits = await db.prepare(`
+    SELECT ir.id, ir.account_type, ir.source, ir.registered_at,
+      pd.nom AS domaine_nom, pd.icone AS domaine_icone, COALESCE(psd.nom, NULL) AS sous_domaine_nom,
+      u.id AS user_id, u.nom, u.prenom, u.photo_url, u.role, u.da_id
+    FROM invitation_registrations ir
+    JOIN users u ON u.id = ir.registered_user_id
+    LEFT JOIN parrainage_domaines pd ON pd.id = ir.domaine_id
+    LEFT JOIN parrainage_sous_domaines psd ON psd.id = ir.sous_domaine_id
+    WHERE ir.inviter_user_id = ?
+    ORDER BY ir.registered_at DESC
+  `).all(user.id);
+  sendJSON(res, 200, { inscrits });
+});
+
+route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const nbInvitations = (await db.prepare("SELECT COUNT(*) n FROM invitations WHERE inviter_user_id=?").get(user.id))?.n || 0;
+  const nbActives = (await db.prepare("SELECT COUNT(*) n FROM invitations WHERE inviter_user_id=? AND statut='active'").get(user.id))?.n || 0;
+  const totaux = await db.prepare("SELECT COALESCE(SUM(visit_count),0) vues, COALESCE(SUM(qr_scan_count),0) scans, COALESCE(SUM(registration_count),0) inscriptions FROM invitations WHERE inviter_user_id=?").get(user.id);
+  sendJSON(res, 200, {
+    nb_invitations: nbInvitations, nb_actives: nbActives,
+    total_vues: totaux?.vues || 0, total_scans: totaux?.scans || 0, total_inscriptions: totaux?.inscriptions || 0,
+  });
 });
 
 /* Anti brute-force PERSISTANT (survit aux cold starts serverless, contrairement à SEC.rateLimit
@@ -23948,6 +24132,125 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   } catch (e) { console.error('[migrateAvisUnifies]', e.message); }
 })();
 
+/* ──────── PARRAINAGE & INVITATIONS — Phase 1 (cahier des charges, 2026-09-19) ────────
+   Même idiome que migrateVideosTutoriels()/migrateAvisUnifies() ci-dessus : CREATE TABLE IF
+   NOT EXISTS, rejouable sans risque à chaque démarrage. Aucune entrée à ajouter dans
+   server/pg-init.js — ce sont des tables NEUVES, traduites automatiquement vers Postgres par
+   toPg() (server/db-pg.js) à chaque db.prepare(...).run(), contrairement à une colonne ajoutée
+   après coup sur une table existante (voir le piège documenté dans la mémoire
+   feedback_reparer_schema_apres_migration — sans objet ici). */
+(async function migrateParrainageInvitations() {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS parrainage_domaines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cle TEXT UNIQUE NOT NULL,
+      nom TEXT NOT NULL,
+      icone TEXT DEFAULT '',
+      ordre INTEGER DEFAULT 0,
+      actif INTEGER NOT NULL DEFAULT 1
+    )`).run();
+    await db.prepare(`CREATE TABLE IF NOT EXISTS parrainage_sous_domaines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      domaine_id INTEGER NOT NULL,
+      nom TEXT NOT NULL,
+      ordre INTEGER DEFAULT 0,
+      actif INTEGER NOT NULL DEFAULT 1
+    )`).run();
+    await db.prepare(`CREATE TABLE IF NOT EXISTS invitations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      inviter_user_id INTEGER NOT NULL,
+      nom TEXT,
+      domaine_id INTEGER NOT NULL,
+      sous_domaine_id INTEGER,
+      sous_domaine_libre TEXT,
+      statut TEXT NOT NULL DEFAULT 'active' CHECK(statut IN ('active','desactivee')),
+      created_at TEXT DEFAULT (datetime('now')),
+      visit_count INTEGER DEFAULT 0,
+      qr_scan_count INTEGER DEFAULT 0,
+      registration_count INTEGER DEFAULT 0
+    )`).run();
+    try { await db.prepare("CREATE INDEX IF NOT EXISTS idx_invitations_inviter ON invitations(inviter_user_id)").run(); } catch (e) {}
+    await db.prepare(`CREATE TABLE IF NOT EXISTS invitation_registrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invitation_id INTEGER NOT NULL,
+      inviter_user_id INTEGER NOT NULL,
+      registered_user_id INTEGER NOT NULL,
+      account_type TEXT NOT NULL,
+      domaine_id INTEGER,
+      sous_domaine_id INTEGER,
+      source TEXT NOT NULL CHECK(source IN ('link','qr_code')),
+      registered_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+    try { await db.prepare("CREATE INDEX IF NOT EXISTS idx_invit_reg_inviter ON invitation_registrations(inviter_user_id)").run(); } catch (e) {}
+    /* Anti-doublon des vues (visit_count) — même principe que da_videos_tutoriels_vues_log :
+       une seule vue comptée par invitation/visiteur/jour, l'incrément n'a lieu que si cet
+       INSERT réussit. */
+    await db.prepare(`CREATE TABLE IF NOT EXISTS invitations_vues_log (
+      invitation_id INTEGER NOT NULL,
+      visiteur_hash TEXT NOT NULL,
+      jour TEXT NOT NULL,
+      PRIMARY KEY(invitation_id, visiteur_hash, jour)
+    )`).run();
+
+    // Seed des 31 domaines — copie figée de window.DOMAINES_ACTIVITE (assets/domaines-activite.js)
+    // au moment de l'écriture de ce module ; une clé n'est jamais renommée une fois publiée, donc
+    // aucune dépendance runtime au fichier front-end n'est nécessaire ici.
+    const nbDomaines = (await db.prepare("SELECT COUNT(*) n FROM parrainage_domaines").get())?.n || 0;
+    if (!nbDomaines) {
+      const DOMAINES_SEED = [
+        ['agriculture', '🌾', 'Agriculture'],
+        ['associations_vie_citoyenne', '🏛️', 'Associations & Vie citoyenne'],
+        ['automobile_mobilite', '🚗', 'Automobile & Mobilité'],
+        ['banque_microfinance', '🏦', 'Banque & Microfinance'],
+        ['btp_immobilier', '🏗️', 'BTP & Immobilier'],
+        ['commerce_distribution', '🛍️', 'Commerce & Distribution'],
+        ['communication_medias', '📱', 'Communication & Médias'],
+        ['conseil_services', '👩‍💼', 'Conseil & Services'],
+        ['culture_arts', '🎨', 'Culture & Arts'],
+        ['developpement_solidarite', '🌍', 'Développement & Solidarité'],
+        ['droit_administration', '⚖️', 'Droit & Administration'],
+        ['eau_assainissement', '💧', 'Eau & Assainissement'],
+        ['education_formation', '🎓', 'Éducation & Formation'],
+        ['elevage_peche', '🐄', 'Élevage & Pêche'],
+        ['energie_environnement', '⚡', 'Énergie & Environnement'],
+        ['environnement', '🌱', 'Environnement'],
+        ['evenementiel', '🎉', 'Événementiel'],
+        ['finance_investissement', '💰', 'Finance & Investissement'],
+        ['industrie_production', '📦', 'Industrie & Production'],
+        ['medecine_sante', '🏥', 'Médecine & Santé'],
+        ['mobilite_internationale', '✈️', 'Mobilité internationale'],
+        ['mode_beaute', '👗', 'Mode & Beauté'],
+        ['numerique_technologie', '💻', 'Numérique & Technologie'],
+        ['recherche_innovation', '🔬', 'Recherche & Innovation'],
+        ['restauration_agroalimentaire', '🍽️', 'Restauration & Agroalimentaire'],
+        ['sante', '🩺', 'Santé'],
+        ['sante_mentale', '🧠', 'Santé mentale'],
+        ['social_famille', '👶', 'Social & Famille'],
+        ['sport', '🏃', 'Sport'],
+        ['tourisme_voyage', '🧳', 'Tourisme & Voyage'],
+        ['transport_logistique', '🚛', 'Transport & Logistique'],
+        ['autre', '🏢', 'Autre'],
+      ];
+      for (let i = 0; i < DOMAINES_SEED.length; i++) {
+        const [cle, icone, nom] = DOMAINES_SEED[i];
+        await db.prepare("INSERT INTO parrainage_domaines (cle, nom, icone, ordre) VALUES (?,?,?,?)").run(cle, nom, icone, i);
+      }
+      // Preuve de concept de la hiérarchie domaine → sous-domaines (cahier des charges, exemple
+      // « Santé ») — les autres domaines restent sans sous-domaine prédéfini tant qu'un futur
+      // panneau d'administration (Phase 3) ne les complète pas ; le formulaire retombe alors sur
+      // un champ libre (sous_domaine_libre), comme partout ailleurs sur la plateforme.
+      const sante = await db.prepare("SELECT id FROM parrainage_domaines WHERE cle='sante'").get();
+      if (sante) {
+        const SOUS_DOMAINES_SANTE = ['Médecine', 'Pharmacie', 'Soins infirmiers', 'Kinésithérapie', 'Dentaire', 'Vétérinaire', 'Recherche médicale', 'Autre'];
+        for (let i = 0; i < SOUS_DOMAINES_SANTE.length; i++) {
+          await db.prepare("INSERT INTO parrainage_sous_domaines (domaine_id, nom, ordre) VALUES (?,?,?)").run(sante.id, SOUS_DOMAINES_SANTE[i], i);
+        }
+      }
+    }
+  } catch (e) { console.error('[migrateParrainageInvitations]', e.message); }
+})();
+
 /* ── Codes Adhésion D'A : paramètres standards, semés une seule fois ──
    getInitiativeOfficielleId() (plus haut) lit ces clés à la volée à chaque appel —
    ce bloc ne fait que garantir qu'elles existent avec une valeur par défaut sûre.
@@ -26243,6 +26546,23 @@ ${jsonLd}
     if (!fs.existsSync(file)) return sendJSON(res, 404, { error: 'Fichier introuvable.' });
     res.writeHead(200, { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes' });
     fs.createReadStream(file).pipe(res);
+    return;
+  }
+
+  /* ── Parrainage & Invitations — lien "joli" /join/CODE (cahier §9-10) ──
+     Aucune route dynamique hors /api/* n'existait avant ce module ; le code est lu côté client
+     via location.pathname (join.html), donc un simple service du fichier statique suffit ici —
+     pas de templating serveur nécessaire. Même position que les autres cas spéciaux avant le
+     bloc générique /api/* ci-dessous. */
+  if (pathname.startsWith('/join/') && req.method === 'GET') {
+    try {
+      const html = await fs.promises.readFile(path.join(ROOT, 'join.html'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (e) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Introuvable.');
+    }
     return;
   }
 

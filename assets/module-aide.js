@@ -20,6 +20,7 @@ window.MODULE_AIDE = {
   support_pilote: { titre: "🖥️ Support Pilote", texte: "Demandez qu'un administrateur voie votre écran en direct et agisse à votre place pour une manipulation, uniquement sur les pages de Diaspo'Actif." },
   formations: { titre: "🎓 Formations", texte: "Consultez le catalogue de formations disponibles sur la plateforme et suivez celles auxquelles vous êtes inscrit(e)." },
   comptes_lies: { titre: "🔗 Liaison de comptes", texte: "Reliez plusieurs de vos comptes Diaspo'Actif entre eux pour basculer de l'un à l'autre sans vous reconnecter." },
+  parrainage: { titre: "🤝 Parrainage", texte: "Créez des invitations (lien + QR Code) liées à un domaine d'activité et suivez, dans votre Centre de vision, les comptes créés grâce à vous." },
   mon_abonnement: { titre: "👑 Mon Abonnement", texte: "Consultez votre formule Premium en cours, sa date de renouvellement, et gérez votre moyen de paiement." },
   formulaires_inscription: { titre: "📝 Formulaires & Inscriptions", texte: "Créez des formulaires d'inscription pour vos événements (champs personnalisés, quotas, QR code de contrôle à l'entrée) et suivez les inscriptions reçues." },
 
