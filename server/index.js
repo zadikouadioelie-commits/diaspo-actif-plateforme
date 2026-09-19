@@ -7238,6 +7238,51 @@ route("GET", "/api/talents-diaspora", async (req, res) => {
   }
 });
 
+/* GET /api/annuaire/apercu-invitation — aperçu public (page /join/CODE) : 2 initiatives +
+   1 compte Utilisateur, tirés au hasard À CHAQUE APPEL (contrairement à /api/talents-diaspora,
+   dont le tirage est volontairement stable 2h pour l'accueil) — ici chaque chargement de la
+   page d'invitation doit montrer un échantillon différent (demande explicite). ORDER BY
+   RANDOM() est vrai sur SQLite comme sur Postgres (déjà utilisé par GET /api/ads/servir).
+   On tire un pool plus large que le nombre final affiché puis on filtre l'invisibilité
+   annuaire après coup (impossible à exprimer proprement dans le ORDER BY RANDOM() ci-dessus),
+   pour ne pas se retrouver avec moins de résultats que demandé si les premiers tirés sont
+   masqués. */
+route("GET", "/api/annuaire/apercu-invitation", async (req, res) => {
+  try {
+    const initsPool = await db.prepare(
+      `SELECT i.id, i.nom, i.slug, i.ville, i.pays, i.logo_url, i.domaine, i.type, i.owner_user_id,
+         u.invisible_annuaire_definitif, u.invisible_annuaire_jusqu_au
+       FROM initiatives i JOIN users u ON u.id=i.owner_user_id
+       WHERE (u.is_demo IS NULL OR u.is_demo=FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid')
+         AND ((i.logo_url IS NOT NULL AND i.logo_url!='') OR (i.domaine IS NOT NULL AND i.domaine!=''))
+       ORDER BY RANDOM() LIMIT 15`
+    ).all();
+    const usersPool = await db.prepare(
+      `SELECT id, nom, prenom, ville, pays, photo_url, titre_pro, origine1, nationalite1,
+         invisible_annuaire_definitif, invisible_annuaire_jusqu_au
+       FROM users WHERE role='utilisateur' AND compte_masque=0 AND nom != 'Compte supprimé'
+         AND (is_demo IS NULL OR is_demo=FALSE)
+         AND ((photo_url IS NOT NULL AND photo_url!='') OR (titre_pro IS NOT NULL AND titre_pro!=''))
+       ORDER BY RANDOM() LIMIT 10`
+    ).all();
+
+    const initiatives = initsPool.filter(r => !annuaireEstInvisible(r)).slice(0, 2).map(i => ({
+      id: i.id, nom: i.nom, ville: i.ville, pays: i.pays, logo_url: i.logo_url,
+      domaine: i.domaine, type: i.type,
+      href: i.owner_user_id ? `profil.html?id=${i.owner_user_id}` : `initiative.html?id=${encodeURIComponent(i.slug || i.id)}`,
+    }));
+    const utilisateurs = usersPool.filter(r => !annuaireEstInvisible(r)).slice(0, 1).map(u => ({
+      id: u.id, nom: [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom,
+      ville: u.ville, pays: u.pays, photo_url: u.photo_url,
+      titre_pro: u.titre_pro, origine: u.origine1 || u.nationalite1 || null,
+      href: `profil.html?id=${u.id}`,
+    }));
+    sendJSON(res, 200, { initiatives, utilisateurs });
+  } catch (e) {
+    sendJSON(res, 500, SEC.safeError(e, "apercu-invitation"));
+  }
+});
+
 route("GET", "/api/initiatives", async (req, res, params, body, query) => {
   let rows = await db.prepare(/* L'origine du PROPRIÉTAIRE accompagne chaque initiative : beaucoup de structures n'ont
    pas d'origine propre en base alors que leur responsable a déclaré la sienne. Sans ce

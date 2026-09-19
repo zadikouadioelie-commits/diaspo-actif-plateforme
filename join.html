@@ -24,8 +24,27 @@
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
 <link rel="stylesheet" href="/assets/theme-manager.css">
 <style>
-  .jn-wrap{min-height:calc(100vh - 160px);display:flex;align-items:center;justify-content:center;padding:30px 16px;}
+  .jn-wrap{min-height:calc(100vh - 160px);display:flex;flex-direction:column;align-items:center;gap:16px;padding:30px 16px;}
   .jn-card{background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:36px 30px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.08);}
+  .jn-types{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;text-align:left;}
+  .jn-type{display:flex;gap:12px;align-items:flex-start;background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;}
+  .jn-type-icon{font-size:20px;line-height:1;flex-shrink:0;}
+  .jn-type-titre{font-size:13px;font-weight:800;margin:0 0 2px;}
+  .jn-type-desc{font-size:12px;color:var(--muted);line-height:1.4;margin:0;}
+  .jn-apercu{max-width:460px;width:100%;text-align:center;}
+  .jn-apercu-titre{font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 12px;}
+  .jn-apercu-grid{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  /* display/flex-direction/align-items explicites : une règle globale (assets/responsive.v2.css,
+     garantie de zone tactile minimale) force "a{display:inline-flex;align-items:center}" sur
+     tout lien du site — sans cette redéfinition, la carte s'affiche en ligne (icône + texte
+     côte à côte) au lieu d'empilée verticalement (bug réel constaté à l'écran). */
+  .jn-apercu-carte{display:flex;flex-direction:column;align-items:center;flex:1;min-width:120px;max-width:150px;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 10px;text-decoration:none;color:inherit;transition:border-color .15s;}
+  .jn-apercu-carte:hover{border-color:#2563EB;}
+  .jn-apercu-photo{width:46px;height:46px;border-radius:50%;object-fit:cover;margin:0 auto 8px;display:block;background:var(--bg);border:2px solid var(--border);}
+  .jn-apercu-photo-fallback{width:46px;height:46px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:18px;background:linear-gradient(135deg,#0D2B4E,#1B4B8C);color:#fff;}
+  .jn-apercu-nom{font-size:12px;font-weight:700;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .jn-apercu-meta{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .jn-apercu-badge{display:inline-block;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#2563EB;margin-top:4px;}
   .jn-avatar{width:78px;height:78px;border-radius:50%;object-fit:cover;margin:0 auto 16px;display:block;background:var(--bg);border:3px solid var(--border);}
   .jn-avatar-fallback{width:78px;height:78px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:34px;background:linear-gradient(135deg,#0D2B4E,#1B4B8C);color:#fff;}
   .jn-titre{font-size:19px;font-weight:800;margin:0 0 6px;}
@@ -58,6 +77,10 @@
   <main class="jn-wrap">
     <div class="jn-card" id="jn-card">
       <p class="jn-loading">Chargement de l'invitation…</p>
+    </div>
+    <div class="jn-apercu" id="jn-apercu" style="display:none;">
+      <p class="jn-apercu-titre">Déjà sur Diaspo'Actif</p>
+      <div class="jn-apercu-grid" id="jn-apercu-grid"></div>
     </div>
   </main>
 
@@ -120,20 +143,52 @@
       <div class="jn-actions">
         <a class="jn-btn jn-btn-utilisateur" href="/inscription.html">Créer un compte</a>
       </div>`;
+    chargerApercuAnnuaire();
     return;
   }
 
   const suite = `&via=${via}`;
+  const typesHtml = `<div class="jn-types">
+    <div class="jn-type"><span class="jn-type-icon">👤</span><div><p class="jn-type-titre">Compte Utilisateur</p><p class="jn-type-desc">Vous êtes une personne : connectez-vous à la diaspora, suivez des initiatives et participez aux événements.</p></div></div>
+    <div class="jn-type"><span class="jn-type-icon">🏢</span><div><p class="jn-type-titre">Compte Initiative</p><p class="jn-type-desc">Vous représentez une structure (association, ONG, entreprise…) : présentez vos actions et mobilisez une communauté.</p></div></div>
+  </div>`;
   card.innerHTML = `${avatarHtml}
     <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite sur Diaspo'Actif</h1>
     <p class="jn-sous">La plateforme mondiale de la diaspora engagée — actions locales, impact global.</p>
     ${domaineHtml}
+    ${typesHtml}
     <div class="jn-actions">
       <a class="jn-btn jn-btn-utilisateur" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=utilisateur${suite}">👤 Créer un compte Utilisateur</a>
       <a class="jn-btn jn-btn-initiative" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=initiative${suite}">🏢 Créer un compte Initiative</a>
     </div>
     <p class="jn-deja">Déjà inscrit(e) ? <a href="/login.html">Se connecter</a></p>`;
+
+  chargerApercuAnnuaire();
 })();
+
+/* Aperçu annuaire (2 initiatives + 1 utilisateur), tiré au hasard à chaque chargement de page
+   — voir GET /api/annuaire/apercu-invitation, dédié à cette page (contrairement à
+   /api/talents-diaspora dont le tirage est stable 2h pour l'accueil). */
+async function chargerApercuAnnuaire() {
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  try {
+    const { initiatives, utilisateurs } = await api('GET', '/annuaire/apercu-invitation');
+    const cartes = [
+      ...initiatives.map(i => ({ ...i, nom: i.nom, photo: i.logo_url, meta: [i.domaine, i.ville].filter(Boolean).join(' · '), badge: 'Initiative' })),
+      ...utilisateurs.map(u => ({ ...u, nom: u.nom, photo: u.photo_url, meta: [u.titre_pro, u.ville].filter(Boolean).join(' · '), badge: 'Membre' })),
+    ];
+    if (!cartes.length) return;
+    const grid = document.getElementById('jn-apercu-grid');
+    grid.innerHTML = cartes.map(c => `
+      <a class="jn-apercu-carte" href="${esc(c.href)}" target="_blank" rel="noopener">
+        ${c.photo ? `<img class="jn-apercu-photo" src="${esc(c.photo)}" alt="">` : `<div class="jn-apercu-photo-fallback">${c.badge === 'Initiative' ? '🏢' : '👤'}</div>`}
+        <p class="jn-apercu-nom">${esc(c.nom)}</p>
+        ${c.meta ? `<p class="jn-apercu-meta">${esc(c.meta)}</p>` : ''}
+        <span class="jn-apercu-badge">${esc(c.badge)}</span>
+      </a>`).join('');
+    document.getElementById('jn-apercu').style.display = 'block';
+  } catch (e) { /* aperçu optionnel — jamais bloquant pour le parcours d'invitation */ }
+}
 </script>
 </body>
 </html>
