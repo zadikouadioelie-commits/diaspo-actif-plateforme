@@ -11,6 +11,8 @@
 .dvt-card-titre{font-weight:700;font-size:13.5px;margin:4px 0 3px;}
 .dvt-card-desc{font-size:12px;color:#676F77;line-height:1.4;}
 .dvt-card-meta{font-size:11px;color:#676F77;margin-top:8px;}
+.dvt-card-plus{font-size:12px;font-weight:700;color:#B84C1A;margin-top:8px;}
+.dvt-card:hover .dvt-card-plus{text-decoration:underline;}
 
 /* ── Page vidéo individuelle ── */
 .dvt-player{aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 6px 20px rgba(0,0,0,.18);}
