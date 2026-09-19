@@ -2310,7 +2310,21 @@ async function initAnnuaire(){
     if (state.paysOrig) params.set("origine", state.paysOrig);
     let r;
     try { r = await api("GET", "/annuaire/recherche?" + params); }
-    catch (e) { list.innerHTML = `<div class="empty">Erreur de recherche.</div>`; return; }
+    catch (e) {
+      /* 2026-09-19 : panne réelle en production sur cette route (bug côté serveur en cours de
+         correction par ailleurs). "Erreur de recherche." laissait croire à un problème de
+         saisie côté visiteur plutôt qu'à une panne temporaire du site — remplacé par un vrai
+         message de maintenance, purement côté affichage (aucune dépendance au correctif
+         serveur : redisparaît de lui-même dès que l'appel réussit à nouveau). */
+      list.innerHTML = `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+          <div style="font-size:2rem;margin-bottom:12px;">🔧</div>
+          <p style="font-weight:700;margin-bottom:6px;">Annuaire temporairement en maintenance</p>
+          <p style="font-size:.88rem;">Nous corrigeons un problème technique. Réessayez dans quelques instants.</p>
+        </div>`;
+      const resultCountElErr = document.getElementById("result-count");
+      if (resultCountElErr) resultCountElErr.textContent = "0";
+      return;
+    }
     const entites = [
       ...(r.initiatives || []).map(it => ({ rang: it._rang ?? 0, html: renderInitiativeCard(it) })),
       ...(r.utilisateurs || []).map(u => ({ rang: u._rang ?? 0, html: renderPersonCard(u) })),
@@ -2339,9 +2353,26 @@ async function initAnnuaire(){
     if (state.motCle || state.typeOrg !== "Utilisateurs") { await applyRechercheMotCle(); return; }
 
     if (state.typeOrg === "Utilisateurs") {
+      let enPanne = false;
       if (!USERS_CACHE) {
         try { const r = await api("GET", "/annuaire/utilisateurs"); USERS_CACHE = r.users || []; }
-        catch(e) { USERS_CACHE = []; }
+        /* 2026-09-19 : panne réelle en production sur cette route. Avant, l'erreur était
+           totalement silencieuse (USERS_CACHE=[] sans distinction) — la liste retombait sur
+           le message "Aucun utilisateur trouvé", laissant croire à une recherche infructueuse
+           plutôt qu'à une panne du site ("l'annuaire est vide", signalé). Le drapeau enPanne
+           permet d'afficher le bon message ci-dessous sans jamais mettre en cache un tableau
+           vide comme s'il s'agissait d'un résultat légitime. */
+        catch(e) { USERS_CACHE = null; enPanne = true; }
+      }
+      if (enPanne) {
+        list.innerHTML = `<div class="empty" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--muted);">
+            <div style="font-size:2rem;margin-bottom:12px;">🔧</div>
+            <p style="font-weight:700;margin-bottom:6px;">Annuaire temporairement en maintenance</p>
+            <p style="font-size:.88rem;">Nous corrigeons un problème technique. Réessayez dans quelques instants.</p>
+          </div>`;
+        const resultCountElErr2 = document.getElementById("result-count");
+        if (resultCountElErr2) resultCountElErr2.textContent = "0";
+        return;
       }
       const filtered = USERS_CACHE.filter(u => {
         if (state.nom && !norm(u.nom||"").includes(norm(state.nom))) return false;
