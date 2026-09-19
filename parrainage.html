@@ -139,6 +139,17 @@
     </div>
   </div>
 
+  <div class="pa-modal-overlay" id="pa-confirm-overlay" style="display:none;">
+    <div class="pa-modal">
+      <h3>Supprimer cette invitation ?</h3>
+      <p id="pa-confirm-texte">Cette action est définitive. Le lien et le QR Code cesseront de fonctionner immédiatement.</p>
+      <div class="pa-modal-actions">
+        <button type="button" class="pa-icon-btn" id="pa-confirm-annuler">Annuler</button>
+        <button type="button" class="pa-icon-btn" id="pa-confirm-supprimer" style="background:#dc2626;color:#fff;border-color:#dc2626;">🗑️ Supprimer</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer"><span id="footer-text">Diaspo'Actif · Du Sud au Nord · 2026</span> · <a href="mentions-legales.html" class="footer-link">Mentions légales</a> · <a href="charte.html" class="footer-link">Charte</a> · <a href="politique-confidentialite.html" class="footer-link">Politique de confidentialité</a></footer>
 </div>
 
@@ -317,6 +328,7 @@
           <div class="pa-inv-actions">
             <button type="button" class="pa-icon-btn pa-voir" data-code="${esc(inv.code)}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🔗 Voir</button>
             ${actif ? `<button type="button" class="pa-icon-btn pa-desactiver" data-id="${inv.id}">⏸️ Désactiver</button>` : ''}
+            <button type="button" class="pa-icon-btn pa-supprimer" data-id="${inv.id}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🗑️ Supprimer</button>
           </div>
         </div>`;
       }).join('');
@@ -339,6 +351,36 @@
         if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de désactiver.', 'error');
         desact.disabled = false;
       }
+    }
+    const suppr = e.target.closest('.pa-supprimer');
+    if (suppr) { ouvrirConfirmSuppression(suppr.dataset.id, suppr.dataset.nom); }
+  });
+
+  /* ── Confirmation de suppression (jamais de confirm() natif — cf. modale QR ci-dessus) ── */
+  const confirmOverlay = document.getElementById('pa-confirm-overlay');
+  let invitationASupprimer = null;
+  function ouvrirConfirmSuppression(id, nom) {
+    invitationASupprimer = id;
+    document.getElementById('pa-confirm-texte').textContent =
+      `« ${nom} » sera supprimée définitivement. Le lien et le QR Code cesseront de fonctionner immédiatement.`;
+    confirmOverlay.style.display = 'flex';
+  }
+  document.getElementById('pa-confirm-annuler').addEventListener('click', () => { confirmOverlay.style.display = 'none'; invitationASupprimer = null; });
+  confirmOverlay.addEventListener('click', e => { if (e.target === confirmOverlay) { confirmOverlay.style.display = 'none'; invitationASupprimer = null; } });
+  document.getElementById('pa-confirm-supprimer').addEventListener('click', async (e) => {
+    if (!invitationASupprimer) return;
+    e.target.disabled = true;
+    try {
+      await api('DELETE', `/parrainage/invitations/${invitationASupprimer}`);
+      confirmOverlay.style.display = 'none';
+      invitationASupprimer = null;
+      invitationsChargees = false;
+      chargerInvitations();
+      if (typeof showToast === 'function') showToast('Invitation supprimée.', 'success');
+    } catch (e2) {
+      if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de supprimer.', 'error');
+    } finally {
+      e.target.disabled = false;
     }
   });
 

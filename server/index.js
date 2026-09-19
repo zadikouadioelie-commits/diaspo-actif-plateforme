@@ -848,8 +848,8 @@ route("GET", "/api/parrainage/invitations/:code", async (req, res, params) => {
   let nomAffiche = inviteur ? [inviteur.prenom, inviteur.nom].filter(Boolean).join(" ") : "";
   let photoAffichee = inviteur?.photo_url || null;
   if (inviteur?.role === "initiative") {
-    const init = await db.prepare("SELECT nom, logo_url, photo_url FROM initiatives WHERE owner_user_id=?").get(inviteur.id);
-    if (init) { nomAffiche = init.nom; photoAffichee = init.logo_url || init.photo_url || photoAffichee; }
+    const init = await db.prepare("SELECT nom, logo_url FROM initiatives WHERE owner_user_id=?").get(inviteur.id);
+    if (init) { nomAffiche = init.nom; photoAffichee = init.logo_url || photoAffichee; }
   }
   // Anti-doublon (même principe que POST /api/analytics/vue) : une vue par visiteur/jour.
   try {
@@ -881,6 +881,24 @@ route("PATCH", "/api/parrainage/invitations/:id/desactiver", async (req, res, pa
     return sendJSON(res, 403, { error: "Vous ne pouvez désactiver que vos propres invitations." });
   }
   await db.prepare("UPDATE invitations SET statut='desactivee' WHERE id=?").run(invitation.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/parrainage/invitations/:id — suppression définitive de l'invitation.
+   L'historique des comptes déjà créés via ce lien (invitation_registrations) n'est jamais
+   affecté : cette table ne référence pas invitations, elle porte sa propre copie du domaine
+   et du sous-domaine (voir GET /api/parrainage/centre-vision) — supprimer l'invitation ne
+   fait donc jamais disparaître de statistique du Centre de vision. */
+route("DELETE", "/api/parrainage/invitations/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const invitation = await db.prepare("SELECT * FROM invitations WHERE id=?").get(params.id);
+  if (!invitation) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (Number(invitation.inviter_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez supprimer que vos propres invitations." });
+  }
+  await db.prepare("DELETE FROM invitations_vues_log WHERE invitation_id=?").run(invitation.id);
+  await db.prepare("DELETE FROM invitations WHERE id=?").run(invitation.id);
   sendJSON(res, 200, { ok: true });
 });
 
