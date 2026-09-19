@@ -80,7 +80,7 @@ async function vtCharger() {
         <div style="flex:1;min-width:180px;">
           <div style="font-weight:700;font-size:14px;">${v.icone || '🎬'} ${vtEsc(v.titre)} <span style="color:${VT_STATUT_COLOR[v.statut]||'#6b7280'};font-size:11px;font-weight:700;">${VT_STATUT_LABEL[v.statut]||v.statut}</span></div>
           <div style="color:var(--muted);font-size:12.5px;margin-top:2px;">${vtEsc(v.description || '')}</div>
-          <div style="color:var(--muted);font-size:11.5px;margin-top:4px;">🏷 ${vtEsc(v.categorie||'—')} · ${v.type_source === 'youtube' ? '📺 YouTube' : '🎞️ MP4'} · ${vtFormatDuree(v.duree_secondes)} · ${v.vues || 0} vues · 💬 ${v.nb_commentaires||0} · 👍 ${v.nb_reactions||0}</div>
+          <div style="color:var(--muted);font-size:11.5px;margin-top:4px;">🏷 ${vtEsc(v.categorie||'—')} · ${vtSourceLabel(v)} · ${vtFormatDuree(v.duree_secondes)} · ${v.vues || 0} vues · 💬 ${v.nb_commentaires||0} · 👍 ${v.nb_reactions||0}</div>
         </div>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="btn btn-sm btn-outline" ${i === 0 ? 'disabled' : ''} onclick="vtDeplacer(${v.id},'haut')" title="Monter">↑</button>
@@ -98,6 +98,10 @@ function vtChangerType() {
   const type = document.querySelector('input[name="vt-type"]:checked').value;
   document.getElementById('vt-champ-youtube').style.display = type === 'youtube' ? '' : 'none';
   document.getElementById('vt-champ-mp4').style.display = type === 'mp4' ? '' : 'none';
+}
+
+function vtSourceLabel(v) {
+  return v.type_source === 'youtube' ? '📺 YouTube' : v.type_source === 'mp4' ? '🎞️ MP4' : '🕒 Bientôt disponible';
 }
 
 function vtRemplirCategories() {
@@ -189,10 +193,12 @@ async function vtSauver() {
   const id = document.getElementById('vt-id').value;
   const titre = document.getElementById('vt-titre').value.trim();
   const type_source = document.querySelector('input[name="vt-type"]:checked').value;
-  const url = type_source === 'youtube' ? document.getElementById('vt-url-youtube').value.trim() : document.getElementById('vt-url-mp4').value.trim();
+  const url = type_source === 'youtube' ? document.getElementById('vt-url-youtube').value.trim()
+    : type_source === 'mp4' ? document.getElementById('vt-url-mp4').value.trim()
+    : ''; // "bientot" : aucune vidéo réelle, pas d'URL à exiger
   const categorie = document.getElementById('vt-categorie').value;
   if (!titre) return alert('Le titre est obligatoire.');
-  if (!url) return alert(type_source === 'youtube' ? "L'URL YouTube est obligatoire." : 'Merci de charger un fichier vidéo.');
+  if (type_source !== 'bientot' && !url) return alert(type_source === 'youtube' ? "L'URL YouTube est obligatoire." : 'Merci de charger un fichier vidéo.');
   if (!categorie) return alert('La catégorie est obligatoire.');
   const payload = {
     titre,

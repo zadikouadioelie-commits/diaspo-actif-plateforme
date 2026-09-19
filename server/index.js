@@ -18895,13 +18895,16 @@ route("POST", "/api/admin/videos-tutoriels", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
   const { titre, description, icone = "🎬", type_source, url, duree_secondes = 0, categorie, miniature_url, statut = 'brouillon' } = body;
-  if (!titre || !url) return sendJSON(res, 400, { error: "Titre et vidéo obligatoires." });
-  if (!["youtube", "mp4"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
+  if (!titre) return sendJSON(res, 400, { error: "Titre obligatoire." });
+  if (!["youtube", "mp4", "bientot"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
+  // "bientot" : capsule affichée avec un message "Bientôt disponible" à la place du lecteur —
+  // aucune vidéo réelle n'existe encore, donc pas d'URL exigée (2026-09-19, demande explicite).
+  if (type_source !== "bientot" && !url) return sendJSON(res, 400, { error: "Vidéo obligatoire (lien YouTube ou fichier)." });
   if (!VT_CATEGORIES.includes(categorie)) return sendJSON(res, 400, { error: "Catégorie obligatoire et invalide." });
   if (!["brouillon", "publie", "depublie"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
   const maxOrdre = (await db.prepare("SELECT COALESCE(MAX(ordre),-1) m FROM da_videos_tutoriels").get())?.m ?? -1;
   const r = await db.prepare("INSERT INTO da_videos_tutoriels (titre,description,icone,type_source,url,duree_secondes,categorie,miniature_url,statut,actif,ordre) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
-    titre, description || null, icone, type_source, url, duree_secondes | 0, categorie, miniature_url || null, statut, statut === 'publie' ? 1 : 0, maxOrdre + 1
+    titre, description || null, icone, type_source, url || '', duree_secondes | 0, categorie, miniature_url || null, statut, statut === 'publie' ? 1 : 0, maxOrdre + 1
   );
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo ajoutée : ${titre}`);
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -18911,7 +18914,7 @@ route("PUT", "/api/admin/videos-tutoriels/:id", async (req, res, params, body) =
   const user = await getCurrentUser(req);
   if (!user || !(await AdminJunior.hasAdminPermission(user, 'videos_tutoriels.gerer', db))) return sendJSON(res, 403, { error: "Réservé aux administrateurs autorisés." });
   const { titre, description, icone, type_source, url, duree_secondes, categorie, miniature_url, statut } = body;
-  if (type_source && !["youtube", "mp4"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
+  if (type_source && !["youtube", "mp4", "bientot"].includes(type_source)) return sendJSON(res, 400, { error: "Type de source invalide." });
   if (categorie && !VT_CATEGORIES.includes(categorie)) return sendJSON(res, 400, { error: "Catégorie invalide." });
   if (statut && !["brouillon", "publie", "depublie"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
   await db.prepare(`UPDATE da_videos_tutoriels SET

@@ -38,22 +38,25 @@ function dvtVignetteHtml(v) {
 }
 
 /* Carte cliquable → mène toujours à la page vidéo individuelle (lecteur + commentaires +
-   réactions), jamais à une simple modale — cohérent avec la fiche vidéo du cahier des charges. */
+   réactions), jamais à une simple modale — cohérent avec la fiche vidéo du cahier des charges.
+   Une capsule "bientot" (aucune vidéo réelle pour l'instant) reste cliquable mais affiche un
+   bandeau "Bientôt disponible" à la place du chrono/lecture — jamais de ▶ trompeur. */
 function dvtCardHtml(v, { compact } = {}) {
   _dvtCache[v.id] = v;
+  const bientot = v.type_source === 'bientot';
   const duree = dvtFormatDuree(v.duree_secondes);
   return `
     <a class="dvt-card" href="videos-tutoriels.html?v=${v.id}" style="text-decoration:none;color:inherit;display:block;">
       <div class="dvt-thumb">
         ${dvtVignetteHtml(v)}
-        ${duree ? `<span class="dvt-duree">${duree}</span>` : ''}
-        <div class="dvt-play"><span>▶</span></div>
+        ${bientot ? `<span class="dvt-duree" style="background:#B84C1A;">🕒 Bientôt disponible</span>` : (duree ? `<span class="dvt-duree">${duree}</span>` : '')}
+        ${bientot ? '' : `<div class="dvt-play"><span>▶</span></div>`}
       </div>
       <div class="dvt-body">
         ${v.categorie ? `<div class="dvt-badge-categorie">${dvtEsc(v.categorie)}</div>` : ''}
         <div class="dvt-card-titre">${v.icone || '🎬'} ${dvtEsc(v.titre)}</div>
         ${!compact ? `<div class="dvt-card-desc">${dvtEsc(v.description || '')}</div>
-        <div class="dvt-card-meta">👁 ${v.vues || 0} vues · ${dvtFormatDate(v.created_at)}</div>` : ''}
+        <div class="dvt-card-meta">${bientot ? '🕒 Bientôt disponible' : `👁 ${v.vues || 0} vues · ${dvtFormatDate(v.created_at)}`}</div>` : ''}
       </div>
     </a>`;
 }
@@ -84,6 +87,13 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
 /* ═══ Page vidéo individuelle (videos-tutoriels.html?v=ID) ═══ */
 
 function dvtLecteurHtml(v) {
+  if (v.type_source === 'bientot') {
+    return `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#0D2B4E 0%,#123a63 100%);color:#fff;">
+      <div style="font-size:40px;">🕒</div>
+      <div style="font-size:16px;font-weight:700;">Bientôt disponible</div>
+      <div style="font-size:12.5px;color:rgba(255,255,255,.75);max-width:280px;text-align:center;">Cette vidéo est en préparation — revenez bientôt !</div>
+    </div>`;
+  }
   const ytId = v.type_source === 'youtube' ? dvtYoutubeId(v.url) : null;
   return ytId
     ? `<iframe src="https://www.youtube.com/embed/${ytId}" style="width:100%;height:100%;border:0;" allow="autoplay; encrypted-media" allowfullscreen></iframe>`
