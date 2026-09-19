@@ -20,6 +20,8 @@ window.MODULE_AIDE = {
   support_pilote: { titre: "🖥️ Support Pilote", texte: "Demandez qu'un administrateur voie votre écran en direct et agisse à votre place pour une manipulation, uniquement sur les pages de Diaspo'Actif." },
   formations: { titre: "🎓 Formations", texte: "Consultez le catalogue de formations disponibles sur la plateforme et suivez celles auxquelles vous êtes inscrit(e)." },
   comptes_lies: { titre: "🔗 Liaison de comptes", texte: "Reliez plusieurs de vos comptes Diaspo'Actif entre eux pour basculer de l'un à l'autre sans vous reconnecter." },
+  mon_abonnement: { titre: "👑 Mon Abonnement", texte: "Consultez votre formule Premium en cours, sa date de renouvellement, et gérez votre moyen de paiement." },
+  formulaires_inscription: { titre: "📝 Formulaires & Inscriptions", texte: "Créez des formulaires d'inscription pour vos événements (champs personnalisés, quotas, QR code de contrôle à l'entrée) et suivez les inscriptions reçues." },
 
   /* ── Dashboard Initiative — Premium ── */
   paiement_initiative: { titre: "💳 Module paiement", texte: "Configurez l'encaissement des paiements pour votre initiative (Boutique, adhésions, billetterie)." },
@@ -41,6 +43,7 @@ window.MODULE_AIDE = {
   crm: { titre: "🤝 CRM", texte: "Suivez vos contacts, prospects et membres dans un fichier relationnel centralisé, propre à votre initiative." },
   cagnottes: { titre: "🪙 Mes Cagnottes", texte: "Créez des cagnottes de collecte pour vos projets et suivez les dons reçus en temps réel." },
   recensement: { titre: "📋 Recensement", texte: "Lancez une campagne de dénombrement auprès de la diaspora (identité, mineurs déclarés, vérification d'identité en option) et suivez les déclarations reçues. Réservé aux Initiatives Premium pour la création." },
+  diaspo_formation: { titre: "🎓 Diaspo Formation", texte: "Créez et gérez vos propres formations (contenu, inscriptions, suivi des participants) — distinct du catalogue public où l'on achète une formation existante. Réservé aux Initiatives Premium." },
   avancement_initiative: { titre: "📈 Avancement de mon initiative", texte: "Suivez la progression de votre initiative sur la plateforme : étapes complétées, indicateurs et prochaines actions." },
 
   /* ── Dashboard Utilisateur ── */
