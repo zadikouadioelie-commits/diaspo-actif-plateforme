@@ -61,12 +61,43 @@ function dvtCardHtml(v, { compact } = {}) {
         ${!compact ? `<div class="dvt-card-desc">${dvtEsc(v.description || '')}</div>
         <div class="dvt-card-meta">${bientot ? 'Bientôt disponible' : `${v.vues || 0} vues · ${dvtFormatDate(v.created_at)}`}</div>
         <div class="dvt-card-stats">
-          <span>${v.nb_commentaires || 0} commentaire${(v.nb_commentaires || 0) > 1 ? 's' : ''}</span>
-          <span>${v.nb_reactions || 0} réaction${(v.nb_reactions || 0) > 1 ? 's' : ''}</span>
-        </div>` : ''}
+          <span>💬 ${v.nb_commentaires || 0} commentaire${(v.nb_commentaires || 0) > 1 ? 's' : ''}</span>
+        </div>
+        ${!bientot ? `<div class="dvt-card-reactions" id="dvt-card-reactions-${v.id}" onclick="event.preventDefault();event.stopPropagation();">
+          <span class="dvt-card-reactions-loading">Chargement des réactions…</span>
+        </div>` : ''}` : ''}
         <div class="dvt-card-plus">En savoir plus →</div>
       </div>
     </a>`;
+}
+
+/* Barre de réactions directement sur la carte (liste/carrousel), sans passer par la page
+   vidéo individuelle — cahier des charges : "tout le monde regarde, seuls les connectés
+   commentent/réagissent" reste vrai (POST /reactions exige une session), mais réagir ne doit
+   plus obliger à ouvrir la vidéo. La carte cliquable (dvtCardHtml) reste un <a> ; le clic sur
+   un bouton de réaction appelle event.preventDefault()+stopPropagation() pour ne pas déclencher
+   la navigation portée par l'ancre englobante. */
+async function dvtChargerReactionsCarte(videoId) {
+  const box = document.getElementById(`dvt-card-reactions-${videoId}`);
+  if (!box) return;
+  try {
+    const data = await fetch(`/api/videos-tutoriels/${videoId}/reactions`).then(r => r.json());
+    const counts = {}; (data.counts || []).forEach(c => counts[c.type] = c.n);
+    const mesReactions = data.mesReactions || [];
+    box.innerHTML = VT_REACTIONS.map(r => `
+      <button type="button" class="dvt-card-reaction-btn ${mesReactions.includes(r.type) ? 'actif' : ''}"
+        onclick="event.preventDefault();event.stopPropagation();dvtReagirCarte(${videoId},'${r.type}')">
+        ${r.emoji} ${counts[r.type] || 0}
+      </button>`).join('');
+  } catch (e) { box.innerHTML = ''; }
+}
+
+async function dvtReagirCarte(videoId, type) {
+  const user = await dvtGuestUser();
+  if (!user) { window.location.href = dvtRedirectLoginUrl(); return; }
+  try { await fetch(`/api/videos-tutoriels/${videoId}/reactions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ type }) }); }
+  catch (e) {}
+  dvtChargerReactionsCarte(videoId);
 }
 
 /* Charge les vidéos actives dans #<gridId>. Si sectionIdSiVide est fourni, la section
@@ -99,6 +130,7 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
     grid.innerHTML = videos.map(v => dvtCardHtml(v, { compact })).join('')
       + (plusBoutonInline ? `<a class="dvt-more-btn" href="${plusBoutonInline.href}">${plusBoutonInline.label}</a>` : '');
     if (section) section.style.display = '';
+    if (!compact) videos.filter(v => v.type_source !== 'bientot').forEach(v => dvtChargerReactionsCarte(v.id));
   } catch (e) { console.error('[videos-tutoriels]', e); }
 }
 

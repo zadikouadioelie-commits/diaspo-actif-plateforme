@@ -2613,6 +2613,17 @@ async function initAnnuaire(){
     });
   }
 
+  /* Pré-remplissage depuis l'URL (?type=Initiative) — utilisé par les raccourcis de l'accueil
+     (assets/app.js n'a jusqu'ici jamais lu ses propres paramètres d'URL : ces liens ne
+     filtraient donc rien silencieusement). Seules les valeurs correspondant à une <option>
+     réelle du sélecteur sont appliquées. */
+  const urlType = new URLSearchParams(location.search).get("type");
+  if (urlType && typeEl && [...typeEl.options].some(o => o.value === urlType)) {
+    state.typeOrg = urlType;
+    typeEl.value = urlType;
+    syncQuickButtons();
+  }
+
   apply();
 }
 
@@ -2738,6 +2749,16 @@ async function initVitrines(){
       id: "v-pays-orig", placeholder: "Ex : Côte d'Ivoire…",
       getList: () => geoGetCountries(), onSelect: v => { state.paysOrig = v; apply(); },
     });
+  }
+
+  /* Pré-remplissage depuis l'URL (?tri=populaire) — même raccourci que initAnnuaire(), pour
+     les liens rapides de l'accueil. Seules les valeurs correspondant à une <option> réelle
+     du sélecteur sont appliquées. */
+  const urlTri = new URLSearchParams(location.search).get("tri");
+  const triEl = document.getElementById("v-tri");
+  if (urlTri && triEl && [...triEl.options].some(o => o.value === urlTri)) {
+    state.tri = urlTri;
+    triEl.value = urlTri;
   }
 
   apply();

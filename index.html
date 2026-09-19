@@ -439,19 +439,35 @@
   background: linear-gradient(90deg, #2563EB, #38BDF8, #34D399);
 }
 .hp-why-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #2563EB;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 24px;
   margin-bottom: 22px;
-  box-shadow: 0 4px 12px rgba(37,99,235,.1);
+  box-shadow: 0 4px 12px rgba(37,99,235,.25);
 }
 .hp-why-card h3 { font-size: 18px; font-weight: 800; margin: 0 0 12px; color: #0D1B2A; }
 .hp-why-card p { font-size: 14px; color: var(--muted); line-height: 1.7; margin: 0; }
+.hp-why-arrow {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #2563EB; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  margin: 18px 0 0 auto;
+  text-decoration: none;
+}
+.hp-why-pills { display: flex; gap: 14px; flex-wrap: wrap; margin: -28px 0 44px; }
+.hp-why-pill { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #0D1B2A; }
+.hp-why-pill-icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #E9F5EE; color: #16A34A;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
 .hp-why-tags {
   display: flex;
   gap: 8px;
@@ -747,6 +763,28 @@
 }
 .hp-annuaire-text h2 { font-size: 28px; font-weight: 900; color: #0D1B2A; margin: 0 0 12px; }
 .hp-annuaire-text p { font-size: 14px; color: var(--muted); line-height: 1.65; margin: 0 0 20px; }
+/* --- Bandeau promo coloré (widgets Recherche rapide) --- */
+.hp-promo { border-radius: 24px; padding: 44px; position: relative; overflow: hidden; }
+.hp-promo-orange { background: linear-gradient(135deg, #F59E0B 0%, #C2410C 100%); }
+.hp-promo-teal { background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%); }
+.hp-promo .hp-section-eyebrow { color: rgba(255,255,255,.85); }
+.hp-promo .hp-section-eyebrow::before { background: rgba(255,255,255,.6); }
+.hp-promo .hp-annuaire-text h2 { color: #fff; }
+.hp-promo .hp-annuaire-text p { color: rgba(255,255,255,.88); }
+.hp-promo-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; margin-bottom: 16px;
+}
+.hp-promo-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #fff; color: #0D1B2A; padding: 13px 26px;
+  border-radius: 10px; font-weight: 800; font-size: 14px;
+  text-decoration: none; margin-top: 8px; transition: transform .15s, box-shadow .15s;
+}
+.hp-promo-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.2); }
+.hp-promo .hp-annuaire-quick { box-shadow: 0 20px 50px rgba(0,0,0,.25); border: none; }
 .hp-annuaire-quick {
   background: #F8FAFF;
   border: 1px solid var(--border);
@@ -820,6 +858,19 @@
 }
 .hp-ann-mini-name { font-size: 12px; font-weight: 700; color: #0D1B2A; line-height: 1.3; }
 .hp-ann-mini-loc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.hp-quick-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.hp-quick-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; text-decoration: none; transition: border-color .15s, background .15s;
+}
+.hp-quick-chip:hover { border-color: #1565C0; background: #F8FAFF; }
+.hp-quick-chip-icon {
+  flex: none; width: 26px; height: 26px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff;
+}
+.hp-quick-chip-label { font-size: 12px; font-weight: 700; color: #0D1B2A; }
+@media (max-width: 700px) { .hp-quick-chips { grid-template-columns: repeat(2, 1fr); } }
 
 /* --- Témoignages --- */
 .hp-testi { background: linear-gradient(135deg, #0D1B2A 0%, #1B3A6B 100%); }
@@ -1332,12 +1383,17 @@
   <!-- ===== SECTION 4 : POURQUOI DIASPO'ACTIF ===== -->
   <section class="hp-section hp-why">
     <div class="hp-section-inner">
-      <div class="hp-section-eyebrow">Notre mission</div>
+      <div class="hp-section-eyebrow">Notre vision</div>
       <h2 class="hp-section-title">Pourquoi Diaspo'Actif ?</h2>
       <p class="hp-section-sub">La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.</p>
+      <div class="hp-why-pills">
+        <div class="hp-why-pill"><span class="hp-why-pill-icon">👥</span> Rassembler les talents</div>
+        <div class="hp-why-pill"><span class="hp-why-pill-icon" style="background:#EFF6FF;color:#2563EB;">🗂️</span> Organiser les initiatives</div>
+        <div class="hp-why-pill"><span class="hp-why-pill-icon" style="background:#FFF7ED;color:#EA580C;">🚀</span> Mobiliser pour un impact durable</div>
+      </div>
       <div class="hp-why-grid">
         <div class="hp-why-card">
-          <div class="hp-why-icon">🔗</div>
+          <div class="hp-why-icon" style="background:#EA580C;">🔗</div>
           <h3>Le problème : la dispersion</h3>
           <p>Des milliers d'initiatives de diaspora existent dans le monde — associations, startups, projets solidaires — mais elles agissent en silo, sans réseau, sans visibilité commune.</p>
           <div class="hp-why-tags">
@@ -1345,9 +1401,10 @@
             <span class="hp-why-tag">Manque de visibilité</span>
             <span class="hp-why-tag">Ressources limitées</span>
           </div>
+          <a class="hp-why-arrow" href="annuaire.html" style="background:#EA580C;" aria-label="En savoir plus">→</a>
         </div>
         <div class="hp-why-card">
-          <div class="hp-why-icon">🎯</div>
+          <div class="hp-why-icon" style="background:#16A34A;">🎯</div>
           <h3>Notre réponse : la mise en réseau</h3>
           <p>Diaspo'Actif crée un espace commun où individus, collectifs, associations et institutions peuvent se trouver, se soutenir et co-construire des projets à impact durable.</p>
           <div class="hp-why-tags">
@@ -1355,9 +1412,10 @@
             <span class="hp-why-tag">Messagerie</span>
             <span class="hp-why-tag">Collaborations</span>
           </div>
+          <a class="hp-why-arrow" href="annuaire.html" style="background:#16A34A;" aria-label="En savoir plus">→</a>
         </div>
         <div class="hp-why-card">
-          <div class="hp-why-icon">🌱</div>
+          <div class="hp-why-icon" style="background:#2563EB;">🌱</div>
           <h3>L'impact visé : Sud ↔ Nord</h3>
           <p>Nos membres agissent dans plus de 28 pays. Ensemble, ils transfèrent des compétences, des ressources et de l'espoir — du Nord vers le Sud, et du Sud vers le monde.</p>
           <div class="hp-why-tags">
@@ -1365,6 +1423,7 @@
             <span class="hp-why-tag">Transfert de savoirs</span>
             <span class="hp-why-tag">Développement durable</span>
           </div>
+          <a class="hp-why-arrow" href="annuaire.html" style="background:#2563EB;" aria-label="En savoir plus">→</a>
         </div>
       </div>
     </div>
@@ -1386,17 +1445,33 @@
   </section>
 
   <!-- ===== SECTION 6 : WIDGET ANNUAIRE ===== -->
-  <section class="hp-section hp-annuaire" style="padding: 64px 0;">
+  <section class="hp-section hp-annuaire" style="padding: 48px 0;">
     <div class="hp-section-inner">
+      <div class="hp-promo hp-promo-orange">
       <div class="hp-annuaire-grid">
         <div class="hp-annuaire-text">
-          <div class="hp-section-eyebrow">Annuaire public</div>
-          <h2>Trouvez une initiative près de chez vous</h2>
+          <div class="hp-promo-icon">📍</div>
+          <div class="hp-section-eyebrow">Trouvez</div>
+          <h2>Une initiative près de chez vous</h2>
           <p>Recherchez par pays, domaine ou mot-clé. L'annuaire est accessible à tous, sans inscription.</p>
-          <a href="annuaire.html" class="hp-cta-primary" style="display:inline-flex;margin-top:8px;">Voir l'annuaire complet →</a>
+          <a href="annuaire.html" class="hp-promo-btn">Voir l'annuaire complet →</a>
         </div>
         <div class="hp-annuaire-quick">
           <h4>Recherche rapide</h4>
+          <div class="hp-quick-chips">
+            <a class="hp-quick-chip" href="annuaire.html?type=Initiative">
+              <span class="hp-quick-chip-icon" style="background:#1565C0;">🌱</span>
+              <span class="hp-quick-chip-label">Initiatives</span>
+            </a>
+            <a class="hp-quick-chip" href="annuaire.html?type=Entreprise">
+              <span class="hp-quick-chip-icon" style="background:#F59E0B;">🏢</span>
+              <span class="hp-quick-chip-label">Entreprises</span>
+            </a>
+            <a class="hp-quick-chip" href="annuaire.html?type=Association">
+              <span class="hp-quick-chip-icon" style="background:#10B981;">🤝</span>
+              <span class="hp-quick-chip-label">Associations</span>
+            </a>
+          </div>
           <div class="hp-search-row">
             <input type="text" id="hp-q" placeholder="Nom ou mot-clé…">
             <select id="hp-domaine">
@@ -1438,21 +1513,38 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
   </section>
 
   <!-- ===== SECTION 6b : WIDGET VITRINES ===== -->
-  <section class="hp-section hp-annuaire" style="padding: 64px 0;">
+  <section class="hp-section hp-annuaire" style="padding: 48px 0;">
     <div class="hp-section-inner">
+      <div class="hp-promo hp-promo-teal">
       <div class="hp-annuaire-grid">
         <div class="hp-annuaire-text">
+          <div class="hp-promo-icon">🛍️</div>
           <div class="hp-section-eyebrow">Boutiques</div>
           <h2>Découvrez les boutiques de la diaspora</h2>
           <p>Entreprises, associations, coopératives et projets — parcourez les boutiques publiées sur Diaspo'Actif, sans passer par les profils.</p>
-          <a href="vitrines.html" class="hp-cta-primary" style="display:inline-flex;margin-top:8px;">Voir toutes les boutiques →</a>
+          <a href="vitrines.html" class="hp-promo-btn">Voir toutes les boutiques →</a>
         </div>
         <div class="hp-annuaire-quick">
           <h4>Recherche rapide</h4>
+          <div class="hp-quick-chips">
+            <a class="hp-quick-chip" href="vitrines.html?tri=recent">
+              <span class="hp-quick-chip-icon" style="background:#1565C0;">🆕</span>
+              <span class="hp-quick-chip-label">Récentes</span>
+            </a>
+            <a class="hp-quick-chip" href="vitrines.html?tri=populaire">
+              <span class="hp-quick-chip-icon" style="background:#F59E0B;">🔥</span>
+              <span class="hp-quick-chip-label">Populaires</span>
+            </a>
+            <a class="hp-quick-chip" href="vitrines.html?tri=note">
+              <span class="hp-quick-chip-icon" style="background:#10B981;">⭐</span>
+              <span class="hp-quick-chip-label">Mieux notées</span>
+            </a>
+          </div>
           <div class="hp-search-row">
             <input type="text" id="hp-vit-q" placeholder="Nom ou mot-clé…">
             <select id="hp-vit-domaine">
@@ -1492,6 +1584,7 @@
             <!-- rempli par JS -->
           </div>
         </div>
+      </div>
       </div>
     </div>
   </section>
