@@ -93,20 +93,10 @@
     </div>
   </header>
 
-  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-  <aside class="sidebar" id="sidebar">
-    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
-    <div class="brand">Diaspo'Actif</div>
-    <a href="index.html">🏠 Accueil</a>
-    <a href="annuaire.html">🔍 Annuaire</a>
-    <a href="vitrines.html">🏪 Boutiques</a>
-    <a href="fil-actualite.html">📰 Fil d'actualité</a>
-    <a href="actualites.html">Projets diasporas</a>
-    <a href="evenements.html">📅 Événements</a>
-    <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
-    <a href="premium.html">⭐ Passer Premium</a>
-    <div id="hb-account-section"></div>
-  </aside>
+  <!-- Pas de tiroir "sidebar" propre à cette page (2026-09-21, demande explicite : "le bouton
+       menu doit afficher les modules, pas autre chose") — voir evenements.html pour le détail
+       du mécanisme (assets/app.js, initSidebarMobile) qui redirige alors vers le tableau de
+       bord du rôle connecté avec #da-menu. -->
 
 <div class="container" style="max-width:1100px;margin:0 auto;padding:24px 16px 60px;">
   <h1 style="font-size:26px;font-weight:800;margin:0 0 4px;">📁 Évaluation de Projet</h1>

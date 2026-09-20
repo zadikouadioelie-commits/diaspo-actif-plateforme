@@ -172,15 +172,9 @@
   .topbar-inner{justify-content:space-between;}
   .logo{flex:1;justify-content:center;text-align:center;}
 }
-@media(min-width:769px){
-  /* #sidebar-toggle retiré de cette règle le 2026-08-30 (demande explicite : "ajoute le bouton
-     menu également dans l'annuaire") — cette page n'a effectivement pas de tiroir #sidebar,
-     mais le bouton lui-même sert désormais aussi de raccourci générique vers le tableau de
-     bord du rôle connecté sur les pages sans tiroir (assets/app.js, initSidebarMobile, ajouté
-     le 2026-08-26 sur profil.html) ; cette règle plus ancienne le masquait encore ici sans
-     avoir été mise à jour en même temps, laissant l'Annuaire en retard sur ce point précis. */
-  #sidebar, #sidebar-backdrop{display:none!important;}
-}
+/* La règle qui masquait #sidebar/#sidebar-backdrop ici (2026-08-30) est devenue inutile :
+   ces éléments ont été retirés du HTML de cette page (2026-09-21, voir plus bas), il n'y a
+   donc plus rien à masquer. */
 </style>
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
@@ -207,20 +201,13 @@
     </div>
   </header>
 
-  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-  <aside class="sidebar" id="sidebar">
-    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
-    <div class="brand">Diaspo'Actif</div>
-    <a href="index.html">🏠 Accueil</a>
-    <a href="annuaire.html">🔍 Annuaire</a>
-    <a href="vitrines.html">🏪 Boutiques</a>
-    <a href="fil-actualite.html">📰 Fil d'actualité</a>
-    <a href="actualites.html">Projets diasporas</a>
-    <a href="evenements.html">📅 Événements</a>
-    <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
-    <a href="premium.html">⭐ Passer Premium</a>
-    <div id="hb-account-section"></div>
-  </aside>
+  <!-- Pas de tiroir "sidebar" propre à cette page (2026-09-21, demande explicite : "le bouton
+       menu doit afficher les modules, pas autre chose") — voir evenements.html pour le détail
+       du mécanisme. Complète ce que la règle CSS ci-dessus tentait déjà de faire (masquer un
+       tiroir qui, selon son propre commentaire, "n'existe effectivement pas" sur cette page) :
+       masquer via CSS laissait #sidebar présent dans le DOM, donc toujours détecté comme "un
+       vrai tiroir" par initSidebarMobile() — le clic sur Menu basculait silencieusement une
+       classe "open" sur un élément resté invisible, sans jamais rediriger vers le vrai menu. -->
 
   <!-- ===== HERO ===== -->
   <div class="ann-hero">

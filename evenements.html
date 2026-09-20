@@ -138,20 +138,14 @@
   </div>
 </header>
 
-<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-<aside class="sidebar" id="sidebar">
-  <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
-  <div class="brand">Diaspo'Actif</div>
-  <a href="index.html">🏠 Accueil</a>
-  <a href="annuaire.html">🔍 Annuaire</a>
-  <a href="vitrines.html">🏪 Boutiques</a>
-  <a href="fil-actualite.html">📰 Fil d'actualité</a>
-  <a href="actualites.html">Projets diasporas</a>
-  <a href="evenements.html">📅 Événements</a>
-  <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
-  <a href="premium.html">⭐ Passer Premium</a>
-  <div id="hb-account-section"></div>
-</aside>
+<!-- Pas de tiroir "sidebar" propre à cette page (2026-09-21, demande explicite : "le bouton
+     menu doit afficher les modules, pas autre chose") — volontaire. assets/app.js
+     (initSidebarMobile) détecte l'absence de #sidebar/.sidebar et redirige alors le clic sur
+     #sidebar-toggle vers le tableau de bord du rôle connecté avec #da-menu, qui ouvre
+     automatiquement son propre menu complet (~30 modules réels) — mécanisme déjà en place et
+     déjà utilisé par d'autres pages sans tiroir (ex. profil-app.html), mais court-circuité ici
+     tant qu'un tiroir générique (Accueil/Annuaire/Boutiques…, dupliquant la nav du bandeau) au
+     contenu bien plus pauvre existait sur cette page. -->
 
 <!-- IDENTITY BANNER -->
 <div id="evt-identity">
