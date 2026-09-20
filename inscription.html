@@ -1100,8 +1100,27 @@ document.addEventListener('DOMContentLoaded', function preremplirDepuisInvitatio
     if (!inv.actif) return;
     const selDomaine = document.getElementById(roleInvite === 'utilisateur' ? 'u-domaine' : 'i-domaine');
     const selSousDomaine = document.getElementById(roleInvite === 'utilisateur' ? 'u-sous-domaine-1' : 'i-sous-domaine-1');
-    if (selDomaine && inv.domaine_cle && !selDomaine.value) selDomaine.value = inv.domaine_cle;
-    if (selSousDomaine && inv.sous_domaine_nom && !selSousDomaine.value) selSousDomaine.value = inv.sous_domaine_nom;
+    /* Le domaine du lien de parrainage est désormais IMPOSÉ (décision du 2026-09-20, suite à un
+       cas réel où la personne avait changé le domaine préempli avant d'envoyer le formulaire) :
+       verrouillage visuel en plus de l'écrasement serveur dans POST /api/auth/signup — sans ce
+       verrou, le champ restait modifiable et donnait l'illusion d'un choix qui n'en était plus un. */
+    if (selDomaine && inv.domaine_cle) {
+      selDomaine.value = inv.domaine_cle;
+      selDomaine.disabled = true;
+      if (!document.getElementById('invitation-domaine-note')) {
+        const note = document.createElement('p');
+        note.id = 'invitation-domaine-note';
+        note.style.cssText = 'font-size:12px;color:#2563EB;margin:4px 0 0;';
+        note.textContent = `🔒 Domaine défini par votre lien d'invitation${inv.domaine_nom ? ' : ' + inv.domaine_nom : ''}`;
+        selDomaine.insertAdjacentElement('afterend', note);
+      }
+    }
+    // Le sous-domaine, lui, reste une simple suggestion pré-remplie (décision du 2026-09-20) :
+    // contrairement au domaine, la personne inscrite garde la main pour préciser ou remplacer
+    // son activité réelle — seul le domaine du lien de parrainage doit être respecté.
+    if (selSousDomaine && inv.sous_domaine_nom && !selSousDomaine.value) {
+      selSousDomaine.value = inv.sous_domaine_nom;
+    }
   }).catch(() => {});
 });
 function updateStrength(input,barId,hintId){

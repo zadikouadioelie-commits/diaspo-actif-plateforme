@@ -399,12 +399,16 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   if (!nom || !email || !password || !role) return sendJSON(res, 400, { error: "Champs requis manquants (nom, email, password, role)." });
 
-  /* Parrainage & Invitations (Phase 1) : une invitation active préremplit le domaine/sous-
-     domaine si le formulaire ne les a pas fournis (§12-13 du cahier — "la personne ne doit pas
-     avoir à sélectionner à nouveau", tout en restant modifiable puisque le formulaire envoie
-     toujours ce que l'utilisateur a effectivement choisi en priorité). Résolu ici, AVANT la
-     validation du domaine obligatoire juste en dessous, pour que le repli marche aussi côté
-     validation serveur (pas seulement côté formulaire). */
+  /* Parrainage & Invitations (Phase 1) : une invitation active IMPOSE son domaine, quoi que le
+     formulaire ait envoyé (décision explicite du 2026-09-20, après un cas réel : une personne
+     arrivée via un lien "Santé" s'est retrouvée avec le domaine "Autre" sur son profil réel —
+     le domaine du lien de parrainage doit toujours être respecté, jamais laissé à l'appréciation
+     du formulaire). Résolu ici, AVANT la validation du domaine obligatoire juste en dessous, et
+     en écrasant systématiquement domaine_principal — pas seulement en repli si vide — pour que
+     ce soit imposé même via un appel API direct qui contournerait le formulaire (inscription.html
+     verrouille aussi le champ côté UI). Le SOUS-domaine, lui, reste une simple suggestion : la
+     personne inscrite garde la main pour préciser sa propre activité (§ décision du même jour) —
+     seul un repli si le formulaire ne l'a pas fourni. */
   let invitationActive = null;
   if (invitation_code) {
     try {
@@ -418,7 +422,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     } catch (e) { console.error('[signup-invitation-lookup]', e.message); }
   }
   if (invitationActive) {
-    if (!domaine_principal) domaine_principal = invitationActive.domaine_cle;
+    domaine_principal = invitationActive.domaine_cle;
     if (!sous_domaine_1) sous_domaine_1 = invitationActive.sous_domaine_nom || invitationActive.sous_domaine_libre || null;
   }
   /* Sécurité : le rôle "administrateur" ne peut PAS être créé via l'inscription publique.
@@ -811,6 +815,14 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       `).run(invitationActive.id, invitationActive.inviter_user_id || null, id, role, invitationActive.domaine_id || null, invitationActive.sous_domaine_id || null, via === 'qr' ? 'qr_code' : 'link');
       await db.prepare("UPDATE invitations SET registration_count = registration_count + 1 WHERE id=?").run(invitationActive.id);
     } catch (e) { console.error('[signup-invitation-registration]', e.message); }
+    // Abonnement automatique à l'inviteur (décision explicite du 2026-09-20) — même mécanisme
+    // que l'abonnement au compte officiel juste au-dessus (user_follows, générique quel que
+    // soit le rôle de l'inviteur : utilisateur ou responsable d'initiative).
+    if (invitationActive.inviter_user_id && Number(invitationActive.inviter_user_id) !== Number(id)) {
+      try {
+        await db.prepare(`INSERT INTO user_follows (follower_id, followed_id) VALUES (?,?) ON CONFLICT(follower_id,followed_id) DO NOTHING`).run(id, invitationActive.inviter_user_id);
+      } catch (e) { console.error('[abonnement-inviteur-signup]', e.message); }
+    }
   }
 
   { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
