@@ -43,6 +43,11 @@
 .evt-col-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;}
 @media(max-width:1100px){
   .evt-layout{grid-template-columns:1fr;}
+  /* Séparation renvoyée entre la liste d'événements et les suggestions de comptes une fois
+     empilées verticalement (2026-09-20, demande explicite : "rend plus visible la séparation"
+     sur téléphone) — le simple gap:22px de la grille se noyait dans le défilement d'une longue
+     liste de cartes événements, les deux sections se lisaient comme une seule. */
+  .evt-suggest-col{margin-top:28px;border-top:3px solid var(--orange,#ff6b00);box-shadow:0 2px 12px rgba(0,0,0,.08);}
 }
 .evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
 .evt-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .15s;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.06)}
