@@ -5580,6 +5580,7 @@ async function migrerAnciensSignalements() {
 let _aspSessionId = null;
 let _aspCountdownTimer = null;
 let _aspMirrorTimer = null;
+let _aspLastSnapshotHtml = null; // évite de rejouer srcdoc quand rien n'a changé, voir aspRafraichirSession
 
 async function loadSupportPilote() {
   aspRetourListe();
@@ -5629,6 +5630,7 @@ function aspRetourListe() {
   clearInterval(_aspCountdownTimer); _aspCountdownTimer = null;
   clearInterval(_aspMirrorTimer); _aspMirrorTimer = null;
   _aspSessionId = null;
+  _aspLastSnapshotHtml = null;
   const sv = document.getElementById('asp-session-view'), lv = document.getElementById('asp-liste-view');
   if (sv) sv.style.display = 'none';
   if (lv) lv.style.display = '';
@@ -5636,6 +5638,7 @@ function aspRetourListe() {
 
 function aspOuvrirSession(id) {
   _aspSessionId = id;
+  _aspLastSnapshotHtml = null;
   document.getElementById('asp-liste-view').style.display = 'none';
   document.getElementById('asp-session-view').style.display = '';
   aspRafraichirSession();
@@ -5679,8 +5682,20 @@ async function aspRafraichirSession() {
   }
 
   const frame = document.getElementById('asp-mirror');
-  if (frame && data.snapshot_html) {
-    frame.onload = () => aspBrancherMiroir(frame);
+  // Le membre pousse un instantané structurel (assets/assistance.js, asCaptureSnapshot) toutes
+  // les ~2s, identique au précédent tant que sa page ne change pas réellement — remplacer
+  // systématiquement le srcdoc de l'iframe à chaque poll donnait l'impression d'un
+  // rechargement constant (capture utilisateur, 2026-09-20) : perte du défilement, flash
+  // visuel, à chaque tick même quand rien ne bouge côté membre. Ne rejoue le miroir que si le
+  // contenu a réellement changé, et restitue le défilement dans ce cas.
+  if (frame && data.snapshot_html && data.snapshot_html !== _aspLastSnapshotHtml) {
+    _aspLastSnapshotHtml = data.snapshot_html;
+    let scrollY = 0;
+    try { scrollY = frame.contentWindow?.scrollY || 0; } catch (e) {}
+    frame.onload = () => {
+      aspBrancherMiroir(frame);
+      try { if (scrollY) frame.contentWindow.scrollTo(0, scrollY); } catch (e) {}
+    };
     frame.srcdoc = data.snapshot_html;
   }
 }
