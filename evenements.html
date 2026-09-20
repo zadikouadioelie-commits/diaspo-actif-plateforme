@@ -31,7 +31,27 @@
 .evt-identity-link:hover{text-decoration:underline;}
 
 
-.evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:20px}
+/* ── Mise en page 3 colonnes (2026-09-20, demande explicite) : filtres à gauche (déplacés
+   depuis la barre horizontale d'origine), événements au centre, suggestions de comptes
+   Initiative à droite. Empilées verticalement sous 1100px — même seuil que .evt-grid, pas
+   de colonne trop étroite pour rester utilisable sur tablette. */
+.evt-layout{display:grid;grid-template-columns:230px 1fr 260px;gap:22px;align-items:start;margin-top:20px;}
+.evt-filters-col,.evt-suggest-col{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.evt-filters-col{display:flex;flex-direction:column;gap:10px;}
+.evt-filters-col select,.evt-filters-col input{width:100%;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;}
+.evt-col-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;}
+@media(max-width:1100px){
+  .evt-layout{grid-template-columns:1fr;}
+}
+/* ── Suggestions d'initiatives (bandeau droit) ── */
+.sugg-item{display:flex;flex-direction:column;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);}
+.sugg-item:last-child{border-bottom:none;padding-bottom:0;}
+.sugg-item:first-child{padding-top:0;}
+.sugg-head{display:flex;align-items:center;gap:10px;}
+.sugg-desc{font-size:12px;color:var(--muted);line-height:1.45;margin:0;}
+.sugg-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+.evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
 .evt-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .15s;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .evt-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
 .evt-img{width:100%;height:140px;background:linear-gradient(135deg,#ff6b00 0%,#ff9f43 100%);display:flex;align-items:center;justify-content:center;font-size:48px;overflow:hidden}
@@ -146,31 +166,46 @@
   <a class="evt-identity-link" href="/agenda.html">📅 Mon Agenda →</a>
 </div>
 
-<main class="container" style="max-width:1100px;padding-top:28px;padding-bottom:48px">
+<main class="container" style="max-width:1400px;padding-top:28px;padding-bottom:48px">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
       <h2 style="margin:0 0 4px">📅 Événements Diaspo'Actif</h2>
-      <p class="sub" style="margin:0">Tous les événements présents sur la plateforme Diaspo'Actif, réunis au même endroit — affinez avec les filtres ci-dessous.</p>
+      <p class="sub" style="margin:0">Tous les événements présents sur la plateforme Diaspo'Actif, réunis au même endroit — affinez avec les filtres ci-contre.</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
       <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
   </div>
-  <div class="filters">
-    <input type="text" id="q" placeholder="🔎 Mot-clé..." style="min-width:180px">
-    <select id="f-pays" title="Localisation / territoire"><option value="">🌍 Tous pays</option></select>
-    <input type="text" id="f-ville" placeholder="📍 Ville..." style="min-width:140px">
-    <input type="date" id="f-date" title="À partir de cette date" style="min-width:150px">
-    <select id="f-domaine" title="Domaine de l'événement"><option value="">🏷️ Domaine de l'événement</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select>
-    <select id="f-type" title="Forme de l'événement"><option value="">👥 Forme de l'événement</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="autre">Autre</option></select>
-    <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">Gratuit</option><option value="0">Payant</option></select>
-    <button class="btn btn-orange" id="btn-search" style="font-size:12px;padding:0 14px">🔍 Rechercher</button>
-    <button class="btn" id="btn-search-global" style="font-size:12px;padding:0 14px">🌍 Rechercher sur tout Diaspo'Actif</button>
-    <button class="btn" id="btn-reset" style="font-size:12px;padding:0 12px">Réinitialiser</button>
+
+  <div class="evt-layout">
+    <!-- ═══ COLONNE GAUCHE : FILTRES ═══ -->
+    <aside class="evt-filters-col">
+      <div class="evt-col-title">🔍 Filtres</div>
+      <input type="text" id="q" placeholder="🔎 Mot-clé...">
+      <select id="f-pays" title="Localisation / territoire"><option value="">🌍 Tous pays</option></select>
+      <input type="text" id="f-ville" placeholder="📍 Ville...">
+      <input type="date" id="f-date" title="À partir de cette date">
+      <select id="f-domaine" title="Domaine de l'événement"><option value="">🏷️ Domaine de l'événement</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select>
+      <select id="f-type" title="Forme de l'événement"><option value="">👥 Forme de l'événement</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="autre">Autre</option></select>
+      <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">Gratuit</option><option value="0">Payant</option></select>
+      <button class="btn btn-orange btn-block" id="btn-search" style="font-size:12px;">🔍 Rechercher</button>
+      <button class="btn btn-block" id="btn-search-global" style="font-size:12px;">🌍 Rechercher sur tout Diaspo'Actif</button>
+      <button class="btn btn-block" id="btn-reset" style="font-size:12px;">Réinitialiser</button>
+    </aside>
+
+    <!-- ═══ COLONNE CENTRALE : ÉVÉNEMENTS ═══ -->
+    <div>
+      <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
+      <div class="evt-grid" id="evt-list"></div>
+    </div>
+
+    <!-- ═══ COLONNE DROITE : SUGGESTIONS D'INITIATIVES ═══ -->
+    <aside class="evt-suggest-col">
+      <div class="evt-col-title">✨ Découvrir des initiatives</div>
+      <div id="sugg-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
+    </aside>
   </div>
-  <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
-  <div class="evt-grid" id="evt-list"></div>
 </main>
 
 <!-- ═══ MODAL CRÉATION ÉVÉNEMENT (enrichie) ═══ -->
@@ -993,6 +1028,66 @@ window.carouselGo = function(id, idx) {
   wrap.querySelectorAll('.carousel-dot').forEach((d,i) => d.classList.toggle('active', i===idx));
 };
 
+/* ══ Suggestions d'initiatives (bandeau droit, 2026-09-20, demande explicite) ══
+   2 comptes Initiative tirés au sort, renouvelés toutes les 3 minutes — aide à la découverte,
+   indépendant des filtres de recherche d'événements ci-contre. Le pool complet n'est
+   récupéré qu'une seule fois (au chargement) : /api/initiatives exclut déjà les comptes
+   démo côté serveur, la rotation se fait ensuite localement sans nouvel appel réseau. */
+let _suggPool = [];
+async function loadSuggestionsPool() {
+  try {
+    const { initiatives } = await api('GET', '/initiatives');
+    const moi = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? Number(CURRENT_USER.id) : null;
+    _suggPool = (initiatives || []).filter(it => it.nom && (!moi || Number(it.owner_user_id) !== moi));
+  } catch (e) { _suggPool = []; }
+}
+function pickRandomSuggestions(n) {
+  const pool = [..._suggPool];
+  const picked = [];
+  while (picked.length < n && pool.length) {
+    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return picked;
+}
+function renderSuggestions() {
+  const box = document.getElementById('sugg-list');
+  if (!box) return;
+  const picks = pickRandomSuggestions(2);
+  if (!picks.length) { box.innerHTML = '<p style="margin:0;">Aucune initiative à suggérer pour le moment.</p>'; return; }
+  box.innerHTML = picks.map(it => {
+    const photo = it.vitrine_banniere_url || it.logo_url || '';
+    const descBrut = it.description || it.mission || '';
+    const desc = descBrut.slice(0, 110) + (descBrut.length > 110 ? '…' : '');
+    const loc = [it.ville, it.pays].filter(Boolean).join(', ');
+    const profilHref = `initiative.html?id=${encodeURIComponent(it.slug || it.id)}`;
+    const avatar = typeof photoAvatar === 'function' ? photoAvatar(it.nom, 40, 'initiative', photo) : '';
+    const contactBtn = it.owner_user_id
+      ? `<a class="btn btn-outline" style="font-size:11px;padding:4px 9px;" href="messagerie.html?with=${it.owner_user_id}">💬 Contacter</a>`
+      : `<button class="btn btn-outline" style="font-size:11px;padding:4px 9px;" disabled title="Aucun responsable assigné pour cette initiative">💬 Contacter</button>`;
+    return `<div class="sugg-item">
+      <a href="${profilHref}" style="text-decoration:none;color:inherit;">
+        <div class="sugg-head">
+          <div style="width:40px;height:40px;flex-shrink:0;border-radius:50%;overflow:hidden;">${avatar}</div>
+          <div style="min-width:0;">
+            <div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(it.nom)}</div>
+            ${loc ? `<div style="font-size:11px;color:var(--muted);">📍 ${esc(loc)}</div>` : ''}
+          </div>
+        </div>
+      </a>
+      ${desc ? `<p class="sugg-desc">${esc(desc)}</p>` : ''}
+      <div class="sugg-actions">
+        ${contactBtn}
+        <button type="button" class="btn btn-outline" data-abonne="0" style="font-size:11px;padding:4px 9px;" onclick="daToggleSuivre('initiative', ${it.id}, this)">🔔 Suivre</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function initSuggestions() {
+  await loadSuggestionsPool();
+  renderSuggestions();
+  setInterval(renderSuggestions, 3 * 60 * 1000);
+}
+
 /* ─── Init ─── */
 (async () => {
   await applyAuthState();
@@ -1004,7 +1099,7 @@ window.carouselGo = function(id, idx) {
       ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role)) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
   }
-  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve()]);
+  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
      "En savoir plus" depuis la mini-fenêtre "Événements" de l'annuaire) — reprend le format
      d'ancre déjà utilisé par notifUrl() (assets/app.js) pour les notifications liées à un
