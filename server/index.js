@@ -19630,6 +19630,36 @@ route("GET", "/api/admin/membres/historique-suppressions", async (req, res) => {
   sendJSON(res, 200, { historique: rows });
 });
 
+/* PATCH /api/admin/membres/:id/domaine — correction manuelle du domaine/sous-domaine d'un
+   compte par un Administrateur (2026-09-20, cas réel : une personne inscrite via un lien de
+   parrainage "Santé" s'était retrouvée avec "Autre", AVANT le correctif qui impose désormais ce
+   domaine dès l'inscription — cette route corrige les comptes déjà créés avant ce correctif).
+   Même répartition users/initiatives que PUT /api/profil (self-service). */
+route("PATCH", "/api/admin/membres/:id/domaine", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(params.id);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const dp = body.domaine_principal !== undefined ? (String(body.domaine_principal || "").trim() || null) : undefined;
+  const sd1 = body.sous_domaine_1 !== undefined ? (String(body.sous_domaine_1 || "").trim() || null) : undefined;
+  const sd2 = body.sous_domaine_2 !== undefined ? (String(body.sous_domaine_2 || "").trim() || null) : undefined;
+  if (cible.role === "initiative") {
+    const dFields = [], dVals = [];
+    if (dp !== undefined)  { dFields.push("domaine_principal=?"); dVals.push(dp); }
+    if (sd1 !== undefined) { dFields.push("sous_domaine_1=?");    dVals.push(sd1); }
+    if (sd2 !== undefined) { dFields.push("sous_domaine_2=?");    dVals.push(sd2); }
+    if (dFields.length) { dVals.push(cible.id); await db.prepare(`UPDATE initiatives SET ${dFields.join(",")} WHERE owner_user_id=?`).run(...dVals); }
+  } else {
+    const fields = [], vals = [];
+    if (dp !== undefined)  { fields.push("domaine_principal=?"); vals.push(dp); }
+    if (sd1 !== undefined) { fields.push("sous_domaine_1=?");    vals.push(sd1); }
+    if (sd2 !== undefined) { fields.push("sous_domaine_2=?");    vals.push(sd2); }
+    if (fields.length) { vals.push(cible.id); await db.prepare(`UPDATE users SET ${fields.join(",")} WHERE id=?`).run(...vals); }
+  }
+  SEC.logSecurity("admin_domaine_corrige", { admin_id: user.id, cible_id: Number(params.id) });
+  sendJSON(res, 200, { ok: true });
+});
+
 route("DELETE", "/api/admin/membres/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
