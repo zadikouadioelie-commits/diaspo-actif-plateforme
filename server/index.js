@@ -11416,6 +11416,42 @@ route("POST", "/api/fil/vitrine-clic", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* GET /api/fil/suggestions-comptes — colonne de droite du fil d'actualité (2026-09-20,
+   demande explicite : "suggestions de comptes avec descriptifs"). Choix acté avec
+   l'utilisateur : sélection ALÉATOIRE parmi les initiatives pas encore suivies (le plus
+   simple des 3 choix proposés) — pas de logique de pertinence géo/domaine pour l'instant.
+   Déclarée avant /api/fil/:id (même piège déjà documenté pour meilleures-ventes juste
+   au-dessus) — sinon le routeur interprète "suggestions-comptes" comme un id de post et
+   renvoie "Publication introuvable" (bug reproduit avant ce déplacement). */
+route("GET", "/api/fil/suggestions-comptes", async (req, res, params, body, query) => {
+  const cu = await getCurrentUser(req);
+  const limit = Math.min(Number(query.limit) || 4, 10);
+  let dejaSuivies = [];
+  if (cu) {
+    dejaSuivies = (await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => Number(r.initiative_id));
+  }
+  const toutes = await db.prepare(`
+    SELECT i.id, i.nom, i.description, i.domaine_principal, i.logo_url, i.vitrine_banniere_url, i.ville, i.pays, i.owner_user_id
+    FROM initiatives i JOIN users u ON u.id = i.owner_user_id
+    WHERE (u.is_demo IS NULL OR u.is_demo = FALSE) AND i.description IS NOT NULL AND i.description != ''
+  `).all();
+  const candidates = toutes.filter(i => !dejaSuivies.includes(Number(i.id)) && (!cu || Number(i.owner_user_id) !== Number(cu.id)));
+  // Mélange (Fisher-Yates) puis on ne garde que les `limit` premiers — un simple ORDER BY
+  // RANDOM() en SQL suffirait aussi, mais la liste est déjà chargée pour le filtre ci-dessus.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const suggestions = candidates.slice(0, limit).map(i => ({
+    id: i.id, nom: i.nom,
+    description: (i.description || '').slice(0, 140),
+    domaine_principal: i.domaine_principal,
+    image: i.logo_url || i.vitrine_banniere_url || null,
+    ville: i.ville, pays: i.pays,
+  }));
+  sendJSON(res, 200, { suggestions });
+});
+
 /* ---------- GET post unique ---------- */
 route("GET", "/api/fil/:id", async (req, res, params) => {
   const cu = await getCurrentUser(req);

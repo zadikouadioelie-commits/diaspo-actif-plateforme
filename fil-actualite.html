@@ -29,6 +29,44 @@
       .topbar-inner{justify-content:space-between;}
       .logo{flex:1;justify-content:center;text-align:center;}
     }
+    /* ── Mise en page 3 colonnes (2026-09-20, demande explicite) : filtres à gauche,
+       fil au centre, suggestions/pub à droite. Colonnes latérales collantes (sticky)
+       pour rester visibles pendant le défilement du fil, comme sur les réseaux sociaux
+       dont s'inspire cette mise en page. ── */
+    .fil-3col{display:flex;align-items:flex-start;gap:22px;}
+    .fil-col-left{width:230px;flex:none;position:sticky;top:84px;}
+    .fil-col-center{flex:1;min-width:0;}
+    .fil-col-right{width:290px;flex:none;position:sticky;top:84px;}
+    .fil-filter-card,.fil-side-card{background:#fff;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:14px 14px 16px;margin-bottom:16px;}
+    .fil-filter-card h4,.fil-side-card h4{margin:0 0 10px;font-size:12px;font-weight:800;color:var(--navy,#0D2B4E);text-transform:uppercase;letter-spacing:.04em;}
+    .fil-filters-vertical{flex-direction:column;align-items:stretch;overflow-x:visible;}
+    .fil-filters-vertical .posts-feed-filter{text-align:left;border-radius:8px;}
+    /* Suggestions de comptes */
+    .fil-sugg-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #F1F3F7;}
+    .fil-sugg-item:last-child{border-bottom:none;}
+    .fil-sugg-avatar{width:40px;height:40px;border-radius:10px;flex:none;object-fit:cover;background:linear-gradient(135deg,#F2A24C,#8E1B2E);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;}
+    .fil-sugg-info{min-width:0;flex:1;}
+    .fil-sugg-nom{font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .fil-sugg-desc{font-size:11.5px;color:#6b7280;line-height:1.4;margin:2px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .fil-sugg-btn{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:8px;border:1.5px solid var(--orange,#ff6b00);color:var(--orange,#ff6b00);background:#fff;cursor:pointer;}
+    .fil-sugg-btn:hover{background:var(--orange,#ff6b00);color:#fff;}
+    .fil-sugg-btn:disabled{opacity:.55;cursor:default;}
+    /* Événements à venir */
+    .fil-evt-item{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #F1F3F7;text-decoration:none;color:inherit;}
+    .fil-evt-item:last-child{border-bottom:none;}
+    .fil-evt-date{width:42px;flex:none;text-align:center;background:#F4F6F9;border-radius:8px;padding:5px 0;}
+    .fil-evt-date .j{font-size:14px;font-weight:800;color:var(--navy,#0D2B4E);line-height:1;}
+    .fil-evt-date .m{font-size:9px;color:#6b7280;text-transform:uppercase;}
+    .fil-evt-titre{font-size:12.5px;font-weight:700;color:#111;line-height:1.3;}
+    .fil-evt-lieu{font-size:11px;color:#6b7280;margin-top:2px;}
+    @media(max-width:1024px){
+      .fil-3col{flex-direction:column;}
+      .fil-col-left,.fil-col-right{width:100%;position:static;}
+      .fil-col-left{order:2;}
+      .fil-col-center{order:1;}
+      .fil-col-right{order:3;}
+      .fil-filters-vertical{flex-direction:row;flex-wrap:wrap;}
+    }
   </style>
 </head>
 <body>
@@ -68,7 +106,7 @@
     <div id="hb-account-section"></div>
   </aside>
 
-  <main class="container" style="max-width:700px;padding-top:24px;padding-bottom:60px;">
+  <main class="container" style="max-width:1200px;padding-top:24px;padding-bottom:60px;">
 
     <!-- En-tête -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
@@ -84,47 +122,73 @@
     <!-- Bouton créer un post (trigger inline) -->
     <div id="feed-create-trigger"></div>
 
-    <!-- Filtres du fil -->
-    <div class="posts-feed-filters" id="feed-filters">
-      <button class="posts-feed-filter active" data-mode="tous">🌐 Tous</button>
-      <button class="posts-feed-filter" data-mode="suivis">👥 Mes abonnements</button>
-      <button class="posts-feed-filter" data-mode="populaires">🔥 Populaires</button>
-      <button class="posts-feed-filter" data-mode="articles">📰 Articles</button>
-    </div>
+    <div class="fil-3col">
+      <!-- ── Colonne gauche : filtres (2026-09-20, demande explicite) ── -->
+      <aside class="fil-col-left">
+        <div class="fil-filter-card">
+          <h4>Affichage</h4>
+          <div class="posts-feed-filters fil-filters-vertical" id="feed-filters">
+            <button class="posts-feed-filter active" data-mode="tous">🌐 Tous</button>
+            <button class="posts-feed-filter" data-mode="suivis">👥 Mes abonnements</button>
+            <button class="posts-feed-filter" data-mode="populaires">🔥 Populaires</button>
+            <button class="posts-feed-filter" data-mode="articles">📰 Articles</button>
+          </div>
+        </div>
+        <div class="fil-filter-card">
+          <h4>Catégories</h4>
+          <div class="posts-feed-filters fil-filters-vertical" id="cat-filters">
+            <button class="posts-feed-filter active" data-cat="">Toutes catégories</button>
+            <button class="posts-feed-filter" data-cat="Actualité">Actualité</button>
+            <button class="posts-feed-filter" data-cat="Projet">Projets</button>
+            <button class="posts-feed-filter" data-cat="Investissement">Investissements</button>
+            <button class="posts-feed-filter" data-cat="Emploi">Emploi</button>
+            <button class="posts-feed-filter" data-cat="Formation">Formation</button>
+            <button class="posts-feed-filter" data-cat="Événement">Événements</button>
+            <button class="posts-feed-filter" data-cat="Succès">Succès</button>
+            <button class="posts-feed-filter" data-cat="Témoignage">Témoignages</button>
+            <button class="posts-feed-filter" data-cat="Appel à bénévoles">Appels à bénévoles</button>
+            <button class="posts-feed-filter" data-cat="Culture">Culture</button>
+            <button class="posts-feed-filter" data-cat="Diaspora">Diaspora</button>
+            <button class="posts-feed-filter" data-cat="Innovation">Innovation</button>
+            <button class="posts-feed-filter" data-cat="Autre">Autre</button>
+          </div>
+        </div>
+      </aside>
 
-    <!-- Filtres par catégorie -->
-    <div class="posts-feed-filters" id="cat-filters" style="margin-bottom:20px;">
-      <button class="posts-feed-filter active" data-cat="">Toutes catégories</button>
-      <button class="posts-feed-filter" data-cat="Actualité">Actualité</button>
-      <button class="posts-feed-filter" data-cat="Projet">Projets</button>
-      <button class="posts-feed-filter" data-cat="Investissement">Investissements</button>
-      <button class="posts-feed-filter" data-cat="Emploi">Emploi</button>
-      <button class="posts-feed-filter" data-cat="Formation">Formation</button>
-      <button class="posts-feed-filter" data-cat="Événement">Événements</button>
-      <button class="posts-feed-filter" data-cat="Succès">Succès</button>
-      <button class="posts-feed-filter" data-cat="Témoignage">Témoignages</button>
-      <button class="posts-feed-filter" data-cat="Appel à bénévoles">Appels à bénévoles</button>
-      <button class="posts-feed-filter" data-cat="Culture">Culture</button>
-      <button class="posts-feed-filter" data-cat="Diaspora">Diaspora</button>
-      <button class="posts-feed-filter" data-cat="Innovation">Innovation</button>
-      <button class="posts-feed-filter" data-cat="Autre">Autre</button>
-    </div>
+      <!-- ── Colonne centre : le fil lui-même (contenu inchangé) ── -->
+      <div class="fil-col-center">
+        <!-- Meilleures ventes du moment -->
+        <div id="meilleures-ventes-widget" style="margin-bottom:20px;"></div>
 
-    <!-- Meilleures ventes du moment -->
-    <div id="meilleures-ventes-widget" style="margin-bottom:20px;"></div>
+        <div id="ad-between-posts" data-ad-emplacement="between_posts" style="display:none;margin-bottom:16px;"></div>
 
-    <div id="ad-between-posts" data-ad-emplacement="between_posts" style="display:none;margin-bottom:16px;"></div>
+        <!-- Liste des posts -->
+        <div id="feed-list">
+          <div style="text-align:center;padding:40px;color:#9ca3af;">
+            <div style="font-size:2rem;margin-bottom:8px;">⏳</div>
+            <p>Chargement du fil…</p>
+          </div>
+        </div>
 
-    <!-- Liste des posts -->
-    <div id="feed-list">
-      <div style="text-align:center;padding:40px;color:#9ca3af;">
-        <div style="font-size:2rem;margin-bottom:8px;">⏳</div>
-        <p>Chargement du fil…</p>
+        <!-- Pagination -->
+        <div id="feed-pagination" style="text-align:center;margin-top:20px;"></div>
       </div>
-    </div>
 
-    <!-- Pagination -->
-    <div id="feed-pagination" style="text-align:center;margin-top:20px;"></div>
+      <!-- ── Colonne droite : suggestions de comptes + événements + publicité (2026-09-20,
+           demande explicite) ── -->
+      <aside class="fil-col-right">
+        <div class="fil-side-card" id="suggestions-comptes-card" style="display:none;">
+          <h4>💡 Comptes à découvrir</h4>
+          <div id="suggestions-comptes-list"></div>
+        </div>
+        <div class="fil-side-card" id="evenements-a-venir-card" style="display:none;">
+          <h4>📅 Événements à venir</h4>
+          <div id="evenements-a-venir-list"></div>
+          <a href="evenements.html" style="display:block;text-align:center;font-size:12px;font-weight:700;color:var(--orange,#ff6b00);margin-top:8px;">Voir tous les événements →</a>
+        </div>
+        <div id="ad-fil-sidebar" data-ad-emplacement="fil_sidebar" style="display:none;"></div>
+      </aside>
+    </div>
 
   </main>
 
@@ -211,7 +275,69 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   loadMeilleuresVentes();
+  loadSuggestionsComptes();
+  loadEvenementsAVenir();
 });
+
+/* ── Colonne droite : comptes suggérés (2026-09-20) ── */
+async function loadSuggestionsComptes() {
+  const card = document.getElementById('suggestions-comptes-card');
+  const list = document.getElementById('suggestions-comptes-list');
+  try {
+    const r = await fetch('/api/fil/suggestions-comptes?limit=4', { credentials: 'include' }).then(r => r.json());
+    const suggestions = r.suggestions || [];
+    if (!suggestions.length) return; // carte reste masquée
+    list.innerHTML = suggestions.map(s => `
+      <div class="fil-sugg-item" data-id="${s.id}">
+        ${s.image ? `<img class="fil-sugg-avatar" src="${s.image}" alt="" loading="lazy">` : `<div class="fil-sugg-avatar">🏳️</div>`}
+        <div class="fil-sugg-info">
+          <div class="fil-sugg-nom">${escFilHtml(s.nom)}</div>
+          ${s.description ? `<div class="fil-sugg-desc">${escFilHtml(s.description)}</div>` : ''}
+          <button class="fil-sugg-btn" onclick="suivreSuggestion(${s.id}, this)">+ Suivre</button>
+        </div>
+      </div>`).join('');
+    card.style.display = '';
+  } catch (e) { /* carte reste masquée en cas d'erreur — pas critique pour le fil */ }
+}
+async function suivreSuggestion(initiativeId, btn) {
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/initiatives/${initiativeId}/suivre`, { method: 'POST', credentials: 'include' }).then(r => r.json());
+    if (r.ok || r.abonne) { btn.textContent = '✓ Suivi'; }
+    else { btn.disabled = false; }
+  } catch (e) {
+    btn.disabled = false;
+    if (!currentUser) window.location.href = 'login.html';
+  }
+}
+
+/* ── Colonne droite : événements à venir (2026-09-20) ── */
+async function loadEvenementsAVenir() {
+  const card = document.getElementById('evenements-a-venir-card');
+  const list = document.getElementById('evenements-a-venir-list');
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await fetch(`/api/evenements?date=${today}`, { credentials: 'include' }).then(r => r.json());
+    const evts = (r.evenements || []).slice(0, 3);
+    if (!evts.length) return; // carte reste masquée
+    const MOIS = ['jan','fév','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
+    list.innerHTML = evts.map(e => {
+      const d = e.date_evt ? new Date(e.date_evt) : null;
+      return `<a class="fil-evt-item" href="evenements.html?id=${e.id}">
+        <div class="fil-evt-date">
+          <div class="j">${d ? d.getDate() : '—'}</div>
+          <div class="m">${d ? MOIS[d.getMonth()] : ''}</div>
+        </div>
+        <div>
+          <div class="fil-evt-titre">${escFilHtml(e.titre || 'Événement')}</div>
+          <div class="fil-evt-lieu">📍 ${escFilHtml(e.ville || e.pays || 'Lieu à confirmer')}</div>
+        </div>
+      </a>`;
+    }).join('');
+    card.style.display = '';
+  } catch (e) { /* carte reste masquée en cas d'erreur */ }
+}
+function escFilHtml(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ── Widget "🔥 Les meilleures ventes du moment" ── */
 async function loadMeilleuresVentes() {
