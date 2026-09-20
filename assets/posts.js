@@ -333,7 +333,6 @@ function renderPostCard(post, options = {}) {
   const menuItems = isAuteur
     ? `<button class="post-menu-item" onclick="Posts.editPost(${post.id})">✏️ Modifier</button>
        <button class="post-menu-item" onclick="Posts.archivePost(${post.id})">📁 Archiver</button>
-       <button class="post-menu-item post-menu-danger" onclick="Posts.deletePost(${post.id})">🗑️ Supprimer</button>
        ${showStats ? `<button class="post-menu-item" onclick="Posts.showStats(${post.id})">📊 Statistiques</button>` : ''}`
     : `<button class="post-menu-item" onclick="Posts.reportPost(${post.id})">🚩 Signaler</button>
        <button class="post-menu-item" onclick="Posts.copyLink(${post.id})">📎 Copier le lien</button>`;
@@ -408,6 +407,9 @@ function renderPostCard(post, options = {}) {
     <button class="post-action-btn" onclick="Posts.share(${post.id})" title="Partager">
       📤
     </button>
+    ${isAuteur ? `<button class="post-action-btn post-action-btn-danger" onclick="Posts.deletePost(${post.id})" title="Supprimer la publication">
+      🗑️
+    </button>` : ''}
   </div>
 
   <div class="post-comments-section" id="comments-${post.id}" style="display:none;">
@@ -612,6 +614,7 @@ function injectStyles() {
 .post-action-count{font-size:.8rem;}
 .post-contribute-btn{color:#0284c7;font-weight:600;}
 .post-contribute-btn:hover{background:#e0f2fe!important;color:#0284c7!important;}
+.post-action-btn-danger:hover{background:#fef2f2!important;color:#dc2626!important;}
 /* Reaction menu */
 .post-reactions-wrap{position:relative;}
 .post-reaction-menu{display:none;position:absolute;bottom:110%;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:30px;padding:6px 10px;box-shadow:0 4px 20px rgba(0,0,0,.12);flex-direction:row;gap:4px;z-index:200;white-space:nowrap;}
