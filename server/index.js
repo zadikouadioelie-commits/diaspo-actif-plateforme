@@ -14963,20 +14963,84 @@ route("GET", "/api/dashboard/administrateur", async (req, res) => {
 });
 
 /* ---------- Cartographie financière de la diaspora ----------
-   Cumule tous les gains (crédits wallet) des bénéficiaires et les ventile par
-   origine (nationalité), pays de résidence, ville et secteur d'activité.       */
+   Cumule TOUTES les transactions réellement payées de la plateforme (billetterie,
+   boutique, adhésions, formations, cagnottes, abonnements Premium — passées et
+   futures, aucun filtre de date) et les ventile par origine (nationalité), pays
+   de résidence, ville et secteur d'activité du membre auquel chaque transaction
+   se rattache (le bénéficiaire qui encaisse pour billet/boutique/adhésion/
+   formation/cagnotte, le souscripteur lui-même pour un abonnement Premium qui
+   n'a pas d'autre membre "gagnant" en face).
+
+   Bug corrigé au passage (2026-09-20, "Erreur de chargement" en production) :
+   l'ancienne requête faisait un `GROUP BY w.id` alors qu'elle sélectionnait des
+   colonnes de `users`/`initiatives` (u.nationalite1, i.domaine…) non dépendantes
+   fonctionnellement de w.id — SQLite tolère ça silencieusement (il choisit une
+   ligne arbitraire par groupe) mais Postgres le REFUSE avec une erreur SQL
+   ("column ... must appear in the GROUP BY clause"), d'où l'échec systématique
+   en production malgré un fonctionnement local parfait. Le secteur de repli sur
+   l'initiative détenue passe donc maintenant par une sous-requête scalaire
+   (LIMIT 1) plutôt qu'un LEFT JOIN, ce qui rend le GROUP BY inutile — il n'y a
+   plus d'agrégation SQL du tout, seulement en JS ensuite via ventiler(). */
 route("GET", "/api/admin/revenus-diaspora", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
 
-  // Toutes les transactions de gain (crédit) rattachées à leur bénéficiaire,
-  // enrichies de l'origine/résidence/secteur. Le secteur retombe sur le domaine
-  // de l'initiative détenue quand le compte n'a pas de secteur propre.
   const rows = await db.prepare(`
+    WITH tx AS (
+      -- Billetterie / Boutique / Adhésions : déjà créditées dans wallet_transactions
+      -- (montant net de la commission plateforme, comme le veut ce module).
+      SELECT
+        w.beneficiaire_id AS beneficiaire_id,
+        w.montant AS montant,
+        CASE
+          WHEN w.ticket_id IS NOT NULL THEN 'billet'
+          WHEN w.commande_vitrine_id IS NOT NULL THEN 'boutique'
+          ELSE 'adhesion'
+        END AS type_tx
+      FROM wallet_transactions w
+      WHERE w.sens = 'credit' AND w.type = 'organizer_credit' AND w.montant IS NOT NULL
+        AND (w.ticket_id IS NOT NULL OR w.commande_vitrine_id IS NOT NULL OR w.adhesion_paiement_id IS NOT NULL)
+
+      UNION ALL
+      -- Formations : lu directement (pas via wallet_transactions) pour couvrir aussi
+      -- les formations rattachées seulement à une initiative (sans owner_user_id
+      -- propre), lacune réelle du webhook Stripe qui ne crédite alors personne.
+      SELECT
+        COALESCE(f.owner_user_id, i.owner_user_id) AS beneficiaire_id,
+        fi.montant_paye AS montant,
+        'formation' AS type_tx
+      FROM formation_inscriptions fi
+      JOIN formations f ON f.id = fi.formation_id
+      LEFT JOIN initiatives i ON i.id = f.initiative_id
+      WHERE fi.paiement_statut = 'paye' AND fi.montant_paye > 0
+
+      UNION ALL
+      -- Cagnottes : absentes de wallet_transactions, le bénéficiaire est le porteur
+      -- de la cagnotte (le contributeur/donateur n'est pas celui qu'on ventile ici).
+      SELECT
+        c.owner_user_id AS beneficiaire_id,
+        cc.montant AS montant,
+        'cagnotte' AS type_tx
+      FROM cagnotte_contributions cc
+      JOIN cagnottes c ON c.id = cc.cagnotte_id
+      WHERE cc.statut = 'paye'
+
+      UNION ALL
+      -- Abonnements Premium (utilisateur_abonne / initiative_abonne uniquement — le
+      -- même système d'accréditations sert aussi à d'anciens types sans rapport avec
+      -- le Premium, exclus ici). Seul membre concerné : le souscripteur lui-même.
+      SELECT
+        ap.user_id AS beneficiaire_id,
+        ap.montant AS montant,
+        'premium' AS type_tx
+      FROM accred_paiements ap
+      JOIN accred_definitions ad ON ad.id = ap.accred_id
+      WHERE ap.statut = 'paye' AND ad.type IN ('utilisateur_abonne', 'initiative_abonne')
+    )
     SELECT
-      w.montant AS montant,
-      w.type    AS type_tx,
+      tx.montant AS montant,
+      tx.type_tx AS type_tx,
       COALESCE(NULLIF(TRIM(u.nationalite1), ''), 'Non renseignée') AS origine,
       COALESCE(NULLIF(TRIM(u.pays), ''), 'Non renseigné')          AS pays,
       COALESCE(NULLIF(TRIM(u.ville), ''), 'Non renseignée')        AS ville,
@@ -14984,14 +15048,12 @@ route("GET", "/api/admin/revenus-diaspora", async (req, res, params, body, query
         NULLIF(TRIM(u.domaine_utilisateur), ''),
         NULLIF(TRIM(u.situation_pro), ''),
         NULLIF(TRIM(u.type_institution), ''),
-        NULLIF(TRIM(i.domaine), ''),
+        NULLIF(TRIM((SELECT i2.domaine FROM initiatives i2 WHERE i2.owner_user_id = u.id LIMIT 1)), ''),
         'Non renseigné'
       ) AS secteur
-    FROM wallet_transactions w
-    JOIN users u ON u.id = w.beneficiaire_id
-    LEFT JOIN initiatives i ON i.owner_user_id = u.id
-    WHERE w.sens = 'credit' AND w.montant IS NOT NULL
-    GROUP BY w.id
+    FROM tx
+    JOIN users u ON u.id = tx.beneficiaire_id
+    WHERE tx.beneficiaire_id IS NOT NULL AND tx.montant IS NOT NULL AND tx.montant > 0
   `).all();
 
   // Valeurs distinctes (non filtrées) pour alimenter les listes déroulantes.
@@ -15011,8 +15073,8 @@ route("GET", "/api/admin/revenus-diaspora", async (req, res, params, body, query
   const nbTx = filtered.length;
 
   const TYPE_LABELS = {
-    commande_vitrine: "Boutique", billet: "Billetterie", ticket: "Billetterie",
-    adhesion: "Adhésions", adhesion_paiement: "Adhésions", don: "Dons", platform_fee: "Commissions"
+    billet: "Billetterie", boutique: "Boutique", adhesion: "Adhésions",
+    formation: "Formations", cagnotte: "Cagnottes", premium: "Abonnements Premium"
   };
 
   // Ventilation générique par clé, avec montant, part et nb de transactions.
