@@ -995,36 +995,6 @@ route("DELETE", "/api/parrainage/invitations/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
-/* GET /api/admin/parrainage/invitations — module Parrainage pour l'Administrateur (2026-09-20,
-   demande explicite) : chaque invitation est déjà référencée à son créateur (inviter_user_id,
-   colonne posée dès la création) — cette route rend cette référence VISIBLE en listant TOUTES
-   les invitations, tous comptes confondus, avec l'identité du créateur jointe. Aucune nouvelle
-   route de mutation n'était nécessaire : PUT/DELETE/desactiver/reactiver ci-dessus autorisent
-   déjà un administrateur à agir sur une invitation qui n'est pas la sienne — l'admin dispose
-   donc déjà "des mêmes fonctions que le créateur du lien", il ne manquait que ce panneau pour
-   les découvrir et les déclencher. */
-route("GET", "/api/admin/parrainage/invitations", async (req, res, params, body, query) => {
-  const user = await getCurrentUser(req);
-  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
-  let invitations = await db.prepare(`
-    SELECT i.*, pd.nom AS domaine_nom, pd.icone AS domaine_icone, psd.nom AS sous_domaine_nom,
-      u.nom AS createur_nom, u.prenom AS createur_prenom, u.email AS createur_email, u.role AS createur_role
-    FROM invitations i
-    JOIN parrainage_domaines pd ON pd.id = i.domaine_id
-    LEFT JOIN parrainage_sous_domaines psd ON psd.id = i.sous_domaine_id
-    LEFT JOIN users u ON u.id = i.inviter_user_id
-    ORDER BY i.created_at DESC
-  `).all();
-  const q = String(query?.q || "").trim().toLowerCase();
-  if (q) {
-    invitations = invitations.filter(inv =>
-      [inv.nom, inv.code, inv.createur_nom, inv.createur_prenom, inv.createur_email]
-        .filter(Boolean).some(v => String(v).toLowerCase().includes(q))
-    );
-  }
-  sendJSON(res, 200, { invitations });
-});
-
 route("GET", "/api/parrainage/centre-vision", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -19639,13 +19609,17 @@ route("GET", "/api/admin/membres", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
   const role = query.role || null;
-  const q = query.q ? `%${query.q}%` : null;
+  // LOWER(...) des deux côtés (2026-09-20, bug réel constaté) : un simple LIKE est
+  // insensible à la casse sur SQLite mais SENSIBLE à la casse sur Postgres — une recherche
+  // "Kourouma" ne trouvait donc jamais un compte enregistré "KOUROUMA" en production, alors
+  // que ça fonctionnait en local. Portable sur les deux moteurs.
+  const q = query.q ? `%${query.q.toLowerCase()}%` : null;
   // Les comptes déjà anonymisés (email @diaspoactif.invalid) ne sont plus des "membres" à gérer —
   // ils apparaissent uniquement dans l'historique des suppressions (voir route dédiée ci-dessous).
   let sql = "SELECT id,nom,prenom,email,telephone,role,ville,pays,statut_verification,created_at FROM users WHERE email NOT LIKE '%@diaspoactif.invalid'";
   const args = [];
   if (role) { sql += " AND role=?"; args.push(role); }
-  if (q) { sql += " AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ?)"; args.push(q, q, q); }
+  if (q) { sql += " AND (LOWER(nom) LIKE ? OR LOWER(prenom) LIKE ? OR LOWER(email) LIKE ?)"; args.push(q, q, q); }
   sql += " ORDER BY created_at DESC LIMIT 200";
   const rows = await db.prepare(sql).all(...args);
   sendJSON(res, 200, { membres: rows });

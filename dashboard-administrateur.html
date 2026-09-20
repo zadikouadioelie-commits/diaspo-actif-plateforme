@@ -88,7 +88,6 @@
       <a href="#verifications-organisation" data-section="verifications-organisation" style="display:flex;justify-content:space-between;align-items:center;">🏢 Vérifications d'organisation <span id="vo-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#demandes-passage" data-section="demandes-passage" style="display:flex;justify-content:space-between;align-items:center;">🚀 Passage « Existante » <span id="dp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
-      <a href="#parrainage-admin" data-section="parrainage-admin">🔗 Parrainage &amp; Invitations</a>
       <a href="#origines" data-section="origines">🌍 Origines manquantes</a>
 
       <span class="sb-group-lbl">🟨 Territoires</span>
@@ -3427,61 +3426,6 @@
         <div id="rdv-onglets" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
         <div id="rdv-liste"><div style="color:#64748B;font-size:13px;">Chargement…</div></div>
       </section>
-
-      <!-- ═══════════ PARRAINAGE & INVITATIONS (vue Administrateur) ═══════════
-           2026-09-20, demande explicite : chaque invitation est déjà référencée à son créateur
-           (invitations.inviter_user_id) — cette section rend cette référence visible en listant
-           TOUTES les invitations de TOUS les comptes, avec les mêmes actions que la personne qui
-           les a créées (Modifier/Désactiver/Réactiver/Supprimer — les routes PUT/DELETE/
-           desactiver/reactiver de /api/parrainage/invitations autorisent déjà un administrateur
-           à agir sur une invitation qui n'est pas la sienne). -->
-      <section id="section-parrainage-admin" style="display:none;">
-        <h2 style="margin:0 0 6px;">🔗 Parrainage &amp; Invitations</h2>
-        <p style="margin:0 0 16px;color:#64748B;font-size:13px;max-width:760px;">
-          Toutes les invitations créées par tous les comptes, quel que soit celui qui les a
-          générées. Vous disposez des mêmes actions que le créateur : modifier, désactiver,
-          réactiver ou supprimer.
-        </p>
-        <div id="pa-adm-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;"></div>
-        <input type="text" id="pa-adm-recherche" placeholder="🔎 Rechercher par nom, code ou par compte créateur (nom, e-mail)…" style="width:100%;max-width:460px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);margin-bottom:16px;font-size:13px;">
-        <div id="pa-adm-liste"><div style="color:#64748B;font-size:13px;">Chargement…</div></div>
-      </section>
-
-      <!-- Modale modification (admin) -->
-      <div id="pa-adm-edit-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
-        <div class="card" style="width:100%;max-width:420px;">
-          <h3 style="margin:0 0 14px;">✏️ Modifier l'invitation</h3>
-          <input type="hidden" id="pa-adm-e-id">
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <div>
-              <label style="font-size:12.5px;font-weight:700;">Nom de l'invitation</label>
-              <input type="text" id="pa-adm-e-nom" class="input-field" style="width:100%;margin-top:4px;box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:12.5px;font-weight:700;">Domaine</label>
-              <select id="pa-adm-e-domaine" class="input-field" style="width:100%;margin-top:4px;box-sizing:border-box;"></select>
-            </div>
-            <div id="pa-adm-e-sous-domaine-zone"></div>
-          </div>
-          <div id="pa-adm-e-err" style="color:#dc2626;font-size:12px;margin-top:10px;"></div>
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
-            <button id="pa-adm-e-annuler" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;">Annuler</button>
-            <button id="pa-adm-e-enregistrer" class="btn-primary" style="padding:9px 18px;border-radius:8px;font-size:13px;">Enregistrer</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modale confirmation suppression (admin) -->
-      <div id="pa-adm-confirm-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
-        <div class="card" style="width:100%;max-width:400px;text-align:center;">
-          <h3 style="margin:0 0 8px;">Supprimer cette invitation ?</h3>
-          <p id="pa-adm-confirm-texte" style="font-size:12.5px;color:#64748B;margin:0 0 16px;"></p>
-          <div style="display:flex;justify-content:center;gap:8px;">
-            <button id="pa-adm-confirm-annuler" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;">Annuler</button>
-            <button id="pa-adm-confirm-supprimer" style="padding:9px 18px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">🗑️ Supprimer</button>
-          </div>
-        </div>
-      </div>
 
       <!-- ═══════════ ORIGINES MANQUANTES ═══════════
            Suivi du système de rappel automatique : détecte les comptes/initiatives sans
@@ -9005,7 +8949,6 @@ async function submitAccordDirect(){
     ads: () => loadAdsAdmin(),
     'social-sync': () => loadSocialSyncAdmin(),
     rencontres:  () => rdvCharger(),
-    'parrainage-admin': () => paAdminCharger(),
     origines:    () => origCharger(),
     'verifications-organisation': () => loadVerificationsOrganisation(),
     'demandes-passage': () => loadDemandesPassage(),
@@ -14094,7 +14037,6 @@ async function diagEmail() {
   <script src="/assets/theme-manager.js"></script>
   <script src="/assets/upload-media.js"></script>
   <script src="/assets/admin-videos-tutoriels-panel.js"></script>
-  <script src="/assets/admin-parrainage-panel.js"></script>
   <script src="/assets/admin-avis-panel.js"></script>
 </body>
 </html>
