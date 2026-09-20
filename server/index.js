@@ -738,14 +738,24 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     } catch (_) {}
   })();
 
-  // Email de vérification d'adresse (non bloquant — soft gate, ne bloque pas la connexion)
+  /* Email de vérification d'adresse (non bloquant — soft gate, ne bloque pas la connexion).
+     BUG RÉEL corrigé (2026-09-20, "certaines personnes se plaignent que la confirmation de
+     mail ne fonctionne pas") : emailVerification() n'était jamais attendu (pas de await) ni
+     son résultat vérifié. En serverless, une promesse abandonnée ainsi peut ne jamais aboutir
+     si le conteneur se fige après l'envoi de la réponse HTTP — échec silencieux et
+     intermittent selon le temps d'exécution restant, jamais visible nulle part (sendEmail()
+     ne lève jamais d'exception, elle renvoie {ok:false} même en cas d'échec Resend — même le
+     try/catch qui entourait cet appel ne pouvait donc rien attraper). Même bug déjà rencontré
+     et corrigé sur le projet Acte Fondateur 2026. Désormais attendu, et un échec réel est
+     journalisé (jamais silencieux) sans jamais faire échouer l'inscription elle-même. */
   try {
     const verifToken = crypto.randomBytes(32).toString("hex");
     const verifExpires = Date.now() + 24 * 3600000; // 24h
     await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, id);
     const { emailVerification } = require("./mailer");
-    emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
-  } catch (_) {}
+    const envoi = await emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
+    if (!envoi?.ok) await logError(new Error(`Envoi email de vérification échoué : ${JSON.stringify(envoi)}`), "signup_email_verification", req);
+  } catch (e) { try { await logError(e, "signup_email_verification", req); } catch (_) {} }
 
   /* Proposition de fusion (tâche #74) : si une ou plusieurs fiches d'adhérent externe
      (sans compte lié) portent exactement cet e-mail, on propose le rattachement plutôt que
@@ -1715,13 +1725,16 @@ route("PUT", "/api/profil/informations-declarees", async (req, res, params, body
   await db.prepare(`UPDATE users SET ${sets.join(",")} WHERE id=?`).run(...vals);
 
   if (emailChanged) {
+    // Même bug corrigé qu'à l'inscription (POST /api/auth/signup, voir son commentaire) :
+    // await manquant + résultat jamais vérifié = échec silencieux et intermittent en serverless.
     try {
       const verifToken = crypto.randomBytes(32).toString("hex");
       const verifExpires = Date.now() + 24 * 3600000;
       await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, cu.id);
       const { emailVerification } = require("./mailer");
-      emailVerification({ email: fields.email, prenom: fields.prenom || fields.nom, token: verifToken });
-    } catch (e) {}
+      const envoi = await emailVerification({ email: fields.email, prenom: fields.prenom || fields.nom, token: verifToken });
+      if (!envoi?.ok) await logError(new Error(`Envoi email de vérification (changement d'adresse) échoué : ${JSON.stringify(envoi)}`), "email_change_verification", req);
+    } catch (e) { try { await logError(e, "email_change_verification", req); } catch (_) {} }
   }
   if (changed && current.identite_verifiee) {
     creerNotif(cu.id, "identite_a_revalider", "Nouvelle vérification d'identité requise",
