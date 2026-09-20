@@ -33,10 +33,22 @@
        fil au centre, suggestions/pub à droite. Colonnes latérales collantes (sticky)
        pour rester visibles pendant le défilement du fil, comme sur les réseaux sociaux
        dont s'inspire cette mise en page. ── */
-    .fil-3col{display:flex;align-items:flex-start;gap:22px;}
-    .fil-col-left{width:230px;flex:none;position:sticky;top:84px;}
-    .fil-col-center{flex:1;min-width:0;}
-    .fil-col-right{width:290px;flex:none;position:sticky;top:84px;}
+    /* Élargi (2026-09-20, demande explicite, capture à l'appui) : trop de marge morte
+       inutilisée de part et d'autre du bloc sur grand écran. Gauche +20% (230→276px),
+       centre +50% (calculé sur sa largeur effective d'avant, ~636px→~950px) — la largeur
+       du conteneur (voir <main> plus bas) grandit d'autant pour absorber les deux, la
+       colonne de droite ne change pas. */
+    .fil-3col{display:flex;align-items:flex-start;gap:22px;height:calc(100vh - 84px);}
+    /* 3 panneaux INDÉPENDANTS pour le défilement (façon Slack/Discord), demande explicite :
+       chaque colonne a sa propre hauteur fixe (celle de l'écran, moins le bandeau du haut)
+       et son propre défilement interne — faire défiler les suggestions à droite, par
+       exemple, ne doit jamais déplacer le fil au centre ni la page entière. Remplace
+       l'ancien position:sticky (qui restait un seul défilement de PAGE, colonnes latérales
+       simplement "collées" pendant qu'il progresse) par un vrai découpage en 3 zones de
+       défilement séparées. */
+    .fil-col-left{width:276px;flex:none;height:100%;overflow-y:auto;}
+    .fil-col-center{flex:1;min-width:0;height:100%;overflow-y:auto;}
+    .fil-col-right{width:290px;flex:none;height:100%;overflow-y:auto;}
     .fil-filter-card,.fil-side-card{background:#fff;border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:14px 14px 16px;margin-bottom:16px;}
     .fil-filter-card h4,.fil-side-card h4{margin:0 0 10px;font-size:12px;font-weight:800;color:var(--navy,#0D2B4E);text-transform:uppercase;letter-spacing:.04em;}
     .fil-filters-vertical{flex-direction:column;align-items:stretch;overflow-x:visible;}
@@ -60,8 +72,11 @@
     .fil-evt-titre{font-size:12.5px;font-weight:700;color:#111;line-height:1.3;}
     .fil-evt-lieu{font-size:11px;color:#6b7280;margin-top:2px;}
     @media(max-width:1024px){
-      .fil-3col{flex-direction:column;}
-      .fil-col-left,.fil-col-right{width:100%;position:static;}
+      /* Le découpage à 3 panneaux indépendants n'a de sens qu'à largeur suffisante pour les
+         voir tous en même temps — repli sur un défilement de page classique, une colonne. */
+      .fil-3col{flex-direction:column;height:auto;}
+      .fil-col-left,.fil-col-right,.fil-col-center{height:auto;overflow-y:visible;}
+      .fil-col-left,.fil-col-right{width:100%;}
       .fil-col-left{order:2;}
       .fil-col-center{order:1;}
       .fil-col-right{order:3;}
@@ -106,7 +121,7 @@
     <div id="hb-account-section"></div>
   </aside>
 
-  <main class="container" style="max-width:1200px;padding-top:24px;padding-bottom:60px;">
+  <main class="container" style="max-width:1560px;padding-top:24px;padding-bottom:60px;">
 
     <!-- En-tête -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
