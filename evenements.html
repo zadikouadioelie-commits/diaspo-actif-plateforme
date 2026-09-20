@@ -370,27 +370,31 @@ function fmtDate(d){
 }
 
 
-/* Filtre "Domaine de l'événement" complété par les vraies valeurs en base (2026-09-10, bug
-   trouvé par exécution réelle : "Networking" affiché comme domaine sur la cartouche d'un
-   événement, mais introuvable dans la liste fixe du filtre — donc jamais sélectionnable, le
-   filtre renvoyait 0 résultat quel que soit le choix fait). La liste d'options codée en dur
-   ci-dessus (server/index.js: le champ `domaine` accepte n'importe quelle valeur à la création,
-   pas seulement celles du <select>) peut donc diverger de ce qui existe réellement — ce bloc
-   consulte TOUS les événements au chargement de la page et ajoute toute valeur de domaine
-   réellement utilisée mais absente de la liste, pour qu'aucun événement ne devienne jamais
-   introuvable par ce filtre. N'écrase rien : ajoute seulement ce qui manque. */
+/* Filtre "Domaine de l'événement" ET select "Domaine" du formulaire de création complétés par
+   les vraies valeurs en base (2026-09-10, bug trouvé par exécution réelle : "Networking"
+   affiché comme domaine sur la cartouche d'un événement, mais introuvable dans la liste fixe du
+   filtre — donc jamais sélectionnable, le filtre renvoyait 0 résultat quel que soit le choix
+   fait). La liste d'options codée en dur (server/index.js : le champ `domaine` accepte
+   n'importe quelle valeur à la création, pas seulement celles du <select>) peut donc diverger
+   de ce qui existe réellement — ce bloc consulte TOUS les événements au chargement de la page
+   et ajoute, sur les DEUX select (filtre + création), toute valeur de domaine réellement
+   utilisée mais absente de la liste (2026-09-21, demande explicite : "propose tous les domaines
+   present sur la plateforme" dans le formulaire de création lui-même, pas seulement le filtre).
+   N'écrase rien : ajoute seulement ce qui manque. */
 async function syncFiltreDomaineOptions() {
   try {
     const { evenements } = await api('GET', '/evenements');
-    const sel = document.getElementById('f-domaine');
-    const existants = new Set(Array.from(sel.options).map(o => o.value).filter(Boolean));
-    const reels = [...new Set((evenements || []).map(e => e.domaine).filter(Boolean))]
-      .filter(d => !existants.has(d))
-      .sort((a, b) => a.localeCompare(b, 'fr'));
-    reels.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d; opt.textContent = d;
-      sel.appendChild(opt);
+    const reelsTous = [...new Set((evenements || []).map(e => e.domaine).filter(Boolean))];
+    ['f-domaine', 'e-domaine'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const existants = new Set(Array.from(sel.options).map(o => o.value).filter(Boolean));
+      const reels = reelsTous.filter(d => !existants.has(d)).sort((a, b) => a.localeCompare(b, 'fr'));
+      reels.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        sel.appendChild(opt);
+      });
     });
   } catch (e) { /* liste codée en dur déjà en place — pas bloquant si cet appel échoue */ }
 }
