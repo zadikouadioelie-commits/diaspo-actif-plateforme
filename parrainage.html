@@ -562,11 +562,15 @@
       zone.innerHTML = inscrits.map(i => {
         const nomComplet = [i.prenom, i.nom].filter(Boolean).join(' ');
         const date = i.registered_at ? new Date((i.registered_at || '').replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : '—';
+        // Quel lien d'invitation a mené à cette inscription (2026-09-20, demande explicite) —
+        // "Invitation supprimée" si le lien source n'existe plus (voir LEFT JOIN côté serveur).
+        const invitationLabel = i.invitation_nom || i.invitation_code || 'Invitation supprimée';
         return `<div class="pa-vc-card">
           ${i.photo_url ? `<img class="pa-vc-avatar" src="${esc(i.photo_url)}" alt="">` : `<div class="pa-vc-avatar">👤</div>`}
           <div class="pa-vc-info">
             <div class="pa-vc-nom">${esc(nomComplet)} <span class="pa-source-pill">${i.source === 'qr_code' ? '📷 QR Code' : '🔗 Lien'}</span></div>
             <div class="pa-vc-meta">${esc(ROLE_LABELS[i.role] || i.role)}${i.domaine_nom ? ' · ' + esc(i.domaine_icone || '') + ' ' + esc(i.domaine_nom) : ''} · inscrit le ${date}</div>
+            <div class="pa-vc-meta">🤝 Via l'invitation : <strong>${esc(invitationLabel)}</strong></div>
           </div>
         </div>`;
       }).join('');

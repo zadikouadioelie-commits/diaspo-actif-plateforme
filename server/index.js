@@ -1008,15 +1008,22 @@ route("GET", "/api/parrainage/centre-vision", async (req, res) => {
      domaine RÉEL et actuel du compte inscrit (initiatives.domaine_principal s'il en a une,
      sinon users.domaine_principal), résolu vers son icône/libellé via parrainage_domaines.cle
      (même liste de 32 domaines que la taxonomie générale du site). */
+  /* inv.nom/code (2026-09-20, demande explicite) : savoir automatiquement PAR QUEL lien chaque
+     personne est arrivée, utile dès qu'on gère plusieurs invitations en parallèle (une par
+     évènement/contexte). LEFT JOIN car une invitation supprimée ne doit pas faire disparaître
+     la ligne d'inscription (voir commentaire sur DELETE /api/parrainage/invitations/:id) — dans
+     ce cas inv.nom/code ressortent NULL, à traiter côté affichage ("Invitation supprimée"). */
   const inscrits = await db.prepare(`
     SELECT ir.id, ir.account_type, ir.source, ir.registered_at,
       pd.nom AS domaine_nom, pd.icone AS domaine_icone,
       COALESCE(init.sous_domaine_1, u.sous_domaine_1) AS sous_domaine_nom,
+      inv.nom AS invitation_nom, inv.code AS invitation_code,
       u.id AS user_id, u.nom, u.prenom, u.photo_url, u.role, u.da_id
     FROM invitation_registrations ir
     JOIN users u ON u.id = ir.registered_user_id
     LEFT JOIN initiatives init ON init.owner_user_id = u.id
     LEFT JOIN parrainage_domaines pd ON pd.cle = COALESCE(init.domaine_principal, u.domaine_principal)
+    LEFT JOIN invitations inv ON inv.id = ir.invitation_id
     WHERE ir.inviter_user_id = ?
     ORDER BY ir.registered_at DESC
   `).all(user.id);
