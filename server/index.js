@@ -11543,11 +11543,17 @@ route("GET", "/api/fil/suggestions-comptes", async (req, res, params, body, quer
     dejaSuivies = (await db.prepare("SELECT initiative_id FROM abonnements WHERE user_id=?").all(cu.id)).map(r => Number(r.initiative_id));
   }
   const toutes = await db.prepare(`
-    SELECT i.id, i.nom, i.description, i.domaine_principal, i.logo_url, i.vitrine_banniere_url, i.ville, i.pays, i.owner_user_id
+    SELECT i.id, i.nom, i.description, i.domaine_principal, i.logo_url, i.vitrine_banniere_url, i.ville, i.pays, i.owner_user_id,
+           u.invisible_annuaire_definitif AS owner_invisible_definitif, u.invisible_annuaire_jusqu_au AS owner_invisible_jusqu_au
     FROM initiatives i JOIN users u ON u.id = i.owner_user_id
-    WHERE (u.is_demo IS NULL OR u.is_demo = FALSE) AND i.description IS NOT NULL AND i.description != ''
+    WHERE (u.is_demo IS NULL OR u.is_demo = FALSE) AND (u.email IS NULL OR u.email NOT LIKE '%@diaspoactif.invalid')
+      AND i.description IS NOT NULL AND i.description != ''
   `).all();
-  const candidates = toutes.filter(i => !dejaSuivies.includes(Number(i.id)) && (!cu || Number(i.owner_user_id) !== Number(cu.id)));
+  // Même filtre "invisible annuaire" que /api/initiatives — sans lui, des comptes de test
+  // volontairement masqués de l'annuaire (ex. "Diagnostic Mobile Test") réapparaissaient ici.
+  const candidates = toutes
+    .filter(i => !annuaireEstInvisible({ invisible_annuaire_definitif: i.owner_invisible_definitif, invisible_annuaire_jusqu_au: i.owner_invisible_jusqu_au }))
+    .filter(i => !dejaSuivies.includes(Number(i.id)) && (!cu || Number(i.owner_user_id) !== Number(cu.id)));
   // Mélange (Fisher-Yates) puis on ne garde que les `limit` premiers — un simple ORDER BY
   // RANDOM() en SQL suffirait aussi, mais la liste est déjà chargée pour le filtre ci-dessus.
   for (let i = candidates.length - 1; i > 0; i--) {
