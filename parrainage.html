@@ -16,6 +16,10 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
 <link rel="stylesheet" href="/assets/theme-manager.css">
+<!-- Cartouches "Mes invitations" : reprend telle quelle la carte de l'annuaire (demande
+     explicite, capture à l'appui), jamais une copie séparée qui pourrait diverger — voir
+     assets/annuaire-cards.css. -->
+<link rel="stylesheet" href="/assets/annuaire-cards.css">
 <style>
   .pa-tabs{display:flex;gap:6px;border-bottom:1.5px solid var(--border);margin-bottom:22px;flex-wrap:wrap;}
   .pa-tab{background:none;border:none;padding:10px 16px;font-size:13.5px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;}
@@ -31,16 +35,11 @@
   .pa-form input, .pa-form select{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);font-size:13.5px;margin-bottom:16px;color:var(--text);}
   .pa-btn-creer{background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;border:none;border-radius:11px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;}
   .pa-btn-creer:disabled{opacity:.6;cursor:default;}
-  .pa-liste{display:flex;flex-direction:column;gap:10px;}
-  .pa-inv-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-  .pa-inv-info{flex:1;min-width:200px;}
-  .pa-inv-nom{font-weight:700;font-size:14px;}
-  .pa-inv-meta{font-size:11.5px;color:var(--muted);margin-top:3px;}
-  .pa-inv-code{font-family:monospace;font-size:12px;background:var(--bg);border-radius:6px;padding:2px 7px;}
-  .pa-badge{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:99px;}
-  .pa-badge-active{background:rgba(21,128,61,.12);color:#15803d;}
-  .pa-badge-inactive{background:rgba(220,38,38,.12);color:#dc2626;}
-  .pa-inv-actions{display:flex;gap:6px;}
+  /* "Mes invitations" reprend la grille + carte de l'annuaire (.ann-card, assets/
+     annuaire-cards.css) — mêmes paliers de colonnes que .ann-grid (annuaire.html), largeur
+     de conteneur différente ici (pas de sidebar de filtres). */
+  .pa-liste{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;}
+  .pa-inv-code{font-family:monospace;font-size:11px;background:var(--bg);border-radius:6px;padding:2px 7px;}
   .pa-icon-btn{background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text);}
   .pa-icon-btn:hover{border-color:#2563EB;color:#2563EB;}
   .pa-empty{text-align:center;padding:50px 20px;color:var(--muted);}
@@ -72,8 +71,10 @@
   .pa-cover-picker{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
   .pa-cover-preview{width:64px;height:40px;border-radius:8px;object-fit:cover;border:1.5px solid var(--border);flex:none;}
   .pa-cover-remove{background:none;border:none;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;padding:0;}
-  /* Même taille que la bannière des cartouches de l'annuaire (.ann-card-banner, assets/annuaire-cards.css) — 80px de haut, recadrée (cover), demande explicite. */
-  .pa-inv-banniere{width:100%;height:80px;object-fit:cover;border-radius:10px;margin-bottom:10px;}
+  /* Seule couleur d'action absente de assets/annuaire-cards.css (aucune carte annuaire ne
+     supprime son propre objet) — même rouge que la modale de confirmation plus bas. */
+  .pa-card-btn-danger{background:#fee2e2;color:#dc2626;}
+  .pa-card-btn-danger:hover{background:#fecaca;}
 </style>
 </head>
 <body>
@@ -400,20 +401,26 @@
       }
       zone.innerHTML = invitations.map(inv => {
         const actif = inv.statut === 'active';
-        return `<div class="pa-inv-card">
-          ${inv.banniere_url ? `<img class="pa-inv-banniere" src="${esc(inv.banniere_url)}" alt="">` : ''}
-          <div class="pa-inv-info">
-            <div class="pa-inv-nom">${esc(inv.nom || inv.domaine_nom)} <span class="pa-badge ${actif ? 'pa-badge-active' : 'pa-badge-inactive'}">${actif ? 'Active' : 'Désactivée'}</span></div>
-            <div class="pa-inv-meta">${esc(inv.domaine_icone || '')} ${esc(inv.domaine_nom)}${inv.sous_domaine_nom ? ' · ' + esc(inv.sous_domaine_nom) : ''} · <span class="pa-inv-code">${esc(inv.code)}</span></div>
-            <div class="pa-inv-meta">👁️ ${inv.visit_count} vues · 📷 ${inv.qr_scan_count} scans · ✅ ${inv.registration_count} comptes créés</div>
+        const nomAffiche = esc(inv.nom || inv.domaine_nom);
+        return `<div class="ann-card">
+          <div class="ann-card-photo" style="background:linear-gradient(135deg,#1B3A6B,#0D1B2A);">
+            ${inv.banniere_url ? `<img src="${esc(inv.banniere_url)}" alt="" loading="lazy" onerror="this.remove()">` : `<span class="ann-card-initiales">🤝</span>`}
+            <span class="ann-cat-badge" style="background:#1B3A6B;">${esc(inv.domaine_icone || '')} ${esc((inv.domaine_nom || '').toUpperCase())}</span>
+            <span class="ann-type-badge">${actif ? 'Active' : 'Désactivée'}</span>
           </div>
-          <div class="pa-inv-actions">
-            <button type="button" class="pa-icon-btn pa-voir" data-code="${esc(inv.code)}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🔗 Voir</button>
-            <button type="button" class="pa-icon-btn pa-modifier" data-id="${inv.id}">✏️ Modifier</button>
-            ${actif
-              ? `<button type="button" class="pa-icon-btn pa-desactiver" data-id="${inv.id}">⏸️ Désactiver</button>`
-              : `<button type="button" class="pa-icon-btn pa-reactiver" data-id="${inv.id}">▶️ Réactiver</button>`}
-            <button type="button" class="pa-icon-btn pa-supprimer" data-id="${inv.id}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🗑️ Supprimer</button>
+          <div class="ann-card-body">
+            <div class="ann-card-title">${nomAffiche}</div>
+            <div class="ann-card-meta-row"><span class="ann-card-loc">🔗 <span class="pa-inv-code">${esc(inv.code)}</span></span></div>
+            ${inv.sous_domaine_nom ? `<div class="ann-card-origs"><strong>Sous domaine :</strong> ${esc(inv.sous_domaine_nom)}</div>` : ''}
+            <div class="ann-card-desc">👁️ ${inv.visit_count} vues · 📷 ${inv.qr_scan_count} scans · ✅ ${inv.registration_count} comptes créés</div>
+            <div class="ann-card-foot">
+              <button type="button" class="ann-card-btn ann-card-btn-primary pa-voir" data-code="${esc(inv.code)}" data-nom="${nomAffiche}">🔗 Voir</button>
+              <button type="button" class="ann-card-btn pa-modifier" data-id="${inv.id}">✏️ Modifier</button>
+              ${actif
+                ? `<button type="button" class="ann-card-btn pa-desactiver" data-id="${inv.id}">⏸️ Désactiver</button>`
+                : `<button type="button" class="ann-card-btn ann-card-btn-affilier pa-reactiver" data-id="${inv.id}">▶️ Réactiver</button>`}
+              <button type="button" class="ann-card-btn pa-card-btn-danger pa-supprimer" data-id="${inv.id}" data-nom="${nomAffiche}">🗑️ Supprimer</button>
+            </div>
           </div>
         </div>`;
       }).join('');
