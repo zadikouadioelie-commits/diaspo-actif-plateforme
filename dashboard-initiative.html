@@ -5591,6 +5591,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       if (typeof window.openInitEvtModal === 'function') window.openInitEvtModal(Number(idAModifier));
     }
   })();
+  /* Ouverture directe de la modale "Créer un événement" (2026-09-20) — même mécanisme que
+     ?modifier_evenement= juste au-dessus, arrivée depuis le bouton "Créer un événement" de la
+     page publique evenements.html, via ?creer_evenement=1#evenements. openInitEvtModal() sans
+     id ouvre le formulaire de création (et affiche l'offre Premium à la place si l'initiative
+     n'est pas encore abonnée — même comportement que le bouton du module lui-même). */
+  (function() {
+    const creer = new URLSearchParams(location.search).get('creer_evenement');
+    if (creer) {
+      history.replaceState(null, '', location.pathname + location.hash);
+      if (typeof window.openInitEvtModal === 'function') window.openInitEvtModal();
+    }
+  })();
   window.initPremiumGates && window.initPremiumGates();
 
   /* Style commun projets */
