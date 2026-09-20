@@ -3046,9 +3046,16 @@ async function initActualites(){
         </div>
         <p>${escH(a.resume||"")}</p>
         <p style="margin-top:8px;color:var(--orange);font-weight:700;font-size:12.5px;">${escH(a.source||"")}</p>
-      </div>`).join("") : `<div class="empty">Aucun projet publié pour l'instant.</div>`;
-  } catch(e){ el.innerHTML = `<div class="empty">Aucun projet publié pour l'instant.</div>`; }
+      </div>`).join("") : EMPTY_ACTUALITES_HTML;
+  } catch(e){ el.innerHTML = EMPTY_ACTUALITES_HTML; }
 }
+/* Message d'attente (2026-09-20, demande explicite) : un simple "Aucun projet publié" laissait
+   penser à un vide définitif plutôt qu'à une fonctionnalité pas encore alimentée — voir le
+   commentaire au-dessus d'initActualites() sur l'absence actuelle de route de création. */
+const EMPTY_ACTUALITES_HTML = `<div class="empty">
+  <p style="font-weight:700;color:var(--text);margin:0;">Aucun projet publié pour l'instant</p>
+  <p style="margin:0;max-width:420px;">Très bientôt, les réussites, annonces et appels à projets portés par les initiatives de la diaspora seront mis en avant ici. Revenez bientôt !</p>
+</div>`;
 function initEvenements(){
   const el = document.getElementById("evt-list");
   if(!el || typeof EVENEMENTS === "undefined") return;
