@@ -41285,19 +41285,17 @@ route("GET", "/api/insc/fiches", async (req, res) => {
   sendJSON(res, 200, { fiches: enrichies });
 });
 
-/* Restriction temporaire de vérification (2026-09-09, demande explicite de l'utilisateur) :
-   seul le compte diaspo.actif@gmail.com (Initiative officielle) peut créer une fiche pendant
-   la phase de test, avant d'ouvrir le module aux autres comptes Initiative. Les administrateurs
-   restent toujours autorisés (ils supervisent déjà tout le module). À retirer sur demande —
-   une seule condition à supprimer. */
-const INSC_BETA_EMAIL = "diaspo.actif@gmail.com";
+/* Restriction bêta levée (2026-09-20, demande explicite) : le module était réservé au seul
+   compte pilote diaspo.actif@gmail.com le temps de la phase de test (2026-09-09) — il est
+   maintenant accessible à tout compte Initiative, les administrateurs restant toujours
+   autorisés (ils supervisent déjà tout le module). */
 function inscBetaAutorise(user) {
-  return user.role === "administrateur" || String(user.email || "").toLowerCase() === INSC_BETA_EMAIL;
+  return user.role === "administrateur" || user.role === "initiative";
 }
 route("POST", "/api/insc/fiches", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est en cours de vérification, réservé pour l'instant à un compte pilote." });
+  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est réservé aux comptes Initiative." });
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = await inscSlugUnique(body.nom);
