@@ -21,7 +21,8 @@ async function uploadMedia(file, type = 'avatar') {
     evenement:   '/api/upload/evenement',
     publication: '/api/upload/post',
     document:    '/api/upload/document',
-    'video-tutoriel': '/api/upload/video-tutoriel'
+    'video-tutoriel': '/api/upload/video-tutoriel',
+    invitation:  '/api/upload/invitation'
   }[type] || '/api/upload/avatar';
 
   const formData = new FormData();

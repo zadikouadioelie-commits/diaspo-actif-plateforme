@@ -59,6 +59,10 @@
   .pa-vc-nom{font-weight:700;font-size:13.5px;}
   .pa-vc-meta{font-size:11px;color:var(--muted);margin-top:2px;}
   .pa-source-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--border);}
+  .pa-cover-picker{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .pa-cover-preview{width:64px;height:40px;border-radius:8px;object-fit:cover;border:1.5px solid var(--border);flex:none;}
+  .pa-cover-remove{background:none;border:none;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;padding:0;}
+  .pa-inv-banniere{width:100%;height:110px;object-fit:cover;border-radius:10px;margin-bottom:10px;}
 </style>
 </head>
 <body>
@@ -107,6 +111,11 @@
         <label>Domaine d'activité *</label>
         <select id="pa-c-domaine"><option value="">— Sélectionner —</option></select>
         <div id="pa-c-sous-domaine-zone"></div>
+        <label>Photo de couverture <span style="font-weight:400;color:var(--muted);">(facultatif, affichée sur la page d'invitation)</span></label>
+        <div class="pa-cover-picker" id="pa-c-cover-picker">
+          <button type="button" class="pa-icon-btn" id="pa-c-cover-btn">🖼️ Choisir une photo</button>
+        </div>
+        <div style="margin-bottom:16px;"></div>
         <button type="button" class="pa-btn-creer" id="pa-c-btn">Créer l'invitation</button>
         <div id="pa-c-err" style="color:#dc2626;font-size:12.5px;margin-top:10px;"></div>
       </div>
@@ -146,6 +155,26 @@
       <div class="pa-modal-actions">
         <button type="button" class="pa-icon-btn" id="pa-confirm-annuler">Annuler</button>
         <button type="button" class="pa-icon-btn" id="pa-confirm-supprimer" style="background:#dc2626;color:#fff;border-color:#dc2626;">🗑️ Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pa-modal-overlay" id="pa-edit-overlay" style="display:none;">
+    <div class="pa-modal" style="max-width:460px;text-align:left;">
+      <h3 style="text-align:center;">Modifier l'invitation</h3>
+      <label>Nom de l'invitation</label>
+      <input type="text" id="pa-e-nom" placeholder="Ex. Rencontre du 20 septembre">
+      <label>Domaine d'activité *</label>
+      <select id="pa-e-domaine"><option value="">— Sélectionner —</option></select>
+      <div id="pa-e-sous-domaine-zone"></div>
+      <label>Photo de couverture</label>
+      <div class="pa-cover-picker" id="pa-e-cover-picker">
+        <button type="button" class="pa-icon-btn" id="pa-e-cover-btn">🖼️ Choisir une photo</button>
+      </div>
+      <div id="pa-e-err" style="color:#dc2626;font-size:12.5px;margin:6px 0 0;"></div>
+      <div class="pa-modal-actions" style="justify-content:flex-end;margin-top:16px;">
+        <button type="button" class="pa-icon-btn" id="pa-e-annuler">Annuler</button>
+        <button type="button" class="pa-btn-creer" id="pa-e-enregistrer" style="padding:9px 18px;">Enregistrer</button>
       </div>
     </div>
   </div>
@@ -201,7 +230,7 @@
     const opt = selDomaine.selectedOptions[0];
     const sousDomaines = opt ? JSON.parse(opt.dataset.sousDomaines || '[]') : [];
     if (sousDomaines.length) {
-      sousDomaineZone.innerHTML = `<label>Sous-domaine</label>
+      sousDomaineZone.innerHTML = `<label>Sous-domaine <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
         <select id="pa-c-sous-domaine">
           <option value="">— Aucun —</option>
           ${sousDomaines.map(sd => `<option value="${sd.id}">${esc(sd.nom)}</option>`).join('')}
@@ -241,6 +270,41 @@
   }
   await chargerDashboard();
 
+  /* ── Sélecteur de photo de couverture — partagé entre création et modification ──
+     pickAndUpload('invitation', ...) compresse déjà côté client (assets/upload-media.js)
+     avant d'envoyer à POST /api/upload/invitation, sur le même modèle que les autres photos
+     d'objet (cagnotte, produit...) — jamais un champ compte (voir la règle sur la source
+     unique photo/bannière, sans objet ici : ceci est la photo d'un OBJET invitation, pas
+     celle du compte). */
+  function creerCoverPicker(pickerId, btnId, urlInitiale) {
+    let url = urlInitiale || null;
+    const picker = document.getElementById(pickerId);
+    const btn = document.getElementById(btnId);
+    function render() {
+      picker.innerHTML = '';
+      if (url) {
+        const img = document.createElement('img');
+        img.className = 'pa-cover-preview'; img.src = url;
+        picker.appendChild(img);
+      }
+      picker.appendChild(btn);
+      btn.textContent = url ? '🖼️ Changer' : '🖼️ Choisir une photo';
+      if (url) {
+        const retirer = document.createElement('button');
+        retirer.type = 'button'; retirer.className = 'pa-cover-remove'; retirer.textContent = 'Retirer';
+        retirer.addEventListener('click', () => { url = null; render(); });
+        picker.appendChild(retirer);
+      }
+    }
+    btn.addEventListener('click', async () => {
+      const nouvelleUrl = await pickAndUpload('invitation', { maxW: 1200, maxH: 630 });
+      if (nouvelleUrl) { url = nouvelleUrl; render(); }
+    });
+    render();
+    return { get: () => url, set: (u) => { url = u || null; render(); } };
+  }
+  const coverCreer = creerCoverPicker('pa-c-cover-picker', 'pa-c-cover-btn', null);
+
   /* ── Créer une invitation ── */
   document.getElementById('pa-c-btn').addEventListener('click', async () => {
     const btn = document.getElementById('pa-c-btn');
@@ -257,10 +321,13 @@
         domaine_id: domaineId,
         sous_domaine_id: sousDomaineSel ? sousDomaineSel.value || null : null,
         sous_domaine_libre: sousDomaineLibre ? sousDomaineLibre.value.trim() || null : null,
+        banniere_url: coverCreer.get(),
       });
       ouvrirModalInvitation(invitation);
       document.getElementById('pa-c-nom').value = '';
       selDomaine.value = ''; sousDomaineZone.innerHTML = '';
+      coverCreer.set(null);
+      invitationsChargees = false;
       if (typeof showToast === 'function') showToast('Invitation créée !', 'success');
     } catch (e) {
       err.textContent = (e && e.message) || "Impossible de créer l'invitation.";
@@ -307,12 +374,14 @@
 
   /* ── Mes invitations ── */
   let invitationsChargees = false;
+  let invitationsCache = []; // sert à préremplir la modale de modification sans refaire un appel
   async function chargerInvitations() {
     if (invitationsChargees) return;
     invitationsChargees = true;
     const zone = document.getElementById('pa-liste-invitations');
     try {
       const { invitations } = await api('GET', '/parrainage/invitations');
+      invitationsCache = invitations;
       if (!invitations.length) {
         zone.innerHTML = `<div class="pa-empty"><div style="font-size:34px;margin-bottom:10px;">🤝</div><p>Aucune invitation créée pour l'instant.</p></div>`;
         return;
@@ -320,6 +389,7 @@
       zone.innerHTML = invitations.map(inv => {
         const actif = inv.statut === 'active';
         return `<div class="pa-inv-card">
+          ${inv.banniere_url ? `<img class="pa-inv-banniere" src="${esc(inv.banniere_url)}" alt="">` : ''}
           <div class="pa-inv-info">
             <div class="pa-inv-nom">${esc(inv.nom || inv.domaine_nom)} <span class="pa-badge ${actif ? 'pa-badge-active' : 'pa-badge-inactive'}">${actif ? 'Active' : 'Désactivée'}</span></div>
             <div class="pa-inv-meta">${esc(inv.domaine_icone || '')} ${esc(inv.domaine_nom)}${inv.sous_domaine_nom ? ' · ' + esc(inv.sous_domaine_nom) : ''} · <span class="pa-inv-code">${esc(inv.code)}</span></div>
@@ -327,7 +397,10 @@
           </div>
           <div class="pa-inv-actions">
             <button type="button" class="pa-icon-btn pa-voir" data-code="${esc(inv.code)}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🔗 Voir</button>
-            ${actif ? `<button type="button" class="pa-icon-btn pa-desactiver" data-id="${inv.id}">⏸️ Désactiver</button>` : ''}
+            <button type="button" class="pa-icon-btn pa-modifier" data-id="${inv.id}">✏️ Modifier</button>
+            ${actif
+              ? `<button type="button" class="pa-icon-btn pa-desactiver" data-id="${inv.id}">⏸️ Désactiver</button>`
+              : `<button type="button" class="pa-icon-btn pa-reactiver" data-id="${inv.id}">▶️ Réactiver</button>`}
             <button type="button" class="pa-icon-btn pa-supprimer" data-id="${inv.id}" data-nom="${esc(inv.nom || inv.domaine_nom)}">🗑️ Supprimer</button>
           </div>
         </div>`;
@@ -351,9 +424,98 @@
         if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de désactiver.', 'error');
         desact.disabled = false;
       }
+      return;
+    }
+    const react = e.target.closest('.pa-reactiver');
+    if (react) {
+      react.disabled = true;
+      try {
+        await api('PATCH', `/parrainage/invitations/${react.dataset.id}/reactiver`);
+        invitationsChargees = false;
+        chargerInvitations();
+        if (typeof showToast === 'function') showToast('Invitation réactivée.', 'success');
+      } catch (e2) {
+        if (typeof showToast === 'function') showToast((e2 && e2.message) || 'Impossible de réactiver.', 'error');
+        react.disabled = false;
+      }
+      return;
+    }
+    const modif = e.target.closest('.pa-modifier');
+    if (modif) {
+      const inv = invitationsCache.find(i => Number(i.id) === Number(modif.dataset.id));
+      if (inv) ouvrirModaleModification(inv);
+      return;
     }
     const suppr = e.target.closest('.pa-supprimer');
     if (suppr) { ouvrirConfirmSuppression(suppr.dataset.id, suppr.dataset.nom); }
+  });
+
+  /* ── Modification d'une invitation ── */
+  const editOverlay = document.getElementById('pa-edit-overlay');
+  const selDomaineEdit = document.getElementById('pa-e-domaine');
+  DOMAINES.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id; opt.textContent = `${d.icone} ${d.nom}`;
+    opt.dataset.sousDomaines = JSON.stringify(d.sous_domaines || []);
+    selDomaineEdit.appendChild(opt);
+  });
+  const sousDomaineZoneEdit = document.getElementById('pa-e-sous-domaine-zone');
+  function rafraichirSousDomaineEdit(sousDomaineIdActuel, sousDomaineLibreActuel) {
+    const opt = selDomaineEdit.selectedOptions[0];
+    const sousDomaines = opt ? JSON.parse(opt.dataset.sousDomaines || '[]') : [];
+    if (sousDomaines.length) {
+      sousDomaineZoneEdit.innerHTML = `<label>Sous-domaine <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+        <select id="pa-e-sous-domaine">
+          <option value="">— Aucun —</option>
+          ${sousDomaines.map(sd => `<option value="${sd.id}"${Number(sd.id) === Number(sousDomaineIdActuel) ? ' selected' : ''}>${esc(sd.nom)}</option>`).join('')}
+        </select>`;
+    } else if (opt && opt.value) {
+      sousDomaineZoneEdit.innerHTML = `<label>Sous-domaine <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+        <input type="text" id="pa-e-sous-domaine-libre" value="${esc(sousDomaineLibreActuel || '')}" placeholder="Précisez si utile">`;
+    } else {
+      sousDomaineZoneEdit.innerHTML = '';
+    }
+  }
+  selDomaineEdit.addEventListener('change', () => rafraichirSousDomaineEdit(null, null));
+  let coverEdit = null;
+  let invitationEnCoursDeModif = null;
+  function ouvrirModaleModification(inv) {
+    invitationEnCoursDeModif = inv;
+    document.getElementById('pa-e-nom').value = inv.nom || '';
+    document.getElementById('pa-e-err').textContent = '';
+    selDomaineEdit.value = inv.domaine_id;
+    rafraichirSousDomaineEdit(inv.sous_domaine_id, inv.sous_domaine_libre);
+    coverEdit = creerCoverPicker('pa-e-cover-picker', 'pa-e-cover-btn', inv.banniere_url || null);
+    editOverlay.style.display = 'flex';
+  }
+  document.getElementById('pa-e-annuler').addEventListener('click', () => { editOverlay.style.display = 'none'; });
+  editOverlay.addEventListener('click', e => { if (e.target === editOverlay) editOverlay.style.display = 'none'; });
+  document.getElementById('pa-e-enregistrer').addEventListener('click', async () => {
+    const btn = document.getElementById('pa-e-enregistrer');
+    const err = document.getElementById('pa-e-err');
+    err.textContent = '';
+    const domaineId = selDomaineEdit.value;
+    if (!domaineId) { err.textContent = 'Veuillez sélectionner un domaine.'; return; }
+    const sousDomaineSel = document.getElementById('pa-e-sous-domaine');
+    const sousDomaineLibre = document.getElementById('pa-e-sous-domaine-libre');
+    btn.disabled = true; btn.textContent = 'Enregistrement…';
+    try {
+      await api('PUT', `/parrainage/invitations/${invitationEnCoursDeModif.id}`, {
+        nom: document.getElementById('pa-e-nom').value.trim() || null,
+        domaine_id: domaineId,
+        sous_domaine_id: sousDomaineSel ? sousDomaineSel.value || null : null,
+        sous_domaine_libre: sousDomaineLibre ? sousDomaineLibre.value.trim() || null : null,
+        banniere_url: coverEdit.get(),
+      });
+      editOverlay.style.display = 'none';
+      invitationsChargees = false;
+      chargerInvitations();
+      if (typeof showToast === 'function') showToast('Invitation modifiée.', 'success');
+    } catch (e2) {
+      err.textContent = (e2 && e2.message) || "Impossible d'enregistrer les modifications.";
+    } finally {
+      btn.disabled = false; btn.textContent = 'Enregistrer';
+    }
   });
 
   /* ── Confirmation de suppression (jamais de confirm() natif — cf. modale QR ci-dessus) ── */

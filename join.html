@@ -45,6 +45,7 @@
   .jn-apercu-nom{font-size:12px;font-weight:700;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .jn-apercu-meta{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .jn-apercu-badge{display:inline-block;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#2563EB;margin-top:4px;}
+  .jn-banniere{width:calc(100% + 60px);height:150px;object-fit:cover;margin:-36px -30px 18px;border-radius:20px 20px 0 0;display:block;}
   .jn-avatar{width:78px;height:78px;border-radius:50%;object-fit:cover;margin:0 auto 16px;display:block;background:var(--bg);border:3px solid var(--border);}
   .jn-avatar-fallback{width:78px;height:78px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:34px;background:linear-gradient(135deg,#0D2B4E,#1B4B8C);color:#fff;}
   .jn-titre{font-size:19px;font-weight:800;margin:0 0 6px;}
@@ -126,6 +127,9 @@
 
   if (via === 'qr') { try { await api('POST', `/parrainage/invitations/${encodeURIComponent(code)}/scan`); } catch (e) {} }
 
+  const banniereHtml = invitation.banniere_url
+    ? `<img class="jn-banniere" src="${esc(invitation.banniere_url)}" alt="">`
+    : '';
   const avatarHtml = invitation.inviteur_photo
     ? `<img class="jn-avatar" src="${esc(invitation.inviteur_photo)}" alt="">`
     : `<div class="jn-avatar-fallback">🤝</div>`;
@@ -141,7 +145,7 @@
       : `<div class="jn-inactive">⏸️ Cette invitation n'est plus active.</div>
          <p class="jn-sous">Vous pouvez tout de même découvrir Diaspo'Actif et créer votre compte librement.</p>
          <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/inscription.html">Créer un compte</a></div>`;
-    card.innerHTML = `${avatarHtml}
+    card.innerHTML = `${banniereHtml}${avatarHtml}
       <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite</h1>
       ${domaineHtml}
       ${suiteInactive}`;
@@ -165,7 +169,7 @@
          <a class="jn-btn jn-btn-initiative" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=initiative${suite}">🏢 Créer un compte Initiative</a>
        </div>
        <p class="jn-deja">Déjà inscrit(e) ? <a href="/login.html">Se connecter</a></p>`;
-  card.innerHTML = `${avatarHtml}
+  card.innerHTML = `${banniereHtml}${avatarHtml}
     <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite sur Diaspo'Actif</h1>
     <p class="jn-sous">La plateforme mondiale de la diaspora engagée — actions locales, impact global.</p>
     ${domaineHtml}

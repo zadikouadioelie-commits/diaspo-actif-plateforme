@@ -857,9 +857,9 @@ route("POST", "/api/parrainage/invitations", async (req, res, params, body) => {
   const sousDomaineLibre = sousDomaineId ? null : (String(body.sous_domaine_libre || "").trim() || null);
   const code = await genererCodeInvitationUnique();
   const id = (await db.prepare(`
-    INSERT INTO invitations (code, inviter_user_id, nom, domaine_id, sous_domaine_id, sous_domaine_libre)
-    VALUES (?,?,?,?,?,?)
-  `).run(code, user.id, String(body.nom || "").trim() || null, domaineId, sousDomaineId, sousDomaineLibre)).lastInsertRowid;
+    INSERT INTO invitations (code, inviter_user_id, nom, domaine_id, sous_domaine_id, sous_domaine_libre, banniere_url)
+    VALUES (?,?,?,?,?,?,?)
+  `).run(code, user.id, String(body.nom || "").trim() || null, domaineId, sousDomaineId, sousDomaineLibre, body.banniere_url || null)).lastInsertRowid;
   const invitation = await db.prepare("SELECT * FROM invitations WHERE id=?").get(id);
   sendJSON(res, 201, { invitation });
 });
@@ -880,7 +880,7 @@ route("GET", "/api/parrainage/invitations", async (req, res) => {
 
 route("GET", "/api/parrainage/invitations/:code", async (req, res, params) => {
   const invitation = await db.prepare(`
-    SELECT i.id, i.code, i.statut, i.inviter_user_id, pd.cle AS domaine_cle, pd.nom AS domaine_nom, pd.icone AS domaine_icone,
+    SELECT i.id, i.code, i.statut, i.inviter_user_id, i.banniere_url, pd.cle AS domaine_cle, pd.nom AS domaine_nom, pd.icone AS domaine_icone,
       COALESCE(psd.nom, i.sous_domaine_libre) AS sous_domaine_nom
     FROM invitations i
     JOIN parrainage_domaines pd ON pd.id = i.domaine_id
@@ -905,7 +905,7 @@ route("GET", "/api/parrainage/invitations/:code", async (req, res, params) => {
   } catch (e) { /* déjà comptée aujourd'hui pour ce visiteur — ignoré volontairement */ }
   sendJSON(res, 200, {
     code: invitation.code, actif: invitation.statut === 'active',
-    inviteur_nom: nomAffiche, inviteur_photo: photoAffichee,
+    inviteur_nom: nomAffiche, inviteur_photo: photoAffichee, banniere_url: invitation.banniere_url || null,
     domaine_cle: invitation.domaine_cle, domaine_nom: invitation.domaine_nom, domaine_icone: invitation.domaine_icone,
     sous_domaine_nom: invitation.sous_domaine_nom,
   });
@@ -926,6 +926,43 @@ route("PATCH", "/api/parrainage/invitations/:id/desactiver", async (req, res, pa
   }
   await db.prepare("UPDATE invitations SET statut='desactivee' WHERE id=?").run(invitation.id);
   sendJSON(res, 200, { ok: true });
+});
+
+route("PATCH", "/api/parrainage/invitations/:id/reactiver", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const invitation = await db.prepare("SELECT * FROM invitations WHERE id=?").get(params.id);
+  if (!invitation) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (Number(invitation.inviter_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez réactiver que vos propres invitations." });
+  }
+  await db.prepare("UPDATE invitations SET statut='active' WHERE id=?").run(invitation.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* PUT /api/parrainage/invitations/:id — modifie une invitation existante (nom, domaine,
+   sous-domaine, photo de couverture) sans changer son code ni ses compteurs — le lien déjà
+   partagé continue de fonctionner, seul son contenu affiché change. */
+route("PUT", "/api/parrainage/invitations/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const invitation = await db.prepare("SELECT * FROM invitations WHERE id=?").get(params.id);
+  if (!invitation) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (Number(invitation.inviter_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres invitations." });
+  }
+  const domaineId = Number(body.domaine_id) || null;
+  if (!domaineId) return sendJSON(res, 400, { error: "Le domaine est obligatoire." });
+  const domaine = await db.prepare("SELECT id FROM parrainage_domaines WHERE id=? AND actif=1").get(domaineId);
+  if (!domaine) return sendJSON(res, 400, { error: "Domaine invalide." });
+  const sousDomaineId = Number(body.sous_domaine_id) || null;
+  const sousDomaineLibre = sousDomaineId ? null : (String(body.sous_domaine_libre || "").trim() || null);
+  await db.prepare(`
+    UPDATE invitations SET nom=?, domaine_id=?, sous_domaine_id=?, sous_domaine_libre=?, banniere_url=?
+    WHERE id=?
+  `).run(String(body.nom || "").trim() || null, domaineId, sousDomaineId, sousDomaineLibre, body.banniere_url || null, invitation.id);
+  const updated = await db.prepare("SELECT * FROM invitations WHERE id=?").get(invitation.id);
+  sendJSON(res, 200, { invitation: updated });
 });
 
 /* DELETE /api/parrainage/invitations/:id — suppression définitive de l'invitation.
@@ -1998,6 +2035,33 @@ route("POST", "/api/upload/cagnotte", async (req, res) => {
     SEC.logSecurity("upload", { uid: Number(user.id), kind: "cagnotte", type: imgType, size: file.buffer.length });
     sendJSON(res, 200, { url });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload cagnotte")); }
+});
+
+/* POST /api/upload/invitation — photo de couverture d'une invitation de parrainage.
+   Simple stockage Bunny sans aucun effet de bord, même modèle que /api/upload/cagnotte. */
+route("POST", "/api/upload/invitation", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Non authentifié" });
+  const contentType = req.headers["content-type"] || "";
+  const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+  if (!boundaryMatch) return sendJSON(res, 400, { error: "Format invalide" });
+  const chunks = []; req.on("data", c => chunks.push(c));
+  await new Promise(r => req.on("end", r));
+  const body = Buffer.concat(chunks);
+  const { uploadToBunny, parseMultipart, uniqueFilename, compressImage } = require("./upload");
+  const { files } = parseMultipart(body, boundaryMatch[1]);
+  const file = files["invitation"] || files["file"] || files[Object.keys(files)[0]];
+  if (!file) return sendJSON(res, 400, { error: "Aucun fichier reçu" });
+  if (file.buffer.length > 5 * 1024 * 1024) return sendJSON(res, 400, { error: "Fichier trop grand (max 5 Mo)" });
+  const imgType = SEC.isSafeRasterImage(file.buffer);
+  if (!imgType) return sendJSON(res, 400, { error: "Format d'image non valide (JPEG, PNG, GIF ou WebP requis)." });
+  try {
+    const filename = uniqueFilename(file.filename, user.id);
+    const compressed = await compressImage(file.buffer, "invitation");
+    const url = await uploadToBunny(compressed, filename, "invitations");
+    SEC.logSecurity("upload", { uid: Number(user.id), kind: "invitation", type: imgType, size: file.buffer.length });
+    sendJSON(res, 200, { url });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "upload invitation")); }
 });
 
 /* POST /api/upload/document — document réel pour la vitrine (Téléchargements) :
@@ -24306,6 +24370,18 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       registration_count INTEGER DEFAULT 0
     )`).run();
     try { await db.prepare("CREATE INDEX IF NOT EXISTS idx_invitations_inviter ON invitations(inviter_user_id)").run(); } catch (e) {}
+    /* Photo de couverture (2026-09-20, demande explicite) — ajoutée après coup sur une table
+       déjà en production : contrairement au CREATE TABLE IF NOT EXISTS ci-dessus (no-op une
+       fois la table créée), cette colonne a besoin de son propre ALTER idempotent pour
+       atteindre les bases qui ont déjà la table sans elle (SQLite local ET Postgres prod,
+       même piège que documenté dans feedback_reparer_schema_apres_migration). "ADD COLUMN IF
+       NOT EXISTS" en une seule commande — utilisé ailleurs dans ce fichier — génère en réalité
+       une erreur de syntaxe sur le SQLite local (node:sqlite 3.53.1 ne supporte pas cette
+       clause pour ADD COLUMN, contrairement à Postgres), silencieusement avalée par le
+       try/catch : la colonne n'était donc jamais réellement créée en local. Idiome
+       PRAGMA table_info, comme migrateVideosTutoriels()/migrateChatbot() plus haut. */
+    const colsInv = (await db.prepare("PRAGMA table_info(invitations)").all()).map(c => c.name);
+    if (!colsInv.includes("banniere_url")) { try { await db.prepare("ALTER TABLE invitations ADD COLUMN banniere_url TEXT").run(); } catch (e) {} }
     await db.prepare(`CREATE TABLE IF NOT EXISTS invitation_registrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       invitation_id INTEGER NOT NULL,

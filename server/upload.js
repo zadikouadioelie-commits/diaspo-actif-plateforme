@@ -23,7 +23,7 @@ const sharp = require("sharp");
      de blocage supplémentaire. */
 const IMAGE_MAX_DIMENSION = {
   avatar: 600, banner: 1600, "vitrine-banniere": 1600, logo: 800,
-  post: 1600, produit: 1600, evenement: 1600, cagnotte: 1600, document: 1600,
+  post: 1600, produit: 1600, evenement: 1600, cagnotte: 1600, document: 1600, invitation: 1600,
 };
 
 async function compressImage(buffer, kind) {
