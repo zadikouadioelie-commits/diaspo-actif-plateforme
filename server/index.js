@@ -995,6 +995,36 @@ route("DELETE", "/api/parrainage/invitations/:id", async (req, res, params) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* GET /api/admin/parrainage/invitations — module Parrainage pour l'Administrateur (2026-09-20,
+   demande explicite) : chaque invitation est déjà référencée à son créateur (inviter_user_id,
+   colonne posée dès la création) — cette route rend cette référence VISIBLE en listant TOUTES
+   les invitations, tous comptes confondus, avec l'identité du créateur jointe. Aucune nouvelle
+   route de mutation n'était nécessaire : PUT/DELETE/desactiver/reactiver ci-dessus autorisent
+   déjà un administrateur à agir sur une invitation qui n'est pas la sienne — l'admin dispose
+   donc déjà "des mêmes fonctions que le créateur du lien", il ne manquait que ce panneau pour
+   les découvrir et les déclencher. */
+route("GET", "/api/admin/parrainage/invitations", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  let invitations = await db.prepare(`
+    SELECT i.*, pd.nom AS domaine_nom, pd.icone AS domaine_icone, psd.nom AS sous_domaine_nom,
+      u.nom AS createur_nom, u.prenom AS createur_prenom, u.email AS createur_email, u.role AS createur_role
+    FROM invitations i
+    JOIN parrainage_domaines pd ON pd.id = i.domaine_id
+    LEFT JOIN parrainage_sous_domaines psd ON psd.id = i.sous_domaine_id
+    LEFT JOIN users u ON u.id = i.inviter_user_id
+    ORDER BY i.created_at DESC
+  `).all();
+  const q = String(query?.q || "").trim().toLowerCase();
+  if (q) {
+    invitations = invitations.filter(inv =>
+      [inv.nom, inv.code, inv.createur_nom, inv.createur_prenom, inv.createur_email]
+        .filter(Boolean).some(v => String(v).toLowerCase().includes(q))
+    );
+  }
+  sendJSON(res, 200, { invitations });
+});
+
 route("GET", "/api/parrainage/centre-vision", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
