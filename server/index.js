@@ -2955,6 +2955,46 @@ route("PATCH", "/api/admin/rencontres/:id", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true, rencontre: maj });
 });
 
+/* POST /api/admin/rencontres/terrain — validation directe d'une rencontre "sur le terrain"
+   (2026-09-20, demande explicite), sans passer par le parcours formel ci-dessus (demande →
+   planification → en_attente_validation → validation) : un administrateur qui a rencontré un
+   membre spontanément — salon, événement, visite, sans rendez-vous programmé via l'annuaire —
+   peut valider directement le point de confiance depuis sa cartouche. mode='terrain' (au lieu de
+   'visio'/'presentiel') distingue ces validations des rencontres formelles pour l'audit. La
+   justification est OBLIGATOIRE : ce raccourci évite le contrôle habituel du parcours normal
+   (où l'agent qui planifie n'est pas nécessairement celui qui valide), la trace écrite en tient
+   lieu — même principe que le motif obligatoire de 'ne_pas_valider' ci-dessus. Réservé aux
+   administrateurs (pas les admin juniors), comme le reste de ce module. */
+route("POST", "/api/admin/rencontres/terrain", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user || user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé aux Administrateurs." });
+  const cibleId = Number(body.cible_id);
+  if (!cibleId) return sendJSON(res, 400, { error: "Compte cible manquant." });
+  const justification = String(body.justification || '').trim();
+  if (justification.length < 10) return sendJSON(res, 400, { error: "Une justification d'au moins 10 caractères est requise." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(cibleId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const deja = await db.prepare("SELECT id FROM rencontres_diaspoactif WHERE user_id=? AND statut='validee' LIMIT 1").get(cibleId);
+  if (deja) return sendJSON(res, 409, { error: "Ce compte a déjà une rencontre validée." });
+
+  const agent = `${user.prenom || ''} ${user.nom || ''}`.trim() || 'Agent Diaspo\'Actif';
+  await db.prepare(
+    `INSERT INTO rencontres_diaspoactif (user_id, statut, mode, compte_rendu, date_rencontre, agent_id, agent_nom)
+     VALUES (?, 'validee', 'terrain', ?, datetime('now'), ?, ?)`
+  ).run(cibleId, justification, user.id, agent);
+
+  try { await db.prepare("DELETE FROM trust_cache WHERE user_id=?").run(cibleId); } catch (e) {}
+  try {
+    await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+      cibleId, 'rencontre_valider', "Rencontre validée",
+      "Votre rencontre avec Diaspo'Actif est validée. Les points correspondants sont ajoutés à votre indice de fiabilité.",
+      JSON.stringify({})
+    );
+  } catch (e) { logError(e, "notification rencontre terrain", req); }
+
+  sendJSON(res, 201, { ok: true });
+});
+
 route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });

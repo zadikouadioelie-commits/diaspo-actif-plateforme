@@ -1797,17 +1797,75 @@ function injectAdminAnnuaireStyles() {
 .admin-ann-dd{display:none;position:fixed;background:#fff;color:#111;color-scheme:light;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.2);min-width:180px;padding:6px;z-index:2100;}
 .admin-ann-dd.open{display:block;}
 .admin-ann-dd button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#111;}
-.admin-ann-dd button:hover{background:#f3f4f6;}`;
+.admin-ann-dd button:hover{background:#f3f4f6;}
+.admin-ann-btn.admin-ann-rencontre{background:#f0fdf4;color:#166534;border-color:#bbf7d0;}
+.admin-ann-btn.admin-ann-rencontre:hover{background:#dcfce7;}
+.admin-ann-rencontre-overlay{position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
+.admin-ann-rencontre-modal{background:#fff;color:#111;color-scheme:light;border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.admin-ann-rencontre-modal h3{margin:0 0 8px;font-size:16px;}
+.admin-ann-rencontre-modal p{margin:0 0 12px;font-size:12.5px;color:#6b7280;line-height:1.5;}
+.admin-ann-rencontre-modal textarea{width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box;}
+.admin-ann-rencontre-err{color:#dc2626;font-size:12px;margin-top:6px;}
+.admin-ann-rencontre-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+.admin-ann-rencontre-actions button{padding:9px 16px;border-radius:8px;border:none;font-weight:700;font-size:13px;cursor:pointer;}
+.admin-ann-rencontre-annuler{background:#F1F5F9;color:#334155;}
+.admin-ann-rencontre-valider{background:#16A34A;color:#fff;}
+.admin-ann-rencontre-valider:disabled{opacity:.6;cursor:not-allowed;}`;
   document.head.appendChild(st);
 }
 
 function adminAnnuaireBoutonsHtml(cibleId, estMoi) {
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER || CURRENT_USER.role !== 'administrateur' || estMoi || !cibleId) return '';
   return `
+    <button type="button" class="ann-card-btn admin-ann-btn admin-ann-rencontre" onclick="event.stopPropagation(); adminAnnuaireOuvrirRencontreTerrain(${cibleId}, this)">🤝 Rencontre D'A</button>
     <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireSupprimer(${cibleId}, this)">🗑️ Supprimer</button>
     <button type="button" class="ann-card-btn admin-ann-btn admin-ann-suspendre" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'suspendre', ${cibleId})">⛔ Suspendre</button>
     <button type="button" class="ann-card-btn admin-ann-btn admin-ann-invisible" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'invisibilite', ${cibleId})">🙈 Invisibilité</button>`;
 }
+
+/* Rencontre "sur le terrain" (2026-09-20, demande explicite) : justification obligatoire dans un
+   vrai formulaire (jamais un prompt() natif — trop peu fiable pour un texte de plusieurs phrases
+   et sans validation de longueur possible). Voir POST /api/admin/rencontres/terrain. */
+window.adminAnnuaireOuvrirRencontreTerrain = function (cibleId, bouton) {
+  injectAdminAnnuaireStyles();
+  document.querySelectorAll('.admin-ann-rencontre-overlay').forEach(o => o.remove());
+  const ov = document.createElement('div');
+  ov.className = 'admin-ann-rencontre-overlay';
+  ov.innerHTML = `
+    <div class="admin-ann-rencontre-modal">
+      <h3>🤝 Rencontre Diaspo'Actif</h3>
+      <p>Vous avez rencontré ce membre sans rendez-vous programmé (salon, événement, visite…). Cette validation accorde directement le point de confiance à l'indice de fiabilité — une justification est obligatoire.</p>
+      <textarea id="admin-ann-rencontre-justif" rows="4" placeholder="Où et dans quelles circonstances avez-vous rencontré ce membre ? (10 caractères minimum)" maxlength="500"></textarea>
+      <div class="admin-ann-rencontre-err" style="display:none;"></div>
+      <div class="admin-ann-rencontre-actions">
+        <button type="button" class="admin-ann-rencontre-annuler">Annuler</button>
+        <button type="button" class="admin-ann-rencontre-valider">✅ Valider la rencontre</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  ov.querySelector('.admin-ann-rencontre-annuler').onclick = () => ov.remove();
+  ov.querySelector('.admin-ann-rencontre-valider').onclick = async () => {
+    const justification = ov.querySelector('#admin-ann-rencontre-justif').value.trim();
+    const err = ov.querySelector('.admin-ann-rencontre-err');
+    if (justification.length < 10) {
+      err.textContent = "Une justification d'au moins 10 caractères est requise.";
+      err.style.display = 'block';
+      return;
+    }
+    const btnValider = ov.querySelector('.admin-ann-rencontre-valider');
+    btnValider.disabled = true;
+    try {
+      await api('POST', '/admin/rencontres/terrain', { cible_id: cibleId, justification });
+      ov.remove();
+      alert("✅ Rencontre validée — le point de confiance est accordé.");
+    } catch (e) {
+      err.textContent = e.message || 'Erreur.';
+      err.style.display = 'block';
+      btnValider.disabled = false;
+    }
+  };
+};
 
 const ADMIN_ANN_DUREES = [['24h','24 heures'], ['7j','7 jours'], ['30j','30 jours'], ['definitif','Définitif']];
 
