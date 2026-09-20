@@ -342,6 +342,13 @@
   </div>
 </div>
 
+<!-- ═══ MODAL GESTION DES INSCRITS (formulaire simple, sans fiche liée) ═══ -->
+<div class="modal-bg" id="modal-gerer-bg" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:640px;padding:0;overflow:hidden;">
+    <div id="gerer-inscrits-content"></div>
+  </div>
+</div>
+
 <!-- ═══ MODAL PRÉVISUALISATION ═══ -->
 <div class="modal-bg" id="modal-preview-bg" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
@@ -488,6 +495,7 @@ function renderEvts() {
             )
           }
           ${peutGerer ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="${hrefModifier}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
+          ${peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px" onclick="gererInscrits(${evt.id}, ${evt.fiche_id || 'null'}, '${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : ''}
           ${peutGerer ? `<button class="btn btn-outline" style="font-size:12px;color:#dc2626;border-color:#FCA5A5;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑 Supprimer</button>` : ''}
         </div>
       </div>
@@ -588,6 +596,42 @@ async function supprimerEvenement(id, btn) {
     allEvts = allEvts.filter(e => e.id !== id);
     renderEvts();
   } catch(e) { alert('Erreur : '+e.message); btn.disabled = false; }
+}
+
+/* Bouton "🗂️ Gérer" (2026-09-21, demande explicite) — réservé à l'organisateur/admin (même
+   garde que "✏️ Modifier", voir peutGerer/peutGererDetail). Deux destinations selon qu'une
+   fiche d'inscription personnalisée est liée à l'événement ou non :
+   - fiche liée (ficheId non nul) → inscriptions-admin.html, qui gère déjà ses inscrits/
+     présences, pas de nouvelle UI à construire ;
+   - sinon → les inscriptions passent par le petit formulaire intégré de cette page
+     (rejoindre(), table evenements_participants) qui n'avait jusqu'ici aucun écran pour
+     l'organisateur (seul un compteur existait) — modale listant nom/e-mail/téléphone/
+     nombre de personnes/message. */
+async function gererInscrits(evtId, ficheId, titre) {
+  if (ficheId) { window.location.href = 'inscriptions-admin.html?fiche=' + ficheId; return; }
+  const bg = document.getElementById('modal-gerer-bg');
+  const zone = document.getElementById('gerer-inscrits-content');
+  zone.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
+  bg.classList.add('open');
+  try {
+    const { participants } = await api('GET', '/evenements/' + evtId + '/participants');
+    zone.innerHTML = `
+      <div style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <strong style="font-size:14.5px;">👥 Inscrits — ${esc(titre)}</strong>
+        <button onclick="document.getElementById('modal-gerer-bg').classList.remove('open')" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div style="padding:10px 20px 20px;max-height:60vh;overflow-y:auto;">
+        <p style="font-size:12px;color:var(--muted);margin:10px 0 4px;">${participants.length} inscription${participants.length>1?'s':''}</p>
+        ${!participants.length ? '<div class="empty-state"><div class="big">👥</div><p>Aucune inscription pour le moment.</p></div>' : participants.map(p => `
+          <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+            <div style="font-weight:700;font-size:13.5px;">${esc(p.nom_complet || '—')}${p.nb_personnes > 1 ? ` <span style="font-weight:400;color:var(--muted);font-size:12px;">(${p.nb_personnes} pers.)</span>` : ''}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">${[p.email ? '✉️ '+esc(p.email) : '', p.telephone ? '📞 '+esc(p.telephone) : ''].filter(Boolean).join(' · ')}</div>
+            ${p.message ? `<div style="font-size:12px;color:#444;margin-top:6px;font-style:italic;">« ${esc(p.message)} »</div>` : ''}
+          </div>`).join('')}
+      </div>`;
+  } catch (e) {
+    zone.innerHTML = '<div style="padding:40px;text-align:center;color:red;">Erreur de chargement : ' + esc(e.message || '') + '</div>';
+  }
 }
 
 /* ─── Pays (origine retirée du filtre Événements, 2026-09-07 — hors du set de filtres
@@ -1001,6 +1045,7 @@ function renderEventDetail(evt, isPreview) {
         }
         <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
         ${peutGererDetail ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="${hrefModifierDetail}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
+        ${peutGererDetail ? `<button type="button" class="btn btn-outline" style="font-size:13px" onclick="gererInscrits(${evt.id}, ${evt.fiche_id || 'null'}, '${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : ''}
         ${peutGererDetail ? `<button class="btn btn-outline" style="font-size:13px;color:#dc2626;border-color:#FCA5A5;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑 Supprimer</button>` : ''}
       </div>
     </div>

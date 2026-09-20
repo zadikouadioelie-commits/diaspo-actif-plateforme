@@ -17865,7 +17865,10 @@ async function enrichirAvecFicheMedia(rows) {
 
   return rows.map(r => {
     const fid = ficheParEvt[r.id];
-    return { ...r, fiche_media: (fid && fichesById[fid]) ? fichesById[fid] : null };
+    /* fiche_id exposé (2026-09-21, demande explicite) pour le bouton "🗂️ Gérer" : permet au
+       client de savoir vers quoi pointer sans appel supplémentaire — inscriptions-admin.html
+       si une fiche est liée, sinon la modale "inscrits" du formulaire simple intégré. */
+    return { ...r, fiche_media: (fid && fichesById[fid]) ? fichesById[fid] : null, fiche_id: fid || null };
   });
 }
 
@@ -19121,6 +19124,25 @@ route("GET", "/api/evenements/participants/:id", async (req, res, params) => {
   if (row.user_id !== user.id && row.organisateur_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Accès refusé." });
   const qrPayload = Buffer.from(JSON.stringify({ pid: row.id, eid: row.evenement_id, sig: row.qr_token })).toString('base64');
   sendJSON(res, 200, { inscription: row, qr_payload: qrPayload });
+});
+
+/* GET /api/evenements/:id/participants — liste des inscrits via le formulaire simple intégré
+   (pas la fiche d'inscription personnalisée, qui a son propre espace sur
+   inscriptions-admin.html) — réservé à l'organisateur de l'événement ou à un administrateur.
+   2026-09-21, demande explicite : le bouton "🗂️ Gérer" doit amener directement ici quand
+   aucune fiche n'a été liée à l'événement. */
+route("GET", "/api/evenements/:id/participants", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== 'administrateur') {
+    return sendJSON(res, 403, { error: "Réservé à l'organisateur de l'événement." });
+  }
+  const participants = await db.prepare(
+    "SELECT id, nom_complet, email, telephone, nb_personnes, message, created_at FROM evenements_participants WHERE evenement_id=? ORDER BY created_at ASC"
+  ).all(params.id);
+  sendJSON(res, 200, { participants });
 });
 
 route("DELETE", "/api/evenements/:id/quitter", async (req, res, params) => {
