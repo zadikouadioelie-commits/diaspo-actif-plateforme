@@ -9587,7 +9587,7 @@ route("POST", "/api/assistance/:id/etendre", async (req, res, params, body) => {
   sendJSON(res, 200, { statut: 'ACTIVE', session_expires_at: nouvelleEcheance });
 });
 
-// Le membre pousse un instantané de sa page courante toutes les ~2s pendant ACTIVE (mirroring).
+// Le membre pousse un instantané de sa page courante toutes les ~700ms pendant ACTIVE (mirroring).
 route("POST", "/api/assistance/:id/etat", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });

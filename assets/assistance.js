@@ -22,7 +22,7 @@
     statut: null,
     idleTimer: null,     // veille : GET mon-statut toutes les ~25s
     countdownTimer: null,
-    pushTimer: null,     // ACTIVE : pousse un instantané toutes les ~2s
+    pushTimer: null,     // ACTIVE : pousse un instantané toutes les ~700ms
     actionsTimer: null,  // ACTIVE : récupère les actions à exécuter toutes les ~1s
   };
 
@@ -215,7 +215,13 @@
 
     if (!AS.pushTimer) {
       asPousserEtat();
-      AS.pushTimer = setInterval(asPousserEtat, 2000);
+      // 700ms (2026-09-20, demande explicite — "voir en continu sans le rechargement
+      // constant") : 2s donnait une impression de page qui se recharge en boucle côté admin
+      // (voir aspRafraichirSession, dashboard-administrateur.html, qui ne remplace plus le
+      // miroir que si le contenu a changé). Un instantané complet reste capturé/envoyé à
+      // chaque tick — ne pas descendre beaucoup plus bas sans repenser vers un push temps réel
+      // (WebSocket), hors de portée de ce simple ajustement de cadence.
+      AS.pushTimer = setInterval(asPousserEtat, 700);
     }
     if (!AS.actionsTimer) {
       asRecupererActions();

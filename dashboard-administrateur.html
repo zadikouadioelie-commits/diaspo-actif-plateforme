@@ -5643,7 +5643,12 @@ function aspOuvrirSession(id) {
   document.getElementById('asp-session-view').style.display = '';
   aspRafraichirSession();
   clearInterval(_aspMirrorTimer);
-  _aspMirrorTimer = setInterval(aspRafraichirSession, 2000);
+  // 700ms (2026-09-20, demande explicite), aligné sur la cadence d'envoi du membre
+  // (assets/assistance.js, AS.pushTimer) — inutile de sonder plus vite que ce qui est
+  // réellement poussé. Sans effet sur la charge visuelle grâce au filtre "contenu
+  // inchangé" plus haut dans aspRafraichirSession : plus de ticks ne veut pas dire plus
+  // de rechargements du miroir, seulement une détection plus rapide d'un vrai changement.
+  _aspMirrorTimer = setInterval(aspRafraichirSession, 700);
 }
 
 // Colonnes *_at au format "YYYY-MM-DD HH:MM:SS" UTC sans indicateur de fuseau — même piège que
