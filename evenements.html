@@ -221,6 +221,7 @@
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
       <div><label>Ville / Lieu</label><input type="text" id="e-lieu" placeholder="Paris, salle X"></div>
       <div><label>Origine (diaspora ciblée)</label><select id="e-origine"><option value="">-- Origine --</option></select></div>
+      <div><label>Zone de diffusion</label><select id="e-zone-diffusion"><option value="">-- Sélectionner --</option><option>Ville</option><option>Commune</option><option>Département</option><option>Région</option><option>National</option><option>International</option></select></div>
       <div style="grid-column:1/-1"><label>📍 Adresse exacte / GPS</label><input type="text" id="e-lieu-gps" placeholder="Adresse complète, coordonnées GPS ou lien Google Maps collé (ex: depuis WhatsApp)"></div>
     </div>
     <div style="margin-bottom:10px;"><label>Description <span style="color:#2563EB">*</span></label><textarea id="e-desc" rows="3" style="width:100%;resize:vertical;box-sizing:border-box" placeholder="Décrivez l'événement : programme, objectifs, public cible…"></textarea></div>
@@ -790,6 +791,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       heure_debut:   document.getElementById('e-heure').value || null,
       type_evt:      document.getElementById('e-type').value,
       domaine:       document.getElementById('e-domaine').value,
+      zone_diffusion: document.getElementById('e-zone-diffusion').value || null,
       pays:          document.getElementById('e-pays').value,
       lieu:          document.getElementById('e-lieu').value,
       ville:         document.getElementById('e-lieu').value,

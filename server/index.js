@@ -17977,8 +17977,19 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   /* Module presente comme Premium (bouton dore + fenetre d'abonnement) : le controle serveur
      manquait. Rejoindre ou quitter un evenement reste libre — ce sont des participants. */
   if (!(await exigerPremium(user, res, "evenements"))) return;
+  /* zone_diffusion (2026-09-20, demande explicite) — ensureEvenementsSourceCol() existe déjà
+     pour cette même table mais vit dans un scope différent (le dispatcheur inline plus bas dans
+     ce fichier, inaccessible depuis les routes enregistrées via route()) : filet auto-réparateur
+     autonome ici, même idiome (mémoïsé sur `global`, ALTER simple sans "IF NOT EXISTS" — absent
+     de la grammaire SQLite, seul Postgres l'accepte — le catch suffit à l'idempotence). */
+  if (!global.__evenementsZoneDiffusionEnsured) {
+    try { await db.prepare(`ALTER TABLE evenements ADD COLUMN zone_diffusion TEXT`).run(); }
+    catch (e) {}
+    global.__evenementsZoneDiffusionEnsured = true;
+  }
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
+    zone_diffusion,
     places_max, inscription_ouverte, lien_inscription, image_url,
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
@@ -17993,16 +18004,16 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // enrichirAvecFicheMedia() plus haut.
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || '[]');
   const id = (await db.prepare(`INSERT INTO evenements
-    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,places_max,
+    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
-      description||null, type_evt||"evenement", domaine||null, places_max||null,
+      description||null, type_evt||"evenement", domaine||null, zone_diffusion||null, places_max||null,
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
       coverImg, galerie,
@@ -28634,22 +28645,32 @@ ${jsonLd}
        la source n'est plus éligible (brouillon, ou Premium expiré), et recréée sinon. */
     async function ensureEvenementsSourceCol() {
       if (global.__evenementsSourceColEnsured) return;
-      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS source_events_id INTEGER`).run(); }
+      /* "ADD COLUMN IF NOT EXISTS" n'existe pas dans la grammaire SQLite (seulement sur
+         Postgres) — chaque ALTER échouait silencieusement en local (avalé par le catch),
+         même bug déjà trouvé et corrigé sur ensureEventGeoColumns() (table `events`, plus haut)
+         pour la table `evenements`. Un ALTER simple suffit, le catch reste nécessaire pour
+         l'idempotence sur les prochains démarrages ("duplicate column name"/"already exists"). */
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN source_events_id INTEGER`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol]', e.message); }
       // Filtre "Gratuit / payant" (2026-09-07) — même filet auto-réparateur, même colonne
       // ajoutée aux deux migrations standard (server/db.js + server/pg-init.js).
-      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS prix_min REAL`).run(); }
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN prix_min REAL`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol/prix_min]', e.message); }
       // Chaîne WhatsApp (2026-09-07) — même filet auto-réparateur.
-      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS whatsapp_lien TEXT`).run(); }
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN whatsapp_lien TEXT`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol/whatsapp_lien]', e.message); }
       // Pays cible / origine diaspora visée (2026-09-07) — origine1 réutilise la colonne
       // `origine` déjà existante, seule origine2 nécessite ce filet.
-      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS origine2 TEXT`).run(); }
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN origine2 TEXT`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol/origine2]', e.message); }
       // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08) — même filet.
-      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN IF NOT EXISTS masquer_inscrits INTEGER DEFAULT 0`).run(); }
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN masquer_inscrits INTEGER DEFAULT 0`).run(); }
       catch (e) { console.error('[ensureEvenementsSourceCol/masquer_inscrits]', e.message); }
+      // Zone de diffusion (2026-09-20, demande explicite) — Ville/Commune/Département/Région/
+      // National/International, même valeurs que le champ homonyme ajouté sur la table `events`
+      // (commit précédent) — même filet auto-réparateur.
+      try { await db.prepare(`ALTER TABLE evenements ADD COLUMN zone_diffusion TEXT`).run(); }
+      catch (e) { console.error('[ensureEvenementsSourceCol/zone_diffusion]', e.message); }
       global.__evenementsSourceColEnsured = true;
     }
     async function syncEvenementVersProgrammation(eventId) {
