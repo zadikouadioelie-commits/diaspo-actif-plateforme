@@ -75,6 +75,7 @@ async function checkProjEvalOwner(req, pid) {
   const projet = await db.prepare(`SELECT * FROM proj_eval_projets WHERE id=?`).get(pid);
   if (!projet) return { error: sendErr(404, 'Projet introuvable.') };
   if (projet.createur_id !== me.id) return { error: sendErr(403, 'Accès refusé.') };
+  me.nomAffichage = await nomCompteAffichage(me.id);
   return { me, projet };
 }
 async function checkProjEvalDossier(req, did, { porteurAussi } = {}) {
@@ -84,6 +85,7 @@ async function checkProjEvalDossier(req, did, { porteurAussi } = {}) {
   const estDestinataire = dossier.destinataire_id === me.id;
   const estPorteur = dossier.createur_id === me.id;
   if (!estDestinataire && !(porteurAussi && estPorteur)) return { error: sendErr(403, 'Accès refusé.') };
+  me.nomAffichage = await nomCompteAffichage(me.id);
   return { me, dossier, estDestinataire, estPorteur };
 }
 
@@ -279,6 +281,48 @@ function safeJSON(s, fallback) {
 async function getOfficialUserId() {
   const row = await db.prepare("SELECT id FROM users WHERE is_official=1 LIMIT 1").get();
   return row ? row.id : null;
+}
+
+/* ── Nom d'affichage PUBLIC d'un compte (2026-09-20, demande explicite) ──
+   Seul un compte 'utilisateur' est une personne physique — son nom personnel EST le nom du
+   compte. Tout autre rôle ('initiative', 'collectivite', 'administrateur'...) est un compte
+   professionnel : le nom personnel de la personne qui le gère n'a AUCUNE pertinence publique,
+   seul le nom du compte lui-même doit apparaître partout où une action lui est attribuée
+   (publication, message, commentaire, avis, mention...). Référence UNIQUE désormais — tout code
+   touchant à un nom de compte doit passer par ici plutôt que ré-écrire [prenom,nom].join(' ').
+   Remplace 3 copies incomplètes qui existaient déjà (enrichPost, GET/POST
+   /api/fil/:id/commentaires) — aucune ne couvrait 'collectivite'/'administrateur'. */
+async function nomCompteAffichage(userId) {
+  if (!userId) return '';
+  const user = await db.prepare("SELECT id, nom, prenom, role, nom_institution FROM users WHERE id=?").get(userId);
+  if (!user) return '';
+  if (user.role === 'initiative') {
+    const init = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(user.id);
+    if (init?.nom) return init.nom;
+  } else if ((user.role === 'collectivite' || user.role === 'administrateur') && user.nom_institution) {
+    return user.nom_institution;
+  }
+  return [user.prenom, user.nom].filter(Boolean).join(' ') || user.nom || '';
+}
+/* Équivalent SQL de nomCompteAffichage(), pour les LISTES — évite un aller-retour DB par ligne.
+   `alias` = alias de la table users dans la requête ; `initAlias` = alias d'un
+   LEFT JOIN initiatives {initAlias} ON {initAlias}.owner_user_id = {alias}.id
+   à ajouter dans la requête si absent. Même règle, même ordre de priorité que la version JS. */
+/* Corrige en place le nom/prenom d'une LISTE de lignes portant déjà .user_id (ou .id, voir
+   idField) et .role — variante pratique de nomCompteAffichage() quand ajouter un LEFT JOIN à la
+   requête serait plus lourd que quelques appels DB supplémentaires (listes courtes, ex. cartes
+   Partenaires Officiels). Vide `prenom` sur les lignes corrigées : le client recombine
+   [prenom, nom] et ne doit afficher que le nom du compte dans ce cas. */
+async function corrigerNomsListe(rows, idField = 'user_id') {
+  await Promise.all(rows.map(async r => {
+    if (r.role && r.role !== 'utilisateur') { r.nom = await nomCompteAffichage(r[idField]); r.prenom = null; }
+  }));
+  return rows;
+}
+function sqlNomAffichage(alias, initAlias) {
+  return `CASE WHEN ${alias}.role='initiative' THEN ${initAlias}.nom
+               WHEN ${alias}.role IN ('collectivite','administrateur') THEN ${alias}.nom_institution
+               ELSE TRIM(COALESCE(${alias}.prenom,'') || ' ' || COALESCE(${alias}.nom,'')) END`;
 }
 
 const routes = [];
@@ -2750,10 +2794,11 @@ route("POST", "/api/rencontres", async (req, res, params, body) => {
      perdue signifie un membre qui attend une réponse qui ne viendra pas. */
   try {
     const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+    const nomDemandeurRencontre = await nomCompteAffichage(user.id);
     for (const a of admins) {
       await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
         a.id, 'rencontre_demande', "Nouvelle demande de rencontre",
-        `${(user.prenom || '') + ' ' + (user.nom || '')} demande une rencontre ${mode === 'visio' ? 'en visioconférence' : 'en présentiel'}.`,
+        `${nomDemandeurRencontre} demande une rencontre ${mode === 'visio' ? 'en visioconférence' : 'en présentiel'}.`,
         JSON.stringify({ rencontre_id: id, user_id: user.id })
       );
     }
@@ -3663,11 +3708,16 @@ route("GET", "/api/profil/:id/avis", async (req, res, params) => {
   try {
     const rows = await db.prepare(`
       SELECT va.id, va.note, va.commentaire, va.created_at, va.modifie_le,
-             va.reponse_texte, va.reponse_date, va.reponse_masquee, va.user_id, u.nom, u.prenom
+             va.reponse_texte, va.reponse_date, va.reponse_masquee, va.user_id, u.nom, u.prenom, u.role
       FROM vitrine_avis va JOIN users u ON u.id = va.user_id
       WHERE va.profil_user_id=? AND (va.statut IS NULL OR va.statut='visible')
       ORDER BY va.created_at DESC LIMIT 50
     `).all(targetId);
+    /* Nom du COMPTE, pas du responsable, pour tout rôle autre que 'utilisateur' — le client
+       (assets/avis-section.js) affiche `${a.prenom||''} ${a.nom||''}`.trim(). */
+    for (const a of rows) {
+      if (a.role !== 'utilisateur') { a.nom = await nomCompteAffichage(a.user_id); a.prenom = null; }
+    }
     const avisPublic = rows.map(a => ({
       ...a,
       // Révélé au propriétaire du profil, à un admin, OU à l'auteur de CET avis précis (pour que
@@ -3713,7 +3763,7 @@ route("POST", "/api/profil/:id/avis", async (req, res, params, body) => {
       // Cahier §7 : si une réponse existe déjà, le propriétaire du profil est informé de la modification.
       if (existant.reponse_texte) {
         creerNotif(targetId, "avis_modifie", "Un avis a été modifié",
-          `${user.prenom || ''} ${user.nom || ''} a modifié son avis.`.trim(), { lien: `profil.html?id=${targetId}#avis-${existant.id}` });
+          `${await nomCompteAffichage(user.id)} a modifié son avis.`, { lien: `profil.html?id=${targetId}#avis-${existant.id}` });
       }
       sendJSON(res, 200, { ok: true, id: existant.id, modifie: true });
     } else {
@@ -3722,7 +3772,7 @@ route("POST", "/api/profil/:id/avis", async (req, res, params, body) => {
         VALUES (?,?,?,?,?, 'visible')
       `).run(initRow ? initRow.id : null, targetId, user.id, note, commentaire);
       creerNotif(targetId, "nouvel_avis", "Vous avez reçu un nouvel avis",
-        `${user.prenom || ''} ${user.nom || ''} a laissé un avis ${'★'.repeat(note)}.`.trim(),
+        `${await nomCompteAffichage(user.id)} a laissé un avis ${'★'.repeat(note)}.`,
         { lien: `profil.html?id=${targetId}#avis-${r.lastInsertRowid}` });
       sendJSON(res, 201, { ok: true, id: r.lastInsertRowid, modifie: false });
     }
@@ -3933,7 +3983,7 @@ route("POST", "/api/initiatives/:id/rejoindre", async (req, res, params, body) =
     "INSERT INTO initiative_rejoindre_demandes (initiative_id, demandeur_id, type, message) VALUES (?,?,?,?)"
   ).run(init.id, user.id, type, message)).lastInsertRowid;
 
-  const nomDemandeur = [user.prenom, user.nom].filter(Boolean).join(' ') || user.nom || 'Un membre';
+  const nomDemandeur = (await nomCompteAffichage(user.id)) || 'Un membre';
   const titre = type === 'benevole' ? '🙋 Nouvelle proposition de bénévolat' : '🤝 Nouvelle proposition de partenariat';
   const contenu = type === 'benevole'
     ? `${nomDemandeur} souhaite devenir bénévole pour « ${init.nom} ».`
@@ -4086,7 +4136,7 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite)).lastInsertRowid;
 
   creerNotif(init.owner_user_id, "commande", "Nouvelle demande de commande",
-    `${user.nom} souhaite commander « ${prod.nom} » (x${quantite})`,
+    `${await nomCompteAffichage(user.id)} souhaite commander « ${prod.nom} » (x${quantite})`,
     { produit_id: prod.id, commande_id: id });
 
   sendJSON(res, 201, { ok: true, id });
@@ -6766,7 +6816,7 @@ route("POST", "/api/publications/:id/like", async (req, res, params) => {
     const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
     if (init && Number(init.owner_user_id) !== Number(user.id)) {
       creerNotif(init.owner_user_id, "pub_like", "Nouveau J'aime",
-        `${user.nom} aime votre publication « ${p.titre} »`, { publication_id: Number(params.id), initiative_id: Number(p.initiative_id) });
+        `${await nomCompteAffichage(user.id)} aime votre publication « ${p.titre} »`, { publication_id: Number(params.id), initiative_id: Number(p.initiative_id) });
     }
   }
   const likes = Number((await db.prepare("SELECT COUNT(*) n FROM vitrine_pub_reactions WHERE publication_id=?").get(params.id))?.n) || 0;
@@ -6792,7 +6842,7 @@ route("POST", "/api/publications/:id/commentaires", async (req, res, params, bod
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(p.initiative_id);
   if (init && Number(init.owner_user_id) !== Number(user.id)) {
     creerNotif(init.owner_user_id, "pub_commentaire", "Nouveau commentaire",
-      `${user.nom} a commenté « ${p.titre} »`, { publication_id: Number(params.id), initiative_id: Number(p.initiative_id) });
+      `${await nomCompteAffichage(user.id)} a commenté « ${p.titre} »`, { publication_id: Number(params.id), initiative_id: Number(p.initiative_id) });
   }
   sendJSON(res, 201, { id });
 });
@@ -10580,7 +10630,7 @@ route("POST", "/api/mon-associe/annonces/:id/candidater", async (req, res, param
   const { message, cv_url } = body || {};
   await db.prepare("INSERT INTO associe_candidatures (annonce_id,candidat_id,message,cv_url) VALUES (?,?,?,?)").run(params.id, user.id, message || null, cv_url || null);
   creerNotif(annonce.auteur_id, "associe_candidature", "Nouvelle candidature « Mon Associé »",
-    `${user.nom} a répondu à votre annonce « ${annonce.titre} ».`, { annonce_id: Number(params.id), candidat_id: user.id });
+    `${await nomCompteAffichage(user.id)} a répondu à votre annonce « ${annonce.titre} ».`, { annonce_id: Number(params.id), candidat_id: user.id });
   sendJSON(res, 201, { ok: true });
 });
 
@@ -10708,12 +10758,13 @@ route("GET", "/api/mon-associe/conversations", async (req, res) => {
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare(`
     SELECT c.*,
-      u.nom AS avec_nom, u.role AS avec_role, u.photo_url AS avec_photo,
+      ${sqlNomAffichage('u', 'i_avec')} AS avec_nom, u.role AS avec_role, u.photo_url AS avec_photo,
       (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere,
       (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_date,
       (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND lu = 0) AS non_lus
     FROM conversations c
     JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
+    LEFT JOIN initiatives i_avec ON i_avec.owner_user_id = u.id
     WHERE c.contexte='mon_associe' AND (c.user1_id = ? OR c.user2_id = ?)
       AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
     ORDER BY COALESCE((SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1), c.created_at) DESC
@@ -10744,7 +10795,7 @@ route("POST", "/api/mon-associe/conversations/:id/messages", async (req, res, pa
   const r = await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json) VALUES (?,?,?,?,?)")
     .run(params.id, user.id, contenu || (fichier?.nom || ''), type, fichier ? JSON.stringify(fichier) : null);
   const autreId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
-  creerNotif(autreId, "associe_message", "Nouveau message « Mon Associé »", `${user.nom} vous a envoyé un message.`, { conversation_id: Number(params.id) });
+  creerNotif(autreId, "associe_message", "Nouveau message « Mon Associé »", `${await nomCompteAffichage(user.id)} vous a envoyé un message.`, { conversation_id: Number(params.id) });
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -10760,7 +10811,7 @@ route("POST", "/api/mon-associe/candidatures/:id/repondre", async (req, res, par
   const contenu = (body?.message || "").trim();
   if (contenu) {
     await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type) VALUES (?,?,?,'text')").run(convId, user.id, contenu);
-    creerNotif(cand.candidat_id, "associe_message", "Nouveau message « Mon Associé »", `${user.nom} vous a répondu au sujet de « ${cand.titre} ».`, { conversation_id: convId });
+    creerNotif(cand.candidat_id, "associe_message", "Nouveau message « Mon Associé »", `${await nomCompteAffichage(user.id)} vous a répondu au sujet de « ${cand.titre} ».`, { conversation_id: convId });
   }
   sendJSON(res, 200, { conversation_id: convId });
 });
@@ -10776,7 +10827,7 @@ route("POST", "/api/mon-associe/documents/:id/transmettre", async (req, res, par
   await db.prepare("INSERT INTO messages (conversation_id, sender_id, contenu, type, fichier_json) VALUES (?,?,?,?,?)")
     .run(conv.id, user.id, doc.nom, fichier.isImage ? 'image' : 'file', JSON.stringify(fichier));
   const autreId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
-  creerNotif(autreId, "associe_message", "Document reçu « Mon Associé »", `${user.nom} vous a transmis « ${doc.nom} ».`, { conversation_id: conv.id });
+  creerNotif(autreId, "associe_message", "Document reçu « Mon Associé »", `${await nomCompteAffichage(user.id)} vous a transmis « ${doc.nom} ».`, { conversation_id: conv.id });
   sendJSON(res, 200, { ok: true });
 });
 
@@ -10817,13 +10868,22 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
     if (!prioriserAbonnes || !abonnesIds.size) return sendJSON(res, 200, { users: [] });
     const idsPlaceholders = [...abonnesIds].map(() => "?").join(",");
     const rows = await db.prepare(`
-      SELECT id, nom, prenom, email, role, photo_url AS avatar_url
-      FROM users
-      WHERE id IN (${idsPlaceholders}) AND role IN (${placeholders})
-        AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
-      ORDER BY nom ASC LIMIT 10
+      SELECT u.id, u.nom, u.prenom, u.email, u.role, u.photo_url AS avatar_url,
+        i_s.nom AS init_nom, u.nom_institution
+      FROM users u
+      LEFT JOIN initiatives i_s ON i_s.owner_user_id = u.id
+      WHERE u.id IN (${idsPlaceholders}) AND u.role IN (${placeholders})
+        AND u.nom != 'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      ORDER BY u.nom ASC LIMIT 10
     `).all(...abonnesIds, ...allowed);
-    return sendJSON(res, 200, { users: rows.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url, abonne: true })) });
+    /* nom : le nom du COMPTE, pas du responsable, pour tout rôle autre que 'utilisateur' (voir
+       nomCompteAffichage()) — u.nom reste le nom personnel brut UNIQUEMENT pour 'utilisateur',
+       le client (assets/posts.js) recombine [prenom, nom] pour ce seul cas. */
+    return sendJSON(res, 200, { users: rows.map(u => ({
+      id: u.id,
+      nom: u.role === 'initiative' ? (u.init_nom || u.nom) : (u.role === 'collectivite' || u.role === 'administrateur') ? (u.nom_institution || u.nom) : u.nom,
+      prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url, abonne: true,
+    })) });
   }
 
   const like = `%${q}%`;
@@ -10831,15 +10891,22 @@ route("GET", "/api/users/search", async (req, res, params, body, query) => {
      la table users, l'ordre SQL brut est arbitraire — un contact abonné pourrait sinon se
      retrouver hors des 10 premiers par pur hasard et ne jamais remonter en tête après le tri. */
   const rows = await db.prepare(`
-    SELECT id, nom, prenom, email, role, photo_url AS avatar_url
-    FROM users
-    WHERE id != ? AND role IN (${placeholders})
-      AND nom != 'Compte supprimé' AND (is_demo IS NULL OR is_demo=FALSE)
-      AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ? OR CAST(id AS TEXT) = ?)
+    SELECT u.id, u.nom, u.prenom, u.email, u.role, u.photo_url AS avatar_url,
+      i_s.nom AS init_nom, u.nom_institution
+    FROM users u
+    LEFT JOIN initiatives i_s ON i_s.owner_user_id = u.id
+    WHERE u.id != ? AND u.role IN (${placeholders})
+      AND u.nom != 'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      AND (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR i_s.nom LIKE ? OR u.nom_institution LIKE ? OR CAST(u.id AS TEXT) = ?)
     LIMIT ${prioriserAbonnes ? 30 : 10}
-  `).all(user.id, ...allowed, like, like, like, q);
+  `).all(user.id, ...allowed, like, like, like, like, like, q);
 
-  let resultats = rows.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url, abonne: abonnesIds.has(Number(u.id)) }));
+  /* Même correctif que ci-dessus : nom du COMPTE, pas du responsable, hors 'utilisateur'. */
+  let resultats = rows.map(u => ({
+    id: u.id,
+    nom: u.role === 'initiative' ? (u.init_nom || u.nom) : (u.role === 'collectivite' || u.role === 'administrateur') ? (u.nom_institution || u.nom) : u.nom,
+    prenom: u.prenom, email: u.email, role: u.role, avatar_url: u.avatar_url, abonne: abonnesIds.has(Number(u.id)),
+  }));
   if (prioriserAbonnes) {
     /* Tri stable : les abonnés d'abord (dans leur ordre d'origine entre eux), puis le reste —
        jamais un tri alphabétique qui perdrait la pertinence déjà apportée par le LIKE. */
@@ -10888,7 +10955,7 @@ route("POST", "/api/initiatives/:id/demande-affiliation", async (req, res, param
       await db.prepare("INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?, ?, ?, ?, ?)").run(
         init.owner_user_id, 'affiliation_demandee',
         `Nouvelle demande d'affiliation`,
-        `${user.prenom || ''} ${user.nom || ''} souhaite rejoindre officiellement « ${init.nom} » en tant que membre affilié.`,
+        `${await nomCompteAffichage(user.id)} souhaite rejoindre officiellement « ${init.nom} » en tant que membre affilié.`,
         JSON.stringify({ initiative_id: params.id, user_id: user.id, lien: 'dashboard-initiative.html#affiliation' }));
     } catch(_) {}
   }
@@ -11185,7 +11252,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
        localisation_pays, localisation_ville)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    user.id, user.nom, pub_type, pub_type,
+    user.id, await nomCompteAffichage(user.id), pub_type, pub_type,
     body.categorie || "Publication",
     contenu || article_titre,
     body.media_url || null,
@@ -11225,7 +11292,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
         creerNotif(
           cibleId,
           "mention",
-          `${user.nom} vous a mentionné dans une publication`,
+          `${await nomCompteAffichage(user.id)} vous a mentionné dans une publication`,
           `« ${extrait} »`,
           { post_id: Number(id) }
         );
@@ -11237,7 +11304,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
         creerNotif(
           owner.owner_user_id,
           "mention",
-          `${user.nom} a mentionné votre initiative dans une publication`,
+          `${await nomCompteAffichage(user.id)} a mentionné votre initiative dans une publication`,
           `« ${extrait} »`,
           { post_id: Number(id) }
         );
@@ -11249,9 +11316,10 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   if (statut === "publie" && visibilite === "public") {
     try {
       const abonnes = await db.prepare("SELECT follower_id FROM user_follows WHERE followed_id=?").all(user.id);
+      const nomAuteurPublication = await nomCompteAffichage(user.id);
       for (const a of abonnes) {
         if (Number(a.follower_id) === user.id) continue;
-        creerNotif(a.follower_id, "nouvelle_publication", `${user.nom} a publié`,
+        creerNotif(a.follower_id, "nouvelle_publication", `${nomAuteurPublication} a publié`,
           extraitOrDefault(contenu || article_titre || article_contenu),
           { post_id: Number(id) });
       }
@@ -11289,7 +11357,7 @@ route("POST", "/api/fil/:id/react", async (req, res, params, body) => {
   // Notifier l'auteur du post
   const post = await db.prepare("SELECT auteur_id,contenu FROM fil_posts WHERE id=?").get(params.id);
   if (post && post.auteur_id && post.auteur_id !== user.id) {
-    creerNotif(post.auteur_id, "reaction", "Réaction sur votre post", `${user.nom} a réagi à votre publication`, { post_id: Number(params.id) });
+    creerNotif(post.auteur_id, "reaction", "Réaction sur votre post", `${await nomCompteAffichage(user.id)} a réagi à votre publication`, { post_id: Number(params.id) });
   }
   sendJSON(res, 200, { reactions: counts });
 });
@@ -11339,7 +11407,7 @@ route("POST", "/api/galerie/:ownerType/:ownerId/:photoId/commentaires", async (r
   if (!contenu) return sendJSON(res, 400, { error: "Le commentaire ne peut pas être vide." });
   await db.prepare(
     "INSERT INTO galerie_commentaires (owner_type, owner_id, photo_id, auteur_id, auteur_nom, contenu) VALUES (?,?,?,?,?,?)"
-  ).run(params.ownerType, params.ownerId, params.photoId, user.id, `${user.nom||''} ${user.prenom||''}`.trim() || user.nom, contenu);
+  ).run(params.ownerType, params.ownerId, params.photoId, user.id, await nomCompteAffichage(user.id), contenu);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -11358,11 +11426,11 @@ route("GET", "/api/fil/:id/commentaires", async (req, res, params) => {
   // l'organisation plutôt que celui du responsable (même correctif que pour les publications).
   const enriched = await Promise.all(comms.map(async c => {
     let certif = null, auteur_nom = c.auteur_nom, photo_url = c.photo_url;
+    if (c.auteur_id) auteur_nom = await nomCompteAffichage(c.auteur_id);
     if (c.role === "initiative" && c.auteur_id) {
-      const init = await db.prepare("SELECT id, nom, logo_url FROM initiatives WHERE owner_user_id=?").get(c.auteur_id);
+      const init = await db.prepare("SELECT id, logo_url FROM initiatives WHERE owner_user_id=?").get(c.auteur_id);
       if (init) {
         certif = await getCertif(init.id);
-        auteur_nom = init.nom;
         if (init.logo_url) photo_url = init.logo_url;
       }
     }
@@ -11379,7 +11447,7 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
 
   const id = (await db.prepare(
     "INSERT INTO fil_commentaires (post_id, auteur_id, auteur_nom, contenu) VALUES (?,?,?,?)"
-  ).run(params.id, user.id, user.nom, contenu)).lastInsertRowid;
+  ).run(params.id, user.id, await nomCompteAffichage(user.id), contenu)).lastInsertRowid;
 
   const comm = await db.prepare(`
     SELECT c.id, c.contenu, c.created_at, c.auteur_id, c.auteur_nom,
@@ -11387,16 +11455,19 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
     FROM fil_commentaires c LEFT JOIN users u ON u.id = c.auteur_id
     WHERE c.id = ?
   `).get(id);
-  // Nom de l'organisation plutôt que celui du responsable (même correctif que pour la lecture).
-  if (comm && comm.role === "initiative" && comm.auteur_id) {
-    const init = await db.prepare("SELECT nom, logo_url FROM initiatives WHERE owner_user_id=?").get(comm.auteur_id);
-    if (init) { comm.auteur_nom = init.nom; if (init.logo_url) comm.photo_url = init.logo_url; }
+  // Nom du compte plutôt que celui du responsable (même correctif que pour la lecture).
+  if (comm && comm.auteur_id) {
+    comm.auteur_nom = await nomCompteAffichage(comm.auteur_id);
+    if (comm.role === "initiative") {
+      const init = await db.prepare("SELECT logo_url FROM initiatives WHERE owner_user_id=?").get(comm.auteur_id);
+      if (init?.logo_url) comm.photo_url = init.logo_url;
+    }
   }
 
   // Notifier l'auteur du post
   const post = await db.prepare("SELECT auteur_id, contenu FROM fil_posts WHERE id=?").get(params.id);
   if (post && post.auteur_id && post.auteur_id !== user.id) {
-    creerNotif(post.auteur_id, "pub_commentaire", `${user.nom} a commenté votre publication`,
+    creerNotif(post.auteur_id, "pub_commentaire", `${await nomCompteAffichage(user.id)} a commenté votre publication`,
       contenu.slice(0, 80) + (contenu.length > 80 ? "…" : ""),
       { post_id: Number(params.id) });
   }
@@ -11616,7 +11687,7 @@ route("POST", "/api/fil/:id/contribuer", async (req, res, params, body) => {
   if (post && post.auteur_id && post.auteur_id !== user.id) {
     creerNotif(
       post.auteur_id, "contribution",
-      `🤝 ${user.nom} souhaite contribuer à votre publication`,
+      `🤝 ${await nomCompteAffichage(user.id)} souhaite contribuer à votre publication`,
       `${type_contribution}${body.message ? " — " + body.message.slice(0,80) : ""}`,
       { post_id: Number(params.id), user_id: user.id }
     );
@@ -11678,7 +11749,7 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
       (auteur_id, auteur_nom, type, pub_type, categorie, contenu, original_post_id, repost_commentaire)
     VALUES (?,?,?,?,?,?,?,?)
   `).run(
-    user.id, user.nom, "repost", "repost",
+    user.id, await nomCompteAffichage(user.id), "repost", "repost",
     original.categorie || "Republication",
     commentaire || "",
     original.id,
@@ -11688,7 +11759,7 @@ route("POST", "/api/fil/:id/republier", async (req, res, params, body) => {
   // Notifier l'auteur de l'original
   if (original.auteur_id && original.auteur_id !== user.id) {
     creerNotif(original.auteur_id, "mention",
-      `${user.nom} a republié votre publication`,
+      `${await nomCompteAffichage(user.id)} a republié votre publication`,
       commentaire ? `« ${commentaire.slice(0,80)} »` : "Sans commentaire ajouté",
       { post_id: Number(newId) });
   }
@@ -11997,13 +12068,14 @@ route("GET", "/api/conversations", async (req, res, params, body, query) => {
 
   const rows = await db.prepare(`
     SELECT c.*,
-      u.nom AS avec_nom, u.role AS avec_role, u.ville AS avec_ville, u.photo_url AS avec_photo,
+      ${sqlNomAffichage('u', 'i_avec')} AS avec_nom, u.role AS avec_role, u.ville AS avec_ville, u.photo_url AS avec_photo,
       (SELECT contenu FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere,
       (SELECT type FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_type,
       (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS derniere_date,
       (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND sender_id != ? AND lu = 0) AS non_lus
     FROM conversations c
     JOIN users u ON u.id = CASE WHEN c.user1_id = ? THEN c.user2_id ELSE c.user1_id END
+    LEFT JOIN initiatives i_avec ON i_avec.owner_user_id = u.id
     WHERE (c.user1_id = ? OR c.user2_id = ?)
       AND (CASE WHEN c.user1_id = ? THEN c.deleted_u1 ELSE c.deleted_u2 END) = 0
       AND (c.contexte IS NULL OR c.contexte != 'mon_associe')
@@ -12328,7 +12400,7 @@ route("POST", "/api/demandes-contact", async (req, res, params, body) => {
   ).run(user.id, destId, MESSAGE_ETABLIR_CONTACT)).lastInsertRowid;
 
   creerNotif(destId, "demande_contact", "Nouvelle demande de contact",
-    (user.nom || "Un membre") + " souhaite entrer en contact avec vous.", { demande_id: id });
+    (await nomCompteAffichage(user.id) || "Un membre") + " souhaite entrer en contact avec vous.", { demande_id: id });
 
   sendJSON(res, 201, { ok: true, demande_id: id, statut: "en_attente" });
 });
@@ -12353,6 +12425,12 @@ route("GET", "/api/demandes-contact", async (req, res, params, body, query) => {
     " FROM demandes_contact d JOIN users u ON u.id=d." + autre +
     " WHERE d." + col + "=?" + filtre + " ORDER BY d.created_at DESC LIMIT 200"
   ).all(user.id);
+  /* Nom du COMPTE, pas du responsable, pour tout rôle autre que 'utilisateur' — le client
+     (messagerie.html) affiche [autre_prenom, autre_nom].filter(Boolean).join(' '), donc vider
+     autre_prenom ici suffit à éviter un mélange "Prénom du responsable + Nom du compte". */
+  for (const d of demandes) {
+    if (d.autre_role !== 'utilisateur') { d.autre_nom = await nomCompteAffichage(d.autre_id); d.autre_prenom = null; }
+  }
   /* Activité publique : ce que le demandeur a réellement produit sur la plateforme.
      Un compte vide n'est pas nécessairement suspect, mais l'information manque sans cela. */
   for (const d of demandes) {
@@ -12410,7 +12488,7 @@ route("POST", "/api/demandes-contact/:id/repondre", async (req, res, params, bod
   }
   await db.prepare("UPDATE demandes_contact SET statut='acceptee', conversation_id=?, repondu_at=datetime('now') WHERE id=?").run(conv.id, demande.id);
   creerNotif(demande.demandeur_id, "demande_contact_acceptee",
-    (user.nom || "Votre demande") + " a accepté votre demande de contact",
+    (await nomCompteAffichage(user.id) || "Votre demande") + " a accepté votre demande de contact",
     "Vous pouvez maintenant échanger librement.", { conversation_id: conv.id });
 
   sendJSON(res, 200, { ok: true, statut: "acceptee", conversation_id: conv.id });
@@ -12427,6 +12505,11 @@ route("GET", "/api/contacts", async (req, res) => {
     " WHERE d.statut='acceptee' AND (d.demandeur_id=? OR d.destinataire_id=?)" +
     " ORDER BY d.repondu_at DESC LIMIT 500"
   ).all(user.id, user.id, user.id);
+  /* Même correctif que /api/demandes-contact : nom du COMPTE, pas du responsable, hors
+     'utilisateur' — le client affiche [prenom, nom].filter(Boolean).join(' '). */
+  for (const c of contacts) {
+    if (c.role !== 'utilisateur') { c.nom = await nomCompteAffichage(c.id); c.prenom = null; }
+  }
   sendJSON(res, 200, { contacts });
 });
 
@@ -12792,7 +12875,7 @@ route("POST", "/api/conversations/:id/messages", async (req, res, params, body) 
   const msg = await db.prepare("SELECT m.*, u.nom AS sender_nom FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(id);
   // Notifier le destinataire
   const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
-  creerNotif(otherId, "message", "Nouveau message", `${user.nom} vous a envoyé un message`, { conversation_id: conv.id, produit_id: produitId });
+  creerNotif(otherId, "message", "Nouveau message", `${await nomCompteAffichage(user.id)} vous a envoyé un message`, { conversation_id: conv.id, produit_id: produitId });
   sendJSON(res, 201, { message: msg });
 });
 
@@ -12828,7 +12911,7 @@ route("PATCH", "/api/messages/:id", async (req, res, params, body) => {
   const conv = await db.prepare("SELECT * FROM conversations WHERE id=?").get(msg.conversation_id);
   if (conv) {
     const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
-    creerNotif(otherId, "message", "Message modifié", `${user.nom} a modifié un message`, { conversation_id: conv.id });
+    creerNotif(otherId, "message", "Message modifié", `${await nomCompteAffichage(user.id)} a modifié un message`, { conversation_id: conv.id });
   }
 
   const updated = await db.prepare("SELECT m.*, u.nom AS sender_nom, u.role AS sender_role FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(msg.id);
@@ -12852,7 +12935,7 @@ route("DELETE", "/api/messages/:id", async (req, res, params) => {
   const conv = await db.prepare("SELECT * FROM conversations WHERE id=?").get(msg.conversation_id);
   if (conv) {
     const otherId = conv.user1_id === user.id ? conv.user2_id : conv.user1_id;
-    creerNotif(otherId, "message", "Message supprimé", `${user.nom} a supprimé un message`, { conversation_id: conv.id });
+    creerNotif(otherId, "message", "Message supprimé", `${await nomCompteAffichage(user.id)} a supprimé un message`, { conversation_id: conv.id });
   }
 
   const updated = await db.prepare("SELECT m.*, u.nom AS sender_nom, u.role AS sender_role FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.id=?").get(msg.id);
@@ -12980,7 +13063,7 @@ route("POST", "/api/initiatives/:id/demande-adhesion", async (req, res, params) 
   }
   if (init.owner_user_id) {
     creerNotif(init.owner_user_id, "demande_adhesion", `Nouvelle demande d'adhésion — ${init.nom}`,
-      `${user.nom}${user.prenom ? ' ' + user.prenom : ''} souhaite adhérer à ${init.nom}.`,
+      `${await nomCompteAffichage(user.id)} souhaite adhérer à ${init.nom}.`,
       { initiative_id: Number(params.id) });
   }
   sendJSON(res, 201, { ok: true, statut: 'en_attente' });
@@ -14481,7 +14564,8 @@ route("POST", "/api/formations/:id/messages", async (req, res, params, body) => 
     creerNotif(destId, 'formation', 'Nouveau message sur votre dossier', `Diaspo'Actif a répondu concernant « ${f.titre} ».`, { formation_id: params.id });
   } else {
     const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
-    for (const a of admins) creerNotif(a.id, 'formation', 'Message formateur', `${user.nom} a répondu concernant « ${f.titre} ».`, { formation_id: params.id });
+    const nomFormateur = await nomCompteAffichage(user.id);
+    for (const a of admins) creerNotif(a.id, 'formation', 'Message formateur', `${nomFormateur} a répondu concernant « ${f.titre} ».`, { formation_id: params.id });
   }
   sendJSON(res, 201, { id });
 });
@@ -15773,7 +15857,8 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
     // Notifie le compte suivi + propose un abonnement en retour (sauf s'il suit déjà)
     const dejaReciproque = await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(followedId, me.id);
     if (!dejaReciproque) {
-      creerNotif(followedId, "nouveau_abonne", "Nouvel abonné", `${me.nom} vous suit désormais.`, { follower_id: me.id, follower_nom: me.nom });
+      const nomAbonne = await nomCompteAffichage(me.id);
+      creerNotif(followedId, "nouveau_abonne", "Nouvel abonné", `${nomAbonne} vous suit désormais.`, { follower_id: me.id, follower_nom: nomAbonne });
     }
     sendJSON(res, 200, { ok: true, nbAbonnes: n });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
@@ -16734,9 +16819,8 @@ async function handleStripeWebhook(req, res) {
                échouer le traitement du paiement. */
             if (c.visibilite === "publique") {
               try {
-                const owner = await db.prepare("SELECT nom FROM users WHERE id=?").get(c.owner_user_id);
                 await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
-                  .run(c.owner_user_id, owner?.nom || "", "cagnotte", "objectif_atteint",
+                  .run(c.owner_user_id, await nomCompteAffichage(c.owner_user_id), "cagnotte", "objectif_atteint",
                     `🎉 **Objectif atteint : ${c.titre}** !\n\n👉 diaspoactif.com/cagnotte.html?slug=${c.slug}`);
               } catch (_) {}
             }
@@ -17775,7 +17859,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
-      titre, organisateur || user.nom, date_evt, lieu||null, pays||null, ville||null, origine||null,
+      titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       description||null, type_evt||"evenement", domaine||null, places_max||null,
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
@@ -17789,7 +17873,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   if (init) {
     const abonnes = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(init.id);
-    abonnes.forEach(a => creerNotif(a.user_id, "evenement", "Nouvel événement", `${user.nom} organise : ${titre}`, { evenement_id: id }));
+    const nomOrganisateur = await nomCompteAffichage(user.id);
+    abonnes.forEach(a => creerNotif(a.user_id, "evenement", "Nouvel événement", `${nomOrganisateur} organise : ${titre}`, { evenement_id: id }));
   }
 
   /* Modèle standard de fiche d'inscription (demande explicite du 2026-09-09) : appliqué par
@@ -18150,7 +18235,7 @@ route("PATCH", "/api/cagnottes/:id/statut", async (req, res, params, body) => {
     if (c.visibilite === "publique") {
       try {
         await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
-          .run(user.id, user.nom, "cagnotte", "creation", `🪙 **Nouvelle cagnotte : ${c.titre}**\n\n${c.description || ''}\n\n👉 diaspoactif.com/cagnotte.html?slug=${c.slug}`);
+          .run(user.id, await nomCompteAffichage(user.id), "cagnotte", "creation", `🪙 **Nouvelle cagnotte : ${c.titre}**\n\n${c.description || ''}\n\n👉 diaspoactif.com/cagnotte.html?slug=${c.slug}`);
       } catch (_) {}
     }
   } else if (action === "pause") {
@@ -18163,7 +18248,7 @@ route("PATCH", "/api/cagnottes/:id/statut", async (req, res, params, body) => {
     if (c.visibilite === "publique") {
       try {
         await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
-          .run(user.id, user.nom, "cagnotte", "cloture", `🔒 **Cagnotte clôturée : ${c.titre}**\n\n${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} récoltés. Merci à tous les contributeurs !`);
+          .run(user.id, await nomCompteAffichage(user.id), "cagnotte", "cloture", `🔒 **Cagnotte clôturée : ${c.titre}**\n\n${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} récoltés. Merci à tous les contributeurs !`);
       } catch (_) {}
     }
   }
@@ -18967,12 +19052,12 @@ async function vtChargerCommentaires(videoId, { inclureMasques = false } = {}) {
     WHERE c.video_id=? ${inclureMasques ? "" : "AND c.statut='visible'"}
     ORDER BY c.created_at ASC
   `).all(videoId);
-  const parAuteur = rows.map(r => ({
+  const parAuteur = await Promise.all(rows.map(async r => ({
     id: r.id, parent_id: r.parent_id, contenu: r.contenu, statut: r.statut,
     created_at: r.created_at, auteur_id: r.auteur_id,
-    auteur_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur',
+    auteur_nom: (await nomCompteAffichage(r.auteur_id)) || 'Utilisateur',
     est_admin: r.auteur_role === 'administrateur' || r.auteur_role === 'administrateur_junior',
-  }));
+  })));
   const racines = parAuteur.filter(c => !c.parent_id);
   racines.forEach(r => { r.reponses = parAuteur.filter(c => c.parent_id === r.id); });
   return racines;
@@ -19227,7 +19312,7 @@ route("GET", "/api/admin/videos-tutoriels/commentaires", async (req, res, params
   if (query.signales === '1') sql += " WHERE EXISTS (SELECT 1 FROM da_videos_tutoriels_signalements s WHERE s.commentaire_id=c.id AND s.statut='nouveau')";
   sql += " ORDER BY c.created_at DESC LIMIT 200";
   const rows = await db.prepare(sql).all();
-  sendJSON(res, 200, { commentaires: rows.map(r => ({ ...r, auteur_nom: `${r.prenom || ''} ${r.nom || ''}`.trim() || 'Utilisateur' })) });
+  sendJSON(res, 200, { commentaires: await Promise.all(rows.map(async r => ({ ...r, auteur_nom: (await nomCompteAffichage(r.auteur_id)) || 'Utilisateur' }))) });
 });
 
 route("POST", "/api/admin/videos-tutoriels/commentaires/:id/masquer", async (req, res, params) => {
@@ -19945,7 +20030,7 @@ route("POST", "/api/collaborations", async (req, res, params, body) => {
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   const id = (await db.prepare("INSERT INTO collaborations (user_id,partenaire,titre,description,type_collab,competences,deadline,statut,initiative_id) VALUES (?,?,?,?,?,?,?,'ouvert',?)")
-    .run(user.id, partenaire||user.nom, titre, description||null, type_collab||"benevolat", JSON.stringify(Array.isArray(competences)?competences:[]), deadline||null, init?.id||null)).lastInsertRowid;
+    .run(user.id, partenaire || await nomCompteAffichage(user.id), titre, description||null, type_collab||"benevolat", JSON.stringify(Array.isArray(competences)?competences:[]), deadline||null, init?.id||null)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -19971,7 +20056,7 @@ route("POST", "/api/collaborations/:id/candidater", async (req, res, params, bod
   if (collab.user_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas candidater à votre propre appel." });
   try {
     await db.prepare("INSERT INTO candidatures (collaboration_id,user_id,message) VALUES (?,?,?)").run(params.id, user.id, body.message||null);
-    creerNotif(collab.user_id, "candidature", "Nouvelle candidature", `${user.nom} a postulé à votre appel « ${collab.titre||collab.partenaire} »`, { collaboration_id: collab.id, candidat_id: user.id });
+    creerNotif(collab.user_id, "candidature", "Nouvelle candidature", `${await nomCompteAffichage(user.id)} a postulé à votre appel « ${collab.titre||collab.partenaire} »`, { collaboration_id: collab.id, candidat_id: user.id });
     sendJSON(res, 201, { ok: true });
   } catch(e) { sendJSON(res, 409, { ok: false, message: "Vous avez déjà candidaté." }); }
 });
@@ -19996,15 +20081,16 @@ async function enrichPost(p, cu) {
     const u = await db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur,role FROM users WHERE id=?").get(p.auteur_id);
     if (u) {
       auteur = u;
+      /* Une publication d'un compte professionnel (Initiative, Collectivité...) doit afficher
+         le nom du COMPTE, jamais celui du responsable qui l'a rédigée — auteur_nom stocké à
+         l'écriture pouvait valoir le nom du responsable (bug historique, désormais corrigé à
+         l'écriture aussi). On l'écrase ici via nomCompteAffichage(), plutôt que de migrer les
+         publications déjà existantes. */
+      auteur_nom = await nomCompteAffichage(p.auteur_id);
       if (u.role === "initiative") {
-        const init = await db.prepare("SELECT id, nom, logo_url FROM initiatives WHERE owner_user_id=?").get(p.auteur_id);
+        const init = await db.prepare("SELECT id, logo_url FROM initiatives WHERE owner_user_id=?").get(p.auteur_id);
         if (init) {
           auteur_certif = getCertif(init.id);
-          /* Une publication d'un compte Initiative doit afficher le nom de l'ORGANISATION,
-             jamais celui du responsable qui l'a rédigée — auteur_nom stocké à l'écriture
-             valait déjà le nom du responsable (bug historique). On l'écrase ici, à la
-             lecture, plutôt que de migrer les publications déjà existantes. */
-          auteur_nom = init.nom;
           if (init.logo_url) auteur.photo_url = init.logo_url;
         }
       }
@@ -20030,9 +20116,10 @@ async function enrichPost(p, cu) {
         const ou = await db.prepare("SELECT photo_url,banner_url,ville,pays,nationalite1,titre_pro,bio,situation_pro,theme_couleur,role FROM users WHERE id=?").get(orig.auteur_id);
         if (ou) {
           orig_auteur = ou;
+          orig_auteur_nom = await nomCompteAffichage(orig.auteur_id);
           if (ou.role === "initiative") {
-            const origInit = await db.prepare("SELECT nom, logo_url FROM initiatives WHERE owner_user_id=?").get(orig.auteur_id);
-            if (origInit) { orig_auteur_nom = origInit.nom; if (origInit.logo_url) orig_auteur.photo_url = origInit.logo_url; }
+            const origInit = await db.prepare("SELECT logo_url FROM initiatives WHERE owner_user_id=?").get(orig.auteur_id);
+            if (origInit?.logo_url) orig_auteur.photo_url = origInit.logo_url;
           }
         }
       }
@@ -20344,7 +20431,7 @@ route("POST", "/api/follow/:id", async (req, res, params) => {
   if (targetId === cu.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   try {
     await db.prepare("INSERT INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(cu.id, targetId);
-    creerNotif(targetId, "abonnement", `${cu.nom} vous suit maintenant`, "", { user_id: cu.id });
+    creerNotif(targetId, "abonnement", `${await nomCompteAffichage(cu.id)} vous suit maintenant`, "", { user_id: cu.id });
   } catch(e) { /* déjà suivi */ }
   sendJSON(res, 200, { ok: true, suivi: true });
 });
@@ -21641,7 +21728,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
       let nb = 0; try { nb = (await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE u.role IN ('utilisateur','initiative') AND (${pw})`).get(...pp))?.n || 0; } catch(e) {}
       action_ref_id = (await db.prepare("INSERT INTO communications_institutionnelles (emetteur_id,titre,contenu,type,cible_json,nb_destinataires) VALUES (?,?,?,?,?,?)")
         .run(user.id, titre, contenu, type === "appel_projets" ? "appel_projets" : "info", JSON.stringify({ perimetre: p, libelle: libellePerimetre(p) }), nb)).lastInsertRowid;
-      try { await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)").run(user.id, user.nom, "institutionnel", type, `**${titre}**\n\n${contenu}`); } catch(e) {}
+      try { await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)").run(user.id, await nomCompteAffichage(user.id), "institutionnel", type, `**${titre}**\n\n${contenu}`); } catch(e) {}
       lien = "dashboard-collectivite.html#communications";
       message = `${LABELS[type]} publiée à ${nb} membre(s) de votre juridiction.`;
     } else if (type === "consultation") {
@@ -21929,7 +22016,7 @@ route("GET", "/api/admin/accreditations", async (req, res) => {
     // Publication sur le fil (sans médias lourds)
     try {
       await db.prepare("INSERT INTO fil_posts (auteur_id,auteur_nom,type,categorie,contenu) VALUES (?,?,?,?,?)")
-        .run(user.id, user.nom, "institutionnel", type||"info", `**${titre}**\n\n${contenu}`);
+        .run(user.id, await nomCompteAffichage(user.id), "institutionnel", type||"info", `**${titre}**\n\n${contenu}`);
     } catch(e) {}
     sendJSON(res, 201, { id, nb_destinataires: nb });
   });
@@ -22562,8 +22649,9 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
     let autoApprouvee = false;
     if (!tarif || tarif.validation_admin !== 0) {
       const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+      const nomDemandeur = await nomCompteAffichage(user.id);
       admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation",
-        `${user.nom} demande « ${def.emoji} ${def.label} »`, { demande_id: Number(id) }));
+        `${nomDemandeur} demande « ${def.emoji} ${def.label} »`, { demande_id: Number(id) }));
     } else {
       /* Accès immédiat sans validation */
       await db.prepare("UPDATE accred_demandes SET statut='approuvee' WHERE id=?").run(id);
@@ -22585,7 +22673,8 @@ route("POST", "/api/accreditations/demande", async (req, res, params, body) => {
   const id = (await db.prepare("INSERT INTO demandes_accreditation (user_id, type, message) VALUES (?,?,?)").run(user.id, type, message||null)).lastInsertRowid;
   const DA_LABELS = { mobilisation_active:"Mobilisation Active", createur_opportunites:"Créateur d'Opportunités", observatoire_diaspora:"Observatoire Diaspora", institutionnelle:"Institutionnelle" };
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
-  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${user.nom} demande l'accréditation « ${DA_LABELS[type]||type} »`, { demande_id: Number(id) }));
+  const nomDemandeurDA = await nomCompteAffichage(user.id);
+  admins.forEach(a => creerNotif(a.id, "validation", "Nouvelle demande d'accréditation", `${nomDemandeurDA} demande l'accréditation « ${DA_LABELS[type]||type} »`, { demande_id: Number(id) }));
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -22765,7 +22854,7 @@ route("POST", "/api/sondages/:id/repondre", async (req, res, params, body) => {
     );
   }
   await db.prepare("UPDATE sondages SET nb_reponses=nb_reponses+1 WHERE id=?").run(params.id);
-  creerNotif(s.createur_id, "mention", "Nouvelle réponse à votre sondage", `${user.nom} a répondu à « ${s.titre} »`, { sondage_id: Number(params.id) });
+  creerNotif(s.createur_id, "mention", "Nouvelle réponse à votre sondage", `${await nomCompteAffichage(user.id)} a répondu à « ${s.titre} »`, { sondage_id: Number(params.id) });
   sendJSON(res, 201, { ok: true });
 });
 
@@ -23166,7 +23255,7 @@ route("POST", "/api/offres/:id/postuler", async (req, res, params, body) => {
     ).run(params.id, user.id, body.message||null, body.cv_url||null, body.lettre_url||null, cvProfileId, lettreId)).lastInsertRowid;
     await db.prepare("UPDATE offres SET nb_candidatures=nb_candidatures+1 WHERE id=?").run(params.id);
     try { await db.prepare("INSERT INTO candidature_historique(candidature_id,statut,auteur_id) VALUES(?,?,?)").run(insId, 'recu', user.id); } catch(_) {}
-    creerNotif(o.createur_id, "mention", "Nouvelle candidature", `${user.nom} a postulé à « ${o.titre} »`, { offre_id: Number(params.id) });
+    creerNotif(o.createur_id, "mention", "Nouvelle candidature", `${await nomCompteAffichage(user.id)} a postulé à « ${o.titre} »`, { offre_id: Number(params.id) });
     sendJSON(res, 201, { ok: true, id: insId });
   } catch(e) {
     sendJSON(res, 409, { error: "Vous avez déjà postulé à cette offre." });
@@ -27220,13 +27309,13 @@ ${jsonLd}
       const rdvId = r.lastInsertRowid;
 
       // Notif à tous les destinataires
-      const moi = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+      const moiNom = await nomCompteAffichage(me.id);
       for (const destId of uniqueDests) {
         try {
           await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             destId, 'rdv_proposition',
             `Nouveau rendez-vous proposé`,
-            `${moi.prenom} ${moi.nom} vous propose un RDV : "${titre}" le ${date_proposee} à ${heure_debut}`,
+            `${moiNom} vous propose un RDV : "${titre}" le ${date_proposee} à ${heure_debut}`,
             JSON.stringify({ rdv_id: rdvId })
           );
         } catch(e) {}
@@ -27268,10 +27357,10 @@ ${jsonLd}
         await db.prepare(`UPDATE rdv_proposals SET statut='accepte',event_proposeur_id=?,event_destinataire_id=?,meeting_id=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
           .run(evP.lastInsertRowid, evD.lastInsertRowid, meetingId, message_reponse||null, rdvId);
         try {
-          const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          const destNom = await nomCompteAffichage(me.id);
           await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             rdv.proposeur_id, 'rdv_accepte', 'Rendez-vous accepté',
-            `${dest.prenom} ${dest.nom} a accepté votre RDV "${rdv.titre}"`,
+            `${destNom} a accepté votre RDV "${rdv.titre}"`,
             JSON.stringify({ rdv_id: rdvId, meeting_id: meetingId })
           );
         } catch(e) {}
@@ -27280,10 +27369,10 @@ ${jsonLd}
       } else if (action === 'refuse') {
         await db.prepare(`UPDATE rdv_proposals SET statut='refuse',message_reponse=?,updated_at=datetime('now') WHERE id=?`).run(message_reponse||null, rdvId);
         try {
-          const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          const destNom = await nomCompteAffichage(me.id);
           await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             rdv.proposeur_id, 'rdv_refuse', 'Rendez-vous refusé',
-            `${dest.prenom} ${dest.nom} a refusé votre RDV "${rdv.titre}"`,
+            `${destNom} a refusé votre RDV "${rdv.titre}"`,
             JSON.stringify({ rdv_id: rdvId })
           );
         } catch(e) {}
@@ -27295,10 +27384,10 @@ ${jsonLd}
         await db.prepare(`UPDATE rdv_proposals SET statut='contre_proposition',contre_date=?,contre_heure_debut=?,contre_heure_fin=?,message_reponse=?,updated_at=datetime('now') WHERE id=?`)
           .run(contre_date, contre_heure_debut, contre_heure_fin, message_reponse||null, rdvId);
         try {
-          const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          const destNom = await nomCompteAffichage(me.id);
           await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             rdv.proposeur_id, 'rdv_contre_prop', 'Contre-proposition de RDV',
-            `${dest.prenom} ${dest.nom} propose une autre date pour "${rdv.titre}" : ${contre_date} à ${contre_heure_debut}`,
+            `${destNom} propose une autre date pour "${rdv.titre}" : ${contre_date} à ${contre_heure_debut}`,
             JSON.stringify({ rdv_id: rdvId })
           );
         } catch(e) {}
@@ -27311,10 +27400,10 @@ ${jsonLd}
         if (rdv.event_destinataire_id) await db.prepare(`DELETE FROM agenda_events WHERE id=?`).run(rdv.event_destinataire_id);
         const autreUser = me.id === rdv.proposeur_id ? rdv.destinataire_id : rdv.proposeur_id;
         try {
-          const dest = await db.prepare(`SELECT prenom, nom FROM users WHERE id=?`).get(me.id);
+          const destNom = await nomCompteAffichage(me.id);
           await db.prepare(`INSERT INTO notifications(user_id,type,titre,contenu,data_json) VALUES(?,?,?,?,?)`).run(
             autreUser, 'rdv_annule', 'Rendez-vous annulé',
-            `${dest.prenom} ${dest.nom} a annulé le RDV "${rdv.titre}"`,
+            `${destNom} a annulé le RDV "${rdv.titre}"`,
             JSON.stringify({ rdv_id: rdvId })
           );
         } catch(e) {}
@@ -27960,6 +28049,7 @@ ${jsonLd}
 
       const membres = await db.prepare(`SELECT user_id FROM listes_diffusion_contacts WHERE liste_id=? AND user_id IS NOT NULL`).all(lid);
       let envoyes = 0, ignores = 0;
+      const nomExpediteurListe = await nomCompteAffichage(me.id);
       for (const m of membres) {
         const otherId = Number(m.user_id);
         if (otherId === me.id) continue;
@@ -27970,7 +28060,7 @@ ${jsonLd}
         );
         if (conv.user1_id === me.id && conv.deleted_u2) await db.prepare(`UPDATE conversations SET deleted_u2=0 WHERE id=?`).run(conv.id);
         if (conv.user2_id === me.id && conv.deleted_u1) await db.prepare(`UPDATE conversations SET deleted_u1=0 WHERE id=?`).run(conv.id);
-        creerNotif(otherId, 'message', 'Nouveau message', `${me.nom} vous a envoyé un message`, { conversation_id: conv.id });
+        creerNotif(otherId, 'message', 'Nouveau message', `${nomExpediteurListe} vous a envoyé un message`, { conversation_id: conv.id });
         envoyes++;
       }
       return sendJSON(res, 200, { envoyes, ignores });
@@ -28945,7 +29035,7 @@ ${jsonLd}
         if (promo) await consommerCodePromo(promo.id, me.id, tickets, quantite);
         if (validationManuelle) {
           creerNotif(ev.organisateur_id, 'billetterie_validation', 'Commande en attente d\'approbation',
-            `${me.nom} a réservé ${quantite} billet(s) gratuit(s) pour « ${ev.titre} », en attente de votre validation.`, { event_id: eid });
+            `${await nomCompteAffichage(me.id)} a réservé ${quantite} billet(s) gratuit(s) pour « ${ev.titre} », en attente de votre validation.`, { event_id: eid });
         } else if (me.email) {
           try {
             const { emailConfirmationBillets } = require('./mailer');
@@ -33279,12 +33369,20 @@ ${jsonLd}
       const me = await getCurrentUser(req);
       const now = new Date().toISOString().slice(0, 10);
       let rows = await db.prepare(`
-        SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays
+        SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays,
+          i_p.nom AS init_nom, u.nom_institution
         FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
+        LEFT JOIN initiatives i_p ON i_p.owner_user_id = u.id
         WHERE po.statut = 'active'
           AND (po.periode_debut IS NULL OR po.periode_debut <= ?)
           AND (po.periode_fin  IS NULL OR po.periode_fin  >= ?)
         ORDER BY po.mise_en_avant DESC, po.priorite DESC, po.nbr_recommandations DESC`).all(now, now);
+      /* Nom du COMPTE, pas du responsable, pour un partenaire Initiative/Collectivité — le
+         client (assets/oz.js, assets/app.js) affiche [prenom, nom].join(' '). */
+      rows.forEach(r => {
+        if (r.role === 'initiative') { r.nom = r.init_nom || r.nom; r.prenom = null; }
+        else if ((r.role === 'collectivite' || r.role === 'administrateur') && r.nom_institution) { r.nom = r.nom_institution; r.prenom = null; }
+      });
 
       // Score de pertinence selon le profil utilisateur
       if (me) {
@@ -33392,6 +33490,7 @@ ${jsonLd}
         WHERE po.statut = 'active' AND po.niveau_visibilite = 'public'
         ORDER BY po.nbr_recommandations DESC, po.date_attribution DESC
         LIMIT ? OFFSET ?`).all(LIMIT, OFFSET);
+      await corrigerNomsListe(rows);
       if (domaine) rows = rows.filter(r => (safeParse(r.domaines_expertise||'[]')).some(d => d.toLowerCase().includes(domaine.toLowerCase())));
       if (pays)    rows = rows.filter(r => (safeParse(r.pays_intervention||'[]')).some(p => p.toLowerCase().includes(pays.toLowerCase())));
       if (q)       rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.bio||''} ${r.description_complete||''}`.toLowerCase().includes(q));
@@ -33413,6 +33512,7 @@ ${jsonLd}
       const r = await db.prepare(`SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.banner_url, u.titre_pro, u.bio, u.ville, u.pays AS user_pays, u.centres_interet, u.competences
         FROM partenaires_officiels po JOIN users u ON u.id = po.user_id WHERE po.user_id=? AND po.statut='active'`).get(uid);
       if (!r) return sendJSON(res, 404, { error: "Partenaire introuvable." });
+      if (r.role && r.role !== 'utilisateur') { r.nom = await nomCompteAffichage(r.user_id); r.prenom = null; }
       return sendJSON(res, 200, {
         ...r,
         domaines_expertise: safeParse(r.domaines_expertise||'[]'),
@@ -33472,6 +33572,7 @@ ${jsonLd}
       let rows   = await db.prepare(`SELECT po.*, u.nom, u.prenom, u.role, u.photo_url, u.titre_pro, u.ville, u.pays AS user_pays
         FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
         WHERE po.statut='active' ORDER BY po.nbr_recommandations DESC`).all();
+      await corrigerNomsListe(rows);
       if (dom) rows = rows.filter(r => (safeParse(r.domaines_expertise||'[]')).some(d => d.toLowerCase().includes(dom)));
       if (q)   rows = rows.filter(r => `${r.nom} ${r.prenom||''} ${r.titre_pro||''} ${r.description_complete||''} ${r.domaines_expertise||''}`.toLowerCase().includes(q));
       rows = rows.slice(0, 5);
@@ -33492,6 +33593,7 @@ ${jsonLd}
         const rows = await db.prepare(`SELECT po.*, u.nom, u.prenom, u.role, u.email, u.photo_url, u.titre_pro
           FROM partenaires_officiels po JOIN users u ON u.id = po.user_id
           ORDER BY po.created_at DESC`).all();
+        await corrigerNomsListe(rows);
         return sendJSON(res, 200, { partenaires: rows.map(r => ({
           ...r,
           domaines_expertise: safeParse(r.domaines_expertise||'[]'),
@@ -33690,9 +33792,9 @@ ${jsonLd}
             .run(pid, d.user_id, d.type_destinataire || 'membre')).lastInsertRowid;
           dossiers.push(did);
           await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-            .run(did, check.me.id, check.me.nom, 'projet_recu', `Projet « ${check.projet.nom_projet} » reçu.`);
+            .run(did, check.me.id, check.me.nomAffichage, 'projet_recu', `Projet « ${check.projet.nom_projet} » reçu.`);
           creerNotif(d.user_id, 'projet_recu', 'Nouveau projet reçu 📁',
-            `${check.me.nom} vous a transmis le projet « ${check.projet.nom_projet} » pour évaluation.`, { destinataire_id: did, projet_id: pid });
+            `${check.me.nomAffichage} vous a transmis le projet « ${check.projet.nom_projet} » pour évaluation.`, { destinataire_id: did, projet_id: pid });
         } catch (e) { /* déjà envoyé à ce destinataire (UNIQUE), on ignore silencieusement */ }
       }
       await db.prepare(`UPDATE proj_eval_projets SET statut_global='envoye', updated_at=datetime('now') WHERE id=?`).run(pid);
@@ -33710,10 +33812,10 @@ ${jsonLd}
         VALUES (?,?,?,?,?,?,?,?,?,?)`)
         .run(check.dossier.projet_id, did, nom, type_mime||null, categorie||'autre', taille||null, url_bunny||null, contenu_b64||null, duree_secondes||null, check.me.id)).lastInsertRowid;
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'document_ajoute', nom);
+        .run(did, check.me.id, check.me.nomAffichage, 'document_ajoute', nom);
       const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
       creerNotif(notifCible, 'projet_document', 'Document ajouté 📎',
-        `${check.me.nom} a ajouté « ${nom} » au dossier « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+        `${check.me.nomAffichage} a ajouté « ${nom} » au dossier « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
       return sendJSON(res, 201, { id: docId });
     }
 
@@ -33734,10 +33836,10 @@ ${jsonLd}
       const msgId = (await db.prepare(`INSERT INTO proj_eval_messages (destinataire_id,auteur_id,contenu,fichier_json) VALUES (?,?,?,?)`)
         .run(did, check.me.id, contenu||null, fichier ? JSON.stringify(fichier) : null)).lastInsertRowid;
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'message', (contenu||'').slice(0,140));
+        .run(did, check.me.id, check.me.nomAffichage, 'message', (contenu||'').slice(0,140));
       const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
       creerNotif(notifCible, 'projet_message', 'Nouveau message 💬',
-        `${check.me.nom} vous a envoyé un message concernant « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+        `${check.me.nomAffichage} vous a envoyé un message concernant « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
       return sendJSON(res, 201, { id: msgId });
     }
 
@@ -33793,9 +33895,9 @@ ${jsonLd}
       if (check.dossier.statut !== 'recu') return sendJSON(res, 400, { error: 'Ce dossier a déjà été pris en charge.' });
       await db.prepare(`UPDATE proj_eval_destinataires SET statut='en_analyse', pris_en_charge_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(did);
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'statut_change', 'Projet pris en charge — en cours d\'évaluation.');
+        .run(did, check.me.id, check.me.nomAffichage, 'statut_change', 'Projet pris en charge — en cours d\'évaluation.');
       creerNotif(check.dossier.createur_id, 'projet_maj', 'Projet pris en charge ✅',
-        `${check.me.nom} a pris en charge votre projet « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+        `${check.me.nomAffichage} a pris en charge votre projet « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -33810,9 +33912,9 @@ ${jsonLd}
         .run(did, JSON.stringify(items), message || null)).lastInsertRowid;
       await db.prepare(`UPDATE proj_eval_destinataires SET statut='documents_demandes', updated_at=datetime('now') WHERE id=?`).run(did);
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'statut_change', `Documents complémentaires demandés : ${items.join(', ')}.`);
+        .run(did, check.me.id, check.me.nomAffichage, 'statut_change', `Documents complémentaires demandés : ${items.join(', ')}.`);
       creerNotif(check.dossier.createur_id, 'projet_documents_demandes', 'Documents complémentaires demandés 📋',
-        `${check.me.nom} demande des documents complémentaires pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+        `${check.me.nomAffichage} demande des documents complémentaires pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
       return sendJSON(res, 201, { id: reqId });
     }
 
@@ -33826,7 +33928,7 @@ ${jsonLd}
       await db.prepare(`UPDATE proj_eval_destinataires SET note_qualite=?, note_faisabilite=?, note_impact=?, commentaire_eval=?, updated_at=datetime('now') WHERE id=?`)
         .run(clamp(note_qualite), clamp(note_faisabilite), clamp(note_impact), commentaire_eval || null, did);
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'evaluation', `Qualité ${note_qualite||'—'}/5, Faisabilité ${note_faisabilite||'—'}/5, Impact ${note_impact||'—'}/5.`);
+        .run(did, check.me.id, check.me.nomAffichage, 'evaluation', `Qualité ${note_qualite||'—'}/5, Faisabilité ${note_faisabilite||'—'}/5, Impact ${note_impact||'—'}/5.`);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -33841,10 +33943,10 @@ ${jsonLd}
       await db.prepare(`UPDATE proj_eval_destinataires SET statut=?, motif_decision=?, decision_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
         .run(decision, motif || null, did);
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'decision', `${decision}${motif ? ' — ' + motif : ''}`);
+        .run(did, check.me.id, check.me.nomAffichage, 'decision', `${decision}${motif ? ' — ' + motif : ''}`);
       const labels = { accepte: 'Projet accepté ✅', refuse: 'Projet refusé ❌', amelioration_demandee: 'Amélioration demandée 🔄' };
       creerNotif(check.dossier.createur_id, 'projet_decision', labels[decision],
-        `${check.me.nom} a statué sur votre projet « ${check.dossier.nom_projet} »${motif ? ' : ' + motif : '.'}`, { destinataire_id: did });
+        `${check.me.nomAffichage} a statué sur votre projet « ${check.dossier.nom_projet} »${motif ? ' : ' + motif : '.'}`, { destinataire_id: did });
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -33884,10 +33986,10 @@ ${jsonLd}
       const rid = (await db.prepare(`INSERT INTO proj_eval_rendezvous (destinataire_id,propose_par,date_heure,lieu_ou_lien,note) VALUES (?,?,?,?,?)`)
         .run(did, check.me.id, date_heure, lieu_ou_lien || null, note || null)).lastInsertRowid;
       await db.prepare(`INSERT INTO proj_eval_historique (destinataire_id,acteur_id,acteur_nom,action,detail) VALUES (?,?,?,?,?)`)
-        .run(did, check.me.id, check.me.nom, 'rendezvous_propose', `Rendez-vous proposé le ${date_heure}.`);
+        .run(did, check.me.id, check.me.nomAffichage, 'rendezvous_propose', `Rendez-vous proposé le ${date_heure}.`);
       const notifCible = check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id;
       creerNotif(notifCible, 'projet_rendezvous', 'Rendez-vous proposé 📅',
-        `${check.me.nom} propose un rendez-vous pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
+        `${check.me.nomAffichage} propose un rendez-vous pour « ${check.dossier.nom_projet} ».`, { destinataire_id: did });
       return sendJSON(res, 201, { id: rid });
     }
     /* ── POST /api/proj-eval/rendezvous/:rid/repondre — accepter/refuser un rendez-vous proposé ── */
@@ -33902,7 +34004,7 @@ ${jsonLd}
       await db.prepare(`UPDATE proj_eval_rendezvous SET statut=?, updated_at=datetime('now') WHERE id=?`).run(statut, rid);
       const notifCible = rdv.propose_par === check.me.id ? (check.estPorteur ? check.dossier.destinataire_id : check.dossier.createur_id) : rdv.propose_par;
       creerNotif(notifCible, 'projet_rendezvous', statut === 'accepte' ? 'Rendez-vous accepté ✅' : 'Rendez-vous refusé ❌',
-        `${check.me.nom} a ${statut === 'accepte' ? 'accepté' : 'refusé'} le rendez-vous du ${rdv.date_heure}.`, { destinataire_id: rdv.destinataire_id });
+        `${check.me.nomAffichage} a ${statut === 'accepte' ? 'accepté' : 'refusé'} le rendez-vous du ${rdv.date_heure}.`, { destinataire_id: rdv.destinataire_id });
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -34120,8 +34222,9 @@ route("POST", "/api/asso/demande", async (req, res, params, body) => {
   const id = (await db.prepare(`INSERT INTO asso_demandes (user_id,niveau,periodicite,nom_asso,pays,ville,siret,description) VALUES (?,?,?,?,?,?,?,?)`)
     .run(user.id, niveau, periodicite, nom_asso, pays||null, ville||null, siret||null, description||null)).lastInsertRowid;
   const admins = await db.prepare(`SELECT id FROM users WHERE role IN ('administrateur','super_administrateur')`).all();
+  const nomDemandeurAsso = await nomCompteAffichage(user.id);
   admins.forEach(a => creerNotif(a.id, "validation", "Demande accréditation association",
-    `${user.nom} demande l'accréditation « Association ${niveau === "accreditee" ? "Accréditée" : "Vérifiée"} »`, { demande_id: Number(id) }));
+    `${nomDemandeurAsso} demande l'accréditation « Association ${niveau === "accreditee" ? "Accréditée" : "Vérifiée"} »`, { demande_id: Number(id) }));
   sendJSON(res, 201, { id, ok: true });
 });
 
@@ -36096,8 +36199,9 @@ route("POST", "/api/accreditations/packs/:id/demande", async (req, res, params, 
   }
   await db.prepare("INSERT INTO accred_pack_demandes (user_id,pack_id,message) VALUES (?,?,?)").run(me.id, params.id, body.message||null);
   const admins = await db.prepare("SELECT id FROM users WHERE role='administrateur'").all();
+  const nomDemandeurPack = await nomCompteAffichage(me.id);
   admins.forEach(a => creerNotif(a.id, 'pack_demande', `Demande pack : ${pack.nom}`,
-    `${me.nom} demande le pack « ${pack.nom} ».`, { pack_id: params.id, user_id: me.id }));
+    `${nomDemandeurPack} demande le pack « ${pack.nom} ».`, { pack_id: params.id, user_id: me.id }));
   sendJSON(res, 201, { ok: true, statut: 'en_attente' });
 });
 
@@ -39349,7 +39453,7 @@ app.post('/api/social/detected/:id/publish', requireAuth, async (req, res) => {
   const r = await db.prepare(`
     INSERT INTO fil_posts (auteur_id, auteur_nom, type, pub_type, categorie, contenu, visibilite, medias, hashtags, statut, source_import)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)
-  `).run(req.user.id, req.user.nom, 'texte', 'texte', categorie, contenu, 'public', '[]', typeof hashtags==='string'?hashtags:JSON.stringify(hashtags), 'publie', post.reseau);
+  `).run(req.user.id, await nomCompteAffichage(req.user.id), 'texte', 'texte', categorie, contenu, 'public', '[]', typeof hashtags==='string'?hashtags:JSON.stringify(hashtags), 'publie', post.reseau);
 
   await (await db.prepare("UPDATE social_posts_detectes SET statut='importe', diaspo_post_id=?, imported_at=datetime('now') WHERE id=?").run(r).lastInsertRowid, post.id);
   sendJSON(res, 200, { ok: true, diaspo_post_id: r.lastInsertRowid });
