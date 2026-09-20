@@ -3557,6 +3557,20 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     body.innerHTML = tabsHtml + `<div>${listHtml}</div>`;
   };
 
+  // Domaines d'activité (2026-09-20, demande explicite : "utilise les domaines déjà présents
+  // sur la plateforme") — même liste canonique de 32 domaines que l'annuaire/le parrainage/
+  // domaine_principal (server: GET /api/parrainage/domaines), pas la liste DOMAINES/PV_DOMAINES
+  // (26 entrées) déjà présente ailleurs sur cette page pour un usage distinct (Collectivité/
+  // domaines secondaires de la vitrine) et jamais synchronisée avec les vraies valeurs stockées
+  // sur les comptes réels. Chargée une fois, mise en cache.
+  let _ievDomaines = null;
+  async function ievChargerDomaines() {
+    if (_ievDomaines) return _ievDomaines;
+    try { const { domaines } = await api('GET', '/parrainage/domaines'); _ievDomaines = domaines; }
+    catch (_) { _ievDomaines = []; }
+    return _ievDomaines;
+  }
+
   window.openInitEvtModal = async function(id) {
     if (!id && !window._daPremiumInitiative && !window.daBypassActive?.('evenements')) { openPremiumUpsell('evenements'); return; }
     initEvtEditingId = id || null;
@@ -3565,6 +3579,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const modal = document.getElementById('init-evt-modal-bg');
     const form = document.getElementById('init-evt-form-content');
     modal.style.display = 'flex';
+    await ievChargerDomaines();
     if (id) {
       form.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>';
       try {
@@ -3619,9 +3634,23 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           <input type="text" id="iev-adresse" value="${v(e?.adresse)}" placeholder="123 rue de la Paix…" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
         </div>
         <div class="form-row">
-          <label>Catégorie</label>
+          <label>Forme de l'événement</label>
           <select id="iev-cat" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
-            ${['Culture','Business','Formation','Sport','Diaspora','Gastronomie','Networking','Conférence','Gala','Autre'].map(c=>`<option${e?.categorie===c?' selected':''}>${c}</option>`).join('')}
+            ${['Événement','Forum','Atelier','Webinaire','Conférence','Gala / Soirée','Marché / Foire','Networking','Débat','Concours','Autre'].map(c=>`<option${e?.categorie===c?' selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Domaine d'activité</label>
+          <select id="iev-domaine" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+            <option value="">— Sélectionner —</option>
+            ${(_ievDomaines||[]).map(d=>`<option value="${v(d.cle)}"${e?.domaine===d.cle?' selected':''}>${v(d.icone||'')} ${v(d.nom)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Zone de diffusion</label>
+          <select id="iev-zone-diffusion" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+            <option value="">— Sélectionner —</option>
+            ${['Ville','Commune','Département','Région','National','International'].map(z=>`<option${e?.zone_diffusion===z?' selected':''}>${z}</option>`).join('')}
           </select>
         </div>
         <div class="form-row">
@@ -4224,6 +4253,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       ville: document.getElementById('iev-ville').value||null,
       adresse: document.getElementById('iev-adresse').value||null,
       categorie: document.getElementById('iev-cat').value||'Général',
+      domaine: document.getElementById('iev-domaine')?.value||null,
+      zone_diffusion: document.getElementById('iev-zone-diffusion')?.value||null,
       capacite: parseInt(document.getElementById('iev-capacite').value)||0,
       masquer_inscrits: document.getElementById('iev-masquer-inscrits').checked,
       statut: modePub==='publie' ? 'publie' : modePub==='programme' ? 'brouillon_programme' : 'brouillon',

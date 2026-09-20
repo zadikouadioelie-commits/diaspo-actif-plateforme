@@ -28602,9 +28602,24 @@ ${jsonLd}
         // whatsapp_lien : même défaut de migration repéré au passage (2026-09-07), corrigé
         // ici aussi plutôt que d'attendre un futur "column does not exist" sur ce module.
         ["whatsapp_lien", "TEXT"],
+        // domaine (2026-09-20, demande explicite) : distinct de `categorie`, qui décrit
+        // désormais la FORME de l'événement (forum, networking, gala…) — `domaine` reprend le
+        // secteur d'activité, même taxonomie que parrainage_domaines/domaine_principal.
+        ["domaine", "TEXT"],
+        // zone_diffusion (2026-09-20, demande explicite) : portée géographique de l'événement
+        // (Ville, Commune, Département, Région, National, International) — distincte de
+        // pays/ville/adresse qui restent la localisation concrète du lieu.
+        ["zone_diffusion", "TEXT"],
       ];
+      /* Bug réel trouvé en testant en local (2026-09-20) : "ADD COLUMN IF NOT EXISTS" n'existe
+         pas dans la grammaire SQLite (seulement "ADD COLUMN") — chaque ALTER échouait avec
+         "near EXISTS: syntax error", silencieusement avalé par le catch ci-dessous, si bien
+         qu'AUCUNE des colonnes de cette fonction (même les plus anciennes : langue, region,
+         whatsapp_lien…) n'a jamais pu être ajoutée en local. Retrait de "IF NOT EXISTS" : un
+         ALTER simple suffit, le catch le rend déjà idempotent au prochain appel ("duplicate
+         column name" sur SQLite, "column already exists" sur Postgres). */
       for (const [name, type] of cols) {
-        try { await db.prepare(`ALTER TABLE events ADD COLUMN IF NOT EXISTS ${name} ${type}`).run(); }
+        try { await db.prepare(`ALTER TABLE events ADD COLUMN ${name} ${type}`).run(); }
         catch (e) { console.error('[ensureEventGeoColumns]', name, e.message); }
       }
       global.__eventGeoColsEnsured = true;
@@ -28752,7 +28767,7 @@ ${jsonLd}
       if (!(await exigerPremium(me, res, "events"))) return;
       await ensureEventGeoColumns();
       const {
-        titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
+        titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie, domaine, zone_diffusion,
         image_b64, ticket_types, statut: statutInit,
         image_couverture, galerie_photos,
         video1_url, video1_titre, video1_thumb, video2_url, video2_titre, video2_thumb,
@@ -28786,7 +28801,7 @@ ${jsonLd}
       let finalStatut = statutInit || 'brouillon';
       if (programmed_at && finalStatut !== 'publie') finalStatut = 'brouillon_programme';
       const eid = (await db.prepare(`INSERT INTO events
-        (titre,description,organisateur_id,pays,ville,adresse,date_debut,date_fin,capacite,categorie,
+        (titre,description,organisateur_id,pays,ville,adresse,date_debut,date_fin,capacite,categorie,domaine,zone_diffusion,
          image_b64,statut,commission_pct,created_at,updated_at,
          image_couverture,galerie_photos,
          video1_url,video1_titre,video1_thumb,video2_url,video2_titre,video2_thumb,
@@ -28795,9 +28810,9 @@ ${jsonLd}
          fc_programme_fichier_url,fc_programme_fichier_nom,
          programmed_at,timezone,inscription_lien_externe,whatsapp_lien,
          rayon_publication,langue,mode_participation,region,departement,communaute,origine1,origine2,masquer_inscrits)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
-             capacite||0, categorie||'Général', coverImg, finalStatut, PLATFORM_COMMISSION_PCT, ts, ts,
+             capacite||0, categorie||'Général', domaine||null, zone_diffusion||null, coverImg, finalStatut, PLATFORM_COMMISSION_PCT, ts, ts,
              coverImg, galerie,
              video1_url||null, video1_titre||null, video1_thumb||null,
              video2_url||null, video2_titre||null, video2_thumb||null,
@@ -28872,7 +28887,7 @@ ${jsonLd}
       if (ev.organisateur_id !== me.id && me.role !== 'administrateur') return sendJSON(res, 403, { error: 'Accès refusé.' });
       await ensureEventGeoColumns();
       const {
-        titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie,
+        titre, description, pays, ville, adresse, date_debut, date_fin, capacite, categorie, domaine, zone_diffusion,
         image_b64, statut, image_couverture, galerie_photos,
         video1_url, video1_titre, video1_thumb, video2_url, video2_titre, video2_thumb,
         pdf_url, pdf_nom, pdf_acces, pdf_extra, cible_type, cible_liste_ids,
@@ -28897,7 +28912,8 @@ ${jsonLd}
         titre=COALESCE(?,titre), description=COALESCE(?,description),
         pays=COALESCE(?,pays), ville=COALESCE(?,ville), adresse=COALESCE(?,adresse),
         date_debut=COALESCE(?,date_debut), date_fin=COALESCE(?,date_fin),
-        capacite=COALESCE(?,capacite), categorie=COALESCE(?,categorie),
+        capacite=COALESCE(?,capacite), categorie=COALESCE(?,categorie), domaine=COALESCE(?,domaine),
+        zone_diffusion=COALESCE(?,zone_diffusion),
         image_b64=COALESCE(?,image_b64), image_couverture=COALESCE(?,image_couverture),
         galerie_photos=COALESCE(?,galerie_photos),
         video1_url=COALESCE(?,video1_url), video1_titre=COALESCE(?,video1_titre), video1_thumb=COALESCE(?,video1_thumb),
@@ -28920,7 +28936,7 @@ ${jsonLd}
         masquer_inscrits=COALESCE(?,masquer_inscrits),
         statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
         .run(titre||null, description||null, pays||null, ville||null, adresse||null,
-             date_debut||null, date_fin||null, capacite||null, categorie||null,
+             date_debut||null, date_fin||null, capacite||null, categorie||null, domaine||null, zone_diffusion||null,
              coverUpd, coverUpd, galerieUpd,
              video1_url||null, video1_titre||null, video1_thumb||null,
              video2_url||null, video2_titre||null, video2_thumb||null,
