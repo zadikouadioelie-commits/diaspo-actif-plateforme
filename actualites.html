@@ -20,6 +20,18 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+<style>
+/* Bannière "Projets diaspora" élargie de 70% par rapport au texte (760px -> 1292px),
+   en sortant du conteneur étroit <main> pour ne pas élargir la liste d'articles avec elle. */
+.actu-banner-wrap{
+  width:1292px;max-width:1292px;
+  margin-left:calc(50% - 646px);margin-right:calc(50% - 646px);
+  margin-bottom:20px;
+}
+@media(max-width:1292px){
+  .actu-banner-wrap{width:100%;max-width:100%;margin-left:0;margin-right:0;}
+}
+</style>
 </head>
 <body>
 <div class="page">
@@ -45,7 +57,9 @@
   </header>
 
   <main class="container" style="max-width:760px;padding-top:30px;padding-bottom:40px;">
-    <img src="assets/banniere-projets-diaspora.png" alt="Projets diaspora — La diaspora crée, la diaspora innove" style="width:100%;height:auto;border-radius:14px;margin-bottom:20px;display:block;">
+    <div class="actu-banner-wrap">
+      <img src="assets/banniere-projets-diaspora.png" alt="Projets diaspora — La diaspora crée, la diaspora innove" style="width:100%;height:auto;border-radius:14px;display:block;">
+    </div>
     <div id="actu-list"></div>
   </main>
 
