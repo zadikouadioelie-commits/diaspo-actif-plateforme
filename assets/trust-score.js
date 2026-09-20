@@ -321,9 +321,16 @@
   }
 
   /* ─────────── Demander une rencontre Diaspo'Actif ───────────
-     Le membre demande ; un agent fixe la date, puis décide de valider ou non.
-     Rien ici n'accorde de point : c'est volontaire, et c'est dit à l'écran. */
+     Le membre laisse un moyen de le recontacter (téléphone/WhatsApp — son e-mail de
+     compte sert toujours de repli) et, s'il le souhaite, ses disponibilités en texte
+     libre. C'est ensuite un agent qui planifie un créneau dans SES disponibilités à elle,
+     plutôt que d'avoir à accepter ou refuser un horaire imposé par le membre (2026-09-20,
+     demande explicite — remplace l'ancien champ "proposez une date et une heure").
+     Avant l'envoi réel, un écran de récapitulatif reprend tout ce qui a été saisi : le
+     membre confirme explicitement plutôt que d'envoyer à l'aveugle. Rien ici n'accorde de
+     point : c'est volontaire, et c'est dit à l'écran. */
   function demanderRencontre(apres) {
+    const monEmail = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) || '';
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:10000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:36px 14px;';
     ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:460px;width:100%;padding:22px;font-family:inherit;">
@@ -333,55 +340,62 @@
         <strong style="color:#334155;">Durée estimée : 30 à 45 minutes.</strong>
       </p>
 
-      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Comment souhaitez-vous échanger ?</label>
-      <div class="da-pill-group" id="tr-modes" style="margin-bottom:14px;">
-        <label class="da-pill checked"><input type="radio" name="tr-mode" value="visio" checked><span>🎥 En visioconférence</span></label>
-        <label class="da-pill"><input type="radio" name="tr-mode" value="presentiel"><span>📍 En présentiel</span></label>
+      <div id="tr-panel">
+        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Comment souhaitez-vous échanger ?</label>
+        <div class="da-pill-group" id="tr-modes" style="margin-bottom:14px;">
+          <label class="da-pill checked"><input type="radio" name="tr-mode" value="visio" checked><span>🎥 En visioconférence</span></label>
+          <label class="da-pill"><input type="radio" name="tr-mode" value="presentiel"><span>📍 En présentiel</span></label>
+        </div>
+
+        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;" for="tr-telephone">Téléphone ou WhatsApp <span style="color:#F26422;">*</span></label>
+        <input type="tel" id="tr-telephone" placeholder="+33 6 12 34 56 78"
+          style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;font-family:inherit;box-sizing:border-box;">
+        <p style="margin:6px 0 12px;font-size:11.5px;color:#64748b;line-height:1.45;">
+          Diaspo'Actif vous recontactera par e-mail${monEmail ? ' (' + esc(monEmail) + ')' : ''} ou au numéro
+          indiqué, pour convenir d'un rendez-vous à un moment qui convient aux deux parties.
+        </p>
+
+        <label style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Message (facultatif)</label>
+        <textarea id="tr-message" rows="2" placeholder="Ce dont vous aimeriez parler…"
+          style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;font-family:inherit;box-sizing:border-box;"></textarea>
+
+        <label style="display:block;font-size:12px;font-weight:700;margin:12px 0 5px;">Vos disponibilités (facultatif)</label>
+        <textarea id="tr-dispos" rows="2" placeholder="Ex : en semaine après 18h, le week-end…"
+          style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;font-family:inherit;box-sizing:border-box;"></textarea>
+
+        <label style="display:block;font-size:12px;font-weight:700;margin:12px 0 5px;">Pièces jointes (facultatif)</label>
+        <p style="margin:0 0 8px;font-size:11.5px;color:#64748b;line-height:1.45;">
+          Documents ou images qui présentent mieux votre profil : plaquette, statuts,
+          photos de réalisations… PDF, Word, Excel, PowerPoint ou image, 15 Mo maximum,
+          5 fichiers au plus.
+        </p>
+        <button type="button" id="tr-ajouter-piece"
+          style="padding:8px 14px;border:1.5px dashed #CBD5E1;background:#F8FAFC;border-radius:9px;font-size:12.5px;font-weight:700;color:#334155;cursor:pointer;font-family:inherit;">
+          📎 Ajouter un fichier
+        </button>
+        <div id="tr-pieces" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
       </div>
 
-      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;" for="tr-creneau">Proposez une date et une heure</label>
-      <input type="datetime-local" id="tr-creneau"
-        style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;font-family:inherit;">
-      <p style="margin:6px 0 12px;font-size:11.5px;color:#64748b;line-height:1.45;">
-        Si ce créneau n'est pas disponible, la rencontre sera reprogrammée à une date
-        ultérieure par Diaspo'Actif.
-      </p>
-
-      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Message (facultatif)</label>
-      <textarea id="tr-message" rows="3" placeholder="Ce dont vous aimeriez parler…"
-        style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;font-family:inherit;"></textarea>
-
-      <label style="display:block;font-size:12px;font-weight:700;margin:12px 0 5px;">Pièces jointes (facultatif)</label>
-      <p style="margin:0 0 8px;font-size:11.5px;color:#64748b;line-height:1.45;">
-        Documents ou images qui présentent mieux votre profil : plaquette, statuts,
-        photos de réalisations… PDF, Word, Excel, PowerPoint ou image, 15 Mo maximum,
-        5 fichiers au plus.
-      </p>
-      <button type="button" id="tr-ajouter-piece"
-        style="padding:8px 14px;border:1.5px dashed #CBD5E1;background:#F8FAFC;border-radius:9px;font-size:12.5px;font-weight:700;color:#334155;cursor:pointer;font-family:inherit;">
-        📎 Ajouter un fichier
-      </button>
-      <div id="tr-pieces" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+      <div id="tr-recap" style="display:none;"></div>
 
       <div id="tr-erreur" style="display:none;margin-top:10px;padding:9px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;font-size:12.5px;color:#991B1B;"></div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
         <button type="button" id="tr-annuler" style="padding:9px 16px;border:1.5px solid #CBD5E1;background:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Annuler</button>
-        <button type="button" id="tr-envoyer" style="padding:9px 18px;border:0;background:#F26422;color:#fff;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;">Envoyer la demande</button>
+        <button type="button" id="tr-modifier" style="display:none;padding:9px 16px;border:1.5px solid #CBD5E1;background:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">← Modifier</button>
+        <button type="button" id="tr-envoyer" style="padding:9px 18px;border:0;background:#F26422;color:#fff;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;">Vérifier ma demande →</button>
       </div>
     </div>`;
     document.body.appendChild(ov);
 
-    /* On empêche de proposer une date passée dès la saisie, plutôt que de laisser le
-       serveur refuser après coup : le champ ne propose que des créneaux à venir. */
-    const champCreneau = ov.querySelector('#tr-creneau');
-    const dansUneHeure = new Date(Date.now() + 3600000);
-    dansUneHeure.setMinutes(dansUneHeure.getMinutes() - dansUneHeure.getTimezoneOffset());
-    champCreneau.min = dansUneHeure.toISOString().slice(0, 16);
-
-    /* Déclaré au niveau de la fenêtre : la zone d'erreur sert aussi bien à l'envoi du
-       formulaire qu'aux refus de fichiers. */
+    /* Déclaré au niveau de la fenêtre : la zone d'erreur sert aussi bien à la vérification
+       du formulaire qu'aux refus de fichiers. */
     const err = ov.querySelector('#tr-erreur');
+    const panel = ov.querySelector('#tr-panel');
+    const recap = ov.querySelector('#tr-recap');
+    const btnEnvoyer = ov.querySelector('#tr-envoyer');
+    const btnModifier = ov.querySelector('#tr-modifier');
+    const champTelephone = ov.querySelector('#tr-telephone');
 
     /* ── Pièces jointes ──
        Les fichiers sont envoyés dès leur sélection, pas au moment de valider : le membre
@@ -443,23 +457,65 @@
     });
 
     ov.querySelector('#tr-annuler').onclick = () => ov.remove();
-    ov.querySelector('#tr-envoyer').onclick = async () => {
-      const btn = ov.querySelector('#tr-envoyer');
-      const creneau = champCreneau.value;
-      if (!creneau) {
-        err.textContent = 'Proposez une date et une heure pour la rencontre.';
+
+    /* Étape 1 → 2 : vérifie le téléphone (seul champ obligatoire), puis bascule sur le
+       récapitulatif plutôt que d'envoyer directement — le membre relit ce qu'il a saisi
+       avant de confirmer. Rien n'est encore transmis au serveur à ce stade. */
+    btnEnvoyer.onclick = () => {
+      if (btnEnvoyer.dataset.step === 'confirmer') { envoyer(); return; }
+      const telephone = champTelephone.value.trim();
+      if (!telephone) {
+        err.textContent = 'Indiquez un numéro de téléphone ou WhatsApp pour que Diaspo\'Actif puisse vous recontacter.';
         err.style.display = '';
-        champCreneau.focus();
+        champTelephone.focus();
         return;
       }
-      btn.disabled = true; btn.textContent = 'Envoi…';
+      err.style.display = 'none';
+      const mode = ov.querySelector('input[name="tr-mode"]:checked')?.value || 'visio';
+      const message = ov.querySelector('#tr-message').value.trim();
+      const dispos = ov.querySelector('#tr-dispos').value.trim();
+      const ligne = (t, v) => `<div style="margin-top:8px;"><strong style="font-size:11.5px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">${t}</strong><br><span style="font-size:13px;color:#334155;">${esc(v)}</span></div>`;
+      recap.innerHTML = `
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;">
+          <p style="margin:0 0 4px;font-size:12px;font-weight:800;color:#334155;">📋 Récapitulatif de votre demande</p>
+          ${ligne('Mode d’échange', mode === 'presentiel' ? '📍 En présentiel' : '🎥 En visioconférence')}
+          ${ligne('Téléphone / WhatsApp', telephone)}
+          ${monEmail ? ligne('E-mail (votre compte)', monEmail) : ''}
+          ${message ? ligne('Message', message) : ''}
+          ${dispos ? ligne('Disponibilités indiquées', dispos) : ''}
+          ${pieces.length ? ligne('Pièces jointes', pieces.length + ' fichier' + (pieces.length > 1 ? 's' : '')) : ''}
+        </div>
+        <p style="margin:10px 0 0;font-size:11.5px;color:#64748b;line-height:1.45;">
+          Vérifiez ces informations puis confirmez l'envoi — Diaspo'Actif vous recontactera
+          ensuite pour convenir d'un rendez-vous.
+        </p>`;
+      panel.style.display = 'none';
+      recap.style.display = '';
+      btnModifier.style.display = '';
+      btnEnvoyer.textContent = "✅ Confirmer l'envoi";
+      btnEnvoyer.dataset.step = 'confirmer';
+    };
+
+    /* Étape 2 → 1 : retour au formulaire sans rien perdre de ce qui a été saisi (les champs
+       restent dans le DOM, seulement masqués). */
+    btnModifier.onclick = () => {
+      recap.style.display = 'none';
+      panel.style.display = '';
+      btnModifier.style.display = 'none';
+      btnEnvoyer.textContent = 'Vérifier ma demande →';
+      delete btnEnvoyer.dataset.step;
+    };
+
+    async function envoyer() {
+      btnEnvoyer.disabled = true; btnEnvoyer.textContent = 'Envoi…';
       try {
         const r = await fetch('/api/rencontres', {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             mode: ov.querySelector('input[name="tr-mode"]:checked')?.value || 'visio',
-            creneau_souhaite: creneau.replace('T', ' '),
+            telephone: champTelephone.value.trim(),
             message: ov.querySelector('#tr-message').value,
+            disponibilites: ov.querySelector('#tr-dispos').value,
             pieces,
           }),
         });
@@ -468,11 +524,14 @@
         ov.remove();
         if (typeof apres === 'function') apres();
       } catch (e) {
+        // Retour au formulaire : une erreur serveur (ex. demande déjà en cours) doit rester
+        // modifiable, pas coincer le membre sur un récapitulatif qu'il ne peut plus changer.
+        btnModifier.onclick();
         err.textContent = e.message;
         err.style.display = '';
-        btn.disabled = false; btn.textContent = 'Envoyer la demande';
+        btnEnvoyer.disabled = false;
       }
-    };
+    }
   }
 
   /* ──────────────── Signalement de compte ────────────────

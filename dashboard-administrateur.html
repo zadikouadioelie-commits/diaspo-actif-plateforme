@@ -8163,9 +8163,11 @@ function rdvCarte(r) {
 
   let actions = '';
   if (r.statut === 'demandee' || r.statut === 'reportee') {
-    /* Le champ est prérempli avec le créneau proposé par le membre : dans le cas courant
-       où il convient, l'agent n'a qu'un clic à faire. S'il ne convient pas, il le change. */
-    const propose = r.disponibilites ? String(r.disponibilites).slice(0, 16).replace(' ', 'T') : '';
+    /* Le champ n'est plus préempli (2026-09-20, demande explicite) : la demande ne propose
+       plus un créneau précis à accepter d'un clic, seulement un moyen de recontacter le
+       membre (téléphone/WhatsApp + e-mail, affichés plus bas) et éventuellement ses
+       disponibilités en texte libre. C'est l'agent qui choisit la date une fois le membre
+       recontacté, dans SES disponibilités à elle. */
     /* "Reporter" (2026-08-25, demande explicite) : un 3e choix entre confirmer et écarter,
        pour les demandes que l'administrateur ne veut ni accepter ni refuser dans l'immédiat
        — mise de côté sans date ni décision, dans l'onglet "Reportées", retraitable plus
@@ -8176,11 +8178,11 @@ function rdvCarte(r) {
       ? `<button class="btn btn-outline" onclick="rdvAction(${r.id},'reporter')">⏭️ Reporter le rendez-vous</button>` : '';
     actions = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
-        <input type="datetime-local" id="rdv-date-${r.id}" value="${propose}" style="padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;">
+        <input type="datetime-local" id="rdv-date-${r.id}" style="padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;">
         <input type="text" id="rdv-lieu-${r.id}" placeholder="Lien de visio ou adresse" style="padding:8px;border:1px solid #CBD5E1;border-radius:8px;font-size:13px;">
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-        <button class="btn btn-orange" onclick="rdvAction(${r.id},'planifier')">📅 Confirmer ce rendez-vous</button>
+        <button class="btn btn-orange" onclick="rdvAction(${r.id},'planifier')">📅 Planifier le rendez-vous</button>
         ${btnReporter}
         <button class="btn btn-outline" onclick="rdvAction(${r.id},'refuser')">✖️ Écarter la demande</button>
       </div>
@@ -8214,8 +8216,9 @@ function rdvCarte(r) {
       </div>
       <div style="font-size:12.5px;color:#64748B;text-align:right;">${mode}<br>Demandé le ${rdvDate(r.created_at)}</div>
     </div>
+    ${l('📞 Téléphone / WhatsApp', r.telephone)}
     ${l('Message du membre', r.message)}
-    ${l('Créneau proposé par le membre', r.disponibilites ? rdvDate(r.disponibilites) : '')}
+    ${l('Disponibilités indiquées par le membre', r.disponibilites)}
     ${rdvPieces(r.pieces_json)}
     ${l('Rendez-vous prévu', r.date_prevue ? rdvDate(r.date_prevue) + (r.lieu_ou_lien ? ' — ' + r.lieu_ou_lien : '') : '')}
     ${l('Rencontre effectuée le', r.date_rencontre ? rdvDate(r.date_rencontre) : '')}

@@ -2666,7 +2666,7 @@ route("GET", "/api/rencontres/moi", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rencontre = await db.prepare(
-    `SELECT id, statut, mode, message, disponibilites, date_prevue, lieu_ou_lien,
+    `SELECT id, statut, mode, message, disponibilites, telephone, date_prevue, lieu_ou_lien,
             date_rencontre, agent_nom, motif_refus, created_at
      FROM rencontres_diaspoactif WHERE user_id=? ORDER BY id DESC LIMIT 1`
   ).get(user.id);
@@ -2710,16 +2710,17 @@ route("POST", "/api/rencontres", async (req, res, params, body) => {
   const mode = RENCONTRE_MODES.includes(body.mode) ? body.mode : 'visio';
   const message = String(body.message || '').trim().slice(0, 1000) || null;
 
-  /* Le membre propose désormais un créneau précis, et non plus des disponibilités en
-     texte libre : l'agent peut l'accepter d'un clic. La colonne `disponibilites` le
-     conserve — inutile d'en migrer une nouvelle pour un changement de forme.
-     Une date passée est refusée ici aussi : le contrôle du navigateur ne protège que
-     l'utilisateur de bonne foi, pas un appel direct à la route. */
-  const creneau = String(body.creneau_souhaite || body.disponibilites || '').trim().slice(0, 40) || null;
-  if (!creneau) return sendJSON(res, 400, { error: "Proposez une date et une heure pour la rencontre." });
-  const quand = new Date(creneau.replace(' ', 'T'));
-  if (isNaN(quand.getTime())) return sendJSON(res, 400, { error: "Date de rencontre invalide." });
-  if (quand.getTime() < Date.now()) return sendJSON(res, 400, { error: "Le créneau proposé est déjà passé." });
+  /* La demande n'impose plus un créneau précis à accepter/refuser (2026-09-20, demande
+     explicite) : le membre laisse un moyen de le recontacter — téléphone/WhatsApp,
+     obligatoire, son e-mail de compte servant toujours de repli — et, s'il le souhaite,
+     ses disponibilités en texte libre. C'est ensuite Diaspo'Actif qui planifie un créneau
+     dans SES disponibilités à elle (action 'planifier' plus bas), plutôt que de devoir
+     accepter ou refuser un horaire imposé par le membre. La colonne `disponibilites`
+     reprend donc son sens d'origine (texte libre), pas de migration nécessaire pour elle —
+     seule `telephone` est nouvelle (voir migrateRencontresContact plus bas). */
+  const telephone = String(body.telephone || '').trim().slice(0, 30);
+  if (!telephone) return sendJSON(res, 400, { error: "Indiquez un numéro de téléphone ou WhatsApp pour que Diaspo'Actif puisse vous recontacter." });
+  const disponibilites = String(body.disponibilites || '').trim().slice(0, 500) || null;
 
   /* Pièces jointes : documents et images qui aident le membre à présenter son profil.
      Le téléversement a déjà eu lieu (route /api/upload/document, qui vérifie les octets
@@ -2735,9 +2736,9 @@ route("POST", "/api/rencontres", async (req, res, params, body) => {
   }).filter(Boolean);
 
   const r = await db.prepare(
-    `INSERT INTO rencontres_diaspoactif (user_id, statut, mode, message, disponibilites, pieces_json)
-     VALUES (?, 'demandee', ?, ?, ?, ?)`
-  ).run(user.id, mode, message, creneau, JSON.stringify(pieces));
+    `INSERT INTO rencontres_diaspoactif (user_id, statut, mode, message, disponibilites, telephone, pieces_json)
+     VALUES (?, 'demandee', ?, ?, ?, ?, ?)`
+  ).run(user.id, mode, message, disponibilites, telephone, JSON.stringify(pieces));
   const id = Number(r?.lastInsertRowid ?? r?.rows?.[0]?.id ?? 0) || null;
 
   /* L'indice est mis en cache 5 minutes. Sans cette purge, le membre venait de faire sa
@@ -23977,6 +23978,21 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       PRIMARY KEY(video_id, visiteur_hash, jour)
     )`).run();
   } catch (e) { console.error('[migrateVideosTutoriels]', e.message); }
+})();
+
+/* ──────── RENCONTRES DIASPO'ACTIF — recontact par téléphone/WhatsApp (2026-09-20,
+   demande explicite) ────────
+   La demande de rencontre ne propose plus un créneau précis à accepter/refuser mais un
+   moyen de recontacter le membre : ajout de `telephone` (voir POST /api/rencontres
+   ci-dessus). Même idiome que migrateVideosTutoriels() ci-dessus — PRAGMA table_info via
+   l'interface db abstraite, fonctionne identiquement en SQLite local et Postgres prod. */
+(async function migrateRencontresContact() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(rencontres_diaspoactif)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('telephone')) {
+      try { await db.prepare("ALTER TABLE rencontres_diaspoactif ADD COLUMN telephone TEXT").run(); } catch (e) {}
+    }
+  } catch (e) { console.error('[migrateRencontresContact]', e.message); }
 })();
 
 /* ──────── AVIS UNIFIÉS (annuaire — Initiative/Utilisateur/Organisme, cahier des charges
