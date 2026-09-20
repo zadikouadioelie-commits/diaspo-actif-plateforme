@@ -212,6 +212,7 @@
       <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select></div>
       <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="e-date"></div>
       <div><label>Heure de début</label><input type="time" id="e-heure" value="09:00"></div>
+      <div><label>Date de fin</label><input type="date" id="e-date-fin"></div>
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
       <div><label>Ville / Lieu</label><input type="text" id="e-lieu" placeholder="Paris, salle X"></div>
       <div><label>Origine (diaspora ciblée)</label><select id="e-origine"><option value="">-- Origine --</option></select></div>
@@ -456,7 +457,6 @@ function renderEvts() {
     const peutGerer = typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur');
     const hrefModifier = evt.source_events_id ? `dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements` : `dashboard-initiative.html#evenements`;
     return `<div class="evt-card">
-      ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
       <div class="evt-img">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}</div>
       <div class="evt-body">
@@ -488,6 +488,7 @@ function renderEvts() {
             )
           }
           ${peutGerer ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="${hrefModifier}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
+          ${peutGerer ? `<button class="btn btn-outline" style="font-size:12px;color:#dc2626;border-color:#FCA5A5;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑 Supprimer</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -787,6 +788,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       titre,
       date_evt:      date,
       heure_debut:   document.getElementById('e-heure').value || null,
+      date_fin:      document.getElementById('e-date-fin').value || null,
       type_evt:      document.getElementById('e-type').value,
       domaine:       document.getElementById('e-domaine').value,
       zone_diffusion: document.getElementById('e-zone-diffusion').value || null,
@@ -961,7 +963,7 @@ function renderEventDetail(evt, isPreview) {
   const hrefModifierDetail = evt.source_events_id ? `dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements` : `dashboard-initiative.html#evenements`;
 
   return `
-    ${!isPreview && peutGererDetail ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button></div>` : carouselHTML}
+    ${!isPreview ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="document.getElementById('modal-detail-bg').classList.remove('open')" title="Fermer" style="font-size:22px;font-weight:600;">×</button></div>` : carouselHTML}
     <div class="evt-detail-header">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <div>
@@ -999,6 +1001,7 @@ function renderEventDetail(evt, isPreview) {
         }
         <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
         ${peutGererDetail ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="${hrefModifierDetail}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
+        ${peutGererDetail ? `<button class="btn btn-outline" style="font-size:13px;color:#dc2626;border-color:#FCA5A5;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑 Supprimer</button>` : ''}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
