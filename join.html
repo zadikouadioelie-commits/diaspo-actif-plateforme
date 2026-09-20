@@ -107,14 +107,13 @@
     return;
   }
 
-  // Un visiteur déjà connecté a déjà un compte : pas d'appel signup, juste une redirection.
+  // Un visiteur déjà connecté a déjà un compte : pas de proposition de créer un compte,
+  // mais l'invitation elle-même (qui invite, description, aperçu annuaire) reste affichée
+  // en entier — avant, la page coupait court sans jamais afficher le contenu de l'invitation.
+  let dejaConnecte = false;
   try {
     const me = await api('GET', '/auth/me');
-    if (me.user) {
-      card.innerHTML = `<div class="jn-avatar-fallback">👋</div><h1 class="jn-titre">Vous avez déjà un compte</h1><p class="jn-sous">Vous êtes déjà connecté(e) sur Diaspo'Actif.</p>
-        <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/index.html">Aller à mon tableau de bord</a></div>`;
-      return;
-    }
+    if (me.user) dejaConnecte = true;
   } catch (e) { /* pas connecté — poursuite normale du parcours d'invitation */ }
 
   let invitation;
@@ -135,14 +134,17 @@
     : '';
 
   if (!invitation.actif) {
+    const suiteInactive = dejaConnecte
+      ? `<div class="jn-inactive">⏸️ Cette invitation n'est plus active.</div>
+         <p class="jn-sous">Vous êtes déjà connecté(e) sur Diaspo'Actif.</p>
+         <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/index.html">Aller à mon tableau de bord</a></div>`
+      : `<div class="jn-inactive">⏸️ Cette invitation n'est plus active.</div>
+         <p class="jn-sous">Vous pouvez tout de même découvrir Diaspo'Actif et créer votre compte librement.</p>
+         <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/inscription.html">Créer un compte</a></div>`;
     card.innerHTML = `${avatarHtml}
       <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite</h1>
       ${domaineHtml}
-      <div class="jn-inactive">⏸️ Cette invitation n'est plus active.</div>
-      <p class="jn-sous">Vous pouvez tout de même découvrir Diaspo'Actif et créer votre compte librement.</p>
-      <div class="jn-actions">
-        <a class="jn-btn jn-btn-utilisateur" href="/inscription.html">Créer un compte</a>
-      </div>`;
+      ${suiteInactive}`;
     chargerApercuAnnuaire();
     return;
   }
@@ -152,16 +154,22 @@
     <div class="jn-type"><span class="jn-type-icon">👤</span><div><p class="jn-type-titre">Compte Utilisateur</p><p class="jn-type-desc">Vous êtes une personne : connectez-vous à la diaspora, suivez des initiatives et participez aux événements.</p></div></div>
     <div class="jn-type"><span class="jn-type-icon">🏢</span><div><p class="jn-type-titre">Compte Initiative</p><p class="jn-type-desc">Vous représentez une structure (association, ONG, entreprise…) : présentez vos actions et mobilisez une communauté.</p></div></div>
   </div>`;
+  // Un visiteur déjà connecté voit l'invitation en entier (qui invite, domaine, aperçu
+  // annuaire) mais sans proposition de créer un nouveau compte — juste un lien vers le sien.
+  const ctaHtml = dejaConnecte
+    ? `<div class="jn-inactive" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">👋 Vous êtes déjà connecté(e) sur Diaspo'Actif.</div>
+       <div class="jn-actions"><a class="jn-btn jn-btn-utilisateur" href="/index.html">Aller à mon tableau de bord</a></div>`
+    : `${typesHtml}
+       <div class="jn-actions">
+         <a class="jn-btn jn-btn-utilisateur" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=utilisateur${suite}">👤 Créer un compte Utilisateur</a>
+         <a class="jn-btn jn-btn-initiative" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=initiative${suite}">🏢 Créer un compte Initiative</a>
+       </div>
+       <p class="jn-deja">Déjà inscrit(e) ? <a href="/login.html">Se connecter</a></p>`;
   card.innerHTML = `${avatarHtml}
     <h1 class="jn-titre">${esc(invitation.inviteur_nom || 'Un membre Diaspo\'Actif')} vous invite sur Diaspo'Actif</h1>
     <p class="jn-sous">La plateforme mondiale de la diaspora engagée — actions locales, impact global.</p>
     ${domaineHtml}
-    ${typesHtml}
-    <div class="jn-actions">
-      <a class="jn-btn jn-btn-utilisateur" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=utilisateur${suite}">👤 Créer un compte Utilisateur</a>
-      <a class="jn-btn jn-btn-initiative" href="/inscription.html?invitation=${encodeURIComponent(code)}&role=initiative${suite}">🏢 Créer un compte Initiative</a>
-    </div>
-    <p class="jn-deja">Déjà inscrit(e) ? <a href="/login.html">Se connecter</a></p>`;
+    ${ctaHtml}`;
 
   chargerApercuAnnuaire();
 })();
