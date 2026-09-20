@@ -1033,6 +1033,14 @@ window.carouselGo = function(id, idx) {
    indépendant des filtres de recherche d'événements ci-contre. Le pool complet n'est
    récupéré qu'une seule fois (au chargement) : /api/initiatives exclut déjà les comptes
    démo côté serveur, la rotation se fait ensuite localement sans nouvel appel réseau. */
+/* Casse incohérente en base (2026-09-20, bug réel repéré à l'écran) : ville/pays sont saisis
+   librement à l'inscription — "FRANCE", "france", "Paris" cohabitent selon le compte. Normalise
+   uniquement l'AFFICHAGE de ce widget, jamais les données stockées : ("Côte" / "d'Ivoire") →
+   première lettre de chaque segment (espace, tiret, apostrophe) en majuscule, le reste en
+   minuscule — couvre "FRANCE"→"France" et "côte d'ivoire"→"Côte D'Ivoire". */
+function casseLieu(s) {
+  return String(s || '').toLowerCase().replace(/(^|[\s\-'])\p{L}/gu, c => c.toUpperCase());
+}
 let _suggPool = [];
 async function loadSuggestionsPool() {
   try {
@@ -1058,7 +1066,7 @@ function renderSuggestions() {
     const photo = it.vitrine_banniere_url || it.logo_url || '';
     const descBrut = it.description || it.mission || '';
     const desc = descBrut.slice(0, 110) + (descBrut.length > 110 ? '…' : '');
-    const loc = [it.ville, it.pays].filter(Boolean).join(', ');
+    const loc = [it.ville, it.pays].filter(Boolean).map(casseLieu).join(', ');
     const profilHref = `initiative.html?id=${encodeURIComponent(it.slug || it.id)}`;
     const avatar = typeof photoAvatar === 'function' ? photoAvatar(it.nom, 40, 'initiative', photo) : '';
     const contactBtn = it.owner_user_id
