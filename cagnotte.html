@@ -85,10 +85,16 @@
     </div>
   </header>
 
-  <!-- Pas de tiroir "sidebar" propre à cette page (2026-09-21, demande explicite : "le bouton
-       menu doit afficher les modules, pas autre chose") — voir evenements.html pour le détail
-       du mécanisme (assets/app.js, initSidebarMobile) qui redirige alors vers le tableau de
-       bord du rôle connecté avec #da-menu. -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+    <div class="brand">Diaspo'Actif</div>
+    <a href="index.html">🏠 Accueil</a>
+    <a href="annuaire.html">🔍 Annuaire</a>
+    <a href="vitrines.html">🏪 Boutiques</a>
+    <a href="cagnottes.html">🪙 Cagnottes</a>
+    <div id="hb-account-section"></div>
+  </aside>
 
   <div class="cg-wrap" id="cg-content">
     <div class="cg-empty">Chargement…</div>

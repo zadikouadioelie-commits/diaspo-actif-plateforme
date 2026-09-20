@@ -138,14 +138,20 @@
   </div>
 </header>
 
-<!-- Pas de tiroir "sidebar" propre à cette page (2026-09-21, demande explicite : "le bouton
-     menu doit afficher les modules, pas autre chose") — volontaire. assets/app.js
-     (initSidebarMobile) détecte l'absence de #sidebar/.sidebar et redirige alors le clic sur
-     #sidebar-toggle vers le tableau de bord du rôle connecté avec #da-menu, qui ouvre
-     automatiquement son propre menu complet (~30 modules réels) — mécanisme déjà en place et
-     déjà utilisé par d'autres pages sans tiroir (ex. profil-app.html), mais court-circuité ici
-     tant qu'un tiroir générique (Accueil/Annuaire/Boutiques…, dupliquant la nav du bandeau) au
-     contenu bien plus pauvre existait sur cette page. -->
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<aside class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+  <div class="brand">Diaspo'Actif</div>
+  <a href="index.html">🏠 Accueil</a>
+  <a href="annuaire.html">🔍 Annuaire</a>
+  <a href="vitrines.html">🏪 Boutiques</a>
+  <a href="fil-actualite.html">📰 Fil d'actualité</a>
+  <a href="actualites.html">Projets diasporas</a>
+  <a href="evenements.html">📅 Événements</a>
+  <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
+  <a href="premium.html">⭐ Passer Premium</a>
+  <div id="hb-account-section"></div>
+</aside>
 
 <!-- IDENTITY BANNER -->
 <div id="evt-identity">
@@ -212,7 +218,6 @@
       <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select></div>
       <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="e-date"></div>
       <div><label>Heure de début</label><input type="time" id="e-heure" value="09:00"></div>
-      <div><label>Date de fin</label><input type="date" id="e-date-fin"></div>
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
       <div><label>Ville / Lieu</label><input type="text" id="e-lieu" placeholder="Paris, salle X"></div>
       <div><label>Origine (diaspora ciblée)</label><select id="e-origine"><option value="">-- Origine --</option></select></div>
@@ -342,13 +347,6 @@
   </div>
 </div>
 
-<!-- ═══ MODAL GESTION DES INSCRITS (formulaire simple, sans fiche liée) ═══ -->
-<div class="modal-bg" id="modal-gerer-bg" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:640px;padding:0;overflow:hidden;">
-    <div id="gerer-inscrits-content"></div>
-  </div>
-</div>
-
 <!-- ═══ MODAL PRÉVISUALISATION ═══ -->
 <div class="modal-bg" id="modal-preview-bg" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
@@ -378,31 +376,27 @@ function fmtDate(d){
 }
 
 
-/* Filtre "Domaine de l'événement" ET select "Domaine" du formulaire de création complétés par
-   les vraies valeurs en base (2026-09-10, bug trouvé par exécution réelle : "Networking"
-   affiché comme domaine sur la cartouche d'un événement, mais introuvable dans la liste fixe du
-   filtre — donc jamais sélectionnable, le filtre renvoyait 0 résultat quel que soit le choix
-   fait). La liste d'options codée en dur (server/index.js : le champ `domaine` accepte
-   n'importe quelle valeur à la création, pas seulement celles du <select>) peut donc diverger
-   de ce qui existe réellement — ce bloc consulte TOUS les événements au chargement de la page
-   et ajoute, sur les DEUX select (filtre + création), toute valeur de domaine réellement
-   utilisée mais absente de la liste (2026-09-21, demande explicite : "propose tous les domaines
-   present sur la plateforme" dans le formulaire de création lui-même, pas seulement le filtre).
-   N'écrase rien : ajoute seulement ce qui manque. */
+/* Filtre "Domaine de l'événement" complété par les vraies valeurs en base (2026-09-10, bug
+   trouvé par exécution réelle : "Networking" affiché comme domaine sur la cartouche d'un
+   événement, mais introuvable dans la liste fixe du filtre — donc jamais sélectionnable, le
+   filtre renvoyait 0 résultat quel que soit le choix fait). La liste d'options codée en dur
+   ci-dessus (server/index.js: le champ `domaine` accepte n'importe quelle valeur à la création,
+   pas seulement celles du <select>) peut donc diverger de ce qui existe réellement — ce bloc
+   consulte TOUS les événements au chargement de la page et ajoute toute valeur de domaine
+   réellement utilisée mais absente de la liste, pour qu'aucun événement ne devienne jamais
+   introuvable par ce filtre. N'écrase rien : ajoute seulement ce qui manque. */
 async function syncFiltreDomaineOptions() {
   try {
     const { evenements } = await api('GET', '/evenements');
-    const reelsTous = [...new Set((evenements || []).map(e => e.domaine).filter(Boolean))];
-    ['f-domaine', 'e-domaine'].forEach(id => {
-      const sel = document.getElementById(id);
-      if (!sel) return;
-      const existants = new Set(Array.from(sel.options).map(o => o.value).filter(Boolean));
-      const reels = reelsTous.filter(d => !existants.has(d)).sort((a, b) => a.localeCompare(b, 'fr'));
-      reels.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d; opt.textContent = d;
-        sel.appendChild(opt);
-      });
+    const sel = document.getElementById('f-domaine');
+    const existants = new Set(Array.from(sel.options).map(o => o.value).filter(Boolean));
+    const reels = [...new Set((evenements || []).map(e => e.domaine).filter(Boolean))]
+      .filter(d => !existants.has(d))
+      .sort((a, b) => a.localeCompare(b, 'fr'));
+    reels.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      sel.appendChild(opt);
     });
   } catch (e) { /* liste codée en dur déjà en place — pas bloquant si cet appel échoue */ }
 }
@@ -464,6 +458,7 @@ function renderEvts() {
     const peutGerer = typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur');
     const hrefModifier = evt.source_events_id ? `dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements` : `dashboard-initiative.html#evenements`;
     return `<div class="evt-card">
+      ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
       <div class="evt-img">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}</div>
       <div class="evt-body">
@@ -495,8 +490,6 @@ function renderEvts() {
             )
           }
           ${peutGerer ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="${hrefModifier}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
-          ${peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px" onclick="gererInscrits(${evt.id}, ${evt.fiche_id || 'null'}, '${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : ''}
-          ${peutGerer ? `<button class="btn btn-outline" style="font-size:12px;color:#dc2626;border-color:#FCA5A5;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑 Supprimer</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -596,42 +589,6 @@ async function supprimerEvenement(id, btn) {
     allEvts = allEvts.filter(e => e.id !== id);
     renderEvts();
   } catch(e) { alert('Erreur : '+e.message); btn.disabled = false; }
-}
-
-/* Bouton "🗂️ Gérer" (2026-09-21, demande explicite) — réservé à l'organisateur/admin (même
-   garde que "✏️ Modifier", voir peutGerer/peutGererDetail). Deux destinations selon qu'une
-   fiche d'inscription personnalisée est liée à l'événement ou non :
-   - fiche liée (ficheId non nul) → inscriptions-admin.html, qui gère déjà ses inscrits/
-     présences, pas de nouvelle UI à construire ;
-   - sinon → les inscriptions passent par le petit formulaire intégré de cette page
-     (rejoindre(), table evenements_participants) qui n'avait jusqu'ici aucun écran pour
-     l'organisateur (seul un compteur existait) — modale listant nom/e-mail/téléphone/
-     nombre de personnes/message. */
-async function gererInscrits(evtId, ficheId, titre) {
-  if (ficheId) { window.location.href = 'inscriptions-admin.html?fiche=' + ficheId; return; }
-  const bg = document.getElementById('modal-gerer-bg');
-  const zone = document.getElementById('gerer-inscrits-content');
-  zone.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
-  bg.classList.add('open');
-  try {
-    const { participants } = await api('GET', '/evenements/' + evtId + '/participants');
-    zone.innerHTML = `
-      <div style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
-        <strong style="font-size:14.5px;">👥 Inscrits — ${esc(titre)}</strong>
-        <button onclick="document.getElementById('modal-gerer-bg').classList.remove('open')" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;">×</button>
-      </div>
-      <div style="padding:10px 20px 20px;max-height:60vh;overflow-y:auto;">
-        <p style="font-size:12px;color:var(--muted);margin:10px 0 4px;">${participants.length} inscription${participants.length>1?'s':''}</p>
-        ${!participants.length ? '<div class="empty-state"><div class="big">👥</div><p>Aucune inscription pour le moment.</p></div>' : participants.map(p => `
-          <div style="padding:12px 0;border-bottom:1px solid var(--border);">
-            <div style="font-weight:700;font-size:13.5px;">${esc(p.nom_complet || '—')}${p.nb_personnes > 1 ? ` <span style="font-weight:400;color:var(--muted);font-size:12px;">(${p.nb_personnes} pers.)</span>` : ''}</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:3px;">${[p.email ? '✉️ '+esc(p.email) : '', p.telephone ? '📞 '+esc(p.telephone) : ''].filter(Boolean).join(' · ')}</div>
-            ${p.message ? `<div style="font-size:12px;color:#444;margin-top:6px;font-style:italic;">« ${esc(p.message)} »</div>` : ''}
-          </div>`).join('')}
-      </div>`;
-  } catch (e) {
-    zone.innerHTML = '<div style="padding:40px;text-align:center;color:red;">Erreur de chargement : ' + esc(e.message || '') + '</div>';
-  }
 }
 
 /* ─── Pays (origine retirée du filtre Événements, 2026-09-07 — hors du set de filtres
@@ -832,7 +789,6 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       titre,
       date_evt:      date,
       heure_debut:   document.getElementById('e-heure').value || null,
-      date_fin:      document.getElementById('e-date-fin').value || null,
       type_evt:      document.getElementById('e-type').value,
       domaine:       document.getElementById('e-domaine').value,
       zone_diffusion: document.getElementById('e-zone-diffusion').value || null,
@@ -1007,7 +963,7 @@ function renderEventDetail(evt, isPreview) {
   const hrefModifierDetail = evt.source_events_id ? `dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements` : `dashboard-initiative.html#evenements`;
 
   return `
-    ${!isPreview ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="document.getElementById('modal-detail-bg').classList.remove('open')" title="Fermer" style="font-size:22px;font-weight:600;">×</button></div>` : carouselHTML}
+    ${!isPreview && peutGererDetail ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button></div>` : carouselHTML}
     <div class="evt-detail-header">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <div>
@@ -1045,8 +1001,6 @@ function renderEventDetail(evt, isPreview) {
         }
         <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
         ${peutGererDetail ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="${hrefModifierDetail}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
-        ${peutGererDetail ? `<button type="button" class="btn btn-outline" style="font-size:13px" onclick="gererInscrits(${evt.id}, ${evt.fiche_id || 'null'}, '${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : ''}
-        ${peutGererDetail ? `<button class="btn btn-outline" style="font-size:13px;color:#dc2626;border-color:#FCA5A5;" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑 Supprimer</button>` : ''}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `

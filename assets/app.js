@@ -5239,6 +5239,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // id="sidebar" — voir dashboard-utilisateur.html) : évite de dupliquer ce module en
     // script inline par page, comme c'était fait jusqu'ici sur 6 pages différentes.
     const sidebar = document.getElementById("sidebar") || document.querySelector(".sidebar");
+    // Distingue le vrai tiroir des ~30 modules (tableaux de bord, marqué data-full-menu) du
+    // petit tiroir local minimal que certaines pages publiques posent encore (ex. Accueil,
+    // Événements — quelques liens dupliquant le bandeau du haut). Sert uniquement au bouton
+    // desktop juste plus bas (#sidebar-toggle) : demande explicite (2026-09-21) de limiter au
+    // PC le renvoi systématique vers le vrai menu, sans changer le comportement mobile
+    // (barre basse, navToggle ci-dessus/dessous) qui doit continuer à ouvrir ce petit tiroir
+    // local tel quel, comme avant cette demande.
+    const richMenu = !!(sidebar && sidebar.hasAttribute("data-full-menu"));
 
     // Aucun tiroir dédié sur cette page : on bascule alors l'affichage mobile de la nav
     // existante du topbar plutôt que d'exiger un tiroir dupliqué par page — la nav contient
@@ -5384,7 +5392,22 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (sidebar.classList.contains("open")) closeSidebar(true);
       else openSidebar(true);
     }
-    if (toggle) toggle.addEventListener("click", toggleSidebar);
+    // PC uniquement (2026-09-21, demande explicite) : si ce tiroir n'est pas le vrai menu des
+    // modules (richMenu), #sidebar-toggle (desktop) renvoie vers le tableau de bord du rôle
+    // connecté au lieu d'ouvrir ce petit tiroir local — même redirection que navToggle
+    // ci-dessus quand aucun tiroir n'existe du tout. navToggle (mobile) n'est PAS concerné :
+    // il garde toggleSidebar() dans tous les cas, comportement mobile inchangé.
+    if (toggle) {
+      if (richMenu) {
+        toggle.addEventListener("click", toggleSidebar);
+      } else {
+        toggle.addEventListener("click", (e) => {
+          e.preventDefault();
+          const dest = (CURRENT_USER && ROLE_DASHBOARD[CURRENT_USER.role]) || "index.html";
+          window.location.href = dest + "#da-menu";
+        });
+      }
+    }
     if (navToggle) navToggle.addEventListener("click", toggleSidebar);
     if (close)    close.addEventListener("click", () => closeSidebar(true));
     if (backdrop) backdrop.addEventListener("click", () => closeSidebar(true));

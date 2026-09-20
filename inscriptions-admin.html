@@ -64,13 +64,21 @@
     <div class="topbar-right"><div id="auth-area" class="auth-area"></div></div>
   </div>
 </header>
-<!-- Pas de tiroir "sidebar" propre à cette page (2026-09-21, demande explicite : "le bouton
-     menu doit afficher les modules, pas autre chose, à chaque fois") — remplace l'ancien tiroir
-     minimal (3 liens + lien "Tous les modules") du 2026-09-09 : ce dernier n'affichait pas
-     directement le vrai menu des modules, ce qui contredit la nouvelle règle. Voir
-     evenements.html pour le détail du mécanisme (assets/app.js, initSidebarMobile) qui redirige
-     désormais vers le tableau de bord du rôle connecté avec #da-menu. -->
-
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<aside class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebar-close" aria-label="Fermer">&#x2715;</button>
+  <div class="brand">Diaspo'Actif</div>
+  <a href="index.html">🏠 Accueil</a>
+  <a href="dashboard-initiative.html">📊 Mon tableau de bord</a>
+  <a href="inscriptions-admin.html">📝 Formulaires & Inscriptions</a>
+  <!-- Cette page a son propre tiroir minimal (3 liens), pas le menu complet des modules
+       (~30, celui de dashboard-initiative.html) -- même convention que profil-app.html et les
+       autres pages sans tiroir riche (voir assets/app.js, commentaire sur #da-menu) : navigue
+       vers le tableau de bord avec ce repère dans l'URL, qui y ouvre automatiquement le vrai
+       menu complet (2026-09-09, demande explicite : "un bouton retour au menu classique"). -->
+  <a href="dashboard-initiative.html#da-menu" style="border-top:1px solid rgba(255,255,255,.15);margin-top:6px;padding-top:16px;">🗂️ Tous les modules</a>
+  <div id="hb-account-section"></div>
+</aside>
 
 <main id="ia-root">
   <div style="text-align:center;padding:60px 0;color:oklch(0.55 0.006 30);">Chargement…</div>
