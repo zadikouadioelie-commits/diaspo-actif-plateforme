@@ -357,8 +357,11 @@
       `<p style="font-size:12px;color:#64748b;margin:0 0 10px;">Choisissez le style de votre bandeau.</p>
        <div class="cda-style-grid">${vignettes}</div>`,
       async () => { /* la sélection sauvegarde et ferme elle-même, voir ci-dessous */ });
-    // Le bouton « Enregistrer » du modal générique ne sert à rien ici : chaque vignette agit seule au clic.
-    ov.querySelector('.cda-modal-actions').style.display = 'none';
+    // Le bouton « Enregistrer » du modal générique ne sert à rien ici : chaque vignette agit
+    // seule au clic. « Annuler » reste en revanche nécessaire : c'était auparavant le seul
+    // moyen de fermer la fenêtre qui disparaissait (aucun clic sur le fond n'était prévu),
+    // obligeant à choisir un thème pour la refermer — bug réel signalé par un utilisateur.
+    ov.querySelector('.cda-modal-save').style.display = 'none';
     ov.querySelectorAll('.cda-style-swatch').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
