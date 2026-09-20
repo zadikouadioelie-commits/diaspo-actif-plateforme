@@ -26,6 +26,20 @@ const REACTIONS = [
   { type:'feliciter',  emoji:'🎉',  label:'Féliciter' },
   { type:'inspirant',  emoji:'🔥',  label:'Inspirant' },
 ];
+/* Troncature "Voir plus" (2026-09-20, demande explicite) : un texte long noyait les boutons
+   d'interaction (réactions/commentaires/partage) très loin sous le pli — ils existaient déjà
+   mais paraissaient absents. Coupe sur le texte BRUT (avant processContent()) puis retraite
+   chaque version séparément, jamais l'inverse : trancher du HTML déjà généré (liens de mention,
+   <br>, gras) risquerait de couper une balise au milieu et de casser le rendu. */
+const POST_TRUNC_LEN = 300;
+function tronquerTexteBrut(texte, max) {
+  if (!texte || texte.length <= max) return null;
+  let coupe = texte.slice(0, max);
+  const dernierEspace = coupe.lastIndexOf(' ');
+  if (dernierEspace > max * 0.6) coupe = coupe.slice(0, dernierEspace);
+  return coupe;
+}
+
 const CONTRIBUTIONS = [
   'Je souhaite devenir partenaire',
   'Je souhaite investir',
@@ -300,9 +314,12 @@ function renderPostCard(post, options = {}) {
   const titrePro = profil.titre_pro ? `<span class="post-auteur-titre">${escHtml(profil.titre_pro)}</span>` : '';
   const villeInfo = profil.ville ? `· ${escHtml(profil.ville)}` : '';
 
-  const contenuHTML = post.pub_type === 'article'
-    ? `<h3 class="post-article-titre">${escHtml(post.article_titre||post.contenu)}</h3>${processContent(post.article_contenu||'')}`
-    : processContent(post.contenu);
+  const estArticle = post.pub_type === 'article';
+  const texteBrut = estArticle ? (post.article_contenu || '') : (post.contenu || '');
+  const titreArticleHtml = estArticle ? `<h3 class="post-article-titre">${escHtml(post.article_titre||post.contenu)}</h3>` : '';
+  const contenuHTML = titreArticleHtml + processContent(texteBrut);
+  const texteTronque = tronquerTexteBrut(texteBrut, POST_TRUNC_LEN);
+  const contenuApercuHTML = texteTronque ? titreArticleHtml + processContent(texteTronque) + '…' : '';
 
   const repostBanner = (post.pub_type === 'repost' || post.type === 'repost') && post.original_post
     ? `<div class="post-repost-banner">
@@ -351,11 +368,13 @@ function renderPostCard(post, options = {}) {
 
   ${repostBanner}
 
-  <div class="post-body">
-    ${contenuHTML}
-  </div>
-
   ${renderMedias(post)}
+
+  <div class="post-body" data-expanded="${texteTronque ? 'false' : 'true'}">
+    <div class="post-body-preview"${texteTronque ? '' : ' style="display:none"'}>${contenuApercuHTML}</div>
+    <div class="post-body-full"${texteTronque ? ' style="display:none"' : ''}>${contenuHTML}</div>
+    ${texteTronque ? `<button type="button" class="post-voir-plus" onclick="Posts.toggleExpand(${post.id}, this)">Voir plus</button>` : ''}
+  </div>
 
   ${hashtags.length ? `<div class="post-hashtags">${hashtags.map(h=>`<a href="fil-actualite.html?hashtag=${encodeURIComponent(h.replace('#',''))}" class="post-hashtag">${escHtml(h.startsWith('#')?h:'#'+h)}</a>`).join(' ')}</div>` : ''}
 
@@ -549,6 +568,8 @@ function injectStyles() {
 .post-badge-loc{background:#f0fdf4;color:#15803d;border-color:#bbf7d0;}
 /* Body */
 .post-body{padding:4px 16px 12px;font-size:.95rem;line-height:1.6;color:#1f2937;white-space:pre-wrap;word-break:break-word;}
+.post-voir-plus{display:inline-block;margin-top:4px;background:none;border:none;padding:0;color:#ff6b00;font-weight:700;font-size:.9rem;cursor:pointer;}
+.post-voir-plus:hover{text-decoration:underline;}
 .post-article-titre{font-size:1.1rem;font-weight:700;color:#111;margin-bottom:8px;}
 .post-hashtag{color:#ff6b00;text-decoration:none;font-weight:500;}
 .post-hashtag:hover{text-decoration:underline;}
@@ -938,6 +959,21 @@ const Posts = {
   toggleReactionMenu(postId, btn) {
     const menu = document.getElementById(`react-menu-${postId}`);
     if (menu) menu.classList.toggle('open');
+  },
+
+  /* "Voir plus" / "Voir moins" (2026-09-20, demande explicite) : bascule entre les deux blocs
+     déjà présents dans le DOM (post-body-preview / post-body-full), jamais un nouvel appel
+     réseau — le contenu complet est déjà rendu, juste masqué. */
+  toggleExpand(postId, btn) {
+    const carte = document.getElementById(`post-${postId}`);
+    if (!carte) return;
+    const apercu = carte.querySelector('.post-body-preview');
+    const complet = carte.querySelector('.post-body-full');
+    if (!apercu || !complet) return;
+    const estDeplie = complet.style.display !== 'none';
+    complet.style.display = estDeplie ? 'none' : '';
+    apercu.style.display = estDeplie ? '' : 'none';
+    btn.textContent = estDeplie ? 'Voir plus' : 'Voir moins';
   },
 
   async react(postId, type) {

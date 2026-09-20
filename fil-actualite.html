@@ -69,8 +69,12 @@
     .fil-evt-date{width:42px;flex:none;text-align:center;background:#F4F6F9;border-radius:8px;padding:5px 0;}
     .fil-evt-date .j{font-size:14px;font-weight:800;color:var(--navy,#0D2B4E);line-height:1;}
     .fil-evt-date .m{font-size:9px;color:#6b7280;text-transform:uppercase;}
-    .fil-evt-titre{font-size:12.5px;font-weight:700;color:#111;line-height:1.3;}
-    .fil-evt-lieu{font-size:11px;color:#6b7280;margin-top:2px;}
+    .fil-evt-photo{width:44px;height:44px;flex:none;border-radius:8px;object-fit:cover;background:#F4F6F9;}
+    .fil-evt-photo-fallback{width:44px;height:44px;flex:none;border-radius:8px;background:#F4F6F9;display:flex;align-items:center;justify-content:center;font-size:18px;}
+    .fil-evt-body{min-width:0;}
+    .fil-evt-titre{font-size:12.5px;font-weight:700;color:#111;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .fil-evt-lieu{font-size:11px;color:#6b7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .fil-evt-domaine{display:inline-block;font-size:9.5px;font-weight:700;color:var(--orange,#ff6b00);background:#fff3ea;border-radius:5px;padding:1px 5px;margin-top:3px;}
     @media(max-width:1024px){
       /* Le découpage à 3 panneaux indépendants n'a de sens qu'à largeur suffisante pour les
          voir tous en même temps — repli sur un défilement de page classique, une colonne. */
@@ -338,14 +342,23 @@ async function loadEvenementsAVenir() {
     const MOIS = ['jan','fév','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'];
     list.innerHTML = evts.map(e => {
       const d = e.date_evt ? new Date(e.date_evt) : null;
+      // Photo réelle de l'événement (2026-09-20, demande explicite) : même champ que la
+      // cartouche complète d'evenements.html (image_couverture > image_url), pour que le
+      // visuel de ce widget corresponde à celui de la fiche complète.
+      const photo = e.image_couverture || e.image_url || null;
+      const photoHtml = photo
+        ? `<img class="fil-evt-photo" src="${escFilHtml(photo)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;fil-evt-photo-fallback&quot;>📅</div>'">`
+        : `<div class="fil-evt-photo-fallback">📅</div>`;
       return `<a class="fil-evt-item" href="evenements.html?id=${e.id}">
         <div class="fil-evt-date">
           <div class="j">${d ? d.getDate() : '—'}</div>
           <div class="m">${d ? MOIS[d.getMonth()] : ''}</div>
         </div>
-        <div>
+        ${photoHtml}
+        <div class="fil-evt-body">
           <div class="fil-evt-titre">${escFilHtml(e.titre || 'Événement')}</div>
           <div class="fil-evt-lieu">📍 ${escFilHtml(e.ville || e.pays || 'Lieu à confirmer')}</div>
+          ${e.domaine ? `<span class="fil-evt-domaine">${escFilHtml(e.domaine)}</span>` : ''}
         </div>
       </a>`;
     }).join('');
