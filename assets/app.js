@@ -5463,7 +5463,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const links = Array.from(sidebar.querySelectorAll("a")).filter(a => a.id !== "sidebar-close");
     const items = links.map(a => {
       const clone = a.cloneNode(true);
-      clone.querySelectorAll("span").forEach(s => s.remove());
+      // "button" en plus de "span" (2026-09-20, bug réel constaté, capture à l'appui) : le
+      // bouton d'aide "?" posé par assets/module-aide-ui.js (.module-aide-btn) est un
+      // <button>, pas un <span> — il survivait donc à ce nettoyage et son texte "?" se
+      // retrouvait collé au nom du module dans les résultats de recherche ("Paramètres
+      // Boutique?"). Un <a> de sidebar ne porte jamais d'autre bouton que ce type de
+      // contrôle auxiliaire, jamais une partie du libellé lui-même.
+      clone.querySelectorAll("span, button").forEach(s => s.remove());
       const label = (clone.textContent || "").trim();
       return { el: a, label, norm: sbNormalize(label) };
     }).filter(it => it.label);
