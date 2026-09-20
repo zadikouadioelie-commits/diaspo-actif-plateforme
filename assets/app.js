@@ -1935,6 +1935,18 @@ function annAvisBadgeHtml(it) {
   return `<span class="ann-avis-badge" title="${it.avis_total} avis">${'★'.repeat(r)}${'☆'.repeat(5 - r)} ${it.avis_moyenne} · ${it.avis_total} avis</span>`;
 }
 
+/* Casse incohérente en base (2026-09-20, bug réel repéré à l'écran : "Toulouse, FRANCE"
+   à côté de "Paris, france") — ville/pays sont saisis librement à l'inscription, jamais
+   normalisés. Corrige uniquement l'AFFICHAGE des 3 cartouches ci-dessous, jamais les
+   données stockées : première lettre de chaque segment (espace/tiret/apostrophe) en
+   majuscule, le reste en minuscule — couvre "FRANCE"→"France" et "côte d'ivoire"→
+   "Côte D'Ivoire". Utilisée par les 3 cartouches (Initiative/Utilisateur/Organisme) et par
+   le widget "Découvrir des initiatives" (evenements.html), toutes alimentées par les mêmes
+   champs ville/pays. */
+function casseLieu(s) {
+  return String(s || '').toLowerCase().replace(/(^|[\s\-'])\p{L}/gu, c => c.toUpperCase());
+}
+
 function renderInitiativeCard(it){
   /* Domaine d'activité unifié (2026-09-04) : prime sur l'ancien it.domaine quand renseigné —
      migration "self-service", les deux champs coexistent tant qu'un compte n'a pas rouvert
@@ -1961,7 +1973,7 @@ function renderInitiativeCard(it){
      une comparaison stricte les manque alors silencieusement — bug déjà rencontré sur ce
      projet, cf. mémoire "Bug types BIGSERIAL". */
   const isOwnInit = !!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && it.owner_user_id && Number(CURRENT_USER.id) === Number(it.owner_user_id));
-  const loc     = [it.ville, it.pays].filter(Boolean).join(', ') || '—';
+  const loc     = [it.ville, it.pays].filter(Boolean).map(casseLieu).join(', ') || '—';
   const nats    = [it.nationalite1, it.nationalite2].filter(Boolean).join(' • ') || '—';
   const origs   = daOrigineDeclaree(it);
   const ray     = it.rayonnement || '';
@@ -2289,7 +2301,7 @@ async function initAnnuaire(){
   }
 
   function renderPersonCard(u) {
-    const loc = [u.ville, u.pays].filter(Boolean).join(', ') || '—';
+    const loc = [u.ville, u.pays].filter(Boolean).map(casseLieu).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(u.id)}`;
     const nom = [u.prenom, u.nom].filter(Boolean).join(' ') || u.nom;
     const isOwn = !!(ME && Number(ME.id) === Number(u.id));
@@ -2332,7 +2344,7 @@ async function initAnnuaire(){
   }
 
   function renderOrganismeCard(o) {
-    const loc = [o.ville, o.pays].filter(Boolean).join(', ') || '—';
+    const loc = [o.ville, o.pays].filter(Boolean).map(casseLieu).join(', ') || '—';
     const profilHref = `profil.html?id=${encodeURIComponent(o.id)}`;
     const badge = o.role === 'administrateur' ? "DIASPO'ACTIF" : (o.role === 'institutionnel' || o.role === 'officiel') ? 'INSTITUTION' : 'COLLECTIVITÉ';
     const isOwn = !!(ME && Number(ME.id) === Number(o.id));

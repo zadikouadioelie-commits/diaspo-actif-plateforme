@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="assets/styles.v2.css">
   <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="assets/annuaire-cards.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -137,115 +138,10 @@
 @media(max-width:780px){.ann-grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:480px){.ann-grid{grid-template-columns:1fr;}}
 
-/* Card */
-.ann-card{
-  background:#fff;border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;text-decoration:none;color:inherit;
-  box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s;
-  display:flex;flex-direction:column;
-}
-.ann-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(27,58,107,.13);}
-
-/* Card photo */
-.ann-card-photo{height:180px;position:relative;overflow:hidden;background:var(--bg);}
-.ann-card-photo img{position:relative;width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
-/* Repli placé sous l'image : visible quand l'initiative n'a chargé ni bannière ni logo,
-   ou si son image ne se charge pas. Ses initiales, jamais une photo qui n'est pas la sienne. */
-.ann-card-initiales{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:44px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,.92);
-  text-shadow:0 2px 8px rgba(0,0,0,.18);
-}
-.ann-card:hover .ann-card-photo img{transform:scale(1.04);}
-.ann-cat-badge{
-  position:absolute;top:10px;left:10px;
-  padding:4px 10px;border-radius:4px;
-  font-size:10px;font-weight:800;color:#fff;letter-spacing:.06em;text-transform:uppercase;
-}
-/* Origine du compte : posée en haut à DROITE de l'image, la zone que l'œil balaie en
-   premier après le titre. Fond clair pour rester lisible sur une photo comme sur un
-   dégradé, quel qu'en soit le contraste. */
-.ann-origine-badge{
-  position:absolute;top:10px;right:10px;z-index:2;
-  display:inline-flex;align-items:center;gap:5px;
-  padding:4px 10px;border-radius:99px;
-  background:rgba(255,255,255,.94);color:#0D2B4E;
-  font-size:11px;font-weight:800;
-  box-shadow:0 1px 4px rgba(0,0,0,.18);
-  max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-
-/* Card profil (utilisateur/organisme) : bandeau + avatar rond superposé, plus de zone vide */
-.ann-card-banner{height:80px;position:relative;}
-.ann-card-avatar-wrap{display:flex;justify-content:center;margin-top:-44px;position:relative;z-index:2;}
-.ann-card-avatar-wrap img{border:4px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.15);display:block;}
-.ann-card-body-profile{padding-top:8px;text-align:center;align-items:center;}
-.ann-card-cover-edit{
-  position:absolute;bottom:8px;right:8px;
-  background:rgba(13,43,78,.75);color:#fff;border:none;border-radius:20px;
-  font-size:10.5px;font-weight:700;padding:5px 10px;cursor:pointer;white-space:nowrap;
-}
-.ann-card-cover-edit:hover{background:rgba(13,43,78,.92);}
-
-/* Card body */
-.ann-card-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:6px;}
-.ann-card-title{font-size:14px;font-weight:700;margin:0;line-height:1.3;color:var(--text);}
-.ann-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;flex:1;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-/* Pied de carte (2026-09-05) : grille à colonnes égales plutôt qu'un flex-wrap en vrac —
-   le nombre de boutons varie selon le type de compte (2 à 5 : profil, abonnement, message,
-   adhésion, événements) et un flex-wrap les empile en lignes de largeurs inégales, la
-   dernière ligne se retrouvant parfois avec un seul bouton isolé. La grille garde toujours
-   des cellules alignées, quel que soit le nombre d'actions présentes sur une carte donnée.
-   « Voir le profil » passe en style discret (contour) car le clic sur la carte fait déjà
-   la même action — les vraies actions (S'abonner, Message, Adhérer) restent seules à porter
-   de la couleur, pour que l'œil aille droit sur ce qui est réellement actionnable. */
-.ann-card-foot{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
-.ann-location{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;}
-.ann-arrow{width:26px;height:26px;border-radius:50%;background:var(--orange-light);color:#2563EB;
-  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
-.ann-card-btn{
-  display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;
-  font-size:11.5px;font-weight:700;padding:8px 8px;border-radius:10px;text-decoration:none;border:1.5px solid transparent;
-  background:var(--orange-light);color:#2563EB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  transition:background .15s,border-color .15s;cursor:pointer;}
-.ann-card-btn:hover{background:#FFE1CE;}
-/* « Voir le profil » : seule action déjà accessible par ailleurs (clic sur la carte) —
-   volontairement neutre pour ne pas rivaliser avec les vraies actions sociales. */
-.ann-card-btn-primary{background:#fff;color:#2563EB;border-color:#BFDBFE;}
-.ann-card-btn-primary:hover{background:#EFF6FF;border-color:#2563EB;}
-.ann-card-btn-vitrine{background:#FEF3C7;color:#92400e;}
-.ann-card-btn-vitrine:hover{background:#FDE7A8;}
-/* Adhérer : seule conversion réelle de la carte (adhésion payante/engagement) — la seule
-   action en couleur pleine, étalée sur toute la largeur pour rester la plus visible. */
-.ann-card-btn-adherer{background:#2563EB;color:#fff;grid-column:1 / -1;}
-.ann-card-btn-adherer:hover{background:#1d4ed8;}
-.ann-card-btn-affilier{background:#16A34A;color:#fff;}
-.ann-card-btn-affilier:hover{background:#15803D;}
-.ann-card-btn[disabled]{cursor:default;}
-/* Infos carte */
-.ann-card-meta-row{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;}
-.ann-card-loc{font-size:12px;color:var(--muted);}
-.ann-avis-badge{display:block;font-size:12px;color:#F4A62A;font-weight:700;margin:2px 0;}
-.ann-card-origs{font-size:12px;color:#1B3A6B;margin:2px 0;}
-.ann-card-nats{font-size:12px;color:#374151;margin:2px 0;}
-.ann-card-responsable{font-size:11px;color:#94a3b8;margin:4px 0 2px;}
-.ann-type-badge{
-  position:absolute;bottom:10px;right:10px;
-  background:rgba(255,255,255,.88);color:#1B3A6B;
-  padding:3px 9px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.04em;
-  backdrop-filter:blur(4px);
-}
-/* Badge rayonnement */
-.ann-ray-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;}
-.ann-ray-locale{background:#F0FDF4;color:#15803D;}
-.ann-ray-régionale{background:#EFF6FF;color:#1D4ED8;}
-.ann-ray-nationale{background:#FFF7ED;color:#C2410C;}
-.ann-ray-internationale{background:#F0F9FF;color:#0369A1;}
-/* Compteur de membres : une donnée, pas une action — sorti du groupe de boutons (2026-09-05,
-   il s'y glissait auparavant comme une pastille de plus, perdue au milieu des CTA). */
-.ann-membres{font-size:11px;font-weight:700;color:#64748B;white-space:nowrap;display:inline-flex;
-  align-items:center;gap:3px;background:#F1F5F9;padding:3px 9px;border-radius:99px;flex-shrink:0;}
+/* Styles de la carte (.ann-card et son contenu) : extraits dans assets/annuaire-cards.css
+   (2026-09-20) pour être réutilisés tels quels par toute autre page qui appelle
+   renderInitiativeCard()/renderPersonCard()/renderOrganismeCard() (assets/app.js) — voir
+   le <link> dans <head>, jamais une copie séparée qui pourrait diverger. */
 
 /* CTA */
 .ann-cta{background:#1B3A6B;padding:40px 24px;text-align:center;margin-top:0;}
