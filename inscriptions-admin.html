@@ -308,7 +308,8 @@ function renderListView() {
   const cards = state.fiches.map(f => {
     const [bg, color] = IA_STATUS_STYLES[f.statut] || IA_STATUS_STYLES['brouillon'];
     return `
-      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;overflow:hidden;cursor:pointer;" data-action="selectFiche" data-id="${f.id}">
+      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;overflow:hidden;cursor:pointer;position:relative;" data-action="selectFiche" data-id="${f.id}">
+        <button title="Supprimer la fiche" data-action="supprimerFicheListe" data-id="${f.id}" data-nom="${escH(f.nom)}" style="position:absolute;top:8px;right:8px;z-index:1;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>
         <div style="height:120px;background:${f.affiche_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(f.affiche_url)}')` : 'oklch(0.94 0.01 258)'};display:flex;align-items:center;justify-content:center;">
           ${f.affiche_url ? '' : '<span style="font-size:28px;opacity:.5;">📅</span>'}
         </div>
@@ -1023,6 +1024,15 @@ const actions = {
   async selectFiche(el) {
     state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
     await iaChargerFiche(state.selectedFicheId);
+  },
+  async supprimerFicheListe(el) {
+    const id = parseInt(el.dataset.id);
+    if (!confirm(`Supprimer définitivement la fiche « ${el.dataset.nom} » ? Cette action est irréversible.\n\n(Une fiche ayant déjà des inscrits ne peut pas être supprimée — archivez-la depuis sa fiche détaillée.)`)) return;
+    try {
+      await api('DELETE', '/insc/fiches/' + id);
+      state.fiches = state.fiches.filter(f => f.id !== id);
+      ia_toast('Fiche supprimée.', true);
+    } catch (e) { ia_toast(e.message, false); }
   },
   async createFiche() {
     const nom = prompt("Nom de la fiche d'inscription :");
