@@ -950,14 +950,24 @@ route("GET", "/api/parrainage/centre-vision", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   // Sécurité (cahier §34) : toujours filtré par l'inviteur CONNECTÉ, jamais un id d'URL/query.
+  /* domaine_id/sous_domaine_id sur invitation_registrations figent le domaine CONFIGURÉ SUR
+     L'INVITATION au moment de l'inscription — pas ce que la personne a réellement choisi dans
+     le formulaire (préremplissage §12-13, mais "reste modifiable", voir POST /api/auth/signup
+     plus haut). Un inscrit changeant son domaine par rapport à celui de l'invitation utilisée
+     se retrouvait donc affiché ici sous l'ancien domaine "figé" au lieu du sien (bug réel
+     signalé : lien "Santé" → profil réel "Autre" toujours affiché "Santé"). On lit désormais le
+     domaine RÉEL et actuel du compte inscrit (initiatives.domaine_principal s'il en a une,
+     sinon users.domaine_principal), résolu vers son icône/libellé via parrainage_domaines.cle
+     (même liste de 32 domaines que la taxonomie générale du site). */
   const inscrits = await db.prepare(`
     SELECT ir.id, ir.account_type, ir.source, ir.registered_at,
-      pd.nom AS domaine_nom, pd.icone AS domaine_icone, COALESCE(psd.nom, NULL) AS sous_domaine_nom,
+      pd.nom AS domaine_nom, pd.icone AS domaine_icone,
+      COALESCE(init.sous_domaine_1, u.sous_domaine_1) AS sous_domaine_nom,
       u.id AS user_id, u.nom, u.prenom, u.photo_url, u.role, u.da_id
     FROM invitation_registrations ir
     JOIN users u ON u.id = ir.registered_user_id
-    LEFT JOIN parrainage_domaines pd ON pd.id = ir.domaine_id
-    LEFT JOIN parrainage_sous_domaines psd ON psd.id = ir.sous_domaine_id
+    LEFT JOIN initiatives init ON init.owner_user_id = u.id
+    LEFT JOIN parrainage_domaines pd ON pd.cle = COALESCE(init.domaine_principal, u.domaine_principal)
     WHERE ir.inviter_user_id = ?
     ORDER BY ir.registered_at DESC
   `).all(user.id);
