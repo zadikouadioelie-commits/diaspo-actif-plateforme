@@ -342,14 +342,21 @@
 
 <!-- ═══ MODAL DÉTAIL ÉVÉNEMENT ═══ -->
 <div class="modal-bg" id="modal-detail-bg" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
+  <!-- overflow:hidden (seul, sans défilement) rognait le bas de la fiche — boutons "S'inscrire"/
+       "Partager"/"Modifier" invisibles dès que le contenu (description longue, etc.) dépassait
+       la hauteur du modal (capture utilisateur à l'appui, 2026-09-21). overflow-x reste hidden
+       (nécessaire pour que le carrousel, à angles vifs et collé au bord via padding:0, se
+       découpe bien sur les coins arrondis du modal) ; overflow-y devient auto pour permettre le
+       défilement au lieu de rogner silencieusement. -->
+  <div class="modal" style="max-width:700px;padding:0;overflow-x:hidden;overflow-y:auto;">
     <div id="evt-detail-content"></div>
   </div>
 </div>
 
 <!-- ═══ MODAL PRÉVISUALISATION ═══ -->
 <div class="modal-bg" id="modal-preview-bg" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
+  <!-- Même correctif que #modal-detail-bg juste au-dessus (même gabarit de contenu, même bug). -->
+  <div class="modal" style="max-width:700px;padding:0;overflow-x:hidden;overflow-y:auto;">
     <div style="background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;">
       <strong>👁 Prévisualisation — tel que vu par les participants</strong>
       <button onclick="document.getElementById('modal-preview-bg').classList.remove('open')" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
@@ -366,6 +373,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/profile-qr.js"></script>
 <script>
 const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Economique:'📈',Politique:'🏛️',Panafricanisme:'✊',Autre:'📅'};
 
@@ -846,6 +854,51 @@ window.previewEvent = function() {
 };
 
 /* ══ Détail événement ══ */
+let evtDetailCourant = null;
+
+/* Partage d'un événement (2026-09-21, demande explicite : "quand on clic sur partager propose
+   un qr code egalement en plus du lien"). Le lien partagé reprend le format d'ancre #evt-<id>
+   déjà utilisé par le lien direct depuis l'annuaire (voir plus bas, "Lien direct vers la fiche
+   complète") — location.href seul (ancien comportement) pointait juste vers la page de liste,
+   sans rouvrir la fiche pour le destinataire. Sur mobile, le partage natif (navigator.share)
+   reste proposé en priorité ; la fenêtre lien+QR sert de repli desktop et reste accessible
+   même sur mobile si le partage natif est annulé. */
+window.partagerEvenement = async function(id) {
+  const titre = (evtDetailCourant && evtDetailCourant.id === id) ? evtDetailCourant.titre : 'Événement Diaspo\'Actif';
+  const url = location.origin + location.pathname + '#evt-' + id;
+  if (navigator.share) {
+    try { await navigator.share({ title: titre, url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  ouvrirModalePartage(url, titre);
+};
+
+function ouvrirModalePartage(url, titre) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:340px;text-align:center;">
+      <button onclick="this.closest('.modal-bg').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">×</button>
+      <h3 style="margin:0 0 4px;font-size:16px;justify-content:center;">📤 Partager</h3>
+      <p style="margin:0 0 16px;font-size:13px;color:var(--muted);">${esc(titre)}</p>
+      <div id="partage-qr-mount" style="display:flex;justify-content:center;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" readonly value="${esc(url)}" onclick="this.select()" style="flex:1;min-width:0;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;color:#333;">
+        <button class="btn btn-outline" style="font-size:13px;white-space:nowrap;" id="btn-copier-lien-partage">🔗 Copier</button>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+  bg.querySelector('#btn-copier-lien-partage').addEventListener('click', function() {
+    navigator.clipboard.writeText(url).then(() => {
+      this.textContent = '✅ Copié';
+      setTimeout(() => { this.textContent = '🔗 Copier'; }, 2000);
+    });
+  });
+  const mount = bg.querySelector('#partage-qr-mount');
+  if (window.ProfileQR) window.ProfileQR.render(mount, { url, userName: titre, size: 160, compact: true, showActions: false });
+}
+
 window.openDetail = async function(id) {
   document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
   document.getElementById('modal-detail-bg').classList.add('open');
@@ -859,6 +912,8 @@ window.openDetail = async function(id) {
     /* Cagnottes associées (Phase 2 point 2) — la route les renvoie en sibling de "evenement",
        pas imbriquées dedans ; on les rattache ici pour que renderEventDetail les affiche. */
     evt.cagnottes = r.cagnottes || [];
+    // Mémorisé pour partagerEvenement() ci-dessous — évite de re-fetcher juste pour le titre.
+    evtDetailCourant = evt;
     document.getElementById('evt-detail-content').innerHTML = renderEventDetail(evt, false);
     initCarousel('detail-carousel');
   } catch(e) {
@@ -999,7 +1054,7 @@ function renderEventDetail(evt, isPreview) {
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
           : (!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>')
         }
-        <button class="btn btn-outline" style="font-size:13px;" onclick="navigator.share ? navigator.share({title:'${esc(evt.titre)}',url:location.href}) : navigator.clipboard.writeText(location.href).then(()=>alert('Lien copié !'))">📤 Partager</button>
+        <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
         ${peutGererDetail ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="${hrefModifierDetail}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
       </div>
     </div>
