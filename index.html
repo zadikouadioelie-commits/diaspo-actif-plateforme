@@ -2010,10 +2010,14 @@
     const path = d3.geoPath(transform).context(cctx);
     cctx.beginPath();
     path(landFeature);
-    cctx.fillStyle = 'rgba(74,144,217,0.11)';
+    /* Contraste relevé (2026-09-21, signalé "les continents ne sont pas distinguables") :
+       le remplissage à 0.11 et le contour à 0.30 se fondaient presque dans le dégradé de
+       fond (#060e1a → #0c2444), lui aussi dans les bleus sombres — les silhouettes des
+       continents disparaissaient derrière la grille et les points/connexions. */
+    cctx.fillStyle = 'rgba(96,160,230,0.26)';
     cctx.fill();
-    cctx.strokeStyle = 'rgba(140,190,240,0.30)';
-    cctx.lineWidth = 0.75;
+    cctx.strokeStyle = 'rgba(170,210,255,0.62)';
+    cctx.lineWidth = 1.1;
     cctx.stroke();
   }
   fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json')
