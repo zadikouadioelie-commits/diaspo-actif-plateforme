@@ -41415,7 +41415,12 @@ route("GET", "/api/insc/fiches", async (req, res) => {
     : await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? ORDER BY id DESC").all(user.id);
   const enrichies = [];
   for (const f of fiches) {
-    const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(f.id))?.n || 0;
+    // Number(...) autour de COUNT(*) (2026-09-22, bug réel constaté en production) : Postgres
+    // renvoie un COUNT(*) sous forme de chaîne ("0", "1"...) pour préserver la précision d'un
+    // bigint, contrairement à SQLite qui renvoie un vrai number — un "0" texte est VRAI en
+    // JavaScript, donc `nb_evenements ? ... : ''` affichait quand même le badge "0 événement
+    // lié" côté client. Même piège que la mémoire projet sur les id BIGSERIAL retournés en texte.
+    const nb = Number((await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule'").get(f.id))?.n) || 0;
     // Aperçu date/lieu depuis le premier événement lié, uniquement pour l'affichage de la carte —
     // la fiche peut être liée à plusieurs événements (voir l'onglet Vue d'ensemble pour le détail).
     const evtApercu = await db.prepare(`
@@ -41424,7 +41429,7 @@ route("GET", "/api/insc/fiches", async (req, res) => {
     // Nombre d'événements liés (2026-09-22, demande explicite) : distinct de apercu_date/lieu
     // ci-dessus (qui ne regardent que le premier) — sert à afficher un bouton "Événements
     // liés" sur la carte de liste, sans devoir ouvrir la fiche pour le savoir.
-    const nbEvt = (await db.prepare("SELECT COUNT(*) n FROM insc_fiches_evenements WHERE fiche_id=?").get(f.id))?.n || 0;
+    const nbEvt = Number((await db.prepare("SELECT COUNT(*) n FROM insc_fiches_evenements WHERE fiche_id=?").get(f.id))?.n) || 0;
     enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null });
   }
   sendJSON(res, 200, { fiches: enrichies });

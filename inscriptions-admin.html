@@ -187,6 +187,7 @@ const state = {
   selectedTypeId: null,
   champCategorieOuverte: null,
   editionInfosOuverte: false,
+  modalLiaisonOuvert: false, // modale "Lier à un événement" (cartouches), ouvrable depuis la liste sans changer de vue
   publicData: null,
   publicSelectedTypeId: null,
   publicReponses: {},
@@ -670,6 +671,44 @@ function renderLiaisonEvenements() {
     </div>`;
 }
 
+// ---- Modale "Lier à un événement" (cartouches) — raccourci depuis la carte de liste ----
+// Même fallback de couverture que evenements.html (evt.image_couverture || evt.image_url),
+// même mécanique de liaison que renderLiaisonEvenements() ci-dessus (PUT evenement_ids), mais
+// présentée en cartouches avec un bouton par événement plutôt qu'une liste à cases à cocher.
+function renderModalLiaison() {
+  if (!state.modalLiaisonOuvert) return '';
+  const fiche = state.ficheDetail?.fiche;
+  if (!fiche) return '';
+  const dejaLies = new Set((state.ficheDetail?.evenements || []).map(e => e.id));
+  const mesEvenements = state.mesEvenements || [];
+  const cartouches = mesEvenements.length ? mesEvenements.map(e => {
+    const lie = dejaLies.has(e.id);
+    const cover = e.image_couverture || e.image_url || null;
+    return `
+      <div style="background:#fff; border:1.5px solid ${lie ? 'oklch(0.32 0.09 258)' : 'oklch(0.9 0.004 30)'}; border-radius:12px; overflow:hidden;">
+        <div style="height:90px; background:${cover ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(cover)}')` : 'oklch(0.94 0.01 258)'}; display:flex; align-items:center; justify-content:center;">
+          ${cover ? '' : '<span style="font-size:22px; opacity:.5;">📅</span>'}
+        </div>
+        <div style="padding:12px 14px;">
+          <div style="font-weight:700; font-size:13px; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escH(e.titre)}</div>
+          <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-bottom:10px;">📅 ${escH(e.date_evt || 'Date à définir')}${e.ville ? ' · 📍 ' + escH(e.ville) : ''}</div>
+          <button data-action="toggleLiaisonEvenementModal" data-evt-id="${e.id}" style="width:100%; background:${lie ? '#fff' : 'oklch(0.32 0.09 258)'}; border:1px solid ${lie ? 'oklch(0.8 0.006 30)' : 'oklch(0.32 0.09 258)'}; color:${lie ? 'oklch(0.2 0.006 30)' : '#fff'}; font-size:11.5px; font-weight:600; padding:8px; border-radius:8px; cursor:pointer;">${lie ? '✅ Lié — Délier' : '🔗 Lier à cet événement'}</button>
+        </div>
+      </div>`;
+  }).join('') : `<div style="grid-column:1/-1; text-align:center; padding:30px 10px; color:oklch(0.55 0.006 30); font-size:13px;">Aucun événement créé sur votre compte — <a href="evenements.html" target="_blank" rel="noopener" style="color:oklch(0.32 0.09 258); font-weight:600;">créez-en un →</a> pour pouvoir le lier.</div>`;
+  return `
+    <div style="position:fixed; inset:0; background:rgba(20,20,30,.55); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div style="background:oklch(0.97 0.002 30); border-radius:16px; max-width:760px; width:100%; max-height:88vh; overflow-y:auto; padding:24px; box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+          <h3 style="margin:0; font-size:17px;">Lier « ${escH(fiche.nom || '')} » à un événement</h3>
+          <button data-action="fermerModalLiaison" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+        </div>
+        <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 18px;">Le bouton « S'inscrire » d'un événement lié redirige vers cette fiche au lieu du parcours d'inscription classique. Un événement ne peut être lié qu'à une seule fiche à la fois.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px;">${cartouches}</div>
+      </div>
+    </div>`;
+}
+
 // ---- Documents & médias (photos/PDF consultables par inscrits ET non-inscrits) ----
 function renderMedias() {
   const medias = (state.ficheDetail && state.ficheDetail.medias) || [];
@@ -1148,14 +1187,31 @@ const actions = {
     state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
     await iaChargerFiche(state.selectedFicheId);
   },
-  // Raccourci depuis la carte de liste (2026-09-22, demande explicite) : ouvre directement la
-  // fiche sur l'encart "Lier à un événement" (Vue d'ensemble → Informations générales en
-  // édition) déjà existant, plutôt que de le refaire ailleurs — sert aussi bien pour lier un
-  // premier événement que pour voir/modifier ceux déjà liés.
+  // Raccourci depuis la carte de liste (2026-09-22, demande explicite) : ouvre une modale
+  // dédiée listant TOUS les événements du compte en cartouches (image/titre/date/lieu), chacune
+  // avec son propre bouton — sans changer de vue (reste sur la liste, contrairement à l'ancien
+  // comportement qui ouvrait la fiche en détail). Ne charge que les données, jamais state.view.
   async ouvrirLiaisonEvenement(el) {
-    state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
-    state.editionInfosOuverte = true;
+    state.selectedFicheId = parseInt(el.dataset.id);
     await iaChargerFiche(state.selectedFicheId);
+    state.modalLiaisonOuvert = true;
+  },
+  fermerModalLiaison() { state.modalLiaisonOuvert = false; },
+  // Une cartouche = un bouton = une action immédiate (lier/délier), pas de case à cocher suivie
+  // d'un "Enregistrer" séparé — cohérent avec les autres bascules immédiates de cette page
+  // (toggleModeleStandard, geler-fonds...). PUT /insc/fiches/:id attend la liste COMPLÈTE des
+  // événements liés (elle remplace, n'ajoute pas) — on part donc de l'état actuel pour n'y
+  // ajouter/retirer que celui-ci.
+  async toggleLiaisonEvenementModal(el) {
+    const evtId = parseInt(el.dataset.evtId);
+    const dejaLies = (state.ficheDetail?.evenements || []).map(e => e.id);
+    const lieDeja = dejaLies.includes(evtId);
+    const nouveaux = lieDeja ? dejaLies.filter(id => id !== evtId) : [...dejaLies, evtId];
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { evenement_ids: nouveaux });
+      await Promise.all([iaChargerFiche(state.selectedFicheId), iaChargerListe()]);
+      ia_toast(lieDeja ? 'Événement délié.' : 'Événement lié — son bouton « S\'inscrire » redirige maintenant vers cette fiche.', true);
+    } catch (e) { ia_toast(e.message, false); }
   },
   async supprimerFicheListe(el) {
     const id = parseInt(el.dataset.id);
@@ -1519,7 +1575,7 @@ async function dispatch(name, el) {
 
 const root = document.getElementById('ia-root');
 function render() {
-  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}</div>`;
+  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}${renderModalLiaison()}</div>`;
 }
 root.addEventListener('click', function (e) {
   const el = e.target.closest('[data-action]');
