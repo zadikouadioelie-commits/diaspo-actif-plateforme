@@ -209,7 +209,7 @@
 <!-- ═══ MODAL CRÉATION ÉVÉNEMENT (enrichie) ═══ -->
 <div class="modal-bg" id="modal-bg">
   <div class="modal">
-    <h3>📢 Mobiliser la diaspora — Créer un événement</h3>
+    <h3 id="modal-evt-titre">📢 Mobiliser la diaspora — Créer un événement</h3>
 
     <div class="section-divider">Informations principales</div>
     <div class="grid-2">
@@ -245,6 +245,29 @@
     </div>
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
     <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
+
+    <!-- Type de participation — Gratuit/Payant (2026-09-22, demande explicite) : purement
+         indicatif côté formulaire, aucun prix ne se saisit ici. Le vrai tarif vit sur les types
+         d'inscription de la fiche liée (voir bouton "Fiche d'inscription" juste en dessous) et
+         se répercute déjà automatiquement sur evenements.prix_min (inscSyncPrixMinEvenements,
+         server/index.js) — ce toggle sert seulement à rendre visible et guider l'obligation de
+         lier une fiche payante quand l'organisateur choisit "Payant". -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Type de participation</label>
+      <div style="display:flex;gap:8px;">
+        <label id="e-gratuit-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:10px 14px;border:1.5px solid var(--orange);border-radius:8px;background:#FFF7ED;font-weight:600;font-size:13px;">
+          <input type="radio" name="e-gratuit-payant" id="e-radio-gratuit" value="gratuit" checked style="accent-color:#16a34a;width:16px;height:16px;">
+          🆓 Gratuit
+        </label>
+        <label id="e-payant-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-weight:600;font-size:13px;">
+          <input type="radio" name="e-gratuit-payant" id="e-radio-payant" value="payant" style="accent-color:#2563EB;width:16px;height:16px;">
+          💳 Payant
+        </label>
+      </div>
+      <div id="e-payant-notice" style="display:none;margin-top:8px;padding:10px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;font-size:12px;color:#92400E;">
+        ⚠️ Liez ou créez ci-dessous une fiche d'inscription avec au moins un tarif payant — le prix affiché sur la fiche de l'événement (« À partir de X € ») en sera déduit automatiquement.
+      </div>
+    </div>
 
     <!-- Modèle standard de fiche d'inscription (2026-09-09) : rempli/affiché dynamiquement à
          l'ouverture du formulaire (voir GET /api/insc/modele-standard) uniquement si un modèle
@@ -411,6 +434,9 @@ async function syncFiltreDomaineOptions() {
 
 /* ─── Liste des événements ─── */
 let allEvts = [];
+// Événement en cours de modification (2026-09-22) : null en création. La même modale sert aux
+// deux, voir ouvrirModaleEdition()/btn-save ci-dessous.
+let evenementEnEditionId = null;
 async function loadEvts() {
   const q      = document.getElementById('q').value;
   const domaine= document.getElementById('f-domaine').value;
@@ -464,7 +490,15 @@ function renderEvts() {
     const coverFiche = evt.fiche_media ? (evt.fiche_media.affiche_url || (evt.fiche_media.medias.find(m=>m.type==='photo')||{}).url) : null;
     const cover = evt.image_couverture || evt.image_url || (galerieCard.filter(Boolean)[0]) || coverFiche || null;
     const peutGerer = typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur');
-    const hrefModifier = evt.source_events_id ? `dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements` : `dashboard-initiative.html#evenements`;
+    // Modifier (2026-09-22, bug réel corrigé, capture à l'appui) : un événement créé
+    // nativement ICI (pas de source_events_id, cas normal pour cette page) ouvre désormais sa
+    // propre modale pré-remplie — avant, il n'avait NULLE PART où aller et retombait sur la
+    // section Événements du dashboard Initiative, sur un événement quelconque sans rapport.
+    // Le pont vers dashboard-initiative.html (source_events_id renseigné) reste inchangé, ce
+    // cas-là fonctionnait déjà.
+    const modifierHtml = evt.source_events_id
+      ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements" title="Modifier cet événement">✏️ Modifier</a>`
+      : `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="ouvrirModaleEdition(${evt.id})" title="Modifier cet événement">✏️ Modifier</button>`;
     return `<div class="evt-card">
       ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
@@ -497,7 +531,7 @@ function renderEvts() {
               )
             )
           }
-          ${peutGerer ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="${hrefModifier}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
+          ${peutGerer ? modifierHtml : ''}
         </div>
       </div>
     </div>`;
@@ -642,7 +676,33 @@ document.getElementById('btn-reset').addEventListener('click', () => {
    tableau de bord Initiative (dashboard-initiative.html), qui redirige désormais ici plutôt que
    d'ouvrir son propre formulaire (moins complet : pas de fiche d'inscription, pas d'upload
    photo/couverture, pas d'aperçu). */
+// Remet la modale à blanc (2026-09-22) : nécessaire maintenant qu'elle sert aussi à l'édition
+// (sans ça, ouvrir "Créer" après avoir fermé une édition, ou l'inverse, laissait les champs de
+// l'événement précédent affichés). N'efface pas les widgets à état propre (fiche choisie,
+// modèle standard, image de couverture) : gérés par leurs propres blocs juste après l'appel.
+function resetModaleEvenement() {
+  ['e-titre','e-date','e-heure','e-pays','e-lieu','e-lieu-gps','e-desc','e-places','e-visio-evt','e-whatsapp'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('e-type').value = 'evenement';
+  document.getElementById('e-domaine').value = '';
+  document.getElementById('e-zone-diffusion').value = '';
+  document.getElementById('e-origine').value = '';
+  document.getElementById('e-visibilite').value = 'public';
+  document.getElementById('e-masquer-inscrits').checked = false;
+  document.getElementById('e-radio-gratuit').checked = true;
+  majToggleGratuitPayant();
+  document.getElementById('e-heure').value = '09:00';
+  clearPhoto(0);
+  coverData = null;
+  document.getElementById('cover-preview').style.display = 'none';
+  document.getElementById('cover-placeholder').style.display = '';
+}
 async function ouvrirModaleCreation() {
+  evenementEnEditionId = null;
+  resetModaleEvenement();
+  document.getElementById('modal-evt-titre').textContent = '📢 Mobiliser la diaspora — Créer un événement';
+  document.getElementById('btn-save').textContent = '📢 Publier l\'événement';
   document.getElementById('modal-bg').classList.add('open');
   ficheChoisie = null;
   document.getElementById('fiche-choisie-cartouche').style.display = 'none';
@@ -661,6 +721,56 @@ async function ouvrirModaleCreation() {
   } catch (e) { document.getElementById('modele-standard-notice').style.display = 'none'; }
 }
 document.getElementById('btn-creer').addEventListener('click', ouvrirModaleCreation);
+// Ouvre la modale pré-remplie sur un événement existant (2026-09-22, corrige "Modifier" qui
+// n'avait nulle part où aller pour un événement créé directement sur cette page — voir
+// PUT /api/evenements/:id et hrefModifier dans renderEvts()/openDetail()). Ne touche jamais au
+// modèle standard (n'a de sens qu'à la création) ni à la fiche liée (déjà gérable depuis
+// inscriptions-admin.html, "Lier à un événement").
+function ouvrirModaleEdition(id) {
+  // La vue liste (allEvts) ET la vue détail (evtDetailCourant, chargée séparément via
+  // openDetail) peuvent l'une comme l'autre déclencher cette modale — cherche dans les deux
+  // plutôt que de supposer que l'événement est forcément déjà dans allEvts (ex. lien direct
+  // vers un détail sans être jamais passé par la liste filtrée).
+  const evt = allEvts.find(e => Number(e.id) === Number(id))
+    || (typeof evtDetailCourant !== 'undefined' && evtDetailCourant && Number(evtDetailCourant.id) === Number(id) ? evtDetailCourant : null);
+  if (!evt) return;
+  evenementEnEditionId = evt.id;
+  resetModaleEvenement();
+  document.getElementById('e-titre').value = evt.titre || '';
+  document.getElementById('e-date').value = evt.date_evt || '';
+  document.getElementById('e-heure').value = evt.heure_debut || '09:00';
+  document.getElementById('e-type').value = evt.type_evt || 'evenement';
+  document.getElementById('e-domaine').value = evt.domaine || '';
+  document.getElementById('e-zone-diffusion').value = evt.zone_diffusion || '';
+  document.getElementById('e-pays').value = evt.pays || '';
+  document.getElementById('e-lieu').value = evt.lieu || evt.ville || '';
+  document.getElementById('e-lieu-gps').value = evt.lieu_gps || '';
+  document.getElementById('e-origine').value = evt.origine || '';
+  document.getElementById('e-desc').value = evt.description || '';
+  document.getElementById('e-places').value = evt.places_max || '';
+  document.getElementById('e-masquer-inscrits').checked = !!evt.masquer_inscrits;
+  document.getElementById('e-visibilite').value = evt.visibilite || 'public';
+  document.getElementById('e-visio-evt').value = evt.lien_visio || '';
+  document.getElementById('e-whatsapp').value = evt.whatsapp_lien || '';
+  // prix_min est purement déduit de la fiche liée (voir inscSyncPrixMinEvenements côté
+  // serveur) — ce radio ne fait donc que refléter l'état déjà en base, jamais le contraire.
+  document.getElementById(evt.prix_min != null ? 'e-radio-payant' : 'e-radio-gratuit').checked = true;
+  majToggleGratuitPayant();
+  const cover = evt.image_couverture || evt.image_url || null;
+  if (cover) {
+    coverData = cover;
+    document.getElementById('cover-img').src = cover;
+    document.getElementById('cover-preview').style.display = '';
+    document.getElementById('cover-placeholder').style.display = 'none';
+  }
+  document.getElementById('modele-standard-notice').style.display = 'none';
+  ficheChoisie = null;
+  document.getElementById('fiche-choisie-cartouche').style.display = 'none';
+  document.getElementById('fiche-picker-panel').style.display = 'none';
+  document.getElementById('modal-evt-titre').textContent = '✏️ Modifier l\'événement';
+  document.getElementById('btn-save').textContent = '💾 Enregistrer les modifications';
+  document.getElementById('modal-bg').classList.add('open');
+}
 /* Ouverture directe depuis un lien externe (ex. bouton "Créer un événement" du module
    Événements, dashboard-initiative.html) — nettoie l'URL pour ne pas rouvrir la modale à un
    simple rechargement de page, même convention que dashboard-initiative.html pour
@@ -671,7 +781,20 @@ document.getElementById('btn-creer').addEventListener('click', ouvrirModaleCreat
     ouvrirModaleCreation();
   }
 })();
-document.getElementById('btn-cancel').addEventListener('click', () => document.getElementById('modal-bg').classList.remove('open'));
+document.getElementById('btn-cancel').addEventListener('click', () => { evenementEnEditionId = null; document.getElementById('modal-bg').classList.remove('open'); });
+
+/* ─── Toggle Type de participation — Gratuit/Payant (2026-09-22) ─── */
+function majToggleGratuitPayant() {
+  const payant = document.getElementById('e-radio-payant').checked;
+  const lblGratuit = document.getElementById('e-gratuit-lbl');
+  const lblPayant = document.getElementById('e-payant-lbl');
+  lblGratuit.style.borderColor = payant ? 'var(--border)' : 'var(--orange)';
+  lblGratuit.style.background = payant ? 'transparent' : '#FFF7ED';
+  lblPayant.style.borderColor = payant ? 'var(--orange)' : 'var(--border)';
+  lblPayant.style.background = payant ? '#FFF7ED' : 'transparent';
+  document.getElementById('e-payant-notice').style.display = payant ? '' : 'none';
+}
+document.querySelectorAll('input[name="e-gratuit-payant"]').forEach(r => r.addEventListener('change', majToggleGratuitPayant));
 
 /* ─── Fiche d'inscription — choix explicite d'une fiche existante (2026-09-09) ───
    Mutuellement exclusif avec le modèle standard ci-dessus : choisir une fiche ici décoche
@@ -791,9 +914,16 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   const errBox = document.getElementById('e-error');
   errBox.style.display = 'none';
   if (!titre || !date) { errBox.textContent='Titre et date requis.'; errBox.style.display='block'; return; }
+  const estPayant = document.getElementById('e-radio-payant').checked;
+  const ficheSeraLiee = !!ficheChoisie || (document.getElementById('modele-standard-notice').style.display !== 'none' && document.getElementById('e-appliquer-modele').checked);
+  if (estPayant && !ficheSeraLiee) {
+    errBox.textContent = "Un événement payant doit être lié à une fiche d'inscription avec un tarif — cliquez sur « 📝 Fiche d'inscription » ci-dessous, ou créez-en une.";
+    errBox.style.display = 'block';
+    return;
+  }
   try {
     const galerie = galleryData.filter(Boolean);
-    const r = await api('POST', '/evenements', {
+    const champsCommuns = {
       titre,
       date_evt:      date,
       heure_debut:   document.getElementById('e-heure').value || null,
@@ -813,16 +943,26 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       whatsapp_lien: document.getElementById('e-whatsapp').value || null,
       image_couverture: coverData,
       galerie_photos:   galerie,
-      fiche_choisie_id: ficheChoisie ? ficheChoisie.id : null,
-      appliquer_fiche_standard: ficheChoisie ? false : (
-        document.getElementById('modele-standard-notice').style.display !== 'none'
-          ? document.getElementById('e-appliquer-modele').checked : false
-      ),
-    });
+    };
+    // Édition (2026-09-22) : ni fiche_choisie_id ni appliquer_fiche_standard — ce sont des
+    // commodités propres à LA CRÉATION (PUT /api/evenements/:id ne les lit d'ailleurs pas),
+    // la liaison à une fiche se gère déjà après coup depuis inscriptions-admin.html.
+    const r = evenementEnEditionId
+      ? await api('PUT', '/evenements/' + evenementEnEditionId, champsCommuns)
+      : await api('POST', '/evenements', {
+          ...champsCommuns,
+          fiche_choisie_id: ficheChoisie ? ficheChoisie.id : null,
+          appliquer_fiche_standard: ficheChoisie ? false : (
+            document.getElementById('modele-standard-notice').style.display !== 'none'
+              ? document.getElementById('e-appliquer-modele').checked : false
+          ),
+        });
     document.getElementById('modal-bg').classList.remove('open');
     if (r.fiche_appliquee && typeof showToast === 'function') {
       showToast(`⭐ Fiche d'inscription « ${r.fiche_appliquee.nom} » créée automatiquement pour cet événement.`, 'success');
     }
+    if (evenementEnEditionId && typeof showToast === 'function') showToast('Événement mis à jour.', 'success');
+    evenementEnEditionId = null;
     loadEvts();
   } catch(e) { errBox.textContent=e.message||'Erreur.'; errBox.style.display='block'; }
 });
@@ -1015,7 +1155,12 @@ function renderEventDetail(evt, isPreview) {
   ` : '';
 
   const peutGererDetail = typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur');
-  const hrefModifierDetail = evt.source_events_id ? `dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements` : `dashboard-initiative.html#evenements`;
+  // Même correctif que dans renderEvts() ci-dessus (2026-09-22) : un événement natif (sans
+  // source_events_id) ouvre désormais sa propre modale d'édition au lieu de retomber sur une
+  // page sans rapport.
+  const modifierDetailHtml = (!isPreview && peutGererDetail) ? (evt.source_events_id
+    ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements" title="Modifier cet événement">✏️ Modifier</a>`
+    : `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="ouvrirModaleEdition(${evt.id})" title="Modifier cet événement">✏️ Modifier</button>`) : '';
 
   return `
     ${!isPreview && peutGererDetail ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button></div>` : carouselHTML}
@@ -1055,7 +1200,7 @@ function renderEventDetail(evt, isPreview) {
           : (!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>')
         }
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
-        ${peutGererDetail ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="${hrefModifierDetail}" title="Modifier cet événement">✏️ Modifier</a>` : ''}
+        ${modifierDetailHtml}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `

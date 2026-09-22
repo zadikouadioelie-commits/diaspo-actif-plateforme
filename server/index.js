@@ -18129,6 +18129,45 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   sendJSON(res, 201, { id, fiche_appliquee: ficheAppliquee });
 });
 
+/* PUT /api/evenements/:id — modifie un événement créé directement sur evenements.html
+   (2026-09-22, bug réel constaté par capture : le bouton "✏️ Modifier" de ces événements-là
+   n'avait AUCUNE route à appeler — il ne pouvait exister que parce que ces événements n'ont
+   pas de source_events_id, contrairement à ceux créés via dashboard-initiative.html/Billetterie
+   qui, eux, ouvrent leur propre modale via ce pont. "Modifier" redirigeait donc vers la section
+   Événements du dashboard Initiative sans aucun événement précis à y ouvrir, laissant
+   l'utilisateur tomber sur un événement quelconque de cette liste sans rapport. Même liste de
+   champs éditables que POST ci-dessus, hors statut/owner_user_id/lien_inscription/
+   source_events_id/insc_fiche_id (gérés ailleurs, jamais via ce formulaire). */
+route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
+  }
+  const {
+    titre, date_evt, heure_debut, type_evt, domaine, zone_diffusion, pays, lieu, ville, lieu_gps,
+    origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
+    image_couverture, image_url, galerie_photos
+  } = body;
+  if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
+  const coverImg = image_couverture || image_url || null;
+  const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 1)) : (galerie_photos || "[]");
+  await db.prepare(`UPDATE evenements SET
+    titre=?, date_evt=?, heure_debut=?, type_evt=?, domaine=?, zone_diffusion=?, pays=?, lieu=?, ville=?, lieu_gps=?,
+    origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
+    image_couverture=?, image_url=?, galerie_photos=?
+    WHERE id=?`)
+    .run(
+      titre, date_evt, heure_debut || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
+      pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, description || null,
+      places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
+      coverImg, coverImg, galerie, evt.id
+    );
+  sendJSON(res, 200, { id: evt.id });
+});
+
 
 /* ═══════════════════════════════════════════════════════════════════
    MODULE CAGNOTTE — Phase 1 (socle : création + gestion de base)
@@ -41354,6 +41393,37 @@ async function inscJournaliser(ficheId, acteur, action, details, evenementId = n
   } catch (e) { console.error("[insc-journal]", e.message); }
 }
 
+/* Synchronise evenements.prix_min (2026-09-22, demande explicite, capture à l'appui) : le badge
+   "🎟️ Gratuit"/"💶 À partir de X€" d'un événement (evenements.html) lit prix_min, alimenté
+   jusqu'ici uniquement par le pont Billetterie (ticket_types) — jamais par une fiche liée via
+   insc_fiches_evenements. Un événement lié à une fiche qui a des types d'inscription payants
+   restait donc affiché "Gratuit" à tort. Appelée après toute modification affectant le prix
+   d'une fiche (liaison à un événement, création/modification/suppression d'un type) pour
+   recalculer et répercuter le prix minimum sur TOUS les événements actuellement liés à cette
+   fiche — jamais l'inverse (une fiche n'a pas de "prix_min" propre à écraser). */
+async function inscSyncPrixMinEvenements(ficheId) {
+  try {
+    const min = (await db.prepare(
+      "SELECT MIN(prix) p FROM insc_types WHERE fiche_id=? AND actif=1 AND gratuit=0 AND prix IS NOT NULL AND prix > 0"
+    ).get(ficheId))?.p;
+    const prixMin = min != null ? Number(min) : null;
+    const evenementIds = (await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(ficheId)).map(r => r.evenement_id);
+    for (const eid of evenementIds) {
+      await db.prepare("UPDATE evenements SET prix_min=? WHERE id=?").run(prixMin, eid);
+    }
+  } catch (e) { console.error("[insc-sync-prix-min]", e.message); }
+}
+// Rattrapage ponctuel (2026-09-22) : corrige au démarrage les liaisons fiche↔événement déjà
+// existantes AVANT ce correctif (cas réel signalé, capture à l'appui) — sans ça, un événement
+// déjà lié à une fiche payante serait resté affiché "Gratuit" jusqu'à un re-lien manuel.
+// N'agit que sur les fiches ayant au moins un événement lié ; sans effet de bord sur les autres.
+(async function rattrapagePrixMinEvenementsLies() {
+  try {
+    const fiches = await db.prepare("SELECT DISTINCT fiche_id FROM insc_fiches_evenements").all();
+    for (const f of fiches) await inscSyncPrixMinEvenements(f.fiche_id);
+  } catch (e) { console.error("[insc-sync-prix-min-rattrapage]", e.message); }
+})();
+
 /* Évalue une condition d'affichage simple {champ_source, operateur, valeur} par rapport aux
    réponses déjà soumises — même logique côté serveur (revalidation) que côté client (affichage). */
 function inscConditionRemplie(conditionJson, reponses) {
@@ -41465,6 +41535,7 @@ route("POST", "/api/insc/fiches", async (req, res, params, body) => {
     for (const eid of body.evenement_ids) {
       try { await db.prepare("INSERT OR IGNORE INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(id, eid); } catch (e) {}
     }
+    await inscSyncPrixMinEvenements(id);
   }
   await inscJournaliser(id, user, "creation", `Fiche « ${body.nom} » créée.`);
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(id);
@@ -41520,7 +41591,16 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     for (const eid of ancienIds) {
       if (nouveauxIds.includes(eid)) continue;
       await db.prepare("UPDATE evenements SET lien_inscription=NULL WHERE id=? AND lien_inscription=?").run(eid, lienFiche);
+      /* Déliage : remet prix_min à vide (2026-09-22) — seulement pour un événement SANS pont
+         Billetterie (source_events_id), sinon on écraserait un vrai prix de billet géré par
+         ailleurs qui n'a rien à voir avec cette fiche. */
+      await db.prepare("UPDATE evenements SET prix_min=NULL WHERE id=? AND source_events_id IS NULL").run(eid);
     }
+    // Répercute le prix minimum des types payants de la fiche sur les événements
+    // désormais liés (2026-09-22, demande explicite, capture à l'appui : un événement lié à
+    // une fiche avec des types payants restait affiché "Gratuit" — voir
+    // inscSyncPrixMinEvenements ci-dessus).
+    await inscSyncPrixMinEvenements(fiche.id);
   }
   await inscJournaliser(fiche.id, user, "modification", "Fiche modifiée.");
   sendJSON(res, 200, { ok: true });
@@ -41764,6 +41844,9 @@ route("POST", "/api/insc/fiches/:id/types", async (req, res, params, body) => {
       body.date_ouverture || null, body.date_fermeture || null, parseInt(body.ordre) || 0
     )).lastInsertRowid;
     await inscJournaliser(fiche.id, user, "ajout_type", `Type « ${body.label} » ajouté.`);
+    // Un nouveau type payant doit se répercuter immédiatement sur les événements déjà liés
+    // (2026-09-22, demande explicite) — voir inscSyncPrixMinEvenements.
+    await inscSyncPrixMinEvenements(fiche.id);
     sendJSON(res, 201, { id });
   } catch (e) { sendJSON(res, 400, { error: "Un type avec cette clé existe déjà sur cette fiche." }); }
 });
@@ -41778,6 +41861,9 @@ route("PUT", "/api/insc/types/:id", async (req, res, params, body) => {
   for (const c of champs) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
   if (set.length) { set.push("updated_at=datetime('now')"); await db.prepare(`UPDATE insc_types SET ${set.join(",")} WHERE id=?`).run(...vals, type.id); }
   await inscJournaliser(type.fiche_id, user, "modification_type", `Type « ${type.label} » modifié.`);
+  // Le prix ou le statut gratuit/actif peut avoir changé — recalcule le prix minimum répercuté
+  // sur les événements liés (2026-09-22, demande explicite).
+  await inscSyncPrixMinEvenements(type.fiche_id);
   sendJSON(res, 200, { ok: true });
 });
 route("DELETE", "/api/insc/types/:id", async (req, res, params) => {
@@ -41789,6 +41875,9 @@ route("DELETE", "/api/insc/types/:id", async (req, res, params) => {
   if (nb > 0) return sendJSON(res, 400, { error: "Ce type a déjà des inscriptions — désactivez-le plutôt que de le supprimer." });
   await db.prepare("DELETE FROM insc_champs WHERE type_id=?").run(type.id);
   await db.prepare("DELETE FROM insc_types WHERE id=?").run(type.id);
+  // Le type supprimé était peut-être celui qui fixait le prix minimum affiché sur les
+  // événements liés (2026-09-22, demande explicite) — recalcule après coup.
+  await inscSyncPrixMinEvenements(type.fiche_id);
   sendJSON(res, 200, { ok: true });
 });
 
