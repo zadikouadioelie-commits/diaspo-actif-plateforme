@@ -197,7 +197,7 @@ function ipOuvrirType(typeId) {
       <div id="ip-erreur" style="color:oklch(0.5 0.16 20);font-size:13px;margin-bottom:12px;display:none;"></div>
       ${IP_APERCU
         ? `<div style="background:oklch(0.95 0.04 85); border:1px solid oklch(0.8 0.08 85); color:oklch(0.4 0.13 85); font-size:12.5px; padding:10px 12px; border-radius:8px;">🔍 Fiche non publiée — ce bouton s'activera une fois la fiche publiée.</div>`
-        : `<button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">Confirmer mon inscription</button>`}
+        : `<button type="submit" class="ip-btn" style="width:100%;height:46px;font-size:14.5px;">${type.gratuit ? 'Confirmer mon inscription' : '💳 Payer ' + (type.prix != null ? type.prix.toFixed(2) + ' €' : '') + ' et confirmer'}</button>`}
     </form>`;
   document.getElementById('ip-form-champs').addEventListener('input', ipReevaluerConditions);
   document.getElementById('ip-form-champs').addEventListener('change', ipReevaluerConditions);
@@ -234,6 +234,7 @@ async function ipSoumettre(ev) {
     const r = await fetch(`/api/insc/public/${IP_SLUG}/inscriptions`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Erreur');
+    if (d.checkout_url) { window.location.href = d.checkout_url; return; }
     ipRenderConfirmation(d);
   } catch (e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
@@ -285,6 +286,8 @@ function ipRenderAccueil() {
 }
 
 const IP_SLUG = new URLSearchParams(location.search).get('slug') || location.pathname.split('/').pop();
+const IP_PAIEMENT_STATUT = new URLSearchParams(location.search).get('paiement');
+const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
 (async function initInscriptionPublique() {
   try {
     const d = await api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG));
@@ -294,7 +297,27 @@ const IP_SLUG = new URLSearchParams(location.search).get('slug') || location.pat
       return;
     }
     IP_FICHE = d.fiche; IP_TYPES = d.types; IP_EVENEMENTS = d.evenements; IP_APERCU = !!d.apercu;
+    /* Retour de Stripe Checkout (2026-09-22) — le webhook confirme le paiement de façon
+       asynchrone, donc ce message reste optimiste (délai de quelques secondes possible avant
+       la vraie confirmation/QR par e-mail) plutôt que d'interroger une route dédiée. */
+    if (IP_PAIEMENT_STATUT === 'succes') {
+      document.getElementById('ip-root').innerHTML = `
+        ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
+        <div class="ip-confirmation">
+          <div class="grand">✅</div>
+          <h2 style="font-size:19px;font-weight:700;margin:0 0 8px;">Paiement reçu !</h2>
+          <p style="color:oklch(0.5 0.006 30);font-size:13.5px;">${IP_PAIEMENT_REF ? `Numéro d'inscription : <strong style="font-family:'IBM Plex Mono',monospace;">${escH(IP_PAIEMENT_REF)}</strong>` : ''}</p>
+          <p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">Votre confirmation et votre billet vous seront envoyés par e-mail sous quelques instants.</p>
+        </div>${ipRenderMedias()}`;
+      return;
+    }
     ipRenderAccueil();
+    if (IP_PAIEMENT_STATUT === 'annule') {
+      const notice = document.createElement('div');
+      notice.style.cssText = 'background:oklch(0.95 0.04 85);border:1px solid oklch(0.8 0.08 85);color:oklch(0.4 0.13 85);font-size:12.5px;padding:10px 12px;border-radius:8px;margin-bottom:16px;';
+      notice.textContent = '⚠️ Paiement annulé — vous pouvez réessayer ci-dessous.';
+      document.getElementById('ip-root').prepend(notice);
+    }
   } catch (e) {
     document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:oklch(0.5 0.16 20);">Fiche introuvable.</div>`;
   }

@@ -16610,6 +16610,52 @@ async function handleStripeWebhook(req, res) {
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_id) {
       const session = event.data.object;
       await db.prepare(`UPDATE tickets SET payment_status='failed' WHERE transaction_ref=? AND payment_status='pending'`).run(session.id);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_insc_inscription_id) {
+      /* Paiement d'une inscription payante confirmé (Formulaires & Inscriptions, 2026-09-22,
+         demande explicite) — même modèle que la Billetterie et la Boutique (commission 3%,
+         crédit wallet_balance au propriétaire de la fiche, retrait ultérieur via le Centre
+         Financier). Rien n'était confirmé/notifié à la création de la ligne (voir POST
+         /api/insc/public/:slug/inscriptions) — fait ici, une fois le paiement réel confirmé.
+         Idempotent : ne traite que si encore 'en_attente'. */
+      if (!global.__walletTransactionsInscColEnsured) {
+        try { await db.prepare(`ALTER TABLE wallet_transactions ADD COLUMN insc_inscription_id INTEGER`).run(); }
+        catch (e) {}
+        global.__walletTransactionsInscColEnsured = true;
+      }
+      const inscriptionId = Number(event.data.object.metadata.diaspoactif_insc_inscription_id);
+      const insc = await db.prepare(`SELECT * FROM insc_inscriptions WHERE id=? AND statut_paiement='en_attente'`).get(inscriptionId);
+      if (insc) {
+        const [type, fiche] = await Promise.all([
+          db.prepare(`SELECT * FROM insc_types WHERE id=?`).get(insc.type_id),
+          db.prepare(`SELECT * FROM insc_fiches WHERE id=?`).get(insc.fiche_id),
+        ]);
+        const montant = Number(type?.prix) || 0;
+        const COMMISSION_RATE = 0.03;
+        const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+        const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+        await db.prepare(`UPDATE insc_inscriptions SET statut_paiement='paye' WHERE id=?`).run(inscriptionId);
+        await db.prepare(`INSERT INTO wallet_transactions (insc_inscription_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+          .run(inscriptionId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`INSERT INTO wallet_transactions (insc_inscription_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+          .run(inscriptionId, fiche.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, fiche.owner_user_id);
+        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+        try {
+          await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'inscription_evenement',?,'reussi',?,?)`)
+            .run(insc.user_id, montant, 'inscription_evenement', new Date().toISOString());
+        } catch (e) { /* table transactions peut avoir schema différent */ }
+
+        if (insc.statut === "confirme") await envoyerConfirmationInscription(inscriptionId);
+        const notifTitre = insc.statut === "inscrit" ? "⏳ Inscription en attente de validation" : "📝 Nouvelle inscription";
+        const notifContenu = insc.statut === "inscrit"
+          ? `${insc.prenom} ${insc.nom} s'est inscrit·e (${type?.label || ''}) à « ${fiche.nom} » — en attente de votre validation.`
+          : `${insc.prenom} ${insc.nom} vient de s'inscrire (${type?.label || ''}) à « ${fiche.nom} » (+${organizer_amount.toFixed(2)}€).`;
+        creerNotif(fiche.owner_user_id, "insc_nouvelle", notifTitre, notifContenu,
+          { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+      }
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_insc_inscription_id) {
+      const session = event.data.object;
+      await db.prepare(`UPDATE insc_inscriptions SET statut_paiement='echec' WHERE transaction_ref=? AND statut_paiement='en_attente'`).run(session.id);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
       /* Paiement Boutique confirmé — même modèle que la Billetterie (commission 3%, crédit wallet_balance
          à l'initiative, retrait ultérieur via le Centre Financier). Idempotent : ne traite que si encore 'en_attente'. */
@@ -41943,28 +41989,84 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
 
   const user = await getCurrentUser(req);
   const reference = await inscGenererReference();
+
+  /* transaction_ref (2026-09-22, demande explicite : "branche le automatiquement à chaque
+     billet créé ici") — filet auto-réparateur autonome, même idiome que zone_diffusion plus
+     haut dans ce fichier : mémoïsé sur `global`, absent avant cette passe car le paiement réel
+     était explicitement hors scope à la construction de ce module (voir server/db.js, commentaire
+     sur insc_inscriptions "Finances/paiement réel restent hors de cette passe"). */
+  if (!global.__inscInscriptionsTransactionRefEnsured) {
+    try { await db.prepare(`ALTER TABLE insc_inscriptions ADD COLUMN transaction_ref TEXT`).run(); }
+    catch (e) {}
+    global.__inscInscriptionsTransactionRefEnsured = true;
+  }
+
+  if (type.gratuit) {
+    const id = (await db.prepare(`
+      INSERT INTO insc_inscriptions (fiche_id, type_id, evenement_id, user_id, reference, nom, prenom, email, telephone,
+        reponses_json, statut, statut_paiement, consentements_json, ip_creation)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run(fiche.id, type.id, evenementId, user?.id || null, reference,
+      String(body.nom).trim(), String(body.prenom).trim(), body.email || null, body.telephone || null,
+      JSON.stringify(reponses), statutInitial, "non_concerne",
+      JSON.stringify(body.consentements || {}), ip
+    )).lastInsertRowid;
+
+    if (statutInitial === "confirme") await envoyerConfirmationInscription(id);
+    /* Texte de notification distinct pour "inscrit" (validation_auto désactivé, demande
+       explicite du 2026-09-09) : l'organisateur doit comprendre qu'une action de sa part est
+       attendue, pas seulement être informé d'une inscription déjà confirmée. */
+    const notifTitre = statutInitial === "inscrit" ? "⏳ Inscription en attente de validation" : "📝 Nouvelle inscription";
+    const notifContenu = statutInitial === "inscrit"
+      ? `${body.prenom} ${body.nom} s'est inscrit·e (${type.label}) à « ${fiche.nom} » — en attente de votre validation.`
+      : `${body.prenom} ${body.nom} vient de s'inscrire (${type.label}) à « ${fiche.nom} ».`;
+    creerNotif(fiche.owner_user_id, "insc_nouvelle", notifTitre, notifContenu,
+      { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+
+    return sendJSON(res, 201, { id, reference, statut: statutInitial });
+  }
+
+  /* Type payant — rien n'est confirmé/notifié tant que Stripe n'a pas confirmé le paiement
+     (mêmes conventions que POST /api/events/:id/buy : ligne créée en amont pour réserver la
+     place/référence, split commission/wallet et notifications faits uniquement dans
+     handleStripeWebhook()). */
+  if (!type.prix || type.prix <= 0) return sendJSON(res, 400, { error: "Tarif invalide pour ce type d'inscription." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+
   const id = (await db.prepare(`
     INSERT INTO insc_inscriptions (fiche_id, type_id, evenement_id, user_id, reference, nom, prenom, email, telephone,
       reponses_json, statut, statut_paiement, consentements_json, ip_creation)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(fiche.id, type.id, evenementId, user?.id || null, reference,
     String(body.nom).trim(), String(body.prenom).trim(), body.email || null, body.telephone || null,
-    JSON.stringify(reponses), statutInitial, type.gratuit ? "non_concerne" : "non_paye",
+    JSON.stringify(reponses), statutInitial, "en_attente",
     JSON.stringify(body.consentements || {}), ip
   )).lastInsertRowid;
 
-  if (statutInitial === "confirme") await envoyerConfirmationInscription(id);
-  /* Texte de notification distinct pour "inscrit" (validation_auto désactivé, demande
-     explicite du 2026-09-09) : l'organisateur doit comprendre qu'une action de sa part est
-     attendue, pas seulement être informé d'une inscription déjà confirmée. */
-  const notifTitre = statutInitial === "inscrit" ? "⏳ Inscription en attente de validation" : "📝 Nouvelle inscription";
-  const notifContenu = statutInitial === "inscrit"
-    ? `${body.prenom} ${body.nom} s'est inscrit·e (${type.label}) à « ${fiche.nom} » — en attente de votre validation.`
-    : `${body.prenom} ${body.nom} vient de s'inscrire (${type.label}) à « ${fiche.nom} ».`;
-  creerNotif(fiche.owner_user_id, "insc_nouvelle", notifTitre, notifContenu,
-    { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
-
-  sendJSON(res, 201, { id, reference, statut: statutInitial });
+  try {
+    const origin = getOrigin(req);
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      ...(body.email ? { customer_email: body.email } : {}),
+      line_items: [{
+        price_data: {
+          currency: "eur",
+          unit_amount: Math.round(type.prix * 100),
+          product_data: { name: `${fiche.nom} — ${type.label}` },
+        },
+        quantity: 1,
+      }],
+      metadata: { diaspoactif_insc_inscription_id: String(id) },
+      success_url: `${origin}/inscription-publique.html?slug=${encodeURIComponent(fiche.slug)}&paiement=succes&insc=${encodeURIComponent(reference)}`,
+      cancel_url: `${origin}/inscription-publique.html?slug=${encodeURIComponent(fiche.slug)}&paiement=annule&insc=${encodeURIComponent(reference)}`,
+    });
+    await db.prepare(`UPDATE insc_inscriptions SET transaction_ref=? WHERE id=?`).run(session.id, id);
+    sendJSON(res, 201, { id, reference, statut: statutInitial, checkout_url: session.url });
+  } catch (e) {
+    await db.prepare(`DELETE FROM insc_inscriptions WHERE id=?`).run(id);
+    sendJSON(res, 500, SEC.safeError(e, "insc-checkout"));
+  }
 });
 
 route("POST", "/api/insc/public/upload", async (req, res) => {
