@@ -737,9 +737,9 @@ function renderFields() {
   const fieldsHtml = fields.map((f, i) => `
     <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
       <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
-      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:oklch(0.5 0.006 30); cursor:pointer;">
-        <input type="checkbox" ${f.obligatoire ? 'checked' : ''} data-action="toggleFieldRequired" data-id="${f.id}" style="width:14px; height:14px; accent-color:oklch(0.32 0.09 258);"/>
-        Obligatoire
+      <label style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; cursor:pointer; padding:7px 13px; border-radius:20px; white-space:nowrap; background:${f.obligatoire ? '#FEE2E2' : '#F1F5F9'}; border:1.5px solid ${f.obligatoire ? '#DC2626' : 'oklch(0.85 0.004 30)'}; color:${f.obligatoire ? '#B91C1C' : 'oklch(0.5 0.006 30)'};">
+        <input type="checkbox" ${f.obligatoire ? 'checked' : ''} data-action="toggleFieldRequired" data-id="${f.id}" style="width:16px; height:16px; accent-color:#DC2626; cursor:pointer;"/>
+        ${f.obligatoire ? '🔴 Obligatoire' : 'Facultatif'}
       </label>
       <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="removeField" data-id="${f.id}">✕</button>
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone sont demandés.</div>';
