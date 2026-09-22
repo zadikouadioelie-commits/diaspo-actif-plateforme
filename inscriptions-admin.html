@@ -100,8 +100,8 @@
 const IA_TABS = [
   { key: 'overview', label: "Vue d'ensemble", emoji: '📊' },
   { key: 'types', label: "Types d'inscription", emoji: '🏷️' },
-  { key: 'validation', label: 'Validation', emoji: '✅' },
   { key: 'fields', label: 'Formulaire', emoji: '📝' },
+  { key: 'validation', label: 'Validation', emoji: '✅' },
   { key: 'public', label: 'Aperçu public', emoji: '🌐' },
   { key: 'communication', label: 'Communication', emoji: '📧' },
   { key: 'qr', label: 'Contrôle QR', emoji: '🎟️' },
@@ -413,7 +413,7 @@ function renderDetailView() {
   }).join('');
   const nav = `<nav style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:0 28px; display:flex; gap:2px; overflow-x:auto;">${tabsHtml}</nav>`;
   // Bouton "Précédent" (2026-09-09, demande explicite) — les onglets se parcourent surtout dans
-  // l'ordre (Vue d'ensemble → Types d'inscription → Validation → Formulaire → …), certains
+  // l'ordre (Vue d'ensemble → Types d'inscription → Formulaire → Validation → …), certains
   // renvoyant même déjà vers "l'onglet précédent" en texte (ex. renderFields ci-dessous) sans
   // qu'aucun bouton ne le fasse réellement. Absent sur le tout premier onglet — le fil d'Ariane
   // "Formulaires & Inscriptions" au-dessus sert déjà de retour à ce niveau-là.
@@ -441,6 +441,15 @@ function renderTabContent() {
   }
 }
 
+// ---- Consigne d'usage (2026-09-22, demande explicite : "ajouter ici l'utilité de cette vue...
+// rend la consigne bien visible dans un carré vert clair") — une phrase en tête de chaque
+// onglet expliquant à quoi il sert, pour un utilisateur qui découvre le module. ----
+function iaConsigne(texte) {
+  return `<div style="background:oklch(0.95 0.05 150);border:1px solid oklch(0.75 0.1 150);color:oklch(0.32 0.1 150);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;line-height:1.5;display:flex;gap:8px;align-items:flex-start;">
+    <span style="flex-shrink:0;">💡</span><span>${texte}</span>
+  </div>`;
+}
+
 // ---- Vue d'ensemble ----
 function renderOverview() {
   const fiche = selectedFiche();
@@ -456,6 +465,7 @@ function renderOverview() {
 
   const publicUrl = location.origin + '/inscription-publique.html?slug=' + fiche.slug;
   return `
+    ${iaConsigne("Un coup d'œil rapide sur l'état de votre fiche : nombre d'inscrits, types actifs, fonds gelés, places restantes.")}
     ${renderModeleStandard(fiche)}
     ${renderInfosGenerales(fiche)}
     <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:24px;">
@@ -667,6 +677,7 @@ function renderTypes() {
       </div>` : `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:40px;text-align:center;color:oklch(0.55 0.006 30);">Ajoutez un type d'inscription pour commencer.</div>`;
 
   return `
+    ${iaConsigne("Créez les différentes formules proposées aux participants (ex. Bénévole, VIP, Standard), chacune avec son tarif et son nombre de places.")}
     <div style="display:grid; grid-template-columns:1fr 1.3fr; gap:20px;">
       <div style="display:flex; flex-direction:column; gap:10px;">
         <button style="background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:12px; border-radius:10px; cursor:pointer;" data-action="addType">+ Ajouter un type d'inscription</button>
@@ -681,7 +692,7 @@ function renderFields() {
   const types = currentTypes().map(buildTypeVM);
   const chips = types.map(rt => `<button style="background:${rt.chipBg}; color:${rt.chipColor}; border:1px solid ${rt.chipBorder}; font-size:13px; font-weight:600; padding:8px 16px; border-radius:20px; cursor:pointer;" data-action="selectType" data-id="${rt.id}">${escH(rt.name)}</button>`).join('');
   const type = selectedType();
-  if (!type) return `<div style="color:oklch(0.55 0.006 30);">Créez d'abord un type d'inscription (onglet précédent).</div>`;
+  if (!type) return `${iaConsigne("Choisissez les informations que vous demandez à vos participants (identité, contact, etc.), en plus de nom/prénom/e-mail/téléphone toujours demandés.")}<div style="color:oklch(0.55 0.006 30);">Créez d'abord un type d'inscription (onglet précédent).</div>`;
   const fields = type.champs || [];
   const fieldsHtml = fields.map((f, i) => `
     <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
@@ -709,6 +720,7 @@ function renderFields() {
     </div>` : '';
 
   return `
+    ${iaConsigne("Choisissez les informations que vous demandez à vos participants (identité, contact, etc.), en plus de nom/prénom/e-mail/téléphone toujours demandés.")}
     <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">${chips}</div>
     <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -766,6 +778,7 @@ function renderPublic() {
   }
 
   return `
+    <div style="max-width:640px;margin:0 auto 14px;">${iaConsigne("Visualisez la fiche exactement telle qu'elle apparaît pour un visiteur avant de s'inscrire.")}</div>
     <div style="max-width:640px;margin:0 auto 14px;">
       ${modeApercu
         ? `<div style="background:oklch(0.95 0.04 85); border:1px solid oklch(0.8 0.08 85); color:oklch(0.4 0.13 85); font-size:12.5px; font-weight:600; text-align:center; padding:9px 12px; border-radius:8px;">🔍 Aperçu en temps réel — cette fiche est encore en brouillon, seul vous pouvez voir cette page. Elle se mettra à jour à chaque modification.</div>`
@@ -797,6 +810,7 @@ function renderCommunication() {
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucune communication envoyée pour le moment.</div>';
 
   return `
+    ${iaConsigne("Envoyez des messages ou rappels à tous les inscrits de cette fiche.")}
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
         <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Nouvelle communication</h3>
@@ -840,6 +854,7 @@ function renderQr() {
   const stats = state.checkinStats || { presents_actuellement:0, entrees:0, sorties:0, non_entres:0 };
   const controlUrl = lien ? (location.origin + '/controle.html?token=' + lien.token) : null;
   return `
+    ${iaConsigne("Scannez le QR code de chaque billet le jour J pour valider les entrées.")}
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
         <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">🎟️ Lien de contrôle</h3>
@@ -911,6 +926,7 @@ function renderValidation() {
     </div>`;
   }).join('');
   return `
+    ${iaConsigne("Choisissez si chaque inscription est acceptée automatiquement ou si vous devez l'approuver vous-même avant qu'elle soit confirmée.")}
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <h3 style="margin:0;font-size:15px;font-weight:700;">Demandes en attente de validation</h3>
@@ -954,6 +970,7 @@ function renderPresences() {
     : `<div style="text-align:center;color:oklch(0.55 0.006 30);font-size:13px;padding:40px 10px;">Cliquez sur un participant pour voir sa fiche.</div>`;
 
   return `
+    ${iaConsigne("Suivez qui s'est réellement présenté à l'événement, une fois les entrées contrôlées.")}
     <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start;">
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;overflow-x:auto;">
         <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Présences</h3>
@@ -976,6 +993,7 @@ function renderFinances() {
     </div>`
     : `<div style="font-size:11px;color:oklch(0.6 0.006 30);margin-top:12px;">🔒 Seul le compte administrateur Diaspo'Actif peut geler ou débloquer les fonds.</div>`;
   return `
+    ${iaConsigne("Suivez les paiements reçus pour cette fiche et l'état des fonds.")}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
         <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">Finances de la fiche</h3>
@@ -1002,6 +1020,7 @@ function renderStats() {
   const tauxPresence = totalConfirmes ? Math.round((entrees / totalConfirmes) * 100) : 0;
   const placesRestantes = types.filter(t => t.capacityDisplay !== '∞').reduce((s, t) => s + Math.max(0, (t.capacityDisplay - t.registered)), 0);
   return `
+    ${iaConsigne("Analysez la fréquentation et les inscriptions dans le temps.")}
     <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px;">
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Taux de présence</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;">${tauxPresence}%</div></div>
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Places restantes</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;">${placesRestantes}</div></div>
@@ -1037,6 +1056,7 @@ function renderHistorique() {
       <button data-action="supprimerToutHistorique" style="background:#dc2626;border:none;color:#fff;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;">🗑 Tout supprimer</button>
     </div>` : '';
   return `
+    ${iaConsigne("Retrouvez toutes les actions effectuées sur cette fiche (créations, modifications, changements de statut).")}
     <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <h3 style="margin:0;font-size:15px;font-weight:700;">Historique / audit</h3>
