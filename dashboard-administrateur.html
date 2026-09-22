@@ -1600,6 +1600,25 @@
         </div>
       </div>
 
+      <!-- MODIFIER UN ÉVÉNEMENT BILLETTERIE — ADMIN TEMPORAIRE (2026-09-23, demande explicite,
+           besoin ponctuel — à retirer une fois le besoin terminé, chercher ce commentaire).
+           Un administrateur ne peut pas ouvrir dashboard-initiative.html (réservé aux comptes
+           Initiative, et sa page suppose le rôle "initiative" à de nombreux endroits — pas
+           qu'un seul garde-fou en tête de page) pour ajuster un événement Billetterie d'un
+           tiers. Contrairement à cette page, PUT /api/events/:id autorise déjà l'administrateur
+           (voir server/index.js) : cette modale, volontairement compacte (pas le formulaire
+           riche du propriétaire — image de couverture, vidéos, PDF, fiche d'inscription liée
+           restent inchangés), couvre les champs qu'on ajuste le plus souvent en urgence. -->
+      <div id="admin-evt-edit-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px;">
+        <div style="background:#fff;border-radius:14px;width:100%;max-width:560px;padding:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;font-size:16px;">✏️ Modifier l'événement (vue administrateur)</h3>
+            <button onclick="document.getElementById('admin-evt-edit-modal-bg').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <div id="admin-evt-edit-content"></div>
+        </div>
+      </div>
+
       <!-- MÉMOIRE CHATBOT -->
       <section id="section-chatbot" style="display:none;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
@@ -13128,6 +13147,9 @@ async function loadAdminBilletterie() {
               <td style="padding:10px;text-align:right;font-weight:700;">${estBillet?(e.revenu||0).toFixed(2)+' €':'—'}</td>
               <td style="padding:10px;text-align:right;color:#8b5cf6;">${estBillet?((e.revenu||0)*0.05).toFixed(2)+' €':'—'}</td>
               <td style="padding:10px;text-align:center;white-space:nowrap;">
+                ${estBillet
+                  ? `<button class="btn btn-sm btn-outline" onclick="adminEditEvent(${e.id})" title="Ajuster titre, dates, lieu, description et statut — sans passer par le tableau de bord du propriétaire">✏️ Modifier</button>`
+                  : `<a class="btn btn-sm btn-outline" href="evenements.html#evt-${e.id}" target="_blank" rel="noopener" title="Ouvrir la fiche événement — les mêmes boutons Modifier/Gérer que voit le propriétaire y apparaissent">✏️ Modifier</a>`}
                 <button class="btn btn-sm btn-outline" onclick="adminObserverEvent(${e.id},'${e.source_table}')" title="Aperçu complet — image, description, toutes les informations, telles qu'affichées publiquement">👁️ Observer</button>
                 ${estBillet && e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="adminPublishEvent(${e.id})">Publier</button>`:''}
                 ${suspendu
@@ -13231,6 +13253,70 @@ window.adminObserverEvent = async function(id, sourceTable) {
       ${e.description?`<p style="font-size:13.5px;line-height:1.6;color:#333;white-space:pre-wrap;">${esc(e.description)}</p>`:'<p style="font-size:13px;color:var(--muted);font-style:italic;">Aucune description.</p>'}
     `;
   } catch(err) { content.innerHTML = '<div style="color:#ef4444;padding:20px;">Erreur : ' + err.message + '</div>'; }
+};
+
+/* Voir le commentaire sur #admin-evt-edit-modal-bg plus haut : modale compacte, ADMIN
+   TEMPORAIRE, réservée aux événements Billetterie (source_table='events') — les événements
+   « Simple » ont déjà leur propre modale d'édition complète, accessible à l'administrateur,
+   sur evenements.html (bouton ✏️ Modifier de la table ci-dessus). */
+window.adminEditEvent = async function(id) {
+  const modal = document.getElementById('admin-evt-edit-modal-bg');
+  const content = document.getElementById('admin-evt-edit-content');
+  content.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
+  modal.style.display = 'flex';
+  try {
+    const { event: ev } = await api('GET', '/events/' + id);
+    const v = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    content.innerHTML = `
+      <div style="display:grid;gap:12px;">
+        <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Titre *</label>
+          <input type="text" id="aee-titre" value="${v(ev.titre)}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Description</label>
+          <textarea id="aee-description" rows="4" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;resize:vertical;">${v(ev.description)}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Date de début *</label>
+            <input type="datetime-local" id="aee-date-debut" value="${v(ev.date_debut ? ev.date_debut.slice(0,16) : '')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></div>
+          <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Date de fin</label>
+            <input type="datetime-local" id="aee-date-fin" value="${v(ev.date_fin ? ev.date_fin.slice(0,16) : '')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Ville</label>
+            <input type="text" id="aee-ville" value="${v(ev.ville)}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></div>
+          <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Pays</label>
+            <input type="text" id="aee-pays" value="${v(ev.pays)}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></div>
+        </div>
+        <div><label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">Adresse</label>
+          <input type="text" id="aee-adresse" value="${v(ev.adresse)}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px;">
+          <button class="btn btn-outline" onclick="document.getElementById('admin-evt-edit-modal-bg').style.display='none'">Annuler</button>
+          <button class="btn btn-orange" id="aee-btn-save" onclick="adminSaveEditEvent(${id})">💾 Enregistrer</button>
+        </div>
+      </div>`;
+  } catch(err) { content.innerHTML = '<div style="color:#ef4444;padding:20px;">Erreur : ' + err.message + '</div>'; }
+};
+
+window.adminSaveEditEvent = async function(id) {
+  const titre = document.getElementById('aee-titre').value.trim();
+  const dateDebut = document.getElementById('aee-date-debut').value;
+  if (!titre || !dateDebut) { alert('Titre et date de début requis.'); return; }
+  const btn = document.getElementById('aee-btn-save');
+  btn.disabled = true; btn.textContent = '⏳ Enregistrement…';
+  try {
+    await api('PUT', '/events/' + id, {
+      titre,
+      description: document.getElementById('aee-description').value.trim() || null,
+      date_debut: dateDebut,
+      date_fin: document.getElementById('aee-date-fin').value || null,
+      ville: document.getElementById('aee-ville').value.trim() || null,
+      pays: document.getElementById('aee-pays').value.trim() || null,
+      adresse: document.getElementById('aee-adresse').value.trim() || null,
+    });
+    document.getElementById('admin-evt-edit-modal-bg').style.display = 'none';
+    loadAdminBilletterie();
+  } catch (err) {
+    alert('Erreur : ' + err.message);
+    btn.disabled = false; btn.textContent = '💾 Enregistrer';
+  }
 };
 </script>
 <script src="assets/posts.js"></script>
