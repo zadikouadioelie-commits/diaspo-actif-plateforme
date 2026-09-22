@@ -3508,6 +3508,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                   📅 ${fmtDateInit(e.date_evt)}${e.heure_debut?' · '+escH(e.heure_debut):''} &nbsp;·&nbsp; 📍 ${escH([e.ville||e.lieu,e.pays].filter(Boolean).join(', ')||'—')}
                   ${e.domaine ? ` &nbsp;·&nbsp; 🏷️ ${escH(e.domaine)}`:''}
                 </div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">🕓 Créé le ${fmtDateInit(e.created_at)}</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                   <span style="font-size:12px;background:var(--bg);padding:4px 10px;border-radius:6px;">${e.prix_min ? '💶 À partir de '+Number(e.prix_min).toLocaleString('fr-FR')+' €' : '🎟️ Gratuit'}</span>
                 </div>
