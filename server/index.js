@@ -19188,6 +19188,23 @@ route("DELETE", "/api/evenements/:id", async (req, res, params) => {
   }
   // Bypass admin avec participants réels : même raison, nettoyer la FK dépendante d'abord.
   if (nbParticipants > 0) await db.prepare("DELETE FROM evenements_participants WHERE evenement_id=?").run(params.id);
+  /* Bug réel signalé (2026-09-23, "erreur serveur" générique au clic sur Supprimer) : le module
+     Formulaires & Inscriptions (insc_*) a 4 tables avec une FK sur evenements(id) — aucune
+     n'était nettoyée ici, alors qu'un événement lié à ne serait-ce qu'une fiche d'inscription
+     (insc_fiches_evenements, même sans inscrit réel) suffisait à faire échouer le DELETE en
+     violation de contrainte. Même classe de bug déjà corrigée pour les cagnottes, voir
+     DELETE /api/cagnottes/:id un peu plus haut — même traitement ici : les vraies inscriptions
+     réelles restent protégées (bloqué pour un non-admin), le lien vers une fiche et les liens de
+     contrôle QR sont de simples artefacts qu'on retire sans risque, et une fiche d'inscription
+     elle-même est un objet indépendant qu'on détache au lieu de supprimer. */
+  const inscInscriptions = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE evenement_id=?").get(params.id))?.n || 0;
+  if (inscInscriptions > 0 && !estAdmin) {
+    return sendJSON(res, 400, { error: `Cet événement a déjà ${inscInscriptions} inscription(s) via sa fiche liée — contactez l'administration plutôt que de le supprimer, pour ne pas perdre cet historique.` });
+  }
+  if (inscInscriptions > 0) await db.prepare("DELETE FROM insc_inscriptions WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM insc_liens_controle WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM insc_fiches_evenements WHERE evenement_id=?").run(params.id);
+  await db.prepare("UPDATE formulaires_inscription SET evenement_id=NULL WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM evenements WHERE id=?").run(params.id);
   if (estAdmin) SEC.logSecurity('evenement_force_deleted_by_admin', { admin_id: user.id, evenement_id: params.id, avait_participants: nbParticipants });
   sendJSON(res, 200, { ok: true });
