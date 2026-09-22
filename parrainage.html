@@ -289,32 +289,49 @@
      d'objet (cagnotte, produit...) — jamais un champ compte (voir la règle sur la source
      unique photo/bannière, sans objet ici : ceci est la photo d'un OBJET invitation, pas
      celle du compte). */
+  /* Bug réel signalé (2026-09-23, "un compte n'arrive pas à remplacer une image") — cette
+     fonction est rappelée à chaque ouverture de la modale de modification
+     (ouvrirModaleModification), mais #pa-e-cover-btn est un bouton STATIQUE, jamais recréé.
+     Chaque appel ajoutait un NOUVEAU listener "click" sur ce même bouton (jamais retiré), avec
+     sa PROPRE variable `url` fermée dessus. Après avoir ouvert la modale plusieurs fois, un
+     clic déclenchait donc plusieurs pickAndUpload() en parallèle, chacun mettant à jour une
+     fermeture différente — l'image effectivement choisie par l'utilisateur pouvait mettre à
+     jour une fermeture PÉRIMÉE, jamais celle que coverEdit.get() relit au moment d'enregistrer,
+     donnant l'impression que le remplacement "ne marche pas" (l'image change à l'écran puis
+     redevient l'ancienne, ou l'enregistrement garde l'ancienne URL). Corrigé en attachant le
+     listener UNE SEULE FOIS sur le bouton (garde via dataset), qui relit toujours l'état courant
+     via picker._coverState — jamais une fermeture figée au moment de l'attachement. */
   function creerCoverPicker(pickerId, btnId, urlInitiale) {
-    let url = urlInitiale || null;
     const picker = document.getElementById(pickerId);
     const btn = document.getElementById(btnId);
+    const state = { url: urlInitiale || null };
     function render() {
       picker.innerHTML = '';
-      if (url) {
+      if (state.url) {
         const img = document.createElement('img');
-        img.className = 'pa-cover-preview'; img.src = url;
+        img.className = 'pa-cover-preview'; img.src = state.url;
         picker.appendChild(img);
       }
       picker.appendChild(btn);
-      btn.textContent = url ? '🖼️ Changer' : '🖼️ Choisir une photo';
-      if (url) {
+      btn.textContent = state.url ? '🖼️ Changer' : '🖼️ Choisir une photo';
+      if (state.url) {
         const retirer = document.createElement('button');
         retirer.type = 'button'; retirer.className = 'pa-cover-remove'; retirer.textContent = 'Retirer';
-        retirer.addEventListener('click', () => { url = null; render(); });
+        retirer.addEventListener('click', () => { state.url = null; render(); });
         picker.appendChild(retirer);
       }
     }
-    btn.addEventListener('click', async () => {
-      const nouvelleUrl = await pickAndUpload('invitation', { maxW: 1200, maxH: 630 });
-      if (nouvelleUrl) { url = nouvelleUrl; render(); }
-    });
+    picker._coverState = state;
+    picker._coverRender = render;
+    if (!btn.dataset.coverBound) {
+      btn.dataset.coverBound = '1';
+      btn.addEventListener('click', async () => {
+        const nouvelleUrl = await pickAndUpload('invitation', { maxW: 1200, maxH: 630 });
+        if (nouvelleUrl) { picker._coverState.url = nouvelleUrl; picker._coverRender(); }
+      });
+    }
     render();
-    return { get: () => url, set: (u) => { url = u || null; render(); } };
+    return { get: () => picker._coverState.url, set: (u) => { picker._coverState.url = u || null; picker._coverRender(); } };
   }
   const coverCreer = creerCoverPicker('pa-c-cover-picker', 'pa-c-cover-btn', null);
 
