@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
 <link rel="stylesheet" href="/assets/theme-manager.css">
+<link rel="stylesheet" href="/assets/guided-tour.css">
 <link rel="apple-touch-icon" href="assets/logo.png">
 <meta name="theme-color" content="#0D2B4E">
 <!-- Design validé (Claude Design, 2026-09-08) — typographies dédiées à ce module, ne pas
@@ -396,6 +397,7 @@ function renderDetailView() {
                fait déjà le même data-action="backToList", mais un simple lien discret n'était
                pas assez visible depuis cette page de détail. -->
           <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="backToList">📋 Visualiser mes fiches</button>
+          <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="window.GuidedTour&&GuidedTour.start('inscriptions-admin')">🎥 Tutoriel</button>
           <button style="background:oklch(0.96 0.004 30); border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="goToPublic">Prévisualiser</button>
           ${publierBtn}
           <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="dupliquerFiche">📑 Dupliquer</button>
@@ -444,9 +446,47 @@ function renderTabContent() {
 // ---- Consigne d'usage (2026-09-22, demande explicite : "ajouter ici l'utilité de cette vue...
 // rend la consigne bien visible dans un carré vert clair") — une phrase en tête de chaque
 // onglet expliquant à quoi il sert, pour un utilisateur qui découvre le module. ----
+/* Mascotte "cache-cache" (2026-09-22, demande explicite) — un petit personnage qui se cache
+   derrière l'encadré vert de conseil (iaConsigne, affiché en haut de chaque onglet) et en
+   ressort en rebondissant pour attirer l'œil vers le bouton 🎥 Tutoriel du haut de page. Injecté
+   une seule fois (idempotent, même patron que ensureStyle() de assets/image-cropper.js) — le
+   contenu de la page est régénéré à chaque changement d'onglet via innerHTML, donc l'élément
+   ne doit pas dépendre d'un état JS externe pour continuer à s'animer. */
+function ensureIaMascotteStyle() {
+  if (document.getElementById('ia-mascotte-style')) return;
+  const s = document.createElement('style');
+  s.id = 'ia-mascotte-style';
+  s.textContent = `
+    .ia-mascotte-wrap{position:absolute;top:-22px;right:14px;cursor:pointer;z-index:2;filter:drop-shadow(0 3px 5px rgba(0,0,0,.18));animation:ia-mascotte-bounce 2.6s ease-in-out infinite;}
+    .ia-mascotte-wrap:hover{animation-play-state:paused;transform:translateY(-9px);}
+    .ia-mascotte-bulle{position:absolute;top:-30px;right:-4px;background:#0D2B4E;color:#fff;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:8px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;}
+    .ia-mascotte-wrap:hover .ia-mascotte-bulle{opacity:1;}
+    @keyframes ia-mascotte-bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-7px);}}
+    @media (prefers-reduced-motion: reduce){ .ia-mascotte-wrap{animation:none;} }
+  `;
+  document.head.appendChild(s);
+}
+const IA_MASCOTTE_SVG = `
+  <svg width="46" height="52" viewBox="0 0 46 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="23" cy="46" rx="15" ry="8" fill="#F26422"/>
+    <path d="M9 46 C9 30, 13 20, 23 20 C33 20, 37 30, 37 46" fill="#F26422"/>
+    <circle cx="23" cy="19" r="13" fill="#0D2B4E"/>
+    <circle cx="18" cy="18" r="3.6" fill="#fff"/>
+    <circle cx="28" cy="18" r="3.6" fill="#fff"/>
+    <circle cx="18.8" cy="18.6" r="1.7" fill="#0D2B4E"/>
+    <circle cx="28.8" cy="18.6" r="1.7" fill="#0D2B4E"/>
+    <path d="M18 25 Q23 28.5 28 25" stroke="#fff" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    <path d="M35 30 Q42 26 41 18" stroke="#F26422" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="41" cy="17" r="4" fill="#F26422"/>
+  </svg>`;
 function iaConsigne(texte) {
-  return `<div style="background:oklch(0.95 0.05 150);border:1px solid oklch(0.75 0.1 150);color:oklch(0.32 0.1 150);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;line-height:1.5;display:flex;gap:8px;align-items:flex-start;">
+  ensureIaMascotteStyle();
+  return `<div style="position:relative;background:oklch(0.95 0.05 150);border:1px solid oklch(0.75 0.1 150);color:oklch(0.32 0.1 150);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;line-height:1.5;display:flex;gap:8px;align-items:flex-start;">
     <span style="flex-shrink:0;">💡</span><span>${texte}</span>
+    <span class="ia-mascotte-wrap" title="Voir le tutoriel" onclick="window.GuidedTour&&GuidedTour.start('inscriptions-admin')">
+      <span class="ia-mascotte-bulle">🎥 Un tuto ?</span>
+      ${IA_MASCOTTE_SVG}
+    </span>
   </div>`;
 }
 
@@ -1475,5 +1515,7 @@ root.addEventListener('change', function (e) {
 <script src="/assets/cookies-banner.js"></script>
 <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<script src="/assets/guided-tour.js"></script>
+<script src="/assets/tours/tour-inscriptions-admin.js"></script>
 </body>
 </html>
