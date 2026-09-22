@@ -17915,18 +17915,28 @@ async function enrichirAvecFicheMedia(rows) {
   const fichesById = {};
   if (ficheIds.length) {
     const ph3 = ficheIds.map(() => '?').join(',');
-    const fiches = await db.prepare(`SELECT id, affiche_url FROM insc_fiches WHERE id IN (${ph3})`).all(...ficheIds);
+    /* slug ajouté (2026-09-23, demande explicite : "cet événement n'a pas la bonne fiche") —
+       manquait pour permettre au bouton "S'inscrire" de pointer vers inscription-publique.html
+       (qui n'accepte qu'un slug, jamais un id, voir GET /api/insc/public/:slug), donc ce bouton
+       retombait TOUJOURS sur l'ancien formulaire minimal (rejoindre()) même quand une vraie
+       fiche existait — jamais vérifié côté client faute de cette donnée. */
+    const fiches = await db.prepare(`SELECT id, slug, statut, affiche_url FROM insc_fiches WHERE id IN (${ph3})`).all(...ficheIds);
     const medias = await db.prepare(`SELECT fiche_id, type, url, libelle FROM insc_fiches_medias WHERE fiche_id IN (${ph3}) ORDER BY position ASC`).all(...ficheIds);
-    fiches.forEach(f => { fichesById[f.id] = { affiche_url: f.affiche_url, medias: [] }; });
+    fiches.forEach(f => { fichesById[f.id] = { slug: f.slug, statut: f.statut, affiche_url: f.affiche_url, medias: [] }; });
     medias.forEach(m => { if (fichesById[m.fiche_id]) fichesById[m.fiche_id].medias.push({ type: m.type, url: m.url, libelle: m.libelle }); });
   }
 
   return rows.map(r => {
     const fid = ficheParEvt[r.id];
+    const fiche = (fid && fichesById[fid]) ? fichesById[fid] : null;
     /* fiche_id exposé (2026-09-21, demande explicite) pour le bouton "🗂️ Gérer" : permet au
        client de savoir vers quoi pointer sans appel supplémentaire — inscriptions-admin.html
-       si une fiche est liée, sinon la modale "inscrits" du formulaire simple intégré. */
-    return { ...r, fiche_media: (fid && fichesById[fid]) ? fichesById[fid] : null, fiche_id: fid || null };
+       si une fiche est liée, sinon la modale "inscrits" du formulaire simple intégré.
+       fiche_slug (2026-09-23) : ne redirige le bouton "S'inscrire" public vers cette fiche que
+       si elle est réellement publiée — une fiche encore en brouillon resterait invisible pour
+       un visiteur (voir GET /api/insc/public/:slug), le bouton doit alors garder l'ancien
+       formulaire minimal plutôt que de mener à une impasse "Fiche introuvable". */
+    return { ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null };
   });
 }
 

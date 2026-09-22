@@ -523,11 +523,14 @@ function renderEvts() {
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           ${evt.lien_inscription
             ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
-            : (inscrit
-              ? '<button class="btn" style="font-size:12px" onclick="quitter('+evt.id+',this)">Se désinscrire</button>'
-              : (plein
-                ? '<button class="btn" disabled style="font-size:12px;opacity:.5">Complet</button>'
-                : '<button class="btn btn-orange" style="font-size:12px" onclick="rejoindre('+evt.id+',this)">'+(typeof CURRENT_USER!=='undefined'&&CURRENT_USER?'S&#39;inscrire':'Se connecter')+'</button>'
+            : (evt.fiche_id && evt.fiche_slug
+              ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="inscription-publique.html?slug=${encodeURIComponent(evt.fiche_slug)}">S'inscrire</a>`
+              : (inscrit
+                ? '<button class="btn" style="font-size:12px" onclick="quitter('+evt.id+',this)">Se désinscrire</button>'
+                : (plein
+                  ? '<button class="btn" disabled style="font-size:12px;opacity:.5">Complet</button>'
+                  : '<button class="btn btn-orange" style="font-size:12px" onclick="rejoindre('+evt.id+',this)">'+(typeof CURRENT_USER!=='undefined'&&CURRENT_USER?'S&#39;inscrire':'Se connecter')+'</button>'
+                )
               )
             )
           }
@@ -1197,7 +1200,10 @@ function renderEventDetail(evt, isPreview) {
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
         ${evt.lien_inscription
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
-          : (!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>')
+          : (evt.fiche_id && evt.fiche_slug
+            ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="inscription-publique.html?slug=${encodeURIComponent(evt.fiche_slug)}">✅ S'inscrire à l'événement</a>`
+            : (!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>')
+          )
         }
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
         ${modifierDetailHtml}
