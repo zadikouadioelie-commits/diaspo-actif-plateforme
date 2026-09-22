@@ -15732,21 +15732,57 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
      son identité publique sur la table initiatives (comme nom_structure ci-dessus), tout autre
      rôle la porte directement sur users. Toujours les 3 champs ensemble (un domaine peut être
      réenregistré vide "" volontairement pour l'effacer, donc on teste !==undefined, pas la
-     vérité du champ). */
+     vérité du champ).
+     Limite "2 modifications par an" (2026-09-23, demande explicite, tous comptes confondus) :
+     seul un changement RÉEL est compté (une valeur déjà renseignée qui devient différente) —
+     le premier renseignement (valeur vide → remplie) reste toujours libre. Historique glissant
+     sur 365 jours (pas une année calendaire, pour ne pas permettre 2 changements le 31/12 puis
+     2 de plus le 1ᵉʳ janvier) stocké en JSON, colonne ajoutée à la volée (même idiome que
+     zone_diffusion plus haut : mémoïsé sur global, ALTER sans IF NOT EXISTS, le catch suffit). */
   if (body.domaine_principal !== undefined || body.sous_domaine_1 !== undefined || body.sous_domaine_2 !== undefined) {
     const dp = body.domaine_principal !== undefined ? (String(body.domaine_principal||"").trim() || null) : undefined;
     const sd1 = body.sous_domaine_1 !== undefined ? (String(body.sous_domaine_1||"").trim() || null) : undefined;
     const sd2 = body.sous_domaine_2 !== undefined ? (String(body.sous_domaine_2||"").trim() || null) : undefined;
-    if (user.role === "initiative") {
+    if (!global.__domaineHistoriqueColsEnsured) {
+      for (const t of ["users", "initiatives"]) {
+        try { await db.prepare(`ALTER TABLE ${t} ADD COLUMN domaine_historique_json TEXT`).run(); } catch (e) {}
+      }
+      global.__domaineHistoriqueColsEnsured = true;
+    }
+    const table = user.role === "initiative" ? "initiatives" : "users";
+    const whereCol = user.role === "initiative" ? "owner_user_id" : "id";
+    const actuel = user.role === "initiative"
+      ? await db.prepare(`SELECT domaine_principal, sous_domaine_1, sous_domaine_2, domaine_historique_json FROM initiatives WHERE owner_user_id=?`).get(user.id)
+      : await db.prepare(`SELECT domaine_principal, sous_domaine_1, sous_domaine_2, domaine_historique_json FROM users WHERE id=?`).get(user.id);
+    const nouveauDp = dp !== undefined ? dp : actuel?.domaine_principal ?? null;
+    const nouveauSd1 = sd1 !== undefined ? sd1 : actuel?.sous_domaine_1 ?? null;
+    const nouveauSd2 = sd2 !== undefined ? sd2 : actuel?.sous_domaine_2 ?? null;
+    const estUnChangement = !!(actuel?.domaine_principal) && (
+      nouveauDp !== (actuel.domaine_principal || null) ||
+      nouveauSd1 !== (actuel.sous_domaine_1 || null) ||
+      nouveauSd2 !== (actuel.sous_domaine_2 || null)
+    );
+    let historique = [];
+    try { historique = JSON.parse(actuel?.domaine_historique_json || "[]"); if (!Array.isArray(historique)) historique = []; } catch (e) { historique = []; }
+    const ilYA365J = Date.now() - 365 * 24 * 3600 * 1000;
+    historique = historique.filter(ts => new Date(ts).getTime() > ilYA365J);
+    if (estUnChangement && actuel) {
+      if (historique.length >= 2) {
+        const prochain = new Date(new Date(historique[0]).getTime() + 365 * 24 * 3600 * 1000);
+        return sendJSON(res, 429, {
+          error: `Le domaine d'activité ne peut être modifié que 2 fois par an. Prochaine modification possible à partir du ${prochain.toLocaleDateString("fr-FR")}.`,
+        });
+      }
+      historique.push(new Date().toISOString());
+    }
+    if (dp !== undefined || sd1 !== undefined || sd2 !== undefined) {
       const dFields = [], dVals = [];
       if (dp !== undefined)  { dFields.push("domaine_principal=?"); dVals.push(dp); }
       if (sd1 !== undefined) { dFields.push("sous_domaine_1=?");    dVals.push(sd1); }
       if (sd2 !== undefined) { dFields.push("sous_domaine_2=?");    dVals.push(sd2); }
-      if (dFields.length) { dVals.push(user.id); await db.prepare(`UPDATE initiatives SET ${dFields.join(",")} WHERE owner_user_id=?`).run(...dVals); }
-    } else {
-      if (dp !== undefined)  { fields.push("domaine_principal=?"); vals.push(dp); }
-      if (sd1 !== undefined) { fields.push("sous_domaine_1=?");    vals.push(sd1); }
-      if (sd2 !== undefined) { fields.push("sous_domaine_2=?");    vals.push(sd2); }
+      if (estUnChangement) { dFields.push("domaine_historique_json=?"); dVals.push(JSON.stringify(historique)); }
+      dVals.push(user.id);
+      await db.prepare(`UPDATE ${table} SET ${dFields.join(",")} WHERE ${whereCol}=?`).run(...dVals);
     }
   }
   if (body.notif_emails_non_essentiels !== undefined) { fields.push("notif_emails_non_essentiels=?"); vals.push(body.notif_emails_non_essentiels ? 1 : 0); }

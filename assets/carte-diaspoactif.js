@@ -215,7 +215,11 @@
           </div>
           <div class="cda-actions" id="cda-actions"></div>
         </div>
-        ${isOwner ? `<div style="padding:0 20px 4px;"><button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button></div>` : ''}
+        ${isOwner || profil.domaine_principal ? `<div style="padding:0 20px 4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-banner-style">🎨 Thème de bandeaux</button>` : ''}
+          ${profil.domaine_principal ? `<span class="cda-theme-btn" style="cursor:default;">${esc(window.domaineActiviteLabel ? window.domaineActiviteLabel(profil.domaine_principal) : profil.domaine_principal)}${profil.sous_domaine_1 ? ' — ' + esc(profil.sous_domaine_1) : ''}${profil.sous_domaine_2 ? ' · ' + esc(profil.sous_domaine_2) : ''}</span>` : ''}
+          ${isOwner ? `<button type="button" class="cda-theme-btn" id="cda-domaine-activite-edit">🏷️ ${profil.domaine_principal ? 'Modifier mon domaine' : 'Renseigner mon domaine'}</button>` : ''}
+        </div>` : ''}
 
         <div class="cda-grid">
           <div class="cda-box">
@@ -289,6 +293,9 @@
 
       const styleBtn = container.querySelector('#cda-banner-style');
       if (styleBtn) styleBtn.addEventListener('click', () => editBannerStyle(container, profil, opts));
+
+      const domaineActiviteBtn = container.querySelector('#cda-domaine-activite-edit');
+      if (domaineActiviteBtn) domaineActiviteBtn.addEventListener('click', () => editDomaineActivite(container, profil, opts));
 
       const infoBtn = container.querySelector('#cda-info-edit');
       if (infoBtn) infoBtn.addEventListener('click', () => editInfos(container, profil, opts));
@@ -414,6 +421,45 @@
         Object.assign(profil, r.profil);
         render(container, profil, opts);
       });
+  }
+
+  /* Domaine d'activité (2026-09-22, demande explicite, capture à l'appui) — réutilise
+     intégralement le champ déjà existant côté serveur (PUT /api/profil, domaine_principal/
+     sous_domaine_1/sous_domaine_2, "Paramètres du compte" du 2026-09-04) et la taxonomie
+     partagée assets/domaines-activite.js (inscription.html, parametres-compte.html, annuaire) —
+     seul un raccourci manquait directement sur la carte de profil. */
+  function editDomaineActivite(container, profil, opts) {
+    const options = window.domaineActiviteOptionsHTML ? window.domaineActiviteOptionsHTML(profil.domaine_principal) : '';
+    const ov = openCdaModal('🏷️ Domaine d\'activité',
+      `<div style="margin-bottom:12px;">
+         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Domaine principal</label>
+         <select id="cda-e-domaine-principal" style="width:100%;box-sizing:border-box;">
+           <option value="">— Aucun —</option>
+           ${options}
+         </select>
+       </div>
+       <div style="margin-bottom:10px;">
+         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Sous-domaine 1</label>
+         <input type="text" id="cda-e-sous-domaine-1" style="width:100%;box-sizing:border-box;" placeholder="Ex : Transit France – Côte d'Ivoire" value="${esc(profil.sous_domaine_1 || '')}">
+       </div>
+       <div>
+         <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Sous-domaine 2 <span style="font-weight:400;color:#64748b;">(facultatif)</span></label>
+         <input type="text" id="cda-e-sous-domaine-2" style="width:100%;box-sizing:border-box;" placeholder="Facultatif" value="${esc(profil.sous_domaine_2 || '')}">
+       </div>`,
+      async ov2 => {
+        const domaine_principal = ov2.querySelector('#cda-e-domaine-principal').value;
+        const sous_domaine_1 = ov2.querySelector('#cda-e-sous-domaine-1').value.trim();
+        const sous_domaine_2 = ov2.querySelector('#cda-e-sous-domaine-2').value.trim();
+        const r = await window.api('PUT', '/profil', { domaine_principal, sous_domaine_1, sous_domaine_2 });
+        Object.assign(profil, r.profil);
+        render(container, profil, opts);
+      });
+    if (window.wireSousDomaineSuggestions) {
+      window.wireSousDomaineSuggestions(
+        ov.querySelector('#cda-e-domaine-principal'),
+        [ov.querySelector('#cda-e-sous-domaine-1'), ov.querySelector('#cda-e-sous-domaine-2')]
+      );
+    }
   }
 
   window.CarteDiaspoActif = { render };

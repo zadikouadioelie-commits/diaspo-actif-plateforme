@@ -1970,6 +1970,14 @@ function renderVisitorProfile() {
   if (profil.ville)     chips.push(`<span class="pvz-chip">📍 ${esc(profil.ville)}</span>`);
   if (nats)             chips.push(`<span class="pvz-chip">🏛 Nationalité : ${esc(nats)}</span>`);
   if (origs)            chips.push(`<span class="pvz-chip">🗺️ Origine : ${esc(origs)}</span>`);
+  /* Domaine d'activité (2026-09-23, demande explicite, "même endroit" que la version déjà
+     construite pour le rôle utilisateur sur assets/carte-diaspoactif.js) — même champ serveur
+     (PUT /api/profil, domaine_principal/sous_domaine_1/sous_domaine_2), porté ici par
+     initiatives (voir GET /api/profil/:id) plutôt que users, mais identique côté API. */
+  if (profil.domaine_principal) {
+    const dLabel = window.domaineActiviteLabel ? window.domaineActiviteLabel(profil.domaine_principal) : profil.domaine_principal;
+    chips.push(`<span class="pvz-chip">${esc(dLabel)}${profil.sous_domaine_1 ? ' — ' + esc(profil.sous_domaine_1) : ''}${profil.sous_domaine_2 ? ' · ' + esc(profil.sous_domaine_2) : ''}</span>`);
+  }
 
   // Actions
   const following = profil.isFollowing;
@@ -1999,7 +2007,8 @@ function renderVisitorProfile() {
   /* Le bouton "🎨 Thème" vivait ici (2026-08-18) — retiré : les couleurs sont désormais
      toujours visibles à droite de la bannière (voir #theme-swatches dans le bloc BANNIÈRE),
      plus besoin d'un panneau à déplier pour les retrouver. */
-  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${gererAdhesionsBtn}${vitrineToggleBtn}${shareBtn}`;
+  const domaineActiviteBtn = `<button class="pvz-btn" onclick="editDomaineActiviteInit()">🏷️ ${profil.domaine_principal ? 'Modifier mon domaine' : 'Renseigner mon domaine'}</button>`;
+  const ownerActionsRow = `<button class="pvz-btn primary" onclick="openEditIdentity()">✏️ Modifier mon profil</button>${domaineActiviteBtn}${gererAdhesionsBtn}${vitrineToggleBtn}${shareBtn}`;
 
   // Onglets + stats
   const seg = `<div class="pvz-segmented">
@@ -2253,6 +2262,67 @@ async function pvzSaveReseaux() {
     profil.reseaux_sociaux = reseaux;
     renderVisitorProfile();
   } catch(e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* Domaine d'activité — modal autonome (2026-09-23, demande explicite : "fait pareil pour les
+   initiatives au même endroit"), même API que la version compte Utilisateur
+   (assets/carte-diaspoactif.js, editDomaineActivite) : PUT /api/profil accepte déjà
+   domaine_principal/sous_domaine_1/sous_domaine_2 pour tout rôle, y compris la limite serveur
+   "2 modifications par an" (server/index.js) — rien à faire ici pour la faire respecter, le
+   message d'erreur renvoyé est affiché tel quel. */
+function editDomaineActiviteInit() {
+  const options = window.domaineActiviteOptionsHTML ? window.domaineActiviteOptionsHTML(profil.domaine_principal) : '';
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(18,32,56,.55);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;box-sizing:border-box;">
+      <h3 style="margin:0 0 14px;font-size:16px;">🏷️ Domaine d'activité</h3>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Domaine principal</label>
+        <select id="pvz-e-domaine-principal" style="width:100%;box-sizing:border-box;border:1px solid rgba(18,32,56,.16);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;">
+          <option value="">— Aucun —</option>
+          ${options}
+        </select>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Sous-domaine 1</label>
+        <input type="text" id="pvz-e-sous-domaine-1" style="width:100%;box-sizing:border-box;border:1px solid rgba(18,32,56,.16);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;" placeholder="Ex : Transit France – Côte d'Ivoire" value="${esc(profil.sous_domaine_1 || '')}">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;">Sous-domaine 2 <span style="font-weight:400;color:#8794A7;">(facultatif)</span></label>
+        <input type="text" id="pvz-e-sous-domaine-2" style="width:100%;box-sizing:border-box;border:1px solid rgba(18,32,56,.16);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;" placeholder="Facultatif" value="${esc(profil.sous_domaine_2 || '')}">
+      </div>
+      <p style="font-size:11.5px;color:#8794A7;margin:0 0 14px;">⚠️ Modifiable 2 fois maximum par an.</p>
+      <div id="pvz-domaine-err" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="pvz-domaine-cancel" style="padding:7px 14px;border:1px solid rgba(18,32,56,.16);border-radius:8px;background:none;cursor:pointer;font-size:12.5px;">Annuler</button>
+        <button id="pvz-domaine-save" style="padding:7px 16px;border:none;border-radius:8px;background:#2F6BED;color:#fff;font-weight:700;cursor:pointer;font-size:12.5px;">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#pvz-domaine-cancel').onclick = () => ov.remove();
+  if (window.wireSousDomaineSuggestions) {
+    window.wireSousDomaineSuggestions(
+      ov.querySelector('#pvz-e-domaine-principal'),
+      [ov.querySelector('#pvz-e-sous-domaine-1'), ov.querySelector('#pvz-e-sous-domaine-2')]
+    );
+  }
+  ov.querySelector('#pvz-domaine-save').onclick = async () => {
+    const err = ov.querySelector('#pvz-domaine-err');
+    err.style.display = 'none';
+    try {
+      const domaine_principal = ov.querySelector('#pvz-e-domaine-principal').value;
+      const sous_domaine_1 = ov.querySelector('#pvz-e-sous-domaine-1').value.trim();
+      const sous_domaine_2 = ov.querySelector('#pvz-e-sous-domaine-2').value.trim();
+      const r = await api('PUT', '/profil', { domaine_principal, sous_domaine_1, sous_domaine_2 });
+      Object.assign(profil, r.profil);
+      ov.remove();
+      renderVisitorProfile();
+    } catch (e) {
+      err.textContent = e.message || 'Erreur.';
+      err.style.display = 'block';
+    }
+  };
 }
 
 /* Partager le profil (Web Share API + repli presse-papiers) */
@@ -8256,6 +8326,7 @@ init();
 <script src="/assets/upload-media.js"></script>
 <script src="assets/avis-section.js"></script>
 <script src="assets/banner-presets.js"></script>
+<script src="assets/domaines-activite.js"></script>
 <script src="assets/carte-diaspoactif.js"></script>
 <script src="/assets/image-cropper.js"></script>
 <script src="/assets/widget-board.js"></script>
