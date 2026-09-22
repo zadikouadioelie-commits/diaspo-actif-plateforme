@@ -374,8 +374,12 @@ function renderListView() {
           </div>
           <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:${f.description ? '6px' : '14px'};">📅 ${escH(f.apercu_date || 'Date à définir')} &nbsp;·&nbsp; 📍 ${escH(f.apercu_lieu || 'Lieu à définir')}</div>
           ${f.description ? `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);line-height:1.5;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(f.description)}</div>` : ''}
-          <div style="display:flex;gap:18px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);">
+          <div style="display:flex;gap:12px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);align-items:center;flex-wrap:wrap;">
             <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
+            <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+              ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}</button>` : ''}
+              <button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>
+            </div>
           </div>
         </div>
       </div>`;
@@ -1142,6 +1146,15 @@ function renderHistorique() {
 const actions = {
   async selectFiche(el) {
     state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
+    await iaChargerFiche(state.selectedFicheId);
+  },
+  // Raccourci depuis la carte de liste (2026-09-22, demande explicite) : ouvre directement la
+  // fiche sur l'encart "Lier à un événement" (Vue d'ensemble → Informations générales en
+  // édition) déjà existant, plutôt que de le refaire ailleurs — sert aussi bien pour lier un
+  // premier événement que pour voir/modifier ceux déjà liés.
+  async ouvrirLiaisonEvenement(el) {
+    state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
+    state.editionInfosOuverte = true;
     await iaChargerFiche(state.selectedFicheId);
   },
   async supprimerFicheListe(el) {

@@ -41421,7 +41421,11 @@ route("GET", "/api/insc/fiches", async (req, res) => {
     const evtApercu = await db.prepare(`
       SELECT e.date_evt, e.ville, e.pays FROM insc_fiches_evenements fe
       JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC LIMIT 1`).get(f.id);
-    enrichies.push({ ...f, nb_inscriptions: nb, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null });
+    // Nombre d'événements liés (2026-09-22, demande explicite) : distinct de apercu_date/lieu
+    // ci-dessus (qui ne regardent que le premier) — sert à afficher un bouton "Événements
+    // liés" sur la carte de liste, sans devoir ouvrir la fiche pour le savoir.
+    const nbEvt = (await db.prepare("SELECT COUNT(*) n FROM insc_fiches_evenements WHERE fiche_id=?").get(f.id))?.n || 0;
+    enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null });
   }
   sendJSON(res, 200, { fiches: enrichies });
 });
