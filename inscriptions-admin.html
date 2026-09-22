@@ -407,9 +407,9 @@ function renderDetailView() {
       </div>
     </header>`;
 
-  const tabsHtml = IA_TABS.map(t => {
+  const tabsHtml = IA_TABS.map((t, i) => {
     const active = state.activeTab === t.key;
-    return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; border-bottom:2px solid ${active ? 'oklch(0.32 0.09 258)' : 'transparent'}; color:${active ? 'oklch(0.2 0.006 30)' : 'oklch(0.5 0.006 30)'};" data-action="selectTab" data-tab="${t.key}">${t.emoji} ${t.label}</button>`;
+    return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; border-bottom:2px solid ${active ? 'oklch(0.32 0.09 258)' : 'transparent'}; color:${active ? 'oklch(0.2 0.006 30)' : 'oklch(0.5 0.006 30)'};" data-action="selectTab" data-tab="${t.key}">${i + 1}. ${t.emoji} ${t.label}</button>`;
   }).join('');
   const nav = `<nav style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:0 28px; display:flex; gap:2px; overflow-x:auto;">${tabsHtml}</nav>`;
   // Bouton "Précédent" (2026-09-09, demande explicite) — les onglets se parcourent surtout dans
