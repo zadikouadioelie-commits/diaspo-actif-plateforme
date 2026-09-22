@@ -16973,9 +16973,10 @@ async function handleStripeWebhook(req, res) {
           "Votre paiement n'a pas pu être traité. Vous avez 7 jours pour régulariser avant suspension de votre Premium.", { accred_id: accredUA.accred_id });
       }
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
-      /* Contribution à une cagnotte confirmée. Aucune commission plateforme pour l'instant
-         (non spécifiée au cahier des charges) : le montant collecté sert uniquement d'affichage
-         de progression — la mécanique de reversement au créateur viendra dans une phase ultérieure. */
+      /* Contribution à une cagnotte confirmée. Même modèle commission 3%/wallet_balance que
+         Boutique/Billetterie/Adhésions (2026-09-22, demande explicite — reversement au
+         créateur enfin branché, voir migrateCagnottesWallet ci-dessus). Idempotent : ne
+         traite que si 'en_attente'. */
       const contribId = Number(event.data.object.metadata.diaspoactif_cagnotte_contribution_id);
       const contrib = await db.prepare("SELECT * FROM cagnotte_contributions WHERE id=? AND statut='en_attente'").get(contribId);
       if (contrib) {
@@ -16989,6 +16990,17 @@ async function handleStripeWebhook(req, res) {
           .run(contrib.montant, contrib.cagnotte_id);
         const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte, visibilite, slug FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
         if (c) {
+          const COMMISSION_RATE = 0.03;
+          const montant = Number(contrib.montant) || 0;
+          const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+          const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+          await db.prepare(`INSERT INTO wallet_transactions (cagnotte_contribution_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+            .run(contribId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+          await db.prepare(`INSERT INTO wallet_transactions (cagnotte_contribution_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+            .run(contribId, c.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+          await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, c.owner_user_id);
+          await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+
           creerNotif(c.owner_user_id, "cagnotte_contribution",
             premierePartcipation ? "Première participation 🎉" : "Nouvelle contribution 🪙",
             premierePartcipation
@@ -24401,6 +24413,25 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
   } catch (e) { console.error('[migrateRencontresContact]', e.message); }
 })();
 
+/* ──────── CAGNOTTES — reversement réel au créateur (2026-09-22, demande explicite) ────────
+   Jusqu'ici le webhook Stripe des cagnottes ne faisait que mettre à jour l'affichage de
+   progression (montant_collecte) — l'argent débité au contributeur atterrissait sur le solde
+   Stripe de la plateforme sans jamais être crédité au créateur (voir le commentaire d'origine
+   dans le webhook, "la mécanique de reversement viendra dans une phase ultérieure"). On branche
+   maintenant le même circuit commission → wallet_transactions → users.wallet_balance déjà
+   utilisé par Adhésions/Dons/Boutique/Billetterie. cagnotte_contribution_id permet de
+   distinguer une ligne "cagnotte" d'un billet (event_id) ou d'une adhésion
+   (adhesion_paiement_id) dans l'historique unifié du Centre Financier. Même idiome que
+   migrateRencontresContact() ci-dessus. */
+(async function migrateCagnottesWallet() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(wallet_transactions)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('cagnotte_contribution_id')) {
+      try { await db.prepare("ALTER TABLE wallet_transactions ADD COLUMN cagnotte_contribution_id INTEGER").run(); } catch (e) {}
+    }
+  } catch (e) { console.error('[migrateCagnottesWallet]', e.message); }
+})();
+
 /* ──────── AVIS UNIFIÉS (annuaire — Initiative/Utilisateur/Organisme, cahier des charges
    "Avis + droit de réponse", 2026-09-19) ────────
    Même idiome que migrateVideosTutoriels() ci-dessus : CREATE TABLE IF NOT EXISTS / ALTER
@@ -29917,10 +29948,15 @@ ${jsonLd}
 
       // Historique unifié : billetterie (wallet_transactions) + autres modules (wallet_ledger, vide tant que non branchés)
       const histBillets = await db.prepare(`
-        SELECT wt.timestamp AS date, 'billetterie' AS module, e.titre AS source_label, NULL AS payeur_nom,
+        SELECT wt.timestamp AS date,
+               CASE WHEN wt.cagnotte_contribution_id IS NOT NULL THEN 'cagnottes' ELSE 'billetterie' END AS module,
+               COALESCE(cg.titre, e.titre) AS source_label, NULL AS payeur_nom,
                wt.prix_billet AS montant_brut, wt.platform_fee AS commission, 0 AS frais_prestataire, wt.montant AS montant_net,
                'valide' AS statut
-        FROM wallet_transactions wt LEFT JOIN events e ON e.id=wt.event_id
+        FROM wallet_transactions wt
+          LEFT JOIN events e ON e.id=wt.event_id
+          LEFT JOIN cagnotte_contributions cc ON cc.id=wt.cagnotte_contribution_id
+          LEFT JOIN cagnottes cg ON cg.id=cc.cagnotte_id
         WHERE wt.beneficiaire_id=? AND wt.type='organizer_credit'
         ORDER BY wt.timestamp DESC LIMIT 50
       `).all(me.id);
