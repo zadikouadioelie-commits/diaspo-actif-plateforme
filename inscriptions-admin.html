@@ -391,6 +391,11 @@ function renderDetailView() {
           ${badge}
         </div>
         <div style="display:flex; gap:10px;">
+          <!-- 2026-09-22, demande explicite : "crée un bouton visualisé mes fiches pour voire
+               toutes les fiches créées" — le fil d'Ariane "Formulaires & Inscriptions" au-dessus
+               fait déjà le même data-action="backToList", mais un simple lien discret n'était
+               pas assez visible depuis cette page de détail. -->
+          <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="backToList">📋 Visualiser mes fiches</button>
           <button style="background:oklch(0.96 0.004 30); border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="goToPublic">Prévisualiser</button>
           ${publierBtn}
           <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="dupliquerFiche">📑 Dupliquer</button>
