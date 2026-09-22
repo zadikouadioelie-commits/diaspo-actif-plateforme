@@ -304,7 +304,7 @@
   function creerCoverPicker(pickerId, btnId, urlInitiale) {
     const picker = document.getElementById(pickerId);
     const btn = document.getElementById(btnId);
-    const state = { url: urlInitiale || null };
+    const state = { url: urlInitiale || null, uploading: false };
     function render() {
       picker.innerHTML = '';
       if (state.url) {
@@ -313,8 +313,9 @@
         picker.appendChild(img);
       }
       picker.appendChild(btn);
-      btn.textContent = state.url ? '🖼️ Changer' : '🖼️ Choisir une photo';
-      if (state.url) {
+      btn.disabled = state.uploading;
+      btn.textContent = state.uploading ? '⏳ Envoi en cours…' : (state.url ? '🖼️ Changer' : '🖼️ Choisir une photo');
+      if (state.url && !state.uploading) {
         const retirer = document.createElement('button');
         retirer.type = 'button'; retirer.className = 'pa-cover-remove'; retirer.textContent = 'Retirer';
         retirer.addEventListener('click', () => { state.url = null; render(); });
@@ -325,13 +326,31 @@
     picker._coverRender = render;
     if (!btn.dataset.coverBound) {
       btn.dataset.coverBound = '1';
+      /* Bug réel signalé (2026-09-23, persiste après le premier correctif) : "Invitation
+         enregistrée" s'affichait mais l'ancienne photo restait — cliquer sur "Enregistrer"
+         pendant que le téléversement de la nouvelle image était encore en cours (compression +
+         upload réseau, ça peut prendre plusieurs secondes sur mobile) enregistrait l'ANCIENNE
+         URL, celle-ci n'ayant pas encore été remplacée. `uploading` empêche désormais
+         l'enregistrement tant que le téléversement n'est pas terminé (voir isUploading() plus
+         bas, utilisé par les deux boutons Créer/Enregistrer). */
       btn.addEventListener('click', async () => {
-        const nouvelleUrl = await pickAndUpload('invitation', { maxW: 1200, maxH: 630 });
-        if (nouvelleUrl) { picker._coverState.url = nouvelleUrl; picker._coverRender(); }
+        picker._coverState.uploading = true;
+        picker._coverRender();
+        try {
+          const nouvelleUrl = await pickAndUpload('invitation', { maxW: 1200, maxH: 630 });
+          if (nouvelleUrl) picker._coverState.url = nouvelleUrl;
+        } finally {
+          picker._coverState.uploading = false;
+          picker._coverRender();
+        }
       });
     }
     render();
-    return { get: () => picker._coverState.url, set: (u) => { picker._coverState.url = u || null; picker._coverRender(); } };
+    return {
+      get: () => picker._coverState.url,
+      set: (u) => { picker._coverState.url = u || null; picker._coverRender(); },
+      isUploading: () => picker._coverState.uploading,
+    };
   }
   const coverCreer = creerCoverPicker('pa-c-cover-picker', 'pa-c-cover-btn', null);
 
@@ -342,6 +361,7 @@
     err.textContent = '';
     const domaineId = selDomaine.value;
     if (!domaineId) { err.textContent = 'Veuillez sélectionner un domaine.'; return; }
+    if (coverCreer.isUploading()) { err.textContent = 'La photo est encore en cours d\'envoi, patientez quelques secondes avant de créer.'; return; }
     const sousDomaineSel = document.getElementById('pa-c-sous-domaine');
     const sousDomaineLibre = document.getElementById('pa-c-sous-domaine-libre');
     btn.disabled = true; btn.textContent = 'Création…';
@@ -532,6 +552,7 @@
     err.textContent = '';
     const domaineId = selDomaineEdit.value;
     if (!domaineId) { err.textContent = 'Veuillez sélectionner un domaine.'; return; }
+    if (coverEdit.isUploading()) { err.textContent = 'La photo est encore en cours d\'envoi, patientez quelques secondes avant d\'enregistrer.'; return; }
     const sousDomaineSel = document.getElementById('pa-e-sous-domaine');
     const sousDomaineLibre = document.getElementById('pa-e-sous-domaine-libre');
     btn.disabled = true; btn.textContent = 'Enregistrement…';
