@@ -641,6 +641,7 @@ function renderTypes() {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:8px;">
           <h3 style="margin:0; font-size:16px; font-weight:700;">${escH(selected.name)}</h3>
           <div style="display:flex; gap:8px;">
+            <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="editNomType" data-id="${selected.id}">✏️ Modifier</button>
             <a href="/api/insc/types/${selected.id}/apercu-billet" target="_blank" rel="noopener" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer; text-decoration:none;">🎫 Aperçu du billet</a>
             <button style="background:none; border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="goToFields">Personnaliser les éléments d'inscription →</button>
           </div>
@@ -1222,6 +1223,18 @@ const actions = {
       await api('PUT', '/insc/types/' + id, { date_ouverture: ouverture.trim() || null, date_fermeture: fermeture.trim() || null });
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
+  },
+  /* Seul le nom du type n'avait aucun moyen d'être modifié après création (tarif/places/
+     période ont déjà leur propre crayon ✏️ cliquable, voir ci-dessus) — 2026-09-22, demande
+     explicite : bouton "✏️ Modifier" dans l'en-tête de la fiche détaillée du type. */
+  async editNomType(el) {
+    const id = parseInt(el.dataset.id);
+    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const nom = prompt("Nom du type d'inscription :", type.label);
+    if (nom === null) return;
+    if (!nom.trim()) { ia_toast('Le nom ne peut pas être vide.', false); return; }
+    try { await api('PUT', '/insc/types/' + id, { label: nom.trim() }); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
   },
   async toggleWaitlist(el) {
     const id = parseInt(el.dataset.id);
