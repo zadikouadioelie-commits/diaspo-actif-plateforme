@@ -27036,7 +27036,50 @@ ${jsonLd}
      bloc générique /api/* ci-dessous. */
   if (pathname.startsWith('/join/') && req.method === 'GET') {
     try {
-      const html = await fs.promises.readFile(path.join(ROOT, 'join.html'), 'utf8');
+      let html = await fs.promises.readFile(path.join(ROOT, 'join.html'), 'utf8');
+      /* Aperçu de lien dynamique (WhatsApp, réseaux sociaux…) — demande explicite du
+         2026-09-22 : le domaine de l'invitation ("Santé", "Éducation"...) doit apparaître
+         automatiquement dans la carte de prévisualisation, sans action manuelle. Les crawlers
+         de ces apps ne lisent QUE les balises <meta> statiques de la réponse HTML initiale —
+         jamais le JS client (qui affiche déjà l'invitation à l'écran via l'API, plus bas) —
+         donc c'est ici, côté serveur, que ça doit être injecté. Lecture seule : pas d'appel à
+         l'anti-doublon de vues (déjà géré par GET /api/parrainage/invitations/:code que le JS
+         client appelle) pour ne pas compter chaque passage de crawler comme une visite.  */
+      try {
+        const code = pathname.slice('/join/'.length).replace(/\/+$/, '');
+        const invitation = code && await db.prepare(`
+          SELECT i.banniere_url, i.inviter_user_id, pd.nom AS domaine_nom, pd.icone AS domaine_icone,
+            COALESCE(psd.nom, i.sous_domaine_libre) AS sous_domaine_nom
+          FROM invitations i
+          JOIN parrainage_domaines pd ON pd.id = i.domaine_id
+          LEFT JOIN parrainage_sous_domaines psd ON psd.id = i.sous_domaine_id
+          WHERE i.code = ?
+        `).get(code);
+        if (invitation) {
+          const inviteur = await db.prepare("SELECT id, nom, prenom, role, photo_url FROM users WHERE id=?").get(invitation.inviter_user_id);
+          let nomAffiche = inviteur ? [inviteur.prenom, inviteur.nom].filter(Boolean).join(" ") : "";
+          if (inviteur?.role === "initiative") {
+            const init = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(inviteur.id);
+            if (init?.nom) nomAffiche = init.nom;
+          }
+          const escAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const domaineTxt = [invitation.domaine_icone, invitation.domaine_nom].filter(Boolean).join(' ')
+            + (invitation.sous_domaine_nom ? ' · ' + invitation.sous_domaine_nom : '');
+          const titre = `${nomAffiche || "Un membre Diaspo'Actif"} vous invite — ${domaineTxt}`;
+          const description = `${domaineTxt} — Rejoignez la plateforme mondiale de la diaspora engagée sur Diaspo'Actif.`;
+          let image = 'https://diaspoactif.com/assets/og-image.png';
+          if (invitation.banniere_url) {
+            image = invitation.banniere_url.startsWith('http')
+              ? invitation.banniere_url
+              : `https://diaspoactif.com${invitation.banniere_url.startsWith('/') ? '' : '/'}${invitation.banniere_url}`;
+          }
+          html = html
+            .replace(/<title>[^<]*<\/title>/, `<title>${escAttr(titre)}</title>`)
+            .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${escAttr(titre)}">`)
+            .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${escAttr(description)}">`)
+            .replace(/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${escAttr(image)}">`);
+        }
+      } catch (e) { console.error('[join-og]', e.message); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
     } catch (e) {
