@@ -529,7 +529,7 @@ function renderEvts() {
           ${evt.origine ? '<span>🎯 '+[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
-          ${evt.prix_min ? '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>' : '<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>'}
+          ${evt.prix_min ? '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>' : (evt.type_participation === 'payant' ? '<span class="evt-tag">💳 Payant</span>' : '<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>')}
           ${visiBadge}
           ${(evt.nb_participants && !evt.masquer_inscrits) ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
         </div>
@@ -773,9 +773,13 @@ function ouvrirModaleEdition(id) {
   document.getElementById('e-visibilite').value = evt.visibilite || 'public';
   document.getElementById('e-visio-evt').value = evt.lien_visio || '';
   document.getElementById('e-whatsapp').value = evt.whatsapp_lien || '';
-  // prix_min est purement déduit de la fiche liée (voir inscSyncPrixMinEvenements côté
-  // serveur) — ce radio ne fait donc que refléter l'état déjà en base, jamais le contraire.
-  document.getElementById(evt.prix_min != null ? 'e-radio-payant' : 'e-radio-gratuit').checked = true;
+  // Priorité à la fiche d'inscription liée (2026-09-23, demande explicite) : un vrai tarif
+  // (prix_min, déduit de la fiche via inscSyncPrixMinEvenements) l'emporte toujours. Sans
+  // fiche/tarif, on retombe sur le choix Payant/Gratuit propre à l'événement (type_participation)
+  // plutôt que de silencieusement revenir sur "Gratuit" par défaut.
+  document.getElementById(
+    evt.prix_min != null ? 'e-radio-payant' : (evt.type_participation === 'payant' ? 'e-radio-payant' : 'e-radio-gratuit')
+  ).checked = true;
   majToggleGratuitPayant();
   const cover = evt.image_couverture || evt.image_url || null;
   if (cover) {
@@ -936,12 +940,13 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   errBox.style.display = 'none';
   if (!titre || !date) { errBox.textContent='Titre et date requis.'; errBox.style.display='block'; return; }
   const estPayant = document.getElementById('e-radio-payant').checked;
-  const ficheSeraLiee = !!ficheChoisie || (document.getElementById('modele-standard-notice').style.display !== 'none' && document.getElementById('e-appliquer-modele').checked);
-  if (estPayant && !ficheSeraLiee) {
-    errBox.textContent = "Un événement payant doit être lié à une fiche d'inscription avec un tarif — cliquez sur « 📝 Fiche d'inscription » ci-dessous, ou créez-en une.";
-    errBox.style.display = 'block';
-    return;
-  }
+  // Bloquant retiré (2026-09-23, demande explicite : "priorité à la fiche d'inscription, si
+  // elle n'existe pas alors priorité à la cartouche elle-même") — un événement peut désormais
+  // être marqué Payant SANS fiche liée : la cartouche affiche alors "💳 Payant" (générique),
+  // et bascule automatiquement sur "À partir de X €" dès qu'une fiche avec un vrai tarif est
+  // liée par la suite (voir type_participation, PUT /api/evenements/:id). Le bandeau
+  // #e-payant-notice ci-dessus reste affiché pour guider vers la fiche, sans plus jamais
+  // empêcher l'enregistrement.
   try {
     const galerie = galleryData.filter(Boolean);
     const champsCommuns = {
@@ -951,6 +956,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       type_evt:      document.getElementById('e-type').value,
       domaine:       document.getElementById('e-domaine').value,
       zone_diffusion: document.getElementById('e-zone-diffusion').value || null,
+      type_participation: estPayant ? 'payant' : 'gratuit',
       pays:          document.getElementById('e-pays').value,
       lieu:          document.getElementById('e-lieu').value,
       ville:         document.getElementById('e-lieu').value,
@@ -1317,7 +1323,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.lieu_gps ? `<a href="${esc(mapsLienItineraire(evt.lieu_gps))}" target="_blank" rel="noopener" style="text-decoration:none;color:#2563EB;">🧭 Itinéraire</a>` : ''}
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
         ${evt.origine ? `<span class="evt-tag">🎯 ${[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')}</span>` : ''}
-        ${evt.prix_min ? `<span class="evt-tag">💶 À partir de ${Number(evt.prix_min).toLocaleString('fr-FR')} €</span>` : `<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>`}
+        ${evt.prix_min ? `<span class="evt-tag">💶 À partir de ${Number(evt.prix_min).toLocaleString('fr-FR')} €</span>` : (evt.type_participation === 'payant' ? `<span class="evt-tag">💳 Payant</span>` : `<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>`)}
       </div>
       ${evt.lieu ? `<div style="display:flex;align-items:flex-start;gap:9px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
         <span style="font-size:16px;flex-shrink:0;line-height:1.3;">📍</span>

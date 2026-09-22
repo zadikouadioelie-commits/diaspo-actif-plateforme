@@ -18094,9 +18094,22 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     catch (e) {}
     global.__evenementsZoneDiffusionEnsured = true;
   }
+  /* type_participation (2026-09-23, demande explicite) : "priorité à la fiche d'inscription, si
+     elle n'existe pas alors priorité à la cartouche elle-même" — evenements.prix_min (déduit du
+     vrai tarif de la fiche liée, voir inscSyncPrixMinEvenements) reste TOUJOURS prioritaire
+     quand une fiche existe. Mais sans fiche liée du tout, le choix Gratuit/Payant du formulaire
+     n'avait jusqu'ici aucun effet persisté : la cartouche retombait silencieusement sur
+     "Gratuit" par défaut (prix_min = null), contredisant un "Payant" explicitement coché. Cette
+     colonne porte ce choix pour qu'il s'affiche même sans fiche/tarif configuré. Même idiome que
+     zone_diffusion juste au-dessus. */
+  if (!global.__evenementsTypeParticipationEnsured) {
+    try { await db.prepare(`ALTER TABLE evenements ADD COLUMN type_participation TEXT DEFAULT 'gratuit'`).run(); }
+    catch (e) {}
+    global.__evenementsTypeParticipationEnsured = true;
+  }
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
-    zone_diffusion,
+    zone_diffusion, type_participation,
     places_max, inscription_ouverte, lien_inscription, image_url,
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
@@ -18111,16 +18124,17 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // enrichirAvecFicheMedia() plus haut.
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || '[]');
   const id = (await db.prepare(`INSERT INTO evenements
-    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,places_max,
+    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,type_participation,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
-      description||null, type_evt||"evenement", domaine||null, zone_diffusion||null, places_max||null,
+      description||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
+      type_participation === 'payant' ? 'payant' : 'gratuit', places_max||null,
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
       coverImg, galerie,
@@ -18194,8 +18208,13 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
   }
+  if (!global.__evenementsTypeParticipationEnsured) {
+    try { await db.prepare(`ALTER TABLE evenements ADD COLUMN type_participation TEXT DEFAULT 'gratuit'`).run(); }
+    catch (e) {}
+    global.__evenementsTypeParticipationEnsured = true;
+  }
   const {
-    titre, date_evt, heure_debut, type_evt, domaine, zone_diffusion, pays, lieu, ville, lieu_gps,
+    titre, date_evt, heure_debut, type_evt, domaine, zone_diffusion, type_participation, pays, lieu, ville, lieu_gps,
     origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
     image_couverture, image_url, galerie_photos
   } = body;
@@ -18203,12 +18222,13 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const coverImg = image_couverture || image_url || null;
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 1)) : (galerie_photos || "[]");
   await db.prepare(`UPDATE evenements SET
-    titre=?, date_evt=?, heure_debut=?, type_evt=?, domaine=?, zone_diffusion=?, pays=?, lieu=?, ville=?, lieu_gps=?,
+    titre=?, date_evt=?, heure_debut=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
     image_couverture=?, image_url=?, galerie_photos=?
     WHERE id=?`)
     .run(
       titre, date_evt, heure_debut || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
+      type_participation === 'payant' ? 'payant' : 'gratuit',
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, description || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
       coverImg, coverImg, galerie, evt.id
