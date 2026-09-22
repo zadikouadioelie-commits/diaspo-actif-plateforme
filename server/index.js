@@ -18155,6 +18155,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
         await db.prepare("UPDATE evenements SET lien_inscription=? WHERE id=?")
           .run(`${process.env.PUBLIC_ORIGIN || "https://diaspoactif.com"}/inscription-publique.html?slug=${fiche.slug}`, id);
         await inscJournaliser(fiche.id, user, "liaison", `Liée manuellement à l'événement « ${titre} ».`);
+        await inscPublierSiBrouillon(fiche.id);
         ficheAppliquee = fiche;
       } catch (e) { console.error("[evenement-fiche-choisie]", e.message); }
     }
@@ -18168,6 +18169,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
         await db.prepare("UPDATE evenements SET lien_inscription=? WHERE id=?")
           .run(`${process.env.PUBLIC_ORIGIN || "https://diaspoactif.com"}/inscription-publique.html?slug=${ficheCree.slug}`, id);
         await inscJournaliser(newFicheId, user, "creation", `Créée automatiquement depuis le modèle standard « ${modele.nom} » pour l'événement « ${titre} ».`);
+        await inscPublierSiBrouillon(newFicheId);
         ficheAppliquee = ficheCree;
       } catch (e) { console.error("[evenement-fiche-standard]", e.message); }
     }
@@ -29107,6 +29109,7 @@ ${jsonLd}
             const newFicheId = await dupliquerFicheStructure(ficheSource, { nom: titre, copierEvenements: false });
             await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(newFicheId, eid);
             await inscJournaliser(newFicheId, me, "creation", `Créée automatiquement pour l'événement Billetterie « ${titre} ».`);
+            await inscPublierSiBrouillon(newFicheId);
             ficheAppliqueeEvt = await db.prepare("SELECT id, nom, slug FROM insc_fiches WHERE id=?").get(newFicheId);
           } catch (e) { console.error("[event-fiche-standard]", e.message); }
         }
@@ -29219,7 +29222,10 @@ ${jsonLd}
         await db.prepare("UPDATE events SET insc_fiche_id=NULL WHERE id=?").run(eid);
       } else if (fiche_choisie_id) {
         const fiche = await db.prepare("SELECT id FROM insc_fiches WHERE id=? AND owner_user_id=?").get(fiche_choisie_id, me.id);
-        if (fiche) await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(fiche.id, eid);
+        if (fiche) {
+          await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(fiche.id, eid);
+          await inscPublierSiBrouillon(fiche.id);
+        }
       } else if (["obligatoire", "validation"].includes(inscription_mode) && !ev.insc_fiche_id && appliquer_fiche_standard !== false) {
         const modele = await db.prepare("SELECT * FROM insc_fiches WHERE owner_user_id=? AND est_modele_standard=1").get(me.id);
         if (modele) {
@@ -29227,6 +29233,7 @@ ${jsonLd}
             const newFicheId = await dupliquerFicheStructure(modele, { nom: titre || ev.titre, copierEvenements: false });
             await db.prepare("UPDATE events SET insc_fiche_id=? WHERE id=?").run(newFicheId, eid);
             await inscJournaliser(newFicheId, me, "creation", `Créée automatiquement pour l'événement Billetterie « ${titre || ev.titre} ».`);
+            await inscPublierSiBrouillon(newFicheId);
             ficheAppliqueeEvt = await db.prepare("SELECT id, nom, slug FROM insc_fiches WHERE id=?").get(newFicheId);
           } catch (e) { console.error("[event-fiche-standard-put]", e.message); }
         }
@@ -41513,6 +41520,30 @@ async function inscSyncPrixMinEvenements(ficheId) {
   } catch (e) { console.error("[insc-sync-prix-min-rattrapage]", e.message); }
 })();
 
+/* Sortie automatique du mode brouillon dès qu'une fiche est réellement liée à un événement
+   (2026-09-23, demande explicite, capture à l'appui : une fiche déjà entièrement configurée —
+   types, tarifs — restait bloquée en aperçu propriétaire uniquement tant que personne n'allait
+   cliquer manuellement "Publier"). Ne touche QUE le cas 'brouillon' : une fiche déjà
+   programmée/suspendue/fermée/archivée reflète un choix explicite du propriétaire, jamais
+   écrasé ici. Appelée à chaque endroit où une liaison fiche↔événement est créée, quel que soit
+   le point d'entrée (module Formulaires & Inscriptions, création d'événement simple ou
+   Billetterie, modèle standard). */
+async function inscPublierSiBrouillon(ficheId) {
+  try { await db.prepare("UPDATE insc_fiches SET statut='publiee' WHERE id=? AND statut='brouillon'").run(ficheId); }
+  catch (e) { console.error("[insc-publier-si-brouillon]", e.message); }
+}
+// Rattrapage ponctuel (2026-09-23) : corrige au démarrage les fiches déjà liées à un événement
+// AVANT ce correctif (cas réel signalé, capture à l'appui) mais restées en brouillon — même
+// principe que rattrapagePrixMinEvenementsLies ci-dessus.
+(async function rattrapageStatutFichesLiees() {
+  try {
+    const fiches = await db.prepare("SELECT DISTINCT fiche_id FROM insc_fiches_evenements").all();
+    for (const f of fiches) await inscPublierSiBrouillon(f.fiche_id);
+    const fichesEvents = await db.prepare("SELECT DISTINCT insc_fiche_id FROM events WHERE insc_fiche_id IS NOT NULL").all();
+    for (const f of fichesEvents) await inscPublierSiBrouillon(f.insc_fiche_id);
+  } catch (e) { console.error("[insc-publier-si-brouillon-rattrapage]", e.message); }
+})();
+
 /* Évalue une condition d'affichage simple {champ_source, operateur, valeur} par rapport aux
    réponses déjà soumises — même logique côté serveur (revalidation) que côté client (affichage). */
 function inscConditionRemplie(conditionJson, reponses) {
@@ -41630,6 +41661,7 @@ route("POST", "/api/insc/fiches", async (req, res, params, body) => {
       try { await db.prepare("INSERT OR IGNORE INTO insc_fiches_evenements (fiche_id, evenement_id) VALUES (?,?)").run(id, eid); } catch (e) {}
     }
     await inscSyncPrixMinEvenements(id);
+    if (body.evenement_ids.length) await inscPublierSiBrouillon(id);
   }
   await inscJournaliser(id, user, "creation", `Fiche « ${body.nom} » créée.`);
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(id);
@@ -41695,6 +41727,7 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     // une fiche avec des types payants restait affiché "Gratuit" — voir
     // inscSyncPrixMinEvenements ci-dessus).
     await inscSyncPrixMinEvenements(fiche.id);
+    if (nouveauxIds.length) await inscPublierSiBrouillon(fiche.id);
   }
   await inscJournaliser(fiche.id, user, "modification", "Fiche modifiée.");
   sendJSON(res, 200, { ok: true });
