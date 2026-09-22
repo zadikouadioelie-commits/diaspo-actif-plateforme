@@ -3447,32 +3447,22 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const el = document.getElementById('evenements');
     el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
     try {
-      const { events = [] } = await api('GET', '/events?organisateur_id='+me.id+'&all=1');
+      /* Deux tables distinctes portent les événements d'une Initiative, selon le formulaire de
+         création emprunté (2026-09-23, bug réel signalé : "j'ai créé deux événements, dans
+         Événements je n'en vois qu'un") : events (ce module, Billetterie/types de billets) ET
+         evenements (module public "Mobiliser la diaspora" de evenements.html — voir son
+         POST /api/evenements). Ce panneau ne montrait jusqu'ici que la première, laissant les
+         événements créés depuis evenements.html invisibles ici. Fusion des deux, triée par date,
+         chacune gardant ses actions propres (l'une a des types de billets/finances, l'autre non). */
+      const [{ events = [] }, { evenements: evtsNatifs = [] }] = await Promise.all([
+        api('GET', '/events?organisateur_id='+me.id+'&all=1'),
+        api('GET', '/evenements?owner='+me.id).catch(() => ({ evenements: [] })),
+      ]);
+      const totalCount = events.length + evtsNatifs.length;
       const pubCount = events.filter(e=>e.statut==='publie').length;
       const badge = document.getElementById('init-billets-badge');
       if (badge && pubCount > 0) { badge.textContent = pubCount; badge.style.display = ''; }
-      el.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-          <h2 style="margin:0;font-size:1.1rem;">📅 Événements</h2>
-          <!-- 4 boutons indépendants (2026-09-09, demande explicite) : "Mes événements" n'est
-               qu'UNE option de ce module, pas son titre — Créer/Billetterie/Tutoriel ne sont
-               plus des sous-actions rattachées à une carte "Mes événements", ce sont des
-               entrées autonomes au même niveau. -->
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-outline" onclick="openMesEvenementsModal()">📋 Mes événements${events.length ? ` <span class="pill">${events.length}</span>` : ''}</button>
-            <button class="btn btn-orange" onclick="allerCreerEvenement()">＋ Créer un événement</button>
-            <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">🎟️ Billetterie & Wallet</button>
-            <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="if(window._daPremiumInitiative||window.daBypassActive?.('evenements')){window.GuidedTour&&GuidedTour.start('evenement-dashboard');}else{openPremiumUpsell('evenements');}">🎥 Tutoriel</button>
-          </div>
-        </div>
-        ${!events.length ? `
-          <div class="card" style="text-align:center;padding:48px 24px;">
-            <div style="font-size:3rem;margin-bottom:12px;">📅</div>
-            <h3 style="margin:0 0 8px;">Aucun événement</h3>
-            <p style="color:var(--muted);font-size:14px;margin:0 0 20px;">Créez votre premier événement pour mobiliser votre communauté.</p>
-            <button class="btn btn-orange" onclick="allerCreerEvenement()">＋ Créer mon premier événement</button>
-          </div>` :
-          events.map(e => `
+      const cartesEvents = events.map(e => `
           <div class="card" style="margin-bottom:12px;padding:16px;">
             <div style="display:flex;gap:14px;align-items:flex-start;">
               ${e.image_couverture||e.image_b64 ? `<img src="${e.image_couverture||e.image_b64}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
@@ -3501,9 +3491,62 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <button class="btn btn-sm btn-outline" onclick="initGererBillets(${e.id})" style="margin-left:auto;">🎟️ Gérer les billets</button>
             </div>
             <div id="fin-panel-${e.id}" style="display:none;margin-top:12px;"></div>
-          </div>`).join('')}`;
+          </div>`);
+      /* Événements "Mobiliser la diaspora" (table evenements) — pas de types de billets/finances
+         (concept propre à la table events ci-dessus), édition/suppression via les routes de ce
+         module-là, gérées directement depuis evenements.html. */
+      const cartesNatives = evtsNatifs.map(e => `
+          <div class="card" style="margin-bottom:12px;padding:16px;">
+            <div style="display:flex;gap:14px;align-items:flex-start;">
+              ${e.image_couverture||e.image_url ? `<img src="${e.image_couverture||e.image_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                  <strong style="font-size:14px;">${escH(e.titre)}</strong>
+                  <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#dcfce7;color:#166534;" title="Créé depuis le module « Mobiliser la diaspora »">🌍 En ligne</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+                  📅 ${fmtDateInit(e.date_evt)}${e.heure_debut?' · '+escH(e.heure_debut):''} &nbsp;·&nbsp; 📍 ${escH([e.ville||e.lieu,e.pays].filter(Boolean).join(', ')||'—')}
+                  ${e.domaine ? ` &nbsp;·&nbsp; 🏷️ ${escH(e.domaine)}`:''}
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <span style="font-size:12px;background:var(--bg);padding:4px 10px;border-radius:6px;">${e.prix_min ? '💶 À partir de '+Number(e.prix_min).toLocaleString('fr-FR')+' €' : '🎟️ Gratuit'}</span>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+              <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html" title="Modifier depuis le module Événements">✏️ Modifier</a>
+              <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html" title="Voir sur la page publique">👁 Voir</a>
+              <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="initDeleteEvenementNatif(${e.id})">🗑 Supprimer</button>
+            </div>
+          </div>`);
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+          <h2 style="margin:0;font-size:1.1rem;">📅 Événements</h2>
+          <!-- 4 boutons indépendants (2026-09-09, demande explicite) : "Mes événements" n'est
+               qu'UNE option de ce module, pas son titre — Créer/Billetterie/Tutoriel ne sont
+               plus des sous-actions rattachées à une carte "Mes événements", ce sont des
+               entrées autonomes au même niveau. -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="openMesEvenementsModal()">📋 Mes événements${totalCount ? ` <span class="pill">${totalCount}</span>` : ''}</button>
+            <button class="btn btn-orange" onclick="allerCreerEvenement()">＋ Créer un événement</button>
+            <button class="btn btn-outline" onclick="initShowSection('billetterie-init')">🎟️ Billetterie & Wallet</button>
+            <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="if(window._daPremiumInitiative||window.daBypassActive?.('evenements')){window.GuidedTour&&GuidedTour.start('evenement-dashboard');}else{openPremiumUpsell('evenements');}">🎥 Tutoriel</button>
+          </div>
+        </div>
+        ${!totalCount ? `
+          <div class="card" style="text-align:center;padding:48px 24px;">
+            <div style="font-size:3rem;margin-bottom:12px;">📅</div>
+            <h3 style="margin:0 0 8px;">Aucun événement</h3>
+            <p style="color:var(--muted);font-size:14px;margin:0 0 20px;">Créez votre premier événement pour mobiliser votre communauté.</p>
+            <button class="btn btn-orange" onclick="allerCreerEvenement()">＋ Créer mon premier événement</button>
+          </div>` : cartesEvents.join('') + cartesNatives.join('')}`;
     } catch(e) { document.getElementById('evenements').innerHTML = '<div class="notice">Erreur chargement.</div>'; }
   }
+  window.initDeleteEvenementNatif = async function(id) {
+    if(!confirm('Supprimer définitivement cet événement ?\n\nCette action est irréversible.')) return;
+    try { await api('DELETE','/evenements/'+id); renderInitEvenements(); }
+    catch(e){alert('Erreur : '+e.message);}
+  };
 
   /* ══ "Mes événements" (2026-09-09) : vue combinée — ce que j'ai créé (organisateur, table
      events déjà chargée par renderInitEvenements ci-dessus) + ce à quoi je suis inscrit en
