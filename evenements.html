@@ -504,6 +504,16 @@ function renderEvts() {
     // sinon vers la modale listant les inscrits du formulaire simple intégré (voir
     // gererInscrits() plus bas et GET /api/evenements/:id/participants).
     const gererHtml = peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="gererInscrits(${evt.id},${evt.fiche_id || 'null'},'${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : '';
+    /* Lier une fiche / Gérer le tarif (2026-09-23, demande explicite : "un bouton lié a une
+       fiche qui permet de créer une fiche ou de lier à une fiche d'inscription" + "un bouton
+       évènement payant ou gratuit"). Visible uniquement au propriétaire (peutGerer, même garde
+       que Modifier/Gérer ci-dessus). Le statut Payant/Gratuit reste calculé depuis le tarif
+       minimum de la fiche liée (evt.prix_min, déjà affiché en badge plus haut) — jamais un
+       interrupteur indépendant, pour ne jamais afficher "Payant" sans tarif réel nulle part
+       (règle déjà appliquée par le formulaire de création/édition). Sans fiche liée, "Gérer le
+       tarif" n'a rien à ouvrir : seul "Lier une fiche" est proposé dans ce cas. */
+    const lierFicheHtml = peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="ouvrirModaleLierFiche(${evt.id},'${esc(evt.titre).replace(/'/g,"\\'")}',${evt.fiche_id || 'null'})" title="${evt.fiche_id ? 'Changer la fiche liée' : 'Lier ou créer une fiche pour cet événement'}">🔗 ${evt.fiche_id ? 'Fiche liée' : 'Lier une fiche'}</button>` : '';
+    const gererTarifHtml = (peutGerer && evt.fiche_id) ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="inscriptions-admin.html?fiche=${evt.fiche_id}" title="Gérer les tarifs de la fiche liée">💶 ${evt.prix_min ? 'Gérer le tarif' : 'Passer en payant'}</a>` : '';
     return `<div class="evt-card">
       ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
@@ -541,6 +551,8 @@ function renderEvts() {
           }
           ${peutGerer ? modifierHtml : ''}
           ${gererHtml}
+          ${lierFicheHtml}
+          ${gererTarifHtml}
         </div>
       </div>
     </div>`;
@@ -1085,6 +1097,79 @@ window.gererInscrits = function(evtId, ficheId, titre) {
   });
 };
 
+/* Lier une fiche d'inscription à un événement, ou en créer une nouvelle (2026-09-23, demande
+   explicite : "un bouton lié a une fiche qui permet de créer une fiche ou de lier à une fiche
+   d'inscription"). Même idiome de modale que ouvrirModalePartage()/gererInscrits() ci-dessus.
+   Le lien se fait via PUT /api/insc/fiches/:id { evenement_ids }, qui REMPLACE la liste
+   complète des événements liés à cette fiche — il faut donc d'abord récupérer ceux déjà liés
+   (GET /api/insc/fiches/:id) et les conserver, sinon on détache silencieusement d'autres
+   événements existants de cette fiche. */
+window.ouvrirModaleLierFiche = async function(evtId, titre, ficheIdActuelle) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <button onclick="this.closest('.modal-bg').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">×</button>
+      <h3 style="margin:0 0 4px;font-size:16px;">🔗 Fiche d'inscription — ${esc(titre)}</h3>
+      <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">Choisissez une fiche existante, ou créez-en une nouvelle pour cet événement.</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="text" id="mlf-nouvelle-nom" placeholder="Nom de la nouvelle fiche…" style="flex:1;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        <button type="button" class="btn btn-orange" id="mlf-creer" style="font-size:12.5px;white-space:nowrap;">+ Créer et lier</button>
+      </div>
+      <div id="mlf-liste" style="max-height:40vh;overflow-y:auto;border-top:1px solid var(--border);padding-top:10px;">
+        <div style="text-align:center;padding:14px;color:var(--muted);">Chargement de vos fiches…</div>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+
+  async function lierFicheExistante(ficheId) {
+    try {
+      const { fiche: detail, evenements } = await api('GET', '/insc/fiches/' + ficheId).then(r => ({ fiche: r.fiche, evenements: r.evenements || [] }));
+      const ids = new Set(evenements.map(e => e.id));
+      ids.add(evtId);
+      await api('PUT', '/insc/fiches/' + ficheId, { evenement_ids: [...ids] });
+      bg.remove();
+      loadEvts();
+      if (typeof showToast === 'function') showToast(`🔗 Fiche « ${detail.nom} » liée à l'événement.`);
+    } catch (e) { alert(e.message || 'Erreur lors de la liaison.'); }
+  }
+
+  const liste = bg.querySelector('#mlf-liste');
+  try {
+    const { fiches } = await api('GET', '/insc/fiches');
+    if (!fiches || !fiches.length) {
+      liste.innerHTML = '<p style="margin:0;font-size:13px;color:var(--muted);">Aucune fiche existante — créez-en une ci-dessus.</p>';
+    } else {
+      liste.innerHTML = fiches.map(f => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #E2E8F0;font-size:13px;">
+          <span>${esc(f.nom)} <span style="color:#94A3B8;font-size:11.5px;">(${esc(f.statut || 'brouillon')})</span></span>
+          <button type="button" class="btn btn-outline" style="font-size:11.5px;padding:4px 10px;" data-fiche-id="${f.id}">${Number(ficheIdActuelle) === f.id ? '✅ Liée' : 'Lier'}</button>
+        </div>`).join('');
+      liste.querySelectorAll('[data-fiche-id]').forEach(btn => {
+        btn.addEventListener('click', () => lierFicheExistante(parseInt(btn.dataset.ficheId)));
+      });
+    }
+  } catch (e) { liste.innerHTML = '<p style="margin:0;color:#dc2626;font-size:13px;">Erreur de chargement.</p>'; }
+
+  bg.querySelector('#mlf-creer').addEventListener('click', async () => {
+    const nom = bg.querySelector('#mlf-nouvelle-nom').value.trim();
+    if (!nom) { alert('Donnez un nom à la nouvelle fiche.'); return; }
+    const btn = bg.querySelector('#mlf-creer');
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      const { fiche } = await api('POST', '/insc/fiches', { nom, type_evenement: 'evenement' });
+      await api('PUT', '/insc/fiches/' + fiche.id, { evenement_ids: [evtId] });
+      bg.remove();
+      loadEvts();
+      if (typeof showToast === 'function') showToast(`✅ Fiche « ${nom} » créée et liée à l'événement.`);
+    } catch (e) {
+      alert(e.message || 'Erreur lors de la création.');
+      btn.disabled = false; btn.textContent = '+ Créer et lier';
+    }
+  });
+};
+
 window.openDetail = async function(id) {
   document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
   document.getElementById('modal-detail-bg').classList.add('open');
@@ -1209,6 +1294,10 @@ function renderEventDetail(evt, isPreview) {
     : `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="ouvrirModaleEdition(${evt.id})" title="Modifier cet événement">✏️ Modifier</button>`) : '';
   // Même bouton "Gérer" que dans renderEvts() ci-dessus, pour la vue détail.
   const gererDetailHtml = (!isPreview && peutGererDetail) ? `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="gererInscrits(${evt.id},${evt.fiche_id || 'null'},'${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : '';
+  // Mêmes boutons "Lier une fiche"/"Gérer le tarif" que dans renderEvts() ci-dessus, voir leur
+  // commentaire pour le détail de la règle Payant/Gratuit.
+  const lierFicheDetailHtml = (!isPreview && peutGererDetail) ? `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="ouvrirModaleLierFiche(${evt.id},'${esc(evt.titre).replace(/'/g,"\\'")}',${evt.fiche_id || 'null'})" title="${evt.fiche_id ? 'Changer la fiche liée' : 'Lier ou créer une fiche pour cet événement'}">🔗 ${evt.fiche_id ? 'Fiche liée' : 'Lier une fiche'}</button>` : '';
+  const gererTarifDetailHtml = (!isPreview && peutGererDetail && evt.fiche_id) ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="inscriptions-admin.html?fiche=${evt.fiche_id}" title="Gérer les tarifs de la fiche liée">💶 ${evt.prix_min ? 'Gérer le tarif' : 'Passer en payant'}</a>` : '';
 
   return `
     ${!isPreview && peutGererDetail ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button></div>` : carouselHTML}
@@ -1253,6 +1342,8 @@ function renderEventDetail(evt, isPreview) {
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
         ${modifierDetailHtml}
         ${gererDetailHtml}
+        ${lierFicheDetailHtml}
+        ${gererTarifDetailHtml}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
