@@ -499,6 +499,11 @@ function renderEvts() {
     const modifierHtml = evt.source_events_id
       ? `<a class="btn btn-outline" style="font-size:12px;text-decoration:none;" href="dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements" title="Modifier cet événement">✏️ Modifier</a>`
       : `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="ouvrirModaleEdition(${evt.id})" title="Modifier cet événement">✏️ Modifier</button>`;
+    // Gérer (2026-09-21, demande explicite) : accès direct à la liste des inscrits, en plus de
+    // Modifier — vers la fiche d'inscription personnalisée si l'événement en a une (fiche_id),
+    // sinon vers la modale listant les inscrits du formulaire simple intégré (voir
+    // gererInscrits() plus bas et GET /api/evenements/:id/participants).
+    const gererHtml = peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="gererInscrits(${evt.id},${evt.fiche_id || 'null'},'${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : '';
     return `<div class="evt-card">
       ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
@@ -535,6 +540,7 @@ function renderEvts() {
             )
           }
           ${peutGerer ? modifierHtml : ''}
+          ${gererHtml}
         </div>
       </div>
     </div>`;
@@ -1042,6 +1048,43 @@ function ouvrirModalePartage(url, titre) {
   if (window.ProfileQR) window.ProfileQR.render(mount, { url, userName: titre, size: 160, compact: true, showActions: false });
 }
 
+/* Gérer les inscrits (2026-09-21, demande explicite ; bouton reconstruit le 2026-09-22 après
+   avoir disparu lors d'une réécriture ultérieure du fichier — voir gererHtml/gererDetailHtml
+   ci-dessus). Deux cas : événement lié à une fiche d'inscription personnalisée (fiche_id) →
+   direct vers son espace de gestion sur inscriptions-admin.html ; sinon → modale listant les
+   inscrits du formulaire simple intégré (GET /api/evenements/:id/participants), même idiome de
+   modale créée dynamiquement que ouvrirModalePartage() ci-dessus. */
+window.gererInscrits = function(evtId, ficheId, titre) {
+  if (ficheId) { location.href = 'inscriptions-admin.html?fiche=' + ficheId; return; }
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <button onclick="this.closest('.modal-bg').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">×</button>
+      <h3 style="margin:0 0 4px;font-size:16px;">🗂️ Inscrits — ${esc(titre)}</h3>
+      <div id="gerer-inscrits-content" style="margin-top:14px;max-height:60vh;overflow-y:auto;">
+        <div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+  api('GET', '/evenements/' + evtId + '/participants').then(({ participants }) => {
+    const mnt = bg.querySelector('#gerer-inscrits-content');
+    if (!participants || !participants.length) {
+      mnt.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">Aucune inscription pour le moment.</div>';
+      return;
+    }
+    mnt.innerHTML = participants.map(p => `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:13.5px;">${esc(p.nom_complet)}${p.nb_personnes > 1 ? ' · '+p.nb_personnes+' personnes' : ''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${p.email ? '✉️ '+esc(p.email) : ''}${p.email && p.telephone ? ' · ' : ''}${p.telephone ? '📞 '+esc(p.telephone) : ''}</div>
+        ${p.message ? '<div style="font-size:12px;color:#444;margin-top:4px;">💬 '+esc(p.message)+'</div>' : ''}
+      </div>`).join('');
+  }).catch(err => {
+    bg.querySelector('#gerer-inscrits-content').innerHTML = '<div style="color:#ef4444;padding:20px;text-align:center;">Erreur : '+esc(err.message||'')+'</div>';
+  });
+};
+
 window.openDetail = async function(id) {
   document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Chargement…</div>';
   document.getElementById('modal-detail-bg').classList.add('open');
@@ -1164,6 +1207,8 @@ function renderEventDetail(evt, isPreview) {
   const modifierDetailHtml = (!isPreview && peutGererDetail) ? (evt.source_events_id
     ? `<a class="btn btn-outline" style="font-size:13px;text-decoration:none;" href="dashboard-initiative.html?modifier_evenement=${evt.source_events_id}#evenements" title="Modifier cet événement">✏️ Modifier</a>`
     : `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="ouvrirModaleEdition(${evt.id})" title="Modifier cet événement">✏️ Modifier</button>`) : '';
+  // Même bouton "Gérer" que dans renderEvts() ci-dessus, pour la vue détail.
+  const gererDetailHtml = (!isPreview && peutGererDetail) ? `<button type="button" class="btn btn-outline" style="font-size:13px;" onclick="gererInscrits(${evt.id},${evt.fiche_id || 'null'},'${esc(evt.titre).replace(/'/g,"\\'")}')" title="Voir les personnes inscrites">🗂️ Gérer</button>` : '';
 
   return `
     ${!isPreview && peutGererDetail ? `<div style="position:relative;">${carouselHTML}<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button></div>` : carouselHTML}
@@ -1207,6 +1252,7 @@ function renderEventDetail(evt, isPreview) {
         }
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
         ${modifierDetailHtml}
+        ${gererDetailHtml}
       </div>
     </div>
     ${Array.isArray(evt.cagnottes) && evt.cagnottes.length ? `
