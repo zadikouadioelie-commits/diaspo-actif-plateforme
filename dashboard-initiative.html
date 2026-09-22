@@ -180,6 +180,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     content.innerHTML = `<div class="notice">⚠️ Cette page est réservée aux comptes Initiative. <a href="${ROLE_DASHBOARD[me.role] || 'index.html'}">Accéder à mon tableau de bord →</a></div>`;
     return;
   }
+  /* Exposé globalement (2026-09-23, demande explicite : "j'ai créé deux événements et je n'en
+     vois qu'un") — un événement créé depuis cet onglet s'est en réalité retrouvé attribué à un
+     AUTRE compte lié (liaison DS-ID, "Mon Associé"). Cause identifiée : basculer de compte
+     réémet le cookie de session pour TOUT le navigateur (assets/app.js, initComptesLiesSwitcher)
+     — un onglet resté ouvert sur ce tableau de bord continue d'afficher l'ancienne identité
+     alors que la session réelle a changé ; une action de création lancée depuis cet onglet
+     "périmé" est alors silencieusement attribuée au nouveau compte actif, sans qu'aucune erreur
+     ne prévienne l'utilisateur. Voir saveInitEvt() pour la vérification qui s'appuie dessus. */
+  window._daMeId = me.id;
   if (window.Posts) Posts.init(me.id);
 
   /* Statut Premium — déterminé tôt pour que le premier rendu (paiement, etc.) soit déjà correctement gaté. */
@@ -4227,6 +4236,21 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
   window.saveInitEvt = async function() {
     if(initEvtUploadsPending>0){showToast('Un fichier est encore en cours d\'envoi, patientez quelques secondes.','warning');return;}
+    /* Bug réel signalé (2026-09-23) : "j'ai créé deux événements et je n'en vois qu'un" — un
+       événement s'est retrouvé attribué à un autre compte lié, pas ZADI. Cause : basculer de
+       compte via "Mon Associé" (assets/app.js) réémet le cookie pour tout le navigateur ; un
+       onglet resté ouvert sur CE tableau de bord continue d'afficher l'ancienne identité alors
+       que la session réelle a changé ailleurs, et l'événement créé depuis cet onglet "périmé"
+       est silencieusement rattaché au nouveau compte actif — jamais celui affiché à l'écran.
+       Vérification juste avant l'envoi plutôt qu'après coup : trop tard pour prévenir une fois
+       l'événement déjà créé sous le mauvais compte. */
+    try {
+      const { user: sessionActuelle } = await api('GET', '/auth/me');
+      if (!sessionActuelle || Number(sessionActuelle.id) !== Number(window._daMeId)) {
+        showToast('Votre session a changé de compte dans un autre onglet — rechargez cette page avant de continuer, pour ne pas créer cet événement sous le mauvais compte.', 'error');
+        return;
+      }
+    } catch (e) { showToast('Impossible de vérifier votre session, rechargez la page.', 'error'); return; }
     const titre = document.getElementById('iev-titre').value.trim();
     const debut = document.getElementById('iev-debut').value;
     if(!titre||!debut){showToast('Titre et date de début requis.','warning');return;}
