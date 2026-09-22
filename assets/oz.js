@@ -41,6 +41,12 @@
     scanner:         { label: 'Scanner QR',      url: '/scanner.html',                 icon: '📷' },
     collaborations:  { label: 'Collaborations',  url: '/collaborations.html',          icon: '🤝' },
     support_pilote:  { label: 'Support Pilote',  url: '/support-pilote.html',          icon: '🖥️' },
+    // Manquait (2026-09-22, bug réel signalé : "ouvre les parrainages" → "section non
+    // trouvée") — le mécanisme "ouvre X" (initCRE() plus bas) enregistre AUTOMATIQUEMENT une
+    // route par entrée de MODULES, donc tout nouveau module futur n'a besoin que d'une seule
+    // ligne ici, jamais d'un intent dédié à écrire à la main.
+    parrainage:      { label: 'Parrainage & Invitations', url: '/parrainage.html',    icon: '🤝' },
+    inscriptions:    { label: 'Formulaires & Inscriptions', url: '/inscriptions-admin.html', icon: '📝' },
   };
 
   // Raccourci pour construire un pattern "open" multi-verbes
@@ -238,9 +244,39 @@
     function norm(s) {
       return (s || '').toLowerCase()
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/\b(le|la|les|l|de|des|du|un|une|mes|mon|ma|aux|au|vers|dans|sur|les|a)\b/g, ' ')
+        // "module"/"section"/"onglet" ajoutés (2026-09-22, demande explicite : « ouvre le
+        // module parrainage » doit fonctionner exactement comme « ouvre parrainage ») — mots
+        // de liaison qui ne font jamais partie d'un vrai nom de module, à ignorer partout où
+        // norm() s'applique (mots-clés ET requête tapée).
+        .replace(/\b(le|la|les|l|de|des|du|un|une|mes|mon|ma|aux|au|vers|dans|sur|les|a|module|section|onglet)\b/g, ' ')
         .replace(/['''`]/g, ' ').replace(/[^a-z0-9\s]/g, ' ')
         .replace(/\s+/g, ' ').trim();
+    }
+
+    // Distance de Levenshtein classique, normalisée en similarité 0-1 (2026-09-22, demande
+    // explicite avec exemple précis : "parainnage" doit tout de même ouvrir "parrainage" —
+    // les vérifications ci-dessus (égalité/préfixe/inclusion) ne couvrent que les troncatures,
+    // jamais une lettre doublée/manquante/transposée comme dans une faute de frappe réelle).
+    function levenshtein(a, b) {
+      if (a === b) return 0;
+      if (!a.length) return b.length;
+      if (!b.length) return a.length;
+      let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+      for (let i = 1; i <= a.length; i++) {
+        const cur = [i];
+        for (let j = 1; j <= b.length; j++) {
+          cur[j] = a[i - 1] === b[j - 1]
+            ? prev[j - 1]
+            : 1 + Math.min(prev[j - 1], prev[j], cur[j - 1]);
+        }
+        prev = cur;
+      }
+      return prev[b.length];
+    }
+    function similarite(a, b) {
+      const maxLen = Math.max(a.length, b.length);
+      if (!maxLen) return 0;
+      return 1 - levenshtein(a, b) / maxLen;
     }
 
     function scoreKw(kw, query) {
@@ -253,7 +289,21 @@
       const tk = nk.split(' ').filter(t => t.length > 1);
       if (!tq.length || !tk.length) return 0;
       const matched = tq.filter(t => tk.some(k => k.startsWith(t) || t.startsWith(k) || (t.length > 3 && k.includes(t)))).length;
-      return matched / Math.max(tq.length, tk.length) * 0.75;
+      const scoreTokens = matched / Math.max(tq.length, tk.length) * 0.75;
+      if (scoreTokens > 0) return scoreTokens;
+      // Repli faute de frappe : compare chaque mot de la requête à chaque mot du mot-clé, ne
+      // retient que les mots assez longs pour qu'une similarité élevée soit significative
+      // (évite qu'un mot de 2-3 lettres "matche" n'importe quoi par hasard).
+      let bestSim = 0;
+      for (const t of tq) {
+        if (t.length < 5) continue;
+        for (const k of tk) {
+          if (k.length < 5) continue;
+          const sim = similarite(t, k);
+          if (sim > bestSim) bestSim = sim;
+        }
+      }
+      return bestSim >= 0.7 ? bestSim * 0.7 : 0;
     }
 
     function scoreRoute(r, query) {
