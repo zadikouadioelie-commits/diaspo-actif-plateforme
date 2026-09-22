@@ -36,7 +36,26 @@
     .icrop-section { margin:12px 20px 0; padding:12px 14px; background:var(--icrop-alt); border:1px solid var(--icrop-border); border-radius:10px; }
     .icrop-section-label { font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--icrop-muted); margin-bottom:9px; display:block; }
     .icrop-controls { display:flex; align-items:center; gap:12px; }
-    .icrop-controls input[type=range] { flex:1; accent-color:#1565C0; }
+    /* Jauge de zoom plus visible (2026-09-22, demande explicite : "le curseur passait
+       inaperçu") — le style natif du navigateur (piste fine ~4px, aucun contraste) ne
+       suffisait pas ; piste et curseur redessinés explicitement, mêmes règles dupliquées
+       pour chaque moteur (-webkit-/-moz-) car les pseudo-éléments de <input type=range> ne
+       peuvent pas être partagés dans un seul sélecteur sans invalider toute la règle. */
+    .icrop-controls input[type=range] {
+      flex:1; accent-color:#1565C0; -webkit-appearance:none; appearance:none;
+      height:8px; border-radius:99px; background:#CBD5E1; outline:none; cursor:pointer;
+    }
+    .icrop-controls input[type=range]::-webkit-slider-runnable-track { height:8px; border-radius:99px; background:#CBD5E1; }
+    .icrop-controls input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance:none; appearance:none; width:22px; height:22px; margin-top:-7px;
+      border-radius:50%; background:#1565C0; border:3px solid #fff;
+      box-shadow:0 0 0 1.5px #1565C0, 0 2px 6px rgba(0,0,0,.35); cursor:pointer;
+    }
+    .icrop-controls input[type=range]::-moz-range-track { height:8px; border-radius:99px; background:#CBD5E1; }
+    .icrop-controls input[type=range]::-moz-range-thumb {
+      width:22px; height:22px; border-radius:50%; background:#1565C0; border:3px solid #fff;
+      box-shadow:0 0 0 1.5px #1565C0, 0 2px 6px rgba(0,0,0,.35); cursor:pointer;
+    }
     .icrop-zoom-label { font-size:16px; color:var(--icrop-muted); user-select:none; }
     .icrop-actions { padding:18px 20px 20px; display:flex; gap:10px; justify-content:flex-end; }
     .icrop-btn { padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid transparent; }
@@ -98,7 +117,7 @@
               <span class="icrop-zoom-label">🔍</span>
               <input type="range" min="50" max="400" value="100" step="1">
               <span class="icrop-zoom-label" style="font-size:15px;">🔍</span>
-              <button class="icrop-btn icrop-btn-reset" type="button" title="Revenir à l'image complète">↺ Réinitialiser</button>
+              <button class="icrop-btn icrop-btn-reset" type="button" title="Revenir à l'image complète">↺ Restaurer</button>
             </div>
           </div>
           <div class="icrop-section">
