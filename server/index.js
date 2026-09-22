@@ -41500,7 +41500,12 @@ route("GET", "/api/insc/fiches", async (req, res) => {
     // ci-dessus (qui ne regardent que le premier) — sert à afficher un bouton "Événements
     // liés" sur la carte de liste, sans devoir ouvrir la fiche pour le savoir.
     const nbEvt = Number((await db.prepare("SELECT COUNT(*) n FROM insc_fiches_evenements WHERE fiche_id=?").get(f.id))?.n) || 0;
-    enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null });
+    /* Badge payant/gratuit sur la carte de liste (2026-09-22, demande explicite) : dès qu'un
+       SEUL type d'inscription de la fiche est payant, toute la fiche est considérée "payante"
+       — même Number(...)-autour-de-COUNT(*) que nb_evenements ci-dessus (bug BIGSERIAL déjà
+       rencontré : un COUNT(*) Postgres renvoyé en texte "0" est vrai en JS). */
+    const nbTypesPayants = Number((await db.prepare("SELECT COUNT(*) n FROM insc_types WHERE fiche_id=? AND gratuit=0 AND COALESCE(prix,0) > 0").get(f.id))?.n) || 0;
+    enrichies.push({ ...f, nb_inscriptions: nb, nb_evenements: nbEvt, apercu_date: evtApercu?.date_evt || null, apercu_lieu: evtApercu ? [evtApercu.ville, evtApercu.pays].filter(Boolean).join(", ") : null, a_types_payants: nbTypesPayants > 0 });
   }
   sendJSON(res, 200, { fiches: enrichies });
 });
