@@ -35036,19 +35036,28 @@ async function getAccredDef(idOrType) {
 }
 
 /* GET /api/accreditations/catalogue — liste filtrée par rôle */
-route("GET", "/api/accreditations/catalogue", async (req, res) => {
+route("GET", "/api/accreditations/catalogue", async (req, res, params, body, query) => {
   const user = await getCurrentUser(req);
   const role = user ? user.role : null;
+  /* forcer_type (2026-09-23, bug signalé par capture d'écran : prix affichés en tirets) —
+     premium.html demande toujours un type précis via ?type=... Le filtre d'éligibilité
+     ci-dessous sert pour une liste générique (accreditations.html, la bannière
+     subscription-required.js), mais sur cette page de détail dédiée à un seul type, il faisait
+     disparaître le tarif ENTIER dès que le compte actif n'avait pas ce rôle — ex. une Initiative
+     consultant premium.html?type=utilisateur pour son compte personnel lié (système "comptes
+     liés") voyait un prix vide, sans aucune indication d'erreur. Seul le type explicitement
+     demandé passe outre le filtre, les autres restent masqués comme avant. */
+  const forcerType = (query?.forcer_type || '').trim();
   const defs = await db.prepare("SELECT * FROM accred_definitions WHERE actif=1 ORDER BY ordre,id").all();
   const result = (await Promise.all(defs.map(async d => {
     const def = await getAccredDef(d.id);
     if (!def) return null;
-    if (role && !def.eligible.includes(role)) return null;
+    if (role && !def.eligible.includes(role) && def.type !== forcerType) return null;
     if (user && (def.tarifs || []).some(t => t.role === role && (t.type_tarif === 'mensuel' || t.type_tarif === 'annuel'))) {
       // Aperçu en lecture seule : un code_da en query permet de prévisualiser la réduction
       // avant paiement, sans jamais créer de ligne d'utilisation ni de coupon Stripe
       // (resoudreAvantagesPremium() est garanti sans effet de bord côté écriture).
-      const codeDA = (req.query?.code_da || '').trim().toUpperCase() || null;
+      const codeDA = (query?.code_da || '').trim().toUpperCase() || null;
       def.tarif_calcule = await calculerTarifPremium(def, user, { code_da: codeDA });
     }
     return def;

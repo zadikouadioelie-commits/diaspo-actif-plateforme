@@ -89,17 +89,26 @@
     },
   };
 
-  async function fetchFormules(accredType) {
+  async function fetchFormules(accredType, pageRole) {
     try {
+      /* forcer_type (2026-09-23, bug signalé par capture d'écran : prix affichés en tirets) —
+         le rôle utilisé pour trouver le tarif est celui DE LA PAGE (pageRole, dérivé de
+         ?type=... — "utilisateur" ou "initiative"), jamais celui de la session active : un
+         compte Initiative consultant premium.html?type=utilisateur (ex. pour son compte
+         personnel lié, système "comptes liés") a le rôle "initiative", absent des tarifs de
+         l'accréditation "utilisateur_abonne" — l'ancien code cherchait le tarif de SON rôle au
+         lieu de celui du type demandé, ne le trouvait jamais, et affichait un prix vide. Le
+         serveur doit aussi recevoir forcer_type, sinon son propre filtre d'éligibilité par rôle
+         retire carrément la définition de la réponse avant même d'arriver ici. */
       const [meRes, catRes] = await Promise.all([
         fetch('/api/auth/me', { credentials: 'same-origin' }),
-        fetch('/api/accreditations/catalogue', { credentials: 'same-origin' }),
+        fetch('/api/accreditations/catalogue?forcer_type=' + encodeURIComponent(accredType), { credentials: 'same-origin' }),
       ]);
       const me = meRes.ok ? (await meRes.json()).user : null;
       const data = await catRes.json();
       const def = (data.catalogue || []).find(d => d.type === accredType);
       if (!def) return { tarifs: [] };
-      const role = (me && me.role) || 'utilisateur';
+      const role = pageRole || (me && me.role) || 'utilisateur';
       const tarifRow = (def.tarifs || []).find(t => t.role === role);
       if (!tarifRow) return { tarifs: [] };
       const reduc = Number(tarifRow.reduction_annuelle_pct) || 0;
@@ -235,7 +244,7 @@
 
     async function renderTarifs(avecParrainage) {
     el.innerHTML = `<div style="text-align:center;padding:80px 20px;color:var(--muted);">Chargement…</div>`;
-    const { tarifs, reduc } = await fetchFormules(cfg.accredType);
+    const { tarifs, reduc } = await fetchFormules(cfg.accredType, type);
     const mensuel = tarifs.find(t => t.type_tarif === 'mensuel');
     const annuel = tarifs.find(t => t.type_tarif === 'annuel');
 
