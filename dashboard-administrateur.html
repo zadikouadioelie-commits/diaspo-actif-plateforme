@@ -1584,6 +1584,10 @@
             <h3 style="margin:0;font-size:14px;">📋 Tous les événements</h3>
             <button class="btn btn-sm btn-outline" onclick="loadAdminBilletterie()">↺ Actualiser</button>
           </div>
+          <!-- Filtre tarif (2026-09-24, demande explicite) : un événement "partiel" (mélange de
+               types de billets gratuits/payants) apparaît à la fois sous "Gratuit" et sous
+               "Payant" — voir adminFiltrerTarif() ci-dessous. -->
+          <div id="admin-billet-filtre-tarif" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
           <div id="admin-billet-table" style="overflow-x:auto;"></div>
         </div>
       </section>
@@ -12963,6 +12967,29 @@ window.useSrIa            = useSrIa;
 
 /* ═══ BILLETTERIE ADMIN ═══ */
 let ADMIN_COMMISSION_SOLDE = 0;
+/* Filtre tarif (2026-09-24, demande explicite) — voir statutTarifEvenement() côté serveur et
+   adminFiltrerTarif() plus bas. Événements mis en cache pour reconstruire le tableau sans
+   refaire d'appel réseau à chaque clic de filtre. */
+let ADMIN_EVENTS_CACHE = [];
+let ADMIN_TARIF_FILTRE = 'tous';
+const ADMIN_TARIF_BADGE = {
+  gratuit: '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#dcfce7;color:#166534;white-space:nowrap;">🟢 Gratuit</span>',
+  partiel: '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fef9c3;color:#92400e;white-space:nowrap;">🟡 Partiel</span>',
+  payant:  '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fee2e2;color:#991b1b;white-space:nowrap;">🔴 Payant</span>',
+};
+/* Un événement "partiel" (mélange de types de billets gratuits/payants) compte à la fois comme
+   Gratuit et comme Payant quand ces filtres-là sont actifs — demande explicite. */
+function adminEvtMatchTarif(e, f) {
+  if (f === 'tous') return true;
+  if (f === 'partiel') return e.statut_tarif === 'partiel';
+  if (f === 'gratuit') return e.statut_tarif === 'gratuit' || e.statut_tarif === 'partiel';
+  if (f === 'payant') return e.statut_tarif === 'payant' || e.statut_tarif === 'partiel';
+  return true;
+}
+window.adminFiltrerTarif = function(f) {
+  ADMIN_TARIF_FILTRE = f;
+  adminRenderBilletTable();
+};
 async function adminWithdrawCommission() {
   const val = parseFloat(document.getElementById('admin-commission-amount').value);
   if (!val || val <= 0) { showToast?.('Indiquez un montant valide.', 'warning'); return; }
@@ -13118,50 +13145,73 @@ async function loadAdminBilletterie() {
           <strong>${(e.revenu||0).toFixed(2)} €</strong></div>`).join('')
       : '<div style="color:var(--muted);font-size:13px;padding:10px 0;">Aucun événement avec revenus.</div>';
     /* Table complète — TOUS les événements de la plateforme, Billetterie ET créés directement
-       sur la page publique (source_table renvoyé par GET /api/admin/events, 2026-09-08). */
-    const events = rEvents.events||[];
-    document.getElementById('admin-billet-table').innerHTML = events.length
-      ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:var(--bg);">
-            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
-            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Type</th>
-            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Organisateur</th>
-            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
-            <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Statut</th>
-            <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Billets</th>
-            <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Revenu</th>
-            <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Commission</th>
-            <th style="padding:10px;text-align:center;border-bottom:1px solid var(--border);">Actions</th>
-          </tr></thead>
-          <tbody>${events.map(e=>{
-            const estBillet = e.source_table === 'events';
-            const suspendu = e.statut === 'suspendu';
-            return `
-            <tr style="border-bottom:1px solid var(--border);">
-              <td style="padding:10px;"><strong>${e.titre}</strong><div style="font-size:11px;color:var(--muted);">${e.ville||''}${e.pays?', '+e.pays:''}</div></td>
-              <td style="padding:10px;">${estBillet?'🎟️ Billetterie':'📢 Simple'}</td>
-              <td style="padding:10px;">${e.organisateur_nom||'—'}</td>
-              <td style="padding:10px;white-space:nowrap;">${fmtDate(e.date_debut)}</td>
-              <td style="padding:10px;">${STATUTS[e.statut]||e.statut}</td>
-              <td style="padding:10px;text-align:right;">${estBillet?(e.nb_billets||0):'—'}</td>
-              <td style="padding:10px;text-align:right;font-weight:700;">${estBillet?(e.revenu||0).toFixed(2)+' €':'—'}</td>
-              <td style="padding:10px;text-align:right;color:#8b5cf6;">${estBillet?((e.revenu||0)*0.05).toFixed(2)+' €':'—'}</td>
-              <td style="padding:10px;text-align:center;white-space:nowrap;">
-                ${estBillet
-                  ? `<button class="btn btn-sm btn-outline" onclick="adminEditEvent(${e.id})" title="Ajuster titre, dates, lieu, description et statut — sans passer par le tableau de bord du propriétaire">✏️ Modifier</button>`
-                  : `<a class="btn btn-sm btn-outline" href="evenements.html#evt-${e.id}" target="_blank" rel="noopener" title="Ouvrir la fiche événement — les mêmes boutons Modifier/Gérer que voit le propriétaire y apparaissent">✏️ Modifier</a>`}
-                <button class="btn btn-sm btn-outline" onclick="adminObserverEvent(${e.id},'${e.source_table}')" title="Aperçu complet — image, description, toutes les informations, telles qu'affichées publiquement">👁️ Observer</button>
-                ${estBillet && e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="adminPublishEvent(${e.id})">Publier</button>`:''}
-                ${suspendu
-                  ? `<button class="btn btn-sm" style="color:#16a34a;border-color:#16a34a;" onclick="adminToggleSuspension(${e.id},'${e.source_table}',false)" title="Réactiver — remet l'événement en ligne et rouvre la vente/les inscriptions">✅ Réactiver</button>`
-                  : (e.statut!=='brouillon' ? `<button class="btn btn-sm" style="color:#f59e0b;border-color:#f59e0b;" onclick="adminToggleSuspension(${e.id},'${e.source_table}',true)" title="Suspendre — gèle immédiatement toute nouvelle vente de billet ou inscription, sans toucher à l'historique">⛔ Suspendre</button>` : '')
-                }
-                <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="adminForceDeleteEvent(${e.id},'${e.source_table}','${(e.titre||'').replace(/'/g,"\\'")}')" title="Supprimer définitivement — bloqué s'il existe de vrais billets payés (suspendre + rembourser d'abord)">🗑 Supprimer</button>
-              </td>
-            </tr>`;}).join('')}
-          </tbody></table>`
-      : '<div style="text-align:center;padding:30px;color:var(--muted);">Aucun événement créé sur la plateforme.</div>';
+       sur la page publique (source_table renvoyé par GET /api/admin/events, 2026-09-08). Mise
+       en cache (ADMIN_EVENTS_CACHE) pour que le filtre tarif ci-dessous se contente de
+       reconstruire le tableau, sans refaire d'appel réseau à chaque clic. */
+    ADMIN_EVENTS_CACHE = rEvents.events||[];
+    adminRenderBilletTable();
   } catch(e) { console.error('billetterie admin', e); }
+}
+
+function adminRenderBilletTable() {
+  // Portée locale (comme STATUTS_OBS dans adminObserverEvent) : fmtDate/STATUTS sont déclarés
+  // dans loadAdminBilletterie(), inaccessible ici depuis que le rendu du tableau en a été extrait
+  // pour permettre au filtre tarif de reconstruire le tableau sans refaire d'appel réseau.
+  const fmtDate = s => { if(!s) return '—'; const d=new Date(s); const M=['jan.','fév.','mar.','avr.','mai','juin','juil.','août','sep.','oct.','nov.','déc.']; return `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`; };
+  const STATUTS = { brouillon:'📝 Brouillon', publie:'🟢 Publié', ferme:'🔒 Fermé', archive:'📁 Archivé', suspendu:'⛔ Suspendu (admin)', ouvert:'🟢 Ouvert' };
+  const FILTRES_TARIF = [
+    { id: 'tous', label: 'Tous' },
+    { id: 'gratuit', label: '🟢 Gratuit' },
+    { id: 'partiel', label: '🟡 Partiellement payant' },
+    { id: 'payant', label: '🔴 Payant' },
+  ];
+  const elFiltre = document.getElementById('admin-billet-filtre-tarif');
+  if (elFiltre) elFiltre.innerHTML = FILTRES_TARIF.map(f => `
+    <button class="btn btn-sm ${ADMIN_TARIF_FILTRE===f.id?'btn-orange':'btn-outline'}" onclick="adminFiltrerTarif('${f.id}')">${f.label}</button>`).join('');
+  const events = ADMIN_EVENTS_CACHE.filter(e => adminEvtMatchTarif(e, ADMIN_TARIF_FILTRE));
+  document.getElementById('admin-billet-table').innerHTML = events.length
+    ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:var(--bg);">
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Événement</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Type</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Tarif</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Organisateur</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Date</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Statut</th>
+          <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Billets</th>
+          <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Revenu</th>
+          <th style="padding:10px;text-align:right;border-bottom:1px solid var(--border);">Commission</th>
+          <th style="padding:10px;text-align:center;border-bottom:1px solid var(--border);">Actions</th>
+        </tr></thead>
+        <tbody>${events.map(e=>{
+          const estBillet = e.source_table === 'events';
+          const suspendu = e.statut === 'suspendu';
+          return `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px;"><strong>${e.titre}</strong><div style="font-size:11px;color:var(--muted);">${e.ville||''}${e.pays?', '+e.pays:''}</div></td>
+            <td style="padding:10px;">${estBillet?'🎟️ Billetterie':'📢 Simple'}</td>
+            <td style="padding:10px;">${ADMIN_TARIF_BADGE[e.statut_tarif] || ''}</td>
+            <td style="padding:10px;">${e.organisateur_nom||'—'}</td>
+            <td style="padding:10px;white-space:nowrap;">${fmtDate(e.date_debut)}</td>
+            <td style="padding:10px;">${STATUTS[e.statut]||e.statut}</td>
+            <td style="padding:10px;text-align:right;">${estBillet?(e.nb_billets||0):'—'}</td>
+            <td style="padding:10px;text-align:right;font-weight:700;">${estBillet?(e.revenu||0).toFixed(2)+' €':'—'}</td>
+            <td style="padding:10px;text-align:right;color:#8b5cf6;">${estBillet?((e.revenu||0)*0.05).toFixed(2)+' €':'—'}</td>
+            <td style="padding:10px;text-align:center;white-space:nowrap;">
+              ${estBillet
+                ? `<button class="btn btn-sm btn-outline" onclick="adminEditEvent(${e.id})" title="Ajuster titre, dates, lieu, description et statut — sans passer par le tableau de bord du propriétaire">✏️ Modifier</button>`
+                : `<a class="btn btn-sm btn-outline" href="evenements.html#evt-${e.id}" target="_blank" rel="noopener" title="Ouvrir la fiche événement — les mêmes boutons Modifier/Gérer que voit le propriétaire y apparaissent">✏️ Modifier</a>`}
+              <button class="btn btn-sm btn-outline" onclick="adminObserverEvent(${e.id},'${e.source_table}')" title="Aperçu complet — image, description, toutes les informations, telles qu'affichées publiquement">👁️ Observer</button>
+              ${estBillet && e.statut==='brouillon'?`<button class="btn btn-sm btn-orange" onclick="adminPublishEvent(${e.id})">Publier</button>`:''}
+              ${suspendu
+                ? `<button class="btn btn-sm" style="color:#16a34a;border-color:#16a34a;" onclick="adminToggleSuspension(${e.id},'${e.source_table}',false)" title="Réactiver — remet l'événement en ligne et rouvre la vente/les inscriptions">✅ Réactiver</button>`
+                : (e.statut!=='brouillon' ? `<button class="btn btn-sm" style="color:#f59e0b;border-color:#f59e0b;" onclick="adminToggleSuspension(${e.id},'${e.source_table}',true)" title="Suspendre — gèle immédiatement toute nouvelle vente de billet ou inscription, sans toucher à l'historique">⛔ Suspendre</button>` : '')
+              }
+              <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="adminForceDeleteEvent(${e.id},'${e.source_table}','${(e.titre||'').replace(/'/g,"\\'")}')" title="Supprimer définitivement — bloqué s'il existe de vrais billets payés (suspendre + rembourser d'abord)">🗑 Supprimer</button>
+            </td>
+          </tr>`;}).join('')}
+        </tbody></table>`
+    : '<div style="text-align:center;padding:30px;color:var(--muted);">Aucun événement pour ce filtre.</div>';
 }
 
 window.adminPublishEvent = async function(id) {

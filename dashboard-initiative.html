@@ -3443,6 +3443,29 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      Ce compteur empêche d'enregistrer l'événement tant qu'un envoi est encore en cours. */
   let initEvtUploadsPending = 0;
 
+  /* Filtre tarif (2026-09-24, demande explicite) — vue créateur, miroir de celui construit côté
+     admin (dashboard-administrateur.html). "Partiel" (mélange de types de billets gratuits/
+     payants sur un même événement Billetterie) compte à la fois comme Gratuit et comme Payant
+     quand ces filtres-là sont actifs. Les événements "Mobiliser la diaspora" (evtsNatifs) n'ont
+     qu'un prix unique (pas de types) : jamais "partiel", calculé ici côté client car
+     GET /api/evenements ne renvoie pas de statut_tarif (contrairement à GET /api/events). */
+  const INIT_TARIF_BADGE = {
+    gratuit: '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#dcfce7;color:#166534;">🟢 Gratuit</span>',
+    partiel: '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fef9c3;color:#92400e;">🟡 Partiel</span>',
+    payant:  '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fee2e2;color:#991b1b;">🔴 Payant</span>',
+  };
+  function initEvtMatchTarif(e, f) {
+    if (f === 'tous') return true;
+    if (f === 'partiel') return e.statut_tarif === 'partiel';
+    if (f === 'gratuit') return e.statut_tarif === 'gratuit' || e.statut_tarif === 'partiel';
+    if (f === 'payant') return e.statut_tarif === 'payant' || e.statut_tarif === 'partiel';
+    return true;
+  }
+  window.initFiltrerTarifEvenements = function(f) {
+    window._initTarifFiltre = f;
+    renderInitEvenementsListe();
+  };
+
   window.renderInitEvenements = async function renderInitEvenements() {
     const el = document.getElementById('evenements');
     el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div>';
@@ -3458,11 +3481,24 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         api('GET', '/events?organisateur_id='+me.id+'&all=1'),
         api('GET', '/evenements?owner='+me.id).catch(() => ({ evenements: [] })),
       ]);
+      evtsNatifs.forEach(e => { e.statut_tarif = Number(e.prix_min) > 0 ? 'payant' : 'gratuit'; });
+      window._initEvtsCache = { events, evtsNatifs };
+      if (!window._initTarifFiltre) window._initTarifFiltre = 'tous';
+      renderInitEvenementsListe();
+    } catch(e) { document.getElementById('evenements').innerHTML = '<div class="notice">Erreur chargement.</div>'; }
+  }
+
+  function renderInitEvenementsListe() {
+      const el = document.getElementById('evenements');
+      const { events, evtsNatifs } = window._initEvtsCache || { events: [], evtsNatifs: [] };
       const totalCount = events.length + evtsNatifs.length;
       const pubCount = events.filter(e=>e.statut==='publie').length;
       const badge = document.getElementById('init-billets-badge');
       if (badge && pubCount > 0) { badge.textContent = pubCount; badge.style.display = ''; }
-      const cartesEvents = events.map(e => `
+      const f = window._initTarifFiltre || 'tous';
+      const eventsAffiches = events.filter(e => initEvtMatchTarif(e, f));
+      const evtsNatifsAffiches = evtsNatifs.filter(e => initEvtMatchTarif(e, f));
+      const cartesEvents = eventsAffiches.map(e => `
           <div class="card" style="margin-bottom:12px;padding:16px;">
             <div style="display:flex;gap:14px;align-items:flex-start;">
               ${e.image_couverture||e.image_b64 ? `<img src="${e.image_couverture||e.image_b64}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
@@ -3470,6 +3506,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
                   <strong style="font-size:14px;">${escH(e.titre)}</strong>
                   <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${e.statut==='publie'?'#dcfce7':e.statut==='brouillon'?'#fef9c3':'#f1f5f9'};color:${e.statut==='publie'?'#166534':e.statut==='brouillon'?'#92400e':'#64748b'};">${EVT_STATUTS[e.statut]||e.statut}</span>
+                  ${INIT_TARIF_BADGE[e.statut_tarif] || ''}
                 </div>
                 <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
                   📅 ${fmtDateInit(e.date_debut)}${e.date_fin?' → '+fmtDateInit(e.date_fin):''} &nbsp;·&nbsp; 📍 ${escH([e.ville,e.pays].filter(Boolean).join(', ')||'—')}
@@ -3495,7 +3532,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       /* Événements "Mobiliser la diaspora" (table evenements) — pas de types de billets/finances
          (concept propre à la table events ci-dessus), édition/suppression via les routes de ce
          module-là, gérées directement depuis evenements.html. */
-      const cartesNatives = evtsNatifs.map(e => `
+      const cartesNatives = evtsNatifsAffiches.map(e => `
           <div class="card" style="margin-bottom:12px;padding:16px;">
             <div style="display:flex;gap:14px;align-items:flex-start;">
               ${e.image_couverture||e.image_url ? `<img src="${e.image_couverture||e.image_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
@@ -3503,6 +3540,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
                   <strong style="font-size:14px;">${escH(e.titre)}</strong>
                   <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#dcfce7;color:#166534;" title="Créé depuis le module « Mobiliser la diaspora »">🌍 En ligne</span>
+                  ${INIT_TARIF_BADGE[e.statut_tarif] || ''}
                 </div>
                 <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
                   📅 ${fmtDateInit(e.date_evt)}${e.heure_debut?' · '+escH(e.heure_debut):''} &nbsp;·&nbsp; 📍 ${escH([e.ville||e.lieu,e.pays].filter(Boolean).join(', ')||'—')}
@@ -3520,6 +3558,15 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="initDeleteEvenementNatif(${e.id})">🗑 Supprimer</button>
             </div>
           </div>`);
+      const FILTRES_TARIF_INIT = [
+        { id: 'tous', label: 'Tous' },
+        { id: 'gratuit', label: '🟢 Gratuit' },
+        { id: 'partiel', label: '🟡 Partiellement payant' },
+        { id: 'payant', label: '🔴 Payant' },
+      ];
+      const filtreBar = totalCount ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
+        ${FILTRES_TARIF_INIT.map(fl => `<button class="btn btn-sm ${f===fl.id?'btn-orange':'btn-outline'}" onclick="initFiltrerTarifEvenements('${fl.id}')">${fl.label}</button>`).join('')}
+      </div>` : '';
       el.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
           <h2 style="margin:0;font-size:1.1rem;">📅 Événements</h2>
@@ -3540,8 +3587,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <h3 style="margin:0 0 8px;">Aucun événement</h3>
             <p style="color:var(--muted);font-size:14px;margin:0 0 20px;">Créez votre premier événement pour mobiliser votre communauté.</p>
             <button class="btn btn-orange" onclick="allerCreerEvenement()">＋ Créer mon premier événement</button>
-          </div>` : cartesEvents.join('') + cartesNatives.join('')}`;
-    } catch(e) { document.getElementById('evenements').innerHTML = '<div class="notice">Erreur chargement.</div>'; }
+          </div>` : filtreBar + (cartesEvents.join('') + cartesNatives.join('') || '<div class="card" style="text-align:center;padding:30px;color:var(--muted);">Aucun événement pour ce filtre.</div>')}`;
   }
   window.initDeleteEvenementNatif = async function(id) {
     if(!confirm('Supprimer définitivement cet événement ?\n\nCette action est irréversible.')) return;

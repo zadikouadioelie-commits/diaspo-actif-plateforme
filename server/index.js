@@ -17930,6 +17930,19 @@ route("POST", "/api/push/unsubscribe", async (req, res, params, body) => {
    (événement créé sur dashboard-initiative.html, jamais recopié dans insc_fiches_evenements
    lors de la synchronisation vers evenements — voir syncEvenementVersProgrammation ci-dessus).
    Batché : un nombre fixe de requêtes quel que soit le nombre de lignes, jamais une par ligne. */
+/* Statut tarifaire d'un événement Billetterie (2026-09-24, demande explicite : distinguer
+   Gratuit / Partiellement payant / Payant pour un repérage rapide, vue créateur ET vue admin)
+   — dérivé des types de billets actifs, jamais stocké en base : gratuit si aucun type payant
+   (ou aucun type du tout), payant si tous le sont, partiel sinon (mélange, ex. "Standard"
+   gratuit + "VIP" payant). */
+function statutTarifEvenement(nbTypes, nbTypesPayants) {
+  const nt = Number(nbTypes) || 0;
+  const ntp = Number(nbTypesPayants) || 0;
+  if (nt === 0 || ntp === 0) return 'gratuit';
+  if (ntp === nt) return 'payant';
+  return 'partiel';
+}
+
 async function enrichirAvecFicheMedia(rows) {
   if (!rows.length) return rows;
   const ids = rows.map(r => r.id);
@@ -28690,12 +28703,13 @@ ${jsonLd}
         COALESCE(tkc.billets_vendus,0) AS billets_vendus,
         COALESCE(ttc.nb_types,0) AS nb_types,
         ttc.prix_min AS prix_min,
+        COALESCE(ttc.nb_types_payants,0) AS nb_types_payants,
         f.slug AS insc_fiche_slug,
         ${expositionExpr} AS statut_exposition
         FROM events e
         LEFT JOIN users u ON u.id=e.organisateur_id
         LEFT JOIN (SELECT event_id, COUNT(*) AS billets_vendus FROM tickets WHERE payment_status='paid' GROUP BY event_id) tkc ON tkc.event_id=e.id
-        LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types, MIN(prix) AS prix_min FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
+        LEFT JOIN (SELECT event_id, COUNT(*) AS nb_types, MIN(prix) AS prix_min, SUM(CASE WHEN prix>0 THEN 1 ELSE 0 END) AS nb_types_payants FROM ticket_types WHERE actif=1 GROUP BY event_id) ttc ON ttc.event_id=e.id
         LEFT JOIN insc_fiches f ON f.id=e.insc_fiche_id
         WHERE 1=1`;
       const args = [];
@@ -28714,7 +28728,8 @@ ${jsonLd}
         sql += ` AND ${expositionExpr} = 'actif'`;
       }
       sql += ' ORDER BY e.date_debut ASC LIMIT 100';
-      const events = await db.prepare(sql).all(...args);
+      const events = (await db.prepare(sql).all(...args))
+        .map(e => ({ ...e, statut_tarif: statutTarifEvenement(e.nb_types, e.nb_types_payants) }));
       return sendJSON(res, 200, { events });
     }
 
@@ -31341,16 +31356,19 @@ ${jsonLd}
       if (!me || !['administrateur'].includes(me.role)) return sendJSON(res, 403, { error: 'Réservé.' });
       const eventsBillet = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
         (SELECT COUNT(*) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') nb_billets,
-        (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') revenu
+        (SELECT COALESCE(SUM(prix_paye),0) FROM tickets t WHERE t.event_id=e.id AND t.payment_status='paid') revenu,
+        (SELECT COUNT(*) FROM ticket_types tt WHERE tt.event_id=e.id AND tt.actif=1) nb_types,
+        (SELECT COUNT(*) FROM ticket_types tt WHERE tt.event_id=e.id AND tt.actif=1 AND tt.prix>0) nb_types_payants
         FROM events e LEFT JOIN users u ON u.id=e.organisateur_id ORDER BY e.created_at DESC LIMIT 200`).all();
-      eventsBillet.forEach(e => { e.source_table = 'events'; });
+      eventsBillet.forEach(e => { e.source_table = 'events'; e.statut_tarif = statutTarifEvenement(e.nb_types, e.nb_types_payants); });
 
       const evenementsNatifs = await db.prepare(`SELECT ev.id, ev.titre, ev.date_evt AS date_debut, ev.pays, ev.ville,
-        ev.statut, ev.created_at, ev.owner_user_id AS organisateur_id, u.nom AS organisateur_nom,
+        ev.statut, ev.created_at, ev.owner_user_id AS organisateur_id, u.nom AS organisateur_nom, ev.prix_min,
         (SELECT COUNT(*) FROM evenements_participants p WHERE p.evenement_id=ev.id) nb_participants
         FROM evenements ev LEFT JOIN users u ON u.id=ev.owner_user_id
         WHERE ev.source_events_id IS NULL ORDER BY ev.created_at DESC LIMIT 200`).all();
-      evenementsNatifs.forEach(e => { e.source_table = 'evenements'; e.nb_billets = 0; e.revenu = 0; });
+      // Un événement "Simple" a un prix unique (pas de types de billets) : jamais "partiel".
+      evenementsNatifs.forEach(e => { e.source_table = 'evenements'; e.nb_billets = 0; e.revenu = 0; e.statut_tarif = Number(e.prix_min) > 0 ? 'payant' : 'gratuit'; });
 
       const events = [...eventsBillet, ...evenementsNatifs]
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
