@@ -42143,7 +42143,8 @@ route("GET", "/api/insc/types/:id/champs", async (req, res, params) => {
   sendJSON(res, 200, { champs });
 });
 const INSC_TYPES_CHAMP = ["texte_court","texte_long","nombre","email","telephone","date","heure","adresse",
-  "liste_deroulante","choix_unique","choix_multiple","oui_non","case_a_cocher","upload_photo","upload_fichier","url"];
+  "liste_deroulante","choix_unique","choix_multiple","oui_non","case_a_cocher","upload_photo","upload_fichier","url",
+  "upload_documents_titres","upload_images_titrees","upload_videos_titrees"];
 route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
   if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
@@ -42352,11 +42353,25 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   // Champs dynamiques du type : validation obligatoire/facultatif + logique conditionnelle revalidée serveur
   const champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? AND actif=1").all(type.id);
   const reponses = (body?.reponses && typeof body.reponses === "object") ? body.reponses : {};
+  /* Champs répétables titrés (Documents/Images/Vidéos, 2026-09-23) : la réponse brute côté
+     client est une liste de {titre, url} — jamais faite confiance telle quelle (client non
+     fiable). Reconstruite ici en ne gardant que les 2 clés attendues, en chaînes, tronquées, et
+     plafonnée à 20 entrées (portfolio de candidature, pas un vecteur d'abus). Un fichier/lien
+     "url" doit déjà exister (uploadé via /api/insc/public/upload, qui valide déjà image/PDF —
+     ou un lien vidéo simplement collé) ; aucun contenu n'est ré-uploadé ici. */
+  const CHAMPS_REPETABLES = new Set(["upload_documents_titres", "upload_images_titrees", "upload_videos_titrees"]);
+  for (const c of champs) {
+    if (!CHAMPS_REPETABLES.has(c.type_champ)) continue;
+    const brut = Array.isArray(reponses[c.nom]) ? reponses[c.nom] : [];
+    reponses[c.nom] = brut.slice(0, 20)
+      .map(e => ({ titre: String(e?.titre || "").trim().slice(0, 150), url: String(e?.url || "").trim().slice(0, 500) }))
+      .filter(e => e.titre && e.url);
+  }
   for (const c of champs) {
     if (!c.obligatoire) continue;
     if (!inscConditionRemplie(c.condition_json, reponses)) continue; // masqué par la logique conditionnelle
     const v = reponses[c.nom];
-    if (v === undefined || v === null || v === "") return sendJSON(res, 400, { error: `Le champ « ${c.libelle} » est obligatoire.` });
+    if (v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0)) return sendJSON(res, 400, { error: `Le champ « ${c.libelle} » est obligatoire.` });
   }
 
   // Quota / liste d'attente

@@ -132,6 +132,8 @@ function ipChampHtml(c) {
     champHtml = `<label style="font-weight:400;"><input type="checkbox" name="${escH(c.nom)}" value="oui"> ${escH(c.placeholder||'')}</label>`;
   } else if (c.type_champ === 'upload_photo' || c.type_champ === 'upload_fichier') {
     champHtml = `<input type="file" name="${escH(c.nom)}" accept="${c.type_champ==='upload_photo'?'image/*':'*'}" onchange="ipUploadChamp(this,'${escH(c.nom)}')"><div id="ip-upload-${escH(c.nom)}" style="font-size:12px;color:oklch(0.55 0.006 30);margin-top:4px;"></div>`;
+  } else if (['upload_documents_titres','upload_images_titrees','upload_videos_titrees'].includes(c.type_champ)) {
+    return ipRepeatableChampHtml(c, req, aide);
   } else {
     const type = IP_TYPE_ICONS[c.type_champ] || 'text';
     champHtml = `<input type="${type}" name="${escH(c.nom)}" placeholder="${escH(c.placeholder||'')}" value="${escH(c.valeur_defaut||'')}">`;
@@ -139,6 +141,67 @@ function ipChampHtml(c) {
   return `<div class="ip-champ" data-champ="${escH(c.nom)}" data-condition='${c.condition_json?escH(c.condition_json):''}'>
     <label>${escH(c.libelle)} ${req}</label>${champHtml}${aide}
   </div>`;
+}
+
+/* ── Champs répétables titrés (2026-09-23, demande explicite : "candidature à un trophée") ──
+   Documents (PDF) et Images uploadent via /api/insc/public/upload (déjà limité à image/PDF côté
+   serveur) ; les Vidéos prennent un LIEN (YouTube/Vimeo/Drive…) plutôt qu'un envoi de fichier —
+   même convention que video1_url ailleurs sur la plateforme, cette route d'upload ne sachant de
+   toute façon traiter que de l'image ou du PDF. Réponse finale = liste de {titre, url}, jamais
+   un fichier seul, injectée dans `reponses` à la soumission (voir ipSoumettre ci-dessous). */
+window.ipRepeatableValues = {};
+const IP_REPEATABLE_CONFIG = {
+  upload_documents_titres: { kind: 'file', accept: 'application/pdf', icon: '📄', ajouterLabel: 'Ajouter un document', placeholderTitre: 'Ex : Dossier de candidature' },
+  upload_images_titrees:   { kind: 'file', accept: 'image/*',         icon: '🖼️', ajouterLabel: 'Ajouter une image',   placeholderTitre: 'Ex : Photo du projet' },
+  upload_videos_titrees:   { kind: 'url',  accept: null,              icon: '🎬', ajouterLabel: 'Ajouter une vidéo',   placeholderTitre: 'Ex : Présentation du projet' },
+};
+function ipRepeatableChampHtml(c, req, aide) {
+  const cfg = IP_REPEATABLE_CONFIG[c.type_champ];
+  if (!window.ipRepeatableValues[c.nom]) window.ipRepeatableValues[c.nom] = [];
+  return `<div class="ip-champ" data-champ="${escH(c.nom)}" data-condition='${c.condition_json?escH(c.condition_json):''}'>
+    <label>${escH(c.libelle)} ${req}</label>${aide}
+    <div id="ip-repeat-${escH(c.nom)}" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
+    <button type="button" class="ip-btn outline" style="margin-top:8px;font-size:12.5px;" onclick="ipRepeatableAjouter('${escH(c.nom)}')">${cfg.icon} + ${cfg.ajouterLabel}</button>
+  </div>`;
+}
+function ipRepeatableAjouter(nom) {
+  window.ipRepeatableValues[nom].push({ titre: '', url: '' });
+  ipRepeatableRender(nom);
+}
+function ipRepeatableSupprimer(nom, idx) {
+  window.ipRepeatableValues[nom].splice(idx, 1);
+  ipRepeatableRender(nom);
+}
+function ipRepeatableRender(nom) {
+  const c = (IP_TYPE_ACTIF?.champs || []).find(x => x.nom === nom);
+  const cfg = IP_REPEATABLE_CONFIG[c?.type_champ];
+  const zone = document.getElementById('ip-repeat-' + nom);
+  if (!zone || !cfg) return;
+  const entries = window.ipRepeatableValues[nom] || [];
+  zone.innerHTML = entries.map((e, i) => `
+    <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;background:oklch(0.98 0.002 30);border:1px solid oklch(0.9 0.004 30);border-radius:8px;padding:8px;">
+      <input type="text" placeholder="${escH(cfg.placeholderTitre)}" value="${escH(e.titre)}" style="flex:1;min-width:140px;height:38px;" oninput="window.ipRepeatableValues['${escH(nom)}'][${i}].titre=this.value">
+      ${cfg.kind === 'url'
+        ? `<input type="url" placeholder="https://…" value="${escH(e.url)}" style="flex:1;min-width:160px;height:38px;" oninput="window.ipRepeatableValues['${escH(nom)}'][${i}].url=this.value">`
+        : `<span style="flex:1;min-width:160px;">
+             <input type="file" accept="${cfg.accept}" onchange="ipRepeatableUpload(this,'${escH(nom)}',${i})">
+             <span id="ip-repeat-status-${escH(nom)}-${i}" style="display:block;font-size:11.5px;color:oklch(0.55 0.006 30);margin-top:2px;">${e.url ? '✅ Fichier envoyé' : ''}</span>
+           </span>`}
+      <button type="button" onclick="ipRepeatableSupprimer('${escH(nom)}',${i})" style="background:none;border:none;color:oklch(0.5 0.16 20);font-size:18px;cursor:pointer;padding:4px 8px;">×</button>
+    </div>`).join('') || `<div style="font-size:12px;color:oklch(0.6 0.006 30);">Aucune entrée pour l'instant.</div>`;
+}
+async function ipRepeatableUpload(input, nom, idx) {
+  const file = input.files[0]; if (!file) return;
+  const statusEl = document.getElementById(`ip-repeat-status-${nom}-${idx}`);
+  if (statusEl) statusEl.textContent = '⏳ Envoi…';
+  try {
+    const fd = new FormData(); fd.append('fichier', file);
+    const res = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Erreur');
+    window.ipRepeatableValues[nom][idx].url = d.url;
+    if (statusEl) statusEl.textContent = '✅ ' + file.name;
+  } catch (e) { if (statusEl) statusEl.textContent = '❌ ' + e.message; }
 }
 
 window.ipUploadValues = {};
@@ -173,6 +236,7 @@ function ipOuvrirType(typeId) {
   if (!type || type.complet || type.periode_ouverte === false) return;
   IP_TYPE_ACTIF = type;
   window.ipUploadValues = {};
+  window.ipRepeatableValues = {};
   const evtChoix = IP_EVENEMENTS.length > 1 ? `
     <div class="ip-champ">
       <label>À quel événement souhaitez-vous participer ? <span class="ip-oblig">*</span></label>
@@ -202,6 +266,7 @@ function ipOuvrirType(typeId) {
   document.getElementById('ip-form-champs').addEventListener('input', ipReevaluerConditions);
   document.getElementById('ip-form-champs').addEventListener('change', ipReevaluerConditions);
   ipReevaluerConditions();
+  type.champs.filter(c => IP_REPEATABLE_CONFIG[c.type_champ]).forEach(c => ipRepeatableRender(c.nom));
 }
 
 async function ipSoumettre(ev) {
@@ -226,6 +291,14 @@ async function ipSoumettre(ev) {
     } else if (window.ipUploadValues[baseName]) {
       reponses[baseName] = window.ipUploadValues[baseName];
     } else reponses[baseName] = el.value;
+  });
+  // Champs répétables titrés (Documents/Images/Vidéos) — pas de [name] dans le DOM, exclus de
+  // la boucle ci-dessus par construction ; on ne garde que les entrées réellement complètes
+  // (titre ET fichier/lien) pour ne jamais enregistrer une ligne vide laissée par erreur.
+  Object.entries(window.ipRepeatableValues || {}).forEach(([nom, entries]) => {
+    const div = document.querySelector(`.ip-champ[data-champ="${CSS.escape(nom)}"]`);
+    if (div && div.style.display === 'none') return; // masqué par condition, non soumis
+    reponses[nom] = (entries || []).filter(e => e.titre?.trim() && e.url?.trim());
   });
   const btn = form.querySelector('button[type=submit]');
   btn.disabled = true; btn.textContent = 'Envoi…';

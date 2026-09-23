@@ -169,6 +169,16 @@ const IA_FIELD_SUGGESTIONS = {
     { libelle: "Pièce d'identité", type_champ: 'upload_fichier' },
     { libelle: 'CV', type_champ: 'upload_fichier' },
     { libelle: 'Vidéo de présentation', type_champ: 'upload_fichier' },
+    /* Types répétables (2026-09-23, demande explicite : "candidature à un trophée") — un
+       fichier unique ne suffit pas pour un portfolio de candidature (plusieurs pièces, chacune
+       titrée). Distincts des upload_fichier/upload_photo ci-dessus : la réponse est une LISTE
+       de {titre, url} plutôt qu'une simple chaîne — voir ipChampHtml()/ipRepeatableAjouter()
+       dans inscription-publique.html. Les vidéos utilisent un lien (YouTube/Vimeo/Drive…), pas
+       un envoi de fichier — /api/insc/public/upload n'accepte que image/PDF, même convention
+       que video1_url ailleurs sur la plateforme (jamais d'upload vidéo brut). */
+    { libelle: 'Documents (PDF, titrés)', type_champ: 'upload_documents_titres' },
+    { libelle: 'Images (titrées)', type_champ: 'upload_images_titrees' },
+    { libelle: 'Vidéos (liens titrés)', type_champ: 'upload_videos_titrees' },
   ],
 };
 const IA_FIELD_CATEGORIES = [
@@ -1010,21 +1020,38 @@ function renderQr() {
 // Liste les demandes d'inscription en attente (statut='inscrit' = validation manuelle requise
 // pour ce type, voir "Validation automatique" dans l'onglet Types d'inscription) avec les
 // réponses du formulaire, pour Valider/Refuser sans devoir chercher la personne dans Présences.
-function iaLibellesChamps(typeId) {
+function iaChampsMap(typeId) {
   const type = (state.ficheDetail?.types || []).find(t => t.id === typeId);
   const map = {};
-  (type?.champs || []).forEach(c => { map[c.nom] = c.libelle || c.nom; });
+  (type?.champs || []).forEach(c => { map[c.nom] = c; });
   return map;
+}
+const IA_TYPES_REPETABLES = ['upload_documents_titres', 'upload_images_titrees', 'upload_videos_titrees'];
+/* Rendu partagé des réponses au formulaire (2026-09-23, demande explicite : les documents/
+   images/vidéos titrés d'une candidature à un trophée doivent rester consultables par l'admin
+   — pas seulement pendant la fenêtre d'attente de validation, voir renderPresences() plus bas). */
+function iaRenderReponses(reponses, champsMap) {
+  const entries = Object.entries(reponses || {}).filter(([,v]) => v !== '' && v != null && !(Array.isArray(v) && v.length === 0));
+  if (!entries.length) return '<div style="color:oklch(0.6 0.006 30);font-size:12.5px;padding:5px 0;">Aucune réponse au formulaire.</div>';
+  return entries.map(([k,v]) => {
+    const c = champsMap[k];
+    const libelle = c?.libelle || k;
+    if (c && IA_TYPES_REPETABLES.includes(c.type_champ) && Array.isArray(v)) {
+      return `<div style="padding:5px 0;border-top:1px solid oklch(0.95 0.004 30);">
+        <div style="color:oklch(0.55 0.006 30);margin-bottom:4px;">${escH(libelle)}</div>
+        <div style="display:flex;flex-direction:column;gap:3px;">${v.map(e => `<a href="${escH(e.url)}" target="_blank" rel="noopener" style="font-size:12.5px;color:oklch(0.5 0.14 258);">📎 ${escH(e.titre)} ↗</a>`).join('')}</div>
+      </div>`;
+    }
+    return `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid oklch(0.95 0.004 30);"><span style="color:oklch(0.55 0.006 30);">${escH(libelle)}</span><span style="font-weight:600;text-align:right;">${escH(Array.isArray(v)?v.join(', '):String(v))}</span></div>`;
+  }).join('');
 }
 function renderValidation() {
   const enAttente = (state.inscriptions || []).filter(i => i.statut === 'inscrit');
   const cartes = enAttente.map(i => {
-    const libelles = iaLibellesChamps(i.type_id);
+    const champsMap = iaChampsMap(i.type_id);
     let reponses = {};
     try { reponses = JSON.parse(i.reponses_json || '{}'); } catch (e) {}
-    const reponsesHtml = Object.entries(reponses).filter(([,v]) => v !== '' && v != null).map(([k,v]) =>
-      `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid oklch(0.95 0.004 30);"><span style="color:oklch(0.55 0.006 30);">${escH(libelles[k]||k)}</span><span style="font-weight:600;text-align:right;">${escH(Array.isArray(v)?v.join(', '):String(v))}</span></div>`
-    ).join('') || '<div style="color:oklch(0.6 0.006 30);font-size:12.5px;padding:5px 0;">Aucune réponse au formulaire.</div>';
+    const reponsesHtml = iaRenderReponses(reponses, champsMap);
     return `
     <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;">
@@ -1078,6 +1105,10 @@ function renderPresences() {
       <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">E-mail</span><span style="font-weight:600;">${escH(selected.email||'—')}</span></div>
       <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">Référence</span><span style="font-weight:600;font-family:'IBM Plex Mono',monospace;">${escH(selected.reference||'—')}</span></div>
       <div style="display:flex;justify-content:space-between;gap:10px;"><span style="color:oklch(0.55 0.006 30);">Statut d'inscription</span><span style="font-weight:600;">${IA_STATUT_INSC_LABEL[selected.statut] || selected.statut}</span></div>
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid oklch(0.92 0.004 30);">
+      <h4 style="margin:0 0 6px;font-size:13px;font-weight:700;">Réponses au formulaire</h4>
+      ${iaRenderReponses((() => { try { return JSON.parse(selected.reponses_json || '{}'); } catch(e) { return {}; } })(), iaChampsMap(selected.type_id))}
     </div>
     ${selected.statut === 'inscrit' ? `
     <div style="display:flex;gap:8px;padding-top:16px;border-top:1px solid oklch(0.92 0.004 30);">
