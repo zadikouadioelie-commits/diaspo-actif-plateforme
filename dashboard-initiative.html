@@ -3553,8 +3553,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               </div>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-              <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html" title="Modifier depuis le module Événements">✏️ Modifier</a>
-              <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html" title="Voir sur la page publique">👁 Voir</a>
+              <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html#evt-${e.id}" title="Voir, modifier, publier ou lier une fiche">✏️ Modifier</a>
+              <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html#evt-${e.id}" title="Voir la fiche complète">👁 Voir</a>
               <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="initDeleteEvenementNatif(${e.id})">🗑 Supprimer</button>
             </div>
           </div>`);

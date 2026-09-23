@@ -18003,7 +18003,12 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
   const withCounts = async (rows) => Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
 
   if (!hasPrefs) {
-    const rows = await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all();
+    // Brouillon (2026-09-24, demande explicite : "l'événement en brouillon ne doit pas
+    // apparaître au public, il doit apparaître que dans Mes événements") — cette route est la
+    // vue par défaut d'evenements.html (aucun filtre actif), donc jamais de brouillon ici, même
+    // pour son propre propriétaire : "Mes événements" (GET /api/evenements?owner=soi-même,
+    // dashboard-initiative.html) reste le seul endroit où le consulter avant publication.
+    const rows = (await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all()).filter(r => r.statut !== 'brouillon');
     return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: null });
   }
 
@@ -18063,16 +18068,25 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
     rows = await db.prepare(baseSelect + (filtresBase.length ? ' AND ' + filtresBase.join(' AND ') : '') + ' ORDER BY e.date_evt ASC LIMIT 60').all(...argsBase);
     niveauRetenu = rows.length ? 'aucun_filtre_geo' : null;
   }
+  // Brouillon — même exclusion inconditionnelle que la branche !hasPrefs ci-dessus.
+  rows = rows.filter(r => r.statut !== 'brouillon');
   return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: niveauRetenu });
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
   let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
   /* Brouillon (2026-09-23, demande explicite : "un bouton brouillon... pour le conserver sans
-     le publier") — jamais visible dans cette liste publique sauf pour son propriétaire ou un
-     admin, sinon "enregistrer sans publier" ne voudrait rien dire. */
+     le publier" ; restreint le 2026-09-24, capture à l'appui : "l'événement en brouillon ne
+     doit pas apparaître au public, il doit apparaître que dans Mes événements") — un brouillon
+     ne doit JAMAIS apparaître dans la grille générale d'evenements.html, y compris pour son
+     propre propriétaire en train de la parcourir : ?owner=<id> est la signature exclusive de
+     "Mes événements" (dashboard-initiative.html, renderInitEvenements()) et non de la
+     découverte publique (query.owner y est absent), donc seule une requête EXPLICITEMENT
+     limitée à ses propres événements peut faire remonter un brouillon. L'admin garde son
+     exception habituelle (supervision), quelle que soit la requête. */
   const meListe = await getCurrentUser(req);
-  rows = rows.filter(r => r.statut !== 'brouillon' || (meListe && (Number(meListe.id) === Number(r.owner_user_id) || meListe.role === 'administrateur')));
+  const proprietaireDemandeSesPropres = meListe && query.owner && Number(query.owner) === Number(meListe.id);
+  rows = rows.filter(r => r.statut !== 'brouillon' || proprietaireDemandeSesPropres || (meListe && meListe.role === 'administrateur'));
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   /* Filtre "🌍 Tous pays" (2026-09-07, demande explicite) — élargi pour matcher aussi les
      pays cible (origine/origine2, la diaspora visée), pas seulement le pays où se déroule
