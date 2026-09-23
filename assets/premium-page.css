@@ -21,6 +21,17 @@
 .prm-hero-sub{margin:0 auto 16px;max-width:600px;font-size:14.5px;opacity:.9;}
 .prm-hero-texte{margin:0 auto;max-width:640px;font-size:13px;opacity:.8;line-height:1.7;}
 
+/* Simulateur "Compte Utilisateur / Compte Initiative" (2026-09-24) — deux pilules sur le fond
+   navy du hero, celle du type actif reprend le dégradé doré des CTA (.prm-btn-gold) pour rester
+   cohérent avec le reste de la page. */
+.prm-type-switch{display:inline-flex;gap:6px;margin-top:18px;padding:4px;background:rgba(255,255,255,.12);border-radius:999px;}
+.prm-type-btn{
+  border:none;border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;
+  background:transparent;color:#fff;opacity:.75;transition:opacity .15s,background .15s,color .15s;
+}
+.prm-type-btn:hover{opacity:1;}
+.prm-type-btn.active{background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+
 .prm-section{padding:36px 0;}
 .prm-section-alt{background:var(--bg);border-radius:var(--radius);}
 .prm-section-title{font-size:20px;font-weight:800;color:var(--navy);margin:0 0 22px;text-align:center;}

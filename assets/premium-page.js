@@ -165,7 +165,21 @@
   window.PremiumPage = async function (container, { type = 'utilisateur', moduleOrigine = '' } = {}) {
     const el = typeof container === 'string' ? document.querySelector(container) : container;
     if (!el) return;
-    const cfg = PREMIUM_CONFIGS[type] || PREMIUM_CONFIGS.utilisateur;
+    let cfg = PREMIUM_CONFIGS[type] || PREMIUM_CONFIGS.utilisateur;
+
+    /* Simulateur "Compte Utilisateur / Compte Initiative" (2026-09-24, demande explicite : "pour
+       avoir les prix adaptés aux besoins du client") — bascule sur place, sans repasser par
+       l'écran « avez-vous déjà un compte ? » ni recharger la page, pour comparer les deux
+       tarifications en un clic. `type`/`cfg` doivent rester réassignables (let, pas const) :
+       fetchFormules() utilise déjà `type` comme rôle de page (jamais celui de la session, voir
+       commentaire plus bas) donc la bascule fonctionne quel que soit le rôle réel du visiteur. */
+    function switchType(nouveauType) {
+      if (nouveauType === type || !PREMIUM_CONFIGS[nouveauType]) return;
+      type = nouveauType;
+      cfg = PREMIUM_CONFIGS[type];
+      try { window.history.replaceState(null, '', '?type=' + encodeURIComponent(type) + (moduleOrigine ? '&module=' + encodeURIComponent(moduleOrigine) : '')); } catch (e) {}
+      renderTarifs(false);
+    }
 
     /* ── Écran préalable « Avez-vous déjà un compte ? » ──
        Parrainage Initiative -50% : réservé aux comptes du MÊME propriétaire (système
@@ -287,6 +301,10 @@
           <h1>${esc(cfg.titre)}</h1>
           <p class="prm-hero-sub">${esc(cfg.sousTitre)}</p>
           <p class="prm-hero-texte">${esc(cfg.texteEngageant)}</p>
+          <div class="prm-type-switch" role="group" aria-label="Simuler un type de compte">
+            <button type="button" class="prm-type-btn${type === 'utilisateur' ? ' active' : ''}" data-simuler-type="utilisateur">🙍 Compte Utilisateur</button>
+            <button type="button" class="prm-type-btn${type === 'initiative' ? ' active' : ''}" data-simuler-type="initiative">🏢 Compte Initiative</button>
+          </div>
         </div>
 
         <section class="prm-section">
@@ -355,6 +373,9 @@
     }
     el.querySelector('#prm-btn-retour-top').addEventListener('click', goRetour);
     el.querySelector('#prm-btn-retour-bottom').addEventListener('click', goRetour);
+    el.querySelectorAll('[data-simuler-type]').forEach(btn => {
+      btn.addEventListener('click', () => switchType(btn.dataset.simulerType));
+    });
 
     /* DS-ID de Parrainage — lu depuis cette variable de fermeture par TOUS les boutons de
        paiement, y compris la seconde paire dupliquée de la bannière basse (un seul
