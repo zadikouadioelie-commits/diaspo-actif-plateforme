@@ -142,14 +142,14 @@
     } catch (e) { return { tarifs: [] }; }
   }
 
-  async function souscrire(accredType, typeTarif, btn, codeDA, parrainageDsId) {
+  async function souscrire(accredType, typeTarif, btn, parrainageDsId) {
     if (btn) { btn.disabled = true; btn.textContent = 'Redirection…'; }
     try {
       const r = await fetch('/api/accreditations/' + accredType + '/payer', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        // code_da / parrainage_ds_id ne sont que des indications : le serveur recalcule et
-        // revalide systématiquement, jamais confiance dans un prix envoyé par le client.
-        body: JSON.stringify({ type_tarif: typeTarif, code_da: codeDA || undefined, parrainage_ds_id: parrainageDsId || undefined }),
+        // parrainage_ds_id n'est qu'une indication : le serveur recalcule et revalide
+        // systématiquement, jamais confiance dans un prix envoyé par le client.
+        body: JSON.stringify({ type_tarif: typeTarif, parrainage_ds_id: parrainageDsId || undefined }),
       }).then(async res => {
         const d = await res.json();
         if (!res.ok) throw Object.assign(new Error(d.error || 'Erreur'), { data: d });
@@ -307,15 +307,6 @@
         <section class="prm-section prm-section-alt">
           <h2 class="prm-section-title">Tarifs</h2>
 
-          <div class="prm-code-da">
-            <label for="prm-code-da">Vous êtes adhérent officiel Diaspo'Actif ? Entrez votre code adhérent D'A pour bénéficier de votre réduction Premium.</label>
-            <div class="prm-code-da-row">
-              <input id="prm-code-da" maxlength="4" placeholder="A472" autocapitalize="characters" autocomplete="off">
-              <button type="button" class="btn btn-outline" id="prm-code-da-btn">Vérifier mon code</button>
-            </div>
-            <div id="prm-code-da-msg"></div>
-          </div>
-
           ${avecParrainage ? `
           <div class="prm-code-da prm-parrainage">
             <label for="prm-parrainage-dsid">Compte de référence identifié : entrez son Code de Sécurité Diaspo'Actif (DS-ID) pour appliquer -50% sur votre abonnement annuel.</label>
@@ -365,84 +356,17 @@
     el.querySelector('#prm-btn-retour-top').addEventListener('click', goRetour);
     el.querySelector('#prm-btn-retour-bottom').addEventListener('click', goRetour);
 
-    /* Code Adhésion D'A / DS-ID de Parrainage — lus depuis ces DEUX variables de fermeture
-       par TOUS les boutons de paiement, y compris la seconde paire dupliquée de la bannière
-       basse (un seul gestionnaire délégué wire les deux paires via [data-tarif]) : jamais
-       depuis un attribut par bouton, sinon la bannière facturerait le plein tarif en
-       silence. Un seul avantage peut s'appliquer à la fois (non-cumul, cf. serveur) : dès
-       que l'un des deux est validé, l'autre champ est désactivé côté UI pour éviter toute
-       confusion sur le prix réellement affiché. */
-    let codeDAApplique = null;
+    /* DS-ID de Parrainage — lu depuis cette variable de fermeture par TOUS les boutons de
+       paiement, y compris la seconde paire dupliquée de la bannière basse (un seul
+       gestionnaire délégué wire les deux paires via [data-tarif]) : jamais depuis un
+       attribut par bouton, sinon la bannière facturerait le plein tarif en silence.
+       Le bouton "code adhérent D'A" qui vivait ici (A472) a été retiré (2026-09-24, demande
+       explicite) — seul le parrainage -50% par compte lié (DS-ID) reste proposé. */
     let parrainageDsIdApplique = null;
     el.querySelectorAll('[data-tarif]').forEach(btn => {
       btn.dataset.origLabel = btn.textContent;
-      btn.addEventListener('click', () => souscrire(cfg.accredType, btn.dataset.tarif, btn, codeDAApplique, parrainageDsIdApplique));
+      btn.addEventListener('click', () => souscrire(cfg.accredType, btn.dataset.tarif, btn, parrainageDsIdApplique));
     });
-
-    const codeDaBtn = el.querySelector('#prm-code-da-btn');
-    const codeDaInput = el.querySelector('#prm-code-da');
-    const codeDaMsg = el.querySelector('#prm-code-da-msg');
-    const MESSAGES_CODE_DA = {
-      inconnu: "Ce code n'existe pas.",
-      suspendu: 'Ce code est actuellement suspendu.',
-      expire: 'Ce code a expiré.',
-      epuise: 'Ce code a déjà été utilisé par le nombre maximum de comptes autorisés.',
-      adhesion_non_a_jour: "L'adhésion associée à ce code n'est plus à jour.",
-      auto_utilisation_non_autorisee: 'Ce code ne peut pas être utilisé sur le compte qui l\'a reçu.',
-      compte_non_identifiable: 'Impossible d\'identifier votre compte pour appliquer ce code.',
-    };
-    if (codeDaBtn && codeDaInput) {
-      codeDaBtn.addEventListener('click', async () => {
-        const code = (codeDaInput.value || '').trim().toUpperCase();
-        if (!code) return;
-        codeDaBtn.disabled = true; codeDaBtn.textContent = 'Vérification…';
-        codeDaMsg.className = ''; codeDaMsg.textContent = '';
-        try {
-          const r = await fetch('/api/premium/code-adhesion/verifier', {
-            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, accred_type: cfg.accredType }),
-          }).then(res => res.json());
-
-          if (!r.valide) {
-            codeDaMsg.className = 'prm-code-da-msg prm-code-da-err';
-            codeDaMsg.textContent = '❌ ' + (MESSAGES_CODE_DA[r.raison] || "Ce code n'est pas valide.");
-            codeDAApplique = null;
-            codeDaBtn.disabled = false; codeDaBtn.textContent = 'Vérifier mon code';
-            return;
-          }
-
-          codeDAApplique = code;
-          const deviseAffichage = (mensuel && mensuel.devise) || (annuel && annuel.devise) || 'EUR';
-          const prixMensuelEl = el.querySelector('#prm-prix-mensuel');
-          const prixAnnuelEl = el.querySelector('#prm-prix-annuel');
-          if (prixMensuelEl) prixMensuelEl.innerHTML = `${fmtPrix(r.montant_mensuel, deviseAffichage)}<span> / mois</span>`;
-          if (prixAnnuelEl) prixAnnuelEl.innerHTML = `${fmtPrix(r.montant_annuel, deviseAffichage)}<span> / an</span>`;
-          const btnMensuel = el.querySelector('#prm-banniere-btn-mensuel');
-          const btnAnnuel = el.querySelector('#prm-banniere-btn-annuel');
-          if (btnMensuel) btnMensuel.textContent = `🟦 Devenir Premium – ${fmtPrix(r.montant_mensuel, deviseAffichage)}/mois`;
-          if (btnAnnuel) btnAnnuel.textContent = `⭐ Devenir Premium – ${fmtPrix(r.montant_annuel, deviseAffichage)}/an`;
-
-          const dateFinTxt = r.date_fin_prevue ? new Date(r.date_fin_prevue.replace(' ', 'T') + 'Z').toLocaleDateString('fr-FR') : null;
-          codeDaMsg.className = 'prm-code-da-msg prm-code-da-ok';
-          codeDaMsg.innerHTML = `✅ Code adhérent D'A validé<br>Vous bénéficiez de ${r.reduction_pct}% de réduction Premium. ` +
-            (r.premiere_utilisation
-              ? `Cet avantage est valable jusqu'au ${dateFinTxt}.`
-              : `Cet avantage sera valable ${r.duree_mois} mois à compter de son activation.`);
-          codeDaBtn.disabled = false; codeDaBtn.textContent = '✅ Code appliqué';
-          codeDaInput.disabled = true;
-          // Non-cumul : un code D'A validé désactive le champ de parrainage, pour ne jamais
-          // laisser croire à l'écran qu'un second avantage pourrait s'ajouter au premier.
-          const parrainageInputApresDA = el.querySelector('#prm-parrainage-dsid');
-          const parrainageBtnApresDA = el.querySelector('#prm-parrainage-btn');
-          if (parrainageInputApresDA) parrainageInputApresDA.disabled = true;
-          if (parrainageBtnApresDA) parrainageBtnApresDA.disabled = true;
-        } catch (e) {
-          codeDaMsg.className = 'prm-code-da-msg prm-code-da-err';
-          codeDaMsg.textContent = '❌ Impossible de vérifier ce code pour le moment.';
-          codeDaBtn.disabled = false; codeDaBtn.textContent = 'Vérifier mon code';
-        }
-      });
-    }
 
     /* ── Parrainage Initiative -50% : vérification du DS-ID de référence ── */
     const parrainageBtn = el.querySelector('#prm-parrainage-btn');
@@ -493,9 +417,6 @@
           parrainageMsg.innerHTML = `✅ Avantage Premium Initiative activé<br>Vous bénéficiez de ${r.reduction_pct}% de réduction sur l'abonnement annuel, pendant environ ${dureeMoisTxt} mois (durée restante du Premium du compte de référence).`;
           parrainageBtn.disabled = false; parrainageBtn.textContent = '✅ Compte appliqué';
           parrainageInput.disabled = true;
-          // Non-cumul : symétrique au cas D'A ci-dessus.
-          if (codeDaInput) codeDaInput.disabled = true;
-          if (codeDaBtn) codeDaBtn.disabled = true;
         } catch (e) {
           parrainageMsg.className = 'prm-code-da-msg prm-code-da-err';
           parrainageMsg.textContent = '❌ Impossible de vérifier ce compte pour le moment.';
