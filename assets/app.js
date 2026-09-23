@@ -1800,6 +1800,11 @@ function injectAdminAnnuaireStyles() {
 .admin-ann-dd button:hover{background:#f3f4f6;}
 .admin-ann-btn.admin-ann-rencontre{background:#f0fdf4;color:#166534;border-color:#bbf7d0;}
 .admin-ann-btn.admin-ann-rencontre:hover{background:#dcfce7;}
+/* Rencontre déjà validée (2026-09-23, demande explicite : "met le en plein pas en transparence
+   pour informer l'administrateur") — bouton plein au lieu du pastel/contour habituel, pour que
+   l'administrateur repère au premier coup d'oeil qu'il n'y a plus rien à faire sur cette carte. */
+.admin-ann-btn.admin-ann-rencontre.rencontre-validee{background:#16A34A;color:#fff;border-color:#16A34A;cursor:default;}
+.admin-ann-btn.admin-ann-rencontre.rencontre-validee:hover{background:#16A34A;}
 .admin-ann-rencontre-overlay{position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
 .admin-ann-rencontre-modal{background:#fff;color:#111;color-scheme:light;border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
 .admin-ann-rencontre-modal h3{margin:0 0 8px;font-size:16px;}
@@ -1858,6 +1863,15 @@ window.adminAnnuaireOuvrirRencontreTerrain = function (cibleId, bouton) {
     try {
       await api('POST', '/admin/rencontres/terrain', { cible_id: cibleId, justification });
       ov.remove();
+      // Bouton plein au lieu du pastel/contour (2026-09-23) — voir .rencontre-validee. Le
+      // "bouton" cliqué à l'ouverture de la modale reste la bonne référence DOM même après
+      // fermeture de celle-ci : n'importe quel re-rendu de liste (recherche, filtre) recréera
+      // de toute façon la carte depuis zéro au prochain chargement de l'annuaire.
+      if (bouton) {
+        bouton.classList.add('rencontre-validee');
+        bouton.textContent = '✅ Rencontre validée';
+        bouton.onclick = null;
+      }
       alert("✅ Rencontre validée — le point de confiance est accordé.");
     } catch (e) {
       err.textContent = e.message || 'Erreur.';
