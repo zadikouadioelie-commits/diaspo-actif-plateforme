@@ -214,17 +214,17 @@
       <button class="btn btn-block" id="btn-search-global" style="font-size:12px;">🌍 Rechercher sur tout Diaspo'Actif</button>
       <button class="btn btn-block" id="btn-reset" style="font-size:12px;">Réinitialiser</button>
       <!-- Trophée diaspora (2026-09-23, demande explicite : "ajoute un nouveau type
-           d'événement... bouton doré et scintillant" + "crée également un bouton nouveau
-           trophée... dans trophée diaspora") — filtre direct vers ce type en un clic, et
-           accès rapide à la création d'un événement de ce type (contenu du formulaire encore
-           identique aux autres types pour l'instant, à affiner plus tard selon l'utilisateur). -->
+           d'événement... bouton doré et scintillant") — filtre direct vers ce type en un clic.
+           Le bouton "Nouveau Trophée" ne vit plus ici (demande explicite : "ce bouton doit être
+           à l'intérieur de trophée diaspora") — il apparaît désormais dans la colonne centrale,
+           uniquement une fois ce filtre actif, voir #trophee-cta-zone et renderEvts(). -->
       <button class="btn btn-block btn-trophee" id="btn-filtre-trophee" style="font-size:12px;margin-top:6px;">🏆 Trophée diaspora</button>
-      <button class="btn btn-block btn-trophee" id="btn-nouveau-trophee" style="font-size:12px;">➕ Nouveau Trophée</button>
     </aside>
 
     <!-- ═══ COLONNE CENTRALE : ÉVÉNEMENTS ═══ -->
     <div>
       <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
+      <div id="trophee-cta-zone"></div>
       <div class="evt-grid" id="evt-list"></div>
     </div>
 
@@ -523,6 +523,19 @@ async function loadMesEvts() {
 function renderEvts() {
   const list = document.getElementById('evt-list');
   document.getElementById('evt-count').textContent = allEvts.length + ' événement' + (allEvts.length!==1?'s':'');
+  // "Nouveau Trophée" (2026-09-23, demande explicite : "ce bouton doit être à l'intérieur de
+  // trophée diaspora") — affiché uniquement quand le filtre "Forme de l'événement" en cours
+  // est "Trophée diaspora", avant la liste (utile même liste vide, pour créer le premier).
+  const zoneTrophee = document.getElementById('trophee-cta-zone');
+  if (document.getElementById('f-type').value === 'trophee_diaspora') {
+    zoneTrophee.innerHTML = `<button class="btn btn-trophee" id="btn-nouveau-trophee" style="font-size:13px;margin-bottom:14px;">➕ Nouveau Trophée</button>`;
+    document.getElementById('btn-nouveau-trophee').addEventListener('click', async () => {
+      await ouvrirModaleCreation();
+      document.getElementById('e-type').value = 'trophee_diaspora';
+    });
+  } else {
+    zoneTrophee.innerHTML = '';
+  }
   if (!allEvts.length) {
     list.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="big">📢</div><p>Aucun événement pour ces critères.</p></div>';
     return;
@@ -817,16 +830,9 @@ async function ouvrirModaleCreation() {
   } catch (e) { document.getElementById('modele-standard-notice').style.display = 'none'; }
 }
 document.getElementById('btn-creer').addEventListener('click', ouvrirModaleCreation);
-// "Nouveau Trophée" (2026-09-23, demande explicite : "crée également un bouton nouveau
-// trophée... les trophées sont gérés également par le module mes événements") — même circuit
-// unique de création (ouvrirModaleCreation), seul le type de départ change. resetModaleEvenement
-// (appelé dans ouvrirModaleCreation) remet e-type sur 'evenement' par défaut : on le force donc
-// juste après, une fois la modale ouverte. Contenu du formulaire volontairement identique aux
-// autres types pour l'instant (précisé par l'utilisateur : détails à venir plus tard).
-document.getElementById('btn-nouveau-trophee').addEventListener('click', async () => {
-  await ouvrirModaleCreation();
-  document.getElementById('e-type').value = 'trophee_diaspora';
-});
+// "Nouveau Trophée" (2026-09-23, demande explicite) : déplacé dans renderEvts()/
+// #trophee-cta-zone (demande explicite suivante : "ce bouton doit être à l'intérieur de
+// trophée diaspora") — le bouton n'existe plus dans le DOM statique, voir plus haut.
 // Ouvre la modale pré-remplie sur un événement existant (2026-09-22, corrige "Modifier" qui
 // n'avait nulle part où aller pour un événement créé directement sur cette page — voir
 // PUT /api/evenements/:id et hrefModifier dans renderEvts()/openDetail()). Ne touche jamais au
