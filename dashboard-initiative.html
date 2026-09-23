@@ -3673,12 +3673,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Création (2026-09-20, demande explicite) : le SEUL circuit de création d'événement est
      désormais le formulaire enrichi de la page publique evenements.html (fiche d'inscription,
      upload photo/couverture, aperçu) — jamais celui-ci, plus simple. openInitEvtModal(id) reste
-     la fonction de MODIFICATION d'un événement existant (bouton "✏️ Modifier"), inchangée. */
+     la fonction de MODIFICATION d'un événement existant (bouton "✏️ Modifier"), inchangée.
+     2026-09-24, demande explicite (doublon "ACTE FONDATEUR 1" constaté en prod, créé via
+     l'ancien circuit malgré le commentaire ci-dessus) : le commentaire seul ne suffisait pas —
+     rien n'empêchait openInitEvtModal() appelé sans id (page restée ouverte depuis avant le
+     20/09, cache navigateur, etc.) de rouvrir malgré tout l'ancien formulaire de création en
+     mode "création". Fermé en dur ici : sans id, on redirige systématiquement vers le nouveau
+     circuit, comme allerCreerEvenement(), au lieu d'ouvrir cette modale. */
   window.allerCreerEvenement = function() {
     location.href = 'evenements.html?creer_evenement=1';
   };
   window.openInitEvtModal = async function(id) {
-    if (!id && !window._daPremiumInitiative && !window.daBypassActive?.('evenements')) { openPremiumUpsell('evenements'); return; }
+    if (!id) { location.href = 'evenements.html?creer_evenement=1'; return; }
     initEvtEditingId = id || null;
     initEvtCoverB64 = null; initEvtGallery = [null]; initEvtPdfB64 = null; initEvtPdfNom = null;
     initEvtPdfExtra = []; initEvtProgrammeFichierB64 = null; initEvtProgrammeFichierNom = null;

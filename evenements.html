@@ -799,13 +799,15 @@ function ouvrirModaleEdition(id) {
 /* Ouverture directe depuis un lien externe (ex. bouton "Créer un événement" du module
    Événements, dashboard-initiative.html) — nettoie l'URL pour ne pas rouvrir la modale à un
    simple rechargement de page, même convention que dashboard-initiative.html pour
-   ?modifier_evenement=. */
-(function() {
-  if (new URLSearchParams(location.search).get('creer_evenement')) {
-    history.replaceState(null, '', location.pathname + location.hash);
-    ouvrirModaleCreation();
-  }
-})();
+   ?modifier_evenement=. 2026-09-24, bug réel corrigé (constaté en prod : ce circuit, désormais
+   le SEUL officiel pour créer un événement, échouait silencieusement à l'arrivée directe avec
+   ?creer_evenement=1) : cette IIFE s'exécutait ici, à l'analyse du script, AVANT que
+   `window.clearPhoto` ne soit défini plus bas dans ce même fichier — resetModaleEvenement()
+   (appelée par ouvrirModaleCreation()) l'appelle immédiatement, ce qui levait un
+   ReferenceError jamais rattrapé (ouvrirModaleCreation() n'est pas appelée avec await) et
+   avortait l'ouverture de la modale avant même la ligne qui l'affiche. Déplacée plus bas, au
+   même point que le lien direct vers une fiche (#evt-<id> ci-dessous), après que toutes les
+   fonctions du fichier ont été définies. */
 document.getElementById('btn-cancel').addEventListener('click', () => { evenementEnEditionId = null; document.getElementById('modal-bg').classList.remove('open'); });
 
 /* ─── Toggle Type de participation — Gratuit/Payant (2026-09-22) ─── */
@@ -1453,6 +1455,12 @@ async function initSuggestions() {
      contenu. */
   const m = location.hash.match(/^#evt-(\d+)$/);
   if (m) openDetail(parseInt(m[1]));
+  /* ?creer_evenement=1 — voir le commentaire déplacé ici, juste avant ouvrirModaleCreation()
+     plus haut dans ce fichier. */
+  if (new URLSearchParams(location.search).get('creer_evenement')) {
+    history.replaceState(null, '', location.pathname + location.hash);
+    ouvrirModaleCreation();
+  }
 })();
 </script>
 

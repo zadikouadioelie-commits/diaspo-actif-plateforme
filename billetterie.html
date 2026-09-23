@@ -1588,10 +1588,16 @@ async function refundTicket(tid, eid) {
 }
 
 /* ══ CRÉER ÉVÉNEMENT ══ */
+/* 2026-09-24, demande explicite (doublon "ACTE FONDATEUR 1" constaté en prod, créé via cet
+   ancien formulaire malgré le bouton principal de cette page redirigeant déjà vers le nouveau
+   circuit, voir dashboard-initiative.html) : cette fonction n'a plus aucun appelant visible
+   dans cette page, mais rien n'empêchait un appel direct (cache navigateur, ancienne page
+   restée ouverte) de rouvrir malgré tout l'ancienne modale de création — d'autant que saveEvent()
+   ci-dessous ne gérait de toute façon jamais la modification (toujours un POST, jamais de PUT),
+   même quand ce formulaire s'affichait en mode "Modifier". Fermé en dur : redirige vers le
+   nouveau circuit au lieu d'ouvrir cette modale, en toutes circonstances. */
 function openCreateEvent(eid) {
-  editingEventId = eid || null;
-  document.getElementById('create-modal-title').textContent = eid ? '✏️ Modifier l\'événement' : '＋ Créer un événement';
-  document.getElementById('modal-create-bg').classList.add('open');
+  location.href = 'evenements.html?creer_evenement=1';
 }
 /* ── MULTIMÉDIA billetterie ── */
 let bltCoverB64 = null;
