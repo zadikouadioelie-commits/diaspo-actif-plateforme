@@ -3532,6 +3532,26 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       /* Événements "Mobiliser la diaspora" (table evenements) — pas de types de billets/finances
          (concept propre à la table events ci-dessus), édition/suppression via les routes de ce
          module-là, gérées directement depuis evenements.html. */
+      // Trophée diaspora — animation (2026-09-23, demande explicite : "les cartouches doivent
+      // être dorées et scintillantes... avec le titre Trophée bien visible comme un cachet").
+      // Injectée une seule fois (idempotent), plutôt que d'ajouter au <style> partagé de cette
+      // page (fichier volumineux, co-édité par d'autres sessions ce même soir) : évite tout
+      // risque d'interférence, ce module est le seul consommateur de ces classes.
+      if (!document.getElementById('trophee-init-style')) {
+        const s = document.createElement('style');
+        s.id = 'trophee-init-style';
+        s.textContent = `
+          .init-card-trophee{animation:initTropheeGlow 2.8s ease-in-out infinite;}
+          .init-trophee-shimmer{position:relative;overflow:hidden;border-radius:10px;}
+          .init-trophee-shimmer::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.85),transparent);animation:initTropheeSweep 3s ease-in-out infinite;pointer-events:none;}
+          .init-trophee-cachet{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFECB3,#FFD700 45%,#B8860B 100%);border:1.5px solid #FFF8E1;box-shadow:0 0 0 1.5px #A67C00,0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:12px;transform:rotate(-8deg);animation:initTropheeCachetGlow 2.4s ease-in-out infinite;}
+          @keyframes initTropheeGlow{0%,100%{box-shadow:none;}50%{box-shadow:0 0 16px 2px rgba(255,215,0,.4);}}
+          @keyframes initTropheeSweep{0%{left:-60%;}55%,100%{left:130%;}}
+          @keyframes initTropheeCachetGlow{0%,100%{box-shadow:0 0 0 1.5px #A67C00,0 2px 6px rgba(0,0,0,.35);}50%{box-shadow:0 0 0 1.5px #A67C00,0 0 8px 3px rgba(255,215,0,.7);}}
+          @media (prefers-reduced-motion: reduce){.init-card-trophee,.init-trophee-shimmer::after,.init-trophee-cachet{animation:none;}}
+        `;
+        document.head.appendChild(s);
+      }
       const cartesNatives = evtsNatifsAffiches.map(e => {
         // Trophée diaspora (2026-09-23, demande explicite : "les trophées sont gérés également
         // par le module mes événements, juste il faudra préciser lorsqu'il s'agit de trophée
@@ -3541,13 +3561,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         const styleCarte = estTrophee
           ? 'margin-bottom:12px;padding:16px;background:linear-gradient(135deg,#FFFBEB,#FFF7E0);border:1.5px solid #E8C34A;'
           : 'margin-bottom:12px;padding:16px;';
+        const classeCarteTrophee = estTrophee ? ' init-card-trophee' : '';
         const badgeTrophee = estTrophee
           ? `<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#B8860B,#FFD700);color:#4A3500;font-weight:700;" title="Événement de type Trophée diaspora">🏆 Trophée diaspora</span>`
           : '';
+        const cachetTrophee = estTrophee ? `<span class="init-trophee-cachet" title="Trophée diaspora">🏆</span>` : '';
         return `
-          <div class="card" style="${styleCarte}">
+          <div class="card${classeCarteTrophee}" style="${styleCarte}">
             <div style="display:flex;gap:14px;align-items:flex-start;">
-              ${e.image_couverture||e.image_url ? `<img src="${e.image_couverture||e.image_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
+              <div style="position:relative;flex-shrink:0;" class="${estTrophee ? 'init-trophee-shimmer' : ''}">
+                ${e.image_couverture||e.image_url ? `<img src="${e.image_couverture||e.image_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;display:block;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;">📅</div>`}
+                ${cachetTrophee}
+              </div>
               <div style="flex:1;min-width:0;">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
                   <strong style="font-size:14px;">${escH(e.titre)}</strong>
