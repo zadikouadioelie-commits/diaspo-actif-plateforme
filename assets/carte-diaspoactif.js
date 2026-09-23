@@ -243,6 +243,11 @@
         </div>
 
         <div class="cda-box" style="margin:14px 20px 20px;">
+          <div class="cda-box-head"><span>📰 Publications</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-publier-btn" title="Créer une publication">✍️ Créer une publication</button>` : ''}</div>
+          <div id="cda-publications-list"></div>
+        </div>
+
+        <div class="cda-box" style="margin:14px 20px 20px;">
           <div class="cda-box-head"><span>🤝 Affiliations</span></div>
           <div class="cda-affiliations" id="cda-affiliations">
             ${affiliations.length ? affiliations.map(a => `
@@ -305,6 +310,9 @@
 
       const domaineBtn = container.querySelector('#cda-domaine-edit');
       if (domaineBtn) domaineBtn.addEventListener('click', () => editDomaine(container, profil, opts));
+
+      const publierBtn = container.querySelector('#cda-publier-btn');
+      if (publierBtn) publierBtn.addEventListener('click', () => window.Posts?.openModal());
     } else {
       // Boutons Demande / Message — widget partagé du site, uniquement pour un visiteur
       const zone = container.querySelector('#cda-actions');
@@ -312,6 +320,23 @@
         zone.innerHTML = `<span data-relation-user="${profil.id}" data-relation-origine="carte_diaspoactif" data-relation-classe="cda-btn"></span>`;
         if (window.initBoutonsRelation) window.initBoutonsRelation();
       }
+    }
+
+    // Publications (2026-09-23, demande explicite : "met le bouton créer une publication sur le
+    // profil public") — même composant Posts (assets/posts.js) que le Fil d'actualité, publie
+    // donc automatiquement aux deux endroits à la fois (une seule table fil_posts). Le tableau
+    // profil.publications est déjà renvoyé par GET /api/profil/:id (utilisé ailleurs sur la
+    // plateforme, voir profil-app.html) — pas de nouvelle route nécessaire pour l'affichage
+    // initial ; window.CdaPublicationsRefresh() ne réinterroge que pour rafraîchir après un post.
+    if (window.Posts) {
+      window.Posts.renderFeed(profil.publications || [], 'cda-publications-list');
+      window.CdaPublicationsRefresh = async () => {
+        try {
+          const r = await window.api('GET', `/profil/${profil.id}/publications`);
+          profil.publications = r.publications || [];
+          window.Posts.renderFeed(profil.publications, 'cda-publications-list');
+        } catch (e) { /* liste non rafraîchie, pas bloquant */ }
+      };
     }
 
     // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — même composant

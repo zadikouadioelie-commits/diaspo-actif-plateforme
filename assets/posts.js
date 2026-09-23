@@ -962,9 +962,11 @@ const Posts = {
       this.closeModal();
       if (typeof showToast === 'function') showToast(programmedAt ? 'Publication programmée !' : 'Publication publiée !', 'success');
 
-      // Recharger le fil si disponible
+      // Recharger le fil si disponible (même convention pour toute page qui affiche ses
+      // propres publications ailleurs que le fil général — voir carte-diaspoactif.js, 2026-09-23).
       if (typeof loadFeed === 'function') loadFeed();
       else if (window.PostsFeed) window.PostsFeed.refresh();
+      else if (typeof window.CdaPublicationsRefresh === 'function') window.CdaPublicationsRefresh();
 
     } catch(e) {
       if (typeof showToast === 'function') showToast('Erreur lors de la publication.', 'error');
