@@ -3532,14 +3532,27 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       /* Événements "Mobiliser la diaspora" (table evenements) — pas de types de billets/finances
          (concept propre à la table events ci-dessus), édition/suppression via les routes de ce
          module-là, gérées directement depuis evenements.html. */
-      const cartesNatives = evtsNatifsAffiches.map(e => `
-          <div class="card" style="margin-bottom:12px;padding:16px;">
+      const cartesNatives = evtsNatifsAffiches.map(e => {
+        // Trophée diaspora (2026-09-23, demande explicite : "les trophées sont gérés également
+        // par le module mes événements, juste il faudra préciser lorsqu'il s'agit de trophée
+        // avec une cartouche dorée") — même carte que les autres événements natifs, bordure et
+        // fond dorés + badge dédié pour la distinguer d'un coup d'œil dans la liste.
+        const estTrophee = e.type_evt === 'trophee_diaspora';
+        const styleCarte = estTrophee
+          ? 'margin-bottom:12px;padding:16px;background:linear-gradient(135deg,#FFFBEB,#FFF7E0);border:1.5px solid #E8C34A;'
+          : 'margin-bottom:12px;padding:16px;';
+        const badgeTrophee = estTrophee
+          ? `<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:linear-gradient(135deg,#B8860B,#FFD700);color:#4A3500;font-weight:700;" title="Événement de type Trophée diaspora">🏆 Trophée diaspora</span>`
+          : '';
+        return `
+          <div class="card" style="${styleCarte}">
             <div style="display:flex;gap:14px;align-items:flex-start;">
               ${e.image_couverture||e.image_url ? `<img src="${e.image_couverture||e.image_url}" style="width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;" alt="">` : `<div style="width:72px;height:72px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;">📅</div>`}
               <div style="flex:1;min-width:0;">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
                   <strong style="font-size:14px;">${escH(e.titre)}</strong>
                   <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:#dcfce7;color:#166534;" title="Créé depuis le module « Mobiliser la diaspora »">🌍 En ligne</span>
+                  ${badgeTrophee}
                   ${INIT_TARIF_BADGE[e.statut_tarif] || ''}
                 </div>
                 <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
@@ -3557,7 +3570,8 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <a class="btn btn-sm btn-outline" style="text-decoration:none;" href="evenements.html#evt-${e.id}" title="Voir la fiche complète">👁 Voir</a>
               <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="initDeleteEvenementNatif(${e.id})">🗑 Supprimer</button>
             </div>
-          </div>`);
+          </div>`;
+      });
       const FILTRES_TARIF_INIT = [
         { id: 'tous', label: 'Tous' },
         { id: 'gratuit', label: '🟢 Gratuit' },
