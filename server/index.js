@@ -18068,6 +18068,11 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
   let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
+  /* Brouillon (2026-09-23, demande explicite : "un bouton brouillon... pour le conserver sans
+     le publier") — jamais visible dans cette liste publique sauf pour son propriétaire ou un
+     admin, sinon "enregistrer sans publier" ne voudrait rien dire. */
+  const meListe = await getCurrentUser(req);
+  rows = rows.filter(r => r.statut !== 'brouillon' || (meListe && (Number(meListe.id) === Number(r.owner_user_id) || meListe.role === 'administrateur')));
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   /* Filtre "🌍 Tous pays" (2026-09-07, demande explicite) — élargi pour matcher aussi les
      pays cible (origine/origine2, la diaspora visée), pas seulement le pays où se déroule
@@ -18083,13 +18088,33 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   // Filtre "📅 Date" (2026-09-07) — événements à partir de cette date (une affiche
   // d'événements à venir, pas une recherche d'un jour précis dans le passé).
   if (query.date) rows = rows.filter(r => r.date_evt && r.date_evt >= query.date);
-  // Filtre "🎟️ Gratuit / payant" (2026-09-07) — prix_min NULL ou 0 = gratuit.
-  if (query.gratuit === '1') rows = rows.filter(r => !r.prix_min);
-  else if (query.gratuit === '0') rows = rows.filter(r => r.prix_min > 0);
+  // Filtre "🎟️ Gratuit / payant" (2026-09-07, étendu à 3 catégories le 2026-09-24, "faciliter
+  // le tri") — utilise la même priorité (fiche liée > choix manuel) que le badge de la
+  // cartouche et le pré-remplissage de la modale d'édition, voir participationEffective().
+  if (query.gratuit === '1') rows = rows.filter(r => participationEffective(r) === 'gratuit');
+  else if (query.gratuit === '0') rows = rows.filter(r => participationEffective(r) === 'payant');
+  else if (query.gratuit === 'partiel') rows = rows.filter(r => participationEffective(r) === 'partiellement_payant');
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
   sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(withCounts) });
 });
+
+// Classification effective Gratuit/Partiellement payant/Payant (2026-09-24, "faciliter le
+// tri") — même priorité partout (filtre ci-dessus, badge cartouche evenements.html, pré-
+// remplissage de la modale d'édition) : un mélange détecté sur la fiche liée l'emporte toujours
+// (type_participation='partiellement_payant', voir inscSyncPrixMinEvenements), sinon un vrai
+// tarif payant (prix_min) ou, à défaut, le choix manuel du formulaire.
+function participationEffective(evt) {
+  if (evt.type_participation === 'partiellement_payant') return 'partiellement_payant';
+  if (evt.prix_min > 0 || evt.type_participation === 'payant') return 'payant';
+  return 'gratuit';
+}
+async function ensureEvenementsTypeParticipationCol() {
+  if (global.__evenementsTypeParticipationEnsured) return;
+  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN type_participation TEXT DEFAULT 'gratuit'`).run(); }
+  catch (e) {}
+  global.__evenementsTypeParticipationEnsured = true;
+}
 
 route("POST", "/api/evenements", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -18107,22 +18132,17 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     catch (e) {}
     global.__evenementsZoneDiffusionEnsured = true;
   }
-  /* type_participation (2026-09-23, demande explicite) : "priorité à la fiche d'inscription, si
-     elle n'existe pas alors priorité à la cartouche elle-même" — evenements.prix_min (déduit du
-     vrai tarif de la fiche liée, voir inscSyncPrixMinEvenements) reste TOUJOURS prioritaire
-     quand une fiche existe. Mais sans fiche liée du tout, le choix Gratuit/Payant du formulaire
-     n'avait jusqu'ici aucun effet persisté : la cartouche retombait silencieusement sur
-     "Gratuit" par défaut (prix_min = null), contredisant un "Payant" explicitement coché. Cette
-     colonne porte ce choix pour qu'il s'affiche même sans fiche/tarif configuré. Même idiome que
-     zone_diffusion juste au-dessus. */
-  if (!global.__evenementsTypeParticipationEnsured) {
-    try { await db.prepare(`ALTER TABLE evenements ADD COLUMN type_participation TEXT DEFAULT 'gratuit'`).run(); }
-    catch (e) {}
-    global.__evenementsTypeParticipationEnsured = true;
-  }
+  /* type_participation (2026-09-23, demande explicite ; étendu à 3 catégories le 2026-09-24,
+     "faciliter le tri") : "priorité à la fiche d'inscription, si elle n'existe pas alors
+     priorité à la cartouche elle-même" — evenements.prix_min ET type_participation restent
+     TOUJOURS écrasés par inscSyncPrixMinEvenements quand une fiche liée a au moins un tarif
+     actif (elle y détecte un mélange gratuit/payant pour distinguer "partiellement_payant" de
+     "payant"). Sans fiche liée du tout, le choix du formulaire (gratuit/partiellement_payant/
+     payant) fait foi. Même idiome que zone_diffusion juste au-dessus. */
+  await ensureEvenementsTypeParticipationCol();
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
-    zone_diffusion, type_participation,
+    zone_diffusion, type_participation, statut,
     places_max, inscription_ouverte, lien_inscription, image_url,
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
@@ -18136,6 +18156,10 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
   // enrichirAvecFicheMedia() plus haut.
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || '[]');
+  // Brouillon (2026-09-23, demande explicite : "un bouton brouillon... pour le conserver sans
+  // le publier") — statut passe désormais par le body au lieu d'être figé sur 'ouvert', mais
+  // reste strictement limité à ces deux valeurs (jamais un statut arbitraire venu du client).
+  const statutFinal = statut === 'brouillon' ? 'brouillon' : 'ouvert';
   const id = (await db.prepare(`INSERT INTO evenements
     (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,type_participation,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
@@ -18143,12 +18167,12 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ouvert',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       description||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
-      type_participation === 'payant' ? 'payant' : 'gratuit', places_max||null,
-      inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, user.id,
+      ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', places_max||null,
+      inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, statutFinal, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
       coverImg, galerie,
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
@@ -18156,8 +18180,9 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
       masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null
     )).lastInsertRowid;
-  // Notifier abonnés de l'initiative
-  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
+  // encore réelle (voir statutFinal ci-dessus).
+  const init = statutFinal !== 'brouillon' ? await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id) : null;
   if (init) {
     const abonnes = await db.prepare("SELECT user_id FROM abonnements WHERE initiative_id=?").all(init.id);
     const nomOrganisateur = await nomCompteAffichage(user.id);
@@ -18216,32 +18241,33 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
 route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  const evt = await db.prepare("SELECT id, owner_user_id, statut FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
   }
-  if (!global.__evenementsTypeParticipationEnsured) {
-    try { await db.prepare(`ALTER TABLE evenements ADD COLUMN type_participation TEXT DEFAULT 'gratuit'`).run(); }
-    catch (e) {}
-    global.__evenementsTypeParticipationEnsured = true;
-  }
+  await ensureEvenementsTypeParticipationCol();
   const {
-    titre, date_evt, heure_debut, type_evt, domaine, zone_diffusion, type_participation, pays, lieu, ville, lieu_gps,
+    titre, date_evt, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, pays, lieu, ville, lieu_gps,
     origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
     image_couverture, image_url, galerie_photos
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   const coverImg = image_couverture || image_url || null;
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 1)) : (galerie_photos || "[]");
+  // Brouillon (2026-09-23) : permet de publier un brouillon existant (statut:'ouvert' envoyé
+  // par le bouton "Publier") ou de repasser un événement publié en brouillon ("Enregistrer en
+  // brouillon" depuis l'édition) — conserve le statut actuel si rien n'est envoyé (défensif,
+  // au cas où un futur appelant de cette route omettrait ce champ).
+  const statutFinal = ['ouvert','brouillon'].includes(statut) ? statut : evt.statut;
   await db.prepare(`UPDATE evenements SET
-    titre=?, date_evt=?, heure_debut=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, pays=?, lieu=?, ville=?, lieu_gps=?,
+    titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
     image_couverture=?, image_url=?, galerie_photos=?
     WHERE id=?`)
     .run(
-      titre, date_evt, heure_debut || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
-      type_participation === 'payant' ? 'payant' : 'gratuit',
+      titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
+      ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, description || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
       coverImg, coverImg, galerie, evt.id
@@ -19171,6 +19197,14 @@ route("DELETE", "/api/cagnottes/:id/actualites/:actuId", async (req, res, params
 route("GET", "/api/evenements/:id", async (req, res, params) => {
   const row = await db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
+  // Brouillon (2026-09-23) : même protection que GET /api/evenements — un lien direct vers un
+  // brouillon ne doit pas non plus le rendre accessible à qui n'est ni propriétaire ni admin.
+  if (row.statut === 'brouillon') {
+    const meDetail = await getCurrentUser(req);
+    if (!meDetail || (Number(meDetail.id) !== Number(row.owner_user_id) && meDetail.role !== 'administrateur')) {
+      return sendJSON(res, 404, { error: "Événement introuvable." });
+    }
+  }
   const participants = await db.prepare("SELECT u.id,u.nom,u.ville FROM evenements_participants ep JOIN users u ON u.id=ep.user_id WHERE ep.evenement_id=?").all(params.id);
   /* Cagnottes associées (Phase 2 point 2) — uniquement publiques et publiées, pour ne jamais
      exposer un brouillon ou une cagnotte privée sur une page événement publique. */
@@ -41553,23 +41587,36 @@ async function inscJournaliser(ficheId, acteur, action, details, evenementId = n
   } catch (e) { console.error("[insc-journal]", e.message); }
 }
 
-/* Synchronise evenements.prix_min (2026-09-22, demande explicite, capture à l'appui) : le badge
-   "🎟️ Gratuit"/"💶 À partir de X€" d'un événement (evenements.html) lit prix_min, alimenté
-   jusqu'ici uniquement par le pont Billetterie (ticket_types) — jamais par une fiche liée via
-   insc_fiches_evenements. Un événement lié à une fiche qui a des types d'inscription payants
-   restait donc affiché "Gratuit" à tort. Appelée après toute modification affectant le prix
-   d'une fiche (liaison à un événement, création/modification/suppression d'un type) pour
-   recalculer et répercuter le prix minimum sur TOUS les événements actuellement liés à cette
-   fiche — jamais l'inverse (une fiche n'a pas de "prix_min" propre à écraser). */
+/* Synchronise evenements.prix_min ET evenements.type_participation (2026-09-22, demande
+   explicite, capture à l'appui ; étendu le 2026-09-24 à la 3ᵉ catégorie "partiellement_payant"
+   pour "faciliter le tri") : le badge "🎟️ Gratuit"/"💶 À partir de X€" d'un événement
+   (evenements.html) lit ces deux champs, alimentés jusqu'ici uniquement par le pont Billetterie
+   (ticket_types) pour prix_min — jamais par une fiche liée via insc_fiches_evenements. Un
+   événement lié à une fiche qui a des types d'inscription payants restait donc affiché
+   "Gratuit" à tort. Appelée après toute modification affectant le prix d'une fiche (liaison à
+   un événement, création/modification/suppression d'un type) pour recalculer et répercuter sur
+   TOUS les événements actuellement liés à cette fiche — jamais l'inverse (une fiche n'a pas de
+   "prix_min"/"type_participation" propres à écraser). Un mélange de types actifs gratuits ET
+   payants sur la même fiche donne "partiellement_payant" ; uniquement des types payants donne
+   "payant" ; uniquement des types gratuits donne "gratuit" — dans tous ces cas la fiche a un
+   avis et l'impose. Seule l'absence TOTALE de type actif (fiche pas encore configurée) laisse
+   type_participation intact, pour laisser la priorité au choix manuel du formulaire quand la
+   fiche n'a rien à en dire ("sinon priorité à la cartouche elle-même"). */
 async function inscSyncPrixMinEvenements(ficheId) {
   try {
+    await ensureEvenementsTypeParticipationCol();
+    const types = await db.prepare("SELECT gratuit, prix FROM insc_types WHERE fiche_id=? AND actif=1").all(ficheId);
     const min = (await db.prepare(
       "SELECT MIN(prix) p FROM insc_types WHERE fiche_id=? AND actif=1 AND gratuit=0 AND prix IS NOT NULL AND prix > 0"
     ).get(ficheId))?.p;
     const prixMin = min != null ? Number(min) : null;
+    const aGratuit = types.some(t => t.gratuit === 1 || !(Number(t.prix) > 0));
+    const aPayant = types.some(t => t.gratuit !== 1 && Number(t.prix) > 0);
+    const typeParticipation = !types.length ? null : (aGratuit && aPayant ? 'partiellement_payant' : (aPayant ? 'payant' : 'gratuit'));
     const evenementIds = (await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(ficheId)).map(r => r.evenement_id);
     for (const eid of evenementIds) {
-      await db.prepare("UPDATE evenements SET prix_min=? WHERE id=?").run(prixMin, eid);
+      if (typeParticipation) await db.prepare("UPDATE evenements SET prix_min=?, type_participation=? WHERE id=?").run(prixMin, typeParticipation, eid);
+      else await db.prepare("UPDATE evenements SET prix_min=? WHERE id=?").run(prixMin, eid);
     }
   } catch (e) { console.error("[insc-sync-prix-min]", e.message); }
 }

@@ -186,7 +186,7 @@
       <input type="date" id="f-date" title="À partir de cette date">
       <select id="f-domaine" title="Domaine de l'événement"><option value="">🏷️ Domaine de l'événement</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select>
       <select id="f-type" title="Forme de l'événement"><option value="">👥 Forme de l'événement</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="autre">Autre</option></select>
-      <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">Gratuit</option><option value="0">Payant</option></select>
+      <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">🟢 Gratuit</option><option value="partiel">🟡 Partiellement payant</option><option value="0">🔴 Payant</option></select>
       <button class="btn btn-orange btn-block" id="btn-search" style="font-size:12px;">🔍 Rechercher</button>
       <button class="btn btn-block" id="btn-search-global" style="font-size:12px;">🌍 Rechercher sur tout Diaspo'Actif</button>
       <button class="btn btn-block" id="btn-reset" style="font-size:12px;">Réinitialiser</button>
@@ -218,6 +218,7 @@
       <div><label>Domaine</label><select id="e-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select></div>
       <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="e-date"></div>
       <div><label>Heure de début</label><input type="time" id="e-heure" value="09:00"></div>
+      <div><label>Heure de fin</label><input type="time" id="e-heure-fin"></div>
       <div><label>Pays</label><input type="text" id="e-pays" placeholder="France"></div>
       <div><label>Ville / Lieu</label><input type="text" id="e-lieu" placeholder="Paris, salle X"></div>
       <div><label>Origine (diaspora ciblée)</label><select id="e-origine"><option value="">-- Origine --</option></select></div>
@@ -246,22 +247,30 @@
     <div style="margin-bottom:10px;"><label>🔗 Lien visioconférence (si en ligne)</label><input type="url" id="e-visio-evt" placeholder="https://zoom.us/… ou https://meet.google.com/…"></div>
     <div style="margin-bottom:10px;"><label>💬 Lien WhatsApp (groupe ou chaîne de l'événement)</label><input type="url" id="e-whatsapp" placeholder="https://chat.whatsapp.com/… ou https://whatsapp.com/channel/…"></div>
 
-    <!-- Type de participation — Gratuit/Payant (2026-09-22, demande explicite) : purement
-         indicatif côté formulaire, aucun prix ne se saisit ici. Le vrai tarif vit sur les types
-         d'inscription de la fiche liée (voir bouton "Fiche d'inscription" juste en dessous) et
-         se répercute déjà automatiquement sur evenements.prix_min (inscSyncPrixMinEvenements,
-         server/index.js) — ce toggle sert seulement à rendre visible et guider l'obligation de
-         lier une fiche payante quand l'organisateur choisit "Payant". -->
+    <!-- Type de participation — Gratuit/Partiellement payant/Payant (2026-09-22, demande
+         explicite ; étendu à 3 catégories le 2026-09-24 pour "faciliter le tri" — voir le
+         filtre 🎟️ colonne gauche) : purement indicatif côté formulaire, aucun prix ne se saisit
+         ici. Le vrai tarif vit sur les types d'inscription de la fiche liée (voir bouton "Fiche
+         d'inscription" juste en dessous) et se répercute déjà automatiquement sur
+         evenements.prix_min ET type_participation (inscSyncPrixMinEvenements, server/index.js,
+         qui détecte un mélange gratuit/payant pour distinguer "Partiellement payant" de
+         "Payant") — ce toggle sert seulement de choix par défaut tant qu'aucune fiche n'a
+         encore d'avis, et à guider vers la fiche quand l'organisateur choisit une catégorie
+         payante. -->
     <div style="margin-bottom:14px;">
       <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px;">Type de participation</label>
       <div style="display:flex;gap:8px;">
-        <label id="e-gratuit-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:10px 14px;border:1.5px solid var(--orange);border-radius:8px;background:#FFF7ED;font-weight:600;font-size:13px;">
+        <label id="e-gratuit-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px 10px;border:1.5px solid #16a34a;border-radius:8px;background:#F0FDF4;font-weight:600;font-size:12.5px;">
           <input type="radio" name="e-gratuit-payant" id="e-radio-gratuit" value="gratuit" checked style="accent-color:#16a34a;width:16px;height:16px;">
-          🆓 Gratuit
+          🟢 Gratuit
         </label>
-        <label id="e-payant-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-weight:600;font-size:13px;">
-          <input type="radio" name="e-gratuit-payant" id="e-radio-payant" value="payant" style="accent-color:#2563EB;width:16px;height:16px;">
-          💳 Payant
+        <label id="e-partiel-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px 10px;border:1.5px solid var(--border);border-radius:8px;font-weight:600;font-size:12.5px;">
+          <input type="radio" name="e-gratuit-payant" id="e-radio-partiel" value="partiellement_payant" style="accent-color:#D97706;width:16px;height:16px;">
+          🟡 Partiellement payant
+        </label>
+        <label id="e-payant-lbl" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px 10px;border:1.5px solid var(--border);border-radius:8px;font-weight:600;font-size:12.5px;">
+          <input type="radio" name="e-gratuit-payant" id="e-radio-payant" value="payant" style="accent-color:#DC2626;width:16px;height:16px;">
+          🔴 Payant
         </label>
       </div>
       <div id="e-payant-notice" style="display:none;margin-top:8px;padding:10px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;font-size:12px;color:#92400E;">
@@ -354,6 +363,12 @@
     <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap;">
       <button class="btn" id="btn-cancel">Annuler</button>
       <button class="btn btn-outline" id="btn-preview-evt" onclick="previewEvent()">👁 Prévisualiser</button>
+      <!-- Brouillon (2026-09-23, demande explicite : "un bouton brouillon ici pour le conserver
+           sans le publier") : même formulaire, même validation que "Publier", seul le statut
+           envoyé change (voir btn-save-brouillon plus bas) — un brouillon n'apparaît que pour
+           son propriétaire (et l'admin), jamais dans la liste publique, voir GET /api/evenements
+           et GET /api/evenements/:id côté serveur. -->
+      <button class="btn btn-outline" id="btn-save-brouillon">💾 Enregistrer en brouillon</button>
       <button class="btn btn-orange" id="btn-save">📢 Publier l'événement</button>
     </div>
     <div style="font-size:.72rem;color:#aaa;text-align:center;margin-top:10px;">
@@ -483,6 +498,10 @@ function renderEvts() {
     const plein   = evt.places_max && evt.nb_participants >= evt.places_max;
     const visiBadge = evt.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
                       evt.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' : '';
+    // Brouillon (2026-09-23) : ne peut être visible ici que pour son propriétaire ou un admin
+    // (voir GET /api/evenements, filtré côté serveur) — badge pour ne jamais le confondre avec
+    // un événement réellement publié en le parcourant dans sa propre liste.
+    const brouillonBadge = evt.statut === 'brouillon' ? '<span class="evt-tag" style="color:#92400E;background:#FFFBEB;">💾 Brouillon</span>' : '';
     let galerieCard = [];
     try { galerieCard = Array.isArray(evt.galerie_photos) ? evt.galerie_photos : JSON.parse(evt.galerie_photos||'[]'); } catch(e) {}
     // Repli sur l'affiche de la fiche d'inscription liée si l'événement n'a pas sa propre
@@ -529,8 +548,9 @@ function renderEvts() {
           ${evt.origine ? '<span>🎯 '+[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')+'</span>' : ''}
           ${evt.type_evt ? '<span class="evt-tag">'+esc(evt.type_evt)+'</span>' : ''}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
-          ${evt.prix_min ? '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>' : (evt.type_participation === 'payant' ? '<span class="evt-tag">💳 Payant</span>' : '<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>')}
+          ${badgeParticipation(evt)}
           ${visiBadge}
+          ${brouillonBadge}
           ${(evt.nb_participants && !evt.masquer_inscrits) ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
         </div>
         ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+mdBold(esc(evt.description.slice(0,120)))+(evt.description.length>120?'…':'')+'</p>' : ''}
@@ -560,6 +580,19 @@ function renderEvts() {
 }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Badge Gratuit/Partiellement payant/Payant de la cartouche (2026-09-24, "faciliter le tri") —
+// partagé entre la vue liste (renderEvts) et la vue détail (renderEventDetail), même priorité
+// que côté serveur (fiche liée > choix manuel, voir participationEffective/
+// inscSyncPrixMinEvenements dans server/index.js).
+function badgeParticipation(evt) {
+  if (evt.type_participation === 'partiellement_payant') {
+    return '<span class="evt-tag" style="color:#D97706;">🟡 Partiellement payant' + (evt.prix_min ? ' · à partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €' : '') + '</span>';
+  }
+  if (evt.prix_min) return '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>';
+  if (evt.type_participation === 'payant') return '<span class="evt-tag">🔴 Payant</span>';
+  return '<span class="evt-tag" style="color:#16a34a;">🟢 Gratuit</span>';
+}
 
 /* Adresse exacte / GPS → lien Google Maps (2026-09-09). Accepte indifféremment une adresse
    complète, des coordonnées "lat,lng", ou un lien déjà tout fait (ex: collé depuis WhatsApp) —
@@ -702,7 +735,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 // l'événement précédent affichés). N'efface pas les widgets à état propre (fiche choisie,
 // modèle standard, image de couverture) : gérés par leurs propres blocs juste après l'appel.
 function resetModaleEvenement() {
-  ['e-titre','e-date','e-heure','e-pays','e-lieu','e-lieu-gps','e-desc','e-places','e-visio-evt','e-whatsapp'].forEach(id => {
+  ['e-titre','e-date','e-heure','e-heure-fin','e-pays','e-lieu','e-lieu-gps','e-desc','e-places','e-visio-evt','e-whatsapp'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   document.getElementById('e-type').value = 'evenement';
@@ -712,7 +745,7 @@ function resetModaleEvenement() {
   document.getElementById('e-visibilite').value = 'public';
   document.getElementById('e-masquer-inscrits').checked = false;
   document.getElementById('e-radio-gratuit').checked = true;
-  majToggleGratuitPayant();
+  majToggleParticipation();
   document.getElementById('e-heure').value = '09:00';
   clearPhoto(0);
   coverData = null;
@@ -760,6 +793,7 @@ function ouvrirModaleEdition(id) {
   document.getElementById('e-titre').value = evt.titre || '';
   document.getElementById('e-date').value = evt.date_evt || '';
   document.getElementById('e-heure').value = evt.heure_debut || '09:00';
+  document.getElementById('e-heure-fin').value = evt.heure_fin || '';
   document.getElementById('e-type').value = evt.type_evt || 'evenement';
   document.getElementById('e-domaine').value = evt.domaine || '';
   document.getElementById('e-zone-diffusion').value = evt.zone_diffusion || '';
@@ -773,14 +807,17 @@ function ouvrirModaleEdition(id) {
   document.getElementById('e-visibilite').value = evt.visibilite || 'public';
   document.getElementById('e-visio-evt').value = evt.lien_visio || '';
   document.getElementById('e-whatsapp').value = evt.whatsapp_lien || '';
-  // Priorité à la fiche d'inscription liée (2026-09-23, demande explicite) : un vrai tarif
-  // (prix_min, déduit de la fiche via inscSyncPrixMinEvenements) l'emporte toujours. Sans
-  // fiche/tarif, on retombe sur le choix Payant/Gratuit propre à l'événement (type_participation)
-  // plutôt que de silencieusement revenir sur "Gratuit" par défaut.
+  // Priorité à la fiche d'inscription liée (2026-09-23, demande explicite ; étendu à 3
+  // catégories le 2026-09-24) : type_participation est désormais TOUJOURS synchronisé côté
+  // serveur dès qu'une fiche liée a au moins un type de tarif actif (inscSyncPrixMinEvenements
+  // détecte un mélange gratuit/payant pour distinguer "partiellement_payant" de "payant") — la
+  // valeur reçue reflète donc déjà la bonne priorité, plus besoin de relire prix_min ici.
   document.getElementById(
-    evt.prix_min != null ? 'e-radio-payant' : (evt.type_participation === 'payant' ? 'e-radio-payant' : 'e-radio-gratuit')
+    evt.type_participation === 'partiellement_payant' ? 'e-radio-partiel'
+    : evt.type_participation === 'payant' ? 'e-radio-payant'
+    : 'e-radio-gratuit'
   ).checked = true;
-  majToggleGratuitPayant();
+  majToggleParticipation();
   const cover = evt.image_couverture || evt.image_url || null;
   if (cover) {
     coverData = cover;
@@ -810,18 +847,24 @@ function ouvrirModaleEdition(id) {
    fonctions du fichier ont été définies. */
 document.getElementById('btn-cancel').addEventListener('click', () => { evenementEnEditionId = null; document.getElementById('modal-bg').classList.remove('open'); });
 
-/* ─── Toggle Type de participation — Gratuit/Payant (2026-09-22) ─── */
-function majToggleGratuitPayant() {
-  const payant = document.getElementById('e-radio-payant').checked;
-  const lblGratuit = document.getElementById('e-gratuit-lbl');
-  const lblPayant = document.getElementById('e-payant-lbl');
-  lblGratuit.style.borderColor = payant ? 'var(--border)' : 'var(--orange)';
-  lblGratuit.style.background = payant ? 'transparent' : '#FFF7ED';
-  lblPayant.style.borderColor = payant ? 'var(--orange)' : 'var(--border)';
-  lblPayant.style.background = payant ? '#FFF7ED' : 'transparent';
-  document.getElementById('e-payant-notice').style.display = payant ? '' : 'none';
+/* ─── Toggle Type de participation — Gratuit/Partiellement payant/Payant (2026-09-22, étendu
+   à 3 catégories le 2026-09-24) ─── */
+function majToggleParticipation() {
+  const valeur = document.querySelector('input[name="e-gratuit-payant"]:checked')?.value || 'gratuit';
+  const styles = {
+    gratuit:              { id: 'e-gratuit-lbl', couleur: '#16a34a', fond: '#F0FDF4' },
+    partiellement_payant: { id: 'e-partiel-lbl',  couleur: '#D97706', fond: '#FFFBEB' },
+    payant:               { id: 'e-payant-lbl',   couleur: '#DC2626', fond: '#FEF2F2' },
+  };
+  Object.entries(styles).forEach(([cle, s]) => {
+    const lbl = document.getElementById(s.id);
+    const actif = cle === valeur;
+    lbl.style.borderColor = actif ? s.couleur : 'var(--border)';
+    lbl.style.background  = actif ? s.fond : 'transparent';
+  });
+  document.getElementById('e-payant-notice').style.display = (valeur !== 'gratuit') ? '' : 'none';
 }
-document.querySelectorAll('input[name="e-gratuit-payant"]').forEach(r => r.addEventListener('change', majToggleGratuitPayant));
+document.querySelectorAll('input[name="e-gratuit-payant"]').forEach(r => r.addEventListener('change', majToggleParticipation));
 
 /* ─── Fiche d'inscription — choix explicite d'une fiche existante (2026-09-09) ───
    Mutuellement exclusif avec le modèle standard ci-dessus : choisir une fiche ici décoche
@@ -935,30 +978,35 @@ window.clearPhoto = function(i) {
 };
 
 /* ══ Sauvegarde événement ══ */
-document.getElementById('btn-save').addEventListener('click', async () => {
+// Brouillon (2026-09-23, demande explicite) : même formulaire, même validation que "Publier" —
+// factorisé en une fonction prenant le statut visé, plutôt que dupliquer toute la collecte des
+// champs pour le second bouton. "brouillon" n'est jamais montré publiquement (voir GET
+// /api/evenements et GET /api/evenements/:id, filtrés côté serveur sur le propriétaire).
+async function enregistrerEvenement(statutVise) {
   const titre = document.getElementById('e-titre').value.trim();
   const date  = document.getElementById('e-date').value;
   const errBox = document.getElementById('e-error');
   errBox.style.display = 'none';
   if (!titre || !date) { errBox.textContent='Titre et date requis.'; errBox.style.display='block'; return; }
-  const estPayant = document.getElementById('e-radio-payant').checked;
+  const typeParticipation = document.querySelector('input[name="e-gratuit-payant"]:checked')?.value || 'gratuit';
   // Bloquant retiré (2026-09-23, demande explicite : "priorité à la fiche d'inscription, si
   // elle n'existe pas alors priorité à la cartouche elle-même") — un événement peut désormais
-  // être marqué Payant SANS fiche liée : la cartouche affiche alors "💳 Payant" (générique),
-  // et bascule automatiquement sur "À partir de X €" dès qu'une fiche avec un vrai tarif est
-  // liée par la suite (voir type_participation, PUT /api/evenements/:id). Le bandeau
-  // #e-payant-notice ci-dessus reste affiché pour guider vers la fiche, sans plus jamais
-  // empêcher l'enregistrement.
+  // être marqué Partiellement payant/Payant SANS fiche liée : la cartouche affiche alors le
+  // badge générique correspondant, et bascule automatiquement sur la valeur déduite de la
+  // fiche dès qu'une fiche avec des tarifs est liée par la suite (voir type_participation,
+  // inscSyncPrixMinEvenements, PUT /api/evenements/:id). Le bandeau #e-payant-notice ci-dessus
+  // reste affiché pour guider vers la fiche, sans plus jamais empêcher l'enregistrement.
   try {
     const galerie = galleryData.filter(Boolean);
     const champsCommuns = {
       titre,
       date_evt:      date,
       heure_debut:   document.getElementById('e-heure').value || null,
+      heure_fin:     document.getElementById('e-heure-fin').value || null,
       type_evt:      document.getElementById('e-type').value,
       domaine:       document.getElementById('e-domaine').value,
       zone_diffusion: document.getElementById('e-zone-diffusion').value || null,
-      type_participation: estPayant ? 'payant' : 'gratuit',
+      type_participation: typeParticipation,
       pays:          document.getElementById('e-pays').value,
       lieu:          document.getElementById('e-lieu').value,
       ville:         document.getElementById('e-lieu').value,
@@ -972,6 +1020,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       whatsapp_lien: document.getElementById('e-whatsapp').value || null,
       image_couverture: coverData,
       galerie_photos:   galerie,
+      statut:        statutVise,
     };
     // Édition (2026-09-22) : ni fiche_choisie_id ni appliquer_fiche_standard — ce sont des
     // commodités propres à LA CRÉATION (PUT /api/evenements/:id ne les lit d'ailleurs pas),
@@ -990,11 +1039,16 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     if (r.fiche_appliquee && typeof showToast === 'function') {
       showToast(`⭐ Fiche d'inscription « ${r.fiche_appliquee.nom} » créée automatiquement pour cet événement.`, 'success');
     }
-    if (evenementEnEditionId && typeof showToast === 'function') showToast('Événement mis à jour.', 'success');
+    if (typeof showToast === 'function') {
+      if (statutVise === 'brouillon') showToast('💾 Brouillon enregistré — visible uniquement par vous tant qu’il n’est pas publié.', 'success');
+      else if (evenementEnEditionId) showToast('Événement mis à jour.', 'success');
+    }
     evenementEnEditionId = null;
     loadEvts();
   } catch(e) { errBox.textContent=e.message||'Erreur.'; errBox.style.display='block'; }
-});
+}
+document.getElementById('btn-save').addEventListener('click', () => enregistrerEvenement('ouvert'));
+document.getElementById('btn-save-brouillon').addEventListener('click', () => enregistrerEvenement('brouillon'));
 
 /* ══ Prévisualisation ══ */
 window.previewEvent = function() {
@@ -1004,6 +1058,7 @@ window.previewEvent = function() {
     titre:       document.getElementById('e-titre').value || 'Titre de l\'événement',
     date_evt:    document.getElementById('e-date').value,
     heure_debut: document.getElementById('e-heure').value,
+    heure_fin:   document.getElementById('e-heure-fin').value,
     lieu:        document.getElementById('e-lieu').value,
     lieu_gps:    document.getElementById('e-lieu-gps').value,
     pays:        document.getElementById('e-pays').value,
@@ -1325,7 +1380,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.lieu_gps ? `<a href="${esc(mapsLienItineraire(evt.lieu_gps))}" target="_blank" rel="noopener" style="text-decoration:none;color:#2563EB;">🧭 Itinéraire</a>` : ''}
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
         ${evt.origine ? `<span class="evt-tag">🎯 ${[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')}</span>` : ''}
-        ${evt.prix_min ? `<span class="evt-tag">💶 À partir de ${Number(evt.prix_min).toLocaleString('fr-FR')} €</span>` : (evt.type_participation === 'payant' ? `<span class="evt-tag">💳 Payant</span>` : `<span class="evt-tag" style="color:#16a34a;">🎟️ Gratuit</span>`)}
+        ${badgeParticipation(evt)}
       </div>
       ${evt.lieu ? `<div style="display:flex;align-items:flex-start;gap:9px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
         <span style="font-size:16px;flex-shrink:0;line-height:1.3;">📍</span>
