@@ -151,17 +151,22 @@ const fournisseurCodeAdhesionDA = {
   },
 };
 
-/* ── Fournisseur : Parrainage Initiative -50% ──
-   Un compte de référence (role='initiative', accréditation initiative_abonne active, payée
-   à 100% — jamais elle-même réduite, cf. reduction_pct_appliquee, la règle anti-chaîne)
-   transmet -50% à un AUTRE compte du MÊME propriétaire (même comptes_lies_membres.groupe_id
-   — système déjà existant, jamais un parrainage ouvert entre inconnus), uniquement sur un
-   Premium ANNUEL. La durée est la durée restante du Premium de la référence AU MOMENT de la
-   réservation (interrogation Stripe current_period_end — aucune date de fin n'est stockée
-   localement pour un abonnement Premium classique, contrairement aux Codes Adhésion D'A qui
-   ont duree_mois en base) : figée dans duree_jours_reservee, jamais recalculée ensuite même
-   si la référence se réabonne. Chaîne de contrôle à 10 étapes, chacune avec un code de
-   raison distinct — jamais d'information sur le propriétaire du DS-ID en cas d'échec. */
+/* ── Fournisseur : Parrainage compte lié -50% ──
+   Un compte de référence (accréditation *_abonne active pour SON PROPRE rôle, payée à 100%
+   — jamais elle-même réduite, cf. reduction_pct_appliquee, la règle anti-chaîne) transmet
+   -50% à un AUTRE compte du MÊME propriétaire (même comptes_lies_membres.groupe_id — système
+   déjà existant, jamais un parrainage ouvert entre inconnus), uniquement sur un Premium
+   ANNUEL. Équivalence de rôle (2026-09-24, demande explicite, exemple donné à l'appui) :
+   Initiative référence Initiative OU Utilisateur (elle "couvre" les deux) ; Utilisateur ne
+   référence qu'un AUTRE compte Utilisateur — un compte Utilisateur ne peut jamais transmettre
+   l'avantage à un compte Initiative. Seul ce cas précis (référence Utilisateur, achat
+   Initiative) est refusé ; toute autre combinaison passe la vérification de rôle.
+   La durée est la durée restante du Premium de la référence AU MOMENT de la réservation
+   (interrogation Stripe current_period_end — aucune date de fin n'est stockée localement pour
+   un abonnement Premium classique, contrairement aux Codes Adhésion D'A qui ont duree_mois en
+   base) : figée dans duree_jours_reservee, jamais recalculée ensuite même si la référence se
+   réabonne. Chaîne de contrôle à 10 étapes, chacune avec un code de raison distinct — jamais
+   d'information sur le propriétaire du DS-ID en cas d'échec. */
 const fournisseurParrainageInitiative = {
   id: 'parrainage_initiative',
 
@@ -178,7 +183,8 @@ const fournisseurParrainageInitiative = {
     const refUser = await db.prepare("SELECT * FROM users WHERE ds_id=?").get(dsIdSaisi);
     if (!refUser) return { valide: false, raison: 'ds_id_introuvable' };
     if (refUser.id === user.id) return { valide: false, raison: 'compte_actuel' };
-    if (refUser.role !== 'initiative') return { valide: false, raison: 'role_non_eligible' };
+    if (!['initiative', 'utilisateur'].includes(refUser.role)) return { valide: false, raison: 'role_non_eligible' };
+    if (refUser.role === 'utilisateur' && user.role === 'initiative') return { valide: false, raison: 'role_non_eligible' };
 
     // Même groupe "comptes liés" — jamais de faux positif si l'un des deux (ou les deux)
     // n'a AUCUNE ligne dans comptes_lies_membres (deux groupe_id NULL ne doivent jamais
@@ -189,12 +195,17 @@ const fournisseurParrainageInitiative = {
       return { valide: false, raison: 'comptes_non_lies' };
     }
 
-    const defInitiative = await db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
-    if (!defInitiative) return { valide: false, raison: 'offre_indisponible' };
+    // Accréditation *_abonne du rôle DE LA RÉFÉRENCE elle-même (2026-09-24) — plus jamais
+    // figée sur initiative_abonne : une référence Utilisateur doit être vérifiée sur SA
+    // propre accréditation utilisateur_abonne, pas celle d'Initiative.
+    const defReference = await db.prepare(
+      "SELECT id FROM accred_definitions WHERE type=?"
+    ).get(refUser.role === 'initiative' ? 'initiative_abonne' : 'utilisateur_abonne');
+    if (!defReference) return { valide: false, raison: 'offre_indisponible' };
 
     const refAccred = await db.prepare(
       "SELECT * FROM user_accreditations WHERE user_id=? AND accred_id=? AND statut='active'"
-    ).get(refUser.id, defInitiative.id);
+    ).get(refUser.id, defReference.id);
     if (!refAccred) return { valide: false, raison: 'reference_non_active' };
     if (refAccred.date_expiration && new Date(refAccred.date_expiration + 'Z') <= new Date()) {
       return { valide: false, raison: 'reference_non_active' };
@@ -228,7 +239,7 @@ const fournisseurParrainageInitiative = {
       duree_jours: dureeJours,
       reference_user_id: refUser.id,
       reference_da_id: refUser.da_id,
-      reference_accred_id: defInitiative.id,
+      reference_accred_id: defReference.id,
       beneficiaire,
     };
   },

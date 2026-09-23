@@ -200,7 +200,9 @@
           <div class="prm-gate-card">
             <div class="prm-hero-crown">👑</div>
             <h1>Avez-vous déjà un compte Diaspo'Actif ?</h1>
-            <p class="prm-hero-sub">Si un de vos autres comptes est déjà Initiative Premium (payé au tarif plein), il peut vous faire bénéficier de -50% sur cet abonnement.</p>
+            <p class="prm-hero-sub">${type === 'initiative'
+              ? "Si un de vos autres comptes est déjà Initiative Premium (payé au tarif plein), il peut vous faire bénéficier de -50% sur cet abonnement."
+              : "Si un de vos autres comptes est déjà Premium à 100% (Initiative ou Utilisateur), il peut vous faire bénéficier de -50% sur cet abonnement."}</p>
             <div class="prm-gate-ctas">
               <button class="btn btn-outline" id="prm-gate-non">Non, je n'ai pas encore de compte</button>
               <button class="btn prm-btn-gold" id="prm-gate-oui">Oui, j'ai déjà un compte</button>
@@ -242,10 +244,10 @@
             <div class="prm-hero-crown">ℹ️</div>
             <h1>Information importante</h1>
             <div class="prm-gate-info">
-              <p>Cet avantage est exclusivement lié au compte Initiative Premium que vous allez identifier.</p>
+              <p>Cet avantage est exclusivement lié au compte Premium que vous allez identifier.</p>
               <p>La réduction de 50&nbsp;% est valable uniquement pendant la durée restante de son abonnement Premium au moment de l'activation de votre avantage.</p>
               <p>Un compte ayant lui-même bénéficié de cette réduction de 50&nbsp;% ne peut pas être utilisé pour obtenir la même réduction sur un autre compte.</p>
-              <p>Le compte de référence doit appartenir au même propriétaire que le vôtre (comptes liés) et avoir payé son Premium au tarif plein, à 100&nbsp;%.</p>
+              <p>Le compte de référence doit appartenir au même propriétaire que le vôtre (comptes liés) et avoir payé son Premium au tarif plein, à 100&nbsp;%. Un compte Initiative peut servir de référence pour un compte Initiative ou Utilisateur ; un compte Utilisateur ne peut servir de référence que pour un autre compte Utilisateur.</p>
               <p>La réduction est plafonnée à 50&nbsp;% et ne peut jamais être cumulée avec une autre réduction permettant de descendre sous 50&nbsp;% du tarif normal.</p>
             </div>
             <div class="prm-gate-ctas">
@@ -334,7 +336,16 @@
             </div>
             <div id="prm-parrainage-msg"></div>
             <p class="prm-parrainage-note">Cette réduction ne s'applique qu'à l'abonnement <strong>annuel</strong>.</p>
-          </div>` : ''}
+          </div>` : `
+          <!-- Entrée manquante pour un visiteur déjà connecté (2026-09-24, demande explicite :
+               "ajoute un bouton [déjà un compte premium à 100%]") — avant, seul un visiteur PAS
+               ENCORE connecté passait par renderGate() et pouvait tomber sur cette offre ; un
+               visiteur déjà authentifié (cas de très loin le plus fréquent : il vient de cliquer
+               "Devenir Premium" depuis son propre tableau de bord) filait droit vers ce
+               renderTarifs(false) et ne voyait jamais cette possibilité. Réutilise handleGateOui()
+               tel quel : il revérifie déjà l'état de connexion en temps réel et enchaîne
+               correctement vers l'information obligatoire, sans dupliquer cette logique ici. -->
+          <button type="button" class="btn prm-btn-gold prm-btn-deja-premium" id="prm-btn-deja-premium">🔑 J'ai déjà un compte Premium à 100% (-50%)</button>`}
 
           <div class="prm-tarifs-grid">
             <div class="prm-tarif-card">
@@ -376,6 +387,8 @@
     el.querySelectorAll('[data-simuler-type]').forEach(btn => {
       btn.addEventListener('click', () => switchType(btn.dataset.simulerType));
     });
+    const btnDejaPremium = el.querySelector('#prm-btn-deja-premium');
+    if (btnDejaPremium) btnDejaPremium.addEventListener('click', handleGateOui);
 
     /* DS-ID de Parrainage — lu depuis cette variable de fermeture par TOUS les boutons de
        paiement, y compris la seconde paire dupliquée de la bannière basse (un seul
@@ -398,9 +411,9 @@
       offre_indisponible: "Aucune offre Premium n'est disponible pour votre type de compte.",
       ds_id_introuvable: "Ce Code de Sécurité ne correspond à aucun compte.",
       compte_actuel: "Vous ne pouvez pas utiliser le Code de Sécurité de votre propre compte.",
-      role_non_eligible: "Seul un compte Initiative peut servir de compte de référence.",
+      role_non_eligible: "Un compte Utilisateur ne peut servir de référence que pour un autre compte Utilisateur, jamais pour un compte Initiative.",
       comptes_non_lies: "Ce compte n'est pas rattaché au vôtre (comptes liés). Seul un compte que vous possédez déjà peut servir de référence.",
-      reference_non_active: "Ce compte n'a pas de Premium Initiative actif.",
+      reference_non_active: "Ce compte n'a pas de Premium actif.",
       reference_deja_reduite: "Ce compte a lui-même bénéficié d'une réduction : il ne peut pas transmettre l'avantage à un autre compte.",
       duree_indeterminee: "Impossible de déterminer la durée restante de ce Premium pour le moment.",
       verification_indisponible: "Vérification momentanément indisponible. Réessayez dans un instant.",
