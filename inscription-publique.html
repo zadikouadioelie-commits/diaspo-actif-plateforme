@@ -180,7 +180,10 @@ function ipRepeatableRender(nom) {
   const entries = window.ipRepeatableValues[nom] || [];
   zone.innerHTML = entries.map((e, i) => `
     <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;background:oklch(0.98 0.002 30);border:1px solid oklch(0.9 0.004 30);border-radius:8px;padding:8px;">
-      <input type="text" placeholder="${escH(cfg.placeholderTitre)}" value="${escH(e.titre)}" style="flex:1;min-width:140px;height:38px;" oninput="window.ipRepeatableValues['${escH(nom)}'][${i}].titre=this.value">
+      <span style="flex:1;min-width:140px;">
+        <input type="text" placeholder="${escH(cfg.placeholderTitre)}" value="${escH(e.titre)}" style="width:100%;height:38px;box-sizing:border-box;" oninput="window.ipRepeatableValues['${escH(nom)}'][${i}].titre=this.value">
+        <span style="display:block;font-size:11px;color:oklch(0.5 0.16 20);margin-top:2px;">Titre obligatoire pour cette entrée</span>
+      </span>
       ${cfg.kind === 'url'
         ? `<input type="url" placeholder="https://…" value="${escH(e.url)}" style="flex:1;min-width:160px;height:38px;" oninput="window.ipRepeatableValues['${escH(nom)}'][${i}].url=this.value">`
         : `<span style="flex:1;min-width:160px;">
@@ -194,6 +197,13 @@ async function ipRepeatableUpload(input, nom, idx) {
   const file = input.files[0]; if (!file) return;
   const statusEl = document.getElementById(`ip-repeat-status-${nom}-${idx}`);
   if (statusEl) statusEl.textContent = '⏳ Envoi…';
+  // Marqueur "en cours d'envoi" (2026-09-24) — même bug déjà rencontré et corrigé sur le
+  // sélecteur de photo de couverture des invitations (parrainage.html) : sans lui, cliquer sur
+  // "Confirmer mon inscription" pendant l'envoi soumettait une entrée avec un titre mais sans
+  // URL (le fichier n'avait pas encore fini d'être envoyé), rejetée comme "incomplète" — lu et
+  // bloqué explicitement par ipSoumettre() ci-dessous.
+  const entree = window.ipRepeatableValues[nom]?.[idx];
+  if (entree) entree.uploading = true;
   try {
     const fd = new FormData(); fd.append('fichier', file);
     const res = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
@@ -202,6 +212,7 @@ async function ipRepeatableUpload(input, nom, idx) {
     window.ipRepeatableValues[nom][idx].url = d.url;
     if (statusEl) statusEl.textContent = '✅ ' + file.name;
   } catch (e) { if (statusEl) statusEl.textContent = '❌ ' + e.message; }
+  finally { if (entree) entree.uploading = false; }
 }
 
 window.ipUploadValues = {};
@@ -293,13 +304,30 @@ async function ipSoumettre(ev) {
     } else reponses[baseName] = el.value;
   });
   // Champs répétables titrés (Documents/Images/Vidéos) — pas de [name] dans le DOM, exclus de
-  // la boucle ci-dessus par construction ; on ne garde que les entrées réellement complètes
-  // (titre ET fichier/lien) pour ne jamais enregistrer une ligne vide laissée par erreur.
-  Object.entries(window.ipRepeatableValues || {}).forEach(([nom, entries]) => {
+  // la boucle ci-dessus par construction. Bug réel signalé (2026-09-24) : une entrée avec un
+  // fichier envoyé mais sans titre (ou l'inverse) disparaissait auparavant en silence — jamais
+  // enregistrée ni ct client ni côté serveur (POST /api/insc/public/:slug/inscriptions filtre
+  // pareil, en dernier rempart) — donnant l'impression qu'"aucun titre n'était jamais demandé"
+  // alors que la personne avait bien envoyé un document. Bloque désormais la soumission avec un
+  // message clair au lieu de perdre la donnée sans un mot. Une ligne jamais touchée après un
+  // "+ Ajouter" (titre ET fichier vides) reste silencieusement ignorée — cas normal.
+  let repetableProbleme = null;
+  for (const [nom, entries] of Object.entries(window.ipRepeatableValues || {})) {
     const div = document.querySelector(`.ip-champ[data-champ="${CSS.escape(nom)}"]`);
-    if (div && div.style.display === 'none') return; // masqué par condition, non soumis
-    reponses[nom] = (entries || []).filter(e => e.titre?.trim() && e.url?.trim());
-  });
+    if (div && div.style.display === 'none') continue; // masqué par condition, non soumis
+    const libelle = div?.querySelector('label')?.textContent?.replace('*', '').trim() || 'un champ';
+    const complets = [];
+    for (const e of (entries || [])) {
+      if (e.uploading) { repetableProbleme = `« ${libelle} » : l'envoi d'un fichier est encore en cours, patientez quelques secondes.`; break; }
+      const titre = (e.titre || '').trim(), url = (e.url || '').trim();
+      if (!titre && !url) continue;
+      if (!titre || !url) { repetableProbleme = `« ${libelle} » : donnez un titre à chaque document/lien ajouté (ou retirez la ligne incomplète avec ×).`; break; }
+      complets.push({ titre, url });
+    }
+    if (repetableProbleme) break;
+    reponses[nom] = complets;
+  }
+  if (repetableProbleme) { errEl.textContent = repetableProbleme; errEl.style.display = 'block'; return false; }
   const btn = form.querySelector('button[type=submit]');
   btn.disabled = true; btn.textContent = 'Envoi…';
   try {
