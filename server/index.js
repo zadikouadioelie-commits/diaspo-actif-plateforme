@@ -11359,6 +11359,24 @@ route("GET", "/api/admin/analytics", async (req, res, params, body, query) => {
 
 const TYPE_PAR_ROLE = { utilisateur: "Utilisateur", initiative: "Initiative", administrateur: "Compte Étatique", collectivite: "Compte Étatique" };
 
+/* Limite Utilisateur sur les publications (2026-09-23, demande explicite : "ils peuvent [publier
+   des articles] une photo maximum par article, pas de vidéos") — les autres rôles (Initiative,
+   Administrateur, Collectivité) restent illimités. Vérifiée ici plutôt que côté client
+   uniquement (assets/posts.js masque déjà le bouton Vidéo et bloque une 2e photo pour ce rôle,
+   mais un appel direct à l'API doit rester bloqué quoi qu'il arrive). */
+function validerMediasUtilisateur(user, medias, pub_type) {
+  if (user.role !== "utilisateur") return null;
+  let mediasArr = [];
+  try { mediasArr = typeof medias === "string" ? JSON.parse(medias) : (medias || []); } catch (e) {}
+  if (!Array.isArray(mediasArr)) mediasArr = [];
+  if (pub_type === "video" || mediasArr.some(m => m?.type === "video")) {
+    return "Les comptes Utilisateur ne peuvent pas ajouter de vidéo à une publication.";
+  }
+  const nbPhotos = mediasArr.filter(m => m?.type === "image").length + (pub_type === "photo" ? 1 : 0);
+  if (nbPhotos > 1) return "Les comptes Utilisateur sont limités à une photo par publication.";
+  return null;
+}
+
 route("POST", "/api/fil", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise pour publier." });
@@ -11375,6 +11393,9 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   if (statut === "publie") {
     if (!contenu && !article_titre) return sendJSON(res, 400, { error: "Le contenu ne peut pas être vide." });
   }
+
+  const erreurMedias = validerMediasUtilisateur(user, medias, pub_type);
+  if (erreurMedias) return sendJSON(res, 403, { error: erreurMedias });
 
   // Extraire automatiquement les hashtags du contenu
   const hashtagsFromText = (contenu + " " + article_contenu).match(/#[\wÀ-ÿ]+/g) || [];
@@ -11729,6 +11750,12 @@ route("PUT", "/api/fil/:id", async (req, res, params, body) => {
   const visibilite = body.visibilite || p.visibilite || "public";
   const statut = body.statut || p.statut || "publie";
   const medias = body.medias ? (typeof body.medias === "string" ? body.medias : JSON.stringify(body.medias)) : (p.medias || "[]");
+  // Réservé à l'auteur qui modifie sa propre publication — un administrateur en modération
+  // reste libre (il ne publie pas en son nom, il traite un signalement par exemple).
+  if (user.id === p.auteur_id) {
+    const erreurMedias = validerMediasUtilisateur(user, medias, body.pub_type || p.pub_type);
+    if (erreurMedias) return sendJSON(res, 403, { error: erreurMedias });
+  }
   const localisation_pays = body.localisation_pays !== undefined ? (body.localisation_pays || null) : p.localisation_pays;
   const localisation_ville = body.localisation_ville !== undefined ? (body.localisation_ville || null) : p.localisation_ville;
   const hashtagsFromText = contenu.match(/#[\wÀ-ÿ]+/g) || [];

@@ -450,7 +450,7 @@ function buildCreateModal() {
     <div class="posts-field">
       <div class="posts-media-toolbar">
         <button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('image')" title="Ajouter une photo">🖼️ Photo</button>
-        <button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('video')" title="Ajouter une vidéo (2 min max)">🎥 Vidéo</button>
+        ${typeof CURRENT_USER !== 'undefined' && CURRENT_USER?.role === 'utilisateur' ? '' : `<button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('video')" title="Ajouter une vidéo (2 min max)">🎥 Vidéo</button>`}
         <button type="button" class="posts-media-btn" onclick="Posts.pickMediaFile('document')" title="Ajouter un document">📄 Document</button>
         <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('audio')" title="Ajouter un audio (lien)">🎵 Audio</button>
         <button type="button" class="posts-media-btn" onclick="Posts.addMediaUrl('link')" title="Ajouter un lien">🔗 Lien</button>
@@ -797,6 +797,19 @@ const Posts = {
 
   /* Sélection d'un vrai fichier (photo/vidéo/document) et upload vers le serveur */
   pickMediaFile(type) {
+    /* Limite Utilisateur (2026-09-23, demande explicite) — le bouton Vidéo est déjà masqué pour
+       ce rôle dans buildCreateModal(), ce garde-fou couvre le cas où CURRENT_USER n'était pas
+       encore chargé à ce moment-là. La vraie limite (jamais contournable) reste server-side,
+       voir validerMediasUtilisateur() dans server/index.js. */
+    const estUtilisateur = typeof CURRENT_USER !== 'undefined' && CURRENT_USER?.role === 'utilisateur';
+    if (estUtilisateur && type === 'video') {
+      if (typeof showToast === 'function') showToast('Les vidéos ne sont pas disponibles pour ce type de compte.', 'error');
+      return;
+    }
+    if (estUtilisateur && type === 'image' && (window._postMedias||[]).some(m => m.type === 'image')) {
+      if (typeof showToast === 'function') showToast('Une seule photo par publication pour ce type de compte.', 'error');
+      return;
+    }
     const input = document.getElementById('post-media-file-input');
     if (!input) return;
     const accepts = { image: 'image/*', video: 'video/*', document: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx' };
