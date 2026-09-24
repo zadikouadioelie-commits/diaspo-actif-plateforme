@@ -19769,7 +19769,13 @@ async function vtAttacherStatsInteraction(rows) {
 }
 
 route("GET", "/api/videos-tutoriels", async (req, res, params, body, query) => {
-  let sql = "SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at FROM da_videos_tutoriels WHERE statut='publie'";
+  /* `statut` inclus (2026-09-25) bien que le WHERE le filtre déjà à 'publie' — nécessaire au
+     formulaire d'édition admin embarqué sur videos-tutoriels.html (assets/admin-videos-
+     tutoriels-panel.js, vtOuvrirForm), qui repart de ce cache public faute de liste de gestion
+     sur cette page. Sans ce champ, la valeur repassait au défaut 'brouillon' à chaque
+     réouverture du formulaire et dépubliait la vidéo au premier enregistrement (bug constaté en
+     testant). */
+  let sql = "SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at,statut FROM da_videos_tutoriels WHERE statut='publie'";
   const args = [];
   if (query.categorie) { sql += " AND categorie=?"; args.push(query.categorie); }
   if (query.q) { sql += " AND (titre LIKE ? OR description LIKE ?)"; args.push(`%${query.q}%`, `%${query.q}%`); }
@@ -19784,7 +19790,7 @@ route("GET", "/api/videos-tutoriels", async (req, res, params, body, query) => {
 });
 
 route("GET", "/api/videos-tutoriels/:id", async (req, res, params) => {
-  const v = await db.prepare("SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at FROM da_videos_tutoriels WHERE id=? AND statut='publie'").get(params.id);
+  const v = await db.prepare("SELECT id,titre,description,icone,type_source,url,miniature_url,categorie,duree_secondes,vues,created_at,statut FROM da_videos_tutoriels WHERE id=? AND statut='publie'").get(params.id);
   if (!v) return sendJSON(res, 404, { error: "Vidéo introuvable." });
   sendJSON(res, 200, { video: v });
 });

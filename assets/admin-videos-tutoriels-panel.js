@@ -62,6 +62,12 @@ async function vtChargerStats() {
 async function vtCharger() {
   vtChargerStats();
   const box = document.getElementById('vt-liste');
+  /* videos-tutoriels.html (2026-09-25, demande explicite) n'embarque que la modale, pas la
+     liste de gestion #vt-liste (hors périmètre : gestion complète réservée au tableau de bord
+     admin) — après un enregistrement, rafraîchit plutôt la grille publique de CETTE page si sa
+     propre fonction de filtrage existe, pour que la vidéo ajoutée/modifiée apparaisse tout de
+     suite sans recharger la page. */
+  if (!box) { window.vtAppliquerFiltres?.(); return; }
   try {
     const { videos, categories } = await api('GET', '/admin/videos-tutoriels');
     _vtCache = videos;
@@ -114,7 +120,13 @@ function vtOuvrirForm(id) {
   vtRemplirCategories();
   document.getElementById('vt-id').value = id || '';
   document.getElementById('vt-modal-titre').textContent = id ? 'Modifier la vidéo' : 'Ajouter une vidéo';
-  const v = id ? _vtCache.find(x => x.id === id) : null;
+  /* videos-tutoriels.html (2026-09-25) n'alimente jamais _vtCache (liste de gestion absente de
+     cette page, voir vtCharger ci-dessus) — repli sur _dvtCache, le cache de la grille PUBLIQUE
+     (assets/videos-tutoriels-public.js, même scope global classique donc accessible ici sans
+     import), où la vidéo cliquée est forcément déjà présente. `typeof` obligatoire : sur
+     dashboard-administrateur.html, qui charge ce fichier SANS le script public, _dvtCache
+     n'existe pas du tout — y référencer la variable nue lèverait un ReferenceError. */
+  const v = id ? (_vtCache.find(x => x.id === id) || (typeof _dvtCache !== 'undefined' ? _dvtCache[id] : null)) : null;
   document.getElementById('vt-titre').value = v?.titre || '';
   document.getElementById('vt-description').value = v?.description || '';
   document.getElementById('vt-icone').value = v?.icone || '🎬';

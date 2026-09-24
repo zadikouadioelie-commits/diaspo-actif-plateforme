@@ -48,12 +48,21 @@ function dvtCardHtml(v, { compact } = {}) {
   _dvtCache[v.id] = v;
   const bientot = v.type_source === 'bientot';
   const duree = dvtFormatDuree(v.duree_secondes);
+  /* Bouton "✎ Modifier" (2026-09-25, demande explicite : "permet un ajout de vidéo") — visible
+     seulement si vtProbePermission() (videos-tutoriels.html) a confirmé l'autorisation admin ;
+     absent partout ailleurs (window.__vtEstAdmin jamais défini) où dvtCardHtml() est réutilisée
+     sans le panneau admin chargé (ex. bandeau accueil). Même parade event.preventDefault()/
+     stopPropagation() que les boutons de réaction ci-dessus, pour ne pas déclencher la
+     navigation de la carte-lien englobante. */
+  const boutonModifier = window.__vtEstAdmin
+    ? `<button type="button" class="dvt-admin-edit" onclick="event.preventDefault();event.stopPropagation();vtOuvrirForm(${v.id});" title="Modifier cette vidéo">✎</button>` : '';
   return `
     <a class="dvt-card" href="videos-tutoriels.html?v=${v.id}" style="text-decoration:none;color:inherit;display:block;">
       <div class="dvt-thumb">
         ${dvtVignetteHtml(v)}
         ${bientot ? `<span class="dvt-duree" style="background:#B84C1A;">Bientôt disponible</span>` : (duree ? `<span class="dvt-duree">${duree}</span>` : '')}
         ${bientot ? '' : `<div class="dvt-play"><span>▶</span></div>`}
+        ${boutonModifier}
       </div>
       <div class="dvt-body">
         ${v.categorie ? `<div class="dvt-badge-categorie">${dvtEsc(v.categorie)}</div>` : ''}
@@ -277,7 +286,10 @@ async function dvtChargerPageVideo(videoId) {
     document.title = `${v.titre} — Diaspo'Actif`;
     root.innerHTML = `
       <div class="dvt-player">${dvtLecteurHtml(v)}</div>
-      <h1 class="dvt-page-titre">${dvtEsc(v.titre)}</h1>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <h1 class="dvt-page-titre">${dvtEsc(v.titre)}</h1>
+        ${window.__vtEstAdmin ? `<button type="button" class="dvt-btn-outline" style="margin-top:18px;flex-shrink:0;" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button>` : ''}
+      </div>
       <div class="dvt-page-meta">🏷 ${dvtEsc(v.categorie||'')} · 📅 ${dvtFormatDate(v.created_at)} · 👁 ${v.vues||0} vues</div>
       <p class="dvt-page-desc">${dvtEsc(v.description || '')}</p>
       <div id="dvt-reactions" class="dvt-reactions"></div>
