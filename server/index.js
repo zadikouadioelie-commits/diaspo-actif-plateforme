@@ -395,6 +395,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     declaration_officielle, statut_etatique,
     // Parrainage & Invitations (Phase 1) — code d'invitation optionnel + canal d'arrivée
     invitation_code, via,
+    // Liens Adhérents (cahier des charges, 2026-09-24) — token du lien d'adhésion Premium
+    lien_adherent_token,
   } = body;
 
   if (!nom || !email || !password || !role) return sendJSON(res, 400, { error: "Champs requis manquants (nom, email, password, role)." });
@@ -424,6 +426,23 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   if (invitationActive) {
     domaine_principal = invitationActive.domaine_cle;
     if (!sous_domaine_1) sous_domaine_1 = invitationActive.sous_domaine_nom || invitationActive.sous_domaine_libre || null;
+  }
+  /* Liens Adhérents (cahier des charges § 8, § 11, 2026-09-24) : un lien valide impose
+     role='utilisateur' quoi que le formulaire envoie (V1 du module, même principe que le
+     domaine imposé par invitation_code ci-dessus) et rejette immédiatement un lien déjà
+     utilisé/annulé — avant même la validation habituelle, pour ne jamais laisser croire
+     qu'une inscription est possible avec un lien mort. Le verrouillage définitif (empêche
+     deux inscriptions simultanées sur le même lien) a lieu plus bas, juste après la création
+     du compte — voir le commentaire sur ce point précis. */
+  let lienAdherent = null;
+  if (lien_adherent_token) {
+    try {
+      lienAdherent = await db.prepare("SELECT * FROM adherent_invitation_links WHERE secure_token=?").get(String(lien_adherent_token).trim());
+    } catch (e) { console.error('[signup-lien-adherent-lookup]', e.message); }
+    if (!lienAdherent) return sendJSON(res, 404, { error: "Cette invitation est introuvable ou n'est plus valide." });
+    if (lienAdherent.status === 'cancelled') return sendJSON(res, 410, { error: "Cette invitation a été annulée." });
+    if (lienAdherent.status === 'used') return sendJSON(res, 409, { error: "Cette invitation Diaspo'Actif a déjà été utilisée pour créer un compte. Elle ne peut être utilisée qu'une seule fois." });
+    role = 'utilisateur';
   }
   /* Sécurité : le rôle "administrateur" ne peut PAS être créé via l'inscription publique.
      Un admin ne peut être promu que manuellement en base (ou par un admin existant). */
@@ -463,7 +482,12 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const emailNorm = SEC.normalizeEmail(email);
   /* Anti-doublon insensible à la casse (empêche 2 comptes ne différant que par la casse). */
   const existing = await db.prepare("SELECT id FROM users WHERE LOWER(email) = ?").get(emailNorm);
-  if (existing) return sendJSON(res, 409, { error: "Un compte existe déjà avec cet e-mail." });
+  if (existing) {
+    // Cahier des charges § 13 : un lien adhérent utilisé par une adresse déjà inscrite ne doit
+    // ni créer de deuxième compte, ni consommer le lien — il reste disponible.
+    if (lienAdherent) return sendJSON(res, 409, { error: "Vous possédez déjà un compte Diaspo'Actif. Cette invitation est destinée à la création d'un nouveau compte. Contactez Diaspo'Actif si vous souhaitez bénéficier de cette adhésion sur votre compte existant." });
+    return sendJSON(res, 409, { error: "Un compte existe déjà avec cet e-mail." });
+  }
 
   const { hash, salt } = hashPassword(password);
 
@@ -502,6 +526,19 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     domaine_principal || null, sous_domaine_1 || null, sous_domaine_2 || null
   )).lastInsertRowid;
 
+  /* Liens Adhérents — verrouillage atomique (cahier des charges § 12) : l'UPDATE conditionnelle
+     (WHERE status='available') ne peut réussir que pour UNE seule requête concurrente sur le
+     même lien, quel que soit le nombre de tentatives simultanées — même principe déjà éprouvé
+     que la consommation d'invitation partenaire (voir POST /api/partenariat/inscription plus
+     bas dans ce fichier). Si la course est perdue, le compte qu'on vient de créer est annulé
+     pour ne jamais laisser un compte "orphelin" créé via un lien déjà grillé. */
+  if (lienAdherent) {
+    const claim = await db.prepare("UPDATE adherent_invitation_links SET status='used', used_at=datetime('now') WHERE id=? AND status='available'").run(lienAdherent.id);
+    if (!claim.changes) {
+      await db.prepare("DELETE FROM users WHERE id=?").run(id);
+      return sendJSON(res, 409, { error: "Cette invitation Diaspo'Actif a déjà été utilisée pour créer un compte. Elle ne peut être utilisée qu'une seule fois." });
+    }
+  }
   // Assigner le DA-ID à l'utilisateur
   try { await db.prepare('UPDATE users SET da_id=? WHERE id=?').run(generateDaId(), id); } catch (_) {}
   /* Cagnotte — association automatique compte ↔ demande d'accès existante (cahier des charges
@@ -518,6 +555,28 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   } catch (_) {}
   // 🥇 Découverte Premium : 30 jours d'accès Premium offerts automatiquement à la création du compte
   await accorderDecouvertePremium(id, role);
+  /* Liens Adhérents (cahier des charges § 9, § 21) : remplace la période Découverte ci-dessus
+     par 12 mois Premium — la période démarre à l'activation RÉELLE du compte (règle centrale
+     du cahier des charges, jamais à la génération du lien). UPDATE et non INSERT :
+     accorderDecouvertePremium() vient déjà de créer la ligne user_accreditations pour ce
+     compte tout neuf (UNIQUE(user_id, accred_id) empêcherait un second INSERT). */
+  if (lienAdherent) {
+    try {
+      const finLien = ajouterMoisDA(null, 12);
+      const debutLien = new Date().toISOString();
+      const defUA = await db.prepare("SELECT id FROM accred_definitions WHERE type='utilisateur_abonne'").get();
+      if (defUA) {
+        await db.prepare(`
+          UPDATE user_accreditations SET statut='active', date_expiration=?, type_tarif='lien_adherent', montant_paye=0, updated_at=datetime('now')
+          WHERE user_id=? AND accred_id=?
+        `).run(finLien, id, defUA.id);
+      }
+      await db.prepare("UPDATE adherent_invitation_links SET used_by_user_id=?, premium_start_date=?, premium_end_date=? WHERE id=?")
+        .run(id, debutLien, finLien, lienAdherent.id);
+      await journaliserLienAdherent(lienAdherent.id, 'account_created', { user_id: id }, id);
+      await journaliserLienAdherent(lienAdherent.id, 'premium_activated', { debut: debutLien, fin: finLien }, id);
+    } catch (e) { console.error('[signup-lien-adherent-activation]', e.message); }
+  }
   // Réseau Pro : quelques listes par défaut, entièrement modifiables/supprimables ensuite
   try {
     const LISTES_DEFAUT = [
@@ -1080,6 +1139,190 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
     nb_invitations: nbInvitations, nb_actives: nbActives,
     total_vues: totaux?.vues || 0, total_scans: totaux?.scans || 0, total_inscriptions: totaux?.inscriptions || 0,
   });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite)
+   Liens/QR codes à usage unique distribués par l'administration : 1 lien = 1 personne =
+   1 compte Utilisateur = 1 adhésion Premium de 12 mois. Explicitement DISTINCT du module
+   Parrainage & Invitations ci-dessus (cahier des charges § 33) — tables, règles et
+   historique séparés, même si le générateur de code s'inspire du même principe
+   (genererCodeInvitation() ci-dessus). Réutilise le système Premium existant
+   (accred_definitions/user_accreditations, type='utilisateur_abonne') plutôt qu'un
+   deuxième système parallèle — voir la modification de POST /api/auth/signup plus bas
+   pour l'activation, et accorderDecouvertePremium() (plus loin dans ce fichier — function
+   declaration, donc accessible malgré l'ordre des lignes) pour le mécanisme déjà en place
+   qu'on surcharge de 3 mois "Découverte" à 12 mois "Lien Adhérent". ═══════════════════════ */
+(async function migrateAdherentInvitationLinks() {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS adherent_invitation_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      public_code TEXT NOT NULL UNIQUE,
+      secure_token TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'available',
+      campagne TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      used_at TEXT,
+      used_by_user_id INTEGER,
+      premium_start_date TEXT,
+      premium_end_date TEXT,
+      cancelled_at TEXT,
+      cancelled_by INTEGER
+    )`).run();
+  } catch (e) { console.error('[migrateAdherentInvitationLinks]', e.message); }
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS adherent_invitation_links_journal (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      link_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      details TEXT,
+      acteur_user_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+  } catch (e) { console.error('[migrateAdherentInvitationLinksJournal]', e.message); }
+})();
+
+const ADH_LIEN_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // même alphabet que JUNIOR_ALPHABET (admin-junior.js) — exclut I/O/0/1
+function genererCodeAdherentLien() {
+  let suffixe = '';
+  for (let i = 0; i < 8; i++) suffixe += ADH_LIEN_ALPHABET[crypto.randomInt(ADH_LIEN_ALPHABET.length)];
+  return 'DA-ADH-' + suffixe;
+}
+async function genererCodeAdherentLienUnique() {
+  for (let essai = 0; essai < 8; essai++) {
+    const candidat = genererCodeAdherentLien();
+    const existe = await db.prepare('SELECT 1 FROM adherent_invitation_links WHERE public_code=?').get(candidat);
+    if (!existe) return candidat;
+  }
+  return genererCodeAdherentLien() + Date.now().toString(36).toUpperCase();
+}
+// Token sécurisé de l'URL — long, aléatoire, jamais basé sur l'id ou le code visible (cahier
+// des charges § 5) : 32 octets hex, même convention que le reste de la plateforme.
+function genererTokenAdherentLien() {
+  return crypto.randomBytes(32).toString('hex');
+}
+async function journaliserLienAdherent(linkId, action, details, acteurUserId) {
+  try {
+    await db.prepare(`INSERT INTO adherent_invitation_links_journal (link_id, action, details, acteur_user_id) VALUES (?,?,?,?)`)
+      .run(linkId, action, details ? JSON.stringify(details) : null, acteurUserId || null);
+  } catch (e) { console.error('[journaliserLienAdherent]', e.message); }
+}
+function publicUrlLienAdherent(token) {
+  return (process.env.PUBLIC_BASE_URL || 'https://diaspoactif.com') + '/inscription-adherent.html?token=' + token;
+}
+/* Réservé au seul compte administrateur officiel (2026-09-24, demande explicite) : ce module
+   accorde une vraie valeur (12 mois de Premium par lien généré) — contrairement aux autres
+   modules délégables (voir server/admin-junior.js), volontairement PAS ouvert à
+   role==='administrateur' en général ni délégable à un administrateur junior, seulement au
+   compte contact@diaspoactif.com. */
+const LIENS_ADHERENTS_ADMIN_EMAIL = 'contact@diaspoactif.com';
+function estAdminOfficielLiensAdherents(user) {
+  return !!user && user.role === 'administrateur' && String(user.email || '').toLowerCase() === LIENS_ADHERENTS_ADMIN_EMAIL;
+}
+
+/* ── POST /api/admin/adherent-links — génère N liens (cahier des charges § 4) ── */
+route("POST", "/api/admin/adherent-links", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!estAdminOfficielLiensAdherents(user)) return sendJSON(res, 403, { error: "Réservé au compte administrateur officiel Diaspo'Actif." });
+  const quantite = Math.min(500, Math.max(1, parseInt(body.quantite) || 1));
+  const campagne = (body.campagne || '').trim() || null;
+  const liens = [];
+  for (let i = 0; i < quantite; i++) {
+    const public_code = await genererCodeAdherentLienUnique();
+    const secure_token = genererTokenAdherentLien();
+    const id = Number((await db.prepare(
+      `INSERT INTO adherent_invitation_links (public_code, secure_token, status, campagne, created_by) VALUES (?,?,'available',?,?)`
+    ).run(public_code, secure_token, campagne, user.id)).lastInsertRowid);
+    await journaliserLienAdherent(id, 'created', { campagne }, user.id);
+    liens.push({ id, public_code, secure_token, url: publicUrlLienAdherent(secure_token) });
+  }
+  sendJSON(res, 201, { liens });
+});
+
+/* ── GET /api/admin/adherent-links — liste + filtres + recherche (§ 17, § 24) ── */
+route("GET", "/api/admin/adherent-links", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!estAdminOfficielLiensAdherents(user)) return sendJSON(res, 403, { error: "Réservé au compte administrateur officiel Diaspo'Actif." });
+  let sql = `SELECT l.*, u.nom AS beneficiaire_nom, u.email AS beneficiaire_email, c.nom AS created_by_nom
+    FROM adherent_invitation_links l
+    LEFT JOIN users u ON u.id = l.used_by_user_id
+    LEFT JOIN users c ON c.id = l.created_by
+    WHERE 1=1`;
+  const args = [];
+  if (query.status) { sql += ' AND l.status=?'; args.push(query.status); }
+  if (query.q) {
+    const q = '%' + query.q.trim() + '%';
+    sql += ' AND (l.public_code LIKE ? OR u.nom LIKE ? OR u.email LIKE ?)';
+    args.push(q, q, q);
+  }
+  sql += ' ORDER BY l.created_at DESC LIMIT 500';
+  const liens = await db.prepare(sql).all(...args);
+  sendJSON(res, 200, { liens: liens.map(l => ({ ...l, url: publicUrlLienAdherent(l.secure_token) })) });
+});
+
+/* ── GET /api/admin/adherent-links/stats — tableau de bord (§ 3) ── */
+route("GET", "/api/admin/adherent-links/stats", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!estAdminOfficielLiensAdherents(user)) return sendJSON(res, 403, { error: "Réservé au compte administrateur officiel Diaspo'Actif." });
+  const total = Number((await db.prepare("SELECT COUNT(*) n FROM adherent_invitation_links").get())?.n) || 0;
+  const disponibles = Number((await db.prepare("SELECT COUNT(*) n FROM adherent_invitation_links WHERE status='available'").get())?.n) || 0;
+  const utilises = Number((await db.prepare("SELECT COUNT(*) n FROM adherent_invitation_links WHERE status='used'").get())?.n) || 0;
+  const annules = Number((await db.prepare("SELECT COUNT(*) n FROM adherent_invitation_links WHERE status='cancelled'").get())?.n) || 0;
+  sendJSON(res, 200, { total, disponibles, utilises, annules });
+});
+
+/* ── GET /api/admin/adherent-links/export — CSV (§ 25) ── */
+route("GET", "/api/admin/adherent-links/export", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!estAdminOfficielLiensAdherents(user)) return sendJSON(res, 403, { error: "Réservé au compte administrateur officiel Diaspo'Actif." });
+  const liens = await db.prepare(`SELECT l.*, u.nom AS beneficiaire_nom, u.email AS beneficiaire_email, c.nom AS created_by_nom
+    FROM adherent_invitation_links l
+    LEFT JOIN users u ON u.id = l.used_by_user_id
+    LEFT JOIN users c ON c.id = l.created_by
+    ORDER BY l.created_at DESC`).all();
+  const esc = s => `"${String(s == null ? '' : s).replace(/"/g,'""')}"`;
+  const header = ['code','statut','date_creation','beneficiaire','email','date_utilisation','debut_premium','fin_premium','cree_par'];
+  const lignes = liens.map(l => [
+    l.public_code, l.status, l.created_at, l.beneficiaire_nom || '', l.beneficiaire_email || '',
+    l.used_at || '', l.premium_start_date || '', l.premium_end_date || '', l.created_by_nom || ''
+  ].map(esc).join(','));
+  const csv = header.join(',') + '\n' + lignes.join('\n');
+  res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="liens-adherents.csv"' });
+  res.end('﻿' + csv);
+});
+
+/* ── GET /api/admin/adherent-links/:id/historique — journal d'un lien (§ 21) ── */
+route("GET", "/api/admin/adherent-links/:id/historique", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!estAdminOfficielLiensAdherents(user)) return sendJSON(res, 403, { error: "Réservé au compte administrateur officiel Diaspo'Actif." });
+  const historique = await db.prepare("SELECT * FROM adherent_invitation_links_journal WHERE link_id=? ORDER BY created_at ASC").all(params.id);
+  sendJSON(res, 200, { historique });
+});
+
+/* ── POST /api/admin/adherent-links/:id/annuler — annulation (§ 20) ── */
+route("POST", "/api/admin/adherent-links/:id/annuler", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!estAdminOfficielLiensAdherents(user)) return sendJSON(res, 403, { error: "Réservé au compte administrateur officiel Diaspo'Actif." });
+  const r = await db.prepare("UPDATE adherent_invitation_links SET status='cancelled', cancelled_at=datetime('now'), cancelled_by=? WHERE id=? AND status='available'")
+    .run(user.id, params.id);
+  if (!r.changes) return sendJSON(res, 409, { error: "Ce lien n'est plus disponible (déjà utilisé ou déjà annulé)." });
+  await journaliserLienAdherent(params.id, 'cancelled', null, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── GET /api/adherent-links/:token — PUBLIC, validation avant inscription (§ 6, § 11, § 13) ──
+   Ne renvoie jamais de donnée personnelle — juste de quoi afficher la bonne page côté client. */
+route("GET", "/api/adherent-links/:token", async (req, res, params) => {
+  const lien = await db.prepare("SELECT status, public_code FROM adherent_invitation_links WHERE secure_token=?").get(params.token);
+  if (!lien) return sendJSON(res, 404, { error: "Cette invitation est introuvable ou n'est plus valide." });
+  sendJSON(res, 200, { status: lien.status, public_code: lien.public_code });
 });
 
 /* Anti brute-force PERSISTANT (survit aux cold starts serverless, contrairement à SEC.rateLimit

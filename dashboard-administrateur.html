@@ -89,6 +89,7 @@
       <a href="#demandes-passage" data-section="demandes-passage" style="display:flex;justify-content:space-between;align-items:center;">🚀 Passage « Existante » <span id="dp-pending-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#rencontres" data-section="rencontres" style="display:flex;justify-content:space-between;align-items:center;">🤝 Rencontres D'A <span id="rdv-badge" style="display:none;background:#f59e0b;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;min-width:18px;text-align:center;"></span></a>
       <a href="#parrainage-admin" data-section="parrainage-admin">🔗 Parrainage &amp; Invitations</a>
+      <a href="#liens-adherents" data-section="liens-adherents">🎫 Liens Adhérents</a>
       <a href="#origines" data-section="origines">🌍 Origines manquantes</a>
 
       <span class="sb-group-lbl">🟨 Territoires</span>
@@ -3450,6 +3451,75 @@
         <input type="text" id="pa-adm-recherche" placeholder="🔎 Rechercher par nom, code ou par compte créateur (nom, e-mail)…" style="width:100%;max-width:460px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);margin-bottom:16px;font-size:13px;">
         <div id="pa-adm-liste"><div style="color:#64748B;font-size:13px;">Chargement…</div></div>
       </section>
+
+      <!-- LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite) — distinct du
+           module Parrainage & Invitations ci-dessus (§ 33 du cahier des charges) : ce module
+           distribue une adhésion Premium de 12 mois via des liens/QR à usage unique, pas une
+           invitation à rejoindre la plateforme. -->
+      <section id="section-liens-adherents" style="display:none;">
+        <h2 style="margin:0 0 6px;">🎫 Liens Adhérents</h2>
+        <p style="margin:0 0 16px;color:#64748B;font-size:13px;max-width:760px;">
+          Chaque lien généré ici permet à une personne de créer un compte Diaspo'Actif et de
+          recevoir automatiquement 12 mois de Premium — un lien = une personne = un compte,
+          utilisable une seule fois.
+        </p>
+        <div id="la-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
+          <button class="btn btn-orange" onclick="laOuvrirGenerer()">➕ Générer des liens</button>
+          <button class="btn btn-outline" onclick="laExporter()">⬇️ Exporter</button>
+          <button class="btn btn-outline" onclick="lienAdherentCharger()">↺ Actualiser</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="btn btn-sm" id="la-filtre-tous" onclick="laFiltrer('')">Tous</button>
+          <button class="btn btn-sm" id="la-filtre-available" onclick="laFiltrer('available')">Disponibles</button>
+          <button class="btn btn-sm" id="la-filtre-used" onclick="laFiltrer('used')">Utilisés</button>
+          <button class="btn btn-sm" id="la-filtre-cancelled" onclick="laFiltrer('cancelled')">Annulés</button>
+        </div>
+        <input type="text" id="la-recherche" placeholder="🔎 Rechercher par code, nom ou e-mail du bénéficiaire…" style="width:100%;max-width:460px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);margin-bottom:16px;font-size:13px;" oninput="laRechercheDebounce()">
+        <div id="la-liste" style="overflow-x:auto;"><div style="color:#64748B;font-size:13px;">Chargement…</div></div>
+      </section>
+
+      <!-- Modale « Générer des liens » -->
+      <div id="la-generer-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+        <div class="card" style="width:100%;max-width:420px;">
+          <h3 style="margin:0 0 14px;">➕ Générer des liens adhérents</h3>
+          <label style="font-size:12.5px;font-weight:700;">Quantité</label>
+          <div id="la-gen-quantites" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px;"></div>
+          <label style="font-size:12.5px;font-weight:700;">Quantité personnalisée</label>
+          <input type="number" id="la-gen-custom" min="1" max="500" class="input-field" style="width:100%;margin-top:4px;box-sizing:border-box;">
+          <label style="font-size:12.5px;font-weight:700;display:block;margin-top:12px;">Campagne (facultatif)</label>
+          <input type="text" id="la-gen-campagne" placeholder="Ex : Acte Fondateur 2026" class="input-field" style="width:100%;margin-top:4px;box-sizing:border-box;">
+          <div id="la-gen-err" style="color:#dc2626;font-size:12px;margin-top:10px;"></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+            <button class="btn btn-outline" onclick="document.getElementById('la-generer-overlay').style.display='none'">Annuler</button>
+            <button class="btn btn-orange" id="la-gen-btn" onclick="laGenerer()">Générer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modale QR Code -->
+      <div id="la-qr-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+        <div class="card" style="width:100%;max-width:380px;text-align:center;">
+          <h3 style="margin:0 0 4px;">🎫 Adhésion Diaspo'Actif</h3>
+          <p style="margin:0 0 14px;color:#64748B;font-size:13px;">Scannez ce QR Code pour créer votre compte Diaspo'Actif et bénéficier de 12 mois de Premium.</p>
+          <div id="la-qr-mount" style="display:flex;justify-content:center;margin-bottom:10px;"></div>
+          <div id="la-qr-code" style="font-family:monospace;font-size:13px;color:#64748B;margin-bottom:14px;"></div>
+          <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('la-qr-overlay').style.display='none'">Fermer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modale Historique -->
+      <div id="la-hist-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+        <div class="card" style="width:100%;max-width:480px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">📋 Historique</h3>
+            <button onclick="document.getElementById('la-hist-overlay').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
+          </div>
+          <div id="la-hist-liste" style="max-height:400px;overflow-y:auto;"></div>
+        </div>
+      </div>
 
       <!-- Modale modification (admin) -->
       <div id="pa-adm-edit-overlay" style="display:none;position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
@@ -9030,6 +9100,7 @@ async function submitAccordDirect(){
     'social-sync': () => loadSocialSyncAdmin(),
     rencontres:  () => rdvCharger(),
     'parrainage-admin': () => paAdminCharger(),
+    'liens-adherents': () => lienAdherentCharger(),
     origines:    () => origCharger(),
     'verifications-organisation': () => loadVerificationsOrganisation(),
     'demandes-passage': () => loadDemandesPassage(),
@@ -13289,7 +13360,141 @@ window.adminObserverEvent = async function(id, sourceTable) {
    passent désormais par le nouveau parcours unique (table evenements, evenements.html) — plus
    aucun événement Billetterie ne peut être créé (voir la fermeture des anciens circuits de
    création), le bouton "✏️ Modifier" ci-dessus ouvre donc evenements.html pour tous. */
+
+/* ═══ LIENS ADHÉRENTS ═══ */
+let LA_LIENS_CACHE = [];
+let LA_FILTRE_STATUT = '';
+const LA_QUANTITES_RAPIDES = [1, 5, 10, 20, 50, 100];
+const LA_STATUT_LABEL = {
+  available: '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#dcfce7;color:#166534;">Disponible</span>',
+  used:      '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#dbeafe;color:#1e40af;">Utilisé</span>',
+  cancelled: '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:#fee2e2;color:#991b1b;">Annulé</span>',
+};
+function laEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function laFmtDate(s) { if (!s) return '—'; const d = new Date(s); return isNaN(d) ? '—' : d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}); }
+
+async function lienAdherentCharger() {
+  try {
+    const [{ total, disponibles, utilises, annules }, { liens }] = await Promise.all([
+      api('GET', '/admin/adherent-links/stats'),
+      api('GET', '/admin/adherent-links' + (LA_FILTRE_STATUT ? '?status=' + LA_FILTRE_STATUT : '')),
+    ]);
+    document.getElementById('la-stats').innerHTML = `
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;">${total}</div><div style="font-size:12px;color:var(--muted);">Liens générés</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#16a34a;">${disponibles}</div><div style="font-size:12px;color:var(--muted);">Disponibles</div></div>
+      <div class="card" style="padding:14px;text-align:center;"><div style="font-size:26px;font-weight:800;color:#2563eb;">${utilises}</div><div style="font-size:12px;color:var(--muted);">Utilisés</div></div>
+      <div class="card" style="padding:14px;text-align:center;color:#991b1b;"><div style="font-size:26px;font-weight:800;">${annules}</div><div style="font-size:12px;color:var(--muted);">Annulés</div></div>`;
+    LA_LIENS_CACHE = liens;
+    laRenderListe();
+    ['tous','available','used','cancelled'].forEach(id => {
+      const btn = document.getElementById('la-filtre-' + id);
+      if (btn) { btn.className = 'btn btn-sm ' + ((id === 'tous' ? '' : id) === LA_FILTRE_STATUT ? 'btn-orange' : 'btn-outline'); }
+    });
+  } catch (e) { document.getElementById('la-liste').innerHTML = '<div style="color:#ef4444;">Erreur : ' + laEsc(e.message) + '</div>'; }
+}
+window.laFiltrer = function(statut) { LA_FILTRE_STATUT = statut; lienAdherentCharger(); };
+
+let LA_RECHERCHE_TIMER = null;
+window.laRechercheDebounce = function() {
+  clearTimeout(LA_RECHERCHE_TIMER);
+  LA_RECHERCHE_TIMER = setTimeout(laRenderListe, 250);
+};
+
+function laRenderListe() {
+  const q = (document.getElementById('la-recherche')?.value || '').trim().toLowerCase();
+  const liens = LA_LIENS_CACHE.filter(l => !q || l.public_code.toLowerCase().includes(q) || (l.beneficiaire_nom||'').toLowerCase().includes(q) || (l.beneficiaire_email||'').toLowerCase().includes(q));
+  document.getElementById('la-liste').innerHTML = liens.length
+    ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:var(--bg);">
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Code</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Création</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Statut</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Bénéficiaire</th>
+          <th style="padding:10px;text-align:left;border-bottom:1px solid var(--border);">Premium</th>
+          <th style="padding:10px;text-align:center;border-bottom:1px solid var(--border);">Actions</th>
+        </tr></thead>
+        <tbody>${liens.map(l => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px;font-family:monospace;">${laEsc(l.public_code)}</td>
+            <td style="padding:10px;white-space:nowrap;">${laFmtDate(l.created_at)}</td>
+            <td style="padding:10px;">${LA_STATUT_LABEL[l.status] || l.status}</td>
+            <td style="padding:10px;">${l.beneficiaire_nom ? laEsc(l.beneficiaire_nom) + '<div style="font-size:11px;color:var(--muted);">' + laEsc(l.beneficiaire_email||'') + '</div>' : '—'}</td>
+            <td style="padding:10px;white-space:nowrap;">${l.premium_start_date ? laFmtDate(l.premium_start_date) + ' → ' + laFmtDate(l.premium_end_date) : '—'}</td>
+            <td style="padding:10px;text-align:center;white-space:nowrap;">
+              ${l.status === 'available' ? `
+                <button class="btn btn-sm btn-outline" onclick="laCopier('${l.url}')" title="Copier le lien">🔗 Copier</button>
+                <button class="btn btn-sm btn-outline" onclick="laAfficherQR('${l.url}','${laEsc(l.public_code)}')" title="Afficher le QR Code">▦ QR</button>
+                <button class="btn btn-sm" style="color:#ef4444;border-color:#ef4444;" onclick="laAnnuler(${l.id})" title="Annuler ce lien">🗑 Annuler</button>
+              ` : `<button class="btn btn-sm btn-outline" onclick="laVoirHistorique(${l.id})">📋 Voir</button>`}
+            </td>
+          </tr>`).join('')}
+        </tbody></table>`
+    : '<div style="text-align:center;padding:30px;color:var(--muted);">Aucun lien pour ce filtre.</div>';
+}
+
+window.laOuvrirGenerer = function() {
+  document.getElementById('la-gen-err').textContent = '';
+  document.getElementById('la-gen-custom').value = '';
+  document.getElementById('la-gen-campagne').value = '';
+  document.getElementById('la-gen-quantites').innerHTML = LA_QUANTITES_RAPIDES.map(n =>
+    `<button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('la-gen-custom').value=${n}">${n}</button>`).join('');
+  document.getElementById('la-generer-overlay').style.display = 'flex';
+};
+window.laGenerer = async function() {
+  const quantite = parseInt(document.getElementById('la-gen-custom').value);
+  const err = document.getElementById('la-gen-err');
+  if (!quantite || quantite < 1) { err.textContent = 'Choisissez une quantité (1 à 500).'; return; }
+  const btn = document.getElementById('la-gen-btn');
+  btn.disabled = true; btn.textContent = '⏳ Génération…';
+  try {
+    await api('POST', '/admin/adherent-links', { quantite, campagne: document.getElementById('la-gen-campagne').value.trim() || undefined });
+    document.getElementById('la-generer-overlay').style.display = 'none';
+    showToast?.(`${quantite} lien(s) généré(s) ✓`, 'success');
+    lienAdherentCharger();
+  } catch (e) { err.textContent = 'Erreur : ' + e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Générer'; }
+};
+
+window.laCopier = function(url) {
+  navigator.clipboard.writeText(url).then(() => showToast?.('Lien copié ✓', 'success'));
+};
+window.laAfficherQR = function(url, code) {
+  document.getElementById('la-qr-code').textContent = 'Code : ' + code;
+  document.getElementById('la-qr-overlay').style.display = 'flex';
+  const mount = document.getElementById('la-qr-mount');
+  mount.innerHTML = '';
+  if (window.ProfileQR) window.ProfileQR.render(mount, { url, userName: code, size: 200, compact: true, showActions: true });
+};
+window.laAnnuler = async function(id) {
+  if (!confirm('Annuler ce lien ?\n\nCette action empêchera définitivement son utilisation.')) return;
+  try { await api('POST', '/admin/adherent-links/' + id + '/annuler'); lienAdherentCharger(); }
+  catch (e) { alert('Erreur : ' + e.message); }
+};
+window.laVoirHistorique = async function(id) {
+  const mount = document.getElementById('la-hist-liste');
+  mount.innerHTML = '<div style="color:var(--muted);">Chargement…</div>';
+  document.getElementById('la-hist-overlay').style.display = 'flex';
+  try {
+    const { historique } = await api('GET', '/admin/adherent-links/' + id + '/historique');
+    const LABELS = { created: 'Lien généré', account_created: 'Compte créé', premium_activated: 'Premium activé', cancelled: 'Lien annulé' };
+    mount.innerHTML = historique.length ? historique.map(h => `
+      <div style="border-bottom:1px solid var(--border);padding:10px 0;">
+        <div style="font-size:12px;color:var(--muted);">${laFmtDate(h.created_at)}</div>
+        <div style="font-weight:700;font-size:13px;">${LABELS[h.action] || h.action}</div>
+      </div>`).join('') : '<div style="color:var(--muted);">Aucun historique.</div>';
+  } catch (e) { mount.innerHTML = '<div style="color:#ef4444;">Erreur : ' + laEsc(e.message) + '</div>'; }
+};
+window.laExporter = function() { window.open('/api/admin/adherent-links/export', '_blank'); };
+// Lien de menu masqué pour tout autre administrateur que le compte officiel (2026-09-24,
+// demande explicite) — les routes rejettent déjà ces comptes (403), ceci évite juste d'afficher
+// un lien qui échouerait systématiquement pour eux.
+api('GET', '/auth/me').then(({ user }) => {
+  if (!user || user.email !== 'contact@diaspoactif.com') {
+    document.querySelector('.sidebar a[data-section="liens-adherents"]')?.remove();
+  }
+}).catch(() => {});
 </script>
+<script src="assets/profile-qr.js"></script>
 <script src="assets/posts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>

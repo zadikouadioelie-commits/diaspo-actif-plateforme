@@ -84,6 +84,11 @@ const CATALOGUE_ADMIN_JUNIOR = [
   // ── Module: avis (2026-09-19, cahier des charges "Avis + droit de réponse") ──
   { id: 'avis.consulter', module: 'avis', numero: 1, description: "Consulter tous les avis, réponses et signalements", capability: 'avis.consulter' },
   { id: 'avis.moderer',   module: 'avis', numero: 2, description: "Masquer/supprimer un avis ou une réponse, traiter les signalements", capability: 'avis.moderer' },
+
+  /* Pas d'entrée "liens_adherents" ici (2026-09-24, demande explicite) : ce module accorde une
+     vraie valeur (12 mois de Premium par lien) et reste réservé au seul compte administrateur
+     officiel (contact@diaspoactif.com), jamais délégable à un administrateur junior — voir
+     estAdminOfficielLiensAdherents() dans server/index.js. */
 ];
 
 function catalogueIdsPourCapacite(capabiliteKey) {

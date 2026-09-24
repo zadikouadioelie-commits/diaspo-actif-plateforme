@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Votre adhésion</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Votre adhésion">
+<meta property="og:description" content="Créez votre compte Diaspo'Actif et bénéficiez de 12 mois de Premium offerts.">
+<meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1565C0">
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* Page volontairement non référencée (aucun lien public) — accessible uniquement via un lien
+   ou un QR code d'adhésion à usage unique généré par un administrateur (module Liens
+   Adhérents, cahier des charges 2026-09-24). */
+body { background: #060e1a; }
+.page { min-height: 100vh; background: linear-gradient(135deg, #060e1a 0%, #0c1e38 50%, #0F2A50 100%); }
+main.container { max-width: 480px; margin: 0 auto; padding: 48px 24px 80px; }
+.auth-form-card { background: #fff; border-radius: 20px !important; padding: 40px !important; box-shadow: 0 32px 80px rgba(0,0,0,.4) !important; border: none !important; }
+.auth-form-card label { font-size: 13px; font-weight: 700; color: #374151; display: block; margin-bottom: 6px; margin-top: 16px; }
+.auth-form-card input, .auth-form-card select { width: 100%; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 0 16px; height: 48px; font-size: 15px; font-family: inherit; box-sizing: border-box; }
+.auth-error { background: #FEF2F2 !important; border: 1.5px solid #FECACA !important; color: #dc2626 !important; border-radius: 10px !important; padding: 12px 16px !important; font-size: 13px !important; font-weight: 600 !important; margin-top: 12px !important; }
+.ia-badge { display:inline-block; background:#FFF3E0; color:#E65100; font-weight:800; font-size:13px; padding:6px 14px; border-radius:99px; margin-bottom:14px; }
+</style>
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/design-upgrade.v2.css">
+<link rel="stylesheet" href="/assets/theme-manager.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="ia-verification" class="card auth-form-card" style="text-align:center;">
+      <p style="color:var(--muted);">Vérification de votre invitation…</p>
+    </div>
+
+    <div id="ia-invalide" class="card auth-form-card" style="display:none;text-align:center;">
+      <h2 style="margin-top:0;" id="ia-invalide-titre">🔒 Invitation introuvable</h2>
+      <p style="color:var(--muted);font-size:14px;" id="ia-invalide-texte">Cette invitation Diaspo'Actif est introuvable ou n'est plus valide.</p>
+    </div>
+
+    <div id="ia-landing" class="card auth-form-card" style="display:none;text-align:center;">
+      <div class="ia-badge">🎁 12 mois de Premium offerts</div>
+      <h2 style="margin:0 0 10px;">Votre adhésion Diaspo'Actif</h2>
+      <p style="color:var(--muted);font-size:14px;line-height:1.6;">
+        Vous avez reçu une invitation à rejoindre Diaspo'Actif en tant qu'adhérent.<br><br>
+        Cette invitation vous permet de créer votre compte et de bénéficier de 12 mois de Premium.
+      </p>
+      <button class="btn btn-orange btn-block" style="margin-top:18px;" onclick="iaAfficherFormulaire()">Créer mon compte</button>
+    </div>
+
+    <div id="ia-form-view" class="card auth-form-card" style="display:none;">
+      <h2 style="margin-top:0;">🎫 Créer mon compte adhérent</h2>
+      <form id="ia-form">
+        <label for="ia-prenom">Prénom</label>
+        <input type="text" id="ia-prenom">
+        <label for="ia-nom">Nom *</label>
+        <input type="text" id="ia-nom" required>
+        <label for="ia-email">Adresse e-mail *</label>
+        <input type="email" id="ia-email" required autocomplete="username">
+        <label for="ia-telephone">Téléphone</label>
+        <input type="tel" id="ia-telephone">
+        <label for="ia-password">Mot de passe *</label>
+        <input type="password" id="ia-password" required minlength="8" autocomplete="new-password">
+        <label for="ia-pays">Pays de résidence *</label>
+        <select id="ia-pays" required><option value="">— Sélectionner —</option></select>
+        <label for="ia-origine">Pays d'origine *</label>
+        <select id="ia-origine" required><option value="">— Sélectionner —</option></select>
+        <label for="ia-domaine">Domaine d'activité *</label>
+        <select id="ia-domaine" required><option value="">— Sélectionner —</option></select>
+        <div class="auth-error" id="ia-error" style="display:none;"></div>
+        <button type="submit" class="btn btn-orange btn-block" style="margin-top:18px;" id="ia-submit-btn">Créer mon compte</button>
+      </form>
+    </div>
+
+    <div id="ia-succes" class="card auth-form-card" style="display:none;text-align:center;">
+      <h2 style="margin-top:0;">🎉 Bienvenue sur Diaspo'Actif !</h2>
+      <p style="color:var(--muted);font-size:14px;">Votre adhésion est activée. Premium actif pendant 12 mois.</p>
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px;margin:16px 0;font-size:13.5px;">
+        <div><strong>Début :</strong> <span id="ia-succes-debut"></span></div>
+        <div><strong>Fin :</strong> <span id="ia-succes-fin"></span></div>
+      </div>
+      <a class="btn btn-orange btn-block" href="index.html">Accéder à la plateforme</a>
+    </div>
+  </main>
+
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js?v=13"></script>
+<script>
+const IA_TOKEN = new URLSearchParams(location.search).get("token");
+
+function iaRemplirPays(selectId) {
+  const sel = document.getElementById(selectId);
+  (typeof PAYS_DU_MONDE !== 'undefined' ? PAYS_DU_MONDE : []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+}
+
+async function iaRemplirDomaines() {
+  const sel = document.getElementById('ia-domaine');
+  try {
+    const { domaines } = await api('GET', '/parrainage/domaines');
+    (domaines || []).forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.cle; opt.textContent = (d.icone ? d.icone + ' ' : '') + d.nom;
+      sel.appendChild(opt);
+    });
+  } catch (e) {}
+}
+
+window.iaAfficherFormulaire = function() {
+  document.getElementById('ia-landing').style.display = 'none';
+  document.getElementById('ia-form-view').style.display = '';
+};
+
+async function initInscriptionAdherent() {
+  const verifEl = document.getElementById("ia-verification");
+  const invalideEl = document.getElementById("ia-invalide");
+  const landingEl = document.getElementById("ia-landing");
+
+  if (!IA_TOKEN) { verifEl.style.display = "none"; invalideEl.style.display = ""; return; }
+
+  let statut;
+  try {
+    const r = await api("GET", `/adherent-links/${encodeURIComponent(IA_TOKEN)}`);
+    statut = r.status;
+  } catch (e) {
+    verifEl.style.display = "none";
+    document.getElementById('ia-invalide-titre').textContent = '🔒 Invitation introuvable';
+    document.getElementById('ia-invalide-texte').textContent = "Cette invitation Diaspo'Actif est introuvable ou n'est plus valide.";
+    invalideEl.style.display = "";
+    return;
+  }
+  verifEl.style.display = "none";
+  if (statut === 'used') {
+    document.getElementById('ia-invalide-titre').textContent = '✅ Invitation déjà utilisée';
+    document.getElementById('ia-invalide-texte').textContent = "Cette invitation Diaspo'Actif a déjà été utilisée pour créer un compte. Elle ne peut être utilisée qu'une seule fois.";
+    invalideEl.style.display = "";
+    return;
+  }
+  if (statut === 'cancelled') {
+    document.getElementById('ia-invalide-titre').textContent = '🔒 Invitation annulée';
+    document.getElementById('ia-invalide-texte').textContent = "Cette invitation a été annulée.";
+    invalideEl.style.display = "";
+    return;
+  }
+  landingEl.style.display = "";
+  iaRemplirPays('ia-pays');
+  iaRemplirPays('ia-origine');
+  iaRemplirDomaines();
+
+  document.getElementById("ia-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errBox = document.getElementById("ia-error");
+    errBox.style.display = "none";
+    const btn = document.getElementById('ia-submit-btn');
+    btn.disabled = true; btn.textContent = '⏳ Création du compte…';
+    const body = {
+      nom: document.getElementById("ia-nom").value.trim(),
+      prenom: document.getElementById("ia-prenom").value.trim() || undefined,
+      email: document.getElementById("ia-email").value.trim(),
+      telephone: document.getElementById("ia-telephone").value.trim() || undefined,
+      password: document.getElementById("ia-password").value,
+      role: 'utilisateur',
+      pays: document.getElementById("ia-pays").value,
+      origine1: document.getElementById("ia-origine").value,
+      domaine_principal: document.getElementById("ia-domaine").value,
+      lien_adherent_token: IA_TOKEN,
+      _form_ts: window.__iaFormTs || Date.now(),
+    };
+    try {
+      await api("POST", "/auth/signup", body);
+      document.getElementById('ia-form-view').style.display = 'none';
+      const debut = new Date();
+      const fin = new Date(debut); fin.setMonth(fin.getMonth() + 12);
+      document.getElementById('ia-succes-debut').textContent = debut.toLocaleDateString('fr-FR');
+      document.getElementById('ia-succes-fin').textContent = fin.toLocaleDateString('fr-FR');
+      document.getElementById('ia-succes').style.display = '';
+    } catch (err) {
+      errBox.textContent = err.message || "Impossible de créer le compte.";
+      errBox.style.display = "block";
+      btn.disabled = false; btn.textContent = 'Créer mon compte';
+    }
+  });
+}
+window.__iaFormTs = Date.now();
+initInscriptionAdherent();
+</script>
+<script src="/assets/theme-manager.js"></script>
+</body>
+</html>
