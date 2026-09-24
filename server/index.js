@@ -41411,14 +41411,146 @@ route('POST', '/api/recensements/:id/image', async (req, res, params, body) => {
    Sous-modules Campagnes/Événements/Audiences/Échanges/Demandes : AUCUNE nouvelle table, ces
    routes lisent directement publicites/events/conversations-messages/devis_demandes. ═══ */
 
+/* Collaboration CRM (2026-09-24, demande explicite : "crée une affiliation au CRM bien
+   spécifique") — un compte non-Initiative (typiquement Utilisateur : salarié, bénévole) avec
+   une invitation ACCEPTÉE dans crm_collaborateurs obtient désormais lui aussi un accès complet
+   aux routes CRM de l'initiative qui l'a invité, à parité avec le propriétaire (aucune
+   permission réduite en écriture — "rendre possible la collaboration" implique un vrai travail
+   à plusieurs, pas une consultation seule). `estProprietaire` distingue les deux cas pour les
+   quelques actions réservées au seul propriétaire (inviter/retirer un collaborateur). */
 async function crmInitOwner(req) {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "initiative") return { erreur: 403, msg: "Réservé aux comptes Initiative." };
-  const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
-  if (!init) return { erreur: 404, msg: "Aucune initiative associée à ce compte." };
-  return { user, init };
+  if (!user) return { erreur: 401, msg: "Connexion requise." };
+  if (user.role === "initiative") {
+    const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
+    if (!init) return { erreur: 404, msg: "Aucune initiative associée à ce compte." };
+    return { user, init, estProprietaire: true };
+  }
+  const collab = await db.prepare("SELECT * FROM crm_collaborateurs WHERE user_id=? AND statut='accepte' ORDER BY id LIMIT 1").get(user.id);
+  if (collab) {
+    const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(collab.initiative_id);
+    if (init) return { user, init, estProprietaire: false };
+  }
+  return { erreur: 403, msg: "Réservé aux comptes Initiative ou aux collaborateurs CRM invités." };
 }
 const CRM_STATUTS_PIPELINE = ["nouveau", "contacte", "interesse", "devis_envoye", "negociation", "gagne", "perdu"];
+
+/* GET /api/crm/mon-invitation — auto-diagnostic pour N'IMPORTE QUEL rôle (jamais gaté par
+   crmInitOwner, qui exigerait déjà l'accès qu'on cherche justement à établir) : dit si le
+   compte connecté a une invitation CRM en attente ou acceptée, et pour quelle initiative.
+   Utilisé par dashboard-initiative.html pour décider, avant même d'atteindre le module CRM,
+   entre l'écran d'invitation (en_attente) et le mode collaborateur restreint (accepte). */
+route("GET", "/api/crm/mon-invitation", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const collab = await db.prepare(
+    `SELECT cc.id, cc.statut, cc.fonction, i.id AS initiative_id, i.nom AS initiative_nom, i.logo_url AS initiative_logo_url
+     FROM crm_collaborateurs cc JOIN initiatives i ON i.id=cc.initiative_id
+     WHERE cc.user_id=? AND cc.statut IN ('en_attente','accepte') ORDER BY cc.id DESC LIMIT 1`
+  ).get(user.id);
+  if (!collab) return sendJSON(res, 200, { statut: "aucune" });
+  sendJSON(res, 200, {
+    statut: collab.statut, collaboration_id: collab.id, fonction: collab.fonction,
+    initiative_id: collab.initiative_id, initiative_nom: collab.initiative_nom, initiative_logo_url: collab.initiative_logo_url,
+  });
+});
+
+/* ── Collaborateurs CRM ── */
+/* GET /api/crm/collaborateurs — liste (propriétaire ET collaborateurs acceptés, pour peupler
+   les menus "Assigné à" des contacts/opportunités/tâches). */
+route("GET", "/api/crm/collaborateurs", async (req, res) => {
+  const { init, erreur, msg } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const rows = await db.prepare(
+    `SELECT cc.id, cc.user_id, cc.fonction, cc.statut, cc.created_at,
+       u.nom, u.prenom, u.photo_url
+     FROM crm_collaborateurs cc JOIN users u ON u.id=cc.user_id
+     WHERE cc.initiative_id=? AND cc.statut != 'retire' ORDER BY cc.created_at DESC`
+  ).all(init.id);
+  /* Propriétaire inclus à part (2026-09-24) — n'a pas de ligne crm_collaborateurs pour
+     lui-même, mais reste une option d'assignation légitime ; le client (crmAssigneOptions,
+     dashboard-initiative.html) en a besoin pour peupler "Assigné à" même quand l'appelant est
+     lui-même un collaborateur (qui n'a sinon aucun moyen de connaître l'identité du propriétaire). */
+  const proprietaire = await db.prepare("SELECT id, nom, prenom, photo_url FROM users WHERE id=?").get(init.owner_user_id);
+  sendJSON(res, 200, { collaborateurs: rows, proprietaire });
+});
+
+/* POST /api/crm/collaborateurs — inviter (réservé au propriétaire). Identifie le compte par
+   son DS-ID (même convention que le reste de la plateforme pour désigner un compte précis —
+   voir GET /api/account/by-da-id/:daId, déjà utilisé côté client pour résoudre le DS-ID avant
+   cet appel). Ré-invitation après un refus/retrait : UPDATE plutôt qu'INSERT, la contrainte
+   UNIQUE(initiative_id,user_id) interdirait sinon une seconde ligne. */
+route("POST", "/api/crm/collaborateurs", async (req, res, params, body) => {
+  const { user, init, erreur, msg, estProprietaire } = await crmInitOwner(req);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!estProprietaire) return sendJSON(res, 403, { error: "Seul le propriétaire de l'initiative peut inviter un collaborateur." });
+  const userId = Number(body.user_id);
+  if (!userId) return sendJSON(res, 400, { error: "Compte à inviter manquant." });
+  if (userId === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous inviter vous-même." });
+  const cible = await db.prepare("SELECT id, role FROM users WHERE id=?").get(userId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const fonction = (body.fonction || "").toString().slice(0, 100) || null;
+  const existant = await db.prepare("SELECT * FROM crm_collaborateurs WHERE initiative_id=? AND user_id=?").get(init.id, userId);
+  if (existant) {
+    if (existant.statut === "accepte" || existant.statut === "en_attente") {
+      return sendJSON(res, 409, { error: "Ce compte est déjà collaborateur ou a déjà une invitation en attente." });
+    }
+    await db.prepare("UPDATE crm_collaborateurs SET statut='en_attente', fonction=?, invited_by=?, updated_at=datetime('now') WHERE id=?")
+      .run(fonction, user.id, existant.id);
+  } else {
+    await db.prepare("INSERT INTO crm_collaborateurs (initiative_id, user_id, fonction, statut, invited_by) VALUES (?,?,?, 'en_attente', ?)")
+      .run(init.id, userId, fonction, user.id);
+  }
+  try {
+    await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+      userId, 'crm_invitation',
+      `Invitation CRM — ${init.nom}`,
+      `« ${init.nom} » vous invite à collaborer sur son CRM${fonction ? ` en tant que ${fonction}` : ''}. Souhaitez-vous accepter cette invitation ?`,
+      JSON.stringify({ lien: 'dashboard-initiative.html' })
+    );
+  } catch (e) { logError(e, "notification invitation CRM", req); }
+  sendJSON(res, 201, { ok: true });
+});
+
+/* PUT /api/crm/collaborateurs/:id/repondre — accepter/refuser (réservé à l'invité lui-même). */
+route("PUT", "/api/crm/collaborateurs/:id/repondre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const collab = await db.prepare("SELECT * FROM crm_collaborateurs WHERE id=?").get(params.id);
+  if (!collab) return sendJSON(res, 404, { error: "Invitation introuvable." });
+  if (collab.user_id !== user.id) return sendJSON(res, 403, { error: "Cette invitation ne vous concerne pas." });
+  if (collab.statut !== "en_attente") return sendJSON(res, 409, { error: "Cette invitation a déjà été traitée." });
+  const accepte = !!body.accepter;
+  await db.prepare("UPDATE crm_collaborateurs SET statut=?, updated_at=datetime('now') WHERE id=?")
+    .run(accepte ? "accepte" : "refuse", collab.id);
+  const init = await db.prepare("SELECT nom, owner_user_id FROM initiatives WHERE id=?").get(collab.initiative_id);
+  if (init) {
+    try {
+      await db.prepare(`INSERT INTO notifications (user_id, type, titre, contenu, data_json) VALUES (?,?,?,?,?)`).run(
+        init.owner_user_id, accepte ? 'crm_invitation_acceptee' : 'crm_invitation_refusee',
+        accepte ? "Invitation CRM acceptée" : "Invitation CRM déclinée",
+        `${[user.prenom, user.nom].filter(Boolean).join(' ') || user.nom} a ${accepte ? 'accepté' : 'décliné'} votre invitation à collaborer sur le CRM.`,
+        JSON.stringify({})
+      );
+    } catch (e) { logError(e, "notification réponse invitation CRM", req); }
+  }
+  sendJSON(res, 200, { ok: true, statut: accepte ? "accepte" : "refuse" });
+});
+
+/* DELETE /api/crm/collaborateurs/:id — retirer un collaborateur (propriétaire) ou se retirer
+   soi-même (le collaborateur concerné). */
+route("DELETE", "/api/crm/collaborateurs/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const collab = await db.prepare("SELECT * FROM crm_collaborateurs WHERE id=?").get(params.id);
+  if (!collab) return sendJSON(res, 404, { error: "Introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(collab.initiative_id);
+  const estProprietaire = init && init.owner_user_id === user.id;
+  const estLeCollaborateur = collab.user_id === user.id;
+  if (!estProprietaire && !estLeCollaborateur) return sendJSON(res, 403, { error: "Non autorisé." });
+  await db.prepare("UPDATE crm_collaborateurs SET statut='retire', updated_at=datetime('now') WHERE id=?").run(collab.id);
+  sendJSON(res, 200, { ok: true });
+});
 
 /* Pièces jointes CRM (2026-09-09, demande explicite) : 2 photos max (tableau d'URLs Bunny) +
    3 documents PDF max (tableau {url,nom}) — mêmes limites appliquées ici qu'à l'affichage
@@ -41460,16 +41592,31 @@ async function crmResoudreLienTache(body, userId) {
   return cible;
 }
 
+/* Valide qu'un `assigne_a` proposé est bien le propriétaire ou un collaborateur ACCEPTÉ de
+   cette initiative — jamais confiance dans un id envoyé par le client, sinon un contact
+   pourrait être assigné à n'importe quel compte de la plateforme. Retourne null si vide/invalide
+   (désassigne plutôt que de planter). */
+async function crmResoudreAssigneA(init, valeur) {
+  const id = Number(valeur) || null;
+  if (!id) return null;
+  if (id === init.owner_user_id) return id;
+  const collab = await db.prepare("SELECT id FROM crm_collaborateurs WHERE initiative_id=? AND user_id=? AND statut='accepte'").get(init.id, id);
+  return collab ? id : null;
+}
+
 /* ── Contacts ── */
 route("GET", "/api/crm/contacts", async (req, res, params, body, query) => {
   const { init, erreur, msg } = await crmInitOwner(req);
   if (erreur) return sendJSON(res, erreur, { error: msg });
   let sql = `SELECT c.*, p.statut AS pipeline_statut, p.valeur_potentielle, p.prochaine_action, p.prochaine_action_date, p.derniere_interaction_at,
-    u.photo_url AS linked_photo_url
+    u.photo_url AS linked_photo_url,
+    a.nom AS assigne_nom, a.prenom AS assigne_prenom, a.photo_url AS assigne_photo_url
     FROM crm_contacts c LEFT JOIN crm_pipeline p ON p.contact_id=c.id LEFT JOIN users u ON u.id=c.linked_user_id
+    LEFT JOIN users a ON a.id=c.assigne_a
     WHERE c.initiative_id=?`;
   const args = [init.id];
   if (query.relation) { sql += " AND c.relation=?"; args.push(query.relation); }
+  if (query.assigne_a) { sql += " AND c.assigne_a=?"; args.push(query.assigne_a); }
   if (query.q) { const like = `%${query.q}%`; sql += " AND (c.nom LIKE ? OR c.prenom LIKE ? OR c.email LIKE ? OR c.societe LIKE ?)"; args.push(like, like, like, like); }
   sql += " ORDER BY c.updated_at DESC LIMIT 500";
   const rows = await db.prepare(sql).all(...args);
@@ -41501,12 +41648,13 @@ route("POST", "/api/crm/contacts", async (req, res, params, body) => {
   const nom = (body.nom || "").trim();
   if (!nom) return sendJSON(res, 400, { error: "Nom requis." });
   const relation = ["prospect", "client", "partenaire", "autre"].includes(body.relation) ? body.relation : "autre";
-  const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,ville,pays,societe,fonction,relation,notes,source,tags_json,photos_json,documents_json,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const assigneA = await crmResoudreAssigneA(init, body.assigne_a);
+  const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,ville,pays,societe,fonction,relation,notes,source,tags_json,photos_json,documents_json,created_by,assigne_a)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, body.linked_user_id || null, nom, body.prenom || null, body.email || null, body.telephone || null,
     body.ville || null, body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null,
     body.source || null, JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []),
-    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id, assigneA
   );
   if (relation === "prospect") await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut) VALUES (?,?,'nouveau')").run(r.lastInsertRowid, init.id);
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -41518,11 +41666,12 @@ route("PUT", "/api/crm/contacts/:id", async (req, res, params, body) => {
   const c = await db.prepare("SELECT id, nom FROM crm_contacts WHERE id=? AND initiative_id=?").get(params.id, init.id);
   if (!c) return sendJSON(res, 404, { error: "Contact introuvable." });
   const relation = ["prospect", "client", "partenaire", "autre"].includes(body.relation) ? body.relation : "autre";
-  await db.prepare(`UPDATE crm_contacts SET nom=?,prenom=?,email=?,telephone=?,ville=?,pays=?,societe=?,fonction=?,relation=?,notes=?,source=?,tags_json=?,photos_json=?,documents_json=?,updated_at=datetime('now') WHERE id=?`).run(
+  const assigneA = await crmResoudreAssigneA(init, body.assigne_a);
+  await db.prepare(`UPDATE crm_contacts SET nom=?,prenom=?,email=?,telephone=?,ville=?,pays=?,societe=?,fonction=?,relation=?,notes=?,source=?,tags_json=?,photos_json=?,documents_json=?,assigne_a=?,updated_at=datetime('now') WHERE id=?`).run(
     (body.nom || "").trim() || c.nom, body.prenom || null, body.email || null, body.telephone || null, body.ville || null,
     body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null, body.source || null,
     JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []),
-    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), params.id
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), assigneA, params.id
   );
   if (relation === "prospect" && !(await db.prepare("SELECT id FROM crm_pipeline WHERE contact_id=?").get(params.id))) {
     await db.prepare("INSERT INTO crm_pipeline (contact_id,initiative_id,statut) VALUES (?,?,'nouveau')").run(params.id, init.id);
@@ -41566,8 +41715,10 @@ route("POST", "/api/crm/contacts/from-devis/:devisId", async (req, res, params) 
 route("GET", "/api/crm/pipeline", async (req, res, params) => {
   const { init, erreur, msg } = await crmInitOwner(req);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const rows = await db.prepare(`SELECT p.*, c.nom, c.prenom, c.email, c.telephone, c.societe
-    FROM crm_pipeline p JOIN crm_contacts c ON c.id=p.contact_id WHERE p.initiative_id=? ORDER BY p.ordre ASC, p.updated_at DESC`).all(init.id);
+  const rows = await db.prepare(`SELECT p.*, c.nom, c.prenom, c.email, c.telephone, c.societe, c.assigne_a,
+    a.nom AS assigne_nom, a.prenom AS assigne_prenom, a.photo_url AS assigne_photo_url
+    FROM crm_pipeline p JOIN crm_contacts c ON c.id=p.contact_id LEFT JOIN users a ON a.id=c.assigne_a
+    WHERE p.initiative_id=? ORDER BY p.ordre ASC, p.updated_at DESC`).all(init.id);
   sendJSON(res, 200, { pipeline: rows });
 });
 
@@ -41602,8 +41753,10 @@ route("PATCH", "/api/crm/pipeline/:contactId", async (req, res, params, body) =>
 route("GET", "/api/crm/opportunites", async (req, res, params) => {
   const { init, erreur, msg } = await crmInitOwner(req);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const rows = await db.prepare(`SELECT o.*, c.nom AS contact_nom, c.prenom AS contact_prenom
-    FROM crm_opportunites o LEFT JOIN crm_contacts c ON c.id=o.contact_id WHERE o.initiative_id=? ORDER BY o.updated_at DESC`).all(init.id);
+  const rows = await db.prepare(`SELECT o.*, c.nom AS contact_nom, c.prenom AS contact_prenom,
+      a.nom AS assigne_nom, a.prenom AS assigne_prenom, a.photo_url AS assigne_photo_url
+    FROM crm_opportunites o LEFT JOIN crm_contacts c ON c.id=o.contact_id LEFT JOIN users a ON a.id=o.assigne_a
+    WHERE o.initiative_id=? ORDER BY o.updated_at DESC`).all(init.id);
   sendJSON(res, 200, { opportunites: rows.map(o => ({ ...o, photos: safeParse(o.photos_json || "[]"), documents: safeParse(o.documents_json || "[]") })) });
 });
 
@@ -41612,13 +41765,14 @@ route("POST", "/api/crm/opportunites", async (req, res, params, body) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const titre = (body.titre || "").trim();
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
-  const r = await db.prepare(`INSERT INTO crm_opportunites (initiative_id,contact_id,titre,valeur,devise,statut,probabilite,date_prevue,prochaine_action,notes,lie_produit_id,lie_event_id,lie_devis_demande_id,lie_campagne_id,photos_json,documents_json,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  const assigneA = await crmResoudreAssigneA(init, body.assigne_a);
+  const r = await db.prepare(`INSERT INTO crm_opportunites (initiative_id,contact_id,titre,valeur,devise,statut,probabilite,date_prevue,prochaine_action,notes,lie_produit_id,lie_event_id,lie_devis_demande_id,lie_campagne_id,photos_json,documents_json,created_by,assigne_a)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, body.contact_id || null, titre, body.valeur != null ? Number(body.valeur) : null, body.devise || "EUR",
     CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : "nouveau", body.probabilite != null ? Number(body.probabilite) : 50,
     body.date_prevue || null, body.prochaine_action || null, body.notes || null,
     body.lie_produit_id || null, body.lie_event_id || null, body.lie_devis_demande_id || null, body.lie_campagne_id || null,
-    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id, assigneA
   );
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
@@ -41628,12 +41782,13 @@ route("PUT", "/api/crm/opportunites/:id", async (req, res, params, body) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const o = await db.prepare("SELECT id, titre FROM crm_opportunites WHERE id=? AND initiative_id=?").get(params.id, init.id);
   if (!o) return sendJSON(res, 404, { error: "Opportunité introuvable." });
+  const assigneA = await crmResoudreAssigneA(init, body.assigne_a);
   await db.prepare(`UPDATE crm_opportunites SET titre=?, valeur=?, devise=COALESCE(?,devise), statut=COALESCE(?,statut),
-    probabilite=COALESCE(?,probabilite), date_prevue=?, prochaine_action=?, notes=?, contact_id=?, photos_json=?, documents_json=?, updated_at=datetime('now') WHERE id=?`).run(
+    probabilite=COALESCE(?,probabilite), date_prevue=?, prochaine_action=?, notes=?, contact_id=?, photos_json=?, documents_json=?, assigne_a=?, updated_at=datetime('now') WHERE id=?`).run(
     (body.titre || "").trim() || o.titre, body.valeur != null ? Number(body.valeur) : null, body.devise || null,
     CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : null, body.probabilite != null ? Number(body.probabilite) : null,
     body.date_prevue || null, body.prochaine_action || null, body.notes || null, body.contact_id || null,
-    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), params.id
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), assigneA, params.id
   );
   sendJSON(res, 200, { ok: true });
 });
@@ -41653,11 +41808,13 @@ route("GET", "/api/crm/taches", async (req, res, params, body, query) => {
   if (erreur) return sendJSON(res, erreur, { error: msg });
   let sql = `SELECT t.*, c.nom AS contact_nom, c.prenom AS contact_prenom,
       l.nom AS liste_nom, l.icone AS liste_icone,
-      u2.nom AS compte_nom, u2.prenom AS compte_prenom
+      u2.nom AS compte_nom, u2.prenom AS compte_prenom,
+      a.nom AS assigne_nom, a.prenom AS assigne_prenom, a.photo_url AS assigne_photo_url
     FROM crm_taches t
     LEFT JOIN crm_contacts c ON c.id=t.contact_id
     LEFT JOIN listes_diffusion l ON l.id=t.liste_id
     LEFT JOIN users u2 ON u2.id=t.linked_user_id
+    LEFT JOIN users a ON a.id=t.assigne_a
     WHERE t.initiative_id=?`;
   const args = [init.id];
   if (query.statut) { sql += " AND t.statut=?"; args.push(query.statut); }
@@ -41675,13 +41832,17 @@ route("POST", "/api/crm/taches", async (req, res, params, body) => {
   let lien;
   try { lien = await crmResoudreLienTache(body, user.id); }
   catch (e) { return sendJSON(res, e.statut || 400, { error: e.message }); }
-  const r = await db.prepare(`INSERT INTO crm_taches (initiative_id,titre,description,priorite,date_echeance,heure_echeance,contact_id,liste_id,linked_user_id,email_libre,opportunite_id,devis_demande_id,event_id,campagne_id,photos_json,documents_json,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+  /* Défaut : une tâche créée sans "assigné à" explicite s'assigne à son créateur — sinon une
+     tâche perdrait tout responsable identifiable dans une équipe à plusieurs, ce qui viderait
+     de son sens la relance automatique construite dessus. */
+  const assigneA = body.assigne_a !== undefined ? await crmResoudreAssigneA(init, body.assigne_a) : user.id;
+  const r = await db.prepare(`INSERT INTO crm_taches (initiative_id,titre,description,priorite,date_echeance,heure_echeance,contact_id,liste_id,linked_user_id,email_libre,opportunite_id,devis_demande_id,event_id,campagne_id,photos_json,documents_json,created_by,assigne_a)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, titre, body.description || null, PRIORITES.includes(body.priorite) ? body.priorite : "normale",
     body.date_echeance || null, body.heure_echeance || null,
     lien.contact_id, lien.liste_id, lien.linked_user_id, lien.email_libre,
     body.opportunite_id || null, body.devis_demande_id || null, body.event_id || null, body.campagne_id || null,
-    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id, assigneA
   );
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
@@ -41689,7 +41850,7 @@ route("POST", "/api/crm/taches", async (req, res, params, body) => {
 route("PUT", "/api/crm/taches/:id", async (req, res, params, body) => {
   const { user, init, erreur, msg } = await crmInitOwner(req);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const t = await db.prepare("SELECT id, titre, contact_id, liste_id, linked_user_id, email_libre FROM crm_taches WHERE id=? AND initiative_id=?").get(params.id, init.id);
+  const t = await db.prepare("SELECT id, titre, contact_id, liste_id, linked_user_id, email_libre, assigne_a FROM crm_taches WHERE id=? AND initiative_id=?").get(params.id, init.id);
   if (!t) return sendJSON(res, 404, { error: "Tâche introuvable." });
   const STATUTS = ["a_faire", "en_cours", "terminee", "annulee"];
   const PRIORITES = ["basse", "normale", "haute", "urgente"];
@@ -41702,13 +41863,16 @@ route("PUT", "/api/crm/taches/:id", async (req, res, params, body) => {
     try { lien = await crmResoudreLienTache(body, user.id); }
     catch (e) { return sendJSON(res, e.statut || 400, { error: e.message }); }
   }
+  /* Même flag explicite que lien_type ci-dessus (2026-09-09) : crmToggleTache (case cochée)
+     n'envoie que {statut}, ne doit jamais effacer l'assignation existante. */
+  const assigneA = body.assigne_a !== undefined ? await crmResoudreAssigneA(init, body.assigne_a) : t.assigne_a;
   await db.prepare(`UPDATE crm_taches SET titre=?, description=?, priorite=COALESCE(?,priorite), statut=COALESCE(?,statut),
-    date_echeance=?, heure_echeance=?, contact_id=?, liste_id=?, linked_user_id=?, email_libre=?, photos_json=?, documents_json=?, updated_at=datetime('now') WHERE id=?`).run(
+    date_echeance=?, heure_echeance=?, contact_id=?, liste_id=?, linked_user_id=?, email_libre=?, photos_json=?, documents_json=?, assigne_a=?, updated_at=datetime('now') WHERE id=?`).run(
     (body.titre || "").trim() || t.titre, body.description || null,
     PRIORITES.includes(body.priorite) ? body.priorite : null, STATUTS.includes(body.statut) ? body.statut : null,
     body.date_echeance || null, body.heure_echeance || null,
     lien.contact_id, lien.liste_id, lien.linked_user_id, lien.email_libre,
-    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), params.id
+    crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), assigneA, params.id
   );
   sendJSON(res, 200, { ok: true });
 });

@@ -177,6 +177,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     return;
   }
   if (me.role !== "initiative") {
+    /* Collaborateur CRM (2026-09-24, demande explicite : "crée une affiliation au CRM bien
+       spécifique") — un compte non-Initiative (typiquement Utilisateur : salarié, bénévole)
+       invité par une initiative peut accéder à CETTE page, mais en mode restreint : réservé au
+       seul module CRM de l'initiative qui l'a invité, jamais aux ~30 autres modules du reste de
+       ce tableau de bord (Vitrine, Cotisations...), qui restent propriétaire uniquement. Voir
+       crmInitOwner() côté serveur (server/index.js), qui accepte désormais aussi un
+       collaborateur accepté — cette page n'a qu'à savoir vers quel écran aiguiller. */
+    let invitation = null;
+    try { invitation = await api('GET', '/crm/mon-invitation'); } catch (e) {}
+    if (invitation && invitation.statut === 'en_attente') return renderCrmInvitationGate(invitation, api, content);
+    if (invitation && invitation.statut === 'accepte') return renderCrmCollaborateurMode(invitation, content);
     content.innerHTML = `<div class="notice">⚠️ Cette page est réservée aux comptes Initiative. <a href="${ROLE_DASHBOARD[me.role] || 'index.html'}">Accéder à mon tableau de bord →</a></div>`;
     return;
   }
@@ -9623,12 +9634,21 @@ function daBypassBtnHtml(context) {
 }
 
 window.openPremiumUpsell = function(context) {
+  /* Défensif (2026-09-19) : un crash réel (`Cannot set properties of null`) a été constaté
+     ici en conditions réelles — voir le correctif ci-dessus (délégation en capture sur
+     .sidebar) pour la cause première. Ces vérifications restent malgré tout nécessaires :
+     cette fonction est appelée depuis plusieurs endroits du dashboard (premiumLockedCardHtml,
+     boutons inline...) et ne doit jamais lever d'exception si la modale n'est pas dans le DOM. */
+  const modal = document.getElementById('premium-upsell-modal');
+  if (!modal) return;
   const c = PREMIUM_UPSELL_CONTEXTS[context] || {};
-  document.getElementById('premium-upsell-title').textContent = c.title || 'Débloquez tous les modules Initiative';
-  document.getElementById('premium-upsell-intro').textContent = c.intro || 'Ce module fait partie des fonctionnalités réservées aux comptes Premium.';
+  const titleEl = document.getElementById('premium-upsell-title');
+  const introEl = document.getElementById('premium-upsell-intro');
+  if (titleEl) titleEl.textContent = c.title || 'Débloquez tous les modules Initiative';
+  if (introEl) introEl.textContent = c.intro || 'Ce module fait partie des fonctionnalités réservées aux comptes Premium.';
   const bypassWrap = document.getElementById('premium-upsell-bypass');
   if (bypassWrap) bypassWrap.innerHTML = daBypassBtnHtml(context);
-  document.getElementById('premium-upsell-modal').style.display = 'flex';
+  modal.style.display = 'flex';
 };
 window.closePremiumUpsell = function() { document.getElementById('premium-upsell-modal').style.display = 'none'; };
 
@@ -9655,6 +9675,16 @@ function applyPremiumButtonStyles() {
 }
 
 async function initPremiumGates() {
+  /* Collaborateur CRM (2026-09-24) — appelée sans condition au chargement de la page (plus bas
+     dans ce fichier), donc aussi pour un compte non-Initiative en mode collaborateur restreint.
+     Le verrouillage/dorure Premium ne concerne que le propriétaire de l'initiative ; sans ce
+     garde-fou, le seul lien "CRM" que voit un collaborateur héritait quand même du cadenas 🔒 et
+     de l'interception clic (accréditations vides pour un compte Utilisateur), rendant le lien
+     inutilisable alors que son accès est déjà validé par ailleurs (crmInitOwner, server-side). */
+  try {
+    const me = await fetchCurrentUser();
+    if (!me || me.role !== 'initiative') return;
+  } catch (e) { return; }
   if (window._daPremiumInitiative === undefined) {
     try {
       const { accreditations } = await api('GET', '/accreditations/mes');
@@ -9702,6 +9732,32 @@ async function initPremiumGates() {
   };
   const typePourPremium = window.__vitrineInitType;
   const SIDEBAR_PREMIUM_LINKS = [...SIDEBAR_PREMIUM_LINKS_TOUS, ...(SIDEBAR_PREMIUM_LINKS_PAR_TYPE[typePourPremium] || [])];
+  /* Interception en délégation, posée UNE FOIS sur .sidebar lui-même (jamais recréé) en phase
+     de CAPTURE — même patron que la délégation Valise plus haut (assets/sidebar-reorder.js) —
+     plutôt qu'un addEventListener direct sur chaque <a>. Bug réel constaté en conditions
+     réelles (clic sur "CRM" verrouillé) : le routeur de sections (`.sidebar a[data-section]`,
+     attaché en amont) et la fermeture auto du tiroir mobile (assets/app.js) sont TOUS LES DEUX
+     posés directement sur le lien AVANT que ce initPremiumGates() (asynchrone, après l'appel
+     /accreditations/mes) n'ajoute son propre écouteur — un clic exécutait donc d'abord le
+     routeur (section verrouillée affichée quand même) puis la fermeture du tiroir, et
+     seulement ensuite l'upsell, `e.preventDefault()` de ce dernier arrivant bien trop tard
+     pour annuler ce qui avait déjà eu lieu. Un écouteur de CAPTURE sur .sidebar s'exécute
+     avant tout écouteur posé sur le lien lui-même (phase AT_TARGET), quel que soit l'ordre
+     d'attachement — `stopPropagation()` bloque alors réellement le routeur et la fermeture du
+     tiroir avant qu'ils ne s'exécutent. */
+  const sidebarEl = document.querySelector('.sidebar');
+  if (sidebarEl && !sidebarEl.dataset.premiumInterceptBound) {
+    sidebarEl.dataset.premiumInterceptBound = '1';
+    sidebarEl.addEventListener('click', (e) => {
+      const link = e.target.closest('a[data-premium-context]');
+      if (!link) return;
+      const context = link.dataset.premiumContext;
+      if (window.daBypassActive?.(context)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openPremiumUpsell(context);
+    }, true);
+  }
   SIDEBAR_PREMIUM_LINKS.forEach(({ href, context, intercept, badgeOnly }) => {
     const link = document.querySelector(`.sidebar a[href="${href}"]`);
     if (!link || link.dataset.premiumStyled) return;
@@ -9713,7 +9769,7 @@ async function initPremiumGates() {
     link.style.margin = '0 8px';
     if (!window._daPremiumInitiative && !badgeOnly) {
       link.innerHTML = '🔒 ' + link.innerHTML;
-      if (intercept) link.addEventListener('click', (e) => { if (window.daBypassActive?.(context)) return; e.preventDefault(); openPremiumUpsell(context); });
+      if (intercept) link.dataset.premiumContext = context;
     }
   });
   /* « Cotisations & Adhésions » et « Votes sécurisés » n'existent pour aucune colonne du
@@ -9808,6 +9864,56 @@ initPremiumGates();
    routes /api/crm/*.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* Collaborateur CRM (2026-09-24, demande explicite : "crée une affiliation au CRM bien
+   spécifique") — les deux écrans appelés par le portail d'accès de ce tableau de bord
+   (initDashboardInitiative, tout en haut de ce fichier) pour un compte non-Initiative avec une
+   invitation en_attente/acceptée. Fonctions globales comme le reste du module CRM (jamais
+   nichées dans l'IIFE d'initDashboardInitiative), afin que crmSwitchTab() etc. restent
+   accessibles depuis onclick="..." comme partout ailleurs dans ce module. */
+function renderCrmInvitationGate(invitation, api, content) {
+  content.innerHTML = `
+    <div class="notice" style="max-width:520px;margin:60px auto;text-align:center;">
+      <div style="font-size:40px;margin-bottom:10px;">🤝</div>
+      <h2 style="margin:0 0 10px;">Invitation à collaborer sur un CRM</h2>
+      <p style="color:var(--muted);">« <strong>${crmEsc(invitation.initiative_nom)}</strong> » vous invite à collaborer sur son CRM${invitation.fonction ? ` en tant que <strong>${crmEsc(invitation.fonction)}</strong>` : ''}.</p>
+      <div id="crm-invit-err" style="color:#dc2626;font-size:13px;margin:8px 0;"></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:18px;">
+        <button class="btn btn-outline" id="crm-invit-refuser">Décliner</button>
+        <button class="btn" id="crm-invit-accepter">✅ Accepter l'invitation</button>
+      </div>
+    </div>`;
+  const repondre = async (accepter) => {
+    const err = document.getElementById('crm-invit-err');
+    try {
+      await api('PUT', `/crm/collaborateurs/${invitation.collaboration_id}/repondre`, { accepter });
+      window.location.reload();
+    } catch (e) { err.textContent = e.message || 'Erreur.'; }
+  };
+  document.getElementById('crm-invit-accepter').addEventListener('click', () => repondre(true));
+  document.getElementById('crm-invit-refuser').addEventListener('click', () => repondre(false));
+}
+
+function renderCrmCollaborateurMode(invitation, content) {
+  const sidebar = document.getElementById('sidebar');
+  /* sidebar-close/sidebar-brand ne sont PAS des enfants directs de #sidebar (ils vivent dans un
+     bloc d'en-tête intermédiaire) — repérés par getElementById plutôt que par une hypothèse de
+     structure, sinon le bloc entier (et le bouton fermer le tiroir mobile avec) se retrouve
+     caché par erreur par la boucle générique ci-dessous. */
+  const brand = document.getElementById('sidebar-brand');
+  if (brand) brand.textContent = `🤝 CRM — ${invitation.initiative_nom}`;
+  const closeBtn = document.getElementById('sidebar-close');
+  if (sidebar) {
+    Array.from(sidebar.children).forEach(el => {
+      if (closeBtn && el.contains(closeBtn)) return;
+      if (el.tagName === 'A' && el.dataset.section === 'crm') return;
+      el.style.display = 'none';
+    });
+  }
+  window._crmEstCollaborateur = true;
+  content.innerHTML = `<div id="crm"></div>`;
+  crmSwitchTab('dashboard');
+}
+
 function crmEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function crmDepuis(dateStr) {
   if (!dateStr) return '';
@@ -9830,6 +9936,35 @@ async function crmMyId() {
   if (CRM_ME_ID) return CRM_ME_ID;
   try { const r = await api('GET', '/auth/me'); CRM_ME_ID = (r.user || r).id; } catch (_) {}
   return CRM_ME_ID;
+}
+/* Collaborateurs (2026-09-24) — GET /crm/collaborateurs renvoie désormais aussi `proprietaire`
+   (server/index.js) : le propriétaire de l'initiative n'a pas de ligne crm_collaborateurs pour
+   lui-même, mais reste une option d'assignation légitime — y compris quand l'appelant EST
+   lui-même un collaborateur, qui n'aurait sinon aucun moyen de connaître son identité. */
+let CRM_COLLAB_CACHE = null;
+async function crmAssigneOptions() {
+  if (CRM_COLLAB_CACHE) return CRM_COLLAB_CACHE;
+  try {
+    const { collaborateurs, proprietaire } = await api('GET', '/crm/collaborateurs');
+    const options = [];
+    if (proprietaire) options.push({ id: proprietaire.id, nom: [proprietaire.prenom, proprietaire.nom].filter(Boolean).join(' ') || proprietaire.nom });
+    collaborateurs.filter(c => c.statut === 'accepte').forEach(c => options.push({ id: c.user_id, nom: [c.prenom, c.nom].filter(Boolean).join(' ') || c.nom }));
+    CRM_COLLAB_CACHE = options;
+  } catch (e) { CRM_COLLAB_CACHE = []; }
+  return CRM_COLLAB_CACHE;
+}
+function crmAssigneSelectHtml(id, selectedId) {
+  return `<div><label>Assigné à</label><select id="${id}"><option value="">— Non assigné —</option></select></div>`;
+}
+async function crmAssigneSelectRemplir(id, selectedId) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const options = await crmAssigneOptions();
+  el.innerHTML = `<option value="">— Non assigné —</option>` + options.map(o => `<option value="${o.id}" ${Number(selectedId) === o.id ? 'selected' : ''}>${crmEsc(o.nom)}</option>`).join('');
+}
+function crmAssigneBadge(nom, prenom) {
+  if (!nom) return '';
+  return `<span style="font-size:11px;color:var(--muted);">👤 ${crmEsc([prenom, nom].filter(Boolean).join(' '))}</span>`;
 }
 const CRM_TABS = [
   ['dashboard', '🏠 Tableau de bord'], ['contacts', '👥 Contacts'], ['prospects', '🎯 Prospects'],
@@ -10062,7 +10197,7 @@ async function crmRenderContacts(relation) {
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="border-bottom:2px solid var(--border);text-align:left;">
           <th style="padding:8px;">Nom</th><th style="padding:8px;">Société</th><th style="padding:8px;">Contact</th>
-          <th style="padding:8px;">Relation</th><th style="padding:8px;">Statut</th>
+          <th style="padding:8px;">Relation</th><th style="padding:8px;">Statut</th><th style="padding:8px;">Assigné</th>
         </tr></thead><tbody>
         ${contacts.map(ct => `
           <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="crmOpenContactForm(${ct.id})">
@@ -10071,6 +10206,7 @@ async function crmRenderContacts(relation) {
             <td style="padding:8px;color:var(--muted);">${crmEsc(ct.email || ct.telephone || '—')}</td>
             <td style="padding:8px;"><span class="pill">${relLabel[ct.relation] || ct.relation}</span></td>
             <td style="padding:8px;">${ct.pipeline_statut ? crmEsc(crmStatutLabel(ct.pipeline_statut)) : '—'}</td>
+            <td style="padding:8px;">${crmAssigneBadge(ct.assigne_nom, ct.assigne_prenom) || '—'}</td>
           </tr>`).join('')}
       </tbody></table></div>
       ` : '<p style="color:var(--muted);">Aucun contact pour l’instant. Ajoutez-en un, ou créez-en un depuis une demande de devis.</p>'}
@@ -10103,8 +10239,11 @@ async function crmOpenContactForm(id, defaultRelation) {
       <div><label>Société</label><input id="crm-c-societe" value="${crmEsc(c.societe)}"></div>
       <div><label>Fonction</label><input id="crm-c-fonction" value="${crmEsc(c.fonction)}"></div>
     </div>
-    <div style="margin-top:10px;"><label>Relation</label>
-      <select id="crm-c-relation">${Object.entries(relOpts).map(([v, l]) => `<option value="${v}" ${c.relation === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+      <div><label>Relation</label>
+        <select id="crm-c-relation">${Object.entries(relOpts).map(([v, l]) => `<option value="${v}" ${c.relation === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      </div>
+      ${crmAssigneSelectHtml('crm-c-assigne', c.assigne_a)}
     </div>
     <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-c-notes" rows="3" style="width:100%;">${crmEsc(c.notes)}</textarea></div>
     <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
@@ -10117,6 +10256,7 @@ async function crmOpenContactForm(id, defaultRelation) {
     </div>
     ${historiqueHtml}
   `);
+  crmAssigneSelectRemplir('crm-c-assigne', c.assigne_a);
 }
 async function crmSaveContact(id) {
   const body = {
@@ -10129,6 +10269,7 @@ async function crmSaveContact(id) {
     societe: document.getElementById('crm-c-societe').value.trim(),
     fonction: document.getElementById('crm-c-fonction').value.trim(),
     relation: document.getElementById('crm-c-relation').value,
+    assigne_a: document.getElementById('crm-c-assigne').value || null,
     notes: document.getElementById('crm-c-notes').value.trim(),
     photos: crmAttachState.photos.filter(Boolean),
     documents: crmAttachState.documents.filter(Boolean),
@@ -10166,6 +10307,7 @@ async function crmRenderProspects() {
             ${p.societe ? `<div style="font-size:11.5px;color:var(--muted);">${crmEsc(p.societe)}</div>` : ''}
             ${p.valeur_potentielle ? `<div style="font-size:12px;font-weight:700;color:var(--orange);margin-top:4px;">${Number(p.valeur_potentielle).toLocaleString('fr-FR')} €</div>` : ''}
             ${p.prochaine_action ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">➡️ ${crmEsc(p.prochaine_action)}</div>` : ''}
+            ${crmAssigneBadge(p.assigne_nom, p.assigne_prenom) ? `<div style="margin-top:4px;">${crmAssigneBadge(p.assigne_nom, p.assigne_prenom)}</div>` : ''}
           </div>`).join('')}
       </div>`;
     }).join('');
@@ -10189,7 +10331,7 @@ async function crmRenderOpportunites() {
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="border-bottom:2px solid var(--border);text-align:left;">
           <th style="padding:8px;">Titre</th><th style="padding:8px;">Contact</th><th style="padding:8px;">Valeur</th>
-          <th style="padding:8px;">Statut</th><th style="padding:8px;">Probabilité</th><th style="padding:8px;">Date prévue</th>
+          <th style="padding:8px;">Statut</th><th style="padding:8px;">Probabilité</th><th style="padding:8px;">Date prévue</th><th style="padding:8px;">Assigné</th>
         </tr></thead><tbody>
         ${opportunites.map(o => `
           <tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="crmOpenOppForm(${o.id})">
@@ -10199,6 +10341,7 @@ async function crmRenderOpportunites() {
             <td style="padding:8px;">${crmEsc(crmStatutLabel(o.statut))}</td>
             <td style="padding:8px;">${o.probabilite}%</td>
             <td style="padding:8px;">${o.date_prevue || '—'}</td>
+            <td style="padding:8px;">${crmAssigneBadge(o.assigne_nom, o.assigne_prenom) || '—'}</td>
           </tr>`).join('')}
       </tbody></table></div>
     ` : '<p style="color:var(--muted);">Aucune opportunité pour l’instant.</p>';
@@ -10217,7 +10360,10 @@ async function crmOpenOppForm(id) {
       <div><label>Statut</label><select id="crm-o-statut">${CRM_PIPELINE_STATUTS.map(([k, l]) => `<option value="${k}" ${o.statut === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div><label>Date prévue</label><input type="date" id="crm-o-date" value="${o.date_prevue || ''}"></div>
     </div>
-    <div style="margin-top:10px;"><label>Contact lié</label><select id="crm-o-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${o.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+      <div><label>Contact lié</label><select id="crm-o-contact"><option value="">—</option>${CRM_CONTACTS_CACHE.map(ct => `<option value="${ct.id}" ${o.contact_id === ct.id ? 'selected' : ''}>${crmEsc(ct.prenom || '')} ${crmEsc(ct.nom)}</option>`).join('')}</select></div>
+      ${crmAssigneSelectHtml('crm-o-assigne', o.assigne_a)}
+    </div>
     <div style="margin-top:10px;"><label>Prochaine action</label><input id="crm-o-action" value="${crmEsc(o.prochaine_action || '')}"></div>
     <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-o-notes" rows="3" style="width:100%;">${crmEsc(o.notes || '')}</textarea></div>
     <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
@@ -10229,6 +10375,7 @@ async function crmOpenOppForm(id) {
       </div>
     </div>
   `);
+  crmAssigneSelectRemplir('crm-o-assigne', o.assigne_a);
 }
 async function crmSaveOpp(id) {
   const body = {
@@ -10238,6 +10385,7 @@ async function crmSaveOpp(id) {
     statut: document.getElementById('crm-o-statut').value,
     date_prevue: document.getElementById('crm-o-date').value || null,
     contact_id: document.getElementById('crm-o-contact').value || null,
+    assigne_a: document.getElementById('crm-o-assigne').value || null,
     prochaine_action: document.getElementById('crm-o-action').value.trim(),
     notes: document.getElementById('crm-o-notes').value.trim(),
     photos: crmAttachState.photos.filter(Boolean),
@@ -10407,7 +10555,7 @@ async function crmRenderTaches(statut) {
           <input type="checkbox" ${t.statut === 'terminee' ? 'checked' : ''} onchange="crmToggleTache(${t.id}, this.checked)" style="margin-top:3px;">
           <div style="flex:1;cursor:pointer;" onclick="crmOpenTacheForm(${t.id})">
             <div style="font-weight:700;font-size:13.5px;${t.statut === 'terminee' ? 'text-decoration:line-through;' : ''}">${crmEsc(t.titre)}</div>
-            <div style="font-size:11.5px;color:var(--muted);">${t.date_echeance ? '📅 ' + t.date_echeance : ''}${t.contact_nom ? ' · 👤 ' + crmEsc(t.contact_prenom || '') + ' ' + crmEsc(t.contact_nom) : ''}${t.liste_nom ? ' · ' + crmEsc(t.liste_icone || '📋') + ' ' + crmEsc(t.liste_nom) : ''}${t.compte_nom ? ' · 🔗 ' + crmEsc(t.compte_prenom || '') + ' ' + crmEsc(t.compte_nom) : ''}${t.email_libre ? ' · ✉️ ' + crmEsc(t.email_libre) : ''}</div>
+            <div style="font-size:11.5px;color:var(--muted);">${t.date_echeance ? '📅 ' + t.date_echeance : ''}${t.contact_nom ? ' · 👤 ' + crmEsc(t.contact_prenom || '') + ' ' + crmEsc(t.contact_nom) : ''}${t.liste_nom ? ' · ' + crmEsc(t.liste_icone || '📋') + ' ' + crmEsc(t.liste_nom) : ''}${t.compte_nom ? ' · 🔗 ' + crmEsc(t.compte_prenom || '') + ' ' + crmEsc(t.compte_nom) : ''}${t.email_libre ? ' · ✉️ ' + crmEsc(t.email_libre) : ''}${t.assigne_nom ? ' · ' + crmAssigneBadge(t.assigne_nom, t.assigne_prenom) : ''}</div>
           </div>
           <span style="width:8px;height:8px;border-radius:50%;background:${PRIORITE_COULEUR[t.priorite] || '#94a3b8'};margin-top:5px;flex-shrink:0;"></span>
         </div>
@@ -10477,6 +10625,7 @@ async function crmOpenTacheForm(id) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
       <div><label>Priorité</label><select id="crm-t-priorite">${['basse', 'normale', 'haute', 'urgente'].map(p => `<option value="${p}" ${t.priorite === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
       <div><label>Échéance</label><input type="date" id="crm-t-date" value="${t.date_echeance || ''}"></div>
+      ${crmAssigneSelectHtml('crm-t-assigne', t.assigne_a)}
     </div>
     <div style="margin-top:10px;">
       <label>Lié à</label>
@@ -10499,6 +10648,10 @@ async function crmOpenTacheForm(id) {
       </div>
     </div>
   `);
+  await crmAssigneSelectRemplir('crm-t-assigne', t.assigne_a);
+  /* Nouvelle tâche : préassigne au créateur par défaut (même défaut que côté serveur si ce
+     champ n'était pas envoyé du tout) — juste plus visible/modifiable ici avant l'enregistrement. */
+  if (!id) { const sel = document.getElementById('crm-t-assigne'); if (sel) sel.value = await crmMyId(); }
 }
 async function crmSaveTache(id) {
   const lienType = document.getElementById('crm-t-lien-type').value;
@@ -10510,6 +10663,7 @@ async function crmSaveTache(id) {
     date_echeance: document.getElementById('crm-t-date').value || null,
     lien_type: lienType,
     lien_valeur: lienValeur,
+    assigne_a: document.getElementById('crm-t-assigne').value || null,
     description: document.getElementById('crm-t-desc').value.trim(),
     photos: crmAttachState.photos.filter(Boolean),
     documents: crmAttachState.documents.filter(Boolean),
@@ -10545,14 +10699,88 @@ async function crmRenderStats() {
   } catch (e) { c.innerHTML = `<div class="notice">${crmEsc(e.message || 'Erreur.')}</div>`; }
 }
 
-/* ── ⚙️ Paramètres — volontairement minimal (pas d'options non demandées en v1) ── */
+/* ── ⚙️ Paramètres — collaborateurs CRM (2026-09-24, demande explicite : "crée une affiliation
+   au CRM bien spécifique") + le reste, volontairement minimal (pas d'options non demandées). */
 function crmRenderParametres() {
   const c = document.getElementById('crm-tab-content');
   c.innerHTML = `
+    <div class="card" style="padding:20px;margin-bottom:16px;">
+      <h4 style="margin-top:0;">🤝 Collaborateurs CRM</h4>
+      <p style="color:var(--muted);font-size:13px;">Un collaborateur invité et accepté travaille avec vous dans ce CRM (mêmes droits sur contacts, prospects, opportunités, tâches), sans accéder aux autres modules de votre tableau de bord.</p>
+      ${window._crmEstCollaborateur ? '' : `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:14px 0;">
+        <div>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px;">Code de Sécurité Diaspo'Actif (DS-ID)</label>
+          <input id="crm-collab-dsid" placeholder="DA-000000" style="padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;">
+        </div>
+        <button class="btn btn-sm btn-outline" id="crm-collab-rechercher">🔍 Rechercher</button>
+      </div>
+      <div id="crm-collab-resultat"></div>
+      <div id="crm-collab-err" style="color:#dc2626;font-size:13px;margin-top:4px;"></div>`}
+    </div>
     <div class="card" style="padding:20px;">
-      <h4 style="margin-top:0;">⚙️ Paramètres</h4>
+      <h4 style="margin-top:0;">Équipe</h4>
+      <div id="crm-collab-liste"><div style="text-align:center;padding:16px;color:var(--muted);">Chargement…</div></div>
+    </div>
+    <div class="card" style="padding:20px;margin-top:16px;">
+      <h4 style="margin-top:0;">Autres réglages</h4>
       <p style="color:var(--muted);font-size:13px;">Les statuts du pipeline, les catégories de contacts et les tags sont pour l'instant fixes — configurables ici dans une prochaine version, au fil des besoins réels.</p>
     </div>`;
+
+  if (!window._crmEstCollaborateur) {
+    document.getElementById('crm-collab-rechercher').addEventListener('click', crmCollabRechercher);
+    document.getElementById('crm-collab-dsid').addEventListener('keydown', e => { if (e.key === 'Enter') crmCollabRechercher(); });
+  }
+  crmChargerCollaborateurs();
+}
+
+async function crmCollabRechercher() {
+  const dsId = (document.getElementById('crm-collab-dsid').value || '').trim().toUpperCase();
+  const resultatEl = document.getElementById('crm-collab-resultat');
+  const errEl = document.getElementById('crm-collab-err');
+  errEl.textContent = ''; resultatEl.innerHTML = '';
+  if (!dsId) return;
+  try {
+    const r = await api('GET', `/account/by-da-id/${encodeURIComponent(dsId)}`);
+    const cpt = r.compte;
+    resultatEl.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:10px;margin-top:6px;">
+        ${cpt.avatar_url ? `<img src="${cpt.avatar_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="" onerror="this.remove()">` : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg);flex-shrink:0;"></div>`}
+        <div style="flex:1;"><strong>${crmEsc(cpt.nom)}</strong><div style="font-size:12px;color:var(--muted);">${crmEsc(cpt.role || '')}</div></div>
+        <input id="crm-collab-fonction" placeholder="Fonction (optionnel)" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:12px;max-width:160px;">
+        <button class="btn btn-sm" id="crm-collab-inviter">Inviter</button>
+      </div>`;
+    document.getElementById('crm-collab-inviter').addEventListener('click', async () => {
+      try {
+        await api('POST', '/crm/collaborateurs', { user_id: cpt.id, fonction: document.getElementById('crm-collab-fonction').value || null });
+        resultatEl.innerHTML = ''; document.getElementById('crm-collab-dsid').value = '';
+        CRM_COLLAB_CACHE = null; crmChargerCollaborateurs();
+      } catch (e) { errEl.textContent = e.message || 'Erreur.'; }
+    });
+  } catch (e) { errEl.textContent = e.message || 'Compte introuvable.'; }
+}
+
+const CRM_COLLAB_STATUT_LABEL = { en_attente: '⏳ En attente', accepte: '✅ Actif', refuse: '❌ Décliné' };
+async function crmChargerCollaborateurs() {
+  const liste = document.getElementById('crm-collab-liste');
+  try {
+    const { collaborateurs } = await api('GET', '/crm/collaborateurs');
+    if (!collaborateurs.length) { liste.innerHTML = `<p style="color:var(--muted);font-size:13px;">Aucun collaborateur pour l'instant.</p>`; return; }
+    const meId = await crmMyId();
+    liste.innerHTML = collaborateurs.map(c => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+        ${c.photo_url ? `<img src="${c.photo_url}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;" alt="" onerror="this.remove()">` : `<div style="width:34px;height:34px;border-radius:50%;background:var(--bg);flex-shrink:0;"></div>`}
+        <div style="flex:1;">
+          <strong>${crmEsc([c.prenom, c.nom].filter(Boolean).join(' ') || c.nom)}</strong>${c.fonction ? ` — ${crmEsc(c.fonction)}` : ''}
+          <div style="font-size:12px;color:var(--muted);">${CRM_COLLAB_STATUT_LABEL[c.statut] || c.statut}</div>
+        </div>
+        ${(!window._crmEstCollaborateur || c.user_id === meId) ? `<button class="btn btn-sm btn-outline" onclick="crmCollabRetirer(${c.id})">${c.user_id === meId ? 'Quitter' : 'Retirer'}</button>` : ''}
+      </div>`).join('');
+  } catch (e) { liste.innerHTML = `<p style="color:#dc2626;font-size:13px;">${crmEsc(e.message || 'Erreur.')}</p>`; }
+}
+async function crmCollabRetirer(id) {
+  if (!confirm('Confirmer ?')) return;
+  try { await api('DELETE', `/crm/collaborateurs/${id}`); CRM_COLLAB_CACHE = null; crmChargerCollaborateurs(); } catch (e) { alert(e.message || 'Erreur.'); }
 }
 </script>
 </body>

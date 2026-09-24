@@ -2352,6 +2352,15 @@ const MIGRATIONS = [
   // fonctionnel (connexion, messages...), juste absent de l'annuaire public le temps choisi.
   ["users", "invisible_annuaire_jusqu_au TEXT"],
   ["users", "invisible_annuaire_definitif INTEGER DEFAULT 0"],
+  // Collaboration CRM (2026-09-24, demande explicite : "crée une affiliation au CRM bien
+  // spécifique") — "à qui appartient ce contact/cette opportunité/cette tâche" au sein d'une
+  // équipe, une fois que le CRM n'est plus mono-utilisateur (voir crm_collaborateurs,
+  // server/index.js). NULL = non assigné. Pas de colonne sur crm_pipeline : une ligne pipeline
+  // est 1:1 avec un contact (voir son commentaire de création), l'assignation du contact suffit
+  // déjà — une deuxième colonne y ferait juste deux sources de vérité à resynchroniser.
+  ["crm_contacts", "assigne_a INTEGER"],
+  ["crm_opportunites", "assigne_a INTEGER"],
+  ["crm_taches", "assigne_a INTEGER"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
@@ -7135,6 +7144,31 @@ db.exec(`
     FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE SET NULL,
     FOREIGN KEY(campagne_id) REFERENCES publicites(id) ON DELETE SET NULL,
     FOREIGN KEY(created_by) REFERENCES users(id)
+  );
+
+  /* Collaborateurs CRM (2026-09-24, demande explicite : "crée une affiliation au CRM bien
+     spécifique") — délibérément SÉPARÉE de initiative_membres (module "Affiliation" public,
+     lié aux cotisations/adhésions, visible sur le profil du membre) : être collaborateur CRM
+     n'a rien à voir avec être membre affilié publiquement d'une initiative, et l'inverse non
+     plus — un salarié qui gère le CRM n'est pas forcément adhérent, un adhérent n'a pas
+     forcément accès au CRM. Même PRINCIPE que l'affiliation (invitation → acceptation/refus,
+     un statut, une notification) mais sa propre table pour ne jamais mélanger les deux usages.
+     Un compte avec statut='accepte' obtient un accès restreint AU SEUL module CRM de cette
+     initiative (voir crmInitOwner(), server/index.js) — jamais aux autres modules du tableau
+     de bord (Vitrine, Cotisations...), réservés au propriétaire. */
+  CREATE TABLE IF NOT EXISTS crm_collaborateurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    fonction TEXT,
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','accepte','refuse','retire')),
+    invited_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(initiative_id, user_id),
+    FOREIGN KEY(initiative_id) REFERENCES initiatives(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(invited_by) REFERENCES users(id)
   );
 `);
 
