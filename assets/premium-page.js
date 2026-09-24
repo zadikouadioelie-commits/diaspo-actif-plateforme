@@ -327,6 +327,19 @@
         <section class="prm-section prm-section-alt">
           <h2 class="prm-section-title">Tarifs</h2>
 
+          <!-- Bascule dupliquée ici (2026-09-24, demande explicite avec capture à l'appui :
+               "ajoute ici un bouton de bascule compte utilisateur et initiative pour voir les
+               prix") — celle du hero (tout en haut) n'est plus visible une fois qu'on a défilé
+               jusqu'aux Tarifs ; même mécanique (switchType), variante de couleurs adaptée au
+               fond clair de cette section (.prm-type-switch-light, voir premium-page.css) au
+               lieu du fond navy du hero. Un seul gestionnaire délégué (plus bas,
+               [data-simuler-type]) pilote déjà toutes les instances, celle-ci comme celle du
+               hero, sans rien à ajouter côté JS. -->
+          <div class="prm-type-switch prm-type-switch-light" role="group" aria-label="Simuler un type de compte">
+            <button type="button" class="prm-type-btn${type === 'utilisateur' ? ' active' : ''}" data-simuler-type="utilisateur">🙍 Compte Utilisateur</button>
+            <button type="button" class="prm-type-btn${type === 'initiative' ? ' active' : ''}" data-simuler-type="initiative">🏢 Compte Initiative</button>
+          </div>
+
           ${avecParrainage ? `
           <div class="prm-code-da prm-parrainage">
             <label for="prm-parrainage-dsid">Compte de référence identifié : entrez son Code de Sécurité Diaspo'Actif (DS-ID) pour appliquer -50% sur votre abonnement annuel.</label>

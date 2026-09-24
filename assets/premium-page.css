@@ -32,6 +32,14 @@
 .prm-type-btn:hover{opacity:1;}
 .prm-type-btn.active{background:linear-gradient(135deg,#F5D061,#C9971C);color:#3A2600;opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.2);}
 
+/* Variante pour fond clair (2026-09-24) — même bascule, dupliquée dans la section "Tarifs"
+   (.prm-section-alt, fond gris-bleu clair) : le texte blanc translucide de la version hero y
+   serait quasi invisible, donc fond blanc + texte navy pour le bouton inactif. */
+.prm-type-switch.prm-type-switch-light{display:flex;width:fit-content;margin:0 auto 24px;background:#fff;box-shadow:0 1px 4px rgba(13,43,78,.1);}
+.prm-type-switch-light .prm-type-btn{color:var(--navy);opacity:.6;}
+.prm-type-switch-light .prm-type-btn:hover{opacity:.85;}
+.prm-type-switch-light .prm-type-btn.active{opacity:1;}
+
 .prm-section{padding:36px 0;}
 .prm-section-alt{background:var(--bg);border-radius:var(--radius);}
 .prm-section-title{font-size:20px;font-weight:800;color:var(--navy);margin:0 0 22px;text-align:center;}
