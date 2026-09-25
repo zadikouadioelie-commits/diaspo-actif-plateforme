@@ -84,6 +84,18 @@ function compressImageFile(file, maxW = 800, maxH = 800, quality = 0.85) {
  */
 function pickAndUpload(type = 'avatar', options = {}) {
   const { maxW = 800, maxH = 800, quality = 0.85, maxMo = 5 } = options;
+  /* Garde-fou brut (2026-09-25, bug réel signalé : "plusieurs personnes ont été embêtées parce
+     que les photos qu'ils ont essayé de mettre n'ont pas passé") — une photo de téléphone
+     récente pèse très souvent 8 à 20 Mo au format d'origine, largement au-dessus de maxMo
+     (5 Mo par défaut). Ce n'est jamais un problème en soi : compressImageFile() ci-dessous la
+     redimensionne et la recompresse, la faisant systématiquement retomber à quelques centaines
+     de Ko. Avant ce correctif, la taille du fichier D'ORIGINE était comparée à maxMo AVANT
+     toute compression, rejetant donc en boucle des photos parfaitement normales que la
+     compression aurait sans problème fait passer — jamais un cas limite, le cas le plus
+     fréquent pour une photo prise directement avec un smartphone. Seul ce plafond très large
+     (jamais la vraie limite : juste pour éviter de tenter de décoder un fichier aberrant dans
+     le canvas) s'applique désormais au fichier BRUT ; maxMo s'applique au résultat COMPRESSÉ. */
+  const RAW_SANITY_CAP_MO = 30;
 
   return new Promise((resolve) => {
     const input = document.createElement('input');
@@ -97,13 +109,17 @@ function pickAndUpload(type = 'avatar', options = {}) {
       document.body.removeChild(input);
       if (!file) return resolve(null);
 
-      if (file.size > maxMo * 1024 * 1024) {
-        alert(`Image trop volumineuse (max ${maxMo} Mo).`);
+      if (file.size > RAW_SANITY_CAP_MO * 1024 * 1024) {
+        alert(`Fichier trop volumineux pour être traité (max ${RAW_SANITY_CAP_MO} Mo avant compression).`);
         return resolve(null);
       }
 
       try {
         const compressed = await compressImageFile(file, maxW, maxH, quality);
+        if (compressed.size > maxMo * 1024 * 1024) {
+          alert(`Image encore trop volumineuse après compression (max ${maxMo} Mo). Essayez une photo moins détaillée.`);
+          return resolve(null);
+        }
         const url = await uploadMedia(compressed, type);
         resolve(url);
       } catch (err) {
