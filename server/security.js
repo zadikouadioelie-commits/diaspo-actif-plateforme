@@ -231,7 +231,18 @@ const RICH_HTML_OPTIONS = {
   // que de faire confiance à ce que le client aurait pu envoyer (rel manquant = vulnérable au
   // tabnabbing ; voir la CSP déjà en place pour le reste du site, même logique de défense
   // "jamais confiance dans ce qui vient du client").
-  transformTags: { a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer" }) },
+  transformTags: {
+    a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer" }),
+    // Filet de sécurité (2026-09-25, bug réel constaté en testant) — assets/rich-editor.js force
+    // désormais <p> pour chaque Entrée (defaultParagraphSeparator), mais un <div> peut encore
+    // survenir par un autre chemin (copier-coller depuis Word/un autre site, navigateur non
+    // Blink...) ; sans ce filet, un <div> n'étant pas dans allowedTags disparaissait avec son
+    // contenu FUSIONNÉ au paragraphe suivant (aucun <p> résiduel pour les séparer) — exactement
+    // le risque que la demande interdisait explicitement ("ne jamais transformer plusieurs
+    // paragraphes en un seul bloc"). transformTags s'applique AVANT le filtre allowedTags
+    // (vérifié en testant), donc un <div> renommé en <p> ici est ensuite normalement accepté.
+    div: "p",
+  },
   disallowedTagsMode: "discard",
 };
 function sanitizeRichHtml(html) {

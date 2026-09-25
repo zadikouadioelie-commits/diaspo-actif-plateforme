@@ -101,7 +101,18 @@
     area.className = 'rich-editor-area';
     area.contentEditable = 'true';
     area.setAttribute('data-placeholder', opts.placeholder || 'Écrivez ici…');
-    area.innerHTML = textarea.value || '';
+    /* Contenu initial toujours enveloppé dans au moins un <p> (2026-09-25, bug réel constaté en
+       testant) — un contenteditable vide au départ insère les tout premiers caractères tapés en
+       texte nu, hors de tout paragraphe ; laissé tel quel, SEC.sanitizeRichHtml() le laisse
+       passer (le texte nu n'est pas une balise interdite) mais il n'a alors ni les espacements
+       ni la structure de paragraphe du reste du texte. */
+    area.innerHTML = textarea.value || '<p><br></p>';
+    // Force <p> (jamais <div>) pour chaque nouveau paragraphe créé par la touche Entrée — sans
+    // ça, Chrome/les navigateurs à moteur Blink insèrent des <div>, absents de la liste blanche
+    // du sanitizeur serveur : plusieurs paragraphes tapés à la suite (juste en appuyant sur
+    // Entrée, sans cliquer sur aucun bouton) se retrouvaient TOUS FUSIONNÉS EN UN SEUL BLOC
+    // après l'enregistrement — exactement ce que la demande interdisait explicitement.
+    area.addEventListener('focus', () => { try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {} });
 
     TOOLBAR.forEach(item => {
       if (item.sep) { toolbarEl.appendChild(Object.assign(document.createElement('span'), { className: 'rich-editor-sep' })); return; }
@@ -135,7 +146,10 @@
 
     const instance = {
       getHTML: () => area.innerHTML,
-      setHTML: html => { area.innerHTML = html || ''; sync(); },
+      // Même repli que l'initialisation dans attach() ci-dessus, et pour la même raison — sinon
+      // setHTML('') (rechargement à vide de la modale) écrasait le <p><br></p> déjà posé par
+      // attach() juste avant, ramenant l'éditeur au cas bogué (bug réel constaté en testant).
+      setHTML: html => { area.innerHTML = html || '<p><br></p>'; sync(); },
       isEmpty: () => !area.textContent.trim(),
       focus: () => area.focus(),
     };
