@@ -468,7 +468,18 @@ function renderDetailView() {
   const tabsAffiches = enCreation ? IA_TABS.filter(t => IA_CREATION_STEPS.includes(t.key)) : IA_TABS;
   const tabsHtml = tabsAffiches.map((t, i) => {
     const active = state.activeTab === t.key;
-    return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; border-bottom:2px solid ${active ? 'oklch(0.32 0.09 258)' : 'transparent'}; color:${active ? 'oklch(0.2 0.006 30)' : 'oklch(0.5 0.006 30)'};" data-action="selectTab" data-tab="${t.key}">${i + 1}. ${t.emoji} ${t.label}</button>`;
+    /* Vert néon (création) / bleu néon (gestion) — 2026-09-25, demande explicite : distinguer
+       visuellement, sur TOUTE la barre d'onglets (pas seulement l'onglet actif), les 3 étapes
+       de l'assistant de création (IA_CREATION_STEPS) des onglets de gestion d'une fiche déjà
+       créée — même idiome "néon" déjà établi plus bas dans ce fichier pour les puces de
+       catégorie de champs (couleur saturée + halo lumineux en box-shadow/text-shadow sur
+       l'état actif, voir "Violet néon"). Le texte utilise une teinte plus sombre du même néon
+       (jamais la couleur vive elle-même) pour rester lisible sur fond blanc ; le soulignement
+       et le halo, eux, gardent la couleur vive pour l'effet néon. */
+    const estCreation = IA_CREATION_STEPS.includes(t.key);
+    const neonVif = estCreation ? '#39FF14' : '#00BFFF';
+    const neonTexte = estCreation ? '#0C8B24' : '#0057B8';
+    return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:700; white-space:nowrap; border-bottom:3px solid ${active ? neonVif : neonVif + '55'}; color:${neonTexte}; text-shadow:${active ? `0 0 10px ${neonVif}99` : 'none'};" data-action="selectTab" data-tab="${t.key}">${i + 1}. ${t.emoji} ${t.label}</button>`;
   }).join('');
   const nav = `<nav style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:0 28px; display:flex; gap:2px; overflow-x:auto;">${tabsHtml}</nav>`;
   // Bouton "Précédent" (2026-09-09, demande explicite) — les onglets se parcourent surtout dans
