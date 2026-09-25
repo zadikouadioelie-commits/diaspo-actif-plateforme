@@ -16,6 +16,17 @@
    HTML riche.
    =========================================================== */
 const crypto = require("node:crypto");
+/* Épinglé EXACTEMENT à 2.17.1 (voir package.json, --save-exact) — panne de production réelle
+   constatée le 2026-09-25 : sanitize-html >=2.17.2 dépend d'htmlparser2 >=10, devenu un paquet
+   ESM pur ("type":"module", aucun point d'entrée CommonJS), que require() charge sans erreur en
+   local (Node 24 y a un interop silencieux) mais fait planter TOUT le serveur au démarrage sur
+   Vercel ("require() of ES Module ... not supported"). 2.17.1 est la dernière version dont la
+   dépendance (htmlparser2 ^8.0.0) est encore purement CommonJS. Les 2-3 CVE modérées corrigées
+   dans les versions plus récentes (bypass de schéma via les attributs action/formaction/data/
+   poster/background, SVG/SMIL, mutation-XSS via allowedTags) ne s'appliquent pas ici : aucun de
+   ces attributs ni des balises <svg>/<img>/<textarea>/<form> ne figure dans RICH_HTML_OPTIONS
+   ci-dessous (testé explicitement contre ces 3 vecteurs avant ce choix) — ne PAS mettre à jour
+   sans revérifier ce point ET tester un déploiement réel sur Vercel avant de fusionner. */
 const sanitizeHtml = require("sanitize-html");
 
 /* ---------------------------------------------------------------
