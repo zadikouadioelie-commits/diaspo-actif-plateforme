@@ -18240,9 +18240,12 @@ async function enrichirAvecFicheMedia(rows) {
        retombait TOUJOURS sur l'ancien formulaire minimal (rejoindre()) même quand une vraie
        fiche existait — jamais vérifié côté client faute de cette donnée. */
     const fiches = await db.prepare(`SELECT id, slug, statut, affiche_url FROM insc_fiches WHERE id IN (${ph3})`).all(...ficheIds);
-    const medias = await db.prepare(`SELECT fiche_id, type, url, libelle FROM insc_fiches_medias WHERE fiche_id IN (${ph3}) ORDER BY position ASC`).all(...ficheIds);
+    /* id ajouté (2026-09-25, demande explicite : "supprimer des documents et images" depuis la
+       page publique de l'événement) — manquait pour que le client puisse cibler
+       DELETE /api/insc/medias/:id, jusqu'ici réservé à inscriptions-admin.html. */
+    const medias = await db.prepare(`SELECT id, fiche_id, type, url, libelle FROM insc_fiches_medias WHERE fiche_id IN (${ph3}) ORDER BY position ASC`).all(...ficheIds);
     fiches.forEach(f => { fichesById[f.id] = { slug: f.slug, statut: f.statut, affiche_url: f.affiche_url, medias: [] }; });
-    medias.forEach(m => { if (fichesById[m.fiche_id]) fichesById[m.fiche_id].medias.push({ type: m.type, url: m.url, libelle: m.libelle }); });
+    medias.forEach(m => { if (fichesById[m.fiche_id]) fichesById[m.fiche_id].medias.push({ id: m.id, type: m.type, url: m.url, libelle: m.libelle }); });
   }
 
   return rows.map(r => {
@@ -18577,6 +18580,31 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
       coverImg, coverImg, galerie, evt.id
     );
   sendJSON(res, 200, { id: evt.id });
+});
+
+/* PATCH /api/evenements/:id/media — retire UNE image/document natif sans toucher au reste de
+   l'événement (2026-09-25, demande explicite : "possibilité de supprimer des documents et
+   images" depuis la page publique). PUT /api/evenements/:id ci-dessus réécrit systématiquement
+   la ligne entière (titre/date obligatoires) — inadapté à un simple retrait ponctuel. La plupart
+   des photos/documents affichés viennent en réalité de la fiche liée (voir enrichirAvecFicheMedia,
+   supprimés via DELETE /api/insc/medias/:id côté client) ; cette route ne couvre que les champs
+   natifs historiques (image_couverture/image_url/galerie_photos, pdf_url/pdf_nom). */
+route("PATCH", "/api/evenements/:id/media", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT id, owner_user_id FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") {
+    return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
+  }
+  if (body?.champ === "cover") {
+    await db.prepare("UPDATE evenements SET image_couverture=NULL, image_url=NULL, galerie_photos='[]' WHERE id=?").run(evt.id);
+  } else if (body?.champ === "pdf") {
+    await db.prepare("UPDATE evenements SET pdf_url=NULL, pdf_nom=NULL WHERE id=?").run(evt.id);
+  } else {
+    return sendJSON(res, 400, { error: "Champ invalide." });
+  }
+  sendJSON(res, 200, { ok: true });
 });
 
 

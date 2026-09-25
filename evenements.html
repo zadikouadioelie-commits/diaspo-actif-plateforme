@@ -55,6 +55,10 @@
 .evt-img{width:100%;height:140px;background:linear-gradient(135deg,#ff6b00 0%,#ff9f43 100%);display:flex;align-items:center;justify-content:center;font-size:48px;overflow:hidden}
 .evt-delete-float{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.4);color:#fff;border:none;padding:0;margin:0;box-sizing:border-box;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;z-index:5;transition:background .15s,transform .15s;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
 .evt-delete-float:hover{background:rgba(220,38,38,.88);transform:scale(1.08);}
+/* Suppression individuelle d'une photo de galerie (2026-09-25) — même principe que
+   .evt-delete-float mais réduit pour un petit vignette au lieu du visuel plein-largeur. */
+.evt-media-delete-btn{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;padding:0;margin:0;box-sizing:border-box;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;z-index:2;transition:background .15s,transform .15s;}
+.evt-media-delete-btn:hover{background:rgba(220,38,38,.9);transform:scale(1.1);}
 /* Bouton WhatsApp déplacé en haut à gauche de la cartouche (2026-09-07, demande explicite) —
    même principe flottant que .evt-delete-float (coin opposé), au-dessus de l'image de couverture. */
 .evt-whatsapp-float{position:absolute;top:8px;left:8px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:5;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .15s;}
@@ -816,6 +820,23 @@ async function supprimerEvenement(id, btn) {
   } catch(e) { alert('Erreur : '+e.message); btn.disabled = false; }
 }
 
+/* Suppression d'une photo/d'un document individuel affiché sur la page d'un événement
+   (2026-09-25, demande explicite, capture à l'appui : "possibilité de supprimer des documents
+   et images"). La plupart de ces fichiers viennent en réalité de la fiche d'inscription liée
+   (voir enrichirAvecFicheMedia() côté serveur) plutôt que de l'événement lui-même — chaque
+   bouton porte donc son "kind" pour appeler la bonne route selon l'origine réelle du fichier. */
+async function supprimerMediaEvt(btn, kind, mediaId, evtId, ficheId) {
+  if (!confirm('Supprimer définitivement ce fichier ?\n\nCette action est irréversible.')) return;
+  btn.disabled = true;
+  try {
+    if (kind === 'fiche_media') await api('DELETE', '/insc/medias/' + mediaId);
+    else if (kind === 'fiche_affiche') await api('PUT', '/insc/fiches/' + ficheId, { affiche_url: '' });
+    else if (kind === 'native_cover') await api('PATCH', '/evenements/' + evtId + '/media', { champ: 'cover' });
+    else if (kind === 'native_pdf') await api('PATCH', '/evenements/' + evtId + '/media', { champ: 'pdf' });
+    await openDetail(evtId);
+  } catch (e) { alert('Erreur : ' + e.message); btn.disabled = false; }
+}
+
 /* ─── Pays (origine retirée du filtre Événements, 2026-09-07 — hors du set de filtres
    demandé : Localisation, Date, Catégorie, Type, Mot-clé, Gratuit/payant) ─── */
 (function() {
@@ -1414,6 +1435,21 @@ function renderEventDetail(evt, isPreview) {
      fiche d'inscription (photos/vidéos/PDF) apparaît directement ici, sur la page publique de
      l'événement. Voir enrichirAvecFicheMedia() côté serveur. */
   const fm = evt.fiche_media || null;
+  // Remonté ici (2026-09-25, était plus bas) : nécessaire dès la construction de la galerie et
+  // des documents ci-dessous pour savoir si les boutons de suppression doivent apparaître.
+  const peutGererDetail = typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur');
+  /* Photos/documents affichés avec leur origine (2026-09-25, demande explicite : "possibilité
+     de supprimer des documents et images" pour le créateur) — chaque entrée porte de quoi être
+     supprimée individuellement par supprimerMediaEvt() plus bas : une photo/PDF de la fiche liée
+     (kind:'fiche_media', id réel) se supprime via DELETE /api/insc/medias/:id ; l'affiche de la
+     fiche (kind:'fiche_affiche', pas de ligne media propre) via PUT /api/insc/fiches/:id ; les
+     champs natifs historiques (kind:'native_cover'/'native_pdf') via le nouveau
+     PATCH /api/evenements/:id/media (voir server/index.js). */
+  const galerieMeta = [
+    ...(Array.isArray(evt.galerie_photos) ? evt.galerie_photos.filter(Boolean).map(url => ({ url, kind: 'native_cover' })) : []),
+    ...(fm && fm.affiche_url ? [{ url: fm.affiche_url, kind: 'fiche_affiche' }] : []),
+    ...(fm ? fm.medias.filter(m => m.type === 'photo').map(m => ({ url: m.url, kind: 'fiche_media', id: m.id })) : []),
+  ];
   const fichePhotos = fm ? [fm.affiche_url, ...fm.medias.filter(m => m.type === 'photo').map(m => m.url)].filter(Boolean) : [];
   const ficheVideos = fm ? fm.medias.filter(m => m.type === 'video') : [];
   const fichePdfs = fm ? fm.medias.filter(m => m.type === 'pdf') : [];
@@ -1445,7 +1481,10 @@ function renderEventDetail(evt, isPreview) {
     <div style="padding:0 20px 10px;">
       <div class="section-divider">🖼️ Galerie</div>
       <div class="gallery-thumb-grid">
-        ${galerie.map((src,i)=>`<img src="${esc(src)}" alt="Photo ${i+1}" onclick="carouselGo('${prefix}-carousel',${uniqueSlides.indexOf(src)})">`).join('')}
+        ${galerieMeta.map((g,i)=>`<div style="position:relative;">
+          <img src="${esc(g.url)}" alt="Photo ${i+1}" onclick="carouselGo('${prefix}-carousel',${uniqueSlides.indexOf(g.url)})">
+          ${!isPreview && peutGererDetail ? `<button type="button" class="evt-media-delete-btn" onclick="event.stopPropagation();supprimerMediaEvt(this,'${g.kind}',${g.id ?? 'null'},${evt.id},${evt.fiche_id ?? 'null'})" title="Supprimer cette photo">✕</button>` : ''}
+        </div>`).join('')}
       </div>
     </div>
   ` : '';
@@ -1475,9 +1514,10 @@ function renderEventDetail(evt, isPreview) {
     </div>
   ` : '';
 
-  // Documents : le champ PDF natif historique (evt.pdf_url) + ceux de la fiche d'inscription.
-  const pdfsNatifs = evt.pdf_url ? [{ url: evt.pdf_url, libelle: evt.pdf_nom }] : [];
-  const tousPdfs = [...pdfsNatifs, ...fichePdfs];
+  // Documents : le champ PDF natif historique (evt.pdf_url, kind:'native_pdf') + ceux de la
+  // fiche d'inscription liée (kind:'fiche_media', id réel — voir supprimerMediaEvt() plus bas).
+  const pdfsNatifs = evt.pdf_url ? [{ url: evt.pdf_url, libelle: evt.pdf_nom, kind: 'native_pdf' }] : [];
+  const tousPdfs = [...pdfsNatifs, ...fichePdfs.map(p => ({ ...p, kind: 'fiche_media' }))];
   const pdfHTML = tousPdfs.length ? `
     <div style="padding:0 20px 14px;">
       <div class="section-divider">📄 Document${tousPdfs.length>1?'s':''}</div>
@@ -1490,11 +1530,11 @@ function renderEventDetail(evt, isPreview) {
         </div>
         <a href="${esc(p.url)}" target="_blank" download="${esc(p.libelle||'document.pdf')}" class="btn btn-orange" style="font-size:12px;">⬇ Télécharger</a>
         <a href="${esc(p.url)}" target="_blank" class="btn btn-outline" style="font-size:12px;">👁 Voir</a>
+        ${!isPreview && peutGererDetail ? `<button type="button" class="btn btn-outline" style="font-size:12px;color:#dc2626;border-color:#dc2626;" onclick="supprimerMediaEvt(this,'${p.kind}',${p.id ?? 'null'},${evt.id},${evt.fiche_id ?? 'null'})" title="Supprimer ce document">🗑</button>` : ''}
       </div>`).join('')}
     </div>
   ` : '';
 
-  const peutGererDetail = typeof CURRENT_USER!=='undefined' && CURRENT_USER && (CURRENT_USER.id===evt.owner_user_id || CURRENT_USER.role==='administrateur');
   // Même correctif que dans renderEvts() ci-dessus (2026-09-22) : un événement natif (sans
   // source_events_id) ouvre désormais sa propre modale d'édition au lieu de retomber sur une
   // page sans rapport.
