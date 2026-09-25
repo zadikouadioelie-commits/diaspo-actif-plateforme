@@ -305,6 +305,18 @@
       </div>
       <div><label>Places max</label><input type="number" id="e-places" min="1" placeholder="Illimitées"></div>
     </div>
+    <!-- Ouverture programmée des inscriptions (2026-09-25, demande explicite : "propose une
+         heure à laquelle les inscriptions doivent commencer... ne prend pas en compte que le
+         jour, mais également l'heure") — jour ET heure exacts (datetime-local), pris en compte
+         par le formulaire d'inscription minimal intégré (bouton "S'inscrire" ci-dessous, sans
+         fiche liée) : les inscriptions restent fermées jusqu'à cet instant précis. Vide = ouvert
+         dès la publication, comportement inchangé. Sans effet sur une fiche d'inscription liée,
+         qui garde son propre réglage équivalent (inscriptions-admin.html). -->
+    <div style="margin-bottom:10px;">
+      <label>⏰ Ouverture programmée des inscriptions <span style="font-weight:400;color:var(--muted);">(optionnel — jour et heure)</span></label>
+      <input type="datetime-local" id="e-ouverture-inscriptions">
+      <p style="font-size:11px;color:#aaa;margin:4px 0 0;">Sans fiche d'inscription liée, les inscriptions restent fermées jusqu'à cette date et heure précises. Laissez vide pour une ouverture immédiate dès la publication.</p>
+    </div>
     <div style="margin-bottom:10px;">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:13px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;">
         <input type="checkbox" id="e-masquer-inscrits" style="width:20px;height:20px;flex-shrink:0;accent-color:#B84C1A;border:2px solid #94A3B8;border-radius:4px;cursor:pointer;">
@@ -592,6 +604,7 @@ function renderEvts() {
     const icon  = DOMAINE_ICON[evt.domaine] || '📢';
     const inscrit = inscritSet.has(evt.id);
     const plein   = evt.places_max && evt.nb_participants >= evt.places_max;
+    const pasEncoreOuvert = inscriptionsPasEncoreOuvertes(evt);
     const visiBadge = evt.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
                       evt.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' : '';
     // Brouillon (2026-09-23) : ne peut être visible ici que pour son propriétaire ou un admin
@@ -664,7 +677,10 @@ function renderEvts() {
                 ? '<button class="btn" style="font-size:12px" onclick="quitter('+evt.id+',this)">Se désinscrire</button>'
                 : (plein
                   ? '<button class="btn" disabled style="font-size:12px;opacity:.5">Complet</button>'
-                  : '<button class="btn btn-orange" style="font-size:12px" onclick="rejoindre('+evt.id+',this)">'+(typeof CURRENT_USER!=='undefined'&&CURRENT_USER?'S&#39;inscrire':'Se connecter')+'</button>'
+                  : (pasEncoreOuvert
+                    ? '<button class="btn" disabled style="font-size:12px;opacity:.5" title="Ouverture le '+esc(ouvertureInscriptionsTexte(evt))+'">⏰ Ouvre le '+esc(ouvertureInscriptionsTexte(evt))+'</button>'
+                    : '<button class="btn btn-orange" style="font-size:12px" onclick="rejoindre('+evt.id+',this)">'+(typeof CURRENT_USER!=='undefined'&&CURRENT_USER?'S&#39;inscrire':'Se connecter')+'</button>'
+                  )
                 )
               )
             )
@@ -692,6 +708,19 @@ function badgeParticipation(evt) {
   if (evt.prix_min) return '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>';
   if (evt.type_participation === 'payant') return '<span class="evt-tag">🔴 Payant</span>';
   return '<span class="evt-tag" style="color:#16a34a;">🟢 Gratuit</span>';
+}
+
+// Ouverture programmée des inscriptions (2026-09-25, demande explicite) — partagé entre la vue
+// liste (renderEvts) et la vue détail (renderEventDetail), même règle que côté serveur
+// (POST /api/evenements/:id/rejoindre) : jour ET heure, pas de conversion de fuseau ajoutée.
+// Ne concerne que le formulaire minimal intégré (evt.lien_inscription/evt.fiche_id absents),
+// jamais évaluée quand une fiche liée existe déjà (elle gère sa propre ouverture, sur sa page).
+function inscriptionsPasEncoreOuvertes(evt) {
+  return !!(evt.ouverture_inscriptions && new Date(evt.ouverture_inscriptions) > new Date());
+}
+function ouvertureInscriptionsTexte(evt) {
+  const dt = new Date(evt.ouverture_inscriptions);
+  return isNaN(dt) ? '' : dt.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 }
 
 /* Adresse exacte / GPS → lien Google Maps (2026-09-09). Accepte indifféremment une adresse
@@ -842,7 +871,7 @@ document.getElementById('btn-filtre-trophee').addEventListener('click', () => {
 // l'événement précédent affichés). N'efface pas les widgets à état propre (fiche choisie,
 // modèle standard, image de couverture) : gérés par leurs propres blocs juste après l'appel.
 function resetModaleEvenement() {
-  ['e-titre','e-date','e-heure','e-heure-fin','e-pays','e-lieu','e-lieu-gps','e-desc','e-places','e-visio-evt','e-whatsapp'].forEach(id => {
+  ['e-titre','e-date','e-heure','e-heure-fin','e-ouverture-inscriptions','e-pays','e-lieu','e-lieu-gps','e-desc','e-places','e-visio-evt','e-whatsapp'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   document.getElementById('e-type').value = 'evenement';
@@ -904,6 +933,7 @@ function ouvrirModaleEdition(id) {
   document.getElementById('e-date').value = evt.date_evt || '';
   document.getElementById('e-heure').value = evt.heure_debut || '09:00';
   document.getElementById('e-heure-fin').value = evt.heure_fin || '';
+  document.getElementById('e-ouverture-inscriptions').value = evt.ouverture_inscriptions ? evt.ouverture_inscriptions.slice(0, 16) : '';
   document.getElementById('e-type').value = evt.type_evt || 'evenement';
   document.getElementById('e-domaine').value = evt.domaine || '';
   document.getElementById('e-zone-diffusion').value = evt.zone_diffusion || '';
@@ -1113,6 +1143,7 @@ async function enregistrerEvenement(statutVise) {
       date_evt:      date,
       heure_debut:   document.getElementById('e-heure').value || null,
       heure_fin:     document.getElementById('e-heure-fin').value || null,
+      ouverture_inscriptions: document.getElementById('e-ouverture-inscriptions').value || null,
       type_evt:      document.getElementById('e-type').value,
       domaine:       document.getElementById('e-domaine').value,
       zone_diffusion: document.getElementById('e-zone-diffusion').value || null,
@@ -1514,7 +1545,13 @@ function renderEventDetail(evt, isPreview) {
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
           : (evt.fiche_id && evt.fiche_slug
             ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="inscription-publique.html?slug=${encodeURIComponent(evt.fiche_slug)}">✅ S'inscrire à l'événement</a>`
-            : (!isPreview ? `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>` : '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>')
+            : (isPreview
+              ? '<button class="btn btn-orange" style="font-size:13px;">✅ S\'inscrire à l\'événement</button>'
+              : (inscriptionsPasEncoreOuvertes(evt)
+                ? `<button class="btn" disabled style="font-size:13px;opacity:.5;">⏰ Ouvre le ${esc(ouvertureInscriptionsTexte(evt))}</button>`
+                : `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>`
+              )
+            )
           )
         }
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>

@@ -18399,6 +18399,24 @@ async function ensureEvenementsTypeParticipationCol() {
   catch (e) {}
   global.__evenementsTypeParticipationEnsured = true;
 }
+/* ouverture_inscriptions (2026-09-25, demande explicite : "propose également une heure à
+   laquelle les inscriptions doivent commencer... ne prend pas en compte que le jour, mais
+   également l'heure") — ne concerne QUE le formulaire minimal intégré (POST /api/evenements/
+   :id/rejoindre, evenements_participants), pour un événement SANS fiche d'inscription liée.
+   Une fiche liée a déjà son propre réglage équivalent (insc_fiches.date_ouverture_inscriptions,
+   inscriptions-admin.html), volontairement indépendant — jamais synchronisé automatiquement
+   entre les deux, même principe que type_participation vs le tarif de la fiche : chacun garde
+   son propre réglage tant qu'aucune fiche n'impose le sien. Format datetime-local (jour ET
+   heure), stocké tel quel, jamais converti — comparé à `new Date()` sans ajout de 'Z', pour
+   rester cohérent avec la convention déjà en place sur insc_fiches (voir GET /api/insc/public/
+   :slug) plutôt que d'introduire une deuxième interprétation de fuseau horaire sur la même
+   plateforme. */
+async function ensureEvenementsOuvertureInscriptionsCol() {
+  if (global.__evenementsOuvertureInscriptionsEnsured) return;
+  try { await db.prepare(`ALTER TABLE evenements ADD COLUMN ouverture_inscriptions TEXT`).run(); }
+  catch (e) {}
+  global.__evenementsOuvertureInscriptionsEnsured = true;
+}
 
 route("POST", "/api/evenements", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -18424,9 +18442,10 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      "payant"). Sans fiche liée du tout, le choix du formulaire (gratuit/partiellement_payant/
      payant) fait foi. Même idiome que zone_diffusion juste au-dessus. */
   await ensureEvenementsTypeParticipationCol();
+  await ensureEvenementsOuvertureInscriptionsCol();
   const {
     titre, organisateur, date_evt, lieu, pays, ville, origine, description, type_evt, domaine,
-    zone_diffusion, type_participation, statut,
+    zone_diffusion, type_participation, statut, ouverture_inscriptions,
     places_max, inscription_ouverte, lien_inscription, image_url,
     heure_debut, heure_fin, date_fin, lien_visio, visibilite,
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
@@ -18445,17 +18464,17 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
   // reste strictement limité à ces deux valeurs (jamais un statut arbitraire venu du client).
   const statutFinal = statut === 'brouillon' ? 'brouillon' : 'ouvert';
   const id = (await db.prepare(`INSERT INTO evenements
-    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,type_participation,places_max,
+    (titre,organisateur,date_evt,lieu,pays,ville,origine,description,type_evt,domaine,zone_diffusion,type_participation,ouverture_inscriptions,places_max,
      inscription_ouverte,lien_inscription,image_url,statut,owner_user_id,
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
      langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       description||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
-      ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', places_max||null,
+      ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions||null, places_max||null,
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, statutFinal, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
       coverImg, galerie,
@@ -18531,8 +18550,9 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
     return sendJSON(res, 403, { error: "Vous ne pouvez modifier que vos propres événements." });
   }
   await ensureEvenementsTypeParticipationCol();
+  await ensureEvenementsOuvertureInscriptionsCol();
   const {
-    titre, date_evt, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, pays, lieu, ville, lieu_gps,
+    titre, date_evt, heure_debut, heure_fin, type_evt, domaine, zone_diffusion, type_participation, statut, ouverture_inscriptions, pays, lieu, ville, lieu_gps,
     origine, description, places_max, masquer_inscrits, visibilite, lien_visio, whatsapp_lien,
     image_couverture, image_url, galerie_photos
   } = body;
@@ -18545,13 +18565,13 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
   // au cas où un futur appelant de cette route omettrait ce champ).
   const statutFinal = ['ouvert','brouillon'].includes(statut) ? statut : evt.statut;
   await db.prepare(`UPDATE evenements SET
-    titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
+    titre=?, date_evt=?, heure_debut=?, heure_fin=?, type_evt=?, domaine=?, zone_diffusion=?, type_participation=?, ouverture_inscriptions=?, statut=?, pays=?, lieu=?, ville=?, lieu_gps=?,
     origine=?, description=?, places_max=?, masquer_inscrits=?, visibilite=?, lien_visio=?, whatsapp_lien=?,
     image_couverture=?, image_url=?, galerie_photos=?
     WHERE id=?`)
     .run(
       titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
-      ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', statutFinal,
+      ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
       pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, description || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
       coverImg, coverImg, galerie, evt.id
@@ -19567,6 +19587,13 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
   const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
+  // Heure d'ouverture programmée (2026-09-25, demande explicite) — voir
+  // ensureEvenementsOuvertureInscriptionsCol() : ne s'applique qu'ici, jamais réévaluée côté
+  // fiche (chacune garde son propre réglage). Pas de 'Z' ajouté, même convention que
+  // insc_fiches.date_ouverture_inscriptions (GET /api/insc/public/:slug).
+  if (evt.ouverture_inscriptions && new Date(evt.ouverture_inscriptions) > new Date()) {
+    return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
+  }
   const nbPers = Math.max(1, Math.min(20, parseInt(body?.nb_personnes) || 1));
   if (evt.places_max) {
     const nb = (await db.prepare("SELECT COALESCE(SUM(nb_personnes),COUNT(*)) AS n FROM evenements_participants WHERE evenement_id=?").get(params.id))?.n || 0;
