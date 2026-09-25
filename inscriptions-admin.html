@@ -34,6 +34,16 @@
 .ia-evt-ligne { border:1.5px solid oklch(0.88 0.004 30); background:#fff; border-radius:8px; padding:9px 12px; transition:background .1s,border-color .1s; }
 .ia-evt-ligne:has(.ia-evt-checkbox:checked) { border-color:oklch(0.32 0.09 258); background:oklch(0.95 0.03 258); }
 .ia-evt-checkbox { width:19px; height:19px; accent-color:oklch(0.32 0.09 258); flex-shrink:0; }
+/* Encart "Étape essentielle — Liaison à un événement" (2026-09-25, demande explicite : violet
+   scintillant, même principe que .trophee-shimmer d'evenements.html — un reflet balaie
+   l'encart en boucle pour rester bien visible sans gêner la lecture ni bloquer les clics
+   (pointer-events:none sur le reflet). Contenu (checkboxes, bouton) au-dessus via z-index. */
+.ia-liaison-essentielle{position:relative;overflow:hidden;background:linear-gradient(135deg,#F5EAFF,#ECDCFF);border:2px solid #BC13FE;animation:iaLiaisonGlow 2.8s ease-in-out infinite;}
+.ia-liaison-essentielle > *{position:relative;z-index:1;}
+.ia-liaison-essentielle::after{content:'';position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.85),transparent);animation:iaLiaisonSweep 3s ease-in-out infinite;pointer-events:none;}
+@keyframes iaLiaisonGlow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}50%{box-shadow:0 0 16px 3px rgba(188,19,254,.55);}}
+@keyframes iaLiaisonSweep{0%{left:-60%;}55%,100%{left:130%;}}
+@media (prefers-reduced-motion: reduce){ .ia-liaison-essentielle, .ia-liaison-essentielle::after{animation:none;} }
 @media (max-width: 720px) {
   #ia-root [style*="grid-template-columns:1fr 1fr"],
   #ia-root [style*="grid-template-columns: 1fr 1fr"],
@@ -816,23 +826,6 @@ function renderFields() {
 
   return `
     ${iaConsigne("Choisissez les informations que vous demandez à vos participants (identité, contact, etc.), en plus de nom/prénom/e-mail/téléphone toujours demandés.")}
-    <!-- Liaison à un événement (2026-09-25, demande explicite : "déplace les boutons et options
-         de liaison de fiche à cette page et rend cette étape de liaison très importante bien
-         visible") — vivait avant dans le panneau "Informations générales" de l'onglet Vue
-         d'ensemble, repliable et donc facile à manquer. Réutilise le même contenu
-         (renderLiaisonEvenements()) mais dans un encart à part, bordure épaisse et fond
-         orangé pour qu'on ne puisse pas passer à côté : sans cette étape, le bouton
-         "S'inscrire" de l'événement continue de pointer vers le parcours d'inscription
-         classique au lieu de cette fiche. -->
-    <div style="background:oklch(0.98 0.03 60); border:2px solid oklch(0.7 0.15 60); border-radius:12px; padding:18px 20px; margin-bottom:20px;">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-        <span style="font-size:18px;">🔗</span>
-        <h3 style="margin:0; font-size:14.5px; font-weight:800; color:oklch(0.4 0.13 60);">Étape essentielle — Liaison à un événement</h3>
-      </div>
-      <p style="font-size:12px; color:oklch(0.4 0.06 60); margin:0 0 10px;">Sans cette étape, le bouton « S'inscrire » de votre événement continue de pointer vers le parcours d'inscription classique au lieu de cette fiche.</p>
-      ${renderLiaisonEvenements()}
-      <button style="background:oklch(0.4 0.13 60); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>
-    </div>
     <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">${chips}</div>
     <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -848,6 +841,24 @@ function renderFields() {
       <div style="margin-top:20px; padding-top:16px; border-top:1px solid oklch(0.92 0.004 30); display:flex; justify-content:flex-end;">
         <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 22px; border-radius:8px; cursor:pointer;" data-action="enregistrerFormulaire">Enregistrer</button>
       </div>
+    </div>
+    <!-- Liaison à un événement (2026-09-25, demande explicite : "déplace les boutons et options
+         de liaison de fiche à cette page et rend cette étape de liaison très importante bien
+         visible") — vivait avant dans le panneau "Informations générales" de l'onglet Vue
+         d'ensemble, repliable et donc facile à manquer. Réutilise le même contenu
+         (renderLiaisonEvenements()). Repositionné APRÈS le formulaire (2026-09-25, demande
+         explicite) : la liaison reste possible à tout moment (rien ne la bloque plus tôt), mais
+         sa place naturelle dans le parcours vient une fois les types/tarifs/champs terminés —
+         violet scintillant (même principe que .trophee-shimmer d'evenements.html) pour rester
+         bien visible même en bas de page. -->
+    <div class="ia-liaison-essentielle" style="border-radius:12px; padding:18px 20px; margin-top:20px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+        <span style="font-size:18px;">🔗</span>
+        <h3 style="margin:0; font-size:14.5px; font-weight:800; color:#6B0FA3;">Étape essentielle — Liaison à un événement</h3>
+      </div>
+      <p style="font-size:12px; color:#7A3FA8; margin:0 0 10px;">Sans cette étape, le bouton « S'inscrire » de votre événement continue de pointer vers le parcours d'inscription classique au lieu de cette fiche.</p>
+      ${renderLiaisonEvenements()}
+      <button style="background:#8B12D6; border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>
     </div>`;
 }
 
