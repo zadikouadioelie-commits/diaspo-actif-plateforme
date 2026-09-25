@@ -200,6 +200,41 @@ a.btn-deconnexion,
   background: #fff !important;
   color: #0D2B4E !important;
 }
+/* Flèches de défilement du rail (2026-09-25, assets/app.js:initNavScroll) — même bloc que
+   styles.v2.css (dupliqué ici pour les pages qui ne chargent que ce fichier-ci) : le rail
+   défile déjà en interne (overflow-x:auto ci-dessus) mais rien ne le signale à un utilisateur
+   souris, la scrollbar étant masquée. */
+.nav-scroll-wrap {
+  display: flex !important;
+  align-items: center !important;
+  position: relative !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+.nav-scroll-arrow {
+  display: none;
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 2 !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  background: #B84C1A !important;
+  color: #fff !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  font-family: inherit !important;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,.45) !important;
+}
+.nav-scroll-arrow.visible { display: flex; }
+.nav-scroll-arrow-left { left: 0 !important; }
+.nav-scroll-arrow-right { right: 0 !important; }
 
 /* Entre 1024px et 1535px, le rail public (Accueil…Événements…Site internet) partage le
    topbar avec le bouton doré "Menu des modules" (icône seule sur cette tranche, voir

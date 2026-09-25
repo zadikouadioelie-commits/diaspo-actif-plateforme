@@ -107,6 +107,25 @@ button{font-family:inherit;cursor:pointer;}
 }
 .nav a.active{background:#fff;color:var(--navy);font-weight:700;}
 .nav a:hover:not(.active){color:#fff;background:rgba(255,255,255,.08);}
+/* Flèches de défilement du rail (2026-09-25, assets/app.js:initNavScroll) — le rail lui-même
+   défile déjà (overflow-x:auto ci-dessus), invisible pour un utilisateur souris sans ces
+   flèches puisque la scrollbar est masquée (scrollbar-width:none). .nav-scroll-wrap reprend
+   le flex:0 1 auto/min-width:0 que .nav portait seule avant d'être enveloppée, pour ne rien
+   changer au comportement de .topbar-inner (justify-content:space-between). */
+.nav-scroll-wrap{display:flex;align-items:center;position:relative;flex:0 1 auto;min-width:0;}
+.nav-scroll-arrow{
+  /* Orange (var(--orange)), pas la même teinte navy que le rail : un rond navy sur navy se
+     fondait presque totalement dans le fond, quasi invisible (constaté en testant) — la
+     couleur d'accent/action de la plateforme (déjà utilisée pour les CTA/badges ailleurs)
+     tranche nettement, cohérent avec son rôle de contrôle interactif. */
+  display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:2;
+  width:24px;height:24px;border-radius:50%;border:none;cursor:pointer;padding:0;
+  background:var(--orange);color:#fff;font-size:15px;line-height:1;font-family:inherit;
+  align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.45);
+}
+.nav-scroll-arrow.visible{display:flex;}
+.nav-scroll-arrow-left{left:0;}
+.nav-scroll-arrow-right{right:0;}
 .topbar-right{display:flex;align-items:center;gap:12px;}
 .lang-select{border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:#000;background:rgba(255,255,255,.85);}
 .lang-select option{color:#000;}

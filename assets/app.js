@@ -5561,6 +5561,51 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     document.addEventListener("click", e => { if (!wrap.contains(e.target)) results.style.display = "none"; });
   })();
 
+  // ── Rail de nav horizontal (topbar) : flèches cliquables quand le contenu déborde
+  // (2026-09-25, demande explicite : capture utilisateur, le dernier lien "Événements" se
+  // voyait coupé à moitié à certaines largeurs de fenêtre). Le rail défile déjà en interne
+  // (overflow-x:auto, styles.v2.css/design-upgrade.v2.css) — ça fonctionne au doigt/trackpad,
+  // mais un utilisateur souris n'a AUCUN moyen de le déclencher : la scrollbar est
+  // volontairement masquée (scrollbar-width:none) pour l'esthétique du rail arrondi, donc rien
+  // ne signale même qu'il y a plus de liens à voir. Flèches ajoutées ici plutôt que par page
+  // (`.nav` existe à l'identique sur ~80 pages) — affichées seulement quand le rail déborde
+  // réellement, et seulement du côté où il reste effectivement du contenu à révéler.
+  (function initNavScroll() {
+    const nav = document.querySelector(".topbar .nav");
+    if (!nav || nav.dataset.scrollArrowsInit) return;
+    nav.dataset.scrollArrowsInit = "1";
+
+    const wrap = document.createElement("div");
+    wrap.className = "nav-scroll-wrap";
+    nav.parentNode.insertBefore(wrap, nav);
+    wrap.appendChild(nav);
+
+    const mkArrow = (dir, label) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `nav-scroll-arrow nav-scroll-arrow-${dir}`;
+      b.setAttribute("aria-label", label);
+      b.textContent = dir === "left" ? "‹" : "›";
+      b.addEventListener("click", () => nav.scrollBy({ left: dir === "left" ? -140 : 140, behavior: "smooth" }));
+      wrap.appendChild(b);
+      return b;
+    };
+    const btnLeft = mkArrow("left", "Voir les boutons précédents");
+    const btnRight = mkArrow("right", "Voir les boutons suivants");
+
+    function update() {
+      const overflow = nav.scrollWidth > nav.clientWidth + 1;
+      btnLeft.classList.toggle("visible", overflow && nav.scrollLeft > 4);
+      btnRight.classList.toggle("visible", overflow && nav.scrollLeft < nav.scrollWidth - nav.clientWidth - 4);
+    }
+    nav.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    update();
+    // Recalcule après le premier rendu complet : le sélecteur de langue/la traduction (setLang)
+    // et le chargement des polices peuvent encore changer la largeur du rail juste après.
+    setTimeout(update, 300);
+  })();
+
   // ── Groupe "Bandeau" dans la sidebar : reprend sur mobile les actions du bandeau du haut
   // qui n'ont plus de place à cet endroit (nav masquée, sélecteur de langue masqué, etc.)
   (async function initSidebarBandeau() {
