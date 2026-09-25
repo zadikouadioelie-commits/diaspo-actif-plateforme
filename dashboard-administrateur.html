@@ -12208,20 +12208,11 @@ function filterFaqLocal(query) {
 }
 
 /* ── Modal créer / modifier ──────────────────────────────── */
-/* Éditeur riche (2026-09-25, demande explicite) — attaché une seule fois, réutilisé à chaque
-   ouverture de la modale. faq-m-reponse acceptait déjà du HTML tapé à la main (voir son
-   placeholder d'origine) : ceci ne fait que donner une vraie barre d'outils à la place, le
-   <textarea> caché reste la source lue par saveFaqQuestion()/toggleFaqPreview() sans aucun
-   changement de leur côté (RichEditor tient .value synchronisé à chaque frappe). */
-function _faqRichEditor() {
-  return window.RichEditor ? window.RichEditor.attach('faq-m-reponse', { placeholder: 'Rédigez la réponse complète…' }) : null;
-}
 function openFaqModal(prefill) {
   _faqEditId = null;
   document.getElementById('faq-modal-title').textContent = 'Nouvelle question FAQ';
   document.getElementById('faq-m-question').value = prefill || '';
   document.getElementById('faq-m-reponse').value  = '';
-  _faqRichEditor()?.setHTML('');
   document.getElementById('faq-m-etapes').value   = '';
   document.getElementById('faq-m-lien').value     = '';
   document.getElementById('faq-m-lbl').value      = '';
@@ -12246,7 +12237,6 @@ async function editFaqQuestion(id) {
     document.getElementById('faq-modal-title').textContent = 'Modifier la question';
     document.getElementById('faq-m-question').value = q.question || '';
     document.getElementById('faq-m-reponse').value  = q.reponse  || '';
-    _faqRichEditor()?.setHTML(q.reponse || '');
     document.getElementById('faq-m-etapes').value   = (q.etapes  || []).join('\n');
     document.getElementById('faq-m-lien').value     = q.module_lien   || '';
     document.getElementById('faq-m-lbl').value      = q.module_label  || '';
@@ -14385,7 +14375,6 @@ async function diagEmail() {
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
   <script src="/assets/upload-media.js"></script>
-  <script src="/assets/rich-editor.js"></script>
   <script src="/assets/admin-videos-tutoriels-panel.js"></script>
   <script src="/assets/admin-parrainage-panel.js"></script>
   <script src="/assets/admin-avis-panel.js"></script>

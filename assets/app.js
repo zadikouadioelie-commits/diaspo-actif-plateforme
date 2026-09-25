@@ -136,24 +136,6 @@ function mdBold(html){
 }
 window.mdBold = mdBold;
 
-/* Affichage compatible ascendant d'un champ "texte enrichi" (2026-09-25, assets/rich-editor.js) —
-   le même champ peut contenir soit du texte brut historique (saisi avant l'introduction de
-   l'éditeur — à échapper puis remettre en forme), soit du HTML déjà sanitisé côté serveur
-   (SEC.sanitizeRichHtml, appliqué à l'écriture — jamais fait confiance ici, ce n'est qu'un
-   helper d'AFFICHAGE). Détection par présence d'une balise reconnue plutôt qu'une colonne
-   séparée : aucune migration de données, aucun contenu existant cassé — exactement le besoin
-   exprimé ("ne pas casser les contenus déjà enregistrés"). Pour du texte brut, une ligne vide
-   sépare les paragraphes et un simple retour à la ligne devient <br> — jamais un bloc compact
-   (autre demande explicite : "ne jamais transformer plusieurs paragraphes en un seul bloc"). */
-function renderRichText(value) {
-  const s = String(value == null ? "" : value);
-  if (!s.trim()) return "";
-  if (/<(p|br|strong|b|em|i|u|ul|ol|li|h2|h3|h4|blockquote|a)[\s>]/i.test(s)) return s;
-  const esc = s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  return esc.split(/\n{2,}/).map(para => `<p>${para.replace(/\n/g, "<br>")}</p>`).join("");
-}
-window.renderRichText = renderRichText;
-
 /* ========== BADGE INITIATIVE VÉRIFIÉE ========== */
 const CERTIF_NIVEAUX = {
   verifie:    { icon: "🛡️", label: "Initiative Vérifiée", cls: "certif-verifie" },

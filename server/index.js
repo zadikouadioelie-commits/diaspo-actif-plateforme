@@ -25759,13 +25759,7 @@ route("POST", "/api/faq", async (req, res, _p, body) => {
       category_id || null,
       types,
       question.trim(),
-      /* Sanitisé avant écriture (2026-09-25) — faq.html:500 injecte `reponse` SANS échappement
-         depuis le début (contrairement à `question`, juste au-dessus, qui passe par esc()) : le
-         placeholder du formulaire admin invite explicitement à taper du HTML, donc l'échapper à
-         l'affichage casserait l'usage voulu — le seul point sûr est de garantir ICI que le HTML
-         stocké ne peut plus contenir de vecteur XSS, jamais de faire confiance à ce que l'admin
-         (ou un compte compromis) a tapé. */
-      SEC.sanitizeRichHtml(reponse.trim()),
+      reponse.trim(),
       JSON.stringify(synonymes || []),
       JSON.stringify(mots_cles || []),
       JSON.stringify(etapes    || []),
@@ -25790,7 +25784,7 @@ route("PUT", "/api/faq/:id", async (req, res, params, body) => {
     medias=?, module_lien=?, module_label=?, ordre=?, statut=?, updated_at=datetime('now')
     WHERE id=?`).run(
       category_id || null, types,
-      (question || '').trim(), SEC.sanitizeRichHtml((reponse || '').trim()),
+      (question || '').trim(), (reponse || '').trim(),
       JSON.stringify(synonymes || []),
       JSON.stringify(mots_cles || []),
       JSON.stringify(etapes    || []),
@@ -31393,12 +31387,7 @@ ${jsonLd}
     /* ── PUT /api/profil-emploi ── */
     if (req.method === 'PUT' && pathname === '/api/profil-emploi') {
       const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: 'Connexion requise.' });
-      const { situation, types_opportunites, secteurs, metier, competences, experience, niveau_etudes, langues, mobilite, teletravail, salaire_min, salaire_max, devise, date_disponibilite, disponible_pour_travailler, suspendre_offres, cv_pdf, lettre_pdf, portfolio_pdf } = body;
-      /* Sanitisé avant écriture (2026-09-25) — espace-candidat.html injecte lettre_contenu tel
-         quel via .innerHTML (éditeur contenteditable maison, #lettre-editor), sans aucun
-         nettoyage côté serveur jusqu'ici : un compte pourrait stocker du HTML actif dans sa
-         propre lettre. Faite ici, une fois pour tout ce module (met à jour ET création). */
-      const lettre_contenu = SEC.sanitizeRichHtml(body.lettre_contenu);
+      const { situation, types_opportunites, secteurs, metier, competences, experience, niveau_etudes, langues, mobilite, teletravail, salaire_min, salaire_max, devise, date_disponibilite, disponible_pour_travailler, suspendre_offres, lettre_contenu, cv_pdf, lettre_pdf, portfolio_pdf } = body;
       const existing = await db.prepare(`SELECT id FROM profil_emploi WHERE user_id=?`).get(me.id);
       if (existing) {
         await db.prepare(`UPDATE profil_emploi SET situation=?,types_opportunites=?,secteurs=?,metier=?,competences=?,experience=?,niveau_etudes=?,langues=?,mobilite=?,teletravail=?,salaire_min=?,salaire_max=?,devise=?,date_disponibilite=?,disponible_pour_travailler=?,suspendre_offres=?,lettre_contenu=?,cv_pdf=COALESCE(?,cv_pdf),lettre_pdf=COALESCE(?,lettre_pdf),portfolio_pdf=COALESCE(?,portfolio_pdf),updated_at=datetime('now') WHERE user_id=?`)

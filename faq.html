@@ -497,7 +497,7 @@ function renderItem(q, highlight) {
       <span class="faq-q-arr">▼</span>
     </div>
     <div class="faq-ans">
-      <div class="rich-content">${renderRichText(q.reponse)}</div>
+      ${q.reponse}
       ${stepsHtml}
       ${mediasHtml}
       <div class="faq-ans-actions">
@@ -660,18 +660,6 @@ function setupSticky() {
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-/* Copie locale de window.renderRichText (assets/app.js) — cette page n'inclut délibérément pas
-   app.js (bootstrap léger, assets/ds.js), inutile d'en charger tout le poids pour une seule
-   fonction. Garder les deux copies alignées si le format évolue. Voir server/security.js
-   (SEC.sanitizeRichHtml) pour la vraie barrière de sécurité — ceci n'est qu'un helper
-   d'affichage, jamais un filtre. */
-function renderRichText(value) {
-  const s = String(value == null ? '' : value);
-  if (!s.trim()) return '';
-  if (/<(p|br|strong|b|em|i|u|ul|ol|li|h2|h3|h4|blockquote|a)[\s>]/i.test(s)) return s;
-  return s.split(/\n{2,}/).map(para => `<p>${esc(para).replace(/\n/g,'<br>')}</p>`).join('');
-}
 
 /* ── Démarrer ────────────────────────────────────────────────── */
 init();
