@@ -122,6 +122,11 @@ const IA_TABS = [
   { key: 'historique', label: 'Historique', emoji: '📜' },
 ];
 
+// Les 3 premiers onglets forment l'assistant de création (Vue d'ensemble → Types d'inscription
+// → Formulaire, ce dernier se terminant par la liaison à un événement) ; les autres onglets
+// (Validation, Aperçu public, Communication...) sont des onglets de gestion d'une fiche déjà
+// créée — voir renderWizardFooter()/icSuivant() et le marquage visuel dans renderDetailView().
+const IA_CREATION_STEPS = ['overview', 'types', 'fields'];
 const IA_STATUS_LABEL = { brouillon: 'Brouillon', programmee: 'Programmée', publiee: 'Publiée', suspendue: 'Suspendue', fermee: 'Fermée', archivee: 'Archivée' };
 const IA_STATUS_STYLES = {
   'publiee':   ['oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
@@ -226,6 +231,8 @@ const state = {
   historique: [],
   historiqueFiltreEvenement: '',
   historiqueSelection: [],
+  icModeGestion: false,      // passe à true une fois les 3 étapes de création franchies (voir icContinuerVersGestion)
+  icTransitionVisible: false, // écran "création terminée" affiché entre la dernière étape et le passage en gestion
   busy: false,
 };
 
@@ -410,6 +417,19 @@ function renderDetailView() {
   const [bg, color] = IA_STATUS_STYLES[status] || IA_STATUS_STYLES['brouillon'];
   const badge = `<span style="background:${bg};color:${color};font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;">● ${IA_STATUS_LABEL[status]}</span>`;
 
+  // Marquage création/gestion (2026-09-25, demande explicite) : tant que la fiche est en
+  // brouillon ET que l'utilisateur n'a pas franchi la dernière étape (icContinuerVersGestion),
+  // on est dans l'assistant de création (3 premiers onglets seulement, IA_CREATION_STEPS).
+  // Dès que la fiche est publiée (notamment automatiquement via une liaison à un événement,
+  // voir inscPublierSiBrouillon côté serveur) ou que l'utilisateur a cliqué "Continuer", on
+  // bascule en gestion et on ne repasse plus jamais par l'assistant pour cette fiche.
+  const enCreation = status === 'brouillon' && !state.icModeGestion;
+  const etapeIdx = IA_CREATION_STEPS.indexOf(state.activeTab);
+  const modePill = enCreation
+    ? `<span style="background:#FFF3E6; border:1px solid #F26422; color:#B9490A; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">🛠️ Création — étape ${(etapeIdx > -1 ? etapeIdx : 0) + 1}/${IA_CREATION_STEPS.length}</span>`
+    : `<span style="background:oklch(0.94 0.03 258); border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">📋 Gestion</span>`;
+  const progressBar = enCreation ? `<div style="height:4px; width:100%; max-width:280px; background:#FFE1C7; border-radius:2px; margin-top:10px; overflow:hidden;"><div style="height:100%; background:#F26422; border-radius:2px; width:${((etapeIdx > -1 ? etapeIdx : 0) + 1) / IA_CREATION_STEPS.length * 100}%; transition:width .25s;"></div></div>` : '';
+
   const publierBtn = (status === 'brouillon' || status === 'fermee') ? `<button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:600; padding:9px 18px; border-radius:8px; cursor:pointer;" data-action="publierFiche">Publier la fiche</button>` :
     status === 'publiee' ? `<button style="background:#fff; border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="fermerFiche">Fermer les inscriptions</button>` : '';
 
@@ -420,6 +440,7 @@ function renderDetailView() {
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <h1 style="margin:0; font-size:22px; font-weight:700;">${escH(fiche.nom)}</h1>
           ${badge}
+          ${modePill}
         </div>
         <div style="display:flex; gap:10px;">
           <!-- 2026-09-22, demande explicite : "crée un bouton visualisé mes fiches pour voire
@@ -437,9 +458,15 @@ function renderDetailView() {
         <span>📅 ${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,10) : 'Ouverture à définir')} → ${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,10) : 'fermeture à définir')}</span>
         <span>👤 Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}</span>
       </div>
+      ${progressBar}
     </header>`;
 
-  const tabsHtml = IA_TABS.map((t, i) => {
+  // En création, la barre d'onglets ne montre que les 3 étapes de l'assistant (IA_CREATION_STEPS)
+  // — les onglets de gestion (Validation, Communication, Finances...) restent masqués tant que
+  // l'utilisateur n'a pas franchi la dernière étape via icContinuerVersGestion, pour ne pas le
+  // laisser filer vers des écrans qui dépendent d'une fiche déjà créée/publiée.
+  const tabsAffiches = enCreation ? IA_TABS.filter(t => IA_CREATION_STEPS.includes(t.key)) : IA_TABS;
+  const tabsHtml = tabsAffiches.map((t, i) => {
     const active = state.activeTab === t.key;
     return `<button style="border:none; background:none; cursor:pointer; padding:14px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; border-bottom:2px solid ${active ? 'oklch(0.32 0.09 258)' : 'transparent'}; color:${active ? 'oklch(0.2 0.006 30)' : 'oklch(0.5 0.006 30)'};" data-action="selectTab" data-tab="${t.key}">${i + 1}. ${t.emoji} ${t.label}</button>`;
   }).join('');
@@ -452,8 +479,37 @@ function renderDetailView() {
   const tabIndex = IA_TABS.findIndex(t => t.key === state.activeTab);
   const prevTab = tabIndex > 0 ? IA_TABS[tabIndex - 1] : null;
   const prevBtn = prevTab ? `<div style="margin-bottom:14px;"><button style="background:#fff; border:1px solid oklch(0.85 0.004 30); color:oklch(0.3 0.006 30); font-size:13px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" data-action="selectTab" data-tab="${prevTab.key}">◀ Précédent — ${prevTab.emoji} ${prevTab.label}</button></div>` : '';
-  const main = `<main style="max-width:1180px; margin:0 auto; padding:28px;">${prevBtn}${renderTabContent()}</main>`;
+
+  // Écran de transition "création terminée" (2026-09-25, demande explicite) : affiché à la place
+  // du contenu d'onglet une fois "Terminer la création" cliqué sur la dernière étape (Formulaire),
+  // le temps que l'utilisateur clique "Continuer" pour basculer en gestion (icContinuerVersGestion).
+  const main = state.icTransitionVisible
+    ? `<main style="max-width:1180px; margin:0 auto; padding:28px;">${renderTransitionCreationGestion()}</main>`
+    : `<main style="max-width:1180px; margin:0 auto; padding:28px;">${prevBtn}${renderTabContent()}${enCreation ? renderWizardFooter() : ''}</main>`;
   return suspendedBanner + header + nav + main;
+}
+
+// ---- Pied de page de l'assistant de création (Suivant / Brouillon) ----
+function renderWizardFooter() {
+  const idx = IA_CREATION_STEPS.indexOf(state.activeTab);
+  if (idx === -1) return '';
+  const derniereEtape = idx === IA_CREATION_STEPS.length - 1;
+  return `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:24px; padding-top:20px; border-top:1px solid oklch(0.9 0.004 30); flex-wrap:wrap;">
+      <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.35 0.006 30); font-size:13px; font-weight:600; padding:10px 18px; border-radius:8px; cursor:pointer;" data-action="icQuitterBrouillon">📄 Enregistrer en brouillon et quitter</button>
+      <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 22px; border-radius:8px; cursor:pointer;" data-action="icSuivant">${derniereEtape ? 'Terminer la création →' : 'Suivant →'}</button>
+    </div>`;
+}
+
+// ---- Écran de transition entre la création et la gestion d'une fiche ----
+function renderTransitionCreationGestion() {
+  return `
+    <div style="max-width:540px; margin:50px auto; text-align:center; background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:16px; padding:40px 32px;">
+      <div style="font-size:38px; margin-bottom:10px;">🎉</div>
+      <h2 style="margin:0 0 10px; font-size:19px; font-weight:800;">Les étapes de création sont terminées</h2>
+      <p style="font-size:13.5px; color:oklch(0.45 0.006 30); line-height:1.6; margin:0 0 26px;">En continuant, nous vous montrerons les étapes de gestion de vos fiches d'inscription. Vous n'êtes plus dans la création, mais dans la gestion de votre fiche.</p>
+      <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:14px; font-weight:700; padding:12px 28px; border-radius:8px; cursor:pointer;" data-action="icContinuerVersGestion">Continuer →</button>
+    </div>`;
 }
 
 function renderTabContent() {
@@ -1217,6 +1273,7 @@ function renderHistorique() {
 const actions = {
   async selectFiche(el) {
     state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'overview'; state.selectedTypeId = null;
+    state.icModeGestion = false; state.icTransitionVisible = false;
     await iaChargerFiche(state.selectedFicheId);
   },
   // Raccourci depuis la carte de liste (2026-09-22, demande explicite) : ouvre une modale
@@ -1260,6 +1317,7 @@ const actions = {
     try {
       const { fiche } = await api('POST', '/insc/fiches', { nom: nom.trim() });
       state.selectedFicheId = fiche.id; state.view = 'detail'; state.activeTab = 'overview';
+      state.icModeGestion = false; state.icTransitionVisible = false;
       await iaChargerFiche(fiche.id);
     } catch (e) { ia_toast(e.message, false); }
   },
@@ -1272,6 +1330,35 @@ const actions = {
      par réflexe un "Enregistrer" avant de continuer (demande explicite du 2026-09-09) ; le
      ramener aux types évite qu'il se sente bloqué sans action à faire. */
   enregistrerFormulaire() { ia_toast('Formulaire enregistré.', true); state.activeTab = 'types'; },
+  // Assistant de création — Suivant/Brouillon/Continuer (2026-09-25, demande explicite).
+  // Sur l'étape "Vue d'ensemble", si le panneau d'édition des infos générales est ouvert, on
+  // l'enregistre d'abord (réutilise enregistrerInfos) avant d'avancer ou de quitter — sinon la
+  // saisie en cours serait perdue. editionInfosOuverte redevient false UNIQUEMENT si la
+  // sauvegarde a réussi (voir enregistrerInfos), ce qui sert ici de signal d'échec silencieux :
+  // le toast d'erreur est déjà affiché par enregistrerInfos, on n'a rien de plus à faire que de
+  // ne pas continuer.
+  async icSuivant() {
+    if (state.activeTab === 'overview' && state.editionInfosOuverte) {
+      await actions.enregistrerInfos();
+      if (state.editionInfosOuverte) return;
+    }
+    const idx = IA_CREATION_STEPS.indexOf(state.activeTab);
+    if (idx < IA_CREATION_STEPS.length - 1) state.activeTab = IA_CREATION_STEPS[idx + 1];
+    else state.icTransitionVisible = true;
+  },
+  async icQuitterBrouillon() {
+    if (state.activeTab === 'overview' && state.editionInfosOuverte) {
+      await actions.enregistrerInfos();
+      if (state.editionInfosOuverte) return;
+    }
+    ia_toast('Fiche enregistrée en brouillon — vous pourrez reprendre la création plus tard.', true);
+    await actions.backToList();
+  },
+  icContinuerVersGestion() {
+    state.icModeGestion = true;
+    state.icTransitionVisible = false;
+    state.activeTab = 'validation';
+  },
   selectType(el) { state.selectedTypeId = parseInt(el.dataset.id); },
   async publierFiche() {
     try { await api('PATCH', `/insc/fiches/${state.selectedFicheId}/statut`, { statut: 'publiee' }); ia_toast('Fiche publiée.', true); await iaChargerFiche(state.selectedFicheId); }
