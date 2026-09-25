@@ -1106,6 +1106,7 @@ html, body { overflow-x:clip; }
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/recherche-contacts.js"></script>
 <script src="assets/signalement.js"></script>
@@ -1357,7 +1358,7 @@ async function renderEnrichedColumns() {
       </div>` : ''}
       <div class="pp-side-card">
         <h4><span>📝 À propos</span> ${owner ? `<button class="edit-btn" onclick="openEditIdentity()" title="Modifier">✏️</button>` : ''}</h4>
-        ${profil.bio ? `<div style="font-size:13px;line-height:1.6;color:var(--text);white-space:pre-line;">${mdBold(esc2(profil.bio))}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
+        ${profil.bio ? `<div class="rich-content" style="font-size:13px;">${renderRichText(profil.bio)}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Ce membre n\'a pas encore ajouté de présentation.</p>'}
       </div>
       <div class="pp-side-card">
         <h4><span>🛡️ Indice de fiabilité</span> <span style="font-size:10px;color:var(--muted);font-weight:400;">(cliquer pour le détail)</span></h4>
@@ -1624,7 +1625,7 @@ async function renderEnrichedColumns() {
          donne uniquement ce qui est demandé") — la description complète peut faire plusieurs
          phrases/paragraphes ; on ne garde que la première phrase, avec un lien vers le texte
          intégral plutôt que de tout déverser d'un coup dans la bulle de discussion. */
-      const texteLong = profil.structure_description || profil.bio;
+      const texteLong = stripRichTags(profil.structure_description || profil.bio);
       if (texteLong) {
         /* Corrigé le 2026-08-30 (constaté en prod : « L'EQUIPE IT » tout seul, réponse
            inexploitable) — un simple saut de ligne juste après le nom de la structure (mise en
@@ -2063,7 +2064,7 @@ function renderVisitorProfile() {
 
   // ── Colonne gauche ──
   const bio = profil.bio
-    ? mdBold(esc(profil.bio)).replace(/\n/g,'<br>')
+    ? `<div class="rich-content">${renderRichText(profil.bio)}</div>`
     : `<span class="pvz-empty">Ce membre n'a pas encore ajouté de présentation.</span>`;
 
   const rs = profil.reseaux_sociaux || {};
@@ -2367,7 +2368,7 @@ function buildWidgetRegistry() {
     s.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:var(--muted);">À PROPOS</div>
         ${isOwn?`<button class="btn-ico" onclick="openAproposEditor()">✏️ Modifier</button>`:''}</div>
-      <div style="font-size:14px;line-height:1.6;color:#334155;">${bio?esc(bio).replace(/\n/g,'<br>'):'<span style="color:#94a3b8;">'+(isOwn?'Ajoutez une présentation…':'Aucune présentation.')+'</span>'}</div>`;
+      <div class="rich-content" style="font-size:14px;">${bio?renderRichText(bio):'<span style="color:#94a3b8;">'+(isOwn?'Ajoutez une présentation…':'Aucune présentation.')+'</span>'}</div>`;
     b.appendChild(s);
   }};
 
@@ -5976,8 +5977,8 @@ function renderIdentity() {
       ${isOwn ? `<button class="apropos-edit-btn" onclick="openAproposEditor()" title="Modifier">✏️ Modifier</button>` : ''}
     </div>`;
   if (profil.bio) {
-    const long = profil.bio.length > 220;
-    html += `<div class="apropos-text${long?' collapsed':''}" id="apropos-text">${mdBold(esc(profil.bio))}</div>
+    const long = stripRichTags(profil.bio).length > 220;
+    html += `<div class="apropos-text rich-content${long?' collapsed':''}" id="apropos-text">${renderRichText(profil.bio)}</div>
       ${long ? `<button class="apropos-more-btn" id="apropos-more" onclick="toggleApropos()">Lire la suite ▾</button>` : ''}`;
   } else if (isOwn) {
     html += `<button class="apropos-add-btn" onclick="openAproposEditor()" style="border:none;text-align:left;padding:4px 0;font-size:13px;color:var(--muted);background:none;cursor:pointer;">✏️ Ajoutez une présentation pour vous faire connaître…</button>`;
@@ -6088,9 +6089,9 @@ function openAproposEditor() {
   if (addBtn) { addBtn.insertAdjacentElement('afterend', wrap); }
   else if (block) { block.appendChild(wrap); }
   const ta = document.getElementById('apropos-ta');
-  ta.addEventListener('input', () => { document.getElementById('apropos-counter').textContent = ta.value.length + '/2000'; });
-  ta.focus();
-  ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.addEventListener('input', () => { document.getElementById('apropos-counter').textContent = stripRichTags(ta.value).length + '/2000'; });
+  const editor = window.RichEditor ? RichEditor.attach('apropos-ta', { placeholder: "Parlez de vous : votre parcours, vos projets, vos valeurs…" }) : null;
+  if (editor) editor.focus(); else { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
 
 function closeAproposEditor() {
@@ -7872,6 +7873,7 @@ function openEditIdentity() {
 
   const slot = document.getElementById('pvz-identity-edit-slot') || document.getElementById('p-identity');
   slot.appendChild(form);
+  if (window.RichEditor) RichEditor.attach('id-bio', { placeholder: "Parlez de vous : votre parcours, vos projets, vos valeurs…" });
   form.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 

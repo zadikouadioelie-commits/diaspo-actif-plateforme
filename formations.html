@@ -806,6 +806,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script>
   // ── Infobulles d'aide (?) : au clic (fiable sur tous les appareils, contrairement au title au survol) ──
@@ -1798,6 +1799,7 @@
       set('new-form-formateur-site', f.formateur_site);
       set('new-form-formateur-reseaux', f.formateur_reseaux);
       set('new-form-formateur-bio', f.formateur_bio);
+      if (window.RichEditor) RichEditor.attach('new-form-formateur-bio', { placeholder: 'Parcours, expérience, expertise…' })?.setHTML(f.formateur_bio || '');
       document.getElementById('new-form-formateur-photo-file').dataset.url = f.formateur_photo_url || '';
       mfwUpdateCommissionPreview();
       mfwRenderCoupons();

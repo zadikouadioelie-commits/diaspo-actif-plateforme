@@ -14534,7 +14534,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     b('accessible_ordinateur'),b('accessible_tablette'),b('accessible_mobile'),b('accessible_hors_ligne'),
     n(body.temps_conseille),n(body.badge),n(body.langues_disponibles_json ? JSON.stringify(body.langues_disponibles_json) : undefined),
     b('sous_titres'),b('transcription'),b('lecteur_ecran'),b('police_dyslexie'),
-    n(body.formateur_bio),n(body.formateur_fonction),
+    n(body.formateur_bio !== undefined ? SEC.sanitizeRichHtml(body.formateur_bio) : undefined),n(body.formateur_fonction),
     n(body.formateur_organisation),n(body.formateur_annees_exp),
     n(body.formateur_site),n(body.formateur_reseaux),n(body.formateur_photo_url),
     n(body.formateur_nom), n(body.logo_url),
@@ -15971,7 +15971,7 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
   if (prenom !== undefined)  { fields.push("prenom=?");        vals.push(prenom); }
   if (ville !== undefined)   { fields.push("ville=?");         vals.push(ville); }
   if (pays !== undefined)    { fields.push("pays=?");          vals.push(pays); }
-  if (bio !== undefined)     { fields.push("bio=?");           vals.push(bio); }
+  if (bio !== undefined)     { fields.push("bio=?");           vals.push(SEC.sanitizeRichHtml(bio)); }
   if (photo_url !== undefined)  { fields.push("photo_url=?");  vals.push(photo_url); }
   if (banner_url !== undefined) { fields.push("banner_url=?"); vals.push(banner_url); }
   if (titre_pro !== undefined)  { fields.push("titre_pro=?");  vals.push(titre_pro); }
@@ -20006,7 +20006,7 @@ route("POST", "/api/admin/videos-tutoriels", async (req, res, params, body) => {
   if (!["brouillon", "publie", "depublie"].includes(statut)) return sendJSON(res, 400, { error: "Statut invalide." });
   const maxOrdre = (await db.prepare("SELECT COALESCE(MAX(ordre),-1) m FROM da_videos_tutoriels").get())?.m ?? -1;
   const r = await db.prepare("INSERT INTO da_videos_tutoriels (titre,description,icone,type_source,url,duree_secondes,categorie,miniature_url,statut,actif,ordre) VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
-    titre, description || null, icone, type_source, url || '', duree_secondes | 0, categorie, miniature_url || null, statut, statut === 'publie' ? 1 : 0, maxOrdre + 1
+    titre, description ? SEC.sanitizeRichHtml(description) : null, icone, type_source, url || '', duree_secondes | 0, categorie, miniature_url || null, statut, statut === 'publie' ? 1 : 0, maxOrdre + 1
   );
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo ajoutée : ${titre}`);
   sendJSON(res, 201, { id: r.lastInsertRowid });
@@ -20025,7 +20025,7 @@ route("PUT", "/api/admin/videos-tutoriels/:id", async (req, res, params, body) =
       miniature_url=COALESCE(?,miniature_url), statut=COALESCE(?,statut),
       actif=COALESCE(?,actif), duree_secondes=COALESCE(?,duree_secondes), updated_at=datetime('now')
     WHERE id=?`)
-    .run(titre || null, description ?? null, icone || null, type_source || null, url || null, categorie || null,
+    .run(titre || null, description ? SEC.sanitizeRichHtml(description) : (description ?? null), icone || null, type_source || null, url || null, categorie || null,
          miniature_url ?? null, statut || null, statut ? (statut === 'publie' ? 1 : 0) : null,
          (duree_secondes === undefined || duree_secondes === null) ? null : (duree_secondes | 0), params.id);
   await AdminJunior.journaliserActionSiJunior(db, user, 'videos_tutoriels.gerer', `Vidéo #${params.id} modifiée`);

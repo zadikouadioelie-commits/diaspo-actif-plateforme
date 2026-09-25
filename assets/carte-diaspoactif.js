@@ -223,8 +223,8 @@
 
         <div class="cda-grid">
           <div class="cda-box">
-            <div class="cda-box-head"><span>📝 Biographie</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-bio-edit" title="Modifier">✏️</button>` : ''}<small>${bio.length}/800</small></div>
-            <p class="cda-bio-text">${bio ? esc(bio) : '<span class="cda-muted">Ce membre n\'a pas encore ajouté de présentation.</span>'}</p>
+            <div class="cda-box-head"><span>📝 Biographie</span>${isOwner ? `<button type="button" class="cda-edit-btn" id="cda-bio-edit" title="Modifier">✏️</button>` : ''}<small>${(window.stripRichTags ? window.stripRichTags(bio) : bio).length}/800</small></div>
+            <div class="cda-bio-text rich-content">${bio ? (window.renderRichText ? window.renderRichText(bio) : esc(bio)) : '<span class="cda-muted">Ce membre n\'a pas encore ajouté de présentation.</span>'}</div>
           </div>
           <div class="cda-col-right">
             <div class="cda-box">
@@ -426,7 +426,7 @@
   }
 
   function editBio(container, profil, opts) {
-    openCdaModal('📝 Biographie',
+    const ov = openCdaModal('📝 Biographie',
       `<textarea id="cda-e-bio" rows="7" maxlength="800" placeholder="Parlez de vous en quelques lignes…">${esc(profil.bio||'')}</textarea>`,
       async ov => {
         const bio = ov.querySelector('#cda-e-bio').value.trim();
@@ -434,6 +434,7 @@
         Object.assign(profil, r.profil);
         render(container, profil, opts);
       });
+    if (window.RichEditor) RichEditor.attach('cda-e-bio', { placeholder: 'Parlez de vous en quelques lignes…' });
   }
 
   function editDomaine(container, profil, opts) {

@@ -154,6 +154,14 @@ function renderRichText(value) {
 }
 window.renderRichText = renderRichText;
 
+/* Dépouille les balises d'un champ texte enrichi pour un usage en texte brut (résumé chatbot,
+   compteur de caractères…) — pas un rendu d'affichage, juste du texte simple. */
+function stripRichTags(value) {
+  const s = String(value == null ? "" : value);
+  return s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+window.stripRichTags = stripRichTags;
+
 /* ========== BADGE INITIATIVE VÉRIFIÉE ========== */
 const CERTIF_NIVEAUX = {
   verifie:    { icon: "🛡️", label: "Initiative Vérifiée", cls: "certif-verifie" },

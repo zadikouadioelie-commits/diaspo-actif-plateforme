@@ -67,7 +67,7 @@ function dvtCardHtml(v, { compact } = {}) {
       <div class="dvt-body">
         ${v.categorie ? `<div class="dvt-badge-categorie">${dvtEsc(v.categorie)}</div>` : ''}
         <div class="dvt-card-titre">${dvtEsc(v.titre)}</div>
-        ${!compact ? `<div class="dvt-card-desc">${dvtEsc(v.description || '')}</div>
+        ${!compact ? `<div class="dvt-card-desc">${dvtEsc(window.stripRichTags ? window.stripRichTags(v.description || '') : (v.description || ''))}</div>
         <div class="dvt-card-meta">${bientot ? 'Bientôt disponible' : `${v.vues || 0} vues · ${dvtFormatDate(v.created_at)}`}</div>
         <div class="dvt-card-stats">
           <span>💬 ${v.nb_commentaires || 0} commentaire${(v.nb_commentaires || 0) > 1 ? 's' : ''}</span>
@@ -291,7 +291,7 @@ async function dvtChargerPageVideo(videoId) {
         ${window.__vtEstAdmin ? `<button type="button" class="dvt-btn-outline" style="margin-top:18px;flex-shrink:0;" onclick="vtOuvrirForm(${v.id})">✎ Modifier</button>` : ''}
       </div>
       <div class="dvt-page-meta">🏷 ${dvtEsc(v.categorie||'')} · 📅 ${dvtFormatDate(v.created_at)} · 👁 ${v.vues||0} vues</div>
-      <p class="dvt-page-desc">${dvtEsc(v.description || '')}</p>
+      <div class="dvt-page-desc rich-content">${window.renderRichText ? renderRichText(v.description || '') : dvtEsc(v.description || '')}</div>
       <div id="dvt-reactions" class="dvt-reactions"></div>
       <div id="dvt-invite-zone"></div>
       <h3 style="margin-top:28px;">💬 Commentaires</h3>

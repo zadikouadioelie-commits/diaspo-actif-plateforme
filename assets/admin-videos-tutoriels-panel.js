@@ -129,6 +129,7 @@ function vtOuvrirForm(id) {
   const v = id ? (_vtCache.find(x => x.id === id) || (typeof _dvtCache !== 'undefined' ? _dvtCache[id] : null)) : null;
   document.getElementById('vt-titre').value = v?.titre || '';
   document.getElementById('vt-description').value = v?.description || '';
+  if (window.RichEditor) RichEditor.attach('vt-description', { placeholder: 'Présentez-vous et mettez en valeur votre parcours…' })?.setHTML(v?.description || '');
   document.getElementById('vt-icone').value = v?.icone || '🎬';
   document.getElementById('vt-categorie').value = v?.categorie || _vtCategories[0];
   document.getElementById('vt-statut').value = v?.statut || 'brouillon';
