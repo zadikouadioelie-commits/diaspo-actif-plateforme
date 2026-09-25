@@ -32,6 +32,16 @@
 .ip-affiche{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-bottom:18px;}
 .ip-titre{font-size:22px;font-weight:700;margin:0 0 6px;}
 .ip-desc{color:oklch(0.5 0.006 30);font-size:14px;line-height:1.6;margin:0 0 22px;}
+.ip-statut-card{border-radius:16px;padding:32px 24px;text-align:center;margin-bottom:8px;}
+.ip-statut-icon{font-size:42px;margin-bottom:12px;}
+.ip-statut-msg{font-size:15.5px;font-weight:700;margin:0 0 8px;}
+.ip-statut-date{font-size:13.5px;margin:0;}
+.ip-statut-attente{background:oklch(0.97 0.03 85);border:1.5px solid oklch(0.82 0.08 85);}
+.ip-statut-attente .ip-statut-msg{color:oklch(0.4 0.13 85);}
+.ip-statut-attente .ip-statut-date{color:oklch(0.45 0.1 85);}
+.ip-statut-fermee{background:oklch(0.97 0.01 30);border:1.5px solid oklch(0.85 0.03 20);}
+.ip-statut-fermee .ip-statut-msg{color:oklch(0.45 0.14 20);}
+.ip-statut-fermee .ip-statut-date{color:oklch(0.5 0.1 20);}
 .ip-types{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
 .ip-type-card{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;background:#fff;}
 .ip-type-card.complet{opacity:.6;}
@@ -394,7 +404,30 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
     const d = await api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG));
     IP_MEDIAS = d.medias || [];
     if (d.fermee || d.pas_encore_ouverte) {
-      document.getElementById('ip-root').innerHTML = `<div style="text-align:center;padding:60px 20px;color:oklch(0.55 0.006 30);"><div style="font-size:40px;">⏳</div><p>${escH(d.message)}</p></div>${ipRenderMedias()}`;
+      // Rendu amélioré (2026-09-25, demande explicite) : reprend l'affiche/titre de la fiche
+      // (déjà renvoyés par le serveur ici, jusqu'ici jamais affichés sur cet écran) et affiche la
+      // date d'ouverture/fermeture réellement déclarée par l'organisateur, en clair — pour que le
+      // visiteur sache QUAND revenir plutôt qu'un message générique sans contexte. Pas de 'Z'
+      // ajouté au parsing : la date est celle saisie telle quelle par l'organisateur
+      // (datetime-local, jamais convertie), même convention que la comparaison serveur qui a
+      // décidé cet état, pour ne jamais afficher une heure différente de celle réellement appliquée.
+      const f = d.fiche || {};
+      const estFermee = !!d.fermee;
+      const dateCle = estFermee ? f.date_fermeture_inscriptions : f.date_ouverture_inscriptions;
+      let dateTxt = '';
+      if (dateCle) {
+        const dt = new Date(String(dateCle).replace(' ', 'T'));
+        if (!isNaN(dt)) dateTxt = dt.toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+      document.getElementById('ip-root').innerHTML = `
+        ${f.affiche_url ? `<img class="ip-affiche" src="${escH(f.affiche_url)}" alt="">` : ''}
+        ${f.nom ? `<h1 class="ip-titre">${escH(f.nom)}</h1>` : ''}
+        <div class="ip-statut-card ${estFermee ? 'ip-statut-fermee' : 'ip-statut-attente'}">
+          <div class="ip-statut-icon">${estFermee ? '🔒' : '⏳'}</div>
+          <p class="ip-statut-msg">${escH(d.message)}</p>
+          ${dateTxt ? `<p class="ip-statut-date">${estFermee ? 'Fermées depuis le' : 'Ouverture le'} <strong>${escH(dateTxt)}</strong></p>` : ''}
+        </div>
+        ${ipRenderMedias()}`;
       return;
     }
     IP_FICHE = d.fiche; IP_TYPES = d.types; IP_EVENEMENTS = d.evenements; IP_APERCU = !!d.apercu;
