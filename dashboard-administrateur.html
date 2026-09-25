@@ -4873,6 +4873,7 @@
             </div>
             <div style="display:flex;gap:6px;">
               <button class="btn btn-sm btn-outline" onclick="loadErrorLogs()">↺ Rafraîchir</button>
+              <button class="btn btn-sm btn-outline" onclick="copierRapportErreurs()">📋 Copier le rapport</button>
               <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;" onclick="purgerErreursResolues()">🗑 Purger résolues</button>
             </div>
           </div>
@@ -6171,6 +6172,7 @@ async function pnSupprimer(id) {
 
 /* ===== Journal d'erreurs (monitoring maison) ===== */
 let _errLogFiltre = 'actif';
+let _errLogCache = [];
 async function loadErrorLogs(filtre) {
   if (filtre) _errLogFiltre = filtre;
   ['actif','resolu','tout'].forEach(f => {
@@ -6202,6 +6204,11 @@ async function loadErrorLogs(filtre) {
       const n = data.stats.non_resolues || 0;
       badge.textContent = n; badge.style.display = n ? '' : 'none';
     }
+    // Mise en cache pour copierRapportErreurs() ci-dessous — "les erreurs affichées" doit
+    // correspondre exactement à ce qui est réellement à l'écran à l'instant du clic (filtre
+    // actif compris), jamais un nouvel appel réseau qui pourrait légèrement diverger si une
+    // erreur est survenue entre-temps.
+    _errLogCache = data.logs;
     if (!data.logs.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:12px 0;">Aucune erreur.</p>'; return; }
     el.innerHTML = data.logs.map(l => `
       <div style="padding:12px 0;border-bottom:1px solid var(--border);" id="errlog-row-${l.id}">
@@ -6227,6 +6234,33 @@ async function loadErrorLogs(filtre) {
 async function resoudreErreur(id) {
   await api('PATCH', `/admin/error-logs/${id}`);
   loadErrorLogs();
+}
+/* "📋 Copier le rapport" (2026-09-25, demande explicite) — copie en un clic toutes les erreurs
+   actuellement affichées (filtre actif compris, voir _errLogCache ci-dessus) dans un format
+   texte simple, prêt à coller directement dans une conversation avec Claude pour investigation.
+   Purement une lecture/mise en forme de données déjà chargées — aucun appel réseau. */
+async function copierRapportErreurs() {
+  if (!_errLogCache.length) { if (typeof showToast === 'function') showToast('Aucune erreur à copier pour ce filtre.'); return; }
+  const FILTRE_LABEL = { actif: 'Actives', resolu: 'Résolues', tout: 'Toutes' };
+  const lignes = _errLogCache.map((l, i) => {
+    const date = l.created_at ? l.created_at.slice(0, 19).replace('T', ' ') : '—';
+    const route = [l.method, l.url].filter(Boolean).join(' ');
+    return [
+      `#${i + 1} — ${date}${l.resolu ? ' — ✅ Résolue' : ''}`,
+      l.context ? `Contexte : ${l.context}` : null,
+      route ? `Route : ${route}` : null,
+      `Message : ${l.message || '—'}`,
+      l.stack ? `Pile :\n${l.stack}` : null,
+    ].filter(Boolean).join('\n');
+  });
+  const rapport = `Journal d'erreurs Diaspo'Actif — ${FILTRE_LABEL[_errLogFiltre] || _errLogFiltre} (${_errLogCache.length})\nGénéré le ${new Date().toLocaleString('fr-FR')}\n\n${lignes.join('\n\n---\n\n')}`;
+  try {
+    await navigator.clipboard.writeText(rapport);
+    if (typeof showToast === 'function') showToast(`✅ Rapport copié (${_errLogCache.length} erreur(s)).`);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Impossible de copier automatiquement — voir la console.');
+    console.log(rapport);
+  }
 }
 
 /* ── Analytics maison (2026-09-17) ── */
