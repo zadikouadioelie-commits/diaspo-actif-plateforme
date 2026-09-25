@@ -1,11 +1,22 @@
 /* ===========================================================
    DIASPO'ACTIF — Module de sécurité, validation & résilience
-   Sans dépendance externe (Node natif uniquement).
+   Sans dépendance externe (Node natif uniquement), à UNE exception
+   volontaire : sanitize-html (section 7 ci-dessous) — la sanitisation
+   anti-XSS d'un contenu HTML riche saisi par l'utilisateur est un
+   domaine où une librairie éprouvée (des années de cas limites/
+   contournements corrigés) l'emporte largement sur du code maison,
+   contrairement au reste de ce fichier (détection de type de
+   fichier, validation, rate-limiting...) qui reste par nature
+   suffisamment simple pour rester en Node natif. Décision actée
+   avec l'utilisateur (2026-09-25, demande explicite "éditeur de
+   texte enrichi réutilisable").
    Regroupe : en-têtes HTTP de sécurité, rate-limiting,
    validation/nettoyage des entrées, détection de type de
-   fichier, messages d'erreur sûrs, journalisation.
+   fichier, messages d'erreur sûrs, journalisation, sanitisation
+   HTML riche.
    =========================================================== */
 const crypto = require("node:crypto");
+const sanitizeHtml = require("sanitize-html");
 
 /* ---------------------------------------------------------------
    1. EN-TÊTES HTTP DE SÉCURITÉ
@@ -175,6 +186,48 @@ function logSecurity(event, data = {}) {
   console.log("[security]", JSON.stringify(line));
 }
 
+/* ---------------------------------------------------------------
+   7. SANITISATION HTML RICHE (assets/rich-editor.js, 2026-09-25)
+   Point de passage OBLIGATOIRE avant toute écriture en base d'un
+   champ édité par le composant d'édition riche — jamais fait
+   confiance au HTML envoyé par le client, même pour un compte admin
+   (voir faq.reponse, corrigé le même jour : affiché SANS échappement
+   depuis le début, donc un vecteur XSS stocké tant que la sauvegarde
+   elle-même n'est pas nettoyée ici). Liste blanche stricte, calée
+   sur la barre d'outils demandée — rien de plus (pas d'images, pas
+   d'iframes, pas de tableaux) : ce que l'éditeur ne sait pas
+   produire, le nettoyeur ne doit pas l'accepter non plus.
+--------------------------------------------------------------- */
+const RICH_HTML_OPTIONS = {
+  allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "h2", "h3", "h4", "blockquote", "a"],
+  allowedAttributes: {
+    a: ["href", "target", "rel"],
+    // `style` doit être explicitement listé ici pour que allowedStyles (ci-dessous) ait quoi
+    // que ce soit à filtrer — sans ça, sanitize-html retire l'attribut style en entier avant
+    // même de regarder son contenu (vérifié en testant : "text-align:center" disparaissait
+    // silencieusement malgré allowedStyles seul). Tous les blocs pouvant recevoir un alignement
+    // (execCommand justifyLeft/Center/Right agit sur le bloc englobant le curseur, quel qu'il
+    // soit parmi ceux-ci).
+    p: ["style"], h2: ["style"], h3: ["style"], h4: ["style"], blockquote: ["style"], li: ["style"],
+  },
+  // http(s)/mailto uniquement — bloque javascript:/data: et autres schémas actifs.
+  allowedSchemes: ["http", "https", "mailto"],
+  // Alignement (execCommand justifyLeft/Center/Right) : seule propriété de style tolérée,
+  // et seulement ces 3 valeurs — jamais de style arbitraire (fuite de mise en page/exfiltration
+  // via des sélecteurs CSS exotiques).
+  allowedStyles: { "*": { "text-align": [/^left$/, /^center$/, /^right$/] } },
+  // Un lien fabriqué par l'éditeur n'a jamais target/rel — ajoutés systématiquement ici plutôt
+  // que de faire confiance à ce que le client aurait pu envoyer (rel manquant = vulnérable au
+  // tabnabbing ; voir la CSP déjà en place pour le reste du site, même logique de défense
+  // "jamais confiance dans ce qui vient du client").
+  transformTags: { a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer" }) },
+  disallowedTagsMode: "discard",
+};
+function sanitizeRichHtml(html) {
+  if (typeof html !== "string" || !html.trim()) return "";
+  return sanitizeHtml(html, RICH_HTML_OPTIONS).trim();
+}
+
 module.exports = {
   applySecurityHeaders,
   rateLimit,
@@ -183,4 +236,5 @@ module.exports = {
   sanitizeString, escapeHtml,
   sniffImageType, isSafeRasterImage, isSafeVideo, isDangerousFile,
   safeError, logSecurity,
+  sanitizeRichHtml,
 };
