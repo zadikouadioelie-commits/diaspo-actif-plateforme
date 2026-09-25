@@ -354,6 +354,159 @@ function iaOuvrirOptionsPayantes() {
     } catch (e) { ia_toast(e.message, false); }
   });
 }
+/* "📊 Sondage" (2026-09-25, demande explicite) — un bloc qui regroupe plusieurs questions,
+   chacune avec son propre mode de réponse (Oui/Non, texte libre, ou une liste de réponses
+   programmées par l'organisateur, affichée en menu déroulant) et sa propre image facultative.
+   Chaque question devient, à l'enregistrement, un insc_champs à part entière — type_champ
+   'oui_non'/'texte_long'/'liste_deroulante' selon le mode choisi, déjà tous les trois
+   entièrement câblés de bout en bout (création, rendu public, collecte des réponses) : ce
+   bloc n'est qu'une façon plus rapide de les créer en série, pas un nouveau mécanisme de
+   stockage. Même principe de modale autonome hors du pipeline render()/state que
+   iaOuvrirOptionsPayantes() ci-dessus, pour ne pas perdre la saisie en cours à chaque
+   re-rendu HTML déclenché par dispatch(). */
+const IS_MODES = [
+  { mode: 'oui_non', label: 'Oui / Non' },
+  { mode: 'texte_long', label: 'Texte libre' },
+  { mode: 'liste_deroulante', label: 'Réponses programmées' },
+];
+function isRenderOptionRow(valeur) {
+  return `<div class="is-opt-row" style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+    <input type="text" data-role="option-texte" placeholder="Ex : Oui" value="${escH(valeur || '')}" style="flex:1;height:34px;border:1px solid oklch(0.85 0.004 30);border-radius:7px;padding:0 10px;font-size:12.5px;box-sizing:border-box;">
+    <button type="button" data-role="option-supprimer" style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:14px;cursor:pointer;padding:2px 6px;flex-shrink:0;">✕</button>
+  </div>`;
+}
+function isRenderQuestionRow() {
+  return `
+    <div class="is-row" style="border:1px solid oklch(0.9 0.004 30);border-radius:10px;padding:14px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <label style="width:46px;height:46px;border-radius:8px;background:oklch(0.96 0.004 30);border:1.5px dashed oklch(0.8 0.006 30);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;overflow:hidden;" title="Ajouter une image (facultatif)">
+          <span style="font-size:16px;opacity:.5;">📷</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-role="photo" style="display:none;">
+        </label>
+        <input type="text" data-role="question-texte" placeholder="Ex : Avez-vous déjà eu besoin d'un expert-comptable ?" style="flex:1;height:46px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 12px;font-size:13.5px;box-sizing:border-box;">
+        <button type="button" data-role="supprimer-question" style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:16px;cursor:pointer;padding:2px 6px;flex-shrink:0;">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        ${IS_MODES.map(m => `<button type="button" data-role="mode" data-mode="${m.mode}" style="background:${m.mode==='oui_non'?'#8B12D6':'#fff'};color:${m.mode==='oui_non'?'#fff':'oklch(0.4 0.006 30)'};border:1.5px solid ${m.mode==='oui_non'?'#8B12D6':'oklch(0.85 0.004 30)'};font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;">${escH(m.label)}</button>`).join('')}
+      </div>
+      <div class="is-options-zone" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed oklch(0.9 0.004 30);">
+        <div class="is-options-list"></div>
+        <button type="button" data-role="option-ajouter" style="margin-top:6px;background:none;border:1.5px dashed oklch(0.8 0.006 30);color:oklch(0.5 0.006 30);font-size:12px;font-weight:600;padding:7px;border-radius:8px;cursor:pointer;width:100%;">+ Ajouter une réponse possible</button>
+      </div>
+    </div>`;
+}
+function iaOuvrirSondage() {
+  if (!state.selectedTypeId) { ia_toast("Sélectionnez ou créez d'abord un type d'inscription.", false); return; }
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+        <h3 style="margin:0; font-size:17px; color:#6B0FA3;">📊 Sondage</h3>
+        <button type="button" id="is-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+      </div>
+      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Posez une ou plusieurs questions aux participants — chacune avec Oui/Non, une réponse libre, ou une liste de réponses que vous programmez vous-même. Image facultative par question.</p>
+      <div id="is-questions-list" style="display:flex; flex-direction:column; gap:12px;"></div>
+      <button type="button" id="is-ajouter" style="width:100%; margin-top:12px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter une autre question</button>
+      <button type="button" id="is-enregistrer" style="width:100%; margin-top:18px; background:#8B12D6; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer le sondage</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const list = overlay.querySelector('#is-questions-list');
+  const ajouterQuestion = () => {
+    const div = document.createElement('div');
+    div.innerHTML = isRenderQuestionRow();
+    const row = div.firstElementChild;
+    row.dataset.mode = 'oui_non';
+    list.appendChild(row);
+  };
+  ajouterQuestion();
+
+  const ajouterOptionRow = (row, valeur) => {
+    const div = document.createElement('div');
+    div.innerHTML = isRenderOptionRow(valeur);
+    row.querySelector('.is-options-list').appendChild(div.firstElementChild);
+  };
+
+  list.addEventListener('click', async (e) => {
+    const row = e.target.closest('.is-row');
+    if (!row) return;
+    if (e.target.dataset.role === 'supprimer-question') {
+      if (list.children.length <= 1) { ia_toast('Au moins une question est requise.', false); return; }
+      row.remove();
+      return;
+    }
+    if (e.target.dataset.role === 'mode') {
+      row.dataset.mode = e.target.dataset.mode;
+      row.querySelectorAll('[data-role="mode"]').forEach(b => {
+        const actif = b.dataset.mode === row.dataset.mode;
+        b.style.background = actif ? '#8B12D6' : '#fff';
+        b.style.color = actif ? '#fff' : 'oklch(0.4 0.006 30)';
+        b.style.borderColor = actif ? '#8B12D6' : 'oklch(0.85 0.004 30)';
+      });
+      const zone = row.querySelector('.is-options-zone');
+      if (row.dataset.mode === 'liste_deroulante') {
+        zone.style.display = '';
+        if (!zone.querySelector('.is-opt-row')) { ajouterOptionRow(row, ''); ajouterOptionRow(row, ''); }
+      } else {
+        zone.style.display = 'none';
+      }
+      return;
+    }
+    if (e.target.dataset.role === 'option-ajouter') { ajouterOptionRow(row, ''); return; }
+    if (e.target.dataset.role === 'option-supprimer') {
+      const optList = row.querySelector('.is-options-list');
+      if (optList.children.length <= 1) { ia_toast('Au moins une réponse possible est requise.', false); return; }
+      e.target.closest('.is-opt-row').remove();
+      return;
+    }
+  });
+
+  list.addEventListener('change', async (e) => {
+    if (e.target.dataset.role !== 'photo') return;
+    const file = e.target.files[0]; if (!file) return;
+    const row = e.target.closest('.is-row');
+    const label = e.target.closest('label');
+    try {
+      const compressed = await compressImageFile(file, 500, 500, 0.85);
+      const url = await uploadMedia(compressed, 'produit');
+      label.style.background = `oklch(0.9 0.004 30) center/cover no-repeat url('${url}')`;
+      const span = label.querySelector('span'); if (span) span.remove();
+      row.dataset.imageUrl = url;
+    } catch (err) { ia_toast(err.message || 'Erreur upload image.', false); }
+  });
+
+  overlay.querySelector('#is-ajouter').addEventListener('click', () => ajouterQuestion());
+  overlay.querySelector('#is-fermer').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#is-enregistrer').addEventListener('click', async () => {
+    const rows = Array.from(list.querySelectorAll('.is-row'));
+    const questions = rows.map(row => ({
+      libelle: row.querySelector('[data-role="question-texte"]').value.trim(),
+      type_champ: row.dataset.mode,
+      image_url: row.dataset.imageUrl || null,
+      options: row.dataset.mode === 'liste_deroulante'
+        ? Array.from(row.querySelectorAll('[data-role="option-texte"]')).map(i => i.value.trim()).filter(Boolean)
+        : undefined,
+    }));
+    const invalide = questions.find(q => !q.libelle);
+    if (invalide) { ia_toast('Chaque question doit avoir un texte.', false); return; }
+    const sansOptions = questions.find(q => q.type_champ === 'liste_deroulante' && (!q.options || !q.options.length));
+    if (sansOptions) { ia_toast('Ajoutez au moins une réponse possible pour chaque question à réponses programmées.', false); return; }
+    try {
+      for (const q of questions) {
+        await api('POST', `/insc/types/${state.selectedTypeId}/champs`, {
+          libelle: q.libelle, type_champ: q.type_champ, obligatoire: false, image_url: q.image_url, options: q.options,
+        });
+      }
+      ia_toast(`${questions.length} question(s) de sondage ajoutée(s).`, true);
+      overlay.remove();
+      await iaChargerFiche(state.selectedFicheId);
+      render();
+    } catch (e) { ia_toast(e.message, false); }
+  });
+}
 function isAdmin() { return IA_ME && IA_ME.role === 'administrateur'; }
 function selectedFiche() { return state.ficheDetail ? state.ficheDetail.fiche : null; }
 function currentTypes() { return state.ficheDetail ? state.ficheDetail.types : []; }
@@ -998,6 +1151,7 @@ function renderFields() {
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           ${cats}
           <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirOptionsPayantes">💰 Option payante</button>
+          <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirSondage">📊 Sondage</button>
         </div>
         ${panelSuggestions}
       </div>
@@ -1662,6 +1816,7 @@ const actions = {
     state.champCategorieOuverte = state.champCategorieOuverte === cat ? null : cat;
   },
   ouvrirOptionsPayantes() { iaOuvrirOptionsPayantes(); },
+  ouvrirSondage() { iaOuvrirSondage(); },
   async ajouterChampSuggere(el) {
     const suggestion = (IA_FIELD_SUGGESTIONS[el.dataset.categorie] || [])[parseInt(el.dataset.idx)];
     if (!suggestion) return;

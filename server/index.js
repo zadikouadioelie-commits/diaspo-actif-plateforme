@@ -1141,6 +1141,21 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   });
 });
 
+/* Champ "Sondage" (Formulaires & Inscriptions, 2026-09-25, demande explicite) — une image
+   optionnelle par question (insc_champs.image_url), utilisable sur n'importe quel type_champ,
+   pas seulement les questions de sondage. Les 3 modes de réponse eux-mêmes (Oui/Non, Texte
+   libre, Réponses programmées) réutilisent des type_champ déjà existants et déjà entièrement
+   câblés de bout en bout (oui_non/texte_long/liste_deroulante) — aucune nouvelle valeur à
+   ajouter à INSC_TYPES_CHAMP. */
+(async function migrateInscChampsImage() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(insc_champs)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('image_url')) {
+      try { await db.prepare("ALTER TABLE insc_champs ADD COLUMN image_url TEXT").run(); } catch (e) {}
+    }
+  } catch (e) { console.error('[migrateInscChampsImage]', e.message); }
+})();
+
 /* ═══════════════════════════════════════════════════════════════════
    MODULE LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite)
    Liens/QR codes à usage unique distribués par l'administration : 1 lien = 1 personne =
@@ -42720,12 +42735,12 @@ route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
   const maxPos = (await db.prepare("SELECT MAX(position) m FROM insc_champs WHERE type_id=?").get(type.id))?.m;
   const id = (await db.prepare(`
     INSERT INTO insc_champs (type_id, nom, libelle, description_aide, type_champ, obligatoire, position,
-      valeur_defaut, placeholder, options_json, regle_validation, condition_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      valeur_defaut, placeholder, options_json, regle_validation, condition_json, image_url)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(type.id, nom, String(body.libelle).trim(), body.description_aide || null, body.type_champ,
     body.obligatoire ? 1 : 0, (maxPos != null ? maxPos + 1 : 0), body.valeur_defaut || null, body.placeholder || null,
     Array.isArray(body.options) ? JSON.stringify(body.options) : "[]", body.regle_validation || null,
-    body.condition ? JSON.stringify(body.condition) : null
+    body.condition ? JSON.stringify(body.condition) : null, body.image_url || null
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -42734,7 +42749,7 @@ route("PUT", "/api/insc/champs/:id", async (req, res, params, body) => {
   if (!champ) return sendJSON(res, 404, { error: "Champ introuvable." });
   const { erreur, msg } = await inscFicheProprietaire(req, champ.fiche_id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
-  const cols = ["libelle","description_aide","obligatoire","actif","valeur_defaut","placeholder","regle_validation"];
+  const cols = ["libelle","description_aide","obligatoire","actif","valeur_defaut","placeholder","regle_validation","image_url"];
   const set = [], vals = [];
   for (const c of cols) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
   if (body.options !== undefined) { set.push("options_json=?"); vals.push(JSON.stringify(body.options || [])); }

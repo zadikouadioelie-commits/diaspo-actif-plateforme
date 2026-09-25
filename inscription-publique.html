@@ -162,8 +162,12 @@ function ipChampHtml(c) {
     const type = IP_TYPE_ICONS[c.type_champ] || 'text';
     champHtml = `<input type="${type}" name="${escH(c.nom)}" placeholder="${escH(c.placeholder||'')}" value="${escH(c.valeur_defaut||'')}">`;
   }
+  // Image de question (2026-09-25, demande explicite : champ "Sondage") — utilisable sur
+  // n'importe quel type_champ, affichée au-dessus du libellé, jamais confondue avec les photos
+  // par option (options_payantes, ci-dessus) qui sont propres à chaque choix coché.
+  const image = c.image_url ? `<img src="${escH(c.image_url)}" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block;">` : '';
   return `<div class="ip-champ" data-champ="${escH(c.nom)}" data-condition='${c.condition_json?escH(c.condition_json):''}'>
-    <label>${escH(c.libelle)} ${req}</label>${champHtml}${aide}
+    ${image}<label>${escH(c.libelle)} ${req}</label>${champHtml}${aide}
   </div>`;
 }
 
