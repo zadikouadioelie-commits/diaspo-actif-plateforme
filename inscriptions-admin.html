@@ -627,7 +627,6 @@ function renderInfosGenerales(fiche) {
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture des inscriptions</label><input id="ia-infos-ouverture" type="datetime-local" value="${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture des inscriptions</label><input id="ia-infos-fermeture" type="datetime-local" value="${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
         </div>
-        ${renderLiaisonEvenements()}
         <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; margin-top:4px;" data-action="enregistrerInfos">Enregistrer</button>
       </div>
     </div>`;
@@ -638,22 +637,16 @@ function renderLiaisonEvenements() {
   const mesEvenements = state.mesEvenements || [];
   const lienCreation = `<a href="evenements.html" target="_blank" rel="noopener" style="font-size:12px; font-weight:600; color:oklch(0.32 0.09 258); text-decoration:none;">+ Créer un nouvel événement →</a>`;
   if (!mesEvenements.length) {
-    return `<div style="font-size:12px; color:oklch(0.55 0.006 30); padding-top:6px; border-top:1px solid oklch(0.92 0.004 30);">Aucun événement créé sur votre compte — ${lienCreation} pour pouvoir le lier à cette fiche.</div>`;
+    return `<div style="font-size:12px; color:oklch(0.55 0.006 30);">Aucun événement créé sur votre compte — ${lienCreation} pour pouvoir le lier à cette fiche.</div>`;
   }
   return `
-    <div style="padding-top:10px; border-top:1px solid oklch(0.92 0.004 30);">
-      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
-        <label style="display:block; font-size:12px; font-weight:600;">Lier à un événement</label>
-        ${lienCreation}
-      </div>
-      <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-bottom:8px;">Le bouton "S'inscrire" de l'événement coché redirigera vers cette fiche au lieu du parcours d'inscription classique.</div>
-      <div style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;">
-        ${mesEvenements.map(e => `
-          <label class="ia-evt-ligne" style="display:flex; align-items:center; gap:10px; font-size:13px; cursor:pointer;">
-            <input type="checkbox" data-evt-id="${e.id}" ${evenementsLies.has(e.id) ? 'checked' : ''} class="ia-evt-checkbox">
-            <span>${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}</span>
-          </label>`).join('')}
-      </div>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">${lienCreation}</div>
+    <div style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;">
+      ${mesEvenements.map(e => `
+        <label class="ia-evt-ligne" style="display:flex; align-items:center; gap:10px; font-size:13px; cursor:pointer; background:#fff; border-radius:8px; padding:6px 10px;">
+          <input type="checkbox" data-evt-id="${e.id}" ${evenementsLies.has(e.id) ? 'checked' : ''} class="ia-evt-checkbox">
+          <span>${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}</span>
+        </label>`).join('')}
     </div>`;
 }
 
@@ -823,6 +816,23 @@ function renderFields() {
 
   return `
     ${iaConsigne("Choisissez les informations que vous demandez à vos participants (identité, contact, etc.), en plus de nom/prénom/e-mail/téléphone toujours demandés.")}
+    <!-- Liaison à un événement (2026-09-25, demande explicite : "déplace les boutons et options
+         de liaison de fiche à cette page et rend cette étape de liaison très importante bien
+         visible") — vivait avant dans le panneau "Informations générales" de l'onglet Vue
+         d'ensemble, repliable et donc facile à manquer. Réutilise le même contenu
+         (renderLiaisonEvenements()) mais dans un encart à part, bordure épaisse et fond
+         orangé pour qu'on ne puisse pas passer à côté : sans cette étape, le bouton
+         "S'inscrire" de l'événement continue de pointer vers le parcours d'inscription
+         classique au lieu de cette fiche. -->
+    <div style="background:oklch(0.98 0.03 60); border:2px solid oklch(0.7 0.15 60); border-radius:12px; padding:18px 20px; margin-bottom:20px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+        <span style="font-size:18px;">🔗</span>
+        <h3 style="margin:0; font-size:14.5px; font-weight:800; color:oklch(0.4 0.13 60);">Étape essentielle — Liaison à un événement</h3>
+      </div>
+      <p style="font-size:12px; color:oklch(0.4 0.06 60); margin:0 0 10px;">Sans cette étape, le bouton « S'inscrire » de votre événement continue de pointer vers le parcours d'inscription classique au lieu de cette fiche.</p>
+      ${renderLiaisonEvenements()}
+      <button style="background:oklch(0.4 0.13 60); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>
+    </div>
     <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">${chips}</div>
     <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -1287,16 +1297,22 @@ const actions = {
       date_ouverture_inscriptions: document.getElementById('ia-infos-ouverture')?.value || null,
       date_fermeture_inscriptions: document.getElementById('ia-infos-fermeture')?.value || null,
     };
-    /* N'envoie evenement_ids QUE si la liste des événements a réellement pu être chargée —
-       sinon les cases seraient toutes vides et on écraserait une vraie liaison existante
-       avec un tableau vide par accident (voir data-evt-id / .ia-evt-checkbox). */
-    if (state.mesEvenements.length) {
-      payload.evenement_ids = Array.from(document.querySelectorAll('.ia-evt-checkbox:checked')).map(el => parseInt(el.dataset.evtId));
-    }
+    // evenement_ids n'est plus envoyé ici (2026-09-25) : la liaison à un événement a sa propre
+    // section, désormais sur l'onglet Formulaire (voir enregistrerLiaisonEvenements ci-dessous)
+    // — l'envoyer aussi ici risquerait d'écraser une vraie liaison avec un tableau vide, les
+    // cases à cocher n'existant plus dans ce panneau.
     try {
       await api('PUT', `/insc/fiches/${state.selectedFicheId}`, payload);
       ia_toast('Informations enregistrées.', true);
       state.editionInfosOuverte = false;
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async enregistrerLiaisonEvenements() {
+    const ids = Array.from(document.querySelectorAll('.ia-evt-checkbox:checked')).map(el => parseInt(el.dataset.evtId));
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { evenement_ids: ids });
+      ia_toast('Liaison enregistrée.', true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
