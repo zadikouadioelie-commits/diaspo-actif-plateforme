@@ -16931,11 +16931,17 @@ async function handleStripeWebhook(req, res) {
       const inscriptionId = Number(event.data.object.metadata.diaspoactif_insc_inscription_id);
       const insc = await db.prepare(`SELECT * FROM insc_inscriptions WHERE id=? AND statut_paiement='en_attente'`).get(inscriptionId);
       if (insc) {
-        const [type, fiche] = await Promise.all([
+        const [type, fiche, champs] = await Promise.all([
           db.prepare(`SELECT * FROM insc_types WHERE id=?`).get(insc.type_id),
           db.prepare(`SELECT * FROM insc_fiches WHERE id=?`).get(insc.fiche_id),
+          db.prepare(`SELECT * FROM insc_champs WHERE type_id=?`).all(insc.type_id),
         ]);
-        const montant = Number(type?.prix) || 0;
+        // Même recalcul qu'à la création (jamais un montant mémorisé) — voir
+        // calculerMontantOptionsPayantes(), pour créditer le bon total type + options cochées.
+        let reponsesInsc = {};
+        try { reponsesInsc = JSON.parse(insc.reponses_json || "{}"); } catch (e) {}
+        const { total: montantOptionsWebhook } = calculerMontantOptionsPayantes(champs, reponsesInsc);
+        const montant = parseFloat(((type?.gratuit ? 0 : (Number(type?.prix) || 0)) + montantOptionsWebhook).toFixed(2));
         const COMMISSION_RATE = 0.03;
         const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
         const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
@@ -42187,6 +42193,34 @@ function inscConditionRemplie(conditionJson, reponses) {
   return String(valSource ?? "") === String(cond.valeur ?? ""); // "egal" par défaut
 }
 
+/* Options payantes (2026-09-25, demande explicite) : catalogue libre d'extras (libellé + prix +
+   photo optionnelle) défini par l'organisateur sur un champ de type "options_payantes"
+   (insc_champs.options_json = [{libelle, photo_url, prix}]) — le participant coche des
+   libellés, jamais un prix. Réutilisée à la fois à la création (calcul du montant Stripe) et
+   dans handleStripeWebhook() (recalcul à l'identique pour créditer le bon montant) : ne fait
+   jamais confiance à un montant mémorisé, toujours recalculé depuis le catalogue réel. Mute
+   `reponses[c.nom]` au passage pour ne garder que les libellés qui existent vraiment au
+   catalogue (un libellé inventé par le client est silencieusement ignoré, jamais facturé). */
+function calculerMontantOptionsPayantes(champs, reponses) {
+  let total = 0;
+  const detail = [];
+  for (const c of champs) {
+    if (c.type_champ !== "options_payantes") continue;
+    let catalogue = [];
+    try { catalogue = JSON.parse(c.options_json || "[]"); } catch (e) {}
+    if (!Array.isArray(catalogue)) catalogue = [];
+    const selection = Array.isArray(reponses[c.nom]) ? reponses[c.nom] : [];
+    const retenues = catalogue.filter(o => selection.includes(o?.libelle));
+    reponses[c.nom] = retenues.map(o => o.libelle);
+    for (const o of retenues) {
+      const prix = Number(o.prix) || 0;
+      total += prix;
+      detail.push({ libelle: o.libelle, prix });
+    }
+  }
+  return { total: parseFloat(total.toFixed(2)), detail };
+}
+
 /* Confirmation automatique (annexe §1-8) : QR + notification + e-mail, toujours best-effort,
    jamais bloquant pour la réponse de soumission. */
 async function envoyerConfirmationInscription(inscriptionId) {
@@ -42650,7 +42684,7 @@ route("GET", "/api/insc/types/:id/champs", async (req, res, params) => {
 });
 const INSC_TYPES_CHAMP = ["texte_court","texte_long","nombre","email","telephone","date","heure","adresse",
   "liste_deroulante","choix_unique","choix_multiple","oui_non","case_a_cocher","upload_photo","upload_fichier","url",
-  "upload_documents_titres","upload_images_titrees","upload_videos_titrees"];
+  "upload_documents_titres","upload_images_titrees","upload_videos_titrees","options_payantes"];
 route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
   if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
@@ -42873,6 +42907,16 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
       .map(e => ({ titre: String(e?.titre || "").trim().slice(0, 150), url: String(e?.url || "").trim().slice(0, 500) }))
       .filter(e => e.titre && e.url);
   }
+  /* Options payantes (2026-09-25, demande explicite : "option payante" — repas, massage, etc.,
+     libellé/photo/prix libres définis par l'organisateur) : le participant ne fait que cocher
+     des libellés, jamais confiance dans un prix venu du client — recalculé ici à partir du
+     catalogue réel (insc_champs.options_json). Une inscription sur un type GRATUIT avec au
+     moins une option cochée bascule donc automatiquement en paiement Stripe pour ce montant
+     (demande explicite : "si jamais une inscription gratuite prend une option payante, c'est
+     cette option qui doit être branchée à Stripe"). Même recalcul refait à l'identique dans
+     handleStripeWebhook() pour créditer le bon montant, jamais un montant mémorisé côté client. */
+  const { total: montantOptions } = calculerMontantOptionsPayantes(champs, reponses);
+  const montantTotal = parseFloat(((type.gratuit ? 0 : (Number(type.prix) || 0)) + montantOptions).toFixed(2));
   for (const c of champs) {
     if (!c.obligatoire) continue;
     if (!inscConditionRemplie(c.condition_json, reponses)) continue; // masqué par la logique conditionnelle
@@ -42908,7 +42952,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
     global.__inscInscriptionsTransactionRefEnsured = true;
   }
 
-  if (type.gratuit) {
+  if (montantTotal <= 0) {
     const id = (await db.prepare(`
       INSERT INTO insc_inscriptions (fiche_id, type_id, evenement_id, user_id, reference, nom, prenom, email, telephone,
         reponses_json, statut, statut_paiement, consentements_json, ip_creation)
@@ -42933,11 +42977,10 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
     return sendJSON(res, 201, { id, reference, statut: statutInitial });
   }
 
-  /* Type payant — rien n'est confirmé/notifié tant que Stripe n'a pas confirmé le paiement
-     (mêmes conventions que POST /api/events/:id/buy : ligne créée en amont pour réserver la
-     place/référence, split commission/wallet et notifications faits uniquement dans
-     handleStripeWebhook()). */
-  if (!type.prix || type.prix <= 0) return sendJSON(res, 400, { error: "Tarif invalide pour ce type d'inscription." });
+  /* Montant total dû (type + options payantes) — rien n'est confirmé/notifié tant que Stripe n'a
+     pas confirmé le paiement (mêmes conventions que POST /api/events/:id/buy : ligne créée en
+     amont pour réserver la place/référence, split commission/wallet et notifications faits
+     uniquement dans handleStripeWebhook()). */
   const { stripe } = require("./stripe-client");
   if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
 
@@ -42959,7 +43002,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
       line_items: [{
         price_data: {
           currency: "eur",
-          unit_amount: Math.round(type.prix * 100),
+          unit_amount: Math.round(montantTotal * 100),
           product_data: { name: `${fiche.nom} — ${type.label}` },
         },
         quantity: 1,
