@@ -147,6 +147,7 @@
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/soumission-da.js"></script>
 <script src="/assets/upload-media.js"></script>
+<script src="/assets/rich-editor.js"></script>
 <script>
 /* Catalogue accréditations DA — défini ici pour éviter les problèmes de cache data.js */
 if (typeof ACCREDITATIONS_DA === 'undefined') {
@@ -4208,6 +4209,21 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       }, 280);
     });
     document.addEventListener('click', ev => { if(partDrop&&!partDrop.contains(ev.target)&&ev.target!==partSearch) partDrop.style.display='none'; }, {capture:true});
+
+    /* Éditeur riche (2026-09-25, demande explicite) — f.innerHTML recrée ces <textarea> à
+       CHAQUE appel de renderInitEvtForm() (création ET édition) : contrairement au formulaire
+       statique d'evenements.html, pas besoin de reset/prefill séparés, RichEditor.attach() lit
+       directement la valeur déjà posée dans le template (${v(e?.description)} etc. ci-dessus)
+       au moment où il s'attache à ces éléments fraîchement créés. */
+    if (window.RichEditor) {
+      RichEditor.attach('iev-desc', { placeholder: "Présentation de l'événement…" });
+      RichEditor.attach('iev-fc-resume', { placeholder: 'Présentation générale de l\'événement, contexte, motivation…' });
+      RichEditor.attach('iev-fc-objectifs', { placeholder: 'Objectifs principaux…' });
+      RichEditor.attach('iev-fc-public', { placeholder: 'Diaspora, investisseurs, jeunes…' });
+      RichEditor.attach('iev-fc-programme', { placeholder: '9h00 — Accueil, 10h00 — Conférence plénière…' });
+      RichEditor.attach('iev-fc-contact', { placeholder: 'Nom, email, téléphone…' });
+      RichEditor.attach('iev-fc-notes', { placeholder: 'Informations pratiques, accès, parking, dress code…' });
+    }
   }
 
   // Partenaires autocomplete helpers

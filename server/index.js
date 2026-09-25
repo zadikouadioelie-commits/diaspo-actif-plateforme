@@ -18463,6 +18463,9 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     whatsapp_lien, lieu_gps
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
+  /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
+     jamais l'éditeur client (assets/rich-editor.js). */
+  const descriptionSafe = SEC.sanitizeRichHtml(description);
   const coverImg = image_couverture || image_url || null;
   // Galerie réduite à 1 photo + couverture (2026-09-09, demande explicite) — le reste des
   // médias (photos/vidéos/documents) vit désormais sur la fiche d'inscription liée, voir
@@ -18482,7 +18485,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
-      description||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
+      descriptionSafe||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions||null, places_max||null,
       inscription_ouverte!==false?1:0, lien_inscription||null, coverImg, statutFinal, user.id,
       heure_debut||null, heure_fin||null, date_fin||null, lien_visio||null, visibilite||'public',
@@ -18566,6 +18569,9 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
     image_couverture, image_url, galerie_photos
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
+  /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
+     jamais l'éditeur client (assets/rich-editor.js). */
+  const descriptionSafe = SEC.sanitizeRichHtml(description);
   const coverImg = image_couverture || image_url || null;
   const galerie = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0, 1)) : (galerie_photos || "[]");
   // Brouillon (2026-09-23) : permet de publier un brouillon existant (statut:'ouvert' envoyé
@@ -18581,7 +18587,7 @@ route("PUT", "/api/evenements/:id", async (req, res, params, body) => {
     .run(
       titre, date_evt, heure_debut || null, heure_fin || null, type_evt || "evenement", domaine || null, zone_diffusion || null,
       ['payant','partiellement_payant'].includes(type_participation) ? type_participation : 'gratuit', ouverture_inscriptions || null, statutFinal,
-      pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, description || null,
+      pays || null, lieu || null, ville || null, lieu_gps || null, origine || null, descriptionSafe || null,
       places_max || null, masquer_inscrits ? 1 : 0, visibilite || "public", lien_visio || null, whatsapp_lien || null,
       coverImg, coverImg, galerie, evt.id
     );
@@ -29474,6 +29480,15 @@ ${jsonLd}
         inscription_mode, nb_places, liste_attente, appliquer_fiche_standard, fiche_choisie_id,
       } = body;
       if (!titre || !date_debut) return sendJSON(res, 400, { error: 'Titre et date_debut requis.' });
+      /* Sanitisés avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
+         jamais l'éditeur client (assets/rich-editor.js). */
+      const descriptionSafe = SEC.sanitizeRichHtml(description);
+      const fcResumeSafe = SEC.sanitizeRichHtml(fc_resume);
+      const fcObjectifsSafe = SEC.sanitizeRichHtml(fc_objectifs);
+      const fcPublicSafe = SEC.sanitizeRichHtml(fc_public);
+      const fcProgrammeSafe = SEC.sanitizeRichHtml(fc_programme);
+      const fcContactSafe = SEC.sanitizeRichHtml(fc_contact);
+      const fcNotesSafe = SEC.sanitizeRichHtml(fc_notes);
       const ts = new Date().toISOString();
       /* Commission plateforme (2026-08-26 : 5% → 3%) — fixée explicitement ici plutôt que
          de laisser events.commission_pct sur son DEFAULT de colonne : aucune route ne permet
@@ -29504,15 +29519,15 @@ ${jsonLd}
          programmed_at,timezone,inscription_lien_externe,whatsapp_lien,
          rayon_publication,langue,mode_participation,region,departement,communaute,origine1,origine2,masquer_inscrits)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(titre, description||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
+        .run(titre, descriptionSafe||null, me.id, pays||null, ville||null, adresse||null, date_debut, date_fin||null,
              capacite||0, categorie||'Général', domaine||null, zone_diffusion||null, coverImg, finalStatut, PLATFORM_COMMISSION_PCT, ts, ts,
              coverImg, galerie,
              video1_url||null, video1_titre||null, video1_thumb||null,
              video2_url||null, video2_titre||null, video2_thumb||null,
              pdf_url||null, pdf_nom||null, pdf_acces||'public', pdfExtraStr,
              cible_type||'tous', cibleListeStr,
-             fc_resume||null, fc_objectifs||null, fc_public||null,
-             fc_programme||null, fc_partenaires||null, partenairesIdsStr, fc_contact||null, fc_notes||null,
+             fcResumeSafe||null, fcObjectifsSafe||null, fcPublicSafe||null,
+             fcProgrammeSafe||null, fc_partenaires||null, partenairesIdsStr, fcContactSafe||null, fcNotesSafe||null,
              fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
              programmed_at||null, timezone||'Europe/Paris', inscription_lien_externe||null, whatsapp_lien||null,
              rayon_publication||'international', langue||'francais', mode_participation||'presentiel',
@@ -29592,6 +29607,15 @@ ${jsonLd}
         origine1, origine2, masquer_inscrits,
         appliquer_fiche_standard, fiche_choisie_id, detacher_fiche,
       } = body;
+      /* Sanitisés avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
+         jamais l'éditeur client (assets/rich-editor.js). */
+      const descriptionSafe = SEC.sanitizeRichHtml(description);
+      const fcResumeSafe = SEC.sanitizeRichHtml(fc_resume);
+      const fcObjectifsSafe = SEC.sanitizeRichHtml(fc_objectifs);
+      const fcPublicSafe = SEC.sanitizeRichHtml(fc_public);
+      const fcProgrammeSafe = SEC.sanitizeRichHtml(fc_programme);
+      const fcContactSafe = SEC.sanitizeRichHtml(fc_contact);
+      const fcNotesSafe = SEC.sanitizeRichHtml(fc_notes);
       const coverUpd = image_couverture || image_b64 || null;
       const galerieUpd = Array.isArray(galerie_photos) ? JSON.stringify(galerie_photos.slice(0,1)) : (galerie_photos || null);
       const cibleListeUpd = Array.isArray(cible_liste_ids) ? JSON.stringify(cible_liste_ids) : (cible_liste_ids || null);
@@ -29629,16 +29653,16 @@ ${jsonLd}
         origine1=COALESCE(?,origine1), origine2=COALESCE(?,origine2),
         masquer_inscrits=COALESCE(?,masquer_inscrits),
         statut=COALESCE(?,statut), updated_at=datetime('now') WHERE id=?`)
-        .run(titre||null, description||null, pays||null, ville||null, adresse||null,
+        .run(titre||null, descriptionSafe||null, pays||null, ville||null, adresse||null,
              date_debut||null, date_fin||null, capacite||null, categorie||null, domaine||null, zone_diffusion||null,
              coverUpd, coverUpd, galerieUpd,
              video1_url||null, video1_titre||null, video1_thumb||null,
              video2_url||null, video2_titre||null, video2_thumb||null,
              pdf_url||null, pdf_nom||null, pdf_acces||null, pdfExtraUpd,
              cible_type||null, cibleListeUpd,
-             fc_resume||null, fc_objectifs||null, fc_public||null,
-             fc_programme||null, fc_partenaires||null, partenairesUpd,
-             fc_contact||null, fc_notes||null,
+             fcResumeSafe||null, fcObjectifsSafe||null, fcPublicSafe||null,
+             fcProgrammeSafe||null, fc_partenaires||null, partenairesUpd,
+             fcContactSafe||null, fcNotesSafe||null,
              fc_programme_fichier_url||null, fc_programme_fichier_nom||null,
              programmed_at||null, timezone||null,
              inscription_mode||null, nb_places!=null?Number(nb_places):null, liste_attente!=null?Number(liste_attente):null,
