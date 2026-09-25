@@ -746,7 +746,10 @@ document.getElementById('ma-doc-add').addEventListener('click', () => {
 document.getElementById('ma-doc-file').addEventListener('change', async (e) => {
   const file = e.target.files[0]; if (!file) return;
   try {
-    const url = await uploadMedia(file, 'document');
+    // Ce champ accepte aussi des images — jamais compressées avant ce correctif (2026-09-25,
+    // bug réel : photos rejetées avant compression, voir assets/upload-media.js).
+    // compressIfImage() laisse un PDF/Word/Excel/PowerPoint strictement inchangé.
+    const url = await uploadMedia(await compressIfImage(file, 1600, 1600, 0.85), 'document');
     await api('POST', '/mon-associe/documents', { nom: file.name, url, taille: file.size });
     loadDocuments();
   } catch(err) { alert(err.message || 'Erreur upload.'); }
@@ -831,7 +834,10 @@ async function renderThread(){
     document.getElementById('ma-thread-file').addEventListener('change', async (e) => {
       const file = e.target.files[0]; if (!file) return;
       try {
-        const url = await uploadMedia(file, 'document');
+        // Pièce jointe libre (n'importe quel type, y compris une image — voir isImage
+        // ci-dessous) — jamais compressée avant ce correctif (2026-09-25, bug réel : photos
+        // rejetées avant compression, voir assets/upload-media.js).
+        const url = await uploadMedia(await compressIfImage(file, 1600, 1600, 0.85), 'document');
         await api('POST', `/mon-associe/conversations/${MA.activeConvId}/messages`, { fichier: { nom: file.name, url, isImage: /image\//.test(file.type) } });
         renderThread();
       } catch(err) { alert(err.message || 'Erreur upload.'); }

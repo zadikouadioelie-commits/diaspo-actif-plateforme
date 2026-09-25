@@ -893,6 +893,7 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="/assets/upload-media.js"></script>
 <script>
 const PAGE_LOAD_TS = Date.now(); // sert au calcul du délai anti-bot côté serveur
 let currentRole=null;
@@ -1200,8 +1201,11 @@ async function uploadPhotosApresInscription(){
   async function envoyer(input,champ,dossier){
     if(!input||!input.files.length)return null;
     try{
+      // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js
+      // (une photo de smartphone au moment de l'inscription est le cas le plus fréquent ici).
+      const fichier = typeof compressIfImage === 'function' ? await compressIfImage(input.files[0], 1000, 1000, 0.85) : input.files[0];
       const fd=new FormData();
-      fd.append(champ,input.files[0]);
+      fd.append(champ,fichier);
       const r=await fetch("/api/upload/"+dossier,{method:"POST",credentials:"include",body:fd});
       const d=await r.json();
       return d.url||null;

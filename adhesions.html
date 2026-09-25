@@ -83,6 +83,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/profile-qr.js"></script>
+<script src="/assets/upload-media.js"></script>
 <script>
 const ADH_TYPE_LABELS = {
   don_libre: 'Don libre', don_ponctuel: 'Don ponctuel',
@@ -299,7 +300,11 @@ async function ouvrirFormulaireAdhesion(formule, montant, userId){
       const champ = champsActifs.find(c => c.key === key);
       if (fileInput.files[0]) {
         try {
-          const fd = new FormData(); fd.append('document', fileInput.files[0]);
+          // Champ photo/pièce d'identité (accept="image/*,application/pdf") — jamais
+          // compressée avant ce correctif (2026-09-25, bug réel : photos rejetées avant
+          // compression, voir assets/upload-media.js). compressIfImage() laisse un PDF inchangé.
+          const fichier = typeof compressIfImage === 'function' ? await compressIfImage(fileInput.files[0], 1600, 1600, 0.85) : fileInput.files[0];
+          const fd = new FormData(); fd.append('document', fichier);
           const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
           const d = await r.json();
           if (!r.ok) throw new Error(d.error || 'Échec du téléversement.');

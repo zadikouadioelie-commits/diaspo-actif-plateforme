@@ -77,6 +77,27 @@ function compressImageFile(file, maxW = 800, maxH = 800, quality = 0.85) {
 }
 
 /**
+ * Compresse un fichier SEULEMENT s'il s'agit d'une image matricielle (jpeg/png/webp/gif) —
+ * laisse strictement inchangé tout le reste : PDF, Word/Excel/PowerPoint, et le SVG (vectoriel,
+ * une compression par canvas le rasteriserait et le déformerait). Pensé pour les endroits qui
+ * uploadent le fichier BRUT aujourd'hui sans jamais appeler compressImageFile() (logo de
+ * partenaire, documents/pièces jointes qui acceptent aussi une photo) — mêmes plaintes
+ * possibles que pickAndUpload() pour tout fichier réellement compressible, voir son commentaire
+ * ci-dessus. Ne modifie rien pour un type non compressible : comportement déjà en place
+ * inchangé, jamais de risque de corrompre un document.
+ * @param {File} file
+ * @param {number} maxW
+ * @param {number} maxH
+ * @param {number} quality
+ * @returns {Promise<File>} le fichier compressé, ou le fichier original tel quel si non compressible
+ */
+async function compressIfImage(file, maxW = 1600, maxH = 1600, quality = 0.85) {
+  if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/svg+xml') return file;
+  try { return await compressImageFile(file, maxW, maxH, quality); }
+  catch (e) { console.error('[compressIfImage]', e); return file; }
+}
+
+/**
  * Ouvre un sélecteur de fichier image et retourne l'URL uploadée
  * @param {'avatar'|'banner'|'logo'|'post'} type
  * @param {{ maxW, maxH, quality, maxMo }} options
@@ -137,3 +158,4 @@ function pickAndUpload(type = 'avatar', options = {}) {
 window.uploadMedia    = uploadMedia;
 window.pickAndUpload  = pickAndUpload;
 window.compressImageFile = compressImageFile;
+window.compressIfImage = compressIfImage;

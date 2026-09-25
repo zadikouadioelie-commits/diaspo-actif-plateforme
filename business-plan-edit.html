@@ -1061,12 +1061,16 @@ function bpAjouterPieceJointeChamp(sectionKey, fieldKey, btnEl) {
     const nom = prompt('Nom de ce document ?', file.name) || file.name;
     btnEl.disabled = true; btnEl.textContent = 'Envoi en cours…';
     try {
+      // Accepte aussi une photo (accept inclut image/*) — jamais compressée avant ce
+      // correctif (2026-09-25, bug réel : photos rejetées avant compression, voir
+      // assets/upload-media.js). compressIfImage() laisse un PDF/Excel/CSV inchangé.
+      const fichier = await compressIfImage(file, 1600, 1600, 0.85);
       const fd = new FormData();
-      fd.append('document', file);
+      fd.append('document', fichier);
       const up = await fetch('/api/upload/document', { method:'POST', credentials:'same-origin', body: fd });
       const upData = await up.json();
       if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
-      await api('POST', `/business-plans/${bpId}/documents`, { section_key: sectionKey, field_key: fieldKey, categorie: BP_SECTION_CATEGORIES[sectionKey] || 'autre', nom, url_bunny: upData.url, type_mime: file.type });
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: sectionKey, field_key: fieldKey, categorie: BP_SECTION_CATEGORIES[sectionKey] || 'autre', nom, url_bunny: upData.url, type_mime: fichier.type });
     } catch (e) { alert(e.message || 'Erreur.'); }
     const iconEl = btnEl.closest('.bp-attach');
     if (iconEl) bpChargerPiecesJointesChamp(iconEl, sectionKey, fieldKey);
@@ -1730,12 +1734,14 @@ function bpAjouterPieceJointeMembre(membreId) {
     const el = document.getElementById('membre-docs-'+membreId);
     if (el) el.innerHTML = 'Envoi en cours…';
     try {
+      // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
+      const fichier = await compressIfImage(file, 1600, 1600, 0.85);
       const fd = new FormData();
-      fd.append('document', file);
+      fd.append('document', fichier);
       const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
       const upData = await up.json();
       if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
-      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'infos_generales', field_key: 'membre_'+membreId, categorie: 'equipe', nom, url_bunny: upData.url, type_mime: file.type });
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'infos_generales', field_key: 'membre_'+membreId, categorie: 'equipe', nom, url_bunny: upData.url, type_mime: fichier.type });
     } catch (e) { alert(e.message || 'Erreur.'); }
     bpChargerDocsMembresEquipe();
   };
@@ -1898,12 +1904,14 @@ function bpTractionAjouterJustificatif() {
     const el = document.getElementById('traction-docs-list');
     el.innerHTML = 'Envoi en cours…';
     try {
+      // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
+      const fichier = await compressIfImage(file, 1600, 1600, 0.85);
       const fd = new FormData();
-      fd.append('document', file);
+      fd.append('document', fichier);
       const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
       const upData = await up.json();
       if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
-      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'traction', categorie, nom, url_bunny: upData.url, type_mime: file.type });
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'traction', categorie, nom, url_bunny: upData.url, type_mime: fichier.type });
     } catch (e) { alert(e.message || 'Erreur.'); }
     bpLoadTractionDocs();
   };
@@ -4009,12 +4017,14 @@ function bpAjouterDocumentBiblio() {
     const el = document.getElementById('bp-biblio-list');
     el.innerHTML = 'Envoi en cours…';
     try {
+      // 2026-09-25, bug réel : photos rejetées avant compression, voir assets/upload-media.js.
+      const fichier = await compressIfImage(file, 1600, 1600, 0.85);
       const fd = new FormData();
-      fd.append('document', file);
+      fd.append('document', fichier);
       const up = await fetch('/api/upload/document', { method: 'POST', credentials: 'same-origin', body: fd });
       const upData = await up.json();
       if (!up.ok) throw new Error(upData.error || 'Envoi impossible.');
-      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'annexes', field_key: fieldKey, categorie, nom, url_bunny: upData.url, type_mime: file.type });
+      await api('POST', `/business-plans/${bpId}/documents`, { section_key: 'annexes', field_key: fieldKey, categorie, nom, url_bunny: upData.url, type_mime: fichier.type });
     } catch (e) { alert(e.message || 'Erreur.'); }
     bpLoadBiblioDocuments();
   };

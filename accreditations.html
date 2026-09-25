@@ -148,6 +148,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="/assets/upload-media.js"></script>
 <script>
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}catch(e){return d;}}
@@ -234,8 +235,12 @@ async function ajouterDocumentDemande(input){
   const btn = document.getElementById('btn-submit-demande');
   btn.disabled = true; btn.textContent = 'Envoi du document…';
   try {
+    // Ce champ accepte aussi une photo (accept inclut .jpg/.jpeg/.png) — jamais compressée
+    // avant ce correctif (2026-09-25, bug réel : photos rejetées avant compression, voir
+    // assets/upload-media.js). compressIfImage() laisse un PDF/Word inchangé.
+    const fichier = typeof compressIfImage === 'function' ? await compressIfImage(file, 1600, 1600, 0.85) : file;
     const fd = new FormData();
-    fd.append('document', file);
+    fd.append('document', fichier);
     const r = await fetch('/api/upload/document', { method:'POST', credentials:'include', body: fd });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Échec de l\'envoi du document.');
