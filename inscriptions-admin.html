@@ -1197,11 +1197,44 @@ function renderPublic() {
         ${t.complet ? '<span style="font-size:12px;font-weight:600;color:oklch(0.6 0.006 30);">Complet</span>' : (t.periode_ouverte === false ? '<span style="font-size:12px;font-weight:600;color:oklch(0.6 0.006 30);">Fermé</span>' : `<button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="selectPublicType" data-id="${t.id}">S'inscrire</button>`)}
       </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);text-align:center;">Aucun type d\'inscription disponible.</div>'}</div>`;
   } else {
-    const fieldsHtml = (pubType.champs || []).map(f => `
-      <div>
-        <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:5px;">${escH(f.libelle)}${f.obligatoire ? '<span style="color:oklch(0.5 0.16 20);"> *</span>' : ''}</label>
-        <input data-champ="${escH(f.nom)}" placeholder="${escH(f.placeholder||'')}" style="width:100%;height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30); padding:0 10px; font-size:13px; box-sizing:border-box;">
-      </div>`).join('');
+    /* Rendu par type_champ (2026-09-26, bug réel signalé : sur une fiche réelle, l'organisateur
+       voyait un simple champ texte à la place d'une case à cocher pour son option payante
+       "repas" — ni prix ni image affichés) — cet aperçu utilisait jusqu'ici un unique <input>
+       texte pour TOUS les champs, quel que soit leur type_champ réel : une fiche de prévisualisation
+       qui n'a jamais reflété fidèlement la vraie page publique (inscription-publique.html,
+       ipChampHtml()) dès qu'un champ n'était pas un simple texte. Reproduit ici la même logique
+       par type, avec la même convention de collecte que celle-ci (voir soumettreApercu()
+       ci-dessous : data-champ-groupe pour les cases à cocher groupées, jamais data-champ seul,
+       qui ne collecterait qu'une case). */
+    const fieldsHtml = (pubType.champs || []).map(f => {
+      let options = []; try { options = JSON.parse(f.options_json || '[]'); } catch (e) {}
+      const req = f.obligatoire ? '<span style="color:oklch(0.5 0.16 20);"> *</span>' : '';
+      let champHtml;
+      if (f.type_champ === 'options_payantes') {
+        champHtml = `<div style="display:flex;flex-direction:column;gap:8px;">${options.map(o => `
+          <label style="display:flex;align-items:center;gap:10px;border:1px solid oklch(0.9 0.004 30);border-radius:8px;padding:8px 10px;font-weight:400;cursor:pointer;">
+            <input type="checkbox" data-champ-groupe="${escH(f.nom)}" value="${escH(o.libelle)}" style="width:16px;height:16px;flex-shrink:0;">
+            ${o.photo_url ? `<img src="${escH(o.photo_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : ''}
+            <span style="flex:1;font-size:13px;">${escH(o.libelle)}</span>
+            <span style="font-size:13px;font-weight:700;color:oklch(0.32 0.09 258);">${(Number(o.prix)||0).toFixed(2)} €</span>
+          </label>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucune option disponible.</div>'}</div>`;
+      } else if (f.type_champ === 'choix_multiple') {
+        champHtml = options.map(o => `<label style="display:block;font-weight:400;font-size:13px;margin:4px 0;"><input type="checkbox" data-champ-groupe="${escH(f.nom)}" value="${escH(o)}"> ${escH(o)}</label>`).join('');
+      } else if (f.type_champ === 'liste_deroulante' || f.type_champ === 'choix_unique') {
+        champHtml = `<select data-champ="${escH(f.nom)}" style="width:100%;height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;"><option value="">-- Choisir --</option>${options.map(o=>`<option value="${escH(o)}">${escH(o)}</option>`).join('')}</select>`;
+      } else if (f.type_champ === 'oui_non') {
+        champHtml = `<select data-champ="${escH(f.nom)}" style="width:100%;height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;"><option value="">-- Choisir --</option><option value="oui">Oui</option><option value="non">Non</option></select>`;
+      } else if (f.type_champ === 'case_a_cocher') {
+        champHtml = `<label style="font-weight:400;font-size:13px;"><input type="checkbox" data-champ="${escH(f.nom)}" value="oui"> ${escH(f.placeholder||'')}</label>`;
+      } else if (f.type_champ === 'texte_long') {
+        champHtml = `<textarea data-champ="${escH(f.nom)}" style="width:100%;min-height:70px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></textarea>`;
+      } else if (['upload_photo','upload_fichier','upload_documents_titres','upload_images_titrees','upload_videos_titrees'].includes(f.type_champ)) {
+        champHtml = `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);font-style:italic;">📎 Champ d'envoi de fichier — non simulable dans cet aperçu, fonctionne normalement sur la vraie page publique.</div>`;
+      } else {
+        champHtml = `<input data-champ="${escH(f.nom)}" placeholder="${escH(f.placeholder||'')}" style="width:100%;height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30); padding:0 10px; font-size:13px; box-sizing:border-box;">`;
+      }
+      return `<div><label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:5px;">${escH(f.libelle)}${req}</label>${champHtml}</div>`;
+    }).join('');
     body = `
       <button style="background:none; border:none; color:oklch(0.5 0.006 30); font-size:13px; cursor:pointer; padding:0; margin-bottom:14px;" data-action="backToPublicTypes">← Retour aux types d'inscription</button>
       <h3 style="margin:0 0 4px; font-size:16px; font-weight:700;">Inscription — ${escH(pubType.label)}</h3>
@@ -1834,7 +1867,21 @@ const actions = {
   async soumettreApercu() {
     const inputs = document.querySelectorAll('#ia-root [data-champ]');
     const reponses = {}; let prenom = '', nom = '', email = '';
-    inputs.forEach(i => { if (i.dataset.champ === '__prenom') prenom = i.value; else if (i.dataset.champ === '__nom') nom = i.value; else if (i.dataset.champ === '__email') email = i.value; else reponses[i.dataset.champ] = i.value; });
+    inputs.forEach(i => {
+      if (i.dataset.champ === '__prenom') prenom = i.value;
+      else if (i.dataset.champ === '__nom') nom = i.value;
+      else if (i.dataset.champ === '__email') email = i.value;
+      else if (i.type === 'checkbox') reponses[i.dataset.champ] = i.checked ? 'oui' : '';
+      else reponses[i.dataset.champ] = i.value;
+    });
+    // Groupes de cases à cocher (choix_multiple / options_payantes, voir renderPublic()
+    // ci-dessus) — plusieurs cases partagent le même data-champ-groupe, valeur finale = liste
+    // des libellés cochés, même convention que ipSoumettre() sur la vraie page publique.
+    document.querySelectorAll('#ia-root [data-champ-groupe]:checked').forEach(i => {
+      const cle = i.dataset.champGroupe;
+      if (!Array.isArray(reponses[cle])) reponses[cle] = [];
+      reponses[cle].push(i.value);
+    });
     if (!prenom.trim() || !nom.trim()) return ia_toast('Prénom et nom sont requis.', false);
     try {
       const r = await api('POST', `/insc/public/${selectedFiche().slug}/inscriptions`, { type_id: state.publicSelectedTypeId, nom, prenom, email, reponses });
