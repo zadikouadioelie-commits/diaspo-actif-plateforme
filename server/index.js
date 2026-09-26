@@ -24329,15 +24329,18 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
 
   const cols = (await db.prepare("PRAGMA table_info(chatbot_memoire)").all()).map(c => c.name);
   const add = async (col, def) => { if (!cols.includes(col)) { try { await db.prepare(`ALTER TABLE chatbot_memoire ADD COLUMN ${col} ${def}`).run(); } catch(e){} } };
-  add("categorie", "TEXT DEFAULT 'Général'");
-  add("mots_cles", "TEXT DEFAULT '[]'");
-  add("priorite",  "INTEGER DEFAULT 5");
-  add("liens_json","TEXT DEFAULT '[]'");
-  add("source",    "TEXT DEFAULT 'admin'");
-  add("actif",     "INTEGER DEFAULT 1");
-  add("nb_consultations","INTEGER DEFAULT 0");
-  add("created_by","INTEGER");
-  add("updated_at","TEXT DEFAULT (datetime('now'))");
+  /* await ajouté le 2026-09-25 : ces 9 appels partaient auparavant en parallèle sans attendre,
+     ce qui pouvait saturer le pool de connexions Postgres (max 5) lors d'un démarrage à froid
+     (voir le commentaire "reste à faire" ci-dessus). */
+  await add("categorie", "TEXT DEFAULT 'Général'");
+  await add("mots_cles", "TEXT DEFAULT '[]'");
+  await add("priorite",  "INTEGER DEFAULT 5");
+  await add("liens_json","TEXT DEFAULT '[]'");
+  await add("source",    "TEXT DEFAULT 'admin'");
+  await add("actif",     "INTEGER DEFAULT 1");
+  await add("nb_consultations","INTEGER DEFAULT 0");
+  await add("created_by","INTEGER");
+  await add("updated_at","TEXT DEFAULT (datetime('now'))");
   // Tables annexes
   try { await db.prepare(`CREATE TABLE IF NOT EXISTS chatbot_memoire_historique (
     id INTEGER PRIMARY KEY AUTOINCREMENT, memoire_id INTEGER NOT NULL,
@@ -24424,7 +24427,10 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       { nom: 'Administration',  slug: 'administration',    icone: '⚙️',  ordre: 12 },
     ];
     const insC = db.prepare(`INSERT INTO faq_categories (nom,slug,icone,ordre) VALUES (?,?,?,?)`);
-    cats.forEach(c => { try { insC.run(c.nom, c.slug, c.icone, c.ordre); } catch(e){} });
+    /* for...of + await (2026-09-25) : un forEach ne peut pas attendre, donc ces 11 insertions
+       partaient toutes en parallèle sans attendre — même risque de saturation du pool que le
+       bloc chatbot_memoire ci-dessus. */
+    for (const c of cats) { try { await insC.run(c.nom, c.slug, c.icone, c.ordre); } catch(e){} }
 
     /* Seed questions initiales */
     const getCat = async (slug) => (await db.prepare(`SELECT id FROM faq_categories WHERE slug=?`).get(slug))?.id || null;
@@ -24621,7 +24627,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
     for (const item of faqSeed) {
       try {
         const catId = await getCat(item.cat);
-        insQ.run(
+        await insQ.run(
           catId,
           item.types,
           item.q,
