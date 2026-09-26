@@ -1610,7 +1610,14 @@ const actions = {
     if (!confirm(`Supprimer définitivement la fiche « ${el.dataset.nom} » ? Cette action est irréversible.\n\n(Une fiche ayant déjà des inscrits ne peut pas être supprimée — archivez-la depuis sa fiche détaillée.)`)) return;
     try {
       await api('DELETE', '/insc/fiches/' + id);
-      state.fiches = state.fiches.filter(f => f.id !== id);
+      // Number(f.id) (2026-09-26, bug réel signalé : "il faut recharger la page pour que le
+      // formulaire ait réellement disparu") — en production (Postgres), insc_fiches.id revient
+      // en chaîne de caractères ("6"), jamais en nombre, alors que `id` ci-dessus est un vrai
+      // nombre (parseInt) : une comparaison stricte f.id !== id ("6" !== 6) est TOUJOURS vraie,
+      // donc la fiche supprimée n'était jamais retirée du tableau affiché — seul un rechargement
+      // (qui refait GET /insc/fiches depuis le serveur, où la ligne est bien absente) la faisait
+      // disparaître. Même famille de bug déjà rencontrée sur users.id (voir mémoire du projet).
+      state.fiches = state.fiches.filter(f => Number(f.id) !== id);
       ia_toast('Fiche supprimée.', true);
     } catch (e) { ia_toast(e.message, false); }
   },
