@@ -399,7 +399,7 @@
         <div class="ob-illus">${step.illustration || '📋'}</div>
       </div>
       <h2 class="ob-step-title">${step.titre}</h2>
-      <div class="ob-step-body">${step.contenu}</div>
+      <div class="ob-step-body rich-content">${window.renderRichText ? renderRichText(step.contenu) : (step.contenu || '')}</div>
       ${step.type === 'action' && step.action_selector ? `
         <div class="ob-action-zone">
           <div class="ob-action-hint">

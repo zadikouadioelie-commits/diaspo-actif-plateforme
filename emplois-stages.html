@@ -400,7 +400,7 @@ function esCardHtml(o){
         </div>
       </div>
       <h3 class="es-card-titre">${esc(o.titre)}</h3>
-      ${o.description?`<p class="es-card-desc">${esc(o.description.length>140?o.description.slice(0,140)+'…':o.description)}</p>`:''}
+      ${o.description?`<p class="es-card-desc">${(()=>{const d=stripRichTags(o.description);return esc(d.length>140?d.slice(0,140)+'…':d);})()}</p>`:''}
       <div class="es-card-meta">
         <span class="es-tag type">${o.type==='stage'?'Stage':'Emploi'}</span>
         ${contrat}
@@ -502,7 +502,7 @@ function esDetailHtml(o){
       </div>
     </div>
     <div class="es-detail-body">
-      ${o.description?`<div class="es-detail-section"><h4>Présentation</h4><p>${esc(o.description)}</p></div>`:''}
+      ${o.description?`<div class="es-detail-section"><h4>Présentation</h4><div class="rich-content">${renderRichText(o.description)}</div></div>`:''}
       <div class="es-detail-section"><h4>Missions</h4><ul>${missions}</ul></div>
       <div class="es-detail-section"><h4>Compétences recherchées</h4><ul>${competences}</ul></div>
       <div class="es-detail-section">

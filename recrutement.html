@@ -246,6 +246,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
@@ -333,7 +334,7 @@ function renderCamps(camps) {
         ${c.organisme?`🏛️ ${escH(c.organisme)} · `:''}
         ${c.ville?`📍 ${escH(c.ville)}${c.pays?', '+escH(c.pays):''}`:c.pays?`📍 ${escH(c.pays)}`:''}
       </div>
-      ${c.description ? `<p style="font-size:12px;color:#555;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(c.description)}</p>` : ''}
+      ${c.description ? `<p style="font-size:12px;color:#555;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(stripRichTags(c.description))}</p>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);">
         <span>${RAYON_LABELS[c.rayon_publication]||''}</span>
         <span>👁️ ${c.vues_total||0} vues · 👤 ${c.nb_candidatures||0} candidatures</span>
@@ -376,7 +377,7 @@ async function openCamp(cid) {
         <div>⏳ <strong>Expire le</strong><br>${fmtDate(c.expire_at)}</div>
         ${c.en_promotion?`<div style="grid-column:1/-1;">⚡ <strong>En promotion jusqu'au</strong> ${fmtDate(c.promotion_fin)}</div>`:''}
       </div>
-      ${c.description?`<div style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.6;white-space:pre-wrap;">${escH(c.description)}</div>`:''}
+      ${c.description?`<div class="rich-content" style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px;font-size:13px;">${renderRichText(c.description)}</div>`:''}
       <!-- Recruteur -->
       <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:10px;margin-bottom:16px;">
         ${c.recruteur_photo?`<img src="${escH(c.recruteur_photo)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;">`:`<div style="width:38px;height:38px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;">🏛️</div>`}
@@ -552,6 +553,7 @@ function openCreateCamp() {
   ['camp-nom','camp-desc','camp-organisme','camp-pays','camp-ville','camp-adresse'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  if (window.RichEditor) RichEditor.attach('camp-desc', { placeholder: 'Missions, profil recherché, conditions…' })?.setHTML('');
   document.getElementById('camp-type').value = 'emploi';
   document.getElementById('camp-publier').checked = false;
   campSelectRayon('international');
@@ -606,6 +608,7 @@ async function editCamp(cid) {
     document.getElementById('btn-save-camp').textContent = 'Enregistrer';
     document.getElementById('camp-nom').value = c.nom||'';
     document.getElementById('camp-desc').value = c.description||'';
+    if (window.RichEditor) RichEditor.attach('camp-desc', { placeholder: 'Missions, profil recherché, conditions…' })?.setHTML(c.description||'');
     document.getElementById('camp-type').value = c.type_recrutement||'emploi';
     document.getElementById('camp-organisme').value = c.organisme||'';
     document.getElementById('camp-pays').value = c.pays||'';

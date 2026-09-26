@@ -3359,21 +3359,21 @@
 
             <!-- TAB : Réalisations -->
             <div class="certif-tab-content" id="tab-realisations" style="display:none;">
-              <div class="certif-field" style="margin-bottom:10px;"><label>Projets réalisés</label><textarea name="projets_realises" class="input-field" rows="3"></textarea></div>
-              <div class="certif-field" style="margin-bottom:10px;"><label>Actions concrètes</label><textarea name="actions_concretes" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Projets réalisés</label><textarea id="projets_realises" name="projets_realises" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Actions concrètes</label><textarea id="actions_concretes" name="actions_concretes" class="input-field" rows="3"></textarea></div>
               <div class="certif-field" style="margin-bottom:10px;"><label>Partenariats conclus</label><textarea name="partenariats" class="input-field" rows="2"></textarea></div>
               <div class="certif-grid">
                 <div class="certif-field"><label>Emplois créés</label><input type="number" min="0" name="emplois_crees" class="input-field"></div>
               </div>
               <div class="certif-field" style="margin-bottom:10px;"><label>Investissements mobilisés</label><textarea name="investissements" class="input-field" rows="2"></textarea></div>
-              <div class="certif-field"><label>Impacts mesurables</label><textarea name="impacts" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field"><label>Impacts mesurables</label><textarea id="impacts" name="impacts" class="input-field" rows="3"></textarea></div>
             </div>
 
             <!-- TAB : Témoignages -->
             <div class="certif-tab-content" id="tab-temoignages" style="display:none;">
-              <div class="certif-field" style="margin-bottom:10px;"><label>Avis des utilisateurs</label><textarea name="avis_utilisateurs" class="input-field" rows="3"></textarea></div>
-              <div class="certif-field" style="margin-bottom:10px;"><label>Recommandations</label><textarea name="recommandations" class="input-field" rows="3"></textarea></div>
-              <div class="certif-field"><label>Retours d'expérience</label><textarea name="retours_experience" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Avis des utilisateurs</label><textarea id="avis_utilisateurs" name="avis_utilisateurs" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field" style="margin-bottom:10px;"><label>Recommandations</label><textarea id="recommandations" name="recommandations" class="input-field" rows="3"></textarea></div>
+              <div class="certif-field"><label>Retours d'expérience</label><textarea id="retours_experience" name="retours_experience" class="input-field" rows="3"></textarea></div>
             </div>
 
             <!-- TAB : Vérifications -->
@@ -3399,8 +3399,8 @@
 
             <!-- TAB : Notes & Rapport -->
             <div class="certif-tab-content" id="tab-notes" style="display:none;">
-              <div class="certif-field" style="margin-bottom:12px;"><label>Notes internes</label><textarea name="notes_internes" class="input-field" rows="5" placeholder="Observations, points d'attention, résumé des échanges…"></textarea></div>
-              <div class="certif-field"><label>Rapport de vérification</label><textarea name="rapport_verification" class="input-field" rows="8" placeholder="Rapport détaillé de la procédure de certification…"></textarea></div>
+              <div class="certif-field" style="margin-bottom:12px;"><label>Notes internes</label><textarea id="notes_internes" name="notes_internes" class="input-field" rows="5" placeholder="Observations, points d'attention, résumé des échanges…"></textarea></div>
+              <div class="certif-field"><label>Rapport de vérification</label><textarea id="rapport_verification" name="rapport_verification" class="input-field" rows="8" placeholder="Rapport détaillé de la procédure de certification…"></textarea></div>
             </div>
 
             <!-- TAB : Historique -->
@@ -5306,11 +5306,15 @@ async function openCertifFiche(id, nom) {
     const { evaluation } = await api("GET", `/admin/certifications/${id}/evaluation`);
     const fiche = document.getElementById("certif-fiche-wrap");
     const textFields = ["delai_reponse","projets_realises","actions_concretes","partenariats","investissements","impacts","avis_utilisateurs","recommandations","retours_experience","infos_administratives","notes_internes","rapport_verification"];
+    const richFields = ["projets_realises","actions_concretes","impacts","avis_utilisateurs","recommandations","retours_experience","notes_internes","rapport_verification"];
     const numFields  = ["anciennete_score","publications_regularite","profil_completude","participation_communaute","taux_reponse","qualite_echanges","emplois_crees"];
     const boolFields = ["documents_officiels","existence_legale","coordonnees_verifiees","entretien_realise","visioconference","rencontre_physique","visite_site","verification_partenaires","verification_beneficiaires","verification_institutions"];
     for (const f of [...textFields, ...numFields]) {
       const el = fiche.querySelector(`[name="${f}"]`);
       if (el && evaluation[f] != null) el.value = evaluation[f];
+    }
+    if (window.RichEditor) {
+      richFields.forEach(f => RichEditor.attach(f, { placeholder: '' })?.setHTML(evaluation[f] || ''));
     }
     for (const f of boolFields) {
       const el = fiche.querySelector(`[name="${f}"]`);
@@ -12535,6 +12539,7 @@ function openAddStepModal() {
   document.getElementById('ob-step-tut-id').value  = _obCurrentTutId;
   document.getElementById('ob-step-titre').value   = '';
   document.getElementById('ob-step-contenu').value = '';
+  if (window.RichEditor) RichEditor.attach('ob-step-contenu', { placeholder: 'Contenu de l\'étape…' })?.setHTML('');
   document.getElementById('ob-step-type').value    = 'info';
   document.getElementById('ob-step-illus').value   = '📋';
   document.getElementById('ob-step-narration').value = '';
@@ -12550,6 +12555,7 @@ function editObStep(s) {
   document.getElementById('ob-step-tut-id').value  = s.tutorial_id;
   document.getElementById('ob-step-titre').value   = s.titre;
   document.getElementById('ob-step-contenu').value = s.contenu;
+  if (window.RichEditor) RichEditor.attach('ob-step-contenu', { placeholder: 'Contenu de l\'étape…' })?.setHTML(s.contenu || '');
   document.getElementById('ob-step-type').value    = s.type || 'info';
   document.getElementById('ob-step-illus').value   = s.illustration || '📋';
   document.getElementById('ob-step-narration').value = s.narration || '';
@@ -13008,6 +13014,7 @@ function openOzKbModal(id) {
   document.getElementById('oz-kb-id').value       = id||'';
   document.getElementById('oz-kb-topic').value    = row?.topic  || '';
   document.getElementById('oz-kb-content').value  = row?.content|| '';
+  if (window.RichEditor) RichEditor.attach('oz-kb-content', { placeholder: 'Expliquez ici ce que O-Z doit répondre sur ce sujet…' })?.setHTML(row?.content || '');
   document.getElementById('oz-kb-tags').value     = row?.tags   || '';
   document.getElementById('oz-kb-modal-bg').style.display = 'flex';
 }

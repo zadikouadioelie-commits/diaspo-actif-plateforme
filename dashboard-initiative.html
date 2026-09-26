@@ -3401,6 +3401,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </div>
       </div>`;
     document.body.appendChild(modal);
+    if (window.RichEditor) RichEditor.attach('oe-description', { placeholder: "Description de l'offre…" });
     if (o) {
       document.getElementById('oe-contrat').value = o.contrat || '';
       document.getElementById('oe-experience').value = o.niveau_experience || '';
@@ -10283,6 +10284,7 @@ async function crmOpenContactForm(id, defaultRelation) {
     ${historiqueHtml}
   `);
   crmAssigneSelectRemplir('crm-c-assigne', c.assigne_a);
+  if (window.RichEditor) RichEditor.attach('crm-c-notes', { placeholder: '' });
 }
 async function crmSaveContact(id) {
   const body = {
@@ -10402,6 +10404,7 @@ async function crmOpenOppForm(id) {
     </div>
   `);
   crmAssigneSelectRemplir('crm-o-assigne', o.assigne_a);
+  if (window.RichEditor) RichEditor.attach('crm-o-notes', { placeholder: '' });
 }
 async function crmSaveOpp(id) {
   const body = {
@@ -10678,6 +10681,7 @@ async function crmOpenTacheForm(id) {
   /* Nouvelle tâche : préassigne au créateur par défaut (même défaut que côté serveur si ce
      champ n'était pas envoyé du tout) — juste plus visible/modifiable ici avant l'enregistrement. */
   if (!id) { const sel = document.getElementById('crm-t-assigne'); if (sel) sel.value = await crmMyId(); }
+  if (window.RichEditor) RichEditor.attach('crm-t-desc', { placeholder: '' });
 }
 async function crmSaveTache(id) {
   const lienType = document.getElementById('crm-t-lien-type').value;

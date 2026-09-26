@@ -187,9 +187,9 @@ function sfContentHtml(l){
     case 'exercice':
     case 'travail_pratique':
     case 'etude_cas':
-      return `<div style="white-space:pre-wrap;line-height:1.6;">${escH(l.contenu_texte||'Aucune consigne fournie.')}</div>`;
+      return `<div class="rich-content" style="line-height:1.6;">${l.contenu_texte ? renderRichText(l.contenu_texte) : 'Aucune consigne fournie.'}</div>`;
     default:
-      return `<div style="white-space:pre-wrap;line-height:1.6;">${escH(l.contenu_texte||'')}</div>`;
+      return `<div class="rich-content" style="line-height:1.6;">${renderRichText(l.contenu_texte||'')}</div>`;
   }
 }
 

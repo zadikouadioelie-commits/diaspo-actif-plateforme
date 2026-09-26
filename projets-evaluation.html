@@ -215,6 +215,7 @@
 </div>
 
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script>
 let ME = null;
 let peSelectedDestinataires = [];
@@ -345,10 +346,12 @@ async function peSupprimerProjet(id) {
    peEditId vaut null en création, l'identifiant du projet en modification. */
 let peEditId = null;
 const PE_CHAMPS = ['nom','categorie','secteur','pays','budget','avancement','date','resume','description','objectifs','lettre'];
+const PE_CHAMPS_RICHES = ['resume','description','objectifs','lettre'];
 
 function peOpenCreate() {
   peEditId = null;
   PE_CHAMPS.forEach(f => { const el = document.getElementById('pe-c-'+f); if (el) el.value = ''; });
+  if (window.RichEditor) PE_CHAMPS_RICHES.forEach(f => RichEditor.attach('pe-c-'+f, { placeholder: '' })?.setHTML(''));
   peUploadedDocsBuffer = [];
   document.getElementById('pe-c-docs-list').innerHTML = '';
   document.getElementById('pe-modal-create-titre').textContent = '➕ Nouveau projet';
@@ -371,6 +374,12 @@ async function peModifierProjet(pid) {
     set('date', p.date_souhaitee);      set('resume', p.resume);
     set('description', p.description);  set('objectifs', p.objectifs);
     set('lettre', p.lettre_accompagnement);
+    if (window.RichEditor) {
+      RichEditor.attach('pe-c-resume', { placeholder: '' })?.setHTML(p.resume || '');
+      RichEditor.attach('pe-c-description', { placeholder: '' })?.setHTML(p.description || '');
+      RichEditor.attach('pe-c-objectifs', { placeholder: '' })?.setHTML(p.objectifs || '');
+      RichEditor.attach('pe-c-lettre', { placeholder: '' })?.setHTML(p.lettre_accompagnement || '');
+    }
 
     peUploadedDocsBuffer = [];
     document.getElementById('pe-c-docs-list').innerHTML = '';
@@ -468,7 +477,7 @@ async function peOpenProjet(pid) {
         <button onclick="peCloseMod('pe-modal-projet-bg')" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">×</button>
       </div>
       <p style="font-size:13px;color:var(--muted);">${escH(p.categorie||'')} · ${escH(p.secteur||'')} · ${escH(p.pays||'')} ${p.budget_estime?'· '+p.budget_estime+' €':''}</p>
-      <p style="font-size:13px;">${escH(p.resume||'')}</p>
+      <div class="rich-content" style="font-size:13px;">${renderRichText(p.resume||'')}</div>
       ${r.business_plan ? `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-size:13px;">📄 Business Plan associé : <strong>${escH(r.business_plan.nom_projet||'Sans titre')}</strong></span>
@@ -609,9 +618,9 @@ function peRenderDossier(r, isDestinataire) {
     <span class="pe-pill pe-pill-${d.statut}">${STATUT_LABELS[d.statut]}</span>
     <p style="font-size:13px;margin-top:10px;">👤 Porteur : ${escH(p.porteur_nom)} (${escH(p.porteur_da_id||'')})</p>
     <p style="font-size:13px;color:var(--muted);">${escH(p.categorie||'')} · ${escH(p.secteur||'')} · ${escH(p.pays||'')} ${p.budget_estime?'· '+p.budget_estime+' €':''}</p>
-    <p style="font-size:13px;">${escH(p.resume||'')}</p>
-    ${p.description ? `<details style="font-size:13px;margin-top:8px;"><summary style="cursor:pointer;font-weight:700;">Description complète</summary><p>${escH(p.description)}</p></details>` : ''}
-    ${p.lettre_accompagnement ? `<div style="background:var(--bg);border-radius:10px;padding:10px;margin-top:8px;font-size:13px;"><strong>Lettre d'accompagnement :</strong><br>${escH(p.lettre_accompagnement)}</div>` : ''}
+    <div class="rich-content" style="font-size:13px;">${renderRichText(p.resume||'')}</div>
+    ${p.description ? `<details style="font-size:13px;margin-top:8px;"><summary style="cursor:pointer;font-weight:700;">Description complète</summary><div class="rich-content">${renderRichText(p.description)}</div></details>` : ''}
+    ${p.lettre_accompagnement ? `<div class="rich-content" style="background:var(--bg);border-radius:10px;padding:10px;margin-top:8px;font-size:13px;"><strong>Lettre d'accompagnement :</strong><br>${renderRichText(p.lettre_accompagnement)}</div>` : ''}
 
     <h4 style="margin:16px 0 8px;" id="pe-docs-anchor">📎 Documents (${r.documents.length})</h4>
     ${r.documents.length ? r.documents.map(doc => peRenderDocRow(doc)).join('') : '<p style="color:var(--muted);font-size:13px;">Aucun document.</p>'}

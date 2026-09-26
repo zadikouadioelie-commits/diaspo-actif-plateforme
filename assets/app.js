@@ -4777,7 +4777,7 @@ async function initFormations() {
   }
 
   function renderCard(f) {
-    const desc = (f.description_courte || f.description || "").slice(0, 160);
+    const desc = stripRichTags(f.description_courte || f.description || "").slice(0, 160);
     let mediaHtml;
     if (f.image_url) {
       mediaHtml = `<div class="fc-media" style="background-image:url('${f.image_url}');"></div>`;

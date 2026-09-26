@@ -1727,7 +1727,9 @@
       set('new-form-sous-titre', f.sous_titre);
       set('new-form-desc-courte', f.description_courte);
       set('new-form-desc', f.description);
+      if (window.RichEditor) RichEditor.attach('new-form-desc', { placeholder: 'Décrivez le contenu, les objectifs et le public cible…' })?.setHTML(f.description || '');
       set('new-form-objectifs', f.objectifs);
+      if (window.RichEditor) RichEditor.attach('new-form-objectifs', { placeholder: "Ce que l'apprenant saura faire à l'issue de la formation…" })?.setHTML(f.objectifs || '');
       set('new-form-competences', f.competences_acquises);
       set('new-form-public', f.public_concerne);
       if(f.niveau) set('new-form-niveau', f.niveau);
@@ -1773,6 +1775,7 @@
       } catch(_){}
       set('new-form-prerequis', f.prerequis);
       set('new-form-resultats', f.resultats_attendus);
+      if (window.RichEditor) RichEditor.attach('new-form-resultats', { placeholder: 'ex: Être capable de monter son business plan…' })?.setHTML(f.resultats_attendus || '');
       set('new-form-metier', f.metier_concerne);
       set('new-form-date-ouverture', (f.date_ouverture||'').slice(0,10));
       set('new-form-date-fermeture', (f.date_fermeture_inscriptions||'').slice(0,10));
@@ -2001,6 +2004,7 @@
     document.getElementById('fb-lecon-description').value = '';
     document.getElementById('fb-lecon-duree').value = '';
     document.getElementById('fb-lecon-texte').value = '';
+    if (window.RichEditor) RichEditor.attach('fb-lecon-texte', { placeholder: 'Le texte affiché tel quel à l\'apprenant…' })?.setHTML('');
     document.getElementById('fb-lecon-contenu-url').value = '';
     document.getElementById('fb-lecon-fichier').value = '';
     document.getElementById('fb-lecon-upload-status').textContent = '';
@@ -2014,6 +2018,7 @@
       document.getElementById('fb-lecon-description').value = l.description || '';
       document.getElementById('fb-lecon-duree').value = l.duree_minutes || '';
       document.getElementById('fb-lecon-texte').value = l.contenu_texte || '';
+      if (window.RichEditor) RichEditor.attach('fb-lecon-texte', { placeholder: 'Le texte affiché tel quel à l\'apprenant…' })?.setHTML(l.contenu_texte || '');
       document.getElementById('fb-lecon-contenu-url').value = l.contenu_url || '';
       document.getElementById('fb-lecon-nb-pages').value = l.nb_pages || '';
       document.getElementById('fb-lecon-telechargement').checked = l.telechargement_autorise !== 0 && l.telechargement_autorise !== false;
@@ -2183,7 +2188,7 @@
         </div>
         <h2 style="margin:0 0 6px;">${formation.titre}</h2>
         ${formation.sous_titre?`<p style="margin:0 0 12px;color:var(--muted);">${formation.sous_titre}</p>`:''}
-        <p style="white-space:pre-wrap;">${formation.description||''}</p>
+        <div class="rich-content">${window.renderRichText ? renderRichText(formation.description||'') : (formation.description||'')}</div>
         <div class="tags" style="margin:10px 0;">
           <span class="tag">${formation.niveau||'—'}</span><span class="tag">${formation.langue||'—'}</span>
           <span class="tag">${formation.mode_acces==='gratuit'?'Gratuit':(formation.prix+' '+(formation.devise||'EUR'))}</span>

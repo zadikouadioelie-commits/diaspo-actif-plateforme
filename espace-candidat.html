@@ -310,15 +310,7 @@
           </div>
           <button class="btn btn-orange" onclick="saveLettre()">💾 Enregistrer</button>
         </div>
-        <div class="editor-toolbar">
-          <button type="button" onclick="fmtDoc('bold')"><b>G</b></button>
-          <button type="button" onclick="fmtDoc('italic')"><i>I</i></button>
-          <button type="button" onclick="fmtDoc('underline')"><u>S</u></button>
-          <button type="button" onclick="fmtDoc('insertUnorderedList')">• Liste</button>
-          <button type="button" onclick="fmtDoc('insertOrderedList')">1. Liste</button>
-          <button type="button" onclick="fmtDoc('removeFormat')">✕ Effacer</button>
-        </div>
-        <div id="lettre-editor" contenteditable="true" style="border-radius:0 0 10px 10px;"></div>
+        <textarea id="lettre-editor"></textarea>
       </div>
 
       <!-- ── OFFRES POUR MOI ── -->
@@ -398,6 +390,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
 <script src="assets/gsap-animations.js" defer></script>
@@ -445,7 +438,7 @@ async function loadAll(){
     fillProfilForm();
     renderExps(); renderForms();
     // Lettre
-    if(r.profil?.lettre_contenu) document.getElementById('lettre-editor').innerHTML = r.profil.lettre_contenu;
+    if (window.RichEditor) RichEditor.attach('lettre-editor', { placeholder: 'Rédigez votre lettre de motivation…' })?.setHTML(r.profil?.lettre_contenu || '');
     // Badge dispo
     renderBadgeDispo(r.profil?.disponible_pour_travailler);
   }catch(e){console.error(e);}
@@ -641,9 +634,8 @@ async function saveFormation(){
 async function deleteForm(id){if(!confirm('Supprimer cette formation ?'))return;await api('DELETE','/profil-emploi/formations/'+id);loadAll();}
 
 /* ── Lettre ── */
-function fmtDoc(cmd){ document.execCommand(cmd,false,null); document.getElementById('lettre-editor').focus(); }
 async function saveLettre(){
-  const contenu = document.getElementById('lettre-editor').innerHTML;
+  const contenu = document.getElementById('lettre-editor').value;
   try{ await api('PUT','/profil-emploi',{lettre_contenu:contenu}); DA.toast('Lettre enregistrée.',{type:'success'}); }
   catch(e){ DA.toast('Erreur.',{type:'danger'}); }
 }

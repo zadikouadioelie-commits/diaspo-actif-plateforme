@@ -924,6 +924,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script src="assets/sidebar-reorder.js"></script>
 <script src="assets/posts.js"></script>
 <script src="assets/soumission-da.js"></script>
@@ -1436,6 +1437,7 @@ function openOffreEmploiModal() {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  if (window.RichEditor) RichEditor.attach('oe-description', { placeholder: "Description de l'offre…" });
 }
 
 async function submitOffreEmploi() {

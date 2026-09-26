@@ -14459,10 +14459,10 @@ route("POST", "/api/formations", async (req, res, params, body) => {
       ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     titre, type_formation||null, organisme||null, domaine||null, nationalite||null, langue||'Français',
-    niveau||null, description||null, prix||0, gratuit, duree||null, duree_heures||null, places||null,
+    niveau||null, description ? SEC.sanitizeRichHtml(description) : null, prix||0, gratuit, duree||null, duree_heures||null, places||null,
     init?.id||null, user.id,
     modeAcces, commission, telecharge_autorise?1:0,
-    objectifs||null, prerequis||null, categorie||null, video_intro||null,
+    objectifs ? SEC.sanitizeRichHtml(objectifs) : null, prerequis||null, categorie||null, video_intro||null,
     sous_titre||null, description_courte||null, competences_acquises||null, public_concerne||null,
     nombre_modules_prevu||null, nombre_lecons_approx||null,
     sous_categorie||null, mots_cles||null, pays_concerne||null, secteur_activite||null,
@@ -14484,6 +14484,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     return sendJSON(res, 400, { error: "Seules les formations en brouillon ou refusées peuvent être modifiées." });
   }
   const n = v => (v === undefined ? null : v);
+  const nr = v => (v === undefined || v === null ? null : SEC.sanitizeRichHtml(v));
   const modeAcces = body.mode_acces || f.mode_acces || 'gratuit';
   const commission = modeAcces === 'gratuit' ? 0 : modeAcces === 'payant_sauf_membres' ? 2 : 3;
   const gratuit = modeAcces === 'gratuit' ? 1 : 0;
@@ -14522,7 +14523,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     formateur_site=COALESCE(?,formateur_site), formateur_reseaux=COALESCE(?,formateur_reseaux), formateur_photo_url=COALESCE(?,formateur_photo_url),
     formateur_nom=COALESCE(?,formateur_nom), logo_url=COALESCE(?,logo_url)
     WHERE id=?`
-  ).run(n(body.titre),n(body.description),n(body.objectifs),n(body.prerequis),
+  ).run(n(body.titre),nr(body.description),nr(body.objectifs),n(body.prerequis),
     n(body.niveau),n(body.langue),n(body.duree),n(body.duree_heures),n(body.places),
     n(body.categorie),modeAcces,gratuit,n(body.prix),commission,newTelecharge,
     n(body.video_intro),n(body.image_url),newStatut,newMotif,
@@ -14532,7 +14533,7 @@ route("PUT", "/api/formations/:id", async (req, res, params, body) => {
     n(body.devise),newPromoActive,n(body.promo_reduction_pct),n(body.promo_date_fin),
     n(body.acces_type),n(body.acces_liste_id),n(body.banniere_url),
     n(body.type_formation),n(body.domaine),
-    n(body.galerie_json ? JSON.stringify(body.galerie_json) : undefined),n(body.resultats_attendus),
+    n(body.galerie_json ? JSON.stringify(body.galerie_json) : undefined),nr(body.resultats_attendus),
     n(body.metier_concerne),n(body.date_ouverture),
     n(body.date_fermeture_inscriptions),n(body.date_debut),n(body.date_fin),
     b('accessible_ordinateur'),b('accessible_tablette'),b('accessible_mobile'),b('accessible_hors_ligne'),
@@ -14839,7 +14840,7 @@ route("POST", "/api/formations/:id/chapitres/:chapitreId/lecons", async (req, re
   const id = (await db.prepare(`INSERT INTO formation_lecons (module_id,chapitre_id,titre,description,type,duree_minutes,contenu_url,contenu_texte,ressources_json,image_url,ordre,telechargement_autorise,nb_pages)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     chapitre.module_id, params.chapitreId, body.titre, body.description||null, body.type||'texte', body.duree_minutes||null,
-    body.contenu_url||null, body.contenu_texte||null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
+    body.contenu_url||null, body.contenu_texte ? SEC.sanitizeRichHtml(body.contenu_texte) : null, body.ressources_json ? JSON.stringify(body.ressources_json) : null,
     body.image_url||null, max+1, body.telechargement_autorise === false ? 0 : 1, body.nb_pages||null
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
@@ -14857,7 +14858,7 @@ route("PUT", "/api/formations/:id/lecons/:leconId", async (req, res, params, bod
     contenu_texte=COALESCE(?,contenu_texte), ressources_json=COALESCE(?,ressources_json), image_url=COALESCE(?,image_url),
     telechargement_autorise=COALESCE(?,telechargement_autorise), nb_pages=COALESCE(?,nb_pages)
     WHERE id=?`).run(n(body.titre),n(body.description),n(body.type),n(body.duree_minutes),n(body.contenu_url),
-    n(body.contenu_texte), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url),
+    (body.contenu_texte === undefined ? null : SEC.sanitizeRichHtml(body.contenu_texte)), body.ressources_json?JSON.stringify(body.ressources_json):null, n(body.image_url),
     body.telechargement_autorise === undefined ? null : (body.telechargement_autorise ? 1 : 0), n(body.nb_pages), params.leconId);
   sendJSON(res, 200, { ok: true });
 });
@@ -15955,7 +15956,7 @@ route("PUT", "/api/profil/profil-public", async (req, res, params, body) => {
          Array.isArray(besoins) ? JSON.stringify(besoins) : null,
          Array.isArray(realisations) ? JSON.stringify(realisations) : null,
          stats_perso && typeof stats_perso === 'object' ? JSON.stringify(stats_perso) : null,
-         services_perso !== undefined ? services_perso : null,
+         services_perso !== undefined ? SEC.sanitizeRichHtml(services_perso) : null,
          Array.isArray(zones) ? JSON.stringify(zones) : null,
          reseaux && typeof reseaux === 'object' ? JSON.stringify(reseaux) : null,
          annee_debut != null ? parseInt(annee_debut) || null : null,
@@ -20733,8 +20734,12 @@ route("PUT", "/api/admin/certifications/:id/evaluation", async (req, res, params
     "verification_partenaires","verification_beneficiaires","verification_institutions",
     "notes_internes","rapport_verification"
   ];
+  const CHAMPS_RICHES_CERTIF = ["projets_realises","actions_concretes","impacts","avis_utilisateurs","recommandations","retours_experience","notes_internes","rapport_verification"];
   const existing = await db.prepare("SELECT id FROM certification_evaluations WHERE initiative_id=?").get(params.id);
-  const vals = fields.map(f => body[f] !== undefined ? body[f] : null);
+  const vals = fields.map(f => {
+    if (body[f] === undefined) return null;
+    return CHAMPS_RICHES_CERTIF.includes(f) ? SEC.sanitizeRichHtml(body[f]) : body[f];
+  });
   if (existing) {
     const sets = fields.map(f => `${f}=?`).join(",") + ",updated_at=datetime('now')";
     await db.prepare(`UPDATE certification_evaluations SET ${sets} WHERE initiative_id=?`).run(...vals, params.id);
@@ -23823,7 +23828,7 @@ route("POST", "/api/offres", async (req, res, params, body) => {
       certifications_requises, pieces_demandees, date_limite, nb_postes, statut, recruteur_contact
     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
-    user.id, initiativeId, titre, type, contrat || null, duree_alternance || null, description || null,
+    user.id, initiativeId, titre, type, contrat || null, duree_alternance || null, description ? SEC.sanitizeRichHtml(description) : null,
     JSON.stringify(Array.isArray(missions) ? missions : []),
     JSON.stringify(Array.isArray(competences_requises) ? competences_requises : []),
     localisation || null, pays || null, region || null, departement || null, ville || null, commune || null,
@@ -24027,7 +24032,7 @@ route("PUT", "/api/offres/:id", async (req, res, params, body) => {
     return sendJSON(res, 400, { error: "Statut invalide." });
   }
   const sets = [], args = [];
-  for (const f of fields) { if (body[f] !== undefined) { sets.push(`${f}=?`); args.push(body[f]); } }
+  for (const f of fields) { if (body[f] !== undefined) { sets.push(`${f}=?`); args.push(f === 'description' ? SEC.sanitizeRichHtml(body[f]) : body[f]); } }
   const jsonFields = ['missions', 'competences_requises', 'avantages', 'langues_requises', 'certifications_requises', 'pieces_demandees'];
   for (const f of jsonFields) { if (body[f] !== undefined) { sets.push(`${f}=?`); args.push(JSON.stringify(Array.isArray(body[f]) ? body[f] : [])); } }
   if (body.teletravail !== undefined) { sets.push('teletravail=?'); args.push(body.teletravail ? 1 : 0); }
@@ -26007,7 +26012,7 @@ route("POST", "/api/onboarding/admin/:id/steps", async (req, res, params, body) 
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre } = body;
   const r = await db.prepare(`INSERT INTO onboarding_steps (tutorial_id,ordre,titre,contenu,type,illustration,narration,module_lien,module_label) VALUES (?,?,?,?,?,?,?,?,?)`)
-    .run(parseInt(params.id), parseInt(ordre)||0, titre||'', contenu||'', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null);
+    .run(parseInt(params.id), parseInt(ordre)||0, titre||'', contenu ? SEC.sanitizeRichHtml(contenu) : '', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null);
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -26017,7 +26022,7 @@ route("PUT", "/api/onboarding/admin/steps/:id", async (req, res, params, body) =
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { titre, contenu, type, illustration, narration, module_lien, module_label, ordre, actif } = body;
   await db.prepare(`UPDATE onboarding_steps SET titre=?,contenu=?,type=?,illustration=?,narration=?,module_lien=?,module_label=?,ordre=?,actif=? WHERE id=?`)
-    .run(titre||'', contenu||'', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null, parseInt(ordre)||0, actif?1:0, parseInt(params.id));
+    .run(titre||'', contenu ? SEC.sanitizeRichHtml(contenu) : '', type||'info', illustration||'📋', narration||'', module_lien||null, module_label||null, parseInt(ordre)||0, actif?1:0, parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
@@ -26117,7 +26122,7 @@ route("POST", "/api/oz/knowledge", async (req, res, _p, body) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { topic, content, tags } = body;
   if (!topic || !content) return sendJSON(res, 400, { error: 'topic + content requis' });
-  const r = await db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(topic.trim(), content.trim(), tags||'');
+  const r = await db.prepare('INSERT INTO oz_knowledge (topic,content,tags) VALUES (?,?,?)').run(topic.trim(), SEC.sanitizeRichHtml(content.trim()), tags||'');
   sendJSON(res, 201, { id: r.lastInsertRowid });
 });
 
@@ -26126,7 +26131,7 @@ route("PUT", "/api/oz/knowledge/:id", async (req, res, params, body) => {
   if (!user || user.role !== 'administrateur') return sendJSON(res, 403, { error: 'Admin requis' });
   const { topic, content, tags, actif } = body;
   await db.prepare(`UPDATE oz_knowledge SET topic=?,content=?,tags=?,actif=?,updated_at=datetime('now') WHERE id=?`)
-    .run(topic||'', content||'', tags||'', actif??1, parseInt(params.id));
+    .run(topic||'', content ? SEC.sanitizeRichHtml(content) : '', tags||'', actif??1, parseInt(params.id));
   sendJSON(res, 200, { ok: true });
 });
 
@@ -30843,7 +30848,7 @@ ${jsonLd}
       const r = await db.prepare(`INSERT INTO recrutement_campagnes
         (recruteur_id,nom,description,titre_poste,type_recrutement,organisme,secteur_activite,pays,region,departement,ville,adresse,teletravail,rayon_publication,image_b64,statut,publie_at,promotion_fin,expire_at,niveau_etudes,experience_annees,competences,langues,certifications,qualites,date_debut,duree_mission,remuneration,devise,nb_postes,photos_json,pdf_b64,pdf_nom,date_limite_candidature,created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))`)
-        .run(me.id,nom,description||null,titre_poste||null,type_recrutement||'emploi',organisme||null,secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,teletravail||'non',rayon_publication||'national',image_b64||null,finalStatut,publie_at,promotion_fin,expire_at,niveau_etudes||null,experience_annees||null,JSON.stringify(competences||[]),JSON.stringify(langues||[]),JSON.stringify(certifications||[]),JSON.stringify(qualites||[]),date_debut||null,duree_mission||null,remuneration||null,devise||'EUR',nb_postes||1,JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,date_limite_candidature||null);
+        .run(me.id,nom,description ? SEC.sanitizeRichHtml(description) : null,titre_poste||null,type_recrutement||'emploi',organisme||null,secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,teletravail||'non',rayon_publication||'national',image_b64||null,finalStatut,publie_at,promotion_fin,expire_at,niveau_etudes||null,experience_annees||null,JSON.stringify(competences||[]),JSON.stringify(langues||[]),JSON.stringify(certifications||[]),JSON.stringify(qualites||[]),date_debut||null,duree_mission||null,remuneration||null,devise||'EUR',nb_postes||1,JSON.stringify(photos_json||[]),pdf_b64||null,pdf_nom||null,date_limite_candidature||null);
       const cid = Number(r.lastInsertRowid);
       // Publication dans le fil si active
       if (finalStatut === 'active' && await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='fil_posts'`).get()) {
@@ -30906,7 +30911,7 @@ ${jsonLd}
         pdf_nom=COALESCE(?,pdf_nom), date_limite_candidature=COALESCE(?,date_limite_candidature),
         publie_at=?, promotion_fin=?, expire_at=?, updated_at=datetime('now')
         WHERE id=?`)
-        .run(nom||null,description||null,titre_poste||null,type_recrutement||null,organisme||null,
+        .run(nom||null,description ? SEC.sanitizeRichHtml(description) : null,titre_poste||null,type_recrutement||null,organisme||null,
              secteur_activite||null,pays||null,region||null,departement||null,ville||null,adresse||null,
              teletravail||null,rayon_publication||null,image_b64||null,statut||null,
              niveau_etudes||null,experience_annees||null,date_debut||null,duree_mission||null,
@@ -31383,7 +31388,7 @@ ${jsonLd}
       const r = await db.prepare(`
         INSERT INTO vitrine_articles (titre, resume, contenu, categorie, cover_image, statut, date_publication, created_by)
         VALUES (?,?,?,?,?,?,?,?)
-      `).run(titre, resume, contenu, categorie, cover_image, statut, date_publication, admin.id);
+      `).run(titre, resume, contenu ? SEC.sanitizeRichHtml(contenu) : '', categorie, cover_image, statut, date_publication, admin.id);
       return sendJSON(res, 200, { ok: true, id: r.lastInsertRowid });
     }
 
@@ -31397,7 +31402,7 @@ ${jsonLd}
       await db.prepare(`
         UPDATE vitrine_articles SET titre=?, resume=?, contenu=?, categorie=?, cover_image=?, statut=?, date_publication=?, updated_at=datetime('now')
         WHERE id=?
-      `).run(titre, resume, contenu, categorie, cover_image, statut, date_publication, id);
+      `).run(titre, resume, contenu ? SEC.sanitizeRichHtml(contenu) : '', categorie, cover_image, statut, date_publication, id);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -31453,14 +31458,18 @@ ${jsonLd}
          quel via .innerHTML (éditeur contenteditable maison, #lettre-editor), sans aucun
          nettoyage côté serveur jusqu'ici : un compte pourrait stocker du HTML actif dans sa
          propre lettre. Faite ici, une fois pour tout ce module (met à jour ET création). */
-      const lettre_contenu = SEC.sanitizeRichHtml(body.lettre_contenu);
-      const existing = await db.prepare(`SELECT id FROM profil_emploi WHERE user_id=?`).get(me.id);
+      const existing = await db.prepare(`SELECT * FROM profil_emploi WHERE user_id=?`).get(me.id);
+      /* Certains appelants (ex: enregistrement isolé de la lettre de motivation, ou upload d'un
+         PDF, depuis espace-candidat.html) n'envoient qu'un seul champ — un champ non fourni doit
+         garder sa valeur existante, jamais être écrasé à null ou vidé. */
+      const lettre_contenu = body.lettre_contenu !== undefined ? SEC.sanitizeRichHtml(body.lettre_contenu) : (existing?.lettre_contenu ?? '');
       if (existing) {
+        const g = (v, def) => v !== undefined ? v : def;
         await db.prepare(`UPDATE profil_emploi SET situation=?,types_opportunites=?,secteurs=?,metier=?,competences=?,experience=?,niveau_etudes=?,langues=?,mobilite=?,teletravail=?,salaire_min=?,salaire_max=?,devise=?,date_disponibilite=?,disponible_pour_travailler=?,suspendre_offres=?,lettre_contenu=?,cv_pdf=COALESCE(?,cv_pdf),lettre_pdf=COALESCE(?,lettre_pdf),portfolio_pdf=COALESCE(?,portfolio_pdf),updated_at=datetime('now') WHERE user_id=?`)
-          .run(situation,JSON.stringify(types_opportunites||[]),JSON.stringify(secteurs||[]),metier,JSON.stringify(competences||[]),experience,niveau_etudes,JSON.stringify(langues||[]),mobilite,teletravail,salaire_min||null,salaire_max||null,devise||'EUR',date_disponibilite,disponible_pour_travailler?1:0,suspendre_offres?1:0,lettre_contenu,cv_pdf||null,lettre_pdf||null,portfolio_pdf||null,me.id);
+          .run(g(situation,existing.situation),g(types_opportunites?JSON.stringify(types_opportunites):undefined,existing.types_opportunites),g(secteurs?JSON.stringify(secteurs):undefined,existing.secteurs),g(metier,existing.metier),g(competences?JSON.stringify(competences):undefined,existing.competences),g(experience,existing.experience),g(niveau_etudes,existing.niveau_etudes),g(langues?JSON.stringify(langues):undefined,existing.langues),g(mobilite,existing.mobilite),g(teletravail,existing.teletravail),g(salaire_min,existing.salaire_min),g(salaire_max,existing.salaire_max),g(devise,existing.devise),g(date_disponibilite,existing.date_disponibilite),g(disponible_pour_travailler!==undefined?(disponible_pour_travailler?1:0):undefined,existing.disponible_pour_travailler),g(suspendre_offres!==undefined?(suspendre_offres?1:0):undefined,existing.suspendre_offres),lettre_contenu,cv_pdf||null,lettre_pdf||null,portfolio_pdf||null,me.id);
       } else {
         await db.prepare(`INSERT INTO profil_emploi(user_id,situation,types_opportunites,secteurs,metier,competences,experience,niveau_etudes,langues,mobilite,teletravail,salaire_min,salaire_max,devise,date_disponibilite,disponible_pour_travailler,suspendre_offres,lettre_contenu,cv_pdf,lettre_pdf,portfolio_pdf) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-          .run(me.id,situation,JSON.stringify(types_opportunites||[]),JSON.stringify(secteurs||[]),metier,JSON.stringify(competences||[]),experience,niveau_etudes,JSON.stringify(langues||[]),mobilite,teletravail,salaire_min||null,salaire_max||null,devise||'EUR',date_disponibilite,disponible_pour_travailler?1:0,suspendre_offres?1:0,lettre_contenu,cv_pdf||null,lettre_pdf||null,portfolio_pdf||null);
+          .run(me.id,situation||null,JSON.stringify(types_opportunites||[]),JSON.stringify(secteurs||[]),metier||null,JSON.stringify(competences||[]),experience||null,niveau_etudes||null,JSON.stringify(langues||[]),mobilite||null,teletravail||null,salaire_min||null,salaire_max||null,devise||'EUR',date_disponibilite||null,disponible_pour_travailler?1:0,suspendre_offres?1:0,lettre_contenu,cv_pdf||null,lettre_pdf||null,portfolio_pdf||null);
       }
       // Mettre à jour le badge sur le user
       if (typeof disponible_pour_travailler !== 'undefined') {
@@ -34635,8 +34644,10 @@ ${jsonLd}
       const id = (await db.prepare(`INSERT INTO proj_eval_projets
         (createur_id,nom_projet,categorie,secteur,pays,resume,description,objectifs,budget_estime,avancement,date_souhaitee,business_plan_id,lettre_accompagnement)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(me.id, nom_projet, categorie||null, secteur||null, pays||null, resume||null, description||null, objectifs||null,
-             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null, lettre_accompagnement||null)).lastInsertRowid;
+        .run(me.id, nom_projet, categorie||null, secteur||null, pays||null,
+             resume?SEC.sanitizeRichHtml(resume):null, description?SEC.sanitizeRichHtml(description):null, objectifs?SEC.sanitizeRichHtml(objectifs):null,
+             budget_estime!=null?parseFloat(budget_estime):null, avancement||null, date_souhaitee||null, business_plan_id||null,
+             lettre_accompagnement?SEC.sanitizeRichHtml(lettre_accompagnement):null)).lastInsertRowid;
       return sendJSON(res, 201, { id });
     }
 
@@ -34657,11 +34668,13 @@ ${jsonLd}
       if (body.nom_projet !== undefined && !String(body.nom_projet).trim()) {
         return sendJSON(res, 400, { error: 'Le nom du projet ne peut pas être vide.' });
       }
+      const CHAMPS_RICHES = ['resume','description','objectifs','lettre_accompagnement'];
       const valeur = c => {
         const v = body[c];
         if (v === null || v === '') return null;
         if (c === 'budget_estime') { const n = parseFloat(v); return isNaN(n) ? null : n; }
         if (c === 'business_plan_id') { const n = parseInt(v); return isNaN(n) ? null : n; }
+        if (CHAMPS_RICHES.includes(c)) return SEC.sanitizeRichHtml(String(v));
         return String(v);
       };
       await db.prepare(
@@ -41779,7 +41792,7 @@ route("POST", "/api/crm/contacts", async (req, res, params, body) => {
   const r = await db.prepare(`INSERT INTO crm_contacts (initiative_id,linked_user_id,nom,prenom,email,telephone,ville,pays,societe,fonction,relation,notes,source,tags_json,photos_json,documents_json,created_by,assigne_a)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, body.linked_user_id || null, nom, body.prenom || null, body.email || null, body.telephone || null,
-    body.ville || null, body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null,
+    body.ville || null, body.pays || null, body.societe || null, body.fonction || null, relation, body.notes ? SEC.sanitizeRichHtml(body.notes) : null,
     body.source || null, JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []),
     crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id, assigneA
   );
@@ -41796,7 +41809,7 @@ route("PUT", "/api/crm/contacts/:id", async (req, res, params, body) => {
   const assigneA = await crmResoudreAssigneA(init, body.assigne_a);
   await db.prepare(`UPDATE crm_contacts SET nom=?,prenom=?,email=?,telephone=?,ville=?,pays=?,societe=?,fonction=?,relation=?,notes=?,source=?,tags_json=?,photos_json=?,documents_json=?,assigne_a=?,updated_at=datetime('now') WHERE id=?`).run(
     (body.nom || "").trim() || c.nom, body.prenom || null, body.email || null, body.telephone || null, body.ville || null,
-    body.pays || null, body.societe || null, body.fonction || null, relation, body.notes || null, body.source || null,
+    body.pays || null, body.societe || null, body.fonction || null, relation, body.notes ? SEC.sanitizeRichHtml(body.notes) : null, body.source || null,
     JSON.stringify(Array.isArray(body.tags) ? body.tags.slice(0, 10) : []),
     crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), assigneA, params.id
   );
@@ -41897,7 +41910,7 @@ route("POST", "/api/crm/opportunites", async (req, res, params, body) => {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     init.id, body.contact_id || null, titre, body.valeur != null ? Number(body.valeur) : null, body.devise || "EUR",
     CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : "nouveau", body.probabilite != null ? Number(body.probabilite) : 50,
-    body.date_prevue || null, body.prochaine_action || null, body.notes || null,
+    body.date_prevue || null, body.prochaine_action || null, body.notes ? SEC.sanitizeRichHtml(body.notes) : null,
     body.lie_produit_id || null, body.lie_event_id || null, body.lie_devis_demande_id || null, body.lie_campagne_id || null,
     crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), user.id, assigneA
   );
@@ -41914,7 +41927,7 @@ route("PUT", "/api/crm/opportunites/:id", async (req, res, params, body) => {
     probabilite=COALESCE(?,probabilite), date_prevue=?, prochaine_action=?, notes=?, contact_id=?, photos_json=?, documents_json=?, assigne_a=?, updated_at=datetime('now') WHERE id=?`).run(
     (body.titre || "").trim() || o.titre, body.valeur != null ? Number(body.valeur) : null, body.devise || null,
     CRM_STATUTS_PIPELINE.includes(body.statut) ? body.statut : null, body.probabilite != null ? Number(body.probabilite) : null,
-    body.date_prevue || null, body.prochaine_action || null, body.notes || null, body.contact_id || null,
+    body.date_prevue || null, body.prochaine_action || null, body.notes ? SEC.sanitizeRichHtml(body.notes) : null, body.contact_id || null,
     crmSanitizePhotos(body.photos), crmSanitizeDocuments(body.documents), assigneA, params.id
   );
   sendJSON(res, 200, { ok: true });
@@ -41965,7 +41978,7 @@ route("POST", "/api/crm/taches", async (req, res, params, body) => {
   const assigneA = body.assigne_a !== undefined ? await crmResoudreAssigneA(init, body.assigne_a) : user.id;
   const r = await db.prepare(`INSERT INTO crm_taches (initiative_id,titre,description,priorite,date_echeance,heure_echeance,contact_id,liste_id,linked_user_id,email_libre,opportunite_id,devis_demande_id,event_id,campagne_id,photos_json,documents_json,created_by,assigne_a)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-    init.id, titre, body.description || null, PRIORITES.includes(body.priorite) ? body.priorite : "normale",
+    init.id, titre, body.description ? SEC.sanitizeRichHtml(body.description) : null, PRIORITES.includes(body.priorite) ? body.priorite : "normale",
     body.date_echeance || null, body.heure_echeance || null,
     lien.contact_id, lien.liste_id, lien.linked_user_id, lien.email_libre,
     body.opportunite_id || null, body.devis_demande_id || null, body.event_id || null, body.campagne_id || null,
@@ -41995,7 +42008,7 @@ route("PUT", "/api/crm/taches/:id", async (req, res, params, body) => {
   const assigneA = body.assigne_a !== undefined ? await crmResoudreAssigneA(init, body.assigne_a) : t.assigne_a;
   await db.prepare(`UPDATE crm_taches SET titre=?, description=?, priorite=COALESCE(?,priorite), statut=COALESCE(?,statut),
     date_echeance=?, heure_echeance=?, contact_id=?, liste_id=?, linked_user_id=?, email_libre=?, photos_json=?, documents_json=?, assigne_a=?, updated_at=datetime('now') WHERE id=?`).run(
-    (body.titre || "").trim() || t.titre, body.description || null,
+    (body.titre || "").trim() || t.titre, body.description ? SEC.sanitizeRichHtml(body.description) : null,
     PRIORITES.includes(body.priorite) ? body.priorite : null, STATUTS.includes(body.statut) ? body.statut : null,
     body.date_echeance || null, body.heure_echeance || null,
     lien.contact_id, lien.liste_id, lien.linked_user_id, lien.email_libre,

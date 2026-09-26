@@ -305,6 +305,7 @@
   function openArticleForm() {
     document.getElementById('article-modal-title').textContent = 'Nouvelle actualité';
     ['art-id','art-titre','art-resume','art-contenu','art-categorie','art-date'].forEach(id => document.getElementById(id).value = '');
+    if (window.RichEditor) RichEditor.attach('art-contenu', { placeholder: 'Contenu complet de l\'actualité…' })?.setHTML('');
     document.getElementById('art-statut').value = 'brouillon';
     document.getElementById('article-modal').classList.add('open');
   }
@@ -315,6 +316,7 @@
     document.getElementById('art-titre').value = a.titre || '';
     document.getElementById('art-resume').value = a.resume || '';
     document.getElementById('art-contenu').value = a.contenu || '';
+    if (window.RichEditor) RichEditor.attach('art-contenu', { placeholder: 'Contenu complet de l\'actualité…' })?.setHTML(a.contenu || '');
     document.getElementById('art-categorie').value = a.categorie || '';
     document.getElementById('art-date').value = a.date_publication || '';
     document.getElementById('art-statut').value = a.statut || 'brouillon';
@@ -352,6 +354,7 @@
     window.location.href = 'vitrine-admin-connexion.html';
   }
 </script>
+<script src="/assets/rich-editor.js"></script>
 <script src="/assets/pwa-install.js"></script>
 </body>
 </html>
