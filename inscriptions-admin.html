@@ -627,6 +627,13 @@ function renderListView() {
           <div style="display:flex;gap:12px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);align-items:center;flex-wrap:wrap;">
             <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
             <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+              <!-- Accès rapide "Gérer"/"Modifier" (2026-09-26, demande explicite : "évite de
+                   rentrer encore une fois dans la fiche pour aller chercher à l'intérieur") —
+                   Gérer saute directement sur l'onglet Validation (inscrits, relances...),
+                   Modifier retombe sur les 3 étapes de création (Vue d'ensemble/Types/Formulaire),
+                   réutilise selectFiche() déjà existant (même comportement que cliquer la carte). -->
+              <button data-action="gererFicheListe" data-id="${f.id}" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗂️ Gérer</button>
+              <button data-action="selectFiche" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
               ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}</button>` : ''}
               <button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>
             </div>
@@ -962,14 +969,43 @@ function renderLiaisonEvenements() {
   if (!mesEvenements.length) {
     return `<div style="font-size:12px; color:oklch(0.55 0.006 30);">Aucun événement créé sur votre compte — ${lienCreation} pour pouvoir le lier à cette fiche.</div>`;
   }
+  /* Miniature + badge brouillon + encart publication (2026-09-26, demande explicite) — même
+     fallback de couverture que renderModalLiaison() ci-dessous. Ces événements (table native
+     evenements, créés depuis evenements.html) n'ont que deux statuts possibles ('ouvert' ou
+     'brouillon' — voir PUT /api/evenements/:id) : pas de publication programmée pour cette
+     table (ça n'existe que pour la table events/Billetterie, un système différent). L'encart
+     ouvre donc evenements.html#evt-<id> plutôt que d'appeler l'API directement : cette route
+     réécrit tous les champs de l'événement sans fusion partielle (titre/date requis), donc
+     seul le vrai formulaire — qui a déjà toutes les données chargées — peut publier sans
+     risquer d'effacer des champs. */
+  const badgeStatut = (e) => e.statut === 'brouillon'
+    ? ' <span style="font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:20px; background:#FEF9C3; color:#92400E;">🟡 Brouillon</span>' : '';
+  const encartPublication = (e) => {
+    if (e.statut !== 'brouillon') return '';
+    return `
+      <div style="background:#FEF9C3; border:1px solid #FDE68A; border-radius:8px; padding:9px 11px; margin:2px 0 6px 46px; font-size:11.5px; color:#92400E;">
+        Cet événement est en brouillon — il n'est pas encore visible du public.
+        <div style="margin-top:6px;">
+          <a href="evenements.html#evt-${e.id}" target="_blank" rel="noopener" style="background:#8B12D6; border:none; color:#fff; font-size:11px; font-weight:600; padding:6px 12px; border-radius:6px; text-decoration:none; display:inline-block;">🚀 Ouvrir et publier →</a>
+        </div>
+      </div>`;
+  };
   return `
     <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">${lienCreation}</div>
-    <div style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;">
-      ${mesEvenements.map(e => `
-        <label class="ia-evt-ligne" style="display:flex; align-items:center; gap:10px; font-size:13px; cursor:pointer; background:#fff; border-radius:8px; padding:6px 10px;">
-          <input type="checkbox" data-evt-id="${e.id}" ${evenementsLies.has(e.id) ? 'checked' : ''} class="ia-evt-checkbox">
-          <span>${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}</span>
-        </label>`).join('')}
+    <div style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
+      ${mesEvenements.map(e => {
+        const cover = e.image_couverture || e.image_url || null;
+        const lie = evenementsLies.has(e.id);
+        return `
+        <div>
+          <label class="ia-evt-ligne" style="display:flex; align-items:center; gap:10px; font-size:13px; cursor:pointer; background:#fff; border-radius:8px; padding:6px 10px;">
+            <input type="checkbox" data-evt-id="${e.id}" ${lie ? 'checked' : ''} class="ia-evt-checkbox">
+            <span style="width:36px; height:36px; border-radius:6px; flex-shrink:0; background:${cover ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(cover)}')` : 'oklch(0.94 0.01 258)'}; display:flex; align-items:center; justify-content:center;">${cover ? '' : '<span style="font-size:15px; opacity:.5;">📅</span>'}</span>
+            <span>${escH(e.titre)}${e.date_evt ? ' — ' + escH(e.date_evt) : ''}${badgeStatut(e)}</span>
+          </label>
+          ${lie ? encartPublication(e) : ''}
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
@@ -1169,13 +1205,18 @@ function renderFields() {
          violet scintillant (même principe que .trophee-shimmer d'evenements.html) pour rester
          bien visible même en bas de page. -->
     <div class="ia-liaison-essentielle" style="border-radius:12px; padding:18px 20px; margin-top:20px;">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-        <span style="font-size:18px;">🔗</span>
-        <h3 style="margin:0; font-size:14.5px; font-weight:800; color:#6B0FA3;">Étape essentielle — Liaison à un événement</h3>
-      </div>
-      <p style="font-size:12px; color:#7A3FA8; margin:0 0 10px;">Sans cette étape, le bouton « S'inscrire » de votre événement continue de pointer vers le parcours d'inscription classique au lieu de cette fiche.</p>
-      ${renderLiaisonEvenements()}
-      <button style="background:#8B12D6; border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>
+      ${state.liaisonEvenementReportee ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;"><span style="font-size:18px;">🔗</span><span style="font-size:13px; font-weight:700; color:#6B0FA3;">Liaison à un événement — reportée pour l'instant</span></div>
+          <button data-action="reprendreLiaisonEvenements" style="background:#8B12D6; border:none; color:#fff; font-size:12px; font-weight:700; padding:7px 14px; border-radius:8px; cursor:pointer;">Reprendre →</button>
+        </div>` : `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;"><span style="font-size:18px;">🔗</span><h3 style="margin:0; font-size:14.5px; font-weight:800; color:#6B0FA3;">Étape essentielle — Liaison à un événement</h3></div>
+          <button data-action="reporterLiaisonEvenements" style="background:none; border:none; color:#7A3FA8; font-size:11.5px; text-decoration:underline; cursor:pointer; padding:0;">Lier plus tard</button>
+        </div>
+        <p style="font-size:12px; color:#7A3FA8; margin:0 0 10px;">Sans cette étape, le bouton « S'inscrire » de votre événement continue de pointer vers le parcours d'inscription classique au lieu de cette fiche.</p>
+        ${renderLiaisonEvenements()}
+        <button style="background:#8B12D6; border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>`}
     </div>`;
 }
 
@@ -1579,6 +1620,20 @@ const actions = {
     state.icModeGestion = false; state.icTransitionVisible = false;
     await iaChargerFiche(state.selectedFicheId);
   },
+  /* Raccourci "🗂️ Gérer" depuis la carte de liste (2026-09-26, demande explicite) : ouvre la
+     fiche directement sur l'onglet de gestion "Validation" (voir les inscrits), au lieu de
+     retomber sur "Vue d'ensemble" puis d'obliger à naviguer manuellement — évite de "rentrer
+     encore une fois dans la fiche pour aller chercher à l'intérieur". icModeGestion:true est
+     indispensable même pour une fiche encore en "brouillon" : sans lui, enCreation reste vrai
+     et la barre d'onglets ne montrerait que les 3 étapes de création (IA_CREATION_STEPS),
+     masquant Validation/Aperçu public/Communication — même bascule que icContinuerVersGestion()
+     plus bas, déclenchée ici directement depuis la liste plutôt qu'en fin d'assistant. */
+  async gererFicheListe(el) {
+    state.selectedFicheId = parseInt(el.dataset.id); state.view = 'detail'; state.activeTab = 'validation'; state.selectedTypeId = null;
+    state.icModeGestion = true; state.icTransitionVisible = false;
+    await iaChargerFiche(state.selectedFicheId);
+    try { await iaChargerOnglet('validation'); } catch (e) { ia_toast(e.message, false); }
+  },
   // Raccourci depuis la carte de liste (2026-09-22, demande explicite) : ouvre une modale
   // dédiée listant TOUS les événements du compte en cartouches (image/titre/date/lieu), chacune
   // avec son propre bouton — sans changer de vue (reste sur la liste, contrairement à l'ancien
@@ -1724,6 +1779,8 @@ const actions = {
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
+  reporterLiaisonEvenements() { state.liaisonEvenementReportee = true; },
+  reprendreLiaisonEvenements() { state.liaisonEvenementReportee = false; },
   async changerPhotoCouverture(el) {
     const file = el.files[0]; if (!file) return;
     try {
