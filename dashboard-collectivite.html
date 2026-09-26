@@ -2085,7 +2085,7 @@ async function loadPartenariats() {
         <div style="flex:1;">
           <div style="font-weight:700;font-size:14px;">${escH(i.nom)}</div>
           <div style="font-size:12.5px;color:var(--muted);">${escH(i.domaine||"")}${i.ville?" · "+escH(i.ville):""}${i.pays?" · "+escH(i.pays):""}</div>
-          ${i.description ? `<p style="font-size:13px;margin:6px 0 0;">${escH(i.description.slice(0,120))}…</p>` : ""}
+          ${i.description ? `<p style="font-size:13px;margin:6px 0 0;">${escH(stripRichTags(i.description).slice(0,120))}…</p>` : ""}
         </div>
         <button class="btn btn-sm btn-outline" onclick="alert('Messagerie partenariat — contactez cette initiative via la messagerie.')">Contacter</button>
       </div>

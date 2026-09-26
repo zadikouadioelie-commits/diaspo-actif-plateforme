@@ -699,7 +699,7 @@ function initCardHTML(i){
         <div class="init-card-loc">📍 ${escH([i.ville,i.pays].filter(Boolean).join(', ')||'—')}</div>
       </div>
     </div>
-    ${i.description?`<div class="init-card-desc">${escH(i.description)}</div>`:''}
+    ${i.description?`<div class="init-card-desc">${escH(stripRichTags(i.description))}</div>`:''}
     <div class="init-card-tags">
       ${i.domaine?`<span class="init-tag secteur">${escH(i.domaine)}</span>`:''}
       ${services.map(s=>`<span class="init-tag">${escH(s)}</span>`).join('')}
@@ -747,7 +747,7 @@ async function voirFiche(id){
           </div>
         </div>
       </div>
-      ${i.description?`<p style="font-size:.87rem;color:var(--muted);margin:0 0 14px;">${escH(i.description)}</p>`:''}
+      ${i.description?`<div class="rich-content" style="font-size:.87rem;color:var(--muted);margin:0 0 14px;">${renderRichText(i.description)}</div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;font-size:.82rem;">
         ${i.annee_creation?`<div><b>Fondée en :</b> ${i.annee_creation}</div>`:''}
         ${i.taille_structure?`<div><b>Taille :</b> ${escH(i.taille_structure)}</div>`:''}

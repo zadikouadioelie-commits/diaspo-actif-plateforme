@@ -893,9 +893,16 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/geo.js"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="/assets/rich-editor.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script>
 const PAGE_LOAD_TS = Date.now(); // sert au calcul du délai anti-bot côté serveur
+document.addEventListener('DOMContentLoaded', function(){
+  if (window.RichEditor) {
+    RichEditor.attach('i-desc', { placeholder: 'Présentez votre initiative…' });
+    RichEditor.attach('ce-desc', { placeholder: 'Missions, territoire, public concerné…' });
+  }
+});
 let currentRole=null;
 
 /* ── Indicatif téléphonique automatique selon le pays saisi ──
@@ -1266,6 +1273,7 @@ function appliquerBrouillon(prefix, state){
     const key = brouillonFieldKey(el);
     if (!key || !(key in state)) return;
     if (el.type === 'checkbox' || el.type === 'radio') el.checked = state[key];
+    else if (el._richEditorInstance) el._richEditorInstance.setHTML(state[key]);
     else el.value = state[key];
     el.dispatchEvent(new Event('change', {bubbles:true}));
   });

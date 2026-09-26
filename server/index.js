@@ -635,7 +635,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
         forme_juridique, date_creation_structure, numero_fiscal)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)
     `).run(
-      slug, nom_institution || nom, type_org || null, description || null, domaine || null, objectifs || null,
+      slug, nom_institution || nom, type_org || null, description ? SEC.sanitizeRichHtml(description) : null, domaine || null, objectifs || null,
       pays || null, region || null, ville || null, adresse || null, code_postal || null,
       site_web || null,
       typeof reseaux_sociaux === "object" ? JSON.stringify(reseaux_sociaux) : (reseaux_sociaux || "{}"),
@@ -685,7 +685,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
       type_organisme: type_organisme || type_institution || null,
       nom_institution: nom_institution || null,
       sigle_institution: sigle_institution || null,
-      description_institution: description_institution || null,
+      description_institution: description_institution ? SEC.sanitizeRichHtml(description_institution) : null,
       date_creation_institution: date_creation_institution || null,
       devise_institution: devise_institution || null,
       logo_url: logo_url || null,
@@ -3490,9 +3490,9 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
     vitrine_banniere_url !== undefined ? vitrine_banniere_url : init.vitrine_banniere_url,
     vitrine_horaires !== undefined ? vitrine_horaires : init.vitrine_horaires,
-    vitrine_services !== undefined ? vitrine_services : init.vitrine_services,
-    description !== undefined ? description : init.description,
-    mission !== undefined ? mission : init.mission,
+    vitrine_services !== undefined ? SEC.sanitizeRichHtml(vitrine_services) : init.vitrine_services,
+    description !== undefined ? SEC.sanitizeRichHtml(description) : init.description,
+    mission !== undefined ? SEC.sanitizeRichHtml(mission) : init.mission,
     galerie_json !== undefined ? JSON.stringify(galerie_json) : init.galerie_json,
     vitrine_pub_onglet !== undefined ? vitrine_pub_onglet : (init.vitrine_pub_onglet || 'À la une'),
     THEMES_VALIDES.includes(vitrine_theme) ? vitrine_theme : (init.vitrine_theme || 'bordeaux'),
@@ -3518,7 +3518,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_google_maps_url !== undefined ? vitrine_google_maps_url : init.vitrine_google_maps_url,
     vitrine_rdv_active !== undefined ? (vitrine_rdv_active ? 1 : 0) : init.vitrine_rdv_active,
     vitrine_temoignages_json !== undefined ? JSON.stringify(vitrine_temoignages_json) : init.vitrine_temoignages_json,
-    vitrine_vision_objectifs !== undefined ? vitrine_vision_objectifs : init.vitrine_vision_objectifs,
+    vitrine_vision_objectifs !== undefined ? SEC.sanitizeRichHtml(vitrine_vision_objectifs) : init.vitrine_vision_objectifs,
     vitrine_resultats_impact_json !== undefined ? JSON.stringify(vitrine_resultats_impact_json) : init.vitrine_resultats_impact_json,
     vitrine_expertise_json !== undefined ? JSON.stringify(vitrine_expertise_json) : init.vitrine_expertise_json,
     vitrine_certifications_json !== undefined ? JSON.stringify(vitrine_certifications_json) : init.vitrine_certifications_json,
@@ -8974,10 +8974,10 @@ route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body
          annee_creation != null ? parseInt(annee_creation) || null : null,
          assistant_actif !== undefined ? (assistant_actif ? 1 : 0) : null,
          Array.isArray(pays_intervention) ? JSON.stringify(pays_intervention) : (typeof pays_intervention === 'string' ? pays_intervention : null),
-         vitrine_services !== undefined ? vitrine_services : null,
+         vitrine_services !== undefined ? SEC.sanitizeRichHtml(vitrine_services) : null,
          vitrine_horaires !== undefined ? vitrine_horaires : null,
-         mission !== undefined ? mission : null,
-         historique !== undefined ? historique : null,
+         mission !== undefined ? SEC.sanitizeRichHtml(mission) : null,
+         historique !== undefined ? SEC.sanitizeRichHtml(historique) : null,
          origine1 !== undefined ? origine1 : null,
          origine2 !== undefined ? origine2 : null,
          nationalite1 !== undefined ? nationalite1 : null,
@@ -9021,7 +9021,7 @@ route("POST", "/api/initiatives", async (req, res, params, body) => {
     JSON.stringify(nationalites_concernees || []), nationalite_unique ? 1 : 0,
     origine1 || null, origine2 || null, rayonnement || 'locale',
     JSON.stringify(Array.isArray(pays_intervention) ? pays_intervention : []),
-    domaine || null, type || null, description || null,
+    domaine || null, type || null, description ? SEC.sanitizeRichHtml(description) : null,
     nom_responsable || null, prenom_responsable || null, fonction_responsable || null,
     adresse || null, code_postal || null, numero_immatriculation || null,
     comment_entendu || null, attentes || null, autorisation_temoignage ? 1 : 0,
@@ -15991,7 +15991,7 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
   // Profil public Collectivité
   if (body.logo_url !== undefined)               { fields.push("logo_url=?");                vals.push(body.logo_url); }
   if (body.site_local !== undefined)             { fields.push("site_local=?");               vals.push(body.site_local); }
-  if (body.presentation_gouvernance !== undefined) { fields.push("presentation_gouvernance=?"); vals.push(body.presentation_gouvernance); }
+  if (body.presentation_gouvernance !== undefined) { fields.push("presentation_gouvernance=?"); vals.push(SEC.sanitizeRichHtml(body.presentation_gouvernance)); }
   if (body.reseaux_sociaux_officiels !== undefined) { fields.push("reseaux_sociaux_officiels=?"); vals.push(JSON.stringify(body.reseaux_sociaux_officiels && typeof body.reseaux_sociaux_officiels === 'object' ? body.reseaux_sociaux_officiels : {})); }
   if (body.documents_publics !== undefined)      { fields.push("documents_publics_json=?");   vals.push(JSON.stringify(Array.isArray(body.documents_publics)?body.documents_publics:[])); }
   if (body.realisations !== undefined)           { fields.push("realisations_json=?");        vals.push(JSON.stringify(Array.isArray(body.realisations)?body.realisations:[])); }

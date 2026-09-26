@@ -244,6 +244,7 @@ html, body{overflow-x:clip !important;}
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script src="assets/signalement.js"></script>
 <!-- Requis par les boutons « Modifier la bannière / le logo » du propriétaire.
      Sans eux, annuaireEditInitiativeCover s'interrompt sur « module de recadrage indisponible ». -->
@@ -876,7 +877,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       </div>
       <div class="side-card">
         <h4><span>💼 Services proposés</span> ${editBtn('services')}</h4>
-        ${init.vitrine_services ? `<p style="font-size:12.5px;margin:0;line-height:1.6;white-space:pre-line;">${esc2(init.vitrine_services)}</p>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
+        ${init.vitrine_services ? `<div class="rich-content" style="font-size:12.5px;">${renderRichText(init.vitrine_services)}</div>` : '<p style="font-size:12px;color:var(--muted);margin:0;">Non renseigné.</p>'}
       </div>
       ${Object.keys(rs).filter(k => rs[k]).length ? `<div class="side-card">
         <h4>🌐 Réseaux sociaux</h4>
@@ -1015,6 +1016,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
     ov.querySelector('#edit-save').onclick = async () => {
       try { await onSave(ov); ov.remove(); } catch (e) { alert(e.message || 'Erreur.'); }
     };
+    return ov;
   }
 
   /* Bande d'information : trois rangées, chacune modifiable sur place par le propriétaire.
@@ -1036,7 +1038,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       return `<div class="info-col">
         <div class="info-col-icon">${r.icone}</div>
         <div class="info-col-title">${r.titre}</div>
-        <div class="info-col-body">${corps ? esc2(corps).replace(/\n/g, '<br>') : `<em style="opacity:.6">${r.vide}</em>`}</div>
+        <div class="info-col-body rich-content">${corps ? renderRichText(corps) : `<em style="opacity:.6">${r.vide}</em>`}</div>
         ${isOwner ? `<button type="button" class="info-col-edit" data-rangee="${r.cle}" title="Modifier ${r.titre}" aria-label="Modifier ${r.titre}">✏️</button>` : '<span></span>'}
       </div>`;
     }).join('');
@@ -1046,7 +1048,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
 
   function editerRangeeInfo(cle) {
     const r = RANGEES_INFO.find(x => x.cle === cle);
-    openEditModal(`${r.icone} ${r.titre}`,
+    const ov = openEditModal(`${r.icone} ${r.titre}`,
       `<textarea id="eb-texte" rows="8" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;line-height:1.6;" placeholder="${r.vide}">${esc2(init[cle] || '')}</textarea>`,
       async ov => {
         const texte = ov.querySelector('#eb-texte').value.trim();
@@ -1058,6 +1060,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
         Object.assign(init, rep.initiative);
         renderBandeInfos();
       });
+    if (window.RichEditor) RichEditor.attach('eb-texte', { placeholder: r.vide });
   }
   renderBandeInfos();
 
@@ -1187,6 +1190,10 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       openEditModal('💼 Services proposés',
         `<textarea id="es-serv" rows="5" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;" placeholder="Conseil, Formation, Accompagnement…">${esc2(init.vitrine_services || '')}</textarea>`,
         ov => saveProfil({ vitrine_services: ov.querySelector('#es-serv').value }));
+      /* Pas de RichEditor ici : ce même champ (vitrine_services) est aussi traité comme une
+         liste "une ligne = un service" par la section Boutique de profil-app.html
+         (pvtAddServiceRow/pvtRemoveServiceRow, split sur '\n') — du HTML enrichi y casserait
+         l'affichage en lignes. Reste un textarea texte brut multi-lignes. */
     } else if (section === 'stats') {
       const s = init.stats_perso || {};
       const champs = [['projets','Projets réalisés'],['formations','Formations dispensées'],['pays_couverts','Pays couverts'],['partenaires','Partenaires'],['benevoles','Bénévoles actifs']];
@@ -1234,7 +1241,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
     const t = q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const has = (...words) => words.some(w => t.includes(w));
     if (has('que faites', 'quoi', 'presentation', 'mission', 'c est quoi', 'qui etes')) {
-      return init.description || init.mission || `${init.nom} est une initiative ${init.domaine ? 'dans le domaine ' + init.domaine : ''} basée à ${init.ville || init.pays || '—'}.`;
+      return renderRichText(init.description || init.mission) || `${init.nom} est une initiative ${init.domaine ? 'dans le domaine ' + init.domaine : ''} basée à ${init.ville || init.pays || '—'}.`;
     }
     if (has('adher', 'cotis', 'membre', 'inscrire', 'rejoindre')) {
       return FORMULES.length
@@ -1257,7 +1264,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
         `<button onclick="contacterBesoin('Proposition de partenariat / bénévolat')" style="color:#2563EB;font-weight:700;background:none;border:none;cursor:pointer;padding:0;">Nous contacter →</button>`;
     }
     if (has('service', 'prestation', 'proposez', 'offre')) {
-      return init.vitrine_services ? `Nos services : ${init.vitrine_services}` : `Consultez notre profil ou contactez-nous pour découvrir nos services.`;
+      return init.vitrine_services ? `Nos services : ${renderRichText(init.vitrine_services)}` : `Consultez notre profil ou contactez-nous pour découvrir nos services.`;
     }
     if (has('contact', 'joindre', 'telephone', 'mail', 'adresse', 'horaire', 'ou etes')) {
       const parts = [

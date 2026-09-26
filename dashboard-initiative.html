@@ -451,6 +451,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
     function mountStep() {
       content.innerHTML = `<div class="flex-between" style="margin-bottom:16px;"><h1 style="margin:0;">${STEPS[currentStep-1].icon} ${STEPS[currentStep-1].label}</h1><span class="badge badge-asso">Compte Initiative</span></div><div class="notice" style="margin-bottom:16px;">Votre compte est prêt. Complétez votre fiche pour apparaître dans l'annuaire.</div>${renderStep()}`;
+      if(currentStep===4 && window.RichEditor) RichEditor.attach('cr-desc', {placeholder: "Présentez votre initiative : ses objectifs, ses actions, ses valeurs, le public qu'elle sert et son impact attendu…"});
 
       document.getElementById('cr-prev')?.addEventListener('click',()=>{collectStep();currentStep--;mountStep();restoreStep();});
       document.getElementById('cr-next')?.addEventListener('click',()=>{collectStep();if(!validateStep())return;currentStep++;mountStep();restoreStep();});
@@ -532,7 +533,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         if(formData.departement) {const el=document.getElementById('cr-departement');if(el)el.value=formData.departement;}
         if(formData.code_postal) {const el=document.getElementById('cr-cp');if(el)el.value=formData.code_postal;}
       } else if(currentStep===4){
-        if(formData.description){const el=document.getElementById('cr-desc');if(el)el.value=formData.description;}
+        if(formData.description){const el=document.getElementById('cr-desc');if(el){if(el._richEditorInstance)el._richEditorInstance.setHTML(formData.description);else el.value=formData.description;}}
       } else if(currentStep===5){
         if(formData.site_web){const el=document.getElementById('cr-site-web');if(el)el.value=formData.site_web;}
         if(formData.linkedin) {const el=document.getElementById('cr-linkedin'); if(el)el.value=formData.linkedin;}
@@ -611,7 +612,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           ${init.type ? `<span class="badge ${badgeClass(init.type)}">${init.type}</span>` : ""}
           ${init.nationalite_unique ? `<span class="badge badge-unique">Réservée à la diaspora ${init.nationalite1 || ""} (nationalité unique)</span>` : ""}
         </div>
-        ${init.description ? `<p style="margin-top:12px;color:var(--muted);font-size:13.5px;">${init.description}</p>` : ""}
+        ${init.description ? `<div class="rich-content" style="margin-top:12px;color:var(--muted);font-size:13.5px;">${renderRichText(init.description)}</div>` : ""}
         <a href="initiative.html?id=${init.slug || init.id}" class="btn btn-sm btn-outline" style="margin-top:12px;">Voir ma fiche publique →</a>
       </div>
     </div>

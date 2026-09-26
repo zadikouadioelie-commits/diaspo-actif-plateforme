@@ -97,6 +97,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/rich-editor.js"></script>
 <script src="assets/signalement.js"></script>
 <script src="assets/back-to-dashboard.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
@@ -199,14 +200,14 @@ function applyPcTheme(name) {
 
         <div class="pc-card">
           <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">📝</span>Présentation</span></h3>
-          ${profil.bio ? `<div style="font-size:13.5px;white-space:pre-line;line-height:1.65;color:#3a4358;">${esc(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
+          ${profil.bio ? `<div class="rich-content" style="font-size:13.5px;">${renderRichText(profil.bio)}</div>` : '<div class="pc-empty">Aucune présentation renseignée.</div>'}
         </div>
 
         ${(profil.nom_responsable || profil.presentation_gouvernance) ? `
         <div class="pc-card">
           <h3><span class="pc-h3-lbl"><span class="pc-h3-icon">🏛️</span>Gouvernance</span></h3>
           ${profil.nom_responsable ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--pc-c2,#16457E),var(--pc-accent,#E8933A));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">${esc((profil.prenom_responsable||profil.nom_responsable||'?').charAt(0).toUpperCase())}</span><div><strong style="font-size:13.5px;">${esc([profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' '))}</strong><br><span style="color:var(--muted,#888);font-size:12px;">${esc(profil.fonction_responsable || 'Responsable')}</span></div></div>` : ''}
-          ${profil.presentation_gouvernance ? `<div style="font-size:13px;white-space:pre-line;color:#3a4358;">${esc(profil.presentation_gouvernance)}</div>` : ''}
+          ${profil.presentation_gouvernance ? `<div class="rich-content" style="font-size:13px;">${renderRichText(profil.presentation_gouvernance)}</div>` : ''}
         </div>` : ''}
 
         ${Object.keys(profil.reseaux_sociaux || {}).length ? `
@@ -389,21 +390,42 @@ function applyPcTheme(name) {
     });
 
     const btnEdit = document.getElementById('pc-btn-edit');
-    if (btnEdit) btnEdit.addEventListener('click', async () => {
-      const logo_url = prompt("URL du logo :", profil.logo_url || '');
-      if (logo_url === null) return;
-      const site_local = prompt("Site web officiel :", profil.site_web || '');
-      if (site_local === null) return;
-      const bio = prompt("Présentation du territoire :", profil.bio || '');
-      if (bio === null) return;
-      const presentation_gouvernance = prompt("Présentation de la gouvernance :", profil.presentation_gouvernance || '');
-      if (presentation_gouvernance === null) return;
-      const facebook = prompt("Lien Facebook (optionnel) :", (profil.reseaux_sociaux||{}).facebook || '') || '';
-      const linkedin = prompt("Lien LinkedIn (optionnel) :", (profil.reseaux_sociaux||{}).linkedin || '') || '';
-      try {
-        await api('PUT', '/profil', { logo_url, site_local, bio, presentation_gouvernance, reseaux_sociaux_officiels: { facebook, linkedin } });
-        location.reload();
-      } catch (e) { alert('Erreur : ' + e.message); }
+    if (btnEdit) btnEdit.addEventListener('click', () => {
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 14px;';
+      const champ = (id, lbl, val, ph) => `<label style="display:block;font-size:12px;font-weight:700;margin:10px 0 3px;">${lbl}</label>
+        <input type="text" id="${id}" style="width:100%;padding:9px 12px;border:1px solid var(--border,#ddd);border-radius:8px;font-size:13px;box-sizing:border-box;" value="${esc(val || '')}" placeholder="${ph || ''}">`;
+      ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;padding:20px;">
+        <h3 style="margin:0 0 14px;font-size:15px;">✏️ Modifier ma fiche</h3>
+        ${champ('pce-logo', 'URL du logo', profil.logo_url, 'https://…/logo.png')}
+        ${champ('pce-site', 'Site web officiel', profil.site_web, 'https://…')}
+        <label style="display:block;font-size:12px;font-weight:700;margin:10px 0 3px;">Présentation du territoire</label>
+        <textarea id="pce-bio" rows="6" style="width:100%;padding:10px 12px;border:1px solid var(--border,#ddd);border-radius:8px;font-size:13px;line-height:1.6;box-sizing:border-box;">${esc(profil.bio || '')}</textarea>
+        <label style="display:block;font-size:12px;font-weight:700;margin:10px 0 3px;">Présentation de la gouvernance</label>
+        <textarea id="pce-gouv" rows="6" style="width:100%;padding:10px 12px;border:1px solid var(--border,#ddd);border-radius:8px;font-size:13px;line-height:1.6;box-sizing:border-box;">${esc(profil.presentation_gouvernance || '')}</textarea>
+        ${champ('pce-fb', 'Lien Facebook (optionnel)', (profil.reseaux_sociaux||{}).facebook, 'https://facebook.com/…')}
+        ${champ('pce-li', 'Lien LinkedIn (optionnel)', (profil.reseaux_sociaux||{}).linkedin, 'https://linkedin.com/…')}
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button class="btn btn-outline" id="pce-cancel">Annuler</button>
+          <button class="btn btn-orange" id="pce-save">Enregistrer</button>
+        </div></div>`;
+      document.body.appendChild(ov);
+      if (window.RichEditor) {
+        RichEditor.attach('pce-bio', { placeholder: 'Présentez le territoire…' });
+        RichEditor.attach('pce-gouv', { placeholder: 'Présentez la gouvernance…' });
+      }
+      ov.querySelector('#pce-cancel').onclick = () => ov.remove();
+      ov.querySelector('#pce-save').onclick = async () => {
+        const v = id => ov.querySelector('#' + id).value.trim();
+        try {
+          await api('PUT', '/profil', {
+            logo_url: v('pce-logo'), site_local: v('pce-site'),
+            bio: v('pce-bio'), presentation_gouvernance: v('pce-gouv'),
+            reseaux_sociaux_officiels: { facebook: v('pce-fb'), linkedin: v('pce-li') },
+          });
+          location.reload();
+        } catch (e) { alert('Erreur : ' + e.message); }
+      };
     });
 
     const btnDoc = document.getElementById('pc-btn-add-doc');
@@ -466,10 +488,10 @@ function applyPcTheme(name) {
 
   function answerIA(q) {
     const t = q.toLowerCase();
-    if (/pr[ée]sent|qui[ -]?êtes|territoire|histoire/.test(t)) return profil.bio || "Aucune présentation du territoire n'est encore renseignée.";
+    if (/pr[ée]sent|qui[ -]?êtes|territoire|histoire/.test(t)) return stripRichTags(profil.bio) || "Aucune présentation du territoire n'est encore renseignée.";
     if (/gouvernance|responsable|maire|pr[ée]sident/.test(t)) {
       if (!profil.nom_responsable) return "Aucune information de gouvernance renseignée.";
-      return `${[profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' ')} — ${profil.fonction_responsable || 'Responsable'}.${profil.presentation_gouvernance ? ' ' + profil.presentation_gouvernance : ''}`;
+      return `${[profil.prenom_responsable, profil.nom_responsable].filter(Boolean).join(' ')} — ${profil.fonction_responsable || 'Responsable'}.${profil.presentation_gouvernance ? ' ' + stripRichTags(profil.presentation_gouvernance) : ''}`;
     }
     if (/projet.*cours|en cours/.test(t)) { const l = expansionData.filter(p => p.statut === 'en_cours'); return l.length ? l.map(p => `• ${p.titre}`).join('\n') : "Aucun projet en cours n'est publié pour le moment."; }
     if (/r[ée]alis|termin[ée]|historique/.test(t)) { const l = expansionData.filter(p => p.statut === 'termine'); return l.length ? l.map(p => `• ${p.titre}`).join('\n') : "Aucun projet réalisé n'est publié pour le moment."; }

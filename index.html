@@ -2306,7 +2306,7 @@
         </div>
         <div class="hp-init-body">
           <div class="hp-init-title">${it.nom}</div>
-          <p class="hp-init-desc">${it.description || it.mission || 'Initiative de la diaspora engagée pour le développement.'}</p>
+          <p class="hp-init-desc">${(stripRichTags(it.description || it.mission || '') || 'Initiative de la diaspora engagée pour le développement.').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}</p>
           <div class="hp-init-progress">
             <div class="hp-init-progress-label">
               <span>${plbl}</span><span>${pct}%</span>
