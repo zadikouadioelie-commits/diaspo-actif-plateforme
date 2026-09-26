@@ -3993,9 +3993,13 @@ function unionModulesTypes(types) {
    Édités depuis l'aperçu, ils transitent par vitrine_draft_json et ne touchent la vitrine
    publique qu'à la publication — c'est ce qui rend « Annuler » possible.
    Volontairement ABSENTS : vitrine_active (visibilité, réservée au Premium), les coordonnées
-   et les Informations générales (nom, logo…), qui restent enregistrées immédiatement. */
+   et les Informations générales (nom, logo…), qui restent enregistrées immédiatement.
+   "description" et "vitrine_vision_objectifs" retirés le 2026-09-26 (bug réel signalé, voir
+   VITRINE_CHAMPS_BROUILLON_CLIENT dans profil-app.html pour le contexte complet) — un simple
+   champ de texte édité depuis deux endroits différents ne doit jamais avoir deux
+   comportements différents selon l'endroit d'où on l'ouvre. */
 const VITRINE_CHAMPS_BROUILLON = [
-  "description", "mission", "vitrine_pourquoi_choisir", "vitrine_vision_objectifs",
+  "mission", "vitrine_pourquoi_choisir",
   "vitrine_temoignages_json", "vitrine_resultats_impact_json", "vitrine_expertise_json",
   "vitrine_certifications_json", "vitrine_documents_json", "vitrine_partenaires_json",
   "vitrine_services", "vitrine_services_categories_json", "vitrine_horaires",

@@ -4717,9 +4717,16 @@ async function editVitrineBanner() {
    est conservé : enregistrement immédiat.
    Les champs hors liste (thème, visibilité, coordonnées) restent toujours enregistrés
    directement — les router vers le brouillon les ferait silencieusement disparaître,
-   la liste blanche du serveur les rejetant. */
+   la liste blanche du serveur les rejetant.
+   'description' et 'vitrine_vision_objectifs' EXCLUS volontairement (2026-09-26, bug réel
+   signalé : mise en forme d'un texte via ce panneau invisible pour les visiteurs tant que
+   « Publier ma boutique » n'est pas cliqué, alors que le même texte, modifié depuis l'icône
+   ✏️ directement sur la page publique, s'enregistre immédiatement) — un simple champ de
+   texte n'a pas besoin d'un brouillon prévisualisable comme un module structurel ; les deux
+   éditeurs du même champ doivent avoir le même comportement, jamais un brouillon "piège"
+   selon l'endroit d'où on l'ouvre. */
 const VITRINE_CHAMPS_BROUILLON_CLIENT = [
-  'description', 'mission', 'vitrine_pourquoi_choisir', 'vitrine_vision_objectifs',
+  'mission', 'vitrine_pourquoi_choisir',
   'vitrine_temoignages_json', 'vitrine_resultats_impact_json', 'vitrine_expertise_json',
   'vitrine_certifications_json', 'vitrine_documents_json', 'vitrine_partenaires_json',
   'vitrine_services', 'vitrine_services_categories_json', 'vitrine_horaires',
