@@ -99,6 +99,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="/assets/rich-editor.js"></script>
 <script src="assets/upload-media.js"></script>
 <script>
 /* ==========================================================================
@@ -623,7 +624,7 @@ function renderListView() {
             </div>
           </div>
           <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:${f.description ? '6px' : '14px'};">📅 ${escH(f.apercu_date || 'Date à définir')} &nbsp;·&nbsp; 📍 ${escH(f.apercu_lieu || 'Lieu à définir')}</div>
-          ${f.description ? `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);line-height:1.5;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(f.description)}</div>` : ''}
+          ${f.description ? `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);line-height:1.5;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(stripRichTags(f.description))}</div>` : ''}
           <div style="display:flex;gap:12px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);align-items:center;flex-wrap:wrap;">
             <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
             <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
@@ -926,7 +927,7 @@ function renderInfosGenerales(fiche) {
       <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:16px 20px; margin-bottom:16px; display:flex; gap:16px; align-items:center;">
         <div style="width:64px; height:64px; border-radius:8px; flex-shrink:0; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)'};"></div>
         <div style="flex:1; min-width:0;">
-          <div style="font-size:13px; color:oklch(0.5 0.006 30); overflow:hidden; text-overflow:ellipsis;">${escH(fiche.description || 'Aucune description.')}</div>
+          <div style="font-size:13px; color:oklch(0.5 0.006 30); overflow:hidden; text-overflow:ellipsis;">${escH(stripRichTags(fiche.description) || 'Aucune description.')}</div>
           <div style="font-size:11.5px; color:oklch(0.6 0.006 30); margin-top:2px;">Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}${fiche.contact_email ? ' · ' + escH(fiche.contact_email) : ''}</div>
         </div>
         <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; white-space:nowrap;" data-action="toggleEditionInfos">✏️ Modifier</button>
@@ -1302,7 +1303,7 @@ function renderPublic() {
       <div style="height:120px; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'repeating-linear-gradient(45deg, oklch(0.94 0.01 30), oklch(0.94 0.01 30) 10px, oklch(0.97 0.004 30) 10px, oklch(0.97 0.004 30) 20px)'};"></div>
       <div style="padding:24px;">
         <h2 style="margin:0 0 6px; font-size:20px; font-weight:700;">${escH(fiche.nom)}</h2>
-        ${fiche.description ? `<p style="font-size:14px; line-height:1.6; color:oklch(0.3 0.006 30); margin:0 0 18px;">${escH(fiche.description)}</p>` : ''}
+        ${fiche.description ? `<div class="rich-content" style="font-size:14px; line-height:1.6; color:oklch(0.3 0.006 30); margin:0 0 18px;">${renderRichText(fiche.description)}</div>` : ''}
         ${body}
       </div>
     </div>`;
@@ -2072,6 +2073,12 @@ async function dispatch(name, el) {
 const root = document.getElementById('ia-root');
 function render() {
   root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}${renderModalLiaison()}</div>`;
+  // Éditeur de texte enrichi sur la Description (le panneau "Informations générales" est
+  // entièrement reconstruit à chaque render() — l'attacher ici garantit qu'il est toujours
+  // présent quand le panneau est ouvert, sans dupliquer si déjà attaché sur cet élément.
+  if (window.RichEditor && state.view === 'detail' && state.activeTab === 'overview' && state.editionInfosOuverte) {
+    RichEditor.attach('ia-infos-description', { placeholder: 'Décrivez cette fiche…' })?.setHTML(selectedFiche()?.description || '');
+  }
 }
 root.addEventListener('click', function (e) {
   const el = e.target.closest('[data-action]');

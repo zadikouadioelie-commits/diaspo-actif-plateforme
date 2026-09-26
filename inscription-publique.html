@@ -415,7 +415,7 @@ function ipRenderAccueil() {
     ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
     ${f.affiche_url ? `<img class="ip-affiche" src="${escH(f.affiche_url)}" alt="">` : ''}
     <h1 class="ip-titre">${escH(f.nom)}</h1>
-    ${f.description ? `<p class="ip-desc">${escH(f.description)}</p>` : ''}
+    ${f.description ? `<div class="ip-desc rich-content">${renderRichText(f.description)}</div>` : ''}
     <div class="ip-types">
       ${IP_TYPES.map(t => `
         <div class="ip-type-card ${t.complet?'complet':''}">

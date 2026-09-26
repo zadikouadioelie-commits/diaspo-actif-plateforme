@@ -42377,7 +42377,7 @@ route("POST", "/api/insc/fiches", async (req, res, params, body) => {
       visibilite, code_acces)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
-    user.id, init?.id || null, String(body.nom).trim(), slug, body.description || null, body.affiche_url || null,
+    user.id, init?.id || null, String(body.nom).trim(), slug, body.description ? SEC.sanitizeRichHtml(body.description) : null, body.affiche_url || null,
     body.organisateur || null, body.contact_nom || null, body.contact_email || null, body.contact_telephone || null,
     body.date_ouverture_inscriptions || null, body.date_fermeture_inscriptions || null,
     ["public", "membres", "prive", "invitation"].includes(body.visibilite) ? body.visibilite : "public",
@@ -42416,7 +42416,10 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
   const champs = ["nom","description","affiche_url","organisateur","contact_nom","contact_email","contact_telephone",
     "date_ouverture_inscriptions","date_fermeture_inscriptions","visibilite","code_acces"];
   const set = [], vals = [];
-  for (const c of champs) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] || null); }
+  for (const c of champs) if (body[c] !== undefined) {
+    set.push(`${c}=?`);
+    vals.push(c === "description" ? (body[c] ? SEC.sanitizeRichHtml(body[c]) : null) : (body[c] || null));
+  }
   if (set.length) {
     set.push("updated_at=datetime('now')");
     await db.prepare(`UPDATE insc_fiches SET ${set.join(",")} WHERE id=?`).run(...vals, fiche.id);
