@@ -64,6 +64,15 @@
 .ip-autre-img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;background:oklch(0.94 0.01 258);}
 .ip-autre-titre{font-size:12.5px;font-weight:700;line-height:1.3;margin:0 0 3px;}
 .ip-autre-meta{font-size:11px;color:oklch(0.55 0.006 30);}
+.ip-cand-box{background:#fff;border:1.5px solid #BC13FE;border-radius:14px;padding:18px;margin-bottom:20px;box-shadow:0 0 10px rgba(188,19,254,.15);}
+.ip-cand-titre{font-size:15px;font-weight:800;color:#6B0FA3;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
+.ip-cand-docs{display:flex;flex-direction:column;gap:8px;margin:14px 0;}
+.ip-cand-doc{display:flex;align-items:center;gap:10px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;padding:8px 10px;text-decoration:none;color:inherit;}
+.ip-cand-doc:hover{border-color:#BC13FE;}
+.ip-cand-doc-titre{flex:1;font-size:13px;font-weight:600;}
+.ip-cand-email{background:oklch(0.97 0.01 300);border:1px dashed oklch(0.8 0.05 300);border-radius:8px;padding:10px 12px;font-size:12.5px;margin:14px 0;}
+.ip-cand-declare-btn{width:100%;height:44px;border-radius:8px;border:none;font-size:13.5px;font-weight:700;cursor:pointer;background:#8B12D6;color:#fff;}
+.ip-cand-declare-btn:disabled{background:#F0FDF4;color:#15803d;border:1.5px solid #15803d;cursor:default;opacity:1;}
 .ip-affiche{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-bottom:18px;}
 .ip-titre{font-size:22px;font-weight:700;margin:0 0 6px;}
 .ip-desc{color:oklch(0.5 0.006 30);font-size:14px;line-height:1.6;margin:0 0 22px;}
@@ -130,7 +139,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
-let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false, IP_MEDIAS=[];
+let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false, IP_MEDIAS=[], IP_CANDIDATURE=null;
 function ipRenderMedias() {
   if (!IP_MEDIAS.length) return '';
   const videos = IP_MEDIAS.filter(m => m.type === 'video');
@@ -588,6 +597,60 @@ function ipRenderConfirmation(d) {
     </div>`;
 }
 
+/* Bloc "Dossier de candidature" (2026-09-27, demande explicite) — jamais de remplissage ni
+   détection dans l'app : documents PDF à télécharger + adresse e-mail de réception, plus un
+   bouton "J'ai candidaté" auto-déclaratif (compte requis) qui alimente la gestion de la fiche
+   côté organisateur. "Dossier de candidature" plutôt que juste "Candidature" dans le libellé
+   pour ne jamais être confondu avec le module recrutement (candidatures d'emploi). */
+function ipRenderCandidature() {
+  const cand = IP_CANDIDATURE;
+  if (!cand || !cand.config || !cand.config.actif) return '';
+  const c = cand.config;
+  const now = new Date();
+  if (c.date_ouverture && new Date(c.date_ouverture) > now) return '';
+  if (c.date_fermeture && new Date(c.date_fermeture) < now) return '';
+  const docs = cand.documents || [];
+  const docsHtml = docs.map(d => `
+    <a class="ip-cand-doc" href="${escH(d.pdf_url)}" target="_blank" rel="noopener">
+      <span>📄</span>
+      <span class="ip-cand-doc-titre">${escH(d.titre)}${d.description ? ` <span style="font-weight:400;color:oklch(0.55 0.006 30);">— ${escH(d.description)}</span>` : ''}</span>
+      ${d.obligatoire ? '<span class="ip-oblig">*</span>' : ''}
+      <span style="font-size:11.5px;color:#8B12D6;font-weight:600;white-space:nowrap;">Télécharger ↓</span>
+    </a>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucun document à télécharger pour l\'instant.</div>';
+  const emailHtml = c.email_reception
+    ? `<div class="ip-cand-email">✉️ Envoyez vos documents complétés à : <a href="mailto:${escH(c.email_reception)}" style="color:#6B0FA3;font-weight:700;">${escH(c.email_reception)}</a></div>`
+    : '';
+  const dejaDeclare = !!cand.deja_declare;
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  const btnHtml = dejaDeclare
+    ? `<button class="ip-cand-declare-btn" disabled>✅ Candidature déclarée</button>`
+    : connecte
+      ? `<button class="ip-cand-declare-btn" onclick="ipDeclarerCandidature(this)">✅ J'ai candidaté</button>`
+      : `<a class="ip-cand-declare-btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;" href="login.html">Se connecter pour déclarer ma candidature</a>`;
+  return `
+    <div class="ip-cand-box">
+      <div class="ip-cand-titre">🎓 ${escH(c.titre || 'Dossier de candidature')}</div>
+      ${c.description ? `<p style="font-size:13px;color:oklch(0.4 0.006 30);margin:0 0 8px;">${escH(c.description)}</p>` : ''}
+      ${c.instructions ? `<p style="font-size:12.5px;color:oklch(0.5 0.006 30);margin:0 0 8px;">${escH(c.instructions)}</p>` : ''}
+      ${c.message_candidat ? `<p style="font-size:12.5px;font-style:italic;color:oklch(0.5 0.006 30);margin:0 0 8px;">${escH(c.message_candidat)}</p>` : ''}
+      <div class="ip-cand-docs">${docsHtml}</div>
+      ${emailHtml}
+      ${btnHtml}
+    </div>`;
+}
+async function ipDeclarerCandidature(btn) {
+  btn.disabled = true; btn.textContent = 'Envoi…';
+  try {
+    await fetch(`/api/insc/public/${IP_SLUG}/candidature/declarer`, { method: 'POST', credentials: 'include' })
+      .then(async r => { const d = await r.json().catch(()=>({})); if (!r.ok) throw new Error(d.error || 'Erreur'); });
+    if (IP_CANDIDATURE) IP_CANDIDATURE.deja_declare = true;
+    btn.outerHTML = `<button class="ip-cand-declare-btn" disabled>✅ Candidature déclarée</button>`;
+  } catch (e) {
+    alert(e.message || 'Erreur lors de la déclaration.');
+    btn.disabled = false; btn.textContent = "✅ J'ai candidaté";
+  }
+}
+
 function ipRenderAccueil() {
   const f = IP_FICHE;
   document.getElementById('ip-root').innerHTML = `
@@ -607,6 +670,7 @@ function ipRenderAccueil() {
           </button>
         </div>`).join('')}
     </div>
+    ${ipRenderCandidature()}
     ${ipRenderMedias()}`;
 }
 
@@ -619,6 +683,7 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
     IP_MEDIAS = d.medias || [];
     IP_FICHE = d.fiche;
     IP_AUTRES_EVENEMENTS = d.autres_evenements || [];
+    IP_CANDIDATURE = d.candidature || null;
     ipRenderSideColonne();
     if (d.fermee || d.pas_encore_ouverte) {
       // Rendu amélioré (2026-09-25, demande explicite) : reprend l'affiche/titre de la fiche

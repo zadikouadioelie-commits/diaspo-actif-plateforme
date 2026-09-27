@@ -42456,7 +42456,14 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
     t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-  sendJSON(res, 200, { fiche, evenements, types, medias });
+  let candidature = null;
+  const candConfig = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
+  if (candConfig) {
+    const documents = await db.prepare("SELECT * FROM insc_candidature_documents WHERE config_id=? ORDER BY ordre ASC, id ASC").all(candConfig.id);
+    const nbDeclarations = (await db.prepare("SELECT COUNT(*) n FROM insc_candidature_declarations WHERE config_id=?").get(candConfig.id))?.n || 0;
+    candidature = { config: candConfig, documents, nb_declarations: nbDeclarations };
+  }
+  sendJSON(res, 200, { fiche, evenements, types, medias, candidature });
 });
 
 route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
@@ -42509,6 +42516,133 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     if (nouveauxIds.length) await inscPublierSiBrouillon(fiche.id);
   }
   await inscJournaliser(fiche.id, user, "modification", "Fiche modifiée.");
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   CANDIDATURE (2026-09-27, demande explicite) — parcours PDF hors ligne
+   attaché à une fiche d'inscription (jamais à l'événement). Volontairement
+   simple, sans remplissage dans l'app ni détection IA : l'organisateur
+   dépose des PDF + une adresse e-mail de réception ; le candidat télécharge/
+   remplit/envoie par e-mail hors plateforme, puis peut "déclarer" sa
+   candidature (compte requis) pour apparaître dans la gestion de la fiche —
+   jamais une confirmation que l'e-mail est réellement arrivé, juste un
+   comptage déclaratif. Voir insc_candidature_* dans server/db.js.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Upsert de la configuration — enregistrement immédiat, pas de brouillon,
+   même convention que les "Informations générales" de la fiche elle-même. */
+route("PUT", "/api/insc/fiches/:id/candidature", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const existant = await db.prepare("SELECT id FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
+  const champs = ["actif", "titre", "description", "instructions", "message_candidat", "email_reception", "date_ouverture", "date_fermeture"];
+  if (existant) {
+    const set = [], vals = [];
+    for (const c of champs) if (body[c] !== undefined) {
+      set.push(`${c}=?`);
+      vals.push(c === "actif" ? (body[c] ? 1 : 0) : (body[c] || null));
+    }
+    if (set.length) {
+      set.push("updated_at=datetime('now')");
+      await db.prepare(`UPDATE insc_candidature_config SET ${set.join(",")} WHERE id=?`).run(...vals, existant.id);
+    }
+    await inscJournaliser(fiche.id, user, "candidature_modifiee", "Configuration de la candidature modifiée.");
+    sendJSON(res, 200, { ok: true, id: existant.id });
+  } else {
+    const id = (await db.prepare(`
+      INSERT INTO insc_candidature_config (fiche_id, actif, titre, description, instructions, message_candidat, email_reception, date_ouverture, date_fermeture)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `).run(fiche.id, body.actif ? 1 : 0, body.titre || null, body.description || null, body.instructions || null,
+      body.message_candidat || null, body.email_reception || null, body.date_ouverture || null, body.date_fermeture || null
+    )).lastInsertRowid;
+    await inscJournaliser(fiche.id, user, "candidature_creee", "Candidature configurée sur la fiche.");
+    sendJSON(res, 201, { ok: true, id });
+  }
+});
+
+/* Propriété d'un document = propriété de la fiche parente (via sa config) — même garde que
+   le reste du module, factorisée ici pour ne pas la répéter dans chaque route document. */
+async function inscCandidatureDocProprietaire(req, documentId) {
+  const doc = await db.prepare("SELECT d.*, c.fiche_id FROM insc_candidature_documents d JOIN insc_candidature_config c ON c.id=d.config_id WHERE d.id=?").get(documentId);
+  if (!doc) return { erreur: 404, msg: "Document introuvable." };
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, doc.fiche_id);
+  if (erreur) return { erreur, msg };
+  return { user, fiche, doc };
+}
+
+route("POST", "/api/insc/candidature/:configId/documents", async (req, res, params, body) => {
+  const config = await db.prepare("SELECT * FROM insc_candidature_config WHERE id=?").get(params.configId);
+  if (!config) return sendJSON(res, 404, { error: "Configuration de candidature introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, config.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!body?.titre || !String(body.titre).trim()) return sendJSON(res, 400, { error: "Le titre du document est requis." });
+  if (!body?.pdf_url) return sendJSON(res, 400, { error: "Le fichier PDF est requis." });
+  const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM insc_candidature_documents WHERE config_id=?").get(config.id))?.m;
+  const id = (await db.prepare(`
+    INSERT INTO insc_candidature_documents (config_id, titre, description, pdf_url, obligatoire, ordre)
+    VALUES (?,?,?,?,?,?)
+  `).run(config.id, String(body.titre).trim(), body.description || null, body.pdf_url,
+    body.obligatoire === false ? 0 : 1, (maxOrdre != null ? maxOrdre + 1 : 0)
+  )).lastInsertRowid;
+  await inscJournaliser(config.fiche_id, user, "candidature_document_ajoute", `Document « ${body.titre} » ajouté à la candidature.`);
+  sendJSON(res, 201, { id });
+});
+
+route("PUT", "/api/insc/candidature/documents/:id", async (req, res, params, body) => {
+  const { erreur, msg, doc } = await inscCandidatureDocProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const champs = ["titre", "description", "obligatoire", "ordre"];
+  const set = [], vals = [];
+  for (const c of champs) if (body[c] !== undefined) {
+    set.push(`${c}=?`);
+    vals.push(c === "obligatoire" ? (body[c] ? 1 : 0) : (c === "ordre" ? Number(body[c]) || 0 : (body[c] || null)));
+  }
+  if (!set.length) return sendJSON(res, 200, { ok: true });
+  await db.prepare(`UPDATE insc_candidature_documents SET ${set.join(",")} WHERE id=?`).run(...vals, doc.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+route("DELETE", "/api/insc/candidature/documents/:id", async (req, res, params) => {
+  const { erreur, msg, doc, fiche, user } = await inscCandidatureDocProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("DELETE FROM insc_candidature_documents WHERE id=?").run(doc.id);
+  await inscJournaliser(fiche.id, user, "candidature_document_supprime", `Document « ${doc.titre} » supprimé de la candidature.`);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Liste des déclarations pour l'onglet "Candidature" de la fiche — toujours par fiche (pas
+   par config id) pour rester cohérent avec le reste des routes de gestion de fiche. */
+route("GET", "/api/insc/fiches/:id/candidature/declarations", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const config = await db.prepare("SELECT id FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
+  if (!config) return sendJSON(res, 200, { declarations: [], total: 0 });
+  const declarations = await db.prepare("SELECT * FROM insc_candidature_declarations WHERE config_id=? ORDER BY declare_le DESC").all(config.id);
+  sendJSON(res, 200, { declarations, total: declarations.length });
+});
+
+/* Déclaration publique ("J'ai candidaté") — compte requis (le nom/prénom/e-mail viennent du
+   compte connecté, jamais saisis à la main), jamais une confirmation que l'e-mail contenant
+   les documents a réellement été reçu par l'organisateur. La contrainte UNIQUE(config_id,
+   user_id) protège nativement contre un double clic sans logique applicative supplémentaire. */
+route("POST", "/api/insc/public/:slug/candidature/declarer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connectez-vous pour déclarer votre candidature." });
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc-candidature-declarer:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=? AND statut='publiee'").get(params.slug);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  const config = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=? AND actif=1").get(fiche.id);
+  if (!config) return sendJSON(res, 404, { error: "Aucune candidature active sur cette fiche." });
+  const now = new Date();
+  if (config.date_ouverture && new Date(config.date_ouverture) > now) return sendJSON(res, 400, { error: "Les candidatures ne sont pas encore ouvertes." });
+  if (config.date_fermeture && new Date(config.date_fermeture) < now) return sendJSON(res, 400, { error: "Les candidatures sont désormais fermées." });
+  try {
+    await db.prepare("INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email) VALUES (?,?,?,?,?)")
+      .run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null);
+  } catch (e) { /* contrainte UNIQUE(config_id,user_id) déjà déclenchée = déjà déclaré, pas une erreur */ }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -42984,7 +43118,23 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     t.periode_ouverte = ouvert;
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements });
+  /* Candidature (2026-09-27, demande explicite) — parcours PDF hors ligne distinct de
+     l'inscription classique, voir insc_candidature_* dans server/db.js. Toujours calculé
+     après la fiche/types normaux, jamais bloquant : une candidature absente ou non active ne
+     doit jamais empêcher l'affichage du reste de la fiche. */
+  let candidature = null;
+  try {
+    const config = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=? AND actif=1").get(fiche.id);
+    if (config) {
+      const documents = await db.prepare("SELECT * FROM insc_candidature_documents WHERE config_id=? ORDER BY ordre ASC, id ASC").all(config.id);
+      const visiteur = await getCurrentUser(req).catch(() => null);
+      const dejaDeclare = visiteur
+        ? !!(await db.prepare("SELECT 1 FROM insc_candidature_declarations WHERE config_id=? AND user_id=?").get(config.id, visiteur.id))
+        : false;
+      candidature = { config, documents, deja_declare: dejaDeclare };
+    }
+  } catch (e) { console.error('[insc-public-candidature]', e.message); }
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {

@@ -691,6 +691,49 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_insc_medias_fiche ON insc_fiches_medias(fiche_id);
 
+  /* Candidature (2026-09-27, demande explicite) — parcours de candidature PDF hors ligne
+     attaché à une fiche d'inscription (jamais à l'événement). Volontairement simple : pas de
+     remplissage dans l'app, pas de détection IA (écarté explicitement par l'utilisateur) —
+     l'organisateur dépose des PDF + une adresse e-mail de réception, le candidat télécharge/
+     remplit/envoie par e-mail hors plateforme, puis peut déclarer sa candidature (bouton
+     "J'ai candidaté", compte requis) pour apparaître dans la gestion de la fiche. Préfixe
+     insc_candidature_ volontaire : ne pas confondre avec les tables candidatures/
+     offres_candidatures/candidature_historique du module recrutement (sans rapport). */
+  CREATE TABLE IF NOT EXISTS insc_candidature_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fiche_id INTEGER NOT NULL UNIQUE,
+    actif INTEGER NOT NULL DEFAULT 0,
+    titre TEXT, description TEXT, instructions TEXT, message_candidat TEXT,
+    email_reception TEXT,
+    date_ouverture TEXT, date_fermeture TEXT,
+    created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(fiche_id) REFERENCES insc_fiches(id)
+  );
+  CREATE TABLE IF NOT EXISTS insc_candidature_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    config_id INTEGER NOT NULL,
+    titre TEXT NOT NULL, description TEXT,
+    pdf_url TEXT NOT NULL,
+    obligatoire INTEGER NOT NULL DEFAULT 1,
+    ordre INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(config_id) REFERENCES insc_candidature_config(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_cand_docs_config ON insc_candidature_documents(config_id);
+  /* nom/prenom/email dupliqués depuis users à la déclaration (comme insc_inscriptions) :
+     instantané stable même si le compte candidat change ensuite ses informations. */
+  CREATE TABLE IF NOT EXISTS insc_candidature_declarations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    config_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    nom TEXT, prenom TEXT, email TEXT,
+    declare_le TEXT DEFAULT (datetime('now')),
+    UNIQUE(config_id, user_id),
+    FOREIGN KEY(config_id) REFERENCES insc_candidature_config(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_cand_decl_config ON insc_candidature_declarations(config_id);
+
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user1_id INTEGER NOT NULL,

@@ -114,6 +114,7 @@ const IA_TABS = [
   { key: 'overview', label: "Vue d'ensemble", emoji: '📊' },
   { key: 'types', label: "Types d'inscription", emoji: '🏷️' },
   { key: 'fields', label: 'Formulaire', emoji: '📝' },
+  { key: 'candidature', label: 'Candidature', emoji: '🎓' },
   { key: 'validation', label: 'Validation', emoji: '✅' },
   { key: 'public', label: 'Aperçu public', emoji: '🌐' },
   { key: 'communication', label: 'Communication', emoji: '📧' },
@@ -233,6 +234,7 @@ const state = {
   historique: [],
   historiqueFiltreEvenement: '',
   historiqueSelection: [],
+  candidatureDeclarations: [], // chargées à l'ouverture de l'onglet Candidature, voir iaChargerOnglet()
   icModeGestion: false,      // passe à true une fois les 3 étapes de création franchies (voir icContinuerVersGestion)
   icTransitionVisible: false, // écran "création terminée" affiché entre la dernière étape et le passage en gestion
   busy: false,
@@ -596,6 +598,7 @@ function iaOuvrirSondage() {
 function isAdmin() { return IA_ME && IA_ME.role === 'administrateur'; }
 function selectedFiche() { return state.ficheDetail ? state.ficheDetail.fiche : null; }
 function currentTypes() { return state.ficheDetail ? state.ficheDetail.types : []; }
+function currentCandidature() { return state.ficheDetail ? state.ficheDetail.candidature : null; }
 /* Number(...) des deux côtés : PostgreSQL renvoie les id en chaîne (même cause que
    project_bug_bigserial_types.md), alors que selectType() stocke state.selectedTypeId en
    nombre (parseInt sur dataset.id) — une comparaison stricte échouait donc toujours,
@@ -683,6 +686,15 @@ async function iaChargerOnglet(tab) {
   if (tab === 'qr' || tab === 'presences') return Promise.all([iaChargerLienEtStats(), iaChargerPresences()]);
   if (tab === 'validation') return iaChargerInscriptions();
   if (tab === 'historique') return iaChargerHistorique();
+  if (tab === 'candidature') return iaChargerCandidatureDeclarations();
+}
+async function iaChargerCandidatureDeclarations() {
+  const fiche = selectedFiche();
+  if (!fiche) return;
+  try {
+    const r = await api('GET', `/insc/fiches/${fiche.id}/candidature/declarations`);
+    state.candidatureDeclarations = r.declarations || [];
+  } catch (e) { state.candidatureDeclarations = []; }
 }
 
 // ---------------------------------------------------------------------------
@@ -868,6 +880,7 @@ function renderTabContent() {
     case 'types': return renderTypes();
     case 'validation': return renderValidation();
     case 'fields': return renderFields();
+    case 'candidature': return renderCandidature();
     case 'public': return renderPublic();
     case 'communication': return renderCommunication();
     case 'qr': return renderQr();
@@ -1317,6 +1330,86 @@ function renderFields() {
         ${renderLiaisonEvenements()}
         <button style="background:#8B12D6; border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>`}
     </div>`;
+}
+
+// ---- Candidature (2026-09-27, demande explicite) — parcours PDF hors ligne : l'organisateur
+// dépose des documents + une adresse e-mail de réception, le candidat télécharge/remplit/
+// envoie par e-mail hors plateforme, puis peut déclarer sa candidature (bouton "J'ai
+// candidaté", compte requis côté public). Aucun remplissage ni détection dans l'application —
+// écarté explicitement par l'utilisateur. ----
+function renderCandidature() {
+  const fiche = selectedFiche();
+  const cand = currentCandidature();
+  const config = cand?.config || null;
+  const actif = !!config?.actif;
+  const documents = cand?.documents || [];
+  const declarations = state.candidatureDeclarations || [];
+  const docsHtml = documents.map(d => `
+    <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
+      <div style="font-size:20px; flex-shrink:0;">📄</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13.5px; font-weight:600;">${escH(d.titre)}${d.description ? ` <span style="font-weight:400; color:oklch(0.55 0.006 30);">— ${escH(d.description)}</span>` : ''}</div>
+        <a href="${escH(d.pdf_url)}" target="_blank" rel="noopener" style="font-size:11.5px; color:oklch(0.5 0.14 258);">Voir le PDF ↗</a>
+      </div>
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; cursor:pointer; padding:6px 11px; border-radius:20px; white-space:nowrap; background:${d.obligatoire ? '#FEE2E2' : '#F1F5F9'}; border:1.5px solid ${d.obligatoire ? '#DC2626' : 'oklch(0.85 0.004 30)'}; color:${d.obligatoire ? '#B91C1C' : 'oklch(0.5 0.006 30)'};">
+        <input type="checkbox" ${d.obligatoire ? 'checked' : ''} data-action="toggleCandidatureDocObligatoire" data-id="${d.id}" style="width:15px; height:15px; accent-color:#DC2626; cursor:pointer;"/>
+        ${d.obligatoire ? '🔴 Obligatoire' : 'Facultatif'}
+      </label>
+      <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="supprimerCandidatureDoc" data-id="${d.id}" data-titre="${escH(d.titre)}">✕</button>
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun document ajouté.</div>';
+  const declarationsHtml = declarations.length
+    ? `<div style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">${declarations.map(dec => `
+        <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid oklch(0.93 0.004 30); border-radius:8px; font-size:12.5px;">
+          <span style="font-weight:600;">${escH(dec.prenom || '')} ${escH(dec.nom || '')}</span>
+          <span style="color:oklch(0.5 0.006 30);">${escH(dec.email || '')}</span>
+          <span style="color:oklch(0.55 0.006 30); font-family:'IBM Plex Mono', monospace; font-size:11.5px;">${escH((dec.declare_le || '').slice(0,16).replace('T',' · '))}</span>
+        </div>`).join('')}</div>`
+    : '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucune candidature déclarée pour l\'instant.</div>';
+
+  return `
+    ${iaConsigne("Proposez un parcours de candidature distinct de l'inscription classique : déposez des documents PDF à remplir hors ligne et une adresse e-mail de réception. Aucun remplissage ni détection automatique dans l'application — le candidat télécharge, remplit, puis envoie par e-mail.")}
+    <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px; margin-bottom:16px;">
+      <label style="display:flex; align-items:center; gap:12px; cursor:pointer;">
+        <input type="checkbox" ${actif ? 'checked' : ''} data-action="toggleCandidatureActive" style="width:19px; height:19px; accent-color:#1C8A0E; flex-shrink:0;"/>
+        <div>
+          <div style="font-size:14px; font-weight:700;">🎓 Activer la candidature sur cette fiche</div>
+          <div style="font-size:12px; color:oklch(0.55 0.006 30); margin-top:2px;">Une fois activée, un bloc « Dossier de candidature » apparaît sur la page publique de la fiche.</div>
+        </div>
+      </label>
+      ${config ? `
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:18px; padding-top:18px; border-top:1px solid oklch(0.92 0.004 30);">
+        <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Titre</label><input id="ia-cand-titre" type="text" placeholder="Ex : Candidature — Prix de l'initiative associative" value="${escH(config.titre || '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+        <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Description</label><textarea id="ia-cand-description" style="width:100%; min-height:60px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit; box-sizing:border-box;">${escH(config.description || '')}</textarea></div>
+        <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Instructions</label><textarea id="ia-cand-instructions" style="width:100%; min-height:60px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit; box-sizing:border-box;">${escH(config.instructions || '')}</textarea></div>
+        <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Message affiché au candidat</label><textarea id="ia-cand-message" style="width:100%; min-height:50px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:10px 12px; font-size:13px; font-family:inherit; box-sizing:border-box;">${escH(config.message_candidat || '')}</textarea></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">E-mail de réception ✉️</label><input id="ia-cand-email" type="email" placeholder="candidatures@monassociation.fr" value="${escH(config.email_reception || '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+          <div></div>
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture</label><input id="ia-cand-ouverture" type="datetime-local" value="${escH(config.date_ouverture ? String(config.date_ouverture).slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+          <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture</label><input id="ia-cand-fermeture" type="datetime-local" value="${escH(config.date_fermeture ? String(config.date_fermeture).slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
+        </div>
+        <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; margin-top:4px; align-self:flex-start; padding-left:22px; padding-right:22px;" data-action="enregistrerCandidatureConfig">Enregistrer</button>
+      </div>` : ''}
+    </div>
+    ${config ? `
+    <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:15px; font-weight:700;">Documents à remplir</h3>
+        <span style="font-size:12px; color:oklch(0.55 0.006 30);">${documents.length} document(s)</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">${docsHtml}</div>
+      <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
+        + Ajouter un document
+        <input type="file" accept="application/pdf" data-action="ajouterCandidatureDoc" style="display:none;">
+      </label>
+    </div>
+    <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:15px; font-weight:700;">Candidatures déclarées</h3>
+        <span style="font-size:12px; color:oklch(0.55 0.006 30);">${declarations.length} personne(s)</span>
+      </div>
+      ${declarationsHtml}
+    </div>` : ''}`;
 }
 
 // ---- Aperçu public (vraie donnée, via l'API publique) ----
@@ -1837,6 +1930,56 @@ const actions = {
     catch (e) { ia_toast(e.message, false); }
   },
   toggleEditionInfos() { state.editionInfosOuverte = !state.editionInfosOuverte; },
+  async toggleCandidatureActive(el) {
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}/candidature`, { actif: !!el.checked });
+      ia_toast(el.checked ? 'Candidature activée.' : 'Candidature désactivée.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async enregistrerCandidatureConfig() {
+    const payload = {
+      titre: document.getElementById('ia-cand-titre')?.value || '',
+      description: document.getElementById('ia-cand-description')?.value || '',
+      instructions: document.getElementById('ia-cand-instructions')?.value || '',
+      message_candidat: document.getElementById('ia-cand-message')?.value || '',
+      email_reception: document.getElementById('ia-cand-email')?.value || '',
+      date_ouverture: document.getElementById('ia-cand-ouverture')?.value || null,
+      date_fermeture: document.getElementById('ia-cand-fermeture')?.value || null,
+    };
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}/candidature`, payload);
+      ia_toast('Candidature enregistrée.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async ajouterCandidatureDoc(el) {
+    const file = el.files[0]; if (!file) return;
+    const config = currentCandidature()?.config;
+    if (!config) return;
+    const titre = prompt('Titre du document (ex. « Fiche de conformité ») :');
+    if (!titre || !titre.trim()) return;
+    try {
+      const pdf_url = await uploadMedia(file, 'document');
+      await api('POST', `/insc/candidature/${config.id}/documents`, { titre: titre.trim(), pdf_url });
+      ia_toast(`Document « ${titre.trim()} » ajouté.`, true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async toggleCandidatureDocObligatoire(el) {
+    try {
+      await api('PUT', `/insc/candidature/documents/${el.dataset.id}`, { obligatoire: el.checked ? 1 : 0 });
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async supprimerCandidatureDoc(el) {
+    if (!confirm(`Supprimer le document « ${el.dataset.titre} » ?`)) return;
+    try {
+      await api('DELETE', `/insc/candidature/documents/${el.dataset.id}`);
+      ia_toast('Document supprimé.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
   async toggleModeleStandard(el) {
     const actif = el.dataset.actif === '1';
     if (actif && !confirm("Définir cette fiche comme modèle standard ? Elle sera dupliquée automatiquement à chaque nouvel événement créé (remplace le modèle précédent s'il y en avait un).")) return;
