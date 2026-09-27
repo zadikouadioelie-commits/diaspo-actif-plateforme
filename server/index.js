@@ -16954,10 +16954,7 @@ async function handleStripeWebhook(req, res) {
         const [type, fiche, champs] = await Promise.all([
           db.prepare(`SELECT * FROM insc_types WHERE id=?`).get(insc.type_id),
           db.prepare(`SELECT * FROM insc_fiches WHERE id=?`).get(insc.fiche_id),
-          db.prepare(`
-            SELECT DISTINCT c.* FROM insc_champs c JOIN insc_types ty ON ty.id=c.type_id
-            WHERE c.type_id=? OR (c.universelle=1 AND ty.fiche_id=?)
-          `).all(insc.type_id, insc.fiche_id),
+          db.prepare(`SELECT * FROM insc_champs WHERE type_id=?`).all(insc.type_id),
         ]);
         // Même recalcul qu'à la création (jamais un montant mémorisé) — voir
         // calculerMontantOptionsPayantes(), pour créditer le bon total type + options cochées.
@@ -42258,21 +42255,6 @@ function inscConditionRemplie(conditionJson, reponses) {
   return String(valSource ?? "") === String(cond.valeur ?? ""); // "egal" par défaut
 }
 
-/* Promotion programmée sur une option payante (2026-09-27, demande explicite) : prix normal
-   (o.prix) + nouveau prix (o.promo_prix) + fenêtre optionnelle [promo_date_debut, promo_date_fin]
-   (ISO, chaînes comparables lexicographiquement comme partout ailleurs sur la plateforme —
-   voir le même motif sur vitrine_promotions). Sans date de début, la promo est déjà active dès
-   l'enregistrement ; sans date de fin, le nouveau prix devient définitif (jamais de retour
-   automatique à l'ancien). */
-function prixEffectifOption(o) {
-  const prix = Number(o?.prix) || 0;
-  if (o?.promo_prix == null || o.promo_prix === "") return prix;
-  const now = new Date().toISOString();
-  const debutOk = !o.promo_date_debut || o.promo_date_debut <= now;
-  const finOk = !o.promo_date_fin || o.promo_date_fin >= now;
-  return (debutOk && finOk) ? (Number(o.promo_prix) || prix) : prix;
-}
-
 /* Options payantes (2026-09-25, demande explicite) : catalogue libre d'extras (libellé + prix +
    photo optionnelle) défini par l'organisateur sur un champ de type "options_payantes"
    (insc_champs.options_json = [{libelle, photo_url, prix}]) — le participant coche des
@@ -42293,7 +42275,7 @@ function calculerMontantOptionsPayantes(champs, reponses) {
     const retenues = catalogue.filter(o => selection.includes(o?.libelle));
     reponses[c.nom] = retenues.map(o => o.libelle);
     for (const o of retenues) {
-      const prix = prixEffectifOption(o);
+      const prix = Number(o.prix) || 0;
       total += prix;
       detail.push({ libelle: o.libelle, prix });
     }
@@ -42779,12 +42761,12 @@ route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
   const maxPos = (await db.prepare("SELECT MAX(position) m FROM insc_champs WHERE type_id=?").get(type.id))?.m;
   const id = (await db.prepare(`
     INSERT INTO insc_champs (type_id, nom, libelle, description_aide, type_champ, obligatoire, position,
-      valeur_defaut, placeholder, options_json, regle_validation, condition_json, image_url, universelle)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      valeur_defaut, placeholder, options_json, regle_validation, condition_json, image_url)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(type.id, nom, String(body.libelle).trim(), body.description_aide || null, body.type_champ,
     body.obligatoire ? 1 : 0, (maxPos != null ? maxPos + 1 : 0), body.valeur_defaut || null, body.placeholder || null,
     Array.isArray(body.options) ? JSON.stringify(body.options) : "[]", body.regle_validation || null,
-    body.condition ? JSON.stringify(body.condition) : null, body.image_url || null, body.universelle ? 1 : 0
+    body.condition ? JSON.stringify(body.condition) : null, body.image_url || null
   )).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
@@ -42798,7 +42780,6 @@ route("PUT", "/api/insc/champs/:id", async (req, res, params, body) => {
   for (const c of cols) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
   if (body.options !== undefined) { set.push("options_json=?"); vals.push(JSON.stringify(body.options || [])); }
   if (body.condition !== undefined) { set.push("condition_json=?"); vals.push(body.condition ? JSON.stringify(body.condition) : null); }
-  if (body.universelle !== undefined) { set.push("universelle=?"); vals.push(body.universelle ? 1 : 0); }
   if (set.length) await db.prepare(`UPDATE insc_champs SET ${set.join(",")} WHERE id=?`).run(...vals, champ.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -42944,14 +42925,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   } catch (e) { console.error('[insc-public-autres-evenements]', e.message); }
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
-    /* Un groupe d'options payantes marqué "universelle" (2026-09-27) est proposé sur tous les
-       types d'inscription de la fiche, pas seulement celui où il a été créé. */
-    t.champs = await db.prepare(`
-      SELECT DISTINCT c.id,c.nom,c.libelle,c.description_aide,c.type_champ,c.obligatoire,c.position,c.valeur_defaut,c.placeholder,c.options_json,c.condition_json
-      FROM insc_champs c JOIN insc_types ty ON ty.id=c.type_id
-      WHERE c.actif=1 AND (c.type_id=? OR (c.universelle=1 AND ty.fiche_id=?))
-      ORDER BY c.position ASC, c.id ASC
-    `).all(t.id, fiche.id);
+    t.champs = await db.prepare("SELECT id,nom,libelle,description_aide,type_champ,obligatoire,position,valeur_defaut,placeholder,options_json,condition_json FROM insc_champs WHERE type_id=? AND actif=1 ORDER BY position ASC, id ASC").all(t.id);
     const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
     t.places_restantes = t.places_max != null ? Math.max(0, t.places_max - nb) : null;
     t.complet = t.places_max != null && nb >= t.places_max;
@@ -42996,11 +42970,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (!body?.email && !body?.telephone) return sendJSON(res, 400, { error: "Un e-mail ou un téléphone est requis." });
 
   // Champs dynamiques du type : validation obligatoire/facultatif + logique conditionnelle revalidée serveur
-  // + groupes d'options payantes "universelle" (2026-09-27) des autres types de la même fiche.
-  const champs = await db.prepare(`
-    SELECT DISTINCT c.* FROM insc_champs c JOIN insc_types ty ON ty.id=c.type_id
-    WHERE c.actif=1 AND (c.type_id=? OR (c.universelle=1 AND ty.fiche_id=?))
-  `).all(type.id, fiche.id);
+  const champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? AND actif=1").all(type.id);
   const reponses = (body?.reponses && typeof body.reponses === "object") ? body.reponses : {};
   /* Champs répétables titrés (Documents/Images/Vidéos, 2026-09-23) : la réponse brute côté
      client est une liste de {titre, url} — jamais faite confiance telle quelle (client non

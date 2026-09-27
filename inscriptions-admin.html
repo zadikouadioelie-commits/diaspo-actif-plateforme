@@ -272,94 +272,32 @@ function ia_choixGratuitPayant() {
    page (même principe que ia_choixGratuitPayant ci-dessus) : les champs texte/prix sont lus
    directement dans le DOM à l'enregistrement plutôt que suivis dans `state`, pour ne pas perdre
    la saisie en cours à chaque re-rendu HTML complet déclenché par dispatch(). */
-/* Promotion programmée par option (2026-09-27, demande explicite) : prix normal + nouveau prix +
-   date de début (et fin facultative) à partir de laquelle le nouveau prix s'applique
-   automatiquement — même sémantique que prixEffectifOption() côté serveur (server/index.js),
-   dupliquée ici en JS pour l'aperçu admin, comme le reste des petits helpers de cette page. */
-function iopEstEnPromo(opt) {
-  return opt.promo_prix != null && opt.promo_prix !== '';
-}
-function iaPrixEffectif(o) {
-  const prix = Number(o.prix) || 0;
-  if (!iopEstEnPromo(o)) return prix;
-  const now = new Date().toISOString();
-  const debutOk = !o.promo_date_debut || o.promo_date_debut <= now;
-  const finOk = !o.promo_date_fin || o.promo_date_fin >= now;
-  return (debutOk && finOk) ? (Number(o.promo_prix) || prix) : prix;
-}
-function iaPrixLabelHtml(o) {
-  const prix = Number(o.prix) || 0;
-  if (!iopEstEnPromo(o)) return `${prix.toFixed(2)} €`;
-  const now = new Date().toISOString();
-  const promoPrix = Number(o.promo_prix) || prix;
-  const debutOk = !o.promo_date_debut || o.promo_date_debut <= now;
-  const finOk = !o.promo_date_fin || o.promo_date_fin >= now;
-  if (debutOk && finOk) {
-    return `<span style="text-decoration:line-through;opacity:.55;font-weight:400;">${prix.toFixed(2)} €</span> <span style="color:#DC2626;">${promoPrix.toFixed(2)} €</span>`;
-  }
-  if (o.promo_date_debut && o.promo_date_debut > now) {
-    const d = new Date(o.promo_date_debut).toLocaleDateString('fr-FR');
-    return `${prix.toFixed(2)} € <span style="display:block;font-size:10.5px;font-weight:600;color:#DC2626;">À partir du ${d} : ${promoPrix.toFixed(2)} €</span>`;
-  }
-  return `${prix.toFixed(2)} €`;
-}
 function iopRenderRow(opt) {
-  const enPromo = iopEstEnPromo(opt);
   return `
-    <div class="iop-row" style="display:flex; flex-direction:column; gap:8px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <label style="width:46px; height:46px; border-radius:8px; background:${opt.photo_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(opt.photo_url)}')` : 'oklch(0.96 0.004 30)'}; border:1.5px dashed oklch(0.8 0.006 30); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; overflow:hidden;" title="Ajouter une photo (facultatif)">
-          ${opt.photo_url ? '' : '<span style="font-size:16px; opacity:.5;">📷</span>'}
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-role="photo" style="display:none;">
-        </label>
-        <input type="text" data-role="libelle" placeholder="Libellé (ex. Repas)" value="${escH(opt.libelle || '')}" style="flex:1; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
-        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-          <input type="number" min="0" step="0.01" data-role="prix" placeholder="Prix" value="${opt.prix !== '' && opt.prix != null ? opt.prix : ''}" style="width:80px; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
-          <span style="font-size:12.5px; color:oklch(0.55 0.006 30);">€</span>
-        </div>
-        <button type="button" data-role="supprimer" style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
-      </div>
-      <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#B91C1C; cursor:pointer;">
-        <input type="checkbox" data-role="promo-toggle" ${enPromo ? 'checked' : ''} style="width:14px;height:14px;accent-color:#DC2626;cursor:pointer;">
-        🏷️ Mettre cette option en promotion
+    <div class="iop-row" style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px;">
+      <label style="width:46px; height:46px; border-radius:8px; background:${opt.photo_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(opt.photo_url)}')` : 'oklch(0.96 0.004 30)'}; border:1.5px dashed oklch(0.8 0.006 30); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; overflow:hidden;" title="Ajouter une photo (facultatif)">
+        ${opt.photo_url ? '' : '<span style="font-size:16px; opacity:.5;">📷</span>'}
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-role="photo" style="display:none;">
       </label>
-      <div data-role="promo-fields" style="display:${enPromo ? 'flex' : 'none'}; gap:8px; flex-wrap:wrap; padding:8px 10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;">
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <label style="font-size:10.5px;color:#7F1D1D;font-weight:600;">Nouveau prix</label>
-          <input type="number" min="0" step="0.01" data-role="promo-prix" placeholder="Nouveau prix" value="${opt.promo_prix != null ? opt.promo_prix : ''}" style="width:90px;height:32px;border:1px solid #FCA5A5;border-radius:6px;padding:0 8px;font-size:12.5px;box-sizing:border-box;">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <label style="font-size:10.5px;color:#7F1D1D;font-weight:600;">À partir du</label>
-          <input type="date" data-role="promo-debut" value="${escH((opt.promo_date_debut || '').slice(0,10))}" style="height:32px;border:1px solid #FCA5A5;border-radius:6px;padding:0 8px;font-size:12.5px;box-sizing:border-box;">
-        </div>
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <label style="font-size:10.5px;color:#7F1D1D;font-weight:600;">Jusqu'au (facultatif)</label>
-          <input type="date" data-role="promo-fin" value="${escH((opt.promo_date_fin || '').slice(0,10))}" style="height:32px;border:1px solid #FCA5A5;border-radius:6px;padding:0 8px;font-size:12.5px;box-sizing:border-box;">
-        </div>
+      <input type="text" data-role="libelle" placeholder="Libellé (ex. Repas)" value="${escH(opt.libelle || '')}" style="flex:1; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
+      <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+        <input type="number" min="0" step="0.01" data-role="prix" placeholder="Prix" value="${opt.prix !== '' && opt.prix != null ? opt.prix : ''}" style="width:80px; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
+        <span style="font-size:12.5px; color:oklch(0.55 0.006 30);">€</span>
       </div>
+      <button type="button" data-role="supprimer" style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
     </div>`;
 }
-/* champId fourni (2026-09-27, demande explicite) : réouvre un groupe d'options payantes
-   EXISTANT pour le modifier (PUT) au lieu d'en créer un nouveau (POST) — jusqu'ici seules la
-   création et la suppression totale d'un groupe étaient possibles depuis cette page. */
-function iaOuvrirOptionsPayantes(champId) {
+function iaOuvrirOptionsPayantes() {
   if (!state.selectedTypeId) { ia_toast("Sélectionnez ou créez d'abord un type d'inscription.", false); return; }
-  const champExistant = champId ? (selectedType().champs || []).find(c => Number(c.id) === Number(champId)) : null;
-  let optionsExistantes = [];
-  if (champExistant) { try { optionsExistantes = JSON.parse(champExistant.options_json || '[]'); } catch (e) {} }
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
-        <h3 style="margin:0; font-size:17px; color:#6B0FA3;">💰 Option payante${champExistant ? ' — ' + escH(champExistant.libelle) : ''}</h3>
+        <h3 style="margin:0; font-size:17px; color:#6B0FA3;">💰 Option payante</h3>
         <button type="button" id="iop-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
       </div>
       <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Proposez des options facultatives payantes (ex. repas, massage) que les participants pourront cocher lors de leur inscription à « ${escH(selectedType() ? selectedType().label : '')} ».</p>
-      <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; margin-bottom:14px; cursor:pointer; padding:9px 12px; background:oklch(0.97 0.02 300); border:1px solid oklch(0.85 0.05 300); border-radius:8px;">
-        <input type="checkbox" id="iop-universelle" ${champExistant?.universelle ? 'checked' : ''} style="width:16px;height:16px;accent-color:#8B12D6;cursor:pointer;">
-        🌐 Universelle — proposer aussi sur les autres types d'inscription de cette fiche
-      </label>
       <div id="iop-options-list" style="display:flex; flex-direction:column; gap:10px;"></div>
       <button type="button" id="iop-ajouter" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter une autre option</button>
       <button type="button" id="iop-enregistrer" style="width:100%; margin-top:18px; background:#8B12D6; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer les options</button>
@@ -370,18 +308,11 @@ function iaOuvrirOptionsPayantes(champId) {
   const ajouterRow = (opt) => {
     const div = document.createElement('div');
     div.innerHTML = iopRenderRow(opt || { libelle: '', photo_url: null, prix: '' });
-    const row = div.firstElementChild;
-    if (opt?.photo_url) row.dataset.photoUrl = opt.photo_url;
-    list.appendChild(row);
+    list.appendChild(div.firstElementChild);
   };
-  if (optionsExistantes.length) optionsExistantes.forEach(ajouterRow); else ajouterRow();
+  ajouterRow();
 
   list.addEventListener('change', async (e) => {
-    if (e.target.dataset.role === 'promo-toggle') {
-      const fields = e.target.closest('.iop-row').querySelector('[data-role="promo-fields"]');
-      fields.style.display = e.target.checked ? 'flex' : 'none';
-      return;
-    }
     if (e.target.dataset.role !== 'photo') return;
     const file = e.target.files[0]; if (!file) return;
     const row = e.target.closest('.iop-row');
@@ -407,30 +338,17 @@ function iaOuvrirOptionsPayantes(champId) {
 
   overlay.querySelector('#iop-enregistrer').addEventListener('click', async () => {
     const rows = Array.from(list.querySelectorAll('.iop-row'));
-    const options = rows.map(row => {
-      const enPromo = row.querySelector('[data-role="promo-toggle"]').checked;
-      const promoPrixVal = parseFloat(row.querySelector('[data-role="promo-prix"]').value);
-      return {
-        libelle: row.querySelector('[data-role="libelle"]').value.trim(),
-        prix: parseFloat(row.querySelector('[data-role="prix"]').value) || 0,
-        photo_url: row.dataset.photoUrl || null,
-        promo_prix: enPromo && !isNaN(promoPrixVal) ? promoPrixVal : null,
-        promo_date_debut: enPromo ? (row.querySelector('[data-role="promo-debut"]').value || null) : null,
-        promo_date_fin: enPromo ? (row.querySelector('[data-role="promo-fin"]').value || null) : null,
-      };
-    }).filter(o => o.libelle && o.prix > 0);
+    const options = rows.map(row => ({
+      libelle: row.querySelector('[data-role="libelle"]').value.trim(),
+      prix: parseFloat(row.querySelector('[data-role="prix"]').value) || 0,
+      photo_url: row.dataset.photoUrl || null,
+    })).filter(o => o.libelle && o.prix > 0);
     if (!options.length) { ia_toast('Ajoutez au moins une option avec un libellé et un prix.', false); return; }
-    const universelle = overlay.querySelector('#iop-universelle').checked;
+    const libelleGroupe = prompt("Nom de ce groupe d'options (affiché aux participants) :", 'Options payantes');
+    if (!libelleGroupe || !libelleGroupe.trim()) return;
     try {
-      if (champExistant) {
-        await api('PUT', `/insc/champs/${champExistant.id}`, { options, universelle });
-        ia_toast('Options payantes mises à jour.', true);
-      } else {
-        const libelleGroupe = prompt("Nom de ce groupe d'options (affiché aux participants) :", 'Options payantes');
-        if (!libelleGroupe || !libelleGroupe.trim()) return;
-        await api('POST', `/insc/types/${state.selectedTypeId}/champs`, { libelle: libelleGroupe.trim(), type_champ: 'options_payantes', obligatoire: false, options, universelle });
-        ia_toast(`${options.length} option(s) payante(s) ajoutée(s).`, true);
-      }
+      await api('POST', `/insc/types/${state.selectedTypeId}/champs`, { libelle: libelleGroupe.trim(), type_champ: 'options_payantes', obligatoire: false, options });
+      ia_toast(`${options.length} option(s) payante(s) ajoutée(s).`, true);
       overlay.remove();
       await iaChargerFiche(state.selectedFicheId);
       render();
@@ -1229,12 +1147,11 @@ function renderFields() {
   const fields = type.champs || [];
   const fieldsHtml = fields.map((f, i) => `
     <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
-      <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}${f.universelle ? ' <span style="font-size:11px;color:#8B12D6;">· 🌐 universelle</span>' : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
+      <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
       <label style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; cursor:pointer; padding:7px 13px; border-radius:20px; white-space:nowrap; background:${f.obligatoire ? '#FEE2E2' : '#F1F5F9'}; border:1.5px solid ${f.obligatoire ? '#DC2626' : 'oklch(0.85 0.004 30)'}; color:${f.obligatoire ? '#B91C1C' : 'oklch(0.5 0.006 30)'};">
         <input type="checkbox" ${f.obligatoire ? 'checked' : ''} data-action="toggleFieldRequired" data-id="${f.id}" style="width:16px; height:16px; accent-color:#DC2626; cursor:pointer;"/>
         ${f.obligatoire ? '🔴 Obligatoire' : 'Facultatif'}
       </label>
-      ${f.type_champ === 'options_payantes' ? `<button style="background:none; border:none; color:#8B12D6; font-size:15px; cursor:pointer; padding:2px 6px;" data-action="modifierOptionsPayantes" data-id="${f.id}" title="Modifier les options">✏️</button>` : ''}
       <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="removeField" data-id="${f.id}">✕</button>
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone sont demandés.</div>';
 
@@ -1341,7 +1258,7 @@ function renderPublic() {
             <input type="checkbox" data-champ-groupe="${escH(f.nom)}" value="${escH(o.libelle)}" style="width:16px;height:16px;flex-shrink:0;">
             ${o.photo_url ? `<img src="${escH(o.photo_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : ''}
             <span style="flex:1;font-size:13px;">${escH(o.libelle)}</span>
-            <span style="font-size:13px;font-weight:700;color:oklch(0.32 0.09 258);">${iaPrixLabelHtml(o)}</span>
+            <span style="font-size:13px;font-weight:700;color:oklch(0.32 0.09 258);">${(Number(o.prix)||0).toFixed(2)} €</span>
           </label>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucune option disponible.</div>'}</div>`;
       } else if (f.type_champ === 'choix_multiple') {
         champHtml = options.map(o => `<label style="display:block;font-weight:400;font-size:13px;margin:4px 0;"><input type="checkbox" data-champ-groupe="${escH(f.nom)}" value="${escH(o)}"> ${escH(o)}</label>`).join('');
@@ -1516,10 +1433,10 @@ function iaRenderReponses(reponses, champsMap) {
     if (c && c.type_champ === 'options_payantes' && Array.isArray(v)) {
       let catalogue = []; try { catalogue = JSON.parse(c.options_json || '[]'); } catch (e) {}
       const retenues = catalogue.filter(o => v.includes(o?.libelle));
-      const total = retenues.reduce((s, o) => s + iaPrixEffectif(o), 0);
+      const total = retenues.reduce((s, o) => s + (Number(o.prix) || 0), 0);
       return `<div style="padding:5px 0;border-top:1px solid oklch(0.95 0.004 30);">
         <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px;"><span style="color:oklch(0.55 0.006 30);">${escH(libelle)}</span><span style="font-weight:700;color:#6B0FA3;">${total.toFixed(2)} €</span></div>
-        <div style="display:flex;flex-direction:column;gap:2px;">${retenues.map(o => `<span style="font-size:12.5px;color:oklch(0.35 0.006 30);">💰 ${escH(o.libelle)} — ${iaPrixEffectif(o).toFixed(2)} €</span>`).join('')}</div>
+        <div style="display:flex;flex-direction:column;gap:2px;">${retenues.map(o => `<span style="font-size:12.5px;color:oklch(0.35 0.006 30);">💰 ${escH(o.libelle)} — ${(Number(o.prix)||0).toFixed(2)} €</span>`).join('')}</div>
       </div>`;
     }
     return `<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid oklch(0.95 0.004 30);"><span style="color:oklch(0.55 0.006 30);">${escH(libelle)}</span><span style="font-weight:600;text-align:right;">${escH(Array.isArray(v)?v.join(', '):String(v))}</span></div>`;
@@ -1997,7 +1914,6 @@ const actions = {
     state.champCategorieOuverte = state.champCategorieOuverte === cat ? null : cat;
   },
   ouvrirOptionsPayantes() { iaOuvrirOptionsPayantes(); },
-  modifierOptionsPayantes(el) { iaOuvrirOptionsPayantes(parseInt(el.dataset.id)); },
   ouvrirSondage() { iaOuvrirSondage(); },
   async ajouterChampSuggere(el) {
     const suggestion = (IA_FIELD_SUGGESTIONS[el.dataset.categorie] || [])[parseInt(el.dataset.idx)];
