@@ -288,7 +288,13 @@ function ipRecalculerTotal() {
 }
 
 function ipOuvrirType(typeId) {
-  const type = IP_TYPES.find(t => t.id === typeId);
+  /* Number() des deux côtés (2026-09-27, bug réel signalé : "on ne peut pas s'inscrire") —
+     insc_types.id revient de PostgreSQL sous forme de texte ("11"), alors que le onclick
+     généré plus bas (onclick="ipOuvrirType(${t.id})") l'interpole en littéral NUMÉRIQUE dans
+     le HTML : la comparaison stricte "11" === 11 échouait toujours, silencieusement (aucune
+     erreur, le bouton "S'inscrire" ne faisait juste rien) — même famille de bug que
+     users.id/BIGSERIAL déjà rencontrée ailleurs sur cette plateforme. */
+  const type = IP_TYPES.find(t => Number(t.id) === Number(typeId));
   if (!type || type.complet || type.periode_ouverte === false) return;
   IP_TYPE_ACTIF = type;
   window.ipUploadValues = {};
