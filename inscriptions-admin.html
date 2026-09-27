@@ -2158,8 +2158,14 @@ const actions = {
   ouvrirOptionsPayantes() { iaOuvrirOptionsPayantes(); },
   modifierOptionsPayantes(el) { iaOuvrirOptionsPayantes(parseInt(el.dataset.id)); },
   ouvrirSondage() { iaOuvrirSondage(); },
-  // "💼 Candidature" (2026-09-27) — bouton seul pour l'instant, contenu de la modale à venir.
-  ouvrirCandidature() { ia_toast('Fonctionnalité « Candidature » bientôt disponible.', true); },
+  // "💼 Candidature" (2026-09-27) — la fonctionnalité (onglet dédié, renderCandidature()) a été
+  // construite séparément depuis ce bouton placeholder, jamais mis à jour pour y naviguer (bug
+  // réel signalé : le clic ne faisait plus qu'afficher le toast "bientôt disponible" alors que
+  // l'onglet existe déjà). Même mécanique que selectTab().
+  async ouvrirCandidature() {
+    state.activeTab = 'candidature';
+    try { await iaChargerOnglet(state.activeTab); } catch (e) { ia_toast(e.message, false); }
+  },
   async ajouterChampSuggere(el) {
     const suggestion = (IA_FIELD_SUGGESTIONS[el.dataset.categorie] || [])[parseInt(el.dataset.idx)];
     if (!suggestion) return;
