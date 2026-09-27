@@ -16954,7 +16954,7 @@ async function handleStripeWebhook(req, res) {
         const [type, fiche, champs] = await Promise.all([
           db.prepare(`SELECT * FROM insc_types WHERE id=?`).get(insc.type_id),
           db.prepare(`SELECT * FROM insc_fiches WHERE id=?`).get(insc.fiche_id),
-          db.prepare(`SELECT * FROM insc_champs WHERE type_id=?`).all(insc.type_id),
+          getChampsPourType(insc.type_id, insc.fiche_id),
         ]);
         // Même recalcul qu'à la création (jamais un montant mémorisé) — voir
         // calculerMontantOptionsPayantes(), pour créditer le bon total type + options cochées.
@@ -42255,6 +42255,55 @@ function inscConditionRemplie(conditionJson, reponses) {
   return String(valSource ?? "") === String(cond.valeur ?? ""); // "egal" par défaut
 }
 
+/* Promotion programmée sur une option payante (2026-09-27, demande explicite) : prix normal
+   (o.prix) + nouveau prix (o.promo_prix) + fenêtre optionnelle [promo_date_debut, promo_date_fin]
+   (ISO, chaînes comparables lexicographiquement comme partout ailleurs sur la plateforme — voir
+   le même motif sur vitrine_promotions). Sans date de début, la promo est déjà active dès
+   l'enregistrement ; sans date de fin, le nouveau prix devient définitif (jamais de retour
+   automatique à l'ancien). Champ libre dans options_json, aucune colonne SQL requise. */
+function prixEffectifOption(o) {
+  const prix = Number(o?.prix) || 0;
+  if (o?.promo_prix == null || o.promo_prix === "") return prix;
+  const now = new Date().toISOString();
+  const debutOk = !o.promo_date_debut || o.promo_date_debut <= now;
+  const finOk = !o.promo_date_fin || o.promo_date_fin >= now;
+  return (debutOk && finOk) ? (Number(o.promo_prix) || prix) : prix;
+}
+
+/* Option payante "universelle" (2026-09-27, demande explicite — CORRIGÉ après incident de
+   production du même jour) : le flag est porté PAR OPTION, à l'intérieur de options_json
+   ({libelle, prix, ..., universelle:true}), jamais par une colonne SQL — la première version
+   ajoutait insc_champs.universelle via une migration au démarrage qui n'a jamais réussi à
+   s'exécuter en production (connexions Neon instables ce jour-là), cassant purement et
+   simplement la page d'inscription de tous les événements liés. Cette version ne dépend
+   d'aucune migration : le comportement souhaité ("le repas universel, le massage réservé à son
+   type") tient entièrement dans le contenu déjà libre de la colonne existante.
+   Un type d'inscription voit : (1) la totalité de ses propres groupes d'options payantes, sans
+   filtre — c'est chez lui ; (2) en plus, uniquement les options individuelles marquées
+   universelle:true dans les groupes des AUTRES types de la même fiche (jamais leurs options non
+   universelles). Le champ "étranger" fusionné garde son id/nom d'origine : la sélection par un
+   visiteur d'un autre type se soumet et se retrouve donc dans le même catalogue que
+   calculerMontantOptionsPayantes() sait déjà lire, sans logique de facturation séparée. */
+async function getChampsPourType(typeId, ficheId) {
+  const propres = await db.prepare(
+    "SELECT * FROM insc_champs WHERE type_id=? AND actif=1 ORDER BY position ASC, id ASC"
+  ).all(typeId);
+  const autresGroupes = await db.prepare(`
+    SELECT c.* FROM insc_champs c JOIN insc_types t ON t.id=c.type_id
+    WHERE t.fiche_id=? AND c.type_id<>? AND c.actif=1 AND c.type_champ='options_payantes'
+    ORDER BY c.position ASC, c.id ASC
+  `).all(ficheId, typeId);
+  const universellesFusionnees = [];
+  for (const c of autresGroupes) {
+    let catalogue = [];
+    try { catalogue = JSON.parse(c.options_json || "[]"); } catch (e) {}
+    if (!Array.isArray(catalogue)) catalogue = [];
+    const universelles = catalogue.filter(o => o && o.universelle);
+    if (universelles.length) universellesFusionnees.push({ ...c, options_json: JSON.stringify(universelles) });
+  }
+  return propres.concat(universellesFusionnees);
+}
+
 /* Options payantes (2026-09-25, demande explicite) : catalogue libre d'extras (libellé + prix +
    photo optionnelle) défini par l'organisateur sur un champ de type "options_payantes"
    (insc_champs.options_json = [{libelle, photo_url, prix}]) — le participant coche des
@@ -42275,7 +42324,7 @@ function calculerMontantOptionsPayantes(champs, reponses) {
     const retenues = catalogue.filter(o => selection.includes(o?.libelle));
     reponses[c.nom] = retenues.map(o => o.libelle);
     for (const o of retenues) {
-      const prix = Number(o.prix) || 0;
+      const prix = prixEffectifOption(o);
       total += prix;
       detail.push({ libelle: o.libelle, prix });
     }
@@ -42925,7 +42974,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   } catch (e) { console.error('[insc-public-autres-evenements]', e.message); }
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
-    t.champs = await db.prepare("SELECT id,nom,libelle,description_aide,type_champ,obligatoire,position,valeur_defaut,placeholder,options_json,condition_json FROM insc_champs WHERE type_id=? AND actif=1 ORDER BY position ASC, id ASC").all(t.id);
+    t.champs = await getChampsPourType(t.id, fiche.id);
     const nb = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
     t.places_restantes = t.places_max != null ? Math.max(0, t.places_max - nb) : null;
     t.complet = t.places_max != null && nb >= t.places_max;
@@ -42970,7 +43019,8 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (!body?.email && !body?.telephone) return sendJSON(res, 400, { error: "Un e-mail ou un téléphone est requis." });
 
   // Champs dynamiques du type : validation obligatoire/facultatif + logique conditionnelle revalidée serveur
-  const champs = await db.prepare("SELECT * FROM insc_champs WHERE type_id=? AND actif=1").all(type.id);
+  // + options payantes individuelles marquées "universelle" des autres types de la même fiche.
+  const champs = await getChampsPourType(type.id, fiche.id);
   const reponses = (body?.reponses && typeof body.reponses === "object") ? body.reponses : {};
   /* Champs répétables titrés (Documents/Images/Vidéos, 2026-09-23) : la réponse brute côté
      client est une liste de {titre, url} — jamais faite confiance telle quelle (client non
