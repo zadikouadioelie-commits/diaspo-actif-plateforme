@@ -1281,6 +1281,12 @@ function renderFields() {
           ${cats}
           <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirOptionsPayantes">💰 Option payante</button>
           <button style="background:#fff; border:1.5px solid #BC13FE; color:#8B12D6; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(188,19,254,.35);" data-action="ouvrirSondage">📊 Sondage</button>
+          <!-- "💼 Candidature" (2026-09-27, demande explicite) — bouton seul pour l'instant,
+               le contenu de la modale qu'il ouvrira est en cours de préparation par
+               l'utilisateur ; data-action enregistré dans actions ci-dessous, ne fait
+               qu'un toast "Bientôt disponible" en attendant. Même style que les puces
+               "Option payante"/"Sondage" ci-dessus, en vert néon plutôt que violet. -->
+          <button style="background:#fff; border:1.5px solid #39FF14; color:#1C8A0E; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(57,255,20,.45);" data-action="ouvrirCandidature">💼 Candidature</button>
         </div>
         ${panelSuggestions}
       </div>
@@ -2008,6 +2014,8 @@ const actions = {
   ouvrirOptionsPayantes() { iaOuvrirOptionsPayantes(); },
   modifierOptionsPayantes(el) { iaOuvrirOptionsPayantes(parseInt(el.dataset.id)); },
   ouvrirSondage() { iaOuvrirSondage(); },
+  // "💼 Candidature" (2026-09-27) — bouton seul pour l'instant, contenu de la modale à venir.
+  ouvrirCandidature() { ia_toast('Fonctionnalité « Candidature » bientôt disponible.', true); },
   async ajouterChampSuggere(el) {
     const suggestion = (IA_FIELD_SUGGESTIONS[el.dataset.categorie] || [])[parseInt(el.dataset.idx)];
     if (!suggestion) return;
