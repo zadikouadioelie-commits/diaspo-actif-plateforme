@@ -28,7 +28,42 @@
 <style>
 #ip-root { font-family:'IBM Plex Sans', sans-serif; color:oklch(0.2 0.006 30); }
 #ip-root button, #ip-root input, #ip-root select, #ip-root textarea { font-family:inherit; }
-.ip-wrap{max-width:640px;margin:0 auto;padding:32px 16px 60px;}
+/* Deux colonnes (2026-09-27, demande explicite : "à droite l'inscription, à gauche les autres
+   événements du même organisme + un calendrier") — .ip-layout reste en une seule colonne
+   centrée (comportement historique, .ip-wrap inchangé) tant qu'aucun autre événement n'existe
+   pour cet organisateur ; la classe --two-col n'est ajoutée par le JS que si la colonne
+   gauche a réellement du contenu, pour ne jamais laisser une colonne vide béante. */
+.ip-layout{max-width:640px;margin:0 auto;}
+.ip-layout.ip-layout--two-col{display:grid;grid-template-columns:300px 1fr;gap:28px;max-width:1000px;align-items:start;}
+@media (max-width:860px){
+  .ip-layout.ip-layout--two-col{grid-template-columns:1fr;gap:0;}
+  .ip-layout.ip-layout--two-col #ip-side{order:2;}
+  .ip-layout.ip-layout--two-col #ip-root{order:1;}
+}
+.ip-wrap{padding:32px 16px 60px;}
+.ip-layout--two-col .ip-wrap{padding-left:0;}
+@media (max-width:860px){.ip-layout--two-col .ip-wrap{padding-left:16px;}}
+.ip-side{display:none;}
+.ip-layout--two-col .ip-side{display:flex;flex-direction:column;gap:18px;padding:32px 0 20px 16px;position:sticky;top:20px;}
+@media (max-width:860px){.ip-layout--two-col .ip-side{position:static;padding:0 16px 28px;}}
+.ip-side-box{background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:14px;padding:16px;}
+.ip-side-title{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.5 0.006 30);margin:0 0 12px;}
+.ip-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:13px;font-weight:700;text-transform:capitalize;}
+.ip-cal-nav{background:none;border:1px solid oklch(0.88 0.004 30);border-radius:6px;cursor:pointer;font-size:13px;color:oklch(0.4 0.006 30);width:24px;height:24px;line-height:1;padding:0;}
+.ip-cal-nav:disabled{opacity:.35;cursor:default;}
+.ip-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;}
+.ip-cal-dow{font-size:10px;color:oklch(0.55 0.006 30);font-weight:600;padding-bottom:4px;}
+.ip-cal-day{font-size:12px;padding:6px 0;border-radius:6px;color:oklch(0.35 0.006 30);position:relative;}
+.ip-cal-day.empty{visibility:hidden;}
+.ip-cal-day.has-event{background:oklch(0.94 0.05 258);color:oklch(0.32 0.09 258);font-weight:700;cursor:pointer;border:none;font-family:inherit;}
+.ip-cal-day.has-event:hover{background:oklch(0.88 0.07 258);}
+.ip-cal-day.today{box-shadow:inset 0 0 0 1.5px oklch(0.32 0.09 258 / .55);}
+.ip-autres-list{display:flex;flex-direction:column;gap:10px;}
+.ip-autre-card{display:flex;gap:10px;text-decoration:none;color:inherit;border:1px solid oklch(0.92 0.004 30);border-radius:10px;padding:8px;transition:border-color .15s;scroll-margin-top:20px;}
+.ip-autre-card:hover,.ip-autre-card.ip-autre-surlignee{border-color:oklch(0.32 0.09 258);}
+.ip-autre-img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;background:oklch(0.94 0.01 258);}
+.ip-autre-titre{font-size:12.5px;font-weight:700;line-height:1.3;margin:0 0 3px;}
+.ip-autre-meta{font-size:11px;color:oklch(0.55 0.006 30);}
 .ip-affiche{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-bottom:18px;}
 .ip-titre{font-size:22px;font-weight:700;margin:0 0 6px;}
 .ip-desc{color:oklch(0.5 0.006 30);font-size:14px;line-height:1.6;margin:0 0 22px;}
@@ -81,9 +116,12 @@
   <div id="hb-account-section"></div>
 </aside>
 
-<main class="ip-wrap" id="ip-root">
-  <div style="text-align:center;padding:60px 0;color:oklch(0.55 0.006 30);">Chargement…</div>
-</main>
+<div class="ip-layout" id="ip-layout">
+  <aside class="ip-side" id="ip-side"></aside>
+  <main class="ip-wrap" id="ip-root">
+    <div style="text-align:center;padding:60px 0;color:oklch(0.55 0.006 30);">Chargement…</div>
+  </main>
+</div>
 </div>
 
 <script src="assets/data.js"></script>
@@ -394,6 +432,112 @@ async function ipSoumettre(ev) {
   }
 }
 
+/* ── Colonne "Autres événements du même organisateur" + calendrier (2026-09-27, demande
+   explicite : "présente à droite les événements du même compte... tu mets même à disposition
+   un calendrier créé automatiquement par les dates de ces événements") — persiste à l'identique
+   quel que soit l'écran affiché dans #ip-root (accueil, formulaire, confirmation, fermée…),
+   rendue une seule fois après le chargement initial plutôt que recalculée à chaque changement
+   d'écran. N'apparaît que si l'organisateur a d'autres événements à venir : jamais de colonne
+   vide. */
+let IP_AUTRES_EVENEMENTS = [];
+let IP_CAL_MOIS = null; // { y, m } — mois actuellement affiché dans le mini-calendrier
+const IP_CAL_MOIS_NOMS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const IP_CAL_JOURS = ['L','M','M','J','V','S','D'];
+
+function ipAutreEvtUrl(e) {
+  return e.fiche_slug ? `inscription-publique.html?slug=${encodeURIComponent(e.fiche_slug)}` : `evenements.html#evt-${e.id}`;
+}
+function ipAutreEvtDateLabel(e) {
+  if (!e.date_evt) return '';
+  const dt = new Date(String(e.date_evt).slice(0,10) + 'T00:00:00');
+  if (isNaN(dt)) return e.date_evt;
+  return dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + (e.heure_debut ? ' · ' + String(e.heure_debut).slice(0,5) : '');
+}
+function ipCalDatesParJour() {
+  const map = {};
+  IP_AUTRES_EVENEMENTS.forEach(e => {
+    if (!e.date_evt) return;
+    const cle = String(e.date_evt).slice(0,10);
+    (map[cle] = map[cle] || []).push(e);
+  });
+  return map;
+}
+function ipRenderCalendrier() {
+  const map = ipCalDatesParJour();
+  const { y, m } = IP_CAL_MOIS;
+  const premierJourSemaine = (new Date(y, m, 1).getDay() + 6) % 7; // lundi = 0
+  const nbJours = new Date(y, m + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0,10);
+  let cells = '';
+  for (let i = 0; i < premierJourSemaine; i++) cells += `<div class="ip-cal-day empty"></div>`;
+  for (let d = 1; d <= nbJours; d++) {
+    const cle = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evts = map[cle];
+    const classes = ['ip-cal-day'];
+    if (evts) classes.push('has-event');
+    if (cle === todayStr) classes.push('today');
+    cells += evts
+      ? `<button type="button" class="${classes.join(' ')}" onclick="ipCalAllerAuJour('${cle}')" title="${evts.length} événement(s) ce jour">${d}</button>`
+      : `<div class="${classes.join(' ')}">${d}</div>`;
+  }
+  const dates = Object.keys(map).sort();
+  const moisIdx = (dateStr) => { const dt = new Date(dateStr+'T00:00:00'); return dt.getFullYear()*12 + dt.getMonth(); };
+  const premierMoisIdx = dates.length ? moisIdx(dates[0]) : null;
+  const dernierMoisIdx = dates.length ? moisIdx(dates[dates.length-1]) : null;
+  const moisCourantIdx = y*12+m;
+  return `
+    <div class="ip-cal-head">
+      <button type="button" class="ip-cal-nav" onclick="ipCalMoisPrecedent()" ${premierMoisIdx!=null && moisCourantIdx<=premierMoisIdx?'disabled':''} aria-label="Mois précédent">‹</button>
+      <span>${IP_CAL_MOIS_NOMS[m]} ${y}</span>
+      <button type="button" class="ip-cal-nav" onclick="ipCalMoisSuivant()" ${dernierMoisIdx!=null && moisCourantIdx>=dernierMoisIdx?'disabled':''} aria-label="Mois suivant">›</button>
+    </div>
+    <div class="ip-cal-grid">
+      ${IP_CAL_JOURS.map(j => `<div class="ip-cal-dow">${j}</div>`).join('')}
+      ${cells}
+    </div>`;
+}
+function ipRerenderCalendrier() {
+  const el = document.getElementById('ip-cal-mount');
+  if (el) el.innerHTML = ipRenderCalendrier();
+}
+function ipCalMoisPrecedent() { IP_CAL_MOIS.m--; if (IP_CAL_MOIS.m<0) { IP_CAL_MOIS.m=11; IP_CAL_MOIS.y--; } ipRerenderCalendrier(); }
+function ipCalMoisSuivant() { IP_CAL_MOIS.m++; if (IP_CAL_MOIS.m>11) { IP_CAL_MOIS.m=0; IP_CAL_MOIS.y++; } ipRerenderCalendrier(); }
+function ipCalAllerAuJour(dateStr) {
+  const carte = document.querySelector(`.ip-autre-card[data-date="${dateStr}"]`);
+  if (!carte) return;
+  carte.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.querySelectorAll('.ip-autre-card.ip-autre-surlignee').forEach(c => c.classList.remove('ip-autre-surlignee'));
+  carte.classList.add('ip-autre-surlignee');
+  setTimeout(() => carte.classList.remove('ip-autre-surlignee'), 2000);
+}
+function ipRenderSideColonne() {
+  const layout = document.getElementById('ip-layout');
+  const side = document.getElementById('ip-side');
+  if (!IP_AUTRES_EVENEMENTS.length) { layout.classList.remove('ip-layout--two-col'); side.innerHTML = ''; return; }
+  layout.classList.add('ip-layout--two-col');
+  const premiere = IP_AUTRES_EVENEMENTS.find(e => e.date_evt);
+  const dtPremiere = premiere ? new Date(String(premiere.date_evt).slice(0,10) + 'T00:00:00') : new Date();
+  IP_CAL_MOIS = { y: dtPremiere.getFullYear(), m: dtPremiere.getMonth() };
+  side.innerHTML = `
+    <div class="ip-side-box">
+      <div class="ip-side-title">📅 Calendrier</div>
+      <div id="ip-cal-mount">${ipRenderCalendrier()}</div>
+    </div>
+    <div class="ip-side-box">
+      <div class="ip-side-title">Autres événements de ${escH(IP_FICHE?.organisateur || "cet organisateur")}</div>
+      <div class="ip-autres-list">
+        ${IP_AUTRES_EVENEMENTS.map(e => `
+          <a class="ip-autre-card" href="${escH(ipAutreEvtUrl(e))}" data-date="${escH(String(e.date_evt||'').slice(0,10))}">
+            ${e.image_couverture || e.image_url ? `<img class="ip-autre-img" src="${escH(e.image_couverture||e.image_url)}" alt="">` : '<div class="ip-autre-img"></div>'}
+            <div>
+              <div class="ip-autre-titre">${escH(e.titre)}</div>
+              <div class="ip-autre-meta">📅 ${escH(ipAutreEvtDateLabel(e))}${e.ville ? ' · 📍 '+escH(e.ville) : ''}</div>
+            </div>
+          </a>`).join('')}
+      </div>
+    </div>`;
+}
+
 function ipRenderConfirmation(d) {
   /* Statut "inscrit" = validation manuelle activée par l'organisateur (validation_auto=0,
      demande explicite du 2026-09-09) : ne JAMAIS afficher "Inscription confirmée" ni un lien
@@ -444,6 +588,9 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
   try {
     const d = await api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG));
     IP_MEDIAS = d.medias || [];
+    IP_FICHE = d.fiche;
+    IP_AUTRES_EVENEMENTS = d.autres_evenements || [];
+    ipRenderSideColonne();
     if (d.fermee || d.pas_encore_ouverte) {
       // Rendu amélioré (2026-09-25, demande explicite) : reprend l'affiche/titre de la fiche
       // (déjà renvoyés par le serveur ici, jusqu'ici jamais affichés sur cet écran) et affiche la

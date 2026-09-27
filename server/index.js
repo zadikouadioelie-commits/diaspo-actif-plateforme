@@ -42909,6 +42909,20 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   const evenements = await db.prepare(`
     SELECT e.id, e.titre, e.date_evt, e.heure_debut, e.ville, e.pays, e.lieu FROM insc_fiches_evenements fe
     JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=? ORDER BY e.date_evt ASC`).all(fiche.id);
+  /* Autres événements du même organisateur (2026-09-27, demande explicite : "présente à droite
+     les événements du même compte pour que les différentes personnes sachent qu'ils peuvent
+     aussi s'inscrire à ces autres événements" + calendrier) — colonne latérale de découverte,
+     jamais bloquante pour l'inscription elle-même si la requête échoue. */
+  let autresEvenements = [];
+  try {
+    const dejaLies = new Set(evenements.map(e => Number(e.id)));
+    const candidats = await db.prepare(`
+      SELECT id, titre, date_evt, heure_debut, ville, pays, lieu, image_couverture, image_url
+      FROM evenements
+      WHERE owner_user_id=? AND statut='ouvert' AND (visibilite IS NULL OR visibilite='public') AND date_evt >= date('now')
+      ORDER BY date_evt ASC LIMIT 20`).all(fiche.owner_user_id);
+    autresEvenements = await enrichirAvecFicheMedia(candidats.filter(e => !dejaLies.has(Number(e.id))));
+  } catch (e) { console.error('[insc-public-autres-evenements]', e.message); }
   const types = await db.prepare("SELECT * FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC").all(fiche.id);
   for (const t of types) {
     t.champs = await db.prepare("SELECT id,nom,libelle,description_aide,type_champ,obligatoire,position,valeur_defaut,placeholder,options_json,condition_json FROM insc_champs WHERE type_id=? AND actif=1 ORDER BY position ASC, id ASC").all(t.id);
@@ -42921,7 +42935,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     t.periode_ouverte = ouvert;
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu });
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {
