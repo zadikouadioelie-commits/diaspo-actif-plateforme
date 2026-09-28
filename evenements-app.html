@@ -690,6 +690,7 @@ function renderEvts() {
         ${evt.description ? '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.5">'+evtDescApercu(evt.description,120)+'</p>' : ''}
         <div class="evt-actions">
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
+          <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
           ${evt.lien_inscription
             ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
             : (evt.fiche_id && evt.fiche_slug
@@ -1281,12 +1282,16 @@ let evtDetailCourant = null;
    liens déjà partagés). Sur mobile, le partage natif (navigator.share) reste proposé en priorité ;
    la fenêtre lien+QR sert de repli desktop et reste accessible même sur mobile si annulé. */
 window.partagerEvenement = async function(id) {
-  /* Number() des deux côtés (2026-09-28, bug réel constaté : le partage natif Windows affichait
-     "Événement Diaspo'Actif" au lieu du vrai titre) — id vient d'un attribut onclick (donc une
-     chaîne), evtDetailCourant.id vient de l'API (un nombre) ; une comparaison stricte échouait
-     donc toujours silencieusement. Même correctif déjà appliqué ailleurs dans ce fichier
-     (openDetail, voir Number(evtDetailCourant.id) === Number(id)). */
-  const evt = (evtDetailCourant && Number(evtDetailCourant.id) === Number(id)) ? evtDetailCourant : null;
+  /* Cherche dans allEvts (vue liste) PUIS evtDetailCourant (vue détail) — 2026-09-28, demande
+     explicite : bouton "Partager" ajouté directement sur la cartouche de renderEvts(), qui
+     n'ouvre jamais evtDetailCourant. Même patron que ouvrirModaleEdition() ci-dessus, pour la
+     même raison : ne pas supposer que l'événement vient forcément de l'un ou l'autre. Number()
+     des deux côtés (bug réel constaté : le partage natif Windows affichait "Événement
+     Diaspo'Actif" au lieu du vrai titre) — id vient d'un attribut onclick (donc une chaîne),
+     les id de allEvts/evtDetailCourant viennent de l'API (des nombres) ; une comparaison
+     stricte échouait donc toujours silencieusement. */
+  const evt = (typeof allEvts !== 'undefined' && allEvts.find(e => Number(e.id) === Number(id)))
+    || ((evtDetailCourant && Number(evtDetailCourant.id) === Number(id)) ? evtDetailCourant : null);
   const titre = evt ? evt.titre : 'Événement Diaspo\'Actif';
   const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
   const url = location.origin + location.pathname + '?evt=' + id + via;
