@@ -42283,14 +42283,21 @@ function prixEffectifOption(o) {
    universelle:true dans les groupes des AUTRES types de la même fiche (jamais leurs options non
    universelles). Le champ "étranger" fusionné garde son id/nom d'origine : la sélection par un
    visiteur d'un autre type se soumet et se retrouve donc dans le même catalogue que
-   calculerMontantOptionsPayantes() sait déjà lire, sans logique de facturation séparée. */
+   calculerMontantOptionsPayantes() sait déjà lire, sans logique de facturation séparée.
+   "Liens utiles" étendus (2026-09-28, demande explicite : "éviter de recréer le même lien pour
+   les autres types... si un lien est commun, étendre à tous les types... si modifié ou
+   supprimé, ça impacte automatiquement tous les endroits où il figure") : même mécanisme,
+   réutilisé tel quel plutôt que réinventé — un lien porte lui aussi universelle:true dans son
+   options_json, et n'existe donc physiquement QUE dans le type où il a été créé/modifié ; toute
+   édition ou suppression s'y fait une seule fois et se reflète partout par construction (fusion
+   en lecture, pas de copie à synchroniser). */
 async function getChampsPourType(typeId, ficheId) {
   const propres = await db.prepare(
     "SELECT * FROM insc_champs WHERE type_id=? AND actif=1 ORDER BY position ASC, id ASC"
   ).all(typeId);
   const autresGroupes = await db.prepare(`
     SELECT c.* FROM insc_champs c JOIN insc_types t ON t.id=c.type_id
-    WHERE t.fiche_id=? AND c.type_id<>? AND c.actif=1 AND c.type_champ='options_payantes'
+    WHERE t.fiche_id=? AND c.type_id<>? AND c.actif=1 AND c.type_champ IN ('options_payantes','liens_utiles')
     ORDER BY c.position ASC, c.id ASC
   `).all(ficheId, typeId);
   const universellesFusionnees = [];
