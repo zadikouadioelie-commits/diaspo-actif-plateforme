@@ -4810,7 +4810,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <h3 style="margin:0;">🪙 Cagnottes et dons</h3>
             <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">Collectez des fonds pour votre initiative — publique ou réservée à des participants invités.</p>
           </div>
-          <button class="btn btn-orange btn-sm" onclick="cagOpenForm()">+ Créer une cagnotte</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-orange btn-sm" onclick="cagOpenForm()">+ Créer une cagnotte</button>
+            <button class="btn btn-outline btn-sm" onclick="cagOpenForm(null,'recurrent')">💚 Créer un don récurrent</button>
+            <button class="btn btn-outline btn-sm" onclick="cagOpenForm(null,'occasionnel')">🎁 Don occasionnel</button>
+          </div>
         </div>
       </div>
       <div id="cag-form-wrap" style="display:none;"></div>
@@ -4873,6 +4877,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagOpenForm(${c.id})">✏️ Modifier</button>`);
           actions.push(`<a class="btn btn-sm btn-outline" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}" target="_blank">🔗 Voir la page publique</a>`);
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagToggleQRInline(${c.id},'${c.slug}','${escH(c.titre).replace(/'/g,"\\'")}')">📱 QR participation rapide</button>`);
+          /* "Mettre en avant partout" (2026-09-28, demande explicite) — un seul don vedette à la
+             fois par initiative, appliqué côté serveur (PATCH .../vedette désactive les autres
+             automatiquement) : un simple re-fetch de la liste après le clic suffit à refléter
+             le nouvel état partout. Réservé aux dons publics (une cagnotte privée ne peut pas
+             être affichée à tout le monde par définition). */
+          if (c.visibilite === 'publique') {
+            actions.push(c.est_vedette
+              ? `<button class="btn btn-sm" style="color:#B45309;background:#FFFBEB;" onclick="cagToggleVedette(${c.id},false)">⭐ Mis en avant partout — retirer</button>`
+              : `<button class="btn btn-sm btn-outline" onclick="cagToggleVedette(${c.id},true)">⭐ Mettre en avant partout</button>`);
+          }
           actions.push(`<button class="btn btn-sm btn-outline" onclick="cagAction(${c.id},'pause')">⏸️ Mettre en pause</button>`);
           actions.push(`<button class="btn btn-sm" style="color:#dc2626;" onclick="cagAction(${c.id},'cloturer')">🔒 Clôturer</button>`);
         } else if (c.statut === 'en_pause') {
@@ -4913,19 +4927,33 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     }
   }
 
-  window.cagOpenForm = async function(id) {
+  window.cagOpenForm = async function(id, typeDonForce) {
     _cagEditId = id || null;
     if (!_cagCategories) { try { _cagCategories = (await api('GET','/cagnottes/categories')).categories; } catch(_) { _cagCategories = []; } }
     if (!window._cagMesEvenements) { try { window._cagMesEvenements = (await api('GET', '/evenements?owner='+me.id)).evenements; } catch(_) { window._cagMesEvenements = []; } }
-    let c = { titre:'', description:'', categorie:'', image_url:'', objectif_montant:null, devise:'EUR', date_debut:'', date_fin:'', visibilite:'publique', evenement_id:null };
+    /* Fiche(s) d'inscription liables (don occasionnel, 2026-09-28, demande explicite) — même
+       patron de chargement paresseux que _cagMesEvenements ci-dessus, mais sur le module actif
+       Formulaires & Inscriptions (insc_fiches), jamais l'ancienne table formulaires_inscription
+       (morte, sans route active). */
+    if (!window._cagMesFiches) { try { window._cagMesFiches = (await api('GET', '/insc/fiches')).fiches; } catch(_) { window._cagMesFiches = []; } }
+    let c = { titre:'', description:'', categorie:'', image_url:'', objectif_montant:null, devise:'EUR', date_debut:'', date_fin:'', visibilite:'publique', evenement_id:null, type_don: typeDonForce || 'campagne', recurrence_periodicite:'mensuel', insc_fiche_id:null };
     if (id) {
       try { c = (await api('GET', '/cagnottes/'+id)).cagnotte; } catch(e) { alert('Erreur : '+e.message); return; }
     }
+    /* Type de don résolu une fois pour toutes : en édition, celui déjà enregistré (jamais
+       modifiable après coup — changer de type changerait la nature du paiement Stripe) ; en
+       création, celui forcé par le bouton cliqué ("Créer une cagnotte"/"don récurrent"/
+       "Don occasionnel"), 'campagne' par défaut. */
+    const _cagTypeDon = id ? (c.type_don || 'campagne') : (typeDonForce || 'campagne');
     const wrap = document.getElementById('cag-form-wrap');
     wrap.style.display = '';
+    const _cagTitreForm = id
+      ? (_cagTypeDon==='recurrent' ? '✏️ Modifier le don récurrent' : _cagTypeDon==='occasionnel' ? '✏️ Modifier le don occasionnel' : '✏️ Modifier la cagnotte')
+      : (_cagTypeDon==='recurrent' ? '💚 Nouveau don récurrent' : _cagTypeDon==='occasionnel' ? '🎁 Nouveau don occasionnel' : '🪙 Nouvelle cagnotte');
     wrap.innerHTML = `
       <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 14px;">${id ? '✏️ Modifier la cagnotte' : '🪙 Nouvelle cagnotte'}</h3>
+        <h3 style="margin:0 0 14px;">${_cagTitreForm}</h3>
+        <input type="hidden" id="cag-f-type-don" value="${_cagTypeDon}">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div style="grid-column:1/-1;">
             <label class="pv-lbl">Titre *</label>
@@ -4955,13 +4983,19 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <button type="button" class="btn btn-sm btn-outline" onclick="cagPickImage()">📷 Choisir une image</button>
             </div>
           </div>
-          <div>
+          <div style="${_cagTypeDon==='recurrent' ? 'display:none;' : ''}">
             <label class="pv-lbl">Objectif financier</label>
             <div style="display:flex;gap:8px;align-items:center;">
               <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="radio" name="cag-f-objectif-type" value="defini" ${c.objectif_montant?'checked':''}> Défini</label>
               <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="radio" name="cag-f-objectif-type" value="libre" ${!c.objectif_montant?'checked':''}> Libre</label>
             </div>
             <input id="cag-f-objectif-montant" type="number" min="1" step="1" placeholder="Ex. 10000" value="${c.objectif_montant||''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-top:6px;${c.objectif_montant?'':'display:none;'}">
+          </div>
+          <div style="${_cagTypeDon==='recurrent' ? '' : 'display:none;'}">
+            <label class="pv-lbl">Périodicité</label>
+            <select id="cag-f-recurrence" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+              ${[['mensuel','Tous les mois'],['trimestriel','Tous les 3 mois'],['annuel','Tous les ans']].map(([v,l])=>`<option value="${v}" ${(c.recurrence_periodicite||'mensuel')===v?'selected':''}>${l}</option>`).join('')}
+            </select>
           </div>
           <div>
             <label class="pv-lbl">Visibilité</label>
@@ -4970,11 +5004,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <label class="da-pill${c.visibilite==='privee'?' checked':''}"><input type="radio" name="cag-f-visibilite" value="privee" ${c.visibilite==='privee'?'checked':''} onchange="document.querySelectorAll('[name=\'cag-f-visibilite\']').forEach(r=>r.closest('.da-pill').classList.toggle('checked',r.checked))"><span>🔒 Privée</span></label>
             </div>
           </div>
-          <div>
+          <div style="${_cagTypeDon==='recurrent' ? 'display:none;' : ''}">
             <label class="pv-lbl">Date de début</label>
             <input id="cag-f-date-debut" type="date" value="${(c.date_debut||'').slice(0,10)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           </div>
-          <div>
+          <div style="${_cagTypeDon==='recurrent' ? 'display:none;' : ''}">
             <label class="pv-lbl">Date de fin</label>
             <input id="cag-f-date-fin" type="date" value="${(c.date_fin||'').slice(0,10)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           </div>
@@ -4983,6 +5017,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <select id="cag-f-evenement" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
               <option value="">— Aucun —</option>
               ${(window._cagMesEvenements||[]).map(e=>`<option value="${e.id}" ${Number(c.evenement_id)===e.id?'selected':''}>${_mvEsc(e.titre)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="grid-column:1/-1;${_cagTypeDon==='occasionnel' ? '' : 'display:none;'}" id="cag-f-fiche-wrap">
+            <label class="pv-lbl">Fiche d'inscription liée (facultatif)</label>
+            <select id="cag-f-fiche" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">— Aucune —</option>
+              ${(window._cagMesFiches||[]).map(f=>`<option value="${f.id}" ${Number(c.insc_fiche_id)===f.id?'selected':''}>${_mvEsc(f.nom)}</option>`).join('')}
             </select>
           </div>
           <div style="grid-column:1/-1;">
@@ -5039,6 +5080,9 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       afficher_participants: document.getElementById('cag-f-afficher-participants').checked,
       afficher_montants: document.getElementById('cag-f-afficher-montants').checked,
       evenement_id: document.getElementById('cag-f-evenement').value || null,
+      type_don: document.getElementById('cag-f-type-don') ? document.getElementById('cag-f-type-don').value : 'campagne',
+      recurrence_periodicite: document.getElementById('cag-f-recurrence') ? document.getElementById('cag-f-recurrence').value : null,
+      insc_fiche_id: document.getElementById('cag-f-fiche') ? (document.getElementById('cag-f-fiche').value || null) : null,
     };
     try {
       if (_cagEditId) await api('PUT', '/cagnottes/'+_cagEditId, payload);
@@ -5054,6 +5098,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     const confirms = { pause:'Mettre cette cagnotte en pause ?', cloturer:'Clôturer définitivement cette cagnotte ?' };
     if (confirms[action] && !confirm(confirms[action])) return;
     try { await api('PATCH', '/cagnottes/'+id+'/statut', { action }); cagRenderListe(); }
+    catch(e) { alert('Erreur : '+e.message); }
+  };
+  window.cagToggleVedette = async function(id, vedette) {
+    try { await api('PATCH', '/cagnottes/'+id+'/vedette', { vedette }); cagRenderListe(); }
     catch(e) { alert('Erreur : '+e.message); }
   };
   window.cagSupprimer = async function(id) {

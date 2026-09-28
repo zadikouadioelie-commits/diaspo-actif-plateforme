@@ -17376,6 +17376,36 @@ async function handleStripeWebhook(req, res) {
       if (accredUA && invoice.billing_reason !== "subscription_create") {
         await db.prepare(`UPDATE user_accreditations SET statut='active', grace_until=NULL, updated_at=datetime('now') WHERE id=?`).run(accredUA.id);
       }
+      /* Renouvellement d'un don récurrent (cagnottes, 2026-09-28) — même modèle que le
+         renouvellement Adhésions ci-dessus : une NOUVELLE ligne cagnotte_contributions par
+         facture (jamais un UPDATE de la 1ère ligne), pour que l'historique du créateur liste
+         chaque prélèvement comme un événement distinct — cohérent avec nb_contributeurs
+         (jamais ré-incrémenté ici : il compte des contributeurs distincts, pas des paiements)
+         et montant_collecte (incrémenté à chaque facture, comme tout autre paiement). */
+      const premiereContribAbo = await db.prepare("SELECT * FROM cagnotte_contributions WHERE stripe_subscription_id=? ORDER BY created_at ASC LIMIT 1").get(invoice.subscription);
+      if (premiereContribAbo && invoice.billing_reason !== "subscription_create") {
+        const cAbo = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(premiereContribAbo.cagnotte_id);
+        if (cAbo) {
+          const montantAbo = (invoice.amount_paid || 0) / 100;
+          const contribAboId = (await db.prepare(`
+            INSERT INTO cagnotte_contributions (cagnotte_id, user_id, nom, prenom, email, montant, devise, anonyme, message, statut, stripe_subscription_id)
+            VALUES (?,?,?,?,?,?,?,?,?,'paye',?)
+          `).run(premiereContribAbo.cagnotte_id, premiereContribAbo.user_id, premiereContribAbo.nom, premiereContribAbo.prenom,
+                 premiereContribAbo.email, montantAbo, cAbo.devise || "EUR", premiereContribAbo.anonyme, null, invoice.subscription)).lastInsertRowid;
+          await db.prepare("UPDATE cagnottes SET montant_collecte = montant_collecte + ?, updated_at=datetime('now') WHERE id=?").run(montantAbo, cAbo.id);
+          const COMMISSION_RATE = 0.03;
+          const platform_fee = parseFloat((montantAbo * COMMISSION_RATE).toFixed(2));
+          const organizer_amount = parseFloat((montantAbo - platform_fee).toFixed(2));
+          await db.prepare(`INSERT INTO wallet_transactions (cagnotte_contribution_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+            .run(contribAboId, platform_fee, COMMISSION_RATE, montantAbo, platform_fee, organizer_amount);
+          await db.prepare(`INSERT INTO wallet_transactions (cagnotte_contribution_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+            .run(contribAboId, cAbo.owner_user_id, organizer_amount, COMMISSION_RATE, montantAbo, platform_fee, organizer_amount);
+          await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, cAbo.owner_user_id);
+          await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+          creerNotif(cAbo.owner_user_id, "cagnotte_contribution", "Renouvellement de don 🔁",
+            `Un don récurrent pour « ${cAbo.titre} » vient d'être renouvelé (${montantAbo} ${cAbo.devise}).`, { cagnotte_id: cAbo.id });
+        }
+      }
     } else if (event.type === "invoice.payment_failed" && event.data.object.subscription) {
       const invoice = event.data.object;
       const abo = await db.prepare("SELECT * FROM pub_abonnements WHERE stripe_subscription_id=?").get(invoice.subscription);
@@ -17401,6 +17431,17 @@ async function handleStripeWebhook(req, res) {
         creerNotif(accredUA.user_id, "accred_paiement_echoue", "Paiement échoué — Abonnement Premium",
           "Votre paiement n'a pas pu être traité. Vous avez 7 jours pour régulariser avant suspension de votre Premium.", { accred_id: accredUA.accred_id });
       }
+      /* Don récurrent (cagnottes) — simple notification au créateur, aucun champ de statut à
+         faire évoluer (rien ne lit un état "abonnement en échec" séparé aujourd'hui pour les
+         cagnottes, contrairement à pub_abonnements/adhesion_membres/user_accreditations). */
+      const contribAboEchec = await db.prepare("SELECT * FROM cagnotte_contributions WHERE stripe_subscription_id=? ORDER BY created_at ASC LIMIT 1").get(invoice.subscription);
+      if (contribAboEchec) {
+        const cEchec = await db.prepare("SELECT titre, owner_user_id FROM cagnottes WHERE id=?").get(contribAboEchec.cagnotte_id);
+        if (cEchec) {
+          creerNotif(cEchec.owner_user_id, "cagnotte_don_echoue", "Paiement de don récurrent échoué",
+            `Un renouvellement de don pour « ${cEchec.titre} » n'a pas pu être traité.`, { cagnotte_id: contribAboEchec.cagnotte_id });
+        }
+      }
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_cagnotte_contribution_id) {
       /* Contribution à une cagnotte confirmée. Même modèle commission 3%/wallet_balance que
          Boutique/Billetterie/Adhésions (2026-09-22, demande explicite — reversement au
@@ -17414,7 +17455,11 @@ async function handleStripeWebhook(req, res) {
            point 4). */
         const avant = await db.prepare("SELECT nb_contributeurs FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
         const premierePartcipation = Number(avant?.nb_contributeurs || 0) === 0;
-        await db.prepare("UPDATE cagnotte_contributions SET statut='paye' WHERE id=?").run(contribId);
+        /* Don récurrent (2026-09-28) : la session Checkout porte un abonnement Stripe créé —
+           on le mémorise sur la 1ère ligne pour que le webhook de renouvellement
+           (invoice.payment_succeeded, plus haut) la retrouve à chaque facture suivante. */
+        await db.prepare("UPDATE cagnotte_contributions SET statut='paye', stripe_subscription_id=? WHERE id=?")
+          .run(event.data.object.subscription || null, contribId);
         await db.prepare("UPDATE cagnottes SET montant_collecte = montant_collecte + ?, nb_contributeurs = nb_contributeurs + 1, updated_at=datetime('now') WHERE id=?")
           .run(contrib.montant, contrib.cagnotte_id);
         const c = await db.prepare("SELECT titre, owner_user_id, objectif_montant, montant_collecte, visibilite, slug FROM cagnottes WHERE id=?").get(contrib.cagnotte_id);
@@ -17488,6 +17533,18 @@ async function handleStripeWebhook(req, res) {
       await db.prepare(`UPDATE pub_abonnements SET statut='canceled', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
       await db.prepare(`UPDATE adhesion_membres SET statut='non_a_jour', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
       await db.prepare(`UPDATE user_accreditations SET statut='expiree', updated_at=datetime('now') WHERE stripe_subscription_id=?`).run(sub.id);
+      /* Don récurrent annulé par le donateur — notification seulement, les lignes déjà payées
+         (cagnotte_contributions.statut='paye') restent telles quelles : elles représentent des
+         paiements réels, jamais réécrites en 'rembourse' ici (ça corromprait la réconciliation
+         de montant_collecte, aucun remboursement réel n'ayant eu lieu). */
+      const contribAboFin = await db.prepare("SELECT * FROM cagnotte_contributions WHERE stripe_subscription_id=? ORDER BY created_at ASC LIMIT 1").get(sub.id);
+      if (contribAboFin) {
+        const cFin = await db.prepare("SELECT titre, owner_user_id FROM cagnottes WHERE id=?").get(contribAboFin.cagnotte_id);
+        if (cFin) {
+          creerNotif(cFin.owner_user_id, "cagnotte_don_annule", "Don récurrent annulé",
+            `Un don récurrent pour « ${cFin.titre} » a été annulé par le donateur.`, { cagnotte_id: contribAboFin.cagnotte_id });
+        }
+      }
     } else if (event.type === "account.updated") {
       const account = event.data.object;
       const row = await db.prepare("SELECT initiative_id FROM stripe_connect_accounts WHERE stripe_account_id=?").get(account.id);
@@ -18949,6 +19006,34 @@ route("GET", "/api/cagnottes/verifier-email", async (req, res, params, body, que
   sendJSON(res, 200, { existe: !!compte });
 });
 
+/* GET /api/cagnottes/vedette?owner_user_id=X — publique, sans authentification. Alimente
+   assets/don-banner.js (bouton "Faire un don" affiché sur toutes les pages publiques d'un
+   compte). Route neuve et isolée plutôt qu'une extension de GET /api/initiatives/:slug,
+   GET /api/evenements/:id ou GET /api/insc/public/:slug — ces 3 fichiers sont partagés et
+   activement modifiés par d'autres sessions (2026-09-28). */
+route("GET", "/api/cagnottes/vedette", async (req, res, params, body, query) => {
+  const ownerId = Number(query?.owner_user_id);
+  if (!ownerId) return sendJSON(res, 400, { error: "owner_user_id requis." });
+  const c = await db.prepare(
+    "SELECT * FROM cagnottes WHERE owner_user_id=? AND est_vedette=1 AND est_publiee=1 AND visibilite='publique'"
+  ).get(ownerId);
+  if (!c || calculerStatutCagnotte(c) !== "active") return sendJSON(res, 200, { don: null });
+  sendJSON(res, 200, { don: { slug: c.slug, titre: c.titre, image_url: c.image_url, type_don: c.type_don, devise: c.devise } });
+});
+
+/* GET /api/cagnottes/pour-fiche/:ficheId — publique. Alimente ipRenderDonLie() sur
+   inscription-publique.html : le(s) don(s) occasionnel(s) explicitement liés à CETTE fiche
+   (insc_fiche_id), distinct du bouton "Faire un don" global (vedette) — une fiche peut afficher
+   les deux indépendamment. */
+route("GET", "/api/cagnottes/pour-fiche/:ficheId", async (req, res, params) => {
+  const rows = await db.prepare(
+    "SELECT * FROM cagnottes WHERE insc_fiche_id=? AND est_publiee=1 AND visibilite='publique' ORDER BY created_at DESC"
+  ).all(params.ficheId);
+  const dons = rows.filter(c => calculerStatutCagnotte(c) === "active")
+    .map(c => ({ slug: c.slug, titre: c.titre, description: c.description, image_url: c.image_url, devise: c.devise, type_don: c.type_don }));
+  sendJSON(res, 200, { dons });
+});
+
 route("GET", "/api/cagnottes/:id", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
@@ -18960,13 +19045,21 @@ route("GET", "/api/cagnottes/:id", async (req, res, params) => {
   sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
 });
 
+/* Périodicité d'un don récurrent — map dédiée aux cagnottes, distincte de ADHESION_RECURRING
+   (sémantique différente : une adhésion a des paliers de formule, un don récurrent est un
+   montant libre choisi par le donateur). */
+const CAGNOTTE_RECURRENCE = {
+  mensuel:     { interval: "month", interval_count: 1 },
+  trimestriel: { interval: "month", interval_count: 3 },
+  annuel:      { interval: "year",  interval_count: 1 },
+};
 route("POST", "/api/cagnottes", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user || !["initiative","administrateur"].includes(user.role)) {
     return sendJSON(res, 403, { error: "Réservé aux comptes Initiative et Administrateur." });
   }
   if (!(await exigerPremium(user, res, "cagnottes"))) return;
-  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id } = body;
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id, type_don, recurrence_periodicite, insc_fiche_id } = body;
   if (!titre) return sendJSON(res, 400, { error: "Titre requis." });
   if (date_debut && date_fin && new Date(date_fin) <= new Date(date_debut)) {
     return sendJSON(res, 400, { error: "La date de fin doit être postérieure à la date de début." });
@@ -18978,11 +19071,21 @@ route("POST", "/api/cagnottes", async (req, res, params, body) => {
     const evt = await db.prepare("SELECT id FROM evenements WHERE id=? AND owner_user_id=?").get(evenement_id, user.id);
     if (evt) evenementIdValide = evt.id;
   }
+  const typeDonValide = ["campagne", "recurrent", "occasionnel"].includes(type_don) ? type_don : "campagne";
+  const recurrenceValide = typeDonValide === "recurrent" && CAGNOTTE_RECURRENCE[recurrence_periodicite] ? recurrence_periodicite : (typeDonValide === "recurrent" ? "mensuel" : null);
+  /* Lien vers une fiche d'inscription (don occasionnel) — uniquement l'une de ses propres fiches
+     (insc_fiches, le module Formulaires & Inscriptions actif), même garde que evenement_id
+     ci-dessus. */
+  let ficheIdValide = null;
+  if (insc_fiche_id) {
+    const fiche = await db.prepare("SELECT id FROM insc_fiches WHERE id=? AND owner_user_id=?").get(insc_fiche_id, user.id);
+    if (fiche) ficheIdValide = fiche.id;
+  }
   const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = (titre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "cagnotte") + "-" + Date.now().toString(36);
   const id = (await db.prepare(`
-    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO cagnottes (slug, owner_user_id, initiative_id, titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id, type_don, recurrence_periodicite, insc_fiche_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     slug, user.id, init ? init.id : null, titre, description || null, categorie || null, image_url || null,
     objectif_montant != null && objectif_montant !== "" ? Number(objectif_montant) : null,
@@ -18990,7 +19093,7 @@ route("POST", "/api/cagnottes", async (req, res, params, body) => {
     visibilite === "privee" ? "privee" : "publique",
     afficher_participants === false ? 0 : 1,
     afficher_montants === false ? 0 : 1,
-    evenementIdValide
+    evenementIdValide, typeDonValide, recurrenceValide, ficheIdValide
   )).lastInsertRowid;
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(id);
   sendJSON(res, 201, { cagnotte: cagnotteAvecStatut(row) });
@@ -19003,7 +19106,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
   if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
   if (!(await cagnottePeutGerer(params.id, user.id))) return sendJSON(res, 403, { error: "Réservé au créateur ou à un co-organisateur administrateur." });
   if (!(await exigerPremium(user, res, "cagnottes"))) return;
-  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id } = body;
+  const { titre, description, categorie, image_url, objectif_montant, devise, date_debut, date_fin, visibilite, afficher_participants, afficher_montants, evenement_id, type_don, recurrence_periodicite, insc_fiche_id } = body;
   const dDebut = date_debut !== undefined ? date_debut : c.date_debut;
   const dFin = date_fin !== undefined ? date_fin : c.date_fin;
   if (dDebut && dFin && new Date(dFin) <= new Date(dDebut)) {
@@ -19017,10 +19120,23 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
       if (evt) evenementIdValide = evt.id;
     }
   }
+  const typeDonValide = type_don !== undefined ? (["campagne", "recurrent", "occasionnel"].includes(type_don) ? type_don : "campagne") : c.type_don;
+  const recurrenceValide = typeDonValide === "recurrent"
+    ? (CAGNOTTE_RECURRENCE[recurrence_periodicite] ? recurrence_periodicite : (c.recurrence_periodicite || "mensuel"))
+    : null;
+  let ficheIdValide = c.insc_fiche_id;
+  if (insc_fiche_id !== undefined) {
+    ficheIdValide = null;
+    if (insc_fiche_id) {
+      const fiche = await db.prepare("SELECT id FROM insc_fiches WHERE id=? AND owner_user_id=?").get(insc_fiche_id, c.owner_user_id);
+      if (fiche) ficheIdValide = fiche.id;
+    }
+  }
   await db.prepare(`
     UPDATE cagnottes SET
       titre=?, description=?, categorie=?, image_url=?, objectif_montant=?, devise=?,
-      date_debut=?, date_fin=?, visibilite=?, afficher_participants=?, afficher_montants=?, evenement_id=?, updated_at=datetime('now')
+      date_debut=?, date_fin=?, visibilite=?, afficher_participants=?, afficher_montants=?, evenement_id=?,
+      type_don=?, recurrence_periodicite=?, insc_fiche_id=?, updated_at=datetime('now')
     WHERE id=?
   `).run(
     titre !== undefined && titre !== "" ? titre : c.titre,
@@ -19033,7 +19149,7 @@ route("PUT", "/api/cagnottes/:id", async (req, res, params, body) => {
     visibilite !== undefined ? (visibilite === "privee" ? "privee" : "publique") : c.visibilite,
     afficher_participants !== undefined ? (afficher_participants ? 1 : 0) : c.afficher_participants,
     afficher_montants !== undefined ? (afficher_montants ? 1 : 0) : c.afficher_montants,
-    evenementIdValide,
+    evenementIdValide, typeDonValide, recurrenceValide, ficheIdValide,
     params.id
   );
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
@@ -19073,6 +19189,32 @@ route("PATCH", "/api/cagnottes/:id/statut", async (req, res, params, body) => {
       } catch (_) {}
     }
   }
+  const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
+});
+
+/* PATCH /api/cagnottes/:id/vedette — "Mettre en avant partout" (2026-09-28, demande explicite) :
+   un seul don peut être vedette à la fois par owner_user_id, c'est LUI que le bouton "Faire un
+   don" (assets/don-banner.js) affiche sur toutes les pages publiques de ce compte. Réservé au
+   créateur (pas aux co-organisateurs) — décision structurante de ce que voit tout visiteur.
+   Un don privé ou non actif ne peut jamais devenir vedette. */
+route("PATCH", "/api/cagnottes/:id/vedette", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
+  if (!c) return sendJSON(res, 404, { error: "Cagnotte introuvable." });
+  if (Number(c.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au créateur de la cagnotte." });
+  const vedette = !!body?.vedette;
+  if (vedette) {
+    if (c.visibilite === "privee") return sendJSON(res, 400, { error: "Seul un don public peut être mis en avant partout." });
+    if (calculerStatutCagnotte(c) !== "active") return sendJSON(res, 400, { error: "Seul un don actif peut être mis en avant partout." });
+  }
+  await db.transaction(async (tx) => {
+    if (vedette) {
+      await tx.prepare("UPDATE cagnottes SET est_vedette=0 WHERE owner_user_id=? AND id!=?").run(c.owner_user_id, c.id);
+    }
+    await tx.prepare("UPDATE cagnottes SET est_vedette=?, updated_at=datetime('now') WHERE id=?").run(vedette ? 1 : 0, c.id);
+  });
   const row = await db.prepare("SELECT * FROM cagnottes WHERE id=?").get(params.id);
   sendJSON(res, 200, { cagnotte: cagnotteAvecStatut(row) });
 });
@@ -19389,18 +19531,22 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
          montant, c.devise || "EUR", anonyme, message)).lastInsertRowid;
 
   const origin = getOrigin(req);
+  /* Don récurrent (2026-09-28) — abonnement Stripe, même patron que l'adhésion périodique
+     (POST /api/adhesion-formules/:id/payer, mode: recurring ? "subscription" : "payment"). */
+  const recurrence = c.type_don === "recurrent" ? (CAGNOTTE_RECURRENCE[c.recurrence_periodicite] || CAGNOTTE_RECURRENCE.mensuel) : null;
   try {
     /* Invité : pas de compte Stripe persistant côté plateforme — customer_email suffit, Stripe
        crée son propre Customer pour la session (même pattern que l'adhésion invitée). */
     const stripeCustomerId = user ? await getOrCreateStripeCustomer(db, user) : null;
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
+      mode: recurrence ? "subscription" : "payment",
       ...(stripeCustomerId ? { customer: stripeCustomerId } : { customer_email: invite.email }),
       line_items: [{
         price_data: {
           currency: (c.devise || "EUR").toLowerCase(),
           unit_amount: Math.round(montant * 100),
-          product_data: { name: `Cagnotte — ${c.titre}` },
+          product_data: { name: `${recurrence ? "Don récurrent" : "Cagnotte"} — ${c.titre}` },
+          ...(recurrence ? { recurring: { interval: recurrence.interval, interval_count: recurrence.interval_count } } : {}),
         },
         quantity: 1,
       }],
@@ -25085,6 +25231,35 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
       try { await db.prepare("ALTER TABLE wallet_transactions ADD COLUMN cagnotte_contribution_id INTEGER").run(); } catch (e) {}
     }
   } catch (e) { console.error('[migrateCagnottesWallet]', e.message); }
+})();
+
+/* Dons récurrents / occasionnels (2026-09-28, demande explicite) — type_don distingue la
+   cagnotte-objectif historique ('campagne', défaut, comportement inchangé) des deux nouveaux
+   modes simplifiés 'recurrent' (abonnement Stripe) et 'occasionnel' (paiement unique,
+   éventuellement lié à une fiche d'inscription). est_vedette marque LE don affiché partout pour
+   ce owner_user_id (un seul à la fois, appliqué par PATCH /api/cagnottes/:id/vedette, jamais
+   directement en base ici). insc_fiche_id est le pendant de evenement_id (déjà existant sur
+   cette table) mais vers insc_fiches (le module Formulaires & Inscriptions actif — PAS
+   formulaires_inscription, table héritée sans route active). */
+(async function migrateCagnottesDons() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(cagnottes)").all()).map(c => c.name);
+    if (cols.length) {
+      if (!cols.includes('type_don')) { try { await db.prepare("ALTER TABLE cagnottes ADD COLUMN type_don TEXT DEFAULT 'campagne'").run(); } catch (e) {} }
+      if (!cols.includes('recurrence_periodicite')) { try { await db.prepare("ALTER TABLE cagnottes ADD COLUMN recurrence_periodicite TEXT").run(); } catch (e) {} }
+      if (!cols.includes('est_vedette')) { try { await db.prepare("ALTER TABLE cagnottes ADD COLUMN est_vedette INTEGER DEFAULT 0").run(); } catch (e) {} }
+      if (!cols.includes('insc_fiche_id')) { try { await db.prepare("ALTER TABLE cagnottes ADD COLUMN insc_fiche_id INTEGER").run(); } catch (e) {} }
+    }
+  } catch (e) { console.error('[migrateCagnottesDons]', e.message); }
+})();
+/* stripe_subscription_id sur cagnotte_contributions — même rôle que adhesion_paiements.stripe_
+   subscription_id : identifie l'abonnement Stripe d'un don récurrent pour que le webhook
+   retrouve/insère les lignes de renouvellement. */
+(async function migrateCagnotteContributionsSubscription() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(cagnotte_contributions)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('stripe_subscription_id')) { try { await db.prepare("ALTER TABLE cagnotte_contributions ADD COLUMN stripe_subscription_id TEXT").run(); } catch (e) {} }
+  } catch (e) { console.error('[migrateCagnotteContributionsSubscription]', e.message); }
 })();
 
 /* ──────── AVIS UNIFIÉS (annuaire — Initiative/Utilisateur/Organisme, cahier des charges
