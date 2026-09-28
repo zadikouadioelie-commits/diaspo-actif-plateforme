@@ -1291,14 +1291,14 @@ window.partagerEvenement = async function(id) {
   const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
   const url = location.origin + location.pathname + '?evt=' + id + via;
   if (navigator.share) {
-    /* `text` (2026-09-28, demande explicite : "le descriptif de l'événement" absent du partage)
-       — le partage natif (Web Share API) n'accepte ni image ni HTML, seulement un texte brut en
-       plus du titre/URL ; certaines destinations (Facebook, e-mail...) l'affichent, d'autres
-       l'ignorent. L'aperçu riche complet (photo + descriptif) reste celui généré par le serveur
-       à l'ouverture du lien lui-même (voir server/index.js, pathname === '/evenements.html'),
-       affiché par les destinations qui déplient l'URL plutôt que d'utiliser ce champ. */
-    const text = evt && evt.description ? String(evt.description).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150) : undefined;
-    try { await navigator.share({ title: titre, text, url }); return; }
+    /* PAS de `text` (2026-09-28, revient en arrière : essayé puis retiré, capture à l'appui) — un
+       `text` non vide fait que WhatsApp (et d'autres cibles) composent le message avec ce texte
+       collé AVANT le lien, au lieu de traiter le partage comme un lien seul à déplier. Résultat
+       constaté : le descriptif s'affichait en clair dans la bulle, et aucune carte d'aperçu
+       (photo/titre/description) ne se générait. Sans `text`, seul le lien est partagé et c'est
+       WhatsApp lui-même qui déplie l'URL pour afficher la carte riche (voir l'injection de méta
+       dans server/index.js, pathname === '/evenements.html'). */
+    try { await navigator.share({ title: titre, url }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   ouvrirModalePartage(url, titre);
