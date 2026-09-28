@@ -481,6 +481,60 @@ function iulRenderRow(lien) {
       </label>
     </div>`;
 }
+/* "🔗 Ajouter un lien de parrainage" (2026-09-28, demande explicite) — propose de réutiliser
+   directement un lien de parrainage déjà créé par l'organisateur (module Parrainage &
+   Invitations, parrainage.html) plutôt que de ressaisir manuellement titre/photo/URL. Source de
+   données : GET /api/parrainage/invitations (déjà existante, filtrée sur l'utilisateur connecté
+   côté serveur) — titre = nom de l'invitation (ou son domaine à défaut), photo = sa bannière
+   (invitations.banniere_url), URL = même format que ouvrirModalInvitation() dans
+   parrainage.html (${location.origin}/join/${code}). Le lien choisi devient une ligne "Liens
+   utiles" ordinaire une fois ajouté : même checkbox "🌐 Étendre à tous les types d'inscription",
+   modifiable/supprimable comme n'importe quel autre lien. */
+async function iulOuvrirPickerParrainage(onChoisir) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.65);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;padding:22px;box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+        <h3 style="margin:0; font-size:16px; color:#1565C0;">🔗 Choisir un lien de parrainage</h3>
+        <button type="button" id="iulp-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+      </div>
+      <p style="font-size:12px; color:oklch(0.55 0.006 30); margin:0 0 14px;">Réutilisez un de vos liens de parrainage déjà créés — titre, photo et adresse seront pré-remplis.</p>
+      <div id="iulp-list" style="display:flex; flex-direction:column; gap:8px;">Chargement…</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#iulp-fermer').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const listEl = overlay.querySelector('#iulp-list');
+  try {
+    const { invitations } = await api('GET', '/parrainage/invitations');
+    const actives = (invitations || []).filter(i => i.statut === 'active');
+    if (!actives.length) {
+      listEl.innerHTML = '<div style="color:oklch(0.55 0.006 30);font-size:13px;text-align:center;padding:20px 0;">Aucun lien de parrainage actif — créez-en un depuis « Parrainage & Invitations ».</div>';
+      return;
+    }
+    listEl.innerHTML = actives.map(inv => `
+      <div class="iulp-item" data-code="${escH(inv.code)}" style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:8px 10px; cursor:pointer;">
+        <div style="width:42px; height:42px; border-radius:8px; background:${inv.banniere_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(inv.banniere_url)}')` : 'oklch(0.96 0.004 30)'}; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+          ${inv.banniere_url ? '' : '<span style="font-size:15px; opacity:.5;">🔗</span>'}
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escH(inv.nom || inv.domaine_nom || 'Lien de parrainage')}</div>
+          <div style="font-size:11.5px; color:oklch(0.55 0.006 30); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escH(inv.domaine_icone || '')} ${escH(inv.domaine_nom || '')}${inv.sous_domaine_nom ? ' · ' + escH(inv.sous_domaine_nom) : ''}</div>
+        </div>
+        <span style="font-size:12px; font-weight:700; color:#1565C0; flex-shrink:0; white-space:nowrap;">+ Utiliser</span>
+      </div>`).join('');
+    listEl.addEventListener('click', (e) => {
+      const item = e.target.closest('.iulp-item'); if (!item) return;
+      const inv = actives.find(i => i.code === item.dataset.code); if (!inv) return;
+      onChoisir(inv);
+      overlay.remove();
+    });
+  } catch (e) {
+    listEl.innerHTML = `<div style="color:oklch(0.5 0.16 20);font-size:13px;text-align:center;padding:20px 0;">${escH(e.message || 'Erreur de chargement.')}</div>`;
+  }
+}
 function iaOuvrirLiensUtiles(champId) {
   if (!state.selectedTypeId) { ia_toast("Sélectionnez ou créez d'abord un type d'inscription.", false); return; }
   const champExistant = champId ? (selectedType().champs || []).find(c => Number(c.id) === Number(champId)) : null;
@@ -496,7 +550,10 @@ function iaOuvrirLiensUtiles(champId) {
       </div>
       <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Ajoutez des liens utiles (groupe WhatsApp, page de l'événement, règlement…) affichés sur le formulaire d'inscription à « ${escH(selectedType() ? selectedType().label : '')} ». Purement informatif : jamais une réponse demandée au participant. Cochez « 🌐 Étendre à tous les types d'inscription » sur un lien pour l'afficher aussi sur les autres types d'inscription de cette fiche — le modifier ou le supprimer ici l'impactera automatiquement partout où il figure.</p>
       <div id="iul-liens-list" style="display:flex; flex-direction:column; gap:10px;"></div>
-      <button type="button" id="iul-ajouter" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter un autre lien</button>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button type="button" id="iul-ajouter" style="flex:1; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter un autre lien</button>
+        <button type="button" id="iul-depuis-parrainage" style="flex:1; background:none; border:1.5px dashed #1565C0; color:#1565C0; font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">🔗 Depuis un lien de parrainage</button>
+      </div>
       <button type="button" id="iul-enregistrer" style="width:100%; margin-top:18px; background:#1565C0; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer les liens</button>
     </div>`;
   document.body.appendChild(overlay);
@@ -532,6 +589,15 @@ function iaOuvrirLiensUtiles(champId) {
   });
 
   overlay.querySelector('#iul-ajouter').addEventListener('click', () => ajouterRow());
+  overlay.querySelector('#iul-depuis-parrainage').addEventListener('click', () => {
+    iulOuvrirPickerParrainage((inv) => {
+      ajouterRow({
+        titre: inv.nom || inv.domaine_nom || 'Lien de parrainage',
+        url: `${location.origin}/join/${inv.code}`,
+        photo_url: inv.banniere_url || null,
+      });
+    });
+  });
   overlay.querySelector('#iul-fermer').addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
