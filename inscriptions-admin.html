@@ -2411,7 +2411,7 @@ const actions = {
      création. Même patron que editTarif/editPlaces/editPeriode ci-dessous. */
   async editNomType(el) {
     const id = parseInt(el.dataset.id);
-    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
     const saisie = prompt("Nom du type d'inscription :", type.label || '');
     if (saisie === null) return;
     const label = saisie.trim();
@@ -2421,7 +2421,7 @@ const actions = {
   },
   async editTarif(el) {
     const id = parseInt(el.dataset.id);
-    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
     const gratuit = await ia_choixGratuitPayant();
     if (gratuit === null) return;
     let prix = 0;
@@ -2435,7 +2435,7 @@ const actions = {
   },
   async editPlaces(el) {
     const id = parseInt(el.dataset.id);
-    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
     const saisie = prompt('Nombre de places maximum (laisser vide = illimité) :', type.places_max != null ? String(type.places_max) : '');
     if (saisie === null) return;
     const places_max = saisie.trim() ? parseInt(saisie.trim()) : null;
@@ -2444,7 +2444,7 @@ const actions = {
   },
   async editPeriode(el) {
     const id = parseInt(el.dataset.id);
-    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const type = currentTypes().find(t => Number(t.id) === id); if (!type) return;
     const ouverture = prompt("Date d'ouverture de ce type (AAAA-MM-JJ, laisser vide pour reprendre la période générale de la fiche) :", type.date_ouverture ? type.date_ouverture.slice(0,10) : '');
     if (ouverture === null) return;
     const fermeture = prompt('Date de fermeture (AAAA-MM-JJ, laisser vide = pas de fermeture spécifique) :', type.date_fermeture ? type.date_fermeture.slice(0,10) : '');
