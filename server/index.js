@@ -43825,10 +43825,16 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   const modeApercu = !erreurProprio && fiche.statut !== "publiee";
 
   if (!modeApercu) {
-    if (fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+    /* "fermee" est un statut à part entière (fermeture manuelle via le bouton "Fermer les
+       inscriptions", indépendante de date_fermeture_inscriptions) — avant ce correctif
+       (2026-09-28, bug remonté en capture : "une fiche a été liée à cet événement donc pourquoi
+       ça écrit fiche introuvable"), le visiteur tombait sur le même 404 "Fiche introuvable"
+       qu'une fiche inexistante, alors que le message "inscriptions désormais fermées" existait
+       déjà plus bas mais restait inatteignable pour ce statut. */
+    if (!["publiee", "fermee"].includes(fiche.statut)) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
     if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche a été temporairement suspendue par l'administration." });
     const now = new Date();
-    if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) {
+    if (fiche.statut === "fermee" || (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now)) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias });
     }
