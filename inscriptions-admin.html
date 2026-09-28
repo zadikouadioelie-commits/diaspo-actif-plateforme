@@ -256,6 +256,18 @@ const state = {
   busy: false,
 };
 
+/* Fichiers "en attente d'enregistrement" pour les dépôts de documents (2026-09-28, demande
+   explicite : "pas prendre en compte automatiquement le document... laisse un bouton
+   d'enregistrement... une petite croix pour supprimer si jamais on s'est trompé", étendue à
+   "tous les endroits où on peut déposer un document") — hors de `state` car un objet File ne
+   survit pas à JSON.stringify ni n'a de sens à y vivre (state ne contient que des données
+   sérialisables rechargées depuis l'API) ; render() régénère tout #ia-root à chaque dispatch, un
+   objet File posé dans une variable module-level survit lui à ce re-rendu contrairement à
+   `el.files` de l'input d'origine (détruit avec lui). */
+let IA_STAGED_PHOTO_COUVERTURE = null;
+let IA_STAGED_MEDIA = null;
+let IA_STAGED_CANDIDATURE_DOC = null;
+
 function ia_toast(msg, ok) { if (typeof showToast === 'function') return showToast(msg, ok ? 'success' : 'error'); alert(msg); }
 /* Choix Gratuit/Payant sans confirm() natif (2026-09-22, demande explicite) — l'ancien
    `confirm('... OK = Gratuit, Annuler = Payant')` forçait à retenir une correspondance
@@ -1327,13 +1339,19 @@ function renderInfosGenerales(fiche) {
         <button style="background:none; border:none; color:oklch(0.55 0.006 30); font-size:13px; cursor:pointer;" data-action="toggleEditionInfos">Fermer</button>
       </div>
       <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:16px;">
-        <div style="width:100px; height:100px; border-radius:10px; flex-shrink:0; background:${fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)'}; display:flex; align-items:center; justify-content:center; color:oklch(0.6 0.006 30); font-size:11px;">${fiche.affiche_url ? '' : 'Aucune photo'}</div>
+        <div style="width:100px; height:100px; border-radius:10px; flex-shrink:0; background:${IA_STAGED_PHOTO_COUVERTURE ? `url('${URL.createObjectURL(IA_STAGED_PHOTO_COUVERTURE)}') center/cover` : (fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)')}; display:flex; align-items:center; justify-content:center; color:oklch(0.6 0.006 30); font-size:11px;">${fiche.affiche_url || IA_STAGED_PHOTO_COUVERTURE ? '' : 'Aucune photo'}</div>
         <div>
-          <label style="display:inline-block; background:oklch(0.32 0.09 258); color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">
-            📷 Changer la photo de couverture
-            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-action="changerPhotoCouverture" style="display:none;">
-          </label>
-          <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-top:6px;">JPEG, PNG, WebP ou GIF — 8 Mo max.</div>
+          ${IA_STAGED_PHOTO_COUVERTURE ? `
+            <div style="font-size:12px; font-weight:600; color:oklch(0.4 0.006 30); margin-bottom:8px;">📄 ${escH(IA_STAGED_PHOTO_COUVERTURE.name)} — en attente d'enregistrement</div>
+            <div style="display:flex; gap:8px;">
+              <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;" data-action="enregistrerPhotoCouverture">💾 Enregistrer</button>
+              <button title="Annuler la sélection" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:13px; font-weight:700; padding:8px 12px; border-radius:8px; cursor:pointer;" data-action="annulerPhotoCouverture">✕</button>
+            </div>` : `
+            <label style="display:inline-block; background:oklch(0.32 0.09 258); color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;">
+              📷 Changer la photo de couverture
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-action="stagerPhotoCouverture" style="display:none;">
+            </label>
+            <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-top:6px;">JPEG, PNG, WebP ou GIF — 8 Mo max.</div>`}
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:12px;">
@@ -1465,10 +1483,19 @@ function renderMedias() {
       </div>
       <div style="font-size:11.5px; color:oklch(0.55 0.006 30); margin-bottom:14px;">📷 ${nbPhotos}/7 photos &nbsp;·&nbsp; 🎬 ${nbVideos}/4 vidéos (3 min et 100 Mo max chacune) &nbsp;·&nbsp; 📄 PDF sans limite (15 Mo max)</div>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">${liste}</div>
-      <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
-        + Ajouter une photo, une vidéo ou un PDF
-        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm" data-action="ajouterMedia" style="display:none;">
-      </label>
+      ${IA_STAGED_MEDIA ? `
+        <div style="border:1px solid oklch(0.9 0.004 30); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:12.5px; font-weight:600; color:oklch(0.4 0.006 30);">📄 ${escH(IA_STAGED_MEDIA.name)} — en attente d'enregistrement</div>
+          <input id="ia-media-libelle" type="text" placeholder="Nom affiché aux visiteurs" value="${escH(IA_STAGED_MEDIA.name)}" style="height:36px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:12.5px; box-sizing:border-box;">
+          <div style="display:flex; gap:8px;">
+            <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;" data-action="enregistrerMedia">💾 Enregistrer</button>
+            <button title="Annuler la sélection" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:13px; font-weight:700; padding:8px 12px; border-radius:8px; cursor:pointer;" data-action="annulerMedia">✕</button>
+          </div>
+        </div>` : `
+        <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
+          + Ajouter une photo, une vidéo ou un PDF
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm" data-action="stagerMedia" style="display:none;">
+        </label>`}
     </div>`;
 }
 
@@ -1750,10 +1777,19 @@ function renderCandidature() {
         <span style="font-size:12px; color:oklch(0.55 0.006 30);">${documents.length} document(s)</span>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">${docsHtml}</div>
-      <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
-        + Ajouter un document
-        <input type="file" accept="application/pdf" data-action="ajouterCandidatureDoc" style="display:none;">
-      </label>
+      ${IA_STAGED_CANDIDATURE_DOC ? `
+        <div style="border:1px solid oklch(0.9 0.004 30); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:12.5px; font-weight:600; color:oklch(0.4 0.006 30);">📄 ${escH(IA_STAGED_CANDIDATURE_DOC.name)} — en attente d'enregistrement</div>
+          <input id="ia-cand-doc-titre" type="text" placeholder="Titre du document (ex. « Fiche de conformité »)" style="height:36px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:12.5px; box-sizing:border-box;">
+          <div style="display:flex; gap:8px;">
+            <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer;" data-action="enregistrerCandidatureDoc">💾 Enregistrer</button>
+            <button title="Annuler la sélection" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:13px; font-weight:700; padding:8px 12px; border-radius:8px; cursor:pointer;" data-action="annulerCandidatureDoc">✕</button>
+          </div>
+        </div>` : `
+        <label style="display:inline-block; background:#fff; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12.5px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">
+          + Ajouter un document
+          <input type="file" accept="application/pdf" data-action="stagerCandidatureDoc" style="display:none;">
+        </label>`}
     </div>
     <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -1966,7 +2002,8 @@ function renderCommunication() {
           ${state.commPiecesJointes.map((p, idx) => `
             <div style="display:flex;align-items:center;gap:8px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;padding:6px 10px;font-size:12.5px;">
               <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 ${escH(p.nom)}</span>
-              <button style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:14px;cursor:pointer;" data-action="retirerPieceJointeComm" data-idx="${idx}">✕</button>
+              <a href="${escH(p.url)}" target="_blank" rel="noopener" style="color:#8B12D6;font-weight:600;font-size:11.5px;white-space:nowrap;text-decoration:none;">👁️ Prévisualiser</a>
+              <button title="Retirer cette pièce jointe" style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:14px;cursor:pointer;" data-action="retirerPieceJointeComm" data-idx="${idx}">✕</button>
             </div>`).join('')}
         </div>
         ${state.commPiecesJointes.length < 3 ? `
@@ -2428,16 +2465,25 @@ const actions = {
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
-  async ajouterCandidatureDoc(el) {
+  /* Sélection ≠ envoi (2026-09-28, demande explicite) — remplace l'ancien prompt() (aucun moyen
+     de voir/corriger le fichier choisi avant l'envoi) par un vrai champ titre visible dans
+     renderCandidature(), IA_STAGED_CANDIDATURE_DOC gardant le fichier en attente. */
+  stagerCandidatureDoc(el) {
     const file = el.files[0]; if (!file) return;
+    IA_STAGED_CANDIDATURE_DOC = file;
+  },
+  annulerCandidatureDoc() { IA_STAGED_CANDIDATURE_DOC = null; },
+  async enregistrerCandidatureDoc() {
+    const file = IA_STAGED_CANDIDATURE_DOC; if (!file) return;
     const config = currentCandidature()?.config;
     if (!config) return;
-    const titre = prompt('Titre du document (ex. « Fiche de conformité ») :');
-    if (!titre || !titre.trim()) return;
+    const titre = (document.getElementById('ia-cand-doc-titre')?.value || '').trim();
+    if (!titre) { ia_toast('Le titre du document est requis.', false); return; }
     try {
       const pdf_url = await uploadMedia(file, 'document');
-      await api('POST', `/insc/candidature/${config.id}/documents`, { titre: titre.trim(), pdf_url });
-      ia_toast(`Document « ${titre.trim()} » ajouté.`, true);
+      await api('POST', `/insc/candidature/${config.id}/documents`, { titre, pdf_url });
+      IA_STAGED_CANDIDATURE_DOC = null;
+      ia_toast(`Document « ${titre} » ajouté.`, true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
@@ -2545,8 +2591,16 @@ const actions = {
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
-  async changerPhotoCouverture(el) {
+  /* Sélection ≠ envoi (2026-09-28, demande explicite, voir IA_STAGED_PHOTO_COUVERTURE plus haut)
+     — stagerPhotoCouverture() ne fait qu'un aperçu local (createObjectURL, voir
+     renderInfosGenerales), rien n'est envoyé tant que "💾 Enregistrer" n'est pas cliqué. */
+  stagerPhotoCouverture(el) {
     const file = el.files[0]; if (!file) return;
+    IA_STAGED_PHOTO_COUVERTURE = file;
+  },
+  annulerPhotoCouverture() { IA_STAGED_PHOTO_COUVERTURE = null; },
+  async enregistrerPhotoCouverture() {
+    const file = IA_STAGED_PHOTO_COUVERTURE; if (!file) return;
     try {
       const fd = new FormData(); fd.append('fichier', file);
       const r = await fetch('/api/insc/public/upload', { method: 'POST', body: fd });
@@ -2569,22 +2623,31 @@ const actions = {
         }
       }
       await api('PUT', `/insc/fiches/${state.selectedFicheId}`, payload);
+      IA_STAGED_PHOTO_COUVERTURE = null;
       ia_toast('Photo de couverture mise à jour.', true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
-  async ajouterMedia(el) {
+  /* Sélection ≠ envoi (2026-09-28, demande explicite) — stagerMedia() garde juste le fichier en
+     mémoire (IA_STAGED_MEDIA), remplace l'ancien prompt() par un vrai champ libellé visible dans
+     renderMedias(), enregistrerMedia() fait l'envoi réel. */
+  stagerMedia(el) {
     const file = el.files[0]; if (!file) return;
-    const libelle = prompt('Nom de ce document (affiché aux visiteurs) :', file.name) || '';
+    IA_STAGED_MEDIA = file;
+  },
+  annulerMedia() { IA_STAGED_MEDIA = null; },
+  async enregistrerMedia() {
+    const file = IA_STAGED_MEDIA; if (!file) return;
+    const libelle = document.getElementById('ia-media-libelle')?.value || file.name;
     try {
       const fd = new FormData(); fd.append('fichier', file); fd.append('libelle', libelle);
       const r = await fetch(`/api/insc/fiches/${state.selectedFicheId}/medias`, { method: 'POST', credentials: 'include', body: fd });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Erreur');
+      IA_STAGED_MEDIA = null;
       ia_toast('Document ajouté.', true);
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
-    el.value = '';
   },
   async supprimerMedia(el) {
     if (!confirm('Supprimer ce document ?')) return;

@@ -284,17 +284,17 @@
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;flex-wrap:wrap;">
             <div>
               <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">CV (PDF)</label>
-              <input type="file" id="cv-pdf-input" accept=".pdf" onchange="uploadDoc('cv')" style="font-size:12px;">
+              <input type="file" id="cv-pdf-input" accept=".pdf" onchange="ecStagerDoc('cv')" style="font-size:12px;">
               <div id="cv-pdf-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
             </div>
             <div>
               <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Lettre de motivation (PDF)</label>
-              <input type="file" id="lettre-pdf-input" accept=".pdf" onchange="uploadDoc('lettre')" style="font-size:12px;">
+              <input type="file" id="lettre-pdf-input" accept=".pdf" onchange="ecStagerDoc('lettre')" style="font-size:12px;">
               <div id="lettre-pdf-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
             </div>
             <div>
               <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Portfolio (PDF)</label>
-              <input type="file" id="portfolio-pdf-input" accept=".pdf" onchange="uploadDoc('portfolio')" style="font-size:12px;">
+              <input type="file" id="portfolio-pdf-input" accept=".pdf" onchange="ecStagerDoc('portfolio')" style="font-size:12px;">
               <div id="portfolio-pdf-status" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
             </div>
           </div>
@@ -390,6 +390,14 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<!-- Bug réel trouvé le 2026-09-28 en vérifiant le dépôt de documents : cette page appelle
+     DA.toast(...) à 18+ endroits (dépôt de CV, sauvegarde du profil, expériences, formations,
+     lettre, candidature...) mais ne chargeait jamais assets/ds.js, qui définit DA — chaque appel
+     levait une ReferenceError non interceptée, empêchant tout code placé après (ex. closeMod()
+     et loadAll() après l'ajout d'une expérience/formation) de s'exécuter. Les enregistrements
+     eux-mêmes fonctionnaient (l'appel API a déjà eu lieu avant le DA.toast qui plante), mais
+     sans aucun retour visuel ni rafraîchissement. -->
+<script src="assets/ds.js"></script>
 <script src="assets/rich-editor.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
@@ -437,6 +445,7 @@ async function loadAll(){
     document.getElementById('k-refuse').textContent = stats.find(s=>s.statut==='refusee')?.n||0;
     fillProfilForm();
     renderExps(); renderForms();
+    ecRenderDocStatus('cv'); ecRenderDocStatus('lettre'); ecRenderDocStatus('portfolio');
     // Lettre
     if (window.RichEditor) RichEditor.attach('lettre-editor', { placeholder: 'Rédigez votre lettre de motivation…' })?.setHTML(r.profil?.lettre_contenu || '');
     // Badge dispo
@@ -523,21 +532,57 @@ async function saveProfil(e){
 }
 
 /* ── Upload PDF (base64) ── */
-function uploadDoc(type){
-  const inputs = {cv:'cv-pdf-input', lettre:'lettre-pdf-input', portfolio:'portfolio-pdf-input'};
-  const statuses = {cv:'cv-pdf-status', lettre:'lettre-pdf-status', portfolio:'portfolio-pdf-status'};
-  const keys = {cv:'cv_pdf', lettre:'lettre_pdf', portfolio:'portfolio_pdf'};
-  const file = document.getElementById(inputs[type]).files[0];
+const EC_DOC_INPUTS = {cv:'cv-pdf-input', lettre:'lettre-pdf-input', portfolio:'portfolio-pdf-input'};
+const EC_DOC_STATUSES = {cv:'cv-pdf-status', lettre:'lettre-pdf-status', portfolio:'portfolio-pdf-status'};
+const EC_DOC_KEYS = {cv:'cv_pdf', lettre:'lettre_pdf', portfolio:'portfolio_pdf'};
+/* Sélection ≠ envoi (2026-09-28, demande explicite : "pas prendre en compte automatiquement le
+   document... laisse un bouton d'enregistrement... une petite croix pour supprimer si jamais on
+   s'est trompé") — ecStagerDoc() ne fait que garder le fichier en mémoire (EC_STAGED_DOC),
+   ecEnregistrerDoc() fait la lecture base64 + le PUT réels. Ajoute aussi un aperçu "👁️
+   Prévisualiser" pour un document déjà enregistré (data URI déjà complète, cv_pdf/lettre_pdf/
+   portfolio_pdf stockent le résultat brut de FileReader.readAsDataURL) — absent jusqu'ici : après
+   un rechargement de page, rien n'indiquait qu'un document avait déjà été déposé. */
+let EC_STAGED_DOC = { cv: null, lettre: null, portfolio: null };
+function ecStagerDoc(type){
+  const file = document.getElementById(EC_DOC_INPUTS[type]).files[0];
   if(!file) return;
   if(file.size > 5*1024*1024){ DA.toast('Fichier trop volumineux (max 5 Mo)', {type:'warning'}); return; }
+  EC_STAGED_DOC[type] = file;
+  ecRenderDocStatus(type);
+}
+function ecAnnulerDoc(type){
+  EC_STAGED_DOC[type] = null;
+  document.getElementById(EC_DOC_INPUTS[type]).value = '';
+  ecRenderDocStatus(type);
+}
+async function ecEnregistrerDoc(type){
+  const file = EC_STAGED_DOC[type]; if(!file) return;
   const reader = new FileReader();
   reader.onload = async e=>{
-    DOC_PDFS[keys[type]] = e.target.result;
-    document.getElementById(statuses[type]).textContent = '✅ ' + file.name + ' prêt';
-    await api('PUT','/profil-emploi',{[keys[type]]: e.target.result});
-    DA.toast('Document enregistré.', {type:'success'});
+    try {
+      DOC_PDFS[EC_DOC_KEYS[type]] = e.target.result;
+      await api('PUT','/profil-emploi',{[EC_DOC_KEYS[type]]: e.target.result});
+      if (PROFIL_EC) PROFIL_EC[EC_DOC_KEYS[type]] = e.target.result;
+      EC_STAGED_DOC[type] = null;
+      document.getElementById(EC_DOC_INPUTS[type]).value = '';
+      DA.toast('Document enregistré.', {type:'success'});
+      ecRenderDocStatus(type);
+    } catch(err) { DA.toast('Erreur : '+err.message, {type:'danger'}); }
   };
   reader.readAsDataURL(file);
+}
+function ecRenderDocStatus(type){
+  const el = document.getElementById(EC_DOC_STATUSES[type]);
+  const staged = EC_STAGED_DOC[type];
+  if (staged) {
+    el.innerHTML = `<div>📄 ${escH(staged.name)} — en attente d'enregistrement</div><div style="display:flex;gap:6px;margin-top:4px;">
+      <button type="button" class="btn btn-sm btn-orange" style="padding:3px 8px;" onclick="ecEnregistrerDoc('${type}')">💾 Enregistrer</button>
+      <button type="button" class="btn btn-sm" title="Annuler la sélection" style="padding:3px 8px;" onclick="ecAnnulerDoc('${type}')">✕</button>
+    </div>`;
+    return;
+  }
+  const saved = PROFIL_EC?.[EC_DOC_KEYS[type]];
+  el.innerHTML = saved ? `<span style="color:#16a34a;">✅ Document déposé</span> <a href="${saved}" target="_blank" rel="noopener" style="margin-left:6px;">👁️ Prévisualiser</a>` : '';
 }
 
 /* ── Expériences ── */

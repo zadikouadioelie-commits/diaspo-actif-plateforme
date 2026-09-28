@@ -491,7 +491,8 @@ function tdaVueFormulaire() {
 
     <label style="font-size:12px;font-weight:700;color:var(--muted,#64748b);">📎 Pièce jointe (facultatif)</label>
     <div style="margin:4px 0 16px;">
-      <input type="file" id="tda-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="tdaUploaderPiece(this)" style="font-size:12.5px;">
+      <input type="file" id="tda-fichier" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="tdaStagerPiece(this)" style="font-size:12.5px;">
+      <div id="tda-piece-en-attente"></div>
       <div id="tda-piece-statut" style="font-size:11.5px;color:var(--muted,#64748b);margin-top:6px;"></div>
       <div id="tda-pieces-liste"></div>
     </div>
@@ -504,11 +505,27 @@ function tdaVueFormulaire() {
 /* Pièces jointes (2026-08-31) : facultatif, ne bloque jamais l'envoi — réutilise l'upload
    générique déjà utilisé ailleurs dans l'éditeur (POST /api/upload/document, validation
    magic-bytes côté serveur) puis les rattache au Business Plan via bp_documents, avec un
-   section_key dédié pour les distinguer du reste des pièces du plan. */
-let tdaPiecesJointes = [];
-async function tdaUploaderPiece(input) {
-  const file = input.files[0];
-  if (!file) return;
+   section_key dédié pour les distinguer du reste des pièces du plan.
+   Sélection ≠ envoi (2026-09-28, demande explicite : "pas prendre en compte automatiquement le
+   document... laisse un bouton d'enregistrement... une petite croix pour supprimer si jamais on
+   s'est trompé") — choisir un fichier ne fait que le garder en mémoire (TDA_STAGED_PIECE) avec un
+   aperçu du nom et deux boutons explicites ; l'upload + le rattachement réels n'ont lieu qu'au
+   clic sur "💾 Enregistrer". Chaque pièce déjà envoyée garde désormais son URL (et pas seulement
+   son nom) pour pouvoir être prévisualisée. */
+let tdaPiecesJointes = []; // {nom, url}
+let TDA_STAGED_PIECE = null;
+function tdaStagerPiece(input) {
+  const file = input.files[0]; if (!file) return;
+  TDA_STAGED_PIECE = file;
+  tdaRenderPiecesJointes();
+}
+function tdaAnnulerPiece() {
+  TDA_STAGED_PIECE = null;
+  const input = document.getElementById('tda-fichier'); if (input) input.value = '';
+  tdaRenderPiecesJointes();
+}
+async function tdaEnregistrerPiece() {
+  const file = TDA_STAGED_PIECE; if (!file) return;
   const statut = document.getElementById('tda-piece-statut');
   statut.textContent = 'Envoi en cours…';
   try {
@@ -520,11 +537,27 @@ async function tdaUploaderPiece(input) {
     await api('POST', `/business-plans/${tdaBP.id}/documents`, {
       section_key: 'transmission_da', categorie: 'financier', nom: file.name, url_bunny: upData.url, type_mime: file.type,
     });
-    tdaPiecesJointes.push(file.name);
+    tdaPiecesJointes.push({ nom: file.name, url: upData.url });
+    TDA_STAGED_PIECE = null;
     statut.textContent = '';
-    document.getElementById('tda-pieces-liste').innerHTML = tdaPiecesJointes.map(n => `<div style="font-size:12.5px;margin-top:4px;">📄 ${esc(n)}</div>`).join('');
-    input.value = '';
+    const input = document.getElementById('tda-fichier'); if (input) input.value = '';
+    tdaRenderPiecesJointes();
   } catch(e) { statut.textContent = 'Erreur : ' + e.message; }
+}
+function tdaRenderPiecesJointes() {
+  const zoneStagee = document.getElementById('tda-piece-en-attente');
+  if (zoneStagee) {
+    zoneStagee.innerHTML = TDA_STAGED_PIECE ? `
+      <div style="border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px;margin-top:6px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:12.5px;font-weight:700;">📄 ${esc(TDA_STAGED_PIECE.name)} — en attente d'enregistrement</div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-orange" style="padding:6px 12px;font-size:12.5px;" onclick="tdaEnregistrerPiece()">💾 Enregistrer</button>
+          <button type="button" class="btn btn-outline" title="Annuler la sélection" style="padding:6px 10px;font-size:13px;" onclick="tdaAnnulerPiece()">✕</button>
+        </div>
+      </div>` : '';
+  }
+  const liste = document.getElementById('tda-pieces-liste');
+  if (liste) liste.innerHTML = tdaPiecesJointes.map(p => `<div style="font-size:12.5px;margin-top:4px;display:flex;align-items:center;gap:8px;">📄 ${esc(p.nom)} <a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:#F26422;font-weight:600;font-size:11.5px;text-decoration:none;">👁️ Prévisualiser</a></div>`).join('');
 }
 function tdaToggleLaisserChoisir(checked) {
   tdaBrouillon.laisser_da_choisir = checked;

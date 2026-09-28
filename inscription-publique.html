@@ -679,28 +679,46 @@ function ipOuvrirCandidature() {
      Le "Télécharger ↓" passe par ipTelechargerDocument() (blob local) plutôt qu'un lien
      target="_blank" classique : sur certains navigateurs mobiles, ouvrir un PDF ainsi fait quitter
      l'onglet/l'appli vers un lecteur externe, obligeant à "aller le rechercher" — plainte
-     utilisateur explicite. */
+     utilisateur explicite.
+     Sélection = mise en attente, PAS d'envoi (2026-09-28, demande explicite : "pas prendre en
+     compte automatiquement le document... s'il y a une erreur, on ne pourra pas rectifier") —
+     choisir un fichier ne fait plus qu'un aperçu local (IP_CAND_DOCS_STAGED, un objet File ne
+     survit pas au re-rendu innerHTML donc gardé hors du DOM) avec un bouton "💾 Enregistrer"
+     explicite et un "✕" pour annuler la sélection sans rien envoyer. Une fois un document déjà
+     déposé, "👁️ Prévisualiser" l'ouvre tel qu'il est réellement enregistré, distinct du
+     "Télécharger ↓" qui télécharge le modèle vierge de l'organisateur. */
   const docsHtml = docs.map(d => {
     const depot = d.mon_depot;
     const depoTexte = depot ? `le ${escH((depot.depose_le || '').slice(0, 10).split('-').reverse().join('/'))}` : '';
+    const staged = IP_CAND_DOCS_STAGED[d.id];
     let deposerHtml;
-    if (!connecte && !visiteurValide) {
+    if (staged) {
+      deposerHtml = `
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <span style="font-size:11px;font-weight:600;color:oklch(0.4 0.006 30);">📄 ${escH(staged.name)} — en attente d'enregistrement</span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" onclick="ipEnregistrerDocumentCandidature(${d.id})" style="font-size:11px;font-weight:700;padding:5px 10px;border-radius:6px;border:none;background:#8B12D6;color:#fff;cursor:pointer;">💾 Enregistrer</button>
+            <button type="button" onclick="ipAnnulerDocumentCandidature(${d.id})" title="Annuler la sélection" style="font-size:12px;font-weight:700;padding:5px 9px;border-radius:6px;border:1px solid oklch(0.8 0.006 30);background:#fff;color:oklch(0.4 0.006 30);cursor:pointer;">✕</button>
+          </div>
+        </div>`;
+    } else if (!connecte && !visiteurValide) {
       deposerHtml = `<span style="font-size:11px;color:oklch(0.55 0.006 30);font-weight:600;white-space:nowrap;">Répondez ci-dessous pour déposer</span>`;
     } else {
-      const onchange = connecte ? `ipDeposerCandidatureDoc(this, ${d.id})` : `ipDeposerCandidatureDocVisiteur(this, ${d.id})`;
       /* Statut de dépôt visible (2026-09-28, demande explicite : "lorsqu'un document est
          sélectionné, il s'affiche en dessous avec le titre du document sélectionné... sinon
          c'est très compliqué de savoir") — id stable par document, mis à jour directement par
-         ipDeposerCandidatureDoc()/…Visiteur() dès la sélection du fichier (nom affiché tout de
-         suite) puis pendant/après l'envoi, y compris en cas d'erreur (affichée ici, jamais
-         seulement en alert() qui peut passer inaperçue). */
+         ipEnregistrerDocumentCandidature() pendant/après l'envoi, y compris en cas d'erreur
+         (affichée ici, jamais seulement en alert() qui peut passer inaperçue). */
       deposerHtml = `
         <div style="display:flex; flex-direction:column; gap:4px;">
           <label style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;padding:5px 10px;border-radius:6px;align-self:flex-start;${depot ? 'color:#1C8A0E;border:1px solid #86EFAC;background:#F0FDF4;' : 'color:#6B0FA3;border:1px solid #D8B4FE;background:#FAF5FF;'}">
             ${depot ? '🔁 Remplacer le document' : '📤 Déposer un document'}
-            <input type="file" accept="application/pdf" style="display:none;" onchange="${onchange}">
+            <input type="file" accept="application/pdf" style="display:none;" onchange="ipStagerDocumentCandidature(this, ${d.id})">
           </label>
-          <span id="ip-depot-statut-${d.id}" style="font-size:11px;font-weight:600;${depot ? 'color:#1C8A0E;' : 'color:oklch(0.55 0.006 30);'}">${depot ? `✅ Déposé ${depoTexte}` : ''}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="ip-depot-statut-${d.id}" style="font-size:11px;font-weight:600;${depot ? 'color:#1C8A0E;' : 'color:oklch(0.55 0.006 30);'}">${depot ? `✅ Déposé ${depoTexte}` : ''}</span>
+            ${depot ? `<button type="button" onclick="ipPrevisualiserDocumentDepose('${escH(depot.url)}')" style="background:none;border:none;font-size:11px;color:#8B12D6;font-weight:600;white-space:nowrap;cursor:pointer;padding:0;font-family:inherit;">👁️ Prévisualiser</button>` : ''}
+          </div>
         </div>`;
     }
     return `
@@ -805,42 +823,56 @@ async function ipTelechargerDocument(url, titre) {
 /* Dépôt du document rempli par le candidat (2026-09-28, demande explicite) — même document que
    celui téléchargé, renvoyé directement sur la plateforme plutôt que uniquement par e-mail.
    L'upload lui-même passe par uploadMedia()/POST /api/upload/document (déjà existant, Bunny CDN,
-   magic-bytes) ; cette fonction enregistre ensuite l'URL obtenue sur CE document précis. */
-async function ipDeposerCandidatureDoc(input, documentId) {
+   magic-bytes) ; cette fonction enregistre ensuite l'URL obtenue sur CE document précis.
+   Sélection ≠ envoi (2026-09-28, demande explicite : "pas prendre en compte automatiquement le
+   document... s'il y a une erreur, on ne pourra pas rectifier... laisse un bouton
+   d'enregistrement... une petite croix pour supprimer si jamais on s'est trompé") — trois
+   fonctions séparées : stager (juste garder le fichier choisi en mémoire + réafficher),
+   enregistrer (l'upload + le POST réels, déclenchés par le bouton "💾 Enregistrer"), annuler (vide
+   la sélection sans rien envoyer). IP_CAND_DOCS_STAGED vit hors du DOM le temps de l'attente :
+   un objet File ne survit pas au re-rendu complet de #ip-root (innerHTML) que fait
+   ipOuvrirCandidature() à chaque re-rendu, contrairement à state.xxx ailleurs sur cette page qui
+   ne contient que des données sérialisables. */
+let IP_CAND_DOCS_STAGED = {};
+function ipStagerDocumentCandidature(input, documentId) {
   const file = input.files[0]; if (!file) return;
+  IP_CAND_DOCS_STAGED[documentId] = file;
+  ipOuvrirCandidature();
+}
+function ipAnnulerDocumentCandidature(documentId) {
+  delete IP_CAND_DOCS_STAGED[documentId];
+  ipOuvrirCandidature();
+}
+async function ipEnregistrerDocumentCandidature(documentId) {
+  const file = IP_CAND_DOCS_STAGED[documentId]; if (!file) return;
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  if (!connecte && !IP_CAND_VISITEUR_ID) { alert('Répondez d\'abord au formulaire ci-dessous.'); return; }
   const statutEl = document.getElementById(`ip-depot-statut-${documentId}`);
   if (statutEl) { statutEl.style.color = 'oklch(0.55 0.006 30)'; statutEl.textContent = `📄 ${file.name} — envoi en cours…`; }
   try {
     const url = await uploadMedia(file, 'document');
-    await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer`, { url });
+    if (connecte) {
+      await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer`, { url });
+    } else {
+      await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer-visiteur`, { url, declaration_id: IP_CAND_VISITEUR_ID });
+    }
     const doc = (IP_CANDIDATURE?.documents || []).find(d => Number(d.id) === Number(documentId));
     if (doc) doc.mon_depot = { url, depose_le: new Date().toISOString() };
+    delete IP_CAND_DOCS_STAGED[documentId];
     ipOuvrirCandidature();
   } catch (e) {
-    console.error('[ipDeposerCandidatureDoc]', e);
+    console.error('[ipEnregistrerDocumentCandidature]', e);
     if (statutEl) { statutEl.style.color = 'oklch(0.5 0.16 20)'; statutEl.textContent = `❌ ${file.name} — ${e.message || 'échec du dépôt'}`; }
     else alert(e.message || 'Erreur lors du dépôt du document.');
   }
 }
-/* Jumelle de la fonction ci-dessus pour un visiteur sans compte (2026-09-28, demande explicite)
-   — utilise IP_CAND_VISITEUR_ID (rempli par ipRepondreCandidature()) à la place d'une session
-   utilisateur pour rattacher le dépôt à sa réponse. */
-async function ipDeposerCandidatureDocVisiteur(input, documentId) {
-  const file = input.files[0]; if (!file) return;
-  if (!IP_CAND_VISITEUR_ID) { alert('Répondez d\'abord au formulaire ci-dessous.'); return; }
-  const statutEl = document.getElementById(`ip-depot-statut-${documentId}`);
-  if (statutEl) { statutEl.style.color = 'oklch(0.55 0.006 30)'; statutEl.textContent = `📄 ${file.name} — envoi en cours…`; }
-  try {
-    const url = await uploadMedia(file, 'document');
-    await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer-visiteur`, { url, declaration_id: IP_CAND_VISITEUR_ID });
-    const doc = (IP_CANDIDATURE?.documents || []).find(d => Number(d.id) === Number(documentId));
-    if (doc) doc.mon_depot = { url, depose_le: new Date().toISOString() };
-    ipOuvrirCandidature();
-  } catch (e) {
-    console.error('[ipDeposerCandidatureDocVisiteur]', e);
-    if (statutEl) { statutEl.style.color = 'oklch(0.5 0.16 20)'; statutEl.textContent = `❌ ${file.name} — ${e.message || 'échec du dépôt'}`; }
-    else alert(e.message || 'Erreur lors du dépôt du document.');
-  }
+/* "👁️ Prévisualiser" (2026-09-28, demande explicite) — ouvre le document RÉELLEMENT enregistré
+   (distinct du bouton "Télécharger ↓" qui télécharge le modèle vierge de l'organisateur) ;
+   simple nouvel onglet plutôt que le mécanisme blob de ipTelechargerDocument() : ici on veut
+   VOIR le PDF (le lecteur PDF natif du navigateur fait très bien l'affaire), pas forcer un
+   téléchargement. */
+function ipPrevisualiserDocumentDepose(url) {
+  window.open(url, '_blank', 'noopener');
 }
 
 /* Sponsors / Partenaires (2026-09-28, demande explicite) — affichage public d'un tableau JSON
