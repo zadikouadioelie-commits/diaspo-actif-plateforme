@@ -728,6 +728,7 @@ db.exec(`
     config_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     nom TEXT, prenom TEXT, email TEXT,
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee')),
     declare_le TEXT DEFAULT (datetime('now')),
     UNIQUE(config_id, user_id),
     FOREIGN KEY(config_id) REFERENCES insc_candidature_config(id),

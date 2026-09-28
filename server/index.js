@@ -1156,6 +1156,21 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscChampsImage]', e.message); }
 })();
 
+/* Traitement des candidatures déclarées (2026-09-28, demande explicite) — la déclaration
+   "J'ai candidaté" n'était jusqu'ici qu'un simple comptage, sans statut : l'organisateur n'avait
+   aucun moyen d'indiquer, une fois le dossier reçu par e-mail et examiné, s'il était accepté ou
+   refusé. Ajoute un statut par déclaration, même esprit que le statut des inscriptions
+   classiques (voir onglet Validation) mais totalement indépendant — une candidature n'est jamais
+   automatiquement acceptée. */
+(async function migrateInscCandidatureDeclarationsStatut() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(insc_candidature_declarations)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('statut')) {
+      try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN statut TEXT NOT NULL DEFAULT 'en_attente'").run(); } catch (e) {}
+    }
+  } catch (e) { console.error('[migrateInscCandidatureDeclarationsStatut]', e.message); }
+})();
+
 /* ═══════════════════════════════════════════════════════════════════
    MODULE LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite)
    Liens/QR codes à usage unique distribués par l'administration : 1 lien = 1 personne =
@@ -42638,6 +42653,27 @@ route("GET", "/api/insc/fiches/:id/candidature/declarations", async (req, res, p
   if (!config) return sendJSON(res, 200, { declarations: [], total: 0 });
   const declarations = await db.prepare("SELECT * FROM insc_candidature_declarations WHERE config_id=? ORDER BY declare_le DESC").all(config.id);
   sendJSON(res, 200, { declarations, total: declarations.length });
+});
+
+/* Traitement d'une candidature déclarée (onglet "Traitement candidatures", 2026-09-28, demande
+   explicite) — l'organisateur reçoit le dossier par e-mail hors application, l'examine, puis
+   enregistre ici sa décision. Jamais automatique : le statut par défaut reste "en_attente" tant
+   que personne n'a tranché, réversible dans les deux sens (une décision peut être annulée). */
+const INSC_CANDIDATURE_STATUTS = ["en_attente", "acceptee", "refusee"];
+route("PATCH", "/api/insc/candidature/declarations/:id/statut", async (req, res, params, body) => {
+  const declaration = await db.prepare(`
+    SELECT d.*, c.fiche_id FROM insc_candidature_declarations d
+    JOIN insc_candidature_config c ON c.id = d.config_id
+    WHERE d.id = ?
+  `).get(params.id);
+  if (!declaration) return sendJSON(res, 404, { error: "Candidature introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, declaration.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!INSC_CANDIDATURE_STATUTS.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE insc_candidature_declarations SET statut=? WHERE id=?").run(body.statut, declaration.id);
+  const libelles = { en_attente: "remise en attente", acceptee: "acceptée", refusee: "refusée" };
+  await inscJournaliser(declaration.fiche_id, user, "candidature_traitee", `Candidature de ${declaration.prenom || ""} ${declaration.nom || ""} ${libelles[body.statut]}.`);
+  sendJSON(res, 200, { ok: true });
 });
 
 /* Déclaration publique ("J'ai candidaté") — compte requis (le nom/prénom/e-mail viennent du

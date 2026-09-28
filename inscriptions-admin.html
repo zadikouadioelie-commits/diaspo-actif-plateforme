@@ -115,6 +115,7 @@ const IA_TABS = [
   { key: 'types', label: "Types d'inscription", emoji: '🏷️' },
   { key: 'fields', label: 'Formulaire', emoji: '📝' },
   { key: 'candidature', label: 'Candidature', emoji: '🎓' },
+  { key: 'traitement_candidatures', label: 'Traitement candidatures', emoji: '📋' },
   { key: 'validation', label: 'Validation', emoji: '✅' },
   { key: 'public', label: 'Aperçu public', emoji: '🌐' },
   { key: 'communication', label: 'Communication', emoji: '📧' },
@@ -235,6 +236,7 @@ const state = {
   historiqueFiltreEvenement: '',
   historiqueSelection: [],
   candidatureDeclarations: [], // chargées à l'ouverture de l'onglet Candidature, voir iaChargerOnglet()
+  traitementCandidatureFiltre: 'en_attente', // filtre actif de l'onglet Traitement candidatures
   icModeGestion: false,      // passe à true une fois les 3 étapes de création franchies (voir icContinuerVersGestion)
   icTransitionVisible: false, // écran "création terminée" affiché entre la dernière étape et le passage en gestion
   busy: false,
@@ -891,7 +893,7 @@ async function iaChargerOnglet(tab) {
   if (tab === 'qr' || tab === 'presences') return Promise.all([iaChargerLienEtStats(), iaChargerPresences()]);
   if (tab === 'validation') return iaChargerInscriptions();
   if (tab === 'historique') return iaChargerHistorique();
-  if (tab === 'candidature') return iaChargerCandidatureDeclarations();
+  if (tab === 'candidature' || tab === 'traitement_candidatures') return iaChargerCandidatureDeclarations();
 }
 async function iaChargerCandidatureDeclarations() {
   const fiche = selectedFiche();
@@ -1087,6 +1089,7 @@ function renderTabContent() {
     case 'validation': return renderValidation();
     case 'fields': return renderFields();
     case 'candidature': return renderCandidature();
+    case 'traitement_candidatures': return renderTraitementCandidatures();
     case 'public': return renderPublic();
     case 'communication': return renderCommunication();
     case 'qr': return renderQr();
@@ -1572,12 +1575,17 @@ function renderCandidature() {
       <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="supprimerCandidatureDoc" data-id="${d.id}" data-titre="${escH(d.titre)}">✕</button>
     </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun document ajouté.</div>';
   const declarationsHtml = declarations.length
-    ? `<div style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">${declarations.map(dec => `
-        <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid oklch(0.93 0.004 30); border-radius:8px; font-size:12.5px;">
+    ? `<div style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">${declarations.map(dec => {
+        const st = dec.statut || 'en_attente';
+        const [dBg, dColor] = IA_CANDIDATURE_STATUT_STYLE[st] || IA_CANDIDATURE_STATUT_STYLE.en_attente;
+        return `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 10px; border:1px solid oklch(0.93 0.004 30); border-radius:8px; font-size:12.5px;">
           <span style="font-weight:600;">${escH(dec.prenom || '')} ${escH(dec.nom || '')}</span>
           <span style="color:oklch(0.5 0.006 30);">${escH(dec.email || '')}</span>
           <span style="color:oklch(0.55 0.006 30); font-family:'IBM Plex Mono', monospace; font-size:11.5px;">${escH((dec.declare_le || '').slice(0,16).replace('T',' · '))}</span>
-        </div>`).join('')}</div>`
+          <span style="font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:20px; background:${dBg}; color:${dColor}; white-space:nowrap;">${IA_CANDIDATURE_STATUT_LABEL[st]}</span>
+        </div>`;
+      }).join('')}</div>`
     : '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucune candidature déclarée pour l\'instant.</div>';
 
   return `
@@ -1625,6 +1633,63 @@ function renderCandidature() {
       </div>
       ${declarationsHtml}
     </div>` : ''}`;
+}
+
+// ---- Traitement des candidatures (2026-09-28, demande explicite) ----
+const IA_CANDIDATURE_STATUT_LABEL = { en_attente: '⏳ En attente', acceptee: '✅ Acceptée', refusee: '❌ Refusée' };
+const IA_CANDIDATURE_STATUT_STYLE = {
+  en_attente: ['oklch(0.96 0.07 85)', 'oklch(0.42 0.13 85)'],
+  acceptee:   ['oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
+  refusee:    ['oklch(0.94 0.05 20)', 'oklch(0.42 0.16 20)'],
+};
+function renderTraitementCandidatures() {
+  const cand = currentCandidature();
+  if (!cand?.config) return `${iaConsigne("Activez d'abord la candidature (onglet Candidature) pour pouvoir traiter les dossiers déclarés.")}<div style="color:oklch(0.55 0.006 30);">Aucune candidature configurée sur cette fiche.</div>`;
+  const declarations = (state.candidatureDeclarations || []).map(d => ({ ...d, statut: d.statut || 'en_attente' }));
+  const filtre = state.traitementCandidatureFiltre || 'en_attente';
+  const filtrees = filtre === 'toutes' ? declarations : declarations.filter(d => d.statut === filtre);
+  const compteurs = { en_attente: 0, acceptee: 0, refusee: 0 };
+  declarations.forEach(d => { compteurs[d.statut] = (compteurs[d.statut] || 0) + 1; });
+
+  const filtresHtml = ['en_attente', 'acceptee', 'refusee', 'toutes'].map(f => {
+    const actif = filtre === f;
+    const label = f === 'toutes' ? `Toutes (${declarations.length})` : `${IA_CANDIDATURE_STATUT_LABEL[f]} (${compteurs[f] || 0})`;
+    return `<button style="background:${actif ? 'oklch(0.32 0.09 258)' : '#fff'}; border:1px solid ${actif ? 'oklch(0.32 0.09 258)' : 'oklch(0.85 0.004 30)'}; color:${actif ? '#fff' : 'oklch(0.4 0.006 30)'}; font-size:12.5px; font-weight:600; padding:7px 14px; border-radius:20px; cursor:pointer; white-space:nowrap;" data-action="filtrerTraitementCandidatures" data-filtre="${f}">${label}</button>`;
+  }).join('');
+
+  const cartes = filtrees.map(d => {
+    const [bg, color] = IA_CANDIDATURE_STATUT_STYLE[d.statut] || IA_CANDIDATURE_STATUT_STYLE.en_attente;
+    /* Documents déposés par le candidat (2026-09-28, demande explicite) — en plus (ou à la
+       place) de l'envoi par e-mail, voir insc_candidature_uploads dans server/db.js. */
+    const depots = d.documents_deposes || [];
+    const depotsHtml = depots.length
+      ? `<div style="display:flex;flex-direction:column;gap:4px;margin:10px 0;">${depots.map(dep => `
+          <a href="${escH(dep.url)}" target="_blank" rel="noopener" style="font-size:12px;color:#6B0FA3;font-weight:600;text-decoration:none;">📄 ${escH(dep.titre)} ↗ <span style="font-weight:400;color:oklch(0.55 0.006 30);">déposé le ${escH((dep.depose_le || '').slice(0,10).split('-').reverse().join('/'))}</span></a>`).join('')}</div>`
+      : '';
+    return `
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;">
+        <h4 style="margin:0;font-size:14.5px;font-weight:700;">${escH(d.prenom || '')} ${escH(d.nom || '')}</h4>
+        <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${IA_CANDIDATURE_STATUT_LABEL[d.statut]}</span>
+      </div>
+      <div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin:8px 0;">${d.email ? '✉️ ' + escH(d.email) : ''}</div>
+      <div style="font-size:11.5px;color:oklch(0.55 0.006 30);font-family:'IBM Plex Mono', monospace;">Déclarée le ${escH((d.declare_le || '').slice(0,16).replace('T',' · '))}</div>
+      ${depotsHtml}
+      <div style="display:flex;gap:8px;padding-top:12px;margin-top:10px;border-top:1px solid oklch(0.92 0.004 30);">
+        ${d.statut !== 'acceptee' ? `<button style="flex:1;background:oklch(0.4 0.13 150);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="accepterCandidature" data-id="${d.id}">✅ Accepter</button>` : ''}
+        ${d.statut !== 'refusee' ? `<button style="flex:1;background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="refuserCandidature" data-id="${d.id}">❌ Refuser</button>` : ''}
+        ${d.statut !== 'en_attente' ? `<button style="flex:1;background:none;border:1px solid oklch(0.85 0.004 30);color:oklch(0.5 0.006 30);font-size:13px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;" data-action="remettreEnAttenteCandidature" data-id="${d.id}">↩️ Remettre en attente</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    ${iaConsigne("Une fois le dossier reçu par e-mail et examiné, enregistrez ici votre décision. Aucun envoi automatique : la déclaration \"J'ai candidaté\" n'est jamais une acceptation.")}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">${filtresHtml}</div>
+    ${filtrees.length
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">${cartes}</div>`
+      : `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:40px 20px;text-align:center;color:oklch(0.55 0.006 30);font-size:13px;">Aucune candidature${filtre !== 'toutes' ? ` « ${IA_CANDIDATURE_STATUT_LABEL[filtre]} »` : ''}.</div>`
+    }`;
 }
 
 // ---- Aperçu public (vraie donnée, via l'API publique) ----
@@ -2213,6 +2278,29 @@ const actions = {
       await api('DELETE', `/insc/candidature/documents/${el.dataset.id}`);
       ia_toast('Document supprimé.', true);
       await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  filtrerTraitementCandidatures(el) { state.traitementCandidatureFiltre = el.dataset.filtre; },
+  async accepterCandidature(el) {
+    try {
+      await api('PATCH', `/insc/candidature/declarations/${el.dataset.id}/statut`, { statut: 'acceptee' });
+      ia_toast('Candidature acceptée.', true);
+      await iaChargerCandidatureDeclarations();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async refuserCandidature(el) {
+    if (!confirm('Refuser cette candidature ? La personne ne sera pas notifiée automatiquement.')) return;
+    try {
+      await api('PATCH', `/insc/candidature/declarations/${el.dataset.id}/statut`, { statut: 'refusee' });
+      ia_toast('Candidature refusée.', true);
+      await iaChargerCandidatureDeclarations();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async remettreEnAttenteCandidature(el) {
+    try {
+      await api('PATCH', `/insc/candidature/declarations/${el.dataset.id}/statut`, { statut: 'en_attente' });
+      ia_toast('Candidature remise en attente.', true);
+      await iaChargerCandidatureDeclarations();
     } catch (e) { ia_toast(e.message, false); }
   },
   async toggleModeleStandard(el) {
