@@ -752,6 +752,40 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_insc_cand_uploads_user ON insc_candidature_uploads(user_id);
+  /* Candidature d'un visiteur SANS compte Diaspo'Actif (2026-09-28, demande explicite : "pas
+     besoin de créer un compte... juste une petite cartouche avec nom, prénom, nom de
+     l'organisme, adresse mail, numéro de téléphone... les informations que cette personne aura
+     saisies elle-même"). Miroir volontaire d'insc_candidature_declarations (mêmes colonnes de
+     contact + statut de traitement) mais SANS user_id — une vraie colonne user_id NOT NULL
+     existe déjà sur la table des candidats connectés, la rendre nullable aurait exigé une
+     reconstruction de table risquée sur une base partagée en cours de modification par une autre
+     session ; une table jumelle dédiée est le choix le plus sûr. L'onglet "Traitement
+     candidatures" doit lire les deux tables (déclarations connectées ET visiteurs) pour avoir la
+     liste complète — voir GET /api/insc/fiches/:id/candidature/declarations qui renvoie
+     désormais aussi declarations_visiteurs. */
+  CREATE TABLE IF NOT EXISTS insc_candidature_declarations_visiteurs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    config_id INTEGER NOT NULL,
+    nom TEXT NOT NULL, prenom TEXT NOT NULL, nom_organisme TEXT, email TEXT NOT NULL, telephone TEXT,
+    message TEXT,
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee')),
+    declare_le TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(config_id) REFERENCES insc_candidature_config(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_cand_decl_visit_config ON insc_candidature_declarations_visiteurs(config_id);
+  /* Dépôts de documents pour ces mêmes visiteurs sans compte — jumelle d'insc_candidature_uploads,
+     clé déclaration_id (au lieu de user_id) puisqu'un visiteur n'a pas de compte. */
+  CREATE TABLE IF NOT EXISTS insc_candidature_visiteur_uploads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    declaration_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    depose_le TEXT DEFAULT (datetime('now')),
+    UNIQUE(document_id, declaration_id),
+    FOREIGN KEY(document_id) REFERENCES insc_candidature_documents(id),
+    FOREIGN KEY(declaration_id) REFERENCES insc_candidature_declarations_visiteurs(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_cand_visit_uploads_decl ON insc_candidature_visiteur_uploads(declaration_id);
 
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

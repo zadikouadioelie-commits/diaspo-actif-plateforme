@@ -638,28 +638,53 @@ function ipRenderCandidature() {
       <button class="ip-cand-declare-btn" onclick="ipOuvrirCandidature()">🎓 Accéder à la candidature</button>
     </div>`;
 }
+/* Réponse d'un visiteur sans compte (2026-09-28, demande explicite) — id de la déclaration créée
+   par ipRepondreCandidature(), gardé en mémoire pour cette page seulement (pas de compte, donc
+   pas de session à laquelle le rattacher) : sert ensuite à ipDeposerCandidatureDoc() pour que ce
+   même visiteur puisse déposer ses documents sans se reconnecter. */
+let IP_CAND_VISITEUR_ID = null;
 function ipOuvrirCandidature() {
   if (!ipCandidatureVisible()) return;
   const cand = IP_CANDIDATURE;
   const c = cand.config;
   const docs = cand.documents || [];
-  const docsHtml = docs.map(d => `
-    <a class="ip-cand-doc" href="${escH(d.pdf_url)}" target="_blank" rel="noopener">
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  const visiteurValide = !connecte && !!IP_CAND_VISITEUR_ID;
+  /* Dépôt de document (2026-09-28, demande explicite : "créer un onglet Déposer un document qui
+     permet de déposer le même document que celui qui a été téléchargé", puis "où les personnes
+     pourront déposer les différents documents" y compris sans compte) — chaque document a un
+     contrôle de dépôt lié à CE document précis (pas un dépôt générique). Un visiteur sans compte
+     ne peut déposer qu'une fois sa réponse validée ci-dessous (IP_CAND_VISITEUR_ID rempli) : avant
+     ça, aucun identifiant (ni user_id, ni declaration_id) n'existe encore pour rattacher le fichier.
+     Le "Télécharger ↓" passe par ipTelechargerDocument() (blob local) plutôt qu'un lien
+     target="_blank" classique : sur certains navigateurs mobiles, ouvrir un PDF ainsi fait quitter
+     l'onglet/l'appli vers un lecteur externe, obligeant à "aller le rechercher" — plainte
+     utilisateur explicite. */
+  const docsHtml = docs.map(d => {
+    const depot = d.mon_depot;
+    const depoTexte = depot ? `le ${escH((depot.depose_le || '').slice(0, 10).split('-').reverse().join('/'))}` : '';
+    let deposerHtml;
+    if (!connecte && !visiteurValide) {
+      deposerHtml = `<span style="font-size:11px;color:oklch(0.55 0.006 30);font-weight:600;white-space:nowrap;">Répondez ci-dessous pour déposer</span>`;
+    } else {
+      const onchange = connecte ? `ipDeposerCandidatureDoc(this, ${d.id})` : `ipDeposerCandidatureDocVisiteur(this, ${d.id})`;
+      deposerHtml = `<label style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;padding:5px 10px;border-radius:6px;${depot ? 'color:#1C8A0E;border:1px solid #86EFAC;background:#F0FDF4;' : 'color:#6B0FA3;border:1px solid #D8B4FE;background:#FAF5FF;'}">
+          ${depot ? `✅ Déposé ${depoTexte} · remplacer` : '📤 Déposer un document'}
+          <input type="file" accept="application/pdf" style="display:none;" onchange="${onchange}">
+        </label>`;
+    }
+    return `
+    <div class="ip-cand-doc">
       <span>📄</span>
       <span class="ip-cand-doc-titre">${escH(d.titre)}${d.description ? ` <span style="font-weight:400;color:oklch(0.55 0.006 30);">— ${escH(d.description)}</span>` : ''}</span>
       ${d.obligatoire ? '<span class="ip-oblig">*</span>' : ''}
-      <span style="font-size:11.5px;color:#8B12D6;font-weight:600;white-space:nowrap;">Télécharger ↓</span>
-    </a>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucun document à télécharger pour l\'instant.</div>';
+      <button type="button" onclick="ipTelechargerDocument('${escH(d.pdf_url)}', '${escH(d.titre).replace(/'/g, "\\'")}')" style="background:none;border:none;font-size:11.5px;color:#8B12D6;font-weight:600;white-space:nowrap;cursor:pointer;padding:0;font-family:inherit;">Télécharger ↓</button>
+      ${deposerHtml}
+    </div>`;
+  }).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucun document à télécharger pour l\'instant.</div>';
   const emailHtml = c.email_reception
     ? `<div class="ip-cand-email">✉️ Envoyez vos documents complétés à : <a href="mailto:${escH(c.email_reception)}" style="color:#6B0FA3;font-weight:700;">${escH(c.email_reception)}</a></div>`
     : '';
-  const dejaDeclare = !!cand.deja_declare;
-  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
-  const btnHtml = dejaDeclare
-    ? `<button class="ip-cand-declare-btn" disabled>✅ Candidature déclarée</button>`
-    : connecte
-      ? `<button class="ip-cand-declare-btn" onclick="ipDeclarerCandidature(this)">✅ J'ai candidaté</button>`
-      : `<a class="ip-cand-declare-btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;" href="login.html">Se connecter pour déclarer ma candidature</a>`;
   document.getElementById('ip-root').innerHTML = `
     ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
     <button class="ip-btn outline" style="margin-bottom:18px;" onclick="ipRenderAccueil()">← Retour</button>
@@ -668,21 +693,83 @@ function ipOuvrirCandidature() {
       ${c.description ? `<p style="font-size:13px;color:oklch(0.4 0.006 30);margin:0 0 8px;">${escH(c.description)}</p>` : ''}
       ${c.instructions ? `<p style="font-size:12.5px;color:oklch(0.5 0.006 30);margin:0 0 8px;">${escH(c.instructions)}</p>` : ''}
       ${c.message_candidat ? `<p style="font-size:12.5px;font-style:italic;color:oklch(0.5 0.006 30);margin:0 0 8px;">${escH(c.message_candidat)}</p>` : ''}
+      <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:oklch(0.5 0.006 30);margin-bottom:8px;">📄 Documents pour répondre à la candidature</div>
       <div class="ip-cand-docs">${docsHtml}</div>
       ${emailHtml}
-      ${btnHtml}
+      ${ipRenderFormulaireReponse(cand, connecte, visiteurValide)}
     </div>`;
 }
-async function ipDeclarerCandidature(btn) {
+/* Formulaire "Répondre à la candidature" (2026-09-28, demande explicite) — remplace l'ancien
+   bouton "J'ai candidaté" purement déclaratif. Connecté : identité reprise automatiquement du
+   compte (nom/prénom/organisme/e-mail/téléphone), rien à saisir à part un message facultatif —
+   voir mon_organisme/mon_message renvoyés par GET /insc/public/:slug. Sans compte : petite
+   cartouche à remplir soi-même (nom, prénom, organisme, e-mail, téléphone), aucune création de
+   compte. Dans les deux cas, valider crée/replace la réponse ; pour un visiteur sans compte, ça
+   débloque aussi le dépôt des documents ci-dessus (voir IP_CAND_VISITEUR_ID). */
+function ipRenderFormulaireReponse(cand, connecte, visiteurValide) {
+  if (visiteurValide) {
+    return `<div style="font-size:12.5px;color:#1C8A0E;font-weight:700;background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:10px 12px;">✅ Votre réponse est enregistrée — vous pouvez déposer vos documents ci-dessus.</div>`;
+  }
+  const identiteHtml = connecte
+    ? `<div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin-bottom:10px;">Vous répondez en tant que <strong>${escH([CURRENT_USER.prenom, CURRENT_USER.nom].filter(Boolean).join(' ') || CURRENT_USER.email)}</strong>${cand.mon_organisme ? ` — ${escH(cand.mon_organisme)}` : ''}${CURRENT_USER.email ? ` (${escH(CURRENT_USER.email)})` : ''}</div>`
+    : `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+        <input id="ip-cand-nom" type="text" placeholder="Nom *" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
+        <input id="ip-cand-prenom" type="text" placeholder="Prénom *" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
+        <input id="ip-cand-organisme" type="text" placeholder="Nom de l'organisme" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
+        <input id="ip-cand-email" type="email" placeholder="Adresse e-mail *" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
+        <input id="ip-cand-telephone" type="tel" placeholder="Téléphone" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
+      </div>`;
+  return `
+    <div style="border-top:1px solid oklch(0.92 0.004 30);margin-top:14px;padding-top:14px;">
+      <div class="ip-cand-titre" style="font-size:13.5px;margin-bottom:8px;">✍️ Répondre à la candidature</div>
+      ${identiteHtml}
+      <textarea id="ip-cand-message" placeholder="Message pour l'organisateur (facultatif)" style="width:100%;min-height:70px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">${connecte ? escH(cand.mon_message || '') : ''}</textarea>
+      <button class="ip-cand-declare-btn" onclick="ipRepondreCandidature(this)">${connecte && cand.deja_declare ? 'Mettre à jour ma réponse' : '✍️ Valider ma réponse'}</button>
+    </div>`;
+}
+async function ipRepondreCandidature(btn) {
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  const texteOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Envoi…';
   try {
-    await fetch(`/api/insc/public/${IP_SLUG}/candidature/declarer`, { method: 'POST', credentials: 'include' })
-      .then(async r => { const d = await r.json().catch(()=>({})); if (!r.ok) throw new Error(d.error || 'Erreur'); });
-    if (IP_CANDIDATURE) IP_CANDIDATURE.deja_declare = true;
-    btn.outerHTML = `<button class="ip-cand-declare-btn" disabled>✅ Candidature déclarée</button>`;
+    const message = document.getElementById('ip-cand-message')?.value || '';
+    if (connecte) {
+      await api('POST', `/insc/public/${IP_SLUG}/candidature/declarer`, { message });
+      if (IP_CANDIDATURE) { IP_CANDIDATURE.deja_declare = true; IP_CANDIDATURE.mon_message = message; }
+    } else {
+      const nom = (document.getElementById('ip-cand-nom')?.value || '').trim();
+      const prenom = (document.getElementById('ip-cand-prenom')?.value || '').trim();
+      const nom_organisme = (document.getElementById('ip-cand-organisme')?.value || '').trim();
+      const email = (document.getElementById('ip-cand-email')?.value || '').trim();
+      const telephone = (document.getElementById('ip-cand-telephone')?.value || '').trim();
+      if (!nom || !prenom || !email) { alert('Nom, prénom et e-mail sont requis.'); btn.disabled = false; btn.textContent = texteOriginal; return; }
+      const r = await api('POST', `/insc/public/${IP_SLUG}/candidature/repondre-visiteur`, { nom, prenom, nom_organisme, email, telephone, message });
+      IP_CAND_VISITEUR_ID = r.declaration_id;
+    }
+    ipOuvrirCandidature();
   } catch (e) {
-    alert(e.message || 'Erreur lors de la déclaration.');
-    btn.disabled = false; btn.textContent = "✅ J'ai candidaté";
+    alert(e.message || "Erreur lors de l'envoi.");
+    btn.disabled = false; btn.textContent = texteOriginal;
+  }
+}
+/* Jumelle de la fonction ci-dessus pour un visiteur sans compte (2026-09-28, demande explicite)
+   — utilise IP_CAND_VISITEUR_ID (rempli par ipRepondreCandidature()) à la place d'une session
+   utilisateur pour rattacher le dépôt à sa réponse. */
+async function ipDeposerCandidatureDocVisiteur(input, documentId) {
+  const file = input.files[0]; if (!file) return;
+  if (!IP_CAND_VISITEUR_ID) { alert('Répondez d\'abord au formulaire ci-dessous.'); return; }
+  const label = input.closest('label');
+  const texteOriginal = label.innerHTML;
+  label.innerHTML = 'Envoi…';
+  try {
+    const url = await uploadMedia(file, 'document');
+    await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer-visiteur`, { url, declaration_id: IP_CAND_VISITEUR_ID });
+    const doc = (IP_CANDIDATURE?.documents || []).find(d => Number(d.id) === Number(documentId));
+    if (doc) doc.mon_depot = { url, depose_le: new Date().toISOString() };
+    ipOuvrirCandidature();
+  } catch (e) {
+    alert(e.message || 'Erreur lors du dépôt du document.');
+    label.innerHTML = texteOriginal;
   }
 }
 

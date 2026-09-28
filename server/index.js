@@ -1171,6 +1171,31 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscCandidatureDeclarationsStatut]', e.message); }
 })();
 
+/* "Répondre à la candidature" (2026-09-28, demande explicite) — le bouton "J'ai candidaté"
+   n'était qu'une case auto-déclarative (nom/prénom/e-mail du compte, rien d'autre) ; l'organisme
+   représenté, un téléphone de contact et un message libre à l'organisateur manquaient pour que
+   celui-ci puisse vraiment recontacter le candidat. Colonnes nullables ajoutées à la table
+   existante plutôt qu'une nouvelle table : insc_candidature_declarations reste la SEULE source
+   pour les candidats connectés, déjà lue par l'onglet "Traitement candidatures" (SELECT * dans
+   GET /api/insc/fiches/:id/candidature/declarations) — aucune autre route à toucher pour que ces
+   champs y apparaissent. */
+(async function migrateInscCandidatureDeclarationsContact() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(insc_candidature_declarations)").all()).map(c => c.name);
+    if (cols.length) {
+      if (!cols.includes('nom_organisme')) {
+        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN nom_organisme TEXT").run(); } catch (e) {}
+      }
+      if (!cols.includes('telephone')) {
+        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN telephone TEXT").run(); } catch (e) {}
+      }
+      if (!cols.includes('message')) {
+        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN message TEXT").run(); } catch (e) {}
+      }
+    }
+  } catch (e) { console.error('[migrateInscCandidatureDeclarationsContact]', e.message); }
+})();
+
 /* ═══════════════════════════════════════════════════════════════════
    MODULE LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite)
    Liens/QR codes à usage unique distribués par l'administration : 1 lien = 1 personne =
@@ -42666,7 +42691,19 @@ route("GET", "/api/insc/fiches/:id/candidature/declarations", async (req, res, p
     for (const dep of depots) (parUser[dep.user_id] = parUser[dep.user_id] || []).push(dep);
     for (const decl of declarations) decl.documents_deposes = parUser[decl.user_id] || [];
   }
-  sendJSON(res, 200, { declarations, total: declarations.length });
+  const declarationsVisiteurs = await db.prepare("SELECT * FROM insc_candidature_declarations_visiteurs WHERE config_id=? ORDER BY declare_le DESC").all(config.id);
+  if (declarationsVisiteurs.length) {
+    const depotsVisiteurs = await db.prepare(`
+      SELECT u.declaration_id, u.url, u.depose_le, d.id AS document_id, d.titre
+      FROM insc_candidature_visiteur_uploads u
+      JOIN insc_candidature_documents d ON d.id = u.document_id
+      WHERE d.config_id=?
+    `).all(config.id);
+    const parDeclaration = {};
+    for (const dep of depotsVisiteurs) (parDeclaration[dep.declaration_id] = parDeclaration[dep.declaration_id] || []).push(dep);
+    for (const decl of declarationsVisiteurs) decl.documents_deposes = parDeclaration[decl.id] || [];
+  }
+  sendJSON(res, 200, { declarations, declarations_visiteurs: declarationsVisiteurs, total: declarations.length + declarationsVisiteurs.length });
 });
 
 /* Traitement d'une candidature déclarée (onglet "Traitement candidatures", 2026-09-28, demande
@@ -42690,13 +42727,34 @@ route("PATCH", "/api/insc/candidature/declarations/:id/statut", async (req, res,
   sendJSON(res, 200, { ok: true });
 });
 
-/* Déclaration publique ("J'ai candidaté") — compte requis (le nom/prénom/e-mail viennent du
-   compte connecté, jamais saisis à la main), jamais une confirmation que l'e-mail contenant
-   les documents a réellement été reçu par l'organisateur. La contrainte UNIQUE(config_id,
-   user_id) protège nativement contre un double clic sans logique applicative supplémentaire. */
-route("POST", "/api/insc/public/:slug/candidature/declarer", async (req, res, params) => {
+/* Jumelle de la route ci-dessus pour une candidature de visiteur sans compte (2026-09-28) — table
+   distincte, donc route distincte plutôt qu'un id ambigu partagé entre les deux tables. */
+route("PATCH", "/api/insc/candidature/declarations-visiteurs/:id/statut", async (req, res, params, body) => {
+  const declaration = await db.prepare(`
+    SELECT d.*, c.fiche_id FROM insc_candidature_declarations_visiteurs d
+    JOIN insc_candidature_config c ON c.id = d.config_id
+    WHERE d.id = ?
+  `).get(params.id);
+  if (!declaration) return sendJSON(res, 404, { error: "Candidature introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, declaration.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!INSC_CANDIDATURE_STATUTS.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  await db.prepare("UPDATE insc_candidature_declarations_visiteurs SET statut=? WHERE id=?").run(body.statut, declaration.id);
+  const libelles = { en_attente: "remise en attente", acceptee: "acceptée", refusee: "refusée" };
+  await inscJournaliser(declaration.fiche_id, user, "candidature_traitee", `Candidature de ${declaration.prenom || ""} ${declaration.nom || ""} (visiteur) ${libelles[body.statut]}.`);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* "Répondre à la candidature", compte connecté (2026-09-28, demande explicite : "pour ceux qui
+   ont un compte... ils n'ont rien à remplir, ces données doivent être saisies automatiquement")
+   — nom/prénom/e-mail/téléphone/organisme viennent TOUS du compte, jamais saisis à la main ;
+   seul `message` est une saisie libre optionnelle. Remplace l'ancien comportement "ignorer si
+   déjà déclaré" par un vrai upsert (ON CONFLICT) : renvoyer le formulaire met à jour le message
+   plutôt que de ne plus rien faire silencieusement. Jamais une confirmation que l'e-mail
+   contenant les documents a réellement été reçu par l'organisateur. */
+route("POST", "/api/insc/public/:slug/candidature/declarer", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
-  if (!user) return sendJSON(res, 401, { error: "Connectez-vous pour déclarer votre candidature." });
+  if (!user) return sendJSON(res, 401, { error: "Connectez-vous pour répondre à la candidature." });
   const ip = SEC.clientIp(req);
   const ipLimit = SEC.rateLimit(`insc-candidature-declarer:ip:${ip}`, 10, 15 * 60 * 1000);
   if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
@@ -42707,11 +42765,48 @@ route("POST", "/api/insc/public/:slug/candidature/declarer", async (req, res, pa
   const now = new Date();
   if (config.date_ouverture && new Date(config.date_ouverture) > now) return sendJSON(res, 400, { error: "Les candidatures ne sont pas encore ouvertes." });
   if (config.date_fermeture && new Date(config.date_fermeture) < now) return sendJSON(res, 400, { error: "Les candidatures sont désormais fermées." });
+  const initiative = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(user.id);
+  const message = (body?.message || "").trim().slice(0, 2000) || null;
   try {
-    await db.prepare("INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email) VALUES (?,?,?,?,?)")
-      .run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null);
-  } catch (e) { /* contrainte UNIQUE(config_id,user_id) déjà déclenchée = déjà déclaré, pas une erreur */ }
+    await db.prepare(`
+      INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email, nom_organisme, telephone, message)
+      VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(config_id, user_id) DO UPDATE SET message=excluded.message
+    `).run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null, initiative?.nom || null, user.telephone || null, message);
+  } catch (e) { console.error('[candidature/declarer]', e.message); return sendJSON(res, 500, { error: "Erreur serveur." }); }
   sendJSON(res, 200, { ok: true });
+});
+
+/* "Répondre à la candidature", visiteur SANS compte (2026-09-28, demande explicite : "pas besoin
+   de créer un compte... la personne aura saisi elle-même" nom/prénom/organisme/e-mail/téléphone)
+   — table jumelle insc_candidature_declarations_visiteurs (voir server/db.js), jamais
+   insc_candidature_declarations dont user_id est NOT NULL. Retourne l'id de la déclaration créée :
+   le front s'en sert ensuite pour déposer les documents (POST .../documents/:id/deposer-visiteur),
+   un visiteur n'ayant pas de session pour s'authentifier à cette étape suivante. */
+route("POST", "/api/insc/public/:slug/candidature/repondre-visiteur", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc-candidature-repondre-visiteur:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const nom = (body?.nom || "").trim();
+  const prenom = (body?.prenom || "").trim();
+  const email = (body?.email || "").trim();
+  if (!nom || !prenom || !email) return sendJSON(res, 400, { error: "Nom, prénom et e-mail sont requis." });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=? AND statut='publiee'").get(params.slug);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  const config = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=? AND actif=1").get(fiche.id);
+  if (!config) return sendJSON(res, 404, { error: "Aucune candidature active sur cette fiche." });
+  const now = new Date();
+  if (config.date_ouverture && new Date(config.date_ouverture) > now) return sendJSON(res, 400, { error: "Les candidatures ne sont pas encore ouvertes." });
+  if (config.date_fermeture && new Date(config.date_fermeture) < now) return sendJSON(res, 400, { error: "Les candidatures sont désormais fermées." });
+  const nomOrganisme = (body?.nom_organisme || "").trim().slice(0, 200) || null;
+  const telephone = (body?.telephone || "").trim().slice(0, 40) || null;
+  const message = (body?.message || "").trim().slice(0, 2000) || null;
+  const id = (await db.prepare(`
+    INSERT INTO insc_candidature_declarations_visiteurs (config_id, nom, prenom, nom_organisme, email, telephone, message)
+    VALUES (?,?,?,?,?,?,?)
+  `).run(config.id, nom.slice(0, 100), prenom.slice(0, 100), nomOrganisme, email.slice(0, 200), telephone, message)).lastInsertRowid;
+  sendJSON(res, 201, { ok: true, declaration_id: id });
 });
 
 /* POST /api/insc/public/:slug/candidature/documents/:documentId/deposer — le candidat dépose la
@@ -42741,6 +42836,34 @@ route("POST", "/api/insc/public/:slug/candidature/documents/:documentId/deposer"
     INSERT INTO insc_candidature_uploads (document_id, user_id, url) VALUES (?,?,?)
     ON CONFLICT(document_id, user_id) DO UPDATE SET url=excluded.url, depose_le=datetime('now')
   `).run(doc.id, user.id, url);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Jumelle de la route ci-dessus pour un visiteur SANS compte (2026-09-28, demande explicite) —
+   `declaration_id` (renvoyé par .../candidature/repondre-visiteur) remplace l'authentification :
+   vérifié contre la config de CETTE fiche pour empêcher de déposer sur une déclaration d'une
+   autre candidature. */
+route("POST", "/api/insc/public/:slug/candidature/documents/:documentId/deposer-visiteur", async (req, res, params, body) => {
+  const declarationId = parseInt(body?.declaration_id);
+  const url = (body?.url || "").trim();
+  if (!declarationId || !url) return sendJSON(res, 400, { error: "Réponse ou document manquant." });
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc-candidature-deposer-visiteur:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=? AND statut='publiee'").get(params.slug);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  const doc = await db.prepare(`
+    SELECT d.* FROM insc_candidature_documents d
+    JOIN insc_candidature_config c ON c.id = d.config_id
+    WHERE d.id=? AND c.fiche_id=? AND c.actif=1
+  `).get(params.documentId, fiche.id);
+  if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+  const declaration = await db.prepare("SELECT id FROM insc_candidature_declarations_visiteurs WHERE id=? AND config_id=?").get(declarationId, doc.config_id);
+  if (!declaration) return sendJSON(res, 404, { error: "Réponse à la candidature introuvable — répondez d'abord au formulaire." });
+  await db.prepare(`
+    INSERT INTO insc_candidature_visiteur_uploads (document_id, declaration_id, url) VALUES (?,?,?)
+    ON CONFLICT(document_id, declaration_id) DO UPDATE SET url=excluded.url, depose_le=datetime('now')
+  `).run(doc.id, declarationId, url);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -42849,7 +42972,14 @@ route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
   // Bug réel trouvé le 2026-09-28 en nettoyant une fiche de test : le module "Dossier de
   // candidature" (2026-09-27) n'était pas nettoyé ici, donc toute fiche ayant une configuration
   // de candidature ne pouvait plus jamais être supprimée (FOREIGN KEY constraint failed, 500).
+  // Réoccurrence le même jour : les tables ajoutées ensuite par une autre session (uploads des
+  // candidats connectés) puis par "Répondre à la candidature" (déclarations et dépôts des
+  // visiteurs sans compte) n'étaient pas non plus nettoyées — ordre : dépôts d'abord (ils
+  // référencent documents ET déclarations), puis déclarations, puis documents, puis la config.
+  await db.prepare("DELETE FROM insc_candidature_uploads WHERE document_id IN (SELECT id FROM insc_candidature_documents WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?))").run(fiche.id);
+  await db.prepare("DELETE FROM insc_candidature_visiteur_uploads WHERE document_id IN (SELECT id FROM insc_candidature_documents WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?))").run(fiche.id);
   await db.prepare("DELETE FROM insc_candidature_declarations WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
+  await db.prepare("DELETE FROM insc_candidature_declarations_visiteurs WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
   await db.prepare("DELETE FROM insc_candidature_documents WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
   await db.prepare("DELETE FROM insc_candidature_config WHERE fiche_id=?").run(fiche.id);
   await db.prepare("DELETE FROM insc_fiches WHERE id=?").run(fiche.id);
@@ -43233,9 +43363,14 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     if (config) {
       const documents = await db.prepare("SELECT * FROM insc_candidature_documents WHERE config_id=? ORDER BY ordre ASC, id ASC").all(config.id);
       const visiteur = await getCurrentUser(req).catch(() => null);
-      const dejaDeclare = visiteur
-        ? !!(await db.prepare("SELECT 1 FROM insc_candidature_declarations WHERE config_id=? AND user_id=?").get(config.id, visiteur.id))
-        : false;
+      const maDeclaration = visiteur
+        ? await db.prepare("SELECT * FROM insc_candidature_declarations WHERE config_id=? AND user_id=?").get(config.id, visiteur.id)
+        : null;
+      let monOrganisme = maDeclaration?.nom_organisme || null;
+      if (visiteur && !monOrganisme) {
+        const initiative = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(visiteur.id);
+        monOrganisme = initiative?.nom || null;
+      }
       /* Dépôt de document (2026-09-28, demande explicite) — indique, pour le visiteur connecté,
          ce qu'il a déjà déposé sur chaque document afin que la page publique affiche "✅ Déposé"
          plutôt que de reproposer un dépôt à chaque visite. */
@@ -43248,7 +43383,12 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
         const parDoc = {}; for (const dep of mesDepots) parDoc[dep.document_id] = dep;
         for (const doc of documents) doc.mon_depot = parDoc[doc.id] || null;
       }
-      candidature = { config, documents, deja_declare: dejaDeclare };
+      candidature = {
+        config, documents,
+        deja_declare: !!maDeclaration,
+        mon_organisme: monOrganisme,
+        mon_message: maDeclaration?.message || null,
+      };
     }
   } catch (e) { console.error('[insc-public-candidature]', e.message); }
   sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature });
