@@ -614,14 +614,34 @@ function ipRenderConfirmation(d) {
    détection dans l'app : documents PDF à télécharger + adresse e-mail de réception, plus un
    bouton "J'ai candidaté" auto-déclaratif (compte requis) qui alimente la gestion de la fiche
    côté organisateur. "Dossier de candidature" plutôt que juste "Candidature" dans le libellé
-   pour ne jamais être confondu avec le module recrutement (candidatures d'emploi). */
-function ipRenderCandidature() {
+   pour ne jamais être confondu avec le module recrutement (candidatures d'emploi).
+   Repliée derrière un bouton "Accéder à la candidature" (2026-09-28, demande explicite) — la
+   page d'accueil montrait jusqu'ici modalités/documents/bouton de déclaration en clair, ce qui
+   noyait les autres types d'inscription ; même patron de navigation que ipOuvrirType() (le clic
+   remplace #ip-root par la vue détaillée, avec un "← Retour" vers ipRenderAccueil()). */
+function ipCandidatureVisible() {
   const cand = IP_CANDIDATURE;
-  if (!cand || !cand.config || !cand.config.actif) return '';
+  if (!cand || !cand.config || !cand.config.actif) return false;
   const c = cand.config;
   const now = new Date();
-  if (c.date_ouverture && new Date(c.date_ouverture) > now) return '';
-  if (c.date_fermeture && new Date(c.date_fermeture) < now) return '';
+  if (c.date_ouverture && new Date(c.date_ouverture) > now) return false;
+  if (c.date_fermeture && new Date(c.date_fermeture) < now) return false;
+  return true;
+}
+function ipRenderCandidature() {
+  if (!ipCandidatureVisible()) return '';
+  const c = IP_CANDIDATURE.config;
+  return `
+    <div class="ip-cand-box">
+      <div class="ip-cand-titre">🎓 ${escH(c.titre || 'Dossier de candidature')}</div>
+      ${c.description ? `<p style="font-size:13px;color:oklch(0.4 0.006 30);margin:0 0 12px;">${escH(c.description)}</p>` : ''}
+      <button class="ip-cand-declare-btn" onclick="ipOuvrirCandidature()">🎓 Accéder à la candidature</button>
+    </div>`;
+}
+function ipOuvrirCandidature() {
+  if (!ipCandidatureVisible()) return;
+  const cand = IP_CANDIDATURE;
+  const c = cand.config;
   const docs = cand.documents || [];
   const docsHtml = docs.map(d => `
     <a class="ip-cand-doc" href="${escH(d.pdf_url)}" target="_blank" rel="noopener">
@@ -640,7 +660,9 @@ function ipRenderCandidature() {
     : connecte
       ? `<button class="ip-cand-declare-btn" onclick="ipDeclarerCandidature(this)">✅ J'ai candidaté</button>`
       : `<a class="ip-cand-declare-btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;" href="login.html">Se connecter pour déclarer ma candidature</a>`;
-  return `
+  document.getElementById('ip-root').innerHTML = `
+    ${IP_APERCU ? IP_BANDEAU_APERCU : ''}
+    <button class="ip-btn outline" style="margin-bottom:18px;" onclick="ipRenderAccueil()">← Retour</button>
     <div class="ip-cand-box">
       <div class="ip-cand-titre">🎓 ${escH(c.titre || 'Dossier de candidature')}</div>
       ${c.description ? `<p style="font-size:13px;color:oklch(0.4 0.006 30);margin:0 0 8px;">${escH(c.description)}</p>` : ''}

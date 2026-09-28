@@ -42765,6 +42765,13 @@ route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
   await db.prepare("DELETE FROM insc_types WHERE fiche_id=?").run(fiche.id);
   await db.prepare("DELETE FROM insc_fiches_evenements WHERE fiche_id=?").run(fiche.id);
   await db.prepare("DELETE FROM insc_historique WHERE fiche_id=?").run(fiche.id);
+  await db.prepare("DELETE FROM insc_fiches_medias WHERE fiche_id=?").run(fiche.id);
+  // Bug réel trouvé le 2026-09-28 en nettoyant une fiche de test : le module "Dossier de
+  // candidature" (2026-09-27) n'était pas nettoyé ici, donc toute fiche ayant une configuration
+  // de candidature ne pouvait plus jamais être supprimée (FOREIGN KEY constraint failed, 500).
+  await db.prepare("DELETE FROM insc_candidature_declarations WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
+  await db.prepare("DELETE FROM insc_candidature_documents WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
+  await db.prepare("DELETE FROM insc_candidature_config WHERE fiche_id=?").run(fiche.id);
   await db.prepare("DELETE FROM insc_fiches WHERE id=?").run(fiche.id);
   sendJSON(res, 200, { ok: true });
 });
