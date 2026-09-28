@@ -1019,7 +1019,15 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
       // décidé cet état, pour ne jamais afficher une heure différente de celle réellement appliquée.
       const f = d.fiche || {};
       const estFermee = !!d.fermee;
-      const dateCle = estFermee ? f.date_fermeture_inscriptions : f.date_ouverture_inscriptions;
+      /* "fermee" est désormais aussi un statut manuel (voir GET /api/insc/public/:slug,
+         2026-09-28) : date_fermeture_inscriptions peut alors être une date FUTURE encore
+         jamais atteinte (l'organisateur a fermé à la main avant l'échéance programmée) — bug
+         remonté en capture : "fermé depuis le 7 novembre 2026 alors qu'on est le 28.09.2026".
+         On n'affiche donc cette date que si elle est réellement passée ; sinon pas de date
+         plutôt qu'une date fausse. */
+      const dateFermetureProgrammee = f.date_fermeture_inscriptions ? new Date(String(f.date_fermeture_inscriptions).replace(' ', 'T')) : null;
+      const fermeturePourDatePassee = estFermee && dateFermetureProgrammee && !isNaN(dateFermetureProgrammee) && dateFermetureProgrammee < new Date();
+      const dateCle = estFermee ? (fermeturePourDatePassee ? f.date_fermeture_inscriptions : null) : f.date_ouverture_inscriptions;
       let dateTxt = '';
       if (dateCle) {
         const dt = new Date(String(dateCle).replace(' ', 'T'));
