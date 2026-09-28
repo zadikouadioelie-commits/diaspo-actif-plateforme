@@ -88,6 +88,12 @@
 .ip-statut-fermee .ip-statut-date{color:oklch(0.5 0.1 20);}
 .ip-types{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
 .ip-type-card{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;background:#fff;}
+.ip-logos-section{margin-bottom:22px;}
+.ip-logos-titre{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.55 0.006 30);margin:0 0 10px;}
+.ip-logos-grid{display:flex;flex-wrap:wrap;gap:12px;}
+.ip-logo-item{display:flex;flex-direction:column;align-items:center;gap:6px;width:84px;}
+.ip-logo-item img{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid oklch(0.9 0.004 30);background:#fff;}
+.ip-logo-item span{font-size:11px;color:oklch(0.45 0.006 30);text-align:center;line-height:1.3;}
 .ip-type-card.complet{opacity:.6;}
 .ip-type-label{font-weight:700;font-size:15px;}
 .ip-type-prix,.ip-type-places{font-size:12.5px;color:oklch(0.5 0.006 30);}
@@ -136,6 +142,7 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
+<script src="assets/upload-media.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
@@ -599,6 +606,11 @@ function ipRenderConfirmation(d) {
     inscrit: { icon: '⏳', titre: 'Inscription soumise à validation', note: "Votre inscription sera examinée par l'organisateur. Vous recevrez un e-mail avec votre billet dès qu'elle sera validée." },
   };
   const info = parStatut[d.statut] || { icon: '✅', titre: 'Inscription confirmée !', note: null };
+  /* "← Retour" (2026-09-28, demande explicite : "des boutons retour... sans pour autant
+     complètement sortir de la fiche, pour éviter d'avoir à tout recommencer") — jusqu'ici cet
+     écran de confirmation était un cul-de-sac : aucun moyen de revenir à l'accueil de la fiche
+     (autres types d'inscription, candidature...) sans recharger la page entière. Reste dans
+     #ip-root, IP_FICHE/IP_TYPES/IP_CANDIDATURE déjà chargés en mémoire ne sont pas reperdus. */
   document.getElementById('ip-root').innerHTML = `
     <div class="ip-confirmation">
       <div class="grand">${info.icon}</div>
@@ -607,7 +619,8 @@ function ipRenderConfirmation(d) {
       ${info.note
         ? `<p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">${info.note}</p>`
         : `<a class="ip-btn" style="text-decoration:none;display:inline-block;margin-top:16px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>`}
-    </div>`;
+    </div>
+    <button class="ip-btn outline" style="margin-top:18px;" onclick="ipRenderAccueil()">← Retour à la fiche</button>`;
 }
 
 /* Bloc "Dossier de candidature" (2026-09-27, demande explicite) — jamais de remplissage ni
@@ -668,10 +681,20 @@ function ipOuvrirCandidature() {
       deposerHtml = `<span style="font-size:11px;color:oklch(0.55 0.006 30);font-weight:600;white-space:nowrap;">Répondez ci-dessous pour déposer</span>`;
     } else {
       const onchange = connecte ? `ipDeposerCandidatureDoc(this, ${d.id})` : `ipDeposerCandidatureDocVisiteur(this, ${d.id})`;
-      deposerHtml = `<label style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;padding:5px 10px;border-radius:6px;${depot ? 'color:#1C8A0E;border:1px solid #86EFAC;background:#F0FDF4;' : 'color:#6B0FA3;border:1px solid #D8B4FE;background:#FAF5FF;'}">
-          ${depot ? `✅ Déposé ${depoTexte} · remplacer` : '📤 Déposer un document'}
-          <input type="file" accept="application/pdf" style="display:none;" onchange="${onchange}">
-        </label>`;
+      /* Statut de dépôt visible (2026-09-28, demande explicite : "lorsqu'un document est
+         sélectionné, il s'affiche en dessous avec le titre du document sélectionné... sinon
+         c'est très compliqué de savoir") — id stable par document, mis à jour directement par
+         ipDeposerCandidatureDoc()/…Visiteur() dès la sélection du fichier (nom affiché tout de
+         suite) puis pendant/après l'envoi, y compris en cas d'erreur (affichée ici, jamais
+         seulement en alert() qui peut passer inaperçue). */
+      deposerHtml = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;padding:5px 10px;border-radius:6px;align-self:flex-start;${depot ? 'color:#1C8A0E;border:1px solid #86EFAC;background:#F0FDF4;' : 'color:#6B0FA3;border:1px solid #D8B4FE;background:#FAF5FF;'}">
+            ${depot ? '🔁 Remplacer le document' : '📤 Déposer un document'}
+            <input type="file" accept="application/pdf" style="display:none;" onchange="${onchange}">
+          </label>
+          <span id="ip-depot-statut-${d.id}" style="font-size:11px;font-weight:600;${depot ? 'color:#1C8A0E;' : 'color:oklch(0.55 0.006 30);'}">${depot ? `✅ Déposé ${depoTexte}` : ''}</span>
+        </div>`;
     }
     return `
     <div class="ip-cand-doc">
@@ -752,15 +775,54 @@ async function ipRepondreCandidature(btn) {
     btn.disabled = false; btn.textContent = texteOriginal;
   }
 }
+/* Téléchargement d'un document de candidature SANS quitter la fenêtre (2026-09-28, demande
+   explicite) — récupère le PDF en blob local plutôt que de naviguer avec target="_blank" : sur
+   certains navigateurs mobiles, un lien PDF direct ouvre un lecteur externe (l'appli/l'onglet
+   perd la main, l'utilisateur doit "aller le rechercher"). Repli sur l'ouverture classique en
+   nouvel onglet si le fetch échoue (CORS ou réseau) — jamais de blocage silencieux. */
+async function ipTelechargerDocument(url, titre) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Téléchargement impossible.');
+    const blob = await r.blob();
+    const ext = (url.split('?')[0].split('.').pop() || 'pdf').toLowerCase();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(titre || 'document').replace(/[^a-z0-9 _-]/gi, '').trim() || 'document'}.${ext}`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) {
+    window.open(url, '_blank', 'noopener');
+  }
+}
+/* Dépôt du document rempli par le candidat (2026-09-28, demande explicite) — même document que
+   celui téléchargé, renvoyé directement sur la plateforme plutôt que uniquement par e-mail.
+   L'upload lui-même passe par uploadMedia()/POST /api/upload/document (déjà existant, Bunny CDN,
+   magic-bytes) ; cette fonction enregistre ensuite l'URL obtenue sur CE document précis. */
+async function ipDeposerCandidatureDoc(input, documentId) {
+  const file = input.files[0]; if (!file) return;
+  const statutEl = document.getElementById(`ip-depot-statut-${documentId}`);
+  if (statutEl) { statutEl.style.color = 'oklch(0.55 0.006 30)'; statutEl.textContent = `📄 ${file.name} — envoi en cours…`; }
+  try {
+    const url = await uploadMedia(file, 'document');
+    await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer`, { url });
+    const doc = (IP_CANDIDATURE?.documents || []).find(d => Number(d.id) === Number(documentId));
+    if (doc) doc.mon_depot = { url, depose_le: new Date().toISOString() };
+    ipOuvrirCandidature();
+  } catch (e) {
+    console.error('[ipDeposerCandidatureDoc]', e);
+    if (statutEl) { statutEl.style.color = 'oklch(0.5 0.16 20)'; statutEl.textContent = `❌ ${file.name} — ${e.message || 'échec du dépôt'}`; }
+    else alert(e.message || 'Erreur lors du dépôt du document.');
+  }
+}
 /* Jumelle de la fonction ci-dessus pour un visiteur sans compte (2026-09-28, demande explicite)
    — utilise IP_CAND_VISITEUR_ID (rempli par ipRepondreCandidature()) à la place d'une session
    utilisateur pour rattacher le dépôt à sa réponse. */
 async function ipDeposerCandidatureDocVisiteur(input, documentId) {
   const file = input.files[0]; if (!file) return;
   if (!IP_CAND_VISITEUR_ID) { alert('Répondez d\'abord au formulaire ci-dessous.'); return; }
-  const label = input.closest('label');
-  const texteOriginal = label.innerHTML;
-  label.innerHTML = 'Envoi…';
+  const statutEl = document.getElementById(`ip-depot-statut-${documentId}`);
+  if (statutEl) { statutEl.style.color = 'oklch(0.55 0.006 30)'; statutEl.textContent = `📄 ${file.name} — envoi en cours…`; }
   try {
     const url = await uploadMedia(file, 'document');
     await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer-visiteur`, { url, declaration_id: IP_CAND_VISITEUR_ID });
@@ -768,11 +830,31 @@ async function ipDeposerCandidatureDocVisiteur(input, documentId) {
     if (doc) doc.mon_depot = { url, depose_le: new Date().toISOString() };
     ipOuvrirCandidature();
   } catch (e) {
-    alert(e.message || 'Erreur lors du dépôt du document.');
-    label.innerHTML = texteOriginal;
+    console.error('[ipDeposerCandidatureDocVisiteur]', e);
+    if (statutEl) { statutEl.style.color = 'oklch(0.5 0.16 20)'; statutEl.textContent = `❌ ${file.name} — ${e.message || 'échec du dépôt'}`; }
+    else alert(e.message || 'Erreur lors du dépôt du document.');
   }
 }
 
+/* Sponsors / Partenaires (2026-09-28, demande explicite) — affichage public d'un tableau JSON
+   [{nom, logo_url}] stocké côté fiche (insc_fiches.sponsors_json / partenaires_json). Une entrée
+   sans logo affiche quand même son nom (juste sans image), jamais masquée silencieusement. */
+function ipRenderLogos(titre, jsonStr) {
+  let items = [];
+  try { items = JSON.parse(jsonStr || '[]'); } catch (e) {}
+  if (!items.length) return '';
+  return `
+    <div class="ip-logos-section">
+      <div class="ip-logos-titre">${escH(titre)}</div>
+      <div class="ip-logos-grid">
+        ${items.map(it => `
+          <div class="ip-logo-item">
+            ${it.logo_url ? `<img src="${escH(it.logo_url)}" alt="${escH(it.nom || '')}">` : ''}
+            <span>${escH(it.nom || '')}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
 function ipRenderAccueil() {
   const f = IP_FICHE;
   document.getElementById('ip-root').innerHTML = `
@@ -793,6 +875,8 @@ function ipRenderAccueil() {
         </div>`).join('')}
     </div>
     ${ipRenderCandidature()}
+    ${ipRenderLogos('Nos sponsors', f.sponsors_json)}
+    ${ipRenderLogos('Nos partenaires', f.partenaires_json)}
     ${ipRenderMedias()}`;
 }
 
