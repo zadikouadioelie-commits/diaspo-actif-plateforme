@@ -1421,7 +1421,7 @@ function renderInfosGenerales(fiche) {
         <h3 style="margin:0; font-size:15px; font-weight:700;">Informations générales</h3>
         <button style="background:none; border:none; color:oklch(0.55 0.006 30); font-size:13px; cursor:pointer;" data-action="toggleEditionInfos">Fermer</button>
       </div>
-      <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:16px;">
+      <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap;">
         <div style="width:100px; height:100px; border-radius:10px; flex-shrink:0; background:${IA_STAGED_PHOTO_COUVERTURE ? `url('${URL.createObjectURL(IA_STAGED_PHOTO_COUVERTURE)}') center/cover` : (fiche.affiche_url ? `url('${escH(fiche.affiche_url)}') center/cover` : 'oklch(0.95 0.004 30)')}; display:flex; align-items:center; justify-content:center; color:oklch(0.6 0.006 30); font-size:11px;">${fiche.affiche_url || IA_STAGED_PHOTO_COUVERTURE ? '' : 'Aucune photo'}</div>
         <div>
           ${IA_STAGED_PHOTO_COUVERTURE ? `
@@ -1436,6 +1436,15 @@ function renderInfosGenerales(fiche) {
             </label>
             <div style="font-size:11px; color:oklch(0.55 0.006 30); margin-top:6px;">JPEG, PNG, WebP ou GIF — 8 Mo max.</div>`}
         </div>
+        <!-- Sponsors/Partenaires remontés au même niveau que l'affiche (2026-09-29, demande
+             explicite : "prends le plus visible... au même niveau que où se trouve le logo de
+             l'affiche") — invisibles en bas du formulaire, sous la description et les dates.
+             Reste les mêmes boutons/actions (ouvrirSponsors/ouvrirPartenaires), simplement
+             déplacés en haut du panneau pour être vus immédiatement à l'ouverture. -->
+        <div style="display:flex; flex-direction:column; gap:8px; min-width:170px;">
+          <button type="button" style="background:#F1F5F9; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:10px; border-radius:8px; cursor:pointer;" data-action="ouvrirSponsors">🏢 Sponsors (${(() => { try { return JSON.parse(fiche.sponsors_json || '[]').length; } catch(e) { return 0; } })()})</button>
+          <button type="button" style="background:#F1F5F9; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:10px; border-radius:8px; cursor:pointer;" data-action="ouvrirPartenaires">🤝 Partenaires (${(() => { try { return JSON.parse(fiche.partenaires_json || '[]').length; } catch(e) { return 0; } })()})</button>
+        </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:12px;">
         <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Nom de la fiche</label><input id="ia-infos-nom" type="text" value="${escH(fiche.nom || '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
@@ -1445,10 +1454,6 @@ function renderInfosGenerales(fiche) {
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">E-mail de contact</label><input id="ia-infos-contact-email" type="email" value="${escH(fiche.contact_email || '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture des inscriptions</label><input id="ia-infos-ouverture" type="datetime-local" value="${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture des inscriptions</label><input id="ia-infos-fermeture" type="datetime-local" value="${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <button type="button" style="background:#F1F5F9; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:10px; border-radius:8px; cursor:pointer;" data-action="ouvrirSponsors">🏢 Sponsors (${(() => { try { return JSON.parse(fiche.sponsors_json || '[]').length; } catch(e) { return 0; } })()})</button>
-          <button type="button" style="background:#F1F5F9; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:10px; border-radius:8px; cursor:pointer;" data-action="ouvrirPartenaires">🤝 Partenaires (${(() => { try { return JSON.parse(fiche.partenaires_json || '[]').length; } catch(e) { return 0; } })()})</button>
         </div>
         <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; margin-top:4px;" data-action="enregistrerInfos">Enregistrer</button>
       </div>
