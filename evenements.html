@@ -1432,6 +1432,12 @@ window.openDetail = async function(id) {
     evtDetailCourant = evt;
     document.getElementById('evt-detail-content').innerHTML = renderEventDetail(evt, false);
     initCarousel('detail-carousel');
+    /* Bouton "Faire un don" partagé (2026-09-28, demande explicite) — distinct du bloc
+       "Cagnottes liées" ci-dessus (campagnes explicitement associées à CET événement) : ici,
+       le don mis en avant "partout" par le compte organisateur, quelle que soit sa nature. */
+    if (evt.owner_user_id && window.DonBanner) {
+      DonBanner.render(evt.owner_user_id, { mode: 'inline', container: document.getElementById('don-banner-evt-'+evt.id) });
+    }
   } catch(e) {
     document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:red;">Erreur de chargement.</div>';
   }
@@ -1636,6 +1642,7 @@ function renderEventDetail(evt, isPreview) {
           ` : `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} collectés</div>`}
         </div>`).join('')}
     </div>` : ''}
+    ${!isPreview ? `<div id="don-banner-evt-${evt.id}" style="padding:0 20px 16px;"></div>` : ''}
     ${thumbsHTML}
     ${videosHTML}
     ${pdfHTML}
@@ -1762,6 +1769,7 @@ async function initSuggestions() {
 <script src="assets/gsap-animations.js" defer></script>
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
+<script src="/assets/don-banner.js"></script>
 <script src="/assets/upload-media.js"></script>
 <script src="/assets/rich-editor.js"></script>
   <script src="/assets/theme-manager.js"></script>

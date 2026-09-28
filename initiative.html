@@ -561,6 +561,14 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
 
   if (window.startDecouvertePremiumCountdown) window.startDecouvertePremiumCountdown();
 
+  /* Bouton "Faire un don" partagé (2026-09-28, demande explicite) — même emplacement pour la
+     cartouche de profil ET la boutique : il n'existe pas de page boutique séparée, la vitrine
+     d'une initiative s'affiche sur cette même page. Jamais montré au propriétaire (rien à
+     donner à soi-même), même garde que le bouton "Signaler" juste au-dessus. */
+  if (!isOwner && init.owner_user_id && window.DonBanner) {
+    DonBanner.render(init.owner_user_id, { mode: 'inline', container: document.querySelector('.init-profile-actions') });
+  }
+
   /* ---- Partenaires ---- */
   (async () => {
     try {
@@ -1329,6 +1337,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
 <script src="assets/gsap-animations.js" defer></script>
 <script src="assets/chatbot.js"></script>
 <script src="/assets/cookies-banner.js"></script>
+<script src="/assets/don-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
 </body>

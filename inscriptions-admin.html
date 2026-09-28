@@ -44,6 +44,15 @@
 @keyframes iaLiaisonGlow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}50%{box-shadow:0 0 16px 3px rgba(188,19,254,.55);}}
 @keyframes iaLiaisonSweep{0%{left:-60%;}55%,100%{left:130%;}}
 @media (prefers-reduced-motion: reduce){ .ia-liaison-essentielle, .ia-liaison-essentielle::after{animation:none;} }
+/* Encart "Lien de parrainage" (2026-09-28, demande explicite : "une autre carte en dessous
+   avec une couleur néon différente") — même patron scintillant que .ia-liaison-essentielle
+   ci-dessus, réutilise iaLiaisonSweep (le reflet ne dépend pas de la couleur), mais en bleu
+   néon pour rester visuellement distincte de la liaison événement (violet). */
+.ia-parrainage-essentielle{position:relative;overflow:hidden;background:linear-gradient(135deg,#E3F5FF,#CFEEFF);border:2px solid #00AEEF;animation:iaParrainageGlow 2.8s ease-in-out infinite;}
+.ia-parrainage-essentielle > *{position:relative;z-index:1;}
+.ia-parrainage-essentielle::after{content:'';position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.85),transparent);animation:iaLiaisonSweep 3s ease-in-out infinite;pointer-events:none;}
+@keyframes iaParrainageGlow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}50%{box-shadow:0 0 16px 3px rgba(0,174,239,.55);}}
+@media (prefers-reduced-motion: reduce){ .ia-parrainage-essentielle, .ia-parrainage-essentielle::after{animation:none;} }
 @media (max-width: 720px) {
   #ia-root [style*="grid-template-columns:1fr 1fr"],
   #ia-root [style*="grid-template-columns: 1fr 1fr"],
@@ -1620,7 +1629,53 @@ function renderFields() {
         <p style="font-size:12px; color:#7A3FA8; margin:0 0 10px;">Sans cette étape, le bouton « S'inscrire » de votre événement continue de pointer vers le parcours d'inscription classique au lieu de cette fiche.</p>
         ${renderLiaisonEvenements()}
         <button style="background:#8B12D6; border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer; margin-top:12px;" data-action="enregistrerLiaisonEvenements">Enregistrer la liaison</button>`}
+    </div>
+    <!-- Lien de parrainage (2026-09-28, demande explicite : "ajoute également un bouton bleu...
+         qui permettrait de sélectionner un lien de parrainage déjà existant... les différentes
+         personnes qui ont accès à cette fiche, si elles n'ont pas de compte Diaspo'Actif,
+         puissent appuyer sur le lien et créer un compte" — "crée une autre carte en dessous
+         avec une couleur néon différente") — bleu néon pour se distinguer du violet de la
+         liaison événement ci-dessus. Le lien choisi (parmi les invitations de l'organisateur,
+         module Parrainage & Invitations) est exposé sur la page publique de la fiche, ouvert
+         dans un nouvel onglet pour ne jamais interrompre l'inscription en cours. -->
+    <div class="ia-parrainage-essentielle" style="border-radius:12px; padding:18px 20px; margin-top:20px;">
+      ${renderParrainageEssentielle()}
     </div>`;
+}
+// ---- Lien de parrainage attaché à une fiche (voir commentaire ci-dessus dans renderFields) ----
+function renderParrainageEssentielle() {
+  const fiche = selectedFiche();
+  const lienActuel = fiche.parrainage_invitation_id
+    ? { nom: fiche.parrainage_nom, code: fiche.parrainage_code, statut: fiche.parrainage_statut }
+    : null;
+  if (state.parrainageSelecteurOuvert) {
+    const invitations = (state.mesInvitationsParrainage || []).filter(i => i.statut === 'active');
+    const listeHtml = invitations.length
+      ? invitations.map(i => `
+        <button data-action="choisirParrainageInvitation" data-id="${i.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left; background:#fff; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:10px 12px; cursor:pointer; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:700;">${escH(i.nom || i.domaine_nom || 'Sans nom')}</span>
+          <span style="font-size:11px; font-family:'IBM Plex Mono', monospace; color:oklch(0.55 0.006 30);">${escH(i.code)}</span>
+        </button>`).join('')
+      : `<div style="font-size:12.5px; color:#0369A1;">Aucun lien de parrainage actif pour l'instant. <a href="parrainage.html" target="_blank" style="color:#0284C7; font-weight:700;">Créer un lien de parrainage →</a></div>`;
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+        <h3 style="margin:0; font-size:14.5px; font-weight:800; color:#0369A1;">🔵 Choisir un lien de parrainage</h3>
+        <button data-action="fermerSelecteurParrainage" style="background:none; border:none; color:#0369A1; font-size:11.5px; text-decoration:underline; cursor:pointer; padding:0;">Annuler</button>
+      </div>
+      <div>${listeHtml}</div>
+      ${lienActuel ? `<button data-action="detacherParrainageInvitation" style="background:none; border:1px solid oklch(0.8 0.006 30); color:oklch(0.4 0.006 30); font-size:12px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; margin-top:8px;">✕ Retirer le lien actuel</button>` : ''}`;
+  }
+  return `
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;"><span style="font-size:18px;">🔵</span><h3 style="margin:0; font-size:14.5px; font-weight:800; color:#0369A1;">Lien de parrainage pour les visiteurs sans compte</h3></div>
+    <p style="font-size:12px; color:#0369A1; margin:0 0 10px;">Les personnes qui consultent cette fiche sans compte Diaspo'Actif pourront en créer un via ce lien, ouvert dans un nouvel onglet — sans jamais fermer ni interrompre leur inscription en cours.</p>
+    ${lienActuel
+      ? `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #7DD3FC; border-radius:8px; padding:10px 12px;">
+          <span style="font-size:13px; font-weight:700;">🔗 ${escH(lienActuel.nom || 'Lien de parrainage')}</span>
+          <span style="font-size:11px; font-family:'IBM Plex Mono', monospace; color:oklch(0.55 0.006 30);">${escH(lienActuel.code)}</span>
+          ${lienActuel.statut !== 'active' ? '<span style="font-size:11px; font-weight:700; color:#B91C1C;">⚠️ Ce lien est désactivé</span>' : ''}
+          <button data-action="ouvrirSelecteurParrainage" style="margin-left:auto; background:#00AEEF; border:none; color:#fff; font-size:12px; font-weight:700; padding:7px 14px; border-radius:8px; cursor:pointer;">Changer</button>
+        </div>`
+      : `<button data-action="ouvrirSelecteurParrainage" style="background:#00AEEF; border:none; color:#fff; font-size:13px; font-weight:700; padding:10px 20px; border-radius:8px; cursor:pointer;">🔵 Sélectionner un lien de parrainage</button>`}`;
 }
 
 // ---- Candidature (2026-09-27, demande explicite) — parcours PDF hors ligne : l'organisateur
@@ -2466,6 +2521,30 @@ const actions = {
   },
   reporterLiaisonEvenements() { state.liaisonEvenementReportee = true; },
   reprendreLiaisonEvenements() { state.liaisonEvenementReportee = false; },
+  async ouvrirSelecteurParrainage() {
+    try {
+      const r = await api('GET', '/parrainage/invitations');
+      state.mesInvitationsParrainage = r.invitations || [];
+      state.parrainageSelecteurOuvert = true;
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  fermerSelecteurParrainage() { state.parrainageSelecteurOuvert = false; },
+  async choisirParrainageInvitation(el) {
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { parrainage_invitation_id: parseInt(el.dataset.id) });
+      state.parrainageSelecteurOuvert = false;
+      ia_toast('Lien de parrainage attaché à la fiche.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async detacherParrainageInvitation() {
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { parrainage_invitation_id: null });
+      state.parrainageSelecteurOuvert = false;
+      ia_toast('Lien de parrainage retiré.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
   async changerPhotoCouverture(el) {
     const file = el.files[0]; if (!file) return;
     try {

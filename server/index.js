@@ -42520,6 +42520,15 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
     t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+  /* Nom du lien de parrainage lié (2026-09-28, demande explicite) — champ additif sur `fiche`,
+     juste pour l'affichage admin (voir renderParrainageEssentielle() côté client) ; la sélection
+     elle-même se fait via GET /api/parrainage/invitations. */
+  if (fiche.parrainage_invitation_id) {
+    const invitation = await db.prepare("SELECT nom, code, statut FROM invitations WHERE id=?").get(fiche.parrainage_invitation_id);
+    fiche.parrainage_nom = invitation?.nom || null;
+    fiche.parrainage_code = invitation?.code || null;
+    fiche.parrainage_statut = invitation?.statut || null;
+  }
   let candidature = null;
   const candConfig = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
   if (candConfig) {
@@ -42550,6 +42559,21 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
   if (Array.isArray(body.partenaires)) {
     set.push("partenaires_json=?");
     vals.push(JSON.stringify(body.partenaires.filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }))));
+  }
+  /* Lien de parrainage (2026-09-28, demande explicite) — un seul lien d'invitation par fiche,
+     choisi par l'organisateur parmi SES PROPRES invitations (jamais celles d'un tiers, même
+     pour un admin gérant la fiche) pour qu'un compte ne puisse jamais s'attribuer le crédit
+     du lien d'un autre. `null` retire le lien (déliage explicite) ; un id invalide, désactivé
+     ou appartenant à quelqu'un d'autre est silencieusement ignoré plutôt que de bloquer toute
+     la sauvegarde — même logique que les filtres sponsors/partenaires ci-dessus. */
+  if (body.parrainage_invitation_id !== undefined) {
+    if (body.parrainage_invitation_id === null) {
+      set.push("parrainage_invitation_id=?");
+      vals.push(null);
+    } else {
+      const invitation = await db.prepare("SELECT id FROM invitations WHERE id=? AND inviter_user_id=? AND statut='active'").get(body.parrainage_invitation_id, fiche.owner_user_id);
+      if (invitation) { set.push("parrainage_invitation_id=?"); vals.push(invitation.id); }
+    }
   }
   if (set.length) {
     set.push("updated_at=datetime('now')");
@@ -43424,7 +43448,19 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       };
     }
   } catch (e) { console.error('[insc-public-candidature]', e.message); }
-  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature });
+  /* Lien de parrainage (2026-09-28, demande explicite) — un visiteur sans compte Diaspo'Actif
+     peut en créer un via ce lien depuis la page publique, sans jamais fermer l'inscription en
+     cours (ouvert dans un nouvel onglet côté client, voir inscription-publique.html). Jamais
+     bloquant : un lien absent, désactivé ou supprimé n'affecte pas le reste de la fiche. Seuls
+     code/nom sont exposés publiquement, jamais l'id interne ni les compteurs. */
+  let parrainage = null;
+  if (fiche.parrainage_invitation_id) {
+    try {
+      const invitation = await db.prepare("SELECT code, nom, statut FROM invitations WHERE id=?").get(fiche.parrainage_invitation_id);
+      if (invitation && invitation.statut === 'active') parrainage = { code: invitation.code, nom: invitation.nom };
+    } catch (e) { console.error('[insc-public-parrainage]', e.message); }
+  }
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature, parrainage });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {

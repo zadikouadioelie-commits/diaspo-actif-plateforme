@@ -2461,6 +2461,11 @@ const MIGRATIONS = [
   // pg-init.js COLONNES_MIGRATION (voir son commentaire sur le pourquoi de cette duplication).
   ["insc_fiches", "sponsors_json TEXT DEFAULT '[]'"],
   ["insc_fiches", "partenaires_json TEXT DEFAULT '[]'"],
+  // Lien de parrainage attaché à une fiche (2026-09-28, demande explicite) — permet à un
+  // visiteur sans compte Diaspo'Actif d'en créer un via ce lien d'invitation depuis la page
+  // publique, sans fermer l'inscription en cours (ouvert dans un nouvel onglet côté client).
+  // Référence la table invitations (module Parrainage), jamais copiée/dupliquée ici.
+  ["insc_fiches", "parrainage_invitation_id INTEGER"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

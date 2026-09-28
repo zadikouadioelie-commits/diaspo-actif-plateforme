@@ -65,6 +65,13 @@
 .ip-autre-titre{font-size:12.5px;font-weight:700;line-height:1.3;margin:0 0 3px;}
 .ip-autre-meta{font-size:11px;color:oklch(0.55 0.006 30);}
 .ip-cand-box{background:#fff;border:1.5px solid #BC13FE;border-radius:14px;padding:18px;margin-bottom:20px;box-shadow:0 0 10px rgba(188,19,254,.15);}
+/* Bouton "Créer un compte via ce lien de parrainage" (2026-09-28, demande explicite) — bleu
+   néon pour se distinguer du violet de la candidature ci-dessus. target="_blank" volontaire :
+   "ce lien ne devra pas fermer l'inscription, mais ouvrir en arrière-plan" — ne remplace jamais
+   l'écran courant, quel qu'il soit. */
+.ip-parrainage-box{display:flex;align-items:center;gap:10px;background:#EAF8FF;border:1.5px solid #00AEEF;border-radius:14px;padding:14px 18px;margin-bottom:20px;box-shadow:0 0 10px rgba(0,174,239,.2);text-decoration:none;color:#0369A1;font-size:13.5px;font-weight:600;}
+.ip-parrainage-box:hover{background:#DCF3FF;}
+.ip-parrainage-box strong{color:#0284C7;}
 .ip-cand-titre{font-size:15px;font-weight:800;color:#6B0FA3;margin:0 0 8px;display:flex;align-items:center;gap:8px;}
 .ip-cand-docs{display:flex;flex-direction:column;gap:8px;margin:14px 0;}
 .ip-cand-doc{display:flex;align-items:center;gap:10px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;padding:8px 10px;text-decoration:none;color:inherit;}
@@ -146,7 +153,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
-let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false, IP_MEDIAS=[], IP_CANDIDATURE=null;
+let IP_FICHE=null, IP_TYPES=[], IP_EVENEMENTS=[], IP_TYPE_ACTIF=null, IP_APERCU=false, IP_MEDIAS=[], IP_CANDIDATURE=null, IP_PARRAINAGE=null;
 function ipRenderMedias() {
   if (!IP_MEDIAS.length) return '';
   const videos = IP_MEDIAS.filter(m => m.type === 'video');
@@ -855,6 +862,45 @@ function ipRenderLogos(titre, jsonStr) {
       </div>
     </div>`;
 }
+/* Lien de parrainage (2026-09-28, demande explicite) — permet à un visiteur SANS compte
+   Diaspo'Actif d'en créer un via le lien choisi par l'organisateur pour cette fiche (module
+   Parrainage & Invitations, voir insc_fiches.parrainage_invitation_id). Masqué pour un visiteur
+   déjà connecté (rien à lui proposer). target="_blank" volontaire, demande explicite : "ce lien
+   ne devra pas fermer l'inscription, mais ouvrir en arrière-plan" — même /join/CODE que
+   parrainage.html, qui respecte déjà domaine/sous-domaine/bannière configurés sur ce lien. */
+function ipRenderParrainage() {
+  if (!IP_PARRAINAGE) return '';
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  if (connecte) return '';
+  return `
+    <a class="ip-parrainage-box" href="${location.origin}/join/${encodeURIComponent(IP_PARRAINAGE.code)}" target="_blank" rel="noopener">
+      <span style="font-size:18px;">🔵</span>
+      <span>Pas encore de compte Diaspo'Actif ? <strong>Créez-en un</strong>${IP_PARRAINAGE.nom ? ` via ${escH(IP_PARRAINAGE.nom)}` : ''} →</span>
+    </a>`;
+}
+/* Don occasionnel lié à cette fiche (2026-09-28, demande explicite) — distinct du bouton
+   "Faire un don" global (le don mis en avant "partout" par l'organisateur, voir
+   assets/don-banner.js) : ici, le ou les dons spécifiquement rattachés à CETTE fiche
+   (cagnottes.insc_fiche_id), affichés en plus, jamais à la place. Fonction async (appel
+   réseau) — contrairement à ipRenderLogos() ci-dessus, ne peut donc pas s'inliner
+   directement dans le template synchrone d'ipRenderAccueil() : appelée séparément après le
+   rendu principal, comme le post-traitement déjà fait pour IP_PAIEMENT_STATUT. */
+async function ipRenderDonLie() {
+  try {
+    const { dons } = await api('GET', '/cagnottes/pour-fiche/' + IP_FICHE.id);
+    if (!dons || !dons.length) return '';
+    return `
+      <div class="ip-logos-section">
+        <div class="ip-logos-titre">Soutenir</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${dons.map(d => `
+            <a href="cagnotte.html?slug=${encodeURIComponent(d.slug)}" class="ip-btn" style="display:inline-flex;width:auto;text-decoration:none;">
+              💚 ${escH(d.titre)}
+            </a>`).join('')}
+        </div>
+      </div>`;
+  } catch (e) { return ''; }
+}
 function ipRenderAccueil() {
   const f = IP_FICHE;
   document.getElementById('ip-root').innerHTML = `
@@ -862,6 +908,9 @@ function ipRenderAccueil() {
     ${f.affiche_url ? `<img class="ip-affiche" src="${escH(f.affiche_url)}" alt="">` : ''}
     <h1 class="ip-titre">${escH(f.nom)}</h1>
     ${f.description ? `<div class="ip-desc rich-content">${renderRichText(f.description)}</div>` : ''}
+    ${ipRenderParrainage()}
+    <div id="ip-don-lie"></div>
+    <div id="ip-don-banner"></div>
     <div class="ip-types">
       ${IP_TYPES.map(t => `
         <div class="ip-type-card ${t.complet?'complet':''}">
@@ -885,11 +934,21 @@ const IP_PAIEMENT_STATUT = new URLSearchParams(location.search).get('paiement');
 const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
 (async function initInscriptionPublique() {
   try {
-    const d = await api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG));
+    /* CURRENT_USER en parallèle (2026-09-28, demande explicite du bouton de parrainage) —
+       ipRenderParrainage() doit savoir dès le tout premier rendu si le visiteur est connecté ;
+       sans cette attente explicite, fetchCurrentUser() (déclenché ailleurs par app.js) résout
+       APRÈS ce premier rendu, et le bouton s'affichait à tort à un visiteur déjà connecté.
+       fetchCurrentUser() mutualise les appels concurrents (voir assets/app.js), donc aucun
+       coût réseau supplémentaire si un autre script l'a déjà déclenché. */
+    const [d] = await Promise.all([
+      api('GET', '/insc/public/' + encodeURIComponent(IP_SLUG)),
+      typeof fetchCurrentUser === 'function' ? fetchCurrentUser().catch(() => null) : null,
+    ]);
     IP_MEDIAS = d.medias || [];
     IP_FICHE = d.fiche;
     IP_AUTRES_EVENEMENTS = d.autres_evenements || [];
     IP_CANDIDATURE = d.candidature || null;
+    IP_PARRAINAGE = d.parrainage || null;
     ipRenderSideColonne();
     if (d.fermee || d.pas_encore_ouverte) {
       // Rendu amélioré (2026-09-25, demande explicite) : reprend l'affiche/titre de la fiche
@@ -934,6 +993,14 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
       return;
     }
     ipRenderAccueil();
+    /* Boutons de don (2026-09-28, demande explicite) — deux mécanismes indépendants, tous deux
+       injectés après le rendu principal puisqu'ils nécessitent chacun un appel réseau propre :
+       le don spécifiquement lié à cette fiche (ipRenderDonLie) et le don "vedette" du compte
+       organisateur, affiché partout (assets/don-banner.js). */
+    ipRenderDonLie().then(html => { const el = document.getElementById('ip-don-lie'); if (el && html) el.innerHTML = html; });
+    if (IP_FICHE.owner_user_id && window.DonBanner) {
+      DonBanner.render(IP_FICHE.owner_user_id, { mode: 'inline', container: document.getElementById('ip-don-banner') });
+    }
     if (IP_PAIEMENT_STATUT === 'annule') {
       const notice = document.createElement('div');
       notice.style.cssText = 'background:oklch(0.95 0.04 85);border:1px solid oklch(0.8 0.08 85);color:oklch(0.4 0.13 85);font-size:12.5px;padding:10px 12px;border-radius:8px;margin-bottom:16px;';
@@ -946,6 +1013,7 @@ const IP_PAIEMENT_REF = new URLSearchParams(location.search).get('insc');
 })();
 </script>
 <script src="/assets/cookies-banner.js"></script>
+<script src="/assets/don-banner.js"></script>
 <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
 </body>
