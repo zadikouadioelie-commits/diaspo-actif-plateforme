@@ -1156,6 +1156,46 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscChampsImage]', e.message); }
 })();
 
+/* Vérification en ligne du numéro d'immatriculation (2026-09-28, demande explicite) — distincte
+   du contrôle Stripe (initiatives.organisation_verifiee, KYC lié à l'activation des paiements) :
+   ce critère-ci confirme juste, via l'API publique gratuite recherche-entreprises.api.gouv.fr,
+   qu'un numéro SIRET/SIREN/RNA correspond à une structure réellement enregistrée — voir
+   verifierImmatriculationEnLigne() et POST /api/initiatives/verifier-immatriculation. */
+(async function migrateImmatriculationVerifiee() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(initiatives)").all()).map(c => c.name);
+    if (cols.length) {
+      if (!cols.includes('immat_verifiee_ligne')) {
+        try { await db.prepare("ALTER TABLE initiatives ADD COLUMN immat_verifiee_ligne INTEGER DEFAULT 0").run(); } catch (e) {}
+      }
+      if (!cols.includes('immat_verifiee_ligne_le')) {
+        try { await db.prepare("ALTER TABLE initiatives ADD COLUMN immat_verifiee_ligne_le TEXT").run(); } catch (e) {}
+      }
+      if (!cols.includes('immat_nom_registre')) {
+        try { await db.prepare("ALTER TABLE initiatives ADD COLUMN immat_nom_registre TEXT").run(); } catch (e) {}
+      }
+    }
+  } catch (e) { console.error('[migrateImmatriculationVerifiee]', e.message); }
+})();
+
+/* Rattrapage FAQ (2026-09-28) : le seed initial de faq_questions ne rejoue jamais sur une base
+   déjà peuplée (voir faqCatCount===0 dans migrateChatbot ci-dessous) — sans cette mise à jour
+   ciblée, la question "Comment faire vérifier mon organisation ?" garderait son ancien texte en
+   production malgré la refonte du texte du seed ci-dessus (deux critères distincts). Idempotent :
+   ne réécrit que si l'ancien texte y est encore. */
+(async function migrateFaqOrganisationVerifiee() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(faq_questions)").all()).map(c => c.name);
+    if (!cols.length) return;
+    await db.prepare(
+      `UPDATE faq_questions SET reponse=? WHERE question=? AND reponse LIKE '%vérification d''organisation est effectuée lors%'`
+    ).run(
+      '<p>Deux contrôles distincts existent :</p><p><strong>Organisation vérifiée</strong> (+5 points) : renseignez votre numéro SIRET, RNA ou équivalent puis validez-le en ligne (gratuit, immédiat) — nous confirmons juste qu\'une structure réelle existe sous ce numéro dans le registre officiel.</p><p><strong>Organisation testée avec Stripe</strong> (+8 points) : contrôle plus approfondi effectué lors de l\'<strong>activation des paiements</strong>, depuis votre tableau de bord Initiative. Notre prestataire de paiement contrôle les informations légales de votre structure (raison sociale, immatriculation, représentant) — obligatoire avant de pouvoir encaisser de vrais paiements.</p>',
+      'Comment faire vérifier mon organisation ?'
+    );
+  } catch (e) { console.error('[migrateFaqOrganisationVerifiee]', e.message); }
+})();
+
 /* Traitement des candidatures déclarées (2026-09-28, demande explicite) — la déclaration
    "J'ai candidaté" n'était jusqu'ici qu'un simple comptage, sans statut : l'organisateur n'avait
    aucun moyen d'indiquer, une fois le dossier reçu par e-mail et examiné, s'il était accepté ou
@@ -17467,8 +17507,8 @@ async function handleStripeWebhook(req, res) {
               "UPDATE initiatives SET organisation_verifiee=1, organisation_verifiee_le=?, organisation_expire_le=? WHERE id=?"
             ).run(now, addMonths(now, IDENTITY_VALIDITY_MONTHS), row.initiative_id);
             if (init.owner_user_id) {
-              creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation vérifiée 🏢",
-                `« ${init.nom} » a obtenu le badge Organisation vérifiée.`, { initiative_id: row.initiative_id });
+              creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation testée avec Stripe 🏢",
+                `« ${init.nom} » a obtenu le badge Organisation testée avec Stripe.`, { initiative_id: row.initiative_id });
             }
           }
         }
@@ -18095,8 +18135,8 @@ route("PUT", "/api/admin/verifications-organisation/:id", async (req, res, param
       ).run(demande.numero, demande.initiative_id);
     }
     if (init?.owner_user_id) {
-      creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation vérifiée 🏢",
-        `« ${init.nom} » a obtenu le badge Organisation vérifiée.`, { initiative_id: demande.initiative_id });
+      creerNotif(init.owner_user_id, "organisation_verifiee", "Organisation testée avec Stripe 🏢",
+        `« ${init.nom} » a obtenu le badge Organisation testée avec Stripe.`, { initiative_id: demande.initiative_id });
     }
   } else if (init?.owner_user_id) {
     creerNotif(init.owner_user_id, "verification_organisation_rejetee", "Vérification d'organisation refusée",
@@ -24549,7 +24589,7 @@ const SCHEMA_MODULES_VERSION  = '2026-07-25';
         q:'Comment faire vérifier mon organisation ?',
         /* L\'envoi d\'un Kbis à une équipe Diaspo\'Actif n\'a jamais existé : la vérification
            d\'organisation passe par le contrôle effectué à l\'activation des paiements. */
-        r:'<p>La vérification d\'organisation est effectuée lors de l\'<strong>activation des paiements</strong>, depuis votre tableau de bord Initiative. Notre prestataire contrôle les informations légales de votre structure (raison sociale, immatriculation, représentant).</p><p>Une fois validée, votre indice de fiabilité augmente de <strong>+8 points</strong>. Vous pouvez aussi renseigner votre numéro d\'immatriculation (SIRET, RNA ou équivalent) pour <strong>+5 points</strong>.</p>',
+        r:'<p>Deux contrôles distincts existent :</p><p><strong>Organisation vérifiée</strong> (+5 points) : renseignez votre numéro SIRET, RNA ou équivalent puis validez-le en ligne (gratuit, immédiat) — nous confirmons juste qu\'une structure réelle existe sous ce numéro dans le registre officiel.</p><p><strong>Organisation testée avec Stripe</strong> (+8 points) : contrôle plus approfondi effectué lors de l\'<strong>activation des paiements</strong>, depuis votre tableau de bord Initiative. Notre prestataire de paiement contrôle les informations légales de votre structure (raison sociale, immatriculation, représentant) — obligatoire avant de pouvoir encaisser de vrais paiements.</p>',
         syn:'["vérifier asso","vérifier entreprise","justificatif","immatriculation"]',
         kw:'["entreprise","association","vérification","organisation","immatriculation"]',
         steps:'["Ouvrir le tableau de bord Initiative","Aller dans Centre Financier","Cliquer sur Activer les paiements","Suivre le contrôle de votre structure"]',
@@ -32087,7 +32127,7 @@ ${jsonLd}
         return resultatOfficiel;
       }
 
-      const init = await db.prepare(`SELECT numero_immatriculation, organisation_verifiee FROM initiatives WHERE owner_user_id=?`).get(userId);
+      const init = await db.prepare(`SELECT numero_immatriculation, organisation_verifiee, immat_verifiee_ligne, immat_nom_registre FROM initiatives WHERE owner_user_id=?`).get(userId);
       /* Les deux critères de structure ne concernent que les comptes qui portent une
          initiative. Un particulier ne les verra même pas : une ligne qu'on ne peut
          jamais cocher décourage sans rien apprendre. */
@@ -32209,15 +32249,21 @@ ${jsonLd}
           aide: nbSignal ? "Contactez la modération si vous contestez ces signalements." : 'Aucun signalement à ce jour.',
           action: nbSignal ? { texte:'Contacter la modération', href:'messagerie.html' } : null },
 
-        { cle:'organisation', icon:'🏢', label:'Organisation vérifiée', pts: init?.organisation_verifiee ? 8 : 0, max:8,
+        /* Deux critères distincts (2026-09-28, demande explicite) — jusqu'ici confondus sous le
+           même mot "vérifiée" alors qu'ils ne prouvent pas la même chose : "Organisation
+           vérifiée" confirme juste qu'une structure réelle existe sous ce numéro (léger, gratuit,
+           en ligne, voir POST /api/initiatives/verifier-immatriculation) ; "Organisation testée
+           avec Stripe" est le contrôle KYC plus lourd exigé par Stripe pour autoriser de vrais
+           paiements — d'où son barème supérieur (8 > 5). */
+        { cle:'organisation', icon:'🏢', label:'Organisation testée avec Stripe', pts: init?.organisation_verifiee ? 8 : 0, max:8,
           applicable: porteUneStructure,
-          aide: init?.organisation_verifiee ? 'Vérifiée.' : "Contrôle effectué à l'activation des paiements.",
-          action: init?.organisation_verifiee ? null : { texte:'Vérifier mon organisation', href:'dashboard-initiative.html#paiements' } },
+          aide: init?.organisation_verifiee ? 'Testée.' : "Contrôle effectué à l'activation des paiements.",
+          action: init?.organisation_verifiee ? null : { texte:'Tester mon organisation avec Stripe', href:'dashboard-initiative.html#paiements' } },
 
-        { cle:'immatriculation', icon:'🏛️', label:'Immatriculation renseignée', pts: init?.numero_immatriculation ? 5 : 0, max:5,
+        { cle:'immatriculation', icon:'🏛️', label:'Organisation vérifiée', pts: init?.immat_verifiee_ligne ? 5 : 0, max:5,
           applicable: porteUneStructure,
-          aide: init?.numero_immatriculation ? 'Renseignée.' : 'Numéro SIRET, RNA ou équivalent.',
-          action: init?.numero_immatriculation ? null : { texte:"Renseigner l'immatriculation", href:'reseau.html' } },
+          aide: init?.immat_verifiee_ligne ? `Validée en ligne${init.immat_nom_registre ? ' — ' + init.immat_nom_registre : ''}.` : (init?.numero_immatriculation ? 'Numéro renseigné — validez-le en ligne pour obtenir ces points.' : 'Numéro SIRET, RNA ou équivalent.'),
+          action: init?.immat_verifiee_ligne ? null : { texte: init?.numero_immatriculation ? 'Valider mon numéro en ligne' : "Renseigner l'immatriculation", href:'reseau.html' } },
       ];
 
       const retenus = criteres.filter(c => c.applicable);
@@ -33595,6 +33641,13 @@ ${jsonLd}
          numero_immatriculation/taille_structure ci-dessus -- pas une régression introduite ici,
          juste le comportement déjà établi de cette route). */
       const { numero_immatriculation, pays_immatriculation, taille_structure, forme_juridique, annee_creation, services, langues, reseau_visible, accepte_messages } = body;
+      /* Un numéro changé n'est plus le numéro validé en ligne (2026-09-28) — sans ça, changer
+         d'immatriculation garderait à tort le badge "Organisation vérifiée" (RNA/SIRET) acquis
+         sur l'ANCIEN numéro. Comparaison normalisée (espaces/casse) pour ne pas invalider sur un
+         simple recopiage du même numéro avec une espace en plus. */
+      if (numero_immatriculation && String(numero_immatriculation).replace(/\s/g, '').toUpperCase() !== String(myInit.numero_immatriculation || '').replace(/\s/g, '').toUpperCase()) {
+        await db.prepare(`UPDATE initiatives SET immat_verifiee_ligne=0, immat_verifiee_ligne_le=NULL, immat_nom_registre=NULL WHERE id=?`).run(myInit.id);
+      }
       await db.prepare(`UPDATE initiatives SET
         numero_immatriculation=COALESCE(?,numero_immatriculation),
         pays_immatriculation=COALESCE(?,pays_immatriculation),
@@ -33616,6 +33669,46 @@ ${jsonLd}
         myInit.id
       );
       return sendJSON(res, 200, { ok: true });
+    }
+
+    /* POST /api/initiatives/verifier-immatriculation — vérification en ligne, légère et
+       gratuite (API publique recherche-entreprises.api.gouv.fr, aucune clé requise), du numéro
+       SIRET/SIREN/RNA déjà renseigné : confirme juste qu'une structure réelle existe sous ce
+       numéro dans le registre officiel. Distincte du contrôle Stripe (organisation_verifiee),
+       qui reste le seul chemin d'activation des paiements — voir criteres de fiabilité
+       ci-dessous. Le numéro recherché doit se retrouver À L'IDENTIQUE sur le résultat (siren,
+       siret du siège, ou identifiant_association) : l'API fait une recherche floue par défaut
+       et peut renvoyer des résultats sans rapport pour un numéro invalide (vérifié en test réel
+       le 2026-09-28 avec un faux RNA — 4 structures sans lien renvoyées). */
+    if (req.method === "POST" && pathname === "/api/initiatives/verifier-immatriculation") {
+      const me = await getCurrentUser(req); if (!me) return sendJSON(res, 401, { error: "Connexion requise." });
+      const myInit = await getMyInit(me.id);
+      if (!myInit) return sendJSON(res, 404, { error: "Aucune initiative associée à votre compte." });
+      const numero = String(myInit.numero_immatriculation || '').trim();
+      if (!numero) return sendJSON(res, 400, { error: "Renseignez d'abord votre numéro d'immatriculation." });
+      const numeroNorm = numero.replace(/\s/g, '').toUpperCase();
+      try {
+        const r = await fetch("https://recherche-entreprises.api.gouv.fr/search?q=" + encodeURIComponent(numero), {
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!r.ok) return sendJSON(res, 502, { error: "Service de vérification indisponible, réessayez plus tard." });
+        const data = await r.json();
+        const match = (data.results || []).find(res2 => {
+          const siren = String(res2.siren || '').toUpperCase();
+          const siret = String(res2.siege?.siret || '').toUpperCase();
+          const rna = String(res2.complements?.identifiant_association || '').toUpperCase();
+          return siren === numeroNorm || siret === numeroNorm || (rna && rna === numeroNorm);
+        });
+        if (!match) {
+          return sendJSON(res, 200, { valide: false, message: "Aucune structure trouvée avec ce numéro dans le registre officiel. Vérifiez qu'il est correctement saisi." });
+        }
+        const nomTrouve = match.nom_complet || match.nom_raison_sociale || null;
+        await db.prepare(`UPDATE initiatives SET immat_verifiee_ligne=1, immat_verifiee_ligne_le=datetime('now'), immat_nom_registre=? WHERE id=?`).run(nomTrouve, myInit.id);
+        return sendJSON(res, 200, { valide: true, nom_trouve: nomTrouve });
+      } catch (e) {
+        console.error('[verifier-immatriculation]', e.message);
+        return sendJSON(res, 502, { error: "Impossible de contacter le service de vérification pour le moment. Réessayez plus tard." });
+      }
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -42520,15 +42613,6 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
     t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
-  /* Nom du lien de parrainage lié (2026-09-28, demande explicite) — champ additif sur `fiche`,
-     juste pour l'affichage admin (voir renderParrainageEssentielle() côté client) ; la sélection
-     elle-même se fait via GET /api/parrainage/invitations. */
-  if (fiche.parrainage_invitation_id) {
-    const invitation = await db.prepare("SELECT nom, code, statut FROM invitations WHERE id=?").get(fiche.parrainage_invitation_id);
-    fiche.parrainage_nom = invitation?.nom || null;
-    fiche.parrainage_code = invitation?.code || null;
-    fiche.parrainage_statut = invitation?.statut || null;
-  }
   let candidature = null;
   const candConfig = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
   if (candConfig) {
@@ -42559,21 +42643,6 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
   if (Array.isArray(body.partenaires)) {
     set.push("partenaires_json=?");
     vals.push(JSON.stringify(body.partenaires.filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }))));
-  }
-  /* Lien de parrainage (2026-09-28, demande explicite) — un seul lien d'invitation par fiche,
-     choisi par l'organisateur parmi SES PROPRES invitations (jamais celles d'un tiers, même
-     pour un admin gérant la fiche) pour qu'un compte ne puisse jamais s'attribuer le crédit
-     du lien d'un autre. `null` retire le lien (déliage explicite) ; un id invalide, désactivé
-     ou appartenant à quelqu'un d'autre est silencieusement ignoré plutôt que de bloquer toute
-     la sauvegarde — même logique que les filtres sponsors/partenaires ci-dessus. */
-  if (body.parrainage_invitation_id !== undefined) {
-    if (body.parrainage_invitation_id === null) {
-      set.push("parrainage_invitation_id=?");
-      vals.push(null);
-    } else {
-      const invitation = await db.prepare("SELECT id FROM invitations WHERE id=? AND inviter_user_id=? AND statut='active'").get(body.parrainage_invitation_id, fiche.owner_user_id);
-      if (invitation) { set.push("parrainage_invitation_id=?"); vals.push(invitation.id); }
-    }
   }
   if (set.length) {
     set.push("updated_at=datetime('now')");
@@ -43448,19 +43517,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       };
     }
   } catch (e) { console.error('[insc-public-candidature]', e.message); }
-  /* Lien de parrainage (2026-09-28, demande explicite) — un visiteur sans compte Diaspo'Actif
-     peut en créer un via ce lien depuis la page publique, sans jamais fermer l'inscription en
-     cours (ouvert dans un nouvel onglet côté client, voir inscription-publique.html). Jamais
-     bloquant : un lien absent, désactivé ou supprimé n'affecte pas le reste de la fiche. Seuls
-     code/nom sont exposés publiquement, jamais l'id interne ni les compteurs. */
-  let parrainage = null;
-  if (fiche.parrainage_invitation_id) {
-    try {
-      const invitation = await db.prepare("SELECT code, nom, statut FROM invitations WHERE id=?").get(fiche.parrainage_invitation_id);
-      if (invitation && invitation.statut === 'active') parrainage = { code: invitation.code, nom: invitation.nom };
-    } catch (e) { console.error('[insc-public-parrainage]', e.message); }
-  }
-  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature, parrainage });
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {

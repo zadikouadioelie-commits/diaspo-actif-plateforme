@@ -1961,10 +1961,10 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
 
     <div class="card" style="margin-bottom:20px;" id="verification-organisation">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h3 style="margin:0;">🏢 Vérification de l'organisation</h3>
+        <h3 style="margin:0;">🏢 Tester l'organisation avec Stripe</h3>
         <button class="btn btn-sm btn-outline" onclick="renderVerificationOrganisation()" style="font-size:12px;">↺ Actualiser</button>
       </div>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites vérifier votre organisation pour obtenir le badge <strong>🏢 Organisation vérifiée</strong>, visible dans l'Annuaire et les Boutiques. Les documents demandés dépendent du type déclaré à l'inscription.</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Faites tester votre organisation pour obtenir le badge <strong>🏢 Organisation testée avec Stripe</strong>, visible dans l'Annuaire et les Boutiques. Les documents demandés dépendent du type déclaré à l'inscription. Ce contrôle est requis pour activer les paiements — pour une vérification plus légère (numéro SIRET/RNA), voir « Organisation vérifiée » dans votre indice de fiabilité.</p>
       <div id="verification-organisation-body"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
@@ -6901,7 +6901,7 @@ async function renderPaiementMarketplace(){
             <div style="font-size:12px;color:#166534;">Votre boutique peut recevoir de vrais paiements et virements.</div>
           </div>
         </div>
-        ${r.organisation_verifiee ? `<p style="font-size:12px;color:var(--muted);margin:0;">🏢 Organisation vérifiée le ${new Date(r.organisation_verifiee_le).toLocaleDateString('fr-FR')}, valable jusqu'au ${new Date(r.organisation_expire_le).toLocaleDateString('fr-FR')}.</p>` : ''}`;
+        ${r.organisation_verifiee ? `<p style="font-size:12px;color:var(--muted);margin:0;">🏢 Organisation testée avec Stripe le ${new Date(r.organisation_verifiee_le).toLocaleDateString('fr-FR')}, valable jusqu'au ${new Date(r.organisation_expire_le).toLocaleDateString('fr-FR')}.</p>` : ''}`;
     } else {
       body.innerHTML = `
         <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Configuration en cours — Stripe vérifie encore vos informations d'entreprise.
@@ -6946,8 +6946,8 @@ async function renderVerificationOrganisation(){
         <div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:14px 16px;">
           <span style="font-size:22px;">🏢</span>
           <div>
-            <div style="font-weight:800;color:#166534;font-size:14px;">Organisation vérifiée</div>
-            <div style="font-size:12px;color:#166534;">Vérifiée le ${new Date(r.organisation_verifiee_le).toLocaleDateString('fr-FR')}.</div>
+            <div style="font-weight:800;color:#166534;font-size:14px;">Organisation testée avec Stripe</div>
+            <div style="font-size:12px;color:#166534;">Testée le ${new Date(r.organisation_verifiee_le).toLocaleDateString('fr-FR')}.</div>
           </div>
         </div>`;
       return;

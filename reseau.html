@@ -1095,7 +1095,12 @@ async function loadProfilReseauTab(){
         </div>
         <div class="form-field">
           <label>Numéro officiel d'immatriculation *</label>
-          <input id="pr-immat" class="input-field" style="width:100%;" value="${escH(moi.numero_immatriculation||'')}" placeholder="SIRET, BCE, RCCM, NINEA…">
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <input id="pr-immat" class="input-field" style="width:100%;" value="${escH(moi.numero_immatriculation||'')}" placeholder="SIRET, BCE, RCCM, NINEA…" oninput="document.getElementById('pr-immat-verif-badge').style.display='none';">
+            <button type="button" class="btn btn-sm btn-outline" style="white-space:nowrap;flex-shrink:0;" onclick="verifierImmatriculationEnLigne(this)">🔍 Valider en ligne</button>
+          </div>
+          <p style="font-size:.75rem;color:var(--muted);margin:6px 0 0;">Confirme gratuitement, via le registre officiel (SIRET/SIREN/RNA), qu'une structure réelle existe sous ce numéro — critère « Organisation vérifiée » de votre indice de fiabilité (+5 points). Enregistrez d'abord le numéro si vous venez de le modifier.</p>
+          <p id="pr-immat-verif-badge" style="font-size:.78rem;margin:6px 0 0;${moi.immat_verifiee_ligne ? '' : 'display:none;'}color:#166534;">✅ Validée en ligne${moi.immat_nom_registre ? ' — ' + escH(moi.immat_nom_registre) : ''}${moi.immat_verifiee_ligne_le ? ' (' + new Date(moi.immat_verifiee_ligne_le.replace(' ','T')).toLocaleDateString('fr-FR') + ')' : ''}</p>
         </div>
         <div class="form-field">
           <label>Année de création</label>
@@ -1187,6 +1192,32 @@ async function sauvegarderProfil(){
     MY_INIT=null;
     loadMyState();
   }catch(e){DA.toast(e.message,{type:'danger'});}
+}
+
+/* Vérification en ligne du numéro d'immatriculation (2026-09-28, demande explicite) — utilise
+   le numéro déjà ENREGISTRÉ en base (POST /api/initiatives/verifier-immatriculation), pas la
+   saisie non sauvegardée du champ : si l'admin vient de taper un nouveau numéro sans encore
+   cliquer "Enregistrer", on le prévient plutôt que de vérifier l'ancien par erreur. */
+async function verifierImmatriculationEnLigne(btn){
+  const champ=document.getElementById('pr-immat')?.value.trim()||'';
+  if(!champ){DA.toast('Renseignez d\'abord votre numéro d\'immatriculation.',{type:'warning'});return;}
+  if(champ!==(MY_INIT?.numero_immatriculation||'').trim()){
+    DA.toast('Enregistrez d\'abord ce numéro (bouton "Enregistrer" en bas du formulaire) avant de le valider en ligne.',{type:'warning'});
+    return;
+  }
+  if(btn){btn.disabled=true;btn.textContent='⏳ Vérification…';}
+  try{
+    const r=await apiCall('POST','/initiatives/verifier-immatriculation',{});
+    const badge=document.getElementById('pr-immat-verif-badge');
+    if(r.valide){
+      DA.toast('✅ Structure trouvée dans le registre officiel : '+(r.nom_trouve||'')+' — critère validé.',{type:'success'});
+      if(badge){badge.style.display='';badge.style.color='#166534';badge.textContent='✅ Validée en ligne'+(r.nom_trouve?' — '+r.nom_trouve:'');}
+      if(MY_INIT){MY_INIT.immat_verifiee_ligne=1;MY_INIT.immat_nom_registre=r.nom_trouve||null;}
+    } else {
+      DA.toast(r.message||'Aucune structure trouvée avec ce numéro.',{type:'warning'});
+    }
+  }catch(e){DA.toast(e.message,{type:'danger'});}
+  finally{ if(btn){btn.disabled=false;btn.textContent='🔍 Valider en ligne';} }
 }
 
 async function saveReseauVisibilite(initId){

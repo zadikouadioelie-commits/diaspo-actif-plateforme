@@ -359,8 +359,8 @@ function urlBase64ToUint8Array(base64String) {
    Certains membres n'ont pas pu/voulu la faire à l'inscription : cette carte permet de la
    lancer (ou de la reprendre) à tout moment depuis la page Confidentialité. Pour une
    Initiative, ceci vérifie la PERSONNE (badge "Responsable identifié"), pas la structure
-   elle-même (badge distinct "Organisation vérifiée", obtenu via Stripe Connect ou le futur
-   dossier documentaire) — les deux ne se substituent jamais l'un à l'autre. */
+   elle-même (badge distinct "Organisation testée avec Stripe", obtenu via Stripe Connect ou le
+   futur dossier documentaire) — les deux ne se substituent jamais l'un à l'autre. */
 (async function initIdentiteVerifZone(){
   let me;
   try {
@@ -399,7 +399,7 @@ function urlBase64ToUint8Array(base64String) {
               <div style="font-size:12px;color:#166534;">${estInitiative ? 'Identité du responsable' : 'Identité'} vérifiée par Diaspo'Actif le ${fmtDateFr(r.verifie_le)}.</div>
             </div>
           </div>
-          <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.${estInitiative ? ' Ce badge ne remplace pas « Organisation vérifiée », qui porte sur la structure elle-même.' : ''}</p>
+          <p class="codes-sub" style="margin:0;">Valable jusqu'au <strong>${fmtDateFr(r.expire_le)}</strong>. Aucun document personnel n'est affiché publiquement — seul ce badge est visible des autres utilisateurs.${estInitiative ? ' Ce badge ne remplace pas « Organisation testée avec Stripe », qui porte sur la structure elle-même.' : ''}</p>
           ${r.mismatch ? `
           <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-top:10px;">
             <span style="font-size:20px;">⚠️</span>
