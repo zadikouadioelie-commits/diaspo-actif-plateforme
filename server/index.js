@@ -5117,6 +5117,21 @@ route("PUT", "/api/initiatives/:id/adhesion-modeles", async (req, res, params, b
   sendJSON(res, 200, { ok: true });
 });
 
+/* Adhésion officielle de l'association (2026-09-28, demande explicite, capture à l'appui) :
+   une seule formule par initiative peut porter ce statut — c'est elle, et elle seule, que le
+   bouton public "Adhérer à l'initiative" cible directement (voir demanderAdhesion(),
+   assets/app.js). L'activer sur une formule la retire d'abord de toutes les autres formules de
+   la même initiative (jamais deux "officielles" en même temps) ; la désactiver ne fait rien de
+   plus que retirer le statut de cette formule précise. */
+async function adhAppliquerOfficielle(formuleId, initiativeId, estOfficielle) {
+  if (estOfficielle) {
+    await db.prepare("UPDATE adhesion_formules SET est_officielle=0 WHERE initiative_id=? AND id<>?").run(initiativeId, formuleId);
+    await db.prepare("UPDATE adhesion_formules SET est_officielle=1 WHERE id=?").run(formuleId);
+  } else {
+    await db.prepare("UPDATE adhesion_formules SET est_officielle=0 WHERE id=?").run(formuleId);
+  }
+}
+
 /* ── Créer une formule ── */
 route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -5182,6 +5197,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
        (modeValidite === 'collectif' && renouvellement_auto_collectif) ? 1 : 0, max_adherents ? Number(max_adherents) : null,
        texte_intro || null, conditions_adhesion || null, reglement_pdf_url || null, statuts_pdf_url || null,
        JSON.stringify(sanitizeChampsConfig(champs_config)), JSON.stringify(sanitizeChampsCustom(champs_custom)))).lastInsertRowid;
+  if (body.est_officielle) await adhAppliquerOfficielle(id, params.id, true);
   sendJSON(res, 201, { id });
 });
 
@@ -5261,6 +5277,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          champs_config !== undefined ? JSON.stringify(sanitizeChampsConfig(champs_config)) : f.champs_config_json,
          champs_custom !== undefined ? JSON.stringify(sanitizeChampsCustom(champs_custom)) : f.champs_custom_json,
          params.id);
+  if (body.est_officielle !== undefined) await adhAppliquerOfficielle(f.id, f.initiative_id, !!body.est_officielle);
   sendJSON(res, 200, { ok: true });
 });
 

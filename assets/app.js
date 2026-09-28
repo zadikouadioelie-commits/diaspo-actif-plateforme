@@ -2079,7 +2079,7 @@ function renderInitiativeCard(it){
         ${['Association','ONG'].includes(it.type) && it.adhesions_ouvertes !== false ? (
           isOwnInit
             ? `<a href="dashboard-initiative.html#adhesions-init" class="ann-card-btn ann-card-btn-adherer" onclick="event.stopPropagation()">⚙️ Gérer les adhésions</a>`
-            : `<button type="button" class="ann-card-btn ann-card-btn-adherer" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer</button>`
+            : `<button type="button" class="ann-card-btn ann-card-btn-adherer" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer à l'initiative</button>`
         ) : ''}
         ${adminAnnuaireBoutonsHtml(it.owner_user_id, isOwnInit)}
       </div>
@@ -2180,11 +2180,22 @@ async function demanderAdhesion(initiativeId, btn){
   } catch (e) { /* vérification impossible : on continue normalement */ }
   /* Si l'association a configuré des formules de cotisation (module "Adhésions", payant ou
      gratuit), on redirige vers la page dédiée qui gère déjà tout le reste : choix de la
-     formule, paiement Stripe, reçu, carte de membre. Sinon, simple demande sans paiement. */
+     formule, paiement Stripe, reçu, carte de membre. Sinon, simple demande sans paiement.
+     Formule "officielle" (2026-09-28, demande explicite) : une association peut avoir plusieurs
+     formules (ex. certaines réservées à un événement précis, "adhérer à une promotion") — une
+     seule représente l'adhésion générale à l'association elle-même (est_officielle=1, réglée
+     depuis dashboard-initiative.html). Ce bouton public cible directement CETTE formule via le
+     paramètre ?formule= déjà géré par adhesions.html (mécanisme du lien "📤 Partager"), pour ne
+     jamais exposer les autres formules internes/ciblées au visiteur qui clique "Adhérer à
+     l'initiative". Si aucune formule n'est encore marquée officielle (association pas encore
+     passée à ce réglage), on retombe sur l'ancien comportement : la liste complète. */
   try {
     const f = await api('GET', `/initiatives/${initiativeId}/adhesion-formules`);
     if (f.formules && f.formules.length) {
-      window.location.href = `adhesions.html?initiative=${initiativeId}`;
+      const officielle = f.formules.find(x => x.est_officielle);
+      window.location.href = officielle
+        ? `adhesions.html?initiative=${initiativeId}&formule=${officielle.id}`
+        : `adhesions.html?initiative=${initiativeId}`;
       return;
     }
   } catch (e) { /* pas de formules accessibles : on retombe sur la demande simple */ }
@@ -2199,7 +2210,7 @@ async function demanderAdhesion(initiativeId, btn){
     }
     if (typeof showToast === 'function') showToast(r.statut === 'acceptee' ? '✅ Vous êtes déjà membre.' : '✅ Demande d\'adhésion envoyée !');
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Adhérer'; }
+    if (btn) { btn.disabled = false; btn.textContent = "Adhérer à l'initiative"; }
     alert(e.message || "Erreur lors de l'envoi de la demande.");
   }
 }
@@ -2772,7 +2783,7 @@ function renderVitrineCard(v) {
       ${noteHtml}
       <div class="vit-card-foot">
         <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la boutique</a>
-        ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer</button>` : ''}
+        ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer à l'initiative</button>` : ''}
       </div>
     </div>
   </div>`;

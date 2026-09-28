@@ -1334,6 +1334,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       </div>
     </div>
 
+    <!-- Bouton "Définir comme adhésion à l'association" (2026-09-28) — doré et scintillant,
+         même principe que .trophee-shimmer/.ia-liaison-essentielle (evenements.html/
+         inscriptions-admin.html) : un reflet balaie l'encart en boucle, jamais sur du texte
+         pour ne pas gêner la lecture (limité au bouton), pointer-events:none sur le reflet pour
+         ne jamais bloquer le clic. -->
+    <style>
+    .adh-officielle-btn{position:relative;overflow:hidden;display:block;width:100%;background:linear-gradient(135deg,#B8860B,#FFD700 55%,#B8860B);border:none;color:#3A2A00;font-weight:800;font-size:13.5px;padding:12px 16px;border-radius:10px;cursor:pointer;text-align:center;box-shadow:0 2px 8px rgba(184,134,11,.35);}
+    .adh-officielle-shimmer::after{content:'';position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.9),transparent);animation:adhOfficielleSweep 3s ease-in-out infinite;pointer-events:none;}
+    @keyframes adhOfficielleSweep{0%{left:-60%;}55%,100%{left:130%;}}
+    @media (prefers-reduced-motion: reduce){ .adh-officielle-shimmer::after{animation:none;} }
+    </style>
+
     <!-- ══ MODAL FORMULE D'ADHÉSION ══ -->
     <div class="modal-back" id="modal-adh-formule" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;">
       <div class="card" style="max-width:520px;width:100%;padding:20px;">
@@ -1501,6 +1513,16 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <button type="button" onclick="document.getElementById('adh-f-video-thumb').play()" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;">▶️</button>
           </div>
         </div>
+
+        <!-- Adhésion officielle de l'association (2026-09-28, demande explicite, capture à
+             l'appui) : une association peut avoir plusieurs formules (certaines réservées à un
+             événement précis, "adhérer à une promotion"), mais une seule doit représenter
+             l'adhésion générale à l'association elle-même — c'est elle que le bouton public
+             "Adhérer à l'initiative" (annuaire/vitrines/profil) cible désormais directement,
+             les autres restant internes. Doré et scintillant (même principe que le violet
+             scintillant de la liaison événement, inscriptions-admin.html) pour rester bien
+             visible : c'est une désignation qui a des conséquences publiques immédiates. -->
+        <div id="adh-f-officielle-zone" style="margin-bottom:14px;"></div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button class="btn btn-outline" onclick="adhFermerModalFormule()">Annuler</button>
@@ -7264,6 +7286,7 @@ async function adhRenderFormules(){
               <div style="font-weight:700;font-size:14px;">${escH(f.nom)}</div>
               <div style="font-size:11px;color:var(--muted);">${ADH_TYPE_LABELS[f.type_contribution]||f.type_contribution}</div>
             </div>
+            ${f.est_officielle ? `<span title="Adhésion officielle de l'association — ciblée directement par le bouton public « Adhérer à l'initiative »" style="flex-shrink:0;background:linear-gradient(135deg,#B8860B,#FFD700 55%,#B8860B);color:#3A2A00;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;">⭐ Officielle</span>` : ''}
           </div>
           <div style="font-size:13px;font-weight:700;margin-bottom:6px;">
             ${f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
@@ -7308,6 +7331,9 @@ function adhSetDureePreset(valeur, unite){
 }
 
 let ADH_F_MEDIA = { type: null, url: null, duree: null };
+// Adhésion officielle de l'association (2026-09-28, demande explicite) — une seule formule par
+// initiative, voir adhToggleOfficielle() et son commentaire.
+let ADH_F_OFFICIELLE = false;
 
 function adhChoisirTypeMedia(type){
   document.querySelectorAll('[id^="adh-f-media-choice-"]').forEach(el => el.classList.remove('checked'));
@@ -7398,6 +7424,8 @@ async function adhChoisirModeListe(mode){
 function adhOuvrirCreationFormule(){
   ADH_EDIT_FORMULE_ID = null;
   ADH_F_MEDIA = { type: null, url: null, duree: null };
+  ADH_F_OFFICIELLE = false;
+  adhRenderBoutonOfficielle();
   document.getElementById('adh-f-liste-nom').value = '';
   adhChoisirModeListe('');
   document.getElementById('adh-formule-titre').textContent = '➕ Créer une formule d\'adhésion';
@@ -7445,6 +7473,8 @@ function adhOuvrirEditionFormule(id){
   const f = ADH_FORMULES.find(x=>x.id===id); if(!f) return;
   ADH_EDIT_FORMULE_ID = id;
   ADH_F_MEDIA = { type: f.media_type || null, url: f.media_url || null, duree: f.media_duree_secondes || null };
+  ADH_F_OFFICIELLE = !!f.est_officielle;
+  adhRenderBoutonOfficielle();
   document.getElementById('adh-formule-titre').textContent = '✏️ Modifier la formule';
   document.getElementById('adh-f-nom').value = f.nom || '';
   document.getElementById('adh-f-description').value = f.description || '';
@@ -7502,6 +7532,27 @@ function adhOuvrirEditionFormule(id){
     adhChoisirModeListe('');
   }
   document.getElementById('modal-adh-formule').style.display = 'flex';
+}
+
+/* Bouton "Définir comme adhésion à l'association" (2026-09-28, demande explicite) — bascule
+   ADH_F_OFFICIELLE localement (enregistré avec le reste au clic sur "Enregistrer", pas d'appel
+   réseau séparé : cohérent avec le fait qu'une formule pas encore créée n'a pas encore d'id).
+   L'exclusivité entre formules (une seule officielle par association) est appliquée côté
+   serveur (adhAppliquerOfficielle(), server/index.js) au moment de l'enregistrement. */
+function adhToggleOfficielle(){
+  ADH_F_OFFICIELLE = !ADH_F_OFFICIELLE;
+  adhRenderBoutonOfficielle();
+}
+function adhRenderBoutonOfficielle(){
+  const zone = document.getElementById('adh-f-officielle-zone');
+  if (!zone) return;
+  zone.innerHTML = ADH_F_OFFICIELLE ? `
+    <button type="button" class="adh-officielle-btn adh-officielle-shimmer" onclick="adhToggleOfficielle()">⭐ Adhésion officielle de l'association</button>
+    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le bouton public « Adhérer à l'initiative » (annuaire, vitrines, profil) redirige directement vers cette formule. Une seule formule peut porter ce statut — cliquez à nouveau pour le retirer.</p>
+  ` : `
+    <button type="button" class="adh-officielle-btn adh-officielle-shimmer" onclick="adhToggleOfficielle()">🌟 Définir comme adhésion à l'association</button>
+    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le bouton public « Adhérer à l'initiative » (annuaire, vitrines, profil) redirigera directement vers cette formule — les autres formules restent utilisables en interne (ex. liées à un événement précis) mais ne seront plus proposées par ce bouton. Une seule formule peut être désignée à la fois : en choisir une nouvelle retire automatiquement ce statut de l'ancienne.</p>
+  `;
 }
 
 function adhFermerModalFormule(){ document.getElementById('modal-adh-formule').style.display = 'none'; }
@@ -7564,6 +7615,7 @@ async function adhEnregistrerFormule(){
     statuts_pdf_url: ADH_F_DOCS.statuts_pdf_url,
     champs_config: Object.fromEntries(Array.from(document.querySelectorAll('.adh-champ-mode')).map(sel => [sel.dataset.key, sel.value])),
     champs_custom: ADH_F_CHAMPS_CUSTOM.filter(c => c.label && c.label.trim()),
+    est_officielle: ADH_F_OFFICIELLE,
   };
   try{
     if(ADH_EDIT_FORMULE_ID) await api('PUT', `/adhesion-formules/${ADH_EDIT_FORMULE_ID}`, payload);

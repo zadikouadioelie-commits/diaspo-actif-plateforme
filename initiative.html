@@ -418,7 +418,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
             statutAdhesion === 'acceptee' ? `<button class="btn btn-outline" disabled style="gap:6px;">✓ Membre</button>`
             : statutAdhesion === 'en_attente' ? `<button class="btn btn-outline" disabled style="gap:6px;">⏳ Demande envoyée</button>`
             : init.adhesions_ouvertes === false ? ''
-            : `<button id="btn-adherer" class="btn btn-blue-adherer" style="gap:6px;" onclick="demanderAdhesion(${init.id}, this)">Adhérer</button>`
+            : `<button id="btn-adherer" class="btn btn-blue-adherer" style="gap:6px;" onclick="demanderAdhesion(${init.id}, this)">Adhérer à l'initiative</button>`
           ) : ''}
           ${init.owner_user_id
             /* Le serveur décide de l'action possible et le bouton la reflète : « Message »

@@ -1996,7 +1996,7 @@ function renderVisitorProfile() {
   const adhererBtn = (!isOwn && isInit && ['Association','ONG'].includes(profil.initiative_type))
     ? (_statutAdhesion === 'acceptee' ? `<button class="pvz-btn" disabled>✓ Membre</button>`
       : _statutAdhesion === 'en_attente' ? `<button class="pvz-btn" disabled>⏳ Demande envoyée</button>`
-      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn primary" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer</button>` : '')
+      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn primary" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer à l'initiative</button>` : '')
     : '';
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;

@@ -1126,6 +1126,9 @@ const COLONNES_MIGRATION = [
     ['adhesion_formules', 'statuts_pdf_url', 'TEXT'],
     ['adhesion_formules', 'champs_config_json', "TEXT DEFAULT '{}'"],
     ['adhesion_formules', 'champs_custom_json', "TEXT DEFAULT '[]'"],
+    // Adhésion officielle de l'association (2026-09-28, miroir de server/db.js) — une seule
+    // formule par initiative, ciblée directement par le bouton public "Adhérer à l'initiative".
+    ['adhesion_formules', 'est_officielle', 'INTEGER DEFAULT 0'],
     ['adhesion_membres', 'reponses_json', "TEXT DEFAULT '{}'"],
     // Module Adhésions — incrément 6 (2026-08-07) : sync avec le module Affiliations (miroir des ALTER db.js)
     ['initiative_membres', 'formule_id', 'INTEGER'],

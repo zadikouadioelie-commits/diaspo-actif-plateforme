@@ -6757,6 +6757,12 @@ db.exec(`
     if (!adhFCols.includes('duree_illimitee'))       db.exec("ALTER TABLE adhesion_formules ADD COLUMN duree_illimitee INTEGER DEFAULT 0");
     if (!adhFCols.includes('renouvellement_auto_collectif')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN renouvellement_auto_collectif INTEGER DEFAULT 0");
     if (!adhFCols.includes('max_adherents'))         db.exec("ALTER TABLE adhesion_formules ADD COLUMN max_adherents INTEGER");
+    /* Adhésion officielle de l'association (2026-09-28, demande explicite, capture à l'appui) :
+       une seule formule peut porter ce statut par initiative (contrainte appliquée côté
+       serveur, pas ici) — c'est elle, et elle seule, que le bouton public "Adhérer à
+       l'initiative" cible désormais directement (les autres formules restent réservées à un
+       usage interne/ciblé, ex. liées à un événement précis). */
+    if (!adhFCols.includes('est_officielle'))        db.exec("ALTER TABLE adhesion_formules ADD COLUMN est_officielle INTEGER DEFAULT 0");
   }
 }
 
