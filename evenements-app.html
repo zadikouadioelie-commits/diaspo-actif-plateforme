@@ -1307,7 +1307,14 @@ window.partagerEvenement = async function(id) {
     || ((evtDetailCourant && Number(evtDetailCourant.id) === Number(id)) ? evtDetailCourant : null);
   const titre = evt ? evt.titre : 'Événement Diaspo\'Actif';
   const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
-  const url = location.origin + location.pathname + '?evt=' + id + via;
+  /* &r=<jeton> (2026-09-28, demande explicite : "peux-tu renouvelle... tus les liens... pour que
+     ca fonctionne") — WhatsApp met en cache le résultat de l'aperçu PAR URL EXACTE, y compris un
+     échec, pour toujours (constaté : un même lien déjà raté une fois reste cassé indéfiniment,
+     même renvoyé à un autre destinataire). Un jeton different à chaque clic sur "Partager" rend
+     chaque lien généré unique, donc jamais vu par WhatsApp — sans jamais dépendre de la mémoire
+     de l'utilisateur pour ne pas réutiliser un ancien lien. Ignoré côté serveur (seuls evt/via
+     sont lus, voir server/index.js) : ne change rien à quel événement s'ouvre au clic. */
+  const url = location.origin + location.pathname + '?evt=' + id + via + '&r=' + Date.now().toString(36);
   if (navigator.share) {
     /* PAS de `text` (2026-09-28, essayé deux fois, retiré deux fois, capture à l'appui à chaque
        fois) — un `text` non vide fait que WhatsApp compose le message avec ce texte collé AVANT
