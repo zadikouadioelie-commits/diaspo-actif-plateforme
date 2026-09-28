@@ -1152,10 +1152,16 @@ function renderDetailView() {
   // bascule en gestion et on ne repasse plus jamais par l'assistant pour cette fiche.
   const enCreation = status === 'brouillon' && !state.icModeGestion;
   const etapeIdx = IA_CREATION_STEPS.indexOf(state.activeTab);
+  /* Vert = Création, Bleu = Gestion (2026-09-28, demande explicite, capture à l'appui) — même
+     convention déjà posée sur la barre d'onglets (renderDetailView(), estCreation/neonVif) pour
+     que les deux indicateurs (onglets ET ce badge) se lisent comme un seul système cohérent au
+     lieu de deux langages de couleur différents sur la même page. Le vert reprend exactement
+     celui du badge de statut "Publiée" (IA_STATUS_STYLES.publiee, hue 150) pour rester dans la
+     palette déjà utilisée par cette page plutôt que d'introduire une nouvelle teinte. */
   const modePill = enCreation
-    ? `<span style="background:#FFF3E6; border:1px solid #F26422; color:#B9490A; font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">🛠️ Création — étape ${(etapeIdx > -1 ? etapeIdx : 0) + 1}/${IA_CREATION_STEPS.length}</span>`
-    : `<span style="background:oklch(0.94 0.03 258); border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">📋 Gestion</span>`;
-  const progressBar = enCreation ? `<div style="height:4px; width:100%; max-width:280px; background:#FFE1C7; border-radius:2px; margin-top:10px; overflow:hidden;"><div style="height:100%; background:#F26422; border-radius:2px; width:${((etapeIdx > -1 ? etapeIdx : 0) + 1) / IA_CREATION_STEPS.length * 100}%; transition:width .25s;"></div></div>` : '';
+    ? `<span style="background:oklch(0.94 0.05 150); border:1px solid oklch(0.4 0.13 150); color:oklch(0.4 0.13 150); font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">🛠️ Création — étape ${(etapeIdx > -1 ? etapeIdx : 0) + 1}/${IA_CREATION_STEPS.length}</span>`
+    : `<span style="background:oklch(0.94 0.04 258); border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">📋 Gestion</span>`;
+  const progressBar = enCreation ? `<div style="height:4px; width:100%; max-width:280px; background:oklch(0.9 0.05 150); border-radius:2px; margin-top:10px; overflow:hidden;"><div style="height:100%; background:oklch(0.4 0.13 150); border-radius:2px; width:${((etapeIdx > -1 ? etapeIdx : 0) + 1) / IA_CREATION_STEPS.length * 100}%; transition:width .25s;"></div></div>` : '';
 
   const publierBtn = (status === 'brouillon' || status === 'fermee') ? `<button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:600; padding:9px 18px; border-radius:8px; cursor:pointer;" data-action="publierFiche">Publier la fiche</button>` :
     status === 'publiee' ? `<button style="background:#fff; border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="fermerFiche">Fermer les inscriptions</button>` : '';
