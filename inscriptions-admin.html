@@ -131,7 +131,7 @@ const IA_TABS = [
   { key: 'qr', label: 'Contrôle QR', emoji: '🎟️' },
   { key: 'presences', label: 'Présences', emoji: '👥' },
   { key: 'finances', label: 'Finances', emoji: '💰' },
-  { key: 'stats', label: 'Statistiques', emoji: '📈' },
+  { key: 'stats', label: "Gestion d'inscription", emoji: '📈' },
   { key: 'historique', label: 'Historique', emoji: '📜' },
 ];
 
@@ -253,6 +253,7 @@ const state = {
   traitementCandidatureFiltre: 'en_attente', // filtre actif de l'onglet Traitement candidatures
   icModeGestion: false,      // passe à true une fois les 3 étapes de création franchies (voir icContinuerVersGestion)
   icTransitionVisible: false, // écran "création terminée" affiché entre la dernière étape et le passage en gestion
+  inscriptionsArchiveesVisibles: false, // bascule "voir les archivées" de la Liste des inscrits (onglet Gestion d'inscription)
   busy: false,
 };
 
@@ -2318,14 +2319,27 @@ const IA_INSC_STATUT_LABELS = {
    Finances. Tous les statuts sont montrés (pas seulement les confirmés) — cacher les inscrits en
    liste d'attente ou annulés donnerait une image incomplète, chaque ligne porte sa propre pastille
    de statut pour rester lisible malgré ça. */
+/* Suppression / archivage (2026-09-28, demande explicite) — l'archivage cache une inscription de
+   cette liste par défaut (elle reste en base, statut inchangé) ; la suppression est définitive.
+   Les deux existent en version unitaire (par ligne) et en masse (pour toute la fiche, ex. à la
+   fin d'un événement) — voir actions.archiverInscription/supprimerInscription/*ToutesInscriptions. */
 function renderListeInscrits() {
-  const inscriptions = state.inscriptions || [];
+  const toutes = state.inscriptions || [];
+  const archivees = toutes.filter(i => i.archive);
+  const inscriptions = state.inscriptionsArchiveesVisibles ? toutes : toutes.filter(i => !i.archive);
+  const toggleArchivesBtn = archivees.length ? `<button data-action="toggleArchivesInscriptions" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;">${state.inscriptionsArchiveesVisibles ? '📁 Masquer les archivées' : `📦 Voir les archivées (${archivees.length})`}</button>` : '';
+  const barreActions = toutes.length ? `
+    <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      ${toggleArchivesBtn}
+      <button data-action="archiverToutesInscriptions" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;">📦 Archiver tout</button>
+      <button data-action="supprimerToutesInscriptions" style="background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;">🗑 Tout supprimer</button>
+    </div>` : '';
   if (!inscriptions.length) {
-    return `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:30px 20px;text-align:center;color:oklch(0.55 0.006 30);font-size:13px;">Aucun inscrit pour le moment.</div>`;
+    return `${barreActions}<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:30px 20px;text-align:center;color:oklch(0.55 0.006 30);font-size:13px;">${toutes.length ? 'Aucun inscrit visible — toutes les inscriptions sont archivées.' : 'Aucun inscrit pour le moment.'}</div>`;
   }
   const parType = {};
   for (const i of inscriptions) (parType[i.type_label || 'Autre'] = parType[i.type_label || 'Autre'] || []).push(i);
-  return Object.keys(parType).map(typeLabel => {
+  const groupes = Object.keys(parType).map(typeLabel => {
     const liste = parType[typeLabel];
     const lignes = liste.map(i => {
       const [label, bg, color] = IA_INSC_STATUT_LABELS[i.statut] || IA_INSC_STATUT_LABELS.inscrit;
@@ -2339,13 +2353,17 @@ function renderListeInscrits() {
          messagerie.html qui le traduit déjà en ?with=). */
       const emailBtn = i.email ? `<a href="mailto:${escH(i.email)}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">✉️ Envoyer un mail</a>` : '';
       const contactBtn = i.user_id ? `<a href="messagerie.html?user=${i.user_id}" target="_blank" rel="noopener" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Contacter sur Diaspo'Actif</a>` : '';
+      const archiveBtn = i.archive
+        ? `<button data-action="desarchiverInscription" data-id="${i.id}" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">↩️ Désarchiver</button>`
+        : `<button data-action="archiverInscription" data-id="${i.id}" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">📦 Archiver</button>`;
+      const supprimerBtn = `<button data-action="supprimerInscription" data-id="${i.id}" data-nom="${escH(i.prenom)} ${escH(i.nom)}" style="background:none;border:1px solid #dc2626;color:#dc2626;font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">🗑 Supprimer</button>`;
       return `
-      <div style="display:flex;align-items:center;gap:14px;padding:10px 4px;border-bottom:1px solid oklch(0.94 0.004 30);flex-wrap:wrap;">
-        <div style="min-width:160px;font-weight:600;font-size:13px;">${escH(i.prenom)} ${escH(i.nom)}</div>
+      <div style="display:flex;align-items:center;gap:14px;padding:10px 4px;border-bottom:1px solid oklch(0.94 0.004 30);flex-wrap:wrap;${i.archive ? 'opacity:.6;' : ''}">
+        <div style="min-width:160px;font-weight:600;font-size:13px;">${escH(i.prenom)} ${escH(i.nom)}${i.archive ? ' <span style="font-size:10.5px;font-weight:700;color:oklch(0.5 0.006 30);">📦 Archivée</span>' : ''}</div>
         <div style="flex:1;min-width:180px;font-size:12.5px;color:oklch(0.4 0.006 30);">${i.email ? '✉️ ' + escH(i.email) : '<span style="color:oklch(0.65 0.006 30);">Aucun e-mail</span>'}</div>
         <div style="min-width:140px;font-size:12.5px;color:oklch(0.4 0.006 30);">${i.telephone ? '📞 ' + escH(i.telephone) : '<span style="color:oklch(0.65 0.006 30);">Aucun téléphone</span>'}</div>
         <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${label}</span>
-        ${emailBtn || contactBtn ? `<div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;">${emailBtn}${contactBtn}</div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;">${emailBtn}${contactBtn}${archiveBtn}${supprimerBtn}</div>
       </div>`;
     }).join('');
     return `
@@ -2357,6 +2375,7 @@ function renderListeInscrits() {
       ${lignes}
     </div>`;
   }).join('');
+  return barreActions + groupes;
 }
 function renderStats() {
   const types = currentTypes().map(buildTypeVM);
@@ -2972,6 +2991,47 @@ const actions = {
     try {
       await api('PATCH', `/insc/inscriptions/${el.dataset.id}/statut`, { statut: 'annule' });
       ia_toast('Inscription refusée.', true);
+      await Promise.all([iaChargerPresences(), iaChargerInscriptions()]);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  toggleArchivesInscriptions() { state.inscriptionsArchiveesVisibles = !state.inscriptionsArchiveesVisibles; },
+  async archiverInscription(el) {
+    try {
+      await api('PATCH', `/insc/inscriptions/${el.dataset.id}/archive`, { archive: true });
+      ia_toast('Inscription archivée.', true);
+      await iaChargerInscriptions();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async desarchiverInscription(el) {
+    try {
+      await api('PATCH', `/insc/inscriptions/${el.dataset.id}/archive`, { archive: false });
+      ia_toast('Inscription désarchivée.', true);
+      await iaChargerInscriptions();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async supprimerInscription(el) {
+    if (!confirm(`Supprimer définitivement l'inscription de ${el.dataset.nom} ? Cette action est irréversible.`)) return;
+    try {
+      await api('DELETE', `/insc/inscriptions/${el.dataset.id}`);
+      ia_toast('Inscription supprimée.', true);
+      await Promise.all([iaChargerPresences(), iaChargerInscriptions()]);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async archiverToutesInscriptions() {
+    if (!state.inscriptions?.length) return;
+    if (!confirm(`Archiver les ${state.inscriptions.length} inscription(s) de cette fiche ? Elles resteront consultables via "Voir les archivées".`)) return;
+    try {
+      const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/inscriptions/archiver-tout`, {});
+      ia_toast(`${r.count} inscription(s) archivée(s).`, true);
+      await iaChargerInscriptions();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async supprimerToutesInscriptions() {
+    if (!state.inscriptions?.length) return;
+    if (!confirm(`Supprimer DÉFINITIVEMENT les ${state.inscriptions.length} inscription(s) de cette fiche ? Cette action est irréversible — préférez "Archiver tout" pour garder une trace.`)) return;
+    try {
+      const r = await api('DELETE', `/insc/fiches/${state.selectedFicheId}/inscriptions`);
+      ia_toast(`${r.count} inscription(s) supprimée(s).`, true);
       await Promise.all([iaChargerPresences(), iaChargerInscriptions()]);
     } catch (e) { ia_toast(e.message, false); }
   },

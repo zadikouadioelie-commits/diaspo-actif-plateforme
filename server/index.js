@@ -1178,6 +1178,26 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateImmatriculationVerifiee]', e.message); }
 })();
 
+/* Archivage des inscriptions (2026-09-28, demande explicite : "à la fin d'un événement,
+   supprimer la totalité des inscriptions... ou les archiver — à ce moment-là ils disparaissent
+   là et ils vont dans un petit bouton archiver") — colonne séparée plutôt qu'une valeur
+   supplémentaire du CHECK(statut IN (...)) de insc_inscriptions (server/db.js) : l'archivage est
+   une question de VISIBILITÉ, pas de statut d'inscription, et garder le vrai statut
+   (confirmé/présent/etc.) intact même une fois archivé évite de perdre cette information. */
+(async function migrateInscInscriptionsArchive() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(insc_inscriptions)").all()).map(c => c.name);
+    if (cols.length) {
+      if (!cols.includes('archive')) {
+        try { await db.prepare("ALTER TABLE insc_inscriptions ADD COLUMN archive INTEGER DEFAULT 0").run(); } catch (e) {}
+      }
+      if (!cols.includes('archive_le')) {
+        try { await db.prepare("ALTER TABLE insc_inscriptions ADD COLUMN archive_le TEXT").run(); } catch (e) {}
+      }
+    }
+  } catch (e) { console.error('[migrateInscInscriptionsArchive]', e.message); }
+})();
+
 /* Rattrapage FAQ (2026-09-28) : le seed initial de faq_questions ne rejoue jamais sur une base
    déjà peuplée (voir faqCatCount===0 dans migrateChatbot ci-dessous) — sans cette mise à jour
    ciblée, la question "Comment faire vérifier mon organisation ?" garderait son ancien texte en
@@ -43583,6 +43603,49 @@ route("PATCH", "/api/insc/inscriptions/:id/statut", async (req, res, params, bod
   if (body.statut === "confirme") await envoyerConfirmationInscription(insc.id);
   sendJSON(res, 200, { ok: true });
 });
+
+/* Suppression / archivage d'une inscription — individuel puis en masse (2026-09-28, demande
+   explicite : "ajoute la possibilité de supprimer une inscription ou de supprimer toute une
+   fiche... ou de les archiver — à ce moment-là ils disparaissent là et ils vont dans un petit
+   bouton archiver"). Suppression = définitive (confirmation côté client). Archivage =
+   réversible, seule la visibilité change (voir migrateInscInscriptionsArchive plus haut). */
+route("DELETE", "/api/insc/inscriptions/:id", async (req, res, params) => {
+  const insc = await db.prepare("SELECT i.*, f.owner_user_id FROM insc_inscriptions i JOIN insc_fiches f ON f.id=i.fiche_id WHERE i.id=?").get(params.id);
+  if (!insc) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, insc.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  await db.prepare("DELETE FROM insc_inscriptions WHERE id=?").run(insc.id);
+  await inscJournaliser(insc.fiche_id, user, "suppression_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) supprimée définitivement.`, insc.evenement_id);
+  sendJSON(res, 200, { ok: true });
+});
+route("PATCH", "/api/insc/inscriptions/:id/archive", async (req, res, params, body) => {
+  const insc = await db.prepare("SELECT i.*, f.owner_user_id FROM insc_inscriptions i JOIN insc_fiches f ON f.id=i.fiche_id WHERE i.id=?").get(params.id);
+  if (!insc) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, insc.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const archive = !!body?.archive;
+  if (archive) await db.prepare("UPDATE insc_inscriptions SET archive=1, archive_le=datetime('now') WHERE id=?").run(insc.id);
+  else await db.prepare("UPDATE insc_inscriptions SET archive=0, archive_le=NULL WHERE id=?").run(insc.id);
+  await inscJournaliser(insc.fiche_id, user, archive ? "archivage_inscription" : "desarchivage_inscription", `Inscription #${insc.id} (${insc.nom} ${insc.prenom}) ${archive ? 'archivée' : 'désarchivée'}.`, insc.evenement_id);
+  sendJSON(res, 200, { ok: true });
+});
+route("POST", "/api/insc/fiches/:id/inscriptions/archiver-tout", async (req, res, params) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const r = await db.prepare("UPDATE insc_inscriptions SET archive=1, archive_le=datetime('now') WHERE fiche_id=? AND (archive IS NULL OR archive=0)").run(fiche.id);
+  const count = r.changes || 0;
+  await inscJournaliser(fiche.id, user, "archivage_masse_inscriptions", `${count} inscription(s) archivée(s) en masse.`);
+  sendJSON(res, 200, { ok: true, count });
+});
+route("DELETE", "/api/insc/fiches/:id/inscriptions", async (req, res, params) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const count = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE fiche_id=?").get(fiche.id))?.n || 0;
+  await db.prepare("DELETE FROM insc_inscriptions WHERE fiche_id=?").run(fiche.id);
+  await inscJournaliser(fiche.id, user, "suppression_masse_inscriptions", `${count} inscription(s) supprimée(s) définitivement.`);
+  sendJSON(res, 200, { ok: true, count });
+});
+
 route("GET", "/api/insc/fiches/:id/stats", async (req, res, params) => {
   const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
