@@ -42932,7 +42932,7 @@ route("GET", "/api/insc/types/:id/champs", async (req, res, params) => {
 });
 const INSC_TYPES_CHAMP = ["texte_court","texte_long","nombre","email","telephone","date","heure","adresse",
   "liste_deroulante","choix_unique","choix_multiple","oui_non","case_a_cocher","upload_photo","upload_fichier","url",
-  "upload_documents_titres","upload_images_titrees","upload_videos_titrees","options_payantes"];
+  "upload_documents_titres","upload_images_titrees","upload_videos_titrees","options_payantes","liens_utiles"];
 route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
   if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
@@ -43197,6 +43197,13 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   const { total: montantOptions } = calculerMontantOptionsPayantes(champs, reponses);
   const montantTotal = parseFloat(((type.gratuit ? 0 : (Number(type.prix) || 0)) + montantOptions).toFixed(2));
   for (const c of champs) {
+    /* "liens_utiles" (2026-09-28, demande explicite) : liste de liens fournie par l'organisateur,
+       purement informative pour le participant — jamais une réponse à saisir, donc jamais
+       "obligatoire" au sens de cette boucle, même si la case a été cochée par erreur sur cet
+       ancien champ générique (toggleFieldRequired ne distingue pas les types de champ). Sans
+       cette exception, une fiche avec ce champ marqué obligatoire bloquerait TOUTE inscription
+       (reponses[c.nom] n'existe jamais côté client pour ce type). */
+    if (c.type_champ === "liens_utiles") continue;
     if (!c.obligatoire) continue;
     if (!inscConditionRemplie(c.condition_json, reponses)) continue; // masqué par la logique conditionnelle
     const v = reponses[c.nom];

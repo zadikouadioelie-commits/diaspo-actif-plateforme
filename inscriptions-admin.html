@@ -442,6 +442,107 @@ function iaOuvrirOptionsPayantes(champId) {
     } catch (e) { ia_toast(e.message, false); }
   });
 }
+/* "🔗 Liens utiles" (2026-09-28, demande explicite) — liste de liens fournie par
+   l'organisateur (titre + photo facultative + URL cliquable), purement informative pour le
+   participant : jamais une réponse à collecter, contrairement à "Option payante"/"Sondage".
+   Affichée sur le formulaire public sans aucun attribut `name` (voir ipChampHtml côté
+   inscription-publique.html), donc totalement ignorée par la collecte générique de
+   ipSoumettre() — et explicitement exemptée de la validation "obligatoire" côté serveur (voir
+   POST /api/insc/public/:slug/inscriptions) puisqu'il n'y a jamais de reponses[c.nom] pour ce
+   type. Même principe de modale autonome et même réutilisation de POST/PUT .../champs
+   (options_json) que iaOuvrirOptionsPayantes ci-dessus — aucune route serveur dédiée. */
+function iulRenderRow(lien) {
+  return `
+    <div class="iul-row" style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px;">
+      <label style="width:46px; height:46px; border-radius:8px; background:${lien.photo_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(lien.photo_url)}')` : 'oklch(0.96 0.004 30)'}; border:1.5px dashed oklch(0.8 0.006 30); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; overflow:hidden;" title="Ajouter une photo (facultatif)">
+        ${lien.photo_url ? '' : '<span style="font-size:16px; opacity:.5;">📷</span>'}
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-role="photo" style="display:none;">
+      </label>
+      <div style="flex:1; display:flex; flex-direction:column; gap:6px; min-width:0;">
+        <input type="text" data-role="titre" placeholder="Titre du lien (ex. Groupe WhatsApp)" value="${escH(lien.titre || '')}" style="width:100%; height:36px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
+        <input type="url" data-role="url" placeholder="https://…" value="${escH(lien.url || '')}" style="width:100%; height:36px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
+      </div>
+      <button type="button" data-role="supprimer" style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
+    </div>`;
+}
+function iaOuvrirLiensUtiles(champId) {
+  if (!state.selectedTypeId) { ia_toast("Sélectionnez ou créez d'abord un type d'inscription.", false); return; }
+  const champExistant = champId ? (selectedType().champs || []).find(c => Number(c.id) === Number(champId)) : null;
+  let liensExistants = [];
+  if (champExistant) { try { liensExistants = JSON.parse(champExistant.options_json || '[]'); } catch (e) {} }
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+        <h3 style="margin:0; font-size:17px; color:#1565C0;">🔗 Liens utiles${champExistant ? ' — ' + escH(champExistant.libelle) : ''}</h3>
+        <button type="button" id="iul-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+      </div>
+      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Ajoutez des liens utiles (groupe WhatsApp, page de l'événement, règlement…) affichés sur le formulaire d'inscription à « ${escH(selectedType() ? selectedType().label : '')} ». Purement informatif : jamais une réponse demandée au participant.</p>
+      <div id="iul-liens-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <button type="button" id="iul-ajouter" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter un autre lien</button>
+      <button type="button" id="iul-enregistrer" style="width:100%; margin-top:18px; background:#1565C0; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer les liens</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const list = overlay.querySelector('#iul-liens-list');
+  const ajouterRow = (lien) => {
+    const div = document.createElement('div');
+    div.innerHTML = iulRenderRow(lien || { titre: '', url: '', photo_url: null });
+    const row = div.firstElementChild;
+    if (lien?.photo_url) row.dataset.photoUrl = lien.photo_url;
+    list.appendChild(row);
+  };
+  if (liensExistants.length) liensExistants.forEach(ajouterRow); else ajouterRow();
+
+  list.addEventListener('change', async (e) => {
+    if (e.target.dataset.role !== 'photo') return;
+    const file = e.target.files[0]; if (!file) return;
+    const row = e.target.closest('.iul-row');
+    const label = e.target.closest('label');
+    try {
+      const compressed = await compressImageFile(file, 400, 400, 0.85);
+      const url = await uploadMedia(compressed, 'produit');
+      label.style.background = `oklch(0.9 0.004 30) center/cover no-repeat url('${url}')`;
+      const span = label.querySelector('span'); if (span) span.remove();
+      row.dataset.photoUrl = url;
+    } catch (err) { ia_toast(err.message || 'Erreur upload photo.', false); }
+  });
+
+  list.addEventListener('click', (e) => {
+    if (e.target.dataset.role !== 'supprimer') return;
+    if (list.children.length <= 1) { ia_toast('Au moins un lien est requis.', false); return; }
+    e.target.closest('.iul-row').remove();
+  });
+
+  overlay.querySelector('#iul-ajouter').addEventListener('click', () => ajouterRow());
+  overlay.querySelector('#iul-fermer').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#iul-enregistrer').addEventListener('click', async () => {
+    const rows = Array.from(list.querySelectorAll('.iul-row'));
+    const liens = rows.map(row => ({
+      titre: row.querySelector('[data-role="titre"]').value.trim(),
+      url: row.querySelector('[data-role="url"]').value.trim(),
+      photo_url: row.dataset.photoUrl || null,
+    })).filter(l => l.titre && /^https?:\/\//i.test(l.url));
+    if (!liens.length) { ia_toast('Ajoutez au moins un lien avec un titre et une adresse (http:// ou https://).', false); return; }
+    try {
+      if (champExistant) {
+        await api('PUT', `/insc/champs/${champExistant.id}`, { options: liens });
+        ia_toast('Liens mis à jour.', true);
+      } else {
+        const libelleGroupe = prompt('Nom de ce groupe de liens (affiché aux participants) :', 'Liens utiles');
+        if (!libelleGroupe || !libelleGroupe.trim()) return;
+        await api('POST', `/insc/types/${state.selectedTypeId}/champs`, { libelle: libelleGroupe.trim(), type_champ: 'liens_utiles', obligatoire: false, options: liens });
+        ia_toast(`${liens.length} lien(s) ajouté(s).`, true);
+      }
+      overlay.remove();
+      await iaChargerFiche(state.selectedFicheId);
+      render();
+    } catch (e) { ia_toast(e.message, false); }
+  });
+}
 /* "📊 Sondage" (2026-09-25, demande explicite) — un bloc qui regroupe plusieurs questions,
    chacune avec son propre mode de réponse (Oui/Non, texte libre, ou une liste de réponses
    programmées par l'organisateur, affichée en menu déroulant) et sa propre image facultative.
@@ -1252,11 +1353,14 @@ function renderFields() {
     return `
     <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
       <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}${nbUniverselles ? ` <span style="font-size:11px;color:#8B12D6;">· 🌐 ${nbUniverselles} universelle(s)</span>` : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
-      <label style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; cursor:pointer; padding:7px 13px; border-radius:20px; white-space:nowrap; background:${f.obligatoire ? '#FEE2E2' : '#F1F5F9'}; border:1.5px solid ${f.obligatoire ? '#DC2626' : 'oklch(0.85 0.004 30)'}; color:${f.obligatoire ? '#B91C1C' : 'oklch(0.5 0.006 30)'};">
+      ${f.type_champ === 'liens_utiles'
+        ? `<span style="font-size:12.5px; font-weight:700; padding:7px 13px; border-radius:20px; white-space:nowrap; background:#F1F5F9; color:oklch(0.5 0.006 30);" title="Purement informatif — jamais une réponse demandée au participant">ℹ️ Informatif</span>`
+        : `<label style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; cursor:pointer; padding:7px 13px; border-radius:20px; white-space:nowrap; background:${f.obligatoire ? '#FEE2E2' : '#F1F5F9'}; border:1.5px solid ${f.obligatoire ? '#DC2626' : 'oklch(0.85 0.004 30)'}; color:${f.obligatoire ? '#B91C1C' : 'oklch(0.5 0.006 30)'};">
         <input type="checkbox" ${f.obligatoire ? 'checked' : ''} data-action="toggleFieldRequired" data-id="${f.id}" style="width:16px; height:16px; accent-color:#DC2626; cursor:pointer;"/>
         ${f.obligatoire ? '🔴 Obligatoire' : 'Facultatif'}
-      </label>
+      </label>`}
       ${f.type_champ === 'options_payantes' ? `<button style="background:none; border:none; color:#8B12D6; font-size:15px; cursor:pointer; padding:2px 6px;" data-action="modifierOptionsPayantes" data-id="${f.id}" title="Modifier les options">✏️</button>` : ''}
+      ${f.type_champ === 'liens_utiles' ? `<button style="background:none; border:none; color:#1565C0; font-size:15px; cursor:pointer; padding:2px 6px;" data-action="modifierLiensUtiles" data-id="${f.id}" title="Modifier les liens">✏️</button>` : ''}
       <button style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px;" data-action="removeField" data-id="${f.id}">✕</button>
     </div>`;
   }).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucun champ personnalisé — seuls nom/prénom/e-mail/téléphone sont demandés.</div>';
@@ -1301,6 +1405,7 @@ function renderFields() {
                qu'un toast "Bientôt disponible" en attendant. Même style que les puces
                "Option payante"/"Sondage" ci-dessus, en vert néon plutôt que violet. -->
           <button style="background:#fff; border:1.5px solid #39FF14; color:#1C8A0E; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(57,255,20,.45);" data-action="ouvrirCandidature">💼 Candidature</button>
+          <button style="background:#fff; border:1.5px solid #1565C0; color:#1565C0; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(21,101,192,.35);" data-action="ouvrirLiensUtiles">🔗 Liens utiles</button>
         </div>
         ${panelSuggestions}
       </div>
@@ -2158,6 +2263,8 @@ const actions = {
   ouvrirOptionsPayantes() { iaOuvrirOptionsPayantes(); },
   modifierOptionsPayantes(el) { iaOuvrirOptionsPayantes(parseInt(el.dataset.id)); },
   ouvrirSondage() { iaOuvrirSondage(); },
+  ouvrirLiensUtiles() { iaOuvrirLiensUtiles(); },
+  modifierLiensUtiles(el) { iaOuvrirLiensUtiles(parseInt(el.dataset.id)); },
   // "💼 Candidature" (2026-09-27) — la fonctionnalité (onglet dédié, renderCandidature()) a été
   // construite séparément depuis ce bouton placeholder, jamais mis à jour pour y naviguer (bug
   // réel signalé : le clic ne faisait plus qu'afficher le toast "bientôt disponible" alors que

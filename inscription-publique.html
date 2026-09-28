@@ -226,6 +226,19 @@ function ipChampHtml(c) {
         <span style="flex:1;font-size:13px;">${escH(o.libelle)}</span>
         <span style="font-size:13px;font-weight:700;color:oklch(0.32 0.09 258);">${ipPrixLabelHtml(o)}</span>
       </label>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucune option disponible.</div>'}</div>`;
+  } else if (c.type_champ === 'liens_utiles') {
+    /* Liste de liens fournie par l'organisateur (2026-09-28, demande explicite) — purement
+       informative : volontairement AUCUN attribut `name`, donc ignorée par la collecte
+       générique de ipSoumettre() (form.querySelectorAll('[name]')) — rien à soumettre pour ce
+       champ, jamais une réponse du participant. Voir aussi l'exemption explicite côté serveur
+       (POST /api/insc/public/:slug/inscriptions) qui traite ce type comme jamais "obligatoire",
+       quelle que soit la valeur de c.obligatoire. */
+    champHtml = `<div style="display:flex;flex-direction:column;gap:8px;">${options.map(o => `
+      <a href="${escH(o.url)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;border:1px solid oklch(0.9 0.004 30);border-radius:8px;padding:8px 10px;text-decoration:none;color:inherit;">
+        ${o.photo_url ? `<img src="${escH(o.photo_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : ''}
+        <span style="flex:1;font-size:13px;font-weight:600;">${escH(o.titre)}</span>
+        <span style="font-size:12px;font-weight:600;color:#1565C0;white-space:nowrap;">Ouvrir ↗</span>
+      </a>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucun lien disponible.</div>'}</div>`;
   } else if (c.type_champ === 'oui_non') {
     champHtml = `<select name="${escH(c.nom)}"><option value="">-- Choisir --</option><option value="oui">Oui</option><option value="non">Non</option></select>`;
   } else if (c.type_champ === 'case_a_cocher') {
