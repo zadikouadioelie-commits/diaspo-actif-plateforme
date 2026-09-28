@@ -1316,21 +1316,27 @@ window.partagerEvenement = async function(id) {
   const titre = evt ? evt.titre : 'Événement Diaspo\'Actif';
   const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
   const url = location.origin + location.pathname + '?evt=' + id + via;
-  /* Capture d'écran de la cartouche + texte en légende (2026-09-28, demande explicite : "tu
-     partages la cartouche de l'événement entièrement... et tu mets en dessous le lien", avec "le
-     nom de la personne... qui transfère l'invitation") — remplace la dépendance à l'aperçu de
-     lien généré par WhatsApp (fragile : mis en cache par URL, cf. tentatives précédentes) par une
-     vraie image envoyée en pièce jointe, qui s'affiche donc TOUJOURS, quel que soit le
-     destinataire ou le cache. Le lien reste indispensable en légende : c'est lui qui permet de
-     réellement s'inscrire (l'image seule n'est pas cliquable). */
+  /* Capture d'écran de la cartouche, PUIS le lien dans un second partage séparé (2026-09-28,
+     demande explicite : "tu partages la cartouche de l'événement entièrement... et tu mets en
+     dessous le lien... rends-le cliquable"). D'abord essayé en un seul partage {files, text} :
+     constaté en conditions réelles (capture à l'appui, WhatsApp Desktop) que le texte
+     accompagnant un fichier partagé est purement et simplement ignoré — seule l'image arrivait,
+     aucun lien, cliquable ou non. Un second appel navigator.share() séparé, SANS fichier, cette
+     fois-ci fonctionne de façon fiable : c'est exactement le partage lien seul déjà validé plus
+     haut dans cette conversation (WhatsApp le déplie et l'affiche comme un vrai lien cliquable).
+     Deux partages successifs plutôt qu'un seul : la seule façon garantie de faire arriver les
+     deux, quelle que soit la cible choisie. */
   const nomPartageur = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER)
     ? ([CURRENT_USER.prenom, CURRENT_USER.nom].filter(Boolean).join(' ') || CURRENT_USER.nom || null)
     : null;
-  const texte = (nomPartageur ? `${nomPartageur} vous transfère l'invitation à l'événement ${titre}` : `Invitation à l'événement ${titre}`) + '\n' + url;
+  const texte = nomPartageur ? `${nomPartageur} vous transfère l'invitation à l'événement ${titre}` : `Invitation à l'événement ${titre}`;
   const image = await genererImageCartouche(id).catch(() => null);
   if (image && navigator.canShare && navigator.canShare({ files: [image] })) {
-    try { await navigator.share({ files: [image], text: texte }); return; }
-    catch (e) { if (e && e.name === 'AbortError') return; }
+    try {
+      await navigator.share({ files: [image] });
+      if (navigator.share) { try { await navigator.share({ title: titre, text: texte, url }); } catch (e) { /* lien facultatif si annulé ici */ } }
+      return;
+    } catch (e) { if (e && e.name === 'AbortError') return; }
   }
   if (navigator.share) {
     /* Repli sans image (2026-09-28) : navigateur/OS sans partage de fichiers, ou capture
