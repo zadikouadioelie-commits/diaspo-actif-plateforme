@@ -2479,6 +2479,14 @@ const MIGRATIONS = [
   // publique, sans fermer l'inscription en cours (ouvert dans un nouvel onglet côté client).
   // Référence la table invitations (module Parrainage), jamais copiée/dupliquée ici.
   ["insc_fiches", "parrainage_invitation_id INTEGER"],
+  // Partenaires & sponsors PAR DÉFAUT d'une initiative (2026-09-28, demande explicite) — liste
+  // [{nom, logo_url}] indépendante de vitrine_partenaires_json (la vitrine reste en saisie
+  // manuelle, décision explicite) : sert uniquement de point de départ recopié sur CHAQUE
+  // NOUVELLE fiche d'inscription (insc_fiches.partenaires_json/sponsors_json) au moment de sa
+  // création — jamais un lien vivant, l'organisateur reste libre de retirer/masquer sur une
+  // fiche précise sans jamais modifier cette liste source ni les fiches déjà créées.
+  ["initiatives", "partenaires_evenements_json TEXT DEFAULT '[]'"],
+  ["initiatives", "sponsors_evenements_json TEXT DEFAULT '[]'"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —

@@ -42745,24 +42745,58 @@ route("GET", "/api/insc/fiches", async (req, res) => {
 function inscBetaAutorise(user) {
   return user.role === "administrateur" || user.role === "initiative";
 }
+/* Partenaires & sponsors PAR DÉFAUT d'une initiative (2026-09-28, demande explicite : "on va
+   garder la vitrine en dehors de tout ça... simple avec partenariat et sponsors qui seront
+   utiles pour les fiches d'inscription") — liste [{nom, logo_url}] indépendante de
+   vitrine_partenaires_json (la vitrine reste en saisie manuelle, décision explicite). Sert
+   uniquement de modèle recopié sur chaque NOUVELLE fiche à sa création (voir POST
+   /api/insc/fiches ci-dessous) — jamais un lien vivant. */
+route("GET", "/api/insc/mes-partenaires-sponsors-defaut", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT partenaires_evenements_json, sponsors_evenements_json FROM initiatives WHERE owner_user_id=?").get(user.id);
+  let partenaires = [], sponsors = [];
+  try { partenaires = JSON.parse(init?.partenaires_evenements_json || "[]"); } catch (e) {}
+  try { sponsors = JSON.parse(init?.sponsors_evenements_json || "[]"); } catch (e) {}
+  sendJSON(res, 200, { partenaires, sponsors });
+});
+route("PUT", "/api/insc/mes-partenaires-sponsors-defaut", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  if (!init) return sendJSON(res, 403, { error: "Réservé aux comptes Initiative." });
+  const nettoyer = (arr) => (Array.isArray(arr) ? arr : []).filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }));
+  const set = [], vals = [];
+  if (body.partenaires !== undefined) { set.push("partenaires_evenements_json=?"); vals.push(JSON.stringify(nettoyer(body.partenaires))); }
+  if (body.sponsors !== undefined) { set.push("sponsors_evenements_json=?"); vals.push(JSON.stringify(nettoyer(body.sponsors))); }
+  if (set.length) await db.prepare(`UPDATE initiatives SET ${set.join(",")} WHERE id=?`).run(...vals, init.id);
+  sendJSON(res, 200, { ok: true });
+});
 route("POST", "/api/insc/fiches", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est réservé aux comptes Initiative." });
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
-  const init = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").get(user.id);
+  const init = await db.prepare("SELECT id, partenaires_evenements_json, sponsors_evenements_json FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = await inscSlugUnique(body.nom);
+  /* Partenaires/sponsors par défaut de l'initiative (2026-09-28, demande explicite) — recopiés
+     UNE SEULE FOIS ici à la création de la fiche (jamais un lien vivant, voir MIGRATIONS dans
+     server/db.js) : modifier la liste source de l'initiative n'affecte jamais les fiches déjà
+     créées, et l'organisateur reste libre de retirer/masquer des entrées sur CETTE fiche via
+     PUT /api/insc/fiches/:id (sponsors/partenaires) sans toucher à la source. */
   const id = (await db.prepare(`
     INSERT INTO insc_fiches (owner_user_id, initiative_id, nom, slug, description, affiche_url, organisateur,
       contact_nom, contact_email, contact_telephone, date_ouverture_inscriptions, date_fermeture_inscriptions,
-      visibilite, code_acces)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      visibilite, code_acces, partenaires_json, sponsors_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     user.id, init?.id || null, String(body.nom).trim(), slug, body.description ? SEC.sanitizeRichHtml(body.description) : null, body.affiche_url || null,
     body.organisateur || null, body.contact_nom || null, body.contact_email || null, body.contact_telephone || null,
     body.date_ouverture_inscriptions || null, body.date_fermeture_inscriptions || null,
     ["public", "membres", "prive", "invitation"].includes(body.visibilite) ? body.visibilite : "public",
-    body.code_acces || null
+    body.code_acces || null,
+    init?.partenaires_evenements_json || '[]',
+    init?.sponsors_evenements_json || '[]'
   )).lastInsertRowid;
   if (Array.isArray(body.evenement_ids)) {
     for (const eid of body.evenement_ids) {

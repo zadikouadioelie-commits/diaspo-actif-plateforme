@@ -741,6 +741,80 @@ function iaOuvrirSponsorsPartenaires(kind) {
     } catch (e) { ia_toast(e.message, false); }
   });
 }
+/* Partenaires & sponsors PAR DÉFAUT de l'initiative (2026-09-28, demande explicite : "on va
+   garder la vitrine en dehors de tout ça... simple avec partenariat et sponsors qui seront
+   utiles pour les fiches d'inscription") — indépendant de la vitrine (reste en saisie manuelle),
+   sert uniquement de modèle recopié UNE FOIS sur chaque nouvelle fiche à sa création (voir
+   POST /api/insc/fiches côté serveur) : modifier cette liste n'affecte jamais les fiches déjà
+   créées. Une seule fenêtre pour les deux listes (partenaires au-dessus, sponsors en dessous,
+   demande explicite), réutilise ispRenderRow() déjà défini juste au-dessus. Accessible depuis
+   la liste des fiches (niveau initiative, pas fiche par fiche), d'où le chargement asynchrone
+   initial (pas de fiche sélectionnée dont partir ici). */
+async function iaOuvrirDefautsPartenairesSponsors() {
+  let data;
+  try { data = await api('GET', '/insc/mes-partenaires-sponsors-defaut'); }
+  catch (e) { return ia_toast(e.message, false); }
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+        <h3 style="margin:0; font-size:17px;">⚙️ Partenaires &amp; sponsors par défaut</h3>
+        <button type="button" id="idps-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+      </div>
+      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 18px;">Repris automatiquement sur chaque NOUVELLE fiche d'inscription que vous créez — libre ensuite d'en retirer ou d'en masquer sur une fiche précise, sans jamais modifier cette liste ni les fiches déjà créées. La vitrine de votre profil n'est pas concernée.</p>
+      <h4 style="margin:0 0 10px; font-size:13.5px; font-weight:700;">🤝 Partenaires</h4>
+      <div id="idps-list-partenaires" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <button type="button" data-role="ajouter" data-kind="partenaires" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter un partenaire</button>
+      <h4 style="margin:22px 0 10px; font-size:13.5px; font-weight:700;">🏢 Sponsors</h4>
+      <div id="idps-list-sponsors" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <button type="button" data-role="ajouter" data-kind="sponsors" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter un sponsor</button>
+      <button type="button" id="idps-enregistrer" style="width:100%; margin-top:18px; background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const listes = { partenaires: overlay.querySelector('#idps-list-partenaires'), sponsors: overlay.querySelector('#idps-list-sponsors') };
+  const ajouterRow = (kind, item) => {
+    const div = document.createElement('div');
+    div.innerHTML = ispRenderRow(item || { nom: '', logo_url: null });
+    const row = div.firstElementChild;
+    if (item?.logo_url) row.dataset.logoUrl = item.logo_url;
+    listes[kind].appendChild(row);
+  };
+  if (data.partenaires?.length) data.partenaires.forEach(i => ajouterRow('partenaires', i)); else ajouterRow('partenaires');
+  if (data.sponsors?.length) data.sponsors.forEach(i => ajouterRow('sponsors', i)); else ajouterRow('sponsors');
+
+  overlay.addEventListener('change', async (e) => {
+    if (e.target.dataset.role !== 'logo') return;
+    const file = e.target.files[0]; if (!file) return;
+    const row = e.target.closest('.isp-row');
+    const label = e.target.closest('label');
+    try {
+      const compressed = await compressImageFile(file, 400, 400, 0.85);
+      const url = await uploadMedia(compressed, 'logo');
+      label.style.background = `oklch(0.9 0.004 30) center/cover no-repeat url('${url}')`;
+      const span = label.querySelector('span'); if (span) span.remove();
+      row.dataset.logoUrl = url;
+    } catch (err) { ia_toast(err.message || 'Erreur upload logo.', false); }
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target.dataset.role === 'supprimer') { e.target.closest('.isp-row').remove(); return; }
+    if (e.target.dataset.role === 'ajouter') { ajouterRow(e.target.dataset.kind); return; }
+    if (e.target.id === 'idps-fermer' || e.target === overlay) { overlay.remove(); return; }
+  });
+
+  overlay.querySelector('#idps-enregistrer').addEventListener('click', async () => {
+    const lireListe = (kind) => Array.from(listes[kind].querySelectorAll('.isp-row')).map(row => ({
+      nom: row.querySelector('[data-role="nom"]').value.trim(),
+      logo_url: row.dataset.logoUrl || null,
+    })).filter(o => o.nom);
+    try {
+      await api('PUT', '/insc/mes-partenaires-sponsors-defaut', { partenaires: lireListe('partenaires'), sponsors: lireListe('sponsors') });
+      ia_toast('Partenaires & sponsors par défaut mis à jour.', true);
+      overlay.remove();
+    } catch (e) { ia_toast(e.message, false); }
+  });
+}
 /* "📊 Sondage" (2026-09-25, demande explicite) — un bloc qui regroupe plusieurs questions,
    chacune avec son propre mode de réponse (Oui/Non, texte libre, ou une liste de réponses
    programmées par l'organisateur, affichée en menu déroulant) et sa propre image facultative.
@@ -1044,7 +1118,10 @@ function renderListView() {
       <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:8px;">Événements &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30);font-weight:500;">Formulaires &amp; Inscriptions</span></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:14px;">
         <h1 style="margin:0;font-size:24px;font-weight:700;">Formulaires &amp; Inscriptions</h1>
-        <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 20px;border-radius:8px;cursor:pointer;" data-action="createFiche">+ Créer une fiche d'inscription</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;" data-action="ouvrirDefautsPartenairesSponsors" title="Repris automatiquement sur chaque nouvelle fiche d'inscription">⚙️ Partenaires &amp; sponsors par défaut</button>
+          <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 20px;border-radius:8px;cursor:pointer;" data-action="createFiche">+ Créer une fiche d'inscription</button>
+        </div>
       </div>
       ${state.fiches.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">${cards}</div>` : `<div style="text-align:center;padding:50px 0;color:oklch(0.55 0.006 30);">Aucune fiche pour le moment — créez la première.</div>`}
     </div>`;
@@ -2391,6 +2468,7 @@ const actions = {
       ia_toast('Fiche supprimée.', true);
     } catch (e) { ia_toast(e.message, false); }
   },
+  ouvrirDefautsPartenairesSponsors() { iaOuvrirDefautsPartenairesSponsors(); },
   async createFiche() {
     const nom = prompt("Nom de la fiche d'inscription :");
     if (!nom || !nom.trim()) return;
