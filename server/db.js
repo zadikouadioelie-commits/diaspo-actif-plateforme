@@ -311,6 +311,15 @@ db.exec(`
     /* Association avec un événement (Phase 2 point 2) — facultative, un événement peut avoir
        plusieurs cagnottes liées. Affichée sur la page de l'événement avec un bouton participer. */
     evenement_id INTEGER,
+    /* Dons récurrents/occasionnels (2026-09-28, demande explicite) — type_don distingue la
+       cagnotte-objectif historique ('campagne', défaut) des deux modes simplifiés 'recurrent'
+       (abonnement Stripe, voir recurrence_periodicite) et 'occasionnel' (paiement unique,
+       éventuellement lié à une fiche d'inscription via insc_fiche_id). est_vedette : un seul don
+       affiché "partout" par owner_user_id (appliqué par PATCH .../vedette, jamais écrit ailleurs). */
+    type_don TEXT DEFAULT 'campagne',
+    recurrence_periodicite TEXT,
+    est_vedette INTEGER DEFAULT 0,
+    insc_fiche_id INTEGER,
     objectif_montant REAL,
     devise TEXT DEFAULT 'EUR',
     date_debut TEXT,
@@ -420,6 +429,10 @@ db.exec(`
     message TEXT,
     statut TEXT DEFAULT 'en_attente' CHECK(statut IN ('en_attente','paye','echoue','rembourse')),
     stripe_session_id TEXT,
+    /* Don récurrent (2026-09-28) — identifie l'abonnement Stripe ; même rôle que
+       adhesion_paiements.stripe_subscription_id. Une ligne par facture (jamais un UPDATE de la
+       1ère ligne), voir le webhook invoice.payment_succeeded. */
+    stripe_subscription_id TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(cagnotte_id) REFERENCES cagnottes(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
