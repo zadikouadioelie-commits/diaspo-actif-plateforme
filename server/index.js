@@ -43168,12 +43168,27 @@ route("GET", "/api/insc/types/:id/champs", async (req, res, params) => {
 const INSC_TYPES_CHAMP = ["texte_court","texte_long","nombre","email","telephone","date","heure","adresse",
   "liste_deroulante","choix_unique","choix_multiple","oui_non","case_a_cocher","upload_photo","upload_fichier","url",
   "upload_documents_titres","upload_images_titrees","upload_videos_titrees","options_payantes","liens_utiles"];
+/* Garde-fou "champ réservé" (2026-09-28, demande explicite après un cas réel en production :
+   un organisateur avait ajouté Nom/Prénom/Adresse e-mail/Numéro de téléphone comme champs
+   personnalisés, dupliquant EXACTEMENT nom/prénom/e-mail/téléphone déjà toujours demandés par
+   défaut sur toute inscription — voir POST /api/insc/public/:slug/inscriptions plus bas, qui les
+   collecte séparément sous __nom/__prenom/__email/__telephone). Les suggestions "Identité"/
+   "Contact" ont été corrigées pour ne plus les proposer, mais "Personnalisé" reste un champ libre
+   (prompt) qui permettrait de retaper le même libellé à la main — d'où ce blocage ICI, au point
+   d'entrée unique des deux chemins (suggestion ET libre), plutôt que côté client seulement. */
+const INSC_LIBELLES_RESERVES = new Set(["nom","prenom","email","e mail","adresse e mail","adresse email","telephone","numero de telephone"]);
+function inscLibelleReserve(libelle) {
+  const normalise = String(libelle || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return INSC_LIBELLES_RESERVES.has(normalise);
+}
 route("POST", "/api/insc/types/:id/champs", async (req, res, params, body) => {
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=?").get(params.id);
   if (!type) return sendJSON(res, 404, { error: "Type introuvable." });
   const { erreur, msg } = await inscFicheProprietaire(req, type.fiche_id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
   if (!body?.libelle || !String(body.libelle).trim()) return sendJSON(res, 400, { error: "Le libellé est requis." });
+  if (inscLibelleReserve(body.libelle)) return sendJSON(res, 400, { error: `« ${String(body.libelle).trim()} » est déjà demandé par défaut à chaque inscription — inutile de le redemander. Pour un champ similaire (ex. le nom d'un accompagnant), donnez-lui un libellé distinct.` });
   if (!INSC_TYPES_CHAMP.includes(body.type_champ)) return sendJSON(res, 400, { error: "Type de champ invalide." });
   const nom = inscSlugify(body.nom || body.libelle).replace(/-/g, "_") || `champ_${Date.now()}`;
   const maxPos = (await db.prepare("SELECT MAX(position) m FROM insc_champs WHERE type_id=?").get(type.id))?.m;
@@ -43193,6 +43208,7 @@ route("PUT", "/api/insc/champs/:id", async (req, res, params, body) => {
   if (!champ) return sendJSON(res, 404, { error: "Champ introuvable." });
   const { erreur, msg } = await inscFicheProprietaire(req, champ.fiche_id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (body.libelle !== undefined && inscLibelleReserve(body.libelle)) return sendJSON(res, 400, { error: `« ${String(body.libelle).trim()} » est déjà demandé par défaut à chaque inscription — inutile de le redemander. Pour un champ similaire (ex. le nom d'un accompagnant), donnez-lui un libellé distinct.` });
   const cols = ["libelle","description_aide","obligatoire","actif","valeur_defaut","placeholder","regle_validation","image_url"];
   const set = [], vals = [];
   for (const c of cols) if (body[c] !== undefined) { set.push(`${c}=?`); vals.push(body[c] === "" ? null : body[c]); }
