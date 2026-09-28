@@ -2514,6 +2514,10 @@ function renderListeInscrits() {
          messagerie.html qui le traduit déjà en ?with=). */
       const emailBtn = i.email ? `<a href="mailto:${escH(i.email)}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">✉️ Envoyer un mail</a>` : '';
       const contactBtn = i.user_id ? `<a href="messagerie.html?user=${i.user_id}" target="_blank" rel="noopener" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Contacter sur Diaspo'Actif</a>` : '';
+      /* Renvoyer le QR code (2026-09-28, demande explicite) — canal choisi automatiquement côté
+         serveur (message interne si compte Diaspo'Actif, sinon e-mail), jamais un choix manuel ici ;
+         réservé aux inscriptions confirmées car un autre statut n'a pas de billet/QR valide. */
+      const renvoyerQrBtn = i.statut === 'confirme' ? `<button data-action="renvoyerQr" data-id="${i.id}" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔄 Renvoyer le QR code</button>` : '';
       const archiveBtn = i.archive
         ? `<button data-action="desarchiverInscription" data-id="${i.id}" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">↩️ Désarchiver</button>`
         : `<button data-action="archiverInscription" data-id="${i.id}" style="background:none;border:1px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">📦 Archiver</button>`;
@@ -2524,7 +2528,7 @@ function renderListeInscrits() {
         <div style="flex:1;min-width:180px;font-size:12.5px;color:oklch(0.4 0.006 30);">${i.email ? '✉️ ' + escH(i.email) : '<span style="color:oklch(0.65 0.006 30);">Aucun e-mail</span>'}</div>
         <div style="min-width:140px;font-size:12.5px;color:oklch(0.4 0.006 30);">${i.telephone ? '📞 ' + escH(i.telephone) : '<span style="color:oklch(0.65 0.006 30);">Aucun téléphone</span>'}</div>
         <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${label}</span>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;">${emailBtn}${contactBtn}${archiveBtn}${supprimerBtn}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;">${emailBtn}${contactBtn}${renvoyerQrBtn}${archiveBtn}${supprimerBtn}</div>
       </div>`;
     }).join('');
     return `
@@ -3169,6 +3173,13 @@ const actions = {
       await api('DELETE', `/insc/inscriptions/${el.dataset.id}`);
       ia_toast('Inscription supprimée.', true);
       await Promise.all([iaChargerPresences(), iaChargerInscriptions()]);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async renvoyerQr(el) {
+    try {
+      const r = await api('POST', `/insc/inscriptions/${el.dataset.id}/renvoyer-qr`, {});
+      const via = r.via_message ? 'par message interne Diaspo\'Actif' : (r.via_email ? 'par e-mail' : null);
+      ia_toast(via ? `QR code renvoyé ${via}.` : 'Inscription sans e-mail ni compte : QR code non renvoyé.', !!via);
     } catch (e) { ia_toast(e.message, false); }
   },
   async archiverToutesInscriptions() {

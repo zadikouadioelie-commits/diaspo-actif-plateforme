@@ -43740,6 +43740,23 @@ route("DELETE", "/api/insc/fiches/:id/inscriptions", async (req, res, params) =>
   sendJSON(res, 200, { ok: true, count });
 });
 
+/* Renvoyer le QR code / confirmation (2026-09-28, demande explicite, capture à l'appui : "au cas
+   où la personne n'ait pas son QR code sur elle") — réutilise exactement envoyerConfirmationInscription(),
+   la même fonction déjà déclenchée à la confirmation initiale ci-dessus : notification interne si
+   l'inscrit a un compte Diaspo'Actif (insc.user_id), e-mail avec lien vers la confirmation PDF/QR
+   si une adresse est renseignée (insc.email) — chaque canal ne se déclenche que si sa donnée
+   existe, jamais un choix arbitraire de l'un ou l'autre. Réservé aux inscriptions confirmées : un
+   statut différent n'a pas de billet valide à renvoyer. */
+route("POST", "/api/insc/inscriptions/:id/renvoyer-qr", async (req, res, params) => {
+  const insc = await db.prepare("SELECT i.*, f.owner_user_id, f.nom AS fiche_nom FROM insc_inscriptions i JOIN insc_fiches f ON f.id=i.fiche_id WHERE i.id=?").get(params.id);
+  if (!insc) return sendJSON(res, 404, { error: "Inscription introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, insc.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (insc.statut !== "confirme") return sendJSON(res, 400, { error: "Seule une inscription confirmée peut recevoir son QR code." });
+  await envoyerConfirmationInscription(insc.id);
+  await inscJournaliser(insc.fiche_id, user, "renvoi_qr", `QR code renvoyé pour l'inscription #${insc.id} (${insc.nom} ${insc.prenom}).`, insc.evenement_id);
+  sendJSON(res, 200, { ok: true, via_message: !!insc.user_id, via_email: !!insc.email });
+});
 route("GET", "/api/insc/fiches/:id/stats", async (req, res, params) => {
   const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
