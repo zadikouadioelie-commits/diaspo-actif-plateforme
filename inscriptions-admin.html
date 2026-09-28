@@ -1575,7 +1575,13 @@ function renderModalLiaison() {
    ce n'est qu'un raccourci, jamais un état séparé — modifier ici modifie la fiche elle-même. */
 function renderModalProgrammation() {
   if (!state.modalProgrammationOuvert) return '';
-  const fiche = state.fiches.find(f => f.id === state.modalProgrammationFicheId);
+  // Number(f.id) (bug réel, même piège déjà rencontré sur cette page — voir supprimerFicheListe
+  // ci-dessus) : en production (Postgres), insc_fiches.id revient en chaîne de caractères ("6"),
+  // jamais en nombre — une comparaison stricte contre modalProgrammationFicheId (un vrai nombre,
+  // parseInt) est TOUJOURS fausse, donc le modal ne s'affichait jamais malgré un clic qui
+  // fonctionnait bel et bien (state.modalProgrammationOuvert passait à true). Invisible en local
+  // (SQLite renvoie un vrai nombre), donc jamais détecté en testant avant ce correctif.
+  const fiche = state.fiches.find(f => Number(f.id) === state.modalProgrammationFicheId);
   if (!fiche) return '';
   const liee = !!fiche.nb_evenements;
   return `
@@ -2691,7 +2697,7 @@ const actions = {
   fermerModalProgrammation() { state.modalProgrammationOuvert = false; },
   async enregistrerProgrammationListe(el) {
     const id = parseInt(el.dataset.id);
-    const fiche = state.fiches.find(f => f.id === id);
+    const fiche = state.fiches.find(f => Number(f.id) === id); // même correctif que renderModalProgrammation() ci-dessus
     const liee = !!fiche?.nb_evenements;
     // Écrit EXACTEMENT les mêmes champs que l'onglet Infos générales, via la même route — un
     // seul et même réglage, jamais une copie séparée (demande explicite). Liée à un événement :
