@@ -106,7 +106,7 @@
 .ip-confirmation .grand{font-size:48px;margin-bottom:10px;}
 </style>
 </head>
-<body>
+<body data-back-target="annuaire.html">
 <div class="page">
 <header class="topbar">
   <div class="topbar-inner">
@@ -136,7 +136,6 @@
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
-<script src="assets/upload-media.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 const IP_TYPE_ICONS = {texte_court:'text',texte_long:'textarea',nombre:'number',email:'email',telephone:'tel',date:'date',heure:'time',adresse:'text',url:'url'};
@@ -600,11 +599,6 @@ function ipRenderConfirmation(d) {
     inscrit: { icon: '⏳', titre: 'Inscription soumise à validation', note: "Votre inscription sera examinée par l'organisateur. Vous recevrez un e-mail avec votre billet dès qu'elle sera validée." },
   };
   const info = parStatut[d.statut] || { icon: '✅', titre: 'Inscription confirmée !', note: null };
-  /* "← Retour" (2026-09-28, demande explicite : "des boutons retour... sans pour autant
-     complètement sortir de la fiche, pour éviter d'avoir à tout recommencer") — jusqu'ici cet
-     écran de confirmation était un cul-de-sac : aucun moyen de revenir à l'accueil de la fiche
-     (autres types d'inscription, candidature...) sans recharger la page entière. Reste dans
-     #ip-root, IP_FICHE/IP_TYPES/IP_CANDIDATURE déjà chargés en mémoire ne sont pas reperdus. */
   document.getElementById('ip-root').innerHTML = `
     <div class="ip-confirmation">
       <div class="grand">${info.icon}</div>
@@ -613,8 +607,7 @@ function ipRenderConfirmation(d) {
       ${info.note
         ? `<p style="font-size:13px;color:oklch(0.5 0.006 30);margin-top:8px;">${info.note}</p>`
         : `<a class="ip-btn" style="text-decoration:none;display:inline-block;margin-top:16px;" href="/api/insc/inscriptions/${d.id}/confirmation.pdf?ref=${encodeURIComponent(d.reference)}" target="_blank">Voir ma confirmation + QR Code →</a>`}
-    </div>
-    <button class="ip-btn outline" style="margin-top:18px;" onclick="ipRenderAccueil()">← Retour à la fiche</button>`;
+    </div>`;
 }
 
 /* Bloc "Dossier de candidature" (2026-09-27, demande explicite) — jamais de remplissage ni
@@ -650,36 +643,18 @@ function ipOuvrirCandidature() {
   const cand = IP_CANDIDATURE;
   const c = cand.config;
   const docs = cand.documents || [];
-  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
-  /* Dépôt de document (2026-09-28, demande explicite : "créer un onglet Déposer un document qui
-     permet de déposer le même document que celui qui a été téléchargé") — chaque document a
-     désormais, en plus du téléchargement, un contrôle de dépôt lié à CE document précis (pas un
-     dépôt générique). Le "Télécharger ↓" passe par ipTelechargerDocument() (blob local) plutôt
-     qu'un lien target="_blank" classique : sur certains navigateurs mobiles, ouvrir un PDF ainsi
-     fait quitter l'onglet/l'appli vers un lecteur externe, obligeant à "aller le rechercher" —
-     plainte utilisateur explicite. */
-  const docsHtml = docs.map(d => {
-    const depot = d.mon_depot;
-    const depoTexte = depot ? `le ${escH((depot.depose_le || '').slice(0, 10).split('-').reverse().join('/'))}` : '';
-    const deposerHtml = !connecte
-      ? `<a href="login.html" style="font-size:11px;color:oklch(0.5 0.006 30);font-weight:600;white-space:nowrap;text-decoration:underline;">Se connecter pour déposer</a>`
-      : `<label style="font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer;padding:5px 10px;border-radius:6px;${depot ? 'color:#1C8A0E;border:1px solid #86EFAC;background:#F0FDF4;' : 'color:#6B0FA3;border:1px solid #D8B4FE;background:#FAF5FF;'}">
-          ${depot ? `✅ Déposé ${depoTexte} · remplacer` : '📤 Déposer un document'}
-          <input type="file" accept="application/pdf" style="display:none;" onchange="ipDeposerCandidatureDoc(this, ${d.id})">
-        </label>`;
-    return `
-    <div class="ip-cand-doc">
+  const docsHtml = docs.map(d => `
+    <a class="ip-cand-doc" href="${escH(d.pdf_url)}" target="_blank" rel="noopener">
       <span>📄</span>
       <span class="ip-cand-doc-titre">${escH(d.titre)}${d.description ? ` <span style="font-weight:400;color:oklch(0.55 0.006 30);">— ${escH(d.description)}</span>` : ''}</span>
       ${d.obligatoire ? '<span class="ip-oblig">*</span>' : ''}
-      <button type="button" onclick="ipTelechargerDocument('${escH(d.pdf_url)}', '${escH(d.titre).replace(/'/g, "\\'")}')" style="background:none;border:none;font-size:11.5px;color:#8B12D6;font-weight:600;white-space:nowrap;cursor:pointer;padding:0;font-family:inherit;">Télécharger ↓</button>
-      ${deposerHtml}
-    </div>`;
-  }).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucun document à télécharger pour l\'instant.</div>';
+      <span style="font-size:11.5px;color:#8B12D6;font-weight:600;white-space:nowrap;">Télécharger ↓</span>
+    </a>`).join('') || '<div style="font-size:12.5px;color:oklch(0.55 0.006 30);">Aucun document à télécharger pour l\'instant.</div>';
   const emailHtml = c.email_reception
     ? `<div class="ip-cand-email">✉️ Envoyez vos documents complétés à : <a href="mailto:${escH(c.email_reception)}" style="color:#6B0FA3;font-weight:700;">${escH(c.email_reception)}</a></div>`
     : '';
   const dejaDeclare = !!cand.deja_declare;
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
   const btnHtml = dejaDeclare
     ? `<button class="ip-cand-declare-btn" disabled>✅ Candidature déclarée</button>`
     : connecte
@@ -708,46 +683,6 @@ async function ipDeclarerCandidature(btn) {
   } catch (e) {
     alert(e.message || 'Erreur lors de la déclaration.');
     btn.disabled = false; btn.textContent = "✅ J'ai candidaté";
-  }
-}
-/* Téléchargement d'un document de candidature SANS quitter la fenêtre (2026-09-28, demande
-   explicite) — récupère le PDF en blob local plutôt que de naviguer avec target="_blank" : sur
-   certains navigateurs mobiles, un lien PDF direct ouvre un lecteur externe (l'appli/l'onglet
-   perd la main, l'utilisateur doit "aller le rechercher"). Repli sur l'ouverture classique en
-   nouvel onglet si le fetch échoue (CORS ou réseau) — jamais de blocage silencieux. */
-async function ipTelechargerDocument(url, titre) {
-  try {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('Téléchargement impossible.');
-    const blob = await r.blob();
-    const ext = (url.split('?')[0].split('.').pop() || 'pdf').toLowerCase();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(titre || 'document').replace(/[^a-z0-9 _-]/gi, '').trim() || 'document'}.${ext}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-  } catch (e) {
-    window.open(url, '_blank', 'noopener');
-  }
-}
-/* Dépôt du document rempli par le candidat (2026-09-28, demande explicite) — même document que
-   celui téléchargé, renvoyé directement sur la plateforme plutôt que uniquement par e-mail.
-   L'upload lui-même passe par uploadMedia()/POST /api/upload/document (déjà existant, Bunny CDN,
-   magic-bytes) ; cette fonction enregistre ensuite l'URL obtenue sur CE document précis. */
-async function ipDeposerCandidatureDoc(input, documentId) {
-  const file = input.files[0]; if (!file) return;
-  const label = input.closest('label');
-  const texteOriginal = label.innerHTML;
-  label.innerHTML = 'Envoi…';
-  try {
-    const url = await uploadMedia(file, 'document');
-    await api('POST', `/insc/public/${IP_SLUG}/candidature/documents/${documentId}/deposer`, { url });
-    const doc = (IP_CANDIDATURE?.documents || []).find(d => Number(d.id) === Number(documentId));
-    if (doc) doc.mon_depot = { url, depose_le: new Date().toISOString() };
-    ipOuvrirCandidature();
-  } catch (e) {
-    alert(e.message || 'Erreur lors du dépôt du document.');
-    label.innerHTML = texteOriginal;
   }
 }
 

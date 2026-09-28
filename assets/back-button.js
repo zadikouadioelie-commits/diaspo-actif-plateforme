@@ -37,6 +37,15 @@
   }
 
   async function daGoBack() {
+    /* Destination forcée (2026-09-28, demande explicite : "le retour doit renvoyer à
+       l'annuaire") — une page publique comme inscription-publique.html est presque toujours
+       découverte en parcourant l'annuaire (ou via un lien partagé/QR sans historique du tout,
+       cas où sameOrigin échoue de toute façon) : y renvoyer inconditionnellement est plus utile
+       que de dépiler un historique de navigateur qui peut pointer n'importe où, ou de retomber
+       sur le tableau de bord/l'accueil. <body data-back-target="..."> pour l'activer page par
+       page, sans toucher au comportement par défaut des autres pages utilisant ce bouton. */
+    const force = document.body.dataset.backTarget;
+    if (force) { window.location.href = force; return; }
     const ref = document.referrer;
     const sameOrigin = ref && ref.indexOf(window.location.origin) === 0;
     if (window.history.length > 1 && sameOrigin) {
