@@ -8,15 +8,27 @@
 window.DonBanner = (function () {
   const CACHE = new Map(); // owner_user_id -> Promise<don|null>, évite un fetch par appel si render() est invoqué plusieurs fois pour le même owner sur une même page.
 
+  /* Priorité recurrent > toutes (2026-09-28, demande explicite) : le don récurrent d'un compte
+     (un seul, créé via "Créer un don récurrent") est CE QUI DOIT s'afficher partout en premier —
+     jamais un choix "vedette" libre parmi ses cagnottes. Sans don récurrent mais avec d'autres
+     cagnottes publiques (campagnes, occasionnels — "les dons sont aussi comptabilisés comme des
+     cagnottes"), le bouton reste affiché mais mène à la liste complète plutôt qu'à une cagnotte
+     précise. Le format renvoyé par l'API est donc {don, mode} et plus seulement {don}. */
   function fetchVedette(ownerUserId) {
     if (!CACHE.has(ownerUserId)) {
       CACHE.set(ownerUserId, fetch(`/api/cagnottes/vedette?owner_user_id=${encodeURIComponent(ownerUserId)}`)
-        .then(r => r.json()).then(d => d.don || null).catch(() => null));
+        .then(r => r.json())
+        .then(d => (d.mode === 'recurrent' || d.mode === 'toutes') ? d : null)
+        .catch(() => null));
     }
     return CACHE.get(ownerUserId);
   }
 
-  function boutonHtml(don) {
+  function boutonHtml(data, ownerUserId) {
+    if (data.mode === 'toutes') {
+      return `<a href="cagnottes.html?owner=${encodeURIComponent(ownerUserId)}" class="don-banner-btn">💚 Faire un don</a>`;
+    }
+    const don = data.don;
     const href = `cagnotte.html?slug=${encodeURIComponent(don.slug)}`;
     const label = `💚 Faire un don${don.titre ? ' — ' + String(don.titre).slice(0, 40) : ''}`;
     return `<a href="${href}" class="don-banner-btn">${label}</a>`;
@@ -43,15 +55,15 @@ window.DonBanner = (function () {
      Ne fait rien si aucun don vedette n'existe pour ce owner_user_id. */
   async function render(ownerUserId, opts = {}) {
     if (!ownerUserId) return;
-    const don = await fetchVedette(ownerUserId);
-    if (!don) return;
+    const data = await fetchVedette(ownerUserId);
+    if (!data) return;
     injecterStyles();
     if (opts.mode === 'inline') {
       const el = typeof opts.container === 'string' ? document.querySelector(opts.container) : opts.container;
-      if (el) el.insertAdjacentHTML('beforeend', boutonHtml(don));
+      if (el) el.insertAdjacentHTML('beforeend', boutonHtml(data, ownerUserId));
     } else if (!document.getElementById('don-banner-floating')) {
       const wrap = document.createElement('div');
-      wrap.innerHTML = boutonHtml(don);
+      wrap.innerHTML = boutonHtml(data, ownerUserId);
       wrap.firstElementChild.id = 'don-banner-floating';
       document.body.appendChild(wrap.firstElementChild);
     }
@@ -76,10 +88,10 @@ window.DonBanner = (function () {
     if (!Object.keys(dons).length) return;
     injecterStyles();
     for (const id of ids) {
-      const don = dons[id];
-      if (!don) continue;
+      const data = dons[id];
+      if (!data) continue;
       const el = typeof mapping[id] === 'string' ? document.querySelector(mapping[id]) : mapping[id];
-      if (el) el.insertAdjacentHTML('beforeend', boutonHtml(don));
+      if (el) el.insertAdjacentHTML('beforeend', boutonHtml(data, id));
     }
   }
 

@@ -18875,6 +18875,13 @@ route("GET", "/api/cagnottes/publiques", async (req, res, params, body, query) =
   let rows = await db.prepare("SELECT * FROM cagnottes WHERE est_publiee=1 AND visibilite='publique' AND (statut_manuel IS NULL OR statut_manuel != 'cloturee') ORDER BY created_at DESC").all();
   if (query.categorie) rows = rows.filter(r => r.categorie === query.categorie);
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+" "+(r.description||"")).toLowerCase().includes(q)); }
+  /* Filtre par compte (2026-09-28, demande explicite) — "toutes les cagnottes d'une initiative
+     en particulier" (campagnes, occasionnels, récurrent confondus : "les dons sont aussi
+     comptabilisés comme des cagnottes"), pour le bouton "Faire un don" de assets/don-banner.js
+     quand le compte n'a pas de don récurrent mais a d'autres cagnottes. Les cagnottes privées
+     restent exclues par le filtre est_publiee/visibilite ci-dessus, accessibles uniquement par
+     lien direct — jamais listées ici, conformément à la même règle. */
+  if (query.owner_user_id) rows = rows.filter(r => Number(r.owner_user_id) === Number(query.owner_user_id));
   sendJSON(res, 200, { cagnottes: rows.map(cagnotteAvecStatut) });
 });
 
@@ -19031,14 +19038,27 @@ route("GET", "/api/cagnottes/verifier-email", async (req, res, params, body, que
    compte). Route neuve et isolée plutôt qu'une extension de GET /api/initiatives/:slug,
    GET /api/evenements/:id ou GET /api/insc/public/:slug — ces 3 fichiers sont partagés et
    activement modifiés par d'autres sessions (2026-09-28). */
+/* Sélection (2026-09-28, demande explicite : "ce n'est pas n'importe quel fruit de la cagnotte...
+   c'est celui qui est créé avec le bouton Créer un don récurrent... c'est celui-là qui doit
+   apparaître partout") — remplace l'ancien critère est_vedette (choix manuel libre) par le type
+   'recurrent' (un seul par compte). Un compte SANS don récurrent mais avec d'autres cagnottes
+   publiques obtient quand même un bouton "Faire un don", mais qui mène à la liste complète de ses
+   cagnottes (mode:"toutes", voir cagnottes.html?owner=) plutôt qu'à une cagnotte en particulier —
+   "les dons sont aussi comptabilisés comme des cagnottes", donc listés avec les autres. Un compte
+   sans aucune cagnotte publique n'a toujours aucun bouton (jamais de bouton mort). */
 route("GET", "/api/cagnottes/vedette", async (req, res, params, body, query) => {
   const ownerId = Number(query?.owner_user_id);
   if (!ownerId) return sendJSON(res, 400, { error: "owner_user_id requis." });
-  const c = await db.prepare(
-    "SELECT * FROM cagnottes WHERE owner_user_id=? AND est_vedette=1 AND est_publiee=1 AND visibilite='publique'"
-  ).get(ownerId);
-  if (!c || calculerStatutCagnotte(c) !== "active") return sendJSON(res, 200, { don: null });
-  sendJSON(res, 200, { don: { slug: c.slug, titre: c.titre, image_url: c.image_url, type_don: c.type_don, devise: c.devise } });
+  const rows = await db.prepare(
+    "SELECT * FROM cagnottes WHERE owner_user_id=? AND est_publiee=1 AND visibilite='publique' AND (statut_manuel IS NULL OR statut_manuel != 'cloturee')"
+  ).all(ownerId);
+  const actives = rows.filter(c => calculerStatutCagnotte(c) === "active");
+  const recurrent = actives.find(c => c.type_don === "recurrent");
+  if (recurrent) {
+    return sendJSON(res, 200, { don: { slug: recurrent.slug, titre: recurrent.titre, image_url: recurrent.image_url, type_don: recurrent.type_don, devise: recurrent.devise }, mode: "recurrent" });
+  }
+  if (actives.length) return sendJSON(res, 200, { don: null, mode: "toutes", owner_user_id: ownerId });
+  sendJSON(res, 200, { don: null });
 });
 /* GET /api/cagnottes/vedette-lot?owner_user_ids=1,2,3 — même donnée que la route ci-dessus, mais
    en lot (2026-09-28, bug réel trouvé en testant l'annuaire : "doit apparaître... sur la
@@ -19051,12 +19071,22 @@ route("GET", "/api/cagnottes/vedette-lot", async (req, res, params, body, query)
   if (!ids.length) return sendJSON(res, 200, { dons: {} });
   const ph = ids.map(() => "?").join(",");
   const rows = await db.prepare(
-    `SELECT * FROM cagnottes WHERE owner_user_id IN (${ph}) AND est_vedette=1 AND est_publiee=1 AND visibilite='publique'`
+    `SELECT * FROM cagnottes WHERE owner_user_id IN (${ph}) AND est_publiee=1 AND visibilite='publique' AND (statut_manuel IS NULL OR statut_manuel != 'cloturee')`
   ).all(...ids);
-  const dons = {};
+  // Même priorité recurrent > toutes que GET /api/cagnottes/vedette ci-dessus, groupée par compte.
+  const parOwner = {};
   for (const c of rows) {
     if (calculerStatutCagnotte(c) !== "active") continue;
-    dons[c.owner_user_id] = { slug: c.slug, titre: c.titre, image_url: c.image_url, type_don: c.type_don, devise: c.devise };
+    (parOwner[c.owner_user_id] = parOwner[c.owner_user_id] || []).push(c);
+  }
+  const dons = {};
+  for (const id of ids) {
+    const liste = parOwner[id];
+    if (!liste || !liste.length) continue;
+    const recurrent = liste.find(c => c.type_don === "recurrent");
+    dons[id] = recurrent
+      ? { slug: recurrent.slug, titre: recurrent.titre, image_url: recurrent.image_url, type_don: recurrent.type_don, devise: recurrent.devise, mode: "recurrent" }
+      : { mode: "toutes" };
   }
   sendJSON(res, 200, { dons });
 });
@@ -43925,12 +43955,7 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias });
     }
-    /* Fiche liée à au moins un événement (2026-09-28, demande explicite : "si cette note est de
-       toute façon liée à un événement, la question ne se pose plus. Automatiquement, la note est
-       ouverte") — sa propre date d'ouverture ne bloque plus rien, seule la fermeture ci-dessus
-       reste pertinente. Sans lien, la date d'ouverture continue de s'appliquer normalement. */
-    const estLieeAUnEvenement = !!(await db.prepare("SELECT 1 FROM insc_fiches_evenements WHERE fiche_id=? LIMIT 1").get(fiche.id));
-    if (!estLieeAUnEvenement && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
+    if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias });
     }
@@ -44023,11 +44048,8 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
   if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
   const now = new Date();
-  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
   if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
-  /* Lié à un événement = ouverture automatique, seule la fermeture compte (2026-09-28, demande
-     explicite) — même règle que GET /api/insc/public/:slug ci-dessus. */
-  if (!liaisons.length && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
+  if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
 
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=? AND fiche_id=? AND actif=1").get(body?.type_id, fiche.id);
   if (!type) return sendJSON(res, 400, { error: "Type d'inscription invalide." });
@@ -44035,6 +44057,7 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (type.date_fermeture && new Date(type.date_fermeture) < now) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » sont fermées.` });
 
   let evenementId = null;
+  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
   if (liaisons.length === 1) evenementId = liaisons[0].evenement_id;
   else if (liaisons.length > 1) {
     if (!body?.evenement_id || !liaisons.some(l => Number(l.evenement_id) === Number(body.evenement_id))) {

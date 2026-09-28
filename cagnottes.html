@@ -113,8 +113,8 @@
     <div class="cag-hero-overlay"></div>
     <div class="cag-hero-content">
       <div class="cag-hero-text">
-        <h1>Cagnottes</h1>
-        <p>Soutenez les projets et initiatives de la diaspora en contribuant à leurs collectes de fonds.</p>
+        <h1 id="cg-hero-titre">Cagnottes</h1>
+        <p id="cg-hero-texte">Soutenez les projets et initiatives de la diaspora en contribuant à leurs collectes de fonds.</p>
       </div>
     </div>
   </div>
@@ -133,7 +133,7 @@
   </div>
 
   <div class="cag-section-head">
-    <h2>Toutes les cagnottes</h2>
+    <h2 id="cg-section-titre">Toutes les cagnottes</h2>
     <div class="cag-result-count"><strong id="cg-result-count">0</strong> cagnotte(s) trouvée(s)</div>
   </div>
 
@@ -154,7 +154,24 @@
 <script>
 (function(){
   function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  let state = { q:'', categorie:'' };
+  /* Filtre par compte (2026-09-28, demande explicite) — "toutes les cagnottes" d'une initiative
+     en particulier, ouvert notamment depuis le bouton "Faire un don" de assets/don-banner.js
+     quand le compte n'a pas de don récurrent mais a d'autres cagnottes publiques. Sans ?owner=,
+     la page reste le catalogue général inchangé. */
+  const ownerId = new URLSearchParams(location.search).get('owner');
+  let state = { q:'', categorie:'', owner: ownerId || '' };
+
+  async function appliquerEnteteCompte(){
+    if (!ownerId) return;
+    try {
+      const { profil } = await fetch('/api/profil/' + encodeURIComponent(ownerId)).then(r=>r.json());
+      const nom = profil?.nom_structure || [profil?.prenom, profil?.nom].filter(Boolean).join(' ') || null;
+      if (!nom) return;
+      document.getElementById('cg-hero-titre').textContent = 'Cagnottes et dons de ' + nom;
+      document.getElementById('cg-hero-texte').textContent = `Toutes les cagnottes et tous les dons publics proposés par ${nom}.`;
+      document.getElementById('cg-section-titre').textContent = 'Toutes les cagnottes de ' + nom;
+    } catch(_) {}
+  }
 
   async function loadCategories(){
     try {
@@ -190,6 +207,7 @@
     const qs = new URLSearchParams();
     if (state.q) qs.set('q', state.q);
     if (state.categorie) qs.set('categorie', state.categorie);
+    if (state.owner) qs.set('owner_user_id', state.owner);
     try {
       const { cagnottes } = await fetch('/api/cagnottes/publiques?' + qs.toString()).then(r=>r.json());
       document.getElementById('cg-result-count').textContent = cagnottes.length;
@@ -207,6 +225,7 @@
   document.getElementById('cg-categorie').addEventListener('change', function(){ state.categorie = this.value; apply(); });
 
   loadCategories();
+  appliquerEnteteCompte();
   apply();
 })();
 </script>
