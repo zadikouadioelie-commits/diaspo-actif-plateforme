@@ -520,6 +520,7 @@ const NOTIF_ICONS = {
   insc_nouvelle: "📝",
   insc_fiche_gelee: "🔒",
   insc_fiche_degelee: "🔓",
+  candidature_traitee: "🗂️",
 };
 
 // Destinations pour les data.cta envoyés par certains types de notifications

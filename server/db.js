@@ -760,6 +760,13 @@ db.exec(`
     user_id INTEGER NOT NULL,
     url TEXT NOT NULL,
     depose_le TEXT DEFAULT (datetime('now')),
+    /* Refus PAR DOCUMENT (2026-09-28, demande explicite : "si jamais une candidature est
+       refusée, le compte qui a refusé puisse rapidement se rendre compte de ce qui n'allait
+       pas... demander à ce que tel ou tel document soit refait") — statut distinct de celui de
+       la candidature entière (insc_candidature_declarations.statut) : un document peut être
+       marqué à refaire sans que la candidature globale soit encore tranchée. */
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','valide','a_refaire')),
+    motif_refus TEXT,
     UNIQUE(document_id, user_id),
     FOREIGN KEY(document_id) REFERENCES insc_candidature_documents(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
@@ -794,6 +801,8 @@ db.exec(`
     declaration_id INTEGER NOT NULL,
     url TEXT NOT NULL,
     depose_le TEXT DEFAULT (datetime('now')),
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','valide','a_refaire')),
+    motif_refus TEXT,
     UNIQUE(document_id, declaration_id),
     FOREIGN KEY(document_id) REFERENCES insc_candidature_documents(id),
     FOREIGN KEY(declaration_id) REFERENCES insc_candidature_declarations_visiteurs(id)
@@ -2479,6 +2488,12 @@ const MIGRATIONS = [
   // publique, sans fermer l'inscription en cours (ouvert dans un nouvel onglet côté client).
   // Référence la table invitations (module Parrainage), jamais copiée/dupliquée ici.
   ["insc_fiches", "parrainage_invitation_id INTEGER"],
+  // Refus PAR DOCUMENT de candidature (2026-09-28, demande explicite) — voir le commentaire
+  // détaillé sur les CREATE TABLE insc_candidature_uploads / insc_candidature_visiteur_uploads.
+  ["insc_candidature_uploads", "statut TEXT NOT NULL DEFAULT 'en_attente'"],
+  ["insc_candidature_uploads", "motif_refus TEXT"],
+  ["insc_candidature_visiteur_uploads", "statut TEXT NOT NULL DEFAULT 'en_attente'"],
+  ["insc_candidature_visiteur_uploads", "motif_refus TEXT"],
   // Partenaires & sponsors PAR DÉFAUT d'une initiative (2026-09-28, demande explicite) — liste
   // [{nom, logo_url}] indépendante de vitrine_partenaires_json (la vitrine reste en saisie
   // manuelle, décision explicite) : sert uniquement de point de départ recopié sur CHAQUE

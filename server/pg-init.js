@@ -1176,6 +1176,14 @@ const COLONNES_MIGRATION = [
        colonne ajoutée côté SQLite, ou GET /api/insc/* casse en 500 sur Postgres. */
     ['insc_fiches', 'sponsors_json', "TEXT DEFAULT '[]'"],
     ['insc_fiches', 'partenaires_json', "TEXT DEFAULT '[]'"],
+    /* Refus PAR DOCUMENT de candidature (2026-09-28, demande explicite) — distinct du statut de
+       la candidature entière (insc_candidature_declarations.statut) : permet de marquer un
+       document précis "à refaire" avec un motif, sans trancher toute la candidature. Mirroir de
+       server/db.js (CREATE TABLE insc_candidature_uploads / insc_candidature_visiteur_uploads). */
+    ['insc_candidature_uploads', 'statut', "TEXT NOT NULL DEFAULT 'en_attente'"],
+    ['insc_candidature_uploads', 'motif_refus', "TEXT"],
+    ['insc_candidature_visiteur_uploads', 'statut', "TEXT NOT NULL DEFAULT 'en_attente'"],
+    ['insc_candidature_visiteur_uploads', 'motif_refus', "TEXT"],
 ];
 
 async function migratePg(pool) {

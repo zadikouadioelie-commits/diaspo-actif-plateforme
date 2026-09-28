@@ -43021,7 +43021,7 @@ route("GET", "/api/insc/fiches/:id/candidature/declarations", async (req, res, p
      été déposé en plus (ou à la place) de l'e-mail, sans requête supplémentaire par carte. */
   if (declarations.length) {
     const depots = await db.prepare(`
-      SELECT u.user_id, u.url, u.depose_le, d.id AS document_id, d.titre
+      SELECT u.id AS upload_id, u.user_id, u.url, u.depose_le, u.statut, u.motif_refus, d.id AS document_id, d.titre
       FROM insc_candidature_uploads u
       JOIN insc_candidature_documents d ON d.id = u.document_id
       WHERE d.config_id=?
@@ -43030,10 +43030,15 @@ route("GET", "/api/insc/fiches/:id/candidature/declarations", async (req, res, p
     for (const dep of depots) (parUser[dep.user_id] = parUser[dep.user_id] || []).push(dep);
     for (const decl of declarations) decl.documents_deposes = parUser[decl.user_id] || [];
   }
+  /* Visiteurs sans compte (2026-09-28, demande explicite) — table jumelle distincte
+     (insc_candidature_declarations_visiteurs), jamais mélangée à `declarations` ci-dessus : un
+     visiteur n'a pas de user_id, `documents_deposes` vient donc d'insc_candidature_visiteur_uploads
+     (clé declaration_id) plutôt que d'insc_candidature_uploads. Champ additif — ne change rien à
+     la forme de `declarations` pour ce qui lit déjà cette route. */
   const declarationsVisiteurs = await db.prepare("SELECT * FROM insc_candidature_declarations_visiteurs WHERE config_id=? ORDER BY declare_le DESC").all(config.id);
   if (declarationsVisiteurs.length) {
     const depotsVisiteurs = await db.prepare(`
-      SELECT u.declaration_id, u.url, u.depose_le, d.id AS document_id, d.titre
+      SELECT u.id AS upload_id, u.declaration_id, u.url, u.depose_le, u.statut, u.motif_refus, d.id AS document_id, d.titre
       FROM insc_candidature_visiteur_uploads u
       JOIN insc_candidature_documents d ON d.id = u.document_id
       WHERE d.config_id=?
@@ -43063,6 +43068,18 @@ route("PATCH", "/api/insc/candidature/declarations/:id/statut", async (req, res,
   await db.prepare("UPDATE insc_candidature_declarations SET statut=? WHERE id=?").run(body.statut, declaration.id);
   const libelles = { en_attente: "remise en attente", acceptee: "acceptée", refusee: "refusée" };
   await inscJournaliser(declaration.fiche_id, user, "candidature_traitee", `Candidature de ${declaration.prenom || ""} ${declaration.nom || ""} ${libelles[body.statut]}.`);
+  /* Message + notification au candidat (2026-09-28, demande explicite) — jusqu'ici la décision
+     restait invisible pour lui (voir le confirm() "ne sera pas notifiée automatiquement" côté
+     front, retiré). Message facultatif : un texte par défaut est utilisé si l'organisateur ne
+     saisit rien plutôt que de laisser un contenu vide. Compte connecté → notification interne. */
+  if (["acceptee", "refusee"].includes(body.statut)) {
+    const fiche = await db.prepare("SELECT nom, slug FROM insc_fiches WHERE id=?").get(declaration.fiche_id);
+    const accepte = body.statut === "acceptee";
+    const titre = `Candidature ${accepte ? "acceptée" : "refusée"} — ${fiche?.nom || ""}`;
+    const contenuDefaut = accepte ? "Votre candidature a été acceptée." : "Votre candidature n'a pas été retenue.";
+    const contenu = (body.message && String(body.message).trim().slice(0, 2000)) || contenuDefaut;
+    creerNotif(declaration.user_id, "candidature_traitee", titre, contenu, { fiche_id: declaration.fiche_id, statut: body.statut, lien: `inscription-publique.html?slug=${fiche?.slug || ""}` });
+  }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -43081,6 +43098,83 @@ route("PATCH", "/api/insc/candidature/declarations-visiteurs/:id/statut", async 
   await db.prepare("UPDATE insc_candidature_declarations_visiteurs SET statut=? WHERE id=?").run(body.statut, declaration.id);
   const libelles = { en_attente: "remise en attente", acceptee: "acceptée", refusee: "refusée" };
   await inscJournaliser(declaration.fiche_id, user, "candidature_traitee", `Candidature de ${declaration.prenom || ""} ${declaration.nom || ""} (visiteur) ${libelles[body.statut]}.`);
+  /* Jumelle de la notification ci-dessus, mais par e-mail : un visiteur sans compte n'a pas de
+     messagerie interne (2026-09-28, demande explicite, cohérent avec l'accès mailto déjà donné
+     sur sa cartouche pour lui écrire hors plateforme). Réutilise le gabarit d'e-mail de
+     communication existant (emailCommunicationInscription) plutôt que d'en dupliquer un. */
+  if (["acceptee", "refusee"].includes(body.statut) && declaration.email) {
+    const fiche = await db.prepare("SELECT nom FROM insc_fiches WHERE id=?").get(declaration.fiche_id);
+    const accepte = body.statut === "acceptee";
+    const contenuDefaut = accepte ? "Votre candidature a été acceptée." : "Votre candidature n'a pas été retenue.";
+    const message = (body.message && String(body.message).trim().slice(0, 2000)) || contenuDefaut;
+    try {
+      const { emailCommunicationInscription } = require("./mailer");
+      emailCommunicationInscription({
+        email: declaration.email,
+        prenom: declaration.prenom,
+        objet: `Candidature ${accepte ? "acceptée" : "refusée"} — ${fiche?.nom || ""}`,
+        message,
+        evenementNom: fiche?.nom || "",
+      }).catch(() => {});
+    } catch (e) { /* silencieux */ }
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Refus PAR DOCUMENT (2026-09-28, demande explicite : "si jamais une candidature est refusée, le
+   compte qui a refusé puisse rapidement se rendre compte de ce qui n'allait pas... demander à ce
+   que tel ou tel document soit refait") — DISTINCT de la décision ci-dessus sur la candidature
+   entière : un document précis peut être marqué "à refaire" avec un motif, sans que la
+   candidature globale soit (encore) tranchée. STRICTEMENT INTERNE (2026-09-28, demande explicite
+   : "la personne qui a fait la candidature ne doit pas avoir les détails de quel document a été
+   refusé... c'est à titre informatif pour l'organisateur... c'est sa responsabilité à lui de dire
+   ou de ne pas dire quel document est à recommencer") — AUCUNE notification ni e-mail automatique
+   n'est envoyé au candidat ici ; le motif reste visible seulement dans cette interface. Si
+   l'organisateur veut prévenir le candidat, il le fait via le message de la décision globale
+   (iaOuvrirDecisionCandidature / creerNotif ci-dessus), de sa propre initiative. */
+const INSC_DOCUMENT_STATUTS = ["en_attente", "valide", "a_refaire"];
+route("PATCH", "/api/insc/candidature/uploads/:id/statut", async (req, res, params, body) => {
+  const upload = await db.prepare(`
+    SELECT u.*, d.titre AS document_titre, c.fiche_id, dec.user_id AS declarant_user_id,
+           dec.prenom AS declarant_prenom, dec.nom AS declarant_nom
+    FROM insc_candidature_uploads u
+    JOIN insc_candidature_documents d ON d.id = u.document_id
+    JOIN insc_candidature_config c ON c.id = d.config_id
+    JOIN insc_candidature_declarations dec ON dec.config_id = d.config_id AND dec.user_id = u.user_id
+    WHERE u.id = ?
+  `).get(params.id);
+  if (!upload) return sendJSON(res, 404, { error: "Document introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, upload.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!INSC_DOCUMENT_STATUTS.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const motif = body.statut === "a_refaire" ? (String(body.motif || "").trim().slice(0, 2000) || null) : null;
+  await db.prepare("UPDATE insc_candidature_uploads SET statut=?, motif_refus=? WHERE id=?").run(body.statut, motif, upload.id);
+  const libelles = { en_attente: "remis en attente", valide: "validé", a_refaire: "marqué à refaire" };
+  await inscJournaliser(upload.fiche_id, user, "candidature_document_traite", `Document « ${upload.document_titre} » de ${upload.declarant_prenom || ""} ${upload.declarant_nom || ""} ${libelles[body.statut]}.`);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Jumelle de la route ci-dessus pour un document déposé par un visiteur sans compte (2026-09-28)
+   — table jumelle distincte, donc route distincte, comme pour les déclarations. Également
+   strictement interne, sans e-mail automatique — voir le commentaire ci-dessus. */
+route("PATCH", "/api/insc/candidature/uploads-visiteurs/:id/statut", async (req, res, params, body) => {
+  const upload = await db.prepare(`
+    SELECT u.*, d.titre AS document_titre, c.fiche_id, dec.email AS declarant_email,
+           dec.prenom AS declarant_prenom, dec.nom AS declarant_nom
+    FROM insc_candidature_visiteur_uploads u
+    JOIN insc_candidature_documents d ON d.id = u.document_id
+    JOIN insc_candidature_config c ON c.id = d.config_id
+    JOIN insc_candidature_declarations_visiteurs dec ON dec.config_id = d.config_id AND dec.id = u.declaration_id
+    WHERE u.id = ?
+  `).get(params.id);
+  if (!upload) return sendJSON(res, 404, { error: "Document introuvable." });
+  const { erreur, msg, user } = await inscFicheProprietaire(req, upload.fiche_id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  if (!INSC_DOCUMENT_STATUTS.includes(body?.statut)) return sendJSON(res, 400, { error: "Statut invalide." });
+  const motif = body.statut === "a_refaire" ? (String(body.motif || "").trim().slice(0, 2000) || null) : null;
+  await db.prepare("UPDATE insc_candidature_visiteur_uploads SET statut=?, motif_refus=? WHERE id=?").run(body.statut, motif, upload.id);
+  const libelles = { en_attente: "remis en attente", valide: "validé", a_refaire: "marqué à refaire" };
+  await inscJournaliser(upload.fiche_id, user, "candidature_document_traite", `Document « ${upload.document_titre} » de ${upload.declarant_prenom || ""} ${upload.declarant_nom || ""} (visiteur) ${libelles[body.statut]}.`);
   sendJSON(res, 200, { ok: true });
 });
 

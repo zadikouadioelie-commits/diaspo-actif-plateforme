@@ -1067,7 +1067,13 @@ async function iaChargerCandidatureDeclarations() {
   if (!fiche) return;
   try {
     const r = await api('GET', `/insc/fiches/${fiche.id}/candidature/declarations`);
-    state.candidatureDeclarations = r.declarations || [];
+    /* Les candidatures "visiteur" (sans compte) n'étaient jusqu'ici jamais affichées dans cet
+       onglet — la route serveur les renvoie pourtant déjà séparément (declarations_visiteurs).
+       Fusionnées ici avec un flag `visiteur` : la même carte peut ainsi distinguer la voie de
+       décision (notification interne vs e-mail direct) sans dupliquer tout le rendu. */
+    const membres = (r.declarations || []).map(d => ({ ...d, visiteur: false }));
+    const visiteurs = (r.declarations_visiteurs || []).map(d => ({ ...d, visiteur: true }));
+    state.candidatureDeclarations = [...membres, ...visiteurs].sort((a, b) => (b.declare_le || '').localeCompare(a.declare_le || ''));
   } catch (e) { state.candidatureDeclarations = []; }
 }
 
@@ -1896,6 +1902,142 @@ const IA_CANDIDATURE_STATUT_STYLE = {
   acceptee:   ['oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
   refusee:    ['oklch(0.94 0.05 20)', 'oklch(0.42 0.16 20)'],
 };
+/* Décision (Accepter/Refuser) avec message facultatif (2026-09-28, demande explicite) — remplace
+   le confirm() muet précédent : PUT.../statut accepte désormais `message`, envoyé en notification
+   interne (compte connecté) ou par e-mail (visiteur, voir la route serveur). Modale autonome
+   (même patron que iaOuvrirOptionsPayantes) plutôt qu'un simple prompt() : un message de refus
+   mérite plus qu'une seule ligne. */
+function iaOuvrirDecisionCandidature(id, visiteur, statut) {
+  const accepte = statut === 'acceptee';
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:24px;box-sizing:border-box;">
+      <h3 style="margin:0 0 4px;font-size:17px;">${accepte ? '✅ Accepter' : '❌ Refuser'} cette candidature</h3>
+      <p style="font-size:12.5px;color:oklch(0.55 0.006 30);margin:0 0 16px;">Message facultatif envoyé au candidat — notification interne s'il a un compte, e-mail sinon (visiteur).</p>
+      <textarea id="idc-message" placeholder="Message (facultatif)…" style="width:100%;min-height:100px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;"></textarea>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button type="button" id="idc-annuler" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.4 0.006 30);font-size:13px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;">Annuler</button>
+        <button type="button" id="idc-confirmer" style="flex:1;background:${accepte ? 'oklch(0.4 0.13 150)' : '#fff'};border:${accepte ? 'none' : '1px solid oklch(0.5 0.16 20)'};color:${accepte ? '#fff' : 'oklch(0.5 0.16 20)'};font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;">${accepte ? "✅ Confirmer l'acceptation" : '❌ Confirmer le refus'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#idc-annuler').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#idc-confirmer').addEventListener('click', async () => {
+    const message = overlay.querySelector('#idc-message').value.trim();
+    const route = visiteur
+      ? `/insc/candidature/declarations-visiteurs/${id}/statut`
+      : `/insc/candidature/declarations/${id}/statut`;
+    try {
+      await api('PATCH', route, { statut, message: message || undefined });
+      ia_toast(accepte ? 'Candidature acceptée.' : 'Candidature refusée.', true);
+      overlay.remove();
+      await iaChargerCandidatureDeclarations();
+      render();
+    } catch (e) { ia_toast(e.message, false); }
+  });
+}
+/* Refus PAR DOCUMENT (2026-09-28, demande explicite : "j'attends de toi également que tu fasses
+   un système de validation de refus de documents... pour pouvoir aussi demander à ce que tel ou
+   tel document soit refait") — DISTINCT de la décision sur la candidature entière ci-dessus :
+   Valider/Demander à refaire ne portent que sur le document actuellement affiché dans la
+   visionneuse. Strictement interne (2026-09-28, demande explicite : "la personne qui a fait la
+   candidature ne doit pas avoir les détails de quel document a été refusé... c'est à titre
+   informatif pour l'organisateur... c'est sa responsabilité à lui de dire ou de ne pas dire quel
+   document est à recommencer") — le motif n'est jamais envoyé au candidat par ce biais, voir la
+   route serveur qui ne déclenche ni notification ni e-mail. iaOuvrirDocumentViewer() est rouverte
+   après coup (même overlay #idv-overlay, donc pas de flash) pour refléter le nouveau statut. */
+function iaOuvrirDocumentRefus(uploadId, visiteur, declarationId, docIndex) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.6);z-index:10002;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:22px;box-sizing:border-box;">
+      <h3 style="margin:0 0 4px;font-size:16px;">♻️ Marquer ce document à refaire</h3>
+      <p style="font-size:12.5px;color:oklch(0.55 0.006 30);margin:0 0 14px;">Note interne pour vous seul(e) — le candidat n'en est <strong>pas</strong> averti automatiquement. Si vous souhaitez le prévenir, faites-le via le message de la décision globale sur la candidature.</p>
+      <textarea id="idr-motif" placeholder="Motif interne (ex : photo illisible, document expiré…)" style="width:100%;min-height:90px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;"></textarea>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button type="button" id="idr-annuler" style="flex:1;background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.4 0.006 30);font-size:13px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;">Annuler</button>
+        <button type="button" id="idr-confirmer" style="flex:1;background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;">♻️ Confirmer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#idr-annuler').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#idr-confirmer').addEventListener('click', async () => {
+    const motif = overlay.querySelector('#idr-motif').value.trim();
+    overlay.remove();
+    await iaAppliquerStatutDocument(uploadId, visiteur, 'a_refaire', motif, declarationId, docIndex);
+  });
+}
+async function iaAppliquerStatutDocument(uploadId, visiteur, statut, motif, declarationId, docIndex) {
+  const route = visiteur ? `/insc/candidature/uploads-visiteurs/${uploadId}/statut` : `/insc/candidature/uploads/${uploadId}/statut`;
+  try {
+    await api('PATCH', route, { statut, motif: motif || undefined });
+    ia_toast(statut === 'valide' ? 'Document validé.' : 'Document marqué à refaire (note interne, candidat non notifié).', true);
+    await iaChargerCandidatureDeclarations();
+    render();
+    iaOuvrirDocumentViewer(declarationId, visiteur, docIndex);
+  } catch (e) { ia_toast(e.message, false); }
+}
+/* Visionneuse de documents (2026-09-28, demande explicite) — aperçu image/PDF intégré, navigation
+   Précédent/Suivant, téléchargement, statut + motif PAR DOCUMENT (Valider / Demander à refaire),
+   et — séparément — raccourci Accepter/Refuser sur TOUTE la candidature (rouvre
+   iaOuvrirDecisionCandidature). Les deux notions sont indépendantes : un document peut être
+   "à refaire" sans que la candidature globale soit tranchée. */
+function iaOuvrirDocumentViewer(declarationId, visiteur, docIndex) {
+  const decl = (state.candidatureDeclarations || []).find(d => Number(d.id) === declarationId && !!d.visiteur === visiteur);
+  if (!decl) return;
+  const docs = decl.documents_deposes || [];
+  if (!docs.length) return;
+  const idx = Math.max(0, Math.min(docIndex || 0, docs.length - 1));
+  const doc = docs[idx];
+  const docStatut = doc.statut || 'en_attente';
+  const isPdf = /\.pdf(\?|$)/i.test(doc.url || '');
+  const docStatutLabel = { en_attente: '⏳ En attente', valide: '✅ Validé', a_refaire: '♻️ À refaire' };
+  let overlay = document.getElementById('idv-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'idv-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,10,15,.9);z-index:10000;display:flex;flex-direction:column;padding:20px;box-sizing:border-box;';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;color:#fff;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:13.5px;font-weight:600;">📄 ${escH(doc.titre)} <span style="opacity:.6;font-weight:400;">(${idx + 1}/${docs.length})</span> <span style="font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.15);">${docStatutLabel[docStatut]}</span></div>
+      <button type="button" id="idv-fermer" style="background:none;border:1px solid rgba(255,255,255,.35);color:#fff;font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer;">✕ Fermer</button>
+    </div>
+    ${docStatut === 'a_refaire' && doc.motif_refus ? `<div style="background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.4);color:#fff;font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:10px;">♻️ Note interne (non envoyée au candidat) : ${escH(doc.motif_refus)}</div>` : ''}
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;min-height:0;">
+      ${isPdf
+        ? `<iframe src="${escH(doc.url)}" style="width:100%;height:100%;border:none;border-radius:8px;background:#fff;"></iframe>`
+        : `<img src="${escH(doc.url)}" alt="${escH(doc.titre)}" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;">`}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px;">
+      <button type="button" id="idv-prec" ${idx === 0 ? 'disabled' : ''} style="background:#fff;border:none;color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;opacity:${idx === 0 ? '.4' : '1'};">← Précédent</button>
+      <a href="${escH(doc.url)}" download target="_blank" rel="noopener" style="background:#fff;color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;text-decoration:none;">⬇️ Télécharger</a>
+      <button type="button" id="idv-suivant" ${idx === docs.length - 1 ? 'disabled' : ''} style="background:#fff;border:none;color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;opacity:${idx === docs.length - 1 ? '.4' : '1'};">Suivant →</button>
+      ${docStatut !== 'valide' ? `<button type="button" id="idv-doc-valider" style="background:oklch(0.4 0.13 150);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:8px;cursor:pointer;">✅ Valider ce document</button>` : ''}
+      ${docStatut !== 'a_refaire' ? `<button type="button" id="idv-doc-refaire" style="background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px 16px;border-radius:8px;cursor:pointer;">♻️ Demander à refaire</button>` : ''}
+    </div>
+    <div style="text-align:center;color:rgba(255,255,255,.55);font-size:11.5px;margin-top:14px;">Décision sur toute la candidature</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+      ${decl.statut !== 'refusee' ? `<button type="button" id="idv-refuser" style="background:none;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px 16px;border-radius:8px;cursor:pointer;">❌ Refuser la candidature</button>` : ''}
+      ${decl.statut !== 'acceptee' ? `<button type="button" id="idv-accepter" style="background:none;border:1px solid oklch(0.4 0.13 150);color:oklch(0.6 0.13 150);font-size:13px;font-weight:700;padding:10px 16px;border-radius:8px;cursor:pointer;">✅ Accepter la candidature</button>` : ''}
+    </div>`;
+  overlay.querySelector('#idv-fermer').addEventListener('click', () => overlay.remove());
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  if (idx > 0) overlay.querySelector('#idv-prec').addEventListener('click', () => iaOuvrirDocumentViewer(declarationId, visiteur, idx - 1));
+  if (idx < docs.length - 1) overlay.querySelector('#idv-suivant').addEventListener('click', () => iaOuvrirDocumentViewer(declarationId, visiteur, idx + 1));
+  const btnDocValider = overlay.querySelector('#idv-doc-valider');
+  if (btnDocValider) btnDocValider.addEventListener('click', () => iaAppliquerStatutDocument(doc.upload_id, visiteur, 'valide', null, declarationId, idx));
+  const btnDocRefaire = overlay.querySelector('#idv-doc-refaire');
+  if (btnDocRefaire) btnDocRefaire.addEventListener('click', () => iaOuvrirDocumentRefus(doc.upload_id, visiteur, declarationId, idx));
+  const btnAccepter = overlay.querySelector('#idv-accepter');
+  if (btnAccepter) btnAccepter.addEventListener('click', () => { overlay.remove(); iaOuvrirDecisionCandidature(declarationId, visiteur, 'acceptee'); });
+  const btnRefuser = overlay.querySelector('#idv-refuser');
+  if (btnRefuser) btnRefuser.addEventListener('click', () => { overlay.remove(); iaOuvrirDecisionCandidature(declarationId, visiteur, 'refusee'); });
+}
 function renderTraitementCandidatures() {
   const cand = currentCandidature();
   if (!cand?.config) return `${iaConsigne("Activez d'abord la candidature (onglet Candidature) pour pouvoir traiter les dossiers déclarés.")}<div style="color:oklch(0.55 0.006 30);">Aucune candidature configurée sur cette fiche.</div>`;
@@ -1916,23 +2058,42 @@ function renderTraitementCandidatures() {
     /* Documents déposés par le candidat (2026-09-28, demande explicite) — en plus (ou à la
        place) de l'envoi par e-mail, voir insc_candidature_uploads dans server/db.js. */
     const depots = d.documents_deposes || [];
+    /* Visionneuse de documents intégrée (2026-09-28, demande explicite) — remplace les liens qui
+       ouvraient le fichier brut dans un nouvel onglet. iaOuvrirDocumentViewer() gère la
+       navigation entre documents ; les clés (id, visiteur) identifient la déclaration pour que
+       les boutons Accepter/Refuser de la visionneuse retombent sur la bonne route serveur. */
+    /* Badge de statut PAR DOCUMENT (2026-09-28, demande explicite : "que le compte qui a refusé
+       puisse rapidement se rendre compte de ce qui n'allait pas") — affiché directement dans la
+       liste, sans avoir à rouvrir la visionneuse pour chaque pièce. */
     const depotsHtml = depots.length
-      ? `<div style="display:flex;flex-direction:column;gap:4px;margin:10px 0;">${depots.map(dep => `
-          <a href="${escH(dep.url)}" target="_blank" rel="noopener" style="font-size:12px;color:#6B0FA3;font-weight:600;text-decoration:none;">📄 ${escH(dep.titre)} ↗ <span style="font-weight:400;color:oklch(0.55 0.006 30);">déposé le ${escH((dep.depose_le || '').slice(0,10).split('-').reverse().join('/'))}</span></a>`).join('')}</div>`
+      ? `<div style="display:flex;flex-direction:column;gap:4px;margin:10px 0;">${depots.map((dep, i) => {
+          const dStatut = dep.statut || 'en_attente';
+          const dBadge = { en_attente: '', valide: ' <span style="color:oklch(0.4 0.13 150);">✅ Validé</span>', a_refaire: ' <span style="color:oklch(0.5 0.16 20);">♻️ À refaire</span>' }[dStatut];
+          return `<button type="button" data-action="ouvrirDocumentCandidature" data-id="${d.id}" data-visiteur="${d.visiteur ? '1' : '0'}" data-index="${i}" style="background:none;border:none;padding:0;text-align:left;font-size:12px;color:#6B0FA3;font-weight:600;cursor:pointer;">📄 ${escH(dep.titre)} <span style="font-weight:400;color:oklch(0.55 0.006 30);">déposé le ${escH((dep.depose_le || '').slice(0,10).split('-').reverse().join('/'))}</span>${dBadge}</button>`;
+        }).join('')}</div>`
+      : '';
+    /* Accès e-mail direct pour un visiteur sans compte (2026-09-28, demande explicite) — un
+       compte connecté se contacte plutôt via la messagerie interne (notification), jamais par
+       mailto. Badge "Visiteur" pour distinguer visuellement les deux catégories fusionnées par
+       iaChargerCandidatureDeclarations(). */
+    const emailHtml = d.email
+      ? (d.visiteur
+        ? `<a href="mailto:${escH(d.email)}" style="color:#6B0FA3;font-weight:600;text-decoration:none;">✉️ ${escH(d.email)} ↗</a>`
+        : `✉️ ${escH(d.email)}`)
       : '';
     return `
     <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;">
-        <h4 style="margin:0;font-size:14.5px;font-weight:700;">${escH(d.prenom || '')} ${escH(d.nom || '')}</h4>
+        <h4 style="margin:0;font-size:14.5px;font-weight:700;">${escH(d.prenom || '')} ${escH(d.nom || '')}${d.visiteur ? ' <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:#F1F5F9;color:oklch(0.5 0.006 30);vertical-align:middle;">👤 Visiteur</span>' : ''}</h4>
         <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${IA_CANDIDATURE_STATUT_LABEL[d.statut]}</span>
       </div>
-      <div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin:8px 0;">${d.email ? '✉️ ' + escH(d.email) : ''}</div>
+      <div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin:8px 0;">${emailHtml}</div>
       <div style="font-size:11.5px;color:oklch(0.55 0.006 30);font-family:'IBM Plex Mono', monospace;">Déclarée le ${escH((d.declare_le || '').slice(0,16).replace('T',' · '))}</div>
       ${depotsHtml}
       <div style="display:flex;gap:8px;padding-top:12px;margin-top:10px;border-top:1px solid oklch(0.92 0.004 30);">
-        ${d.statut !== 'acceptee' ? `<button style="flex:1;background:oklch(0.4 0.13 150);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="accepterCandidature" data-id="${d.id}">✅ Accepter</button>` : ''}
-        ${d.statut !== 'refusee' ? `<button style="flex:1;background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="refuserCandidature" data-id="${d.id}">❌ Refuser</button>` : ''}
-        ${d.statut !== 'en_attente' ? `<button style="flex:1;background:none;border:1px solid oklch(0.85 0.004 30);color:oklch(0.5 0.006 30);font-size:13px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;" data-action="remettreEnAttenteCandidature" data-id="${d.id}">↩️ Remettre en attente</button>` : ''}
+        ${d.statut !== 'acceptee' ? `<button style="flex:1;background:oklch(0.4 0.13 150);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="accepterCandidature" data-id="${d.id}" data-visiteur="${d.visiteur ? '1' : '0'}">✅ Accepter</button>` : ''}
+        ${d.statut !== 'refusee' ? `<button style="flex:1;background:#fff;border:1px solid oklch(0.5 0.16 20);color:oklch(0.5 0.16 20);font-size:13px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;" data-action="refuserCandidature" data-id="${d.id}" data-visiteur="${d.visiteur ? '1' : '0'}">❌ Refuser</button>` : ''}
+        ${d.statut !== 'en_attente' ? `<button style="flex:1;background:none;border:1px solid oklch(0.85 0.004 30);color:oklch(0.5 0.006 30);font-size:13px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;" data-action="remettreEnAttenteCandidature" data-id="${d.id}" data-visiteur="${d.visiteur ? '1' : '0'}">↩️ Remettre en attente</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -2621,27 +2782,20 @@ const actions = {
     } catch (e) { ia_toast(e.message, false); }
   },
   filtrerTraitementCandidatures(el) { state.traitementCandidatureFiltre = el.dataset.filtre; },
-  async accepterCandidature(el) {
-    try {
-      await api('PATCH', `/insc/candidature/declarations/${el.dataset.id}/statut`, { statut: 'acceptee' });
-      ia_toast('Candidature acceptée.', true);
-      await iaChargerCandidatureDeclarations();
-    } catch (e) { ia_toast(e.message, false); }
-  },
-  async refuserCandidature(el) {
-    if (!confirm('Refuser cette candidature ? La personne ne sera pas notifiée automatiquement.')) return;
-    try {
-      await api('PATCH', `/insc/candidature/declarations/${el.dataset.id}/statut`, { statut: 'refusee' });
-      ia_toast('Candidature refusée.', true);
-      await iaChargerCandidatureDeclarations();
-    } catch (e) { ia_toast(e.message, false); }
-  },
+  accepterCandidature(el) { iaOuvrirDecisionCandidature(parseInt(el.dataset.id), el.dataset.visiteur === '1', 'acceptee'); },
+  refuserCandidature(el) { iaOuvrirDecisionCandidature(parseInt(el.dataset.id), el.dataset.visiteur === '1', 'refusee'); },
   async remettreEnAttenteCandidature(el) {
+    const route = el.dataset.visiteur === '1'
+      ? `/insc/candidature/declarations-visiteurs/${el.dataset.id}/statut`
+      : `/insc/candidature/declarations/${el.dataset.id}/statut`;
     try {
-      await api('PATCH', `/insc/candidature/declarations/${el.dataset.id}/statut`, { statut: 'en_attente' });
+      await api('PATCH', route, { statut: 'en_attente' });
       ia_toast('Candidature remise en attente.', true);
       await iaChargerCandidatureDeclarations();
     } catch (e) { ia_toast(e.message, false); }
+  },
+  ouvrirDocumentCandidature(el) {
+    iaOuvrirDocumentViewer(parseInt(el.dataset.id), el.dataset.visiteur === '1', parseInt(el.dataset.index));
   },
   async toggleModeleStandard(el) {
     const actif = el.dataset.actif === '1';
