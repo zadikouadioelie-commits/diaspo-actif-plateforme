@@ -1269,15 +1269,21 @@ window.previewEvent = function() {
 let evtDetailCourant = null;
 
 /* Partage d'un événement (2026-09-21, demande explicite : "quand on clic sur partager propose
-   un qr code egalement en plus du lien"). Le lien partagé reprend le format d'ancre #evt-<id>
-   déjà utilisé par le lien direct depuis l'annuaire (voir plus bas, "Lien direct vers la fiche
-   complète") — location.href seul (ancien comportement) pointait juste vers la page de liste,
-   sans rouvrir la fiche pour le destinataire. Sur mobile, le partage natif (navigator.share)
-   reste proposé en priorité ; la fenêtre lien+QR sert de repli desktop et reste accessible
-   même sur mobile si le partage natif est annulé. */
+   un qr code egalement en plus du lien"). Le lien partagé utilise désormais ?evt=<id> (query
+   string, lisible côté serveur) et non plus l'ancre #evt-<id> (2026-09-28, demande explicite :
+   "ajoute l'image de couverture de l'événement, le nom du compte qui a envoyé l'invitation et un
+   aperçu du descriptif" dans l'aperçu WhatsApp/réseaux sociaux) — un fragment n'est jamais transmis
+   au serveur, qui ne peut donc pas générer d'aperçu dynamique dessus (voir l'injection de méta
+   dans server/index.js, pathname === '/evenements.html' && parsed.query.evt). &via=<user_id>,
+   ajouté seulement si connecté, porte l'identité de la personne qui partage pour l'aperçu
+   ("X vous invite —"). L'ouverture de la fiche pour le destinataire est gérée plus bas au
+   chargement de page (lecture de ?evt= en plus de l'ancienne ancre #evt-, conservée pour les
+   liens déjà partagés). Sur mobile, le partage natif (navigator.share) reste proposé en priorité ;
+   la fenêtre lien+QR sert de repli desktop et reste accessible même sur mobile si annulé. */
 window.partagerEvenement = async function(id) {
   const titre = (evtDetailCourant && evtDetailCourant.id === id) ? evtDetailCourant.titre : 'Événement Diaspo\'Actif';
-  const url = location.origin + location.pathname + '#evt-' + id;
+  const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
+  const url = location.origin + location.pathname + '?evt=' + id + via;
   if (navigator.share) {
     try { await navigator.share({ title: titre, url }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
@@ -1754,7 +1760,12 @@ async function initSuggestions() {
      la fiche). Ouvre directement la modale de détail existante (openDetail), sans dupliquer son
      contenu. */
   const m = location.hash.match(/^#evt-(\d+)$/);
+  /* ?evt=<id> (2026-09-28, demande explicite) — nouveau format des liens "Partager" (voir
+     partagerEvenement plus haut), en query string pour permettre l'aperçu dynamique côté serveur
+     (server/index.js). Ancien #evt-<id> conservé ci-dessus pour les liens déjà partagés/notifiés. */
+  const evtQuery = new URLSearchParams(location.search).get('evt');
   if (m) openDetail(parseInt(m[1]));
+  else if (evtQuery) openDetail(parseInt(evtQuery));
   /* ?creer_evenement=1 — voir le commentaire déplacé ici, juste avant ouvrirModaleCreation()
      plus haut dans ce fichier. */
   if (new URLSearchParams(location.search).get('creer_evenement')) {
