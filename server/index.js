@@ -27912,11 +27912,18 @@ ${jsonLd}
             const titre = nomInviteur ? `${nomInviteur} vous invite à l'événement ${evt.titre}` : `${evt.titre} — Diaspo'Actif`;
             const description = (evt.description ? String(evt.description).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) : null)
               || "La plateforme mondiale de la diaspora engagée — actions locales, impact global.";
+            /* og:image DOIT être une vraie URL http(s) — un crawler (WhatsApp, etc.) ne peut pas
+               "récupérer" un data: URI comme il le ferait d'une image (bug réel constaté, capture
+               à l'appui : image_couverture peut valoir un data:image/...;base64,... brut pour un
+               événement créé avant migration vers l'hébergement CDN — startsWith('http') étant
+               alors faux, l'ancien code concaténait bêtement base+chemin et produisait une URL
+               cassée du style diaspoactif.com/data:image/...). Repli sur l'image générique dans
+               ce cas, comme si aucune couverture n'existait. */
             let image = `${base}/assets/og-image.png`;
-            if (evt.image_couverture) {
-              image = evt.image_couverture.startsWith('http')
-                ? evt.image_couverture
-                : `${base}${evt.image_couverture.startsWith('/') ? '' : '/'}${evt.image_couverture}`;
+            if (evt.image_couverture && evt.image_couverture.startsWith('http')) {
+              image = evt.image_couverture;
+            } else if (evt.image_couverture && evt.image_couverture.startsWith('/')) {
+              image = `${base}${evt.image_couverture}`;
             }
             const pageUrl = `${base}/evenements.html?evt=${evt.id}`;
             html = html
