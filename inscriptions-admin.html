@@ -961,7 +961,7 @@ async function iaChargerOnglet(tab) {
   if (tab === 'public') return iaChargerPublic();
   if (tab === 'communication') return iaChargerCommunications();
   if (tab === 'qr' || tab === 'presences') return Promise.all([iaChargerLienEtStats(), iaChargerPresences()]);
-  if (tab === 'validation') return iaChargerInscriptions();
+  if (tab === 'validation' || tab === 'stats') return iaChargerInscriptions();
   if (tab === 'historique') return iaChargerHistorique();
   if (tab === 'candidature' || tab === 'traitement_candidatures') return iaChargerCandidatureDeclarations();
 }
@@ -2122,6 +2122,50 @@ function renderFinances() {
 }
 
 // ---- Statistiques ----
+const IA_INSC_STATUT_LABELS = {
+  inscrit: ['⏳ En attente', 'oklch(0.96 0.07 85)', 'oklch(0.42 0.13 85)'],
+  confirme: ['✅ Confirmé', 'oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
+  present: ['🟢 Présent', 'oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
+  absent: ['⚪ Absent', 'oklch(0.93 0.004 30)', 'oklch(0.5 0.006 30)'],
+  annule: ['❌ Annulé', 'oklch(0.94 0.05 20)', 'oklch(0.42 0.16 20)'],
+  liste_attente: ["🟠 Liste d'attente", 'oklch(0.94 0.04 258)', 'oklch(0.4 0.1 258)'],
+};
+/* Liste des inscrits, classée par type d'inscription (2026-09-28, demande explicite) —
+   nom/prénom/e-mail/téléphone directement disponibles sur insc_inscriptions (déjà chargée pour
+   l'onglet Validation, réutilisée ici sans nouvelle route) pour que l'organisateur retrouve
+   facilement qui s'est inscrit, dans quelle formule, sans passer par l'export ou le module
+   Finances. Tous les statuts sont montrés (pas seulement les confirmés) — cacher les inscrits en
+   liste d'attente ou annulés donnerait une image incomplète, chaque ligne porte sa propre pastille
+   de statut pour rester lisible malgré ça. */
+function renderListeInscrits() {
+  const inscriptions = state.inscriptions || [];
+  if (!inscriptions.length) {
+    return `<div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:30px 20px;text-align:center;color:oklch(0.55 0.006 30);font-size:13px;">Aucun inscrit pour le moment.</div>`;
+  }
+  const parType = {};
+  for (const i of inscriptions) (parType[i.type_label || 'Autre'] = parType[i.type_label || 'Autre'] || []).push(i);
+  return Object.keys(parType).map(typeLabel => {
+    const liste = parType[typeLabel];
+    const lignes = liste.map(i => {
+      const [label, bg, color] = IA_INSC_STATUT_LABELS[i.statut] || IA_INSC_STATUT_LABELS.inscrit;
+      return `
+      <div style="display:flex;align-items:center;gap:14px;padding:10px 4px;border-bottom:1px solid oklch(0.94 0.004 30);flex-wrap:wrap;">
+        <div style="min-width:160px;font-weight:600;font-size:13px;">${escH(i.prenom)} ${escH(i.nom)}</div>
+        <div style="flex:1;min-width:180px;font-size:12.5px;color:oklch(0.4 0.006 30);">${i.email ? '✉️ ' + escH(i.email) : '<span style="color:oklch(0.65 0.006 30);">Aucun e-mail</span>'}</div>
+        <div style="min-width:140px;font-size:12.5px;color:oklch(0.4 0.006 30);">${i.telephone ? '📞 ' + escH(i.telephone) : '<span style="color:oklch(0.65 0.006 30);">Aucun téléphone</span>'}</div>
+        <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${label}</span>
+      </div>`;
+    }).join('');
+    return `
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:18px 20px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h4 style="margin:0;font-size:14px;font-weight:700;">🏷️ ${escH(typeLabel)}</h4>
+        <span style="font-size:12px;color:oklch(0.55 0.006 30);">${liste.length} inscrit${liste.length > 1 ? 's' : ''}</span>
+      </div>
+      ${lignes}
+    </div>`;
+  }).join('');
+}
 function renderStats() {
   const types = currentTypes().map(buildTypeVM);
   const totalConfirmes = types.reduce((s,t)=>s+t.registered,0);
@@ -2136,7 +2180,9 @@ function renderStats() {
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Don moyen</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;color:oklch(0.6 0.006 30);">—</div></div>
       <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:16px;"><div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:6px;">Total inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;">${totalConfirmes}</div></div>
     </div>
-    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;color:oklch(0.55 0.006 30);font-size:12.5px;">La répartition par pays et le don moyen nécessitent le module Finances (à venir).</div>`;
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;color:oklch(0.55 0.006 30);font-size:12.5px;margin-bottom:20px;">La répartition par pays et le don moyen nécessitent le module Finances (à venir).</div>
+    <h3 style="margin:0 0 14px;font-size:15px;font-weight:700;">📋 Liste des inscrits</h3>
+    ${renderListeInscrits()}`;
 }
 
 // ---- Historique ----
