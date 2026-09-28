@@ -329,7 +329,7 @@ function iopRenderRow(opt) {
         </label>
         <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#6B0FA3; cursor:pointer;">
           <input type="checkbox" data-role="universelle" ${opt.universelle ? 'checked' : ''} style="width:14px;height:14px;accent-color:#8B12D6;cursor:pointer;">
-          🌐 Universelle — proposer aussi sur les autres types d'inscription
+          🌐 Étendre à tous les types d'inscription
         </label>
       </div>
       <div data-role="promo-fields" style="display:${enPromo ? 'flex' : 'none'}; gap:8px; flex-wrap:wrap; padding:8px 10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;">
@@ -364,7 +364,7 @@ function iaOuvrirOptionsPayantes(champId) {
         <h3 style="margin:0; font-size:17px; color:#6B0FA3;">💰 Option payante${champExistant ? ' — ' + escH(champExistant.libelle) : ''}</h3>
         <button type="button" id="iop-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
       </div>
-      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Proposez des options facultatives payantes (ex. repas, massage) que les participants pourront cocher lors de leur inscription à « ${escH(selectedType() ? selectedType().label : '')} ». Cochez « 🌐 Universelle » sur une option pour la proposer aussi sur les autres types d'inscription de cette fiche.</p>
+      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Proposez des options facultatives payantes (ex. repas, massage) que les participants pourront cocher lors de leur inscription à « ${escH(selectedType() ? selectedType().label : '')} ». Cochez « 🌐 Étendre à tous les types d'inscription » sur une option pour l'appliquer à tous les types d'inscription de cette fiche.</p>
       <div id="iop-options-list" style="display:flex; flex-direction:column; gap:10px;"></div>
       <button type="button" id="iop-ajouter" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter une autre option</button>
       <button type="button" id="iop-enregistrer" style="width:100%; margin-top:18px; background:#8B12D6; border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer les options</button>
@@ -1352,7 +1352,7 @@ function renderFields() {
     }
     return `
     <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid oklch(0.92 0.004 30); border-radius:8px; background:oklch(0.99 0.001 30);">
-      <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}${nbUniverselles ? ` <span style="font-size:11px;color:#8B12D6;">· 🌐 ${nbUniverselles} universelle(s)</span>` : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
+      <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">${escH(f.libelle)}${f.condition_json ? ' <span style="font-size:11px;color:oklch(0.5 0.09 258);">· conditionnel</span>' : ''}${nbUniverselles ? ` <span style="font-size:11px;color:#8B12D6;">· 🌐 ${nbUniverselles} étendue(s) à tous les types</span>` : ''}</div><div style="font-family:'IBM Plex Mono', monospace; font-size:11px; color:oklch(0.55 0.006 30); margin-top:2px;">${escH(f.type_champ)}</div></div>
       ${f.type_champ === 'liens_utiles'
         ? `<span style="font-size:12.5px; font-weight:700; padding:7px 13px; border-radius:20px; white-space:nowrap; background:#F1F5F9; color:oklch(0.5 0.006 30);" title="Purement informatif — jamais une réponse demandée au participant">ℹ️ Informatif</span>`
         : `<label style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700; cursor:pointer; padding:7px 13px; border-radius:20px; white-space:nowrap; background:${f.obligatoire ? '#FEE2E2' : '#F1F5F9'}; border:1.5px solid ${f.obligatoire ? '#DC2626' : 'oklch(0.85 0.004 30)'}; color:${f.obligatoire ? '#B91C1C' : 'oklch(0.5 0.006 30)'};">
