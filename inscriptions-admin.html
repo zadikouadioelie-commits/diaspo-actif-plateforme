@@ -141,14 +141,18 @@ const IA_STATUS_STYLES = {
   'programmee':['oklch(0.94 0.04 258)','oklch(0.4 0.1 258)'],
 };
 const IA_TYPES_CHAMP = ['texte_court','texte_long','nombre','email','telephone','date','heure','adresse','liste_deroulante','choix_unique','choix_multiple','oui_non','case_a_cocher','upload_photo','upload_fichier','url'];
-/* Suggestions génériques par catégorie (2026-09-09, demande explicite) — Nom/Prénom apparaissent
-   ici aussi bien qu'ils soient déjà demandés par défaut sur la fiche : un organisateur peut vouloir
-   les redemander pour un accompagnant, un second contact, etc. "Personnalisé" reste un champ libre
-   (prompt), pas une liste — il n'a donc pas de suggestions. */
+/* Suggestions génériques par catégorie (2026-09-09, demande explicite ; Nom/Prénom retirés le
+   2026-09-28 — capture réelle à l'appui : un organisateur avait ajouté ces deux suggestions,
+   produisant sur le formulaire public un Nom/Prénom strictement DUPLIQUÉ avec les champs
+   nom/prénom déjà toujours demandés par défaut, sans que rien ne l'en avertisse. L'usage prévu
+   (redemander le nom d'un accompagnant, d'un second contact) reste possible via "Personnalisé",
+   mais n'est plus proposé en un clic sous un libellé identique aux champs par défaut. À la
+   place : "Nom de l'organisme" — un participant représente parfois une structure (association,
+   entreprise) et non lui-même, information que rien ne couvrait jusqu'ici dans cette catégorie.
+   "Personnalisé" reste un champ libre (prompt), pas une liste — il n'a donc pas de suggestions. */
 const IA_FIELD_SUGGESTIONS = {
   'Identité': [
-    { libelle: 'Nom', type_champ: 'texte_court' },
-    { libelle: 'Prénom', type_champ: 'texte_court' },
+    { libelle: 'Nom de l\'organisme (si vous en avez un)', type_champ: 'texte_court' },
     { libelle: 'Genre', type_champ: 'choix_unique', options: ['Homme', 'Femme'] },
     { libelle: 'Date de naissance', type_champ: 'date' },
     { libelle: "Nombre d'enfants", type_champ: 'nombre' },
