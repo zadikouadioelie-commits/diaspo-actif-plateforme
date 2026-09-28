@@ -27855,48 +27855,61 @@ ${jsonLd}
 
   /* Aperçu de lien dynamique pour un événement partagé (2026-09-28, demande explicite : "ajoute
      l'image de couverture de l'événement, le nom du compte qui a envoyé l'invitation et un
-     aperçu du descriptif") — evenements.html reste un fichier statique servi normalement (voir
-     plus bas) SAUF quand l'URL porte ?evt=<id> (nouveau format du lien "Partager", en query
-     string donc lisible côté serveur, contrairement à l'ancien #evt-<id> qui est un fragment
-     jamais transmis au serveur — voir partagerEvenement() dans evenements.html). Même patron que
-     /join/CODE et /profil.html?id= ci-dessus : lecture seule, aucun impact sur les vues/statistiques
-     de l'événement, repli silencieux sur les balises génériques en cas d'erreur ou d'événement
-     introuvable/privé. ?via=<user_id> (facultatif) porte l'identité de la personne qui partage,
-     réutilise nomCompteAffichage() déjà existant plutôt que d'en écrire un second. */
-  if (pathname === '/evenements.html' && parsed.query.evt) {
+     aperçu du descriptif"). evenements.html est servi depuis evenements-app.html (fichier
+     renommé, 2026-09-28) — même raison que profil.html/profil-app.html juste au-dessus : tant
+     qu'un fichier physique "evenements.html" existe dans le dépôt, Vercel le sert directement
+     depuis son hébergement statique et ne passe JAMAIS par cette fonction, quel que soit le
+     rewrite ajouté dans vercel.json (constaté en prod : balises génériques renvoyées malgré
+     ?evt=<id> dans l'URL). Renommer élimine la collision, le rewrite vercel.json fait le reste —
+     l'URL publique reste /evenements.html, inchangée pour tous les liens déjà partagés/indexés.
+     ?evt=<id> (query string, contrairement à l'ancien #evt-<id> qui est un fragment jamais
+     transmis au serveur — voir partagerEvenement() dans evenements-app.html) déclenche
+     l'injection ; sans lui, le fichier est servi tel quel. Lecture seule, aucun impact sur les
+     vues/statistiques de l'événement, repli silencieux sur les balises génériques en cas
+     d'erreur ou d'événement introuvable/privé. ?via=<user_id> (facultatif) porte l'identité de la
+     personne qui partage, réutilise nomCompteAffichage() déjà existant plutôt que d'en écrire un
+     second. */
+  if (pathname === '/evenements.html') {
     try {
-      let html = await fs.promises.readFile(path.join(ROOT, 'evenements.html'), 'utf8');
-      try {
-        const evt = await db.prepare("SELECT id, titre, description, image_couverture, statut, visibilite FROM evenements WHERE id=?").get(parsed.query.evt);
-        if (evt && evt.statut !== 'brouillon' && evt.visibilite !== 'prive') {
-          const escAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const base = 'https://diaspoactif.com';
-          const nomInviteur = parsed.query.via ? await nomCompteAffichage(parsed.query.via) : '';
-          const titre = nomInviteur ? `${nomInviteur} vous invite à l'événement ${evt.titre}` : `${evt.titre} — Diaspo'Actif`;
-          const description = (evt.description ? String(evt.description).replace(/\s+/g, ' ').trim().slice(0, 200) : null)
-            || "La plateforme mondiale de la diaspora engagée — actions locales, impact global.";
-          let image = `${base}/assets/og-image.png`;
-          if (evt.image_couverture) {
-            image = evt.image_couverture.startsWith('http')
-              ? evt.image_couverture
-              : `${base}${evt.image_couverture.startsWith('/') ? '' : '/'}${evt.image_couverture}`;
+      let html = await fs.promises.readFile(path.join(ROOT, 'evenements-app.html'), 'utf8');
+      if (parsed.query.evt) {
+        try {
+          const evt = await db.prepare("SELECT id, titre, description, image_couverture, statut, visibilite FROM evenements WHERE id=?").get(parsed.query.evt);
+          if (evt && evt.statut !== 'brouillon' && evt.visibilite !== 'prive') {
+            const escAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const base = 'https://diaspoactif.com';
+            const nomInviteur = parsed.query.via ? await nomCompteAffichage(parsed.query.via) : '';
+            const titre = nomInviteur ? `${nomInviteur} vous invite à l'événement ${evt.titre}` : `${evt.titre} — Diaspo'Actif`;
+            const description = (evt.description ? String(evt.description).replace(/\s+/g, ' ').trim().slice(0, 200) : null)
+              || "La plateforme mondiale de la diaspora engagée — actions locales, impact global.";
+            let image = `${base}/assets/og-image.png`;
+            if (evt.image_couverture) {
+              image = evt.image_couverture.startsWith('http')
+                ? evt.image_couverture
+                : `${base}${evt.image_couverture.startsWith('/') ? '' : '/'}${evt.image_couverture}`;
+            }
+            const pageUrl = `${base}/evenements.html?evt=${evt.id}`;
+            html = html
+              .replace(/<title>[^<]*<\/title>/, `<title>${escAttr(titre)}</title>`)
+              .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${escAttr(titre)}">`)
+              .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${escAttr(description)}">`)
+              .replace(/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${escAttr(image)}">`)
+              .replace(/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${escAttr(pageUrl)}">`)
+              .replace(/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${escAttr(titre)}">`)
+              .replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${escAttr(description)}">`)
+              .replace(/<meta name="twitter:image" content="[^"]*">/, `<meta name="twitter:image" content="${escAttr(image)}">`);
           }
-          const pageUrl = `${base}/evenements.html?evt=${evt.id}`;
-          html = html
-            .replace(/<title>[^<]*<\/title>/, `<title>${escAttr(titre)}</title>`)
-            .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${escAttr(titre)}">`)
-            .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${escAttr(description)}">`)
-            .replace(/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${escAttr(image)}">`)
-            .replace(/<meta property="og:url" content="[^"]*">/, `<meta property="og:url" content="${escAttr(pageUrl)}">`)
-            .replace(/<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${escAttr(titre)}">`)
-            .replace(/<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${escAttr(description)}">`)
-            .replace(/<meta name="twitter:image" content="[^"]*">/, `<meta name="twitter:image" content="${escAttr(image)}">`);
-        }
-      } catch (e) { console.error('[evenements-og]', e.message); }
+        } catch (e) { console.error('[evenements-og]', e.message); }
+      }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
       return;
-    } catch (e) { /* fichier introuvable : laisse tomber sur le service statique normal ci-dessous */ }
+    } catch (e) {
+      console.error('[SEO evenements.html]', e.message);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Erreur serveur.');
+      return;
+    }
   }
 
   /* ── Servir les vidéos uploadées ── */
