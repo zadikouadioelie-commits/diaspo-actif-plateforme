@@ -43925,7 +43925,12 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias });
     }
-    if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
+    /* Fiche liée à au moins un événement (2026-09-28, demande explicite : "si cette note est de
+       toute façon liée à un événement, la question ne se pose plus. Automatiquement, la note est
+       ouverte") — sa propre date d'ouverture ne bloque plus rien, seule la fermeture ci-dessus
+       reste pertinente. Sans lien, la date d'ouverture continue de s'appliquer normalement. */
+    const estLieeAUnEvenement = !!(await db.prepare("SELECT 1 FROM insc_fiches_evenements WHERE fiche_id=? LIMIT 1").get(fiche.id));
+    if (!estLieeAUnEvenement && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias });
     }
@@ -44018,8 +44023,11 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
   if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
   const now = new Date();
+  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
   if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
-  if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
+  /* Lié à un événement = ouverture automatique, seule la fermeture compte (2026-09-28, demande
+     explicite) — même règle que GET /api/insc/public/:slug ci-dessus. */
+  if (!liaisons.length && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
 
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=? AND fiche_id=? AND actif=1").get(body?.type_id, fiche.id);
   if (!type) return sendJSON(res, 400, { error: "Type d'inscription invalide." });
@@ -44027,7 +44035,6 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (type.date_fermeture && new Date(type.date_fermeture) < now) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » sont fermées.` });
 
   let evenementId = null;
-  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
   if (liaisons.length === 1) evenementId = liaisons[0].evenement_id;
   else if (liaisons.length > 1) {
     if (!body?.evenement_id || !liaisons.some(l => Number(l.evenement_id) === Number(body.evenement_id))) {

@@ -231,6 +231,8 @@ const state = {
   champCategorieOuverte: null,
   editionInfosOuverte: false,
   modalLiaisonOuvert: false, // modale "Lier à un événement" (cartouches), ouvrable depuis la liste sans changer de vue
+  modalProgrammationOuvert: false, // modale "Programmation" (ouverture/fermeture), accès rapide depuis la cartouche
+  modalProgrammationFicheId: null,
   publicData: null,
   publicSelectedTypeId: null,
   publicReponses: {},
@@ -1102,6 +1104,20 @@ function renderListView() {
           </div>
           <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:${f.description ? '6px' : '14px'};">📅 ${escH(f.apercu_date || 'Date à définir')} &nbsp;·&nbsp; 📍 ${escH(f.apercu_lieu || 'Lieu à définir')}</div>
           ${f.description ? `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);line-height:1.5;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(stripRichTags(f.description))}</div>` : ''}
+          <!-- Programmation ouverture/fermeture, accès rapide depuis la cartouche (2026-09-28,
+               demande explicite : "affiche directement sur la cartouche de quand à quand est-ce
+               que l'inscription est ouverte... ce qui permettra de le modifier en temps voulu")
+               — lit/écrit les MÊMES champs que l'onglet Infos générales (date_ouverture_
+               inscriptions/date_fermeture_inscriptions), via la même route PUT /insc/fiches/:id :
+               un seul accès rapide, jamais une copie séparée. Liée à un événement (f.nb_evenements
+               > 0) : ouverture automatique, seule la fermeture est affichée/modifiable ici (même
+               règle appliquée en temps réel côté serveur, voir GET /api/insc/public/:slug). -->
+          <div data-action="ouvrirProgrammationListe" data-id="${f.id}" title="Cliquez pour modifier" style="cursor:pointer;font-size:11.5px;font-weight:600;color:${f.nb_evenements ? 'oklch(0.4 0.13 258)' : 'oklch(0.4 0.006 30)'};background:${f.nb_evenements ? 'oklch(0.96 0.03 258)' : 'oklch(0.97 0.004 30)'};border:1px solid ${f.nb_evenements ? 'oklch(0.85 0.05 258)' : 'oklch(0.88 0.004 30)'};border-radius:8px;padding:7px 10px;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
+            ${f.nb_evenements
+              ? `<span>🔗 Ouverture automatique (lié à un événement) · Ferme ${f.date_fermeture_inscriptions ? 'le ' + escH(f.date_fermeture_inscriptions.slice(0,10)) : '— à définir'}</span>`
+              : `<span>📅 ${f.date_ouverture_inscriptions ? escH(f.date_ouverture_inscriptions.slice(0,10)) : 'Ouverture à définir'} → ${f.date_fermeture_inscriptions ? escH(f.date_fermeture_inscriptions.slice(0,10)) : 'fermeture à définir'}</span>`}
+            <span style="margin-left:auto;flex-shrink:0;">✏️</span>
+          </div>
           <div style="display:flex;gap:12px;padding-top:12px;border-top:1px solid oklch(0.93 0.004 30);align-items:center;flex-wrap:wrap;">
             <div><div style="font-size:11px;color:oklch(0.55 0.006 30);">Inscrits</div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;">${f.nb_inscriptions}</div></div>
             <div style="flex:1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
@@ -1549,6 +1565,39 @@ function renderModalLiaison() {
         </div>
         <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 18px;">Le bouton « S'inscrire » d'un événement lié redirige vers cette fiche au lieu du parcours d'inscription classique. Un événement ne peut être lié qu'à une seule fiche à la fois.</p>
         <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px;">${cartouches}</div>
+      </div>
+    </div>`;
+}
+
+/* Programmation ouverture/fermeture — accès rapide depuis la cartouche de liste (2026-09-28,
+   demande explicite). Lit/écrit EXACTEMENT les mêmes champs que l'onglet Infos générales de la
+   fiche (date_ouverture_inscriptions/date_fermeture_inscriptions, via PUT /insc/fiches/:id) :
+   ce n'est qu'un raccourci, jamais un état séparé — modifier ici modifie la fiche elle-même. */
+function renderModalProgrammation() {
+  if (!state.modalProgrammationOuvert) return '';
+  const fiche = state.fiches.find(f => f.id === state.modalProgrammationFicheId);
+  if (!fiche) return '';
+  const liee = !!fiche.nb_evenements;
+  return `
+    <div style="position:fixed; inset:0; background:rgba(20,20,30,.55); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div style="background:oklch(0.97 0.002 30); border-radius:16px; max-width:420px; width:100%; padding:24px; box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+          <h3 style="margin:0; font-size:17px;">📅 Programmation — « ${escH(fiche.nom || '')} »</h3>
+          <button data-action="fermerModalProgrammation" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+        </div>
+        ${liee ? `
+        <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 18px;">Cette fiche est liée à un événement : les inscriptions sont automatiquement ouvertes. Seule la date de fermeture ci-dessous compte.</p>
+        ` : `
+        <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 18px;">Appliqué en temps réel : dès que la date/heure d'ouverture choisie est atteinte, les inscriptions s'ouvrent immédiatement — pas besoin d'attendre.</p>
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture des inscriptions</label>
+        <input id="prog-ouverture" type="datetime-local" value="${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box; margin-bottom:14px;">
+        `}
+        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture des inscriptions</label>
+        <input id="prog-fermeture" type="datetime-local" value="${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box; margin-bottom:20px;">
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button data-action="fermerModalProgrammation" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;">Annuler</button>
+          <button data-action="enregistrerProgrammationListe" data-id="${fiche.id}" style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:9px 18px; border-radius:8px; cursor:pointer;">💾 Enregistrer</button>
+        </div>
       </div>
     </div>`;
 }
@@ -2632,6 +2681,32 @@ const actions = {
     state.modalLiaisonOuvert = true;
   },
   fermerModalLiaison() { state.modalLiaisonOuvert = false; },
+  /* Programmation ouverture/fermeture — accès rapide depuis la cartouche (2026-09-28, demande
+     explicite). state.fiches contient déjà les deux dates (voir GET /insc/fiches) : pas besoin
+     de recharger la fiche complète juste pour ouvrir ce modal léger. */
+  ouvrirProgrammationListe(el) {
+    state.modalProgrammationFicheId = parseInt(el.dataset.id);
+    state.modalProgrammationOuvert = true;
+  },
+  fermerModalProgrammation() { state.modalProgrammationOuvert = false; },
+  async enregistrerProgrammationListe(el) {
+    const id = parseInt(el.dataset.id);
+    const fiche = state.fiches.find(f => f.id === id);
+    const liee = !!fiche?.nb_evenements;
+    // Écrit EXACTEMENT les mêmes champs que l'onglet Infos générales, via la même route — un
+    // seul et même réglage, jamais une copie séparée (demande explicite). Liée à un événement :
+    // l'ouverture n'est ni affichée ni modifiée ici, donc jamais envoyée (le champ existant, le
+    // cas échéant, reste tel quel en base — non effacé — pour rester intact si la fiche est
+    // déliée plus tard).
+    const payload = { date_fermeture_inscriptions: document.getElementById('prog-fermeture')?.value || '' };
+    if (!liee) payload.date_ouverture_inscriptions = document.getElementById('prog-ouverture')?.value || '';
+    try {
+      await api('PUT', `/insc/fiches/${id}`, payload);
+      state.modalProgrammationOuvert = false;
+      await iaChargerListe();
+      ia_toast('Programmation enregistrée.', true);
+    } catch (e) { ia_toast(e.message, false); }
+  },
   /* Ouvrir/fermer la fiche directement depuis la carte de liste (2026-09-28, demande explicite :
      "évite de rentrer encore une fois dans la fiche... tout simplement à cet endroit") — seul
      point d'entrée désormais pour cette bascule, le bouton équivalent de l'en-tête de détail
@@ -3275,7 +3350,7 @@ async function dispatch(name, el) {
 
 const root = document.getElementById('ia-root');
 function render() {
-  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}${renderModalLiaison()}</div>`;
+  root.innerHTML = `<div style="min-height:100%; width:100%;">${state.view === 'list' ? renderListView() : renderDetailView()}${renderModalLiaison()}${renderModalProgrammation()}</div>`;
   // Éditeur de texte enrichi sur la Description (le panneau "Informations générales" est
   // entièrement reconstruit à chaque render() — l'attacher ici garantit qu'il est toujours
   // présent quand le panneau est ouvert, sans dupliquer si déjà attaché sur cet élément.
