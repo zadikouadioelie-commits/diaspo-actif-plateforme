@@ -1399,9 +1399,12 @@ function renderTypes() {
 
   const list = types.map(rt => `
     <div style="background:#fff; border:1.5px solid ${rt.cardBorder}; border-radius:12px; padding:14px 16px; cursor:pointer;" data-action="selectType" data-id="${rt.id}">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
         <div style="font-weight:700; font-size:14.5px;">${escH(rt.name)}</div>
-        <span style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; background:${rt.statusBg}; color:${rt.statusColor};">${rt.statusLabel}</span>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <span style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; background:${rt.statusBg}; color:${rt.statusColor}; white-space:nowrap;">${rt.statusLabel}</span>
+          <button title="Supprimer ce type d'inscription" data-action="supprimerType" data-id="${rt.id}" data-nom="${escH(rt.name)}" style="width:24px; height:24px; border-radius:50%; border:none; background:oklch(0.96 0.004 30); color:oklch(0.5 0.006 30); font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">🗑</button>
+        </div>
       </div>
       <div style="display:flex; gap:14px; margin-top:8px; font-size:12.5px; color:oklch(0.5 0.006 30);">
         <span>${rt.priceLabel}</span><span>${rt.capacityLabel}</span><span>${rt.validationLabel}</span>
@@ -2402,6 +2405,19 @@ const actions = {
     try {
       await api('POST', `/insc/fiches/${state.selectedFicheId}/types`, { label: label.trim(), gratuit, prix, places_max: placesTxt ? parseInt(placesTxt) : null, liste_attente_active: !!placesTxt });
       await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async supprimerType(el) {
+    const id = parseInt(el.dataset.id);
+    if (!confirm(`Supprimer définitivement le type d'inscription « ${el.dataset.nom} » ? Cette action est irréversible.\n\n(Un type ayant déjà des inscrits ne peut pas être supprimé — désactivez-le plutôt.)`)) return;
+    try {
+      await api('DELETE', '/insc/types/' + id);
+      // iaChargerFiche() recale automatiquement selectedTypeId sur le premier type restant si
+      // celui qui vient d'être supprimé était sélectionné (voir sa propre logique) — même
+      // rechargement complet que addType()/supprimerFicheListe() ci-dessus, pour éviter la même
+      // famille de bug id-string-vs-number déjà rencontrée sur les fiches (voir mémoire du projet).
+      await iaChargerFiche(state.selectedFicheId);
+      ia_toast("Type d'inscription supprimé.", true);
     } catch (e) { ia_toast(e.message, false); }
   },
   /* Renommer un type d'inscription (2026-09-28, demande explicite, capture à l'appui) — le
