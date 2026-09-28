@@ -1281,11 +1281,24 @@ let evtDetailCourant = null;
    liens déjà partagés). Sur mobile, le partage natif (navigator.share) reste proposé en priorité ;
    la fenêtre lien+QR sert de repli desktop et reste accessible même sur mobile si annulé. */
 window.partagerEvenement = async function(id) {
-  const titre = (evtDetailCourant && evtDetailCourant.id === id) ? evtDetailCourant.titre : 'Événement Diaspo\'Actif';
+  /* Number() des deux côtés (2026-09-28, bug réel constaté : le partage natif Windows affichait
+     "Événement Diaspo'Actif" au lieu du vrai titre) — id vient d'un attribut onclick (donc une
+     chaîne), evtDetailCourant.id vient de l'API (un nombre) ; une comparaison stricte échouait
+     donc toujours silencieusement. Même correctif déjà appliqué ailleurs dans ce fichier
+     (openDetail, voir Number(evtDetailCourant.id) === Number(id)). */
+  const evt = (evtDetailCourant && Number(evtDetailCourant.id) === Number(id)) ? evtDetailCourant : null;
+  const titre = evt ? evt.titre : 'Événement Diaspo\'Actif';
   const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
   const url = location.origin + location.pathname + '?evt=' + id + via;
   if (navigator.share) {
-    try { await navigator.share({ title: titre, url }); return; }
+    /* `text` (2026-09-28, demande explicite : "le descriptif de l'événement" absent du partage)
+       — le partage natif (Web Share API) n'accepte ni image ni HTML, seulement un texte brut en
+       plus du titre/URL ; certaines destinations (Facebook, e-mail...) l'affichent, d'autres
+       l'ignorent. L'aperçu riche complet (photo + descriptif) reste celui généré par le serveur
+       à l'ouverture du lien lui-même (voir server/index.js, pathname === '/evenements.html'),
+       affiché par les destinations qui déplient l'URL plutôt que d'utiliser ce champ. */
+    const text = evt && evt.description ? String(evt.description).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150) : undefined;
+    try { await navigator.share({ title: titre, text, url }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   ouvrirModalePartage(url, titre);
