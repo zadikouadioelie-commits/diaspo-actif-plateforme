@@ -19040,6 +19040,26 @@ route("GET", "/api/cagnottes/vedette", async (req, res, params, body, query) => 
   if (!c || calculerStatutCagnotte(c) !== "active") return sendJSON(res, 200, { don: null });
   sendJSON(res, 200, { don: { slug: c.slug, titre: c.titre, image_url: c.image_url, type_don: c.type_don, devise: c.devise } });
 });
+/* GET /api/cagnottes/vedette-lot?owner_user_ids=1,2,3 — même donnée que la route ci-dessus, mais
+   en lot (2026-09-28, bug réel trouvé en testant l'annuaire : "doit apparaître... sur la
+   cartouche de l'annuaire" appelait D'ABORD la route au-dessus une fois PAR cartouche affichée en
+   parallèle — une recherche à 30-50 résultats déclenchait autant de requêtes simultanées et
+   provoquait des 429 Too Many Requests). Une seule requête pour toute la page, quel que soit le
+   nombre de cartouches. */
+route("GET", "/api/cagnottes/vedette-lot", async (req, res, params, body, query) => {
+  const ids = String(query?.owner_user_ids || "").split(",").map(Number).filter(Boolean).slice(0, 100);
+  if (!ids.length) return sendJSON(res, 200, { dons: {} });
+  const ph = ids.map(() => "?").join(",");
+  const rows = await db.prepare(
+    `SELECT * FROM cagnottes WHERE owner_user_id IN (${ph}) AND est_vedette=1 AND est_publiee=1 AND visibilite='publique'`
+  ).all(...ids);
+  const dons = {};
+  for (const c of rows) {
+    if (calculerStatutCagnotte(c) !== "active") continue;
+    dons[c.owner_user_id] = { slug: c.slug, titre: c.titre, image_url: c.image_url, type_don: c.type_don, devise: c.devise };
+  }
+  sendJSON(res, 200, { dons });
+});
 
 /* GET /api/cagnottes/pour-fiche/:ficheId — publique. Alimente ipRenderDonLie() sur
    inscription-publique.html : le(s) don(s) occasionnel(s) explicitement liés à CETTE fiche
@@ -19822,7 +19842,15 @@ route("DELETE", "/api/cagnottes/:id/actualites/:actuId", async (req, res, params
 });
 
 route("GET", "/api/evenements/:id", async (req, res, params) => {
-  const row = await db.prepare("SELECT e.*,u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(params.id);
+  /* init_id/init_type/init_adhesions_ouvertes (2026-09-28, demande explicite) : ajoutés pour
+     que le bouton public "Adhérer à l'initiative" (même mécanisme que initiative.html/profil
+     public/annuaire, formule est_officielle, demanderAdhesion() dans assets/app.js) puisse
+     aussi apparaître sur la page d'un événement organisé par l'initiative. Champs additifs,
+     LEFT JOIN pour ne rien casser côté événements sans initiative propriétaire (ex. admin). */
+  const row = await db.prepare(`SELECT e.*, u.nom AS organisateur_nom,
+    i.id AS init_id, i.type AS init_type, i.adhesions_ouvertes AS init_adhesions_ouvertes
+    FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id
+    LEFT JOIN initiatives i ON i.owner_user_id=e.owner_user_id WHERE e.id=?`).get(params.id);
   if (!row) return sendJSON(res, 404, { error: "Événement introuvable." });
   // Brouillon (2026-09-23) : même protection que GET /api/evenements — un lien direct vers un
   // brouillon ne doit pas non plus le rendre accessible à qui n'est ni propriétaire ni admin.

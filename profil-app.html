@@ -750,6 +750,11 @@ html, body { overflow-x:clip; }
 .pvz-actions { display:flex; gap:9px; flex:none; padding-top:20px; flex-wrap:wrap; }
 .pvz-btn { font-size:13px; font-weight:600; padding:10px 18px; border-radius:10px; border:1px solid rgba(18,32,56,.16); background:#fff; color:#3B4658; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
 .pvz-btn.primary { background-color:var(--tp,#2F6BED); border-color:var(--tp,#2F6BED); color:#fff; }
+/* Violet (2026-09-28, demande explicite) — dédiée pour ne pas recolorer .primary, partagée avec
+   le bouton "S'abonner" : même couleur que ce bouton partout ailleurs (annuaire, initiative.html,
+   boutique, événements). Voir .ann-card-btn-adherer, .btn-adherer-violet, .vit-card-btn-adherer. */
+.pvz-btn.adherer { background-color:#7C3AED; border-color:#7C3AED; color:#fff; }
+.pvz-btn.adherer:hover { background-color:#6D28D9; border-color:#6D28D9; }
 .pvz-btn.following { background:#E4F3EC; border-color:#1F8A5B; color:#1F8A5B; }
 .pvz-btn.follow-main { font-size:14.5px; font-weight:800; padding:12px 24px; border-radius:11px; box-shadow:0 4px 14px rgba(0,0,0,.18); transition:transform .12s ease, box-shadow .12s ease; }
 .pvz-btn.follow-main:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.24); }
@@ -1110,6 +1115,7 @@ html, body { overflow-x:clip; }
 <script src="assets/galerie-lightbox.js"></script>
 <script src="assets/recherche-contacts.js"></script>
 <script src="assets/signalement.js"></script>
+<script src="/assets/don-banner.js"></script>
 <script>
 /* ===================================================
    PROFIL UTILISATEUR — logique complète
@@ -1886,6 +1892,13 @@ function render() {
   document.getElementById('wb-toolbar-slot').style.display = 'none';
   document.getElementById('pvz-visitor').style.display = '';
 
+  /* Don récurrent "vedette" du compte visité (2026-09-28, demande explicite : "doit apparaître
+     partout... sur le profil public") — un seul par organisateur (cagnottes.est_vedette),
+     n'affiche rien si absent (voir assets/don-banner.js). Mode floating (bouton fixe bas-droite,
+     indépendant de la structure de la page) plutôt qu'inline : posé avant la branche
+     utilisateur/organisme ci-dessous pour s'appliquer aux deux sans dépendre de leur DOM. */
+  if (window.DonBanner) DonBanner.render(profil.id, { mode: 'floating' });
+
   // Carte Diaspo'Actif : remplace le profil public pour le rôle utilisateur uniquement
   // (2026-07-27). Les autres rôles gardent la vue hi-fi existante ci-dessous.
   if (profil.role === 'utilisateur' && window.CarteDiaspoActif) {
@@ -1996,7 +2009,7 @@ function renderVisitorProfile() {
   const adhererBtn = (!isOwn && isInit && ['Association','ONG'].includes(profil.initiative_type))
     ? (_statutAdhesion === 'acceptee' ? `<button class="pvz-btn" disabled>✓ Membre</button>`
       : _statutAdhesion === 'en_attente' ? `<button class="pvz-btn" disabled>⏳ Demande envoyée</button>`
-      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn primary" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer à l'initiative</button>` : '')
+      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn adherer" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer à l'initiative</button>` : '')
     : '';
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;

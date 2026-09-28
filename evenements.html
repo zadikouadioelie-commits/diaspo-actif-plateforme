@@ -25,6 +25,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="assets/logo.png">
 <style>
+/* Bouton "Adhérer à l'initiative" (2026-09-28, demande explicite : violet, distinct du bouton
+   "Faire un don" orange à côté) — même couleur que .pvz-btn.adherer / .vit-card-btn-adherer /
+   .ann-card-btn-adherer / .btn-adherer-violet (initiative.html), un seul et même bouton public. */
+.btn-adherer-violet{background:#7C3AED;color:#fff;border-color:#7C3AED;}
+.btn-adherer-violet:hover{background:#6D28D9;border-color:#6D28D9;}
+
 /* IDENTITY BANNER */
 #evt-identity{background:linear-gradient(135deg,#ff6b00 0%,#ff9f43 100%);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
 .evt-pill{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:99px;padding:4px 12px;font-size:.74rem;font-weight:700;}
@@ -1438,6 +1444,26 @@ window.openDetail = async function(id) {
     if (evt.owner_user_id && window.DonBanner) {
       DonBanner.render(evt.owner_user_id, { mode: 'inline', container: document.getElementById('don-banner-evt-'+evt.id) });
     }
+    /* Bouton "Adhérer à l'initiative" (2026-09-28, demande explicite) — même mécanisme que
+       initiative.html / profil public / annuaire (formule est_officielle, demanderAdhesion()
+       dans assets/app.js) : ajouté ici pour capter l'adhésion depuis la page d'un événement
+       organisé par l'initiative. init_adhesions_ouvertes vient en brut de la colonne SQLite
+       (0/1/null), jamais un vrai booléen — donc on teste explicitement "fermées" (!= null &&
+       falsy) plutôt que "=== false", qui ne matcherait jamais un entier. */
+    const initFerme = evt.init_adhesions_ouvertes != null && !evt.init_adhesions_ouvertes;
+    const estProprio = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && Number(CURRENT_USER.id) === Number(evt.owner_user_id);
+    if (evt.init_id && ['Association','ONG'].includes(evt.init_type) && !initFerme && !estProprio) {
+      let statutAdh = null;
+      if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+        try { statutAdh = (await api('GET', `/initiatives/${evt.init_id}/demande-adhesion`)).statut; } catch (e) {}
+      }
+      const cont = document.getElementById('adherer-evt-'+evt.id);
+      if (cont) {
+        cont.innerHTML = statutAdh === 'acceptee' ? `<button class="btn btn-outline" disabled>✓ Membre</button>`
+          : statutAdh === 'en_attente' ? `<button class="btn btn-outline" disabled>⏳ Demande envoyée</button>`
+          : `<button class="btn btn-adherer-violet" onclick="demanderAdhesion(${evt.init_id}, this)">🤝 Adhérer à l'initiative</button>`;
+      }
+    }
   } catch(e) {
     document.getElementById('evt-detail-content').innerHTML = '<div style="padding:40px;text-align:center;color:red;">Erreur de chargement.</div>';
   }
@@ -1642,7 +1668,7 @@ function renderEventDetail(evt, isPreview) {
           ` : `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">${Number(c.montant_collecte).toLocaleString('fr-FR')} ${c.devise} collectés</div>`}
         </div>`).join('')}
     </div>` : ''}
-    ${!isPreview ? `<div id="don-banner-evt-${evt.id}" style="padding:0 20px 16px;"></div>` : ''}
+    ${!isPreview ? `<div id="evt-cta-row-${evt.id}" style="padding:0 20px 16px;display:flex;gap:10px;flex-wrap:wrap;"><span id="adherer-evt-${evt.id}"></span><span id="don-banner-evt-${evt.id}"></span></div>` : ''}
     ${thumbsHTML}
     ${videosHTML}
     ${pdfHTML}

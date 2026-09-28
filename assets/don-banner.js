@@ -57,5 +57,31 @@ window.DonBanner = (function () {
     }
   }
 
-  return { render };
+  /* renderLot(mapping) — pour une PAGE DE LISTE (ex. l'annuaire), jamais render() en boucle par
+     carte (2026-09-28, bug réel trouvé en testant l'annuaire : une recherche à 30-50 résultats
+     déclenchait autant de requêtes GET /api/cagnottes/vedette en parallèle, provoquant des 429
+     Too Many Requests). Une seule requête groupée (GET /api/cagnottes/vedette-lot) quel que soit
+     le nombre de cartouches affichées.
+     mapping : { ownerUserId: containerElementOuSelecteur, ... } — un container par carte, déjà
+     posé dans son DOM (mode toujours 'inline' ici, jamais 'floating' qui n'a de sens que pour
+     UNE seule carte). Ne fait rien pour les owner_user_id sans don vedette. */
+  async function renderLot(mapping) {
+    const ids = Object.keys(mapping).filter(Boolean);
+    if (!ids.length) return;
+    let dons = {};
+    try {
+      const r = await fetch(`/api/cagnottes/vedette-lot?owner_user_ids=${ids.join(',')}`);
+      dons = (await r.json()).dons || {};
+    } catch (e) { return; }
+    if (!Object.keys(dons).length) return;
+    injecterStyles();
+    for (const id of ids) {
+      const don = dons[id];
+      if (!don) continue;
+      const el = typeof mapping[id] === 'string' ? document.querySelector(mapping[id]) : mapping[id];
+      if (el) el.insertAdjacentHTML('beforeend', boutonHtml(don));
+    }
+  }
+
+  return { render, renderLot };
 })();

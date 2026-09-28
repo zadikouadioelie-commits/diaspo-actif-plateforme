@@ -2069,6 +2069,7 @@ function renderInitiativeCard(it){
       ${partenaireOfficielBadge}
       ${desc ? `<div class="ann-card-desc">${desc}</div>` : ''}
       ${accredBadges ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${accredBadges}</div>` : ''}
+      ${it.owner_user_id ? `<div id="ann-donban-${it.id}" onclick="event.stopPropagation()"></div>` : ''}
       <div class="ann-card-foot" onclick="event.stopPropagation()">
         <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
         <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
@@ -2503,6 +2504,16 @@ async function initAnnuaire(){
       </div>`;
     renderChips();
     if (typeof initBoutonsRelation === 'function') initBoutonsRelation(list);
+    /* Don récurrent "vedette" affiché sur chaque cartouche d'initiative (2026-09-28, demande
+       explicite : "doit apparaître partout... également dans l'annuaire... sur la cartouche de
+       l'annuaire") — un seul par organisateur (cagnottes.est_vedette), n'affiche rien si absent
+       (voir assets/don-banner.js). renderLot() en UNE requête groupée pour toute la page — un
+       render() par carte en boucle a réellement saturé le rate-limit (429) dès 30-50 résultats. */
+    if (window.DonBanner) {
+      const mapping = {};
+      (r.initiatives || []).forEach(it => { if (it.owner_user_id) mapping[it.owner_user_id] = document.getElementById('ann-donban-' + it.id); });
+      DonBanner.renderLot(mapping);
+    }
   }
 
   /* ── Appliquer les filtres ── */
@@ -2784,7 +2795,7 @@ function renderVitrineCard(v) {
       ${noteHtml}
       <div class="vit-card-foot">
         <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la boutique</a>
-        ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer à l'initiative</button>` : ''}
+        ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn vit-card-btn-adherer" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer à l'initiative</button>` : ''}
       </div>
     </div>
   </div>`;

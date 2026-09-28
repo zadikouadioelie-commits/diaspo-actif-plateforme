@@ -89,9 +89,11 @@
 .ann-card-btn-vitrine{background:#FEF3C7;color:#92400e;}
 .ann-card-btn-vitrine:hover{background:#FDE7A8;}
 /* Adhérer : seule conversion réelle de la carte (adhésion payante/engagement) — la seule
-   action en couleur pleine, étalée sur toute la largeur pour rester la plus visible. */
-.ann-card-btn-adherer{background:#2563EB;color:#fff;grid-column:1 / -1;}
-.ann-card-btn-adherer:hover{background:#1d4ed8;}
+   action en couleur pleine, étalée sur toute la largeur pour rester la plus visible. Violet
+   (2026-09-28, demande explicite) — même couleur que ce bouton partout ailleurs (profil public,
+   boutique, événements, initiative.html) : voir .btn-adherer-violet. */
+.ann-card-btn-adherer{background:#7C3AED;color:#fff;grid-column:1 / -1;}
+.ann-card-btn-adherer:hover{background:#6D28D9;}
 .ann-card-btn-affilier{background:#16A34A;color:#fff;}
 .ann-card-btn-affilier:hover{background:#15803D;}
 .ann-card-btn[disabled]{cursor:default;}
