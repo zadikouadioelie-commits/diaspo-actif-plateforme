@@ -558,6 +558,95 @@ function iaOuvrirLiensUtiles(champId) {
     } catch (e) { ia_toast(e.message, false); }
   });
 }
+/* Sponsors / Partenaires (2026-09-28, demande explicite) — liste de logos + noms au niveau de LA
+   FICHE (pas d'un type d'inscription précis, contrairement à "Option payante"/"Sondage"/"Liens
+   utiles" ci-dessus) : affichée une seule fois, publiquement, sur la page d'inscription. Stockée
+   dans insc_fiches.sponsors_json / partenaires_json (tableau JSON [{nom, logo_url}]) — jamais de
+   table ni de colonne dédiée par entrée, même principe que options_json. PUT /api/insc/fiches/:id
+   accepte déjà `sponsors`/`partenaires`. Contrairement aux options payantes, la liste peut être
+   vidée entièrement (0 sponsor est un état final valide), donc pas de garde-fou "1 ligne minimum"
+   sur la suppression. */
+function ispRenderRow(item) {
+  return `
+    <div class="isp-row" style="display:flex; align-items:center; gap:10px; border:1px solid oklch(0.9 0.004 30); border-radius:10px; padding:10px 12px;">
+      <label style="width:46px; height:46px; border-radius:8px; background:${item.logo_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(item.logo_url)}')` : 'oklch(0.96 0.004 30)'}; border:1.5px dashed oklch(0.8 0.006 30); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; overflow:hidden;" title="Logo (facultatif)">
+        ${item.logo_url ? '' : '<span style="font-size:16px; opacity:.5;">🖼️</span>'}
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-role="logo" style="display:none;">
+      </label>
+      <input type="text" data-role="nom" placeholder="Nom" value="${escH(item.nom || '')}" style="flex:1; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;">
+      <button type="button" data-role="supprimer" style="background:none; border:none; color:oklch(0.6 0.006 30); font-size:15px; cursor:pointer; padding:2px 6px; flex-shrink:0;">✕</button>
+    </div>`;
+}
+function iaOuvrirSponsorsPartenaires(kind) {
+  const fiche = selectedFiche();
+  if (!fiche) return;
+  const isSponsors = kind === 'sponsors';
+  const titre = isSponsors ? '🏢 Sponsors' : '🤝 Partenaires';
+  let items = [];
+  try { items = JSON.parse((isSponsors ? fiche.sponsors_json : fiche.partenaires_json) || '[]'); } catch (e) {}
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; gap:10px;">
+        <h3 style="margin:0; font-size:17px;">${titre}</h3>
+        <button type="button" id="isp-fermer" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
+      </div>
+      <p style="font-size:12.5px; color:oklch(0.55 0.006 30); margin:0 0 16px;">Affiché publiquement sur la page d'inscription de cette fiche.</p>
+      <div id="isp-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <button type="button" id="isp-ajouter" style="width:100%; margin-top:10px; background:none; border:1.5px dashed oklch(0.8 0.006 30); color:oklch(0.5 0.006 30); font-size:13px; font-weight:600; padding:11px; border-radius:10px; cursor:pointer;">+ Ajouter ${isSponsors ? 'un sponsor' : 'un partenaire'}</button>
+      <button type="button" id="isp-enregistrer" style="width:100%; margin-top:18px; background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13.5px; font-weight:700; padding:12px; border-radius:10px; cursor:pointer;">Enregistrer</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const list = overlay.querySelector('#isp-list');
+  const ajouterRow = (item) => {
+    const div = document.createElement('div');
+    div.innerHTML = ispRenderRow(item || { nom: '', logo_url: null });
+    const row = div.firstElementChild;
+    if (item?.logo_url) row.dataset.logoUrl = item.logo_url;
+    list.appendChild(row);
+  };
+  if (items.length) items.forEach(ajouterRow); else ajouterRow();
+
+  list.addEventListener('change', async (e) => {
+    if (e.target.dataset.role !== 'logo') return;
+    const file = e.target.files[0]; if (!file) return;
+    const row = e.target.closest('.isp-row');
+    const label = e.target.closest('label');
+    try {
+      const compressed = await compressImageFile(file, 400, 400, 0.85);
+      const url = await uploadMedia(compressed, 'logo');
+      label.style.background = `oklch(0.9 0.004 30) center/cover no-repeat url('${url}')`;
+      const span = label.querySelector('span'); if (span) span.remove();
+      row.dataset.logoUrl = url;
+    } catch (err) { ia_toast(err.message || 'Erreur upload logo.', false); }
+  });
+
+  list.addEventListener('click', (e) => {
+    if (e.target.dataset.role !== 'supprimer') return;
+    e.target.closest('.isp-row').remove();
+  });
+
+  overlay.querySelector('#isp-ajouter').addEventListener('click', () => ajouterRow());
+  overlay.querySelector('#isp-fermer').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#isp-enregistrer').addEventListener('click', async () => {
+    const rows = Array.from(list.querySelectorAll('.isp-row'));
+    const payload = rows.map(row => ({
+      nom: row.querySelector('[data-role="nom"]').value.trim(),
+      logo_url: row.dataset.logoUrl || null,
+    })).filter(o => o.nom);
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { [kind]: payload });
+      ia_toast(`${titre} mis à jour.`, true);
+      overlay.remove();
+      await iaChargerFiche(state.selectedFicheId);
+      render();
+    } catch (e) { ia_toast(e.message, false); }
+  });
+}
 /* "📊 Sondage" (2026-09-25, demande explicite) — un bloc qui regroupe plusieurs questions,
    chacune avec son propre mode de réponse (Oui/Non, texte libre, ou une liste de réponses
    programmées par l'organisateur, affichée en menu déroulant) et sa propre image facultative.
@@ -1173,6 +1262,10 @@ function renderInfosGenerales(fiche) {
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Ouverture des inscriptions</label><input id="ia-infos-ouverture" type="datetime-local" value="${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
           <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:5px;">Fermeture des inscriptions</label><input id="ia-infos-fermeture" type="datetime-local" value="${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,16) : '')}" style="width:100%; height:38px; border:1px solid oklch(0.85 0.004 30); border-radius:8px; padding:0 10px; font-size:13px; box-sizing:border-box;"></div>
         </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <button type="button" style="background:#F1F5F9; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:10px; border-radius:8px; cursor:pointer;" data-action="ouvrirSponsors">🏢 Sponsors (${(() => { try { return JSON.parse(fiche.sponsors_json || '[]').length; } catch(e) { return 0; } })()})</button>
+          <button type="button" style="background:#F1F5F9; border:1px solid oklch(0.85 0.004 30); color:oklch(0.2 0.006 30); font-size:12.5px; font-weight:600; padding:10px; border-radius:8px; cursor:pointer;" data-action="ouvrirPartenaires">🤝 Partenaires (${(() => { try { return JSON.parse(fiche.partenaires_json || '[]').length; } catch(e) { return 0; } })()})</button>
+        </div>
         <button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; margin-top:4px;" data-action="enregistrerInfos">Enregistrer</button>
       </div>
     </div>`;
@@ -1317,7 +1410,7 @@ function renderTypes() {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:8px;">
           <h3 style="margin:0; font-size:16px; font-weight:700;">${escH(selected.name)}</h3>
           <div style="display:flex; gap:8px;">
-            <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="goToFields">✏️ Modifier</button>
+            <button style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="editNomType" data-id="${selected.id}" title="Renommer ce type d'inscription">✏️ Modifier</button>
             <a href="/api/insc/types/${selected.id}/apercu-billet" target="_blank" rel="noopener" style="background:#fff; border:1px solid oklch(0.8 0.006 30); color:oklch(0.2 0.006 30); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer; text-decoration:none;">🎫 Aperçu du billet</a>
             <button style="background:none; border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:600; padding:6px 12px; border-radius:6px; cursor:pointer;" data-action="goToFields">Personnaliser les éléments d'inscription →</button>
           </div>
@@ -1618,6 +1711,26 @@ function renderPublic() {
         <h2 style="margin:0 0 6px; font-size:20px; font-weight:700;">${escH(fiche.nom)}</h2>
         ${fiche.description ? `<div class="rich-content" style="font-size:14px; line-height:1.6; color:oklch(0.3 0.006 30); margin:0 0 18px;">${renderRichText(fiche.description)}</div>` : ''}
         ${body}
+        ${iaRenderLogosApercu('Nos sponsors', fiche.sponsors_json)}
+        ${iaRenderLogosApercu('Nos partenaires', fiche.partenaires_json)}
+      </div>
+    </div>`;
+}
+/* Même contenu que ipRenderLogos() (inscription-publique.html) — pas de scope JS partagé entre
+   les deux pages, dupliqué volontairement plutôt qu'extrait dans un fichier commun pour un rendu
+   aussi simple (2026-09-28, demande explicite : l'aperçu admin doit refléter la vraie page). */
+function iaRenderLogosApercu(titre, jsonStr) {
+  let items = []; try { items = JSON.parse(jsonStr || '[]'); } catch (e) {}
+  if (!items.length) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:oklch(0.55 0.006 30); margin-bottom:8px;">${escH(titre)}</div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px;">
+        ${items.map(it => `
+          <div style="display:flex; flex-direction:column; align-items:center; gap:4px; width:70px;">
+            ${it.logo_url ? `<img src="${escH(it.logo_url)}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;border:1px solid oklch(0.9 0.004 30);">` : ''}
+            <span style="font-size:10px;color:oklch(0.45 0.006 30);text-align:center;line-height:1.25;">${escH(it.nom || '')}</span>
+          </div>`).join('')}
       </div>
     </div>`;
 }
@@ -2203,6 +2316,21 @@ const actions = {
       await iaChargerFiche(state.selectedFicheId);
     } catch (e) { ia_toast(e.message, false); }
   },
+  /* Renommer un type d'inscription (2026-09-28, demande explicite, capture à l'appui) — le
+     bouton "✏️ Modifier" en haut du panneau de détail pointait par erreur vers "goToFields"
+     (Personnaliser les éléments d'inscription, bouton juste à côté qui fait déjà ça), donc
+     aucun moyen de changer le nom lui-même (ex. "bénévole" → autre chose) sans passer par la
+     création. Même patron que editTarif/editPlaces/editPeriode ci-dessous. */
+  async editNomType(el) {
+    const id = parseInt(el.dataset.id);
+    const type = currentTypes().find(t => t.id === id); if (!type) return;
+    const saisie = prompt("Nom du type d'inscription :", type.label || '');
+    if (saisie === null) return;
+    const label = saisie.trim();
+    if (!label) { ia_toast('Le nom ne peut pas être vide.', false); return; }
+    try { await api('PUT', '/insc/types/' + id, { label }); await iaChargerFiche(state.selectedFicheId); }
+    catch (e) { ia_toast(e.message, false); }
+  },
   async editTarif(el) {
     const id = parseInt(el.dataset.id);
     const type = currentTypes().find(t => t.id === id); if (!type) return;
@@ -2278,6 +2406,8 @@ const actions = {
   },
   ouvrirOptionsPayantes() { iaOuvrirOptionsPayantes(); },
   modifierOptionsPayantes(el) { iaOuvrirOptionsPayantes(parseInt(el.dataset.id)); },
+  ouvrirSponsors() { iaOuvrirSponsorsPartenaires('sponsors'); },
+  ouvrirPartenaires() { iaOuvrirSponsorsPartenaires('partenaires'); },
   ouvrirSondage() { iaOuvrirSondage(); },
   ouvrirLiensUtiles() { iaOuvrirLiensUtiles(); },
   modifierLiensUtiles(el) { iaOuvrirLiensUtiles(parseInt(el.dataset.id)); },
