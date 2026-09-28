@@ -43301,6 +43301,11 @@ route("DELETE", "/api/insc/fiches/:id", async (req, res, params) => {
   await db.prepare("DELETE FROM insc_candidature_declarations_visiteurs WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
   await db.prepare("DELETE FROM insc_candidature_documents WHERE config_id IN (SELECT id FROM insc_candidature_config WHERE fiche_id=?)").run(fiche.id);
   await db.prepare("DELETE FROM insc_candidature_config WHERE fiche_id=?").run(fiche.id);
+  // Même famille de bug que la candidature ci-dessus (2026-09-28, reproduit en vérifiant le
+  // correctif du lien de contrôle QR) : insc_liens_controle référence aussi fiche_id en clé
+  // étrangère et n'était pas nettoyée ici — DELETE FROM insc_fiches échouait (500) dès qu'un
+  // lien de contrôle avait été créé, quel que soit son état actif/inactif.
+  await db.prepare("DELETE FROM insc_liens_controle WHERE fiche_id=?").run(fiche.id);
   await db.prepare("DELETE FROM insc_fiches WHERE id=?").run(fiche.id);
   sendJSON(res, 200, { ok: true });
 });
@@ -44147,7 +44152,14 @@ route("POST", "/api/insc/fiches/:id/liens-controle", async (req, res, params, bo
   const evenementId = body?.evenement_id || null;
   const evenement = evenementId ? await db.prepare("SELECT * FROM evenements WHERE id=?").get(evenementId) : null;
   const duree = body?.duree || "24h";
-  await db.prepare("UPDATE insc_liens_controle SET actif=0 WHERE fiche_id=? AND (evenement_id=? OR (evenement_id IS NULL AND ? IS NULL)) AND actif=1").run(fiche.id, evenementId, evenementId);
+  /* Bug réel en production (2026-09-28) : "Erreur serveur." au clic sur "Créer le lien de
+     contrôle" — jamais reproduit en local (SQLite). Cause : PostgreSQL 42P18 "could not
+     determine data type of parameter" sur l'ancienne forme `(evenement_id=? OR (evenement_id
+     IS NULL AND ? IS NULL))` — le 3e paramètre n'apparaissait que dans un `? IS NULL` isolé,
+     sans colonne typée pour permettre l'inférence, ce que PostgreSQL refuse (SQLite ne fait pas
+     cette vérification). `IS NOT DISTINCT FROM` est l'équivalent NULL-safe standard et n'a pas
+     ce problème : le type se déduit directement de la comparaison à la colonne. */
+  await db.prepare("UPDATE insc_liens_controle SET actif=0 WHERE fiche_id=? AND evenement_id IS NOT DISTINCT FROM ? AND actif=1").run(fiche.id, evenementId);
   const token = "CTRL-" + crypto.randomBytes(6).toString("hex").toUpperCase();
   const valideJusqua = inscCalculerValideJusqua(duree, evenement, fiche);
   const id = (await db.prepare(`
