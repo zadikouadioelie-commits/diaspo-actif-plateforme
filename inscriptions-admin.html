@@ -1114,6 +1114,11 @@ function renderListView() {
               <button data-action="selectFiche" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">✏️ Modifier</button>
               ${f.nb_evenements ? `<button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:oklch(0.95 0.03 258);border:1px solid oklch(0.85 0.05 258);color:oklch(0.32 0.09 258);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">📅 ${f.nb_evenements} événement${f.nb_evenements > 1 ? 's' : ''} lié${f.nb_evenements > 1 ? 's' : ''}</button>` : ''}
               <button data-action="ouvrirLiaisonEvenement" data-id="${f.id}" style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔗 Lier à un événement</button>
+              ${(f.statut === 'brouillon' || f.statut === 'fermee')
+                ? `<button data-action="ouvrirFicheListe" data-id="${f.id}" style="background:oklch(0.94 0.05 150);border:1px solid oklch(0.4 0.13 150);color:oklch(0.4 0.13 150);font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔓 Ouvrir la fiche</button>`
+                : f.statut === 'publiee'
+                ? `<button data-action="fermerFicheListe" data-id="${f.id}" style="background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;cursor:pointer;white-space:nowrap;">🔒 Fermer la fiche</button>`
+                : ''}
             </div>
           </div>
         </div>
@@ -1170,9 +1175,6 @@ function renderDetailView() {
     : `<span style="background:oklch(0.94 0.04 258); border:1px solid oklch(0.32 0.09 258); color:oklch(0.32 0.09 258); font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px;">📋 Gestion</span>`;
   const progressBar = enCreation ? `<div style="height:4px; width:100%; max-width:280px; background:oklch(0.9 0.05 150); border-radius:2px; margin-top:10px; overflow:hidden;"><div style="height:100%; background:oklch(0.4 0.13 150); border-radius:2px; width:${((etapeIdx > -1 ? etapeIdx : 0) + 1) / IA_CREATION_STEPS.length * 100}%; transition:width .25s;"></div></div>` : '';
 
-  const publierBtn = (status === 'brouillon' || status === 'fermee') ? `<button style="background:oklch(0.32 0.09 258); border:none; color:#fff; font-size:13px; font-weight:600; padding:9px 18px; border-radius:8px; cursor:pointer;" data-action="publierFiche">Publier la fiche</button>` :
-    status === 'publiee' ? `<button style="background:#fff; border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="fermerFiche">Fermer les inscriptions</button>` : '';
-
   const header = `
     <header style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:16px 28px;">
       <button data-action="backToList" style="background:none; border:none; color:oklch(0.32 0.09 258); font-size:13px; font-weight:600; cursor:pointer; padding:0; margin-bottom:8px; display:inline-flex; align-items:center; gap:4px;">← Retour</button>
@@ -1191,7 +1193,6 @@ function renderDetailView() {
           <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="backToList">📋 Visualiser mes fiches</button>
           <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="window.GuidedTour&&GuidedTour.start('inscriptions-admin')">🎥 Tutoriel</button>
           <button style="background:oklch(0.96 0.004 30); border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="goToPublic">Prévisualiser</button>
-          ${publierBtn}
           <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="dupliquerFiche">📑 Dupliquer</button>
         </div>
       </div>
@@ -2631,6 +2632,24 @@ const actions = {
     state.modalLiaisonOuvert = true;
   },
   fermerModalLiaison() { state.modalLiaisonOuvert = false; },
+  /* Ouvrir/fermer la fiche directement depuis la carte de liste (2026-09-28, demande explicite :
+     "évite de rentrer encore une fois dans la fiche... tout simplement à cet endroit") — seul
+     point d'entrée désormais pour cette bascule, le bouton équivalent de l'en-tête de détail
+     (data-action="publierFiche"/"fermerFiche") a été retiré pour ne garder qu'un seul chemin. */
+  async ouvrirFicheListe(el) {
+    try {
+      await api('PATCH', `/insc/fiches/${el.dataset.id}/statut`, { statut: 'publiee' });
+      ia_toast('Fiche ouverte.', true);
+      await iaChargerListe();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async fermerFicheListe(el) {
+    try {
+      await api('PATCH', `/insc/fiches/${el.dataset.id}/statut`, { statut: 'fermee' });
+      ia_toast('Fiche fermée.', true);
+      await iaChargerListe();
+    } catch (e) { ia_toast(e.message, false); }
+  },
   // Une cartouche = un bouton = une action immédiate (lier/délier), pas de case à cocher suivie
   // d'un "Enregistrer" séparé — cohérent avec les autres bascules immédiates de cette page
   // (toggleModeleStandard, geler-fonds...). PUT /insc/fiches/:id attend la liste COMPLÈTE des
@@ -2713,14 +2732,6 @@ const actions = {
     state.activeTab = 'validation';
   },
   selectType(el) { state.selectedTypeId = parseInt(el.dataset.id); },
-  async publierFiche() {
-    try { await api('PATCH', `/insc/fiches/${state.selectedFicheId}/statut`, { statut: 'publiee' }); ia_toast('Fiche publiée.', true); await iaChargerFiche(state.selectedFicheId); }
-    catch (e) { ia_toast(e.message, false); }
-  },
-  async fermerFiche() {
-    try { await api('PATCH', `/insc/fiches/${state.selectedFicheId}/statut`, { statut: 'fermee' }); ia_toast('Inscriptions fermées.', true); await iaChargerFiche(state.selectedFicheId); }
-    catch (e) { ia_toast(e.message, false); }
-  },
   async dupliquerFiche() {
     try { const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/dupliquer`, {}); ia_toast('Fiche dupliquée.', true); state.selectedFicheId = r.fiche_id; await iaChargerFiche(r.fiche_id); }
     catch (e) { ia_toast(e.message, false); }
