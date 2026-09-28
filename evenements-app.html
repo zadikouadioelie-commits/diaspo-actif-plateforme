@@ -517,14 +517,6 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/profile-qr.js"></script>
-<!-- html2canvas (2026-09-28, demande explicite : "partage la cartouche entière... capture d'écran
-     de la cartouche de l'événement") — capture la cartouche telle qu'affichée à l'écran (photo
-     réelle, texte, emoji) pour la partager comme une vraie image plutôt que de dépendre d'un
-     aperçu de lien généré à distance (fragile, mis en cache par WhatsApp — voir
-     partagerEvenement() plus bas). Même bibliothèque déjà chargée ailleurs sur la plateforme
-     (cv-builder.js, business-plan-view.html, lettre-builder.html, via html2pdf.js qui l'embarque) ;
-     chargée ici en autonome (sans jsPDF, inutile pour un simple export image). -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 const DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Economique:'📈',Politique:'🏛️',Panafricanisme:'✊',Autre:'📅'};
 // Libellés affichés pour "Forme de l'événement" (2026-09-23, ajout de "Trophée diaspora") — la
@@ -1316,68 +1308,23 @@ window.partagerEvenement = async function(id) {
   const titre = evt ? evt.titre : 'Événement Diaspo\'Actif';
   const via = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.id) ? '&via=' + CURRENT_USER.id : '';
   const url = location.origin + location.pathname + '?evt=' + id + via;
-  /* Capture d'écran de la cartouche, PUIS le lien dans un second partage séparé (2026-09-28,
-     demande explicite : "tu partages la cartouche de l'événement entièrement... et tu mets en
-     dessous le lien... rends-le cliquable"). D'abord essayé en un seul partage {files, text} :
-     constaté en conditions réelles (capture à l'appui, WhatsApp Desktop) que le texte
-     accompagnant un fichier partagé est purement et simplement ignoré — seule l'image arrivait,
-     aucun lien, cliquable ou non. Un second appel navigator.share() séparé, SANS fichier, cette
-     fois-ci fonctionne de façon fiable : c'est exactement le partage lien seul déjà validé plus
-     haut dans cette conversation (WhatsApp le déplie et l'affiche comme un vrai lien cliquable).
-     Deux partages successifs plutôt qu'un seul : la seule façon garantie de faire arriver les
-     deux, quelle que soit la cible choisie. */
-  const nomPartageur = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER)
-    ? ([CURRENT_USER.prenom, CURRENT_USER.nom].filter(Boolean).join(' ') || CURRENT_USER.nom || null)
-    : null;
-  const texte = nomPartageur ? `${nomPartageur} vous transfère l'invitation à l'événement ${titre}` : `Invitation à l'événement ${titre}`;
-  const image = await genererImageCartouche(id).catch(() => null);
-  if (image && navigator.canShare && navigator.canShare({ files: [image] })) {
-    try {
-      await navigator.share({ files: [image] });
-      if (navigator.share) { try { await navigator.share({ title: titre, text: texte, url }); } catch (e) { /* lien facultatif si annulé ici */ } }
-      return;
-    } catch (e) { if (e && e.name === 'AbortError') return; }
-  }
   if (navigator.share) {
-    /* Repli sans image (2026-09-28) : navigateur/OS sans partage de fichiers, ou capture
-       impossible (html2canvas non chargé, image de couverture bloquée par CORS...). PAS de
-       `text` ici (2026-09-28, essayé puis retiré, capture à l'appui) — un `text` non vide fait
-       que WhatsApp (et d'autres cibles) composent le message avec ce texte collé AVANT le lien,
-       au lieu de traiter le partage comme un lien seul à déplier ; aucune carte d'aperçu ne se
-       générait alors. Sans `text`, WhatsApp déplie lui-même l'URL (voir l'injection de méta dans
-       server/index.js, pathname === '/evenements.html'). */
+    /* PAS de `text` (2026-09-28, essayé deux fois, retiré deux fois, capture à l'appui à chaque
+       fois) — un `text` non vide fait que WhatsApp compose le message avec ce texte collé AVANT
+       le lien au lieu de traiter le partage comme un lien seul à déplier ; aucune carte d'aperçu
+       ne se générait alors. Essayé aussi en partageant une capture d'écran de la cartouche en
+       pièce jointe (files) + `text` en légende : WhatsApp Desktop ignore purement et simplement
+       tout texte accompagnant un fichier — et scinder l'envoi en deux partages successifs
+       (image, puis lien) a été explicitement refusé ("je veux que tout soit ensemble en un seul
+       bloc"). Sans aucun `text`, WhatsApp déplie lui-même l'URL et construit UN SEUL bloc
+       indivisible et cliquable (photo + titre + descriptif), confirmé fonctionner en conditions
+       réelles avec un lien jamais vu auparavant (voir l'injection de méta dans server/index.js,
+       pathname === '/evenements.html' && parsed.query.evt). */
     try { await navigator.share({ title: titre, url }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   ouvrirModalePartage(url, titre);
 };
-
-/* Clone la cartouche (sans les boutons d'action ni les icônes de gestion propriétaire — Modifier/
-   Gérer/Supprimer n'ont pas leur place dans une image partagée à des tiers), la place hors-écran
-   pour ne jamais perturber l'affichage réel, puis la capture avec html2canvas. Renvoie null (jamais
-   d'exception) si la cartouche n'existe pas dans le DOM courant (partage depuis la vue détail,
-   pas la liste) ou si la bibliothèque n'a pas pu se charger — l'appelant se replie alors sur le
-   partage lien seul. */
-async function genererImageCartouche(id) {
-  if (typeof html2canvas === 'undefined') return null;
-  const carte = document.querySelector('.evt-card[data-evt-id="' + id + '"]');
-  if (!carte) return null;
-  const clone = carte.cloneNode(true);
-  clone.querySelectorAll('.evt-actions, .evt-delete-float, .evt-whatsapp-float').forEach(el => el.remove());
-  clone.style.position = 'fixed';
-  clone.style.left = '-9999px';
-  clone.style.top = '0';
-  clone.style.width = carte.offsetWidth + 'px';
-  document.body.appendChild(clone);
-  try {
-    const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    return await new Promise(resolve => canvas.toBlob(blob => {
-      resolve(blob ? new File([blob], 'evenement-' + id + '.jpg', { type: 'image/jpeg' }) : null);
-    }, 'image/jpeg', 0.92));
-  } finally {
-    clone.remove();
-  }
-}
 
 function ouvrirModalePartage(url, titre) {
   const bg = document.createElement('div');
