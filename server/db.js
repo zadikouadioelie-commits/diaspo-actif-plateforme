@@ -735,6 +735,23 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_insc_cand_decl_config ON insc_candidature_declarations(config_id);
+  /* Dépôt de document candidat (2026-09-28, demande explicite : "créer un onglet Déposer un
+     document qui permet de déposer le même document que celui qui a été téléchargé") — le
+     candidat peut désormais renvoyer directement sur la plateforme la version remplie d'un
+     document listé dans insc_candidature_documents, en plus (ou à la place) de l'envoi par
+     e-mail. UNIQUE(document_id, user_id) : un seul dépôt par candidat et par document — un
+     nouveau dépôt REMPLACE le précédent (upsert), jamais d'historique à gérer ici. */
+  CREATE TABLE IF NOT EXISTS insc_candidature_uploads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    depose_le TEXT DEFAULT (datetime('now')),
+    UNIQUE(document_id, user_id),
+    FOREIGN KEY(document_id) REFERENCES insc_candidature_documents(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_insc_cand_uploads_user ON insc_candidature_uploads(user_id);
 
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

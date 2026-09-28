@@ -42652,6 +42652,20 @@ route("GET", "/api/insc/fiches/:id/candidature/declarations", async (req, res, p
   const config = await db.prepare("SELECT id FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
   if (!config) return sendJSON(res, 200, { declarations: [], total: 0 });
   const declarations = await db.prepare("SELECT * FROM insc_candidature_declarations WHERE config_id=? ORDER BY declare_le DESC").all(config.id);
+  /* Documents déposés par les candidats (2026-09-28, demande explicite) — regroupés par
+     user_id pour que l'organisateur voie, dans le traitement de chaque candidature, ce qui a
+     été déposé en plus (ou à la place) de l'e-mail, sans requête supplémentaire par carte. */
+  if (declarations.length) {
+    const depots = await db.prepare(`
+      SELECT u.user_id, u.url, u.depose_le, d.id AS document_id, d.titre
+      FROM insc_candidature_uploads u
+      JOIN insc_candidature_documents d ON d.id = u.document_id
+      WHERE d.config_id=?
+    `).all(config.id);
+    const parUser = {};
+    for (const dep of depots) (parUser[dep.user_id] = parUser[dep.user_id] || []).push(dep);
+    for (const decl of declarations) decl.documents_deposes = parUser[decl.user_id] || [];
+  }
   sendJSON(res, 200, { declarations, total: declarations.length });
 });
 
@@ -42697,6 +42711,36 @@ route("POST", "/api/insc/public/:slug/candidature/declarer", async (req, res, pa
     await db.prepare("INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email) VALUES (?,?,?,?,?)")
       .run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null);
   } catch (e) { /* contrainte UNIQUE(config_id,user_id) déjà déclenchée = déjà déclaré, pas une erreur */ }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/insc/public/:slug/candidature/documents/:documentId/deposer — le candidat dépose la
+   version remplie d'un document de candidature (2026-09-28, demande explicite : "créer un onglet
+   Déposer un document qui permet de déposer le même document que celui qui a été téléchargé"),
+   en complément de l'envoi par e-mail existant. Le fichier lui-même est déjà passé par
+   POST /api/upload/document (Bunny CDN, magic-bytes) — cette route enregistre seulement l'URL
+   obtenue, voir insc_candidature_uploads dans server/db.js. Un nouveau dépôt REMPLACE le
+   précédent (upsert) : pas de compte requis au-delà de l'authentification déjà nécessaire. */
+route("POST", "/api/insc/public/:slug/candidature/documents/:documentId/deposer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connectez-vous pour déposer un document." });
+  const url = (body?.url || "").trim();
+  if (!url) return sendJSON(res, 400, { error: "Aucun document reçu." });
+  const ip = SEC.clientIp(req);
+  const ipLimit = SEC.rateLimit(`insc-candidature-deposer:ip:${ip}`, 20, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
+  const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=? AND statut='publiee'").get(params.slug);
+  if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
+  const doc = await db.prepare(`
+    SELECT d.* FROM insc_candidature_documents d
+    JOIN insc_candidature_config c ON c.id = d.config_id
+    WHERE d.id=? AND c.fiche_id=? AND c.actif=1
+  `).get(params.documentId, fiche.id);
+  if (!doc) return sendJSON(res, 404, { error: "Document introuvable." });
+  await db.prepare(`
+    INSERT INTO insc_candidature_uploads (document_id, user_id, url) VALUES (?,?,?)
+    ON CONFLICT(document_id, user_id) DO UPDATE SET url=excluded.url, depose_le=datetime('now')
+  `).run(doc.id, user.id, url);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -43192,6 +43236,18 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       const dejaDeclare = visiteur
         ? !!(await db.prepare("SELECT 1 FROM insc_candidature_declarations WHERE config_id=? AND user_id=?").get(config.id, visiteur.id))
         : false;
+      /* Dépôt de document (2026-09-28, demande explicite) — indique, pour le visiteur connecté,
+         ce qu'il a déjà déposé sur chaque document afin que la page publique affiche "✅ Déposé"
+         plutôt que de reproposer un dépôt à chaque visite. */
+      if (visiteur && documents.length) {
+        const mesDepots = await db.prepare(`
+          SELECT u.document_id, u.url, u.depose_le FROM insc_candidature_uploads u
+          JOIN insc_candidature_documents d ON d.id = u.document_id
+          WHERE u.user_id=? AND d.config_id=?
+        `).all(visiteur.id, config.id);
+        const parDoc = {}; for (const dep of mesDepots) parDoc[dep.document_id] = dep;
+        for (const doc of documents) doc.mon_depot = parDoc[doc.id] || null;
+      }
       candidature = { config, documents, deja_declare: dejaDeclare };
     }
   } catch (e) { console.error('[insc-public-candidature]', e.message); }
