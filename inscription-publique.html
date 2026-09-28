@@ -57,6 +57,8 @@
 .ip-cal-day.empty{visibility:hidden;}
 .ip-cal-day.has-event{background:oklch(0.94 0.05 258);color:oklch(0.32 0.09 258);font-weight:700;cursor:pointer;border:none;font-family:inherit;}
 .ip-cal-day.has-event:hover{background:oklch(0.88 0.07 258);}
+.ip-cal-day.has-event.passe{background:oklch(0.93 0.004 30);color:oklch(0.6 0.006 30);}
+.ip-cal-day.has-event.passe:hover{background:oklch(0.9 0.004 30);}
 .ip-cal-day.today{box-shadow:inset 0 0 0 1.5px oklch(0.32 0.09 258 / .55);}
 .ip-autres-list{display:flex;flex-direction:column;gap:10px;}
 .ip-autre-card{display:flex;gap:10px;text-decoration:none;color:inherit;border:1px solid oklch(0.92 0.004 30);border-radius:10px;padding:8px;transition:border-color .15s;scroll-margin-top:20px;}
@@ -64,6 +66,14 @@
 .ip-autre-img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;background:oklch(0.94 0.01 258);}
 .ip-autre-titre{font-size:12.5px;font-weight:700;line-height:1.3;margin:0 0 3px;}
 .ip-autre-meta{font-size:11px;color:oklch(0.55 0.006 30);}
+/* Événements déjà passés (2026-09-28, demande explicite : "mets-les en gris... comme si ils
+   étaient plus accessibles... pour éviter de saturer d'informations inutiles") — grisés et non
+   cliquables plutôt que masqués : ça donne une image d'activité réelle de l'initiative sans
+   laisser croire qu'on peut encore s'y inscrire. */
+.ip-autre-card.passe{cursor:default;opacity:.55;}
+.ip-autre-card.passe:hover{border-color:oklch(0.92 0.004 30);}
+.ip-autre-card.passe .ip-autre-img{filter:grayscale(1);}
+.ip-autre-badge-terminee{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:oklch(0.5 0.006 30);background:oklch(0.93 0.004 30);border-radius:4px;padding:1px 6px;margin-left:6px;}
 .ip-cand-box{background:#fff;border:1.5px solid #BC13FE;border-radius:14px;padding:18px;margin-bottom:20px;box-shadow:0 0 10px rgba(188,19,254,.15);}
 /* Bouton "Créer un compte via ce lien de parrainage" (2026-09-28, demande explicite) — bleu
    néon pour se distinguer du violet de la candidature ci-dessus. target="_blank" volontaire :
@@ -518,6 +528,13 @@ function ipAutreEvtDateLabel(e) {
   if (isNaN(dt)) return e.date_evt;
   return dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + (e.heure_debut ? ' · ' + String(e.heure_debut).slice(0,5) : '');
 }
+/* Événements déjà passés (2026-09-28, demande explicite) — le serveur inclut désormais aussi les
+   événements des 90 derniers jours (voir server/index.js) ; c'est ici, côté affichage, qu'on
+   distingue passé/à venir pour les griser. */
+function ipEstEvenementPasse(e) {
+  if (!e.date_evt) return false;
+  return String(e.date_evt).slice(0,10) < new Date().toISOString().slice(0,10);
+}
 function ipCalDatesParJour() {
   const map = {};
   IP_AUTRES_EVENEMENTS.forEach(e => {
@@ -541,6 +558,7 @@ function ipRenderCalendrier() {
     const classes = ['ip-cal-day'];
     if (evts) classes.push('has-event');
     if (cle === todayStr) classes.push('today');
+    if (evts && cle < todayStr) classes.push('passe');
     cells += evts
       ? `<button type="button" class="${classes.join(' ')}" onclick="ipCalAllerAuJour('${cle}')" title="${evts.length} événement(s) ce jour">${d}</button>`
       : `<div class="${classes.join(' ')}">${d}</div>`;
@@ -580,8 +598,11 @@ function ipRenderSideColonne() {
   const side = document.getElementById('ip-side');
   if (!IP_AUTRES_EVENEMENTS.length) { layout.classList.remove('ip-layout--two-col'); side.innerHTML = ''; return; }
   layout.classList.add('ip-layout--two-col');
-  const premiere = IP_AUTRES_EVENEMENTS.find(e => e.date_evt);
-  const dtPremiere = premiere ? new Date(String(premiere.date_evt).slice(0,10) + 'T00:00:00') : new Date();
+  /* Le calendrier s'ouvre sur le mois du premier événement À VENIR (2026-09-28) — la liste
+     inclut désormais aussi les événements passés (triés du plus ancien au plus récent), donc
+     prendre "le premier avec une date" ouvrirait le calendrier sur un mois déjà révolu. */
+  const premiereAVenir = IP_AUTRES_EVENEMENTS.find(e => e.date_evt && !ipEstEvenementPasse(e)) || IP_AUTRES_EVENEMENTS.find(e => e.date_evt);
+  const dtPremiere = premiereAVenir ? new Date(String(premiereAVenir.date_evt).slice(0,10) + 'T00:00:00') : new Date();
   IP_CAL_MOIS = { y: dtPremiere.getFullYear(), m: dtPremiere.getMonth() };
   side.innerHTML = `
     <div class="ip-side-box">
@@ -591,14 +612,19 @@ function ipRenderSideColonne() {
     <div class="ip-side-box">
       <div class="ip-side-title">Autres événements de ${escH(IP_FICHE?.organisateur || "cet organisateur")}</div>
       <div class="ip-autres-list">
-        ${IP_AUTRES_EVENEMENTS.map(e => `
-          <a class="ip-autre-card" href="${escH(ipAutreEvtUrl(e))}" data-date="${escH(String(e.date_evt||'').slice(0,10))}">
+        ${IP_AUTRES_EVENEMENTS.map(e => {
+          const passe = ipEstEvenementPasse(e);
+          const attrs = passe ? '' : `href="${escH(ipAutreEvtUrl(e))}"`;
+          const balise = passe ? 'div' : 'a';
+          return `
+          <${balise} class="ip-autre-card${passe ? ' passe' : ''}" ${attrs} data-date="${escH(String(e.date_evt||'').slice(0,10))}">
             ${e.image_couverture || e.image_url ? `<img class="ip-autre-img" src="${escH(e.image_couverture||e.image_url)}" alt="">` : '<div class="ip-autre-img"></div>'}
             <div>
-              <div class="ip-autre-titre">${escH(e.titre)}</div>
+              <div class="ip-autre-titre">${escH(e.titre)}${passe ? '<span class="ip-autre-badge-terminee">Terminé</span>' : ''}</div>
               <div class="ip-autre-meta">📅 ${escH(ipAutreEvtDateLabel(e))}${e.ville ? ' · 📍 '+escH(e.ville) : ''}</div>
             </div>
-          </a>`).join('')}
+          </${balise}>`;
+        }).join('')}
       </div>
     </div>`;
 }

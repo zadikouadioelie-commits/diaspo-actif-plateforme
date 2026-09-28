@@ -43670,14 +43670,21 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
   /* Autres événements du même organisateur (2026-09-27, demande explicite : "présente à droite
      les événements du même compte pour que les différentes personnes sachent qu'ils peuvent
      aussi s'inscrire à ces autres événements" + calendrier) — colonne latérale de découverte,
-     jamais bloquante pour l'inscription elle-même si la requête échoue. */
+     jamais bloquante pour l'inscription elle-même si la requête échoue.
+     Inclut aussi les événements récemment passés (2026-09-28, demande explicite : "prends en
+     compte... les événements déjà passés... mets-les en gris... pour éviter de saturer
+     d'informations inutiles") — auparavant strictement filtrés (date_evt >= date('now')), donc
+     invisibles ; le front les affiche désormais mais grisés/non cliquables (voir
+     ipRenderSideColonne côté public) pour donner une image d'activité réelle de l'initiative
+     sans laisser croire qu'on peut encore s'y inscrire. Fenêtre de 90 jours en arrière pour ne
+     jamais faire grossir indéfiniment la liste d'un organisateur actif depuis des années. */
   let autresEvenements = [];
   try {
     const dejaLies = new Set(evenements.map(e => Number(e.id)));
     const candidats = await db.prepare(`
       SELECT id, titre, date_evt, heure_debut, ville, pays, lieu, image_couverture, image_url
       FROM evenements
-      WHERE owner_user_id=? AND statut='ouvert' AND (visibilite IS NULL OR visibilite='public') AND date_evt >= date('now')
+      WHERE owner_user_id=? AND statut='ouvert' AND (visibilite IS NULL OR visibilite='public') AND date_evt >= date('now', '-90 days')
       ORDER BY date_evt ASC LIMIT 20`).all(fiche.owner_user_id);
     autresEvenements = await enrichirAvecFicheMedia(candidats.filter(e => !dejaLies.has(Number(e.id))));
   } catch (e) { console.error('[insc-public-autres-evenements]', e.message); }
