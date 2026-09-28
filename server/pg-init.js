@@ -1166,6 +1166,13 @@ const COLONNES_MIGRATION = [
        cause distincte). */
     ['users', 'invisible_annuaire_jusqu_au', 'TEXT'],
     ['users', 'invisible_annuaire_definitif', 'INTEGER DEFAULT 0'],
+    /* Sponsors / Partenaires d'une fiche d'inscription (2026-09-28, demande explicite) — même
+       principe que insc_champs.options_json : un tableau JSON ({nom, logo_url}), pas de table
+       séparée. Mirroir de server/db.js (CREATE TABLE insc_fiches) — voir le commentaire du 2026-
+       09-27 juste au-dessus sur les colonnes invisible_annuaire_* : toujours dupliquer ici toute
+       colonne ajoutée côté SQLite, ou GET /api/insc/* casse en 500 sur Postgres. */
+    ['insc_fiches', 'sponsors_json', "TEXT DEFAULT '[]'"],
+    ['insc_fiches', 'partenaires_json', "TEXT DEFAULT '[]'"],
 ];
 
 async function migratePg(pool) {

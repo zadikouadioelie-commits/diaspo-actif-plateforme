@@ -42483,6 +42483,17 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
     set.push(`${c}=?`);
     vals.push(c === "description" ? (body[c] ? SEC.sanitizeRichHtml(body[c]) : null) : (body[c] || null));
   }
+  /* Sponsors / Partenaires (2026-09-28, demande explicite) : tableaux [{nom, logo_url}],
+     sérialisés dans les colonnes JSON dédiées — même mécanique que options_json, gérée à part
+     du tableau `champs` générique ci-dessus car ce ne sont pas de simples chaînes. */
+  if (Array.isArray(body.sponsors)) {
+    set.push("sponsors_json=?");
+    vals.push(JSON.stringify(body.sponsors.filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }))));
+  }
+  if (Array.isArray(body.partenaires)) {
+    set.push("partenaires_json=?");
+    vals.push(JSON.stringify(body.partenaires.filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }))));
+  }
   if (set.length) {
     set.push("updated_at=datetime('now')");
     await db.prepare(`UPDATE insc_fiches SET ${set.join(",")} WHERE id=?`).run(...vals, fiche.id);

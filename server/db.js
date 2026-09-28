@@ -532,6 +532,7 @@ db.exec(`
     visibilite TEXT NOT NULL DEFAULT 'public' CHECK(visibilite IN ('public','membres','prive','invitation')),
     code_acces TEXT,
     gele_le TEXT, gele_motif TEXT,
+    sponsors_json TEXT DEFAULT '[]', partenaires_json TEXT DEFAULT '[]',
     created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(owner_user_id) REFERENCES users(id),
     FOREIGN KEY(initiative_id) REFERENCES initiatives(id)
@@ -2404,6 +2405,10 @@ const MIGRATIONS = [
   ["crm_contacts", "assigne_a INTEGER"],
   ["crm_opportunites", "assigne_a INTEGER"],
   ["crm_taches", "assigne_a INTEGER"],
+  // Sponsors / Partenaires d'une fiche d'inscription (2026-09-28, demande explicite) — miroir de
+  // pg-init.js COLONNES_MIGRATION (voir son commentaire sur le pourquoi de cette duplication).
+  ["insc_fiches", "sponsors_json TEXT DEFAULT '[]'"],
+  ["insc_fiches", "partenaires_json TEXT DEFAULT '[]'"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
