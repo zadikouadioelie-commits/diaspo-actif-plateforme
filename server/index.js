@@ -27880,7 +27880,7 @@ ${jsonLd}
             const base = 'https://diaspoactif.com';
             const nomInviteur = parsed.query.via ? await nomCompteAffichage(parsed.query.via) : '';
             const titre = nomInviteur ? `${nomInviteur} vous invite à l'événement ${evt.titre}` : `${evt.titre} — Diaspo'Actif`;
-            const description = (evt.description ? String(evt.description).replace(/\s+/g, ' ').trim().slice(0, 200) : null)
+            const description = (evt.description ? String(evt.description).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) : null)
               || "La plateforme mondiale de la diaspora engagée — actions locales, impact global.";
             let image = `${base}/assets/og-image.png`;
             if (evt.image_couverture) {
