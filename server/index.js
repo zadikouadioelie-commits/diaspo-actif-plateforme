@@ -21521,6 +21521,21 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
     return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "article" }))), total, page, pages: Math.ceil(total/limit), mode });
   }
 
+  // ─── MODE ORGANISATIONS (2026-09-29, demande explicite) ────────────────────
+  // Publications de tout compte SAUF les comptes Utilisateur individuels (Initiative,
+  // Collectivité, Administrateur) — alimente la colonne "Publications" d'evenements-app.html,
+  // volontairement séparée du mode "tous" ci-dessous pour ne jamais toucher à son algorithme.
+  if (mode === "organisations") {
+    const posts = await db.prepare(`
+      SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
+      WHERE u.role != 'utilisateur' AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}
+      ORDER BY p.created_at DESC LIMIT ? OFFSET ?
+    `).all(...catArgs, limit, offset);
+    const _totalOrg = await db.prepare(`SELECT COUNT(*) AS n FROM fil_posts p JOIN users u ON u.id=p.auteur_id WHERE u.role != 'utilisateur' AND (u.is_demo IS NULL OR u.is_demo=FALSE)${catClause}`).get(...catArgs);
+    const total = _totalOrg ? _totalOrg.n : 0;
+    return sendJSON(res, 200, { posts: await Promise.all(posts.map(async p => ({ ...await enrichPost(p, cu), source: "organisation" }))), total, page, pages: Math.ceil(total/limit), mode });
+  }
+
   // ─── MODE TOUS (fil global enrichi) ────────────────────────────────────────
   // Algorithme : suivis en premier, puis populaires, puis reste chronologique
   let orderedIds = new Set();

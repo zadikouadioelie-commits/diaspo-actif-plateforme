@@ -1673,6 +1673,67 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <div id="pv-infos-form"><div class="notice">Chargement…</div></div>
           </div>
 
+          <!-- ═══ APERÇU DE LA CARTOUCHE (2026-09-29, demande explicite) — exactement la carte
+               affichée sur l'annuaire des boutiques (même fonction renderVitrineCard(), voir
+               assets/app.js, jamais dupliquée), visible ici uniquement par vous. S'adapte à votre
+               thème boutique (pas au domaine d'activité comme dans les autres annuaires — voir
+               #pv-card-preview-mount .vit-card-logo ci-dessous) et se met à jour dès que vous
+               changez la couleur ou republiez nom/description. Nom et description modifiables en
+               un clic directement ici — même route d'enregistrement immédiat que le formulaire
+               au-dessus (pvSaveInfos()), jamais un état séparé. ═══ -->
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">🪪 Aperçu de votre cartouche</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">C'est exactement ce que voient les visiteurs dans l'annuaire des boutiques. Cliquez le nom ou le descriptif pour les modifier directement.</p>
+            <div id="pv-card-preview-mount">Chargement…</div>
+          </div>
+          <style>
+          /* Copie scopée de .vit-card* (vitrines.html) — cette page n'a normalement aucune raison
+             de charger ce CSS, donc on le duplique ici plutôt que d'ajouter un <link> supplémentaire
+             juste pour un seul aperçu. Si vitrines.html change son style, penser à répercuter ici. */
+          #pv-card-preview-mount .vit-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;flex-direction:column;cursor:default;max-width:340px;}
+          #pv-card-preview-mount .vit-card-top{display:flex;gap:12px;align-items:flex-start;padding:16px 16px 0;}
+          #pv-card-preview-mount .vit-card-logo{width:52px;height:52px;border-radius:12px;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:rgba(255,255,255,.92);background:var(--bg);}
+          #pv-card-preview-mount .vit-card-logo img{width:100%;height:100%;object-fit:cover;display:block;}
+          #pv-card-preview-mount .vit-card-headline{flex:1;min-width:0;padding-top:2px;}
+          #pv-card-preview-mount .vit-card-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+          #pv-card-preview-mount .vit-type-pill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:800;color:#fff;letter-spacing:.04em;text-transform:uppercase;}
+          #pv-card-preview-mount .vit-type-pill-outline{background:none;border:1px solid var(--border);color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;}
+          #pv-card-preview-mount .vit-card-body{padding:12px 16px 14px;flex:1;display:flex;flex-direction:column;gap:6px;}
+          #pv-card-preview-mount .vit-card-title{font-size:15px;font-weight:800;margin:0;line-height:1.3;color:var(--text);}
+          #pv-card-preview-mount .vit-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+          #pv-card-preview-mount .vit-card-products{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:2px 0;}
+          #pv-card-preview-mount .vit-prod-mini{text-align:center;min-width:0;}
+          #pv-card-preview-mount .vit-prod-mini-photo{width:100%;aspect-ratio:1;border-radius:8px;background:var(--bg);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:3px;}
+          #pv-card-preview-mount .vit-prod-mini-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+          #pv-card-preview-mount .vit-prod-mini-nom{font-size:10.5px;color:var(--text);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+          #pv-card-preview-mount .vit-prod-mini-prix{font-size:10.5px;font-weight:800;color:#1B3A6B;}
+          #pv-card-preview-mount .vit-card-note{font-size:12px;color:#b45309;display:flex;align-items:center;gap:4px;}
+          #pv-card-preview-mount .vit-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);gap:8px;}
+          #pv-card-preview-mount .vit-card-btn{font-size:11.5px;font-weight:700;padding:6px 14px;border-radius:20px;text-decoration:none;background:var(--orange-light);color:#2563EB;white-space:nowrap;}
+          #pv-card-preview-mount .vit-card-btn-adherer{background:#7C3AED;color:#fff;}
+          /* Variables de thème (copie de profil-app.html, .pvt-scope) — la cartouche doit refléter
+             la couleur boutique choisie, jamais celle du domaine d'activité (DOMAIN_BADGE) comme
+             sur les autres annuaires : les règles !important ci-dessous, scopées à cet aperçu
+             uniquement, prennent le pas sur le style inline posé par renderVitrineCard(). */
+          #pv-card-preview-mount .pvt-scope{--v1:#8E1B2E;--v2:#5E0E1C;--v3:#B5262E;--v4:#3A1116;--vsoft:#F5EBEC;}
+          #pv-card-preview-mount .pvt-scope[data-theme="ocean"]{--v1:#1B4F8E;--v2:#0E2C5E;--v3:#2670C5;--v4:#0B1E40;--vsoft:#EAF1FB;}
+          #pv-card-preview-mount .pvt-scope[data-theme="emeraude"]{--v1:#1F6B4A;--v2:#0E3D2A;--v3:#2A9163;--v4:#0A2D1F;--vsoft:#E6F3EC;}
+          #pv-card-preview-mount .pvt-scope[data-theme="prune"]{--v1:#4A2E6B;--v2:#2C1A46;--v3:#6B49A6;--v4:#1E1233;--vsoft:#F0EAF7;}
+          #pv-card-preview-mount .pvt-scope[data-theme="or"]{--v1:#8A5E1A;--v2:#5E3F0E;--v3:#B5872A;--v4:#3D2907;--vsoft:#F6EFE0;}
+          #pv-card-preview-mount .pvt-scope .vit-card{border-color:var(--vsoft);}
+          #pv-card-preview-mount .pvt-scope .vit-card-logo{background:linear-gradient(135deg,var(--v1),var(--v2))!important;}
+          #pv-card-preview-mount .pvt-scope .vit-type-pill{background:var(--v1)!important;}
+          #pv-card-preview-mount .pvt-scope .vit-card-btn{background:var(--vsoft)!important;color:var(--v2)!important;}
+          /* Origine/Résidence beaucoup plus visibles (2026-09-29, demande explicite) — pastille
+             colorée dans le ton du thème plutôt que du texte bleu discret en ligne. */
+          #pv-card-preview-mount .pvt-scope .vit-card-locs{gap:6px;}
+          #pv-card-preview-mount .pvt-scope .vit-card-locs span{display:inline-flex;align-items:center;background:var(--vsoft);color:var(--v2);font-weight:700;font-size:12.5px;padding:4px 10px;border-radius:20px;}
+          /* Édition en un clic (nom/descriptif) — même esprit que les nombreux "édition sur place"
+             déjà utilisés ailleurs sur cette page (logo, couverture…) : survol = affordance visible. */
+          #pv-card-preview-mount .pv-card-editable{cursor:pointer;border-radius:6px;transition:background .12s;}
+          #pv-card-preview-mount .pv-card-editable:hover{background:var(--vsoft,#F1F5F9);outline:1px dashed var(--v1,#94A3B8);}
+          </style>
+
           <div class="card" style="margin-bottom:20px;">
             <h3 style="margin:0 0 12px;font-size:15px;">👁️ Statut de la boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Choisissez si votre boutique est visible par les visiteurs, ou masquée le temps de la préparer.</p>
@@ -6072,6 +6133,7 @@ async function loadParametresVitrineFull() {
     renderPvThemeSwatches();
     renderPvStylePresets();
     renderPvDraftStatus();
+    pvRenderCartouchePreview();
     pvRefreshPreview();
     pvSyncStickyTop();
   } catch (e) { console.error(e); }
@@ -6287,7 +6349,80 @@ async function pvSaveInfos() {
     Object.assign(__pvInit, payload);
     const s = document.getElementById('pv-infos-saved');
     if (s) { s.style.display = 'inline'; setTimeout(() => s.style.display = 'none', 2000); }
+    pvRenderCartouchePreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+
+/* ── Aperçu de la cartouche (2026-09-29, demande explicite) — rend EXACTEMENT la carte de
+   l'annuaire des boutiques via la même fonction que vitrines.html (renderVitrineCard(),
+   assets/app.js), jamais une copie divergente. Enveloppée dans .pvt-scope[data-theme] pour que
+   les surcharges CSS !important ci-dessus (voir <style> juste au-dessus dans le HTML) remplacent
+   la couleur du domaine d'activité par celle du thème boutique choisi. Appelée à l'ouverture de
+   l'onglet, après chaque enregistrement d'infos (pvSaveInfos) et après chaque changement de
+   thème (pvSetTheme) — jamais de cache, toujours l'état __pvInit courant. */
+function pvRenderCartouchePreview() {
+  const mount = document.getElementById('pv-card-preview-mount');
+  if (!mount || !__pvInit) return;
+  const theme = window.__pvInitTheme || 'bordeaux';
+  const v = { ...__pvInit, produits_vedettes: __pvInit.produits_vedettes || [] };
+  const html = renderVitrineCard(v);
+  mount.innerHTML = `<div class="pvt-scope" data-theme="${theme === 'bordeaux' ? '' : theme}">${html}</div>`;
+  // La carte réelle navigue au clic (onclick sur .vit-card) — inutile et gênant dans un aperçu.
+  const card = mount.querySelector('.vit-card');
+  if (card) card.removeAttribute('onclick');
+  const titre = mount.querySelector('.vit-card-title');
+  if (titre) {
+    titre.classList.add('pv-card-editable');
+    titre.title = 'Cliquez pour modifier le nom affiché sur la boutique';
+    titre.onclick = (e) => { e.stopPropagation(); pvEditerCartouche('nom'); };
+  }
+  const desc = mount.querySelector('.vit-card-desc') || (() => {
+    // Pas de description existante : ajoute une invite cliquable à la place (jamais de champ vide muet).
+    const body = mount.querySelector('.vit-card-body');
+    if (!body) return null;
+    const el = document.createElement('div');
+    el.className = 'vit-card-desc pv-card-editable';
+    el.style.fontStyle = 'italic';
+    el.textContent = '+ Ajouter un descriptif pour votre boutique';
+    body.insertBefore(el, body.querySelector('.vit-card-foot'));
+    return el;
+  })();
+  if (desc) {
+    desc.classList.add('pv-card-editable');
+    desc.title = 'Cliquez pour modifier le descriptif de la boutique';
+    desc.onclick = (e) => { e.stopPropagation(); pvEditerCartouche('description'); };
+  }
+}
+/* Édition sur place : remplace le texte par un champ, enregistre au blur/Entrée via pvSaveInfos()
+   (même route que le formulaire au-dessus — jamais un enregistrement séparé), annule sur Échap. */
+function pvEditerCartouche(champ) {
+  const mount = document.getElementById('pv-card-preview-mount');
+  const cible = champ === 'nom' ? mount.querySelector('.vit-card-title') : mount.querySelector('.vit-card-desc');
+  const inputEl = document.getElementById(champ === 'nom' ? 'pv-f-boutique-nom' : 'pv-f-boutique-desc');
+  if (!cible || !inputEl || cible.querySelector('input,textarea')) return;
+  const valeurActuelle = inputEl.value;
+  const champHtml = champ === 'nom'
+    ? `<input type="text" value="${_mvEsc(valeurActuelle)}" style="width:100%;box-sizing:border-box;font:inherit;font-weight:800;padding:2px 4px;border:1px solid var(--v1,#94A3B8);border-radius:4px;">`
+    : `<textarea rows="2" maxlength="500" style="width:100%;box-sizing:border-box;font:inherit;padding:2px 4px;border:1px solid var(--v1,#94A3B8);border-radius:4px;resize:vertical;">${_mvEsc(valeurActuelle)}</textarea>`;
+  cible.innerHTML = champHtml;
+  const champEl = cible.querySelector('input,textarea');
+  champEl.focus();
+  champEl.select?.();
+  let valide = false;
+  const terminer = async (annuler) => {
+    if (valide) return; valide = true;
+    if (!annuler) {
+      inputEl.value = champEl.value.trim();
+      await pvSaveInfos(); // ré-appelle pvRenderCartouchePreview() en fin de save, voir ci-dessus
+    } else {
+      pvRenderCartouchePreview();
+    }
+  };
+  champEl.addEventListener('blur', () => terminer(false));
+  champEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && champ === 'nom') { e.preventDefault(); champEl.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); terminer(true); }
+  });
 }
 
 /* ── Aperçu en direct (iframe sur la vitrine réelle en mode brouillon — mêmes composants que la
@@ -6874,6 +7009,7 @@ async function pvSetTheme(theme) {
     await pvDraftPatch({ theme });
     window.__pvInitTheme = theme;
     renderPvThemeSwatches();
+    pvRenderCartouchePreview();
     pvRefreshPreview();
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }

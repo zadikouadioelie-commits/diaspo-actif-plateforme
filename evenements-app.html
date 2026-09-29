@@ -75,12 +75,47 @@
 #evt-page-row{display:flex;gap:24px;align-items:flex-start;justify-content:center;}
 #evt-page-row>main{margin:0;}
 .evt-ad-col{display:none;flex:1;min-width:280px;max-width:360px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
+/* Colonne "Publications" (2026-09-29, demande explicite) — publications du fil d'actualité de
+   tout compte SAUF Utilisateur individuel (Initiative/Collectivité/Administrateur), même
+   traitement visuel/responsive que .evt-ad-col juste à côté (n'apparaît que s'il reste de la
+   place, jamais au détriment de la mise en page principale). */
+.evt-pub-col{display:none;flex:1;min-width:260px;max-width:320px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
 @media(min-width:1700px){
   #evt-page-row{justify-content:flex-start;}
   .evt-ad-col{display:block;}
 }
+@media(min-width:2000px){
+  .evt-pub-col{display:block;}
+}
 .evt-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
 .evt-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
+.evt-pub-item{padding:10px 0;border-bottom:1px solid var(--border);}
+.evt-pub-item:last-child{border-bottom:none;}
+.evt-pub-auteur{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;margin-bottom:3px;}
+.evt-pub-role{font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--bg-alt,#f1f5f9);color:var(--muted);white-space:nowrap;}
+.evt-pub-contenu{font-size:12.5px;color:var(--text);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.evt-pub-date{font-size:11px;color:var(--muted);margin-top:4px;}
+/* Calendrier Diaspora (2026-09-29, demande explicite) — même esprit que le mini-calendrier
+   d'inscription-publique.html (ipRenderCalendrier), adapté aux variables de couleur de ce
+   fichier plutôt qu'à celles de l'autre page. */
+.cd-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:14px;font-weight:700;text-transform:capitalize;}
+.cd-cal-nav{background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px;color:var(--text);width:28px;height:28px;line-height:1;padding:0;}
+.cd-cal-nav:disabled{opacity:.35;cursor:default;}
+.cd-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;}
+.cd-cal-dow{font-size:11px;color:var(--muted);font-weight:600;padding-bottom:4px;}
+.cd-cal-day{font-size:13px;padding:8px 0;border-radius:8px;color:var(--text);position:relative;background:none;border:none;font-family:inherit;}
+.cd-cal-day.empty{visibility:hidden;}
+.cd-cal-day.has-event{background:#fff3e8;color:var(--orange,#ff6b00);font-weight:700;cursor:pointer;}
+.cd-cal-day.has-event:hover{background:#ffe4cc;}
+.cd-cal-day.has-event.passe{background:var(--bg-alt,#f1f5f9);color:var(--muted);}
+.cd-cal-day.has-event.passe:hover{background:#e6e9ed;}
+.cd-cal-day.today{box-shadow:inset 0 0 0 2px var(--orange,#ff6b00);}
+.cd-cal-day.selected{outline:2px solid var(--orange,#ff6b00);outline-offset:-2px;}
+.cd-jour-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.cd-jour-item:last-child{border-bottom:none;}
+.cd-jour-item.passe{opacity:.55;}
+.cd-jour-titre{font-weight:700;}
+.cd-jour-meta{color:var(--muted);font-size:11.5px;}
 .evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
 .evt-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .15s;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .evt-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
@@ -277,6 +312,7 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
+      <button class="btn btn-outline" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()">📅 Calendrier Diaspora</button>
       <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
   </div>
@@ -332,6 +368,14 @@
     </div>
   </template>
   <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-fallback="evt-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
+</aside>
+
+<!-- ═══ COLONNE PUBLICATIONS (2026-09-29, demande explicite) — fil d'actualité filtré aux
+     comptes Initiative/Collectivité/Administrateur, jamais les comptes Utilisateur individuels.
+     Voir GET /api/fil?mode=organisations, nouveau mode dédié côté serveur. ═══ -->
+<aside class="evt-pub-col">
+  <div class="evt-col-title">📰 Publications</div>
+  <div id="evt-pub-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
 </aside>
 </div>
 
@@ -515,6 +559,21 @@
     <div style="font-size:.72rem;color:#aaa;text-align:center;margin-top:10px;">
       Cet événement sera visible sur Diaspo'Actif selon la visibilité choisie.
       Pour un rendez-vous privé (max 10 personnes), <a href="/agenda.html" style="color:#2563EB;">utilisez l'Agenda</a>.
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL CALENDRIER DIASPORA (2026-09-29, demande explicite) — tous les événements inscrits
+     sur 2 ans (12 mois avant/après aujourd'hui), marqués sur toute leur plage date_evt→date_fin,
+     passés grisés, navigation mois par mois bornée à cette fenêtre. ═══ -->
+<div class="modal-bg" id="modal-cd-bg" onclick="if(event.target===this)cdFermerCalendrier()">
+  <div class="modal" style="max-width:520px;">
+    <h3>📅 Calendrier Diaspora</h3>
+    <p style="font-size:.8rem;color:var(--muted,#6b7280);margin:-8px 0 14px;">Tous les événements de la plateforme, sur 2 ans — cliquez un jour marqué pour voir ses événements.</p>
+    <div id="cd-cal-mount">Chargement…</div>
+    <div id="cd-jour-liste" style="margin-top:16px;"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-outline" onclick="cdFermerCalendrier()">Fermer</button>
     </div>
   </div>
 </div>
@@ -1819,6 +1878,200 @@ async function initSuggestions() {
   setInterval(renderSuggestions, 3 * 60 * 1000);
 }
 
+/* Colonne "Publications" (2026-09-29, demande explicite) — fil d'actualité filtré aux comptes
+   Initiative/Collectivité/Administrateur, jamais les comptes Utilisateur individuels. Voir
+   GET /api/fil?mode=organisations, nouveau mode dédié côté serveur (n'affecte pas le mode "tous"
+   utilisé ailleurs). Rendu compact volontairement séparé de assets/posts.js (Posts.renderPostCard,
+   conçu pour une carte pleine largeur avec réactions/commentaires) — cette colonne est étroite
+   et ne fait qu'inviter à cliquer vers fil-actualite.html pour la suite. */
+const EVT_PUB_ROLE_LABEL = { initiative: 'Initiative', collectivite: 'Collectivité', administrateur: 'Admin' };
+function evtPubDateLabel(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const dt = new Date(String(dateStr).replace(' ', 'T') + 'Z');
+    return dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  } catch (e) { return ''; }
+}
+function renderPublicationsOrganisations(posts) {
+  const box = document.getElementById('evt-pub-list');
+  if (!box) return;
+  if (!posts.length) { box.innerHTML = '<p style="margin:0;">Aucune publication pour le moment.</p>'; return; }
+  box.innerHTML = posts.map(p => {
+    const texte = esc(p.contenu || p.article_titre || '').replace(/\n/g, ' ');
+    const roleLbl = EVT_PUB_ROLE_LABEL[p.auteur_profil?.role] || '';
+    return `
+    <a href="fil-actualite.html" class="evt-pub-item" style="display:block;text-decoration:none;color:inherit;">
+      <div class="evt-pub-auteur">
+        <span>${esc(p.auteur_nom || 'Diaspo\'Actif')}</span>
+        ${roleLbl ? `<span class="evt-pub-role">${roleLbl}</span>` : ''}
+      </div>
+      <div class="evt-pub-contenu">${texte}</div>
+      <div class="evt-pub-date">${evtPubDateLabel(p.created_at)}</div>
+    </a>`;
+  }).join('');
+}
+async function initPublicationsOrganisations() {
+  try {
+    const { posts = [] } = await api('GET', '/fil?mode=organisations&limit=6');
+    renderPublicationsOrganisations(posts);
+  } catch (e) {
+    const box = document.getElementById('evt-pub-list');
+    if (box) box.innerHTML = '<p style="margin:0;">Impossible de charger les publications.</p>';
+  }
+}
+
+/* ══ Calendrier Diaspora (2026-09-29, demande explicite) ══
+   Tous les événements inscrits, marqués par jour sur toute leur plage date_evt→date_fin (pas
+   seulement le jour de début), fenêtre glissante de 2 ans (12 mois avant/après aujourd'hui),
+   navigation mois par mois bornée à cette fenêtre. Réutilise GET /api/evenements (déjà toutes
+   les colonnes nécessaires) — chargé une seule fois à l'ouverture, mis en cache pour la
+   session (pas de re-fetch à chaque changement de mois). */
+let CD_EVENEMENTS = null;
+let CD_MOIS = null; // { y, m } — mois actuellement affiché
+let CD_JOUR_SELECTIONNE = null;
+const CD_MOIS_NOMS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const CD_JOURS = ['L','M','M','J','V','S','D'];
+
+function cdBornes() {
+  const now = new Date();
+  const min = { y: now.getFullYear(), m: now.getMonth() - 12 };
+  while (min.m < 0) { min.m += 12; min.y--; }
+  const max = { y: now.getFullYear(), m: now.getMonth() + 12 };
+  while (max.m > 11) { max.m -= 12; max.y++; }
+  return { min, max };
+}
+function cdEstPasse(e) {
+  const ref = e.date_fin || e.date_evt;
+  if (!ref) return false;
+  return String(ref).slice(0,10) < cdCleLocale(new Date());
+}
+/* Clé locale AAAA-MM-JJ sans passer par toISOString() (2026-09-29, bug réel trouvé en testant :
+   toISOString() convertit en UTC, donc sur un fuseau positif (ex. UTC+2, Europe/Paris l'été) un
+   minuit local se décale au jour précédent une fois reconverti — le dernier jour d'un événement
+   sur plusieurs jours (date_fin) disparaissait systématiquement de la carte, remplacé par le
+   jour d'avant. Reconstruite à la main à partir des composants LOCAUX du Date, jamais via une
+   conversion de fuseau. */
+function cdCleLocale(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function cdDatesParJour() {
+  const map = {};
+  const MAX_JOURS_EVT = 60; // filet de sécurité — une date_fin mal saisie ne doit jamais figer la page
+  (CD_EVENEMENTS || []).forEach(e => {
+    if (!e.date_evt) return;
+    const debut = new Date(String(e.date_evt).slice(0,10) + 'T00:00:00');
+    if (isNaN(debut)) return;
+    let fin = e.date_fin ? new Date(String(e.date_fin).slice(0,10) + 'T00:00:00') : debut;
+    if (isNaN(fin) || fin < debut) fin = debut;
+    const cur = new Date(debut);
+    let compte = 0;
+    while (cur <= fin && compte < MAX_JOURS_EVT) {
+      const cle = cdCleLocale(cur);
+      (map[cle] = map[cle] || []).push(e);
+      cur.setDate(cur.getDate() + 1);
+      compte++;
+    }
+  });
+  return map;
+}
+function cdRenderCalendrier() {
+  const map = cdDatesParJour();
+  const { y, m } = CD_MOIS;
+  const { min, max } = cdBornes();
+  const premierJourSemaine = (new Date(y, m, 1).getDay() + 6) % 7; // lundi = 0
+  const nbJours = new Date(y, m + 1, 0).getDate();
+  const todayStr = cdCleLocale(new Date());
+  let cells = '';
+  for (let i = 0; i < premierJourSemaine; i++) cells += `<div class="cd-cal-day empty"></div>`;
+  for (let d = 1; d <= nbJours; d++) {
+    const cle = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const evts = map[cle];
+    const classes = ['cd-cal-day'];
+    if (evts) classes.push('has-event');
+    if (cle === todayStr) classes.push('today');
+    if (evts && cle < todayStr) classes.push('passe');
+    if (cle === CD_JOUR_SELECTIONNE) classes.push('selected');
+    cells += evts
+      ? `<button type="button" class="${classes.join(' ')}" onclick="cdAllerAuJour('${cle}')" title="${evts.length} événement(s) ce jour">${d}</button>`
+      : `<div class="${classes.join(' ')}">${d}</div>`;
+  }
+  const moisCourantIdx = y*12+m, minIdx = min.y*12+min.m, maxIdx = max.y*12+max.m;
+  return `
+    <div class="cd-cal-head">
+      <button type="button" class="cd-cal-nav" onclick="cdMoisPrecedent()" ${moisCourantIdx<=minIdx?'disabled':''} aria-label="Mois précédent">‹</button>
+      <span>${CD_MOIS_NOMS[m]} ${y}</span>
+      <button type="button" class="cd-cal-nav" onclick="cdMoisSuivant()" ${moisCourantIdx>=maxIdx?'disabled':''} aria-label="Mois suivant">›</button>
+    </div>
+    <div class="cd-cal-grid">
+      ${CD_JOURS.map(j => `<div class="cd-cal-dow">${j}</div>`).join('')}
+      ${cells}
+    </div>`;
+}
+function cdRerenderCalendrier() {
+  const el = document.getElementById('cd-cal-mount');
+  if (el) el.innerHTML = cdRenderCalendrier();
+}
+function cdMoisPrecedent() {
+  const { min } = cdBornes();
+  if (CD_MOIS.y*12+CD_MOIS.m <= min.y*12+min.m) return;
+  CD_MOIS.m--; if (CD_MOIS.m < 0) { CD_MOIS.m = 11; CD_MOIS.y--; }
+  cdRerenderCalendrier();
+}
+function cdMoisSuivant() {
+  const { max } = cdBornes();
+  if (CD_MOIS.y*12+CD_MOIS.m >= max.y*12+max.m) return;
+  CD_MOIS.m++; if (CD_MOIS.m > 11) { CD_MOIS.m = 0; CD_MOIS.y++; }
+  cdRerenderCalendrier();
+}
+function cdAllerAuJour(dateStr) {
+  CD_JOUR_SELECTIONNE = dateStr;
+  cdRerenderCalendrier();
+  const map = cdDatesParJour();
+  const evts = map[dateStr] || [];
+  const box = document.getElementById('cd-jour-liste');
+  if (!box) return;
+  const dt = new Date(dateStr + 'T00:00:00');
+  const label = dt.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  box.innerHTML = `
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;text-transform:capitalize;">${esc(label)}</div>
+    ${evts.map(e => `
+      <div class="cd-jour-item ${cdEstPasse(e) ? 'passe' : ''}">
+        <div>
+          <div class="cd-jour-titre">${esc(e.titre || 'Sans titre')}</div>
+          <div class="cd-jour-meta">${esc(e.ville || e.lieu || '')}${cdEstPasse(e) ? ' · Terminé' : ''}</div>
+        </div>
+        <a href="javascript:void(0)" onclick="cdFermerCalendrier();openDetail(${e.id})" style="font-size:11.5px;color:var(--orange,#ff6b00);font-weight:700;text-decoration:none;white-space:nowrap;">Voir →</a>
+      </div>`).join('') || '<div style="color:var(--muted);font-size:12.5px;">Aucun événement.</div>'}`;
+}
+/* Toujours re-charger à l'ouverture (2026-09-29, demande explicite : "met à jour le calendrier
+   de façon automatique à chaque nouvel événement") — plus de cache mémorisé pour la session :
+   un événement créé/modifié/supprimé entre deux ouvertures doit toujours apparaître à jour,
+   sans avoir à recharger toute la page. */
+async function cdChargerEvenements() {
+  const mount = document.getElementById('cd-cal-mount');
+  mount.innerHTML = 'Chargement…';
+  try {
+    const r = await api('GET', '/evenements');
+    CD_EVENEMENTS = r.evenements || [];
+    return true;
+  } catch (e) {
+    mount.innerHTML = '<p style="color:red;">Impossible de charger les événements.</p>';
+    return false;
+  }
+}
+async function cdOuvrirCalendrier() {
+  document.getElementById('modal-cd-bg').classList.add('open');
+  document.getElementById('cd-jour-liste').innerHTML = '';
+  CD_JOUR_SELECTIONNE = null;
+  if (!(await cdChargerEvenements())) return;
+  const now = new Date();
+  CD_MOIS = { y: now.getFullYear(), m: now.getMonth() };
+  cdRerenderCalendrier();
+}
+function cdFermerCalendrier() {
+  document.getElementById('modal-cd-bg').classList.remove('open');
+}
+
 /* ─── Init ─── */
 (async () => {
   await applyAuthState();
@@ -1830,7 +2083,7 @@ async function initSuggestions() {
       ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role)) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
   }
-  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions()]);
+  await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
      "En savoir plus" depuis la mini-fenêtre "Événements" de l'annuaire) — reprend le format
      d'ancre déjà utilisé par notifUrl() (assets/app.js) pour les notifications liées à un
