@@ -390,6 +390,11 @@
   const overlay = document.getElementById('pa-modal-overlay');
   async function ouvrirModalInvitation(invitation) {
     const lien = `${location.origin}/join/${invitation.code}`;
+    // Domaine ajouté au message partagé (2026-09-22, demande explicite, capture à l'appui) :
+    // la personne qui reçoit le lien voit tout de suite le thème de l'invitation ("Santé",
+    // "Éducation"...) sans avoir à cliquer d'abord. N'affecte que WhatsApp/partage natif —
+    // "Copier" reste le lien nu, plus utile pour un usage libre (site, e-mail rédigé à la main...).
+    const texteMessage = invitation.domaine_nom ? `${lien} : ${invitation.domaine_nom}` : lien;
     document.getElementById('pa-modal-titre').textContent = invitation.nom || 'Invitation créée';
     document.getElementById('pa-modal-lien').value = lien;
     overlay.style.display = 'flex';
