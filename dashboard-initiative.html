@@ -10513,8 +10513,15 @@ async function crmOpenContactForm(id, defaultRelation) {
     </div>
     ${extra?.pipeline ? `
     <div style="margin-top:10px;">
-      <label>Étape du pipeline ${crmStatutBadge(extra.pipeline.statut)}</label>
-      <select id="crm-c-pipeline-statut">${CRM_PIPELINE_STATUTS.map(([k, l]) => `<option value="${k}" ${extra.pipeline.statut === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label>Étape du pipeline</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+        ${CRM_PIPELINE_STATUTS.map(([k, l]) => {
+          const actif = extra.pipeline.statut === k;
+          const [bg, color] = CRM_STATUT_COLORS[k] || CRM_STATUT_COLORS.nouveau;
+          return `<button type="button" class="crm-etape-btn" data-contact-id="${id}" data-statut="${k}"
+            style="border:2px solid ${actif ? color : 'transparent'};background:${bg};color:${color};font-size:12px;font-weight:700;padding:6px 12px;border-radius:20px;cursor:${actif ? 'default' : 'pointer'};opacity:${actif ? '1' : '.75'};" ${actif ? 'disabled' : ''}>${actif ? '● ' : ''}${l}</button>`;
+        }).join('')}
+      </div>
     </div>` : ''}
     <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-c-notes" rows="3" style="width:100%;">${crmEsc(c.notes)}</textarea></div>
     <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
@@ -10529,6 +10536,21 @@ async function crmOpenContactForm(id, defaultRelation) {
   `);
   crmAssigneSelectRemplir('crm-c-assigne', c.assigne_a);
   if (window.RichEditor) RichEditor.attach('crm-c-notes', { placeholder: '' });
+  /* Boutons d'action pour l'étape du pipeline (2026-09-29, demande explicite : "je vais demander
+     des boutons d'action pour faire évoluer le statut... et elles sont toujours pas là") — un
+     simple <select> (première version) n'était pas assez visiblement une action cliquable.
+     Chaque bouton change l'étape IMMÉDIATEMENT (sans attendre "Enregistrer" du reste de la
+     fiche) et rouvre la même fiche pour refléter le nouvel état à l'instant. */
+  document.querySelectorAll('.crm-etape-btn').forEach(btn => {
+    btn.addEventListener('click', () => crmChangerEtapePipeline(Number(btn.dataset.contactId), btn.dataset.statut));
+  });
+}
+async function crmChangerEtapePipeline(contactId, statut) {
+  try {
+    await api('PATCH', `/crm/pipeline/${contactId}`, { statut });
+  } catch (e) { alert(e.message || 'Erreur.'); return; }
+  await crmOpenContactForm(contactId);
+  crmRefreshCurrentTab();
 }
 async function crmSaveContact(id) {
   const body = {
@@ -10549,12 +10571,8 @@ async function crmSaveContact(id) {
   if (!body.nom) { alert('Le nom est requis.'); return; }
   try {
     if (id) await api('PUT', `/crm/contacts/${id}`, body); else await api('POST', '/crm/contacts', body);
-    /* Étape du pipeline (2026-09-29, demande explicite : "aucune action possible pour le faire
-       évoluer... selon son statut") — champ affiché uniquement pour un prospect déjà suivi (voir
-       crmOpenContactForm), enregistré séparément via la route déjà existante PATCH
-       /crm/pipeline/:contactId (jusqu'ici seule accessible en glissant une carte sur le kanban). */
-    const statutEl = document.getElementById('crm-c-pipeline-statut');
-    if (id && statutEl) await api('PATCH', `/crm/pipeline/${id}`, { statut: statutEl.value });
+    /* Étape du pipeline : n'est plus enregistrée ici (2026-09-29) — voir crmChangerEtapePipeline(),
+       qui l'applique immédiatement au clic sur un bouton d'étape, sans attendre "Enregistrer". */
     crmCloseModal(); crmRefreshCurrentTab();
   } catch (e) { alert(e.message || 'Erreur.'); }
 }
