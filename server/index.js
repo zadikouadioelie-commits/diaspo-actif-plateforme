@@ -42511,7 +42511,7 @@ route("PATCH", "/api/crm/pipeline/:contactId", async (req, res, params, body) =>
     await db.prepare(`UPDATE crm_pipeline SET
       statut=COALESCE(?,statut), valeur_potentielle=COALESCE(?,valeur_potentielle), produit_service=COALESCE(?,produit_service),
       prochaine_action=COALESCE(?,prochaine_action), prochaine_action_date=COALESCE(?,prochaine_action_date),
-      derniere_interaction_at=CASE WHEN ? IS NOT NULL THEN datetime('now') ELSE derniere_interaction_at END,
+      derniere_interaction_at=CASE WHEN CAST(? AS TEXT) IS NOT NULL THEN datetime('now') ELSE derniere_interaction_at END,
       ordre=COALESCE(?,ordre), updated_at=datetime('now') WHERE contact_id=?`).run(
       statut, body.valeur_potentielle ?? null, body.produit_service ?? null, body.prochaine_action ?? null, body.prochaine_action_date ?? null,
       statut, body.ordre ?? null, params.contactId
