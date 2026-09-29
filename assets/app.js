@@ -2073,6 +2073,7 @@ function renderInitiativeCard(it){
       <div class="ann-card-foot" onclick="event.stopPropagation()">
         <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
         <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
+        <button type="button" class="ann-card-btn" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(it.nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
         ${vitrineBtn}
         ${(!isOwnInit && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<button type="button" class="ann-card-btn" data-abonne="0" onclick="event.stopPropagation(); daToggleSuivre('initiative', ${it.id}, this)">🔔 S'abonner</button>` : ''}
         ${(!isOwnInit && it.owner_user_id && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? `<span data-relation-user="${it.owner_user_id}" data-relation-classe="ann-card-btn"></span>` : ''}
@@ -3538,6 +3539,37 @@ window.openShareModal = function(postId){
         <a class="share-btn share-tw" href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Publication sur Diaspo\'Actif')}" target="_blank" rel="noopener">
           Twitter / X
         </a>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if(e.target===modal) modal.remove(); });
+};
+
+/* Partage générique par e-mail / message / WhatsApp (2026-09-29, demande explicite : "un bouton
+   de partage qui permettra de transférer un compte intéressant à une personne par mail ou
+   message ou whatsapp") — distinct d'openShareModal() ci-dessus (spécifique aux publications du
+   fil, WhatsApp/LinkedIn/Twitter) : ici les 3 canaux explicitement demandés plutôt que les
+   réseaux sociaux. Générique (url + titre en paramètres) pour être réutilisable ailleurs qu'à
+   l'annuaire si besoin, pas câblé en dur sur une initiative. */
+window.openShareUrlModal = function(url, titre){
+  document.getElementById("share-url-modal")?.remove();
+  const message = titre ? `${titre} — ${url}` : url;
+  const modal = document.createElement("div");
+  modal.id = "share-url-modal";
+  modal.className = "social-modal-overlay";
+  modal.innerHTML = `
+    <div class="social-modal">
+      <button class="social-modal-close" onclick="document.getElementById('share-url-modal').remove()">✕</button>
+      <h3>↗ Partager${titre ? " « " + escH(titre) + " »" : ""}</h3>
+      <div class="share-url-box">
+        <input type="text" id="share-url-modal-inp" value="${escH(url)}" readonly>
+        <button onclick="navigator.clipboard.writeText('${escH(url)}').then(()=>{const s=document.getElementById('share-url-modal-copied'); if(s) s.style.display='inline'})">Copier</button>
+      </div>
+      <span id="share-url-modal-copied" style="display:none;color:#10B981;font-size:13px;">✓ Lien copié !</span>
+      <div class="share-btns">
+        <a class="share-btn share-wa" href="https://wa.me/?text=${encodeURIComponent(message)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <a class="share-btn share-email" href="mailto:?subject=${encodeURIComponent(titre || 'À découvrir sur Diaspo\'Actif')}&body=${encodeURIComponent(message)}">✉️ E-mail</a>
+        <a class="share-btn share-sms" href="sms:?body=${encodeURIComponent(message)}">💬 Message</a>
       </div>
     </div>`;
   document.body.appendChild(modal);
