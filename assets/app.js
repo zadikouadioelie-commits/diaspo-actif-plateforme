@@ -2765,8 +2765,19 @@ async function initAnnuaire(){
 /* ---------- Rubrique Vitrines (catalogue public des vitrines d'initiatives) ---------- */
 const DOMAINES_VITRINE = ["Agriculture","Agroalimentaire","Agropastoral","Artisanat","Assurance","Commerce","Communication & Médias","Construction & BTP","Consulting & Conseil","Culture & Arts","Éducation","Énergie","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Numérique & Technologies","Restauration","Santé, Soins & Thérapies","Services","Tourisme","Transport & Logistique","Autres"];
 
+/* Même palette que PVT_THEMES (profil-app.html) — la boutique choisit l'un de ces 5 thèmes
+   pour sa propre page (couleur dominante de sa vitrine) ; dupliquée ici plutôt que partagée en
+   module, ce sont 5 couleurs fixes de marque peu susceptibles de diverger. */
+const VIT_THEME_COLORS = { bordeaux:'#8E1B2E', ocean:'#1B4F8E', emeraude:'#1F6B4A', prune:'#4A2E6B', or:'#8A5E1A' };
+
 function renderVitrineCard(v) {
   const badge = DOMAIN_BADGE[v.domaine] || {bg:'#1B3A6B', label:(v.domaine||'BOUTIQUE').toUpperCase()};
+  /* Couleurs dominantes de la carte (2026-09-29, demande explicite : "inspire-toi des couleurs
+     dominantes de la boutique") — reprend le thème déjà choisi par le titulaire pour sa vraie
+     page boutique (vitrine_theme, voir PVT_THEMES/ownerSetVitrineTheme dans profil-app.html)
+     plutôt que d'extraire une couleur depuis une image (plus lourd, moins fiable) : c'est déjà
+     la couleur dominante voulue par le titulaire lui-même. */
+  const themeColor = VIT_THEME_COLORS[v.vitrine_theme] || VIT_THEME_COLORS.bordeaux;
   const initiales = String(v.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
     .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
   /* Corrigé (2026-09-29, demande explicite, capture à l'appui) : pointait vers initiative.html
@@ -2784,9 +2795,12 @@ function renderVitrineCard(v) {
      boutique_description ; sans ce nettoyage, le repli affichait les balises
      <p>/<b> telles quelles sur la carte (bug réel constaté en production, 2026-09-29). */
   const descBoutique = v.boutique_description || (v.description ? stripRichTags(v.description) : '');
+  /* Origine/Résidence plus visibles (2026-09-29, demande explicite) — simples <span> en texte
+     bleu jusqu'ici, faciles à manquer à côté des badges/produits. Chips pleines avec la couleur
+     du thème de la boutique, même logique que les pastilles de type/domaine juste au-dessus. */
   const locs = [];
-  if (v.origine1) locs.push(`<span>${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
-  if (v.pays) locs.push(`<span>${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
+  if (v.origine1) locs.push(`<span class="vit-loc-chip">${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
+  if (v.pays) locs.push(`<span class="vit-loc-chip">${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
   const noteHtml = v.nb_avis > 0 ? `<div class="vit-card-note">⭐ ${v.note_moyenne} (${v.nb_avis} avis)</div>` : '';
   const domainesSecondairesHtml = (v.domaines_secondaires||[]).length
     ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 6px;">${(v.domaines_secondaires||[]).map(d=>`<span style="font-size:10.5px;font-weight:700;color:var(--muted);background:var(--bg);border-radius:20px;padding:2px 8px;">${escapeHtml(d)}</span>`).join('')}</div>`
@@ -2800,11 +2814,19 @@ function renderVitrineCard(v) {
       </div>`).join('')}
     </div>` : '';
 
+  /* Descriptif modifiable par le compte (2026-09-29, demande explicite) — visible uniquement
+     au titulaire de CETTE boutique dans le listing public (jamais aux autres visiteurs).
+     stopPropagation indispensable : toute la carte est cliquable (onclick sur .vit-card). */
+  const estProprio = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && Number(CURRENT_USER.id) === Number(v.owner_user_id);
+  const descEditBtn = estProprio
+    ? `<button type="button" onclick="event.stopPropagation();vitEditDescription(${v.id},this)" title="Modifier le descriptif" style="background:none;border:none;color:${themeColor};cursor:pointer;font-size:12px;padding:0 0 0 4px;flex-shrink:0;">✏️</button>`
+    : '';
+
   return `
-  <div class="vit-card" onclick="window.location.href='${href}'">
-    <div class="vit-card-top">
-      <div class="vit-card-logo" style="${v.logo_url ? '' : `background:linear-gradient(135deg,${badge.bg},#0D1B2A);`}">
-        ${v.logo_url ? `<img src="${escapeHtml(v.logo_url)}" alt="${escapeHtml(nomBoutique)}" loading="lazy" onerror="this.parentElement.textContent='${initiales}';this.parentElement.style.background='linear-gradient(135deg,${badge.bg},#0D1B2A)';">` : initiales}
+  <div class="vit-card" style="border-color:${themeColor}33;" onclick="window.location.href='${href}'">
+    <div class="vit-card-top" style="background:linear-gradient(135deg,${themeColor}26,${themeColor}0d);">
+      <div class="vit-card-logo" style="${v.logo_url ? '' : `background:linear-gradient(135deg,${themeColor},#0D1B2A);`}">
+        ${v.logo_url ? `<img src="${escapeHtml(v.logo_url)}" alt="${escapeHtml(nomBoutique)}" loading="lazy" onerror="this.parentElement.textContent='${initiales}';this.parentElement.style.background='linear-gradient(135deg,${themeColor},#0D1B2A)';">` : initiales}
       </div>
       <div class="vit-card-headline">
         <div class="vit-card-title">${escapeHtml(nomBoutique)}</div>
@@ -2818,8 +2840,8 @@ function renderVitrineCard(v) {
       ${badgeVerifications(v, { small: true })}
       ${domainesSecondairesHtml}
       ${produitsHtml}
-      ${locs.length ? `<div class="vit-card-locs">${locs.join('')}</div>` : ''}
-      ${descBoutique ? `<div class="vit-card-desc">${escapeHtml(descBoutique)}</div>` : ''}
+      ${locs.length ? `<div class="vit-card-locs" style="--vc:${themeColor};">${locs.join('')}</div>` : ''}
+      ${(descBoutique || estProprio) ? `<div class="vit-card-desc" style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;-webkit-line-clamp:unset;overflow:visible;"><span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${descBoutique ? escapeHtml(descBoutique) : '<em>Aucun descriptif — cliquez sur ✏️ pour en ajouter un.</em>'}</span>${descEditBtn}</div>` : ''}
       ${noteHtml}
       <div class="vit-card-foot">
         <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Découvrir la boutique</a>
@@ -2827,6 +2849,43 @@ function renderVitrineCard(v) {
       </div>
     </div>
   </div>`;
+}
+
+/* Édition du descriptif directement depuis la carte du listing (2026-09-29, demande explicite :
+   "rends le descriptif modifiable par le compte") — petite fenêtre autonome (même patron que
+   les overlays de profil-app.html), pas de dépendance à editVitrineText() qui vit sur cette
+   autre page. Sauvegarde sur la même route que "Présentation de la boutique"
+   (PUT /api/initiatives/:id/vitrine, champ boutique_description), puis met à jour uniquement le
+   texte de CETTE carte plutôt que de recharger tout le listing. */
+function vitEditDescription(id, btn) {
+  const card = btn.closest('.vit-card');
+  const span = card?.querySelector('.vit-card-desc span');
+  const current = span ? span.textContent.trim() : '';
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px;" onclick="event.stopPropagation()">
+      <h3 style="margin:0 0 12px;font-size:15px;">✏️ Descriptif de la boutique</h3>
+      <textarea id="vit-edit-desc-ta" rows="4" maxlength="500" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font:inherit;resize:vertical;"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button type="button" class="btn btn-outline" onclick="this.closest('div[style*=fixed]').remove()">Annuler</button>
+        <button type="button" class="btn btn-orange" id="vit-edit-desc-save">Enregistrer</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', () => overlay.remove());
+  document.body.appendChild(overlay);
+  const ta = overlay.querySelector('#vit-edit-desc-ta');
+  ta.value = current === 'Aucun descriptif — cliquez sur ✏️ pour en ajouter un.' ? '' : current;
+  ta.focus();
+  overlay.querySelector('#vit-edit-desc-save').onclick = async () => {
+    const val = ta.value.trim();
+    try {
+      await api('PUT', `/initiatives/${id}/vitrine`, { boutique_description: val });
+      if (span) span.textContent = val || 'Aucun descriptif — cliquez sur ✏️ pour en ajouter un.';
+      overlay.remove();
+      if (typeof showToast === 'function') showToast('Descriptif mis à jour.', 'success');
+    } catch (e) { alert('Erreur : ' + (e.message || '')); }
+  };
 }
 
 async function initVitrines(){

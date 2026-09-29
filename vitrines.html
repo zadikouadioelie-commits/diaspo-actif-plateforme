@@ -116,7 +116,10 @@
 .vit-card-title{font-size:15px;font-weight:800;margin:0;line-height:1.3;color:var(--text);}
 .vit-card-desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.5;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.vit-card-locs{font-size:12px;color:#1B3A6B;display:flex;flex-wrap:wrap;gap:8px;}
+/* Origine/Résidence plus visibles (2026-09-29, demande explicite) — chips pleines colorées
+   (couleur du thème de la boutique, --vc) au lieu d'un simple texte bleu facile à manquer. */
+.vit-card-locs{display:flex;flex-wrap:wrap;gap:6px;}
+.vit-loc-chip{font-size:12px;font-weight:700;color:var(--vc,#1B3A6B);background:color-mix(in srgb, var(--vc,#1B3A6B) 12%, #fff);border:1px solid color-mix(in srgb, var(--vc,#1B3A6B) 30%, #fff);border-radius:20px;padding:3px 10px;}
 /* 3 produits vedettes (étoile en gestion de boutique) — grille compacte, jamais plus de 3. */
 .vit-card-products{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:2px 0;}
 .vit-prod-mini{text-align:center;min-width:0;}

@@ -8109,6 +8109,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
       id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
       domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
       boutique_nom: r.boutique_nom || null, boutique_description: r.boutique_description || null,
+      vitrine_theme: r.vitrine_theme || 'bordeaux',
       slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
       pays: r.pays, ville: r.ville,
       origine1: r.origine1 || r.owner_origine1 || null, origine2: r.origine2 || r.owner_origine2 || null,
