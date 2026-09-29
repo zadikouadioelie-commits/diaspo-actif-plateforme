@@ -17607,7 +17607,17 @@ const PUB_PLANS = [
   { id: "business", label: "Business", prix_annuel: 150, prix_mensuel_equiv: 12.50, quota_mensuel: 2 },
   { id: "premium",  label: "Premium",  prix_annuel: 200, prix_mensuel_equiv: 16.67, quota_mensuel: 4 },
 ];
-const PUB_SLOTS = ["homepage_feed", "between_posts", "between_videos", "vitrine_section"];
+/* Liste blanche des emplacements (2026-09-29) — "homepage_top", "inscription_sidebar_gauche",
+   "inscription_sidebar_droite" et "fil_sidebar" étaient déjà posés en HTML (index.html,
+   inscription.html, fil-actualite.html, data-ad-emplacement) mais absents d'ici : aucune
+   publicité ne pouvait jamais leur être assignée (filtrée par PUB_SLOTS.includes() à la création
+   ET au moment de servir), ces 4 emplacements étaient donc inertes depuis leur mise en ligne.
+   "evenements_sidebar" est le nouvel emplacement d'evenements-app.html (demande explicite). */
+const PUB_SLOTS = [
+  "homepage_feed", "between_posts", "between_videos", "vitrine_section",
+  "homepage_top", "inscription_sidebar_gauche", "inscription_sidebar_droite", "fil_sidebar",
+  "evenements_sidebar",
+];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
 
 route("GET", "/api/ads/plans", async (req, res) => {

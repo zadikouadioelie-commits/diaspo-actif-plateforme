@@ -4484,12 +4484,20 @@ function initProjetsDiaspoActif(){
 /* ---------- Régie publicitaire : diffusion d'une publicité approuvée sur un emplacement ---------- */
 function trackAdClic(id){ fetch(`/api/ads/${id}/clic`, { method:"POST" }).catch(()=>{}); }
 
-async function renderAdSlot(containerId, emplacement){
+/* opts.fallbackHtml (2026-09-29, demande explicite) : affiché à la place de l'emplacement au
+   lieu de le masquer quand aucune publicité active n'existe — utilisé pour "en attendant qu'il y
+   ait de la publicité, mets-y des informations sur la vision de Diaspo'Actif" (voir
+   evenements-app.html, data-ad-fallback). Sans fallbackHtml, comportement inchangé (masqué). */
+async function renderAdSlot(containerId, emplacement, opts = {}){
   const el = document.getElementById(containerId);
   if (!el) return;
   try {
     const r = await fetch(`/api/ads/servir?emplacement=${emplacement}`).then(x => x.json());
-    if (!r.ad) { el.style.display = "none"; return; }
+    if (!r.ad) {
+      if (opts.fallbackHtml) { el.innerHTML = opts.fallbackHtml; el.style.display = ""; }
+      else el.style.display = "none";
+      return;
+    }
     const ad = r.ad;
     const clic = `onclick="trackAdClic(${ad.id})"`;
     el.innerHTML = `<div style="display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
@@ -4504,12 +4512,29 @@ async function renderAdSlot(containerId, emplacement){
       ${ad.lien_url ? `<a href="${ad.lien_url}" target="_blank" rel="noopener sponsored" class="btn btn-orange" style="flex-shrink:0;font-size:13px;" ${clic}>${ad.cta}</a>` : ""}
     </div>`;
     el.style.display = "";
-  } catch(e) { el.style.display = "none"; }
+  } catch(e) {
+    if (opts.fallbackHtml) { el.innerHTML = opts.fallbackHtml; el.style.display = ""; }
+    else el.style.display = "none";
+  }
 }
 
+/* data-ad-fallback="<id d'un <template>>" et data-ad-rotate="<ms>" (2026-09-29, demande
+   explicite : "chaque minute, il y a une nouvelle publicité qui va s'afficher") — deux attributs
+   optionnels lus ici, sans effet sur les emplacements existants qui ne les déclarent pas (aucun
+   changement de comportement pour eux). Le nouvel appel de /api/ads/servir à chaque tick choisit
+   déjà une publicité au hasard parmi les actives (ORDER BY RANDOM() côté serveur) : un simple
+   re-fetch périodique suffit à obtenir "une nouvelle" publicité sans logique de rotation dédiée. */
 function renderAllAdSlots(){
   document.querySelectorAll("[data-ad-emplacement]").forEach(el=>{
-    if (el.id) renderAdSlot(el.id, el.dataset.adEmplacement);
+    if (!el.id) return;
+    const opts = {};
+    if (el.dataset.adFallback) {
+      const tpl = document.getElementById(el.dataset.adFallback);
+      if (tpl) opts.fallbackHtml = tpl.innerHTML;
+    }
+    renderAdSlot(el.id, el.dataset.adEmplacement, opts);
+    const rotateMs = parseInt(el.dataset.adRotate, 10);
+    if (rotateMs > 0) setInterval(() => renderAdSlot(el.id, el.dataset.adEmplacement, opts), rotateMs);
   });
 }
 

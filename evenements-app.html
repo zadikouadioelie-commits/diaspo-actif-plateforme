@@ -63,6 +63,24 @@
      liste de cartes événements, les deux sections se lisaient comme une seule. */
   .evt-suggest-col{margin-top:28px;border-top:3px solid var(--orange,#ff6b00);box-shadow:0 2px 12px rgba(0,0,0,.08);}
 }
+/* Emplacement publicitaire (2026-09-29, demande explicite : "décaler tout à gauche et laisser
+   de l'espace à droite pour les publicités") — le conteneur ci-dessus reste à max-width:1400px
+   et le trio filtres/événements/suggestions n'est PAS touché (zéro risque de casse) ; on ajoute
+   simplement, à côté, un panneau qui n'apparaît QUE quand il reste vraiment de la place libre à
+   droite du conteneur (écrans très larges) — jamais au détriment de la mise en page normale.
+   Bandeau "Espace publicitaire" toujours visible ; en dessous, la vision Diaspo'Actif tant
+   qu'aucune publicité active n'existe pour cet emplacement (voir renderAdSlot/data-ad-fallback
+   dans assets/app.js), remplacée automatiquement par une publicité dès qu'il y en a une, avec
+   rotation toutes les 60s (data-ad-rotate) s'il y en a plusieurs. */
+#evt-page-row{display:flex;gap:24px;align-items:flex-start;justify-content:center;}
+#evt-page-row>main{margin:0;}
+.evt-ad-col{display:none;flex:1;min-width:280px;max-width:360px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
+@media(min-width:1700px){
+  #evt-page-row{justify-content:flex-start;}
+  .evt-ad-col{display:block;}
+}
+.evt-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
+.evt-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
 .evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
 .evt-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .15s;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .evt-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
@@ -250,6 +268,7 @@
   <a class="evt-identity-link" href="/agenda.html">📅 Mon Agenda →</a>
 </div>
 
+<div id="evt-page-row">
 <main class="container" style="max-width:1400px;padding-top:28px;padding-bottom:48px">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
@@ -298,6 +317,23 @@
     </aside>
   </div>
 </main>
+
+<!-- ═══ EMPLACEMENT PUBLICITAIRE (2026-09-29, demande explicite) — visible uniquement quand il
+     reste de la place à droite (voir @media(min-width:1700px) ci-dessus), jamais au détriment de
+     la mise en page ci-dessus. Contenu de secours (vision Diaspo'Actif) tant qu'aucune publicité
+     active n'existe pour cet emplacement ; rotation automatique toutes les 60s s'il y en a
+     plusieurs (data-ad-rotate, voir renderAllAdSlots() dans assets/app.js). ═══ -->
+<aside class="evt-ad-col">
+  <div class="evt-col-title">📢 Espace publicitaire</div>
+  <template id="evt-ad-fallback">
+    <div class="evt-ad-vision">
+      <strong>Pourquoi Diaspo'Actif ?</strong>
+      Une diaspora unie, actrice du développement. La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.
+    </div>
+  </template>
+  <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-fallback="evt-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
+</aside>
+</div>
 
 <!-- ═══ MODAL CRÉATION ÉVÉNEMENT (enrichie) ═══ -->
 <div class="modal-bg" id="modal-bg">
