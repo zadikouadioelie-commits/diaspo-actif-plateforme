@@ -1280,6 +1280,24 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscInscriptionsArchive]', e.message); }
 })();
 
+/* Journal de la sauvegarde quotidienne (2026-09-29, demande explicite : "un code que je vais
+   mettre quelque part pour vérifier automatiquement") — une ligne par tentative de
+   /api/cron/backup (succès ou échec), lue par /api/backup-status et /api/cron/backup-verify
+   pour détecter une nuit sans sauvegarde réussie sans avoir besoin d'interroger Bunny. */
+(async function migrateBackupJournal() {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS backup_journal (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ran_at TEXT DEFAULT (datetime('now')),
+      succes INTEGER NOT NULL DEFAULT 0,
+      tables_count INTEGER,
+      rows_count INTEGER,
+      taille_octets INTEGER,
+      erreur TEXT
+    )`).run();
+  } catch (e) { console.error('[migrateBackupJournal]', e.message); }
+})();
+
 /* Rattrapage FAQ (2026-09-28) : le seed initial de faq_questions ne rejoue jamais sur une base
    déjà peuplée (voir faqCatCount===0 dans migrateChatbot ci-dessous) — sans cette mise à jour
    ciblée, la question "Comment faire vérifier mon organisation ?" garderait son ancien texte en
@@ -26854,10 +26872,76 @@ async function handleRequest(req, res) {
         }
       } catch (e) { console.error('[backup] cleanup error:', e.message); }
 
+      try {
+        await db.prepare(`INSERT INTO backup_journal (succes, tables_count, rows_count, taille_octets) VALUES (1,?,?,?)`)
+          .run(tables.length, totalRows, buffer.length);
+      } catch (e) { console.error('[backup] journal error:', e.message); }
       sendJSON(res, 200, { ok: true, filename, tables: tables.length, rows: totalRows });
     } catch (e) {
       console.error('[backup]', e.stack || e.message);
+      try {
+        await db.prepare(`INSERT INTO backup_journal (succes, erreur) VALUES (0,?)`).run(String(e.message || e).slice(0, 500));
+      } catch (e2) { console.error('[backup] journal error:', e2.message); }
       sendJSON(res, 500, { error: 'Backup failed', detail: e.message });
+    }
+    return;
+  }
+
+  /* ── GET /api/backup-status — vérification automatique de la sauvegarde quotidienne
+     (2026-09-29, demande explicite : "un code que je vais mettre quelque part pour vérifier
+     automatiquement") — lit backup_journal plutôt que d'interroger Bunny directement (pas
+     besoin des identifiants Bunny pour ce simple contrôle de statut). Public et en lecture
+     seule : ne révèle qu'un horodatage et des compteurs, rien de sensible, pensé pour être
+     appelé par un moniteur externe (UptimeRobot, cron-job.org, ou un script local) sans
+     secret à transmettre. */
+  if (pathname === '/api/backup-status' && req.method === 'GET') {
+    try {
+      const dernier = await db.prepare(`SELECT * FROM backup_journal ORDER BY id DESC LIMIT 1`).get();
+      const dernierSucces = await db.prepare(`SELECT * FROM backup_journal WHERE succes=1 ORDER BY id DESC LIMIT 1`).get();
+      const heuresDepuisSucces = dernierSucces ? (Date.now() - new Date(dernierSucces.ran_at.replace(' ', 'T') + 'Z')) / 3600000 : null;
+      // Cron quotidien à 3h UTC : au-delà de 26h sans succès, quelque chose a sauté (marge de 2h).
+      const enRetard = heuresDepuisSucces === null || heuresDepuisSucces > 26;
+      sendJSON(res, enRetard ? 503 : 200, {
+        ok: !enRetard,
+        derniere_tentative: dernier ? { le: dernier.ran_at, succes: !!dernier.succes, erreur: dernier.erreur || null } : null,
+        dernier_succes: dernierSucces ? { le: dernierSucces.ran_at, tables: dernierSucces.tables_count, lignes: dernierSucces.rows_count, taille_mo: dernierSucces.taille_octets ? +(dernierSucces.taille_octets / 1024 / 1024).toFixed(2) : null } : null,
+        heures_depuis_succes: heuresDepuisSucces !== null ? +heuresDepuisSucces.toFixed(1) : null,
+        en_retard: enRetard,
+      });
+    } catch (e) {
+      sendJSON(res, 500, { error: 'Impossible de lire le statut.', detail: e.message });
+    }
+    return;
+  }
+
+  /* ── GET /api/cron/backup-verify — alerte par e-mail si la sauvegarde n'a pas tourné
+     (2026-09-29) — cron séparé, programmé 2h après /api/cron/backup (3h UTC), pour laisser le
+     temps à une exécution lente/retentée. Sans ça, un /api/cron/backup qui échoue silencieusement
+     (ex. identifiants Bunny expirés) ne serait jamais remarqué avant d'en avoir besoin. */
+  if (pathname === '/api/cron/backup-verify') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return sendJSON(res, 401, { error: "Non autorisé." });
+    }
+    try {
+      const dernierSucces = await db.prepare(`SELECT * FROM backup_journal WHERE succes=1 ORDER BY id DESC LIMIT 1`).get();
+      const heuresDepuisSucces = dernierSucces ? (Date.now() - new Date(dernierSucces.ran_at.replace(' ', 'T') + 'Z')) / 3600000 : Infinity;
+      const enRetard = heuresDepuisSucces > 26;
+      if (enRetard) {
+        const dernierEchec = await db.prepare(`SELECT * FROM backup_journal WHERE succes=0 ORDER BY id DESC LIMIT 1`).get();
+        try {
+          const { sendEmail } = require('./mailer');
+          await sendEmail({
+            to: 'contact@diaspoactif.com',
+            subject: "⚠️ Sauvegarde Diaspo'Actif en retard",
+            html: `<p>Aucune sauvegarde réussie depuis ${dernierSucces ? new Date(dernierSucces.ran_at.replace(' ', 'T') + 'Z').toLocaleString('fr-FR') : 'jamais'}.</p>${dernierEchec ? `<p>Dernier échec : ${new Date(dernierEchec.ran_at.replace(' ', 'T') + 'Z').toLocaleString('fr-FR')} — ${dernierEchec.erreur || 'raison inconnue'}.</p>` : ''}<p>Vérifiez /api/backup-status et les identifiants BACKUP_BUNNY_ZONE/BACKUP_BUNNY_KEY sur Vercel.</p>`,
+          });
+        } catch (e) { console.error('[backup-verify] envoi alerte échoué:', e.message); }
+      }
+      sendJSON(res, 200, { ok: true, en_retard: enRetard, alerte_envoyee: enRetard });
+    } catch (e) {
+      sendJSON(res, 500, { error: 'Vérification impossible.', detail: e.message });
     }
     return;
   }
