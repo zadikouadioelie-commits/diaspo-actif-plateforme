@@ -69,6 +69,11 @@
       <a href="reseau.html" class="sb-premium" data-aide="reseau_pro" title="Module premium — réservé aux comptes Abonné" style="display:none;">👑 Mon Réseau Pro <span class="pill" id="u-reseau-badge" style="display:none;"></span></a>
       <a href="business-plan.html" class="sb-premium" title="Module premium — réservé aux comptes Abonné" data-aide="business_plans">👑 Business Plans</a>
       <a href="#" data-usection="outils" data-aide="cv_lettres">📄 CV, Lettres, Candidatures</a>
+      <!-- CRM partagé (2026-09-29, demande explicite) — visible seulement si le compte a au
+           moins une collaboration CRM acceptée (voir GET /api/crm/mes-crm), affiché/masqué par
+           le script plus bas. Vert distinctif (demande explicite : "un bouton vert nommé CRM
+           partagé"), CRM lui-même rendu par dashboard-initiative.html (mode collaborateur). -->
+      <a href="dashboard-initiative.html#crm" id="u-crm-partage-link" data-aide="crm_partage" style="display:none;background:#16a34a!important;color:#fff!important;font-weight:700;">🟢 CRM partagé</a>
       <a href="mes-billets.html" data-aide="mes_billets">🎟 Mes Billets</a>
       <a href="mes-devis.html" data-aide="mes_devis">📩 Mes demandes de devis</a>
       <a href="mes-paiements.html" data-aide="paiements_utilisateur">💳 Paiements</a>
@@ -618,6 +623,15 @@ function fmtDate(d){if(!d)return '';try{return new Date(d).toLocaleDateString('f
     const convs = (r.conversations||[]).slice(0,5);
     const nonLus = convs.reduce((a,c)=>a+(c.non_lus||0),0);
     if(nonLus>0){ const p=document.getElementById('u-msg-pill'); if(p){p.textContent=nonLus;p.style.display='';} }
+    /* CRM partagé (2026-09-29, demande explicite) — visible seulement si le compte a au moins
+       une collaboration CRM acceptée ; jamais de proprietaire ici (GET /api/crm/mes-crm ne peut
+       renvoyer un rôle "proprietaire" que pour un compte Initiative, jamais Utilisateur). Le CRM
+       lui-même reste entièrement rendu par dashboard-initiative.html (mode collaborateur, voir
+       renderCrmCollaborateurMode) — pas de duplication de toute cette UI ici. */
+    try {
+      const { disponibles = [] } = await api('GET', '/crm/mes-crm');
+      if (disponibles.length) { const lienCrm = document.getElementById('u-crm-partage-link'); if (lienCrm) lienCrm.style.display = ''; }
+    } catch (e) {}
     document.getElementById('u-kpi-msgs').textContent = nonLus || '0';
     convEl.innerHTML = convs.length
       ? convs.map(c=>`<a href="messagerie.html" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;">
