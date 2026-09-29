@@ -17716,6 +17716,9 @@ const PUB_SLOTS = [
   "homepage_feed", "between_posts", "between_videos", "vitrine_section",
   "homepage_top", "inscription_sidebar_gauche", "inscription_sidebar_droite", "fil_sidebar",
   "evenements_sidebar",
+  // "annuaire_sidebar" (2026-09-29, demande explicite) : colonne latérale à droite de la grille
+  // de comptes (annuaire.html), distincte de "vitrine_section" (bandeau au-dessus de la grille).
+  "annuaire_sidebar",
 ];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
 

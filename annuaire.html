@@ -138,6 +138,20 @@
 @media(max-width:780px){.ann-grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:480px){.ann-grid{grid-template-columns:1fr;}}
 
+/* Emplacement publicitaire (2026-09-29, demande explicite : même principe qu'evenements-app.html
+   "décaler tout à gauche et laisser de l'espace à droite pour les publicités", appliqué ici à la
+   grille des 4 colonnes de comptes) — .ann-grid garde son max-width:1180px et son
+   comportement/contenu inchangés (zéro risque de casse), la colonne pub n'apparaît QUE quand il
+   reste vraiment de la place libre à droite (écran large). */
+#ann-page-row{display:flex;gap:24px;align-items:flex-start;justify-content:center;}
+.ann-ad-col{display:none;flex:1;min-width:280px;max-width:360px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
+@media(min-width:1550px){
+  #ann-page-row{justify-content:flex-start;}
+  .ann-ad-col{display:block;}
+}
+.ann-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
+.ann-ad-vision strong{display:block;color:var(--text);font-size:13.5px;margin-bottom:6px;}
+
 /* Styles de la carte (.ann-card et son contenu) : extraits dans assets/annuaire-cards.css
    (2026-09-20) pour être réutilisés tels quels par toute autre page qui appelle
    renderInitiativeCard()/renderPersonCard()/renderOrganismeCard() (assets/app.js) — voir
@@ -354,8 +368,26 @@
     <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" style="display:none;"></div>
   </div>
 
+  <div id="ann-page-row">
   <div class="ann-grid" id="init-list">
     <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
+  </div>
+
+  <!-- ═══ EMPLACEMENT PUBLICITAIRE (2026-09-29, demande explicite) — visible uniquement quand il
+       reste de la place à droite. Contenu de secours (vision Diaspo'Actif) tant qu'aucune
+       publicité active n'existe ; rotation toutes les 60s s'il y en a plusieurs (data-ad-rotate,
+       voir renderAllAdSlots() dans assets/app.js). Distinct de "vitrine_section" ci-dessus (bandeau
+       horizontal au-dessus de la grille), aucun conflit. ═══ -->
+  <aside class="ann-ad-col">
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;">📢 Espace publicitaire</div>
+    <template id="ann-ad-fallback">
+      <div class="ann-ad-vision">
+        <strong>Pourquoi Diaspo'Actif ?</strong>
+        Une diaspora unie, actrice du développement. La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.
+      </div>
+    </template>
+    <div id="ad-annuaire-sidebar" data-ad-emplacement="annuaire_sidebar" data-ad-fallback="ann-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
+  </aside>
   </div>
 
   <!-- ===== CTA ===== -->
