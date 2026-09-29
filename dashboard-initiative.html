@@ -10055,6 +10055,24 @@ const CRM_PIPELINE_STATUTS = [
   ['devis_envoye', 'Devis envoyé'], ['negociation', 'Négociation'], ['gagne', 'Gagné'], ['perdu', 'Perdu'],
 ];
 function crmStatutLabel(k) { return (CRM_PIPELINE_STATUTS.find(s => s[0] === k) || [null, k])[1]; }
+/* Cartouches de couleur par étape du pipeline (2026-09-29, demande explicite : "des petites
+   cartouches de couleurs différentes pour que, visuellement, ce soit facile de déterminer qui a
+   été perdu, qui a été envoyé un devis, etc.") — même palette oklch [fond, texte] que les autres
+   badges de statut de la plateforme (Validation/Candidature/etc.), progression neutre → chaud →
+   vert/rouge pour rester lisible d'un coup d'œil. */
+const CRM_STATUT_COLORS = {
+  nouveau:      ['oklch(0.94 0.02 258)', 'oklch(0.45 0.08 258)'],
+  contacte:     ['oklch(0.93 0.06 200)', 'oklch(0.42 0.12 200)'],
+  interesse:    ['oklch(0.93 0.07 300)', 'oklch(0.42 0.14 300)'],
+  devis_envoye: ['oklch(0.94 0.07 85)',  'oklch(0.42 0.13 85)'],
+  negociation:  ['oklch(0.92 0.07 265)', 'oklch(0.42 0.15 265)'],
+  gagne:        ['oklch(0.94 0.05 150)', 'oklch(0.4 0.13 150)'],
+  perdu:        ['oklch(0.94 0.05 20)',  'oklch(0.42 0.16 20)'],
+};
+function crmStatutBadge(k) {
+  const [bg, color] = CRM_STATUT_COLORS[k] || CRM_STATUT_COLORS.nouveau;
+  return `<span style="display:inline-block;font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${crmEsc(crmStatutLabel(k))}</span>`;
+}
 let CRM_TAB = 'dashboard';
 let CRM_CONTACTS_CACHE = [];
 let CRM_LISTES_CACHE = [];
@@ -10372,6 +10390,11 @@ async function crmOpenContactForm(id, defaultRelation) {
       </div>
       ${crmAssigneSelectHtml('crm-c-assigne', c.assigne_a)}
     </div>
+    ${extra?.pipeline ? `
+    <div style="margin-top:10px;">
+      <label>Étape du pipeline ${crmStatutBadge(extra.pipeline.statut)}</label>
+      <select id="crm-c-pipeline-statut">${CRM_PIPELINE_STATUTS.map(([k, l]) => `<option value="${k}" ${extra.pipeline.statut === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    </div>` : ''}
     <div style="margin-top:10px;"><label>Notes</label><textarea id="crm-c-notes" rows="3" style="width:100%;">${crmEsc(c.notes)}</textarea></div>
     <div id="crm-attach-zone">${crmAttachmentsHtml()}</div>
     <div style="display:flex;justify-content:space-between;margin-top:16px;">
@@ -10405,6 +10428,12 @@ async function crmSaveContact(id) {
   if (!body.nom) { alert('Le nom est requis.'); return; }
   try {
     if (id) await api('PUT', `/crm/contacts/${id}`, body); else await api('POST', '/crm/contacts', body);
+    /* Étape du pipeline (2026-09-29, demande explicite : "aucune action possible pour le faire
+       évoluer... selon son statut") — champ affiché uniquement pour un prospect déjà suivi (voir
+       crmOpenContactForm), enregistré séparément via la route déjà existante PATCH
+       /crm/pipeline/:contactId (jusqu'ici seule accessible en glissant une carte sur le kanban). */
+    const statutEl = document.getElementById('crm-c-pipeline-statut');
+    if (id && statutEl) await api('PATCH', `/crm/pipeline/${id}`, { statut: statutEl.value });
     crmCloseModal(); crmRefreshCurrentTab();
   } catch (e) { alert(e.message || 'Erreur.'); }
 }
@@ -10423,19 +10452,27 @@ async function crmRenderProspects() {
       : '<p style="color:var(--muted);">Aucun prospect pour l’instant — marquez un contact comme « Prospect » ou créez-en un directement.</p>';
     if (!pipeline.length) return;
     const board = document.getElementById('crm-kanban');
+    /* Colonnes plus larges et plus espacées (2026-09-29, demande explicite : "pas compressé,
+       mais bien exposé") — 240px → 260px, padding et marges augmentés, liseré de couleur en
+       haut de chaque colonne (même couleur que la cartouche de ses cartes) pour repérer l'étape
+       d'un seul coup d'œil même de loin, sans avoir à lire le libellé. */
     board.innerHTML = CRM_PIPELINE_STATUTS.map(([key, label]) => {
       const cards = pipeline.filter(p => p.statut === key);
-      return `<div data-statut="${key}" style="flex:0 0 220px;background:var(--bg);border-radius:10px;padding:10px;min-height:200px;"
+      const [, accent] = CRM_STATUT_COLORS[key] || CRM_STATUT_COLORS.nouveau;
+      return `<div data-statut="${key}" style="flex:0 0 260px;background:var(--bg);border-radius:10px;border-top:3px solid ${accent};padding:12px;min-height:220px;"
                 ondragover="event.preventDefault();this.style.background='#e2e8f0';" ondragleave="this.style.background='var(--bg)';" ondrop="crmKanbanDrop(event,'${key}')">
-        <div style="font-weight:800;font-size:12px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">${label} (${cards.length})</div>
+        <div style="font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:10px;">${label} (${cards.length})</div>
         ${cards.map(p => `
           <div class="card" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${p.contact_id}')"
-               style="padding:10px;margin-bottom:8px;cursor:grab;" onclick="crmOpenContactForm(${p.contact_id})">
-            <div style="font-weight:700;font-size:13px;">${crmEsc(p.prenom || '')} ${crmEsc(p.nom)}</div>
-            ${p.societe ? `<div style="font-size:11.5px;color:var(--muted);">${crmEsc(p.societe)}</div>` : ''}
-            ${p.valeur_potentielle ? `<div style="font-size:12px;font-weight:700;color:var(--orange);margin-top:4px;">${Number(p.valeur_potentielle).toLocaleString('fr-FR')} €</div>` : ''}
-            ${p.prochaine_action ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">➡️ ${crmEsc(p.prochaine_action)}</div>` : ''}
-            ${crmAssigneBadge(p.assigne_nom, p.assigne_prenom) ? `<div style="margin-top:4px;">${crmAssigneBadge(p.assigne_nom, p.assigne_prenom)}</div>` : ''}
+               style="padding:12px;margin-bottom:10px;cursor:grab;" onclick="crmOpenContactForm(${p.contact_id})">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div style="font-weight:700;font-size:13px;">${crmEsc(p.prenom || '')} ${crmEsc(p.nom)}</div>
+              ${crmStatutBadge(p.statut)}
+            </div>
+            ${p.societe ? `<div style="font-size:11.5px;color:var(--muted);margin-top:3px;">${crmEsc(p.societe)}</div>` : ''}
+            ${p.valeur_potentielle ? `<div style="font-size:12px;font-weight:700;color:var(--orange);margin-top:6px;">${Number(p.valeur_potentielle).toLocaleString('fr-FR')} €</div>` : ''}
+            ${p.prochaine_action ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;">➡️ ${crmEsc(p.prochaine_action)}</div>` : ''}
+            ${crmAssigneBadge(p.assigne_nom, p.assigne_prenom) ? `<div style="margin-top:6px;">${crmAssigneBadge(p.assigne_nom, p.assigne_prenom)}</div>` : ''}
           </div>`).join('')}
       </div>`;
     }).join('');
