@@ -1186,8 +1186,9 @@ async function init() {
       try { await renderEnrichedColumns(); } catch(e) { console.warn('colonnes enrichies:', e); }
     }
   } catch(e) {
-    document.getElementById('p-sections').innerHTML =
-      '<div class="p-section"><p style="color:red">Profil introuvable ou erreur serveur.</p></div>';
+    console.error('[profil init]', e);
+    document.getElementById('root-page').innerHTML =
+      '<div class="p-section" style="padding:40px;text-align:center"><p style="color:red">Profil introuvable ou erreur serveur.</p></div>';
   }
 
   /* Retour depuis Stripe Checkout (commande boutique) */
