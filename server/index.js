@@ -2529,8 +2529,8 @@ route("POST", "/api/upload/document", async (req, res) => {
 });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
-const MAX_PRODUITS_VITRINE = 20;
-const MAX_ARTICLES_PAR_CATALOGUE = 5;
+const MAX_PRODUITS_VITRINE = 100;
+const MAX_ARTICLES_PAR_CATALOGUE = 10;
 
 /* ── Demandes de devis — machine à statuts (2026-09-07) ──
    Pas de contrainte CHECK sur devis_demandes.statut (même choix que STATUTS_PROJETS_DA, voir

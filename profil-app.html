@@ -2941,7 +2941,7 @@ async function renderVitrineVisitor(init) {
   _produitsVitrine = produits;
   _boutiqueInit = init;
 
-  // Charger les catalogues (regroupement des articles par univers, max 5 articles/catalogue)
+  // Charger les catalogues (regroupement des articles par univers, max 10 articles/catalogue)
   let catalogues = [];
   try { const rc = await api('GET', `/initiatives/${init.id}/catalogues`); catalogues = rc.catalogues || []; } catch (e) { catalogues = []; }
   _cataloguesVitrine = catalogues;
@@ -4295,7 +4295,7 @@ function pvtProductCardHtml(p, ownerId) {
   </div>`;
 }
 
-/* ══════════ Catalogues (regroupement des articles, max 5 articles/catalogue) ══════════ */
+/* ══════════ Catalogues (regroupement des articles, max 10 articles/catalogue) ══════════ */
 function renderPvtCatalogues(catalogues, produits, ownerId) {
   const grid = document.getElementById('pvt-cataloguesgrid');
   if (!grid) return;
@@ -4792,10 +4792,10 @@ async function editVitrineText(field, label, placeholder) {
 }
 
 /* ======================================================
-   BOUTIQUE (produits de la Vitrine, max 20)
+   BOUTIQUE (produits de la Vitrine, max 100)
    ====================================================== */
-const MAX_PRODUITS_VITRINE = 20;
-const MAX_ARTICLES_PAR_CATALOGUE = 5;
+const MAX_PRODUITS_VITRINE = 100;
+const MAX_ARTICLES_PAR_CATALOGUE = 10;
 let _produitsVitrine = [];
 let _cataloguesVitrine = [];
 let _boutiqueDragId = null;
