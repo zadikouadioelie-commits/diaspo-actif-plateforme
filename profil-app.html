@@ -902,7 +902,7 @@ html, body { overflow-x:clip; }
 .pvt-services-list { padding:16px 20px; display:flex; flex-direction:column; gap:11px; }
 .pvt-service-row { display:flex; align-items:center; gap:11px; font-size:13px; color:#3B4658; }
 .pvt-service-ico { width:34px; height:34px; border-radius:9px; flex:none; background:var(--vsoft); display:flex; align-items:center; justify-content:center; font-size:16px; }
-.pvt-gallery { padding:18px 22px; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+.pvt-gallery { padding:18px 22px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,150px)); gap:12px; justify-content:center; }
 .pvt-gallery img { width:100%; height:130px; object-fit:cover; border-radius:12px; }
 .pvt-actu-item { display:flex; gap:12px; padding:14px 0; border-top:1px solid rgba(94,14,28,.08); }
 .pvt-actu-item:first-child { border-top:none; padding-top:0; }
@@ -3080,17 +3080,23 @@ async function renderVitrineVisitor(init) {
      image n'a été choisie (pas d'espace vide/placeholder montré au public) ; pour le
      propriétaire sans image, un bouton "+ Ajouter une image" occupe cet espace à la place. */
   const presentationImageHtml = init.vitrine_presentation_image_url
-    ? `<div style="position:relative;flex-shrink:0;width:180px;">
-        <img src="${esc(init.vitrine_presentation_image_url)}" alt="" style="width:180px;height:180px;object-fit:cover;border-radius:10px;display:block;">
+    ? `<div style="position:relative;flex-shrink:0;width:360px;">
+        <img src="${esc(init.vitrine_presentation_image_url)}" alt="" style="width:360px;height:360px;object-fit:contain;border-radius:10px;display:block;">
         ${isOwn ? `<button type="button" onclick="pvtRemovePresentationImage()" title="Retirer l'image" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:13px;line-height:1;">✕</button>` : ''}
       </div>`
-    : (isOwn ? `<button type="button" onclick="pvtChangePresentationImage()" style="flex-shrink:0;width:180px;height:180px;border:1.5px dashed var(--vsoftbd,#cbd5e1);border-radius:10px;background:none;color:#94a3b8;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+    : (isOwn ? `<button type="button" onclick="pvtChangePresentationImage()" style="flex-shrink:0;width:360px;height:360px;border:1.5px dashed var(--vsoftbd,#cbd5e1);border-radius:10px;background:none;color:#94a3b8;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
         <span style="font-size:24px;">🖼️</span>Ajouter une image
       </button>` : '');
+  /* Photo entière + agrandie + tout centré (2026-09-29, demande explicite : "présente la photo
+     entière... augmente la taille de 100%... que les textes et l'espace dans lequel ils
+     évoluent soient centrés... y compris la galerie") — object-fit:contain (plus "cover", qui
+     recadrait) et 360px (le double de 180px). justify-content:center sur la ligne texte+image
+     pour qu'elle se centre comme un bloc plutôt que de coller à gauche avec du vide à droite ;
+     text-align:center sur le texte ; même traitement sur .pvt-gallery plus bas. */
   const presentation = ((init.description || isOwn) && modOn('a_propos')) ? `<section id="pv-presentation" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la boutique</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
-    <div class="pvt-section-body" style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
-      <div style="flex:1 1 260px;min-width:0;">
+    <div class="pvt-section-body" style="display:flex;gap:20px;align-items:center;justify-content:center;flex-wrap:wrap;text-align:center;">
+      <div style="flex:1 1 260px;min-width:0;max-width:520px;">
         <div id="pvt-desc-text" class="rich-content ${init.description ? 'pvt-desc-clamp' : ''}" style="margin:0;font-size:14px;">${init.description ? renderRichText(init.description) : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</div>
         ${init.description ? `<button type="button" class="pvt-desc-more" onclick="pvtToggleDescription(this)">En savoir plus ▾</button>` : ''}
       </div>
