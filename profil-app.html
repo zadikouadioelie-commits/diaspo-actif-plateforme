@@ -3819,10 +3819,91 @@ function pvtEditVideos() {
   pvtOpenListEditor({ field:'vitrine_videos_json', title:'Galerie vidéos', itemLabel:'une vidéo',
     itemFields:[{key:'url',label:'Lien de la vidéo (YouTube ou Vimeo)'},{key:'titre',label:'Titre (facultatif)'}] });
 }
+/* Portfolio — éditeur à upload réel (2026-09-29, demande explicite : "que ça lui permette
+   d'avoir énormément de photos de la même façon qu'un compte photographe"). Remplace l'ancien
+   pvtOpenListEditor() générique qui demandait de COLLER une URL d'image à la main — inutilisable
+   pour un photographe qui veut simplement envoyer ses photos. Garde exactement la même forme de
+   données ({image,titre,description,lien}, voir portfolioSec plus haut qui les affiche déjà
+   correctement) : seule la façon de les CRÉER change, rien à toucher côté rendu public.
+   Sélection multiple de fichiers en un seul geste (input multiple) plutôt qu'un aller-retour
+   par photo — c'est ce qui rend "énormément de photos" réellement praticable. Aucune limite de
+   nombre posée ici (comme l'ancien éditeur) : un compte photographe doit pouvoir en ajouter
+   autant qu'il le souhaite. */
 function pvtEditPortfolio() {
-  pvtOpenListEditor({ field:'vitrine_portfolio_json', title:'Portfolio', itemLabel:'une réalisation',
-    itemFields:[{key:'titre',label:'Titre du projet'},{key:'description',label:'Description courte'},
-                {key:'image',label:"Lien de l'image (facultatif)"},{key:'lien',label:'Lien externe (facultatif)'}] });
+  if (!isOwn || !_vitrineInit) return;
+  const items = safeParseJson(_vitrineInit.vitrine_portfolio_json, []);
+  document.getElementById('pvt-portfolio-modal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'pvt-portfolio-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;padding:22px;max-height:88vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;gap:10px;">
+      <h2 style="margin:0;font-size:16px;">🗂️ Portfolio</h2>
+      <button onclick="document.getElementById('pvt-portfolio-modal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;flex-shrink:0;">✕</button>
+    </div>
+    <p style="font-size:12.5px;color:#6B7686;margin:0 0 16px;">Envoyez vos photos directement — titre, description et lien externe sont facultatifs.</p>
+    <div id="pvt-portfolio-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px;"></div>
+    <label style="display:block;border:1.5px dashed #cbd5e1;border-radius:10px;padding:14px;text-align:center;font-size:13px;color:#6B7686;cursor:pointer;margin-bottom:18px;">
+      ➕ Ajouter des photos
+      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none;" onchange="pvtPortfolioAjouterFichiers(this.files)">
+    </label>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('pvt-portfolio-modal').remove()" style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;">Annuler</button>
+      <button onclick="pvtPortfolioSave()" style="padding:9px 16px;border-radius:8px;border:none;background:var(--v1,#8E1B2E);color:#fff;font-weight:700;cursor:pointer;">Enregistrer</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  window._pvtPortfolioItems = items.map(it => ({ image: it.image || '', titre: it.titre || '', description: it.description || '', lien: it.lien || '' }));
+  pvtPortfolioRender();
+}
+function pvtPortfolioRender() {
+  const grid = document.getElementById('pvt-portfolio-grid');
+  if (!grid) return;
+  const items = window._pvtPortfolioItems || [];
+  grid.innerHTML = items.map((it, i) => `
+    <div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="position:relative;background:${it.image ? `#EDF1F6 url('${esc(it.image)}') center/cover` : '#EDF1F6'};height:130px;display:flex;align-items:center;justify-content:center;">
+        ${it.image ? '' : '<span style="font-size:22px;opacity:.4;">🖼️</span>'}
+        <button onclick="pvtPortfolioRetirer(${i})" title="Retirer cette photo" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;font-size:12px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:6px;">
+        <input data-k="titre" data-i="${i}" placeholder="Titre du projet" value="${esc(it.titre)}" oninput="pvtPortfolioMajChamp(${i},'titre',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+        <input data-k="description" data-i="${i}" placeholder="Description courte" value="${esc(it.description)}" oninput="pvtPortfolioMajChamp(${i},'description',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+        <input data-k="lien" data-i="${i}" placeholder="Lien externe (facultatif)" value="${esc(it.lien)}" oninput="pvtPortfolioMajChamp(${i},'lien',this.value)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12.5px;">
+      </div>
+    </div>`).join('') || '<span style="color:#94a3b8;font-style:italic;font-size:13px;grid-column:1/-1;">Aucune photo pour l\'instant — utilisez « Ajouter des photos » ci-dessous.</span>';
+}
+function pvtPortfolioMajChamp(i, cle, val) { if (window._pvtPortfolioItems?.[i]) window._pvtPortfolioItems[i][cle] = val; }
+function pvtPortfolioRetirer(i) { window._pvtPortfolioItems.splice(i, 1); pvtPortfolioRender(); }
+async function pvtPortfolioAjouterFichiers(fileList) {
+  const fichiers = Array.from(fileList || []);
+  if (!fichiers.length) return;
+  for (const file of fichiers) {
+    // Place-tenant immédiat pendant l'envoi : sur une sélection de plusieurs dizaines de
+    // photos, l'attente serait sinon totalement silencieuse jusqu'à la toute fin.
+    const item = { image: '', titre: '', description: '', lien: '', _envoi: true };
+    window._pvtPortfolioItems.push(item);
+    pvtPortfolioRender();
+    try {
+      const compressed = await compressImageFile(file, 1600, 1600, 0.85);
+      item.image = await uploadMedia(compressed, 'produit');
+    } catch (e) {
+      window._pvtPortfolioItems.splice(window._pvtPortfolioItems.indexOf(item), 1);
+      alert(`Échec de l'envoi de « ${file.name} » : ${e.message || ''}`);
+    }
+    delete item._envoi;
+    pvtPortfolioRender();
+  }
+}
+async function pvtPortfolioSave() {
+  const items = (window._pvtPortfolioItems || []).filter(it => it.image);
+  try {
+    await vitrineSave({ vitrine_portfolio_json: items });
+    _vitrineInit.vitrine_portfolio_json = JSON.stringify(items);
+    document.getElementById('pvt-portfolio-modal')?.remove();
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 function pvtEditEquipe() {
   pvtOpenListEditor({ field:'vitrine_equipe_json', title:'Équipe (organigramme)', itemLabel:'un membre',

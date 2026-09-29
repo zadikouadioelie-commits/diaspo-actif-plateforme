@@ -1702,6 +1702,22 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <p style="font-size:12px;color:var(--muted);margin:14px 0 0;">🔜 Mises en page alternatives (au-delà des 3 styles ci-dessus) : à venir dans une prochaine évolution du module.</p>
           </div>
 
+          <!-- Activation rapide (2026-09-29, demande explicite) : les organisateurs qui
+               cherchaient "Portfolio" ou "Avis clients" devaient d'abord repérer que ces
+               fonctionnalités vivent dans "Personnaliser ma boutique", parmi une trentaine de
+               modules classés par catégorie — pas de raccourci direct pour les plus demandées.
+               Réutilise pvConfigurerDansApercu() TEL QUEL (même mécanisme que le bouton ⚙️ de
+               chaque module ci-dessous) : active le module s'il ne l'est pas encore, puis fait
+               défiler jusqu'à lui dans l'aperçu en le surlignant, prêt à être modifié — "il
+               appuie, ça apparaît, il l'utilise". Sélection volontairement courte (8 modules,
+               pas les ~30) : les plus utiles pour une boutique, pas une redite de la liste
+               complète juste en-dessous. -->
+          <div class="card" style="margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;">⚡ Activation rapide</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Un clic pour activer et configurer directement une fonctionnalité courante de votre boutique.</p>
+            <div id="pv-quick-activate" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+
           <div class="card" style="margin-bottom:20px;">
             <h3 style="margin:0 0 4px;font-size:15px;">🧩 Personnaliser ma boutique</h3>
             <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Activez, masquez ou configurez chaque module. Un module masqué conserve ses données — vous pouvez le réactiver à tout moment sans rien perdre.</p>
@@ -6039,6 +6055,7 @@ async function loadParametresVitrineFull() {
     window.__pvStylePreset = ['moderne','elegant','minimaliste'].includes(styleObj.preset) ? styleObj.preset : 'moderne';
     renderPvInfosForm();
     renderPvTemplates();
+    renderPvQuickActivate();
     renderPvModulesLib();
     renderPvOrderList();
     renderPvThemeSwatches();
@@ -6682,6 +6699,25 @@ async function pvRestaurer(id) {
 const PV_MODULES_CONFIGURABLES = new Set(['a_propos','equipe','expertise','certifications','galerie_photos',
   'documents','realisations','services','temoignages','vision_objectifs','resultats_impact','partenaires',
   'objectif_jauge','pourquoi_choisir','offre_flash','galerie_videos','portfolio','reservation']);
+
+/* Sélection courte pour "⚡ Activation rapide" (2026-09-29, demande explicite) — les modules
+   les plus demandés pour une boutique, pas une redite des ~30 modules de la bibliothèque
+   complète juste en-dessous. Chacun a une entrée dans PV_PREVIEW_SECTION_KEYS (vérifié), donc
+   pvConfigurerDansApercu() fonctionne pour les 8 sans traitement particulier — y compris
+   "avis" (absent de PV_MODULES_CONFIGURABLES, qui ne gouverne que le bouton ⚙️ de la
+   bibliothèque ci-dessous, pas cet appel direct). */
+const PV_QUICK_ACTIVATE = [
+  ['portfolio', '🖼️ Portfolio'], ['avis', '⭐ Avis clients'], ['catalogue', '📇 Catalogue'],
+  ['services', '🛠️ Services'], ['reservation', '📅 Réservation'], ['offre_flash', '⚡ Offre flash'],
+  ['documents', '📄 Documents'], ['certifications', '🏅 Certifications'],
+];
+function renderPvQuickActivate() {
+  const box = document.getElementById('pv-quick-activate');
+  if (!box) return;
+  box.innerHTML = PV_QUICK_ACTIVATE.map(([key, label]) =>
+    `<button onclick="pvConfigurerDansApercu('${key}')" class="btn btn-sm btn-outline" style="white-space:nowrap;">${label}</button>`
+  ).join('');
+}
 
 function renderPvModulesLib() {
   const box = document.getElementById('pv-modules-lib');
