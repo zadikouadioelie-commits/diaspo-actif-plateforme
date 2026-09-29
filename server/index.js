@@ -3588,6 +3588,10 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     nom, domaine, domaines_secondaires, logo_url, reseaux_sociaux, slogan,
     // Identité "boutique" distincte du compte (2026-09-29, demande explicite)
     boutique_nom, boutique_description,
+    // Image d'illustration à droite du texte "Présentation de la boutique" (2026-09-29,
+    // demande explicite : "à droite... qu'il y a de la place vide") — facultative, jamais
+    // requise (le texte seul reste un état valide).
+    vitrine_presentation_image_url,
     // Villes/pays d'implantation (2026-08-30, demande explicite)
     villes_implantation, pays_implantation,
     // Modules "Galerie vidéos", "Portfolio", "Réservation", "Équipe", "Réalisations"
@@ -3686,6 +3690,7 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
       : undefined],
     ['boutique_nom', boutique_nom !== undefined ? (String(boutique_nom||'').trim().slice(0, 80) || null) : undefined],
     ['boutique_description', boutique_description !== undefined ? (String(boutique_description||'').trim().slice(0, 500) || null) : undefined],
+    ['vitrine_presentation_image_url', vitrine_presentation_image_url !== undefined ? (vitrine_presentation_image_url || null) : undefined],
   ]) {
     if (valeur === undefined) continue;
     /* Bug réel trouvé par exécution (2026-09-10, audit demandé explicitement : "je veux des

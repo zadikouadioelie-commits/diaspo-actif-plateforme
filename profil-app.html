@@ -3075,11 +3075,26 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>`;
 
+  /* Image à droite du texte (2026-09-29, demande explicite : "à droite... qu'il y a de la
+     place vide") — purement illustrative, jamais requise. Masquée pour un visiteur si aucune
+     image n'a été choisie (pas d'espace vide/placeholder montré au public) ; pour le
+     propriétaire sans image, un bouton "+ Ajouter une image" occupe cet espace à la place. */
+  const presentationImageHtml = init.vitrine_presentation_image_url
+    ? `<div style="position:relative;flex-shrink:0;width:180px;">
+        <img src="${esc(init.vitrine_presentation_image_url)}" alt="" style="width:180px;height:180px;object-fit:cover;border-radius:10px;display:block;">
+        ${isOwn ? `<button type="button" onclick="pvtRemovePresentationImage()" title="Retirer l'image" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:13px;line-height:1;">✕</button>` : ''}
+      </div>`
+    : (isOwn ? `<button type="button" onclick="pvtChangePresentationImage()" style="flex-shrink:0;width:180px;height:180px;border:1.5px dashed var(--vsoftbd,#cbd5e1);border-radius:10px;background:none;color:#94a3b8;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <span style="font-size:24px;">🖼️</span>Ajouter une image
+      </button>` : '');
   const presentation = ((init.description || isOwn) && modOn('a_propos')) ? `<section id="pv-presentation" class="pvt-section">
     <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Présentation de la boutique</h3>${isOwn?`<button onclick="editVitrineText('description','Présentation','Décrivez votre activité…')" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}</div>
-    <div class="pvt-section-body">
-      <div id="pvt-desc-text" class="rich-content ${init.description ? 'pvt-desc-clamp' : ''}" style="margin:0;font-size:14px;">${init.description ? renderRichText(init.description) : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</div>
-      ${init.description ? `<button type="button" class="pvt-desc-more" onclick="pvtToggleDescription(this)">En savoir plus ▾</button>` : ''}
+    <div class="pvt-section-body" style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1 1 260px;min-width:0;">
+        <div id="pvt-desc-text" class="rich-content ${init.description ? 'pvt-desc-clamp' : ''}" style="margin:0;font-size:14px;">${init.description ? renderRichText(init.description) : `<span style="color:#94a3b8;font-style:italic;">Aucune présentation. ${isOwn?'Cliquez sur Modifier pour en ajouter une.':''}</span>`}</div>
+        ${init.description ? `<button type="button" class="pvt-desc-more" onclick="pvtToggleDescription(this)">En savoir plus ▾</button>` : ''}
+      </div>
+      ${presentationImageHtml}
     </div>
   </section>` : '';
 
@@ -3704,6 +3719,32 @@ async function pvtRemovePartenaire(i) {
   try {
     await vitrineSave({ vitrine_partenaires_json: list });
     _vitrineInit.vitrine_partenaires_json = JSON.stringify(list);
+    renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + (e.message||'')); }
+}
+/* Image à droite de "Présentation de la boutique" (2026-09-29, demande explicite) — même
+   patron que pvtAddPartenaire() ci-dessus (compressIfImage + uploadMedia type 'logo', aucun
+   recadrage forcé : fit:"inside" côté serveur préserve le cadrage d'origine). */
+async function pvtChangePresentationImage() {
+  if (!isOwn || !_vitrineInit) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  input.onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const url = await uploadMedia(await compressIfImage(file, 800, 800, 0.85), 'logo');
+      await vitrineSave({ vitrine_presentation_image_url: url });
+      _vitrineInit.vitrine_presentation_image_url = url;
+      renderVitrineVisitor(_vitrineInit);
+    } catch (err) { alert('Erreur : ' + err.message); }
+  };
+  input.click();
+}
+async function pvtRemovePresentationImage() {
+  if (!isOwn || !_vitrineInit) return;
+  try {
+    await vitrineSave({ vitrine_presentation_image_url: null });
+    _vitrineInit.vitrine_presentation_image_url = null;
     renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
@@ -4881,7 +4922,7 @@ const VITRINE_CHAMPS_BROUILLON_CLIENT = [
   'vitrine_temoignages_json', 'vitrine_resultats_impact_json', 'vitrine_expertise_json',
   'vitrine_certifications_json', 'vitrine_documents_json', 'vitrine_partenaires_json',
   'vitrine_services', 'vitrine_services_categories_json', 'vitrine_horaires',
-  'vitrine_banniere_url', 'galerie_json',
+  'vitrine_banniere_url', 'vitrine_presentation_image_url', 'galerie_json',
   'vitrine_objectif_cible', 'vitrine_objectif_libelle',
   'vitrine_offre_flash_titre', 'vitrine_offre_flash_fin',
 ];

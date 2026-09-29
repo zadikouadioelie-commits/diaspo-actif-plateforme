@@ -2502,6 +2502,9 @@ const MIGRATIONS = [
   // fiche précise sans jamais modifier cette liste source ni les fiches déjà créées.
   ["initiatives", "partenaires_evenements_json TEXT DEFAULT '[]'"],
   ["initiatives", "sponsors_evenements_json TEXT DEFAULT '[]'"],
+  // Image d'illustration à droite du texte "Présentation de la boutique" (2026-09-29, demande
+  // explicite) — facultative, jamais requise.
+  ["initiatives", "vitrine_presentation_image_url TEXT"],
 ];
 
 /* Initialise updated_at pour les initiatives déjà existantes (jamais modifiées depuis) —
