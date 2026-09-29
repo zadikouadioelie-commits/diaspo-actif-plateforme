@@ -2529,8 +2529,8 @@ route("POST", "/api/upload/document", async (req, res) => {
 });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
-const MAX_PRODUITS_VITRINE = 100;
-const MAX_ARTICLES_PAR_CATALOGUE = 10;
+const MAX_PRODUITS_VITRINE = 20;
+const MAX_ARTICLES_PAR_CATALOGUE = 5;
 
 /* ── Demandes de devis — machine à statuts (2026-09-07) ──
    Pas de contrainte CHECK sur devis_demandes.statut (même choix que STATUTS_PROJETS_DA, voir
@@ -8019,7 +8019,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
   if (query.limit) rows = rows.slice(0, parseInt(query.limit) || rows.length);
 
   rows = await Promise.all(rows.map(async r => ({
-    id: r.id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
+    id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
     domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
     slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
     pays: r.pays, ville: r.ville,

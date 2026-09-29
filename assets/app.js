@@ -2769,7 +2769,12 @@ function renderVitrineCard(v) {
   const photo = v.vitrine_banniere_url || v.logo_url || '';
   const initiales = String(v.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
     .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
-  const href = `initiative.html?id=${encodeURIComponent(v.slug || v.id)}`;
+  /* Corrigé (2026-09-29, demande explicite, capture à l'appui) : pointait vers initiative.html
+     (fiche générale — description, partenaires, publications…), jamais la boutique elle-même,
+     malgré le libellé "Voir la boutique". profil.html?...&vitrine=1 est le lien déjà éprouvé
+     ailleurs (renderInitiativeCard ci-dessus) pour atterrir directement sur l'onglet Boutique
+     de profil-app.html, sans jamais montrer le profil public "brut" en premier. */
+  const href = `profil.html?id=${encodeURIComponent(v.owner_user_id)}&vitrine=1`;
   const locs = [];
   if (v.origine1) locs.push(`<span>${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
   if (v.pays) locs.push(`<span>${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
