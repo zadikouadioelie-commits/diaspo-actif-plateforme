@@ -97,7 +97,7 @@ button{font-family:inherit;cursor:pointer;}
      l'espace flex disponible — sur .topbar-inner élargi, sinon la pastille arrondie
      laissait un grand vide navy à droite des liens. Espace libéré redistribué par
      .topbar-inner (justify-content:space-between, ci-dessous). */
-  padding:4px;flex:0 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;
+  padding:4px;flex:0 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:scroll;
   -webkit-overflow-scrolling:touch;
   /* Barre de défilement VISIBLE, bleu néon (2026-09-29, demande explicite) — d'abord tentées des
      flèches cliquables (assets/app.js:initNavScroll, retirées ci-dessous), jugées "pas très
@@ -105,7 +105,10 @@ button{font-family:inherit;cursor:pointer;}
      gauche, dans le même bleu néon déjà utilisé ailleurs sur la plateforme pour ce type d'accent
      (#00BFFF, voir inscriptions-admin.html). Masquer la scrollbar rendait les liens qui débordent
      (ex. "Événements") invisibles ET impossibles à découvrir, sur toutes les pages puisque .nav
-     est partagé par tout le site via ce fichier. */
+     est partagé par tout le site via ce fichier. overflow-x:scroll (pas auto, demande explicite
+     du 2026-09-29) : la barre reste affichée en permanence, indissociable du bandeau, même sur
+     un écran assez large pour que le rail tienne sans déborder — pas seulement quand il y a
+     effectivement quelque chose à faire défiler. */
   scrollbar-width:auto;
   scrollbar-color:#00BFFF rgba(255,255,255,.15);
   padding-bottom:4px;

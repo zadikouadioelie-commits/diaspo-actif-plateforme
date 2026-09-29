@@ -171,13 +171,15 @@ a.btn-deconnexion,
   flex: 0 1 auto !important;
   min-width: 0 !important;
   flex-wrap: nowrap !important;
-  overflow-x: auto !important;
+  overflow-x: scroll !important;
   -webkit-overflow-scrolling: touch !important;
   /* Barre de défilement VISIBLE, bleu néon (2026-09-29, demande explicite) — même correctif que
      styles.v2.css (dupliqué ici pour les pages qui ne chargent que ce fichier-ci) : masquer la
      scrollbar rendait les liens qui débordent invisibles et impossibles à découvrir. Les flèches
      cliquables essayées d'abord (assets/app.js:initNavScroll) ont été jugées "pas très
-     esthétique" et retirées, remplacées par cette barre directement glissable. */
+     esthétique" et retirées, remplacées par cette barre directement glissable. overflow-x:scroll
+     (pas auto, demande explicite du 2026-09-29) : la barre reste affichée en permanence,
+     indissociable du bandeau, même quand le rail tient sans déborder. */
   scrollbar-width: auto !important;
   scrollbar-color: #00BFFF rgba(255,255,255,.15) !important;
   padding-bottom: 4px !important;
