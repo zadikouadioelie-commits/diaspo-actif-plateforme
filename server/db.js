@@ -6046,12 +6046,24 @@ db.exec(`
   if (!initCols2.includes('vitrine_horaires')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_horaires TEXT");
   if (!initCols2.includes('vitrine_services')) db.exec("ALTER TABLE initiatives ADD COLUMN vitrine_services TEXT");
 
+  /* Identité "boutique" distincte du compte (2026-09-29, demande explicite, capture à
+     l'appui) : nom et descriptif courts propres à la carte boutique, pour permettre à un
+     porteur de nommer/décrire sa boutique différemment de son initiative — jamais utilisés
+     ailleurs (l'initiative garde son propre nom/description partout hors de la carte). */
+  if (!initCols2.includes('boutique_nom')) db.exec("ALTER TABLE initiatives ADD COLUMN boutique_nom TEXT");
+  if (!initCols2.includes('boutique_description')) db.exec("ALTER TABLE initiatives ADD COLUMN boutique_description TEXT");
+
   // ── Vitrine v2 : statuts d'indisponibilité + messagerie contextuelle ──
   const prodCols = db.prepare('PRAGMA table_info(produits_vitrine)').all().map(c=>c.name);
   if (prodCols.length) {
     if (!prodCols.includes('statut')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN statut TEXT DEFAULT 'disponible'");
     if (!prodCols.includes('date_retour')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN date_retour TEXT");
     if (!prodCols.includes('reference')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN reference TEXT");
+    /* Produit vedette (2026-09-29, demande explicite) : jusqu'à 3 produits mis en avant par
+       boutique, sélectionnés via une étoile en gestion de boutique — voir la carte publique
+       (renderVitrineCard, assets/app.js) et renderVitrineCols() (profil-app.html) qui la
+       lisent déjà toutes deux (cette dernière avant même que la colonne existe). */
+    if (!prodCols.includes('mis_en_avant')) db.exec("ALTER TABLE produits_vitrine ADD COLUMN mis_en_avant INTEGER DEFAULT 0");
   }
   const msgCols3 = db.prepare('PRAGMA table_info(messages)').all().map(c=>c.name);
   if (!msgCols3.includes('produit_id')) db.exec("ALTER TABLE messages ADD COLUMN produit_id INTEGER");

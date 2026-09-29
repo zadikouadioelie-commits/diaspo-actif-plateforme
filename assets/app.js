@@ -2765,8 +2765,7 @@ async function initAnnuaire(){
 const DOMAINES_VITRINE = ["Agriculture","Agroalimentaire","Agropastoral","Artisanat","Assurance","Commerce","Communication & Médias","Construction & BTP","Consulting & Conseil","Culture & Arts","Éducation","Énergie","Environnement","Événementiel","Finance","Formation","Immobilier","Industrie","Institution","Numérique & Technologies","Restauration","Santé, Soins & Thérapies","Services","Tourisme","Transport & Logistique","Autres"];
 
 function renderVitrineCard(v) {
-  const badge = DOMAIN_BADGE[v.domaine] || {bg:'#1B3A6B', label:(v.domaine||'VITRINE').toUpperCase()};
-  const photo = v.vitrine_banniere_url || v.logo_url || '';
+  const badge = DOMAIN_BADGE[v.domaine] || {bg:'#1B3A6B', label:(v.domaine||'BOUTIQUE').toUpperCase()};
   const initiales = String(v.nom || '?').trim().split(/[\s'’-]+/).filter(Boolean)
     .slice(0, 2).map(m => m[0]).join('').toUpperCase() || '?';
   /* Corrigé (2026-09-29, demande explicite, capture à l'appui) : pointait vers initiative.html
@@ -2775,6 +2774,12 @@ function renderVitrineCard(v) {
      ailleurs (renderInitiativeCard ci-dessus) pour atterrir directement sur l'onglet Boutique
      de profil-app.html, sans jamais montrer le profil public "brut" en premier. */
   const href = `profil.html?id=${encodeURIComponent(v.owner_user_id)}&vitrine=1`;
+  /* Nom/descriptif propres à la carte boutique (2026-09-29, demande explicite, maquette
+     "Saveurs d'Afrique" à l'appui) : distincts du nom/description de l'initiative pour
+     permettre à chaque propriétaire de nommer sa boutique comme il le souhaite ; à défaut
+     de saisie, on reprend le nom/description généraux plutôt que de laisser un vide. */
+  const nomBoutique = v.boutique_nom || v.nom;
+  const descBoutique = v.boutique_description || v.description || '';
   const locs = [];
   if (v.origine1) locs.push(`<span>${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
   if (v.pays) locs.push(`<span>${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
@@ -2782,24 +2787,38 @@ function renderVitrineCard(v) {
   const domainesSecondairesHtml = (v.domaines_secondaires||[]).length
     ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 6px;">${(v.domaines_secondaires||[]).map(d=>`<span style="font-size:10.5px;font-weight:700;color:var(--muted);background:var(--bg);border-radius:20px;padding:2px 8px;">${escapeHtml(d)}</span>`).join('')}</div>`
     : '';
+  const produits = v.produits_vedettes || [];
+  const produitsHtml = produits.length ? `<div class="vit-card-products">
+      ${produits.map(p => `<div class="vit-prod-mini">
+        <div class="vit-prod-mini-photo">${p.photo ? `<img src="${escapeHtml(p.photo)}" alt="${escapeHtml(p.nom)}" loading="lazy" onerror="this.parentElement.textContent='🛍️'">` : '🛍️'}</div>
+        <div class="vit-prod-mini-nom">${escapeHtml(p.nom)}</div>
+        ${p.prix != null ? `<div class="vit-prod-mini-prix">${Number(p.prix).toFixed(0)} ${escapeHtml(p.devise||'EUR')}</div>` : ''}
+      </div>`).join('')}
+    </div>` : '';
 
   return `
   <div class="vit-card" onclick="window.location.href='${href}'">
-    <div class="vit-card-photo" style="background:linear-gradient(135deg,${badge.bg},#0D1B2A);">
-      <span class="vit-card-initiales">${initiales}</span>
-      ${photo ? `<img src="${photo}" alt="${escapeHtml(v.nom)}" loading="lazy" onerror="this.remove()">` : ''}
-      <span class="vit-cat-badge" style="background:${badge.bg};">${badge.label}</span>
-      ${v.type ? `<span class="vit-type-badge">${escapeHtml(v.type)}</span>` : ''}
+    <div class="vit-card-top">
+      <div class="vit-card-logo" style="${v.logo_url ? '' : `background:linear-gradient(135deg,${badge.bg},#0D1B2A);`}">
+        ${v.logo_url ? `<img src="${escapeHtml(v.logo_url)}" alt="${escapeHtml(nomBoutique)}" loading="lazy" onerror="this.parentElement.textContent='${initiales}';this.parentElement.style.background='linear-gradient(135deg,${badge.bg},#0D1B2A)';">` : initiales}
+      </div>
+      <div class="vit-card-headline">
+        <div class="vit-card-title">${escapeHtml(nomBoutique)}</div>
+        <div class="vit-card-pills">
+          <span class="vit-type-pill" style="background:${badge.bg};">${badge.label}</span>
+          ${v.type ? `<span class="vit-type-pill vit-type-pill-outline">${escapeHtml(v.type)}</span>` : ''}
+        </div>
+      </div>
     </div>
     <div class="vit-card-body">
-      <div class="vit-card-title">${escapeHtml(v.nom)}</div>
       ${badgeVerifications(v, { small: true })}
       ${domainesSecondairesHtml}
+      ${produitsHtml}
       ${locs.length ? `<div class="vit-card-locs">${locs.join('')}</div>` : ''}
-      ${v.description ? `<div class="vit-card-desc">${escapeHtml(v.description)}</div>` : ''}
+      ${descBoutique ? `<div class="vit-card-desc">${escapeHtml(descBoutique)}</div>` : ''}
       ${noteHtml}
       <div class="vit-card-foot">
-        <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Voir la boutique</a>
+        <a href="${href}" class="vit-card-btn" onclick="event.stopPropagation()">🏬 Découvrir la boutique</a>
         ${['Association','ONG'].includes(v.type) && v.adhesions_ouvertes !== false ? `<button type="button" class="vit-card-btn vit-card-btn-adherer" data-adherer-init="${v.id}" onclick="event.stopPropagation(); demanderAdhesion(${v.id}, this)">🤝 Adhérer à l'initiative</button>` : ''}
       </div>
     </div>

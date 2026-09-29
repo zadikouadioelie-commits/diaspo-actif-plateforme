@@ -4402,8 +4402,9 @@ function pvtProductCardHtml(p, ownerId) {
   const devisResolu = p.devis_active != null ? Number(p.devis_active) : Number(_vitrineInit?.vitrine_devis_active || 0);
   const devisBtn = (!isOwn && devisResolu === 1)
     ? `<button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="openDevisModal(${p.id})">📩 Demander un devis</button>` : '';
-  const ownerRow = isOwn ? `<div style="display:flex;gap:6px;margin-top:6px;">
+  const ownerRow = isOwn ? `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
       <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="openProductModal(${p.id})">✏️ Modifier</button>
+      <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="toggleProduitVedette(${p.id})" title="Produit vedette sur la carte boutique (3 maximum)">${p.mis_en_avant ? '⭐ Retirer' : '☆ Mettre en vedette'}</button>
       <button class="pvt-btn" style="flex:1;font-size:12px;padding:7px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
     </div>` : '';
   const visitorRow = !isOwn ? `<div class="pvt-prod-foot">
@@ -4418,6 +4419,7 @@ function pvtProductCardHtml(p, ownerId) {
     <div class="pvt-prod-imgwrap">
       ${cover ? `<img loading="lazy" src="${esc(cover)}" alt="">` : `<div class="noimg">🛍️</div>`}
       ${p.categorie ? `<span class="pvt-ribbon">${esc((p.categorie||'').toUpperCase())}</span>` : ''}
+      ${p.mis_en_avant ? `<span class="pvt-badge top" style="right:auto;left:9px;">⭐ Vedette</span>` : ''}
       ${badge}
     </div>
     <div class="pvt-prod-body">
@@ -5047,7 +5049,7 @@ function renderProductGrid(produits, init, ownerFlag) {
         </div>
         <div class="prod-actions">
           ${ownerFlag
-            ? `<button class="prod-btn-edit" onclick="openProductModal(${p.id})">✏️ Modifier</button><button class="prod-btn-delete" onclick="deleteProduct(${p.id})">🗑️</button>`
+            ? `<button class="prod-btn-edit" onclick="openProductModal(${p.id})">✏️ Modifier</button><button class="prod-btn-edit" onclick="toggleProduitVedette(${p.id})" title="Produit vedette sur la carte boutique (3 maximum)">${p.mis_en_avant ? '⭐ Retirer' : '☆ Mettre en vedette'}</button><button class="prod-btn-delete" onclick="deleteProduct(${p.id})">🗑️</button>`
             : `${dispo ? `<button class="prod-btn-commander" onclick="openCommanderModal(${p.id})">📦 Commander</button>` : `<button class="prod-btn-alerte" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
                <button class="prod-btn-contact" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>`}
         </div>
@@ -5399,6 +5401,19 @@ async function deleteProduct(id) {
   try {
     await api('DELETE', `/produits/${id}`);
     renderVitrineVisitor(_vitrineInit);
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* Produit vedette (2026-09-29, demande explicite) : jusqu'à 3 produits mis en avant sur la
+   carte publique de la boutique (renderVitrineCard, assets/app.js) — le serveur refuse le
+   4e (voir PUT /api/produits/:id/mise-en-avant). */
+async function toggleProduitVedette(id) {
+  try {
+    await api('PUT', `/produits/${id}/mise-en-avant`);
+    /* renderVitrineVisitor recharge elle-même les produits à jour (voir son propre appel à
+       GET /initiatives/:id/produits) et alimente au passage _boutiqueInit/_produitsVitrine —
+       même fonction de rafraîchissement que saveCatalogue()/deleteCatalogue() plus haut. */
+    if (_vitrineInit) await renderVitrineVisitor(_vitrineInit);
   } catch (e) { alert('Erreur : ' + e.message); }
 }
 

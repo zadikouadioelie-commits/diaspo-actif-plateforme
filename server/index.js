@@ -2788,6 +2788,28 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* PUT /api/produits/:id/mise-en-avant — owner only : jusqu'à 3 produits "vedettes" par
+   boutique (2026-09-29, demande explicite : "sur chaque produit tu mets une étoile pour
+   choisir les 3 produits phares") — affichés sur la carte publique de la boutique
+   (renderVitrineCard, assets/app.js) et déjà lus (mais jusqu'ici jamais écrits) par
+   renderVitrineCols() (profil-app.html, colonne latérale de la vitrine elle-même). */
+route("PUT", "/api/produits/:id/mise-en-avant", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(params.id);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+
+  const activer = !prod.mis_en_avant;
+  if (activer) {
+    const nb = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=? AND mis_en_avant=1").get(prod.initiative_id))?.n || 0;
+    if (Number(nb) >= 3) return sendJSON(res, 400, { error: "3 produits vedettes maximum — retirez-en un d'abord." });
+  }
+  await db.prepare("UPDATE produits_vitrine SET mis_en_avant=? WHERE id=?").run(activer ? 1 : 0, params.id);
+  sendJSON(res, 200, { ok: true, mis_en_avant: activer });
+});
+
 /* POST /api/produits/:id/alerte — visiteur : être averti quand dispo */
 route("POST", "/api/produits/:id/alerte", async (req, res, params) => {
   const user = await getCurrentUser(req);
@@ -3564,6 +3586,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     vitrine_style_json,
     // Informations générales (identité de la structure — éditables aussi depuis "Paramètres Vitrine")
     nom, domaine, domaines_secondaires, logo_url, reseaux_sociaux, slogan,
+    // Identité "boutique" distincte du compte (2026-09-29, demande explicite)
+    boutique_nom, boutique_description,
     // Villes/pays d'implantation (2026-08-30, demande explicite)
     villes_implantation, pays_implantation,
     // Modules "Galerie vidéos", "Portfolio", "Réservation", "Équipe", "Réalisations"
@@ -3660,6 +3684,8 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
     ['pays_implantation_json', pays_implantation !== undefined
       ? JSON.stringify([...new Set((Array.isArray(pays_implantation) ? pays_implantation : []).map(v => String(v||'').trim()).filter(Boolean))])
       : undefined],
+    ['boutique_nom', boutique_nom !== undefined ? (String(boutique_nom||'').trim().slice(0, 80) || null) : undefined],
+    ['boutique_description', boutique_description !== undefined ? (String(boutique_description||'').trim().slice(0, 500) || null) : undefined],
   ]) {
     if (valeur === undefined) continue;
     /* Bug réel trouvé par exécution (2026-09-10, audit demandé explicitement : "je veux des
@@ -8045,19 +8071,33 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
 
   if (query.limit) rows = rows.slice(0, parseInt(query.limit) || rows.length);
 
-  rows = await Promise.all(rows.map(async r => ({
-    id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
-    domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
-    slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
-    pays: r.pays, ville: r.ville,
-    origine1: r.origine1 || r.owner_origine1 || null, origine2: r.origine2 || r.owner_origine2 || null,
-    vues: r.vues || 0, note_moyenne: r.note_moyenne ? Math.round(r.note_moyenne * 10) / 10 : null,
-    nb_avis: r.nb_avis || 0, created_at: r.created_at, updated_at: r.updated_at || r.created_at,
-    certif: await getCertif(r.id),
-    organisation_verifiee: !!r.organisation_verifiee, organisation_verifiee_le: r.organisation_verifiee_le || null,
-    owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id),
-    adhesions_ouvertes: r.adhesions_ouvertes == null ? true : !!r.adhesions_ouvertes,
-  })));
+  rows = await Promise.all(rows.map(async r => {
+    /* Produits vedettes (2026-09-29, demande explicite, "Saveurs d'Afrique" en exemple) :
+       jusqu'à 3, choisis en gestion de boutique (étoile) ; à défaut aucun choisi, on complète
+       avec les premiers produits disponibles pour que la carte ne reste jamais vide dès qu'il
+       existe des produits — jamais de produit masqué/épuisé mis en avant malgré lui ici. */
+    const prods = await db.prepare(
+      "SELECT nom, prix, devise, photos_json, mis_en_avant FROM produits_vitrine WHERE initiative_id=? AND (statut IS NULL OR statut='disponible') ORDER BY mis_en_avant DESC, ordre ASC, id ASC"
+    ).all(r.id);
+    const produitsVedettes = prods.slice(0, 3).map(p => ({
+      nom: p.nom, prix: p.prix, devise: p.devise || 'EUR', photo: (safeParseArray(p.photos_json)[0]) || null,
+    }));
+    return {
+      id: r.id, owner_user_id: r.owner_user_id, slug: r.slug, nom: r.nom, type: r.type, domaine: r.domaine,
+      domaines_secondaires: safeParseArray(r.domaines_secondaires_json), description: r.description,
+      boutique_nom: r.boutique_nom || null, boutique_description: r.boutique_description || null,
+      slogan: r.slogan, logo_url: r.logo_url, vitrine_banniere_url: r.vitrine_banniere_url,
+      pays: r.pays, ville: r.ville,
+      origine1: r.origine1 || r.owner_origine1 || null, origine2: r.origine2 || r.owner_origine2 || null,
+      vues: r.vues || 0, note_moyenne: r.note_moyenne ? Math.round(r.note_moyenne * 10) / 10 : null,
+      nb_avis: r.nb_avis || 0, created_at: r.created_at, updated_at: r.updated_at || r.created_at,
+      certif: await getCertif(r.id),
+      organisation_verifiee: !!r.organisation_verifiee, organisation_verifiee_le: r.organisation_verifiee_le || null,
+      owner_identite_verifiee: await ownerIdentiteVerifiee(r.owner_user_id),
+      adhesions_ouvertes: r.adhesions_ouvertes == null ? true : !!r.adhesions_ouvertes,
+      produits_vedettes: produitsVedettes,
+    };
+  }));
 
   sendJSON(res, 200, { vitrines: rows });
 });

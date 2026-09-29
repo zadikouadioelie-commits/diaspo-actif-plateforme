@@ -6137,8 +6137,18 @@ function renderPvInfosForm() {
         <label class="btn btn-sm btn-outline" style="cursor:pointer;">📷 Logo<input type="file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="pvUploadLogo(this)"></label>
       </div>
       <div style="flex:1;min-width:240px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="grid-column:1/-1;"><label class="pv-lbl">Nom de la boutique</label><input id="pv-f-nom" value="${_mvEsc(init.nom||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="grid-column:1/-1;"><label class="pv-lbl">Nom du compte / de la structure</label><input id="pv-f-nom" value="${_mvEsc(init.nom||'')}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="grid-column:1/-1;">
+          <label class="pv-lbl">Nom affiché sur la boutique</label>
+          <input id="pv-f-boutique-nom" value="${_mvEsc(init.boutique_nom||'')}" placeholder="${_mvEsc(init.nom||'')} (laisser vide pour reprendre ce nom)" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">Peut être différent du nom du compte — c'est ce nom qui apparaît sur la carte boutique de l'annuaire.</div>
+        </div>
         <div style="grid-column:1/-1;"><label class="pv-lbl">Description courte (sous-titre de la bannière)</label><input id="pv-f-slogan" value="${_mvEsc(init.slogan||'')}" placeholder="Ex : Artisanat durable pour la diaspora" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;"></div>
+        <div style="grid-column:1/-1;">
+          <label class="pv-lbl">Descriptif court de la boutique (carte annuaire)</label>
+          <textarea id="pv-f-boutique-desc" rows="3" maxlength="500" oninput="document.getElementById('pv-boutique-desc-count').textContent=this.value.length" placeholder="Résumé de votre boutique en quelques phrases — affiché sur la carte, dans l'annuaire des boutiques." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;resize:vertical;">${_mvEsc(init.boutique_description||'')}</textarea>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;text-align:right;"><span id="pv-boutique-desc-count">${(init.boutique_description||'').length}</span>/500</div>
+        </div>
         <div><label class="pv-lbl">Catégorie</label><select id="pv-f-domaine" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
           <option value="">—</option>${PV_DOMAINES.map(d=>`<option value="${d}" ${init.domaine===d?'selected':''}>${d}</option>`).join('')}
         </select></div>
@@ -6252,6 +6262,8 @@ async function pvSaveInfos() {
     .filter(d => d && d !== domainePrincipal);
   const payload = {
     nom: document.getElementById('pv-f-nom').value.trim(),
+    boutique_nom: document.getElementById('pv-f-boutique-nom').value.trim(),
+    boutique_description: document.getElementById('pv-f-boutique-desc').value.trim(),
     slogan: document.getElementById('pv-f-slogan').value.trim(),
     domaine: domainePrincipal,
     domaines_secondaires: domainesSecondaires,
@@ -7643,10 +7655,10 @@ function adhRenderBoutonOfficielle(){
   if (!zone) return;
   zone.innerHTML = ADH_F_OFFICIELLE ? `
     <button type="button" class="adh-officielle-btn adh-officielle-shimmer" onclick="adhToggleOfficielle()">⭐ Adhésion officielle de l'association</button>
-    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le bouton public « Adhérer à l'initiative » (annuaire, vitrines, profil) redirige directement vers cette formule. Une seule formule peut porter ce statut — cliquez à nouveau pour le retirer.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le bouton public « Adhérer à l'initiative » (annuaire, boutiques, profil) redirige directement vers cette formule. Une seule formule peut porter ce statut — cliquez à nouveau pour le retirer.</p>
   ` : `
     <button type="button" class="adh-officielle-btn adh-officielle-shimmer" onclick="adhToggleOfficielle()">🌟 Définir comme adhésion à l'association</button>
-    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le bouton public « Adhérer à l'initiative » (annuaire, vitrines, profil) redirigera directement vers cette formule — les autres formules restent utilisables en interne (ex. liées à un événement précis) mais ne seront plus proposées par ce bouton. Une seule formule peut être désignée à la fois : en choisir une nouvelle retire automatiquement ce statut de l'ancienne.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin:8px 0 0;">Le bouton public « Adhérer à l'initiative » (annuaire, boutiques, profil) redirigera directement vers cette formule — les autres formules restent utilisables en interne (ex. liées à un événement précis) mais ne seront plus proposées par ce bouton. Une seule formule peut être désignée à la fois : en choisir une nouvelle retire automatiquement ce statut de l'ancienne.</p>
   `;
 }
 

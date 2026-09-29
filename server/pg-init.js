@@ -494,10 +494,13 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'vitrine_banniere_url', 'TEXT'],
     ['initiatives', 'vitrine_horaires', 'TEXT'],
     ['initiatives', 'vitrine_services', 'TEXT'],
+    ['initiatives', 'boutique_nom', 'TEXT'],
+    ['initiatives', 'boutique_description', 'TEXT'],
     // vitrine v2 : statuts + messagerie contextuelle
     ['produits_vitrine', 'statut', "TEXT DEFAULT 'disponible'"],
     ['produits_vitrine', 'date_retour', 'TEXT'],
     ['produits_vitrine', 'reference', 'TEXT'],
+    ['produits_vitrine', 'mis_en_avant', 'INTEGER DEFAULT 0'],
     ['messages', 'produit_id', 'INTEGER'],
     ['messages', 'edited', 'INTEGER DEFAULT 0'],
     ['messages', 'edited_at', 'TEXT'],
