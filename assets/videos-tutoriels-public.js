@@ -115,7 +115,12 @@ async function dvtReagirCarte(videoId, type) {
    prête pour l'instant, afficher l'affiche officielle "Bientôt disponible" à la place plutôt
    que de masquer toute la rubrique) : la section reste visible, l'en-tête/le bouton "voir
    plus" (masquerIdsSiVide) disparaissent, et l'affiche seule occupe la grille. */
-async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide, plusBoutonInline } = {}) {
+/* opts.adEmplacement (2026-09-29, bug réel corrigé : promis à l'annonceur dès la création de
+   publicité — aperçu "tuile publicitaire au milieu des miniatures vidéo" dans
+   dashboard-initiative.html — mais jamais affiché nulle part). Opt-in explicite : seul l'appel de
+   videos-tutoriels.html (grille complète "vt-grid-page") le passe, jamais dvt-grid-accueil
+   (aperçu compact de la page d'accueil) qui n'a pas fait cette promesse. */
+async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, q, tri, posterSiVide, masquerIdsSiVide, plusBoutonInline, adEmplacement } = {}) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
   try {
@@ -136,10 +141,16 @@ async function dvtCharger(gridId, { limit, sectionIdSiVide, compact, categorie, 
       else grid.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aucune vidéo pour le moment.</p>';
       return;
     }
-    grid.innerHTML = videos.map(v => dvtCardHtml(v, { compact })).join('')
+    const cartes = videos.map(v => dvtCardHtml(v, { compact }));
+    if (adEmplacement) {
+      cartes.splice(Math.min(2, cartes.length), 0,
+        `<div id="ad-${adEmplacement.replace(/_/g,'-')}" data-ad-emplacement="${adEmplacement}" style="display:none;grid-column:span 2;"></div>`);
+    }
+    grid.innerHTML = cartes.join('')
       + (plusBoutonInline ? `<a class="dvt-more-btn" href="${plusBoutonInline.href}">${plusBoutonInline.label}</a>` : '');
     if (section) section.style.display = '';
     if (!compact) videos.filter(v => v.type_source !== 'bientot').forEach(v => dvtChargerReactionsCarte(v.id));
+    if (adEmplacement && window.renderAdSlot) renderAdSlot(`ad-${adEmplacement.replace(/_/g,'-')}`, adEmplacement);
   } catch (e) { console.error('[videos-tutoriels]', e); }
 }
 
