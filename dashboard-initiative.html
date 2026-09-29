@@ -10146,9 +10146,12 @@ function crmSwitchTab(tab) {
       </div>
       <div id="crm-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this) crmCloseModal()">
         <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <h3 id="crm-modal-title" style="margin:0;font-size:1.05rem;"></h3>
-            <button onclick="crmCloseModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;">×</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+              <button onclick="crmCloseModal()" style="background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;padding:2px 0;white-space:nowrap;flex-shrink:0;">← Retour</button>
+              <h3 id="crm-modal-title" style="margin:0;font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></h3>
+            </div>
+            <button onclick="crmCloseModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#64748b;line-height:1;flex-shrink:0;">×</button>
           </div>
           <div id="crm-modal-body"></div>
         </div>
