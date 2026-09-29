@@ -657,7 +657,7 @@
       { el:null, pos:'center', cta:'initiative', titre:"✅ Une fiche complète, plus de confiance", voice:"Une fiche bien remplie augmente votre score d'activité et votre crédibilité.", desc:"Revenez régulièrement mettre à jour vos informations." }
     ]},
     'f-init-publications': { badge:'📰 Publications boutique', couleur:'#15803d', steps:[
-      { el:null, pos:'center', badge:true, titre:"Publier sur votre vitrine", voice:"Annoncez vos actualités, offres et nouveautés directement sur votre vitrine publique.", desc:"Vos publications apparaissent dans l'onglet Boutique de votre profil, visibles par tous vos abonnés." },
+      { el:null, pos:'center', badge:true, titre:"Publier sur votre boutique", voice:"Annoncez vos actualités, offres et nouveautés directement sur votre boutique publique.", desc:"Vos publications apparaissent dans l'onglet Boutique de votre profil, visibles par tous vos abonnés." },
       { el:null, pos:'center', titre:"🖼️ Texte, image, promotion", voice:"Ajoutez une image, un prix promotionnel ou un appel à l'action à chaque publication.", desc:"• Titre et description\n• Image de mise en avant\n• Prix / promotion optionnels\n• Bouton d'action (contacter, commander...)", lien:{href:'dashboard-initiative.html', label:'Publications'} },
       { el:null, pos:'center', titre:"✅ Suivez l'engagement", voice:"Vues, partages, réactions et commentaires sont mesurés sur chaque publication.", desc:"Utilisez ces statistiques pour savoir ce qui intéresse le plus votre communauté." }
     ]},

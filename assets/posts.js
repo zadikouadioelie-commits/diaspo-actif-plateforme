@@ -250,7 +250,7 @@ function renderMedias(post) {
 
 /* ── Carte de post ── */
 const VITRINE_CARD_BADGES = {
-  vitrine:         { emoji: '🛍️', label: 'Vitrine' },
+  vitrine:         { emoji: '🛍️', label: 'Boutique' },
   catalogue:       { emoji: '📢', label: 'Nouveau catalogue' },
   promotion:       { emoji: '🎉', label: 'Promotion' },
   meilleure_vente: { emoji: '🔥', label: 'Meilleure vente' },

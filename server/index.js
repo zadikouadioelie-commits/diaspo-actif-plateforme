@@ -2896,7 +2896,7 @@ route("POST", "/api/produits/:id/devis", async (req, res, params, body) => {
     telephone = String(body.requester_phone || "").trim().slice(0, 30) || null;
     if (!nom || !prenom) return sendJSON(res, 400, { error: "Nom et prénom requis." });
     if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
-    if (Number(init.vitrine_devis_tel_requis) === 1 && !telephone) return sendJSON(res, 400, { error: "Numéro de téléphone requis pour cette vitrine." });
+    if (Number(init.vitrine_devis_tel_requis) === 1 && !telephone) return sendJSON(res, 400, { error: "Numéro de téléphone requis pour cette boutique." });
   }
 
   // Champs de la demande — plafonds pour éviter tout abus, aucun n'est obligatoire hors description
