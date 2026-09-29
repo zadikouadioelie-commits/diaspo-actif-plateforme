@@ -2779,7 +2779,10 @@ function renderVitrineCard(v) {
      permettre à chaque propriétaire de nommer sa boutique comme il le souhaite ; à défaut
      de saisie, on reprend le nom/description généraux plutôt que de laisser un vide. */
   const nomBoutique = v.boutique_nom || v.nom;
-  const descBoutique = v.boutique_description || v.description || '';
+  /* v.description est du HTML enrichi (RichEditor) — jamais du texte brut comme
+     boutique_description ; sans ce nettoyage, le repli affichait les balises
+     <p>/<b> telles quelles sur la carte (bug réel constaté en production, 2026-09-29). */
+  const descBoutique = v.boutique_description || (v.description ? stripRichTags(v.description) : '');
   const locs = [];
   if (v.origine1) locs.push(`<span>${daDrapeau(v.origine1)} Origine : ${escapeHtml(v.origine1)}</span>`);
   if (v.pays) locs.push(`<span>${daDrapeau(v.pays)} Résidence : ${escapeHtml(v.pays)}</span>`);
