@@ -98,34 +98,29 @@ button{font-family:inherit;cursor:pointer;}
      laissait un grand vide navy à droite des liens. Espace libéré redistribué par
      .topbar-inner (justify-content:space-between, ci-dessous). */
   padding:4px;flex:0 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;
-  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  /* Barre de défilement VISIBLE, bleu néon (2026-09-29, demande explicite) — d'abord tentées des
+     flèches cliquables (assets/app.js:initNavScroll, retirées ci-dessous), jugées "pas très
+     esthétique" ; remplacées par une vraie barre qu'on peut directement glisser de droite à
+     gauche, dans le même bleu néon déjà utilisé ailleurs sur la plateforme pour ce type d'accent
+     (#00BFFF, voir inscriptions-admin.html). Masquer la scrollbar rendait les liens qui débordent
+     (ex. "Événements") invisibles ET impossibles à découvrir, sur toutes les pages puisque .nav
+     est partagé par tout le site via ce fichier. */
+  scrollbar-width:auto;
+  scrollbar-color:#00BFFF rgba(255,255,255,.15);
+  padding-bottom:4px;
+  mask-image:linear-gradient(to right,#000 calc(100% - 14px),transparent);
 }
-.nav::-webkit-scrollbar{display:none;}
+.nav::-webkit-scrollbar{height:8px;}
+.nav::-webkit-scrollbar-track{background:rgba(255,255,255,.15);border-radius:99px;}
+.nav::-webkit-scrollbar-thumb{background:#00BFFF;border-radius:99px;box-shadow:0 0 6px rgba(0,191,255,.8);}
+.nav::-webkit-scrollbar-thumb:hover{background:#33CFFF;}
 .nav a{
   font-size:14px;font-weight:600;color:rgba(255,255,255,.8);padding:8px 15px;border-radius:9px;
   border-bottom:none;white-space:nowrap;flex:none;
 }
 .nav a.active{background:#fff;color:var(--navy);font-weight:700;}
 .nav a:hover:not(.active){color:#fff;background:rgba(255,255,255,.08);}
-/* Flèches de défilement du rail (2026-09-25, assets/app.js:initNavScroll) — le rail lui-même
-   défile déjà (overflow-x:auto ci-dessus), invisible pour un utilisateur souris sans ces
-   flèches puisque la scrollbar est masquée (scrollbar-width:none). .nav-scroll-wrap reprend
-   le flex:0 1 auto/min-width:0 que .nav portait seule avant d'être enveloppée, pour ne rien
-   changer au comportement de .topbar-inner (justify-content:space-between). */
-.nav-scroll-wrap{display:flex;align-items:center;position:relative;flex:0 1 auto;min-width:0;}
-.nav-scroll-arrow{
-  /* Orange (var(--orange)), pas la même teinte navy que le rail : un rond navy sur navy se
-     fondait presque totalement dans le fond, quasi invisible (constaté en testant) — la
-     couleur d'accent/action de la plateforme (déjà utilisée pour les CTA/badges ailleurs)
-     tranche nettement, cohérent avec son rôle de contrôle interactif. */
-  display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:2;
-  width:24px;height:24px;border-radius:50%;border:none;cursor:pointer;padding:0;
-  background:var(--orange);color:#fff;font-size:15px;line-height:1;font-family:inherit;
-  align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.45);
-}
-.nav-scroll-arrow.visible{display:flex;}
-.nav-scroll-arrow-left{left:0;}
-.nav-scroll-arrow-right{right:0;}
 /* Affichage public d'un champ texte enrichi (2026-09-25, assets/rich-editor.js +
    window.renderRichText, assets/app.js) — largeur de lecture confortable, espacements entre
    paragraphes, hauteur de ligne aérée, distinction nette titres/texte, jamais un bloc compact.
