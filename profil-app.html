@@ -2631,6 +2631,34 @@ async function renderVitrineCols() {
   const wa = (_vitrineInit.vitrine_whatsapp || '').replace(/[^0-9+]/g, '').replace('+', '');
   const scrollTo = id => `document.getElementById('${id}')?.scrollIntoView({behavior:'smooth'})`;
 
+  /* Services (2026-09-29, demande explicite : "le bouton service ne le met pas en plein
+     milieu... rangez-le à gauche, avec les autres cartouches") — anciennement un onglet à
+     pleine largeur dans la zone centrale (renderVitrineVisitor()), déplacé ici comme carte
+     compacte au même titre que les autres cartouches de la colonne gauche. Mêmes données/
+     fonctions d'édition que l'ancien emplacement (pvtEditServices()/pvtAddServiceRow()/
+     pvtRemoveServiceRow(), voir plus bas) — seul le HTML de présentation change, adapté au
+     style .pp-side-card/.pp-list-item de cette colonne plutôt qu'au style pleine largeur
+     .pvt-section. Id #pvt-services-body conservé à l'identique pour que ces fonctions
+     continuent de fonctionner sans modification. */
+  const servicesCats = safeParseJson(_vitrineInit.vitrine_services_categories_json, null);
+  const hasServices = (servicesCats && servicesCats.length) || _vitrineInit.vitrine_services;
+  const enModeCategories = !!(servicesCats && servicesCats.length);
+  const servicesCard = (hasServices || isOwn) ? `<div class="pp-side-card">
+      <h4>🛠 Services${isOwn ? `<span style="display:flex;">
+        <button class="edit-btn" onclick="pvtEditServices()" title="Modifier">✏️</button>
+        ${!enModeCategories ? `<button class="edit-btn" onclick="pvtAddServiceRow()" title="Ajouter">➕</button>` : ''}
+      </span>` : ''}</h4>
+      <div id="pvt-services-body">${
+        enModeCategories
+          ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${servicesCats.map(c=>`<span class="pvz-interest-chip">${vitrineCategorieLabel(c)}</span>`).join('')}</div>`
+          : (_vitrineInit.vitrine_services
+              ? _vitrineInit.vitrine_services.split('\n').filter(Boolean).map((s,i)=>`<div class="pp-list-item"><span>✔</span><span style="flex:1;">${esc2(s)}</span>${isOwn?`<button onclick="pvtRemoveServiceRow(${i})" title="Retirer ce service" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;padding:2px 4px;flex:none;">✕</button>`:''}</div>`).join('')
+              : isOwn
+                ? `<span style="font-size:12px;color:var(--muted);">Cliquez sur ✏️ ou ➕ pour renseigner vos services.</span>`
+                : `<span style="font-size:12px;color:var(--muted);font-style:italic;">Aucun service renseigné.</span>`)
+      }</div>
+    </div>` : '';
+
   /* ── COLONNE GAUCHE : réassurance + infos utiles ── */
   left.innerHTML = `
     <div class="pp-side-card">
@@ -2640,6 +2668,7 @@ async function renderVitrineCols() {
         ${prixMin != null ? `<div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;"><div style="font-size:18px;font-weight:800;">${prixMin}<span style="font-size:11px;">${esc2(devise)}</span></div><div style="font-size:10px;color:var(--muted);">À partir de</div></div>` : ''}
       </div>
     </div>
+    ${servicesCard}
     <div class="pp-side-card">
       <h4>🔒 Acheter en confiance</h4>
       <div class="pp-list-item"><span>💳</span><span style="flex:1;">Paiement 100% sécurisé (Stripe)</span></div>
@@ -2957,7 +2986,9 @@ async function renderVitrineVisitor(init) {
   if ((catalogues.length || isOwn) && modOn('catalogue'))     navItems.push(['collections','Catalogue']);
   if ((articlesNonClasses.length || isOwn) && modOn('produits')) navItems.push(['produits','Non classé']);
   if (modOn('offre_flash') || true) navItems.push(['promos','Promotions']);
-  if ((init.vitrine_services_categories_json || init.vitrine_services || isOwn) && modOn('services')) navItems.push(['services','Services']);
+  /* Services déplacé dans la colonne de gauche (2026-09-29, demande explicite : "rangez-le à
+     gauche, avec les autres cartouches") — n'est plus un onglet séparé, voir la carte
+     "🛠 Services" ajoutée dans renderVitrineCols(). */
   if (modOn('pourquoi_choisir')) navItems.push(['pourquoi','Pourquoi nous']);
   if (galerie.length && modOn('galerie_photos'))  navItems.push(['galerie','Galerie']);
   if ((init.vitrine_expertise_json || isOwn) && modOn('expertise')) navItems.push(['expertise','Expertise']);
@@ -3032,27 +3063,7 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!articlesNonClasses.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.${isOwn?' Ajoutez un article et rangez-le dans un catalogue depuis « Modifier ».':''}</div>`:''}</div></div>
   </section>` : '';
 
-  const servicesCats = safeParseJson(init.vitrine_services_categories_json, null);
-  const hasServices = (servicesCats && servicesCats.length) || init.vitrine_services;
-  const enModeCategories = !!(servicesCats && servicesCats.length);
-  const services = ((hasServices || isOwn) && modOn('services')) ? `<section id="pv-services" class="pvt-section">
-    <div class="pvt-section-head sm" style="display:flex;justify-content:space-between;align-items:center;">
-      <h3>🛠 Services</h3>
-      <div style="display:flex;gap:6px;">
-        ${isOwn?`<button onclick="pvtEditServices()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">✏️ Modifier</button>`:''}
-        ${isOwn && !enModeCategories?`<button onclick="pvtAddServiceRow()" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter</button>`:''}
-      </div>
-    </div>
-    <div id="pvt-services-body" class="pvt-services-list">${
-      enModeCategories
-        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${servicesCats.map(c=>`<span class="pvz-interest-chip">${vitrineCategorieLabel(c)}</span>`).join('')}${servicesCats.length<MAX_SERVICES_CATEGORIES && isOwn ? Array.from({length:Math.min(3,MAX_SERVICES_CATEGORIES-servicesCats.length)}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('') : ''}</div>`
-        : (init.vitrine_services
-            ? init.vitrine_services.split('\n').filter(Boolean).map((s,i)=>`<div class="pvt-service-row"><span class="pvt-service-ico">✔</span><span style="flex:1;">${esc(s)}</span>${isOwn?`<button onclick="pvtRemoveServiceRow(${i})" title="Retirer ce service" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 6px;flex:none;">✕</button>`:''}</div>`).join('')
-            : isOwn
-              ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${Array.from({length:3}).map(()=>`<span onclick="pvtEditServices()" style="cursor:pointer;border:1.5px dashed #cbd5e1;border-radius:99px;padding:6px 14px;font-size:12.5px;color:#94a3b8;">+ Catégorie</span>`).join('')}</div>`
-              : `<span style="color:#94a3b8;font-style:italic;font-size:13px;">Aucun service renseigné.</span>`)
-    }</div>
-  </section>` : '';
+  // Services déplacé dans la colonne de gauche (2026-09-29) — voir renderVitrineCols().
 
   const galerieSec = (galerie.length && modOn('galerie_photos')) ? `<section id="pv-galerie" class="pvt-section">
     <div class="pvt-section-head sm"><h3>📸 Galerie</h3></div>
@@ -3497,7 +3508,7 @@ async function renderVitrineVisitor(init) {
     ['realisations', realisationsSec], ['reseaux_sociaux', reseauxSociauxSec],
     ['offre_flash', offreFlashSec], ['a_propos', presentation], ['expertise', expertiseSec],
     ['certifications', certificationsSec], ['vision_objectifs', visionSec], ['catalogue', collectionsSec],
-    ['produits', produitsSec], ['services', services], ['pourquoi_choisir', pourquoiSec],
+    ['produits', produitsSec], ['pourquoi_choisir', pourquoiSec],
     ['galerie_photos', galerieSec], ['resultats_impact', impactSec], ['besoins_projet', besoinsSec],
     ['temoignages', temoignagesSec], ['partenaires', partenairesObjectifSec],
     ['documents', telechargementsSec],
@@ -4224,7 +4235,7 @@ async function pvtSaveServices() {
     await vitrineSave({ vitrine_services_categories_json: cats });
     _vitrineInit.vitrine_services_categories_json = JSON.stringify(cats);
     document.getElementById('pvt-services-modal')?.remove();
-    renderVitrineVisitor(_vitrineInit);
+    renderVitrineCols(); // Services vit désormais dans la colonne gauche (2026-09-29)
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
@@ -4240,11 +4251,15 @@ function pvtAddServiceRow() {
   if (!body || document.getElementById('pvt-service-add-row')) return;
   const row = document.createElement('div');
   row.id = 'pvt-service-add-row';
-  row.className = 'pvt-service-row';
-  row.innerHTML = `<span class="pvt-service-ico">➕</span>
-    <input id="pvt-service-add-input" type="text" placeholder="Ex : Livraison à domicile" maxlength="200" style="flex:1;box-sizing:border-box;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;">
-    <button onclick="pvtValidateServiceRow()" style="background:var(--v1,#8E1B2E);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;flex:none;">✓ Valider</button>
-    <button onclick="pvtCancelServiceRow()" title="Annuler" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 6px;flex:none;">✕</button>`;
+  /* Style local plutôt que .pvt-service-row/.pvt-service-ico (2026-09-29) — ces classes
+     dépendent de variables CSS (--vsoft) définies dans .pvt-scope, qui n'entoure plus cette
+     ligne depuis le déplacement du bloc Services dans #pp-col-left (colonne gauche, en dehors
+     de .pvt-scope) : conservaient ces classes, l'icône ➕ perdait son fond de couleur. */
+  row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 0;';
+  row.innerHTML = `
+    <input id="pvt-service-add-input" type="text" placeholder="Ex : Livraison à domicile" maxlength="200" style="flex:1;min-width:0;box-sizing:border-box;padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12.5px;">
+    <button onclick="pvtValidateServiceRow()" style="background:var(--v1,#8E1B2E);color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;flex:none;">✓</button>
+    <button onclick="pvtCancelServiceRow()" title="Annuler" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 4px;flex:none;">✕</button>`;
   body.appendChild(row);
   const input = document.getElementById('pvt-service-add-input');
   input.focus();
@@ -4263,7 +4278,7 @@ async function pvtValidateServiceRow() {
   try {
     await vitrineSave({ vitrine_services: nouveauTexte });
     _vitrineInit.vitrine_services = nouveauTexte;
-    renderVitrineVisitor(_vitrineInit);
+    renderVitrineCols(); // Services vit désormais dans la colonne gauche (2026-09-29)
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 async function pvtRemoveServiceRow(index) {
@@ -4275,7 +4290,7 @@ async function pvtRemoveServiceRow(index) {
   try {
     await vitrineSave({ vitrine_services: nouveauTexte });
     _vitrineInit.vitrine_services = nouveauTexte;
-    renderVitrineVisitor(_vitrineInit);
+    renderVitrineCols(); // Services vit désormais dans la colonne gauche (2026-09-29)
   } catch (e) { alert('Erreur : ' + (e.message||'')); }
 }
 
