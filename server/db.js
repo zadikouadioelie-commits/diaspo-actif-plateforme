@@ -5498,6 +5498,20 @@ db.exec(`
   }
 }
 
+/* crm_contexte_actif_initiative_id (2026-09-29, demande explicite : "collaborer sur plusieurs
+   CRM à la fois... voir/basculer entre") — un compte (propriétaire Initiative ou collaborateur
+   crm_collaborateurs) peut désormais avoir accès à PLUSIEURS CRM en même temps ; cette colonne
+   mémorise lequel est actuellement affiché, persistée en base (et non en mémoire serveur) car une
+   fonction serverless Vercel ne garde aucun état entre deux requêtes. NULL = comportement
+   inchangé d'avant cette fonctionnalité (voir crmInitOwner() dans server/index.js : repli sur le
+   premier CRM disponible, son propre CRM en priorité s'il est propriétaire). */
+{
+  const userCols3 = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!userCols3.includes('crm_contexte_actif_initiative_id')) {
+    db.exec('ALTER TABLE users ADD COLUMN crm_contexte_actif_initiative_id INTEGER');
+  }
+}
+
 /* Ancien format local (DAS-XXXX-XXXX-XXXX, Math.random) abandonné au profit de
    sharedGenerateDsId — une seule implémentation, identique en local et en
    production (10 caractères, crypto.randomInt). */

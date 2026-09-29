@@ -242,12 +242,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (r.user) {
       currentUser = r.user;
       Posts.init(currentUser.id);
-      // Créer un post retiré pour le rôle utilisateur (2026-07-26) — voir module "Bientôt disponible"
-      if (r.user.role !== 'utilisateur') {
-        document.getElementById('btn-create-post').style.display = 'inline-flex';
-        document.getElementById('posts-fab').style.display = 'flex';
-        Posts.renderTrigger('feed-create-trigger');
-      }
+      /* Réactivé pour le rôle utilisateur (2026-09-29, demande explicite : "les publications des
+         comptes utilisateurs, fais-les apparaître dans les fils d'actualité") — la restriction du
+         2026-07-26 renvoyait vers un module "Bientôt disponible" resté sans suite ; assets/posts.js
+         gère déjà ce rôle explicitement depuis le 2026-09-23 (vidéo masquée, une seule photo, voir
+         buildCreateModal()/pickMediaFile()) et POST /api/fil/GET /api/fil n'ont jamais restreint
+         par rôle côté serveur — seul ce déclencheur d'affichage bloquait encore l'accès. */
+      document.getElementById('btn-create-post').style.display = 'inline-flex';
+      document.getElementById('posts-fab').style.display = 'flex';
+      Posts.renderTrigger('feed-create-trigger');
     } else {
       Posts.init(null);
     }

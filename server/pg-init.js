@@ -1184,6 +1184,8 @@ const COLONNES_MIGRATION = [
     ['insc_candidature_uploads', 'motif_refus', "TEXT"],
     ['insc_candidature_visiteur_uploads', 'statut', "TEXT NOT NULL DEFAULT 'en_attente'"],
     ['insc_candidature_visiteur_uploads', 'motif_refus', "TEXT"],
+    // CRM multi-collaboration — quel CRM est actuellement affiché (2026-09-29, miroir de l'ALTER db.js)
+    ['users', 'crm_contexte_actif_initiative_id', 'INTEGER'],
 ];
 
 async function migratePg(pool) {

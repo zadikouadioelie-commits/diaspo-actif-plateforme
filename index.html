@@ -2464,8 +2464,20 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
           </button>
         </div>
       </div>`;
-    }).join('');
-    grid.innerHTML = html + `
+    });
+    /* Publicité "homepage_feed" (2026-09-29, bug réel corrigé : promise à l'annonceur dès la
+       création — aperçu "mêlée aux publications du fil de la page d'accueil" dans
+       dashboard-initiative.html — mais jamais affichée nulle part). Insérée mêlée aux
+       publications réelles, après la 2ᵉ s'il y en a assez, comme le mockup le montre. Appel
+       direct de renderAdSlot() plutôt que de compter sur le passage global renderAllAdSlots()
+       (assets/app.js) au chargement de la page : cette grille se peuple après un fetch
+       asynchrone, souvent APRÈS ce passage global — le data-ad-emplacement n'existerait pas
+       encore au bon moment. N'affiche rien si aucune publicité active (même comportement que
+       les autres emplacements). */
+    const adSlotHtml = `<div id="ad-homepage-feed" data-ad-emplacement="homepage_feed" style="display:none;grid-column:1/-1;"></div>`;
+    const posIdx = Math.min(2, html.length);
+    html.splice(posIdx, 0, adSlotHtml);
+    grid.innerHTML = html.join('') + `
     <div class="hp-feed-cta">
       <div class="hp-feed-cta-text">
         <h3>Rejoignez la conversation</h3>
@@ -2473,6 +2485,7 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
       </div>
       <a href="inscription.html" class="hp-feed-cta-btn">🚀 Créer mon compte</a>
     </div>`;
+    if (window.renderAdSlot) renderAdSlot('ad-homepage-feed', 'homepage_feed');
   } catch {
     grid.innerHTML = `<div class="hp-feed-cta" style="grid-column:1/-1;">
       <div class="hp-feed-cta-text">

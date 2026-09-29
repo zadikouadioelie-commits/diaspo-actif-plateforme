@@ -188,7 +188,18 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     let invitation = null;
     try { invitation = await api('GET', '/crm/mon-invitation'); } catch (e) {}
     if (invitation && invitation.statut === 'en_attente') return renderCrmInvitationGate(invitation, api, content);
-    if (invitation && invitation.statut === 'accepte') return renderCrmCollaborateurMode(invitation, content);
+    /* Multi-CRM (2026-09-29, demande explicite) — /crm/mon-invitation ne renvoie que la PLUS
+       RÉCENTE collaboration (ORDER BY id DESC LIMIT 1, server/index.js) : un compte accepté sur
+       PLUSIEURS CRM à la fois n'atterrissait donc que sur un seul, les autres invisibles.
+       /crm/mes-crm liste tous les CRM réellement accessibles (mêmes règles d'accès, sans limite) ;
+       le nom de la première initiative sert juste au premier affichage de la barre latérale,
+       ensuite tenu à jour par le sélecteur (voir crmChargerSwitcher() plus bas). */
+    let mesCrm = null;
+    try { mesCrm = await api('GET', '/crm/mes-crm'); } catch (e) {}
+    if (mesCrm && mesCrm.disponibles && mesCrm.disponibles.length) {
+      const actif = mesCrm.disponibles.find(d => Number(d.initiative_id) === Number(mesCrm.actif_initiative_id)) || mesCrm.disponibles[0];
+      return renderCrmCollaborateurMode({ initiative_nom: actif.nom }, content);
+    }
     content.innerHTML = `<div class="notice">⚠️ Cette page est réservée aux comptes Initiative. <a href="${ROLE_DASHBOARD[me.role] || 'index.html'}">Accéder à mon tableau de bord →</a></div>`;
     return;
   }
@@ -9452,10 +9463,18 @@ const EXPANSION_MODULES_PAR_TYPE = {
      de restriction serveur les empêchant (exigerPremium ne vérifie que l'abonnement, jamais
      le type), il manquait juste un chemin d'accès. Miroir exact côté serveur :
      server/index.js, même constante EXPANSION_MODULES_PAR_TYPE. */
-  Entreprise:  ['zones_action','stats_impact','visioconference','evaluation_projet','accreditations_da','cotisations_adhesions','votes_securises'],
+  /* cagnottes/recensement ajoutés le 2026-09-29 (demande explicite) : "à première vue inutiles"
+     pour une entreprise au premier login — pas privés d'accès, juste rangés en Expansion comme
+     le reste de cette liste. */
+  Entreprise:  ['zones_action','stats_impact','visioconference','evaluation_projet','accreditations_da','cotisations_adhesions','votes_securises','cagnottes','recensement'],
   ONG:         ['candidatures','visioconference','evaluation_projet','accreditations_da'],
+  // Fondation = mêmes droits qu'Association (2026-09-29, demande explicite).
+  Fondation:   ['emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','accreditations_da'],
+  /* Média = mêmes droits qu'Entreprise, SAUF cagnottes qui reste toujours visible (2026-09-29,
+     demande explicite : "on leur laisse le module cagnotte"). */
+  Média:       ['zones_action','stats_impact','visioconference','evaluation_projet','accreditations_da','cotisations_adhesions','votes_securises','recensement'],
 };
-const EXPANSION_MODULES_TOUS = ['zones_action','emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','accreditations_da','cotisations_adhesions','votes_securises'];
+const EXPANSION_MODULES_TOUS = ['zones_action','emplois_stages','candidatures','stats_impact','visioconference','evaluation_projet','accreditations_da','cotisations_adhesions','votes_securises','cagnottes','recensement'];
 
 /* Masque les libellés de rubrique (ex. "05 — INTELLIGENCE") dont tous les liens
    sont actuellement cachés — évite les en-têtes de section vides quand aucun
@@ -9892,6 +9911,20 @@ async function initPremiumGates() {
       { href: '#offres-emploi', context: 'emplois_stages', intercept: true },
       { href: '#recrutement', context: 'candidatures', intercept: true },
     ],
+    /* Fondation = mêmes droits qu'Association, y compris CRM (2026-09-29, demande explicite)
+       — CRM n'est de toute façon jamais restreint par type (SIDEBAR_PREMIUM_LINKS_TOUS), donc
+       rien à faire de ce côté, seule cette liste avait besoin d'une entrée. */
+    Fondation: [
+      { href: '#adhesions-init', context: 'adhesions', intercept: true },
+      { href: '#votes-init', context: 'votes', intercept: true },
+    ],
+    /* Média = mêmes droits qu'Entreprise (2026-09-29, demande explicite) — l'exception
+       "Cagnottes et dons" toujours visible pour Média se règle dans EXPANSION_MODULES_PAR_TYPE
+       plus bas (cagnottes absent de la liste Média, présent dans celle d'Entreprise). */
+    Média: [
+      { href: '#offres-emploi', context: 'emplois_stages', intercept: true },
+      { href: '#recrutement', context: 'candidatures', intercept: true },
+    ],
   };
   const typePourPremium = window.__vitrineInitType;
   const SIDEBAR_PREMIUM_LINKS = [...SIDEBAR_PREMIUM_LINKS_TOUS, ...(SIDEBAR_PREMIUM_LINKS_PAR_TYPE[typePourPremium] || [])];
@@ -10164,6 +10197,7 @@ function crmSwitchTab(tab) {
           <div>
             <h2 style="margin:0;">🤝 CRM</h2>
             <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Le centre de pilotage de votre activité — contacts, prospects, opportunités, et tout ce qui s'y connecte.</p>
+            <div id="crm-switcher"></div>
           </div>
           <div style="position:relative;min-width:240px;">
             <input type="search" id="crm-search-input" placeholder="🔍 Rechercher dans le CRM…" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;">
@@ -10193,6 +10227,7 @@ function crmSwitchTab(tab) {
         </div>
       </div>`;
     crmWireSearch();
+    crmChargerSwitcher();
   }
   document.getElementById('crm-tabs').innerHTML = CRM_TABS.map(([key, label]) =>
     `<button class="btn btn-sm ${key === tab ? '' : 'btn-outline'}" onclick="crmSwitchTab('${key}')">${label}</button>`
@@ -10215,6 +10250,41 @@ function crmOpenModal(title, bodyHtml) {
   document.getElementById('crm-modal-backdrop').style.display = 'flex';
 }
 function crmCloseModal() { const el = document.getElementById('crm-modal-backdrop'); if (el) el.style.display = 'none'; }
+
+/* Sélecteur multi-CRM (2026-09-29, demande explicite : "collaborer sur plusieurs CRM à la fois...
+   voir/basculer entre") — invisible pour l'immense majorité des comptes (un seul CRM accessible,
+   comportement strictement inchangé) ; n'apparaît que si /crm/mes-crm liste plus d'un CRM
+   accessible (son propre CRM en tant que propriétaire, et/ou une ou plusieurs collaborations
+   acceptées). Chargé une seule fois à la création du crm-shell (voir crmSwitchTab). */
+let CRM_MES_CRM_CACHE = null;
+async function crmChargerSwitcher() {
+  const zone = document.getElementById('crm-switcher');
+  if (!zone) return;
+  try {
+    CRM_MES_CRM_CACHE = await api('GET', '/crm/mes-crm');
+  } catch (e) { return; }
+  const { disponibles = [], actif_initiative_id } = CRM_MES_CRM_CACHE;
+  if (disponibles.length < 2) { zone.innerHTML = ''; return; }
+  zone.innerHTML = `
+    <select id="crm-switcher-select" style="margin-top:6px;font-size:12.5px;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);max-width:280px;">
+      ${disponibles.map(d => `<option value="${d.initiative_id}" ${Number(d.initiative_id) === Number(actif_initiative_id) ? 'selected' : ''}>${crmEsc(d.nom)}${d.role === 'proprietaire' ? ' (mon CRM)' : ' (collaboration)'}</option>`).join('')}
+    </select>`;
+  document.getElementById('crm-switcher-select').addEventListener('change', e => crmBasculer(e.target.value));
+}
+async function crmBasculer(initiativeId) {
+  const zone = document.getElementById('crm-switcher');
+  try {
+    await api('POST', '/crm/basculer', { initiative_id: Number(initiativeId) });
+  } catch (e) { alert(e.message || 'Erreur.'); return; }
+  const choix = (CRM_MES_CRM_CACHE?.disponibles || []).find(d => Number(d.initiative_id) === Number(initiativeId));
+  window._crmEstCollaborateur = choix ? choix.role !== 'proprietaire' : false;
+  const brand = document.getElementById('sidebar-brand');
+  if (brand && choix && brand.textContent.startsWith('🤝 CRM')) brand.textContent = `🤝 CRM — ${choix.nom}`;
+  /* Options "Assigné à" et liste des collaborateurs propres au CRM précédent — invalides pour
+     le nouveau contexte, jamais recalculées automatiquement sinon (caches CRM, voir plus haut). */
+  CRM_COLLAB_CACHE = null;
+  crmSwitchTab('dashboard');
+}
 
 /* ── Pièces jointes CRM (2026-09-09, demande explicite) — 2 photos max + 3 PDF max, partagées
    par les 3 formulaires (Contact/Prospect, Opportunité, Tâche) : un seul état en mémoire, réinitialisé

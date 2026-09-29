@@ -1141,6 +1141,48 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   });
 });
 
+/* ═══════════════════════════════════════════════════════════════════
+   MODULE LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite)
+   Liens/QR codes à usage unique distribués par l'administration : 1 lien = 1 personne =
+   1 compte Utilisateur = 1 adhésion Premium de 12 mois. Explicitement DISTINCT du module
+   Parrainage & Invitations ci-dessus (cahier des charges § 33) — tables, règles et
+   historique séparés, même si le générateur de code s'inspire du même principe
+   (genererCodeInvitation() ci-dessus). Réutilise le système Premium existant
+   (accred_definitions/user_accreditations, type='utilisateur_abonne') plutôt qu'un
+   deuxième système parallèle — voir la modification de POST /api/auth/signup plus bas
+   pour l'activation, et accorderDecouvertePremium() (plus loin dans ce fichier — function
+   declaration, donc accessible malgré l'ordre des lignes) pour le mécanisme déjà en place
+   qu'on surcharge de 3 mois "Découverte" à 12 mois "Lien Adhérent". ═══════════════════════ */
+(async function migrateAdherentInvitationLinks() {
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS adherent_invitation_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      public_code TEXT NOT NULL UNIQUE,
+      secure_token TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'available',
+      campagne TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      used_at TEXT,
+      used_by_user_id INTEGER,
+      premium_start_date TEXT,
+      premium_end_date TEXT,
+      cancelled_at TEXT,
+      cancelled_by INTEGER
+    )`).run();
+  } catch (e) { console.error('[migrateAdherentInvitationLinks]', e.message); }
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS adherent_invitation_links_journal (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      link_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      details TEXT,
+      acteur_user_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`).run();
+  } catch (e) { console.error('[migrateAdherentInvitationLinksJournal]', e.message); }
+})();
+
 /* Champ "Sondage" (Formulaires & Inscriptions, 2026-09-25, demande explicite) — une image
    optionnelle par question (insc_champs.image_url), utilisable sur n'importe quel type_champ,
    pas seulement les questions de sondage. Les 3 modes de réponse eux-mêmes (Oui/Non, Texte
@@ -1154,6 +1196,46 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
       try { await db.prepare("ALTER TABLE insc_champs ADD COLUMN image_url TEXT").run(); } catch (e) {}
     }
   } catch (e) { console.error('[migrateInscChampsImage]', e.message); }
+})();
+
+/* Traitement des candidatures déclarées (2026-09-28, demande explicite) — la déclaration
+   "J'ai candidaté" n'était jusqu'ici qu'un simple comptage, sans statut : l'organisateur n'avait
+   aucun moyen d'indiquer, une fois le dossier reçu par e-mail et examiné, s'il était accepté ou
+   refusé. Ajoute un statut par déclaration, même esprit que le statut des inscriptions
+   classiques (voir onglet Validation) mais totalement indépendant — une candidature n'est jamais
+   automatiquement acceptée. */
+(async function migrateInscCandidatureDeclarationsStatut() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(insc_candidature_declarations)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('statut')) {
+      try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN statut TEXT NOT NULL DEFAULT 'en_attente'").run(); } catch (e) {}
+    }
+  } catch (e) { console.error('[migrateInscCandidatureDeclarationsStatut]', e.message); }
+})();
+
+/* "Répondre à la candidature" (2026-09-28, demande explicite) — le bouton "J'ai candidaté"
+   n'était qu'une case auto-déclarative (nom/prénom/e-mail du compte, rien d'autre) ; l'organisme
+   représenté, un téléphone de contact et un message libre à l'organisateur manquaient pour que
+   celui-ci puisse vraiment recontacter le candidat. Colonnes nullables ajoutées à la table
+   existante plutôt qu'une nouvelle table : insc_candidature_declarations reste la SEULE source
+   pour les candidats connectés, déjà lue par l'onglet "Traitement candidatures" (SELECT * dans
+   GET /api/insc/fiches/:id/candidature/declarations) — aucune autre route à toucher pour que ces
+   champs y apparaissent. */
+(async function migrateInscCandidatureDeclarationsContact() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(insc_candidature_declarations)").all()).map(c => c.name);
+    if (cols.length) {
+      if (!cols.includes('nom_organisme')) {
+        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN nom_organisme TEXT").run(); } catch (e) {}
+      }
+      if (!cols.includes('telephone')) {
+        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN telephone TEXT").run(); } catch (e) {}
+      }
+      if (!cols.includes('message')) {
+        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN message TEXT").run(); } catch (e) {}
+      }
+    }
+  } catch (e) { console.error('[migrateInscCandidatureDeclarationsContact]', e.message); }
 })();
 
 /* Vérification en ligne du numéro d'immatriculation (2026-09-28, demande explicite) — distincte
@@ -1214,88 +1296,6 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
       'Comment faire vérifier mon organisation ?'
     );
   } catch (e) { console.error('[migrateFaqOrganisationVerifiee]', e.message); }
-})();
-
-/* Traitement des candidatures déclarées (2026-09-28, demande explicite) — la déclaration
-   "J'ai candidaté" n'était jusqu'ici qu'un simple comptage, sans statut : l'organisateur n'avait
-   aucun moyen d'indiquer, une fois le dossier reçu par e-mail et examiné, s'il était accepté ou
-   refusé. Ajoute un statut par déclaration, même esprit que le statut des inscriptions
-   classiques (voir onglet Validation) mais totalement indépendant — une candidature n'est jamais
-   automatiquement acceptée. */
-(async function migrateInscCandidatureDeclarationsStatut() {
-  try {
-    const cols = (await db.prepare("PRAGMA table_info(insc_candidature_declarations)").all()).map(c => c.name);
-    if (cols.length && !cols.includes('statut')) {
-      try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN statut TEXT NOT NULL DEFAULT 'en_attente'").run(); } catch (e) {}
-    }
-  } catch (e) { console.error('[migrateInscCandidatureDeclarationsStatut]', e.message); }
-})();
-
-/* "Répondre à la candidature" (2026-09-28, demande explicite) — le bouton "J'ai candidaté"
-   n'était qu'une case auto-déclarative (nom/prénom/e-mail du compte, rien d'autre) ; l'organisme
-   représenté, un téléphone de contact et un message libre à l'organisateur manquaient pour que
-   celui-ci puisse vraiment recontacter le candidat. Colonnes nullables ajoutées à la table
-   existante plutôt qu'une nouvelle table : insc_candidature_declarations reste la SEULE source
-   pour les candidats connectés, déjà lue par l'onglet "Traitement candidatures" (SELECT * dans
-   GET /api/insc/fiches/:id/candidature/declarations) — aucune autre route à toucher pour que ces
-   champs y apparaissent. */
-(async function migrateInscCandidatureDeclarationsContact() {
-  try {
-    const cols = (await db.prepare("PRAGMA table_info(insc_candidature_declarations)").all()).map(c => c.name);
-    if (cols.length) {
-      if (!cols.includes('nom_organisme')) {
-        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN nom_organisme TEXT").run(); } catch (e) {}
-      }
-      if (!cols.includes('telephone')) {
-        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN telephone TEXT").run(); } catch (e) {}
-      }
-      if (!cols.includes('message')) {
-        try { await db.prepare("ALTER TABLE insc_candidature_declarations ADD COLUMN message TEXT").run(); } catch (e) {}
-      }
-    }
-  } catch (e) { console.error('[migrateInscCandidatureDeclarationsContact]', e.message); }
-})();
-
-/* ═══════════════════════════════════════════════════════════════════
-   MODULE LIENS ADHÉRENTS (cahier des charges, 2026-09-24, demande explicite)
-   Liens/QR codes à usage unique distribués par l'administration : 1 lien = 1 personne =
-   1 compte Utilisateur = 1 adhésion Premium de 12 mois. Explicitement DISTINCT du module
-   Parrainage & Invitations ci-dessus (cahier des charges § 33) — tables, règles et
-   historique séparés, même si le générateur de code s'inspire du même principe
-   (genererCodeInvitation() ci-dessus). Réutilise le système Premium existant
-   (accred_definitions/user_accreditations, type='utilisateur_abonne') plutôt qu'un
-   deuxième système parallèle — voir la modification de POST /api/auth/signup plus bas
-   pour l'activation, et accorderDecouvertePremium() (plus loin dans ce fichier — function
-   declaration, donc accessible malgré l'ordre des lignes) pour le mécanisme déjà en place
-   qu'on surcharge de 3 mois "Découverte" à 12 mois "Lien Adhérent". ═══════════════════════ */
-(async function migrateAdherentInvitationLinks() {
-  try {
-    await db.prepare(`CREATE TABLE IF NOT EXISTS adherent_invitation_links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      public_code TEXT NOT NULL UNIQUE,
-      secure_token TEXT NOT NULL UNIQUE,
-      status TEXT NOT NULL DEFAULT 'available',
-      campagne TEXT,
-      created_by INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now')),
-      used_at TEXT,
-      used_by_user_id INTEGER,
-      premium_start_date TEXT,
-      premium_end_date TEXT,
-      cancelled_at TEXT,
-      cancelled_by INTEGER
-    )`).run();
-  } catch (e) { console.error('[migrateAdherentInvitationLinks]', e.message); }
-  try {
-    await db.prepare(`CREATE TABLE IF NOT EXISTS adherent_invitation_links_journal (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      link_id INTEGER NOT NULL,
-      action TEXT NOT NULL,
-      details TEXT,
-      acteur_user_id INTEGER,
-      created_at TEXT DEFAULT (datetime('now'))
-    )`).run();
-  } catch (e) { console.error('[migrateAdherentInvitationLinksJournal]', e.message); }
 })();
 
 const ADH_LIEN_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // même alphabet que JUNIOR_ALPHABET (admin-junior.js) — exclut I/O/0/1
@@ -2529,8 +2529,8 @@ route("POST", "/api/upload/document", async (req, res) => {
 });
 
 /* ========== VITRINE COMMERCIALE + BOUTIQUE (comptes Initiative) ========== */
-const MAX_PRODUITS_VITRINE = 20;
-const MAX_ARTICLES_PAR_CATALOGUE = 5;
+const MAX_PRODUITS_VITRINE = 100;
+const MAX_ARTICLES_PAR_CATALOGUE = 10;
 
 /* ── Demandes de devis — machine à statuts (2026-09-07) ──
    Pas de contrainte CHECK sur devis_demandes.statut (même choix que STATUTS_PROJETS_DA, voir
@@ -3709,6 +3709,26 @@ route("PUT", "/api/initiatives/:id/vitrine", async (req, res, params, body) => {
   sendJSON(res, 200, { ok: true });
 });
 
+/* Casse de initiatives.type (2026-09-29, bug réel trouvé en explorant le filtrage par type) :
+   quelques comptes ont "association" (minuscule) au lieu de "Association" — un simple écart de
+   casse à la création, jamais corrigé depuis. Comme EXPANSION_MODULES_PAR_TYPE/
+   SIDEBAR_PREMIUM_LINKS_PAR_TYPE (ci-dessous et côté client) indexent par correspondance EXACTE
+   de chaîne, ces comptes tombaient silencieusement sur la liste vide par défaut — aucun module
+   Expansion, aucun lien Cotisations & Adhésions/Votes sécurisés propre à leur vrai type. Corrigé
+   à la racine (en base), une fois pour toutes, plutôt que de normaliser la casse à chaque
+   endroit du code qui compare initiatives.type — auto-réparateur, sans risque de récidive
+   puisqu'il se réexécute à chaque démarrage. */
+(async function normaliserCasseTypeInitiatives() {
+  try {
+    await db.prepare(`UPDATE initiatives SET type='Association' WHERE type IS NOT NULL AND LOWER(type)='association' AND type<>'Association'`).run();
+    await db.prepare(`UPDATE initiatives SET type='ONG' WHERE type IS NOT NULL AND LOWER(type)='ong' AND type<>'ONG'`).run();
+    await db.prepare(`UPDATE initiatives SET type='Entreprise' WHERE type IS NOT NULL AND LOWER(type)='entreprise' AND type<>'Entreprise'`).run();
+    await db.prepare(`UPDATE initiatives SET type='Fondation' WHERE type IS NOT NULL AND LOWER(type)='fondation' AND type<>'Fondation'`).run();
+    await db.prepare(`UPDATE initiatives SET type='Média' WHERE type IS NOT NULL AND LOWER(type) IN ('média','media') AND type<>'Média'`).run();
+    await db.prepare(`UPDATE initiatives SET type='Collectivité' WHERE type IS NOT NULL AND LOWER(type) IN ('collectivité','collectivite') AND type<>'Collectivité'`).run();
+  } catch (e) { console.error('[normaliserCasseTypeInitiatives]', e.message); }
+})();
+
 /* ═══════════════════════════════════════════════════════════════════════
    MODULE EXPANSION — modules non-standard selon le type d'initiative
    (Association/Entreprise/ONG), rangés hors de la sidebar principale et
@@ -3723,8 +3743,15 @@ const EXPANSION_MODULES_PAR_TYPE = {
      empêchant leur usage (exigerPremium ne vérifie que l'abonnement, jamais le type), il
      manquait juste un chemin d'accès. Rangés ici pour rester cohérent avec l'objectif du
      module Expansion : ne pas surcharger le menu par défaut. */
-  Entreprise: ["zones_action", "stats_impact", "evaluation_projet", "centre_financier", "accreditations_da", "cotisations_adhesions", "votes_securises"],
+  // cagnottes/recensement ajoutés le 2026-09-29 (demande explicite) — miroir exact du client,
+  // voir dashboard-initiative.html, même constante EXPANSION_MODULES_PAR_TYPE.
+  Entreprise: ["zones_action", "stats_impact", "evaluation_projet", "centre_financier", "accreditations_da", "cotisations_adhesions", "votes_securises", "cagnottes", "recensement"],
   ONG: ["candidatures", "evaluation_projet", "accreditations_da"],
+  // Fondation = mêmes droits qu'Association (2026-09-29, demande explicite).
+  Fondation: ["emplois_stages", "candidatures", "stats_impact", "evaluation_projet", "accreditations_da"],
+  // Média = mêmes droits qu'Entreprise, SAUF cagnottes qui reste toujours accessible (2026-09-29,
+  // demande explicite : "on leur laisse le module cagnotte").
+  Média: ["zones_action", "stats_impact", "evaluation_projet", "centre_financier", "accreditations_da", "cotisations_adhesions", "votes_securises", "recensement"],
 };
 
 /* GET /api/initiatives/:id/modules-actifs — owner only */
@@ -15827,11 +15854,16 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
      sur le nom personnel, qui n'apparaît plus qu'en information secondaire "responsable du compte". */
   let nomStructure = null, responsable = null, initiativeId = null, initiativeType = null, adhesionsOuvertes = null, photoFallbackInitiative = null;
   let descriptionStructure = null;
+  // Bandeau/badge de la BOUTIQUE (2026-09-29, demande explicite, capture à l'appui) : distincts
+  // de la bannière/du badge du profil PERSONNEL — le client (profil-app.html, onglet Boutique)
+  // ne doit jamais montrer "Identité vérifiée" (responsable) ni la bannière de couverture
+  // personnelle, mais la bannière et le statut de vérification de l'ORGANISATION elle-même.
+  let vitrineBanniereUrl = null, organisationVerifiee = false;
   // Domaine d'activité unifié : porté par users pour tout compte, sauf initiative (porté par
   // initiatives, écrasé juste en-dessous si une ligne existe — même logique que nom_structure).
   let domaineActivite = { domaine_principal: u.domaine_principal||null, sous_domaine_1: u.sous_domaine_1||null, sous_domaine_2: u.sous_domaine_2||null };
   if (u.role === 'initiative') {
-    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url, description, domaine_principal, sous_domaine_1, sous_domaine_2 FROM initiatives WHERE owner_user_id=?").get(u.id);
+    const initRow = await db.prepare("SELECT id, nom, type, adhesions_ouvertes, nom_responsable, prenom_responsable, fonction_responsable, logo_url, vitrine_banniere_url, description, domaine_principal, sous_domaine_1, sous_domaine_2, organisation_verifiee FROM initiatives WHERE owner_user_id=?").get(u.id);
     if (initRow) {
       nomStructure = initRow.nom;
       domaineActivite = { domaine_principal: initRow.domaine_principal||null, sous_domaine_1: initRow.sous_domaine_1||null, sous_domaine_2: initRow.sous_domaine_2||null };
@@ -15853,6 +15885,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
          initiative. Même règle de repli reprise ici pour que profil.html et l'annuaire
          montrent la même image — jamais utilisée si l'utilisateur a sa propre photo_url. */
       photoFallbackInitiative = initRow.vitrine_banniere_url || initRow.logo_url || null;
+      vitrineBanniereUrl = initRow.vitrine_banniere_url || null;
+      organisationVerifiee = !!initRow.organisation_verifiee;
     }
   } else if (u.role === 'collectivite' || u.role === 'administrateur') {
     if (u.nom_institution) {
@@ -15990,6 +16024,8 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     nom_structure: nomStructure,
     structure_description: descriptionStructure,
     responsable,
+    vitrine_banniere_url: vitrineBanniereUrl,
+    organisation_verifiee: organisationVerifiee,
     ...domaineActivite,
     notif_emails_non_essentiels: u.notif_emails_non_essentiels==null ? true : !!u.notif_emails_non_essentiels,
     type_organisme: u.type_organisme,
@@ -42036,23 +42072,80 @@ route('POST', '/api/recensements/:id/image', async (req, res, params, body) => {
    aux routes CRM de l'initiative qui l'a invité, à parité avec le propriétaire (aucune
    permission réduite en écriture — "rendre possible la collaboration" implique un vrai travail
    à plusieurs, pas une consultation seule). `estProprietaire` distingue les deux cas pour les
-   quelques actions réservées au seul propriétaire (inviter/retirer un collaborateur). */
+   quelques actions réservées au seul propriétaire (inviter/retirer un collaborateur).
+
+   Multi-CRM (2026-09-29, demande explicite : "collaborer sur plusieurs CRM à la fois... voir/
+   basculer entre") — un compte peut désormais être propriétaire de SON initiative ET collaborateur
+   accepté sur d'autres en même temps (crm_collaborateurs n'a jamais empêché ça, seul le
+   comportement ici ne considérait qu'un seul CRM). `disponibles` liste tous les CRM accessibles ;
+   le CRM actif est users.crm_contexte_actif_initiative_id (persisté en base — une fonction
+   serverless ne garde aucun état en mémoire entre deux requêtes) s'il correspond à l'un des
+   disponibles, sinon le premier de la liste (propre initiative en priorité si propriétaire) —
+   comportement strictement identique à avant cette fonctionnalité pour qui n'a jamais eu qu'un
+   seul CRM accessible. */
 async function crmInitOwner(req) {
   const user = await getCurrentUser(req);
   if (!user) return { erreur: 401, msg: "Connexion requise." };
+  const disponibles = [];
   if (user.role === "initiative") {
     const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(user.id);
-    if (!init) return { erreur: 404, msg: "Aucune initiative associée à ce compte." };
-    return { user, init, estProprietaire: true };
+    if (init) disponibles.push({ init, estProprietaire: true });
   }
-  const collab = await db.prepare("SELECT * FROM crm_collaborateurs WHERE user_id=? AND statut='accepte' ORDER BY id LIMIT 1").get(user.id);
-  if (collab) {
-    const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(collab.initiative_id);
-    if (init) return { user, init, estProprietaire: false };
+  const collabs = await db.prepare("SELECT * FROM crm_collaborateurs WHERE user_id=? AND statut='accepte' ORDER BY id").all(user.id);
+  for (const c of collabs) {
+    const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(c.initiative_id);
+    if (init) disponibles.push({ init, estProprietaire: false });
   }
-  return { erreur: 403, msg: "Réservé aux comptes Initiative ou aux collaborateurs CRM invités." };
+  if (!disponibles.length) return { erreur: 403, msg: "Réservé aux comptes Initiative ou aux collaborateurs CRM invités." };
+  /* crm_contexte_actif_initiative_id n'est pas dans la liste explicite de colonnes de
+     getCurrentUser() (universelle, utilisée par tout le site) — requête dédiée plutôt que
+     d'alourdir cette liste pour une seule fonctionnalité CRM. */
+  const pref = await db.prepare("SELECT crm_contexte_actif_initiative_id FROM users WHERE id=?").get(user.id);
+  const actifId = pref?.crm_contexte_actif_initiative_id;
+  const choix = (actifId && disponibles.find(d => Number(d.init.id) === Number(actifId))) || disponibles[0];
+  return { user, init: choix.init, estProprietaire: choix.estProprietaire, disponibles };
 }
 const CRM_STATUTS_PIPELINE = ["nouveau", "contacte", "interesse", "devis_envoye", "negociation", "gagne", "perdu"];
+
+/* GET /api/crm/mes-crm (2026-09-29, demande explicite) — liste TOUS les CRM accessibles au
+   compte connecté (son propre CRM s'il est propriétaire, plus toute collaboration acceptée),
+   pour peupler le sélecteur "quel CRM afficher" et, sur dashboard-utilisateur.html, décider
+   d'afficher ou non l'entrée "CRM partagé" dans le menu — jamais gaté par crmInitOwner (qui
+   renverrait 403 pour un compte sans aucun CRM, exactement le cas normal ici : liste vide, pas
+   une erreur). */
+route("GET", "/api/crm/mes-crm", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const disponibles = [];
+  if (user.role === "initiative") {
+    const init = await db.prepare("SELECT id, nom, logo_url FROM initiatives WHERE owner_user_id=?").get(user.id);
+    if (init) disponibles.push({ initiative_id: init.id, nom: init.nom, logo_url: init.logo_url, role: "proprietaire" });
+  }
+  const collabs = await db.prepare(
+    `SELECT i.id AS initiative_id, i.nom, i.logo_url FROM crm_collaborateurs cc JOIN initiatives i ON i.id=cc.initiative_id WHERE cc.user_id=? AND cc.statut='accepte' ORDER BY cc.id`
+  ).all(user.id);
+  for (const c of collabs) disponibles.push({ initiative_id: c.initiative_id, nom: c.nom, logo_url: c.logo_url, role: "collaborateur" });
+  const pref = await db.prepare("SELECT crm_contexte_actif_initiative_id FROM users WHERE id=?").get(user.id);
+  const actifId = pref?.crm_contexte_actif_initiative_id;
+  const actif = (actifId && disponibles.find(d => Number(d.initiative_id) === Number(actifId))) || disponibles[0] || null;
+  sendJSON(res, 200, { disponibles, actif_initiative_id: actif ? actif.initiative_id : null });
+});
+
+/* POST /api/crm/basculer (2026-09-29, demande explicite) — change quel CRM est actuellement
+   affiché pour ce compte. Persisté en base (voir crm_contexte_actif_initiative_id, server/db.js)
+   plutôt qu'en mémoire serveur : une fonction serverless Vercel ne garde aucun état entre deux
+   requêtes, la sélection serait perdue à la moindre requête suivante sur une autre instance. */
+route("POST", "/api/crm/basculer", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const initiativeId = Number(body?.initiative_id);
+  if (!initiativeId) return sendJSON(res, 400, { error: "initiative_id requis." });
+  const estProprio = await db.prepare("SELECT id FROM initiatives WHERE id=? AND owner_user_id=?").get(initiativeId, user.id);
+  const estCollab = !estProprio && await db.prepare("SELECT id FROM crm_collaborateurs WHERE initiative_id=? AND user_id=? AND statut='accepte'").get(initiativeId, user.id);
+  if (!estProprio && !estCollab) return sendJSON(res, 403, { error: "Accès refusé à ce CRM." });
+  await db.prepare("UPDATE users SET crm_contexte_actif_initiative_id=? WHERE id=?").run(initiativeId, user.id);
+  sendJSON(res, 200, { ok: true });
+});
 
 /* GET /api/crm/mon-invitation — auto-diagnostic pour N'IMPORTE QUEL rôle (jamais gaté par
    crmInitOwner, qui exigerait déjà l'accès qu'on cherche justement à établir) : dit si le
@@ -42976,6 +43069,15 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
     t.nb_inscrits = (await db.prepare("SELECT COUNT(*) n FROM insc_inscriptions WHERE type_id=? AND statut NOT IN ('annule','liste_attente')").get(t.id))?.n || 0;
   }
   const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+  /* Nom du lien de parrainage lié (2026-09-28, demande explicite) — champ additif sur `fiche`,
+     juste pour l'affichage admin (voir renderParrainageEssentielle() côté client) ; la sélection
+     elle-même se fait via GET /api/parrainage/invitations. */
+  if (fiche.parrainage_invitation_id) {
+    const invitation = await db.prepare("SELECT nom, code, statut FROM invitations WHERE id=?").get(fiche.parrainage_invitation_id);
+    fiche.parrainage_nom = invitation?.nom || null;
+    fiche.parrainage_code = invitation?.code || null;
+    fiche.parrainage_statut = invitation?.statut || null;
+  }
   let candidature = null;
   const candConfig = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
   if (candConfig) {
@@ -43006,6 +43108,21 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
   if (Array.isArray(body.partenaires)) {
     set.push("partenaires_json=?");
     vals.push(JSON.stringify(body.partenaires.filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }))));
+  }
+  /* Lien de parrainage (2026-09-28, demande explicite) — un seul lien d'invitation par fiche,
+     choisi par l'organisateur parmi SES PROPRES invitations (jamais celles d'un tiers, même
+     pour un admin gérant la fiche) pour qu'un compte ne puisse jamais s'attribuer le crédit
+     du lien d'un autre. `null` retire le lien (déliage explicite) ; un id invalide, désactivé
+     ou appartenant à quelqu'un d'autre est silencieusement ignoré plutôt que de bloquer toute
+     la sauvegarde — même logique que les filtres sponsors/partenaires ci-dessus. */
+  if (body.parrainage_invitation_id !== undefined) {
+    if (body.parrainage_invitation_id === null) {
+      set.push("parrainage_invitation_id=?");
+      vals.push(null);
+    } else {
+      const invitation = await db.prepare("SELECT id FROM invitations WHERE id=? AND inviter_user_id=? AND statut='active'").get(body.parrainage_invitation_id, fiche.owner_user_id);
+      if (invitation) { set.push("parrainage_invitation_id=?"); vals.push(invitation.id); }
+    }
   }
   if (set.length) {
     set.push("updated_at=datetime('now')");
@@ -43972,7 +44089,12 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Les inscriptions pour cet événement sont désormais fermées.", medias });
     }
-    if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
+    /* Fiche liée à au moins un événement (2026-09-28, demande explicite : "si cette note est de
+       toute façon liée à un événement, la question ne se pose plus. Automatiquement, la note est
+       ouverte") — sa propre date d'ouverture ne bloque plus rien, seule la fermeture ci-dessus
+       reste pertinente. Sans lien, la date d'ouverture continue de s'appliquer normalement. */
+    const estLieeAUnEvenement = !!(await db.prepare("SELECT 1 FROM insc_fiches_evenements WHERE fiche_id=? LIMIT 1").get(fiche.id));
+    if (!estLieeAUnEvenement && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias });
     }
@@ -44027,6 +44149,11 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       const maDeclaration = visiteur
         ? await db.prepare("SELECT * FROM insc_candidature_declarations WHERE config_id=? AND user_id=?").get(config.id, visiteur.id)
         : null;
+      /* Nom d'organisme pré-rempli pour "Répondre à la candidature" (2026-09-28, demande
+         explicite : "pour ceux qui ont un compte... rien à remplir... nom de l'organisme...
+         automatique") — repris de la déclaration déjà enregistrée si elle existe (au cas où
+         l'utilisateur aurait rejoint/quitté une initiative depuis), sinon de son initiative
+         actuelle. Jamais saisi à la main pour un compte connecté. */
       let monOrganisme = maDeclaration?.nom_organisme || null;
       if (visiteur && !monOrganisme) {
         const initiative = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(visiteur.id);
@@ -44052,7 +44179,19 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
       };
     }
   } catch (e) { console.error('[insc-public-candidature]', e.message); }
-  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature });
+  /* Lien de parrainage (2026-09-28, demande explicite) — un visiteur sans compte Diaspo'Actif
+     peut en créer un via ce lien depuis la page publique, sans jamais fermer l'inscription en
+     cours (ouvert dans un nouvel onglet côté client, voir inscription-publique.html). Jamais
+     bloquant : un lien absent, désactivé ou supprimé n'affecte pas le reste de la fiche. Seuls
+     code/nom sont exposés publiquement, jamais l'id interne ni les compteurs. */
+  let parrainage = null;
+  if (fiche.parrainage_invitation_id) {
+    try {
+      const invitation = await db.prepare("SELECT code, nom, statut FROM invitations WHERE id=?").get(fiche.parrainage_invitation_id);
+      if (invitation && invitation.statut === 'active') parrainage = { code: invitation.code, nom: invitation.nom };
+    } catch (e) { console.error('[insc-public-parrainage]', e.message); }
+  }
+  sendJSON(res, 200, { fiche, evenements, types, medias, apercu: modeApercu, autres_evenements: autresEvenements, candidature, parrainage });
 });
 
 route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, body) => {
@@ -44065,8 +44204,11 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (!fiche || fiche.statut !== "publiee") return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
   if (fiche.gele_le) return sendJSON(res, 403, { error: "Cette fiche est temporairement suspendue." });
   const now = new Date();
+  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
   if (fiche.date_fermeture_inscriptions && new Date(fiche.date_fermeture_inscriptions) < now) return sendJSON(res, 400, { error: "Les inscriptions pour cet événement sont désormais fermées." });
-  if (fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
+  /* Lié à un événement = ouverture automatique, seule la fermeture compte (2026-09-28, demande
+     explicite) — même règle que GET /api/insc/public/:slug ci-dessus. */
+  if (!liaisons.length && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) return sendJSON(res, 400, { error: "Les inscriptions ne sont pas encore ouvertes." });
 
   const type = await db.prepare("SELECT * FROM insc_types WHERE id=? AND fiche_id=? AND actif=1").get(body?.type_id, fiche.id);
   if (!type) return sendJSON(res, 400, { error: "Type d'inscription invalide." });
@@ -44074,7 +44216,6 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (type.date_fermeture && new Date(type.date_fermeture) < now) return sendJSON(res, 400, { error: `Les inscriptions « ${type.label} » sont fermées.` });
 
   let evenementId = null;
-  const liaisons = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=?").all(fiche.id);
   if (liaisons.length === 1) evenementId = liaisons[0].evenement_id;
   else if (liaisons.length > 1) {
     if (!body?.evenement_id || !liaisons.some(l => Number(l.evenement_id) === Number(body.evenement_id))) {

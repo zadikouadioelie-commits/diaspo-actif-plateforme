@@ -921,29 +921,13 @@ function ipRenderLogos(titre, jsonStr) {
       </div>
     </div>`;
 }
-/* Lien de parrainage (2026-09-28, demande explicite) — permet à un visiteur SANS compte
-   Diaspo'Actif d'en créer un via le lien choisi par l'organisateur pour cette fiche (module
-   Parrainage & Invitations, voir insc_fiches.parrainage_invitation_id). Masqué pour un visiteur
-   déjà connecté (rien à lui proposer). target="_blank" volontaire, demande explicite : "ce lien
-   ne devra pas fermer l'inscription, mais ouvrir en arrière-plan" — même /join/CODE que
-   parrainage.html, qui respecte déjà domaine/sous-domaine/bannière configurés sur ce lien. */
-function ipRenderParrainage() {
-  if (!IP_PARRAINAGE) return '';
-  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
-  if (connecte) return '';
-  return `
-    <a class="ip-parrainage-box" href="${location.origin}/join/${encodeURIComponent(IP_PARRAINAGE.code)}" target="_blank" rel="noopener">
-      <span style="font-size:18px;">🔵</span>
-      <span>Pas encore de compte Diaspo'Actif ? <strong>Créez-en un</strong>${IP_PARRAINAGE.nom ? ` via ${escH(IP_PARRAINAGE.nom)}` : ''} →</span>
-    </a>`;
-}
 /* Don occasionnel lié à cette fiche (2026-09-28, demande explicite) — distinct du bouton
    "Faire un don" global (le don mis en avant "partout" par l'organisateur, voir
    assets/don-banner.js) : ici, le ou les dons spécifiquement rattachés à CETTE fiche
    (cagnottes.insc_fiche_id), affichés en plus, jamais à la place. Fonction async (appel
-   réseau) — contrairement à ipRenderLogos() ci-dessus, ne peut donc pas s'inliner
-   directement dans le template synchrone d'ipRenderAccueil() : appelée séparément après le
-   rendu principal, comme le post-traitement déjà fait pour IP_PAIEMENT_STATUT. */
+   réseau) — contrairement à ipRenderLogos()/ipRenderParrainage() ci-dessus, ne peut donc pas
+   s'inliner directement dans le template synchrone d'ipRenderAccueil() : appelée séparément
+   après le rendu principal, comme le post-traitement déjà fait pour IP_PAIEMENT_STATUT. */
 async function ipRenderDonLie() {
   try {
     const { dons } = await api('GET', '/cagnottes/pour-fiche/' + IP_FICHE.id);
@@ -959,6 +943,22 @@ async function ipRenderDonLie() {
         </div>
       </div>`;
   } catch (e) { return ''; }
+}
+/* Lien de parrainage (2026-09-28, demande explicite) — permet à un visiteur SANS compte
+   Diaspo'Actif d'en créer un via le lien choisi par l'organisateur pour cette fiche (module
+   Parrainage & Invitations, voir insc_fiches.parrainage_invitation_id). Masqué pour un visiteur
+   déjà connecté (rien à lui proposer). target="_blank" volontaire, demande explicite : "ce lien
+   ne devra pas fermer l'inscription, mais ouvrir en arrière-plan" — même /join/CODE que
+   parrainage.html, qui respecte déjà domaine/sous-domaine/bannière configurés sur ce lien. */
+function ipRenderParrainage() {
+  if (!IP_PARRAINAGE) return '';
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  if (connecte) return '';
+  return `
+    <a class="ip-parrainage-box" href="${location.origin}/join/${encodeURIComponent(IP_PARRAINAGE.code)}" target="_blank" rel="noopener">
+      <span style="font-size:18px;">🔵</span>
+      <span>Pas encore de compte Diaspo'Actif ? <strong>Créez-en un</strong>${IP_PARRAINAGE.nom ? ` via ${escH(IP_PARRAINAGE.nom)}` : ''} →</span>
+    </a>`;
 }
 function ipRenderAccueil() {
   const f = IP_FICHE;

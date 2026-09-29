@@ -1965,10 +1965,23 @@ function renderVisitorProfile() {
   const sub = profil.titre_pro || (profil.situation_pro ? profil.situation_pro.replace(/_/g,' ') : (profil.role_label || profil.role || 'Membre'));
   const isInit = profil.role === 'initiative';
   const responsableNom = profil.responsable ? [profil.responsable.prenom, profil.responsable.nom].filter(Boolean).join(' ') : '';
+  /* pvz-mode-profil / pvz-mode-vitrine (2026-09-29, demande explicite, capture à l'appui) :
+     "Responsable du compte", "Identité vérifiée" (personnelle) et les chips géo/perso
+     n'ont rien à faire sur la boutique — une vitrine représente la STRUCTURE, jamais son
+     gestionnaire. Les deux jeux de badges sont construits une fois ici, basculés par simple
+     display:none/'' au clic sur l'onglet (voir pvzSwitchTab), sans re-rendu ni requête réseau. */
   const responsableLine = (isOrgAccount && responsableNom)
-    ? `<div class="pvz-responsable">👤 Responsable du compte : <strong>${esc(responsableNom)}</strong>${profil.responsable.fonction ? ` — ${esc(profil.responsable.fonction)}` : ''}</div>`
+    ? `<div class="pvz-responsable pvz-mode-profil">👤 Responsable du compte : <strong>${esc(responsableNom)}</strong>${profil.responsable.fonction ? ` — ${esc(profil.responsable.fonction)}` : ''}</div>`
     : '';
   const verified = !!(profil.identite_verifiee);
+  const vitrineVerified = !!(profil.organisation_verifiee);
+  const categorieLabel = profil.domaine_principal
+    ? (window.domaineActiviteLabel ? window.domaineActiviteLabel(profil.domaine_principal) : profil.domaine_principal)
+    : '';
+  const vitrineBadgesLine = isInit ? `<div class="pvz-mode-vitrine" style="display:none;gap:8px;flex-wrap:wrap;margin:6px 0 0;">
+    ${vitrineVerified ? `<span class="pvz-verified"><span class="dot">✓</span>Organisation vérifiée</span>` : ''}
+    ${categorieLabel ? `<span class="pvz-chip">🏷️ ${esc(categorieLabel)}${profil.sous_domaine_1 ? ' — ' + esc(profil.sous_domaine_1) : ''}</span>` : ''}
+  </div>` : '';
   const isPremium = (profil._accreditations || []).includes('utilisateur_abonne');
 
   // Avatar
@@ -2062,12 +2075,13 @@ function renderVisitorProfile() {
               ${(!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBadgeHtml(profil._decouverte_premium.date_expiration) : ''}
               ${profil.role === 'partenaire' ? `<span class="pvz-premium-badge" title="Compte Partenaire Diaspo'Actif" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);">🤝 Partenaire</span>` : ''}
               ${(Array.isArray(profil.partenariats) ? profil.partenariats : []).map(p => `<span class="pvz-partenaire-badge" title="Partenariat officiel avec ${esc(p.nom)}">${p.badge_image ? `<img src="${esc(p.badge_image)}" alt="" onerror="this.remove()">` : '🤝'}Partenaire de ${esc(p.nom)}</span>`).join('')}
-              ${verified ? `<span class="pvz-verified"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
+              ${verified ? `<span class="pvz-verified pvz-mode-profil"><span class="dot">✓</span>Identité vérifiée</span>` : ''}
             </div>
-            <div class="pvz-sub">${esc(sub)}</div>
+            <div class="pvz-sub pvz-mode-profil">${esc(sub)}</div>
             ${responsableLine}
-            ${profil.role === 'partenaire' ? `<div class="notice" style="margin:8px 0 0;font-size:12.5px;">📂 Projets : sur orientation de Diaspo'Actif. Les porteurs de projets ne contactent jamais un partenaire directement — c'est toujours Diaspo'Actif qui oriente un dossier après analyse.</div>` : ''}
-            ${chips.length ? `<div class="pvz-chips">${chips.join('')}</div>` : ''}
+            ${profil.role === 'partenaire' ? `<div class="notice pvz-mode-profil" style="margin:8px 0 0;font-size:12.5px;">📂 Projets : sur orientation de Diaspo'Actif. Les porteurs de projets ne contactent jamais un partenaire directement — c'est toujours Diaspo'Actif qui oriente un dossier après analyse.</div>` : ''}
+            ${chips.length ? `<div class="pvz-chips pvz-mode-profil">${chips.join('')}</div>` : ''}
+            ${vitrineBadgesLine}
           </div>
           <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+adhererBtn+msgBtn+shareBtn+reportBtn}</div>
         </div>
@@ -2214,6 +2228,29 @@ function setPp3colVitrineState(isVitrine) {
 if (_pp3colMq.addEventListener) _pp3colMq.addEventListener('change', applyPp3colLayout);
 else if (_pp3colMq.addListener) _pp3colMq.addListener(applyPp3colLayout);
 
+/* Bandeau + badges "boutique" (2026-09-29, demande explicite, capture à l'appui) : le bandeau
+   de couverture personnel (#p-banner) et les badges "Identité vérifiée"/chips géographiques du
+   responsable n'ont rien à faire une fois sur l'onglet Boutique — une vitrine représente la
+   STRUCTURE, jamais son gestionnaire. On bascule ici entre les deux jeux déjà construits une
+   fois dans le HTML (classes .pvz-mode-profil / .pvz-mode-vitrine, voir renderVisitorProfile()),
+   sans re-rendu ni requête réseau supplémentaire. */
+function pvzAppliquerIdentiteBoutique(isVitrine) {
+  document.querySelectorAll('.pvz-mode-profil').forEach(el => { el.style.display = isVitrine ? 'none' : ''; });
+  document.querySelectorAll('.pvz-mode-vitrine').forEach(el => { el.style.display = isVitrine ? 'flex' : 'none'; });
+  const img = document.getElementById('banner-img');
+  const banner = document.getElementById('p-banner');
+  if (!img || !banner) return;
+  if (isVitrine && profil.role === 'initiative' && profil.vitrine_banniere_url) {
+    img.classList.remove('loaded');
+    img.onload = () => img.classList.add('loaded');
+    img.src = profil.vitrine_banniere_url; img.style.display = 'block';
+    if (img.complete) img.classList.add('loaded');
+    banner.style.background = 'none';
+  } else {
+    renderBanner();
+  }
+}
+
 function pvzSwitchTab(view) {
   const body = document.getElementById('pvz-profil-body');
   const vitrine = document.getElementById('p-vitrine');
@@ -2224,6 +2261,7 @@ function pvzSwitchTab(view) {
   if (vitrine) vitrine.style.display = isVitrine ? '' : 'none';
   if (segP) segP.classList.toggle('active', !isVitrine);
   if (segV) segV.classList.toggle('active', isVitrine);
+  pvzAppliquerIdentiteBoutique(isVitrine);
 
   /* En vitrine : on retire la colonne de droite pour donner plus d'espace aux produits
      (uniquement au-dessus du seuil mobile — voir applyPp3colLayout). */
