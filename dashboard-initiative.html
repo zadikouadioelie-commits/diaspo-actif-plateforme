@@ -10878,12 +10878,10 @@ function crmRenderParametres() {
       <h4 style="margin-top:0;">🤝 Collaborateurs CRM</h4>
       <p style="color:var(--muted);font-size:13px;">Un collaborateur invité et accepté travaille avec vous dans ce CRM (mêmes droits sur contacts, prospects, opportunités, tâches), sans accéder aux autres modules de votre tableau de bord.</p>
       ${window._crmEstCollaborateur ? '' : `
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:14px 0;">
-        <div>
-          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px;">Code de Sécurité Diaspo'Actif (DS-ID)</label>
-          <input id="crm-collab-dsid" placeholder="DA-000000" style="padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;">
-        </div>
-        <button class="btn btn-sm btn-outline" id="crm-collab-rechercher">🔍 Rechercher</button>
+      <div style="position:relative;max-width:320px;margin:14px 0;">
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px;">Nom ou prénom du compte à inviter</label>
+        <input id="crm-collab-recherche" placeholder="Tapez un nom…" autocomplete="off" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;box-sizing:border-box;">
+        <div id="crm-collab-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:260px;overflow-y:auto;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>
       </div>
       <div id="crm-collab-resultat"></div>
       <div id="crm-collab-err" style="color:#dc2626;font-size:13px;margin-top:4px;"></div>`}
@@ -10897,37 +10895,69 @@ function crmRenderParametres() {
       <p style="color:var(--muted);font-size:13px;">Les statuts du pipeline, les catégories de contacts et les tags sont pour l'instant fixes — configurables ici dans une prochaine version, au fil des besoins réels.</p>
     </div>`;
 
-  if (!window._crmEstCollaborateur) {
-    document.getElementById('crm-collab-rechercher').addEventListener('click', crmCollabRechercher);
-    document.getElementById('crm-collab-dsid').addEventListener('keydown', e => { if (e.key === 'Enter') crmCollabRechercher(); });
-  }
+  if (!window._crmEstCollaborateur) crmCollabInitRecherche();
   crmChargerCollaborateurs();
 }
 
-async function crmCollabRechercher() {
-  const dsId = (document.getElementById('crm-collab-dsid').value || '').trim().toUpperCase();
+/* Recherche par nom/prénom (2026-09-29, demande explicite : remplace la recherche par code —
+   le champ précédent affichait "DS-ID" mais interrogeait en fait /account/by-da-id, donc le
+   DA-ID (public, déjà exposé partout via publicUser()), pas le vrai DS-ID (secret, jamais exposé
+   nulle part — voir publicUser() côté serveur) : aucune fuite du secret, mais un libellé trompeur
+   et une manip peu naturelle ("donne-moi ton code" avant de pouvoir inviter quelqu'un). Réutilise
+   GET /api/search/comptes déjà utilisé ailleurs (ex. autocomplete partenaires d'événement) plutôt
+   que d'écrire une seconde recherche. */
+let crmCollabRechTimer = null;
+function crmCollabInitRecherche() {
+  const input = document.getElementById('crm-collab-recherche');
+  const dropdown = document.getElementById('crm-collab-dropdown');
+  if (!input || !dropdown) return;
+  input.addEventListener('input', () => {
+    clearTimeout(crmCollabRechTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { dropdown.style.display = 'none'; return; }
+    crmCollabRechTimer = setTimeout(async () => {
+      try {
+        const { comptes = [] } = await api('GET', '/search/comptes?q=' + encodeURIComponent(q));
+        const moi = await crmMyId();
+        const resultats = comptes.filter(c => Number(c.id) !== Number(moi));
+        if (!resultats.length) { dropdown.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--muted);">Aucun résultat</div>'; dropdown.style.display = ''; return; }
+        dropdown.innerHTML = resultats.map(c => `
+          <div class="crm-collab-suggestion" data-id="${c.id}" data-nom="${crmEsc(c.nom)}" data-role="${crmEsc(c.role || '')}" data-avatar="${crmEsc(c.avatar_url || '')}" style="padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f1f5f9;">
+            ${c.avatar_url ? `<img src="${crmEsc(c.avatar_url)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="" onerror="this.remove()">` : `<div style="width:28px;height:28px;border-radius:50%;background:var(--bg);flex-shrink:0;"></div>`}
+            <div><div style="font-size:13px;font-weight:600;">${crmEsc(c.nom)}</div><div style="font-size:11px;color:var(--muted);">${crmEsc(c.role || '')}${c.source ? ' · ' + (c.source === 'initiative' ? 'Initiative' : 'Utilisateur') : ''}</div></div>
+          </div>`).join('');
+        dropdown.style.display = '';
+      } catch (e) { dropdown.style.display = 'none'; }
+    }, 280);
+  });
+  dropdown.addEventListener('click', e => {
+    const row = e.target.closest('.crm-collab-suggestion');
+    if (!row) return;
+    dropdown.style.display = 'none';
+    input.value = row.dataset.nom;
+    crmCollabProposerInvite({ id: row.dataset.id, nom: row.dataset.nom, role: row.dataset.role, avatar_url: row.dataset.avatar });
+  });
+  document.addEventListener('click', e => { if (!dropdown.contains(e.target) && e.target !== input) dropdown.style.display = 'none'; }, { capture: true });
+}
+
+function crmCollabProposerInvite(cpt) {
   const resultatEl = document.getElementById('crm-collab-resultat');
   const errEl = document.getElementById('crm-collab-err');
-  errEl.textContent = ''; resultatEl.innerHTML = '';
-  if (!dsId) return;
-  try {
-    const r = await api('GET', `/account/by-da-id/${encodeURIComponent(dsId)}`);
-    const cpt = r.compte;
-    resultatEl.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:10px;margin-top:6px;">
-        ${cpt.avatar_url ? `<img src="${cpt.avatar_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="" onerror="this.remove()">` : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg);flex-shrink:0;"></div>`}
-        <div style="flex:1;"><strong>${crmEsc(cpt.nom)}</strong><div style="font-size:12px;color:var(--muted);">${crmEsc(cpt.role || '')}</div></div>
-        <input id="crm-collab-fonction" placeholder="Fonction (optionnel)" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:12px;max-width:160px;">
-        <button class="btn btn-sm" id="crm-collab-inviter">Inviter</button>
-      </div>`;
-    document.getElementById('crm-collab-inviter').addEventListener('click', async () => {
-      try {
-        await api('POST', '/crm/collaborateurs', { user_id: cpt.id, fonction: document.getElementById('crm-collab-fonction').value || null });
-        resultatEl.innerHTML = ''; document.getElementById('crm-collab-dsid').value = '';
-        CRM_COLLAB_CACHE = null; crmChargerCollaborateurs();
-      } catch (e) { errEl.textContent = e.message || 'Erreur.'; }
-    });
-  } catch (e) { errEl.textContent = e.message || 'Compte introuvable.'; }
+  errEl.textContent = '';
+  resultatEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:10px;margin-top:6px;">
+      ${cpt.avatar_url ? `<img src="${cpt.avatar_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="" onerror="this.remove()">` : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg);flex-shrink:0;"></div>`}
+      <div style="flex:1;"><strong>${crmEsc(cpt.nom)}</strong><div style="font-size:12px;color:var(--muted);">${crmEsc(cpt.role || '')}</div></div>
+      <input id="crm-collab-fonction" placeholder="Fonction (optionnel)" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:12px;max-width:160px;">
+      <button class="btn btn-sm" id="crm-collab-inviter">Inviter</button>
+    </div>`;
+  document.getElementById('crm-collab-inviter').addEventListener('click', async () => {
+    try {
+      await api('POST', '/crm/collaborateurs', { user_id: cpt.id, fonction: document.getElementById('crm-collab-fonction').value || null });
+      resultatEl.innerHTML = ''; document.getElementById('crm-collab-recherche').value = '';
+      CRM_COLLAB_CACHE = null; crmChargerCollaborateurs();
+    } catch (e) { errEl.textContent = e.message || 'Erreur.'; }
+  });
 }
 
 const CRM_COLLAB_STATUT_LABEL = { en_attente: '⏳ En attente', accepte: '✅ Actif', refuse: '❌ Décliné' };
