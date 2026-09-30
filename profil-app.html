@@ -5477,10 +5477,19 @@ function openCommanderModal(productId, publicationId) {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;">
       <h2 style="margin:0 0 6px;font-size:17px;">📦 Commander « ${esc(prod.nom)} »</h2>
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${payant ? `Paiement sécurisé par Stripe — ${Number(prod.prix).toFixed(2)} ${esc(prod.devise||'EUR')} / unité.` : "Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici."}</p>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${payant ? `Paiement sécurisé — ${Number(prod.prix).toFixed(2)} ${esc(prod.devise||'EUR')} / unité.` : "Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici."}</p>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Quantité</label>
       <input type="number" min="1" id="cmd-qte" value="1" oninput="cmdUpdateTotal(${Number(prod.prix)||0})" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
       ${payant ? `<p style="font-size:13px;font-weight:700;margin:0 0 12px;">Total : <span id="cmd-total">${Number(prod.prix).toFixed(2)}</span> ${esc(prod.devise||'EUR')}</p>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Moyen de paiement</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 10px;cursor:pointer;">
+          <input type="radio" name="cmd-provider" value="stripe" checked> 💳 Carte
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 10px;cursor:pointer;">
+          <input type="radio" name="cmd-provider" value="paypal"> 🅿️ PayPal
+        </label>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin:0 0 12px;cursor:pointer;">
         <input type="checkbox" id="cmd-save-card"> Enregistrer cette carte pour mes prochains achats
       </label>` : ''}
@@ -5504,6 +5513,7 @@ function openCommanderModal(productId, publicationId) {
         message: document.getElementById('cmd-msg').value.trim() || null,
         publication_id: publicationId != null ? publicationId : null,
         enregistrer_carte: document.getElementById('cmd-save-card')?.checked || false,
+        provider: document.querySelector('input[name="cmd-provider"]:checked')?.value || 'stripe',
       });
       if (r.checkout_url) { window.location.href = r.checkout_url; return; }
       overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;">
@@ -6115,7 +6125,12 @@ async function quickFollow(id, btn) {
 
 function timeAgo(str) {
   try {
-    const d = new Date(str.replace(' ','T'));
+    // Dates serveur en UTC sans 'Z' : sans ce suffixe, le moteur JS les lit comme une heure
+    // LOCALE et gonfle l'âge affiché de l'écart UTC↔local (bug identique corrigé dans
+    // assets/posts.js le 2026-09-30 — même correctif ici). Garde le format déjà muni d'un
+    // fuseau (ISO avec 'Z' ou offset) intact pour ne pas lui ajouter un 'Z' en double.
+    const iso = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(str) ? str.replace(' ','T') + 'Z' : str;
+    const d = new Date(iso);
     const diff = (Date.now() - d.getTime()) / 1000;
     if (diff < 60) return "à l'instant";
     if (diff < 3600) return Math.floor(diff/60) + ' min';
@@ -6571,7 +6586,12 @@ function loadVideosTab() {
 async function loadEvenementsTab() {
   const panel = document.getElementById('ptab-evenements');
   try {
-    const r = await api('GET', '/evenements');
+    /* ?owner= ajouté (2026-09-30, demande explicite) — signature nécessaire pour que le
+       serveur inclue les événements visibilite='boutique' de ce propriétaire (voir
+       GET /api/evenements) : absents de la découverte générale, mais destinés à être vus par
+       n'importe quel visiteur DE CETTE PAGE boutique, pas seulement par le propriétaire lui-même
+       (contrairement aux brouillons, qui restent invisibles ici aussi). */
+    const r = await api('GET', '/evenements?owner=' + profil.id);
     const all = r.evenements || r.events || [];
     const mine = all.filter(e => Number(e.owner_user_id) === Number(profil.id));
     if (!mine.length) {

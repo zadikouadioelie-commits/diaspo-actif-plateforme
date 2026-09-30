@@ -61,12 +61,18 @@ function apiRequest(method, url, data) {
 }
 
 function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+  // Le serveur stocke les dates en UTC sans indicateur de fuseau ("YYYY-MM-DD HH:MM:SS") — sans
+  // le 'Z', le moteur JS les interprète comme une heure LOCALE, ce qui gonflait systématiquement
+  // l'âge affiché de l'écart UTC↔local (ex. +2h l'été à Paris) sur toute publication/commentaire
+  // tout juste créé (bug découvert et corrigé le 2026-09-30, en vérifiant "à l'instant" affiché "2h").
+  const iso = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(dateStr) ? dateStr.replace(' ', 'T') + 'Z' : dateStr;
+  const d = new Date(iso);
+  const diff = (Date.now() - d.getTime()) / 1000;
   if (diff < 60) return 'à l\'instant';
   if (diff < 3600) return Math.floor(diff/60) + ' min';
   if (diff < 86400) return Math.floor(diff/3600) + 'h';
   if (diff < 2592000) return Math.floor(diff/86400) + 'j';
-  return new Date(dateStr).toLocaleDateString('fr-FR', { day:'numeric', month:'short', year:'numeric' });
+  return d.toLocaleDateString('fr-FR', { day:'numeric', month:'short', year:'numeric' });
 }
 
 function escHtml(s) {
@@ -216,7 +222,14 @@ function renderMedias(post) {
     // 100%/200px, ce qui tronquait par exemple le texte visible sur une bannière.
     html += `<div class="post-media-grid post-media-grid--${cols === 1 ? 'single' : 'multi'}" style="grid-template-columns:repeat(${cols},1fr);">`;
     imgs.forEach(m => {
-      html += `<div class="post-media-item"><img src="${escHtml(m.url)}" alt="Média" loading="lazy" onclick="window.open('${escHtml(m.url)}','_blank')"></div>`;
+      // Fond flouté généré depuis l'image elle-même (2026-09-30, demande explicite : un fond
+      // adapté à la couleur dominante de la photo pour combler l'espace vide autour d'elle,
+      // jamais un fond neutre fixe) — l'image de premier plan (.post-media-fg) reste, elle,
+      // toujours entière et jamais recadrée. Clic → vue détaillée façon Facebook.
+      html += `<div class="post-media-item">
+        <img class="post-media-bg" src="${escHtml(m.url)}" aria-hidden="true" loading="lazy">
+        <img class="post-media-fg" src="${escHtml(m.url)}" alt="Média" loading="lazy" onclick="Posts.openDetail(${post.id})">
+      </div>`;
     });
     html += `</div>`;
   }
@@ -548,6 +561,33 @@ function buildContributeModal() {
   document.body.appendChild(modal);
 }
 
+/* ── Modal de vue détaillée (façon Facebook) ── */
+function buildDetailModal() {
+  if (document.getElementById('posts-detail-modal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'posts-detail-modal';
+  modal.className = 'posts-modal-overlay pd-overlay';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+<div class="pd-box">
+  <button class="pd-close" onclick="Posts.closeDetail()" title="Fermer">✕</button>
+  <div class="pd-media" id="pd-media"></div>
+  <div class="pd-side">
+    <div class="pd-header" id="pd-header"></div>
+    <div class="pd-caption" id="pd-caption"></div>
+    <div class="pd-statsbar" id="pd-statsbar"></div>
+    <div class="pd-actions" id="pd-actions"></div>
+    <div class="pd-comments" id="pd-comments"></div>
+    <div class="pd-comment-form">
+      <textarea id="pd-comment-input" class="post-comment-input" placeholder="Écrire un commentaire…" rows="1"></textarea>
+      <button class="btn-primary btn-sm" onclick="Posts.detailSubmitComment()">Publier</button>
+    </div>
+  </div>
+</div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) Posts.closeDetail(); });
+  document.body.appendChild(modal);
+}
+
 /* ── Styles CSS injectés ── */
 function injectStyles() {
   if (document.getElementById('posts-styles')) return;
@@ -580,17 +620,21 @@ function injectStyles() {
 /* Médias (2026-09-16, demande explicite : photos affichées entières, jamais coupées,
    à l'image de LinkedIn) */
 .post-media-grid{display:grid;gap:4px;padding:0 16px 12px;}
-.post-media-item{background:#f1f5f9;border-radius:8px;overflow:hidden;cursor:zoom-in;}
-.post-media-item img{width:100%;display:block;}
+.post-media-item{position:relative;background:#111;border-radius:8px;overflow:hidden;cursor:zoom-in;}
+/* Fond flouté généré depuis l'image affichée elle-même (2026-09-30, demande explicite) :
+   comble l'espace vide autour d'une image qui ne remplit pas son cadre par un fond "adapté
+   à sa couleur dominante", au lieu d'un gris neutre fixe. Purement décoratif → aria-hidden. */
+.post-media-bg{position:absolute;inset:-12px;width:calc(100% + 24px);height:calc(100% + 24px);object-fit:cover;filter:blur(26px) saturate(1.35) brightness(.82);transform:scale(1.08);z-index:0;pointer-events:none;}
+.post-media-fg{position:relative;z-index:1;width:100%;display:block;}
 /* Une seule image : hauteur naturelle (aucun recadrage) — juste plafonnée pour qu'une image
    très haute n'envahisse pas tout le fil ; au-delà du plafond elle est "contenue" (image
    entière rétrécie, jamais tronquée) plutôt que recadrée. */
-.post-media-grid--single .post-media-item img{height:auto;max-height:520px;object-fit:contain;}
+.post-media-grid--single .post-media-item img.post-media-fg{height:auto;max-height:520px;object-fit:contain;}
 /* Plusieurs images : grille carrée pour un alignement propre, mais chaque image reste
    entièrement visible dedans (object-fit:contain sur fond neutre) au lieu d'être recadrée
    pour remplir la case (cover) comme c'était le cas avant. */
 .post-media-grid--multi .post-media-item{aspect-ratio:1/1;}
-.post-media-grid--multi .post-media-item img{height:100%;object-fit:contain;}
+.post-media-grid--multi .post-media-item img.post-media-fg{height:100%;object-fit:contain;}
 .post-media-video{padding:0 16px 12px;}
 .post-media-audio{padding:0 16px;}
 .post-media-docs{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px;}
@@ -643,6 +687,30 @@ function injectStyles() {
 .post-comment-input{width:100%;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:.88rem;resize:vertical;font-family:inherit;}
 .post-comment-input:focus{outline:none;border-color:#ff6b00;}
 .post-comment-actions{display:flex;justify-content:flex-end;}
+/* ── Vue détaillée d'une publication, façon Facebook (2026-09-30, demande explicite) :
+   clic sur une image → publication à gauche, réactions + commentaires TOUJOURS ouverts
+   (jamais de bouton pour les replier) à droite. ── */
+.pd-overlay{z-index:1200;padding:0;}
+.pd-box{position:relative;background:#000;width:100%;height:100%;max-width:1280px;max-height:900px;display:flex;border-radius:12px;overflow:hidden;}
+.pd-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:16px;cursor:pointer;z-index:5;}
+.pd-close:hover{background:rgba(255,255,255,.28);}
+.pd-media{flex:1;min-width:0;background:#0b0b0c;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+.pd-media .post-media-grid{width:100%;height:100%;padding:0!important;margin:0;}
+.pd-media .post-media-item{border-radius:0;height:100%;}
+.pd-media .post-media-fg{max-height:none!important;height:100%!important;width:100%!important;object-fit:contain!important;}
+.pd-side{width:400px;flex:none;background:#fff;display:flex;flex-direction:column;max-height:100%;}
+.pd-header{padding:14px 16px;border-bottom:1px solid #f0f1f3;flex:none;}
+.pd-caption{padding:12px 16px;font-size:13.5px;line-height:1.55;color:#1f2937;border-bottom:1px solid #f0f1f3;flex:none;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;}
+.pd-statsbar{display:flex;gap:14px;padding:8px 16px;font-size:.8rem;color:#6b7280;border-bottom:1px solid #f0f1f3;flex:none;}
+.pd-actions{display:flex;align-items:center;padding:4px 10px;gap:2px;border-bottom:1px solid #f0f1f3;flex:none;flex-wrap:wrap;}
+.pd-comments{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
+.pd-comment-form{flex:none;display:flex;align-items:flex-end;gap:8px;padding:10px 16px;border-top:1px solid #f0f1f3;}
+.pd-comment-form textarea{flex:1;}
+@media(max-width:760px){
+  .pd-box{flex-direction:column;max-height:100vh;border-radius:0;}
+  .pd-media{flex:none;height:42vh;}
+  .pd-side{width:100%;flex:1;}
+}
 /* Bouton créer post */
 .posts-create-trigger{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;cursor:pointer;width:100%;text-align:left;color:#9ca3af;font-size:.95rem;transition:border-color .2s,box-shadow .2s;margin-bottom:16px;}
 .posts-create-trigger:hover{border-color:#ff6b00;box-shadow:0 0 0 3px rgba(255,107,0,.08);}
@@ -715,10 +783,17 @@ const Posts = {
     injectStyles();
     buildCreateModal();
     buildContributeModal();
+    buildDetailModal();
     // Fermer menus sur clic extérieur
     document.addEventListener('click', e => {
       if (!e.target.closest('.post-menu-wrap')) document.querySelectorAll('.post-menu-dropdown.open').forEach(d => d.classList.remove('open'));
       if (!e.target.closest('.post-reactions-wrap')) document.querySelectorAll('.post-reaction-menu.open').forEach(d => d.classList.remove('open'));
+    });
+    // Échap ferme la vue détaillée
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const dm = document.getElementById('posts-detail-modal');
+      if (dm && dm.style.display !== 'none') Posts.closeDetail();
     });
   },
 
@@ -1073,6 +1148,155 @@ const Posts = {
         }
       }
     } catch(e) { if (typeof showToast === 'function') showToast('Erreur.', 'error'); }
+  },
+
+  /* ── Vue détaillée (façon Facebook) : publication à gauche, réactions + commentaires
+     TOUJOURS ouverts à droite (2026-09-30, demande explicite, maquette validée) ── */
+  _detailPostId: null,
+
+  async openDetail(postId) {
+    buildDetailModal();
+    this._detailPostId = postId;
+    const modal = document.getElementById('posts-detail-modal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('pd-media').innerHTML = `<div style="color:#fff;padding:40px;">Chargement…</div>`;
+    document.getElementById('pd-comments').innerHTML = '';
+    try {
+      const r = await apiRequest('GET', `/api/fil/${postId}`);
+      if (!r.post) { this.closeDetail(); return; }
+      this._renderDetailPost(r.post);
+      this._loadDetailComments(postId);
+      attachMentionPicker(document.getElementById('pd-comment-input'));
+    } catch (e) { this.closeDetail(); }
+  },
+
+  closeDetail() {
+    const modal = document.getElementById('posts-detail-modal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    this._detailPostId = null;
+  },
+
+  _renderDetailPost(post) {
+    document.getElementById('pd-media').innerHTML = renderMedias(post) ||
+      `<div style="color:#fff;padding:60px;text-align:center;">${escHtml(post.auteur_nom)}</div>`;
+
+    const profil = post.auteur_profil || {};
+    const titrePro = profil.titre_pro ? `<span class="post-auteur-titre">${escHtml(profil.titre_pro)}</span>` : '';
+    const certifBadge = post.auteur_certif ? `<span class="post-certif" title="${escHtml(post.auteur_certif.label||'Vérifié')}">✓</span>` : '';
+    document.getElementById('pd-header').innerHTML = `
+      <a href="profil.html?id=${post.auteur_id||''}" class="post-auteur-link">
+        ${avatarHTML(post)}
+        <div class="post-auteur-info">
+          <div class="post-auteur-name">${escHtml(post.auteur_nom)}${certifBadge}</div>
+          ${titrePro}
+          <div class="post-meta">${timeAgo(post.created_at)}</div>
+        </div>
+      </a>`;
+
+    const estArticle = post.pub_type === 'article';
+    const texteBrut = estArticle ? (post.article_contenu || '') : (post.contenu || '');
+    const titreArticleHtml = estArticle ? `<h3 class="post-article-titre">${escHtml(post.article_titre||post.contenu)}</h3>` : '';
+    document.getElementById('pd-caption').innerHTML = titreArticleHtml + processContent(texteBrut);
+
+    document.getElementById('pd-actions').innerHTML = `
+      <div class="post-reactions-wrap">
+        <button class="post-action-btn ${post.user_a_aime?'active':''}" onclick="Posts.toggleReactionMenu('detail', this)" title="Réagir">
+          ❤️ <span class="post-action-count">${(Object.values(post.reactions||{}).reduce((s,n)=>s+n,0))||''}</span>
+        </button>
+        <div class="post-reaction-menu" id="react-menu-detail">
+          ${REACTIONS.map(r=>`<button class="post-react-btn" onclick="Posts.detailReact('${r.type}')" title="${r.label}">${r.emoji}</button>`).join('')}
+        </div>
+      </div>
+      <button class="post-action-btn" onclick="Posts.repost(${post.id})" title="Republier">🔁 <span class="post-action-count">${(post.reactions&&post.reactions.repost)||''}</span></button>
+      <button class="post-action-btn" id="pd-bookmark-btn" onclick="Posts.bookmark(${post.id}, this)" title="Enregistrer" data-bookmarked="${post.user_bookmarked||false}">${post.user_bookmarked ? '🔖' : '📌'}</button>
+      <button class="post-action-btn post-contribute-btn" onclick="Posts.openContribute(${post.id})" title="Je souhaite contribuer">🤝 Contribuer</button>
+      <button class="post-action-btn" onclick="Posts.share(${post.id})" title="Partager">📤</button>`;
+
+    this._updateDetailStats(post);
+  },
+
+  _updateDetailStats(post) {
+    const reactions = post.reactions || {};
+    const totalReactions = Object.values(reactions).reduce((s, n) => s + n, 0);
+    const nb_commentaires = post.nb_commentaires || 0;
+    const nb_reposts = reactions.repost || 0;
+    const mainReaction = totalReactions > 0
+      ? `${REACTIONS.find(r => (reactions[r.type]||0) === Math.max(...Object.values(reactions)))?.emoji||'❤️'} ${totalReactions}`
+      : '';
+    const statsbar = document.getElementById('pd-statsbar');
+    if (statsbar) statsbar.innerHTML = `
+      ${mainReaction ? `<span class="post-stats-item">${mainReaction}</span>` : ''}
+      ${nb_commentaires ? `<span class="post-stats-item">${nb_commentaires} commentaire${nb_commentaires>1?'s':''}</span>` : ''}
+      ${nb_reposts ? `<span class="post-stats-item">${nb_reposts} republication${nb_reposts>1?'s':''}</span>` : ''}`;
+    const reactBtn = document.querySelector('#pd-actions .post-reactions-wrap .post-action-btn');
+    if (reactBtn) {
+      reactBtn.querySelector('.post-action-count').textContent = totalReactions || '';
+      if (post.user_a_aime) reactBtn.classList.add('active');
+    }
+  },
+
+  async detailReact(type) {
+    const id = this._detailPostId; if (!id) return;
+    try {
+      await apiRequest('POST', `/api/fil/${id}/react`, { type });
+      document.getElementById('react-menu-detail')?.classList.remove('open');
+      const r2 = await apiRequest('GET', `/api/fil/${id}`);
+      if (r2.post) this._updateDetailStats(r2.post);
+      const card = document.getElementById(`post-${id}`);
+      if (card && r2.post) {
+        const cbtn = card.querySelector('.post-reactions-wrap .post-action-btn');
+        const total = Object.values(r2.post.reactions||{}).reduce((s,n)=>s+n,0);
+        if (cbtn) { cbtn.querySelector('.post-action-count').textContent = total || ''; cbtn.classList.add('active'); }
+      }
+    } catch (e) {}
+  },
+
+  async _loadDetailComments(postId) {
+    const list = document.getElementById('pd-comments');
+    if (!list) return;
+    try {
+      const r = await apiRequest('GET', `/api/fil/${postId}/commentaires`);
+      const comms = r.commentaires || [];
+      if (!comms.length) { list.innerHTML = '<p style="color:#9ca3af;font-size:.85rem;text-align:center;padding:16px 0;">Aucun commentaire. Soyez le premier !</p>'; return; }
+      list.innerHTML = comms.map(c => {
+        const initiales = getInitiales(c.auteur_nom);
+        const color = getAvatarColor(c.auteur_nom);
+        const avatarEl = c.photo_url
+          ? `<img src="${escHtml(c.photo_url)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="">`
+          : `<div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.75rem;flex-shrink:0;">${initiales}</div>`;
+        return `
+          <div class="post-comment">
+            ${avatarEl}
+            <div class="post-comment-bubble">
+              <div class="post-comment-author">${escHtml(c.auteur_nom)}</div>
+              <div class="post-comment-text">${processContent(c.contenu)}</div>
+              <div class="post-comment-time">${timeAgo(c.created_at)}</div>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (e) { list.innerHTML = '<p style="color:#dc2626;">Erreur de chargement.</p>'; }
+  },
+
+  async detailSubmitComment() {
+    const id = this._detailPostId; if (!id) return;
+    const input = document.getElementById('pd-comment-input');
+    const contenu = input?.value?.trim() || '';
+    if (!contenu) return;
+    try {
+      await apiRequest('POST', `/api/fil/${id}/commentaires`, { contenu });
+      input.value = '';
+      await this._loadDetailComments(id);
+      const r2 = await apiRequest('GET', `/api/fil/${id}`);
+      if (r2.post) this._updateDetailStats(r2.post);
+      const card = document.getElementById(`post-${id}`);
+      if (card) {
+        const btn = card.querySelector('.post-action-btn[onclick*="toggleComments"]');
+        const n = document.querySelectorAll('#pd-comments .post-comment').length;
+        if (btn) btn.querySelector('.post-action-count').textContent = n || '';
+      }
+    } catch (e) { if (typeof showToast === 'function') showToast('Erreur.', 'error'); }
   },
 
   /* ── Repost ── */

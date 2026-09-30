@@ -81,10 +81,18 @@
       .fil-3col{flex-direction:column;height:auto;}
       .fil-col-left,.fil-col-right,.fil-col-center{height:auto;overflow-y:visible;}
       .fil-col-left,.fil-col-right{width:100%;}
-      .fil-col-left{order:2;}
-      .fil-col-center{order:1;}
+      /* Filtres TOUJOURS accessibles en mobile (2026-09-30, demande explicite, maquette
+         validée) : avant, ils passaient après le fil (order:2) et redevenaient hors de vue
+         sans remonter tout en haut pendant le défilement — désormais premiers ET fixés sous
+         le bandeau (sticky), en une seule rangée compacte par carte plutôt qu'empilés. */
+      .fil-col-left{order:1;position:sticky;top:var(--topbar-h,56px);z-index:5;background:#F4F6F9;padding:8px 0 4px;margin:0 0 12px;box-shadow:0 4px 10px rgba(13,43,78,.06);}
+      .fil-col-center{order:2;}
       .fil-col-right{order:3;}
-      .fil-filters-vertical{flex-direction:row;flex-wrap:wrap;}
+      .fil-filter-card{margin-bottom:6px;padding:8px 10px 10px;}
+      .fil-filter-card h4{display:none;}
+      .fil-filters-vertical{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+      .fil-filters-vertical::-webkit-scrollbar{display:none;}
+      .fil-filters-vertical .posts-feed-filter{flex:0 0 auto;}
     }
   </style>
 </head>
@@ -233,6 +241,15 @@ let feedMode = 'tous';
 let feedCat  = '';
 let feedPage = 1;
 let currentUser = null;
+
+/* Hauteur réelle du bandeau (topbar est déjà position:sticky;top:0), pour que la barre de
+   filtres sticky se positionne juste en dessous sans le recouvrir, sur toute taille d'écran. */
+function majTopbarHeight() {
+  const tb = document.querySelector('.topbar');
+  if (tb) document.documentElement.style.setProperty('--topbar-h', tb.offsetHeight + 'px');
+}
+majTopbarHeight();
+window.addEventListener('resize', majTopbarHeight);
 
 /* ── Init ── */
 document.addEventListener('DOMContentLoaded', async () => {
