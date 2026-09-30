@@ -20805,8 +20805,14 @@ route("DELETE", "/api/admin/membres/:id", async (req, res, params, body) => {
   const motif = (body?.motif || "").trim() || null;
   /* Anonymisation, pas suppression physique : la table users est référencée par 122 clés
      étrangères (moitié seulement en ON DELETE CASCADE) — un vrai DELETE FROM users échoue
-     ou casse l'intégrité dès qu'un compte a la moindre activité. Même logique que
-     l'auto-suppression RGPD (DELETE /api/auth/account), voir executerSuppressionCompte(). */
+     ou casse l'intégrité dès qu'un compte a la moindre activité. Même fonction que la
+     suppression définitive côté utilisateur, mais celle-ci ne passe plus par
+     DELETE /api/auth/account (commentaire corrigé le 2026-09-30, bug de documentation trouvé
+     en marge d'une autre tâche) : cette route ne fait plus que masquer le compte
+     (compte_masque=1, voir "Masquage de compte (remplace l'ancienne suppression RGPD)" dans
+     profil-app.html) — la suppression définitive n'est plus déclenchable en libre-service et
+     exige désormais une demande via POST /api/deletion-requests, traitée par un administrateur,
+     qui appelle executerSuppressionCompte() une fois approuvée (voir plus bas dans ce fichier). */
   await executerSuppressionCompte(params.id, null);
   await db.prepare(`
     INSERT INTO admin_suppressions_membres (user_id, role, nom, prenom, email, date_creation_compte, motif, admin_id, admin_nom)
