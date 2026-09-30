@@ -8862,9 +8862,15 @@ route("GET", "/api/collectivites/:id/actualites", async (req, res, params) => {
   sendJSON(res, 200, { posts });
 });
 
-/* GET /api/collectivites/:id/agenda — événements à venir organisés par la collectivité */
+/* GET /api/collectivites/:id/agenda — événements à venir organisés par la collectivité.
+   Bug réel trouvé en creusant le leak de visibilite='boutique' (2026-09-30) : cette route ne
+   filtrait AUCUN statut — un brouillon de la collectivité remontait ici publiquement, sans
+   passer par GET /api/evenements. visibilite='boutique' reste volontairement inclus : cette
+   page EST la page propre de la collectivité (même rôle que ?owner= sur GET /api/evenements),
+   pas la découverte générale. */
 route("GET", "/api/collectivites/:id/agenda", async (req, res, params) => {
-  const events = await db.prepare("SELECT * FROM evenements WHERE owner_user_id=? AND (date_evt IS NULL OR date_evt >= date('now')) ORDER BY date_evt ASC LIMIT 20").all(params.id);
+  const events = (await db.prepare("SELECT * FROM evenements WHERE owner_user_id=? AND (date_evt IS NULL OR date_evt >= date('now')) ORDER BY date_evt ASC LIMIT 20").all(params.id))
+    .filter(e => e.statut !== 'brouillon');
   sendJSON(res, 200, { events });
 });
 
@@ -16880,8 +16886,13 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
   const formations = (type === "tous" || type === "formations")
     ? await db.prepare("SELECT id,titre,domaine,organisme,gratuit,duree FROM formations WHERE titre LIKE ? OR description LIKE ? OR organisme LIKE ? LIMIT 8").all(like, like, like)
     : [];
+  /* Recherche plateforme entière, sans contexte propriétaire (query.owner n'existe pas ici) :
+     un brouillon ou un événement "boutique uniquement" n'a donc aucune raison d'y remonter,
+     même bug de fond que GET /api/evenements/recommandes (2026-09-30, trouvé en production —
+     un événement de test "boutique uniquement" remontait dans une liste censée n'afficher que
+     les véritables événements publics). */
   const evenements = (type === "tous" || type === "evenements")
-    ? await db.prepare("SELECT id,titre,lieu,date_evt,type_evt,pays FROM evenements WHERE titre LIKE ? OR lieu LIKE ? OR description LIKE ? LIMIT 8").all(like, like, like)
+    ? await db.prepare("SELECT id,titre,lieu,date_evt,type_evt,pays FROM evenements WHERE (titre LIKE ? OR lieu LIKE ? OR description LIKE ?) AND statut != 'brouillon' AND (visibilite IS NULL OR visibilite NOT IN ('boutique','prive','abonnes')) LIMIT 8").all(like, like, like)
     : [];
 
   sendJSON(res, 200, { q, utilisateurs, initiatives, publications, formations, evenements });
@@ -18804,7 +18815,13 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
     // vue par défaut d'evenements.html (aucun filtre actif), donc jamais de brouillon ici, même
     // pour son propre propriétaire : "Mes événements" (GET /api/evenements?owner=soi-même,
     // dashboard-initiative.html) reste le seul endroit où le consulter avant publication.
-    const rows = (await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all()).filter(r => r.statut !== 'brouillon');
+    /* Visibilité "🏬 Boutique uniquement" (2026-09-30, bug réel trouvé en production : ces
+       événements remontaient ici alors qu'ils sont explicitement exclus de GET /api/evenements
+       — cette route de recommandations interroge la table directement, sans passer par ce
+       filtre-là, donc jamais couverte par lui) — cette route n'est JAMAIS appelée avec un
+       ?owner=, contrairement à "Mes événements"/la page boutique : aucune raison de jamais les
+       inclure ici, l'exclusion est donc inconditionnelle. */
+    const rows = (await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all()).filter(r => r.statut !== 'brouillon' && r.visibilite !== 'boutique');
     return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: null });
   }
 
@@ -18864,8 +18881,9 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
     rows = await db.prepare(baseSelect + (filtresBase.length ? ' AND ' + filtresBase.join(' AND ') : '') + ' ORDER BY e.date_evt ASC LIMIT 60').all(...argsBase);
     niveauRetenu = rows.length ? 'aucun_filtre_geo' : null;
   }
-  // Brouillon — même exclusion inconditionnelle que la branche !hasPrefs ci-dessus.
-  rows = rows.filter(r => r.statut !== 'brouillon');
+  // Brouillon + visibilité "boutique" — mêmes exclusions inconditionnelles que la branche
+  // !hasPrefs ci-dessus (voir son commentaire : jamais de ?owner= sur cette route).
+  rows = rows.filter(r => r.statut !== 'brouillon' && r.visibilite !== 'boutique');
   return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: niveauRetenu });
 });
 
