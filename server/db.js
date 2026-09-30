@@ -5647,6 +5647,46 @@ db.exec(`
     FOREIGN KEY(junior_user_id) REFERENCES users(id)
   );
   CREATE INDEX IF NOT EXISTS idx_admin_junior_journal_junior ON admin_junior_journal(junior_user_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS admin_impersonation_journal (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id        INTEGER NOT NULL,
+    admin_nom       TEXT,
+    cible_id        INTEGER NOT NULL,
+    cible_nom       TEXT,
+    action          TEXT NOT NULL CHECK(action IN ('entree','sortie','requete')),
+    methode         TEXT,
+    chemin          TEXT,
+    details         TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(admin_id) REFERENCES users(id),
+    FOREIGN KEY(cible_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_admin_imperso_journal_admin ON admin_impersonation_journal(admin_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_admin_imperso_journal_cible ON admin_impersonation_journal(cible_id, created_at);
+
+  /* Demande d'accès admin, soumise au consentement du compte concerné (2026-09-29, demande
+     explicite : "pour avoir accès à chaque module d'un utilisateur, on produit une demande,
+     il reçoit une notification et accepte la demande pour nous donner la main"). Rien n'est
+     ouvert tant que statut n'est pas 'acceptee' — voir la route qui ouvre l'accès, qui
+     revérifie systématiquement statut ET expire_at avant de laisser passer quoi que ce soit. */
+  CREATE TABLE IF NOT EXISTS admin_acces_demandes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id        INTEGER NOT NULL,
+    admin_nom       TEXT,
+    cible_id        INTEGER NOT NULL,
+    cible_nom       TEXT,
+    motif           TEXT,
+    statut          TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente','acceptee','refusee','expiree','revoquee')),
+    duree_heures    INTEGER NOT NULL DEFAULT 2,
+    created_at      TEXT DEFAULT (datetime('now')),
+    repondu_at      TEXT,
+    expire_at       TEXT,
+    FOREIGN KEY(admin_id) REFERENCES users(id),
+    FOREIGN KEY(cible_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_admin_acces_demandes_admin ON admin_acces_demandes(admin_id, statut);
+  CREATE INDEX IF NOT EXISTS idx_admin_acces_demandes_cible ON admin_acces_demandes(cible_id, statut);
 `);
 
 /* =====================================================================

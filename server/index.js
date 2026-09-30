@@ -11036,6 +11036,181 @@ route("GET", "/api/comptes-lies/journal", async (req, res) => {
   sendJSON(res, 200, { entries });
 });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCÈS ADMIN SUR AUTORISATION (2026-09-29, demande explicite)
+   ──────────────────────────────────────────────────────────────────────────
+   "Pour avoir accès à chaque module d'un utilisateur, on produit une demande, il reçoit
+   une notification et accepte la demande pour nous donner la main, ce qui nous permettrait
+   de débloquer les situations compliquées." Aucun accès n'existe tant que le compte
+   concerné n'a pas explicitement accepté — jamais une bascule silencieuse. ══ */
+
+route("POST", "/api/admin/acces-demandes", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const cibleId = Number(body?.cible_id);
+  if (!cibleId) return sendJSON(res, 400, { error: "Compte cible manquant." });
+  if (cibleId === admin.id) return sendJSON(res, 400, { error: "Impossible de se demander l'accès à soi-même." });
+  const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(cibleId);
+  if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const dejaEnAttente = await db.prepare("SELECT id FROM admin_acces_demandes WHERE admin_id=? AND cible_id=? AND statut='en_attente'").get(admin.id, cibleId);
+  if (dejaEnAttente) return sendJSON(res, 409, { error: "Une demande est déjà en attente pour ce compte.", demande_id: dejaEnAttente.id });
+  const dureeHeures = Math.min(Math.max(Number(body?.duree_heures) || 2, 1), 24);
+  const motif = body?.motif ? String(body.motif).trim().slice(0, 300) : null;
+  const adminNom = await nomCompteAffichage(admin.id);
+  const cibleNom = await nomCompteAffichage(cibleId);
+  const id = (await db.prepare(
+    `INSERT INTO admin_acces_demandes (admin_id, admin_nom, cible_id, cible_nom, motif, duree_heures) VALUES (?,?,?,?,?,?)`
+  ).run(admin.id, adminNom, cibleId, cibleNom, motif, dureeHeures)).lastInsertRowid;
+  creerNotif(cibleId, "admin_acces_demande",
+    "Demande d'accès de l'administration",
+    `${adminNom} demande à accéder temporairement à votre espace${motif ? " : " + motif : ""}.`,
+    /* acces_demande_id, jamais demande_id (2026-09-29, bug réel trouvé en testant) — demande_id
+       est déjà pris par notifUrl() (assets/app.js) pour les demandes de CONTACT, qui pointe vers
+       messagerie.html : la réutiliser ici aurait fait naviguer un clic sur cette notification
+       vers une page de messagerie sans rapport. */
+    { acces_demande_id: id });
+  sendJSON(res, 201, { id });
+});
+
+/* Répondre à une demande — réservée au compte concerné, jamais à l'admin qui l'a émise. */
+route("POST", "/api/admin/acces-demandes/:id/repondre", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const demande = await db.prepare("SELECT * FROM admin_acces_demandes WHERE id=?").get(params.id);
+  if (!demande) return sendJSON(res, 404, { error: "Demande introuvable." });
+  if (Number(demande.cible_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Cette demande ne vous concerne pas." });
+  if (demande.statut !== "en_attente") return sendJSON(res, 409, { error: "Cette demande a déjà été traitée." });
+  const accepter = !!body?.accepter;
+  const statut = accepter ? "acceptee" : "refusee";
+  const expireAt = accepter ? new Date(Date.now() + demande.duree_heures * 3600 * 1000).toISOString() : null;
+  await db.prepare("UPDATE admin_acces_demandes SET statut=?, repondu_at=datetime('now'), expire_at=? WHERE id=?").run(statut, expireAt, demande.id);
+  creerNotif(demande.admin_id, "admin_acces_reponse",
+    accepter ? "Accès accordé" : "Accès refusé",
+    accepter
+      ? `${demande.cible_nom || "Le compte"} a accepté votre demande — accès valable ${demande.duree_heures}h.`
+      : `${demande.cible_nom || "Le compte"} a refusé votre demande d'accès.`,
+    { acces_demande_id: demande.id }); // pas demande_id — voir commentaire plus haut (notifUrl)
+  sendJSON(res, 200, { ok: true, statut });
+});
+
+/* Demandes que J'AI ÉMISES (vue admin) — pour savoir lesquelles sont encore en attente,
+   acceptées (et jusqu'à quand), ou refusées. */
+route("GET", "/api/admin/acces-demandes/mes-envoyees", async (req, res) => {
+  const admin = await getCurrentUser(req);
+  if (!admin) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (admin.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  const demandes = await db.prepare("SELECT * FROM admin_acces_demandes WHERE admin_id=? ORDER BY created_at DESC LIMIT 100").all(admin.id);
+  sendJSON(res, 200, { demandes });
+});
+
+/* Demandes REÇUES par le compte connecté — alimente une éventuelle bannière/liste dédiée,
+   en plus de la notification elle-même (qui reste le point d'entrée principal). */
+route("GET", "/api/admin/acces-demandes/recues", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const demandes = await db.prepare("SELECT * FROM admin_acces_demandes WHERE cible_id=? ORDER BY created_at DESC LIMIT 50").all(user.id);
+  sendJSON(res, 200, { demandes });
+});
+
+/* ── Accès délégué (2026-09-29, demande explicite) — une fois la demande acceptée, l'admin
+   consulte/corrige le compte concerné SANS jamais changer de session ni d'identité : chaque
+   appel reste authentifié comme l'admin lui-même, et c'est ce garde-fou qui vérifie à chaque
+   fois que l'autorisation est toujours valable (acceptée, pas expirée, bon admin) avant de
+   laisser passer quoi que ce soit — pas de bascule de cookies, contrairement à la première
+   approche tentée (bloquée par le contrôle de sécurité automatique). Chaque appel réussi est
+   journalisé (admin_impersonation_journal, table déjà en place) pour rester consultable comme
+   preuve plus tard. */
+async function verifierAccesDelegue(req, demandeId) {
+  const admin = await getCurrentUser(req);
+  if (!admin) return { erreur: 401, msg: "Connexion requise." };
+  if (admin.role !== "administrateur") return { erreur: 403, msg: "Réservé à l'administration." };
+  const demande = await db.prepare("SELECT * FROM admin_acces_demandes WHERE id=?").get(demandeId);
+  if (!demande) return { erreur: 404, msg: "Demande introuvable." };
+  if (Number(demande.admin_id) !== Number(admin.id)) return { erreur: 403, msg: "Cette autorisation ne vous appartient pas." };
+  if (demande.statut !== "acceptee") return { erreur: 403, msg: "Cette demande n'a pas (ou plus) été acceptée." };
+  if (!demande.expire_at || new Date(demande.expire_at) < new Date()) {
+    if (demande.statut === "acceptee") await db.prepare("UPDATE admin_acces_demandes SET statut='expiree' WHERE id=?").run(demande.id);
+    return { erreur: 403, msg: "Cette autorisation a expiré — envoyez une nouvelle demande." };
+  }
+  return { admin, demande };
+}
+async function journaliserAccesDelegue(admin, demande, methode, chemin, details) {
+  try {
+    await db.prepare(`INSERT INTO admin_impersonation_journal (admin_id, admin_nom, cible_id, cible_nom, action, methode, chemin, details) VALUES (?,?,?,?,'requete',?,?,?)`)
+      .run(admin.id, demande.admin_nom, demande.cible_id, demande.cible_nom, methode, chemin, details ? String(details).slice(0, 500) : null);
+  } catch (e) { /* le journal ne doit jamais bloquer l'action elle-même */ }
+}
+
+/* Aperçu diagnostic — lecture seule, ce que l'admin voit en premier pour comprendre la
+   situation avant de corriger quoi que ce soit. */
+route("GET", "/api/admin/acces-demandes/:id/donnees", async (req, res, params) => {
+  const { erreur, msg, admin, demande } = await verifierAccesDelegue(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const cible = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, email_verifie, created_at FROM users WHERE id=?").get(demande.cible_id);
+  const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(demande.cible_id);
+  let premium = false;
+  try { premium = await hasAccreditation(demande.cible_id, "initiative_abonne"); } catch (e) {}
+  /* try/catch et non .catch() chaîné (2026-09-29, bug réel corrigé après test en direct :
+     "db.prepare(...).all(...).catch is not a function") — db.prepare().all() n'est pas une
+     vraie Promise chaînable ici, seul `await` fonctionne dessus, jamais .catch() derrière. */
+  let erreursRecentes = [];
+  try {
+    erreursRecentes = await db.prepare("SELECT message, created_at FROM error_logs WHERE user_id=? ORDER BY created_at DESC LIMIT 10").all(demande.cible_id);
+  } catch (e) {}
+  await journaliserAccesDelegue(admin, demande, "GET", `/admin/acces-demandes/${demande.id}/donnees`, null);
+  sendJSON(res, 200, {
+    compte: cible,
+    initiative: init || null,
+    premium: !!premium,
+    expire_le: demande.expire_at,
+    erreurs_recentes: erreursRecentes,
+  });
+});
+
+/* Correction ciblée — volontairement un sous-ensemble restreint de champs (identité, contact,
+   thème boutique, statut), pas l'intégralité du constructeur de vitrine : assez pour corriger
+   une situation bloquée sans reconstruire toute la surface d'édition en double. */
+route("PUT", "/api/admin/acces-demandes/:id/initiative", async (req, res, params, body) => {
+  const { erreur, msg, admin, demande } = await verifierAccesDelegue(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(demande.cible_id);
+  if (!init) return sendJSON(res, 404, { error: "Ce compte n'a pas d'initiative." });
+  const THEMES_VALIDES = ["bordeaux", "ocean", "emeraude", "prune", "or"];
+  const { nom, description, tel_responsable, email_responsable, vitrine_theme, vitrine_active } = body || {};
+  await db.prepare(`
+    UPDATE initiatives SET
+      nom=COALESCE(?,nom), description=?, tel_responsable=?, email_responsable=?,
+      vitrine_theme=?, vitrine_active=?, updated_at=datetime('now')
+    WHERE id=?
+  `).run(
+    nom ? String(nom).trim() : null,
+    description !== undefined ? SEC.sanitizeRichHtml(description) : init.description,
+    tel_responsable !== undefined ? tel_responsable : init.tel_responsable,
+    email_responsable !== undefined ? email_responsable : init.email_responsable,
+    THEMES_VALIDES.includes(vitrine_theme) ? vitrine_theme : init.vitrine_theme,
+    vitrine_active === false ? 0 : (vitrine_active === true ? 1 : init.vitrine_active),
+    init.id
+  );
+  await journaliserAccesDelegue(admin, demande, "PUT", `/admin/acces-demandes/${demande.id}/initiative`, JSON.stringify({ nom, description: description ? "(modifié)" : undefined, tel_responsable, email_responsable, vitrine_theme, vitrine_active }));
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Consultation du journal des accès délégués — "produire les preuves plus tard au besoin"
+   (demande explicite). Filtrable par ?admin_id= ou ?cible_id=. */
+route("GET", "/api/admin/impersonation-journal", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé à l'administration." });
+  let sql = "SELECT * FROM admin_impersonation_journal WHERE 1=1";
+  const args = [];
+  if (query?.admin_id) { sql += " AND admin_id=?"; args.push(Number(query.admin_id)); }
+  if (query?.cible_id) { sql += " AND cible_id=?"; args.push(Number(query.cible_id)); }
+  sql += " ORDER BY created_at DESC LIMIT 300";
+  const entries = await db.prepare(sql).all(...args);
+  sendJSON(res, 200, { entries });
+});
+
 /* ══ Mon Associé — Connexion au module par DS-ID seul (sans e-mail/mot de passe) ══
    Choix assumé avec l'utilisateur malgré l'affaiblissement de sécurité que cela représente
    par rapport au DS-ID « signature seule » ci-dessus (toute personne ayant vu le code une
@@ -13023,6 +13198,27 @@ route("GET", "/api/relation-statut", async (req, res, params, body, query) => {
   const cible = await db.prepare("SELECT id FROM users WHERE id=?").get(cibleId);
   if (!cible) return sendJSON(res, 404, { error: "Compte introuvable." });
   sendJSON(res, 200, await statutRelation(user, cibleId, query.origine));
+});
+
+/* GET /api/relation-statut-lot?user_ids=1,2,3 — même donnée que la route ci-dessus, en lot
+   (2026-09-29, bug réel trouvé en testant l'annuaire : initBoutonsRelation(), assets/app.js,
+   appelait cette route une fois PAR cartouche affichée, en plus d'être invoquée plusieurs fois
+   sans jamais s'attendre l'une l'autre à chaque rendu de liste — une recherche à 30-50 résultats
+   déclenchait des dizaines de requêtes simultanées et provoquait des 429 Too Many Requests,
+   même défaut déjà corrigé pour le don récurrent vedette, GET /api/cagnottes/vedette-lot). Une
+   seule requête pour toute la liste affichée, quel que soit le nombre de cartouches — la boucle
+   sur statutRelation() reste ici, côté serveur, où N appels internes ne coûtent qu'un aller-
+   retour HTTP au lieu de N. */
+route("GET", "/api/relation-statut-lot", async (req, res, params, body, query) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ids = String(query?.user_ids || "").split(",").map(Number).filter(id => id && id !== user.id).slice(0, 100);
+  const statuts = {};
+  for (const cibleId of [...new Set(ids)]) {
+    try { statuts[cibleId] = await statutRelation(user, cibleId, query.origine); }
+    catch (e) { /* un id invalide ne doit jamais faire échouer tout le lot */ }
+  }
+  sendJSON(res, 200, { statuts });
 });
 
 /* POST /api/demandes-contact — envoyer une demande. Message imposé côté serveur : ce que

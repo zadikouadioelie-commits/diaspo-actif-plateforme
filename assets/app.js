@@ -521,6 +521,8 @@ const NOTIF_ICONS = {
   insc_fiche_gelee: "🔒",
   insc_fiche_degelee: "🔓",
   candidature_traitee: "🗂️",
+  admin_acces_demande: "🔐",
+  admin_acces_reponse: "🔐",
 };
 
 // Destinations pour les data.cta envoyés par certains types de notifications
@@ -557,6 +559,7 @@ function renderNotifItem(n) {
   const showAffiliation = n.type === "affiliation_initiative" && unread && d.initiative_id;
   const showFusionAdhesion = n.type === "adhesion_fusion_proposee" && unread && d.membre_id;
   const showFusionCagnotte = n.type === "cagnotte_fusion_proposee" && unread && d.contribution_id;
+  const showAccesDemande = n.type === "admin_acces_demande" && unread && d.acces_demande_id;
   return `<div class="notif-item${unread ? " unread" : ""}" data-notif-id="${n.id}">
     <a href="${url}" style="display:flex;gap:11px;padding:12px 16px;text-decoration:none;color:inherit;" onclick="markNotifRead(${n.id})">
       <div class="notif-icon ${n.type}">${icon}</div>
@@ -583,6 +586,10 @@ function renderNotifItem(n) {
     ${showFusionCagnotte ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:0 16px 12px 65px;">
       <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();acceptFusionCagnotte(${n.id},${d.contribution_id},this)">🔗 Rattacher</button>
       <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();markNotifRead(${n.id});this.closest('.notif-followback-actions').remove();">Ignorer</button>
+    </div>` : ""}
+    ${showAccesDemande ? `<div class="notif-followback-actions" style="display:flex;gap:6px;margin:0 16px 12px 65px;">
+      <button type="button" class="btn btn-sm btn-orange" onclick="event.preventDefault();event.stopPropagation();accepterAccesDemande(${n.id},${d.acces_demande_id},this)">✅ Accepter</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick="event.preventDefault();event.stopPropagation();refuserAccesDemande(${n.id},${d.acces_demande_id},this)">Refuser</button>
     </div>` : ""}
   </div>`;
 }
@@ -631,6 +638,36 @@ window.acceptAffiliation = async function(notifId, initiativeId, btnEl) {
 window.refuseAffiliation = async function(notifId, initiativeId, btnEl) {
   try {
     await api("PUT", `/initiatives/${initiativeId}/membres/${CURRENT_USER.id}`, { statut: "refuse" });
+  } catch(e) { alert("Erreur : " + (e.message || "")); return; }
+  try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+  if (item) {
+    item.classList.remove("unread");
+    item.querySelector(".notif-unread-dot")?.remove();
+    item.querySelector(".notif-followback-actions")?.remove();
+  }
+};
+
+/* Demande d'accès admin (2026-09-29, demande explicite) — accepter/refuser depuis la
+   notification, même patron que acceptAffiliation/refuseAffiliation ci-dessus. Rien d'autre
+   ne se passe côté client : c'est la route serveur qui pose expire_at et ouvre réellement
+   l'accès, jamais l'interface. */
+window.accepterAccesDemande = async function(notifId, demandeId, btnEl) {
+  try {
+    await api("POST", `/admin/acces-demandes/${demandeId}/repondre`, { accepter: true });
+  } catch(e) { alert("Erreur : " + (e.message || "")); return; }
+  try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
+  const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+  if (item) {
+    item.classList.remove("unread");
+    item.querySelector(".notif-unread-dot")?.remove();
+    item.querySelector(".notif-followback-actions")?.remove();
+  }
+  if (typeof showToast === 'function') showToast('Accès accordé.', 'success');
+};
+window.refuserAccesDemande = async function(notifId, demandeId, btnEl) {
+  try {
+    await api("POST", `/admin/acces-demandes/${demandeId}/repondre`, { accepter: false });
   } catch(e) { alert("Erreur : " + (e.message || "")); return; }
   try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
   const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
@@ -1852,8 +1889,28 @@ function adminAnnuaireBoutonsHtml(cibleId, estMoi) {
     <button type="button" class="ann-card-btn admin-ann-btn admin-ann-rencontre" onclick="event.stopPropagation(); adminAnnuaireOuvrirRencontreTerrain(${cibleId}, this)">🤝 Rencontre D'A</button>
     <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireSupprimer(${cibleId}, this)">🗑️ Supprimer</button>
     <button type="button" class="ann-card-btn admin-ann-btn admin-ann-suspendre" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'suspendre', ${cibleId})">⛔ Suspendre</button>
-    <button type="button" class="ann-card-btn admin-ann-btn admin-ann-invisible" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'invisibilite', ${cibleId})">🙈 Invisibilité</button>`;
+    <button type="button" class="ann-card-btn admin-ann-btn admin-ann-invisible" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'invisibilite', ${cibleId})">🙈 Invisibilité</button>
+    <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireDemanderAcces(${cibleId}, this)" title="Envoie une demande — rien ne s'ouvre tant que le compte n'a pas accepté">🔐 Demander l'accès</button>`;
 }
+
+/* Vue "100% initiative" sur autorisation (2026-09-29, demande explicite) — remplace toute
+   bascule de session directe : l'admin envoie une demande, le compte reçoit une notification
+   et doit explicitement l'accepter avant que quoi que ce soit ne s'ouvre (voir
+   POST /api/admin/acces-demandes, accepterAccesDemande() ci-dessus). */
+window.adminAnnuaireDemanderAcces = async function (cibleId, bouton) {
+  if (!confirm("Envoyer une demande d'accès à ce compte ? Rien ne s'ouvrira tant qu'il ne l'aura pas acceptée.")) return;
+  const motif = prompt("Motif de la demande (optionnel, aide la personne à décider) :") || null;
+  const ancien = bouton ? bouton.innerHTML : null;
+  if (bouton) { bouton.disabled = true; bouton.innerHTML = '⏳ Envoi…'; }
+  try {
+    await api('POST', '/admin/acces-demandes', { cible_id: cibleId, motif });
+    if (bouton) { bouton.innerHTML = '✅ Demande envoyée'; }
+    if (typeof showToast === 'function') showToast("Demande envoyée — en attente de l'accord du compte.", 'success');
+  } catch (e) {
+    if (bouton) { bouton.disabled = false; bouton.innerHTML = ancien; }
+    alert(e.message || "Erreur lors de l'envoi de la demande.");
+  }
+};
 
 /* Rencontre "sur le terrain" (2026-09-20, demande explicite) : justification obligatoire dans un
    vrai formulaire (jamais un prompt() natif — trop peu fiable pour un texte de plusieurs phrases
@@ -6392,37 +6449,63 @@ window.etablirContact = async function (userId, messagePredefini, bouton) {
   }
 };
 
+/* Rend un bouton de relation à partir du statut déjà connu (factorisé, 2026-09-29) — utilisé
+   par le lot ci-dessous, même logique d'affichage qu'avant, juste séparée de l'appel réseau. */
+function appliquerStatutRelation(el, userId, classe, st) {
+  if (st.action === 'message') {
+    el.innerHTML = `<a href="messagerie.html?with=${userId}" class="${classe}">✉️ Message</a>`;
+  } else if (st.action === 'en_attente') {
+    /* Bouton inerte : renvoyer une demande déjà en attente serait refusé par le serveur,
+       autant l'annoncer plutôt que de laisser cliquer dans le vide. */
+    el.innerHTML = `<button class="${classe}" disabled style="opacity:.65;cursor:default;">⏳ Demande en attente</button>`;
+  } else if (st.action === 'a_repondre') {
+    el.innerHTML = `<a href="messagerie.html" class="${classe}">🤝 Répondre à sa demande</a>`;
+  } else if (st.action === 'bloque') {
+    el.innerHTML = '';   // rien à proposer : l'échange est fermé des deux côtés
+  } else {
+    const msg = (st.message_predefini || '').replace(/'/g, "\\'");
+    el.innerHTML = `<button class="${classe}" onclick="etablirContact('${userId}', '${msg}', this)">🤝 Établir contact</button>`;
+  }
+}
+/* Une requête groupée pour TOUTE la liste (2026-09-29, bug réel trouvé en testant l'annuaire :
+   un appel /relation-statut par cartouche affichée, en plus d'invocations concurrentes qui ne
+   s'attendaient jamais l'une l'autre — une recherche à 30-50 résultats déclenchait des dizaines
+   de requêtes simultanées et provoquait des 429 Too Many Requests). Voir
+   GET /api/relation-statut-lot, même correctif déjà appliqué au don récurrent vedette
+   (GET /api/cagnottes/vedette-lot). */
 window.initBoutonsRelation = async function (racine) {
-  const cibles = (racine || document).querySelectorAll('[data-relation-user]:not([data-relation-prete])');
+  const cibles = [...(racine || document).querySelectorAll('[data-relation-user]:not([data-relation-prete])')];
+  if (!cibles.length) return;
+  cibles.forEach(el => el.setAttribute('data-relation-prete', '1'));
+  const aTraiter = [];
   for (const el of cibles) {
-    el.setAttribute('data-relation-prete', '1');
     const userId = el.getAttribute('data-relation-user');
-    const classe = el.getAttribute('data-relation-classe') || 'pvz-btn';
     /* Garde-fou centralisé : le serveur refuse déjà une relation avec soi-même (400), mais
        ne pas même tenter l'appel si un appelant a oublié son propre filtre "isOwn" —
        Number() des deux côtés car l'id peut arriver en texte (BIGSERIAL Postgres). */
     if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && Number(CURRENT_USER.id) === Number(userId)) {
-      el.innerHTML = ''; continue;
-    }
-    let st = null;
-    try { st = await api('GET', `/relation-statut?user_id=${encodeURIComponent(userId)}`); }
-    catch (e) { el.innerHTML = ''; continue; }   // non connecté : on n'affiche rien
-
-    if (st.action === 'message') {
-      el.innerHTML = `<a href="messagerie.html?with=${userId}" class="${classe}">✉️ Message</a>`;
-    } else if (st.action === 'en_attente') {
-      /* Bouton inerte : renvoyer une demande déjà en attente serait refusé par le serveur,
-         autant l'annoncer plutôt que de laisser cliquer dans le vide. */
-      el.innerHTML = `<button class="${classe}" disabled style="opacity:.65;cursor:default;">⏳ Demande en attente</button>`;
-    } else if (st.action === 'a_repondre') {
-      el.innerHTML = `<a href="messagerie.html" class="${classe}">🤝 Répondre à sa demande</a>`;
-    } else if (st.action === 'bloque') {
-      el.innerHTML = '';   // rien à proposer : l'échange est fermé des deux côtés
+      el.innerHTML = '';
     } else {
-      const msg = (st.message_predefini || '').replace(/'/g, "\\'");
-      el.innerHTML = `<button class="${classe}" onclick="etablirContact('${userId}', '${msg}', this)">🤝 Établir contact</button>`;
+      aTraiter.push(el);
     }
   }
+  if (!aTraiter.length) return;
+  const ids = [...new Set(aTraiter.map(el => el.getAttribute('data-relation-user')))];
+  let statuts = {};
+  try {
+    const r = await api('GET', `/relation-statut-lot?user_ids=${ids.join(',')}`);
+    statuts = r.statuts || {};
+  } catch (e) {
+    aTraiter.forEach(el => el.innerHTML = '');   // non connecté : on n'affiche rien
+    return;
+  }
+  aTraiter.forEach(el => {
+    const userId = el.getAttribute('data-relation-user');
+    const classe = el.getAttribute('data-relation-classe') || 'pvz-btn';
+    const st = statuts[userId];
+    if (!st) { el.innerHTML = ''; return; }
+    appliquerStatutRelation(el, userId, classe, st);
+  });
 };
 
 document.addEventListener('DOMContentLoaded', function () {

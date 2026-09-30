@@ -333,7 +333,10 @@
     <div style="display:flex;gap:8px;align-items:center;">
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
       <button class="btn btn-outline" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()">📅 Calendrier Diaspora</button>
-      <button class="btn" id="btn-flash" style="display:none;font-size:12.5px;background:#39FF14;color:#052e0f;border:none;font-weight:800;box-shadow:0 0 8px #39FF14,0 0 16px rgba(57,255,20,.6);" onclick="flashOuvrir()">⚡ Événement flash</button>
+      <span id="btn-flash-wrap" style="display:none;align-items:center;gap:4px;">
+        <button class="btn" id="btn-flash" style="font-size:12.5px;background:#7BE87B;color:#052e0f;border:none;font-weight:800;" onclick="flashOuvrir()">⚡ Événement flash</button>
+        <button type="button" onclick="alert('Événement flash : publiez en quelques secondes une simple annonce (photo, adresse, dates, description) pour prévenir rapidement la communauté. Purement informatif — aucune inscription n\'est proposée. Pour un événement où les gens peuvent s\'inscrire, utilisez plutôt « 📢 Créer un événement ».')" title="À quoi sert ce bouton ?" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">?</button>
+      </span>
       <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
   </div>
@@ -490,6 +493,9 @@
       </div>
       <div id="e-payant-notice" style="display:none;margin-top:8px;padding:10px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;font-size:12px;color:#92400E;">
         ⚠️ Liez ou créez ci-dessous une fiche d'inscription avec au moins un tarif payant — le prix affiché sur la fiche de l'événement (« À partir de X € ») en sera déduit automatiquement.
+      </div>
+      <div id="e-gratuit-notice" style="display:none;margin-top:8px;padding:10px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;font-size:12px;color:#166534;">
+        ✅ Événement totalement gratuit : pas besoin de lier une fiche d'inscription. Si vous voulez tout de même suivre qui participe, utilisez le bouton « 🗂️ Gérer les inscrits » disponible une fois l'événement créé.
       </div>
     </div>
 
@@ -884,6 +890,7 @@ function renderEvts() {
           ${evt.type_evt === 'trophee_diaspora' ? '<span class="evt-tag" style="background:linear-gradient(135deg,#B8860B,#FFD700);color:#4A3500;font-weight:700;">'+esc(TYPE_EVT_LABEL[evt.type_evt])+'</span>' : (evt.type_evt ? '<span class="evt-tag">'+esc(TYPE_EVT_LABEL[evt.type_evt]||evt.type_evt)+'</span>' : '')}
           ${evt.domaine ? '<span class="evt-tag">'+esc(evt.domaine)+'</span>' : ''}
           ${badgeParticipation(evt)}
+          ${badgeFlash(evt)}
           ${visiBadge}
           ${brouillonBadge}
           ${(evt.nb_participants && !evt.masquer_inscrits) ? '<span>👥 '+evt.nb_participants+' inscrit'+(evt.nb_participants>1?'s':'')+(evt.places_max?' / '+evt.places_max:'')+'</span>' : ''}
@@ -931,6 +938,16 @@ function badgeParticipation(evt) {
   if (evt.prix_min) return '<span class="evt-tag">💶 À partir de '+Number(evt.prix_min).toLocaleString('fr-FR')+' €</span>';
   if (evt.type_participation === 'payant') return '<span class="evt-tag">🔴 Payant</span>';
   return '<span class="evt-tag" style="color:#16a34a;">🟢 Gratuit</span>';
+}
+
+// Badge Flash (2026-09-30, précisé après discussion : l'éclair désigne un événement PUREMENT
+// informatif, sans aucune inscription possible — pas "sans fiche". Un événement gratuit avec
+// inscription légère intégrée (rejoindre/quitter, sans fiche) garde seulement le badge
+// "🟢 Gratuit" de badgeParticipation(), jamais l'éclair. Seul inscription_ouverte===0 (réservé au
+// parcours ⚡ Événement flash, voir flashPublier()) déclenche ce badge.
+function badgeFlash(evt) {
+  if (evt.inscription_ouverte !== 0) return '';
+  return '<span class="evt-tag" style="color:#052e0f;background:#7BE87B;font-weight:800;" title="Événement informatif — aucune inscription possible">⚡ Flash</span>';
 }
 
 // Ouverture programmée des inscriptions (2026-09-25, demande explicite) — partagé entre la vue
@@ -1256,6 +1273,7 @@ function majToggleParticipation() {
     lbl.style.background  = actif ? s.fond : 'transparent';
   });
   document.getElementById('e-payant-notice').style.display = (valeur !== 'gratuit') ? '' : 'none';
+  document.getElementById('e-gratuit-notice').style.display = (valeur === 'gratuit') ? '' : 'none';
 }
 document.querySelectorAll('input[name="e-gratuit-payant"]').forEach(r => r.addEventListener('change', majToggleParticipation));
 
@@ -1967,6 +1985,7 @@ function renderEventDetail(evt, isPreview) {
         ${evt.domaine ? `<span class="evt-tag">🏷️ ${esc(evt.domaine)}</span>` : ''}
         ${evt.origine ? `<span class="evt-tag">🎯 ${[evt.origine,evt.origine2].filter(Boolean).map(esc).join(' · ')}</span>` : ''}
         ${badgeParticipation(evt)}
+        ${badgeFlash(evt)}
       </div>
       ${evt.lieu ? `<div style="display:flex;align-items:flex-start;gap:9px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
         <span style="font-size:16px;flex-shrink:0;line-height:1.3;">📍</span>
@@ -2290,7 +2309,7 @@ function cdFermerCalendrier() {
          pont Billetterie. */
       ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role)) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
-    document.getElementById('btn-flash').style.display = 'inline-flex';
+    document.getElementById('btn-flash-wrap').style.display = 'inline-flex';
   }
   await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton

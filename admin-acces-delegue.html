@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diaspo'Actif — Accès délégué</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/logo.png">
+<style>
+:root{--navy:#0D2B4E;--orange:#F26422;--border:#e2e6ec;--muted:#64748b;--bg:#f6f8fb;--card:#fff;--text:#1a2332;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Public Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);}
+header{background:var(--navy);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+header h1{font-size:16px;margin:0;font-weight:700;}
+header a{color:rgba(255,255,255,.85);text-decoration:none;font-size:13px;}
+main{max-width:760px;margin:24px auto;padding:0 16px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;}
+.card h2{margin:0 0 4px;font-size:15px;}
+.card .sub{font-size:12.5px;color:var(--muted);margin:0 0 14px;}
+.row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.row:last-child{border-bottom:none;}
+.row .lbl{color:var(--muted);}
+.row .val{font-weight:600;text-align:right;}
+.badge{display:inline-flex;align-items:center;gap:5px;background:#fff7ed;color:#b45309;border:1px solid #fde68a;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;}
+label{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;}
+input[type=text],input[type=email],textarea,select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13.5px;margin-bottom:14px;}
+textarea{resize:vertical;min-height:70px;}
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:8px;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;text-decoration:none;}
+.btn-orange{background:var(--orange);color:#fff;}
+.btn-outline{background:#fff;border:1px solid var(--border);color:var(--text);}
+.notice{text-align:center;padding:40px 20px;color:var(--muted);}
+.notice.err{color:#b91c1c;}
+.err-item{font-size:12px;color:#b91c1c;padding:5px 0;border-bottom:1px solid var(--border);}
+.saved{color:#16a34a;font-size:12.5px;font-weight:700;display:none;margin-left:10px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔐 Accès délégué — Diaspo'Actif</h1>
+  <a href="dashboard-administrateur.html">← Retour au tableau de bord</a>
+</header>
+<main id="main">
+  <div class="notice">Vérification de l'autorisation…</div>
+</main>
+
+<script src="assets/app.js?v=13"></script>
+<script>
+/* Accès délégué (2026-09-29, demande explicite) — jamais de bascule de session : cette page
+   reste authentifiée comme l'admin de bout en bout, chaque appel est revérifié côté serveur
+   contre l'autorisation accordée par le compte concerné (voir verifierAccesDelegue(),
+   server/index.js). Un lien direct vers cette page sans autorisation valable échoue proprement
+   (401/403/expirée), jamais un accès par défaut. */
+const params = new URLSearchParams(location.search);
+const demandeId = params.get('demande_id');
+
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return s; }
+}
+
+async function charger() {
+  const main = document.getElementById('main');
+  if (!demandeId) { main.innerHTML = '<div class="notice err">Lien invalide — aucune autorisation indiquée.</div>'; return; }
+  let data;
+  try {
+    data = await api('GET', `/admin/acces-demandes/${demandeId}/donnees`);
+  } catch (e) {
+    main.innerHTML = `<div class="notice err">⛔ ${escapeHtml(e.message || "Accès refusé.")}</div>`;
+    return;
+  }
+  const c = data.compte || {};
+  const init = data.initiative;
+  main.innerHTML = `
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="margin:0;">👁️ Vous consultez : ${escapeHtml(init?.nom || c.nom || 'Compte #' + c.id)}</h2>
+        <p class="sub" style="margin:4px 0 0;">${escapeHtml(c.email || '')} — ${escapeHtml(c.role || '')}</p>
+      </div>
+      <span class="badge">⏰ Autorisation valable jusqu'à ${fmtDate(data.expire_le)}</span>
+    </div>
+
+    <div class="card">
+      <h2>📋 Résumé du compte</h2>
+      <div class="row"><span class="lbl">Inscrit depuis</span><span class="val">${fmtDate(c.created_at)}</span></div>
+      <div class="row"><span class="lbl">E-mail vérifié</span><span class="val">${c.email_verifie ? '✅ Oui' : '❌ Non'}</span></div>
+      <div class="row"><span class="lbl">Compte Premium</span><span class="val">${data.premium ? '✅ Oui' : '❌ Non'}</span></div>
+      <div class="row"><span class="lbl">Ville / Pays</span><span class="val">${escapeHtml([c.ville, c.pays].filter(Boolean).join(', ') || '—')}</span></div>
+    </div>
+
+    ${data.erreurs_recentes && data.erreurs_recentes.length ? `
+    <div class="card">
+      <h2>⚠️ Erreurs récentes de ce compte</h2>
+      <p class="sub">Peut aider à comprendre ce qui bloque — dernières ${data.erreurs_recentes.length} entrées.</p>
+      ${data.erreurs_recentes.map(e => `<div class="err-item">${fmtDate(e.created_at)} — ${escapeHtml(e.message || '')}</div>`).join('')}
+    </div>` : ''}
+
+    ${init ? `
+    <div class="card">
+      <h2>✏️ Corriger les informations de l'initiative</h2>
+      <p class="sub">Uniquement l'essentiel (identité, contact, thème, visibilité) — pour le reste, la personne garde la main depuis son propre tableau de bord.</p>
+      <label>Nom de la structure</label>
+      <input type="text" id="f-nom" value="${escapeHtml(init.nom || '')}">
+      <label>Description</label>
+      <textarea id="f-description">${escapeHtml(init.description || '')}</textarea>
+      <label>Téléphone du responsable</label>
+      <input type="text" id="f-tel" value="${escapeHtml(init.tel_responsable || '')}">
+      <label>E-mail du responsable</label>
+      <input type="email" id="f-email" value="${escapeHtml(init.email_responsable || '')}">
+      <label>Thème boutique</label>
+      <select id="f-theme">
+        ${['bordeaux','ocean','emeraude','prune','or'].map(t => `<option value="${t}" ${init.vitrine_theme === t ? 'selected' : ''}>${t}</option>`).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:600;color:var(--text);">
+        <input type="checkbox" id="f-active" ${init.vitrine_active ? 'checked' : ''} style="width:auto;margin:0;"> Boutique visible au public
+      </label>
+      <div style="margin-top:6px;">
+        <button class="btn btn-orange" onclick="enregistrer()">💾 Enregistrer</button>
+        <span class="saved" id="saved-msg">✓ Enregistré</span>
+      </div>
+    </div>` : `<div class="card"><p class="sub" style="margin:0;">Ce compte n'a pas encore d'initiative associée — rien à corriger ici.</p></div>`}
+  `;
+}
+
+async function enregistrer() {
+  try {
+    await api('PUT', `/admin/acces-demandes/${demandeId}/initiative`, {
+      nom: document.getElementById('f-nom').value.trim(),
+      description: document.getElementById('f-description').value.trim(),
+      tel_responsable: document.getElementById('f-tel').value.trim(),
+      email_responsable: document.getElementById('f-email').value.trim(),
+      vitrine_theme: document.getElementById('f-theme').value,
+      vitrine_active: document.getElementById('f-active').checked,
+    });
+    const s = document.getElementById('saved-msg');
+    s.style.display = 'inline';
+    setTimeout(() => s.style.display = 'none', 2500);
+  } catch (e) {
+    alert('Erreur : ' + (e.message || ''));
+  }
+}
+
+charger();
+</script>
+</body>
+</html>

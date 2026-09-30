@@ -52,6 +52,7 @@
       <a href="projets-evaluation.html">📁 Évaluation de Projet</a>
       <!-- Désactivé temporairement : intégration réelle des API réseaux sociaux pas encore branchée. <a href="reseaux-sociaux.html">🔄 Synchronisation réseaux sociaux</a> -->
       <a href="#error-logs" data-section="error-logs" style="display:flex;justify-content:space-between;align-items:center;">🩺 Journal d'erreurs <span id="errlog-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
+      <a href="#acces-delegue-admin" data-section="acces-delegue-admin">🔐 Accès délégué</a>
       <a href="#analytics-trafic" data-section="analytics-trafic">📈 Analytics trafic</a>
       <a href="#messages-techniques" data-section="messages-techniques" style="display:flex;justify-content:space-between;align-items:center;">🛠️ Messages techniques <span id="support-badge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;"></span></a>
       <a href="#formations" data-section="formations">📚 Formations</a>
@@ -4833,6 +4834,12 @@
       </section>
 
       <!-- JOURNAL D'ERREURS (monitoring maison) -->
+      <section id="section-acces-delegue-admin" style="display:none;">
+        <h2>🔐 Accès délégué</h2>
+        <div class="notice" style="margin-bottom:16px;">"Vue 100% initiative" sur autorisation (2026-09-29, demande explicite) — envoyez une demande depuis une cartouche de l'annuaire (bouton "🔐 Demander l'accès"), la personne reçoit une notification et doit l'accepter avant que quoi que ce soit ne s'ouvre. Une fois acceptée, l'accès reste disponible ici jusqu'à expiration (2h par défaut) — jamais de bascule de session, chaque action reste journalisée à votre nom.</div>
+        <div id="acces-delegue-liste"><div class="notice">Chargement…</div></div>
+      </section>
+
       <section id="section-error-logs" style="display:none;">
         <h2>🩺 Journal d'erreurs serveur</h2>
         <div class="notice" style="margin-bottom:16px;">Chaque erreur serveur (route qui plante, exception non gérée) est journalisée ici automatiquement. Remplace un service externe type Sentry pour un usage local/petite échelle.</div>
@@ -6172,6 +6179,47 @@ async function pnSupprimer(id) {
     pnRetourListe();
     loadPartenariatComptes();
   } catch (e) { alert('Erreur : ' + (e.message || '')); }
+}
+
+/* ===== Accès délégué sur autorisation (2026-09-29, demande explicite) ===== */
+function adFmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return s; }
+}
+const AD_STATUT_LABEL = {
+  en_attente: { label: '⏳ En attente', color: '#b45309', bg: '#fffbeb' },
+  acceptee:   { label: '✅ Acceptée',   color: '#16a34a', bg: '#f0fdf4' },
+  refusee:    { label: '🚫 Refusée',    color: '#dc2626', bg: '#fef2f2' },
+  expiree:    { label: '⌛ Expirée',    color: '#64748b', bg: '#f1f5f9' },
+  revoquee:   { label: '🚫 Révoquée',   color: '#64748b', bg: '#f1f5f9' },
+};
+async function loadAccesDelegueAdmin() {
+  const box = document.getElementById('acces-delegue-liste');
+  if (!box) return;
+  box.innerHTML = '<div class="notice">Chargement…</div>';
+  try {
+    const { demandes } = await api('GET', '/admin/acces-demandes/mes-envoyees');
+    if (!demandes.length) { box.innerHTML = '<div class="notice">Aucune demande envoyée pour le moment — utilisez le bouton "🔐 Demander l\'accès" depuis une cartouche de l\'annuaire.</div>'; return; }
+    box.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;">${demandes.map(d => {
+      const now = new Date();
+      const expiree = d.statut === 'acceptee' && d.expire_at && new Date(d.expire_at) < now;
+      const statutInfo = AD_STATUT_LABEL[expiree ? 'expiree' : d.statut] || AD_STATUT_LABEL.en_attente;
+      const peutAcceder = d.statut === 'acceptee' && !expiree;
+      return `<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-weight:700;font-size:13.5px;">${escapeHtml(d.cible_nom || ('Compte #' + d.cible_id))}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Envoyée le ${adFmtDate(d.created_at)}${d.motif ? ' — ' + escapeHtml(d.motif) : ''}</div>
+          ${peutAcceder ? `<div style="font-size:11.5px;color:#b45309;margin-top:2px;">⏰ Valable jusqu'au ${adFmtDate(d.expire_at)}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:20px;background:${statutInfo.bg};color:${statutInfo.color};">${statutInfo.label}</span>
+          ${peutAcceder ? `<a class="btn btn-sm btn-orange" href="admin-acces-delegue.html?demande_id=${d.id}">🔓 Accéder</a>` : ''}
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="notice">Erreur de chargement : ${escapeHtml(e.message || '')}</div>`;
+  }
 }
 
 /* ===== Journal d'erreurs (monitoring maison) ===== */
@@ -9133,6 +9181,7 @@ async function submitAccordDirect(){
     'videos-tutoriels': () => vtOuvrirOnglet('videos'),
     'avis-moderation': () => avOuvrirOnglet('avis'),
     'error-logs': () => loadErrorLogs(),
+    'acces-delegue-admin': () => loadAccesDelegueAdmin(),
     'analytics-trafic': () => loadAnalytics(),
     ads: () => loadAdsAdmin(),
     'social-sync': () => loadSocialSyncAdmin(),
