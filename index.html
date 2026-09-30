@@ -724,6 +724,7 @@
   color: #1565C0;
 }
 .hp-feed-lock-icon { font-size: 10px; opacity: .7; }
+.hp-feed-action-btn.active { color: #DC2626; }
 .hp-feed-cta {
   grid-column: 1 / -1;
   background: linear-gradient(135deg, #0F2A50, #1565C0);
@@ -2434,6 +2435,23 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
   const grid = document.getElementById('hp-feed-grid');
   const TYPE_ICON = { publication:'📝', evenement:'📅', actualite:'📰', opportunite:'💼' };
   try {
+    /* Bug réel signalé (2026-09-30, capture à l'appui : "il y a un souci je suis pourtant
+       connecté") — cette section affichait TOUJOURS les boutons "verrouillés" invitant à créer
+       un compte, MÊME pour un visiteur déjà connecté : elle ne vérifiait jamais l'état de
+       connexion, contrairement à la barre du haut qui fait son propre appel /api/auth/me,
+       jamais partagé avec cette section. Vérifié ici indépendamment (plutôt que de dépendre du
+       timing d'un autre script) et exposé sur window.CURRENT_USER : daToggleSuivre()
+       (assets/app.js, réutilisé ci-dessous pour "S'abonner") lit cette même variable globale,
+       absente jusqu'ici sur cette page — sans elle, jamais aucun clic n'aurait pu fonctionner
+       pour un compte connecté. */
+    let moi = null;
+    try {
+      const ra = await fetch('/api/auth/me', {credentials:'same-origin'});
+      const da = await ra.json();
+      moi = da && da.user ? da.user : null;
+    } catch (e) {}
+    window.CURRENT_USER = moi;
+
     const r = await fetch('/api/fil?limit=4');
     if (!r.ok) throw new Error();
     const data = await r.json();
@@ -2445,6 +2463,38 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
       /* Avatar dessiné sur place (assets/app.js) : la photo réelle de l'auteur si elle
          existe, sinon ses initiales — plus aucun appel à un service extérieur. */
       const avatarSrc = p.auteur_photo || window.daAvatarLocal(p.auteur_nom || 'Membre', 'user');
+      /* Boutons "Partager"/"Voir le profil" (2026-09-30, demande explicite) — fonctionnels pour
+         TOUT LE MONDE, visiteur inclus : partager un lien et consulter un profil public ne
+         demandent pas de compte, contrairement à J'aime/Commenter/S'abonner ci-dessous. */
+      const postUrl = `${location.origin}/fil-actualite.html#fp-${p.id}`;
+      const nomEsc = JSON.stringify(p.auteur_nom || '').replace(/"/g,'&quot;');
+      const partagerBtn = `<button type="button" class="hp-feed-action-btn" onclick="openShareUrlModal('${postUrl}', ${nomEsc})">↗ Partager</button>`;
+      const profilBtn = p.auteur_id ? `<a href="profil.html?id=${p.auteur_id}" class="hp-feed-action-btn">👤 Voir le profil</a>` : '';
+      const nbLikes = (p.reactions && p.reactions.like) || 0;
+      const nbComm = p.nb_commentaires || 0;
+      const actionsHtml = moi ? `
+        <div class="hp-feed-actions">
+          <button type="button" class="hp-feed-action-btn${p.user_a_aime?' active':''}" onclick="hpReagir(${p.id}, this)">
+            ${p.user_a_aime ? '❤️' : '👍'} J'aime${nbLikes ? ' ('+nbLikes+')' : ''}
+          </button>
+          <a href="${postUrl}" class="hp-feed-action-btn">💬 Commenter${nbComm ? ' ('+nbComm+')' : ''}</a>
+          ${partagerBtn}
+          ${profilBtn}
+          ${(p.auteur_id && Number(p.auteur_id) !== Number(moi.id)) ? `<button type="button" class="hp-feed-action-btn" data-abonne="0" onclick="daToggleSuivre('user', ${p.auteur_id}, this)">🔔 S'abonner</button>` : ''}
+        </div>` : `
+        <div class="hp-feed-actions">
+          <button type="button" class="hp-feed-action-btn locked" data-lock-msg="Pour réagir aux publications, créez votre compte gratuit.">
+            👍 J'aime${nbLikes ? ' ('+nbLikes+')' : ''} <span class="hp-feed-lock-icon">🔒</span>
+          </button>
+          <button type="button" class="hp-feed-action-btn locked" data-lock-msg="Pour commenter, créez votre compte gratuit.">
+            💬 Commenter${nbComm ? ' ('+nbComm+')' : ''} <span class="hp-feed-lock-icon">🔒</span>
+          </button>
+          ${partagerBtn}
+          ${profilBtn}
+          <button type="button" class="hp-feed-action-btn locked" data-lock-msg="Pour vous abonner, créez votre compte gratuit.">
+            🔔 S'abonner <span class="hp-feed-lock-icon">🔒</span>
+          </button>
+        </div>`;
       return `
       <div class="hp-feed-post">
         <div class="hp-feed-post-header">
@@ -2455,14 +2505,7 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
           </div>
         </div>
         <p class="hp-feed-content">${p.contenu || ''}</p>
-        <div class="hp-feed-actions">
-          <button class="hp-feed-action-btn locked" data-lock-msg="Pour réagir aux publications, créez votre compte gratuit.">
-            👍 J'aime <span class="hp-feed-lock-icon">🔒</span>
-          </button>
-          <button class="hp-feed-action-btn locked" data-lock-msg="Pour commenter, créez votre compte gratuit.">
-            💬 Commenter <span class="hp-feed-lock-icon">🔒</span>
-          </button>
-        </div>
+        ${actionsHtml}
       </div>`;
     });
     /* Publicité "homepage_feed" (2026-09-29, bug réel corrigé : promise à l'annonceur dès la
@@ -2477,14 +2520,24 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
     const adSlotHtml = `<div id="ad-homepage-feed" data-ad-emplacement="homepage_feed" style="display:none;grid-column:1/-1;"></div>`;
     const posIdx = Math.min(2, html.length);
     html.splice(posIdx, 0, adSlotHtml);
-    grid.innerHTML = html.join('') + `
-    <div class="hp-feed-cta">
-      <div class="hp-feed-cta-text">
-        <h3>Rejoignez la conversation</h3>
-        <p>Publiez, réagissez, commentez et contactez les membres de la communauté.</p>
-      </div>
-      <a href="inscription.html" class="hp-feed-cta-btn">🚀 Créer mon compte</a>
-    </div>`;
+    /* Même bug que ci-dessus (2026-09-30) : ce bandeau invitait un compte déjà connecté à
+       "créer un compte" — incohérent une fois `moi` connu. */
+    const ctaHtml = moi
+      ? `<div class="hp-feed-cta">
+          <div class="hp-feed-cta-text">
+            <h3>Voir toute l'actualité</h3>
+            <p>Publiez, réagissez, commentez et contactez les membres de la communauté.</p>
+          </div>
+          <a href="fil-actualite.html" class="hp-feed-cta-btn">📰 Voir le fil complet</a>
+        </div>`
+      : `<div class="hp-feed-cta">
+          <div class="hp-feed-cta-text">
+            <h3>Rejoignez la conversation</h3>
+            <p>Publiez, réagissez, commentez et contactez les membres de la communauté.</p>
+          </div>
+          <a href="inscription.html" class="hp-feed-cta-btn">🚀 Créer mon compte</a>
+        </div>`;
+    grid.innerHTML = html.join('') + ctaHtml;
     if (window.renderAdSlot) renderAdSlot('ad-homepage-feed', 'homepage_feed');
   } catch {
     grid.innerHTML = `<div class="hp-feed-cta" style="grid-column:1/-1;">
@@ -2496,6 +2549,26 @@ document.getElementById('hp-vit-q')?.addEventListener('keydown', e => {
     </div>`;
   }
 })();
+
+/* "J'aime" fonctionnel pour un compte connecté (2026-09-30, demande explicite) — même route que
+   le fil complet (Posts.react(), assets/posts.js) : POST /api/fil/:id/react {type:'like'}. Pas
+   un vrai bascule : côté serveur, un like est un INSERT protégé par une contrainte UNIQUE
+   (post_id,user_id,type) — un second appel est silencieusement ignoré, jamais retiré (même
+   comportement que Posts.react(), qui ne gère lui non plus que le sens "aimer", jamais
+   "retirer"). Le bouton passe donc à l'état "aimé" une fois pour toutes, sans repasser en
+   arrière au reclic. */
+async function hpReagir(postId, btn) {
+  if (!window.CURRENT_USER) { window.location.href = 'login.html'; return; }
+  if (btn.classList.contains('active')) return; // déjà aimé, rien à refaire côté serveur
+  btn.disabled = true;
+  try {
+    const r = await api('POST', `/fil/${postId}/react`, { type: 'like' });
+    const total = Object.values(r.reactions || {}).reduce((s, n) => s + n, 0);
+    btn.classList.add('active');
+    btn.innerHTML = `❤️ J'aime${total ? ' (' + total + ')' : ''}`;
+  } catch (e) { alert(e.message || "Erreur."); }
+  finally { btn.disabled = false; }
+}
 
 /* --- 7. Modal actions verrouillées --- */
 (function() {
