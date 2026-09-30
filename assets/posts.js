@@ -571,6 +571,8 @@ function buildDetailModal() {
   modal.innerHTML = `
 <div class="pd-box">
   <button class="pd-close" onclick="Posts.closeDetail()" title="Fermer">✕</button>
+  <button class="pd-nav pd-nav-prev" id="pd-nav-prev" onclick="Posts.detailPrev()" title="Publication précédente">‹</button>
+  <button class="pd-nav pd-nav-next" id="pd-nav-next" onclick="Posts.detailNext()" title="Publication suivante">›</button>
   <div class="pd-media" id="pd-media"></div>
   <div class="pd-side">
     <div class="pd-header" id="pd-header"></div>
@@ -694,6 +696,14 @@ function injectStyles() {
 .pd-box{position:relative;background:#000;width:100%;height:100%;max-width:1280px;max-height:900px;display:flex;border-radius:12px;overflow:hidden;}
 .pd-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:16px;cursor:pointer;z-index:5;}
 .pd-close:hover{background:rgba(255,255,255,.28);}
+/* Navigation "publication précédente / suivante" (2026-09-30, demande explicite) : parcourt
+   la liste des posts actuellement chargés (Posts._feedIds), sans fermer la vue détaillée. */
+.pd-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.35);border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.pd-nav:hover{background:rgba(0,0,0,.55);}
+.pd-nav:disabled{opacity:0;pointer-events:none;}
+.pd-nav-prev{left:14px;}
+.pd-nav-next{right:14px;}
+@media(max-width:760px){.pd-nav{top:21vh;}}
 .pd-media{flex:1;min-width:0;background:#0b0b0c;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
 .pd-media .post-media-grid{width:100%;height:100%;padding:0!important;margin:0;}
 .pd-media .post-media-item{border-radius:0;height:100%;}
@@ -789,11 +799,15 @@ const Posts = {
       if (!e.target.closest('.post-menu-wrap')) document.querySelectorAll('.post-menu-dropdown.open').forEach(d => d.classList.remove('open'));
       if (!e.target.closest('.post-reactions-wrap')) document.querySelectorAll('.post-reaction-menu.open').forEach(d => d.classList.remove('open'));
     });
-    // Échap ferme la vue détaillée
+    // Échap ferme la vue détaillée, ← → passe à la publication précédente/suivante
+    // (sauf si le focus est dans un champ de saisie, ex. le commentaire)
     document.addEventListener('keydown', e => {
-      if (e.key !== 'Escape') return;
       const dm = document.getElementById('posts-detail-modal');
-      if (dm && dm.style.display !== 'none') Posts.closeDetail();
+      if (!dm || dm.style.display === 'none') return;
+      if (e.key === 'Escape') { Posts.closeDetail(); return; }
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+      if (e.key === 'ArrowLeft') Posts.detailPrev();
+      else if (e.key === 'ArrowRight') Posts.detailNext();
     });
   },
 
@@ -1153,6 +1167,7 @@ const Posts = {
   /* ── Vue détaillée (façon Facebook) : publication à gauche, réactions + commentaires
      TOUJOURS ouverts à droite (2026-09-30, demande explicite, maquette validée) ── */
   _detailPostId: null,
+  _feedIds: [],
 
   async openDetail(postId) {
     buildDetailModal();
@@ -1162,6 +1177,7 @@ const Posts = {
     document.body.style.overflow = 'hidden';
     document.getElementById('pd-media').innerHTML = `<div style="color:#fff;padding:40px;">Chargement…</div>`;
     document.getElementById('pd-comments').innerHTML = '';
+    this._updateDetailNav();
     try {
       const r = await apiRequest('GET', `/api/fil/${postId}`);
       if (!r.post) { this.closeDetail(); return; }
@@ -1176,6 +1192,29 @@ const Posts = {
     if (modal) modal.style.display = 'none';
     document.body.style.overflow = '';
     this._detailPostId = null;
+  },
+
+  /* Boutons ‹ › : n'affiche que ce qui existe réellement — pas de flèche vers nulle part.
+     Se base sur la dernière liste de posts chargée par renderFeed() (le fil visible
+     derrière la modale), donc marche pour toute page qui utilise Posts.renderFeed(). */
+  _updateDetailNav() {
+    const ids = this._feedIds || [];
+    const idx = ids.indexOf(this._detailPostId);
+    const prevBtn = document.getElementById('pd-nav-prev');
+    const nextBtn = document.getElementById('pd-nav-next');
+    if (prevBtn) prevBtn.disabled = idx <= 0;
+    if (nextBtn) nextBtn.disabled = idx === -1 || idx >= ids.length - 1;
+  },
+
+  detailPrev() { this._detailStep(-1); },
+  detailNext() { this._detailStep(1); },
+  _detailStep(dir) {
+    const ids = this._feedIds || [];
+    const idx = ids.indexOf(this._detailPostId);
+    if (idx === -1) return;
+    const nextIdx = idx + dir;
+    if (nextIdx < 0 || nextIdx >= ids.length) return;
+    this.openDetail(ids[nextIdx]);
   },
 
   _renderDetailPost(post) {
@@ -1428,6 +1467,9 @@ const Posts = {
   renderFeed(posts, containerId, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
+    // Mémorise l'ordre des posts affichés pour la navigation ‹ › de la vue détaillée
+    // (Posts.detailNext/detailPrev) — ignore les cartes vitrine, qui n'ont pas de vue détaillée.
+    this._feedIds = posts.filter(p => p.type !== 'carte_vitrine').map(p => p.id);
     if (!posts.length) {
       container.innerHTML = `<div style="text-align:center;padding:40px;color:#9ca3af;">
         <div style="font-size:2.5rem;margin-bottom:12px;">📭</div>
