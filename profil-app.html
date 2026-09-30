@@ -3173,11 +3173,19 @@ async function renderVitrineVisitor(init) {
           api('GET', `/events?organisateur_id=${encodeURIComponent(owner)}`).catch(() => ({})),
         ]);
 
+        /* visibilite === 'boutique' inclus ici (2026-09-30, demande explicite) — c'est tout le
+           sens de cette visibilité : un événement volontairement absent de la découverte
+           générale ("Tous les événements") mais destiné à être vu ICI, sur la page boutique de
+           son organisateur, par n'importe quel visiteur. 'prive'/'abonnes' restent exclus : ce
+           sont des événements sur invitation, jamais montrés sur une page publique. */
         const annonces = (rAnnonces.evenements || [])
-          .filter(e => !e.visibilite || e.visibilite === 'public')
+          .filter(e => !e.visibilite || e.visibilite === 'public' || e.visibilite === 'boutique')
           .map(e => ({
             id: e.id, lien: `evenement.html?id=${e.id}`, titre: e.titre, lieu: e.lieu,
-            date: e.date_evt, image: e.image_couverture || e.image_url, billetterie: false,
+            date: e.date_evt, heure: e.heure_debut, image: e.image_couverture || e.image_url, billetterie: false,
+            type_evt: e.type_evt, domaine: e.domaine, visibilite: e.visibilite,
+            description: e.description, nb_participants: e.nb_participants,
+            places_max: e.places_max, masquer_inscrits: e.masquer_inscrits,
           }));
 
         /* Seuls les événements réellement en vente : un brouillon ou un événement clos ne doit
@@ -3193,19 +3201,32 @@ async function renderVitrineVisitor(init) {
         const liste = [...billetterie, ...annonces]
           .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
 
+        /* Ajustement drastique du format de présentation (2026-09-30, demande explicite : "avec
+           les mêmes façons de présenter, les événements de la boutique") — ajoute forme/domaine,
+           badge de visibilité et extrait de description aux cartouches, en plus de date/titre/
+           lieu déjà là. La billetterie (prix/places/bouton Réserver) reste inchangée : c'est le
+           seul système avec un vrai état de vente à afficher ici. */
+        const EVT_TYPE_LABEL = {evenement:'Événement',forum:'Forum',atelier:'Atelier',webinaire:'Webinaire',conference:'Conférence',gala:'Gala',marche:'Marché / Foire',networking:'Networking',debat:'Débat',concours:'Concours',trophee_diaspora:'🏆 Trophée diaspora',autre:'Autre'};
         boxEvt.innerHTML = liste.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
-          ${liste.slice(0, 6).map(e => `<a href="${e.lien}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
+          ${liste.slice(0, 6).map(e => { const desc = e.description ? String(e.description).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : ''; const descApercu = desc.length > 90 ? desc.slice(0,90).trim() + '…' : desc; return `<a href="${e.lien}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
             ${e.image ? `<img loading="lazy" src="${esc(e.image)}" alt="" style="width:100%;height:110px;object-fit:cover;display:block;">` : ''}
             <div style="padding:12px;">
-              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(String(e.date || '').slice(0, 16))}</div>
+              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(String(e.date || '').slice(0, 16))}${e.heure ? ' · '+esc(e.heure) : ''}</div>
               <div style="font-size:13.5px;font-weight:700;color:#122A4D;margin-top:3px;line-height:1.35;">${esc(e.titre || '')}</div>
-              ${e.lieu ? `<div style="font-size:12px;color:#8794A7;margin-top:4px;">📍 ${esc(e.lieu)}</div>` : ''}
+              <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">
+                ${e.lieu ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">📍 ${esc(e.lieu)}</span>` : ''}
+                ${e.type_evt ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">${esc(EVT_TYPE_LABEL[e.type_evt]||e.type_evt)}</span>` : ''}
+                ${e.domaine ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">${esc(e.domaine)}</span>` : ''}
+                ${e.visibilite === 'boutique' ? `<span style="font-size:11px;color:#8B12D6;background:#F5EBFF;border:1px solid #BC13FE;border-radius:99px;padding:2px 8px;">🏬 Boutique uniquement</span>` : ''}
+                ${(e.nb_participants!=null && !e.masquer_inscrits) ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">👥 ${e.nb_participants}${e.places_max?' / '+e.places_max:''}</span>` : ''}
+              </div>
+              ${descApercu ? `<div style="font-size:12px;color:#6b7280;margin-top:6px;line-height:1.5;">${esc(descApercu)}</div>` : ''}
               ${e.billetterie ? `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                   <span style="font-size:13px;font-weight:800;color:#2F6BED;">${Number(e.prix) > 0 ? esc(String(e.prix)) + ' €' : 'Gratuit'}</span>
                   <span style="font-size:11.5px;font-weight:700;background:#2F6BED;color:#fff;padding:4px 10px;border-radius:7px;">🎟️ Réserver</span>
                 </div>
                 ${e.places > 0 && e.places <= 20 ? `<div style="font-size:11px;color:#b45309;margin-top:5px;">Plus que ${e.places} place${e.places > 1 ? 's' : ''}</div>` : ''}` : ''}
-            </div></a>`).join('')}
+            </div></a>`; }).join('')}
         </div>` : vide('Aucun événement publié pour le moment.', 'dashboard-initiative.html#evenements', 'Créer un événement');
       } catch (e) { boxEvt.innerHTML = vide('Événements momentanément indisponibles.'); }
     }
