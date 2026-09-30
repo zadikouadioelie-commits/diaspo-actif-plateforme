@@ -6576,7 +6576,12 @@ function loadVideosTab() {
 async function loadEvenementsTab() {
   const panel = document.getElementById('ptab-evenements');
   try {
-    const r = await api('GET', '/evenements');
+    /* ?owner= ajouté (2026-09-30, demande explicite) — signature nécessaire pour que le
+       serveur inclue les événements visibilite='boutique' de ce propriétaire (voir
+       GET /api/evenements) : absents de la découverte générale, mais destinés à être vus par
+       n'importe quel visiteur DE CETTE PAGE boutique, pas seulement par le propriétaire lui-même
+       (contrairement aux brouillons, qui restent invisibles ici aussi). */
+    const r = await api('GET', '/evenements?owner=' + profil.id);
     const all = r.evenements || r.events || [];
     const mine = all.filter(e => Number(e.owner_user_id) === Number(profil.id));
     if (!mine.length) {

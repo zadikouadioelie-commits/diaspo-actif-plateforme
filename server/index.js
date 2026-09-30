@@ -18687,6 +18687,13 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   const meListe = await getCurrentUser(req);
   const proprietaireDemandeSesPropres = meListe && query.owner && Number(query.owner) === Number(meListe.id);
   rows = rows.filter(r => r.statut !== 'brouillon' || proprietaireDemandeSesPropres || (meListe && meListe.role === 'administrateur'));
+  /* Visibilité "🏬 Boutique uniquement" (2026-09-30, demande explicite : un événement RÉEL/publié,
+     pas un brouillon, mais volontairement absent de la découverte générale — affiché seulement
+     sur la page boutique de son organisateur. Même signature ?owner=<id> que "Mes événements"
+     ci-dessus, mais SANS exiger que le visiteur SOIT ce propriétaire (contrairement au brouillon
+     juste au-dessus) : un vrai visiteur public consultant une page boutique doit voir ces
+     événements-là, c'est tout l'intérêt — seule la découverte générale (sans ?owner=) les exclut. */
+  rows = rows.filter(r => r.visibilite !== 'boutique' || !!query.owner);
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   /* Filtre "🌍 Tous pays" (2026-09-07, demande explicite) — élargi pour matcher aussi les
      pays cible (origine/origine2, la diaspora visée), pas seulement le pays où se déroule

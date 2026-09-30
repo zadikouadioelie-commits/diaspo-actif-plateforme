@@ -412,6 +412,15 @@
       </div>
       <div><label>Places max</label><input type="number" id="e-places" min="1" placeholder="Illimitées"></div>
     </div>
+    <!-- Afficher uniquement sur la boutique (2026-09-30, demande explicite) — bouton/case dédié,
+         plus visible qu'une énième option noyée dans le select Visibilité ci-dessus : force
+         visibilite='boutique' côté serveur (voir GET /api/evenements) à la sauvegarde, quel que
+         soit le choix du select. Même case dans la modale Événement flash (#fl-boutique-uniquement
+         plus bas), chacune lue indépendamment par son propre payload de sauvegarde. -->
+    <label id="e-boutique-uniquement-lbl" style="display:flex;align-items:center;gap:8px;background:#F5EBFF;border:1.5px solid #BC13FE;border-radius:8px;padding:10px 12px;margin-bottom:14px;cursor:pointer;font-size:13px;">
+      <input type="checkbox" id="e-boutique-uniquement" style="width:17px;height:17px;accent-color:#8B12D6;flex-shrink:0;">
+      <span><strong>🏬 Afficher uniquement sur ma boutique</strong><br><span style="font-size:11.5px;color:#6b7280;">L'événement sera visible sur ma page boutique, mais pas dans le calendrier public « Tous les événements ».</span></span>
+    </label>
     <!-- Ouverture programmée des inscriptions (2026-09-25, demande explicite : "propose une
          heure à laquelle les inscriptions doivent commencer... ne prend pas en compte que le
          jour, mais également l'heure") — jour ET heure exacts (datetime-local), pris en compte
@@ -601,6 +610,10 @@
           <img id="fl-photo2-preview" style="display:none;width:100%;max-height:110px;object-fit:cover;border-radius:8px;margin-top:6px;">
         </div>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;background:#F5EBFF;border:1.5px solid #BC13FE;border-radius:8px;padding:10px 12px;margin-top:10px;cursor:pointer;font-size:13px;">
+        <input type="checkbox" id="fl-boutique-uniquement" style="width:17px;height:17px;accent-color:#8B12D6;flex-shrink:0;">
+        <span><strong>🏬 Afficher uniquement sur ma boutique</strong><br><span style="font-size:11.5px;color:#6b7280;">Visible sur ma page boutique, pas dans le calendrier public.</span></span>
+      </label>
       <p id="fl-err" style="color:#dc2626;font-size:.8rem;margin-top:10px;display:none;"></p>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
         <button class="btn btn-outline" onclick="flashFermer()">Annuler</button>
@@ -794,7 +807,8 @@ function renderEvts() {
     const plein   = evt.places_max && evt.nb_participants >= evt.places_max;
     const pasEncoreOuvert = inscriptionsPasEncoreOuvertes(evt);
     const visiBadge = evt.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
-                      evt.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' : '';
+                      evt.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' :
+                      evt.visibilite === 'boutique' ? '<span class="evt-tag" style="color:#8B12D6;">🏬 Boutique uniquement</span>' : '';
     // Brouillon (2026-09-23) : ne peut être visible ici que pour son propriétaire ou un admin
     // (voir GET /api/evenements, filtré côté serveur) — badge pour ne jamais le confondre avec
     // un événement réellement publié en le parcourant dans sa propre liste.
@@ -1095,6 +1109,7 @@ function resetModaleEvenement() {
   document.getElementById('e-zone-diffusion').value = '';
   document.getElementById('e-origine').value = '';
   document.getElementById('e-visibilite').value = 'public';
+  document.getElementById('e-boutique-uniquement').checked = false;
   document.getElementById('e-masquer-inscrits').checked = false;
   document.getElementById('e-radio-gratuit').checked = true;
   majToggleParticipation();
@@ -1161,7 +1176,8 @@ function ouvrirModaleEdition(id) {
   _evtDescRichEditor()?.setHTML(evt.description || '');
   document.getElementById('e-places').value = evt.places_max || '';
   document.getElementById('e-masquer-inscrits').checked = !!evt.masquer_inscrits;
-  document.getElementById('e-visibilite').value = evt.visibilite || 'public';
+  document.getElementById('e-boutique-uniquement').checked = evt.visibilite === 'boutique';
+  document.getElementById('e-visibilite').value = evt.visibilite === 'boutique' ? 'public' : (evt.visibilite || 'public');
   document.getElementById('e-visio-evt').value = evt.lien_visio || '';
   document.getElementById('e-whatsapp').value = evt.whatsapp_lien || '';
   // Priorité à la fiche d'inscription liée (2026-09-23, demande explicite ; étendu à 3
@@ -1314,6 +1330,7 @@ function flashOuvrir() {
   document.getElementById('fl-public').value = '';
   document.getElementById('fl-texte').value = '';
   document.getElementById('fl-compteur').textContent = '0/500';
+  document.getElementById('fl-boutique-uniquement').checked = false;
   flashPhoto1 = null; flashPhoto2 = null;
   ['fl-photo1','fl-photo2'].forEach(id => { document.getElementById(id).value = ''; const p = document.getElementById(id+'-preview'); p.style.display = 'none'; p.src = ''; });
   document.getElementById('fl-err').style.display = 'none';
@@ -1364,6 +1381,7 @@ function flashVoirRecap() {
     ${c.origine ? `<div><strong>Origine :</strong> ${esc(c.origine)}</div>` : ''}
     ${c.public_concerne ? `<div><strong>Public concerné :</strong> ${esc(c.public_concerne)}</div>` : ''}
     <div style="margin-top:8px;"><strong>Description :</strong><br>${esc(c.description)}</div>
+    ${document.getElementById('fl-boutique-uniquement')?.checked ? '<div style="margin-top:8px;color:#8B12D6;font-weight:600;">🏬 Visible uniquement sur votre boutique, pas dans le calendrier public.</div>' : ''}
     <div style="margin-top:10px;font-size:.78rem;color:var(--muted,#6b7280);">ℹ️ Événement informatif — aucune inscription ne sera proposée.</div>
   `;
   document.getElementById('flash-step-form').style.display = 'none';
@@ -1384,6 +1402,7 @@ async function flashPublier() {
       origine: c.origine, lieu: c.lieu, description: c.description, public_concerne: c.public_concerne,
       type_evt: 'evenement', statut: 'ouvert', inscription_ouverte: false,
       appliquer_fiche_standard: false,
+      visibilite: document.getElementById('fl-boutique-uniquement')?.checked ? 'boutique' : 'public',
       image_couverture: flashPhoto1 || null,
       galerie_photos: flashPhoto2 ? [flashPhoto2] : [],
     });
@@ -1476,7 +1495,7 @@ async function enregistrerEvenement(statutVise) {
       description:   document.getElementById('e-desc').value,
       places_max:    document.getElementById('e-places').value || null,
       masquer_inscrits: document.getElementById('e-masquer-inscrits').checked,
-      visibilite:    document.getElementById('e-visibilite').value,
+      visibilite:    document.getElementById('e-boutique-uniquement').checked ? 'boutique' : document.getElementById('e-visibilite').value,
       lien_visio:    document.getElementById('e-visio-evt').value || null,
       whatsapp_lien: document.getElementById('e-whatsapp').value || null,
       image_couverture: coverData,
