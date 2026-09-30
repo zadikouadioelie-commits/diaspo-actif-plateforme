@@ -6588,18 +6588,43 @@ async function loadEvenementsTab() {
       panel.innerHTML = `<div class="p-section"><div class="empty-p"><div class="ei">📅</div>Aucun événement publié.${isOwn?' <br><a href="evenements.html" style="color:var(--tp);font-weight:600;">Créer un événement →</a>':''}</div></div>`;
       return;
     }
-    panel.innerHTML = `<div class="evt-grid">${mine.map(e=>`
+    /* Ajustement drastique du format de présentation (2026-09-30, demande explicite : "avec les
+       mêmes façons de présenter, les événements de la boutique") — reprend le langage visuel des
+       cartouches riches de evenements-app.html (icône de domaine, badges type/domaine/visibilité,
+       compteur d'inscrits, extrait de description) au lieu de la version minimale précédente
+       (date/titre/lieu/participants seulement). Volontairement SANS les actions de gestion
+       (Modifier/Gérer/Supprimer/Partager) ni l'état d'inscription (inscrit/complet/ouverture) :
+       cette page reste un aperçu public de la boutique, pas un second "Mes événements" — la
+       carte entière reste un lien unique vers la fiche complète (evenements.html) où toutes ces
+       actions existent déjà. */
+    const PVT_DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Economique:'📈',Politique:'🏛️',Panafricanisme:'✊',Autre:'📅'};
+    const PVT_TYPE_EVT_LABEL = {evenement:'Événement',forum:'Forum',atelier:'Atelier',webinaire:'Webinaire',conference:'Conférence',gala:'Gala',marche:'Marché / Foire',networking:'Networking',debat:'Débat',concours:'Concours',trophee_diaspora:'🏆 Trophée diaspora',autre:'Autre'};
+    panel.innerHTML = `<div class="evt-grid">${mine.map(e=>{
+      const icon = PVT_DOMAINE_ICON[e.domaine] || '📢';
+      const visiBadge = e.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
+                        e.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' :
+                        e.visibilite === 'boutique' ? '<span class="evt-tag" style="color:#8B12D6;">🏬 Boutique uniquement</span>' : '';
+      const desc = e.description ? String(e.description).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : '';
+      const descApercu = desc.length > 120 ? desc.slice(0,120).trim() + '…' : desc;
+      return `
       <a class="evt-card" href="evenements.html?id=${e.id}" style="text-decoration:none;color:inherit;">
-        ${e.image_couverture ? `<img class="evt-img" src="${esc(e.image_couverture)}" alt="">` : `<div class="evt-img">📅</div>`}
+        <div class="evt-img">${e.image_couverture ? `<img src="${esc(e.image_couverture)}" alt="${esc(e.titre)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.textContent='${icon}'">` : icon}</div>
         <div class="evt-body">
-          <div class="evt-date">${esc(fmtDateFull(e.date_evt))}</div>
+          <div class="evt-date">${esc(fmtDateFull(e.date_evt))}${e.heure_debut?' · '+esc(e.heure_debut):''}</div>
           <div class="evt-title">${esc(e.titre)}</div>
           <div class="evt-meta">
             ${e.lieu?`<span class="evt-tag">📍 ${esc(e.lieu)}</span>`:''}
-            ${e.nb_participants!=null?`<span class="evt-tag">👥 ${e.nb_participants}</span>`:''}
+            ${e.ville?`<span class="evt-tag">🏙️ ${esc(e.ville)}</span>`:''}
+            ${e.pays?`<span class="evt-tag">🌍 ${esc(e.pays)}</span>`:''}
+            ${e.type_evt?`<span class="evt-tag">${esc(PVT_TYPE_EVT_LABEL[e.type_evt]||e.type_evt)}</span>`:''}
+            ${e.domaine?`<span class="evt-tag">${esc(e.domaine)}</span>`:''}
+            ${visiBadge}
+            ${(e.nb_participants!=null && !e.masquer_inscrits)?`<span class="evt-tag">👥 ${e.nb_participants} inscrit${e.nb_participants>1?'s':''}${e.places_max?' / '+e.places_max:''}</span>`:''}
           </div>
+          ${descApercu ? `<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5;">${esc(descApercu)}</p>` : ''}
         </div>
-      </a>`).join('')}</div>`;
+      </a>`;
+    }).join('')}</div>`;
   } catch(e) {
     panel.innerHTML = `<div class="p-section"><div class="empty-p"><div class="ei">📅</div>Impossible de charger les événements.</div></div>`;
   }
