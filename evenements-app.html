@@ -43,7 +43,7 @@
    Initiative à droite. Empilées verticalement sous 1100px — même seuil que .evt-grid, pas
    de colonne trop étroite pour rester utilisable sur tablette. */
 .evt-layout{display:grid;grid-template-columns:230px 1fr 260px;gap:22px;align-items:start;margin-top:20px;}
-.evt-filters-col,.evt-suggest-col{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.evt-filters-col,.evt-suggest-col,.evt-ad-col,.evt-pub-col{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}
 .evt-filters-col{display:flex;flex-direction:column;gap:10px;}
 .evt-filters-col select,.evt-filters-col input{width:100%;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;}
 .evt-col-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;}
@@ -52,39 +52,51 @@
    pour ce même agencement filtres/contenu/suggestions (top:80px sous le bandeau sticky, voir
    emplois-stages.html .es-layout>main/.es-filters/.es-docs-col). Uniquement en layout 3
    colonnes (>1100px) : repassé en flux normal ci-dessous une fois empilé verticalement, un
-   défilement imbriqué par colonne n'aurait aucun sens sur mobile/tablette. */
-.evt-filters-col,.evt-main-col,.evt-suggest-col{position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+   défilement imbriqué par colonne n'aurait aucun sens sur mobile/tablette.
+   evt-ad-col/evt-pub-col rejoignent ici la même règle (2026-09-30, demande explicite : "mets
+   toutes les cartouches au même niveau") — avant, ces deux colonnes vivaient dans un conteneur
+   flex séparé, en dehors de cette grille, ce qui créait le décalage vertical visible sur
+   capture (leur position de départ dans le flux normal différait de celle des autres colonnes,
+   même avec le même position:sticky;top:80px). Intégrées à la grille, elles démarrent
+   désormais exactement à la même hauteur que les filtres/événements/suggestions. */
+.evt-filters-col,.evt-main-col,.evt-suggest-col,.evt-ad-col,.evt-pub-col{position:sticky;top:80px;max-height:calc(100vh - 100px);overflow-y:auto;}
+.evt-ad-col,.evt-pub-col{display:none;}
 @media(max-width:1100px){
   .evt-layout{grid-template-columns:1fr;}
-  .evt-filters-col,.evt-main-col,.evt-suggest-col{position:static;max-height:none;overflow-y:visible;}
+  .evt-filters-col,.evt-main-col,.evt-suggest-col,.evt-ad-col,.evt-pub-col{position:static;max-height:none;overflow-y:visible;}
   /* Séparation renvoyée entre la liste d'événements et les suggestions de comptes une fois
      empilées verticalement (2026-09-20, demande explicite : "rend plus visible la séparation"
      sur téléphone) — le simple gap:22px de la grille se noyait dans le défilement d'une longue
      liste de cartes événements, les deux sections se lisaient comme une seule. */
   .evt-suggest-col{margin-top:28px;border-top:3px solid var(--orange,#ff6b00);box-shadow:0 2px 12px rgba(0,0,0,.08);}
 }
-/* Emplacement publicitaire (2026-09-29, demande explicite : "décaler tout à gauche et laisser
-   de l'espace à droite pour les publicités") — le conteneur ci-dessus reste à max-width:1400px
-   et le trio filtres/événements/suggestions n'est PAS touché (zéro risque de casse) ; on ajoute
-   simplement, à côté, un panneau qui n'apparaît QUE quand il reste vraiment de la place libre à
-   droite du conteneur (écrans très larges) — jamais au détriment de la mise en page normale.
-   Bandeau "Espace publicitaire" toujours visible ; en dessous, la vision Diaspo'Actif tant
-   qu'aucune publicité active n'existe pour cet emplacement (voir renderAdSlot/data-ad-fallback
-   dans assets/app.js), remplacée automatiquement par une publicité dès qu'il y en a une, avec
-   rotation toutes les 60s (data-ad-rotate) s'il y en a plusieurs. */
-#evt-page-row{display:flex;gap:24px;align-items:flex-start;justify-content:center;}
+#evt-page-row{display:flex;justify-content:center;}
 #evt-page-row>main{margin:0;}
-.evt-ad-col{display:none;flex:1;min-width:280px;max-width:360px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
+/* Emplacement publicitaire (2026-09-29, demande explicite : "décaler tout à gauche et laisser
+   de l'espace à droite pour les publicités"), réduit de 20% et réaligné (2026-09-30, demande
+   explicite : "induit de 20% l'espace dédié aux publicités et donc agrandis tous les autres...
+   mets toutes les cartouches au même niveau") — n'apparaît que quand il reste vraiment de la
+   place libre à droite (écrans très larges), jamais au détriment de la mise en page normale en
+   dessous de ces seuils. Bandeau "Espace publicitaire" toujours visible ; en dessous, la vision
+   Diaspo'Actif tant qu'aucune publicité active n'existe pour cet emplacement (voir
+   renderAdSlot/data-ad-fallback dans assets/app.js), remplacée automatiquement par une
+   publicité dès qu'il y en a une, avec rotation toutes les 60s (data-ad-rotate) s'il y en a
+   plusieurs. */
 /* Colonne "Publications" (2026-09-29, demande explicite) — publications du fil d'actualité de
    tout compte SAUF Utilisateur individuel (Initiative/Collectivité/Administrateur), même
    traitement visuel/responsive que .evt-ad-col juste à côté (n'apparaît que s'il reste de la
    place, jamais au détriment de la mise en page principale). */
-.evt-pub-col{display:none;flex:1;min-width:260px;max-width:320px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;position:sticky;top:80px;}
 @media(min-width:1700px){
-  #evt-page-row{justify-content:flex-start;}
+  /* max-width en !important : le style inline de <main> (voir plus bas dans le HTML) l'emporte
+     sinon sur toute règle externe, même dans une media query — nécessaire ici pour laisser la
+     grille s'élargir et accueillir la colonne pub sans la comprimer. */
+  #evt-page-row>main{max-width:1750px!important;}
+  .evt-layout{grid-template-columns:230px 1fr 300px 288px;}
   .evt-ad-col{display:block;}
 }
 @media(min-width:2000px){
+  #evt-page-row>main{max-width:2060px!important;}
+  .evt-layout{grid-template-columns:230px 1fr 300px 288px 290px;}
   .evt-pub-col{display:block;}
 }
 .evt-ad-vision{font-size:12.5px;color:var(--muted);line-height:1.6;}
@@ -375,32 +387,34 @@
       <div class="evt-col-title">✨ Découvrir des initiatives</div>
       <div id="sugg-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
     </aside>
+
+    <!-- ═══ EMPLACEMENT PUBLICITAIRE (2026-09-29, demande explicite) — visible uniquement quand
+         il reste de la place à droite (voir @media(min-width:1700px) ci-dessus), jamais au
+         détriment de la mise en page ci-dessus. Contenu de secours (vision Diaspo'Actif) tant
+         qu'aucune publicité active n'existe pour cet emplacement ; rotation automatique toutes
+         les 60s s'il y en a plusieurs (data-ad-rotate, voir renderAllAdSlots() dans
+         assets/app.js). Colonne de cette grille (2026-09-30, demande explicite) plutôt que
+         panneau externe séparé — voir le commentaire CSS de .evt-ad-col. ═══ -->
+    <aside class="evt-ad-col">
+      <div class="evt-col-title">📢 Espace publicitaire</div>
+      <template id="evt-ad-fallback">
+        <div class="evt-ad-vision">
+          <strong>Pourquoi Diaspo'Actif ?</strong>
+          Une diaspora unie, actrice du développement. La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.
+        </div>
+      </template>
+      <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-fallback="evt-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
+    </aside>
+
+    <!-- ═══ COLONNE PUBLICATIONS (2026-09-29, demande explicite) — fil d'actualité filtré aux
+         comptes Initiative/Collectivité/Administrateur, jamais les comptes Utilisateur
+         individuels. Voir GET /api/fil?mode=organisations, nouveau mode dédié côté serveur. ═══ -->
+    <aside class="evt-pub-col">
+      <div class="evt-col-title">📰 Publications</div>
+      <div id="evt-pub-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
+    </aside>
   </div>
 </main>
-
-<!-- ═══ EMPLACEMENT PUBLICITAIRE (2026-09-29, demande explicite) — visible uniquement quand il
-     reste de la place à droite (voir @media(min-width:1700px) ci-dessus), jamais au détriment de
-     la mise en page ci-dessus. Contenu de secours (vision Diaspo'Actif) tant qu'aucune publicité
-     active n'existe pour cet emplacement ; rotation automatique toutes les 60s s'il y en a
-     plusieurs (data-ad-rotate, voir renderAllAdSlots() dans assets/app.js). ═══ -->
-<aside class="evt-ad-col">
-  <div class="evt-col-title">📢 Espace publicitaire</div>
-  <template id="evt-ad-fallback">
-    <div class="evt-ad-vision">
-      <strong>Pourquoi Diaspo'Actif ?</strong>
-      Une diaspora unie, actrice du développement. La diaspora africaine représente un levier de développement majeur. Pourtant, les initiatives restent dispersées, invisibles, sans réseau. Diaspo'Actif change ça.
-    </div>
-  </template>
-  <div id="ad-evenements-sidebar" data-ad-emplacement="evenements_sidebar" data-ad-fallback="evt-ad-fallback" data-ad-rotate="60000" style="margin-top:10px;"></div>
-</aside>
-
-<!-- ═══ COLONNE PUBLICATIONS (2026-09-29, demande explicite) — fil d'actualité filtré aux
-     comptes Initiative/Collectivité/Administrateur, jamais les comptes Utilisateur individuels.
-     Voir GET /api/fil?mode=organisations, nouveau mode dédié côté serveur. ═══ -->
-<aside class="evt-pub-col">
-  <div class="evt-col-title">📰 Publications</div>
-  <div id="evt-pub-list" style="margin-top:10px;font-size:12.5px;color:var(--muted);">Chargement…</div>
-</aside>
 </div>
 
 <!-- ═══ MODAL CRÉATION ÉVÉNEMENT (enrichie) ═══ -->
