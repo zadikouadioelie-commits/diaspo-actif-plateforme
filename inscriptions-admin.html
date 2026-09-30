@@ -1017,6 +1017,22 @@ async function iaChargerListe() {
   const { fiches } = await api('GET', '/insc/fiches');
   state.fiches = fiches;
 }
+/* Extrait de l'action "createFiche" (2026-09-30, demande explicite) — accepte un nom proposé en
+   pré-remplissage du prompt (jamais imposé sans confirmation) pour le lien direct depuis
+   evenements-app.html (bouton "+ Créer une nouvelle fiche" du panneau de choix, ?creer_nom=<titre
+   de l'événement en cours de création>) : l'organisateur voit tout de suite à quel événement la
+   fiche va correspondre, sans avoir à retaper le titre, mais reste libre de le changer. */
+async function iaCreerFiche(nomPropose) {
+  const nom = prompt("Nom de la fiche d'inscription :", nomPropose || '');
+  if (!nom || !nom.trim()) return;
+  try {
+    const { fiche } = await api('POST', '/insc/fiches', { nom: nom.trim() });
+    state.selectedFicheId = fiche.id; state.view = 'detail'; state.activeTab = 'overview';
+    state.icModeGestion = false; state.icTransitionVisible = false;
+    await iaChargerFiche(fiche.id);
+    render();
+  } catch (e) { ia_toast(e.message, false); }
+}
 async function iaChargerFiche(id) {
   const data = await api('GET', '/insc/fiches/' + id);
   state.ficheDetail = data;
@@ -2765,14 +2781,7 @@ const actions = {
   },
   ouvrirDefautsPartenairesSponsors() { iaOuvrirDefautsPartenairesSponsors(); },
   async createFiche() {
-    const nom = prompt("Nom de la fiche d'inscription :");
-    if (!nom || !nom.trim()) return;
-    try {
-      const { fiche } = await api('POST', '/insc/fiches', { nom: nom.trim() });
-      state.selectedFicheId = fiche.id; state.view = 'detail'; state.activeTab = 'overview';
-      state.icModeGestion = false; state.icTransitionVisible = false;
-      await iaChargerFiche(fiche.id);
-    } catch (e) { ia_toast(e.message, false); }
+    await iaCreerFiche();
   },
   async backToList() { state.view = 'list'; await iaChargerListe(); },
   async selectTab(el) { state.activeTab = el.dataset.tab; try { await iaChargerOnglet(state.activeTab); } catch (e) { ia_toast(e.message, false); } },
@@ -3392,6 +3401,11 @@ root.addEventListener('change', function (e) {
       state.selectedFicheId = parseInt(ficheIdParam); state.view = 'detail';
       await iaChargerFiche(state.selectedFicheId);
     }
+    /* Lien direct depuis evenements-app.html, bouton "+ Créer une nouvelle fiche" du panneau de
+       choix (2026-09-30, demande explicite) — ?creer_nom=<titre de l'événement en cours de
+       création> déclenche directement la création plutôt que la liste, nom pré-rempli. */
+    const creerNomParam = new URLSearchParams(location.search).get('creer_nom');
+    if (creerNomParam) await iaCreerFiche(creerNomParam);
     render();
   }
   catch (e) { root.innerHTML = `<div style="text-align:center;padding:60px;color:oklch(0.5 0.16 20);">${escH(e.message)}</div>`; }

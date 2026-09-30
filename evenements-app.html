@@ -503,8 +503,9 @@
       </div>
       <div id="fiche-picker-panel" style="display:none;margin-top:8px;padding:12px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
         <div id="fiche-picker-liste" style="font-size:13px;color:var(--muted);">Chargement…</div>
-        <a href="inscriptions-admin.html" target="_blank" style="display:inline-block;margin-top:10px;font-size:12.5px;color:#2563EB;">➕ Créer une nouvelle fiche →</a>
+        <a id="lien-creer-fiche" href="inscriptions-admin.html" target="_blank" style="display:inline-block;margin-top:10px;font-size:12.5px;color:#2563EB;">➕ Créer une nouvelle fiche →</a>
       </div>
+      <p style="font-size:11px;color:#aaa;margin:6px 0 0;">Une fiche d'inscription est le formulaire que rempliront les participants : elle sert à recueillir leurs coordonnées, gérer les places disponibles et, pour un événement payant, encaisser le tarif choisi. Sans elle, l'événement reste consultable mais personne ne peut s'y inscrire formellement.</p>
     </div>
 
     <!-- ── MULTIMÉDIA ── -->
@@ -1233,6 +1234,13 @@ document.getElementById('btn-fiche-inscription').addEventListener('click', async
   const ouvert = panel.style.display !== 'none';
   if (ouvert) { panel.style.display = 'none'; return; }
   panel.style.display = '';
+  /* "+ Créer une nouvelle fiche" (2026-09-30, demande explicite) — pré-remplit le nom de la
+     nouvelle fiche avec le titre de l'événement en cours de création (?creer_nom=, lu par
+     inscriptions-admin.html), pour qu'on sache tout de suite à quel événement elle correspond
+     sans avoir à retaper l'information. Le titre peut être vide à ce stade (champ pas encore
+     rempli) — inscriptions-admin.html gère déjà un prompt sans valeur par défaut dans ce cas. */
+  const titreEvt = document.getElementById('e-titre').value.trim();
+  document.getElementById('lien-creer-fiche').href = 'inscriptions-admin.html' + (titreEvt ? '?creer_nom=' + encodeURIComponent(titreEvt) : '');
   const liste = document.getElementById('fiche-picker-liste');
   liste.textContent = 'Chargement…';
   try {
