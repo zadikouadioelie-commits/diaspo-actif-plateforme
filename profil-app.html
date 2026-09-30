@@ -417,13 +417,25 @@ html, body { overflow-x:clip; }
 .vtp-card { border:1px solid var(--border); border-radius:16px; overflow:hidden; margin-bottom:18px; background:#fff; box-shadow:0 2px 10px rgba(13,27,42,.05); }
 .vtp-card:last-child { margin-bottom:0; }
 .vtp-brouillon { background:#fef3c7; color:#92400e; font-size:11.5px; font-weight:700; padding:5px 12px; }
-/* Affichage "affiche premium" : image entière (contain), grande surface, fond neutre, ratio conservé */
-.vtp-media { width:100%; background:#f1f3f5; display:flex; align-items:center; justify-content:center; }
-.vtp-media img { width:100%; height:auto; max-height:72vh; display:block; object-fit:contain; }
-.vtp-media video { width:100%; height:auto; max-height:72vh; display:block; object-fit:contain; background:#f1f3f5; }
+/* Affichage "affiche premium" : image entière (contain), grande surface, fond adapté, ratio
+   conservé. Fond automatique (2026-09-30, demande explicite : "automatiquement... adapte le
+   fond à la couleur dominante de l'image", pour tout ce qui existe déjà et tout le reste) :
+   par défaut (aucune couleur choisie manuellement via le sélecteur 🎨), un fond flouté généré
+   depuis l'image elle-même (.vtp-media-blur) comble l'espace vide autour d'elle plutôt qu'un
+   gris neutre fixe — même technique déjà en place sur le fil d'actualité (assets/posts.js,
+   .post-media-bg/.post-media-fg), donc s'applique d'elle-même à toute publication existante
+   sans avoir à la rouvrir. #111 reste le fond de base (équivalent du "fond noir" demandé)
+   tant que l'image floutée n'a pas fini de charger. Une couleur choisie manuellement
+   (media_bg, voir pubMediaHtml) reste prioritaire via le style inline qui l'emporte ici. */
+.vtp-media { width:100%; position:relative; overflow:hidden; background:#111; display:flex; align-items:center; justify-content:center; }
+.vtp-media img.vtp-media-fg { width:100%; height:auto; max-height:72vh; display:block; object-fit:contain; position:relative; z-index:1; }
+.vtp-media img.vtp-media-blur { position:absolute; inset:-12px; width:calc(100% + 24px); height:calc(100% + 24px); object-fit:cover; filter:blur(26px) saturate(1.35) brightness(.82); transform:scale(1.08); z-index:0; pointer-events:none; }
+.vtp-media video { width:100%; height:auto; max-height:72vh; display:block; object-fit:contain; background:#111; }
 .vtp-media-empty { display:flex; align-items:center; justify-content:center; font-size:60px; min-height:260px; color:#94a3b8; }
-.vtp-media-duo { display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#f1f3f5; }
-.vtp-media-duo img { width:100%; height:auto; max-height:60vh; object-fit:contain; }
+.vtp-media-duo { display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#111; }
+.vtp-media-duo-item { position:relative; overflow:hidden; }
+.vtp-media-duo img.vtp-media-fg { width:100%; height:auto; max-height:60vh; object-fit:contain; position:relative; z-index:1; }
+.vtp-media-duo img.vtp-media-blur { position:absolute; inset:-12px; width:calc(100% + 24px); height:calc(100% + 24px); object-fit:cover; filter:blur(26px) saturate(1.35) brightness(.82); transform:scale(1.08); z-index:0; pointer-events:none; }
 .vtp-body { padding:16px 18px; }
 .vtp-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .vtp-titre { margin:0; font-size:19px; font-weight:800; color:#0d1b2a; line-height:1.25; }
@@ -5651,10 +5663,15 @@ function renderPubList() {
 
 function pubMediaHtml(p) {
   const medias = p.medias || [];
-  const bg = p.media_bg ? `style="background:${esc(p.media_bg)}"` : '';
   if (!medias.length) return `<div class="vtp-media vtp-media-empty">📢</div>`;
-  if (medias.length === 1) return `<div class="vtp-media" ${bg}><img loading="lazy" src="${esc(medias[0])}" alt="${esc(p.titre)}"></div>`;
-  return `<div class="vtp-media vtp-media-duo" ${bg}>${medias.map(m => `<img loading="lazy" src="${esc(m)}" alt="${esc(p.titre)}">`).join('')}</div>`;
+  const bg = p.media_bg ? `style="background:${esc(p.media_bg)}"` : '';
+  // Pas de couleur choisie manuellement → fond flouté automatique (voir commentaire CSS
+  // .vtp-media ci-dessus) ; une couleur choisie (media_bg) reste prioritaire, pas de flou.
+  const mediaHtml = m => p.media_bg
+    ? `<img class="vtp-media-fg" loading="lazy" src="${esc(m)}" alt="${esc(p.titre)}">`
+    : `<img class="vtp-media-blur" src="${esc(m)}" aria-hidden="true" loading="lazy"><img class="vtp-media-fg" loading="lazy" src="${esc(m)}" alt="${esc(p.titre)}">`;
+  if (medias.length === 1) return `<div class="vtp-media" ${bg}>${mediaHtml(medias[0])}</div>`;
+  return `<div class="vtp-media vtp-media-duo" ${bg}>${medias.map(m => `<div class="vtp-media-duo-item">${mediaHtml(m)}</div>`).join('')}</div>`;
 }
 
 function pubCard(p) {

@@ -234,8 +234,14 @@ function renderMedias(post) {
     html += `</div>`;
   }
   if (vids.length) {
+    // Fond noir explicite + object-fit:contain (2026-09-30, demande explicite : "pour les
+    // vidéos et les photos... dès qu'il y a un espace vide") — sans object-fit, une vidéo
+    // dont le ratio ne remplit pas exactement 100%×300px pouvait être légèrement étirée ;
+    // "contain" garde toujours la vidéo entière et non déformée, fond noir en letterbox
+    // (l'extraction de couleur dominante n'a pas de sens ici sans décoder une image de la
+    // vidéo — le noir reste le repli attendu, déjà validé pour les photos sans fond choisi).
     vids.forEach(m => {
-      html += `<div class="post-media-video"><video controls preload="metadata" style="width:100%;border-radius:8px;max-height:300px;"><source src="${escHtml(m.url)}">Votre navigateur ne supporte pas la vidéo.</video></div>`;
+      html += `<div class="post-media-video"><video controls preload="metadata" style="width:100%;height:auto;max-height:300px;border-radius:8px;object-fit:contain;background:#111;display:block;"><source src="${escHtml(m.url)}">Votre navigateur ne supporte pas la vidéo.</video></div>`;
     });
   }
   if (auds.length) {
