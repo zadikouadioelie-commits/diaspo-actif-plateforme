@@ -1280,6 +1280,20 @@ route("GET", "/api/parrainage/mon-tableau-de-bord", async (req, res) => {
   } catch (e) { console.error('[migrateInscInscriptionsArchive]', e.message); }
 })();
 
+/* "Événement flash" (2026-09-30, demande explicite) — parcours allégé de POST /api/evenements
+   pour un événement purement informatif, SANS inscription (public_concerne est propre à ce
+   parcours : à qui l'événement s'adresse, ex. "Étudiants", "Familles", distinct de origine qui
+   cible la diaspora d'origine). Réutilise entièrement la route existante — mêmes permissions
+   (rôle + Premium via exigerPremium), même table — un simple champ de plus. */
+(async function migrateEvenementsPublicConcerne() {
+  try {
+    const cols = (await db.prepare("PRAGMA table_info(evenements)").all()).map(c => c.name);
+    if (cols.length && !cols.includes('public_concerne')) {
+      try { await db.prepare("ALTER TABLE evenements ADD COLUMN public_concerne TEXT").run(); } catch (e) {}
+    }
+  } catch (e) { console.error('[migrateEvenementsPublicConcerne]', e.message); }
+})();
+
 /* Journal de la sauvegarde quotidienne (2026-09-29, demande explicite : "un code que je vais
    mettre quelque part pour vérifier automatiquement") — une ligne par tentative de
    /api/cron/backup (succès ou échec), lue par /api/backup-status et /api/cron/backup-verify
@@ -18767,7 +18781,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
     pdf_url, pdf_nom, pdf_acces,
     langue, mode_participation, region, departement, masquer_inscrits,
-    whatsapp_lien, lieu_gps
+    whatsapp_lien, lieu_gps, public_concerne
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -18788,8 +18802,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
-     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       descriptionSafe||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
@@ -18800,7 +18814,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
-      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null
+      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
   // encore réelle (voir statutFinal ci-dessus).

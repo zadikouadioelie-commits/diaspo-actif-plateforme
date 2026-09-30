@@ -313,6 +313,7 @@
     <div style="display:flex;gap:8px;align-items:center;">
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
       <button class="btn btn-outline" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()">📅 Calendrier Diaspora</button>
+      <button class="btn btn-outline" id="btn-flash" style="display:none;font-size:12.5px;" onclick="flashOuvrir()">⚡ Événement flash</button>
       <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
   </div>
@@ -563,6 +564,60 @@
   </div>
 </div>
 
+<!-- ═══ MODAL ÉVÉNEMENT FLASH (2026-09-30, demande explicite) — parcours allégé, purement
+     informatif (pas d'inscription) : 2 photos, adresse, date/heure début-fin, origine, public
+     concerné, texte 500 caractères, puis un récap avant publication. Réutilise POST
+     /api/evenements (même permissions rôle+Premium que "Créer un événement") avec
+     inscription_ouverte:false pour ne proposer aucune inscription sur la cartouche publiée. ═══ -->
+<div class="modal-bg" id="modal-flash-bg" onclick="if(event.target===this)flashFermer()">
+  <div class="modal" style="max-width:520px;">
+    <h3>⚡ Événement flash</h3>
+    <p style="font-size:.8rem;color:var(--muted,#6b7280);margin:-8px 0 14px;">Un événement informatif, sans inscription — pour prévenir rapidement la communauté.</p>
+
+    <div id="flash-step-form">
+      <div class="grid-2">
+        <div style="grid-column:1/-1;"><label>Titre <span style="color:#2563EB">*</span></label><input type="text" id="fl-titre" placeholder="Titre de l'événement"></div>
+        <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="fl-date"></div>
+        <div><label>Heure de début</label><input type="time" id="fl-heure-debut" value="09:00"></div>
+        <div><label>Heure de fin</label><input type="time" id="fl-heure-fin"></div>
+        <div><label>Origine (diaspora ciblée)</label><select id="fl-origine"><option value="">-- Origine --</option></select></div>
+        <div style="grid-column:1/-1;"><label>Adresse de l'événement <span style="color:#2563EB">*</span></label><input type="text" id="fl-adresse" placeholder="Adresse complète"></div>
+        <div style="grid-column:1/-1;"><label>Public concerné</label><input type="text" id="fl-public" placeholder="Ex : Étudiants, Familles, Entrepreneurs…"></div>
+        <div style="grid-column:1/-1;">
+          <label>Description <span style="color:#2563EB">*</span> <span id="fl-compteur" style="font-weight:400;color:var(--muted,#6b7280);">0/500</span></label>
+          <textarea id="fl-texte" maxlength="500" rows="4" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border,#ddd);border-radius:8px;font:inherit;resize:vertical;" oninput="document.getElementById('fl-compteur').textContent=this.value.length+'/500';"></textarea>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:10px;">
+        <div>
+          <label>Photo 1</label>
+          <input type="file" id="fl-photo1" accept="image/*">
+          <img id="fl-photo1-preview" style="display:none;width:100%;max-height:110px;object-fit:cover;border-radius:8px;margin-top:6px;">
+        </div>
+        <div>
+          <label>Photo 2 (facultative)</label>
+          <input type="file" id="fl-photo2" accept="image/*">
+          <img id="fl-photo2-preview" style="display:none;width:100%;max-height:110px;object-fit:cover;border-radius:8px;margin-top:6px;">
+        </div>
+      </div>
+      <p id="fl-err" style="color:#dc2626;font-size:.8rem;margin-top:10px;display:none;"></p>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button class="btn btn-outline" onclick="flashFermer()">Annuler</button>
+        <button class="btn btn-orange" onclick="flashVoirRecap()">Voir le récap →</button>
+      </div>
+    </div>
+
+    <div id="flash-step-recap" style="display:none;">
+      <div id="fl-recap-body" style="font-size:.85rem;line-height:1.7;"></div>
+      <p id="fl-recap-err" style="color:#dc2626;font-size:.8rem;margin-top:10px;display:none;"></p>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:16px;">
+        <button class="btn btn-outline" onclick="flashRetourForm()">← Modifier</button>
+        <button class="btn btn-orange" id="fl-btn-publier" onclick="flashPublier()">✅ Confirmer et publier</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ MODAL CALENDRIER DIASPORA (2026-09-29, demande explicite) — tous les événements inscrits
      sur 2 ans (12 mois avant/après aujourd'hui), marqués sur toute leur plage date_evt→date_fin,
      passés grisés, navigation mois par mois bornée à cette fenêtre. ═══ -->
@@ -802,7 +857,9 @@ function renderEvts() {
         <div class="evt-actions">
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
-          ${evt.lien_inscription
+          ${evt.inscription_ouverte === 0
+            ? `<span class="btn btn-outline" style="font-size:12px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Informatif</span>`
+            : (evt.lien_inscription
             ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
             : (evt.fiche_id && evt.fiche_slug
               ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="inscription-publique.html?slug=${encodeURIComponent(evt.fiche_slug)}">S'inscrire</a>`
@@ -816,6 +873,7 @@ function renderEvts() {
                   )
                 )
               )
+            )
             )
           }
         </div>
@@ -969,9 +1027,11 @@ async function supprimerMediaEvt(btn, kind, mediaId, evtId, ficheId) {
   if (typeof PAYS_DU_MONDE === 'undefined') return;
   const selPays = document.getElementById('f-pays');
   const selFormOrig = document.getElementById('e-origine');
+  const selFlashOrig = document.getElementById('fl-origine');
   PAYS_DU_MONDE.forEach(p => {
-    if (selPays)     { const o=document.createElement('option'); o.value=p; o.textContent=p; selPays.appendChild(o); }
-    if (selFormOrig) { const o=document.createElement('option'); o.value=p; o.textContent=p; selFormOrig.appendChild(o); }
+    if (selPays)      { const o=document.createElement('option'); o.value=p; o.textContent=p; selPays.appendChild(o); }
+    if (selFormOrig)  { const o=document.createElement('option'); o.value=p; o.textContent=p; selFormOrig.appendChild(o); }
+    if (selFlashOrig) { const o=document.createElement('option'); o.value=p; o.textContent=p; selFlashOrig.appendChild(o); }
   });
 })();
 
@@ -1232,6 +1292,102 @@ function compressImage(file, maxW, maxH, quality) {
     };
     img.src = url;
   });
+}
+
+/* ─── Événement flash (2026-09-30, demande explicite) ─── */
+let flashPhoto1 = null, flashPhoto2 = null;
+function flashOuvrir() {
+  document.getElementById('fl-titre').value = '';
+  document.getElementById('fl-date').value = '';
+  document.getElementById('fl-heure-debut').value = '09:00';
+  document.getElementById('fl-heure-fin').value = '';
+  document.getElementById('fl-origine').value = '';
+  document.getElementById('fl-adresse').value = '';
+  document.getElementById('fl-public').value = '';
+  document.getElementById('fl-texte').value = '';
+  document.getElementById('fl-compteur').textContent = '0/500';
+  flashPhoto1 = null; flashPhoto2 = null;
+  ['fl-photo1','fl-photo2'].forEach(id => { document.getElementById(id).value = ''; const p = document.getElementById(id+'-preview'); p.style.display = 'none'; p.src = ''; });
+  document.getElementById('fl-err').style.display = 'none';
+  document.getElementById('flash-step-form').style.display = '';
+  document.getElementById('flash-step-recap').style.display = 'none';
+  document.getElementById('modal-flash-bg').classList.add('open');
+}
+function flashFermer() { document.getElementById('modal-flash-bg').classList.remove('open'); }
+async function flashHandlePhoto(inputId, previewId, setter) {
+  const el = document.getElementById(inputId);
+  const file = el.files[0]; if (!file) return;
+  if (file.size > 2*1024*1024) { alert('Image trop lourde (max 2 Mo).'); el.value = ''; return; }
+  const b64 = await compressImage(file, 1000, 700, 0.8);
+  setter(b64);
+  const prev = document.getElementById(previewId);
+  prev.src = b64; prev.style.display = '';
+}
+document.getElementById('fl-photo1').addEventListener('change', () => flashHandlePhoto('fl-photo1','fl-photo1-preview', v => flashPhoto1 = v));
+document.getElementById('fl-photo2').addEventListener('change', () => flashHandlePhoto('fl-photo2','fl-photo2-preview', v => flashPhoto2 = v));
+
+function flashLireChamps() {
+  return {
+    titre: document.getElementById('fl-titre').value.trim(),
+    date_evt: document.getElementById('fl-date').value,
+    heure_debut: document.getElementById('fl-heure-debut').value || null,
+    heure_fin: document.getElementById('fl-heure-fin').value || null,
+    origine: document.getElementById('fl-origine').value || null,
+    lieu: document.getElementById('fl-adresse').value.trim(),
+    public_concerne: document.getElementById('fl-public').value.trim() || null,
+    description: document.getElementById('fl-texte').value.trim(),
+  };
+}
+function flashVoirRecap() {
+  const c = flashLireChamps();
+  const err = document.getElementById('fl-err');
+  if (!c.titre || !c.date_evt || !c.lieu || !c.description) {
+    err.textContent = 'Titre, date, adresse et description sont requis.';
+    err.style.display = '';
+    return;
+  }
+  err.style.display = 'none';
+  const dateAffiche = new Date(c.date_evt + 'T00:00:00').toLocaleDateString('fr-FR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('fl-recap-body').innerHTML = `
+    ${flashPhoto1 ? `<img src="${flashPhoto1}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:10px;">` : ''}
+    <div><strong>Titre :</strong> ${esc(c.titre)}</div>
+    <div><strong>Date :</strong> ${esc(dateAffiche)}${c.heure_debut ? ' à '+esc(c.heure_debut) : ''}${c.heure_fin ? ' → '+esc(c.heure_fin) : ''}</div>
+    <div><strong>Adresse :</strong> ${esc(c.lieu)}</div>
+    ${c.origine ? `<div><strong>Origine :</strong> ${esc(c.origine)}</div>` : ''}
+    ${c.public_concerne ? `<div><strong>Public concerné :</strong> ${esc(c.public_concerne)}</div>` : ''}
+    <div style="margin-top:8px;"><strong>Description :</strong><br>${esc(c.description)}</div>
+    <div style="margin-top:10px;font-size:.78rem;color:var(--muted,#6b7280);">ℹ️ Événement informatif — aucune inscription ne sera proposée.</div>
+  `;
+  document.getElementById('flash-step-form').style.display = 'none';
+  document.getElementById('flash-step-recap').style.display = '';
+}
+function flashRetourForm() {
+  document.getElementById('flash-step-form').style.display = '';
+  document.getElementById('flash-step-recap').style.display = 'none';
+}
+async function flashPublier() {
+  const c = flashLireChamps();
+  const btn = document.getElementById('fl-btn-publier');
+  const err = document.getElementById('fl-recap-err');
+  btn.disabled = true; btn.textContent = '⏳ Publication…';
+  try {
+    await api('POST', '/evenements', {
+      titre: c.titre, date_evt: c.date_evt, heure_debut: c.heure_debut, heure_fin: c.heure_fin,
+      origine: c.origine, lieu: c.lieu, description: c.description, public_concerne: c.public_concerne,
+      type_evt: 'evenement', statut: 'ouvert', inscription_ouverte: false,
+      appliquer_fiche_standard: false,
+      image_couverture: flashPhoto1 || null,
+      galerie_photos: flashPhoto2 ? [flashPhoto2] : [],
+    });
+    flashFermer();
+    if (typeof loadEvts === 'function') loadEvts();
+    if (typeof loadMesEvts === 'function') loadMesEvts();
+  } catch (e) {
+    err.textContent = e.message || 'Erreur.';
+    err.style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Confirmer et publier';
+  }
 }
 
 // Cover
@@ -1776,7 +1932,9 @@ function renderEventDetail(evt, isPreview) {
         <strong style="font-size:13px;color:#166534;">Rejoindre la chaîne WhatsApp de l'événement</strong>
       </a>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-        ${evt.lien_inscription
+        ${evt.inscription_ouverte === 0
+          ? `<span class="btn btn-outline" style="font-size:13px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Événement informatif — sans inscription</span>`
+          : (evt.lien_inscription
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
           : (evt.fiche_id && evt.fiche_slug
             ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="inscription-publique.html?slug=${encodeURIComponent(evt.fiche_slug)}">✅ S'inscrire à l'événement</a>`
@@ -1787,6 +1945,7 @@ function renderEventDetail(evt, isPreview) {
                 : `<button class="btn btn-orange" onclick="rejoindre(${evt.id},this)" style="font-size:13px;">✅ S'inscrire à l'événement</button>`
               )
             )
+          )
           )
         }
         <button class="btn btn-outline" style="font-size:13px;" ${isPreview ? 'disabled title="Disponible une fois l\'événement enregistré"' : `onclick="partagerEvenement(${evt.id})"`}>📤 Partager</button>
@@ -2082,6 +2241,7 @@ function cdFermerCalendrier() {
          pont Billetterie. */
       ['initiative','administrateur','collectivite'].includes(CURRENT_USER.role)) {
     document.getElementById('btn-creer').style.display = 'inline-flex';
+    document.getElementById('btn-flash').style.display = 'inline-flex';
   }
   await Promise.all([syncFiltreDomaineOptions(), loadEvts(), (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? loadMesEvts() : Promise.resolve(), initSuggestions(), initPublicationsOrganisations()]);
   /* Lien direct vers la fiche complète d'un événement (2026-09-10, demande explicite : bouton
