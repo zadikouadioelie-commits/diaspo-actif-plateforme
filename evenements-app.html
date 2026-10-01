@@ -345,9 +345,13 @@
     <div style="display:flex;gap:8px;align-items:center;">
       <a class="btn btn-outline" href="programmation.html" style="font-size:12.5px;">🔔 Programmation d'alertes</a>
       <button class="btn btn-outline" id="btn-calendrier-diaspora" style="font-size:12.5px;" onclick="cdOuvrirCalendrier()">📅 Calendrier Diaspora</button>
-      <span id="btn-flash-wrap" style="display:none;align-items:center;gap:4px;">
-        <button class="btn" id="btn-flash" style="font-size:12.5px;background:#7BE87B;color:#052e0f;border:none;font-weight:800;" onclick="flashOuvrir()">⚡ Événement flash</button>
-        <button type="button" onclick="alert('Événement flash : publiez en quelques secondes une simple annonce (photo, adresse, dates, description) pour prévenir rapidement la communauté. Purement informatif — aucune inscription n\'est proposée. Pour un événement où les gens peuvent s\'inscrire, utilisez plutôt « 📢 Créer un événement ».')" title="À quoi sert ce bouton ?" style="width:20px;height:20px;border-radius:50%;border:1px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;line-height:1;padding:0;">?</button>
+      <span id="btn-flash-wrap" style="display:none;align-items:center;gap:2px;">
+        <button class="btn" id="btn-flash" style="font-size:12.5px;background:#7BE87B;color:#052e0f;border:none;font-weight:800;border-radius:8px 0 0 8px;" onclick="flashOuvrir()">⚡ Événement flash</button>
+        <!-- "?" rattaché visuellement au bouton Flash (2026-10-01, demande explicite : "permet
+             de comprendre que ce point d'interrogation concerne ce bouton et rend le plus
+             visible") — même teinte verte que le bouton, accolé sans espace (coins arrondis
+             complémentaires), au lieu d'un cercle gris générique qui semblait flotter à part. -->
+        <button type="button" onclick="alert('Événement flash : publiez en quelques secondes une simple annonce (photo, adresse, dates, description) pour prévenir rapidement la communauté. Purement informatif — aucune inscription n\'est proposée. Pour un événement où les gens peuvent s\'inscrire, utilisez plutôt « 📢 Créer un événement ».')" title="À quoi sert le bouton ⚡ Événement flash ?" style="width:24px;height:24px;border-radius:0 8px 8px 0;border:none;border-left:1px solid rgba(5,46,15,.25);background:#7BE87B;color:#052e0f;font-size:13px;font-weight:800;cursor:pointer;line-height:1;padding:0;flex-shrink:0;">?</button>
       </span>
       <button class="btn btn-orange" id="btn-creer" style="display:none">📢 Créer un événement</button>
     </div>
