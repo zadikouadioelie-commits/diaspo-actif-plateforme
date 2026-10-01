@@ -17420,8 +17420,10 @@ async function handleStripeWebhook(req, res) {
         const notifContenu = insc.statut === "inscrit"
           ? `${insc.prenom} ${insc.nom} s'est inscrit·e (${type?.label || ''}) à « ${fiche.nom} » — en attente de votre validation.`
           : `${insc.prenom} ${insc.nom} vient de s'inscrire (${type?.label || ''}) à « ${fiche.nom} » (+${organizer_amount.toFixed(2)}€).`;
+        // ?inscription=<id> : même amélioration que POST /api/insc/public/:slug/inscriptions
+        // (2026-10-01, demande explicite) — voir le commentaire là-bas pour le détail.
         creerNotif(fiche.owner_user_id, "insc_nouvelle", notifTitre, notifContenu,
-          { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+          { lien: `inscriptions-admin.html?fiche=${fiche.id}&inscription=${inscriptionId}` });
       }
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_insc_inscription_id) {
       const session = event.data.object;
@@ -44705,8 +44707,14 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
     const notifContenu = statutInitial === "inscrit"
       ? `${body.prenom} ${body.nom} s'est inscrit·e (${type.label}) à « ${fiche.nom} » — en attente de votre validation.`
       : `${body.prenom} ${body.nom} vient de s'inscrire (${type.label}) à « ${fiche.nom} ».`;
+    /* ?inscription=<id> (2026-10-01, demande explicite : "cliquer sur une inscription dans les
+       notifications devrait conduire directement à l'inscription de la personne dans gestion
+       des inscriptions") — lu par inscriptions-admin.html pour basculer sur l'onglet Présences
+       (seul onglet listant toute inscription quel que soit son statut, avec panneau de détail
+       sélectionnable) et sélectionner directement cette ligne, au lieu d'atterrir sur la vue
+       d'ensemble de la fiche sans savoir pour qui la notification a été reçue. */
     creerNotif(fiche.owner_user_id, "insc_nouvelle", notifTitre, notifContenu,
-      { lien: `inscriptions-admin.html?fiche=${fiche.id}` });
+      { lien: `inscriptions-admin.html?fiche=${fiche.id}&inscription=${id}` });
 
     return sendJSON(res, 201, { id, reference, statut: statutInitial });
   }

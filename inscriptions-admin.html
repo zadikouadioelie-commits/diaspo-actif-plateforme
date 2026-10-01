@@ -3401,6 +3401,19 @@ root.addEventListener('change', function (e) {
       state.selectedFicheId = parseInt(ficheIdParam); state.view = 'detail';
       await iaChargerFiche(state.selectedFicheId);
     }
+    /* Lien direct depuis une notification "Nouvelle inscription" (2026-10-01, demande explicite :
+       "cliquer sur une inscription dans les notifications devrait conduire directement à
+       l'inscription de la personne... de sorte à voir ces informations directement") —
+       ?inscription=<id> bascule sur l'onglet Présences (seul onglet listant TOUTE inscription
+       quel que soit son statut, avec panneau de détail sélectionnable — contrairement à
+       "Validation" qui ne liste que les demandes encore 'inscrit', jamais celles déjà
+       auto-confirmées) et sélectionne directement la ligne concernée. */
+    const inscriptionIdParam = new URLSearchParams(location.search).get('inscription');
+    if (inscriptionIdParam && state.selectedFicheId) {
+      state.activeTab = 'presences';
+      await iaChargerOnglet('presences');
+      state.selectedPresenceId = parseInt(inscriptionIdParam);
+    }
     /* Lien direct depuis evenements-app.html, bouton "+ Créer une nouvelle fiche" du panneau de
        choix (2026-09-30, demande explicite) — ?creer_nom=<titre de l'événement en cours de
        création> déclenche directement la création plutôt que la liste, nom pré-rempli. */
