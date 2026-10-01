@@ -467,8 +467,9 @@
     <!-- Afficher uniquement sur la boutique (2026-09-30, demande explicite) — bouton/case dédié,
          plus visible qu'une énième option noyée dans le select Visibilité ci-dessus : force
          visibilite='boutique' côté serveur (voir GET /api/evenements) à la sauvegarde, quel que
-         soit le choix du select. Même case dans la modale Événement flash (#fl-boutique-uniquement
-         plus bas), chacune lue indépendamment par son propre payload de sauvegarde. -->
+         soit le choix du select. La modale Événement flash (plus bas) a son propre contrôle de
+         visibilité, étendu à 3 états le 2026-10-01 (input[name="fl-visibilite"]) — chacune lue
+         indépendamment par son propre payload de sauvegarde. -->
     <label id="e-boutique-uniquement-lbl" style="display:flex;align-items:center;gap:8px;background:#F5EBFF;border:1.5px solid #BC13FE;border-radius:8px;padding:10px 12px;margin-bottom:14px;cursor:pointer;font-size:13px;">
       <input type="checkbox" id="e-boutique-uniquement" style="width:17px;height:17px;accent-color:#8B12D6;flex-shrink:0;">
       <span><strong>🏬 Afficher uniquement sur ma boutique</strong><br><span style="font-size:11.5px;color:#6b7280;">L'événement sera visible sur ma page boutique, mais pas dans le calendrier public « Tous les événements ».</span></span>
@@ -642,6 +643,12 @@
     <div id="flash-step-form">
       <div class="grid-2">
         <div style="grid-column:1/-1;"><label>Titre <span style="color:#2563EB">*</span></label><input type="text" id="fl-titre" placeholder="Titre de l'événement"></div>
+        <!-- Forme + Domaine (2026-10-01, demande explicite : "utilise déjà ce qui existe comme
+             champs d'identification") — mêmes options, dans le même ordre, que #e-type/#e-domaine
+             de la modale "Créer un événement" juste au-dessus : une seule liste de référence,
+             jamais une saisie libre ou une liste réinventée ici. -->
+        <div><label>Forme d'événement</label><select id="fl-type"><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala / Soirée</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="trophee_diaspora">🏆 Trophée diaspora</option><option value="autre">Autre</option></select></div>
+        <div><label>Domaine</label><select id="fl-domaine"><option value="">-- Domaine --</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select></div>
         <div><label>Date <span style="color:#2563EB">*</span></label><input type="date" id="fl-date"></div>
         <div><label>Heure de début</label><input type="time" id="fl-heure-debut" value="09:00"></div>
         <div><label>Heure de fin</label><input type="time" id="fl-heure-fin"></div>
@@ -665,10 +672,29 @@
           <img id="fl-photo2-preview" style="display:none;width:100%;max-height:110px;object-fit:cover;border-radius:8px;margin-top:6px;">
         </div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;background:#F5EBFF;border:1.5px solid #BC13FE;border-radius:8px;padding:10px 12px;margin-top:10px;cursor:pointer;font-size:13px;">
-        <input type="checkbox" id="fl-boutique-uniquement" style="width:17px;height:17px;accent-color:#8B12D6;flex-shrink:0;">
-        <span><strong>🏬 Afficher uniquement sur ma boutique</strong><br><span style="font-size:11.5px;color:#6b7280;">Visible sur ma page boutique, pas dans le calendrier public.</span></span>
-      </label>
+      <!-- Visibilité à 3 états (2026-10-01, demande explicite : "ajoute aussi un bouton ne pas
+           afficher sur la boutique / et un évenement affiché sur la boutique et dans
+           évenements") — avant, une simple case à cocher ne permettait que 2 états (public, ou
+           boutique uniquement) ; impossible d'exclure un événement public de sa propre boutique
+           tout en le gardant public. "Boutique et Événements" reste la valeur par défaut :
+           c'est déjà le comportement historique d'un événement public (visible partout). -->
+      <div style="margin-top:10px;">
+        <label class="pv-lbl" style="display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.03em;">Visibilité</label>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:flex;align-items:flex-start;gap:8px;border:1.5px solid var(--border,#ddd);border-radius:8px;padding:9px 12px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="fl-visibilite" id="fl-vis-both" value="both" checked style="margin-top:2px;flex-shrink:0;">
+            <span><strong>🌍🏬 Boutique et Événements</strong><br><span style="font-size:11.5px;color:#6b7280;">Visible dans le calendrier public ET sur votre page boutique.</span></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;border:1.5px solid var(--border,#ddd);border-radius:8px;padding:9px 12px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="fl-visibilite" id="fl-vis-public" value="public" style="margin-top:2px;flex-shrink:0;">
+            <span><strong>🌍 Événements uniquement</strong><br><span style="font-size:11.5px;color:#6b7280;">Visible dans le calendrier public, pas affiché sur votre page boutique.</span></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;background:#F5EBFF;border:1.5px solid #BC13FE;border-radius:8px;padding:9px 12px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="fl-visibilite" id="fl-vis-boutique" value="boutique" style="margin-top:2px;flex-shrink:0;accent-color:#8B12D6;">
+            <span><strong>🏬 Boutique uniquement</strong><br><span style="font-size:11.5px;color:#6b7280;">Visible sur votre page boutique, pas dans le calendrier public.</span></span>
+          </label>
+        </div>
+      </div>
       <p id="fl-err" style="color:#dc2626;font-size:.8rem;margin-top:10px;display:none;"></p>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
         <button class="btn btn-outline" onclick="flashFermer()">Annuler</button>
@@ -1397,7 +1423,9 @@ function flashOuvrir() {
   document.getElementById('fl-public').value = '';
   document.getElementById('fl-texte').value = '';
   document.getElementById('fl-compteur').textContent = '0/500';
-  document.getElementById('fl-boutique-uniquement').checked = false;
+  document.getElementById('fl-type').value = 'evenement';
+  document.getElementById('fl-domaine').value = '';
+  document.getElementById('fl-vis-both').checked = true;
   flashPhoto1 = null; flashPhoto2 = null;
   ['fl-photo1','fl-photo2'].forEach(id => { document.getElementById(id).value = ''; const p = document.getElementById(id+'-preview'); p.style.display = 'none'; p.src = ''; });
   document.getElementById('fl-err').style.display = 'none';
@@ -1421,6 +1449,8 @@ document.getElementById('fl-photo2').addEventListener('change', () => flashHandl
 function flashLireChamps() {
   return {
     titre: document.getElementById('fl-titre').value.trim(),
+    type_evt: document.getElementById('fl-type').value || 'evenement',
+    domaine: document.getElementById('fl-domaine').value || null,
     date_evt: document.getElementById('fl-date').value,
     heure_debut: document.getElementById('fl-heure-debut').value || null,
     heure_fin: document.getElementById('fl-heure-fin').value || null,
@@ -1428,6 +1458,9 @@ function flashLireChamps() {
     lieu: document.getElementById('fl-adresse').value.trim(),
     public_concerne: document.getElementById('fl-public').value.trim() || null,
     description: document.getElementById('fl-texte').value.trim(),
+    // Visibilité à 3 états (voir le commentaire HTML du bloc radio) — traduite ici en
+    // (visibilite, masquer_boutique) pour POST /api/evenements.
+    fl_visibilite: document.querySelector('input[name="fl-visibilite"]:checked')?.value || 'both',
   };
 }
 function flashVoirRecap() {
@@ -1440,15 +1473,18 @@ function flashVoirRecap() {
   }
   err.style.display = 'none';
   const dateAffiche = new Date(c.date_evt + 'T00:00:00').toLocaleDateString('fr-FR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const typeLabel = document.getElementById('fl-type').selectedOptions[0]?.textContent || c.type_evt;
+  const visMsg = { both: '🌍🏬 Visible dans le calendrier public et sur votre boutique.', public: '🌍 Visible dans le calendrier public uniquement, pas sur votre boutique.', boutique: '🏬 Visible uniquement sur votre boutique, pas dans le calendrier public.' }[c.fl_visibilite];
   document.getElementById('fl-recap-body').innerHTML = `
     ${flashPhoto1 ? `<img src="${flashPhoto1}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:10px;">` : ''}
     <div><strong>Titre :</strong> ${esc(c.titre)}</div>
+    <div><strong>Forme :</strong> ${esc(typeLabel)}${c.domaine ? ` · <strong>Domaine :</strong> ${esc(c.domaine)}` : ''}</div>
     <div><strong>Date :</strong> ${esc(dateAffiche)}${c.heure_debut ? ' à '+esc(c.heure_debut) : ''}${c.heure_fin ? ' → '+esc(c.heure_fin) : ''}</div>
     <div><strong>Adresse :</strong> ${esc(c.lieu)}</div>
     ${c.origine ? `<div><strong>Origine :</strong> ${esc(c.origine)}</div>` : ''}
     ${c.public_concerne ? `<div><strong>Public concerné :</strong> ${esc(c.public_concerne)}</div>` : ''}
     <div style="margin-top:8px;"><strong>Description :</strong><br>${esc(c.description)}</div>
-    ${document.getElementById('fl-boutique-uniquement')?.checked ? '<div style="margin-top:8px;color:#8B12D6;font-weight:600;">🏬 Visible uniquement sur votre boutique, pas dans le calendrier public.</div>' : ''}
+    <div style="margin-top:8px;color:#8B12D6;font-weight:600;">${visMsg}</div>
     <div style="margin-top:10px;font-size:.78rem;color:var(--muted,#6b7280);">ℹ️ Événement informatif — aucune inscription ne sera proposée.</div>
   `;
   document.getElementById('flash-step-form').style.display = 'none';
@@ -1464,12 +1500,17 @@ async function flashPublier() {
   const err = document.getElementById('fl-recap-err');
   btn.disabled = true; btn.textContent = '⏳ Publication…';
   try {
+    // Visibilité à 3 états → (visibilite, masquer_boutique) côté serveur : "boutique" reste un
+    // 3e état de `visibilite` à part entière (inchangé) ; "public"/"both" sont tous deux
+    // visibilite='public', seul masquer_boutique les distingue (voir GET /api/evenements).
+    const visibilite = c.fl_visibilite === 'boutique' ? 'boutique' : 'public';
+    const masquerBoutique = c.fl_visibilite === 'public';
     await api('POST', '/evenements', {
       titre: c.titre, date_evt: c.date_evt, heure_debut: c.heure_debut, heure_fin: c.heure_fin,
       origine: c.origine, lieu: c.lieu, description: c.description, public_concerne: c.public_concerne,
-      type_evt: 'evenement', statut: 'ouvert', inscription_ouverte: false,
+      type_evt: c.type_evt, domaine: c.domaine, statut: 'ouvert', inscription_ouverte: false,
       appliquer_fiche_standard: false,
-      visibilite: document.getElementById('fl-boutique-uniquement')?.checked ? 'boutique' : 'public',
+      visibilite, masquer_boutique: masquerBoutique,
       image_couverture: flashPhoto1 || null,
       galerie_photos: flashPhoto2 ? [flashPhoto2] : [],
     });

@@ -3180,8 +3180,12 @@ async function renderVitrineVisitor(init) {
            comprendre une distinction purement technique. On les fusionne donc en une seule
            liste, où le tarif et le bouton de réservation n'apparaissent que si des billets
            existent réellement. */
+        /* &boutique=1 (2026-10-01, demande explicite) — signature propre à CETTE page boutique,
+           distincte de "Mes événements" (dashboard-initiative.html) qui utilise le même ?owner=
+           mais doit continuer à tout montrer au propriétaire : seule cette signature applique
+           le filtre masquer_boutique côté serveur (voir GET /api/evenements). */
         const [rAnnonces, rBillets] = await Promise.all([
-          api('GET', `/evenements?owner=${encodeURIComponent(owner)}`).catch(() => ({})),
+          api('GET', `/evenements?owner=${encodeURIComponent(owner)}&boutique=1`).catch(() => ({})),
           api('GET', `/events?organisateur_id=${encodeURIComponent(owner)}`).catch(() => ({})),
         ]);
 
@@ -6618,8 +6622,10 @@ async function loadEvenementsTab() {
        serveur inclue les événements visibilite='boutique' de ce propriétaire (voir
        GET /api/evenements) : absents de la découverte générale, mais destinés à être vus par
        n'importe quel visiteur DE CETTE PAGE boutique, pas seulement par le propriétaire lui-même
-       (contrairement aux brouillons, qui restent invisibles ici aussi). */
-    const r = await api('GET', '/evenements?owner=' + profil.id);
+       (contrairement aux brouillons, qui restent invisibles ici aussi). &boutique=1 ajouté
+       (2026-10-01, demande explicite) — applique en plus le filtre masquer_boutique, propre à
+       cette page boutique (jamais à "Mes événements" du dashboard, qui garde le ?owner= seul). */
+    const r = await api('GET', '/evenements?owner=' + profil.id + '&boutique=1');
     const all = r.evenements || r.events || [];
     const mine = all.filter(e => Number(e.owner_user_id) === Number(profil.id));
     if (!mine.length) {

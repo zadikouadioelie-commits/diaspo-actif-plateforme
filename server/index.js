@@ -18910,6 +18910,13 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
      juste au-dessus) : un vrai visiteur public consultant une page boutique doit voir ces
      événements-là, c'est tout l'intérêt — seule la découverte générale (sans ?owner=) les exclut. */
   rows = rows.filter(r => r.visibilite !== 'boutique' || !!query.owner);
+  /* masquer_boutique (2026-10-01, demande explicite) — un événement public peut être exclu
+     spécifiquement de la page boutique de son organisateur (3e état, "Événements uniquement")
+     sans devenir pour autant invisible du calendrier public. &boutique=1 est la signature
+     ajoutée côté front UNIQUEMENT par la page boutique elle-même (profil-app.html) — jamais par
+     "Mes événements" (dashboard-initiative.html), qui utilise le même ?owner= mais doit
+     continuer à montrer TOUS les événements du propriétaire pour qu'il puisse les gérer. */
+  if (query.boutique) rows = rows.filter(r => !r.masquer_boutique);
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine);
   /* Filtre "🌍 Tous pays" (2026-09-07, demande explicite) — élargi pour matcher aussi les
      pays cible (origine/origine2, la diaspora visée), pas seulement le pays où se déroule
@@ -18987,6 +18994,19 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     catch (e) {}
     global.__evenementsZoneDiffusionEnsured = true;
   }
+  /* masquer_boutique (2026-10-01, demande explicite : "un bouton ne pas afficher sur la
+     boutique / et un évenement affiché sur la boutique et dans événements") — 3e état de
+     visibilité pour l'Événement flash, indépendant de `visibilite` : un événement public
+     (visibilite='public') s'affiche déjà à la fois dans le calendrier public ET sur la page
+     boutique du propriétaire (GET /api/evenements avec ?owner=&boutique=1, voir plus bas) —
+     ce drapeau permet de l'exclure spécifiquement de la boutique tout en le gardant public,
+     sans toucher au sens de `visibilite` lui-même. Même idiome auto-réparateur que
+     zone_diffusion juste au-dessus. */
+  if (!global.__evenementsMasquerBoutiqueEnsured) {
+    try { await db.prepare(`ALTER TABLE evenements ADD COLUMN masquer_boutique INTEGER DEFAULT 0`).run(); }
+    catch (e) {}
+    global.__evenementsMasquerBoutiqueEnsured = true;
+  }
   /* type_participation (2026-09-23, demande explicite ; étendu à 3 catégories le 2026-09-24,
      "faciliter le tri") : "priorité à la fiche d'inscription, si elle n'existe pas alors
      priorité à la cartouche elle-même" — evenements.prix_min ET type_participation restent
@@ -19004,7 +19024,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
     image_couverture, galerie_photos, video1_url, video1_titre, video2_url, video2_titre,
     pdf_url, pdf_nom, pdf_acces,
     langue, mode_participation, region, departement, masquer_inscrits,
-    whatsapp_lien, lieu_gps, public_concerne
+    whatsapp_lien, lieu_gps, public_concerne, masquer_boutique
   } = body;
   if (!titre || !date_evt) return sendJSON(res, 400, { error: "Titre et date requis." });
   /* Sanitisé avant écriture (2026-09-25, éditeur de texte enrichi) — seule vraie barrière,
@@ -19025,8 +19045,8 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
      heure_debut,heure_fin,date_fin,lien_visio,visibilite,
      image_couverture,galerie_photos,video1_url,video1_titre,video2_url,video2_titre,
      pdf_url,pdf_nom,pdf_acces,
-     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+     langue,mode_participation,region,departement,masquer_inscrits,whatsapp_lien,lieu_gps,public_concerne,masquer_boutique)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(
       titre, organisateur || await nomCompteAffichage(user.id), date_evt, lieu||null, pays||null, ville||null, origine||null,
       descriptionSafe||null, type_evt||"evenement", domaine||null, zone_diffusion||null,
@@ -19037,7 +19057,7 @@ route("POST", "/api/evenements", async (req, res, params, body) => {
       video1_url||null, video1_titre||null, video2_url||null, video2_titre||null,
       pdf_url||null, pdf_nom||null, pdf_acces||'public',
       langue||'francais', mode_participation||'presentiel', region||null, departement||null,
-      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null
+      masquer_inscrits?1:0, whatsapp_lien||null, lieu_gps||null, public_concerne||null, masquer_boutique?1:0
     )).lastInsertRowid;
   // Notifier abonnés de l'initiative — jamais pour un brouillon, la publication n'est pas
   // encore réelle (voir statutFinal ci-dessus).

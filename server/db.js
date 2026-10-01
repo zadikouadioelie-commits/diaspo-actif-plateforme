@@ -2083,6 +2083,11 @@ const MIGRATIONS = [
   // les deux tables, comme prix_min/whatsapp_lien/origine plus haut.
   ["events", "masquer_inscrits INTEGER DEFAULT 0"],
   ["evenements", "masquer_inscrits INTEGER DEFAULT 0"],
+  // Exclure un événement public de la page boutique de son organisateur, sans le rendre privé
+  // (2026-10-01, demande explicite, voir POST /api/evenements et GET /api/evenements
+  // &boutique=1 côté serveur) — déjà auto-réparé au runtime par ce dernier, ajouté ici aussi
+  // pour les installations locales neuves.
+  ["evenements", "masquer_boutique INTEGER DEFAULT 0"],
   // Agenda events — lien source
   ["agenda_events", "source_type TEXT DEFAULT 'manuel'"],
   ["agenda_events", "source_id INTEGER"],
