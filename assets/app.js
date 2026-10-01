@@ -6528,3 +6528,20 @@ document.addEventListener('DOMContentLoaded', function () {
     }).catch(function () {});
   } catch (e) {}
 })();
+
+/* Lazy-load : bascule la classe .loaded sur les <img loading="lazy"> une fois chargées
+   (2026-10-01, bug réel trouvé en creusant une demande de fond noir sur les cartouches
+   d'événements — assets/responsive.v2.css définit bien un shimmer de chargement et sa sortie
+   via "img[loading="lazy"].loaded { background:none }", mais rien nulle part dans le code
+   n'ajoutait jamais cette classe : le shimmer tournait donc indéfiniment, même des années après
+   le chargement réel de l'image, visible dans tout espace vide (object-fit:contain, image plus
+   petite que son cadre, etc.) sur TOUTE la plateforme, pas seulement sur evenements.html.
+   Écouteur global en phase de capture sur `document` : l'événement "load" d'une <img> ne
+   remonte pas (pas de bubbling), seule la capture permet de l'intercepter sans poser un
+   listener sur chaque image individuellement, y compris celles ajoutées plus tard via
+   innerHTML. */
+document.addEventListener('load', function (e) {
+  if (e.target && e.target.tagName === 'IMG' && e.target.loading === 'lazy') {
+    e.target.classList.add('loaded');
+  }
+}, true);

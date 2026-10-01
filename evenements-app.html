@@ -147,6 +147,17 @@
    remplir le cadre 140px ; "contain" montre l'image entière, quitte à laisser apparaître
    le dégradé de fond de .evt-img sur les côtés pour une image d'un autre ratio. */
 .evt-img img{width:100%;height:100%;object-fit:contain;display:block}
+/* Fond noir une fois l'image chargée (2026-10-01, demande explicite : "remplire les espace des
+   images... a droite et a gauche"). Avant ce correctif, le vide à gauche/droite d'une image
+   plus étroite que la carte montrait un gris-bleu clair figé en boucle — pas le dégradé de
+   .evt-img juste au-dessus comme prévu à l'origine (voir son commentaire), mais le placeholder
+   de chargement générique d'assets/responsive.v2.css (img[loading="lazy"]), jamais nettoyé car
+   rien dans le code n'ajoutait la classe .loaded qui l'efface (vrai bug corrigé dans
+   assets/app.js, écouteur global sur l'événement "load"). Cible précisément .loaded pour ne
+   jamais passer en noir avant la fin du chargement (le chatoiement reste visible pendant,
+   cohérent avec le reste de la plateforme) ; une carte SANS image du tout (icône seule) garde
+   le dégradé de .evt-img, inchangé. */
+.evt-img img.loaded{background:#000}
 .evt-body{padding:16px}
 .evt-date{font-size:12px;color:#2563EB;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .evt-title{font-size:16px;font-weight:700;margin:0 0 8px;line-height:1.3}
