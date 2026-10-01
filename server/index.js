@@ -20341,7 +20341,12 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
     // signTicket() : la signature couvre l'id réellement attribué, jamais deviné à l'avance.
     const qrToken = await signParticipation(insertId, params.id, evt.created_at || '');
     await db.prepare("UPDATE evenements_participants SET qr_token=? WHERE id=?").run(qrToken, insertId);
-    if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${nomComplet || user.nom} s'est inscrit à « ${evt.titre} »${nbPers > 1 ? ` (${nbPers} pers.)` : ''}`, { evenement_id: evt.id });
+    /* lien direct (2026-10-01, demande explicite : même principe que pour les fiches insc_* —
+       voir le commentaire au-dessus de l'appel creerNotif dans
+       POST /api/insc/public/:slug/inscriptions) — amène directement sur la liste des inscrits
+       de CET événement (evenements-app.html?gerer_evenement=<id>, ouvre gererInscrits() au
+       chargement) au lieu de la fiche publique générique de l'événement. */
+    if (evt.owner_user_id && evt.owner_user_id !== user.id) creerNotif(evt.owner_user_id, "evenement", "Nouvelle inscription", `${nomComplet || user.nom} s'est inscrit à « ${evt.titre} »${nbPers > 1 ? ` (${nbPers} pers.)` : ''}`, { lien: `evenements-app.html?gerer_evenement=${evt.id}` });
     sendJSON(res, 201, { ok: true, inscrit: true });
   } catch(e) {
     // Déjà inscrit → on met à jour ses infos plutôt que d'échouer

@@ -2360,6 +2360,22 @@ function cdFermerCalendrier() {
     history.replaceState(null, '', location.pathname + location.hash);
     ouvrirModaleCreation();
   }
+  /* ?gerer_evenement=<id> (2026-10-01, demande explicite : "il y a des événements qui ne sont
+     pas liés à une fiche, oriente directement au bon endroit") — lien direct depuis la notif
+     "Nouvelle inscription" d'un événement sans fiche liée (POST /api/evenements/:id/rejoindre,
+     voir son commentaire), même principe que ?inscription= sur inscriptions-admin.html pour les
+     fiches insc_*. allEvts (rempli par loadEvts() ci-dessus) peut ne pas contenir l'événement
+     selon les filtres actifs par défaut — on va donc chercher directement son détail via
+     GET /api/evenements/:id plutôt que de dépendre de la liste déjà chargée. Ouvre ensuite
+     gererInscrits(), qui sait déjà rediriger vers inscriptions-admin.html si l'événement a
+     finalement une fiche liée (fiche_id) — même garde-fou que le bouton "🗂️ Gérer" existant. */
+  const gererEvtParam = new URLSearchParams(location.search).get('gerer_evenement');
+  if (gererEvtParam) {
+    history.replaceState(null, '', location.pathname + location.hash);
+    api('GET', '/evenements/' + gererEvtParam).then(({ evenement }) => {
+      if (evenement) gererInscrits(evenement.id, evenement.fiche_id, evenement.titre);
+    }).catch(() => {});
+  }
 })();
 </script>
 
