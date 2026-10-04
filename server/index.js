@@ -14929,8 +14929,12 @@ route("GET", "/api/admin/schema-check", async (req, res) => {
        les routes qui la touchent. */
     const tablesAttendues = [...new Set(
       require('fs').readFileSync(require('path').join(__dirname, 'db.js'), 'utf8')
-        .match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/gi) || []
-    )].map(m => m.replace(/CREATE TABLE IF NOT EXISTS\s+/i, ''));
+        /* La parenthèse ouvrante est exigée pour ne retenir que les vrais `CREATE TABLE IF NOT
+           EXISTS xxx (` : sans elle, des commentaires du type "CREATE TABLE IF NOT EXISTS ne
+           touche jamais..." étaient lus comme une table nommée "ne" (faux-positif découvert le
+           2026-10-04 : schema-check la signalait "manquante" en permanence). */
+        .match(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(/gi) || []
+    )].map(m => m.replace(/CREATE TABLE IF NOT EXISTS\s+/i, '').replace(/\s*\($/, ''));
     const tablesManquantes = [];
     for (const t of tablesAttendues) {
       try {
