@@ -18749,6 +18749,18 @@ function statutTarifEvenement(nbTypes, nbTypesPayants) {
   return 'partiel';
 }
 
+/* Événement terminé (2026-10-04, demande explicite) : le jour de fin (date_fin, à défaut date_evt)
+   est strictement antérieur à aujourd'hui, heure de Paris — même règle que cdEstPasse() côté
+   calendrier (evenements-app.html). Source unique : le front lit evt.est_termine plutôt que de
+   recalculer avec l'horloge (et le fuseau) du navigateur, et les routes d'inscription l'appliquent. */
+function dateParisISO(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+function evenementEstTermine(evt) {
+  const ref = String((evt && (evt.date_fin || evt.date_evt)) || '').slice(0, 10);
+  return !!ref && ref < dateParisISO();
+}
+
 async function enrichirAvecFicheMedia(rows) {
   if (!rows.length) return rows;
   const ids = rows.map(r => r.id);
@@ -18794,7 +18806,7 @@ async function enrichirAvecFicheMedia(rows) {
        si elle est réellement publiée — une fiche encore en brouillon resterait invisible pour
        un visiteur (voir GET /api/insc/public/:slug), le bouton doit alors garder l'ancien
        formulaire minimal plutôt que de mener à une impasse "Fiche introuvable". */
-    return { ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null };
+    return { ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null, est_termine: evenementEstTermine(r) };
   });
 }
 
@@ -20338,6 +20350,7 @@ route("POST", "/api/evenements/:id/rejoindre", async (req, res, params, body) =>
   const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
   if (!evt.inscription_ouverte) return sendJSON(res, 400, { error: "Les inscriptions sont fermées." });
+  if (evenementEstTermine(evt)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
   // Heure d'ouverture programmée (2026-09-25, demande explicite) — voir
   // ensureEvenementsOuvertureInscriptionsCol() : ne s'applique qu'ici, jamais réévaluée côté
   // fiche (chacune garde son propre réglage). Pas de 'Z' ajouté, même convention que
@@ -44509,7 +44522,15 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
        toute façon liée à un événement, la question ne se pose plus. Automatiquement, la note est
        ouverte") — sa propre date d'ouverture ne bloque plus rien, seule la fermeture ci-dessus
        reste pertinente. Sans lien, la date d'ouverture continue de s'appliquer normalement. */
-    const estLieeAUnEvenement = !!(await db.prepare("SELECT 1 FROM insc_fiches_evenements WHERE fiche_id=? LIMIT 1").get(fiche.id));
+    const evenementsLies = await db.prepare("SELECT e.id, e.date_evt, e.date_fin FROM insc_fiches_evenements fe JOIN evenements e ON e.id=fe.evenement_id WHERE fe.fiche_id=?").all(fiche.id);
+    const estLieeAUnEvenement = evenementsLies.length > 0;
+    /* Tous les événements liés sont terminés (2026-10-04, demande explicite) : plus d'inscription
+       possible, même sans date de fermeture saisie. Une fiche liée à plusieurs événements reste
+       ouverte tant qu'au moins un est à venir (le visiteur choisit alors l'événement). */
+    if (estLieeAUnEvenement && evenementsLies.every(evenementEstTermine)) {
+      const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
+      return sendJSON(res, 200, { fiche, fermee: true, message: "Cet événement est terminé : les inscriptions sont closes.", medias });
+    }
     if (!estLieeAUnEvenement && fiche.date_ouverture_inscriptions && new Date(fiche.date_ouverture_inscriptions) > now) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, pas_encore_ouverte: true, message: "Les inscriptions ne sont pas encore ouvertes.", medias });
@@ -44638,6 +44659,10 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
       return sendJSON(res, 400, { error: "Veuillez sélectionner à quel événement vous souhaitez participer." });
     }
     evenementId = body.evenement_id;
+  }
+  if (evenementId) {
+    const evtCible = await db.prepare("SELECT date_evt, date_fin FROM evenements WHERE id=?").get(evenementId);
+    if (evtCible && evenementEstTermine(evtCible)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
   }
 
   if (!body?.nom || !String(body.nom).trim() || !body?.prenom || !String(body.prenom).trim()) return sendJSON(res, 400, { error: "Nom et prénom sont requis." });
