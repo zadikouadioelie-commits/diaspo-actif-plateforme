@@ -131,12 +131,7 @@
 .evt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
 .evt-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .15s;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .evt-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
-/* Événement terminé (2026-10-04) : carte grisée, jamais masquée sans que le visiteur le sache. */
-.evt-card-termine .evt-img{filter:grayscale(1);opacity:.6}
-.evt-card-termine .evt-title,.evt-card-termine .evt-meta,.evt-card-termine .evt-body > p{opacity:.65}
-.evt-card-termine .evt-date{color:#6B7280}
-.evt-termine-badge{display:inline-block;background:#E5E7EB;color:#374151;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:99px;margin-left:6px;vertical-align:middle}
-.evt-filtre-termines{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;padding:2px 2px}
+
 .evt-img{width:100%;height:140px;background:linear-gradient(135deg,#ff6b00 0%,#ff9f43 100%);display:flex;align-items:center;justify-content:center;font-size:48px;overflow:hidden}
 .evt-delete-float{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.4);color:#fff;border:none;padding:0;margin:0;box-sizing:border-box;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;z-index:5;transition:background .15s,transform .15s;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
 .evt-delete-float:hover{background:rgba(220,38,38,.88);transform:scale(1.08);}
@@ -385,7 +380,6 @@
       <select id="f-domaine" title="Domaine de l'événement"><option value="">🏷️ Domaine de l'événement</option><option>Entrepreneuriat</option><option>Formation</option><option>Culture</option><option>Sante</option><option>Agriculture</option><option>Technologie</option><option>Sport</option><option>Action Sociale</option><option>Business</option><option>Diaspora</option><option>Gastronomie</option><option>Economique</option><option>Politique</option><option>Panafricanisme</option><option>Autre</option></select>
       <select id="f-type" title="Forme de l'événement"><option value="">👥 Forme de l'événement</option><option value="evenement">Événement</option><option value="forum">Forum</option><option value="atelier">Atelier</option><option value="webinaire">Webinaire</option><option value="conference">Conférence</option><option value="gala">Gala</option><option value="marche">Marché / Foire</option><option value="networking">Networking</option><option value="debat">Débat</option><option value="concours">Concours</option><option value="trophee_diaspora">🏆 Trophée diaspora</option><option value="autre">Autre</option></select>
       <select id="f-gratuit" title="Gratuit / payant"><option value="">🎟️ Gratuit ou payant</option><option value="1">🟢 Gratuit</option><option value="partiel">🟡 Partiellement payant</option><option value="0">🔴 Payant</option></select>
-      <label class="evt-filtre-termines"><input type="checkbox" id="f-termines"> 🏁 Afficher les événements terminés</label>
       <button class="btn btn-orange btn-block" id="btn-search" style="font-size:12px;">🔍 Rechercher</button>
       <button class="btn btn-block" id="btn-search-global" style="font-size:12px;">🌍 Rechercher sur tout Diaspo'Actif</button>
       <button class="btn btn-block" id="btn-reset" style="font-size:12px;">Réinitialiser</button>
@@ -399,6 +393,7 @@
 
     <!-- ═══ COLONNE CENTRALE : ÉVÉNEMENTS ═══ -->
     <div class="evt-main-col">
+      <div id="evt-tabs"></div>
       <div id="evt-count" style="font-size:13px;color:var(--muted);margin-bottom:8px"></div>
       <div id="trophee-cta-zone"></div>
       <div class="evt-grid" id="evt-list"></div>
@@ -767,6 +762,7 @@
 </div>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
+<script src="assets/evt-temporel.js"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/profile-qr.js"></script>
 <script>
@@ -811,6 +807,7 @@ async function syncFiltreDomaineOptions() {
 
 /* ─── Liste des événements ─── */
 let allEvts = [];
+let evtOnglet = 'a_venir', evtTerminesMax = 12;
 // Événement en cours de modification (2026-09-22) : null en création. La même modale sert aux
 // deux, voir ouvrirModaleEdition()/btn-save ci-dessous.
 let evenementEnEditionId = null;
@@ -860,16 +857,15 @@ function evtDescApercu(html, maxLen) {
 
 function renderEvts() {
   const list = document.getElementById('evt-list');
-  /* Événements terminés (2026-10-04, demande explicite) : à venir d'abord (le plus proche en
-     tête), terminés ensuite (le plus récent en tête) et masqués tant que la case n'est pas
-     cochée. est_termine vient du serveur (heure de Paris), même règle que le refus d'inscription. */
-  const montrerTermines = document.getElementById('f-termines').checked;
-  const cleTri = e => String(e.date_evt || '') + ' ' + String(e.heure_debut || '');
-  const aVenir = allEvts.filter(e => !e.est_termine).sort((a, b) => cleTri(a).localeCompare(cleTri(b)));
-  const termines = allEvts.filter(e => e.est_termine).sort((a, b) => cleTri(b).localeCompare(cleTri(a)));
-  const evts = montrerTermines ? [...aVenir, ...termines] : aVenir;
-  document.getElementById('evt-count').textContent = evts.length + ' événement' + (evts.length!==1?'s':'')
-    + (!montrerTermines && termines.length ? ' · ' + termines.length + ' terminé' + (termines.length>1?'s':'') + ' masqué' + (termines.length>1?'s':'') : '');
+  /* Trois onglets En cours / À venir / Terminés (2026-10-04, demande explicite : isoler les
+     événements passés et présents pour ne pas tout saturer au même endroit). Le statut vient du
+     serveur (heure de Paris), voir assets/evt-temporel.js. Terminés : par lots de 12. */
+  const g = EvtTemporel.repartir(allEvts);
+  const actif = EvtTemporel.ongletActif(g, evtOnglet);
+  document.getElementById('evt-tabs').innerHTML = EvtTemporel.barre('evt', g, actif, false, o => { evtOnglet = o; evtTerminesMax = 12; renderEvts(); });
+  const tousOnglet = g[actif];
+  const evts = actif === 'termine' ? tousOnglet.slice(0, evtTerminesMax) : tousOnglet;
+  document.getElementById('evt-count').textContent = tousOnglet.length + ' événement' + (tousOnglet.length!==1?'s':'');
   // "Nouveau Trophée" (2026-09-23, demande explicite : "ce bouton doit être à l'intérieur de
   // trophée diaspora") — affiché uniquement quand le filtre "Forme de l'événement" en cours
   // est "Trophée diaspora", avant la liste (utile même liste vide, pour créer le premier).
@@ -895,7 +891,7 @@ function renderEvts() {
     zoneTrophee.innerHTML = '';
   }
   if (!evts.length) {
-    list.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="big">📢</div><p>' + (termines.length && !montrerTermines ? 'Aucun événement à venir pour ces critères. Cochez « Afficher les événements terminés » pour voir les ' + termines.length + ' événement' + (termines.length>1?'s passés':' passé') + '.' : 'Aucun événement pour ces critères.') + '</p></div>';
+    list.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="big">📢</div><p>Aucun événement pour ces critères.</p></div>';
     return;
   }
   list.innerHTML = evts.map(evt => {
@@ -950,7 +946,7 @@ function renderEvts() {
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
       <div class="evt-img${estTrophee ? ' trophee-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}</div>
       <div class="evt-body">
-        <div class="evt-date">${fmtDate(evt.date_evt)}${evt.heure_debut?' · '+evt.heure_debut:''}${evt.est_termine ? '<span class="evt-termine-badge">Terminé</span>' : ''}</div>
+        <div class="evt-date">${fmtDate(evt.date_evt)}${evt.heure_debut?' · '+evt.heure_debut:''}${EvtTemporel.badge(evt)}</div>
         <div class="evt-title">${esc(evt.titre)}</div>
         <div class="evt-meta">
           ${evt.lieu ? '<span>📍 '+esc(evt.lieu)+'</span>' : ''}
@@ -993,7 +989,8 @@ function renderEvts() {
         ${peutGerer ? `<div class="evt-actions-gerer">${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}</div>` : ''}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (actif === 'termine' && tousOnglet.length > evtTerminesMax
+    ? '<div style="grid-column:1/-1"><button type="button" class="evt-plus" onclick="evtTerminesMax+=12;renderEvts()">Voir plus (' + (tousOnglet.length - evtTerminesMax) + ' restant' + (tousOnglet.length - evtTerminesMax > 1 ? 's' : '') + ')</button></div>' : '');
 }
 
 // Bouton affiché à la place de « S'inscrire » une fois l'événement terminé (liste et détail).
@@ -1164,7 +1161,6 @@ async function supprimerMediaEvt(btn, kind, mediaId, evtId, ficheId) {
 
 /* ─── Filtres — mise à jour automatique à chaque changement (2026-09-07, demande explicite) ─── */
 ['f-domaine','f-type','f-pays','f-date','f-gratuit'].forEach(id => document.getElementById(id).addEventListener('change', loadEvts));
-document.getElementById('f-termines').addEventListener('change', renderEvts);
 document.getElementById('q').addEventListener('input', () => setTimeout(loadEvts, 300));
 document.getElementById('f-ville').addEventListener('input', () => setTimeout(loadEvts, 300));
 // Bouton « Rechercher » : lance la recherche locale (événements), même avec un seul filtre saisi
@@ -1184,7 +1180,7 @@ document.getElementById('btn-search-global').addEventListener('click', () => {
 });
 document.getElementById('btn-reset').addEventListener('click', () => {
   ['q','f-domaine','f-type','f-pays','f-ville','f-date','f-gratuit'].forEach(id => document.getElementById(id).value='');
-  document.getElementById('f-termines').checked = false;
+  evtOnglet = 'a_venir'; evtTerminesMax = 12;
   loadEvts();
 });
 // Trophée diaspora (2026-09-23, demande explicite) : raccourci filtrant directement sur ce

@@ -8869,7 +8869,7 @@ route("GET", "/api/collectivites/:id/actualites", async (req, res, params) => {
    page EST la page propre de la collectivité (même rôle que ?owner= sur GET /api/evenements),
    pas la découverte générale. */
 route("GET", "/api/collectivites/:id/agenda", async (req, res, params) => {
-  const events = (await db.prepare("SELECT * FROM evenements WHERE owner_user_id=? AND (date_evt IS NULL OR date_evt >= date('now')) ORDER BY date_evt ASC LIMIT 20").all(params.id))
+  const events = (await db.prepare("SELECT * FROM evenements WHERE owner_user_id=? AND (date_evt IS NULL OR substr(COALESCE(date_fin, date_evt), 1, 10) >= ?) ORDER BY date_evt ASC LIMIT 20").all(params.id, dateParisISO()))
     .filter(e => e.statut !== 'brouillon');
   sendJSON(res, 200, { events });
 });
@@ -16892,7 +16892,7 @@ route("GET", "/api/recherche", async (req, res, params, body, query) => {
      un événement de test "boutique uniquement" remontait dans une liste censée n'afficher que
      les véritables événements publics). */
   const evenements = (type === "tous" || type === "evenements")
-    ? await db.prepare("SELECT id,titre,lieu,date_evt,type_evt,pays FROM evenements WHERE (titre LIKE ? OR lieu LIKE ? OR description LIKE ?) AND statut != 'brouillon' AND (visibilite IS NULL OR visibilite NOT IN ('boutique','prive','abonnes')) LIMIT 8").all(like, like, like)
+    ? (await db.prepare("SELECT id,titre,lieu,date_evt,date_fin,type_evt,pays FROM evenements WHERE (titre LIKE ? OR lieu LIKE ? OR description LIKE ?) AND statut != 'brouillon' AND (visibilite IS NULL OR visibilite NOT IN ('boutique','prive','abonnes')) LIMIT 8").all(like, like, like)).map(avecStatutTemporel)
     : [];
 
   sendJSON(res, 200, { q, utilisateurs, initiatives, publications, formations, evenements });
@@ -18756,9 +18756,25 @@ function statutTarifEvenement(nbTypes, nbTypesPayants) {
 function dateParisISO(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }
+/* Trois états (2026-10-04) : 'termine' (jour de fin passé), 'en_cours' (commencé, pas fini —
+   y compris un événement d'un jour qui a lieu aujourd'hui), 'a_venir'. Valable pour les deux
+   tables : `evenements` (date_evt/date_fin) et `events` billetterie (date_debut/date_fin).
+   Sans aucune date connue, l'événement reste 'a_venir' (jamais classé terminé par défaut). */
+function statutTemporelEvenement(evt) {
+  const debut = String((evt && (evt.date_evt || evt.date_debut)) || '').slice(0, 10);
+  const fin = String((evt && evt.date_fin) || '').slice(0, 10) || debut;
+  if (!debut && !fin) return 'a_venir';
+  const auj = dateParisISO();
+  if ((fin || debut) < auj) return 'termine';
+  if (debut && debut <= auj) return 'en_cours';
+  return 'a_venir';
+}
 function evenementEstTermine(evt) {
-  const ref = String((evt && (evt.date_fin || evt.date_evt)) || '').slice(0, 10);
-  return !!ref && ref < dateParisISO();
+  return statutTemporelEvenement(evt) === 'termine';
+}
+function avecStatutTemporel(r) {
+  const st = statutTemporelEvenement(r);
+  return { ...r, statut_temporel: st, est_termine: st === 'termine' };
 }
 
 async function enrichirAvecFicheMedia(rows) {
@@ -18806,7 +18822,7 @@ async function enrichirAvecFicheMedia(rows) {
        si elle est réellement publiée — une fiche encore en brouillon resterait invisible pour
        un visiteur (voir GET /api/insc/public/:slug), le bouton doit alors garder l'ancien
        formulaire minimal plutôt que de mener à une impasse "Fiche introuvable". */
-    return { ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null, est_termine: evenementEstTermine(r) };
+    return avecStatutTemporel({ ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null });
   });
 }
 
@@ -18943,7 +18959,8 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   if (query.owner) rows = rows.filter(r => Number(r.owner_user_id) === Number(query.owner));
   // Filtre "📅 Date" (2026-09-07) — événements à partir de cette date (une affiche
   // d'événements à venir, pas une recherche d'un jour précis dans le passé).
-  if (query.date) rows = rows.filter(r => r.date_evt && r.date_evt >= query.date);
+  // Un événement sur plusieurs jours encore en cours à cette date reste inclus (date_fin).
+  if (query.date) rows = rows.filter(r => r.date_evt && (String(r.date_fin || r.date_evt).slice(0, 10) >= query.date));
   // Filtre "🎟️ Gratuit / payant" (2026-09-07, étendu à 3 catégories le 2026-09-24, "faciliter
   // le tri") — utilise la même priorité (fiche liée > choix manuel) que le badge de la
   // cartouche et le pré-remplissage de la modale d'édition, voir participationEffective().
@@ -30043,11 +30060,14 @@ ${jsonLd}
       }
       // Par défaut : exclure du listing public les événements terminés ou expirés (sauf si ?mode=archive ou ?mine=1)
       if (!q.mode && q.mine !== '1' && q.all !== '1') {
-        sql += ` AND ${expositionExpr} = 'actif'`;
+        /* inclure_termines=1 (2026-10-04) : la vitrine d'une initiative affiche ses événements
+           passés dans un onglet « Terminés » — relâche UNIQUEMENT l'exclusion des terminés
+           (les 'expire', publiés depuis plus de duree_exposition_jours, restent exclus). */
+        sql += q.inclure_termines === '1' ? ` AND ${expositionExpr} IN ('actif','termine')` : ` AND ${expositionExpr} = 'actif'`;
       }
       sql += ' ORDER BY e.date_debut ASC LIMIT 100';
       const events = (await db.prepare(sql).all(...args))
-        .map(e => ({ ...e, statut_tarif: statutTarifEvenement(e.nb_types, e.nb_types_payants) }));
+        .map(e => avecStatutTemporel({ ...e, statut_tarif: statutTarifEvenement(e.nb_types, e.nb_types_payants) }));
       return sendJSON(res, 200, { events });
     }
 
@@ -30505,7 +30525,7 @@ ${jsonLd}
       if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
       const types = await db.prepare(`SELECT tt.*, (tt.quantite_totale - tt.quantite_vendue) AS dispo FROM ticket_types tt WHERE tt.event_id=? AND tt.actif=1`).all(eid);
       const stats = await db.prepare(`SELECT COUNT(*) nb, COALESCE(SUM(prix_paye),0) revenu FROM tickets WHERE event_id=? AND payment_status='paid'`).get(eid);
-      return sendJSON(res, 200, { event: ev, ticket_types: types, stats });
+      return sendJSON(res, 200, { event: avecStatutTemporel(ev), ticket_types: types, stats });
     }
 
     /* ── PUT /api/events/:id ── */
@@ -30821,6 +30841,7 @@ ${jsonLd}
       if (!ticket_type_id) return sendJSON(res, 400, { error: 'ticket_type_id requis.' });
       const ev = await db.prepare(`SELECT * FROM events WHERE id=? AND statut='publie'`).get(eid);
       if (!ev) return sendJSON(res, 400, { error: 'Événement non disponible.' });
+      if (evenementEstTermine(ev)) return sendJSON(res, 400, { error: 'Cet événement est terminé : la vente de billets est close.' });
       const tt = await db.prepare(`SELECT * FROM ticket_types WHERE id=? AND event_id=? AND actif=1`).get(ticket_type_id, eid);
       if (!tt) return sendJSON(res, 400, { error: 'Type de billet introuvable.' });
       const config = await db.prepare(`SELECT * FROM event_billetterie_config WHERE event_id=?`).get(eid);
@@ -31186,6 +31207,7 @@ ${jsonLd}
       const eid = parseInt(pathname.split('/')[3]);
       const ev = await db.prepare(`SELECT id,titre,date_debut,date_fin,ville,pays,inscription_mode,nb_places,liste_attente,organisateur_id FROM events WHERE id=? AND statut='publie'`).get(eid);
       if (!ev) return sendJSON(res, 404, { error: 'Événement introuvable.' });
+      if (evenementEstTermine(ev)) return sendJSON(res, 400, { error: 'Cet événement est terminé : les inscriptions sont closes.' });
       const { da_id } = body;
       if (!da_id) return sendJSON(res, 400, { error: 'ID DA manquant.' });
       const normalizedId = da_id.trim().toUpperCase();
@@ -44527,7 +44549,9 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
     /* Tous les événements liés sont terminés (2026-10-04, demande explicite) : plus d'inscription
        possible, même sans date de fermeture saisie. Une fiche liée à plusieurs événements reste
        ouverte tant qu'au moins un est à venir (le visiteur choisit alors l'événement). */
-    if (estLieeAUnEvenement && evenementsLies.every(evenementEstTermine)) {
+    const evenementsBilletterieLies = await db.prepare("SELECT id, date_debut, date_fin FROM events WHERE insc_fiche_id=?").all(fiche.id);
+    const tousLiesTermines = [...evenementsLies, ...evenementsBilletterieLies];
+    if (tousLiesTermines.length && tousLiesTermines.every(evenementEstTermine)) {
       const medias = await db.prepare("SELECT * FROM insc_fiches_medias WHERE fiche_id=? ORDER BY position ASC, id ASC").all(fiche.id);
       return sendJSON(res, 200, { fiche, fermee: true, message: "Cet événement est terminé : les inscriptions sont closes.", medias });
     }
@@ -44663,6 +44687,10 @@ route("POST", "/api/insc/public/:slug/inscriptions", async (req, res, params, bo
   if (evenementId) {
     const evtCible = await db.prepare("SELECT date_evt, date_fin FROM evenements WHERE id=?").get(evenementId);
     if (evtCible && evenementEstTermine(evtCible)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
+  } else if (!liaisons.length) {
+    // Fiche liée à un événement de billetterie (events.insc_fiche_id) : même règle.
+    const liesBilletterie = await db.prepare("SELECT id, date_debut, date_fin FROM events WHERE insc_fiche_id=?").all(fiche.id);
+    if (liesBilletterie.length && liesBilletterie.every(evenementEstTermine)) return sendJSON(res, 400, { error: "Cet événement est terminé : les inscriptions sont closes." });
   }
 
   if (!body?.nom || !String(body.nom).trim() || !body?.prenom || !String(body.prenom).trim()) return sendJSON(res, 400, { error: "Nom et prénom sont requis." });

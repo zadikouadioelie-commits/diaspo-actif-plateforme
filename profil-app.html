@@ -1122,6 +1122,7 @@ html, body { overflow-x:clip; }
 <script src="assets/decouverte-premium.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/demo.js?v=2"></script>
+<script src="assets/evt-temporel.js"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/rich-editor.js"></script>
 <script src="assets/galerie-lightbox.js"></script>
@@ -3186,7 +3187,7 @@ async function renderVitrineVisitor(init) {
            le filtre masquer_boutique côté serveur (voir GET /api/evenements). */
         const [rAnnonces, rBillets] = await Promise.all([
           api('GET', `/evenements?owner=${encodeURIComponent(owner)}&boutique=1`).catch(() => ({})),
-          api('GET', `/events?organisateur_id=${encodeURIComponent(owner)}`).catch(() => ({})),
+          api('GET', `/events?organisateur_id=${encodeURIComponent(owner)}&inclure_termines=1`).catch(() => ({})),
         ]);
 
         /* visibilite === 'boutique' inclus ici (2026-09-30, demande explicite) — c'est tout le
@@ -3223,11 +3224,22 @@ async function renderVitrineVisitor(init) {
            lieu déjà là. La billetterie (prix/places/bouton Réserver) reste inchangée : c'est le
            seul système avec un vrai état de vente à afficher ici. */
         const EVT_TYPE_LABEL = {evenement:'Événement',forum:'Forum',atelier:'Atelier',webinaire:'Webinaire',conference:'Conférence',gala:'Gala',marche:'Marché / Foire',networking:'Networking',debat:'Débat',concours:'Concours',trophee_diaspora:'🏆 Trophée diaspora',autre:'Autre'};
-        boxEvt.innerHTML = liste.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
-          ${liste.slice(0, 6).map(e => { const desc = e.description ? String(e.description).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : ''; const descApercu = desc.length > 90 ? desc.slice(0,90).trim() + '…' : desc; return `<a href="${e.lien}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;">
+        /* Onglets À venir et en cours / Terminés (2026-10-04, demande explicite : isoler passés et
+           présents). Statut calculé par le serveur (heure de Paris) — assets/evt-temporel.js. */
+        let evtOngletVitrine = 'a_venir', evtMaxVitrine = 6;
+        const dessinerEvts = () => {
+        const g = EvtTemporel.repartir(liste, true);
+        const actifEvt = EvtTemporel.ongletActif(g, evtOngletVitrine);
+        const tousEvt = actifEvt === 'termine' ? g.termine : g.a_venir;
+        const visibles = tousEvt.slice(0, evtMaxVitrine);
+        const plusEvt = tousEvt.length > evtMaxVitrine
+          ? '<button type="button" class="evt-plus" onclick="pvtEvtPlus()">Voir plus (' + (tousEvt.length - evtMaxVitrine) + ' restant' + (tousEvt.length - evtMaxVitrine > 1 ? 's' : '') + ')</button>' : '';
+        window.pvtEvtPlus = () => { evtMaxVitrine += 6; dessinerEvts(); };
+        boxEvt.innerHTML = EvtTemporel.barre('pvt-evt', g, actifEvt, true, o => { evtOngletVitrine = o; evtMaxVitrine = 6; dessinerEvts(); }) + (visibles.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
+          ${visibles.map(e => { const desc = e.description ? String(e.description).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : ''; const descApercu = desc.length > 90 ? desc.slice(0,90).trim() + '…' : desc; return `<a href="${e.lien}" style="display:block;background:#F6F1EE;border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;${EvtTemporel.statut(e) === 'termine' ? 'opacity:.62;filter:grayscale(.7);' : ''}">
             ${e.image ? `<img loading="lazy" src="${esc(e.image)}" alt="" style="width:100%;height:110px;object-fit:cover;display:block;">` : ''}
             <div style="padding:12px;">
-              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(String(e.date || '').slice(0, 16))}${e.heure ? ' · '+esc(e.heure) : ''}</div>
+              <div style="font-size:11.5px;font-weight:800;color:#2F6BED;text-transform:uppercase;letter-spacing:.03em;">${esc(String(e.date || '').slice(0, 16))}${e.heure ? ' · '+esc(e.heure) : ''}${EvtTemporel.badge(e)}</div>
               <div style="font-size:13.5px;font-weight:700;color:#122A4D;margin-top:3px;line-height:1.35;">${esc(e.titre || '')}</div>
               <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">
                 ${e.lieu ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">📍 ${esc(e.lieu)}</span>` : ''}
@@ -3237,13 +3249,15 @@ async function renderVitrineVisitor(init) {
                 ${(e.nb_participants!=null && !e.masquer_inscrits) ? `<span style="font-size:11px;color:#8794A7;background:#fff;border:1px solid #E3DDD8;border-radius:99px;padding:2px 8px;">👥 ${e.nb_participants}${e.places_max?' / '+e.places_max:''}</span>` : ''}
               </div>
               ${descApercu ? `<div style="font-size:12px;color:#6b7280;margin-top:6px;line-height:1.5;">${esc(descApercu)}</div>` : ''}
-              ${e.billetterie ? `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              ${(e.billetterie && EvtTemporel.statut(e) !== 'termine') ? `<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                   <span style="font-size:13px;font-weight:800;color:#2F6BED;">${Number(e.prix) > 0 ? esc(String(e.prix)) + ' €' : 'Gratuit'}</span>
                   <span style="font-size:11.5px;font-weight:700;background:#2F6BED;color:#fff;padding:4px 10px;border-radius:7px;">🎟️ Réserver</span>
                 </div>
                 ${e.places > 0 && e.places <= 20 ? `<div style="font-size:11px;color:#b45309;margin-top:5px;">Plus que ${e.places} place${e.places > 1 ? 's' : ''}</div>` : ''}` : ''}
             </div></a>`; }).join('')}
-        </div>` : vide('Aucun événement publié pour le moment.', 'dashboard-initiative.html#evenements', 'Créer un événement');
+        </div>` + plusEvt : vide('Aucun événement publié pour le moment.', 'dashboard-initiative.html#evenements', 'Créer un événement'));
+        };
+        dessinerEvts();
       } catch (e) { boxEvt.innerHTML = vide('Événements momentanément indisponibles.'); }
     }
 
@@ -6643,7 +6657,14 @@ async function loadEvenementsTab() {
        actions existent déjà. */
     const PVT_DOMAINE_ICON = {Entrepreneuriat:'💼',Formation:'📚',Culture:'🎭',Sante:'🏥',Agriculture:'🌱',Technologie:'💻',Sport:'⚽','Action Sociale':'🤝',Business:'🏢',Diaspora:'🌍',Gastronomie:'🍽️',Economique:'📈',Politique:'🏛️',Panafricanisme:'✊',Autre:'📅'};
     const PVT_TYPE_EVT_LABEL = {evenement:'Événement',forum:'Forum',atelier:'Atelier',webinaire:'Webinaire',conference:'Conférence',gala:'Gala',marche:'Marché / Foire',networking:'Networking',debat:'Débat',concours:'Concours',trophee_diaspora:'🏆 Trophée diaspora',autre:'Autre'};
-    panel.innerHTML = `<div class="evt-grid">${mine.map(e=>{
+    /* Onglets En cours / À venir / Terminés (2026-10-04) — assets/evt-temporel.js, statut serveur. */
+    let ongletProfil = 'a_venir', maxProfil = 12;
+    const dessinerProfil = () => {
+    const gp = EvtTemporel.repartir(mine);
+    const actifP = EvtTemporel.ongletActif(gp, ongletProfil);
+    const tousP = gp[actifP];
+    window.pvtProfilEvtPlus = () => { maxProfil += 12; dessinerProfil(); };
+    panel.innerHTML = EvtTemporel.barre('pvt-profil-evt', gp, actifP, false, o => { ongletProfil = o; maxProfil = 12; dessinerProfil(); }) + `<div class="evt-grid">${tousP.slice(0, maxProfil).map(e=>{
       const icon = PVT_DOMAINE_ICON[e.domaine] || '📢';
       const visiBadge = e.visibilite === 'prive' ? '<span class="evt-tag" style="color:#e74c3c;">🔒 Privé</span>' :
                         e.visibilite === 'abonnes' ? '<span class="evt-tag" style="color:#9b59b6;">⭐ Abonnés</span>' :
@@ -6651,10 +6672,10 @@ async function loadEvenementsTab() {
       const desc = e.description ? String(e.description).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim() : '';
       const descApercu = desc.length > 120 ? desc.slice(0,120).trim() + '…' : desc;
       return `
-      <a class="evt-card" href="evenements.html?id=${e.id}" style="text-decoration:none;color:inherit;">
+      <a class="evt-card${EvtTemporel.statut(e) === 'termine' ? ' evt-card-termine' : ''}" href="evenements.html?id=${e.id}" style="text-decoration:none;color:inherit;">
         <div class="evt-img">${e.image_couverture ? `<img src="${esc(e.image_couverture)}" alt="${esc(e.titre)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.textContent='${icon}'">` : icon}</div>
         <div class="evt-body">
-          <div class="evt-date">${esc(fmtDateFull(e.date_evt))}${e.heure_debut?' · '+esc(e.heure_debut):''}</div>
+          <div class="evt-date">${esc(fmtDateFull(e.date_evt))}${e.heure_debut?' · '+esc(e.heure_debut):''}${EvtTemporel.badge(e)}</div>
           <div class="evt-title">${esc(e.titre)}</div>
           <div class="evt-meta">
             ${e.lieu?`<span class="evt-tag">📍 ${esc(e.lieu)}</span>`:''}
@@ -6668,7 +6689,9 @@ async function loadEvenementsTab() {
           ${descApercu ? `<p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5;">${esc(descApercu)}</p>` : ''}
         </div>
       </a>`;
-    }).join('')}</div>`;
+    }).join('')}</div>` + (tousP.length > maxProfil ? '<button type="button" class="evt-plus" onclick="pvtProfilEvtPlus()">Voir plus (' + (tousP.length - maxProfil) + ' restant' + (tousP.length - maxProfil > 1 ? 's' : '') + ')</button>' : '');
+    };
+    dessinerProfil();
   } catch(e) {
     panel.innerHTML = `<div class="p-section"><div class="empty-p"><div class="ei">📅</div>Impossible de charger les événements.</div></div>`;
   }

@@ -814,7 +814,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
     AVIS = rAvis; FORMULES = rForm.formules || [];
     EVENTS = (rEv.events || [])
       .filter(e => Number(e.organisateur_id) === Number(init.owner_user_id)
-                && (!e.date_debut || new Date(e.date_debut) >= new Date(Date.now() - 86400000)))
+                && !e.est_termine)
       .slice(0, 4);
   } catch (e) {}
 

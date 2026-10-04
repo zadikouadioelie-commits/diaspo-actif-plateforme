@@ -167,7 +167,7 @@ function renderResults() {
   }
   if(show('evenements') && (lastRes.evenements||[]).length) {
     html+='<div class="result-section"><h3>📅 Evenements <span class="result-count">'+lastRes.evenements.length+'</span></h3>';
-    html+=lastRes.evenements.map(e=>'<a href="evenements.html" class="result-item"><div class="result-icon">📅</div><div class="result-body"><div class="result-title">'+escHtml(e.titre)+'</div><div class="result-sub">'+(e.date_evt?e.date_evt+', ':'')+escHtml(e.lieu||e.pays||'')+'</div></div></a>').join('');
+    html+=lastRes.evenements.slice().sort((x,y)=>(x.est_termine?1:0)-(y.est_termine?1:0)).map(e=>'<a href="evenements.html" class="result-item"'+(e.est_termine?' style="opacity:.65"':'')+'><div class="result-icon">'+(e.est_termine?'🏁':'📅')+'</div><div class="result-body"><div class="result-title">'+escHtml(e.titre)+'</div><div class="result-sub">'+(e.est_termine?'Terminé · ':'')+(e.date_evt?e.date_evt+', ':'')+escHtml(e.lieu||e.pays||'')+'</div></div></a>').join('');
     html+='</div>';
   }
   res.innerHTML = html;

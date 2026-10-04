@@ -2174,7 +2174,7 @@ async function openAnnuaireEvents(ownerId, initNom){
   try {
     const [evR, mesR] = await Promise.all([ api('GET','/evenements'), api('GET','/mes-evenements').catch(()=>({evenements:[]})) ]);
     const inscrits = new Set((mesR.evenements||[]).map(e=>e.id));
-    const evts = (evR.evenements||[]).filter(e => Number(e.owner_user_id) === Number(ownerId) && e.date_evt >= new Date().toISOString().slice(0,10));
+    const evts = (evR.evenements||[]).filter(e => Number(e.owner_user_id) === Number(ownerId) && !e.est_termine);
     if (!evts.length) {
       body.innerHTML = `<div style="text-align:center;color:#6B7280;padding:24px;">Aucun événement à venir pour cette initiative.</div>`;
       return;

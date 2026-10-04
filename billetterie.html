@@ -581,7 +581,7 @@ async function openEvent(eid) {
   try {
     const r = await api('GET', '/events/'+eid);
     const e = r.event; const types = r.ticket_types || []; const stats = r.stats || {};
-    const canBuy = ME && ME.role === 'utilisateur';
+    const canBuy = ME && ME.role === 'utilisateur' && !e.est_termine;
     document.getElementById('modal-event-content').innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
         <div><h3 style="margin:0;">${escH(e.titre)}</h3>
@@ -625,9 +625,10 @@ async function openEvent(eid) {
             ${canBuy && tt.dispo>0 ? `<button class="btn btn-sm btn-orange" onclick="buyTicket(${e.id},${tt.id},'${escH(tt.nom)}',${tt.prix})">Acheter</button>` : ''}
           </div>
         </div>`).join('') : '<p style="color:var(--muted);font-size:13px;">Aucun billet disponible pour cet événement.</p>'}
-      ${!ME ? '<div class="notice" style="margin-top:16px;">🔐 <a href="login.html">Connectez-vous</a> pour acheter des billets.</div>' : ''}
-      ${ME && ME.role !== 'utilisateur' ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}
-      ${e.inscription_mode && e.inscription_mode !== 'libre' ? await renderInscriptionSecuriseeSection(e) : ''}
+      ${e.est_termine ? '<div class="notice" style="margin-top:16px;">🏁 Cet événement est terminé : la vente de billets et les inscriptions sont closes.</div>' : ''}
+      ${!ME && !e.est_termine ? '<div class="notice" style="margin-top:16px;">🔐 <a href="login.html">Connectez-vous</a> pour acheter des billets.</div>' : ''}
+      ${ME && ME.role !== 'utilisateur' && !e.est_termine ? '<div class="notice" style="margin-top:16px;">ℹ️ Seuls les membres Diaspora peuvent acheter des billets.</div>' : ''}
+      ${e.inscription_mode && e.inscription_mode !== 'libre' && !e.est_termine ? await renderInscriptionSecuriseeSection(e) : ''}
       ${ME ? `<div style="margin-top:18px;background:var(--surface-2,#f8f9fa);border-radius:12px;padding:14px 16px;border:1px solid var(--border);">
         <div style="font-weight:700;font-size:13px;color:#2563EB;margin-bottom:10px;">💡 Vos deux codes Diaspo'Actif</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;line-height:1.5;">
