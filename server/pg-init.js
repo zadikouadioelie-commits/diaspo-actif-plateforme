@@ -1192,6 +1192,24 @@ const COLONNES_MIGRATION = [
     ['insc_candidature_visiteur_uploads', 'motif_refus', "TEXT"],
     // CRM multi-collaboration — quel CRM est actuellement affiché (2026-09-29, miroir de l'ALTER db.js)
     ['users', 'crm_contexte_actif_initiative_id', 'INTEGER'],
+    // Livraison boutique (2026-09-30, miroir exact de l'ALTER db.js, voir le commentaire
+    // équivalent là-bas) — statut_livraison volontairement sans CHECK, numero_suivi généré
+    // automatiquement par le serveur, jamais saisi à la main.
+    ['produits_vitrine', 'livraison_retrait', 'INTEGER DEFAULT 1'],
+    ['produits_vitrine', 'livraison_expedition', 'INTEGER DEFAULT 0'],
+    ['produits_vitrine', 'frais_expedition', 'REAL'],
+    ['commandes_vitrine', 'mode_livraison', 'TEXT'],
+    ['commandes_vitrine', 'livraison_nom', 'TEXT'],
+    ['commandes_vitrine', 'livraison_adresse', 'TEXT'],
+    ['commandes_vitrine', 'livraison_code_postal', 'TEXT'],
+    ['commandes_vitrine', 'livraison_ville', 'TEXT'],
+    ['commandes_vitrine', 'livraison_pays', 'TEXT'],
+    ['commandes_vitrine', 'livraison_telephone', 'TEXT'],
+    ['commandes_vitrine', 'frais_livraison', 'REAL DEFAULT 0'],
+    ['commandes_vitrine', 'statut_livraison', 'TEXT'],
+    ['commandes_vitrine', 'numero_suivi', 'TEXT'],
+    ['commandes_vitrine', 'expedie_le', 'TEXT'],
+    ['commandes_vitrine', 'livre_le', 'TEXT'],
 ];
 
 async function migratePg(pool) {

@@ -3136,6 +3136,17 @@ async function renderVitrineVisitor(init) {
     <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!articlesNonClasses.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.${isOwn?' Ajoutez un article et rangez-le dans un catalogue depuis « Modifier ».':''}</div>`:''}</div></div>
   </section>` : '';
 
+  /* Commandes reçues (2026-09-30, demande explicite : livraison/suivi de colis) — jamais un
+     module de contenu curable (modOn/MODULE_SECTIONS) : c'est de la gestion opérationnelle,
+     donc réservé au seul propriétaire, toujours visible pour lui, jamais pour un visiteur.
+     Rattachait précédemment renderBoutique()/#vt-boutique (ancien système de gestion, plus
+     jamais exécuté depuis le passage à cette vue hi-fi unifiée — voir le commentaire plus haut
+     sur renderVitrineVisitor) : orpheline, donc invisible, jusqu'à ce rattachement. */
+  const commandesSec = isOwn ? `<section id="pv-commandes" class="pvt-section">
+    <div class="pvt-section-head sm"><h3>📬 Commandes reçues</h3></div>
+    <div id="vt-commandes" style="padding:16px 20px;"><div class="pvz-empty">Chargement…</div></div>
+  </section>` : '';
+
   // Services déplacé dans la colonne de gauche (2026-09-29) — voir renderVitrineCols().
 
   const galerieSec = (galerie.length && modOn('galerie_photos')) ? `<section id="pv-galerie" class="pvt-section">
@@ -3199,7 +3210,7 @@ async function renderVitrineVisitor(init) {
           .filter(e => !e.visibilite || e.visibilite === 'public' || e.visibilite === 'boutique')
           .map(e => ({
             id: e.id, lien: `evenement.html?id=${e.id}`, titre: e.titre, lieu: e.lieu,
-            date: e.date_evt, heure: e.heure_debut, image: e.image_couverture || e.image_url, billetterie: false,
+            date: e.date_evt, fin: e.date_fin, statut_temporel: e.statut_temporel, heure: e.heure_debut, image: e.image_couverture || e.image_url, billetterie: false,
             type_evt: e.type_evt, domaine: e.domaine, visibilite: e.visibilite,
             description: e.description, nb_participants: e.nb_participants,
             places_max: e.places_max, masquer_inscrits: e.masquer_inscrits,
@@ -3211,7 +3222,7 @@ async function renderVitrineVisitor(init) {
           .filter(e => e.statut === 'publie')
           .map(e => ({
             id: e.id, lien: `evenement-billetterie.html?id=${e.id}`, titre: e.titre, lieu: e.ville || e.adresse,
-            date: e.date_debut, image: e.image_b64, billetterie: true,
+            date: e.date_debut, fin: e.date_fin, statut_temporel: e.statut_temporel, image: e.image_b64, billetterie: true,
             prix: e.prix_min, places: (e.capacite || 0) - (e.billets_vendus || 0),
           }));
 
@@ -3636,6 +3647,7 @@ async function renderVitrineVisitor(init) {
       ${hero}
       ${actionbar}
       ${sortedModuleSections}
+      ${commandesSec}
       <div class="pvt-grid2">${promosSec}${meilleuresVentesSec}</div>
       ${contactSec}
     </div>
@@ -3646,6 +3658,9 @@ async function renderVitrineVisitor(init) {
 
   // Articles non classés (cartes stylées)
   renderPvtProducts(articlesNonClasses, ownerId);
+
+  // Commandes reçues, propriétaire uniquement (2026-09-30, voir commandesSec ci-dessus)
+  if (isOwn) renderMesCommandes(init.id);
 
   // QR de partage
   if (window.ProfileQR) {
@@ -4505,10 +4520,16 @@ function pvtProductCardHtml(p, ownerId) {
       <button class="pvt-btn soft" style="flex:1;font-size:12px;padding:7px 10px;" onclick="toggleProduitVedette(${p.id})" title="Produit vedette sur la carte boutique (3 maximum)">${p.mis_en_avant ? '⭐ Retirer' : '☆ Mettre en vedette'}</button>
       <button class="pvt-btn" style="flex:1;font-size:12px;padding:7px 10px;background:#FEF2F2;color:#B91C1C;" onclick="deleteProduct(${p.id})">🗑️ Supprimer</button>
     </div>` : '';
+  /* Panier (2026-10-02, demande explicite) — un produit à prix fixe se met au panier (façon
+     Temu/Amazon, paiement différé au passage en caisse) ; un produit "sur devis"/service n'a pas
+     de montant à mettre en caisse et garde son ancien bouton "Commander" (demande de contact). */
+  const payant = p.prix != null && Number(p.prix) > 0;
   const visitorRow = !isOwn ? `<div class="pvt-prod-foot">
         <span class="pvt-prod-price">${prix}</span>
         ${dispo
-          ? `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">🛒 Commander</button>`
+          ? (payant
+            ? `<button class="pvt-prod-buy" onclick="ajouterAuPanier(${p.id})">🛒 Ajouter au panier</button>`
+            : `<button class="pvt-prod-buy" onclick="openCommanderModal(${p.id})">📦 Commander</button>`)
           : `<button class="pvt-prod-buy" style="background:#8794A7;" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
       </div>
       <button class="pvt-btn soft" style="margin-top:2px;font-size:12px;padding:7px 10px;" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>
@@ -5126,6 +5147,7 @@ function renderProductGrid(produits, init, ownerFlag) {
     const cover = photos[0];
     const statut = p.statut || 'disponible';
     const dispo = statut === 'disponible';
+    const payant = p.prix != null && Number(p.prix) > 0;
     const banner = STATUT_BANNER[statut];
     return `
     <div class="evt-card prod-card${ownerFlag?' draggable':''}" data-pid="${p.id}" ${ownerFlag?'draggable="true"':''}>
@@ -5148,7 +5170,11 @@ function renderProductGrid(produits, init, ownerFlag) {
         <div class="prod-actions">
           ${ownerFlag
             ? `<button class="prod-btn-edit" onclick="openProductModal(${p.id})">✏️ Modifier</button><button class="prod-btn-edit" onclick="toggleProduitVedette(${p.id})" title="Produit vedette sur la carte boutique (3 maximum)">${p.mis_en_avant ? '⭐ Retirer' : '☆ Mettre en vedette'}</button><button class="prod-btn-delete" onclick="deleteProduct(${p.id})">🗑️</button>`
-            : `${dispo ? `<button class="prod-btn-commander" onclick="openCommanderModal(${p.id})">📦 Commander</button>` : `<button class="prod-btn-alerte" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
+            : `${dispo
+                ? (payant
+                  ? `<button class="prod-btn-commander" onclick="ajouterAuPanier(${p.id})">🛒 Ajouter au panier</button>`
+                  : `<button class="prod-btn-commander" onclick="openCommanderModal(${p.id})">📦 Commander</button>`)
+                : `<button class="prod-btn-alerte" onclick="alerteProduit(${p.id})">🔔 M'avertir</button>`}
                <button class="prod-btn-contact" onclick="contacterVendeur(${ownerId},${p.id})">💬 Contacter le vendeur</button>`}
         </div>
       </div>
@@ -5422,6 +5448,20 @@ function openProductModal(productId, presetCatalogueId) {
         <option value="1" ${prod&&prod.devis_active!=null&&Number(prod.devis_active)===1?'selected':''}>☑ Autoriser les demandes de devis</option>
         <option value="0" ${prod&&prod.devis_active!=null&&Number(prod.devis_active)===0?'selected':''}>☐ Désactiver les demandes de devis</option>
       </select>
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">🚚 Livraison</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;">
+          <input type="checkbox" id="pf-livraison-retrait" ${!prod || Number(prod.livraison_retrait) !== 0 ? 'checked' : ''}> Retrait sur place
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;">
+          <input type="checkbox" id="pf-livraison-expedition" onchange="pfToggleFraisExpedition()" ${prod && Number(prod.livraison_expedition) === 1 ? 'checked' : ''}> Expédition (l'acheteur renseigne son adresse à la commande)
+        </label>
+      </div>
+      <div id="pf-frais-expedition-wrap" style="margin-bottom:16px;display:${prod && Number(prod.livraison_expedition) === 1 ? 'block' : 'none'};">
+        <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Frais d'expédition</label>
+        <input type="number" step="0.01" min="0" id="pf-frais-expedition" placeholder="0.00" value="${prod && prod.frais_expedition != null ? prod.frais_expedition : ''}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+        <p style="font-size:11px;color:#aaa;margin:4px 0 0;">Ajoutés automatiquement au montant payé par l'acheteur s'il choisit l'expédition. Laissez vide pour une expédition gratuite.</p>
+      </div>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">Photos (jusqu'à 4)</label>
       <div class="prod-photo-slots" id="pf-photo-slots" style="margin-bottom:16px;"></div>
       <p id="pf-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
@@ -5464,6 +5504,11 @@ function pfToggleDateRetour() {
   if (wrap) wrap.style.display = st === 'indisponible' ? 'block' : 'none';
 }
 
+function pfToggleFraisExpedition() {
+  const wrap = document.getElementById('pf-frais-expedition-wrap');
+  if (wrap) wrap.style.display = document.getElementById('pf-livraison-expedition').checked ? 'block' : 'none';
+}
+
 async function saveProduct(productId) {
   const nom = document.getElementById('pf-nom').value.trim();
   const err = document.getElementById('pf-err');
@@ -5482,6 +5527,9 @@ async function saveProduct(productId) {
     photos: _prodPhotoData.filter(Boolean),
     catalogue_id: catSel ? Number(catSel) : null,
     devis_active: (() => { const v = document.getElementById('pf-devis-active').value; return v === '' ? null : Number(v); })(),
+    livraison_retrait: document.getElementById('pf-livraison-retrait').checked,
+    livraison_expedition: document.getElementById('pf-livraison-expedition').checked,
+    frais_expedition: document.getElementById('pf-frais-expedition').value !== '' ? Number(document.getElementById('pf-frais-expedition').value) : null,
   };
   try {
     if (productId) await api('PUT', `/produits/${productId}`, payload);
@@ -5515,6 +5563,34 @@ async function toggleProduitVedette(id) {
   } catch (e) { alert('Erreur : ' + e.message); }
 }
 
+/* ---- Panier (2026-10-02, demande explicite : "ajouter au panier" façon Temu/Amazon) ----
+   Aucune modale ici : le mode de livraison par défaut (retrait, sauf si seule l'expédition est
+   proposée) est posé au moment de l'ajout, et reste modifiable depuis panier.html avant le
+   paiement — un clic "Ajouter au panier" doit rester aussi rapide que chez n'importe quel
+   e-commerçant, la personnalisation vient après, pas avant. */
+async function ajouterAuPanier(productId) {
+  if (!CU) { window.location.href = 'login.html'; return; }
+  const prod = (_produitsVitrine || []).find(p => p.id === productId);
+  if (!prod) return;
+  const expeditionDispo = Number(prod.livraison_expedition) === 1;
+  const retraitDispo = Number(prod.livraison_retrait) !== 0;
+  const mode = expeditionDispo && !retraitDispo ? 'expedition' : 'retrait';
+  try {
+    const r = await api('POST', '/panier', { produit_id: productId, quantite: 1, mode_livraison: mode });
+    if (typeof window.updatePanierBadge === 'function') window.updatePanierBadge(r.nb_articles);
+    panierToast(`« ${prod.nom} » ajouté au panier.`);
+  } catch (e) {
+    alert(e.message || 'Erreur.');
+  }
+}
+function panierToast(msg) {
+  const el = document.createElement('div');
+  el.textContent = '🛒 ' + msg;
+  el.style.cssText = 'position:fixed;bottom:24px;right:24px;max-width:280px;background:#0D2B4E;color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:10000;box-shadow:0 6px 20px rgba(0,0,0,.25);';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
 /* ---- Modale "Commander" (visiteur — demande de contact, PAS de paiement) ---- */
 function openCommanderModal(productId, publicationId) {
   if (!CU) { window.location.href = 'login.html'; return; }
@@ -5525,13 +5601,42 @@ function openCommanderModal(productId, publicationId) {
   overlay.id = 'cmd-modal-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
   const payant = prod.prix != null && Number(prod.prix) > 0;
+  /* Livraison (2026-09-30, demande explicite) — aucun changement visuel pour un produit qui n'a
+     pas activé l'expédition (comportement identique à avant ce module). Si les deux modes sont
+     proposés, l'acheteur choisit ; si seule l'expédition l'est, elle est imposée sans case à
+     cocher inutile. Adresse pré-remplie depuis le profil de l'acheteur (CU) pour lui éviter de
+     tout retaper — reste entièrement modifiable avant l'envoi. */
+  const expeditionDispo = Number(prod.livraison_expedition) === 1;
+  const retraitDispo = Number(prod.livraison_retrait) !== 0;
+  const fraisExpedition = expeditionDispo && prod.frais_expedition != null ? Number(prod.frais_expedition) : 0;
+  const modeParDefaut = expeditionDispo && !retraitDispo ? 'expedition' : 'retrait';
   overlay.innerHTML = `
-    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;">
+    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
       <h2 style="margin:0 0 6px;font-size:17px;">📦 Commander « ${esc(prod.nom)} »</h2>
-      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${payant ? `Paiement sécurisé par Stripe — ${Number(prod.prix).toFixed(2)} ${esc(prod.devise||'EUR')} / unité.` : "Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici."}</p>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">${payant ? `Paiement sécurisé — ${Number(prod.prix).toFixed(2)} ${esc(prod.devise||'EUR')} / unité.` : "Ceci envoie une demande de contact à l'initiative — aucun paiement n'est effectué ici."}</p>
       <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">Quantité</label>
-      <input type="number" min="1" id="cmd-qte" value="1" oninput="cmdUpdateTotal(${Number(prod.prix)||0})" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
-      ${payant ? `<p style="font-size:13px;font-weight:700;margin:0 0 12px;">Total : <span id="cmd-total">${Number(prod.prix).toFixed(2)}</span> ${esc(prod.devise||'EUR')}</p>
+      <input type="number" min="1" id="cmd-qte" value="1" oninput="cmdUpdateTotal(${Number(prod.prix)||0},${fraisExpedition})" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;">
+      ${expeditionDispo ? `
+      <label style="font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:6px;">🚚 Livraison</label>
+      ${retraitDispo ? `<div style="display:flex;gap:8px;margin-bottom:12px;">
+        <label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 10px;cursor:pointer;">
+          <input type="radio" name="cmd-mode-livraison" value="retrait" ${modeParDefaut==='retrait'?'checked':''} onchange="cmdToggleLivraison(${Number(prod.prix)||0},${fraisExpedition})"> Retrait sur place
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 10px;cursor:pointer;">
+          <input type="radio" name="cmd-mode-livraison" value="expedition" ${modeParDefaut==='expedition'?'checked':''} onchange="cmdToggleLivraison(${Number(prod.prix)||0},${fraisExpedition})"> Expédition${fraisExpedition>0?` (+${fraisExpedition.toFixed(2)} ${esc(prod.devise||'EUR')})`:' (gratuite)'}
+        </label>
+      </div>` : `<input type="hidden" name="cmd-mode-livraison" value="expedition"><p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">Expédition${fraisExpedition>0?` — +${fraisExpedition.toFixed(2)} ${esc(prod.devise||'EUR')} de frais de port`:' gratuite'}.</p>`}
+      <div id="cmd-adresse-wrap" style="display:${modeParDefaut==='expedition'?'block':'none'};margin-bottom:12px;">
+        <input type="text" id="cmd-liv-nom" placeholder="Nom et prénom" value="${esc((CU.prenom?CU.prenom+' ':'')+(CU.nom||''))}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:6px;">
+        <input type="text" id="cmd-liv-adresse" placeholder="Adresse" value="${esc(CU.adresse||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:6px;">
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input type="text" id="cmd-liv-cp" placeholder="Code postal" value="${esc(CU.code_postal||'')}" style="flex:1;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+          <input type="text" id="cmd-liv-ville" placeholder="Ville" value="${esc(CU.ville||'')}" style="flex:2;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+        </div>
+        <input type="text" id="cmd-liv-pays" placeholder="Pays" value="${esc(CU.pays||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:6px;">
+        <input type="text" id="cmd-liv-tel" placeholder="Téléphone (optionnel)" value="${esc(CU.telephone||'')}" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;">
+      </div>` : ''}
+      ${payant ? `<p style="font-size:13px;font-weight:700;margin:0 0 12px;">Total : <span id="cmd-total">${(Number(prod.prix)+(modeParDefaut==='expedition'?fraisExpedition:0)).toFixed(2)}</span> ${esc(prod.devise||'EUR')}</p>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin:0 0 12px;cursor:pointer;">
         <input type="checkbox" id="cmd-save-card"> Enregistrer cette carte pour mes prochains achats
       </label>` : ''}
@@ -5549,12 +5654,22 @@ function openCommanderModal(productId, publicationId) {
     const err = document.getElementById('cmd-err');
     const btn = document.getElementById('cmd-send');
     btn.disabled = true;
+    const modeLivraison = document.querySelector('input[name="cmd-mode-livraison"]:checked, input[name="cmd-mode-livraison"][type="hidden"]')?.value || 'retrait';
     try {
       const r = await api('POST', `/produits/${productId}/commander`, {
         quantite: Number(document.getElementById('cmd-qte').value) || 1,
         message: document.getElementById('cmd-msg').value.trim() || null,
         publication_id: publicationId != null ? publicationId : null,
         enregistrer_carte: document.getElementById('cmd-save-card')?.checked || false,
+        mode_livraison: modeLivraison,
+        ...(modeLivraison === 'expedition' ? {
+          livraison_nom: document.getElementById('cmd-liv-nom')?.value.trim(),
+          livraison_adresse: document.getElementById('cmd-liv-adresse')?.value.trim(),
+          livraison_code_postal: document.getElementById('cmd-liv-cp')?.value.trim(),
+          livraison_ville: document.getElementById('cmd-liv-ville')?.value.trim(),
+          livraison_pays: document.getElementById('cmd-liv-pays')?.value.trim(),
+          livraison_telephone: document.getElementById('cmd-liv-tel')?.value.trim() || null,
+        } : {}),
       });
       if (r.checkout_url) { window.location.href = r.checkout_url; return; }
       overlay.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:32px;text-align:center;">
@@ -5570,39 +5685,91 @@ function openCommanderModal(productId, publicationId) {
     }
   };
 }
-function cmdUpdateTotal(prixUnitaire) {
+function cmdUpdateTotal(prixUnitaire, fraisExpedition) {
   const el = document.getElementById('cmd-total');
   if (!el) return;
   const qte = Number(document.getElementById('cmd-qte').value) || 1;
-  el.textContent = (prixUnitaire * qte).toFixed(2);
+  const modeLivraison = document.querySelector('input[name="cmd-mode-livraison"]:checked, input[name="cmd-mode-livraison"][type="hidden"]')?.value || 'retrait';
+  const frais = modeLivraison === 'expedition' ? (fraisExpedition || 0) : 0;
+  el.textContent = (prixUnitaire * qte + frais).toFixed(2);
+}
+/* Affiche/masque le formulaire d'adresse selon le mode choisi (2026-09-30, demande explicite) —
+   recalcule aussi le total affiché, les frais d'expédition n'apparaissant que pour ce mode. */
+function cmdToggleLivraison(prixUnitaire, fraisExpedition) {
+  const wrap = document.getElementById('cmd-adresse-wrap');
+  const mode = document.querySelector('input[name="cmd-mode-livraison"]:checked')?.value || 'retrait';
+  if (wrap) wrap.style.display = mode === 'expedition' ? 'block' : 'none';
+  cmdUpdateTotal(prixUnitaire, fraisExpedition);
 }
 
 /* ---- "Mes commandes" (owner) ---- */
 async function renderMesCommandes(initiativeId) {
   const box = document.getElementById('vt-commandes');
   if (!box) return;
-  box.innerHTML = '<div class="p-widget-title">📬 Commandes reçues</div><div class="empty-p" style="padding:14px 0;">Chargement…</div>';
+  box.innerHTML = '<div class="empty-p" style="padding:14px 0;">Chargement…</div>';
   try {
     const r = await api('GET', `/initiatives/${initiativeId}/commandes`);
     const cmds = r.commandes || [];
-    if (!cmds.length) { box.innerHTML = '<div class="p-widget-title">📬 Commandes reçues</div><div class="empty-p" style="padding:14px 0;">Aucune commande reçue pour le moment.</div>'; return; }
-    box.innerHTML = `<div class="p-widget-title">📬 Commandes reçues</div>` + cmds.map(c => `
-      <div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;" id="cmdrow-${c.id}">
-        <div>
-          <strong style="font-size:13px;">${esc(c.produit_nom)}</strong> × ${c.quantite} — <span style="font-size:12px;color:var(--muted);">${esc(c.acheteur_nom)}</span>
-          ${c.message ? `<div style="font-size:12px;color:#334155;margin-top:2px;">"${esc(c.message)}"</div>` : ''}
+    if (!cmds.length) { box.innerHTML = '<div class="empty-p" style="padding:14px 0;">Aucune commande reçue pour le moment.</div>'; return; }
+    box.innerHTML = cmds.map(c => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);" id="cmdrow-${c.id}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <strong style="font-size:13px;">${esc(c.produit_nom)}</strong> × ${c.quantite} — <span style="font-size:12px;color:var(--muted);">${esc(c.acheteur_nom)}</span>
+            ${c.message ? `<div style="font-size:12px;color:#334155;margin-top:2px;">"${esc(c.message)}"</div>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="evt-tag" style="background:${c.statut==='traitee'?'#dcfce7':c.statut==='annulee'?'#fef2f2':'#fef3c7'};">${c.statut}</span>
+            ${c.statut==='en_attente' ? `<button class="btn btn-sm btn-outline" onclick="updateCommandeStatut(${c.id},'traitee')">✅ Traiter</button>` : ''}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="evt-tag" style="background:${c.statut==='traitee'?'#dcfce7':c.statut==='annulee'?'#fef2f2':'#fef3c7'};">${c.statut}</span>
-          ${c.statut==='en_attente' ? `<button class="btn btn-sm btn-outline" onclick="updateCommandeStatut(${c.id},'traitee')">✅ Traiter</button>` : ''}
-        </div>
+        ${cmdRenderLivraison(c)}
       </div>`).join('');
-  } catch (e) { box.innerHTML = '<div class="p-widget-title">📬 Commandes reçues</div><div class="empty-p" style="padding:14px 0;color:#dc2626;">Erreur de chargement.</div>'; }
+  } catch (e) { box.innerHTML = '<div class="empty-p" style="padding:14px 0;color:#dc2626;">Erreur de chargement.</div>'; }
 }
 
 async function updateCommandeStatut(id, statut) {
   try {
     await api('PATCH', `/commandes_vitrine/${id}`, { statut });
+    if (_vitrineInit) renderMesCommandes(_vitrineInit.id);
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+/* Bloc livraison d'une ligne de commande (2026-09-30, demande explicite) — adresse à préparer,
+   bouton d'action qui automatise tout ce qui peut l'être (numéro de suivi généré côté serveur,
+   horodatage, notification à l'acheteur) dès qu'une expédition/un retrait avance d'une étape. */
+function cmdRenderLivraison(c) {
+  if (!c.mode_livraison || !c.statut_livraison) return '';
+  const adresseHtml = c.mode_livraison === 'expedition' && c.livraison_adresse ? `
+    <div style="font-size:12px;color:#334155;margin-top:6px;padding:8px 10px;background:#F8FAFC;border-radius:8px;">
+      📍 ${esc(c.livraison_nom||'')}<br>${esc(c.livraison_adresse||'')}, ${esc(c.livraison_code_postal||'')} ${esc(c.livraison_ville||'')}, ${esc(c.livraison_pays||'')}
+      ${c.livraison_telephone ? `<br>☎ ${esc(c.livraison_telephone)}` : ''}
+    </div>` : '';
+  const LABELS = { a_traiter: 'À préparer', pret_retrait: 'Prêt pour retrait', expedie: 'Expédiée', retire: 'Retirée', livre: 'Livrée' };
+  let action = '';
+  if (c.mode_livraison === 'expedition' && c.statut_livraison === 'a_traiter') {
+    /* Paiement pas encore confirmé (webhook Stripe/PayPal pas encore reçu) : rien à préparer
+       tant que ce n'est pas sûr que l'acheteur a bien payé — voir la même garde côté serveur. */
+    action = c.paiement_statut === 'en_attente'
+      ? `<span style="font-size:12px;color:var(--muted);">⏳ En attente du paiement</span>`
+      : `<button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'expedier')">🚚 Marquer comme expédiée</button>`;
+  } else if (c.mode_livraison === 'expedition' && c.statut_livraison === 'expedie') {
+    action = `<span style="font-size:12px;color:var(--muted);">N° de suivi : <strong>${esc(c.numero_suivi||'')}</strong></span> <button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'livre')">✅ Marquer comme livrée</button>`;
+  } else if (c.mode_livraison === 'retrait' && c.statut_livraison === 'pret_retrait') {
+    action = `<button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'retire')">✅ Client a récupéré</button>`;
+  }
+  return `<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span class="evt-tag" style="background:#EFF6FF;color:#1D4ED8;">${c.mode_livraison==='expedition'?'🚚 Expédition':'🏬 Retrait'} — ${LABELS[c.statut_livraison]||c.statut_livraison}</span>
+      ${action}
+    </div>
+    ${adresseHtml}
+  </div>`;
+}
+
+async function cmdActionLivraison(id, action) {
+  try {
+    await api('PATCH', `/commandes_vitrine/${id}/livraison`, { action });
     if (_vitrineInit) renderMesCommandes(_vitrineInit.id);
   } catch (e) { alert('Erreur : ' + e.message); }
 }

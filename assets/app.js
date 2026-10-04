@@ -409,6 +409,21 @@ function updateTopbarBadge(count) {
   }
 }
 
+/* Badge du nombre d'articles dans le panier (2026-10-02) — même logique que updateTopbarBadge
+   ci-dessus, exposée globalement pour être rafraîchie dès un "Ajouter au panier" sans recharger
+   toute la topbar (voir ajouterAuPanier() dans profil-app.html). */
+function updatePanierBadge(count) {
+  const badge = document.getElementById("panier-topbar-badge");
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count > 9 ? "9+" : count;
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+window.updatePanierBadge = updatePanierBadge;
+
 /* Styles du dropdown notifications (injectés une seule fois) */
 function injectNotifStyles() {
   if (document.getElementById("notif-dropdown-style")) return;
@@ -1484,6 +1499,13 @@ async function applyAuthState() {
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span id="msg-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
       </a>
+      <!-- Panier (2026-10-02, demande explicite : module panier accessible "pour tous les
+           comptes") — même construction que l'icône Messagerie juste au-dessus (pastille de
+           comptage, même style). -->
+      <a href="panier.html" class="topbar-icon-btn" title="Mon panier">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+        <span id="panier-topbar-badge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center;"></span>
+      </a>
       <div class="notif-bell-wrap">
         <button class="notif-bell-btn topbar-icon-btn" id="notif-bell-btn" title="Notifications" onclick="openNotifDropdown(this)">
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -1578,13 +1600,15 @@ async function applyAuthState() {
     if (window.DADemo && user.role !== 'utilisateur') DADemo.checkUser(user);
     // Rappel de vérification d'identité : toutes les 5 connexions, tant que non vérifiée
     checkIdentityReminder(user);
-    // Charger le nombre de messages non lus + notifications non lues
+    // Charger le nombre de messages non lus + notifications non lues + articles du panier
     try {
-      const [msgs, notifs] = await Promise.all([
+      const [msgs, notifs, panier] = await Promise.all([
         api("GET", "/messages/non-lus").catch(()=>({total:0})),
-        api("GET", "/notifications?limit=1").catch(()=>({non_lues:0}))
+        api("GET", "/notifications?limit=1").catch(()=>({non_lues:0})),
+        api("GET", "/panier").catch(()=>({nb_articles:0}))
       ]);
       updateTopbarBadge(msgs.total);
+      updatePanierBadge(panier.nb_articles);
       const nb = document.getElementById("notif-badge");
       if (nb && notifs.non_lues > 0) {
         nb.textContent = notifs.non_lues > 9 ? "9+" : notifs.non_lues;

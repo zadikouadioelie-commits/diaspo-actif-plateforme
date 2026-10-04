@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Mon panier</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Mon panier">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.pn-wrap{max-width:960px;margin:0 auto;padding:22px 16px 60px;}
+.pn-wrap h1{font-size:22px;margin:0 0 4px;}
+.pn-sub{font-size:13px;color:var(--muted);margin:0 0 18px;}
+.pn-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;}
+.pn-vendor{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid var(--border);}
+.pn-vendor-name{font-weight:800;font-size:14.5px;}
+.pn-vendor-name a{color:inherit;text-decoration:none;}
+.pn-vendor-name a:hover{text-decoration:underline;}
+.pn-vendor-tag{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.pn-line{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+.pn-line:last-child{border-bottom:none;}
+.pn-img{width:68px;height:68px;border-radius:10px;object-fit:cover;background:var(--bg);flex:none;display:flex;align-items:center;justify-content:center;font-size:24px;}
+.pn-info{flex:1;min-width:0;}
+.pn-name{font-weight:700;font-size:14px;}
+.pn-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.pn-ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;}
+.pn-qty{display:inline-flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;}
+.pn-qty button{border:none;background:var(--bg);width:28px;height:28px;cursor:pointer;font-size:15px;font-weight:700;}
+.pn-qty span{min-width:30px;text-align:center;font-size:13px;font-weight:700;}
+.pn-sel{padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;background:#fff;}
+.pn-rm{border:none;background:none;color:#B91C1C;font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 6px;}
+.pn-price{font-weight:800;font-size:14px;white-space:nowrap;text-align:right;}
+.pn-warn{font-size:12px;color:#B45309;font-weight:600;margin-top:4px;}
+.pn-input{width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:6px;}
+.pn-pay{display:flex;gap:8px;margin:10px 0;}
+.pn-pay label{flex:1;display:flex;align-items:center;gap:6px;font-size:13px;border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;}
+.pn-total{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:800;margin:12px 0;}
+.pn-btn{padding:11px 20px;border-radius:10px;border:none;background:var(--orange);color:#fff;font-weight:800;font-size:14px;cursor:pointer;width:100%;}
+.pn-btn:disabled{opacity:.6;cursor:default;}
+.pn-banner{padding:12px 14px;border-radius:10px;font-size:13.5px;font-weight:600;margin-bottom:14px;}
+.pn-banner.ok{background:#DCFCE7;color:#166534;}
+.pn-banner.ko{background:#FEF3C7;color:#92400E;}
+.pn-empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:14px;}
+.pn-hist-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+.pn-hist-row:last-child{border-bottom:none;}
+.pn-badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-right:4px;}
+.pn-badge.paye{background:#DCFCE7;color:#166534;}
+.pn-badge.attente{background:#FEF3C7;color:#92400E;}
+.pn-badge.echoue{background:#FEE2E2;color:#991B1B;}
+.pn-badge.livr{background:#EFF6FF;color:#1D4ED8;}
+.pn-tabs{display:flex;gap:6px;margin-bottom:12px;}
+.pn-tab{padding:7px 14px;border-radius:99px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.pn-tab.active{background:#EEF2FF;color:#1d4ed8;border-color:#C7D2FE;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="formations.html">Formations</a>
+        <a href="messagerie.html">Messages</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="pn-wrap">
+    <h1>🛒 Mon panier</h1>
+    <p class="pn-sub">Vos articles en attente de paiement et l'historique de tous vos achats, boutiques et vendeurs confondus.</p>
+
+    <div id="pn-banner"></div>
+
+    <div class="pn-tabs">
+      <button class="pn-tab active" data-tab="panier" onclick="pnTab('panier')">🛒 Panier <span id="pn-tab-count"></span></button>
+      <button class="pn-tab" data-tab="achats" onclick="pnTab('achats')">📦 Mes achats</button>
+    </div>
+
+    <section id="pn-panier"><div class="pn-empty">Chargement…</div></section>
+    <section id="pn-achats" style="display:none;"><div class="pn-empty">Chargement…</div></section>
+  </main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let PN = { items: [], total: 0 };
+let PN_USER = null;
+
+const fmt = (n, devise) => Number(n).toFixed(2) + ' ' + (devise || 'EUR');
+
+function pnTab(tab) {
+  document.querySelectorAll('.pn-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('pn-panier').style.display = tab === 'panier' ? 'block' : 'none';
+  document.getElementById('pn-achats').style.display = tab === 'achats' ? 'block' : 'none';
+  if (tab === 'achats') pnChargerAchats();
+}
+
+function pnBanner() {
+  const p = new URLSearchParams(location.search).get('paiement');
+  const box = document.getElementById('pn-banner');
+  if (p === 'succes') box.innerHTML = '<div class="pn-banner ok">✅ Paiement reçu — vos commandes sont enregistrées. Retrouvez-les dans « Mes achats ».</div>';
+  else if (p === 'annule') box.innerHTML = '<div class="pn-banner ko">Paiement annulé — aucun montant n\'a été débité. Les articles non payés ne sont plus dans votre panier : ajoutez-les de nouveau si besoin.</div>';
+  if (p) history.replaceState(null, '', 'panier.html');
+  if (p === 'succes') pnTab('achats');
+}
+
+async function pnCharger() {
+  try {
+    const r = await api('GET', '/panier');
+    PN = r;
+    pnRender();
+    if (typeof updatePanierBadge === 'function') updatePanierBadge(r.nb_articles);
+  } catch (e) {
+    document.getElementById('pn-panier').innerHTML = '<div class="pn-empty">Impossible de charger le panier.</div>';
+  }
+}
+
+function pnRender() {
+  const box = document.getElementById('pn-panier');
+  document.getElementById('pn-tab-count').textContent = PN.nb_articles ? '(' + PN.nb_articles + ')' : '';
+  if (!PN.items.length) {
+    box.innerHTML = '<div class="pn-card"><div class="pn-empty">Votre panier est vide.<br><a href="vitrines.html" class="btn btn-orange" style="display:inline-block;margin-top:12px;">Découvrir les boutiques</a></div></div>';
+    return;
+  }
+  const parVendeur = {};
+  PN.items.forEach(it => { (parVendeur[it.initiative_id] = parVendeur[it.initiative_id] || []).push(it); });
+  const needsAddress = PN.items.some(it => it.mode_livraison === 'expedition');
+  const bloquant = PN.items.some(it => it.produit_statut !== 'disponible');
+  const nomDefaut = PN_USER ? ((PN_USER.prenom ? PN_USER.prenom + ' ' : '') + (PN_USER.nom || '')) : '';
+
+  const groupes = Object.values(parVendeur).map(lignes => {
+    const v = lignes[0];
+    const sousTotal = lignes.reduce((s, l) => s + l.sous_total, 0);
+    return `<div class="pn-card">
+      <div class="pn-vendor">
+        <div><div class="pn-vendor-tag">Vendu par</div>
+          <div class="pn-vendor-name"><a href="profil.html?id=${v.vendeur_id}&vitrine=1">🏪 ${esc(v.initiative_nom)}</a></div></div>
+        <a href="messagerie.html?with=${v.vendeur_id}" class="btn btn-sm btn-outline">💬 Contacter le vendeur</a>
+      </div>
+      ${lignes.map(l => {
+        const deuxModes = l.livraison_expedition && l.livraison_retrait;
+        return `<div class="pn-line">
+          ${l.photo ? `<img class="pn-img" src="${esc(l.photo)}" alt="" loading="lazy">` : '<div class="pn-img">🛍️</div>'}
+          <div class="pn-info">
+            <div class="pn-name">${esc(l.produit_nom)}</div>
+            <div class="pn-meta">${fmt(l.prix, l.devise)} / unité</div>
+            ${l.produit_statut !== 'disponible' ? '<div class="pn-warn">⚠️ Ce produit n\'est plus disponible — retirez-le pour payer.</div>' : ''}
+            <div class="pn-ctrl">
+              <div class="pn-qty"><button onclick="pnQte(${l.id},${l.quantite - 1})" ${l.quantite <= 1 ? 'disabled' : ''}>−</button><span>${l.quantite}</span><button onclick="pnQte(${l.id},${l.quantite + 1})">+</button></div>
+              ${deuxModes ? `<select class="pn-sel" onchange="pnMode(${l.id},this.value)">
+                <option value="retrait" ${l.mode_livraison === 'retrait' ? 'selected' : ''}>🏬 Retrait sur place</option>
+                <option value="expedition" ${l.mode_livraison === 'expedition' ? 'selected' : ''}>🚚 Expédition${l.frais_expedition > 0 ? ' (+' + fmt(l.frais_expedition, l.devise) + ')' : ' (gratuite)'}</option>
+              </select>` : `<span class="pn-meta">${l.mode_livraison === 'expedition' ? '🚚 Expédition' + (l.frais_expedition > 0 ? ' (+' + fmt(l.frais_expedition, l.devise) + ')' : ' (gratuite)') : '🏬 Retrait sur place'}</span>`}
+              <button class="pn-rm" onclick="pnRetirer(${l.id})">🗑️ Retirer</button>
+            </div>
+          </div>
+          <div class="pn-price">${fmt(l.sous_total, l.devise)}</div>
+        </div>`;
+      }).join('')}
+      <div style="text-align:right;font-size:13px;color:var(--muted);padding-top:8px;">Sous-total ${esc(v.initiative_nom)} : <strong>${fmt(sousTotal, v.devise)}</strong></div>
+    </div>`;
+  }).join('');
+
+  const adresse = needsAddress ? `<div style="margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px;">🚚 Adresse de livraison (articles en expédition)</div>
+      <input class="pn-input" id="pn-nom" placeholder="Nom et prénom" value="${esc(nomDefaut)}">
+      <input class="pn-input" id="pn-adresse" placeholder="Adresse" value="${esc(PN_USER?.adresse || '')}">
+      <div style="display:flex;gap:6px;"><input class="pn-input" id="pn-cp" placeholder="Code postal" value="${esc(PN_USER?.code_postal || '')}" style="flex:1;"><input class="pn-input" id="pn-ville" placeholder="Ville" value="${esc(PN_USER?.ville || '')}" style="flex:2;"></div>
+      <input class="pn-input" id="pn-pays" placeholder="Pays" value="${esc(PN_USER?.pays || '')}">
+      <input class="pn-input" id="pn-tel" placeholder="Téléphone (optionnel)" value="${esc(PN_USER?.telephone || '')}">
+    </div>` : '';
+
+  box.innerHTML = groupes + `<div class="pn-card">
+    ${adresse}
+    <div style="font-size:13px;font-weight:700;">Moyen de paiement</div>
+    <div class="pn-pay">
+      <label><input type="radio" name="pn-provider" value="stripe" checked> 💳 Carte</label>
+      <label><input type="radio" name="pn-provider" value="paypal"> 🅿️ PayPal</label>
+    </div>
+    <div class="pn-total"><span>Total (${PN.nb_articles} article${PN.nb_articles > 1 ? 's' : ''})</span><span>${fmt(PN.total, PN.items[0].devise)}</span></div>
+    <p id="pn-err" style="color:#dc2626;font-size:12.5px;display:none;margin:0 0 8px;"></p>
+    <button class="pn-btn" id="pn-payer" onclick="pnPayer()" ${bloquant ? 'disabled' : ''}>💳 Payer ${fmt(PN.total, PN.items[0].devise)}</button>
+    <div style="text-align:center;margin-top:10px;"><button class="pn-rm" onclick="pnVider()">Vider le panier</button></div>
+  </div>`;
+}
+
+async function pnAction(fn) {
+  try { await fn(); await pnCharger(); } catch (e) { alert(e.message || 'Erreur.'); }
+}
+const pnQte = (id, q) => pnAction(() => api('PATCH', '/panier/' + id, { quantite: q }));
+const pnMode = (id, m) => pnAction(() => api('PATCH', '/panier/' + id, { mode_livraison: m }));
+const pnRetirer = id => pnAction(() => api('DELETE', '/panier/' + id));
+const pnVider = () => { if (confirm('Vider tout le panier ?')) pnAction(() => api('DELETE', '/panier')); };
+
+async function pnPayer() {
+  const err = document.getElementById('pn-err');
+  const btn = document.getElementById('pn-payer');
+  err.style.display = 'none';
+  const needsAddress = PN.items.some(it => it.mode_livraison === 'expedition');
+  const body = { provider: document.querySelector('input[name="pn-provider"]:checked')?.value || 'stripe' };
+  if (needsAddress) {
+    Object.assign(body, {
+      livraison_nom: document.getElementById('pn-nom').value.trim(),
+      livraison_adresse: document.getElementById('pn-adresse').value.trim(),
+      livraison_code_postal: document.getElementById('pn-cp').value.trim(),
+      livraison_ville: document.getElementById('pn-ville').value.trim(),
+      livraison_pays: document.getElementById('pn-pays').value.trim(),
+      livraison_telephone: document.getElementById('pn-tel').value.trim() || null,
+    });
+  }
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/panier/commander', body);
+    if (r.checkout_url) { window.location.href = r.checkout_url; return; }
+    await pnCharger();
+  } catch (e) {
+    err.textContent = e.message || 'Erreur.';
+    err.style.display = 'block';
+    btn.disabled = false;
+  }
+}
+
+const PN_LIV = { a_traiter: 'À préparer', pret_retrait: 'Prêt pour retrait', expedie: 'Expédiée', retire: 'Retirée', livre: 'Livrée' };
+
+async function pnChargerAchats() {
+  const box = document.getElementById('pn-achats');
+  try {
+    const r = await api('GET', '/mes-commandes-boutique');
+    const cmds = r.commandes || [];
+    if (!cmds.length) { box.innerHTML = '<div class="pn-card"><div class="pn-empty">Aucun achat pour le moment.</div></div>'; return; }
+    box.innerHTML = '<div class="pn-card">' + cmds.map(c => {
+      const pay = c.paiement_statut === 'paye' ? '<span class="pn-badge paye">Payé</span>'
+        : c.paiement_statut === 'en_attente' ? '<span class="pn-badge attente">Paiement en attente</span>'
+        : c.paiement_statut === 'echoue' ? '<span class="pn-badge echoue">Paiement échoué</span>'
+        : '<span class="pn-badge attente">Demande envoyée</span>';
+      const liv = c.mode_livraison && c.statut_livraison && c.paiement_statut !== 'echoue'
+        ? `<span class="pn-badge livr">${c.mode_livraison === 'expedition' ? '🚚' : '🏬'} ${PN_LIV[c.statut_livraison] || esc(c.statut_livraison)}</span>` : '';
+      const suivi = c.numero_suivi ? `<div class="pn-meta">N° de suivi : <strong>${esc(c.numero_suivi)}</strong></div>` : '';
+      return `<div class="pn-hist-row">
+        ${c.photo ? `<img class="pn-img" src="${esc(c.photo)}" alt="" loading="lazy">` : '<div class="pn-img">🛍️</div>'}
+        <div class="pn-info">
+          <div class="pn-name">${esc(c.produit_nom)} × ${c.quantite}</div>
+          <div class="pn-meta">Vendu par <a href="profil.html?id=${c.vendeur_id}&vitrine=1" style="font-weight:700;">${esc(c.initiative_nom)}</a> · ${esc(String(c.created_at || '').slice(0, 10))}</div>
+          <div style="margin-top:6px;">${pay}${liv}</div>
+          ${suivi}
+        </div>
+        <div class="pn-price">${c.montant_total != null ? Number(c.montant_total).toFixed(2) + ' €' : '—'}</div>
+      </div>`;
+    }).join('') + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="pn-card"><div class="pn-empty">Impossible de charger vos achats.</div></div>';
+  }
+}
+
+(async function init() {
+  PN_USER = await fetchCurrentUser().catch(() => null);
+  if (!PN_USER) { window.location.href = 'login.html'; return; }
+  pnBanner();
+  pnCharger();
+})();
+</script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

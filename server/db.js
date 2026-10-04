@@ -7672,6 +7672,34 @@ db.exec(`
      invité, réglable par vitrine. */
   ["produits_vitrine", "devis_active INTEGER"],
   ["initiatives", "vitrine_devis_tel_requis INTEGER DEFAULT 0"],
+  /* Livraison boutique (2026-09-30, demande explicite : "que reste-t-il... le système de
+     livraison" → "fait le maximum de choses en automatisation") — jusqu'ici, une commande ne
+     recueillait aucune adresse, aucun mode de livraison, aucun frais, et n'avait aucun statut
+     d'expédition ni numéro de suivi : payer un produit ne disait jamais au vendeur où l'envoyer.
+     Colonnes de configuration côté produit (retrait/expédition, frais) : valeurs par défaut
+     choisies pour ne RIEN changer aux produits déjà créés (retrait actif, expédition inactive,
+     donc toujours "Envoyer la demande"/"Payer" sans nouveau champ tant que le vendeur n'a pas
+     activé l'expédition lui-même). statut_livraison est une colonne SÉPARÉE de `statut`
+     (paiement/traitement, CHECK déjà figé) — jamais de CHECK ici, validé uniquement côté
+     application (voir PATCH /api/commandes_vitrine/:id/livraison), pour ne jamais toucher à la
+     contrainte existante sur une table déjà en production. numero_suivi est généré
+     AUTOMATIQUEMENT par le serveur à l'expédition (jamais saisi à la main) — voir la référence
+     dans /api/commandes_vitrine/:id/livraison. */
+  ["produits_vitrine", "livraison_retrait INTEGER DEFAULT 1"],
+  ["produits_vitrine", "livraison_expedition INTEGER DEFAULT 0"],
+  ["produits_vitrine", "frais_expedition REAL"],
+  ["commandes_vitrine", "mode_livraison TEXT"],
+  ["commandes_vitrine", "livraison_nom TEXT"],
+  ["commandes_vitrine", "livraison_adresse TEXT"],
+  ["commandes_vitrine", "livraison_code_postal TEXT"],
+  ["commandes_vitrine", "livraison_ville TEXT"],
+  ["commandes_vitrine", "livraison_pays TEXT"],
+  ["commandes_vitrine", "livraison_telephone TEXT"],
+  ["commandes_vitrine", "frais_livraison REAL DEFAULT 0"],
+  ["commandes_vitrine", "statut_livraison TEXT"],
+  ["commandes_vitrine", "numero_suivi TEXT"],
+  ["commandes_vitrine", "expedie_le TEXT"],
+  ["commandes_vitrine", "livre_le TEXT"],
 ].forEach(([table, col]) => {
   const colName = col.split(" ")[0];
   try {
@@ -7679,6 +7707,27 @@ db.exec(`
     if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
   } catch (e) { /* déjà présent */ }
 });
+
+/* Panier d'achat multi-vendeurs (2026-10-02, demande explicite : « crée un système de panier
+   pour les acheteurs comme pour temus et amazone ») — un article en attente de paiement, par
+   acheteur. mode_livraison est choisi dès l'ajout (pré-rempli selon ce que le produit propose,
+   modifiable avant paiement). Au passage en caisse, chaque article du panier devient sa propre
+   ligne commandes_vitrine (même table, même logique métier que l'achat direct existant) : un
+   panier multi-vendeurs produit donc naturellement une commande par vendeur, sans aucune
+   nouvelle colonne sur commandes_vitrine. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS panier_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    produit_id INTEGER NOT NULL,
+    quantite INTEGER DEFAULT 1,
+    mode_livraison TEXT DEFAULT 'retrait',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, produit_id, mode_livraison),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id)
+  );
+`);
 
 /* Second passage de appliquerMigrations() (voir sa définition ~ligne 2679) : 13 tables
    référencées par MIGRATIONS sont créées plus haut dans ce fichier mais APRÈS le premier

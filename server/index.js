@@ -2213,6 +2213,21 @@ route("GET", "/api/auth/me", async (req, res) => {
     } catch (e) { pub.origine_manquante = false; }
   }
 
+  /* Adresse de livraison (2026-09-30, demande explicite : "fait le maximum de choses en
+     automatisation") — pré-remplit le formulaire d'adresse du module Livraison Boutique
+     (profil-app.html, openCommanderModal) sans que l'acheteur ait à tout retaper. Ajoutés
+     UNIQUEMENT ici (jamais dans publicUser(), utilisée aussi pour exposer un compte À
+     D'AUTRES personnes) : /api/auth/me ne renvoie jamais que les données du compte connecté
+     lui-même, aucun risque de fuite vers un tiers. */
+  if (pub) {
+    try {
+      const u = await db.prepare("SELECT adresse, code_postal, telephone FROM users WHERE id=?").get(user.id);
+      pub.adresse = u?.adresse || null;
+      pub.code_postal = u?.code_postal || null;
+      pub.telephone = u?.telephone || null;
+    } catch (e) { /* champs de pré-remplissage best-effort, jamais bloquant */ }
+  }
+
   sendJSON(res, 200, { user: pub });
 });
 
@@ -2727,7 +2742,7 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const count = (await db.prepare("SELECT COUNT(*) n FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.n || 0;
   if (Number(count) >= MAX_PRODUITS_VITRINE) return sendJSON(res, 400, { error: `Limite de ${MAX_PRODUITS_VITRINE} produits atteinte. Supprimez-en un pour en ajouter un nouveau.` });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition } = body;
   if (!nom) return sendJSON(res, 400, { error: "Nom du produit requis." });
   let catId = null;
   if (catalogue_id != null && catalogue_id !== '') {
@@ -2744,10 +2759,17 @@ route("POST", "/api/initiatives/:id/produits", async (req, res, params, body) =>
   const devisActiveVal = devis_active === true || devis_active === 1 ? 1 : (devis_active === false || devis_active === 0 ? 0 : null);
   const maxOrdre = (await db.prepare("SELECT MAX(ordre) m FROM produits_vitrine WHERE initiative_id=?").get(params.id))?.m;
   const ref = (reference && reference.trim()) || ('REF-' + Date.now().toString(36).toUpperCase().slice(-6));
+  /* Livraison (2026-09-30, demande explicite) — retrait actif par défaut (comportement inchangé
+     pour un vendeur qui ne touche à rien), expédition explicitement activée par le vendeur avant
+     de pouvoir être proposée à l'achat (voir POST /api/produits/:id/commander, qui refuse
+     mode_livraison="expedition" si livraison_expedition=0). */
+  const livraisonRetraitVal = livraison_retrait === false || livraison_retrait === 0 ? 0 : 1;
+  const livraisonExpeditionVal = livraison_expedition === true || livraison_expedition === 1 ? 1 : 0;
+  const fraisExpeditionVal = frais_expedition != null && frais_expedition !== '' ? Number(frais_expedition) : null;
   const id = (await db.prepare(`
-    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id, devis_active)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId, devisActiveVal)).lastInsertRowid;
+    INSERT INTO produits_vitrine (initiative_id, nom, description, prix, devise, disponible, statut, date_retour, reference, categorie, photos_json, ordre, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, nom, description || null, prix != null ? Number(prix) : null, devise || "EUR", dispo, st, date_retour || null, ref, categorie || null, JSON.stringify(photosArr), (Number(maxOrdre) || 0) + 1, prix_promo != null && prix_promo !== '' ? Number(prix_promo) : null, catId, devisActiveVal, livraisonRetraitVal, livraisonExpeditionVal, fraisExpeditionVal)).lastInsertRowid;
   // Notifie les abonnés de la vitrine (sauf produit masqué)
   if (st !== 'masque') {
     notifierAbonnes(params.id, "vitrine_produit", "Nouveau produit en boutique",
@@ -2765,8 +2787,11 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
   const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(prod.initiative_id);
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
 
-  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active } = body;
+  const { nom, description, prix, devise, categorie, photos, statut, date_retour, reference, prix_promo, catalogue_id, devis_active, livraison_retrait, livraison_expedition, frais_expedition } = body;
   const photosArr = Array.isArray(photos) ? photos.slice(0, 4) : safeParse(prod.photos_json || "[]");
+  const livraisonRetraitVal = livraison_retrait !== undefined ? (livraison_retrait === false || livraison_retrait === 0 ? 0 : 1) : prod.livraison_retrait;
+  const livraisonExpeditionVal = livraison_expedition !== undefined ? (livraison_expedition === true || livraison_expedition === 1 ? 1 : 0) : prod.livraison_expedition;
+  const fraisExpeditionVal = frais_expedition !== undefined ? (frais_expedition === null || frais_expedition === '' ? null : Number(frais_expedition)) : prod.frais_expedition;
   const ancienStatut = prod.statut || 'disponible';
   const nouveauStatut = ['disponible','indisponible','epuise','masque'].includes(statut) ? statut : ancienStatut;
   const dispo = nouveauStatut === 'disponible' ? 1 : 0;
@@ -2789,7 +2814,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
     : prod.devis_active;
 
   await db.prepare(`
-    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=?, devis_active=? WHERE id=?
+    UPDATE produits_vitrine SET nom=?, description=?, prix=?, devise=?, disponible=?, statut=?, date_retour=?, reference=?, categorie=?, photos_json=?, prix_promo=?, catalogue_id=?, devis_active=?, livraison_retrait=?, livraison_expedition=?, frais_expedition=? WHERE id=?
   `).run(
     nom || prod.nom, description !== undefined ? description : prod.description,
     prix != null ? Number(prix) : prod.prix, devise || prod.devise, dispo,
@@ -2797,7 +2822,7 @@ route("PUT", "/api/produits/:id", async (req, res, params, body) => {
     reference !== undefined ? reference : prod.reference,
     categorie !== undefined ? categorie : prod.categorie, JSON.stringify(photosArr),
     prix_promo !== undefined ? (prix_promo === null || prix_promo === '' ? null : Number(prix_promo)) : prod.prix_promo,
-    catId, devisActiveVal,
+    catId, devisActiveVal, livraisonRetraitVal, livraisonExpeditionVal, fraisExpeditionVal,
     params.id
   );
 
@@ -4658,10 +4683,58 @@ route("GET", "/api/initiatives/:id/meilleures-ventes", async (req, res, params) 
   sendJSON(res, 200, { produits: rows, total_commandes: total?.n || 0 });
 });
 
+/* Applique le crédit/notifications d'une commande Boutique payée — factorisé (2026-09-29) hors du
+   webhook Stripe pour être appelé aussi bien par celui-ci (checkout.session.completed) que par la
+   capture PayPal (POST /api/paypal/commandes/:id/capturer), qui n'a pas de webhook signé
+   équivalent. Idempotent : ne fait rien si la commande n'est plus 'en_attente' (copié tel quel
+   depuis l'ancienne logique inline du webhook, aucun changement de comportement Stripe). */
+async function finaliserCommandeVitrinePayee(commandeId) {
+  const cmd = await db.prepare(`SELECT * FROM commandes_vitrine WHERE id=? AND paiement_statut='en_attente'`).get(commandeId);
+  if (!cmd) return;
+  const [prod, init] = await Promise.all([
+    db.prepare(`SELECT * FROM produits_vitrine WHERE id=?`).get(cmd.produit_id),
+    db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(cmd.initiative_id),
+  ]);
+  const COMMISSION_RATE = 0.03;
+  const montant = Number(cmd.montant_total) || 0;
+  const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
+  const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
+  /* Retrait sur place : automatiquement "prêt pour retrait" dès que le paiement est confirmé,
+     aucune action manuelle du vendeur nécessaire pour cette étape (2026-09-30, demande explicite
+     : "fait le maximum de choses en automatisation"). Une expédition reste "a_traiter" : préparer
+     et expédier un colis est une vraie action physique du vendeur, jamais automatisable. */
+  await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='paye', statut='traitee', statut_livraison=CASE WHEN mode_livraison='retrait' THEN 'pret_retrait' ELSE statut_livraison END WHERE id=?`).run(commandeId);
+  await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
+    .run(commandeId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+  await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
+    .run(commandeId, init.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
+  await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
+  await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
+  try {
+    await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'commande_boutique',?,'reussi',?,?)`)
+      .run(cmd.acheteur_id, montant, 'commande_boutique', new Date().toISOString());
+  } catch (e) { /* table transactions peut avoir schema différent */ }
+  /* Message adapté au mode de livraison (2026-09-30, demande explicite) — le vendeur voit
+     immédiatement s'il doit préparer un retrait ou une expédition, avec l'adresse le cas échéant,
+     sans avoir à rouvrir la commande. */
+  const retrait = cmd.mode_livraison === 'retrait';
+  creerNotif(cmd.acheteur_id, "commande_payee", "Commande payée ✅",
+    retrait
+      ? `Votre commande « ${prod?.nom || ''} » (x${cmd.quantite}) est confirmée — prête à être retirée auprès de ${init?.nom || "l'initiative"}.`
+      : `Votre commande « ${prod?.nom || ''} » (x${cmd.quantite}) est confirmée — elle sera bientôt expédiée à l'adresse indiquée.`,
+    { commande_id: commandeId });
+  creerNotif(init.owner_user_id, "commande_vendue", "Nouvelle vente 🛍️",
+    retrait
+      ? `« ${prod?.nom || ''} » vendu (x${cmd.quantite}, +${organizer_amount}€) — à préparer pour retrait sur place.`
+      : `« ${prod?.nom || ''} » vendu (x${cmd.quantite}, +${organizer_amount}€) — à expédier à ${cmd.livraison_ville || ''}, ${cmd.livraison_pays || ''}.`,
+    { commande_id: commandeId });
+}
+
 /* POST /api/produits/:id/commander — visiteur connecté.
-   Si le produit a un prix (prod.prix > 0) : vraie session Stripe Checkout (même modèle que la Billetterie —
-   paiement encaissé sur le compte plateforme, crédité en wallet_balance à l'initiative moins 3% de commission,
-   retiré ensuite via le Centre Financier). Sinon (produit "sur devis"/service sans prix) : ancien flux de
+   Si le produit a un prix (prod.prix > 0) : vraie session de paiement (Stripe Checkout par défaut,
+   ou PayPal si body.provider==='paypal' — même modèle que la Billetterie : paiement encaissé sur
+   le compte plateforme, crédité en wallet_balance à l'initiative moins 3% de commission, retiré
+   ensuite via le Centre Financier). Sinon (produit "sur devis"/service sans prix) : ancien flux de
    demande de contact inchangé. */
 route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
@@ -4675,21 +4748,84 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
   const quantite = Math.max(1, Number(body.quantite) || 1);
   const publicationId = body.publication_id != null ? Number(body.publication_id) : null;
 
-  /* ── Produit payant : vraie session Stripe Checkout ── */
+  /* Livraison (2026-09-30, demande explicite) — le mode choisi doit correspondre à une option
+     réellement activée par le vendeur (jamais une valeur envoyée par le client sans contrôle
+     serveur, même logique que partout ailleurs sur cette route). "retrait" reste le mode par
+     défaut si le vendeur n'a même pas activé l'expédition (comportement identique à avant
+     l'ajout de ce module pour tout produit qui ne l'utilise pas). L'adresse n'est exigée QUE
+     pour l'expédition — jamais pour un retrait sur place. */
+  const modeLivraisonDemande = body.mode_livraison === "expedition" ? "expedition" : "retrait";
+  if (modeLivraisonDemande === "expedition" && !prod.livraison_expedition) {
+    return sendJSON(res, 400, { error: "L'expédition n'est pas proposée pour ce produit." });
+  }
+  if (modeLivraisonDemande === "retrait" && !prod.livraison_retrait && prod.livraison_expedition) {
+    return sendJSON(res, 400, { error: "Le retrait sur place n'est pas proposé pour ce produit." });
+  }
+  let livraisonNom = null, livraisonAdresse = null, livraisonCodePostal = null, livraisonVille = null, livraisonPays = null, livraisonTelephone = null;
+  let fraisLivraison = 0;
+  if (modeLivraisonDemande === "expedition") {
+    livraisonNom = String(body.livraison_nom || "").trim();
+    livraisonAdresse = String(body.livraison_adresse || "").trim();
+    livraisonCodePostal = String(body.livraison_code_postal || "").trim();
+    livraisonVille = String(body.livraison_ville || "").trim();
+    livraisonPays = String(body.livraison_pays || "").trim();
+    livraisonTelephone = String(body.livraison_telephone || "").trim() || null;
+    if (!livraisonNom || !livraisonAdresse || !livraisonCodePostal || !livraisonVille || !livraisonPays) {
+      return sendJSON(res, 400, { error: "Adresse de livraison incomplète (nom, adresse, code postal, ville et pays requis)." });
+    }
+    fraisLivraison = prod.frais_expedition != null ? Number(prod.frais_expedition) : 0;
+  }
+
+  /* ── Produit payant : vraie session de paiement (Stripe par défaut, ou PayPal) ── */
   if (prod.prix != null && Number(prod.prix) > 0) {
     /* Vendre réellement (encaisser un paiement) est réservé aux initiatives Abonné —
        configurer produits/prix reste libre, voir GET /api/initiatives/:id/produits. */
     if (!(await hasAccreditation(init.owner_user_id, "initiative_abonne"))) {
       return sendJSON(res, 402, { error: "Cette boutique n'est pas encore ouverte à la vente (initiative non Abonné)." });
     }
+    const provider = body.provider === "paypal" ? "paypal" : "stripe";
+    /* Vérifier la disponibilité du prestataire AVANT de créer la commande — sinon une
+       indisponibilité laisse une ligne 'en_attente' orpheline, jamais marquée 'echoue'
+       (aucun webhook/retour ne viendra jamais la clôturer). */
+    const { paypalEnabled, createOrder } = require("./paypal-client");
     const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
-    if (!stripe) return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+    if (provider === "paypal" ? !paypalEnabled : !stripe) {
+      return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+    }
 
-    const montantTotal = parseFloat((Number(prod.prix) * quantite).toFixed(2));
+    /* Frais de livraison inclus automatiquement dans le montant encaissé (2026-09-30, demande
+       explicite) — calculé côté serveur à partir de la configuration du produit, jamais transmis
+       par le client, même garde que le prix unitaire juste au-dessus. */
+    const montantTotal = parseFloat((Number(prod.prix) * quantite + fraisLivraison).toFixed(2));
+    /* statut_livraison démarre à "a_traiter" même pour un retrait : il ne bascule en
+       "pret_retrait" QU'après confirmation réelle du paiement (finaliserCommandeVitrinePayee),
+       jamais avant — sinon un produit apparaîtrait "prêt" alors que le paiement peut encore
+       échouer/être annulé. */
     const id = (await db.prepare(`
-      INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite, paiement_statut, montant_total)
-      VALUES (?,?,?,?,?,?,'en_attente',?)
-    `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite, montantTotal)).lastInsertRowid;
+      INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite, paiement_statut, montant_total, provider,
+        mode_livraison, livraison_nom, livraison_adresse, livraison_code_postal, livraison_ville, livraison_pays, livraison_telephone, frais_livraison, statut_livraison)
+      VALUES (?,?,?,?,?,?,'en_attente',?,?,?,?,?,?,?,?,?,?,'a_traiter')
+    `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite, montantTotal, provider,
+      modeLivraisonDemande, livraisonNom, livraisonAdresse, livraisonCodePostal, livraisonVille, livraisonPays, livraisonTelephone, fraisLivraison)).lastInsertRowid;
+
+    if (provider === "paypal") {
+      try {
+        const origin = getOrigin(req);
+        const order = await createOrder({
+          amount: montantTotal,
+          currency: (prod.devise || "EUR").toUpperCase(),
+          description: `${prod.nom} (x${quantite})${fraisLivraison > 0 ? ' + frais de livraison' : ''}`,
+          custom_id: id,
+          return_url: `${origin}/api/paypal/commandes/${id}/retour?id=${init.owner_user_id}`,
+          cancel_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=annule&commande=${id}`,
+        });
+        await db.prepare(`UPDATE commandes_vitrine SET paypal_order_id=? WHERE id=?`).run(order.id, id);
+        return sendJSON(res, 201, { ok: true, id, checkout_url: order.approveUrl });
+      } catch (e) {
+        await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=?`).run(id);
+        return sendJSON(res, 500, SEC.safeError(e, "commander-produit-paypal"));
+      }
+    }
 
     try {
       const origin = getOrigin(req);
@@ -4704,7 +4840,14 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
             product_data: { name: prod.nom },
           },
           quantity: quantite,
-        }],
+        }, ...(fraisLivraison > 0 ? [{
+          price_data: {
+            currency: (prod.devise || "EUR").toLowerCase(),
+            unit_amount: Math.round(fraisLivraison * 100),
+            product_data: { name: "Frais de livraison" },
+          },
+          quantity: 1,
+        }] : [])],
         ...(body.enregistrer_carte ? { payment_intent_data: { setup_future_usage: "off_session" } } : {}),
         metadata: { diaspoactif_commande_vitrine_id: String(id) },
         success_url: `${origin}/profil.html?id=${init.owner_user_id}&vitrine=1&paiement=succes&commande=${id}`,
@@ -4718,16 +4861,357 @@ route("POST", "/api/produits/:id/commander", async (req, res, params, body) => {
     }
   }
 
-  /* ── Produit sans prix (sur devis / service) : demande de contact classique ── */
+  /* ── Produit sans prix (sur devis / service) : demande de contact classique ──
+     Adresse de livraison capturée si l'acheteur l'a renseignée (mode_livraison="expedition"),
+     mais jamais exigée ici : le prix reste à négocier, la logistique se précisera avec le
+     vendeur via le message/la conversation. Retrait : "prêt" immédiatement, il n'y a ici aucun
+     paiement à attendre (contrairement au flux payant, où l'auto-transition n'a lieu qu'à la
+     confirmation du paiement, voir finaliserCommandeVitrinePayee) — sans ce cas, une commande
+     gratuite en retrait resterait "à traiter" indéfiniment, sans aucune action possible pour le
+     vendeur. */
   const id = (await db.prepare(`
-    INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite) VALUES (?,?,?,?,?,?)
-  `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite)).lastInsertRowid;
+    INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, publication_id, message, quantite,
+      mode_livraison, livraison_nom, livraison_adresse, livraison_code_postal, livraison_ville, livraison_pays, livraison_telephone, frais_livraison, statut_livraison)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(params.id, prod.initiative_id, user.id, publicationId, body.message || null, quantite,
+    modeLivraisonDemande, livraisonNom, livraisonAdresse, livraisonCodePostal, livraisonVille, livraisonPays, livraisonTelephone, fraisLivraison,
+    modeLivraisonDemande === "retrait" ? "pret_retrait" : "a_traiter")).lastInsertRowid;
 
   creerNotif(init.owner_user_id, "commande", "Nouvelle demande de commande",
     `${await nomCompteAffichage(user.id)} souhaite commander « ${prod.nom} » (x${quantite})`,
     { produit_id: prod.id, commande_id: id });
 
   sendJSON(res, 201, { ok: true, id });
+});
+
+/* GET /api/paypal/commandes/:id/retour — return_url PayPal (l'acheteur revient ici après avoir
+   approuvé le paiement sur paypal.com). PayPal n'exige pas de webhook signé pour ce flux simple
+   "capture au retour" (contrairement à Stripe) : on capture ici même, puis on redirige vers la
+   même page profil.html?...&paiement=succes que Stripe utilise — le front ne distingue donc pas
+   les deux prestataires. Idempotent (finaliserCommandeVitrinePayee ne traite qu'une commande
+   encore 'en_attente' ; une capture PayPal déjà faite est tolérée en best-effort). */
+route("GET", "/api/paypal/commandes/:id/retour", async (req, res, params) => {
+  const commandeId = Number(params.id);
+  const cmd = await db.prepare("SELECT * FROM commandes_vitrine WHERE id=?").get(commandeId);
+  const origin = getOrigin(req);
+  if (!cmd || !cmd.paypal_order_id) {
+    res.writeHead(302, { Location: `${origin}/profil.html?vitrine=1&paiement=annule&commande=${commandeId}` });
+    return res.end();
+  }
+  try {
+    const { captureOrder } = require("./paypal-client");
+    await captureOrder(cmd.paypal_order_id);
+    await finaliserCommandeVitrinePayee(commandeId);
+  } catch (e) {
+    logError(e, "paypal-capture-commande-vitrine", req);
+  }
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cmd.initiative_id);
+  res.writeHead(302, { Location: `${origin}/profil.html?id=${init?.owner_user_id || ''}&vitrine=1&paiement=succes&commande=${commandeId}` });
+  res.end();
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   MODULE PANIER — achat multi-vendeurs façon Temu/Amazon (2026-10-02, demande explicite :
+   "crée un système de panier pour les acheteurs... branche les paiements... pour toutes les
+   boutiques" + "crée un module panier pour tous les comptes... tous les achats et éléments
+   ajoutés au panier avec identification du vendeur"). Un article de panier_items devient, au
+   paiement, sa propre ligne commandes_vitrine : la logique de commission/livraison/notification
+   déjà en place pour un achat direct (finaliserCommandeVitrinePayee, PATCH .../livraison) est
+   réutilisée sans aucune duplication, qu'il y ait un ou plusieurs vendeurs dans le panier.
+   Réservé aux produits à prix fixe (prix > 0) : un produit "sur devis" reste sur son propre
+   circuit de demande de contact (Commander / Demander un devis), un panier suppose un montant
+   déjà connu à payer, comme chez tout commerçant en ligne. ══════════════════════════════════ */
+
+/* GET /api/panier — contenu du panier courant, groupable par vendeur côté client via
+   initiative_id/initiative_nom déjà présents sur chaque ligne. */
+route("GET", "/api/panier", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const items = await db.prepare(`
+    SELECT pi.id, pi.produit_id, pi.quantite, pi.mode_livraison, pi.created_at,
+      p.nom AS produit_nom, p.prix, p.devise, p.photos_json, p.statut AS produit_statut,
+      p.livraison_retrait, p.livraison_expedition, p.frais_expedition,
+      i.id AS initiative_id, i.nom AS initiative_nom, i.owner_user_id AS vendeur_id
+    FROM panier_items pi
+    JOIN produits_vitrine p ON p.id = pi.produit_id
+    JOIN initiatives i ON i.id = p.initiative_id
+    WHERE pi.user_id = ?
+    ORDER BY pi.created_at DESC
+  `).all(user.id);
+  const lignes = items.map(it => {
+    const prix = Number(it.prix) || 0;
+    const fraisLivraison = it.mode_livraison === "expedition" && it.frais_expedition != null ? Number(it.frais_expedition) : 0;
+    let photos = [];
+    try { photos = JSON.parse(it.photos_json || "[]"); } catch (e) {}
+    return {
+      id: it.id, produit_id: Number(it.produit_id), quantite: Number(it.quantite), mode_livraison: it.mode_livraison,
+      produit_nom: it.produit_nom, prix, devise: it.devise || "EUR", photo: photos[0] || null,
+      produit_statut: it.produit_statut || "disponible",
+      livraison_retrait: !!Number(it.livraison_retrait), livraison_expedition: !!Number(it.livraison_expedition),
+      frais_expedition: it.frais_expedition != null ? Number(it.frais_expedition) : 0,
+      initiative_id: Number(it.initiative_id), initiative_nom: it.initiative_nom, vendeur_id: Number(it.vendeur_id),
+      sous_total: parseFloat((prix * it.quantite + fraisLivraison).toFixed(2)),
+    };
+  });
+  const total = parseFloat(lignes.reduce((s, l) => s + l.sous_total, 0).toFixed(2));
+  const nb_articles = lignes.reduce((s, l) => s + l.quantite, 0);
+  sendJSON(res, 200, { ok: true, items: lignes, total, nb_articles });
+});
+
+/* POST /api/panier — ajouter un produit (fusionne avec la ligne existante même produit+mode de
+   livraison : "Ajouter au panier" deux fois incrémente la quantité, ne duplique jamais la ligne). */
+route("POST", "/api/panier", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const produitId = Number(body.produit_id);
+  const prod = await db.prepare("SELECT * FROM produits_vitrine WHERE id=?").get(produitId);
+  if (!prod) return sendJSON(res, 404, { error: "Produit introuvable." });
+  const init = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(prod.initiative_id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) === Number(user.id)) return sendJSON(res, 400, { error: "Vous ne pouvez pas ajouter votre propre produit au panier." });
+  if (prod.prix == null || Number(prod.prix) <= 0) {
+    return sendJSON(res, 400, { error: "Ce produit n'a pas de prix fixe — utilisez « Demander un devis » ou « Commander »." });
+  }
+  if ((prod.statut || "disponible") !== "disponible") return sendJSON(res, 400, { error: "Ce produit n'est plus disponible." });
+
+  const quantite = Math.max(1, Number(body.quantite) || 1);
+  /* Même garde que POST /api/produits/:id/commander : le mode choisi doit être réellement
+     proposé par le vendeur, jamais une valeur envoyée par le client sans contrôle serveur. */
+  const modeLivraisonDemande = body.mode_livraison === "expedition" ? "expedition" : "retrait";
+  if (modeLivraisonDemande === "expedition" && !prod.livraison_expedition) {
+    return sendJSON(res, 400, { error: "L'expédition n'est pas proposée pour ce produit." });
+  }
+  if (modeLivraisonDemande === "retrait" && !prod.livraison_retrait && prod.livraison_expedition) {
+    return sendJSON(res, 400, { error: "Le retrait sur place n'est pas proposé pour ce produit." });
+  }
+
+  const existant = await db.prepare("SELECT id FROM panier_items WHERE user_id=? AND produit_id=? AND mode_livraison=?").get(user.id, produitId, modeLivraisonDemande);
+  if (existant) {
+    await db.prepare("UPDATE panier_items SET quantite=quantite+? WHERE id=?").run(quantite, existant.id);
+  } else {
+    await db.prepare("INSERT INTO panier_items (user_id, produit_id, quantite, mode_livraison) VALUES (?,?,?,?)").run(user.id, produitId, quantite, modeLivraisonDemande);
+  }
+  const nb = (await db.prepare("SELECT COALESCE(SUM(quantite),0) AS n FROM panier_items WHERE user_id=?").get(user.id)).n;
+  sendJSON(res, 201, { ok: true, nb_articles: Number(nb) });
+});
+
+/* PATCH /api/panier/:id — modifier la quantité et/ou le mode de livraison d'une ligne. */
+route("PATCH", "/api/panier/:id", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const item = await db.prepare("SELECT * FROM panier_items WHERE id=? AND user_id=?").get(params.id, user.id);
+  if (!item) return sendJSON(res, 404, { error: "Article introuvable." });
+  if (body.quantite != null) {
+    const q = Math.max(1, Number(body.quantite) || 1);
+    await db.prepare("UPDATE panier_items SET quantite=? WHERE id=?").run(q, item.id);
+  }
+  if (body.mode_livraison && ["retrait", "expedition"].includes(body.mode_livraison) && body.mode_livraison !== item.mode_livraison) {
+    const prod = await db.prepare("SELECT livraison_retrait, livraison_expedition FROM produits_vitrine WHERE id=?").get(item.produit_id);
+    if (body.mode_livraison === "expedition" && !prod?.livraison_expedition) return sendJSON(res, 400, { error: "L'expédition n'est pas proposée pour ce produit." });
+    if (body.mode_livraison === "retrait" && !prod?.livraison_retrait && prod?.livraison_expedition) return sendJSON(res, 400, { error: "Le retrait sur place n'est pas proposé pour ce produit." });
+    // Fusionne avec une ligne existante du même produit+nouveau mode plutôt que d'en dupliquer une.
+    const autre = await db.prepare("SELECT id, quantite FROM panier_items WHERE user_id=? AND produit_id=? AND mode_livraison=? AND id!=?").get(user.id, item.produit_id, body.mode_livraison, item.id);
+    if (autre) {
+      await db.prepare("UPDATE panier_items SET quantite=quantite+? WHERE id=?").run(item.quantite, autre.id);
+      await db.prepare("DELETE FROM panier_items WHERE id=?").run(item.id);
+    } else {
+      await db.prepare("UPDATE panier_items SET mode_livraison=? WHERE id=?").run(body.mode_livraison, item.id);
+    }
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* DELETE /api/panier/:id — retirer une ligne. DELETE /api/panier — vider tout le panier. */
+route("DELETE", "/api/panier/:id", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM panier_items WHERE id=? AND user_id=?").run(params.id, user.id);
+  sendJSON(res, 200, { ok: true });
+});
+route("DELETE", "/api/panier", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  await db.prepare("DELETE FROM panier_items WHERE user_id=?").run(user.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* POST /api/panier/commander — paie TOUT le panier en une fois. Chaque article devient sa
+   propre ligne commandes_vitrine ; si le panier contient plusieurs vendeurs, une seule session
+   de paiement (Stripe ou PayPal) couvre toutes les lignes, qui sont ensuite créditées
+   séparément par finaliserCommandeVitrinePayee (voir le webhook Stripe et le retour PayPal
+   ci-dessous) — même mécanique de commission 3%/wallet que l'achat direct, appliquée N fois. */
+route("POST", "/api/panier/commander", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+
+  const items = await db.prepare(`
+    SELECT pi.*, p.nom AS produit_nom, p.prix, p.devise, p.initiative_id, p.statut AS produit_statut,
+      p.livraison_retrait, p.livraison_expedition, p.frais_expedition
+    FROM panier_items pi JOIN produits_vitrine p ON p.id = pi.produit_id
+    WHERE pi.user_id = ?
+  `).all(user.id);
+  if (!items.length) return sendJSON(res, 400, { error: "Votre panier est vide." });
+
+  // Validation complète AVANT toute création de commande/session — même esprit que
+  // POST /api/produits/:id/commander (jamais de ligne 'en_attente' orpheline).
+  const initsCache = {};
+  for (const it of items) {
+    if ((it.produit_statut || "disponible") !== "disponible") {
+      return sendJSON(res, 400, { error: `« ${it.produit_nom} » n'est plus disponible — retirez-le du panier.` });
+    }
+    if (it.prix == null || Number(it.prix) <= 0) {
+      return sendJSON(res, 400, { error: `« ${it.produit_nom} » n'a pas de prix fixe et ne peut pas être payé directement.` });
+    }
+    if (!initsCache[it.initiative_id]) initsCache[it.initiative_id] = await db.prepare("SELECT * FROM initiatives WHERE id=?").get(it.initiative_id);
+    const init = initsCache[it.initiative_id];
+    if (Number(init.owner_user_id) === Number(user.id)) {
+      return sendJSON(res, 400, { error: `« ${it.produit_nom} » appartient à votre propre boutique — retirez-le du panier.` });
+    }
+    if (!(await hasAccreditation(init.owner_user_id, "initiative_abonne"))) {
+      return sendJSON(res, 402, { error: `La boutique vendant « ${it.produit_nom} » n'est pas encore ouverte à la vente (initiative non Abonné).` });
+    }
+    if (it.mode_livraison === "expedition" && !it.livraison_expedition) {
+      return sendJSON(res, 400, { error: `« ${it.produit_nom} » ne propose pas l'expédition.` });
+    }
+  }
+
+  const needsAddress = items.some(it => it.mode_livraison === "expedition");
+  let livraisonNom = null, livraisonAdresse = null, livraisonCodePostal = null, livraisonVille = null, livraisonPays = null, livraisonTelephone = null;
+  if (needsAddress) {
+    livraisonNom = String(body.livraison_nom || "").trim();
+    livraisonAdresse = String(body.livraison_adresse || "").trim();
+    livraisonCodePostal = String(body.livraison_code_postal || "").trim();
+    livraisonVille = String(body.livraison_ville || "").trim();
+    livraisonPays = String(body.livraison_pays || "").trim();
+    livraisonTelephone = String(body.livraison_telephone || "").trim() || null;
+    if (!livraisonNom || !livraisonAdresse || !livraisonCodePostal || !livraisonVille || !livraisonPays) {
+      return sendJSON(res, 400, { error: "Adresse de livraison incomplète (nom, adresse, code postal, ville et pays requis)." });
+    }
+  }
+
+  const provider = body.provider === "paypal" ? "paypal" : "stripe";
+  const { paypalEnabled, createOrder } = require("./paypal-client");
+  const { stripe, getOrCreateStripeCustomer } = require("./stripe-client");
+  if (provider === "paypal" ? !paypalEnabled : !stripe) {
+    return sendJSON(res, 503, { error: "Paiements momentanément indisponibles." });
+  }
+
+  const devise = (items[0].devise || "EUR").toUpperCase();
+  const commandes = [];
+  for (const it of items) {
+    const fraisLivraison = it.mode_livraison === "expedition" && it.frais_expedition != null ? Number(it.frais_expedition) : 0;
+    const montantTotal = parseFloat((Number(it.prix) * it.quantite + fraisLivraison).toFixed(2));
+    const expedie = it.mode_livraison === "expedition";
+    const id = (await db.prepare(`
+      INSERT INTO commandes_vitrine (produit_id, initiative_id, acheteur_id, quantite, paiement_statut, montant_total, provider,
+        mode_livraison, livraison_nom, livraison_adresse, livraison_code_postal, livraison_ville, livraison_pays, livraison_telephone, frais_livraison, statut_livraison)
+      VALUES (?,?,?,?,'en_attente',?,?,?,?,?,?,?,?,?,?,'a_traiter')
+    `).run(it.produit_id, it.initiative_id, user.id, it.quantite, montantTotal, provider,
+      it.mode_livraison, expedie ? livraisonNom : null, expedie ? livraisonAdresse : null,
+      expedie ? livraisonCodePostal : null, expedie ? livraisonVille : null,
+      expedie ? livraisonPays : null, expedie ? livraisonTelephone : null, fraisLivraison)).lastInsertRowid;
+    commandes.push({ id: Number(id), item: it, montantTotal, fraisLivraison });
+  }
+
+  const origin = getOrigin(req);
+  const montantGlobal = parseFloat(commandes.reduce((s, c) => s + c.montantTotal, 0).toFixed(2));
+  const idsPlaceholders = commandes.map(() => "?").join(",");
+
+  if (provider === "paypal") {
+    try {
+      const order = await createOrder({
+        amount: montantGlobal,
+        currency: devise,
+        description: `Panier Diaspo'Actif (${commandes.length} article${commandes.length > 1 ? "s" : ""})`,
+        custom_id: `panier-${user.id}`,
+        return_url: `${origin}/api/paypal/panier/retour?ids=${commandes.map(c => c.id).join(",")}`,
+        cancel_url: `${origin}/panier.html?paiement=annule`,
+      });
+      await db.prepare(`UPDATE commandes_vitrine SET paypal_order_id=? WHERE id IN (${idsPlaceholders})`).run(order.id, ...commandes.map(c => c.id));
+      await db.prepare("DELETE FROM panier_items WHERE user_id=?").run(user.id);
+      return sendJSON(res, 201, { ok: true, checkout_url: order.approveUrl });
+    } catch (e) {
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id IN (${idsPlaceholders})`).run(...commandes.map(c => c.id));
+      return sendJSON(res, 500, SEC.safeError(e, "panier-commander-paypal"));
+    }
+  }
+
+  try {
+    const stripeCustomerId = await getOrCreateStripeCustomer(db, user);
+    const lineItems = [];
+    for (const c of commandes) {
+      lineItems.push({
+        price_data: { currency: devise.toLowerCase(), unit_amount: Math.round(Number(c.item.prix) * 100), product_data: { name: c.item.produit_nom } },
+        quantity: c.item.quantite,
+      });
+      if (c.fraisLivraison > 0) {
+        lineItems.push({
+          price_data: { currency: devise.toLowerCase(), unit_amount: Math.round(c.fraisLivraison * 100), product_data: { name: `Frais de livraison — ${c.item.produit_nom}` } },
+          quantity: 1,
+        });
+      }
+    }
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer: stripeCustomerId,
+      line_items: lineItems,
+      metadata: { diaspoactif_panier_checkout: "1" },
+      success_url: `${origin}/panier.html?paiement=succes`,
+      cancel_url: `${origin}/panier.html?paiement=annule`,
+    });
+    await db.prepare(`UPDATE commandes_vitrine SET stripe_session_id=? WHERE id IN (${idsPlaceholders})`).run(session.id, ...commandes.map(c => c.id));
+    await db.prepare("DELETE FROM panier_items WHERE user_id=?").run(user.id);
+    return sendJSON(res, 201, { ok: true, checkout_url: session.url });
+  } catch (e) {
+    await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id IN (${idsPlaceholders})`).run(...commandes.map(c => c.id));
+    return sendJSON(res, 500, SEC.safeError(e, "panier-commander-stripe"));
+  }
+});
+
+/* GET /api/paypal/panier/retour — retour PayPal après paiement d'un panier multi-articles (un
+   seul ordre PayPal pour tout le panier, capturé une fois ; chaque ligne commandes_vitrine
+   partageant cet ordre est ensuite finalisée séparément, même logique que le retour mono-article
+   ci-dessus). */
+route("GET", "/api/paypal/panier/retour", async (req, res) => {
+  const origin = getOrigin(req);
+  const ids = String(req.query?.ids || "").split(",").map(Number).filter(n => Number.isInteger(n) && n > 0);
+  if (ids.length) {
+    try {
+      const premiere = await db.prepare(`SELECT paypal_order_id FROM commandes_vitrine WHERE id=?`).get(ids[0]);
+      if (premiere?.paypal_order_id) {
+        const { captureOrder } = require("./paypal-client");
+        await captureOrder(premiere.paypal_order_id);
+        for (const id of ids) await finaliserCommandeVitrinePayee(id);
+      }
+    } catch (e) {
+      logError(e, "paypal-capture-panier", req);
+    }
+  }
+  res.writeHead(302, { Location: `${origin}/panier.html?paiement=${ids.length ? "succes" : "annule"}` });
+  res.end();
+});
+
+/* GET /api/mes-commandes-boutique — historique d'achats de l'acheteur connecté, TOUTES
+   boutiques confondues, avec identification du vendeur par ligne (demande explicite : "tous les
+   achats et éléments ajoutés au panier avec identification du vendeur"). */
+route("GET", "/api/mes-commandes-boutique", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const rows = await db.prepare(`
+    SELECT c.*, p.nom AS produit_nom, p.photos_json, i.nom AS initiative_nom, i.id AS initiative_id, i.owner_user_id AS vendeur_id
+    FROM commandes_vitrine c
+    JOIN produits_vitrine p ON p.id = c.produit_id
+    JOIN initiatives i ON i.id = c.initiative_id
+    WHERE c.acheteur_id = ?
+    ORDER BY c.created_at DESC
+  `).all(user.id);
+  const commandes = rows.map(c => {
+    let photos = [];
+    try { photos = JSON.parse(c.photos_json || "[]"); } catch (e) {}
+    const { photos_json, ...rest } = c;
+    return { ...rest, photo: photos[0] || null };
+  });
+  sendJSON(res, 200, { ok: true, commandes });
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -7233,6 +7717,61 @@ route("PATCH", "/api/commandes_vitrine/:id", async (req, res, params, body) => {
   if (!statut) return sendJSON(res, 400, { error: "Statut invalide." });
   await db.prepare("UPDATE commandes_vitrine SET statut=? WHERE id=?").run(statut, params.id);
   sendJSON(res, 200, { ok: true });
+});
+
+/* PATCH /api/commandes_vitrine/:id/livraison — owner only, fait avancer le statut de livraison.
+   (2026-09-30, demande explicite : "fait le maximum de choses en automatisation" pour le suivi
+   de colis). Chaque action automatise tout ce qui peut l'être : numéro de suivi généré ici même
+   (jamais saisi à la main), horodatage automatique, notification automatique à l'acheteur — seule
+   la décision humaine ("j'ai remis le colis au transporteur") reste manuelle, elle correspond à un
+   vrai geste physique que rien ne peut deviner à la place du vendeur. */
+route("PATCH", "/api/commandes_vitrine/:id/livraison", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const cmd = await db.prepare("SELECT * FROM commandes_vitrine WHERE id=?").get(params.id);
+  if (!cmd) return sendJSON(res, 404, { error: "Commande introuvable." });
+  const init = await db.prepare("SELECT owner_user_id, nom FROM initiatives WHERE id=?").get(cmd.initiative_id);
+  if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const prod = await db.prepare("SELECT nom FROM produits_vitrine WHERE id=?").get(cmd.produit_id);
+  const action = body.action;
+
+  if (action === "expedier") {
+    if (cmd.mode_livraison !== "expedition") return sendJSON(res, 400, { error: "Cette commande n'est pas en mode expédition." });
+    /* 'en_attente' = paiement Stripe/PayPal pas encore confirmé (webhook pas encore reçu, ou
+       jamais reçu si l'acheteur a abandonné le paiement) ; 'aucun' = produit sur devis/service,
+       sans paiement à attendre — ce cas-là reste autorisé à expédier dès "à traiter". */
+    if (cmd.paiement_statut === "en_attente") return sendJSON(res, 400, { error: "Le paiement de cette commande n'est pas encore confirmé." });
+    if (cmd.numero_suivi) return sendJSON(res, 400, { error: "Cette commande a déjà été expédiée." });
+    /* Numéro de suivi interne généré automatiquement — pas un vrai transporteur externe (aucun
+       contrat/API La Poste, Colissimo, DHL... n'existe sur cette plateforme), mais une référence
+       unique et vérifiable que l'acheteur peut communiquer au vendeur en cas de question, et qui
+       identifie sans ambiguïté CETTE commande précise. Format : DA-<id sur 6 chiffres>-<4
+       caractères aléatoires>, jamais deux fois le même (id unique + suffixe aléatoire). */
+    const numeroSuivi = `DA-${String(cmd.id).padStart(6, '0')}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+    await db.prepare("UPDATE commandes_vitrine SET statut_livraison='expedie', numero_suivi=?, expedie_le=datetime('now') WHERE id=?").run(numeroSuivi, params.id);
+    creerNotif(cmd.acheteur_id, "commande_expediee", "Commande expédiée 🚚",
+      `« ${prod?.nom || ''} » a été expédiée. Numéro de suivi : ${numeroSuivi}.`, { commande_id: cmd.id });
+    return sendJSON(res, 200, { ok: true, numero_suivi: numeroSuivi });
+  }
+
+  if (action === "livre") {
+    if (!["expedie"].includes(cmd.statut_livraison)) return sendJSON(res, 400, { error: "Cette commande n'a pas encore été expédiée." });
+    await db.prepare("UPDATE commandes_vitrine SET statut_livraison='livre', livre_le=datetime('now') WHERE id=?").run(params.id);
+    creerNotif(cmd.acheteur_id, "commande_livree", "Commande livrée ✅",
+      `« ${prod?.nom || ''} » a été marquée comme livrée par ${init.nom}.`, { commande_id: cmd.id });
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  if (action === "retire") {
+    if (cmd.mode_livraison !== "retrait") return sendJSON(res, 400, { error: "Cette commande n'est pas en mode retrait." });
+    if (cmd.statut_livraison !== "pret_retrait") return sendJSON(res, 400, { error: "Cette commande n'est pas encore prête pour retrait." });
+    await db.prepare("UPDATE commandes_vitrine SET statut_livraison='retire', livre_le=datetime('now') WHERE id=?").run(params.id);
+    creerNotif(cmd.acheteur_id, "commande_retiree", "Commande retirée ✅",
+      `Votre retrait de « ${prod?.nom || ''} » a bien été enregistré par ${init.nom}.`, { commande_id: cmd.id });
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  return sendJSON(res, 400, { error: "Action inconnue." });
 });
 
 /* GET /api/initiatives/:id/vitrine-messages — owner : conversations issues de la vitrine */
@@ -17429,36 +17968,22 @@ async function handleStripeWebhook(req, res) {
       const session = event.data.object;
       await db.prepare(`UPDATE insc_inscriptions SET statut_paiement='echec' WHERE transaction_ref=? AND statut_paiement='en_attente'`).run(session.id);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
-      /* Paiement Boutique confirmé — même modèle que la Billetterie (commission 3%, crédit wallet_balance
-         à l'initiative, retrait ultérieur via le Centre Financier). Idempotent : ne traite que si encore 'en_attente'. */
-      const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
-      const cmd = await db.prepare(`SELECT * FROM commandes_vitrine WHERE id=? AND paiement_statut='en_attente'`).get(commandeId);
-      if (cmd) {
-        const [prod, init] = await Promise.all([
-          db.prepare(`SELECT * FROM produits_vitrine WHERE id=?`).get(cmd.produit_id),
-          db.prepare(`SELECT * FROM initiatives WHERE id=?`).get(cmd.initiative_id),
-        ]);
-        const COMMISSION_RATE = 0.03;
-        const montant = Number(cmd.montant_total) || 0;
-        const platform_fee = parseFloat((montant * COMMISSION_RATE).toFixed(2));
-        const organizer_amount = parseFloat((montant - platform_fee).toFixed(2));
-        await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='paye', statut='traitee' WHERE id=?`).run(commandeId);
-        await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'platform_fee',NULL,?,?,?,?,?)`)
-          .run(commandeId, platform_fee, COMMISSION_RATE, montant, platform_fee, organizer_amount);
-        await db.prepare(`INSERT INTO wallet_transactions (commande_vitrine_id,type,beneficiaire_id,montant,commission_rate,prix_billet,platform_fee,organizer_amount) VALUES (?,'organizer_credit',?,?,?,?,?,?)`)
-          .run(commandeId, init.owner_user_id, organizer_amount, COMMISSION_RATE, montant, platform_fee, organizer_amount);
-        await db.prepare(`UPDATE users SET wallet_balance = COALESCE(wallet_balance,0) + ? WHERE id = ?`).run(organizer_amount, init.owner_user_id);
-        await db.prepare(`UPDATE platform_wallet SET total_commissions = total_commissions + ?, total_transactions = total_transactions + 1, updated_at = datetime('now') WHERE id = 1`).run(platform_fee);
-        try {
-          await db.prepare(`INSERT INTO transactions (user_id,type,montant,statut,description,date_transaction) VALUES (?,'commande_boutique',?,'reussi',?,?)`)
-            .run(cmd.acheteur_id, montant, 'commande_boutique', new Date().toISOString());
-        } catch (e) { /* table transactions peut avoir schema différent */ }
-        creerNotif(cmd.acheteur_id, "commande_payee", "Commande payée ✅", `Votre commande « ${prod?.nom || ''} » (x${cmd.quantite}) est confirmée.`, { commande_id: commandeId });
-        creerNotif(init.owner_user_id, "commande_vendue", "Nouvelle vente 🛍️", `« ${prod?.nom || ''} » vendu (x${cmd.quantite}, +${organizer_amount}€).`, { commande_id: commandeId });
-      }
+      /* Paiement Boutique confirmé — logique factorisée dans finaliserCommandeVitrinePayee()
+         (2026-09-29, réutilisée aussi par la capture PayPal) : commission 3%, crédit wallet_balance
+         à l'initiative, retrait ultérieur via le Centre Financier. Idempotent (voir la fonction). */
+      await finaliserCommandeVitrinePayee(Number(event.data.object.metadata.diaspoactif_commande_vitrine_id));
     } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_commande_vitrine_id) {
       const commandeId = Number(event.data.object.metadata.diaspoactif_commande_vitrine_id);
       await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE id=? AND paiement_statut='en_attente'`).run(commandeId);
+    } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_panier_checkout === "1") {
+      /* Paiement d'un PANIER multi-articles (2026-10-02) — une session Stripe peut regrouper
+         plusieurs commandes_vitrine (potentiellement plusieurs vendeurs différents) : on
+         retrouve toutes les lignes qui partagent ce stripe_session_id et on réutilise
+         finaliserCommandeVitrinePayee() pour chacune, inchangée. */
+      const lignes = await db.prepare(`SELECT id FROM commandes_vitrine WHERE stripe_session_id=?`).all(event.data.object.id);
+      for (const ligne of lignes) await finaliserCommandeVitrinePayee(Number(ligne.id));
+    } else if (event.type === "checkout.session.expired" && event.data.object.metadata?.diaspoactif_panier_checkout === "1") {
+      await db.prepare(`UPDATE commandes_vitrine SET paiement_statut='echoue' WHERE stripe_session_id=? AND paiement_statut='en_attente'`).run(event.data.object.id);
     } else if (event.type === "checkout.session.completed" && event.data.object.metadata?.diaspoactif_formation_inscription_id) {
       /* Paiement formation confirmé — même modèle que Boutique/Billetterie (commission 3%,
          crédit wallet_balance au propriétaire de la formation). Idempotent : ne traite que si
