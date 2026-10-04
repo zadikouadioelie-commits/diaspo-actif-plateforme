@@ -18918,7 +18918,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
-  let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC").all();
+  let rows = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id ORDER BY e.date_evt ASC, e.heure_debut ASC").all();
   /* Brouillon (2026-09-23, demande explicite : "un bouton brouillon... pour le conserver sans
      le publier" ; restreint le 2026-09-24, capture à l'appui : "l'événement en brouillon ne
      doit pas apparaître au public, il doit apparaître que dans Mes événements") — un brouillon

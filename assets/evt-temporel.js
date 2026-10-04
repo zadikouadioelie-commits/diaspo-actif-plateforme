@@ -44,7 +44,16 @@ window.EvtTemporel = (function () {
     return 'a_venir';
   }
 
-  const cleTri = e => String(e.date_evt || e.date_debut || e.date || '') + ' ' + String(e.heure_debut || e.heure || '');
+  /* Clé de tri = JOUR DE DÉBUT puis heure (jamais la date de création, ni la date de fin d'un
+     événement sur plusieurs jours). Heure normalisée sur 2 chiffres pour que « 9:00 » passe
+     avant « 10:00 » ; un événement sans date est classé en dernier. */
+  function cleTri(e) {
+    const brut = String(e.date_evt || e.date_debut || e.date || '');
+    const jour = brut.slice(0, 10);
+    if (!jour) return '9999-99-99 99:99';
+    const m = String(e.heure_debut || e.heure || '').match(/(\d{1,2})[:h](\d{2})/) || brut.slice(11, 16).match(/(\d{1,2}):(\d{2})/);
+    return jour + ' ' + (m ? m[1].padStart(2, '0') + ':' + m[2] : '00:00');
+  }
 
   /* fusion=true : « En cours » est regroupé avec « À venir » (vitrine, place limitée) —
      chaque carte garde son badge « En cours » pour rester repérable. */
