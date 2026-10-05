@@ -325,6 +325,33 @@ async function getCurrentUser(req) {
   return user || null;
 }
 
+/* Audit « fuites vers les visiteurs » (2026-10-06) : les routes publiques de l'annuaire renvoyaient la ligne
+   COMPLÈTE de l'initiative (SELECT i.*) et la route /api/profil/:id l'e-mail du membre à n'importe quel
+   appelant, même non connecté — un robot pouvait donc moissonner coordonnées et réponses privées. Ces deux
+   fonctions sont LA référence unique : toute route publique qui renvoie une initiative ou un profil doit
+   les traverser. Le propriétaire et l'administration voient tout, les autres reçoivent null (la forme de la
+   réponse ne change pas, le client n'a rien à adapter). */
+const CHAMPS_INITIATIVE_PRIVES = [
+  'tel_responsable', 'tel_responsable_2', 'tel_responsable_3', 'email_responsable', 'genre_responsable',
+  'numero_fiscal', 'stripe_identity_session_id', 'comment_entendu', 'attentes', 'autorisation_temoignage',
+  'signalements_confirmes', 'vitrine_draft_json', 'adhesion_relances_jours', 'adhesion_modele_relance',
+  'adhesion_modele_recu', 'relance_avancement_mensuelle_le', 'liste_membres_generale_id',
+];
+function assainirInitiativePublique(row, moi) {
+  if (!row) return row;
+  if (moi && (Number(moi.id) === Number(row.owner_user_id) || moi.role === 'administrateur')) return row;
+  CHAMPS_INITIATIVE_PRIVES.forEach(c => { if (c in row) row[c] = null; });
+  /* Renseigner un numéro de vitrine ne vaut pas consentement à le publier. */
+  if (Number(row.vitrine_tel_visible) !== 1) { if ('vitrine_tel_pro' in row) row.vitrine_tel_pro = null; if ('vitrine_whatsapp' in row) row.vitrine_whatsapp = null; }
+  return row;
+}
+function publicUserVisiteur(u, moi) {
+  const base = publicUser(u);
+  if (!base) return base;
+  if (moi && (Number(moi.id) === Number(u.id) || moi.role === 'administrateur')) return base;
+  return { ...base, email: null, nb_connexions: 0, pwa_prompt_dismiss: false, temoignage_statut: 'non_demande', temoignage_derniere_demande: null, demo_vue: 0 };
+}
+
 function publicUser(u) {
   if (!u) return null;
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
@@ -8699,7 +8726,7 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
   sendJSON(res, 200, {
     q: qRaw,
     total: resultats.length,
-    initiatives: await attachAvisAggregate(resultats.filter(r => r.type === 'initiative').map(r => r.data), 'owner_user_id'),
+    initiatives: await attachAvisAggregate(resultats.filter(r => r.type === 'initiative').map(r => assainirInitiativePublique(r.data, cu)), 'owner_user_id'),
     utilisateurs: await attachAvisAggregate(resultats.filter(r => r.type === 'utilisateur').map(r => r.data), 'id'),
     organismes: await attachAvisAggregate(resultats.filter(r => r.type === 'organisme').map(r => r.data), 'id'),
   });
@@ -8949,6 +8976,7 @@ route("GET", "/api/initiatives", async (req, res, params, body, query) => {
     };
   });
   rows = await attachAvisAggregate(rows, 'owner_user_id');
+  rows.forEach(r => assainirInitiativePublique(r, moiListe));
   sendJSON(res, 200, { initiatives: rows });
 });
 
@@ -9021,6 +9049,7 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
     };
   }));
 
+  { const moiV = await getCurrentUser(req); rows.forEach(r => assainirInitiativePublique(r, moiV)); }
   sendJSON(res, 200, { vitrines: rows });
 });
 
@@ -9085,8 +9114,7 @@ route("GET", "/api/initiatives/:id", async (req, res, params, body, query) => {
     const moi = await getCurrentUser(req);
     const proprietaire = moi && (Number(moi.id) === Number(row.owner_user_id) || moi.role === "administrateur");
     if (!proprietaire) {
-      row.tel_responsable = null;
-      row.email_responsable = null;
+      assainirInitiativePublique(row, moi);
       /* Renseigner un numéro de vitrine ne vaut pas consentement à le publier :
          il n'apparaît que si le propriétaire l'a explicitement autorisé. */
       if (Number(row.vitrine_tel_visible) !== 1) { row.vitrine_tel_pro = null; row.vitrine_whatsapp = null; }
@@ -17188,7 +17216,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
     }
   }
   sendJSON(res, 200, { profil: {
-    ...publicUser(u),
+    ...publicUserVisiteur(u, me),
     bio: u.bio, photo_url: u.photo_url || photoFallbackInitiative, banner_url: u.banner_url,
     prenom: u.prenom, titre_pro: u.titre_pro,
     nationalite1: u.nationalite1, nationalite2: u.nationalite2,
