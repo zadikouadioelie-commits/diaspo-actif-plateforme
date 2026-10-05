@@ -1166,6 +1166,8 @@
     <div id="hb-account-section"></div>
   </aside>
 
+  <!-- ===== ANNONCE OFFICIELLE DIASPO'ACTIF (2026-10-05) : visible de tous tant qu'une annonce est active ===== -->
+  <section class="ao-band" id="ao-band" style="display:none;" aria-label="Annonce officielle Diaspo'Actif"></section>
   <!-- ===== BANDEAU VIDÉOS TUTORIELS ===== -->
   <section class="dvt-banner" id="dvt-banner" style="display:none;">
     <style>
@@ -1702,6 +1704,8 @@
 <script src="assets/app.js?v=13"></script>
 <script src="assets/chatbot.js?v=2"></script>
 <script src="assets/packages.js"></script>
+<script src="assets/annonce-officielle.js?v=1"></script>
+<script>if (window.AnnonceOff) { AnnonceOff.css(); AnnonceOff.bandeauAccueil('ao-band'); }</script>
 <!-- Le paquet autonome d3-geo@3 seul jette "Adder is not a constructor" au runtime : son
      bundle UMD suppose un objet d3 global déjà enrichi par d3-array (où Adder est défini),
      donc chargé isolément il échoue dès qu'un calcul l'utilise en interne. Le bundle d3

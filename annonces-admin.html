@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Annonces officielles (administration)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="assets/annonce-officielle.css?v=1">
+<style>
+.aa{max-width:980px;margin:0 auto;padding:22px 16px 80px}
+.aa h1{font-size:22px;margin:0 0 4px}.aa .sub{color:var(--muted,#5B6B82);font-size:13.5px;margin:0 0 18px}
+.aa-card{background:#fff;border:1px solid var(--border,#DCE4F0);border-radius:14px;padding:18px;margin-bottom:16px}
+.aa-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.aa label{display:block;font-size:12.5px;font-weight:700;margin:12px 0 4px}
+.aa input,.aa textarea{width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--border,#DCE4F0);border-radius:10px;font:inherit;font-size:14px}
+.aa textarea{min-height:140px}
+.aa-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}@media(max-width:700px){.aa-grid{grid-template-columns:1fr}}
+.aa-btn{border:none;border-radius:10px;padding:10px 16px;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit}
+.aa-btn.pri{background:#F26422;color:#1f0e02}.aa-btn.sec{background:#E8F0FD;color:#2E74E0}.aa-btn.out{background:#fff;border:1.5px solid #DCE4F0;color:#1f2937}.aa-btn.red{background:#FEE2E2;color:#B91C1C}
+.aa-btn:disabled{opacity:.55;cursor:default}
+.aa-st{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 10px;border-radius:99px}
+.aa-st.brouillon{background:#FEF3C7;color:#92400E}.aa-st.publiee{background:#DCFCE7;color:#166534}.aa-st.retiree{background:#F1F5F9;color:#475569}
+.aa-note{font-size:12.5px;color:var(--muted,#5B6B82)}
+.aa-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0D2B4E;color:#fff;padding:11px 18px;border-radius:12px;font-weight:700;font-size:14px;z-index:10000;max-width:90vw}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar"><div class="topbar-inner">
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav"><a href="index.html">Accueil</a><a href="evenements.html">Événements</a><a href="fil-actualite.html">Fil</a></nav>
+    <div class="topbar-right"><select class="lang-select" id="lang-select"></select><div id="auth-area" class="auth-area"></div></div>
+  </div></header>
+  <main class="aa" id="aa"><p class="aa-note">Chargement…</p></main>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/annonce-officielle.js?v=1"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function toast(m) { const t = document.createElement('div'); t.className = 'aa-toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 3500); }
+const fmt = d => d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—';
+const iso = d => d ? new Date(d).toISOString().slice(0, 16) : '';
+let DATA = null;
+
+async function charger() {
+  const root = $('#aa');
+  try { DATA = await api('GET', '/admin/annonces-officielles'); }
+  catch (e) { root.innerHTML = '<div class="aa-card"><h1>Accès réservé</h1><p class="aa-note">' + esc(e.message || 'Réservé aux administrateurs.') + '</p></div>'; return; }
+  let h = '<h1>📌 Annonces officielles</h1><p class="sub">Une annonce officielle apparaît sur l\'accueil, dans les événements (catégorie « Trophée de la diaspora »), en tête du fil, et envoie une notification à tous les comptes.</p>';
+  if (DATA.modele_disponible) h += '<div class="aa-card"><b>Annonce « Trophée de la Diaspora — Comptes à l\'honneur »</b><p class="aa-note">Le modèle est prêt (affiche, texte, décompte, « Voir plus »). Créez-le en brouillon pour le relire avant de le publier.</p><button class="aa-btn pri" id="creer">Créer l\'annonce en brouillon</button></div>';
+  h += (DATA.annonces || []).map(a => carte(a)).join('') || (DATA.modele_disponible ? '' : '<div class="aa-card aa-note">Aucune annonce.</div>');
+  root.innerHTML = h;
+  const c = $('#creer'); if (c) c.onclick = async () => { try { await api('POST', '/admin/annonces-officielles/modele-honneur', {}); toast('Brouillon créé'); charger(); } catch (e) { toast(e.message); } };
+  (DATA.annonces || []).forEach(a => brancher(a));
+}
+
+function carte(a) {
+  const brouillon = a.statut === 'brouillon';
+  return '<div class="aa-card" id="a' + a.id + '"><div class="aa-row"><b style="font-size:16px">' + esc(a.titre) + '</b><span class="aa-st ' + a.statut + '">' + (a.statut === 'brouillon' ? 'Brouillon' : a.statut === 'publiee' ? (a.active ? 'Publiée · affichée' : 'Publiée · hors période') : 'Retirée') + '</span></div>'
+    + (brouillon ? '<label>Titre</label><input data-k="titre" value="' + esc(a.titre) + '"><label>Accroche</label><input data-k="accroche" value="' + esc(a.accroche) + '"><label>Texte (une ligne vide = un paragraphe)</label><textarea data-k="contenu">' + esc(a.contenu) + '</textarea>'
+      + '<div class="aa-grid"><div><label>Début d\'affichage <span class="aa-note">(vide = maintenant)</span></label><input type="datetime-local" data-k="date_debut" value="' + iso(a.date_debut) + '"></div><div><label>Fin d\'affichage <span class="aa-note">(vide = 31 jours)</span></label><input type="datetime-local" data-k="date_fin" value="' + iso(a.date_fin) + '"></div><div><label>Décompte jusqu\'au</label><input type="date" data-k="decompte_cible" value="' + esc(a.decompte_cible || '') + '"></div></div>'
+      + '<div class="aa-row" style="margin-top:14px"><button class="aa-btn out" data-act="sauver">Enregistrer</button><button class="aa-btn pri" data-act="publier">Publier maintenant et notifier ' + DATA.nb_comptes_a_notifier + ' comptes</button></div><p class="aa-note">La publication est immédiate et ne peut pas être faite deux fois. Elle crée l\'événement « Trophée de la diaspora », la publication épinglée du fil, l\'annonce de l\'accueil et la notification à tous.</p>'
+      : '<p class="aa-note">Affichée du <b>' + fmt(a.date_debut) + '</b> au <b>' + fmt(a.date_fin) + '</b>' + (a.decompte_cible ? ' · décompte jusqu\'au ' + esc(a.decompte_cible) : '') + '. Notifications envoyées : <b>' + a.nb_notifies + '</b>.</p>'
+        + '<div class="aa-row">' + (a.evenement_id ? '<a class="aa-btn sec" href="evenements.html?evt=' + a.evenement_id + '" style="text-decoration:none">Voir l\'événement</a>' : '') + '<a class="aa-btn sec" href="index.html" style="text-decoration:none">Voir l\'accueil</a><a class="aa-btn sec" href="fil-actualite.html" style="text-decoration:none">Voir le fil</a>'
+        + (a.statut === 'publiee' ? '<button class="aa-btn out" data-act="notifier">Relancer la notification (sans doublon)</button><button class="aa-btn red" data-act="retirer">Retirer l\'annonce</button>' : '') + '</div>')
+    + '</div>';
+}
+
+function brancher(a) {
+  const root = $('#a' + a.id); if (!root) return;
+  const corps = () => { const o = {}; root.querySelectorAll('[data-k]').forEach(i => { o[i.dataset.k] = i.value; }); return o; };
+  const act = n => root.querySelector('[data-act="' + n + '"]');
+  const sauver = async () => { const o = corps(); ['date_debut', 'date_fin'].forEach(k => { if (!o[k]) delete o[k]; }); await api('PUT', '/admin/annonces-officielles/' + a.id, { ...o, date_debut: o.date_debut || null, date_fin: o.date_fin || null }); };
+  if (act('sauver')) act('sauver').onclick = async () => { try { await sauver(); toast('Enregistré'); } catch (e) { toast(e.message); } };
+  if (act('publier')) act('publier').onclick = async () => {
+    if (!confirm('Publier maintenant l\'annonce et notifier ' + DATA.nb_comptes_a_notifier + ' comptes ? Cette action est immédiate.')) return;
+    const b = act('publier'); b.disabled = true;
+    try { await sauver(); const r = await api('POST', '/admin/annonces-officielles/' + a.id + '/publier', {}); toast('Publiée : ' + (r.notifications ? r.notifications.envoyes : 0) + ' notifications' + (r.notifications && r.notifications.restants ? ' (' + r.notifications.restants + ' restantes : relancez)' : '')); charger(); }
+    catch (e) { toast(e.message); b.disabled = false; }
+  };
+  if (act('notifier')) act('notifier').onclick = async () => { try { const r = await api('POST', '/admin/annonces-officielles/' + a.id + '/notifier', {}); toast(r.envoyes + ' notification(s) envoyée(s), ' + r.restants + ' restante(s)'); charger(); } catch (e) { toast(e.message); } };
+  if (act('retirer')) act('retirer').onclick = async () => { if (!confirm('Retirer cette annonce de l\'accueil, du fil et des événements ?')) return; try { await api('POST', '/admin/annonces-officielles/' + a.id + '/retirer', {}); toast('Annonce retirée'); charger(); } catch (e) { toast(e.message); } };
+}
+charger();
+</script>
+<script src="assets/cookies-banner.js"></script>
+</body>
+</html>

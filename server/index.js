@@ -20197,6 +20197,204 @@ route("POST", "/api/admin/evenements/compte-rendu-anciens", async (req, res, par
   catch (e) { sendJSON(res, 500, SEC.safeError(e, "cr-relance-anciens")); }
 });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ANNONCES OFFICIELLES DIASPO'ACTIF (2026-10-05, demande explicite)
+   Une annonce officielle est visible par TOUS pendant une durée fixée (un mois par défaut) :
+   • sur la page d'accueil (bandeau « Annonce officielle »), • dans les événements (catégorie
+   « Trophée de la diaspora », avec réactions, commentaires et lien de partage, déjà fournis par
+   la page événement), • en tête du fil d'actualité (publication épinglée, mêmes réactions et
+   commentaires que toute publication) • et par une notification envoyée à tous les comptes.
+   Publication déclenchée par un administrateur (jamais automatiquement) : atomique, une seule
+   fois ; la notification peut être relancée sans doublon (annonce_notifications).
+   ══════════════════════════════════════════════════════════════════════════ */
+const ANNONCE_HONNEUR_SLUG = 'comptes-a-l-honneur';
+const ANNONCE_DUREE_JOURS = 31;
+const ANNONCE_AFFICHE = '/assets/trophee-diaspora-affiche.webp';
+
+function annonceModeleHonneur() {
+  return {
+    slug: ANNONCE_HONNEUR_SLUG,
+    titre: 'Trophée de la Diaspora : les comptes les plus actifs sont récompensés !',
+    accroche: 'Un calendrier commun, des lauréats chaque trimestre et un mois offert. Découvrez comment participer.',
+    contenu: [
+      "Votre engagement fait vivre la diaspora. Diaspo'Actif met désormais à l'honneur ses comptes les plus actifs, à travers le Trophée de la Diaspora.",
+      "Un calendrier commun à tous : des cycles de 3 mois (janvier-mars, avril-juin, juillet-septembre, octobre-décembre).",
+      "Deux mois mesurés : l'activité de chaque compte est comparée à un barème de base (100 %). Les comptes qui atteignent le barème sont éligibles ; ceux qui le dépassent concourent.",
+      "Les mieux classés sur le cumul des 2 mois sont à l'honneur : 2 lauréats par tranche de 100 comptes, membres et initiatives comptés séparément.",
+      "Le 3e mois est offert aux lauréats, payant pour les autres. Il n'est mesuré pour personne : il laisse la place aux autres comptes.",
+      "Ouvert aux comptes Premium. Votre participation à l'amélioration de la plateforme est également prise en compte. Retrouvez vos propres décomptes dans Paramètres du compte.",
+    ].join('\n\n'),
+    image_url: ANNONCE_AFFICHE,
+    decompte_cible: '2027-01-01',
+    voir_plus: {
+      exemples: [
+        { nom: 'Association Exemple A', type: 'initiative', ville: 'Toulouse' },
+        { nom: 'Collectif Exemple B', type: 'initiative', ville: 'Lyon' },
+        { nom: 'Amina K.', type: 'utilisateur', ville: 'Paris' },
+        { nom: 'Moussa T.', type: 'utilisateur', ville: 'Bruxelles' },
+      ],
+      vocabulaire: [
+        { terme: "🏆 Compte à l'honneur", def: "Un compte mis en lumière pour son activité sur la plateforme, pendant tout un cycle." },
+        { terme: '✦ Lauréat du cycle', def: "Un compte au-dessus du barème et parmi les mieux classés sur le cumul des 2 mois." },
+        { terme: '🎁 Mois offert', def: "Le 3e mois du cycle, offert aux lauréats. Un seul mois offert à chaque fois." },
+        { terme: '📊 Barème de base', def: "100 % = une activité régulière et saine. Au-delà, on concourt." },
+        { terme: "★ À l'honneur dans l'annuaire", def: "Un cadre doré et une place d'honneur en tête de l'annuaire." },
+        { terme: '🤝 Co-créateur actif', def: "Un badge pour les comptes qui contribuent à améliorer la plateforme." },
+      ],
+    },
+  };
+}
+
+function annonceEstActive(a, maintenant = new Date()) {
+  if (!a || a.statut !== 'publiee') return false;
+  const d = a.date_debut ? new Date(a.date_debut) : null, f = a.date_fin ? new Date(a.date_fin) : null;
+  if (d && maintenant < d) return false;
+  if (f && maintenant > f) return false;
+  return true;
+}
+function annonceSerialiser(a) {
+  return {
+    id: a.id, slug: a.slug, titre: a.titre, accroche: a.accroche || '', contenu: a.contenu || '', image_url: a.image_url || null,
+    evenement_id: a.evenement_id || null, fil_post_id: a.fil_post_id || null, decompte_cible: a.decompte_cible || null,
+    date_debut: a.date_debut || null, date_fin: a.date_fin || null, statut: a.statut,
+    voir_plus: crJson(a.voir_plus_json, { exemples: [], vocabulaire: [] }),
+  };
+}
+
+/* Carte d'annonce jointe aux publications du fil (comme evenement_promo / compte_rendu). */
+async function carteAnnonceOfficielle(annonceId) {
+  const a = await db.prepare("SELECT * FROM annonces_officielles WHERE id=?").get(annonceId);
+  if (!a || !annonceEstActive(a)) return null;
+  return annonceSerialiser(a);
+}
+
+/* Notification de l'annonce à TOUS les comptes actifs (hors démonstration, suspendus, supprimés).
+   Idempotent : annonce_notifications retient qui l'a déjà reçue ; relançable en cas d'arrêt. */
+async function annonceNotifierTous(a, budgetMs = 20000) {
+  const debut = Date.now();
+  const lot = 200; let envoyes = 0, restants = 0;
+  const base = `FROM users u WHERE (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE)
+      AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé'
+      AND NOT EXISTS (SELECT 1 FROM annonce_notifications n WHERE n.annonce_id=? AND n.user_id=u.id)`;
+  const titre = '🏆 Annonce officielle · Trophée de la Diaspora';
+  const contenu = 'Les comptes les plus actifs sont récompensés ! Découvrez le programme et comment participer.';
+  const data = JSON.stringify({ annonce_id: Number(a.id), evenement_id: a.evenement_id ? Number(a.evenement_id) : undefined, post_id: a.fil_post_id ? Number(a.fil_post_id) : undefined, lien: a.evenement_id ? `evenements.html?evt=${a.evenement_id}` : 'fil-actualite.html' });
+  while (Date.now() - debut < budgetMs) {
+    const ids = (await db.prepare(`SELECT u.id ${base} ORDER BY u.id LIMIT ${lot}`).all(a.id)).map(r => Number(r.id));
+    if (!ids.length) break;
+    await db.prepare(`INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES ${ids.map(() => '(?,?,?,?,?)').join(',')}`)
+      .run(...ids.flatMap(uid => [uid, 'annonce_officielle', titre, contenu, data]));
+    await db.prepare(`INSERT INTO annonce_notifications (annonce_id,user_id) VALUES ${ids.map(() => '(?,?)').join(',')}`).run(...ids.flatMap(uid => [a.id, uid]));
+    envoyes += ids.length;
+  }
+  restants = Number((await db.prepare(`SELECT COUNT(*) AS n ${base}`).get(a.id)).n || 0);
+  await db.prepare("UPDATE annonces_officielles SET nb_notifies=COALESCE(nb_notifies,0)+?, notifie_at=COALESCE(notifie_at,?) WHERE id=?").run(envoyes, new Date().toISOString(), a.id);
+  return { envoyes, restants };
+}
+
+async function exigerAdmin(req, res) {
+  const u = await getCurrentUser(req);
+  if (!u) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+  if (u.role !== 'administrateur') { sendJSON(res, 403, { error: "Réservé aux administrateurs." }); return null; }
+  return u;
+}
+
+/* GET public — annonces actuellement affichées (accueil, fil). */
+route("GET", "/api/annonces-officielles/actives", async (req, res) => {
+  const rows = await db.prepare("SELECT * FROM annonces_officielles WHERE statut='publiee' ORDER BY id DESC LIMIT 5").all();
+  sendJSON(res, 200, { annonces: rows.filter(a => annonceEstActive(a)).map(annonceSerialiser) });
+});
+
+/* ── Administration ── */
+route("GET", "/api/admin/annonces-officielles", async (req, res) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const rows = await db.prepare("SELECT * FROM annonces_officielles ORDER BY id DESC").all();
+  const total = Number((await db.prepare(`SELECT COUNT(*) AS n FROM users u WHERE (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé'`).get()).n || 0);
+  sendJSON(res, 200, { annonces: rows.map(a => ({ ...annonceSerialiser(a), nb_notifies: Number(a.nb_notifies || 0), notifie_at: a.notifie_at || null, active: annonceEstActive(a) })), nb_comptes_a_notifier: total, modele_disponible: !rows.some(a => a.slug === ANNONCE_HONNEUR_SLUG) });
+});
+
+route("POST", "/api/admin/annonces-officielles/modele-honneur", async (req, res) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const existe = await db.prepare("SELECT id FROM annonces_officielles WHERE slug=?").get(ANNONCE_HONNEUR_SLUG);
+  if (existe) return sendJSON(res, 409, { error: "Cette annonce existe déjà.", id: existe.id });
+  const m = annonceModeleHonneur();
+  const id = (await db.prepare(`INSERT INTO annonces_officielles (slug,titre,accroche,contenu,image_url,decompte_cible,voir_plus_json,statut,created_by) VALUES (?,?,?,?,?,?,?,'brouillon',?)`)
+    .run(m.slug, m.titre, m.accroche, m.contenu, m.image_url, m.decompte_cible, JSON.stringify(m.voir_plus), admin.id)).lastInsertRowid;
+  sendJSON(res, 201, { ok: true, id });
+});
+
+route("PUT", "/api/admin/annonces-officielles/:id", async (req, res, params, body) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const a = await db.prepare("SELECT * FROM annonces_officielles WHERE id=?").get(params.id);
+  if (!a) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  const set = [], vals = [];
+  const txt = (k, max) => { if (body[k] !== undefined) { set.push(`${k}=?`); vals.push(String(body[k] || '').trim().slice(0, max) || null); } };
+  txt('titre', 200); txt('accroche', 400); txt('contenu', 6000);
+  if (body.decompte_cible !== undefined) { set.push('decompte_cible=?'); vals.push(crDateISO(body.decompte_cible)); }
+  if (body.date_debut !== undefined) { set.push('date_debut=?'); vals.push(body.date_debut ? new Date(body.date_debut).toISOString() : null); }
+  if (body.date_fin !== undefined) { set.push('date_fin=?'); vals.push(body.date_fin ? new Date(body.date_fin).toISOString() : null); }
+  if (!set.length) return sendJSON(res, 400, { error: "Rien à modifier." });
+  await db.prepare(`UPDATE annonces_officielles SET ${set.join(',')}, updated_at=? WHERE id=?`).run(...vals, new Date().toISOString(), a.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Publication : événement « Trophée de la diaspora » + publication épinglée du fil + notification à tous.
+   Réservation atomique (brouillon → publiee) : un double clic ne peut jamais publier deux fois. */
+route("POST", "/api/admin/annonces-officielles/:id/publier", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const a0 = await db.prepare("SELECT * FROM annonces_officielles WHERE id=?").get(params.id);
+  if (!a0) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  const debut = body.date_debut ? new Date(body.date_debut) : (a0.date_debut ? new Date(a0.date_debut) : new Date());
+  const fin = body.date_fin ? new Date(body.date_fin) : (a0.date_fin ? new Date(a0.date_fin) : new Date(debut.getTime() + ANNONCE_DUREE_JOURS * 86400000));
+  if (isNaN(debut) || isNaN(fin) || fin <= debut) return sendJSON(res, 400, { error: "Dates d'affichage invalides." });
+  const claim = await db.prepare("UPDATE annonces_officielles SET statut='publiee', date_debut=?, date_fin=?, updated_at=? WHERE id=? AND statut='brouillon'").run(debut.toISOString(), fin.toISOString(), new Date().toISOString(), a0.id);
+  if (!claim.changes) return sendJSON(res, 409, { error: "Cette annonce est déjà publiée (ou retirée)." });
+  let evtId = null, postId = null;
+  try {
+    const officiel = (await getOfficialUserId()) || admin.id;
+    const iso = d => dateParisISO(d);
+    const description = SEC.sanitizeRichHtml(String(a0.contenu || '').split(/\n\s*\n/).map(p => `<p>${p.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))}</p>`).join(''));
+    /* Événement interne : catégorie « Trophée de la diaspora », visible par tous, informatif (sans inscription). */
+    evtId = (await db.prepare(`INSERT INTO evenements (titre,organisateur,date_evt,date_fin,heure_debut,lieu,pays,description,type_evt,domaine,inscription_ouverte,image_url,image_couverture,galerie_photos,statut,visibilite,owner_user_id,mode_participation,langue)
+      VALUES (?,?,?,?,?,?,?,?,'trophee_diaspora',?,0,?,?,'[]','ouvert','public',?, 'distanciel','francais')`)
+      .run(a0.titre, "Diaspo'Actif", iso(debut), iso(fin), null, "En ligne · Événement interne Diaspo'Actif", null, description, 'Communauté', a0.image_url, a0.image_url, officiel)).lastInsertRowid;
+    const auteurNom = await nomCompteAffichage(officiel);
+    postId = (await db.prepare(`INSERT INTO fil_posts
+      (auteur_id, auteur_nom, type, pub_type, categorie, titre, corps, contenu, visibilite, medias, hashtags, statut, annonce_officielle_id)
+      VALUES (?, ?, 'annonce_officielle', 'annonce_officielle', 'Annonce officielle', ?, ?, ?, 'public', '[]', '[]', 'publie', ?)`)
+      .run(officiel, auteurNom, a0.titre, a0.accroche || '', `📌 ${a0.titre}\n\n${a0.accroche || ''}`, a0.id)).lastInsertRowid;
+    await db.prepare("UPDATE annonces_officielles SET evenement_id=?, fil_post_id=? WHERE id=?").run(evtId, postId, a0.id);
+  } catch (e) {
+    /* Rien de visible n'a été notifié : on rend l'annonce à l'état de brouillon pour pouvoir réessayer. */
+    try { await db.prepare("UPDATE annonces_officielles SET statut='brouillon' WHERE id=?").run(a0.id); } catch (_) {}
+    if (evtId) { try { await db.prepare("DELETE FROM evenements WHERE id=?").run(evtId); } catch (_) {} }
+    return sendJSON(res, 500, SEC.safeError(e, "annonce-publier"));
+  }
+  const a = await db.prepare("SELECT * FROM annonces_officielles WHERE id=?").get(a0.id);
+  let notif = { envoyes: 0, restants: null };
+  if (body.notifier !== false) { try { notif = await annonceNotifierTous(a); } catch (e) { logError(e, 'annonce-notifier', req); } }
+  SEC.logSecurity("annonce_officielle_publiee", { uid: Number(admin.id), annonce_id: Number(a.id), evenement_id: evtId, post_id: postId, notifies: notif.envoyes });
+  sendJSON(res, 200, { ok: true, evenement_id: evtId, fil_post_id: postId, notifications: notif });
+});
+
+/* Relance de la notification (en cas d'arrêt avant la fin) — sans jamais doubler. */
+route("POST", "/api/admin/annonces-officielles/:id/notifier", async (req, res, params) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const a = await db.prepare("SELECT * FROM annonces_officielles WHERE id=?").get(params.id);
+  if (!a || a.statut !== 'publiee') return sendJSON(res, 404, { error: "Annonce non publiée." });
+  try { sendJSON(res, 200, { ok: true, ...(await annonceNotifierTous(a)) }); } catch (e) { sendJSON(res, 500, SEC.safeError(e, "annonce-notifier")); }
+});
+
+route("POST", "/api/admin/annonces-officielles/:id/retirer", async (req, res, params) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const a = await db.prepare("SELECT * FROM annonces_officielles WHERE id=?").get(params.id);
+  if (!a) return sendJSON(res, 404, { error: "Annonce introuvable." });
+  await db.prepare("UPDATE annonces_officielles SET statut='retiree', updated_at=? WHERE id=?").run(new Date().toISOString(), a.id);
+  if (a.fil_post_id) { try { await db.prepare("UPDATE fil_posts SET statut='archive' WHERE id=?").run(a.fil_post_id); } catch (_) {} }
+  if (a.evenement_id) { try { await db.prepare("UPDATE evenements SET statut='ferme' WHERE id=?").run(a.evenement_id); } catch (_) {} }
+  sendJSON(res, 200, { ok: true });
+});
+
 route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
   let prefs = {};
@@ -23164,7 +23362,9 @@ async function enrichPost(p, cu) {
   if (p.promo_evenement_id) { try { evenement_promo = await cartePromoEvenement(p.promo_evenement_id); } catch (_) {} }
   let compte_rendu = null;
   if (p.compte_rendu_evenement_id) { try { compte_rendu = await carteCompteRenduPost(p.compte_rendu_evenement_id); } catch (_) {} }
-  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo, compte_rendu };
+  let annonce = null;
+  if (p.annonce_officielle_id) { try { annonce = await carteAnnonceOfficielle(p.annonce_officielle_id); } catch (_) {} }
+  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo, compte_rendu, annonce };
 }
 
 /* ---------- Fil intelligent ---------- */
@@ -23348,6 +23548,18 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // Algorithme : suivis en premier, puis populaires, puis reste chronologique
   let orderedIds = new Set();
   const allPosts = [];
+
+  /* 00) Annonces officielles Diaspo'Actif : épinglées en tête du fil de TOUS (connectés ou non), tant que
+     l'annonce est active (fenêtre de dates) — jamais sur une page suivante ni quand une catégorie est filtrée. */
+  if (!catFiltre && page === 1) {
+    try {
+      const actives = (await db.prepare("SELECT * FROM annonces_officielles WHERE statut='publiee' AND fil_post_id IS NOT NULL ORDER BY id DESC LIMIT 3").all()).filter(a => annonceEstActive(a));
+      for (const a of actives) {
+        const p = await db.prepare("SELECT * FROM fil_posts WHERE id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon')").get(a.fil_post_id);
+        if (p && !orderedIds.has(p.id)) { orderedIds.add(p.id); allPosts.push({ ...p, source: "annonce" }); }
+      }
+    } catch (_) { /* épinglage facultatif : ne jamais faire échouer le fil */ }
+  }
 
   /* 0) Mise en avant des promotions J-7 destinées à ce membre (2026-10-05) : en tête du fil, avant
      tout autre critère — uniquement celles dont il a reçu la notification (donc ciblé), et

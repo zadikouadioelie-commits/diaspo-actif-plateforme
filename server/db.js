@@ -2090,6 +2090,8 @@ const MIGRATIONS = [
      (fil_posts.compte_rendu_evenement_id) et emplacement « Programme » de la fiche d'inscription
      (texte + pièce jointe, mêmes champs que fc_programme de l'événement). */
   ["evenements", "cr_relance_at TEXT"],
+  // Annonces officielles Diaspo'Actif (2026-10-05) : publication épinglée du fil rattachée à une annonce.
+  ["fil_posts", "annonce_officielle_id INTEGER"],
   ["fil_posts", "compte_rendu_evenement_id INTEGER"],
   ["insc_fiches", "programme_texte TEXT"],
   ["insc_fiches", "programme_fichier_url TEXT"],
@@ -7811,6 +7813,36 @@ db.exec(`
     UNIQUE(evenement_id, user_id, emoji),
     FOREIGN KEY(evenement_id) REFERENCES evenements(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Annonces officielles Diaspo'Actif (2026-10-05) — visibles de tous pendant une fenêtre de dates : accueil,
+     événement « Trophée de la diaspora », fil épinglé, notification à tous les comptes. */
+  CREATE TABLE IF NOT EXISTS annonces_officielles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    titre TEXT NOT NULL,
+    accroche TEXT,
+    contenu TEXT,
+    image_url TEXT,
+    decompte_cible TEXT,
+    voir_plus_json TEXT DEFAULT '{}',
+    statut TEXT NOT NULL DEFAULT 'brouillon',
+    date_debut TEXT,
+    date_fin TEXT,
+    evenement_id INTEGER,
+    fil_post_id INTEGER,
+    notifie_at TEXT,
+    nb_notifies INTEGER DEFAULT 0,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  /* Qui a déjà reçu la notification d'une annonce : relancer l'envoi ne double jamais personne. */
+  CREATE TABLE IF NOT EXISTS annonce_notifications (
+    annonce_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY (annonce_id, user_id)
   );
 
   /* Adresses qui ont utilisé le lien « Ne plus recevoir ces comptes-rendus » : jamais ciblées par un envoi. */

@@ -457,6 +457,16 @@ function renderCompteRenduBloc(post) {
   </div>`;
 }
 
+/* Annonce officielle Diaspo'Actif (2026-10-05) : publication épinglée en tête du fil de tous. Le bloc (affiche,
+   décompte, « Découvrir », « Voir plus ») vient de assets/annonce-officielle.js, partagé avec l'accueil ; réactions,
+   commentaires et partage sont ceux de toute publication. */
+function renderAnnonceOfficielleBloc(post) {
+  const a = post.annonce;
+  if (!a) return '';
+  if (window.AnnonceOff) { AnnonceOff.css(); setTimeout(() => AnnonceOff.demarrerTick(), 0); return '<div class="ao-post">' + AnnonceOff.bloc(a, { compact: true, h: 'h3' }) + '</div>'; }
+  return '<div style="padding:12px 0"><strong>' + escHtml(a.titre) + '</strong><p>' + escHtml(a.accroche || '') + '</p><a class="btn" href="' + (a.evenement_id ? 'evenements.html?evt=' + a.evenement_id : 'fil-actualite.html') + '">Découvrir le programme</a></div>';
+}
+
 function renderPostCard(post, options = {}) {
   if (post.type === 'carte_vitrine') return renderVitrineCard(post);
   if (post.type === 'evenement_promo') return renderEvenementPromoCard(post);
@@ -507,8 +517,9 @@ function renderPostCard(post, options = {}) {
         </div>
        </div>` : '';
 
-  const crBloc = (post.type === 'compte_rendu' && post.compte_rendu) ? renderCompteRenduBloc(post) : '';
-  const menuItems = (isAuteur && crBloc)
+  const crBloc = (post.type === 'compte_rendu' && post.compte_rendu) ? renderCompteRenduBloc(post)
+    : ((post.type === 'annonce_officielle' && post.annonce) ? renderAnnonceOfficielleBloc(post) : '');
+  const menuItems = (isAuteur && crBloc && post.type === 'compte_rendu')
     ? `<a class="post-menu-item" style="text-decoration:none;display:block;" href="compte-rendu.html?evt=${post.compte_rendu.evenement_id}&edition=1">✏️ Modifier le compte-rendu</a>`
     : isAuteur
     ? `<button class="post-menu-item" onclick="Posts.editPost(${post.id})">✏️ Modifier</button>
@@ -1603,13 +1614,18 @@ const Posts = {
   _renderDetailPost(post) {
     const promoEvt = post.type === 'evenement_promo' && post.evenement_promo && post.evenement_promo.promo_active ? post.evenement_promo : null;
     const crDetail = post.type === 'compte_rendu' && post.compte_rendu ? post.compte_rendu : null;
+    const annonceDetail = post.type === 'annonce_officielle' && post.annonce ? post.annonce : null;
     /* Panneau de gauche (2026-10-06, demande explicite : « si c'est du texte, afficher le texte ; si
        c'est une image, afficher l'image » — la vignette montrait le texte mais l'ouvrir n'affichait
        plus que le nom de l'auteur) : image/vidéo si la publication en a, sinon son titre et son
        texte (les documents, audios et liens éventuels en dessous). Le texte étant alors déjà à
        gauche, la légende de droite est masquée pour ne pas le répéter. */
     let mediaHtml, texteSurMedia = false;
-    if (crDetail) {
+    if (annonceDetail) {
+      mediaHtml = annonceDetail.image_url
+        ? `<img src="${escHtml(annonceDetail.image_url)}" alt="${escHtml(annonceDetail.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
+        : `<div style="color:#fff;padding:60px;text-align:center;font-weight:800;font-size:20px;">🏆 ${escHtml(annonceDetail.titre)}</div>`;
+    } else if (crDetail) {
       mediaHtml = crDetail.image
         ? `<img src="${escHtml(crDetail.image)}" alt="${escHtml(crDetail.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
         : `<div style="color:#fff;padding:60px;text-align:center;font-weight:800;font-size:20px;">📄 ${escHtml(crDetail.titre)}</div>`;
@@ -1642,7 +1658,9 @@ const Posts = {
 
     const estArticle = post.pub_type === 'article';
     const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
-    document.getElementById('pd-caption').innerHTML = crDetail
+    document.getElementById('pd-caption').innerHTML = annonceDetail
+      ? (window.AnnonceOff ? (AnnonceOff.css(), setTimeout(() => AnnonceOff.demarrerTick(), 0), '<div class="ao-post">' + AnnonceOff.bloc({ ...annonceDetail, image_url: null }, { compact: true, h: 'h3' }) + '</div>') : escHtml(annonceDetail.titre))
+      : crDetail
       ? titrePostHtml(post) + renderCompteRenduBloc(post).replace(/<div class="cr-cover">[\s\S]*?<\/div>\s*(?=<div class="cr-resume)/, '')
       : promoEvt
       ? `<h3 class="post-titre">${escHtml(promoEvt.titre)}</h3><a href="evenements.html?evt=${promoEvt.id}" style="color:var(--orange,#ff6b00);font-weight:700;">Voir l'événement →</a>`

@@ -473,6 +473,8 @@ const COLONNES_MIGRATION = [
     ['fil_posts', 'promo_evenement_id', 'INTEGER'],
     // Compte-rendu d'événement (2026-10-05) — miroir exact des ALTER db.js.
     ['evenements', 'cr_relance_at', 'TEXT'],
+    // Annonces officielles (2026-10-05) — miroir exact de l'ALTER db.js.
+    ['fil_posts', 'annonce_officielle_id', 'INTEGER'],
     ['fil_posts', 'compte_rendu_evenement_id', 'INTEGER'],
     ['insc_fiches', 'programme_texte', 'TEXT'],
     ['insc_fiches', 'programme_fichier_url', 'TEXT'],

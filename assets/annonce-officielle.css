@@ -1,0 +1,48 @@
+/* Annonces officielles Diaspo'Actif (2026-10-05) — bandeau d'accueil, carte du fil, « Voir plus ».
+   Palette : marine #0D2B4E, or #F2C94C, orange #F26422. Animations coupées si prefers-reduced-motion. */
+@property --ao-a{syntax:"<angle>";initial-value:0deg;inherits:false}
+.ao-gold{position:relative;border-radius:18px;padding:3px;background:conic-gradient(from var(--ao-a),#FFF6C8,#E7B93C,#FFFBE0,#A8791B,#FFE27A,#D4A017,#FFF6C8);animation:ao-spin 7s linear infinite;box-shadow:0 0 0 1px rgba(255,243,176,.4),0 10px 34px rgba(242,201,76,.28),0 0 46px rgba(242,201,76,.16)}
+@keyframes ao-spin{to{--ao-a:360deg}}
+.ao-gold-in{position:relative;border-radius:15px;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#1B3F6B 0%,#0C2240 60%,#09182D 100%);color:#F4EFE0}
+.ao-gold-in::after{content:"";position:absolute;inset:-40% -60%;background:linear-gradient(115deg,transparent 42%,rgba(255,250,214,.45) 50%,transparent 58%);transform:translateX(-60%);animation:ao-shine 4.4s ease-in-out infinite;pointer-events:none}
+@keyframes ao-shine{0%,35%{transform:translateX(-70%)}70%,100%{transform:translateX(70%)}}
+.ao-spk{position:absolute;background:#FFF8D6;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);opacity:0;animation:ao-tw 2.8s ease-in-out infinite;filter:drop-shadow(0 0 5px #FFE27A);pointer-events:none}
+@keyframes ao-tw{0%,100%{opacity:0;transform:scale(.4) rotate(0)}50%{opacity:1;transform:scale(1.1) rotate(45deg)}}
+.ao-band{background:linear-gradient(180deg,#0A1E38,#0D2B4E);padding:18px 16px}
+.ao-wrap{max-width:1180px;margin:0 auto;position:relative}
+.ao-close{position:absolute;top:-6px;right:-4px;z-index:5;width:30px;height:30px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:15px;cursor:pointer}
+.ao-feat{display:grid;grid-template-columns:minmax(0,310px) minmax(0,1fr)}
+@media (max-width:760px){.ao-feat{grid-template-columns:1fr}}
+.ao-art{aspect-ratio:1/1;width:100%;align-self:start;background:#0D2B4E center/cover no-repeat;cursor:zoom-in;border:0;padding:0}
+.ao-body{padding:16px 18px 14px;min-width:0}
+.ao-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#2A1D00;background:linear-gradient(135deg,#FFF3B0,#F2C94C 50%,#C9962B);padding:4px 11px;border-radius:99px}
+.ao-body h2,.ao-body h3{font-family:Georgia,"Times New Roman",serif;font-weight:800;line-height:1.2;margin:10px 0 6px;color:#fff;font-size:clamp(19px,3.2vw,26px)}
+.ao-body p{margin:0 0 10px;color:#B8C4D6;font-size:14.5px;line-height:1.55}
+.ao-cd{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.ao-cd div{min-width:60px;text-align:center;padding:6px 8px;border-radius:10px;background:rgba(0,0,0,.3);border:1px solid rgba(242,201,76,.4)}
+.ao-cd b{display:block;font-family:Georgia,serif;font-size:21px;color:#FFF3B0;font-variant-numeric:tabular-nums}.ao-cd span{font-size:10px;letter-spacing:.1em;color:#A9B6C9;text-transform:uppercase}
+.ao-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.ao-btn{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:8px 15px;border-radius:11px;border:1.5px solid rgba(242,201,76,.55);background:rgba(255,255,255,.07);color:#F4EFE0;font:700 13.5px/1 inherit;font-family:inherit;cursor:pointer;text-decoration:none;transition:background .15s,transform .1s}
+.ao-btn:hover{background:rgba(242,201,76,.2);transform:translateY(-1px)}
+.ao-btn.pri{background:linear-gradient(135deg,#FFF3B0,#F2C94C 55%,#C9962B);color:#2A1D00;border-color:transparent}
+.ao-btn:focus-visible,.ao-art:focus-visible{outline:3px solid #FFF3B0;outline-offset:2px}
+.ao-vp{display:none;margin-top:12px;background:linear-gradient(160deg,#0F2E55,#07111F);border:1px solid rgba(242,201,76,.4);border-radius:14px;padding:14px;color:#F4EFE0;text-align:left}
+.ao-vp.on{display:block}
+.ao-vp .ao-lbl{font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#F2C94C;margin:12px 0 8px}.ao-vp .ao-lbl:first-child{margin-top:0}
+.ao-ex{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.ao-ex .ao-gold-in{padding:14px 10px 12px;text-align:center}
+.ao-av{width:60px;height:60px;margin:2px auto 6px;border-radius:50%;display:grid;place-items:center;font-family:Georgia,serif;font-weight:800;font-size:21px;color:#FFF3B0;background:linear-gradient(135deg,#1F4F86,#0D2B4E);border:3px solid #F2C94C;box-shadow:0 0 0 3px rgba(242,201,76,.25),0 0 18px rgba(242,201,76,.35)}
+.ao-av.sq{border-radius:15px}
+.ao-ex .nm{font-weight:700;font-size:14.5px}.ao-ex .sb{font-size:12px;color:#A9B6C9}
+.ao-ex .chip{display:inline-block;margin-top:8px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(110,231,168,.14);color:#6EE7A8;border:1px solid rgba(110,231,168,.4)}
+.ao-gl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.ao-gl div{border:1px solid rgba(244,239,224,.14);border-radius:12px;padding:9px 11px;background:rgba(255,255,255,.04);font-size:13.5px}.ao-gl b{display:block;color:#FFF3B0;margin-bottom:2px}
+.ao-note{font-size:12px;color:#A9B6C9;margin:8px 0 0}
+.ao-lbx{position:fixed;inset:0;z-index:100000;background:rgba(3,8,16,.88);display:grid;place-items:center;padding:16px;cursor:zoom-out}
+.ao-lbx div{width:min(94vw,92vh);aspect-ratio:1/1;border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,.6);background:center/contain no-repeat}
+.ao-lbx button{position:absolute;top:14px;right:16px;border:none;border-radius:99px;width:40px;height:40px;font-size:20px;cursor:pointer;background:#F2C94C;color:#2A1D00;font-weight:800}
+/* variante dans le fil : fond clair de la carte, l'annonce garde son cadre sombre */
+.ao-post{margin:6px 0 10px}
+.ao-post .ao-feat{grid-template-columns:1fr}
+.ao-post .ao-art{width:min(100%,520px);margin:0 auto;border-radius:0 0 14px 14px}
+@media (prefers-reduced-motion:reduce){.ao-gold,.ao-gold-in::after,.ao-spk{animation:none!important}.ao-spk{opacity:.9}}
