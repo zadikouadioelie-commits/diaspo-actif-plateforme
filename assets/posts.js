@@ -363,10 +363,9 @@ function renderPostCard(post, options = {}) {
 
   const estArticle = post.pub_type === 'article';
   /* Titre (2026-10-05) : toute publication en a un (saisi, ou généré par le serveur à partir du
-     contenu). Affiché au-dessus du média ; quand il a été généré à l'identique de la première
-     ligne, le serveur fournit corps_sans_titre pour ne pas la répéter dans le texte. */
+     contenu). Affiché au-dessus du média ; champ à part du texte, jamais retiré ni modifié par lui. */
   const titreHtml = titrePostHtml(post);
-  const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps_sans_titre != null ? post.corps_sans_titre : (post.contenu || ''));
+  const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
   const contenuHTML = processContent(texteBrut);
   const texteTronque = tronquerTexteBrut(texteBrut, POST_TRUNC_LEN);
   const contenuApercuHTML = texteTronque ? processContent(texteTronque) + '…' : '';
@@ -494,7 +493,7 @@ function buildCreateModal() {
   <div class="posts-modal-body">
     <!-- Titre (2026-10-05) : facultatif, mis en forme librement ; généré automatiquement (en gras) si laissé vide -->
     <div class="posts-field">
-      <label for="post-titre" style="display:block;font-size:12px;font-weight:700;color:var(--muted,#6b7280);margin-bottom:5px;">Titre <span style="font-weight:500;">(facultatif — généré automatiquement en gras à partir de votre texte si vide)</span></label>
+      <label for="post-titre" style="display:block;font-size:12px;font-weight:700;color:var(--muted,#6b7280);margin-bottom:5px;">Titre <span style="font-weight:500;">(facultatif — indépendant du texte ci-dessous ; si vous le laissez vide, la première ligne de votre texte devient le titre, en gras)</span></label>
       <textarea id="post-titre" rows="1" class="posts-textarea" style="min-height:0;" placeholder="Titre de la publication"></textarea>
     </div>
 
@@ -903,7 +902,7 @@ const Posts = {
     this._preparerTitre(draftPost ? (draftPost.titre || '') : '');
 
     if (draftPost) {
-      document.getElementById('post-contenu').value = draftPost.contenu || '';
+      document.getElementById('post-contenu').value = (draftPost.corps != null ? draftPost.corps : draftPost.contenu) || '';
       document.getElementById('post-categorie').value = draftPost.categorie || '';
       document.getElementById('post-visibilite').value = draftPost.visibilite || 'public';
       document.getElementById('post-pays').value = draftPost.localisation_pays || '';
@@ -1086,7 +1085,8 @@ const Posts = {
       else alert('Envoi du fichier en cours, patientez…');
       return;
     }
-    if (!contenu && !(window._postMedias||[]).some(m=>m.url)) {
+    const titreTexte = (document.getElementById('post-titre')?.value || '').replace(/<[^>]+>/g, '').trim();
+    if (!contenu && !titreTexte && !(window._postMedias||[]).some(m=>m.url)) {
       if (typeof showToast === 'function') showToast('Veuillez écrire quelque chose.', 'error');
       else alert('Veuillez écrire quelque chose.');
       return;
@@ -1298,7 +1298,7 @@ const Posts = {
       </a>`;
 
     const estArticle = post.pub_type === 'article';
-    const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps_sans_titre != null ? post.corps_sans_titre : (post.contenu || ''));
+    const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
     document.getElementById('pd-caption').innerHTML = titrePostHtml(post) + processContent(texteBrut);
 
     document.getElementById('pd-actions').innerHTML = `

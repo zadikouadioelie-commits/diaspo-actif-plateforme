@@ -12665,8 +12665,11 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   const medias   = body.medias ? (typeof body.medias === "string" ? body.medias : JSON.stringify(body.medias)) : "[]";
   const hashtags = body.hashtags ? (typeof body.hashtags === "string" ? body.hashtags : JSON.stringify(body.hashtags)) : "[]";
 
+  // Le titre (case séparée) suffit à faire une publication : texte facultatif.
+  const titrePlainSaisi = texteDuTitre(SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : ""));
+
   if (statut === "publie") {
-    if (!contenu && !article_titre) return sendJSON(res, 400, { error: "Le contenu ne peut pas être vide." });
+    if (!contenu && !article_titre && !titrePlainSaisi) return sendJSON(res, 400, { error: "Le contenu ne peut pas être vide." });
   }
 
   const erreurMedias = validerMediasUtilisateur(user, medias, pub_type);
@@ -12686,7 +12689,7 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   `).run(
     user.id, await nomCompteAffichage(user.id), pub_type, pub_type,
     body.categorie || "Publication",
-    contenu || article_titre,
+    contenu || article_titre || titrePlainSaisi,
     body.media_url || null,
     pub_type === "photo" ? "image" : pub_type === "video" ? "video" : null,
     article_titre || null,
@@ -12702,8 +12705,8 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   // Titre saisi (mise en forme en ligne autorisée) ou, à défaut, généré depuis le contenu.
   {
     const saisi = SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : "").slice(0, 800);
-    if (texteDuTitre(saisi)) await ecrireTitrePost(id, saisi, false);
-    else await ecrireTitrePost(id, genererTitrePost({ contenu, article_titre, pub_type, categorie: body.categorie }).html, !article_titre);
+    if (texteDuTitre(saisi)) await ecrireTitreEtCorps(id, saisi, 0, contenu, composerContenu(saisi, contenu, 0));
+    else await genererEtAppliquerTitre({ id, contenu: contenu || article_titre, article_titre, pub_type, categorie: body.categorie });
   }
 
   // Récupère le post complet pour le renvoyer
@@ -13046,19 +13049,25 @@ route("PUT", "/api/fil/:id", async (req, res, params, body) => {
   await db.prepare(`UPDATE fil_posts SET contenu=?, categorie=?, visibilite=?, statut=?, medias=?, hashtags=?, localisation_pays=?, localisation_ville=? WHERE id=?`)
     .run(contenu, categorie, visibilite, statut, medias, hashtags, localisation_pays, localisation_ville, p.id);
 
-  /* Titre (2026-10-05) : un titre saisi/modifié par l'auteur est conservé tel quel (titre_auto=0) ;
-     un titre vide, ou resté tel qu'il avait été généré, est régénéré à partir du contenu à jour
-     tant que l'auteur n'y a pas touché. */
+  /* Titre (2026-10-05) : champ indépendant du texte — modifier le texte ne change jamais le titre,
+     et inversement. Un titre saisi/modifié est conservé tel quel (titre_auto=0). Seul un titre
+     vidé (ou absent) est regénéré, une fois, à partir du texte courant. `body.contenu` est la case
+     « texte » ; `contenu` (version complète) est recomposé ensuite pour les autres modules. */
   {
-    const regenerer = () => ecrireTitrePost(p.id, genererTitrePost({ ...p, contenu, categorie }).html, !p.article_titre);
+    const corpsCourant = body.contenu !== undefined ? contenu : (p.corps != null ? p.corps : p.contenu);
+    let titre = p.titre || null, auto = p.titre_auto == null ? 0 : Number(p.titre_auto), corps = corpsCourant, regenerer = false;
     if (body.titre !== undefined) {
       const saisi = SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : "").slice(0, 800);
-      if (!texteDuTitre(saisi)) await regenerer();
-      else if (saisi === SEC.sanitizeInlineHtml(p.titre || "") && p.titre_auto) await regenerer();
-      else if (saisi !== SEC.sanitizeInlineHtml(p.titre || "")) await ecrireTitrePost(p.id, saisi, false);
-    } else if (!p.titre || p.titre_auto) {
-      await regenerer();
+      if (!texteDuTitre(saisi)) regenerer = true;
+      else if (saisi !== SEC.sanitizeInlineHtml(p.titre || "")) { titre = saisi; auto = 0; }
+    } else if (!p.titre) regenerer = true;
+    if (regenerer) {
+      const source = { ...p, contenu: corpsCourant, categorie };
+      const g = genererTitrePost(source);
+      const extrait = titreExtractible(source, g);
+      titre = g.html; auto = p.article_titre ? 0 : (extrait ? 1 : 2); corps = extrait ? g.reste : corpsCourant;
     }
+    if (titre) await ecrireTitreEtCorps(p.id, titre, auto, corps, composerContenu(titre, corps, auto));
   }
 
   const updated = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.id);
@@ -16823,7 +16832,7 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé' LIMIT 12").all(u.id);
   const publications = (await db.prepare(`
     SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, p.medias, p.media_url, p.media_type,
-      p.pub_type, p.article_titre, p.article_contenu, p.titre, p.titre_auto,
+      p.pub_type, p.article_titre, p.article_contenu, p.titre, p.titre_auto, p.corps,
       COUNT(DISTINCT r.id) AS nb_reactions,
       COUNT(DISTINCT c.id) AS nb_commentaires
     FROM fil_posts p
@@ -22280,30 +22289,52 @@ function genererTitrePost(p) {
   /* reste : le texte SANS sa première ligne, utilisé à l'affichage pour ne pas répéter un titre
      généré à l'identique de cette ligne (jamais quand elle a été raccourcie ou nettoyée). */
   const reste = (!tronque && idx >= 0 && !p.article_titre && lignesBrutes[idx].trim() === ligne)
-    ? [apresPhrase, ...lignesBrutes.slice(idx + 1)].filter(x => x !== null).join("\n").trim() : null;
+    ? [...lignesBrutes.slice(0, idx).filter(l => l.trim()), apresPhrase, ...lignesBrutes.slice(idx + 1)].filter(x => x !== null).join("\n").trim() : null;
   return { texte, html: `<strong>${SEC.escapeHtml(texte)}</strong>`, reste };
 }
+/* Le titre est un champ À PART du texte (2026-10-05, précision de la demande : « une case pour le
+   titre, une case pour le texte, deux choses différentes »). Deux colonnes distinctes : titre (HTML
+   en ligne) et corps (le texte seul) ; modifier l'un ne touche jamais l'autre. `contenu` reste la
+   version « complète » (titre + texte) pour tous les modules qui le lisent déjà — recherche,
+   notifications, citations de republication, tableaux de bord —, recalculée à chaque écriture.
+   titre_auto : 0 = saisi par l'auteur ; 1 = généré en sortant la 1re ligne/phrase du texte
+   (corps = le reste) ; 2 = généré sans rien retirer du texte (ligne trop longue, repli). */
 function titrePostComplet(p) {
-  const g = genererTitrePost(p);
-  const aTitre = !!(p && p.titre && String(p.titre).trim());
-  const titre = aTitre ? p.titre : g.html;
-  const auto = aTitre ? p.titre_auto : 1;
-  const corps = (auto && g.reste !== null && texteDuTitre(titre) === g.texte) ? g.reste : null;
-  return { ...p, titre, titre_auto: auto ? 1 : 0, corps_sans_titre: corps };
+  const corps = p && p.corps != null ? p.corps : (p ? p.contenu : null);
+  if (p && p.titre && String(p.titre).trim()) return { ...p, corps };
+  return { ...p, corps, titre: genererTitrePost(p).html, titre_auto: 2 };
 }
-async function ecrireTitrePost(id, titre, auto) {
-  try { await db.prepare("UPDATE fil_posts SET titre=?, titre_auto=? WHERE id=?").run(titre, auto ? 1 : 0, id); }
-  catch (e) { /* colonne pas encore migrée en production : l'affichage retombe sur titrePostComplet() */ }
+function composerContenu(titreHtml, corps, auto) {
+  const t = texteDuTitre(titreHtml);
+  if (!t || Number(auto) === 2) return corps || "";
+  return corps ? t + "\n\n" + corps : t;
+}
+function titreExtractible(p, g) {
+  return g.reste !== null && !p.article_titre && !["article", "repost"].includes(p.pub_type || p.type);
+}
+async function ecrireTitreEtCorps(id, titre, auto, corps, contenu) {
+  try {
+    if (contenu === undefined) await db.prepare("UPDATE fil_posts SET titre=?, titre_auto=?, corps=? WHERE id=?").run(titre, auto, corps, id);
+    else await db.prepare("UPDATE fil_posts SET titre=?, titre_auto=?, corps=?, contenu=? WHERE id=?").run(titre, auto, corps, contenu, id);
+    return true;
+  } catch (e) { return false; /* colonnes pas encore migrées en production : repli à l'affichage (titrePostComplet) */ }
+}
+/* Titre d'une publication qui n'en a pas (saisie sans titre, ou publication ancienne) : généré à
+   partir du texte, qui n'est jamais modifié — seul `corps` reçoit le texte sans la ligne devenue titre. */
+async function genererEtAppliquerTitre(p) {
+  const g = genererTitrePost(p);
+  const extrait = titreExtractible(p, g);
+  const auto = p.article_titre ? 0 : (extrait ? 1 : 2);
+  const corps = extrait ? g.reste : (p.contenu || "");
+  const ok = await ecrireTitreEtCorps(p.id, g.html, auto, corps);
+  return ok ? { ...p, titre: g.html, titre_auto: auto, corps } : null;
 }
 async function rattraperTitresPosts(essai = 1) {
   try {
     for (let tour = 0; tour < 40; tour++) {
       const lot = await db.prepare("SELECT id, contenu, article_titre, pub_type, type, categorie FROM fil_posts WHERE titre IS NULL OR titre='' LIMIT 500").all();
       if (!lot.length) break;
-      for (const p of lot) {
-        const g = genererTitrePost(p);
-        await db.prepare("UPDATE fil_posts SET titre=?, titre_auto=? WHERE id=?").run(g.html, p.article_titre ? 0 : 1, p.id);
-      }
+      for (const p of lot) { if (!(await genererEtAppliquerTitre(p))) throw new Error("migration des titres impossible"); }
       if (lot.length < 500) break;
     }
   } catch (e) { if (essai < 3) setTimeout(() => { rattraperTitresPosts(essai + 1).catch(() => {}); }, 20000); }
@@ -22312,6 +22343,12 @@ setTimeout(() => { rattraperTitresPosts().catch(() => {}); }, 3000);
 
 /* ---------- Helper : enrichir un post ---------- */
 async function enrichPost(p, cu) {
+  // Publication encore sans titre (insérée par un autre module depuis le dernier rattrapage) :
+  // titre généré et enregistré ici, une fois (seulement si la ligne a bien été lue en entier).
+  if ("titre" in p && !(p.titre && String(p.titre).trim()) && "contenu" in p) {
+    const maj = await genererEtAppliquerTitre(p);
+    if (maj) p = maj;
+  }
   const reactions = await db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
   const counts = {}; reactions.forEach(r => counts[r.type] = r.n);
   const _nbComm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);

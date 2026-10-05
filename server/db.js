@@ -5044,6 +5044,7 @@ const postsAlters = [
   "ALTER TABLE fil_posts ADD COLUMN source_import TEXT",
   "ALTER TABLE fil_posts ADD COLUMN titre TEXT",
   "ALTER TABLE fil_posts ADD COLUMN titre_auto INTEGER DEFAULT 0",
+  "ALTER TABLE fil_posts ADD COLUMN corps TEXT",
 ];
 for (const sql of postsAlters) { try { db.prepare(sql).run(); } catch(e) { /* colonne déjà existante */ } }
 

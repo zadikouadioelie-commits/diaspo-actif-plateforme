@@ -1957,34 +1957,18 @@ function render() {
 
 /* Extrait la 1re image d'une publication (medias JSON ou media_url) */
 /* Publication = titre + (image) + aperçu + « Voir plus » (2026-10-05, demande explicite : les
-   posts trop longs noyaient la page). Une publication ordinaire n'a pas de champ titre : on prend
-   sa première ligne (ou, si elle est très longue, ses ~110 premiers caractères) ; un article
-   garde son vrai titre. Le reste du texte devient l'aperçu (~220 caractères, coupé sur un mot). */
+   posts trop longs noyaient la page). Le titre est un champ séparé du texte ; l'aperçu fait ~220
+   caractères coupés sur un mot. */
 function pvzPubParts(p) {
   const estArticle = p.pub_type === 'article';
-  const brut = String(estArticle ? (p.article_contenu || '') : (p.corps_sans_titre != null ? p.corps_sans_titre : (p.contenu || ''))).replace(/\r/g, '').trim();
-  let titre, reste;
-  /* Titre fourni par le serveur (saisi, ou généré en gras) : HTML en ligne déjà nettoyé, filtré
-     ici une seconde fois avant injection. Les branches ci-dessous ne servent que de repli. */
-  const titreServeur = String(p.titre || '')
+  /* Le titre est un champ à part du texte (fourni par le serveur : saisi, ou généré en gras) —
+     HTML en ligne déjà nettoyé, filtré ici une seconde fois avant injection. Le texte n'est jamais
+     modifié par lui. Les liens de mention @[Nom](u:3) sont affichés « @Nom ». */
+  const titreHtml = String(p.titre || '')
     .replace(/<(?!\/?(strong|b|em|i|u)\b)[^>]*>/gi, '')
     .replace(/<(strong|b|em|i|u)\b[^>]*>/gi, '<$1>').trim();
-  if (titreServeur) {
-    titre = null; reste = brut;
-  } else if (estArticle) {
-    titre = String(p.article_titre || p.contenu || '').trim();
-    reste = brut;
-  } else {
-    const lignes = brut.split('\n');
-    const premiere = (lignes.shift() || '').trim();
-    if (premiere.length <= 120) { titre = premiere; reste = lignes.join('\n').trim(); }
-    else {
-      let coupe = premiere.slice(0, 110);
-      const sp = coupe.lastIndexOf(' ');
-      if (sp > 70) coupe = coupe.slice(0, sp);
-      titre = coupe + '…'; reste = brut;
-    }
-  }
+  const reste = String(estArticle ? (p.article_contenu || '') : (p.corps != null ? p.corps : (p.contenu || '')))
+    .replace(/\r/g, '').replace(/@\[([^\]]+)\]\([ui]:\d+\)/g, '@$1').trim();
   const compact = reste.replace(/\s+/g, ' ');
   let apercu = compact, tronque = false;
   if (compact.length > 220) {
@@ -1993,7 +1977,6 @@ function pvzPubParts(p) {
     if (sp > 150) apercu = apercu.slice(0, sp);
     apercu += '…'; tronque = true;
   }
-  const titreHtml = titreServeur || (titre ? `<strong>${esc(titre)}</strong>` : '');
   return { titreHtml, apercu, complet: reste, tronque };
 }
 function pvzTogglePub(btn) {
