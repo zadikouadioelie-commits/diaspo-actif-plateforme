@@ -12628,6 +12628,13 @@ route("POST", "/api/fil", async (req, res, params, body) => {
   )).lastInsertRowid;
   if (body.source_import) await db.prepare("UPDATE fil_posts SET source_import=? WHERE id=?").run(body.source_import, id);
 
+  // Titre saisi (mise en forme en ligne autorisée) ou, à défaut, généré depuis le contenu.
+  {
+    const saisi = SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : "").slice(0, 800);
+    if (texteDuTitre(saisi)) await ecrireTitrePost(id, saisi, false);
+    else await ecrireTitrePost(id, genererTitrePost({ contenu, article_titre, pub_type, categorie: body.categorie }).html, !article_titre);
+  }
+
   // Récupère le post complet pour le renvoyer
   const post = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(id);
 
@@ -12968,8 +12975,23 @@ route("PUT", "/api/fil/:id", async (req, res, params, body) => {
   await db.prepare(`UPDATE fil_posts SET contenu=?, categorie=?, visibilite=?, statut=?, medias=?, hashtags=?, localisation_pays=?, localisation_ville=? WHERE id=?`)
     .run(contenu, categorie, visibilite, statut, medias, hashtags, localisation_pays, localisation_ville, p.id);
 
+  /* Titre (2026-10-05) : un titre saisi/modifié par l'auteur est conservé tel quel (titre_auto=0) ;
+     un titre vide, ou resté tel qu'il avait été généré, est régénéré à partir du contenu à jour
+     tant que l'auteur n'y a pas touché. */
+  {
+    const regenerer = () => ecrireTitrePost(p.id, genererTitrePost({ ...p, contenu, categorie }).html, !p.article_titre);
+    if (body.titre !== undefined) {
+      const saisi = SEC.sanitizeInlineHtml(typeof body.titre === "string" ? body.titre : "").slice(0, 800);
+      if (!texteDuTitre(saisi)) await regenerer();
+      else if (saisi === SEC.sanitizeInlineHtml(p.titre || "") && p.titre_auto) await regenerer();
+      else if (saisi !== SEC.sanitizeInlineHtml(p.titre || "")) await ecrireTitrePost(p.id, saisi, false);
+    } else if (!p.titre || p.titre_auto) {
+      await regenerer();
+    }
+  }
+
   const updated = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(p.id);
-  sendJSON(res, 200, { post: enrichPost(updated, user) });
+  sendJSON(res, 200, { post: await enrichPost(updated, user) });
 });
 
 /* ---------- Supprimer post ---------- */
@@ -16728,16 +16750,16 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const isFollowing  = me ? !!await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(me.id, u.id) : false;
   const initiativesSuivies = await db.prepare("SELECT i.id,i.slug,i.nom,i.domaine,i.pays FROM abonnements a JOIN initiatives i ON i.id=a.initiative_id WHERE a.user_id=? LIMIT 12").all(u.id);
   const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé' LIMIT 12").all(u.id);
-  const publications = await db.prepare(`
+  const publications = (await db.prepare(`
     SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, p.medias, p.media_url, p.media_type,
-      p.pub_type, p.article_titre, p.article_contenu,
+      p.pub_type, p.article_titre, p.article_contenu, p.titre, p.titre_auto,
       COUNT(DISTINCT r.id) AS nb_reactions,
       COUNT(DISTINCT c.id) AS nb_commentaires
     FROM fil_posts p
     LEFT JOIN fil_reactions r ON r.post_id = p.id
     LEFT JOIN fil_commentaires c ON c.post_id = p.id
     WHERE p.auteur_id = ? AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')
-    GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id);
+    GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id)).map(titrePostComplet);
   const po = await db.prepare("SELECT statut,domaines_expertise,pays_intervention,services,description_complete,site_web,liens_utiles,date_attribution FROM partenaires_officiels WHERE user_id=?").get(u.id);
   /* Affiliations officielles (module Initiative → Utilisateur, 2026-07-27) : uniquement les
      affiliations ACCEPTÉES par le compte, issues d'organisations réellement enregistrées —
@@ -22149,6 +22171,74 @@ route("GET", "/api/mes-candidatures", async (req, res) => {
   sendJSON(res, 200, { candidatures: rows });
 });
 
+/* ---------- Titres des publications (2026-10-05, demande explicite) ----------
+   Toute publication a un titre, en gras et bien visible. Sans titre saisi, il est généré à partir
+   du contenu (titre_auto=1) et reste modifiable par son auteur — qui peut alors lui donner la mise
+   en forme de son choix (gras, italique, souligné). */
+function texteDuTitre(html) {
+  return String(html || "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+}
+function genererTitrePost(p) {
+  const pub = p.pub_type || p.type || "";
+  const nettoyer = (l) => String(l)
+    .replace(/@\[([^\]]+)\]\([ui]:\d+\)/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const lignesBrutes = String(p.article_titre || p.contenu || "").replace(/\r/g, "").split("\n");
+  let idx = -1, ligne = "";
+  for (let i = 0; i < lignesBrutes.length; i++) {
+    const l = nettoyer(lignesBrutes[i]);
+    if (l && !/^(#[\wÀ-ÿ]+\s*)+$/.test(l)) { idx = i; ligne = l; break; }
+  }
+  let texte = ligne, tronque = false, apresPhrase = null;
+  if (texte.length > 110) {
+    const phrase = texte.match(/^.{8,110}?[.!?…](?=\s|$)/);
+    if (phrase) { texte = phrase[0]; apresPhrase = ligne.slice(phrase[0].length).trim(); }
+    else {
+      tronque = true;
+      let coupe = texte.slice(0, 90);
+      const sp = coupe.lastIndexOf(" ");
+      if (sp > 55) coupe = coupe.slice(0, sp);
+      texte = coupe.replace(/[\s,;:–-]+$/, "") + "…";
+    }
+  }
+  texte = texte.replace(/[\s:–-]+$/, "");
+  if (!texte) texte = pub === "photo" ? "Photo partagée" : pub === "video" ? "Vidéo partagée" : pub === "article" ? "Article" : /https?:\/\//.test(String(p.contenu || "")) ? "Lien partagé" : (p.categorie || "Publication");
+  /* reste : le texte SANS sa première ligne, utilisé à l'affichage pour ne pas répéter un titre
+     généré à l'identique de cette ligne (jamais quand elle a été raccourcie ou nettoyée). */
+  const reste = (!tronque && idx >= 0 && !p.article_titre && lignesBrutes[idx].trim() === ligne)
+    ? [apresPhrase, ...lignesBrutes.slice(idx + 1)].filter(x => x !== null).join("\n").trim() : null;
+  return { texte, html: `<strong>${SEC.escapeHtml(texte)}</strong>`, reste };
+}
+function titrePostComplet(p) {
+  const g = genererTitrePost(p);
+  const aTitre = !!(p && p.titre && String(p.titre).trim());
+  const titre = aTitre ? p.titre : g.html;
+  const auto = aTitre ? p.titre_auto : 1;
+  const corps = (auto && g.reste !== null && texteDuTitre(titre) === g.texte) ? g.reste : null;
+  return { ...p, titre, titre_auto: auto ? 1 : 0, corps_sans_titre: corps };
+}
+async function ecrireTitrePost(id, titre, auto) {
+  try { await db.prepare("UPDATE fil_posts SET titre=?, titre_auto=? WHERE id=?").run(titre, auto ? 1 : 0, id); }
+  catch (e) { /* colonne pas encore migrée en production : l'affichage retombe sur titrePostComplet() */ }
+}
+async function rattraperTitresPosts(essai = 1) {
+  try {
+    for (let tour = 0; tour < 40; tour++) {
+      const lot = await db.prepare("SELECT id, contenu, article_titre, pub_type, type, categorie FROM fil_posts WHERE titre IS NULL OR titre='' LIMIT 500").all();
+      if (!lot.length) break;
+      for (const p of lot) {
+        const g = genererTitrePost(p);
+        await db.prepare("UPDATE fil_posts SET titre=?, titre_auto=? WHERE id=?").run(g.html, p.article_titre ? 0 : 1, p.id);
+      }
+      if (lot.length < 500) break;
+    }
+  } catch (e) { if (essai < 3) setTimeout(() => { rattraperTitresPosts(essai + 1).catch(() => {}); }, 20000); }
+}
+setTimeout(() => { rattraperTitresPosts().catch(() => {}); }, 3000);
+
 /* ---------- Helper : enrichir un post ---------- */
 async function enrichPost(p, cu) {
   const reactions = await db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(p.id);
@@ -22212,7 +22302,11 @@ async function enrichPost(p, cu) {
   const auteur_accreditations = p.auteur_id
     ? (await db.prepare("SELECT type FROM compte_accreditations WHERE user_id=? AND statut='active'").all(p.auteur_id)).map(a => a.type)
     : [];
-  return { ...p, auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post };
+  /* Post de promotion J-7 : joint la carte de l'événement (données déjà publiques sur sa
+     cartouche) pour que le front l'affiche avec le design promo, boutons compris. */
+  let evenement_promo = null;
+  if (p.promo_evenement_id) { try { evenement_promo = await cartePromoEvenement(p.promo_evenement_id); } catch (_) {} }
+  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo };
 }
 
 /* ---------- Fil intelligent ---------- */

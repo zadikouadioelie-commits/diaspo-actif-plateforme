@@ -40,6 +40,34 @@ function tronquerTexteBrut(texte, max) {
   return coupe;
 }
 
+/* Titre d'une publication (2026-10-05, demande explicite) : HTML en ligne (gras/italique/souligné)
+   déjà nettoyé par le serveur ; filtré une seconde fois ici, par principe, avant injection. */
+function titreSur(html) {
+  return String(html || '')
+    .replace(/<(?!\/?(strong|b|em|i|u)\b)[^>]*>/gi, '')
+    .replace(/<(strong|b|em|i|u)\b[^>]*>/gi, '<$1>');
+}
+function titrePostHtml(post) {
+  const t = titreSur(post.titre).trim();
+  return t ? `<h3 class="post-titre">${t}</h3>` : '';
+}
+/* L'éditeur de texte enrichi n'est pas chargé sur toutes les pages qui utilisent ce module :
+   chargement à la demande, une seule fois. */
+let _richEditorPromesse = null;
+function ensureRichEditor() {
+  if (window.RichEditor) return Promise.resolve(true);
+  if (!_richEditorPromesse) {
+    _richEditorPromesse = new Promise(resolve => {
+      const s = document.createElement('script');
+      s.src = 'assets/rich-editor.js';
+      s.onload = () => resolve(!!window.RichEditor);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+  }
+  return _richEditorPromesse;
+}
+
 const CONTRIBUTIONS = [
   'Je souhaite devenir partenaire',
   'Je souhaite investir',
@@ -334,11 +362,14 @@ function renderPostCard(post, options = {}) {
   const villeInfo = profil.ville ? `· ${escHtml(profil.ville)}` : '';
 
   const estArticle = post.pub_type === 'article';
-  const texteBrut = estArticle ? (post.article_contenu || '') : (post.contenu || '');
-  const titreArticleHtml = estArticle ? `<h3 class="post-article-titre">${escHtml(post.article_titre||post.contenu)}</h3>` : '';
-  const contenuHTML = titreArticleHtml + processContent(texteBrut);
+  /* Titre (2026-10-05) : toute publication en a un (saisi, ou généré par le serveur à partir du
+     contenu). Affiché au-dessus du média ; quand il a été généré à l'identique de la première
+     ligne, le serveur fournit corps_sans_titre pour ne pas la répéter dans le texte. */
+  const titreHtml = titrePostHtml(post);
+  const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps_sans_titre != null ? post.corps_sans_titre : (post.contenu || ''));
+  const contenuHTML = processContent(texteBrut);
   const texteTronque = tronquerTexteBrut(texteBrut, POST_TRUNC_LEN);
-  const contenuApercuHTML = texteTronque ? titreArticleHtml + processContent(texteTronque) + '…' : '';
+  const contenuApercuHTML = texteTronque ? processContent(texteTronque) + '…' : '';
 
   const repostBanner = (post.pub_type === 'repost' || post.type === 'repost') && post.original_post
     ? `<div class="post-repost-banner">
@@ -386,9 +417,11 @@ function renderPostCard(post, options = {}) {
 
   ${repostBanner}
 
+  ${titreHtml}
+
   ${renderMedias(post)}
 
-  <div class="post-body" data-expanded="${texteTronque ? 'false' : 'true'}">
+  <div class="post-body" data-expanded="${texteTronque ? 'false' : 'true'}"${texteBrut ? '' : ' style="display:none"'}>
     <div class="post-body-preview"${texteTronque ? '' : ' style="display:none"'}>${contenuApercuHTML}</div>
     <div class="post-body-full"${texteTronque ? ' style="display:none"' : ''}>${contenuHTML}</div>
     ${texteTronque ? `<button type="button" class="post-voir-plus" onclick="Posts.toggleExpand(${post.id}, this)">Voir plus</button>` : ''}
@@ -459,6 +492,12 @@ function buildCreateModal() {
   </div>
 
   <div class="posts-modal-body">
+    <!-- Titre (2026-10-05) : facultatif, mis en forme librement ; généré automatiquement (en gras) si laissé vide -->
+    <div class="posts-field">
+      <label for="post-titre" style="display:block;font-size:12px;font-weight:700;color:var(--muted,#6b7280);margin-bottom:5px;">Titre <span style="font-weight:500;">(facultatif — généré automatiquement en gras à partir de votre texte si vide)</span></label>
+      <textarea id="post-titre" rows="1" class="posts-textarea" style="min-height:0;" placeholder="Titre de la publication"></textarea>
+    </div>
+
     <!-- Zone de texte -->
     <div class="posts-field">
       <textarea id="post-contenu" class="posts-textarea" placeholder="Partagez une actualité, un projet, une opportunité… Utilisez #hashtag et @ ou * pour identifier un compte" rows="5" oninput="Posts.updateCounter()"></textarea>
@@ -621,6 +660,8 @@ function injectStyles() {
 .post-voir-plus{display:inline-block;margin-top:4px;background:none;border:none;padding:0;color:#ff6b00;font-weight:700;font-size:.9rem;cursor:pointer;}
 .post-voir-plus:hover{text-decoration:underline;}
 .post-article-titre{font-size:1.1rem;font-weight:700;color:#111;margin-bottom:8px;}
+.post-titre{margin:0;padding:4px 16px 10px;font-size:1.2rem;line-height:1.35;font-weight:400;color:#0f172a;word-break:break-word;}
+.post-titre strong,.post-titre b{font-weight:800;}
 .post-hashtag{color:#ff6b00;text-decoration:none;font-weight:500;}
 .post-hashtag:hover{text-decoration:underline;}
 .post-mention{color:#0284c7;}
@@ -859,6 +900,7 @@ const Posts = {
     document.getElementById('post-medias-list').innerHTML = '';
     this.updateCounter();
     attachMentionPicker(document.getElementById('post-contenu'));
+    this._preparerTitre(draftPost ? (draftPost.titre || '') : '');
 
     if (draftPost) {
       document.getElementById('post-contenu').value = draftPost.contenu || '';
@@ -870,6 +912,20 @@ const Posts = {
       this._editingId = draftPost.id;
       try { window._postMedias = JSON.parse(draftPost.medias||'[]'); this.renderMediasList(); } catch(e){}
     }
+  },
+
+  /* Champ titre du composeur : éditeur compact (gras/italique/souligné) ; sans l'éditeur, retombe
+     sur un simple champ texte. Le titre généré d'une publication existante est prérempli et
+     reste modifiable — s'il n'est pas touché, le serveur le régénère à partir du contenu. */
+  async _preparerTitre(valeur) {
+    const ta = document.getElementById('post-titre');
+    if (!ta) return;
+    ta.value = '';
+    const ok = await ensureRichEditor();
+    if (ok && !ta._richEditorInstance) window.RichEditor.attach(ta, { compact: true, defaultBold: true, placeholder: 'Titre de la publication' });
+    const ed = ta._richEditorInstance;
+    if (ed) ed.setHTML(valeur || '');
+    else ta.value = String(valeur || '').replace(/<[^>]+>/g, '');
   },
 
   closeModal() {
@@ -1003,7 +1059,7 @@ const Posts = {
     const contenu = document.getElementById('post-contenu')?.value?.trim() || '';
     const editId = document.getElementById('post-edit-id')?.value;
     const payload = {
-      contenu, statut: 'brouillon',
+      contenu, statut: 'brouillon', titre: document.getElementById('post-titre')?.value || '',
       categorie: document.getElementById('post-categorie')?.value || '',
       visibilite: document.getElementById('post-visibilite')?.value || 'public',
       localisation_pays: document.getElementById('post-pays')?.value || '',
@@ -1038,6 +1094,7 @@ const Posts = {
 
     const payload = {
       contenu,
+      titre: document.getElementById('post-titre')?.value || '',
       statut: programmedAt ? 'programme' : 'publie',
       categorie: document.getElementById('post-categorie')?.value || 'Publication',
       visibilite: document.getElementById('post-visibilite')?.value || 'public',
@@ -1241,9 +1298,8 @@ const Posts = {
       </a>`;
 
     const estArticle = post.pub_type === 'article';
-    const texteBrut = estArticle ? (post.article_contenu || '') : (post.contenu || '');
-    const titreArticleHtml = estArticle ? `<h3 class="post-article-titre">${escHtml(post.article_titre||post.contenu)}</h3>` : '';
-    document.getElementById('pd-caption').innerHTML = titreArticleHtml + processContent(texteBrut);
+    const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps_sans_titre != null ? post.corps_sans_titre : (post.contenu || ''));
+    document.getElementById('pd-caption').innerHTML = titrePostHtml(post) + processContent(texteBrut);
 
     document.getElementById('pd-actions').innerHTML = `
       <div class="post-reactions-wrap">

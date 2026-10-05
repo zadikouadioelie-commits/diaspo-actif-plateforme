@@ -250,7 +250,17 @@ function sanitizeRichHtml(html) {
   return sanitizeHtml(html, RICH_HTML_OPTIONS).trim();
 }
 
+/* Titre d'une publication (2026-10-05) : mise en forme en ligne uniquement (gras, italique,
+   souligné) — jamais de bloc, de lien ni de style libre. Les retours à la ligne / paragraphes de
+   l'éditeur sont ramenés à une espace : un titre tient sur un seul bloc. */
+function sanitizeInlineHtml(html) {
+  if (typeof html !== "string" || !html.trim()) return "";
+  const aplati = html.replace(/<\/p>\s*<p[^>]*>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+  return sanitizeHtml(aplati, { allowedTags: ["strong", "b", "em", "i", "u"], allowedAttributes: {}, disallowedTagsMode: "discard" }).replace(/\s+/g, " ").trim();
+}
+
 module.exports = {
+  sanitizeInlineHtml,
   applySecurityHeaders,
   rateLimit,
   clientIp,

@@ -801,7 +801,8 @@ html, body { overflow-x:clip; }
 .pvz-pub-av { width:40px; height:40px; border-radius:50%; flex:none; background-image:linear-gradient(135deg,var(--tp,#2F6BED),var(--tp-dark,#1a3f8a)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
 .pvz-pub-name { font-size:13.5px; font-weight:600; color:#122A4D; }
 .pvz-pub-date { font-size:11.5px; color:#8794A7; }
-.pvz-pub-title { margin:0 0 8px; font-size:15.5px; font-weight:800; line-height:1.35; color:#122A4D; }
+.pvz-pub-title { margin:0 0 8px; font-size:16.5px; font-weight:400; line-height:1.35; color:#122A4D; }
+.pvz-pub-title strong, .pvz-pub-title b { font-weight:800; }
 .pvz-pub-text { margin:0 0 6px; font-size:14px; line-height:1.55; color:#3B4658; white-space:pre-wrap; }
 .pvz-pub-img { display:block; width:100%; max-height:280px; object-fit:cover; border-radius:12px; margin:0 0 10px; }
 .pvz-pub-more { background:none; border:none; padding:2px 0; margin:0 0 4px; color:var(--tp,#2F6BED); font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
@@ -1961,9 +1962,16 @@ function render() {
    garde son vrai titre. Le reste du texte devient l'aperçu (~220 caractères, coupé sur un mot). */
 function pvzPubParts(p) {
   const estArticle = p.pub_type === 'article';
-  const brut = String(estArticle ? (p.article_contenu || '') : (p.contenu || '')).replace(/\r/g, '').trim();
+  const brut = String(estArticle ? (p.article_contenu || '') : (p.corps_sans_titre != null ? p.corps_sans_titre : (p.contenu || ''))).replace(/\r/g, '').trim();
   let titre, reste;
-  if (estArticle) {
+  /* Titre fourni par le serveur (saisi, ou généré en gras) : HTML en ligne déjà nettoyé, filtré
+     ici une seconde fois avant injection. Les branches ci-dessous ne servent que de repli. */
+  const titreServeur = String(p.titre || '')
+    .replace(/<(?!\/?(strong|b|em|i|u)\b)[^>]*>/gi, '')
+    .replace(/<(strong|b|em|i|u)\b[^>]*>/gi, '<$1>').trim();
+  if (titreServeur) {
+    titre = null; reste = brut;
+  } else if (estArticle) {
     titre = String(p.article_titre || p.contenu || '').trim();
     reste = brut;
   } else {
@@ -1985,7 +1993,8 @@ function pvzPubParts(p) {
     if (sp > 150) apercu = apercu.slice(0, sp);
     apercu += '…'; tronque = true;
   }
-  return { titre, apercu, complet: reste, tronque };
+  const titreHtml = titreServeur || (titre ? `<strong>${esc(titre)}</strong>` : '');
+  return { titreHtml, apercu, complet: reste, tronque };
 }
 function pvzTogglePub(btn) {
   const art = btn.closest('.pvz-pub');
@@ -2201,7 +2210,7 @@ function renderVisitorProfile() {
             <div class="pvz-pub-date">${dateStr}</div>
           </div>
         </div>
-        ${pp.titre?`<h4 class="pvz-pub-title">${esc(pp.titre)}</h4>`:''}
+        ${pp.titreHtml?`<h4 class="pvz-pub-title">${pp.titreHtml}</h4>`:''}
         ${img?`<img class="pvz-pub-img" loading="lazy" src="${esc(img)}" alt="">`:''}
         ${pp.apercu?`<p class="pvz-pub-text pvz-pub-apercu">${esc(pp.apercu)}</p>`:''}
         ${pp.tronque?`<p class="pvz-pub-text pvz-pub-complet" style="display:none;">${esc(pp.complet)}</p><button type="button" class="pvz-pub-more" onclick="pvzTogglePub(this)">Voir plus</button>`:''}

@@ -80,6 +80,7 @@
       .rich-editor-area ul,.rich-editor-area ol{margin:0 0 12px;padding-left:22px;}
       .rich-editor-area a{color:var(--orange,#B84C1A);text-decoration:underline;}
       .rich-editor-area:empty::before{content:attr(data-placeholder);color:#9AA5B1;}
+      .rich-editor-area.rich-editor-area-compact{min-height:44px;max-height:none;overflow:visible;font-size:17px;line-height:1.4;padding:10px 14px;}
     `;
     document.head.appendChild(s);
   }
@@ -114,7 +115,36 @@
     // après l'enregistrement — exactement ce que la demande interdisait explicitement.
     area.addEventListener('focus', () => { try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {} });
 
-    TOOLBAR.forEach(item => {
+    /* Mode compact (2026-10-05, titre des publications) : mise en forme en ligne seulement (gras,
+       italique, souligné, effacer), jamais de bloc/liste/lien ; la touche Entrée est neutralisée
+       (un titre tient sur une ligne) et le collage est ramené à du texte brut. defaultBold met le
+       gras par défaut à la première saisie — l'auteur peut l'enlever ou le remplacer. */
+    const COMPACT_CMDS = ['bold', 'italic', 'underline', 'removeFormat'];
+    const barre = opts.compact ? TOOLBAR.filter(i => !i.sep && COMPACT_CMDS.includes(i.cmd)) : TOOLBAR;
+    if (opts.compact) {
+      area.classList.add('rich-editor-area-compact');
+      area.innerHTML = textarea.value || '';
+      area.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+      area.addEventListener('paste', e => {
+        e.preventDefault();
+        const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\s+/g, ' ');
+        if (opts.defaultBold && area.textContent.length === 0 && t.trim()) {
+          document.execCommand('insertHTML', false, '<strong>' + t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</strong>');
+        } else document.execCommand('insertText', false, t);
+      });
+      if (opts.defaultBold) {
+        // Premier caractère tapé dans un champ vide : inséré directement en gras (execCommand('bold')
+        // au focus n'est pas fiable — la sélection n'est pas encore posée à ce moment-là).
+        const echap = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        area.addEventListener('beforeinput', e => {
+          if (area.textContent.length === 0 && e.inputType === 'insertText' && e.data) {
+            e.preventDefault();
+            document.execCommand('insertHTML', false, '<strong>' + echap(e.data) + '</strong>');
+          }
+        });
+      }
+    }
+    barre.forEach(item => {
       if (item.sep) { toolbarEl.appendChild(Object.assign(document.createElement('span'), { className: 'rich-editor-sep' })); return; }
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -149,7 +179,7 @@
       // Même repli que l'initialisation dans attach() ci-dessus, et pour la même raison — sinon
       // setHTML('') (rechargement à vide de la modale) écrasait le <p><br></p> déjà posé par
       // attach() juste avant, ramenant l'éditeur au cas bogué (bug réel constaté en testant).
-      setHTML: html => { area.innerHTML = html || '<p><br></p>'; sync(); },
+      setHTML: html => { area.innerHTML = html || (opts.compact ? '' : '<p><br></p>'); sync(); },
       isEmpty: () => !area.textContent.trim(),
       focus: () => area.focus(),
     };
