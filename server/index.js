@@ -18575,6 +18575,10 @@ const PUB_SLOTS = [
   // "annuaire_sidebar" (2026-09-29, demande explicite) : colonne latérale à droite de la grille
   // de comptes (annuaire.html), distincte de "vitrine_section" (bandeau au-dessus de la grille).
   "annuaire_sidebar",
+  // "vue_publication_restreinte" (2026-10-05, demande explicite) : cases publicitaires insérées
+  // entre les publications de la grille du fil d'actualité ET entre les publications de la vue
+  // dédiée (navigation verticale) — voir assets/fil-grille.js.
+  "vue_publication_restreinte",
 ];
 const PUB_AD_CTA = ["En savoir plus", "Acheter", "Contacter", "S'inscrire"];
 
@@ -18817,6 +18821,14 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
     ORDER BY RANDOM()
   `).all(`%${emplacement}%`, now, now);
 
+  /* ?exclude=1,2 (2026-10-05) : publicités déjà affichées sur la page — évite de répéter la même
+     dans deux cases voisines quand d'autres existent ; si TOUTES les candidates sont exclues,
+     on les rend éligibles de nouveau plutôt que de laisser l'emplacement vide. */
+  const exclureIds = new Set(String(query.exclude || "").split(",").map(s => Number(s)).filter(Boolean));
+  if (exclureIds.size && candidates.some(c => !exclureIds.has(Number(c.id)))) {
+    for (let i = candidates.length - 1; i >= 0; i--) if (exclureIds.has(Number(candidates[i].id))) candidates.splice(i, 1);
+  }
+
   let ad = null;
   for (const c of candidates) {
     const zones = safeParseArray(c.cible_zones);
@@ -18845,6 +18857,11 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
     break;
   }
   if (!ad) return sendJSON(res, 200, { ad: null });
+
+  /* ?peek=1 : savoir seulement s'il existe une publicité à servir (la grille du fil décide ainsi
+     d'y réserver des cases ou non) — ne compte AUCUNE impression, l'annonceur n'est facturé/compté
+     que pour une publicité réellement affichée. */
+  if (query.peek) return sendJSON(res, 200, { ad: { id: ad.id } });
 
   await db.prepare("UPDATE publicites SET nb_impressions=nb_impressions+1, updated_at=datetime('now') WHERE id=?").run(ad.id);
   sendJSON(res, 200, { ad: {

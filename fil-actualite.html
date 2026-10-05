@@ -24,6 +24,7 @@
 <link rel="apple-touch-icon" href="assets/logo.png">
   <link rel="stylesheet" href="/assets/design-upgrade.v2.css">
   <link rel="stylesheet" href="/assets/theme-manager.css">
+  <link rel="stylesheet" href="/assets/fil-grille.css?v=1">
   <style>
     @media(max-width:680px){
       .topbar-inner{justify-content:space-between;}
@@ -189,6 +190,15 @@
 
         <div id="ad-between-posts" data-ad-emplacement="between_posts" style="display:none;margin-bottom:16px;"></div>
 
+        <!-- Choix de la présentation : grille (plusieurs publications visibles) ou liste (2026-10-05) -->
+        <div class="fg-barre" id="fg-barre">
+          <span class="fg-barre-info" id="fg-barre-info">Cliquez sur une publication pour l'ouvrir, puis ↑ ↓ pour passer à la suivante.</span>
+          <div class="fg-bascule" role="group" aria-label="Présentation du fil">
+            <button type="button" id="vue-grille" data-vue="grille" class="active" aria-pressed="true">▦ Grille</button>
+            <button type="button" id="vue-liste" data-vue="liste" aria-pressed="false">☰ Liste</button>
+          </div>
+        </div>
+
         <!-- Liste des posts -->
         <div id="feed-list">
           <div style="text-align:center;padding:40px;color:#9ca3af;">
@@ -234,6 +244,7 @@
 <script src="assets/demo.js?v=2"></script>
 <script src="assets/app.js?v=13"></script>
 <script src="assets/posts.js"></script>
+<script src="assets/fil-grille.js?v=1"></script>
 
 <script>
 /* ── État du fil ── */
@@ -241,6 +252,18 @@ let feedMode = 'tous';
 let feedCat  = '';
 let feedPage = 1;
 let currentUser = null;
+/* Présentation du fil (2026-10-05) : grille par défaut, mémorisée par navigateur. */
+let feedVue = 'grille';
+try { if (localStorage.getItem('fil_vue') === 'liste') feedVue = 'liste'; } catch (_) {}
+function majBasculeVue() {
+  document.querySelectorAll('#fg-barre .fg-bascule button').forEach(b => {
+    const actif = b.dataset.vue === feedVue;
+    b.classList.toggle('active', actif);
+    b.setAttribute('aria-pressed', actif ? 'true' : 'false');
+  });
+  const info = document.getElementById('fg-barre-info');
+  if (info) info.style.visibility = feedVue === 'grille' ? 'visible' : 'hidden';
+}
 
 /* Hauteur réelle du bandeau (topbar est déjà position:sticky;top:0), pour que la barre de
    filtres sticky se positionne juste en dessous sans le recouvrir, sur toute taille d'écran. */
@@ -274,6 +297,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch(e) {
     Posts.init(null);
   }
+
+  FilGrille.init({ containerId: 'feed-list', currentUserId: currentUser?.id });
+  majBasculeVue();
+  document.querySelectorAll('#fg-barre .fg-bascule button').forEach(b => {
+    b.addEventListener('click', () => {
+      if (feedVue === b.dataset.vue) return;
+      feedVue = b.dataset.vue;
+      try { localStorage.setItem('fil_vue', feedVue); } catch (_) {}
+      majBasculeVue();
+      feedPage = 1;
+      loadFeed();
+    });
+  });
 
   // Filtres mode
   document.querySelectorAll('#feed-filters .posts-feed-filter').forEach(btn => {
@@ -418,6 +454,12 @@ async function loadMeilleuresVentes() {
 /* ── Charger le fil ── */
 async function loadFeed() {
   const container = document.getElementById('feed-list');
+  if (feedVue === 'grille') {
+    document.getElementById('feed-pagination').innerHTML = '';
+    container.innerHTML = '';
+    return FilGrille.charger(feedMode, feedCat, new URLSearchParams(location.search).get('hashtag') || '');
+  }
+  FilGrille.arreter();
   container.innerHTML = `<div style="text-align:center;padding:30px;color:#9ca3af;"><div style="font-size:1.8rem;margin-bottom:8px;">⏳</div><p>Chargement…</p></div>`;
 
   try {

@@ -2524,6 +2524,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         between_posts: 'Entre les publications',
         between_videos: 'Entre les vidéos',
         vitrine_section: 'Section boutique',
+        vue_publication_restreinte: 'Vue publication restreinte',
       };
       document.getElementById('ad-emplacements').className = 'da-pill-group';
       document.getElementById('ad-emplacements').innerHTML = _adSlots.map(s => `
@@ -2732,6 +2733,26 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
               <span style="font-size:18px;">📣</span>
             </div>
             <div style="background:#0D1B2A;border-radius:8px;aspect-ratio:16/10;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;">▶️</div>
+          </div>
+        </div>`
+    },
+    vue_publication_restreinte: {
+      titre: 'Vue publication restreinte',
+      caption: "Une case dédiée à votre publicité, insérée de loin en loin entre les publications : dans la grille du fil d'actualité (une case toutes les 6 publications) et dans la vue plein écran quand on passe d'une publication à l'autre (une toutes les 5). Badge « Publicité » toujours visible.",
+      html: `
+        <div style="background:#F4F6FA;border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.05em;color:#94a3b8;margin-bottom:8px;">▦ FIL D'ACTUALITÉ — GRILLE</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;aspect-ratio:4/5;"><div style="height:62%;background:#EEF1F6;border-radius:7px 7px 0 0;"></div><div style="height:6px;width:70%;background:#E5EAF2;border-radius:3px;margin:7px 6px 0;"></div></div>
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;aspect-ratio:4/5;"><div style="height:62%;background:#EEF1F6;border-radius:7px 7px 0 0;"></div><div style="height:6px;width:60%;background:#E5EAF2;border-radius:3px;margin:7px 6px 0;"></div></div>
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;aspect-ratio:4/5;"><div style="height:62%;background:#EEF1F6;border-radius:7px 7px 0 0;"></div><div style="height:6px;width:75%;background:#E5EAF2;border-radius:3px;margin:7px 6px 0;"></div></div>
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;aspect-ratio:4/5;"><div style="height:62%;background:#EEF1F6;border-radius:7px 7px 0 0;"></div><div style="height:6px;width:55%;background:#E5EAF2;border-radius:3px;margin:7px 6px 0;"></div></div>
+            <div style="background:#FFF3EC;border:2px solid #B84C1A;border-radius:8px;aspect-ratio:4/5;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="position:absolute;top:-9px;left:6px;background:#B84C1A;color:#fff;font-size:8px;padding:2px 7px;border-radius:99px;font-weight:800;">📣 PUBLICITÉ</span>
+              <span style="font-size:22px;">📣</span>
+              <div style="height:5px;width:60%;background:#FBD2BB;border-radius:3px;margin-top:8px;"></div>
+            </div>
+            <div style="background:#fff;border:1px solid #DCE4EF;border-radius:8px;aspect-ratio:4/5;"><div style="height:62%;background:#EEF1F6;border-radius:7px 7px 0 0;"></div><div style="height:6px;width:65%;background:#E5EAF2;border-radius:3px;margin:7px 6px 0;"></div></div>
           </div>
         </div>`
     },

@@ -615,8 +615,9 @@ function buildDetailModal() {
   modal.innerHTML = `
 <div class="pd-box">
   <button class="pd-close" onclick="Posts.closeDetail()" title="Fermer">✕</button>
-  <button class="pd-nav pd-nav-prev" id="pd-nav-prev" onclick="Posts.detailPrev()" title="Publication précédente">‹</button>
-  <button class="pd-nav pd-nav-next" id="pd-nav-next" onclick="Posts.detailNext()" title="Publication suivante">›</button>
+  <button class="pd-nav pd-nav-prev" id="pd-nav-prev" onclick="Posts.detailPrev()" title="Publication précédente (↑)" aria-label="Publication précédente">︿</button>
+  <button class="pd-nav pd-nav-next" id="pd-nav-next" onclick="Posts.detailNext()" title="Publication suivante (↓)" aria-label="Publication suivante">﹀</button>
+  <div class="pd-hint" id="pd-hint" aria-hidden="true">↕ Faites défiler ou balayez pour changer de publication</div>
   <div class="pd-media" id="pd-media"></div>
   <div class="pd-side">
     <div class="pd-header" id="pd-header"></div>
@@ -632,6 +633,36 @@ function buildDetailModal() {
 </div>`;
   modal.addEventListener('click', e => { if (e.target === modal) Posts.closeDetail(); });
   document.body.appendChild(modal);
+  bindDetailGestures(modal.querySelector('.pd-media'));
+}
+
+/* Balayage vertical (tactile) et molette/pavé tactile sur la zone média de la vue détaillée :
+   passer à la publication suivante/précédente sans viser un bouton (2026-10-05, demande
+   explicite : « un bouton, ou un balayage du haut vers le bas »). Limité à la zone média : la
+   colonne de droite (commentaires) garde son propre défilement, jamais détourné. */
+function bindDetailGestures(zone) {
+  if (!zone) return;
+  let startY = 0, startX = 0, suivi = false;
+  zone.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) { suivi = false; return; }
+    suivi = true; startY = e.touches[0].clientY; startX = e.touches[0].clientX;
+  }, { passive: true });
+  zone.addEventListener('touchend', e => {
+    if (!suivi) return; suivi = false;
+    const t = e.changedTouches[0];
+    const dy = startY - t.clientY, dx = startX - t.clientX;
+    if (Math.abs(dy) < 60 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+    if (dy > 0) Posts.detailNext(); else Posts.detailPrev();
+  }, { passive: true });
+  let verrouMolette = false;
+  zone.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) < 30 || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    if (verrouMolette) return;
+    verrouMolette = true;
+    setTimeout(() => { verrouMolette = false; }, 650);
+    if (e.deltaY > 0) Posts.detailNext(); else Posts.detailPrev();
+  }, { passive: false });
 }
 
 /* ── Styles CSS injectés ── */
@@ -743,14 +774,35 @@ function injectStyles() {
 .pd-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:16px;cursor:pointer;z-index:5;}
 .pd-close:hover{background:rgba(255,255,255,.28);}
 /* Navigation "publication précédente / suivante" (2026-09-30, demande explicite) : parcourt
-   la liste des posts actuellement chargés (Posts._feedIds), sans fermer la vue détaillée. */
-.pd-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.35);border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center;transition:background .15s;}
-.pd-nav:hover{background:rgba(0,0,0,.55);}
+   la liste des posts actuellement chargés (Posts._feedIds), sans fermer la vue détaillée.
+   Passée à la verticale le 2026-10-05 (demande explicite : ↑ ↓ / balayage haut-bas), boutons
+   empilés sur le bord droit de la zone média, juste à gauche de la colonne de commentaires. */
+.pd-nav{position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:20px;line-height:1;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center;transition:background .15s,opacity .15s;}
+.pd-nav:hover{background:rgba(0,0,0,.7);}
+.pd-nav:focus-visible{outline:2px solid #ff6b00;outline-offset:2px;}
 .pd-nav:disabled{opacity:0;pointer-events:none;}
-.pd-nav-prev{left:14px;}
-.pd-nav-next{right:14px;}
-@media(max-width:760px){.pd-nav{top:21vh;}}
-.pd-media{flex:1;min-width:0;background:#0b0b0c;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+.pd-nav-prev{right:414px;top:calc(50% - 52px);}
+.pd-nav-next{right:414px;top:calc(50% + 8px);}
+@media(max-width:760px){.pd-nav-prev{right:12px;top:calc(21vh - 52px);}.pd-nav-next{right:12px;top:calc(21vh + 8px);}}
+.pd-hint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:6px 14px;border-radius:99px;pointer-events:none;opacity:0;transition:opacity .4s;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;}
+.pd-hint.show{opacity:1;}
+@media(min-width:761px){.pd-hint{left:calc((100% - 400px)/2);}}
+@media(max-width:760px){.pd-hint{bottom:auto;top:calc(42vh - 40px);}}
+.pd-profil-btn{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:7px 14px;border:1.5px solid var(--orange,#ff6b00);color:var(--orange,#ff6b00);border-radius:99px;font-size:12.5px;font-weight:700;text-decoration:none;background:#fff;}
+.pd-profil-btn:hover{background:var(--orange,#ff6b00);color:#fff;}
+@keyframes pdSlideNext{from{opacity:.25;transform:translateY(34px);}to{opacity:1;transform:none;}}
+@keyframes pdSlidePrev{from{opacity:.25;transform:translateY(-34px);}to{opacity:1;transform:none;}}
+.pd-box.pd-anim-next .pd-media,.pd-box.pd-anim-next .pd-side{animation:pdSlideNext .24s ease-out;}
+.pd-box.pd-anim-prev .pd-media,.pd-box.pd-anim-prev .pd-side{animation:pdSlidePrev .24s ease-out;}
+@media(prefers-reduced-motion:reduce){.pd-box.pd-anim-next .pd-media,.pd-box.pd-anim-next .pd-side,.pd-box.pd-anim-prev .pd-media,.pd-box.pd-anim-prev .pd-side{animation:none;}}
+/* Case publicitaire dans la navigation (emplacement « Vue publication restreinte ») : pas de
+   statistiques, de réactions ni de commentaires — rien à commenter sur une publicité. */
+.pd-overlay.pd-ad-mode .pd-statsbar,.pd-overlay.pd-ad-mode .pd-comments,.pd-overlay.pd-ad-mode .pd-comment-form{display:none;}
+.pd-ad-media{width:100%;height:100%;display:flex;align-items:center;justify-content:center;position:relative;background:#0b0b0c;}
+.pd-ad-media img,.pd-ad-media video{max-width:100%;max-height:100%;object-fit:contain;display:block;}
+.pd-ad-badge{position:absolute;top:14px;left:14px;background:#B84C1A;color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-radius:99px;letter-spacing:.03em;}
+.pd-ad-cta{display:inline-block;margin:6px 16px 12px;padding:10px 20px;background:var(--orange,#ff6b00);color:#fff;border-radius:10px;font-weight:700;text-decoration:none;font-size:14px;}
+.pd-media{flex:1;min-width:0;background:#0b0b0c;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;touch-action:none;}
 .pd-media .post-media-grid{width:100%;height:100%;padding:0!important;margin:0;}
 .pd-media .post-media-item{border-radius:0;height:100%;}
 .pd-media .post-media-fg{max-height:none!important;height:100%!important;width:100%!important;object-fit:contain!important;}
@@ -845,15 +897,15 @@ const Posts = {
       if (!e.target.closest('.post-menu-wrap')) document.querySelectorAll('.post-menu-dropdown.open').forEach(d => d.classList.remove('open'));
       if (!e.target.closest('.post-reactions-wrap')) document.querySelectorAll('.post-reaction-menu.open').forEach(d => d.classList.remove('open'));
     });
-    // Échap ferme la vue détaillée, ← → passe à la publication précédente/suivante
-    // (sauf si le focus est dans un champ de saisie, ex. le commentaire)
+    // Échap ferme la vue détaillée ; ↓ / ↑ (ou ← →, J / K) passent à la publication suivante /
+    // précédente (sauf si le focus est dans un champ de saisie, ex. le commentaire)
     document.addEventListener('keydown', e => {
       const dm = document.getElementById('posts-detail-modal');
       if (!dm || dm.style.display === 'none') return;
       if (e.key === 'Escape') { Posts.closeDetail(); return; }
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
-      if (e.key === 'ArrowLeft') Posts.detailPrev();
-      else if (e.key === 'ArrowRight') Posts.detailNext();
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'j' || e.key === 'J') { e.preventDefault(); Posts.detailNext(); }
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'k' || e.key === 'K') { e.preventDefault(); Posts.detailPrev(); }
     });
   },
 
@@ -1232,57 +1284,185 @@ const Posts = {
   _detailPostId: null,
   _feedIds: [],
 
+  /* Séquence de navigation de la vue détaillée (2026-10-05, demande explicite : naviguer de
+     publication en publication sans revenir au fil, façon grandes plateformes).
+     - Par défaut : les posts de la dernière liste affichée par renderFeed() (_feedIds).
+     - Une page peut fournir sa propre séquence (setDetailSequence) : posts ET cases publicitaires
+       mêlés, avec un rappel qui charge la suite quand on approche de la fin (assets/fil-grille.js).
+     Une entrée est { kind:'post', id } ou { kind:'ad' } (publicité, chargée à la demande). */
+  _navItems: null,
+  _navNeedMore: null,
+  _navHasMore: false,
+  _navLoading: false,
+  _detailSeqIdx: -1,
+  _detailToken: 0,
+  _hintVu: false,
+
+  setDetailSequence(items, needMore, hasMore) {
+    this._navItems = items || null;
+    this._navNeedMore = needMore || null;
+    this._navHasMore = !!hasMore;
+  },
+  appendDetailItems(items, hasMore) {
+    if (!this._navItems) this._navItems = [];
+    this._navItems.push(...items);
+    this._navHasMore = !!hasMore;
+    this._updateDetailNav();
+  },
+  _seq() {
+    return this._navItems || (this._feedIds || []).map(id => ({ kind: 'post', id }));
+  },
+  async _requestMore() {
+    if (!this._navHasMore || this._navLoading || !this._navNeedMore) return;
+    this._navLoading = true;
+    try { await this._navNeedMore(); } catch (_) { /* la suite reste simplement indisponible */ }
+    this._navLoading = false;
+    this._updateDetailNav();
+  },
+
+  /* Temps passé sur une publication ouverte en vue détaillée : alimente la même mesure que les
+     cartes du fil (_flushDwell, envoyée si >= 2 s) — sinon ouvrir depuis la grille ferait
+     disparaître ce signal de l'algorithme du fil. */
+  _suivreTemps(nouvelId) {
+    if (this._detailPostId != null) _flushDwell(String(this._detailPostId));
+    if (nouvelId != null) _postDwellStart.set(String(nouvelId), Date.now());
+  },
+
   async openDetail(postId) {
     buildDetailModal();
+    this._suivreTemps(postId);
+    const seq = this._seq();
+    const idx = seq.findIndex(e => e.kind === 'post' && String(e.id) === String(postId));
+    this._detailSeqIdx = idx;
     this._detailPostId = postId;
+    const token = ++this._detailToken;
     const modal = document.getElementById('posts-detail-modal');
+    modal.classList.remove('pd-ad-mode');
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     document.getElementById('pd-media').innerHTML = `<div style="color:#fff;padding:40px;">Chargement…</div>`;
     document.getElementById('pd-comments').innerHTML = '';
     this._updateDetailNav();
+    this._montrerIndice();
+    if (idx >= 0 && idx >= seq.length - 4) this._requestMore();
     try {
       const r = await apiRequest('GET', `/api/fil/${postId}`);
+      if (token !== this._detailToken) return; // l'utilisateur est déjà passé à une autre publication
       if (!r.post) { this.closeDetail(); return; }
       this._renderDetailPost(r.post);
       this._loadDetailComments(postId);
       attachMentionPicker(document.getElementById('pd-comment-input'));
-    } catch (e) { this.closeDetail(); }
+    } catch (e) { if (token === this._detailToken) this.closeDetail(); }
   },
 
   closeDetail() {
+    this._suivreTemps(null);
     const modal = document.getElementById('posts-detail-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) { modal.style.display = 'none'; modal.classList.remove('pd-ad-mode'); }
     document.body.style.overflow = '';
     this._detailPostId = null;
+    this._detailSeqIdx = -1;
+    this._detailToken++;
   },
 
-  /* Boutons ‹ › : n'affiche que ce qui existe réellement — pas de flèche vers nulle part.
-     Se base sur la dernière liste de posts chargée par renderFeed() (le fil visible
-     derrière la modale), donc marche pour toute page qui utilise Posts.renderFeed(). */
+  /* Boutons ︿ ﹀ : n'affiche que ce qui existe réellement — pas de flèche vers nulle part ;
+     « suivant » reste actif tant qu'une suite peut encore être chargée. */
   _updateDetailNav() {
-    const ids = this._feedIds || [];
-    const idx = ids.indexOf(this._detailPostId);
+    const seq = this._seq();
+    const idx = this._detailSeqIdx;
     const prevBtn = document.getElementById('pd-nav-prev');
     const nextBtn = document.getElementById('pd-nav-next');
     if (prevBtn) prevBtn.disabled = idx <= 0;
-    if (nextBtn) nextBtn.disabled = idx === -1 || idx >= ids.length - 1;
+    if (nextBtn) nextBtn.disabled = idx === -1 || (idx >= seq.length - 1 && !this._navHasMore);
+  },
+
+  /* Petit rappel « faites défiler ou balayez », une seule fois par visite de la page. */
+  _montrerIndice() {
+    if (this._hintVu) return;
+    this._hintVu = true;
+    const h = document.getElementById('pd-hint');
+    if (!h || this._seq().length < 2) return;
+    h.classList.add('show');
+    setTimeout(() => h.classList.remove('show'), 3200);
   },
 
   detailPrev() { this._detailStep(-1); },
   detailNext() { this._detailStep(1); },
   _detailStep(dir) {
-    const ids = this._feedIds || [];
-    const idx = ids.indexOf(this._detailPostId);
+    const seq = this._seq();
+    const idx = this._detailSeqIdx;
     if (idx === -1) return;
-    const nextIdx = idx + dir;
-    if (nextIdx < 0 || nextIdx >= ids.length) return;
-    this.openDetail(ids[nextIdx]);
+    const n = idx + dir;
+    if (n < 0) return;
+    if (n >= seq.length) {
+      // Fin de la liste chargée : on va chercher la suite, puis on avance si elle est arrivée.
+      if (dir > 0 && this._navHasMore) {
+        const avant = seq.length;
+        this._requestMore().then(() => { if (this._seq().length > avant) this._detailStep(1); });
+      }
+      return;
+    }
+    this._allerA(n, dir);
+  },
+  async _allerA(n, dir) {
+    const seq = this._seq();
+    const entree = seq[n];
+    if (!entree) return;
+    const box = document.querySelector('#posts-detail-modal .pd-box');
+    if (box) {
+      box.classList.remove('pd-anim-next', 'pd-anim-prev');
+      void box.offsetWidth; // relance l'animation même sur deux pas consécutifs
+      box.classList.add(dir > 0 ? 'pd-anim-next' : 'pd-anim-prev');
+    }
+    if (entree.kind === 'post') { this.openDetail(entree.id); return; }
+    const token = ++this._detailToken;
+    const ok = await this._montrerPubDetail(entree, token);
+    if (token !== this._detailToken) return;
+    if (ok) { this._detailSeqIdx = n; this._detailPostId = null; this._updateDetailNav(); if (n >= seq.length - 4) this._requestMore(); return; }
+    // Aucune publicité à servir : on retire la case et on poursuit dans le même sens, sans trou.
+    seq.splice(n, 1);
+    if (this._detailSeqIdx > n) this._detailSeqIdx--;
+    const m = dir > 0 ? n : n - 1;
+    if (m < 0 || m >= seq.length) { this._updateDetailNav(); return; }
+    this._allerA(m, dir);
+  },
+
+  /* Affiche une publicité (emplacement « vue_publication_restreinte ») dans la vue détaillée. */
+  async _montrerPubDetail(entree, token) {
+    if (!entree.ad) {
+      const dejaVues = this._seq().filter(e => e.kind === 'ad' && e.ad).map(e => e.ad.id).join(',');
+      try {
+        const r = await apiRequest('GET', `/api/ads/servir?emplacement=vue_publication_restreinte${dejaVues ? '&exclude=' + dejaVues : ''}`);
+        if (!r.ad) return false;
+        entree.ad = r.ad;
+      } catch (_) { return false; }
+    }
+    if (token !== this._detailToken) return true;
+    const ad = entree.ad;
+    const modal = document.getElementById('posts-detail-modal');
+    modal.classList.add('pd-ad-mode');
+    this._suivreTemps(null);
+    this._detailPostId = null;
+    const media = ad.media_url
+      ? (ad.media_type === 'video'
+          ? `<video src="${escHtml(ad.media_url)}" controls autoplay muted loop playsinline></video>`
+          : `<img src="${escHtml(ad.media_url)}" alt="${escHtml(ad.titre)}">`)
+      : `<div style="color:#fff;font-size:42px;">📣</div>`;
+    document.getElementById('pd-media').innerHTML = `<div class="pd-ad-media"><span class="pd-ad-badge">📣 PUBLICITÉ</span>${media}</div>`;
+    document.getElementById('pd-header').innerHTML = `<div style="font-weight:700;font-size:15px;">${escHtml(ad.titre)}</div><div style="font-size:12px;color:#6b7280;margin-top:2px;">Contenu sponsorisé</div>`;
+    document.getElementById('pd-caption').innerHTML = ad.description ? escHtml(ad.description) : '';
+    document.getElementById('pd-actions').innerHTML = ad.lien_url
+      ? `<a class="pd-ad-cta" href="${escHtml(ad.lien_url)}" target="_blank" rel="noopener sponsored" onclick="fetch('/api/ads/${Number(ad.id)}/clic',{method:'POST'}).catch(function(){})">${escHtml(ad.cta || 'En savoir plus')}</a>`
+      : '';
+    return true;
   },
 
   _renderDetailPost(post) {
+    const promoEvt = post.type === 'evenement_promo' && post.evenement_promo && post.evenement_promo.promo_active ? post.evenement_promo : null;
     document.getElementById('pd-media').innerHTML = renderMedias(post) ||
-      `<div style="color:#fff;padding:60px;text-align:center;">${escHtml(post.auteur_nom)}</div>`;
+      (promoEvt && promoEvt.image
+        ? `<img src="${escHtml(promoEvt.image)}" alt="${escHtml(promoEvt.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
+        : `<div style="color:#fff;padding:60px;text-align:center;">${escHtml(promoEvt ? promoEvt.titre : post.auteur_nom)}</div>`);
 
     const profil = post.auteur_profil || {};
     const titrePro = profil.titre_pro ? `<span class="post-auteur-titre">${escHtml(profil.titre_pro)}</span>` : '';
@@ -1295,11 +1475,14 @@ const Posts = {
           ${titrePro}
           <div class="post-meta">${timeAgo(post.created_at)}</div>
         </div>
-      </a>`;
+      </a>
+      <a class="pd-profil-btn" href="profil.html?id=${post.auteur_id||''}#tab-publications">👤 Voir le profil · toutes ses publications</a>`;
 
     const estArticle = post.pub_type === 'article';
     const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
-    document.getElementById('pd-caption').innerHTML = titrePostHtml(post) + processContent(texteBrut);
+    document.getElementById('pd-caption').innerHTML = promoEvt
+      ? `<h3 class="post-titre">${escHtml(promoEvt.titre)}</h3><a href="evenements.html?evt=${promoEvt.id}" style="color:var(--orange,#ff6b00);font-weight:700;">Voir l'événement →</a>`
+      : titrePostHtml(post) + processContent(texteBrut);
 
     document.getElementById('pd-actions').innerHTML = `
       <div class="post-reactions-wrap">
@@ -1532,6 +1715,8 @@ const Posts = {
     // Mémorise l'ordre des posts affichés pour la navigation ‹ › de la vue détaillée
     // (Posts.detailNext/detailPrev) — ignore les cartes vitrine, qui n'ont pas de vue détaillée.
     this._feedIds = posts.filter(p => p.type !== 'carte_vitrine').map(p => p.id);
+    // Un fil classique reprend la main sur toute séquence fournie par une vue en grille.
+    this._navItems = null; this._navNeedMore = null; this._navHasMore = false;
     if (!posts.length) {
       container.innerHTML = `<div style="text-align:center;padding:40px;color:#9ca3af;">
         <div style="font-size:2.5rem;margin-bottom:12px;">📭</div>
