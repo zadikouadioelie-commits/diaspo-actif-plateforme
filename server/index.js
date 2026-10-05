@@ -22324,6 +22324,15 @@ async function ecrireTitreEtCorps(id, titre, auto, corps, contenu) {
 async function genererEtAppliquerTitre(p) {
   const g = genererTitrePost(p);
   const extrait = titreExtractible(p, g);
+  if (p.titre && String(p.titre).trim()) {
+    // Titre déjà présent (posé par la première version de cette fonctionnalité) mais pas encore de
+    // corps : le titre n'est pas touché ; corps reçoit le texte sans la ligne qu'il reprend.
+    const autoActuel = Number(p.titre_auto || 0);
+    const identique = autoActuel > 0 && texteDuTitre(p.titre) === g.texte;
+    const auto = identique ? (extrait ? 1 : 2) : autoActuel;
+    const corps = identique && extrait ? g.reste : (p.contenu || "");
+    return (await ecrireTitreEtCorps(p.id, p.titre, auto, corps)) ? { ...p, titre_auto: auto, corps } : null;
+  }
   const auto = p.article_titre ? 0 : (extrait ? 1 : 2);
   const corps = extrait ? g.reste : (p.contenu || "");
   const ok = await ecrireTitreEtCorps(p.id, g.html, auto, corps);
@@ -22332,7 +22341,7 @@ async function genererEtAppliquerTitre(p) {
 async function rattraperTitresPosts(essai = 1) {
   try {
     for (let tour = 0; tour < 40; tour++) {
-      const lot = await db.prepare("SELECT id, contenu, article_titre, pub_type, type, categorie FROM fil_posts WHERE titre IS NULL OR titre='' LIMIT 500").all();
+      const lot = await db.prepare("SELECT id, contenu, article_titre, pub_type, type, categorie, titre, titre_auto FROM fil_posts WHERE titre IS NULL OR titre='' OR corps IS NULL LIMIT 500").all();
       if (!lot.length) break;
       for (const p of lot) { if (!(await genererEtAppliquerTitre(p))) throw new Error("migration des titres impossible"); }
       if (lot.length < 500) break;
@@ -22345,7 +22354,7 @@ setTimeout(() => { rattraperTitresPosts().catch(() => {}); }, 3000);
 async function enrichPost(p, cu) {
   // Publication encore sans titre (insérée par un autre module depuis le dernier rattrapage) :
   // titre généré et enregistré ici, une fois (seulement si la ligne a bien été lue en entier).
-  if ("titre" in p && !(p.titre && String(p.titre).trim()) && "contenu" in p) {
+  if ("titre" in p && "corps" in p && "contenu" in p && (!(p.titre && String(p.titre).trim()) || p.corps == null)) {
     const maj = await genererEtAppliquerTitre(p);
     if (maj) p = maj;
   }
