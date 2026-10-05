@@ -41,7 +41,13 @@
 
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  const texteSeul = html => String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  /* Les entités (&#39;, &amp;…) du titre/texte sont décodées AVANT d'être ré-échappées par esc() :
+     sinon « j&#39;accompagne » s'affichait tel quel sur la vignette (double échappement). */
+  const decoderEntites = s => s
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+  const texteSeul = html => decoderEntites(String(html || '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 
   function tempsEcoule(d) {
     if (!d) return '';

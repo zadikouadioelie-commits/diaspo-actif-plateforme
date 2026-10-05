@@ -295,6 +295,36 @@ function renderMedias(post) {
   return html;
 }
 
+/* Vue détaillée : la publication a-t-elle une image ou une vidéo à montrer à gauche ? */
+function aImageOuVideo(post) {
+  let medias = [];
+  try { medias = JSON.parse(post.medias || '[]'); } catch (e) { medias = []; }
+  const items = [];
+  if (post.media_url) items.push({ type: post.media_type || 'image', url: post.media_url });
+  items.push(...medias);
+  return items.some(m => m && m.url && (m.type === 'image' || m.type === 'video'
+    || (!m.type && /\.(jpg|jpeg|png|gif|webp)/i.test(m.url)) || /\.(mp4|webm|ogg)/i.test(m.url)));
+}
+const COULEURS_PANNEAU = ['#ff6b00', '#0284c7', '#16a34a', '#7c3aed', '#dc2626', '#d97706', '#0891b2', '#be185d'];
+/* Panneau de texte de la vue détaillée : même couleur que la vignette de la grille (fil-grille.js),
+   titre puis texte complet (défilant s'il est long), documents/audios/liens en dessous. */
+function renderPanneauTexte(post) {
+  let h = 0;
+  for (const c of (post.auteur_nom || '')) h = c.charCodeAt(0) + ((h << 5) - h);
+  const c = COULEURS_PANNEAU[Math.abs(h) % COULEURS_PANNEAU.length];
+  const estArticle = post.pub_type === 'article';
+  const repost = (post.pub_type === 'repost' || post.type === 'repost') && post.original_post;
+  let texte = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
+  if (!texte && repost) texte = post.original_post.contenu || '';
+  const titre = titreSur(post.titre).trim();
+  const pieces = renderMedias(post);
+  return `<div class="pd-texte" style="background:linear-gradient(135deg,${c},${c}bb)"><div class="pd-texte-inner">
+    ${titre ? `<h3 class="pd-texte-titre">${titre}</h3>` : ''}
+    ${texte ? `<div class="pd-texte-corps">${processContent(texte)}</div>` : ''}
+    ${pieces}
+  </div></div>`;
+}
+
 /* ── Carte de post ── */
 const VITRINE_CARD_BADGES = {
   vitrine:         { emoji: '🛍️', label: 'Boutique' },
@@ -911,6 +941,16 @@ function injectStyles() {
 .pd-header{padding:14px 16px;border-bottom:1px solid #f0f1f3;flex:none;}
 .pd-caption{padding:12px 16px;font-size:13.5px;line-height:1.55;color:#1f2937;border-bottom:1px solid #f0f1f3;flex:none;max-height:min(46vh,420px);overflow-y:auto;white-space:pre-wrap;word-break:break-word;}
 .pd-caption .post-titre{padding:0 0 8px;}
+.pd-texte{width:100%;height:100%;overflow-y:auto;display:flex;box-sizing:border-box;padding:48px 44px;color:#fff;}
+.pd-texte-inner{margin:auto;width:100%;max-width:580px;}
+.pd-texte-titre{margin:0 0 18px;font-size:1.7rem;line-height:1.25;font-weight:400;color:#fff;word-break:break-word;}
+.pd-texte-titre strong,.pd-texte-titre b{font-weight:800;}
+.pd-texte-corps{font-size:1.08rem;line-height:1.65;white-space:pre-wrap;word-break:break-word;}
+.pd-texte a{color:#fff!important;text-decoration:underline;}
+.pd-texte .post-media-docs,.pd-texte .post-media-audio,.pd-texte .post-link-preview{margin-top:20px;}
+.pd-media > .post-media-video:only-child{width:100%;height:100%;}
+.pd-media > .post-media-video:only-child video{width:100%!important;height:100%!important;max-height:none!important;border-radius:0!important;}
+@media(max-width:760px){.pd-texte{padding:28px 20px;}.pd-texte-titre{font-size:1.35rem;}}
 .pd-statsbar{display:flex;gap:14px;padding:8px 16px;font-size:.8rem;color:#6b7280;border-bottom:1px solid #f0f1f3;flex:none;}
 .pd-actions{display:flex;align-items:center;padding:4px 10px;gap:2px;border-bottom:1px solid #f0f1f3;flex:none;flex-wrap:wrap;}
 .pd-comments{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;}
@@ -1552,6 +1592,7 @@ const Posts = {
       : `<div style="color:#fff;font-size:42px;">📣</div>`;
     document.getElementById('pd-media').innerHTML = `<div class="pd-ad-media"><span class="pd-ad-badge">📣 PUBLICITÉ</span>${media}</div>`;
     document.getElementById('pd-header').innerHTML = `<div style="font-weight:700;font-size:15px;">${escHtml(ad.titre)}</div><div style="font-size:12px;color:#6b7280;margin-top:2px;">Contenu sponsorisé</div>`;
+    document.getElementById('pd-caption').style.display = '';
     document.getElementById('pd-caption').innerHTML = ad.description ? escHtml(ad.description) : '';
     document.getElementById('pd-actions').innerHTML = ad.lien_url
       ? `<a class="pd-ad-cta" href="${escHtml(ad.lien_url)}" target="_blank" rel="noopener sponsored" onclick="fetch('/api/ads/${Number(ad.id)}/clic',{method:'POST'}).catch(function(){})">${escHtml(ad.cta || 'En savoir plus')}</a>`
@@ -1562,14 +1603,28 @@ const Posts = {
   _renderDetailPost(post) {
     const promoEvt = post.type === 'evenement_promo' && post.evenement_promo && post.evenement_promo.promo_active ? post.evenement_promo : null;
     const crDetail = post.type === 'compte_rendu' && post.compte_rendu ? post.compte_rendu : null;
-    document.getElementById('pd-media').innerHTML = (crDetail
-      ? (crDetail.image
-          ? `<img src="${escHtml(crDetail.image)}" alt="${escHtml(crDetail.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
-          : `<div style="color:#fff;padding:60px;text-align:center;font-weight:800;font-size:20px;">📄 ${escHtml(crDetail.titre)}</div>`)
-      : renderMedias(post)) ||
-      (promoEvt && promoEvt.image
+    /* Panneau de gauche (2026-10-06, demande explicite : « si c'est du texte, afficher le texte ; si
+       c'est une image, afficher l'image » — la vignette montrait le texte mais l'ouvrir n'affichait
+       plus que le nom de l'auteur) : image/vidéo si la publication en a, sinon son titre et son
+       texte (les documents, audios et liens éventuels en dessous). Le texte étant alors déjà à
+       gauche, la légende de droite est masquée pour ne pas le répéter. */
+    let mediaHtml, texteSurMedia = false;
+    if (crDetail) {
+      mediaHtml = crDetail.image
+        ? `<img src="${escHtml(crDetail.image)}" alt="${escHtml(crDetail.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
+        : `<div style="color:#fff;padding:60px;text-align:center;font-weight:800;font-size:20px;">📄 ${escHtml(crDetail.titre)}</div>`;
+    } else if (promoEvt) {
+      mediaHtml = renderMedias(post) || (promoEvt.image
         ? `<img src="${escHtml(promoEvt.image)}" alt="${escHtml(promoEvt.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
-        : `<div style="color:#fff;padding:60px;text-align:center;">${escHtml(promoEvt ? promoEvt.titre : post.auteur_nom)}</div>`);
+        : `<div style="color:#fff;padding:60px;text-align:center;">${escHtml(promoEvt.titre)}</div>`);
+    } else if (aImageOuVideo(post)) {
+      mediaHtml = renderMedias(post);
+    } else {
+      mediaHtml = renderPanneauTexte(post);
+      texteSurMedia = true;
+    }
+    document.getElementById('pd-media').innerHTML = mediaHtml;
+    document.getElementById('pd-caption').style.display = texteSurMedia ? 'none' : '';
 
     const profil = post.auteur_profil || {};
     const titrePro = profil.titre_pro ? `<span class="post-auteur-titre">${escHtml(profil.titre_pro)}</span>` : '';
