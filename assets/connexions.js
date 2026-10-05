@@ -47,6 +47,23 @@
 .cx-aide a{color:#b45309;font-weight:700;}
 .cx-msg{font-size:12.5px;color:#15803d;font-weight:700;min-height:1em;}
 .cx-vide{padding:24px;text-align:center;color:#6b7280;font-size:13px;}
+.cx-tag.cx-principal{background:#b45309;}
+.cx-exp{font-size:11.5px;color:#92400e;margin-top:2px;}
+.cx-exp.cx-long{color:#15803d;}
+.cx-star{border:1.5px solid #f59e0b;background:#fffbeb;color:#92400e;font-weight:700;font-size:12px;border-radius:8px;padding:6px 10px;cursor:pointer;margin-top:8px;}
+.cx-star:hover:not(:disabled){background:#fef3c7;}
+.cx-star:disabled{opacity:.55;cursor:default;}
+.cx-star.cx-retirer{border-color:#d1d5db;background:#fff;color:#4b5563;}
+.cx-dsid-zone{border:1.5px solid #fcd34d;background:#fffbeb;border-radius:10px;padding:12px;font-size:12.5px;color:#78350f;line-height:1.5;}
+.cx-dsid-zone input{width:100%;box-sizing:border-box;margin:8px 0;padding:10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:15px;color:#111;background:#fff;}
+.cx-dsid-zone button{border:none;border-radius:8px;padding:9px 14px;font-weight:800;font-size:12.5px;cursor:pointer;background:#b45309;color:#fff;margin-right:8px;}
+.cx-prop-box{background:#fff;color:#111;color-scheme:light;border-radius:16px;width:100%;max-width:420px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+.cx-prop-box h3{margin:0 0 8px;font-size:18px;}
+.cx-prop-box p{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:#374151;}
+.cx-prop-act{display:flex;gap:10px;margin-top:16px;}
+.cx-prop-act button{flex:1;border:none;border-radius:10px;padding:12px;font-weight:800;font-size:13.5px;cursor:pointer;}
+.cx-prop-oui{background:#b45309;color:#fff;}
+.cx-prop-non{background:#f3f4f6;color:#374151;}
 .cx-bandeau{display:none;position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:2600;width:calc(100% - 24px);max-width:760px;background:#7f1d1d;color:#fff;border-radius:14px;padding:12px 16px;box-shadow:0 10px 40px rgba(0,0,0,.4);align-items:center;gap:14px;flex-wrap:wrap;}
 .cx-bandeau-txt{flex:1;min-width:220px;font-size:13px;line-height:1.45;}
 .cx-bandeau-txt span{opacity:.92;font-size:12.5px;}
@@ -70,6 +87,18 @@
     return 'il y a ' + Math.round(s / 86400) + ' j';
   }
 
+  function dans(d) {
+    if (!d) return '';
+    const t = new Date(String(d).replace(' ', 'T') + 'Z').getTime();
+    if (!t) return '';
+    const s = (t - Date.now()) / 1000;
+    if (s <= 0) return 'maintenant';
+    if (s < 3600) return Math.max(1, Math.round(s / 60)) + ' min';
+    if (s < 86400) return Math.round(s / 3600) + ' h';
+    const j = Math.floor(s / 86400), h = Math.floor((s - j * 86400) / 3600);
+    return j + ' j' + (h && j < 3 ? ' ' + h + ' h' : '');
+  }
+
   function majBouton() {
     const btn = document.getElementById('cx-btn');
     if (!btn) return;
@@ -87,9 +116,11 @@
   async function charger() {
     try {
       const r = await api('GET', '/auth/connexions');
-      etat = { connexions: r.connexions || [], total: r.total || 0, comptes_lies: r.comptes_lies || [], en_attente: r.en_attente || [], incidents: r.incidents_30j || 0 };
+      etat = { connexions: r.connexions || [], total: r.total || 0, comptes_lies: r.comptes_lies || [], en_attente: r.en_attente || [], incidents: r.incidents_30j || 0,
+        principaux: r.principaux || {}, proposer: !!r.proposer_principal, exempt: !!r.exempt, categorie: r.categorie_courante || null };
       majBouton();
       majBandeau();
+      majProposition();
     } catch (e) { /* silencieux : la pastille reste masquée */ }
   }
 
@@ -167,8 +198,14 @@
         <div class="cx-item${c.courante ? ' cx-courante' : ''}" data-id="${esc(c.id)}">
           <div class="cx-ico" aria-hidden="true">${ICONES[c.type] || '💻'}</div>
           <div class="cx-info">
-            <div class="cx-nom">${esc(c.etiquette)}${c.courante ? '<span class="cx-tag">Cet appareil</span>' : ''}</div>
+            <div class="cx-nom">${esc(c.etiquette)}${c.courante ? '<span class="cx-tag">Cet appareil</span>' : ''}${c.principal ? '<span class="cx-tag cx-principal">⭐ Principal</span>' : ''}</div>
             <div class="cx-meta">${c.lieu ? '📍 ' + esc(c.lieu) + ' · ' : ''}Active ${esc(ilYa(c.derniere_activite))}${c.ip ? ' · réseau ' + esc(c.ip) : ''}</div>
+            ${etat.exempt ? '' : (c.principal
+              ? `<div class="cx-exp cx-long">Reste connecté tant que vous l'utilisez (renouvelé 30 jours à chaque visite).</div>`
+              : `<div class="cx-exp">Déconnexion automatique dans ${esc(dans(c.expire))}.</div>`)}
+            ${c.courante && !etat.exempt ? (c.principal
+              ? `<button type="button" class="cx-star cx-retirer" data-act="retirer">Ne plus en faire mon appareil principal</button>`
+              : `<button type="button" class="cx-star" data-act="principal">⭐ En faire mon ${c.categorie === 'mobile' ? 'téléphone' : 'ordinateur'} principal</button>`) : ''}
           </div>
           ${c.courante ? '' : `<button type="button" class="cx-off" data-act="off" data-id="${esc(c.id)}">Déconnecter</button>`}
         </div>`).join('');
@@ -176,7 +213,7 @@
     const autres = etat.connexions.filter(c => !c.courante).length;
     const lies = etat.comptes_lies || [];
     const nLies = lies.reduce((s, c) => s + (c.total || 0), 0);
-    let html = '';
+    let html = '<div id="cx-dsid-zone"></div>';
     if (autres > 0 || nLies > 0) {
       if (lies.length) {
         html += `<label class="cx-lies"><input type="checkbox" id="cx-lies-chk" ${nLies ? 'checked' : ''}>
@@ -221,6 +258,13 @@
         const m = document.getElementById('cx-msg'); if (m) m.textContent = 'Appareil déconnecté.';
         return;
       }
+      if (e.target.closest('[data-act="principal"]')) { await designerPrincipal(null); return; }
+      if (e.target.closest('[data-act="retirer"]')) {
+        try { await api('POST', '/auth/connexions/principal/retirer'); await charger(); rendreListe(); const m = document.getElementById('cx-msg'); if (m) m.textContent = 'Cet appareil n\'est plus votre appareil principal : il sera déconnecté automatiquement dans 3 jours.'; }
+        catch (err) { const m = document.getElementById('cx-msg'); if (m) m.textContent = err.message || 'Erreur.'; }
+        return;
+      }
+      if (e.target.id === 'cx-dsid-ok') { await designerPrincipal((document.getElementById('cx-dsid-champ') || {}).value || ''); return; }
       if (e.target.id === 'cx-tous') {
         const tous = e.target;
         const lies = document.getElementById('cx-lies-chk');
@@ -233,6 +277,63 @@
         } catch (err) { tous.disabled = false; }
       }
     });
+  }
+
+  /* Désigne CET appareil comme principal. Si la place est prise, le serveur répond « DS-ID requis » :
+     on affiche alors une zone de saisie dans la fenêtre. Utilisable depuis la fenêtre ET la proposition. */
+  async function designerPrincipal(dsId) {
+    const msg = (t) => { const m = document.getElementById('cx-msg'); if (m) m.textContent = t; };
+    try {
+      await api('POST', '/auth/connexions/principal', dsId ? { ds_id: dsId } : {});
+      await charger();
+      if (document.getElementById('cx-liste')) rendreListe();
+      msg('✅ Cet appareil est maintenant votre appareil principal : vous y restez connecté 30 jours.');
+      return true;
+    } catch (err) {
+      const zone = document.getElementById('cx-dsid-zone');
+      if (err.data && err.data.ds_id_requis && zone) {
+        zone.innerHTML = `<div class="cx-dsid-zone">${esc(err.message)}
+          <input id="cx-dsid-champ" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Votre Code de Sécurité (DS-ID)">
+          <button type="button" id="cx-dsid-ok">Remplacer</button></div>`;
+        const c = document.getElementById('cx-dsid-champ'); if (c) c.focus();
+      } else if (zone && dsId) {
+        const c = zone.querySelector('.cx-dsid-zone');
+        if (c) c.insertAdjacentHTML('beforeend', `<div style="color:#b91c1c;font-weight:700;margin-top:6px;">${esc(err.message || 'Erreur.')}</div>`);
+      } else { msg(err.message || 'Erreur.'); }
+      return false;
+    }
+  }
+
+  /* Proposition « est-ce votre appareil principal ? » : une fois que le serveur dit qu'il y a une place
+     libre pour cette catégorie d'appareil. Refus mémorisé 7 jours sur cet appareil. */
+  function propositionRefusee() { try { const t = Number(localStorage.getItem('cx_prop_refus') || 0); return Date.now() - t < 7 * 24 * 3600 * 1000; } catch (_) { return false; } }
+  function majProposition() {
+    if (!etat.proposer || propositionRefusee() || document.getElementById('cx-prop-overlay')) return;
+    injecterStyles();
+    const quoi = etat.categorie === 'mobile' ? 'téléphone' : 'ordinateur';
+    const ov = document.createElement('div');
+    ov.id = 'cx-prop-overlay';
+    ov.className = 'cx-overlay open';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-labelledby', 'cx-prop-titre');
+    ov.innerHTML = `<div class="cx-prop-box">
+      <h3 id="cx-prop-titre">⭐ Est-ce votre ${quoi} principal ?</h3>
+      <p>Sur votre appareil principal, vous restez connecté <strong>30 jours</strong> d'affilée. Sur tout autre appareil, la connexion est limitée à <strong>3 jours</strong> pour protéger votre compte.</p>
+      <p style="font-size:12.5px;color:#6b7280;">Vous pouvez avoir un ordinateur principal et un téléphone (ou tablette) principal, et en changer plus tard depuis « Mes connexions ».</p>
+      <div class="cx-prop-act">
+        <button type="button" class="cx-prop-non" id="cx-prop-non">Pas maintenant</button>
+        <button type="button" class="cx-prop-oui" id="cx-prop-oui">Oui, c'est mon ${quoi} principal</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    document.getElementById('cx-prop-non').onclick = () => { try { localStorage.setItem('cx_prop_refus', String(Date.now())); } catch (_) {} ov.remove(); };
+    document.getElementById('cx-prop-oui').onclick = async (e) => {
+      e.target.disabled = true;
+      const ok = await designerPrincipal(null);
+      ov.remove();
+      if (!ok && window.ouvrirMesConnexions) window.ouvrirMesConnexions();
+    };
+    document.getElementById('cx-prop-oui').focus();
   }
 
   window.ouvrirMesConnexions = async function () {

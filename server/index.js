@@ -142,6 +142,12 @@ const SEC = require("./security");
 const Connexions = require("./connexions");
 /* Confirmation d'un nouvel appareil (étape 2 du chantier sécurité des connexions) — server/confirmation-appareil.js. */
 const ConfirmationAppareil = require("./confirmation-appareil");
+/* Étape 3 : l'échéance réelle d'une session enregistrée est dans le registre (30 jours glissants pour un
+   appareil principal, 3 jours pour un autre) — le jeton et le cookie doivent donc pouvoir vivre au moins
+   aussi longtemps, d'où cette durée longue pour toute session portée par un jti. Sans jti (ancien
+   jeton, panne du registre) : durée historique de 7 jours. */
+const TOKEN_TTL_LONG = 400 * 24 * 3600;
+const dureeJeton = (cx) => (cx ? TOKEN_TTL_LONG : TOKEN_TTL);
 
 /* Journal d'erreurs maison (table error_logs) — sans service externe (Sentry).
    Best-effort : ne doit jamais lui-même faire planter le serveur. */
@@ -197,7 +203,10 @@ async function send(res, status, data, headers = {}) {
    émettre. Ne bloque jamais l'ouverture de session : en cas d'erreur, la session est émise sans
    jti (comportement d'avant cette fonctionnalité) et l'erreur est journalisée. */
 async function ouvrirConnexion(req, userId, sidToken) {
-  try { return await Connexions.ouvrir(db, { req, userId, sidToken, ip: SEC.clientIp(req) }); }
+  try {
+    const u = await db.prepare("SELECT email, is_demo FROM users WHERE id=?").get(userId);
+    return await Connexions.ouvrir(db, { req, userId, sidToken, ip: SEC.clientIp(req), exempt: !!(u && ConfirmationAppareil.estCompteDemo(u)) });
+  }
   catch (e) { console.error('[connexions.ouvrir]', e.message); return null; }
 }
 
@@ -274,10 +283,13 @@ async function getCurrentUser(req) {
     if (payload?.uid && payload.jti) {
       try {
         const cx = await Connexions.verifier(db, payload.jti);
-        if (cx) { req._connexionId = cx.id; Connexions.toucher(db, cx.id); }
+        if (cx) { req._connexionId = cx.id; Connexions.toucher(db, cx); }
         else connexionOk = false;
       } catch (e) { console.error('[connexions.verifier]', e.message); }
     }
+    /* Connexion expirée (3 jours pour un appareil non principal) ou révoquée : fin de session, sans repli
+       sur le cookie sid — sinon la session SQL (30 jours) la ferait renaître. */
+    if (payload?.uid && payload.jti && !connexionOk) return null;
     if (payload?.uid && connexionOk) {
       const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version FROM users WHERE id = ?").get(payload.uid);
       /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
@@ -297,6 +309,17 @@ async function getCurrentUser(req) {
   if (!sid) return null;
   const session = getSession(sid);
   if (!session) return null;
+  /* Même règle pour une session retrouvée par le seul cookie sid : si elle est enregistrée dans le
+     registre, son échéance et sa révocation s'appliquent. */
+  try {
+    const ligneReg = await db.prepare("SELECT id FROM connexions WHERE sid_token=?").get(sid);
+    if (ligneReg) {
+      const okReg = await Connexions.verifier(db, ligneReg.id);
+      if (!okReg) return null;
+      req._connexionId = okReg.id;
+      Connexions.toucher(db, okReg);
+    }
+  } catch (e) { console.error('[connexions.verifier-sid]', e.message); }
   const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee FROM users WHERE id = ?").get(session.userId);
   if (user) user.id = Number(user.id);
   return user || null;
@@ -801,7 +824,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
   const token = createSession(id);
   const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification, email_verifie FROM users WHERE id = ?").get(id);
   const cx = await ouvrirConnexion(req, id, token);
-  const authTok = signAuthToken({ uid: id, role: user.role, cv: 1, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL }); // nouveau compte : credential_version démarre toujours à 1
+  const authTok = signAuthToken({ uid: id, role: user.role, cv: 1, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + dureeJeton(cx) }); // nouveau compte : credential_version démarre toujours à 1
 
   // Email de bienvenue + "Sceau" (non bloquant) + notification in-app (2026-09-07 : canal
   // "les deux" demandé explicitement). Nom complet (prénom+nom), jamais le prénom seul.
@@ -947,7 +970,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   }
 
-  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
+  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
 });
 
 /* ════════════════ PARRAINAGE & INVITATIONS — Phase 1 ════════════════
@@ -1632,7 +1655,7 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
   const cx = await ouvrirConnexion(req, user.id, token);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + dureeJeton(cx) });
   if (user.role === 'administrateur_junior') {
     /* Fige les droits actuels pour toute la session à venir — voir le commentaire sur
        actualiserSnapshotPermissions() : c'est ce qui garantit qu'une révocation faite par
@@ -1668,7 +1691,7 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     }
   } catch (e) { console.error('[fusion-cagnotte-login]', e.message); }
 
-  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
+  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
 });
 
 /* POST /api/auth/forgot-password — demande de réinitialisation */
@@ -2262,8 +2285,8 @@ async function revoquerConnexionDuCookie(req, motif) {
 }
 async function reemettreCookieAuth(req, userId, jti) {
   const u = await db.prepare("SELECT role, credential_version FROM users WHERE id=?").get(userId);
-  const authTok = signAuthToken({ uid: userId, role: u.role, cv: u.credential_version, ...(jti ? { jti } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
-  return `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${cookieSecureFlag(req)}`;
+  const authTok = signAuthToken({ uid: userId, role: u.role, cv: u.credential_version, ...(jti ? { jti } : {}), exp: Math.floor(Date.now()/1000) + (jti ? TOKEN_TTL_LONG : TOKEN_TTL) });
+  return `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${jti ? TOKEN_TTL_LONG : TOKEN_TTL}${cookieSecureFlag(req)}`;
 }
 async function membresDuGroupe(userId) {
   const m = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(userId);
@@ -2285,7 +2308,14 @@ route("GET", "/api/auth/connexions", async (req, res) => {
   for (const m of await membresDuGroupe(user.id)) comptesLies.push({ id: Number(m.id), nom: m.nom, total: await Connexions.compter(db, m.id) });
   const enAttente = await ConfirmationAppareil.enAttente(db, user.id);
   const incidents = await ConfirmationAppareil.incidents30j(db, user.id);
-  sendJSON(res, 200, { connexions, total: connexions.length, comptes_lies: comptesLies, en_attente: enAttente, incidents_30j: incidents }, cookiesSortie.length ? { "Set-Cookie": cookiesSortie } : undefined);
+  /* Appareils principaux (étape 3) : état des deux places + proposition à faire sur CET appareil. */
+  const exempt = ConfirmationAppareil.estCompteDemo(await db.prepare("SELECT email, is_demo FROM users WHERE id=?").get(user.id) || {});
+  const principaux = await Connexions.etatPrincipaux(db, user.id);
+  const cxCourante = courant ? connexions.find(c => c.courante) : null;
+  const proposerPrincipal = !!(cxCourante && !exempt && !cxCourante.principal && !principaux[cxCourante.categorie].occupe);
+  sendJSON(res, 200, { connexions, total: connexions.length, comptes_lies: comptesLies, en_attente: enAttente, incidents_30j: incidents,
+    principaux, exempt, proposer_principal: proposerPrincipal, categorie_courante: cxCourante ? cxCourante.categorie : null },
+    cookiesSortie.length ? { "Set-Cookie": cookiesSortie } : undefined);
 });
 
 /* ── Confirmation d'un nouvel appareil (étape 2) ───────────────────────────────────────────────
@@ -2334,6 +2364,49 @@ route("POST", "/api/auth/confirmer-appareil/envoyer-code", async (req, res, para
     return sendJSON(res, 502, { error: "L'envoi du code par e-mail est momentanément impossible. Utilisez votre Code de Sécurité (DS-ID)." });
   }
   sendJSON(res, 200, { ok: true, email_masque: ConfirmationAppareil.masquerEmail(u.email) });
+});
+
+/* ── Appareils principaux (étape 3) ──────────────────────────────────────────────────────────────
+   Un compte a au plus 2 appareils principaux : un mobile (téléphone/tablette) et un ordinateur. Principal =
+   30 jours glissants ; tout autre appareil = 3 jours fermes. Prendre une place déjà occupée exige le DS-ID. */
+route("POST", "/api/auth/connexions/principal", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!req._connexionId) return sendJSON(res, 400, { error: "Cette session n'est pas encore enregistrée : rechargez la page puis réessayez." });
+  const cx = await Connexions.verifier(db, req._connexionId);
+  if (!cx) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (ConfirmationAppareil.estCompteDemo(await db.prepare("SELECT email, is_demo FROM users WHERE id=?").get(user.id) || {})) {
+    return sendJSON(res, 400, { error: "Les comptes de démonstration n'ont pas d'appareil principal." });
+  }
+  const cat = Connexions.categorieDe(cx.type_appareil);
+  const etat = await Connexions.etatPrincipaux(db, user.id);
+  let remplacer = false;
+  if (etat[cat].occupe && etat[cat].appareil_id !== cx.appareil_id) {
+    const dsId = body && body.ds_id;
+    if (!dsId) return sendJSON(res, 409, { error: `Votre ${cat === "mobile" ? "téléphone" : "ordinateur"} principal est déjà défini sur un autre appareil. Saisissez votre Code de Sécurité (DS-ID) pour le remplacer.`, ds_id_requis: true });
+    const lim = SEC.rateLimit(`principal:${user.id}`, 5, 15 * 60 * 1000);
+    if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
+    if (!(await ConfirmationAppareil.dsIdValide(db, user.id, dsId))) {
+      SEC.logSecurity("appareil_principal_dsid_incorrect", { uid: Number(user.id) });
+      return sendJSON(res, 401, { error: "Code de Sécurité incorrect." });
+    }
+    remplacer = true;
+  }
+  const r = await Connexions.designerPrincipal(db, cx, { remplacer });
+  SEC.logSecurity("appareil_principal_designe", { uid: Number(user.id), categorie: cat, remplace: !!r.remplace });
+  sendJSON(res, 200, { ok: true, categorie: cat, remplace: !!r.remplace });
+});
+
+route("POST", "/api/auth/connexions/principal/retirer", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  if (!req._connexionId) return sendJSON(res, 400, { error: "Cette session n'est pas encore enregistrée : rechargez la page puis réessayez." });
+  const cx = await Connexions.verifier(db, req._connexionId);
+  if (!cx) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ok = await Connexions.retirerPrincipal(db, cx);
+  if (!ok) return sendJSON(res, 404, { error: "Cet appareil n'est pas un appareil principal." });
+  SEC.logSecurity("appareil_principal_retire", { uid: Number(user.id) });
+  sendJSON(res, 200, { ok: true });
 });
 
 /* Sur l'appareil DÉJÀ connecté : « Ce n'est pas moi » refuse la connexion en attente. */
@@ -11422,9 +11495,9 @@ route("POST", "/api/partenariat/inscription/:token", async (req, res, params, bo
 
   const sessionToken = createSession(userId);
   const cx = await ouvrirConnexion(req, userId, sessionToken);
-  const authTok = signAuthToken({ uid: userId, role: "partenaire", cv: 1, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: userId, role: "partenaire", cv: 1, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now() / 1000) + dureeJeton(cx) });
   const sf = cookieSecureFlag(req);
-  sendJSON(res, 200, { ok: true, user_id: userId }, { "Set-Cookie": [`sid=${sessionToken}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
+  sendJSON(res, 200, { ok: true, user_id: userId }, { "Set-Cookie": [`sid=${sessionToken}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
 });
 
 /* ── Incrément 3 : cartouches admin, notes privées, périodes historisées, suppression ──
@@ -11794,9 +11867,9 @@ route("POST", "/api/comptes-lies/basculer", async (req, res, params, body) => {
 
   const token = createSession(cible.id);
   const cx = await ouvrirConnexion(req, cible.id, token);
-  const authTok = signAuthToken({ uid: cible.id, role: cible.role, cv: cible.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: cible.id, role: cible.role, cv: cible.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + dureeJeton(cx) });
   const sf = cookieSecureFlag(req);
-  sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
+  sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
 });
 
 /* Retirer une liaison (Étape 5). N'importe quel membre du groupe peut retirer n'importe
@@ -12101,10 +12174,10 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
   const cx = await ouvrirConnexion(req, user.id, token);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + dureeJeton(cx) });
   SEC.logSecurity("associe_dsid_success", { ip, uid: Number(user.id) });
   const sf = cookieSecureFlag(req);
-  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
+  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${dureeJeton(cx)}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
 });
 
 /* ══ Mon Associé — garde d'accès à la publication ══

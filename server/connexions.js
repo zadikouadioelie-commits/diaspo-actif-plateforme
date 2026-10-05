@@ -12,7 +12,13 @@ const crypto = require('node:crypto');
 const { parseCookies } = require('./auth');
 
 const COOKIE_APPAREIL = 'da_dev';
-const DUREE_SESSION_MS = 7 * 24 * 3600 * 1000;      // aligné sur TOKEN_TTL (auth.js)
+/* Durées (étape 3, 2026-10-05) : appareil principal 30 jours glissants ; tout autre appareil 3 jours
+   fermes depuis la connexion (jamais prolongés par l'usage) ; comptes de démonstration : 7 jours
+   comme avant (partagés par conception, hors du dispositif). */
+const DUREE_PRINCIPAL_MS = 30 * 24 * 3600 * 1000;
+const DUREE_SECONDAIRE_MS = 3 * 24 * 3600 * 1000;
+const DUREE_EXEMPT_MS = 7 * 24 * 3600 * 1000;
+const INACTIVITE_LIBERE_PLACE_MS = 90 * 24 * 3600 * 1000;
 const DUREE_COOKIE_APPAREIL_S = 365 * 24 * 3600;
 const ID_RE = /^[a-f0-9]{32}$/;
 
@@ -76,17 +82,50 @@ async function revoquerLignes(db, lignes, motif) {
 /* ── Ouverture d'une connexion : renvoie { id, appareilId, cookieAppareil(sf) } ──────────────────
    Un navigateur (appareil_id) ne détient jamais qu'UNE session : toute ligne active du même
    navigateur — quel que soit le compte — est révoquée, car les cookies viennent d'être écrasés. */
-async function ouvrir(db, { req, userId, sidToken, ip }) {
+/* mobile = téléphone ou tablette ; ordinateur = le reste. */
+const categorieDe = (type) => (type === 'mobile' || type === 'tablette') ? 'mobile' : 'ordinateur';
+
+/* Une désignation « appareil principal » est-elle encore vivante pour cette catégorie ? */
+async function principalActif(db, userId, categorie) {
+  const limite = horodatage(-INACTIVITE_LIBERE_PLACE_MS);
+  const lignes = await db.prepare('SELECT * FROM appareils_principaux WHERE user_id=? AND categorie=? ORDER BY designe_at DESC').all(userId, categorie);
+  return lignes.find(l => String(l.derniere_activite || l.designe_at || '') >= limite) || null;
+}
+
+/* Cet appareil est-il principal pour ce compte ? Hérité d'un compte lié : si le même navigateur est
+   l'appareil principal d'un compte du même groupe et que celui-ci n'a pas encore de principal dans
+   cette catégorie, il le devient aussi (la bascule entre comptes liés reste sur le même appareil). */
+async function estPrincipal(db, userId, appareilId, categorie) {
+  const direct = await db.prepare('SELECT id FROM appareils_principaux WHERE user_id=? AND appareil_id=? AND categorie=?').get(userId, appareilId, categorie);
+  if (direct) return true;
+  if (await principalActif(db, userId, categorie)) return false;
+  try {
+    const m = await db.prepare('SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?').get(userId);
+    if (!m) return false;
+    const frere = await db.prepare(`SELECT ap.id FROM appareils_principaux ap
+      JOIN comptes_lies_membres cm ON cm.user_id = ap.user_id
+      WHERE cm.groupe_id=? AND ap.user_id<>? AND ap.appareil_id=? AND ap.categorie=?`).get(m.groupe_id, userId, appareilId, categorie);
+    if (!frere) return false;
+    await db.prepare('INSERT INTO appareils_principaux (user_id, appareil_id, categorie, designe_at, derniere_activite) VALUES (?,?,?,?,?)')
+      .run(userId, appareilId, categorie, horodatage(), horodatage());
+    return true;
+  } catch (_) { return false; }
+}
+
+async function ouvrir(db, { req, userId, sidToken, ip, exempt }) {
   const cookies = parseCookies(req);
   const appareilId = ID_RE.test(cookies[COOKIE_APPAREIL] || '') ? cookies[COOKIE_APPAREIL] : crypto.randomBytes(16).toString('hex');
   const id = crypto.randomBytes(16).toString('hex');
   const a = analyserAppareil(req, ip);
   const anciennes = await db.prepare('SELECT id, sid_token FROM connexions WHERE appareil_id=? AND revoque_at IS NULL').all(appareilId);
   await revoquerLignes(db, anciennes, 'remplacee');
+  // Durée : principal 30 j (glissants), autre appareil 3 j fermes, compte de démonstration 7 j.
+  let principal = 0, duree = exempt ? DUREE_EXEMPT_MS : DUREE_SECONDAIRE_MS;
+  if (!exempt && await estPrincipal(db, userId, appareilId, categorieDe(a.type))) { principal = 1; duree = DUREE_PRINCIPAL_MS; }
   await db.prepare(`INSERT INTO connexions
     (id, user_id, sid_token, appareil_id, type_appareil, navigateur, os, ville, pays, ip_masquee, created_at, last_seen_at, expire_at, principal)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0)`)
-    .run(id, userId, sidToken || null, appareilId, a.type, a.navigateur, a.os, a.ville, a.pays, a.ipMasquee, horodatage(), horodatage(), horodatage(DUREE_SESSION_MS));
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(id, userId, sidToken || null, appareilId, a.type, a.navigateur, a.os, a.ville, a.pays, a.ipMasquee, horodatage(), horodatage(), horodatage(duree), principal);
   // Nettoyage opportuniste des vieilles lignes révoquées (garde 90 jours d'historique).
   try { await db.prepare('DELETE FROM connexions WHERE revoque_at IS NOT NULL AND revoque_at < ?').run(horodatage(-90 * 24 * 3600 * 1000)); } catch (_) {}
   return {
@@ -105,13 +144,22 @@ async function verifier(db, id) {
 }
 
 const dernierToucher = new Map();
-async function toucher(db, id) {
+async function toucher(db, cx) {
+  const id = cx.id;
   const maintenant = Date.now();
   if (maintenant - (dernierToucher.get(id) || 0) < 60 * 1000) return;
   dernierToucher.set(id, maintenant);
   if (dernierToucher.size > 5000) dernierToucher.clear();
-  try { await db.prepare('UPDATE connexions SET last_seen_at=? WHERE id=?').run(horodatage(), id); } catch (_) {}
+  try {
+    if (Number(cx.principal) === 1) {
+      await db.prepare('UPDATE connexions SET last_seen_at=?, expire_at=? WHERE id=?').run(horodatage(), horodatage(DUREE_PRINCIPAL_MS), id);
+      await db.prepare('UPDATE appareils_principaux SET derniere_activite=? WHERE user_id=? AND appareil_id=?').run(horodatage(), cx.user_id, cx.appareil_id);
+    } else {
+      await db.prepare('UPDATE connexions SET last_seen_at=? WHERE id=?').run(horodatage(), id);   // JAMAIS d'allongement pour un appareil secondaire
+    }
+  } catch (_) {}
 }
+function _viderThrottle() { dernierToucher.clear(); }   // tests uniquement
 
 /* ── Lecture : connexions actives d'un compte ── */
 async function lister(db, userId, courantId) {
@@ -129,8 +177,54 @@ async function lister(db, userId, courantId) {
     derniere_activite: l.last_seen_at,
     expire: l.expire_at,
     principal: !!Number(l.principal),
+    categorie: categorieDe(l.type_appareil),
     courante: !!courantId && l.id === courantId,
   }));
+}
+
+/* ── Appareils principaux : état des deux places + désignation / retrait ── */
+async function etatPrincipaux(db, userId) {
+  const etat = {};
+  for (const cat of ['mobile', 'ordinateur']) {
+    const p = await principalActif(db, userId, cat);
+    etat[cat] = { occupe: !!p, appareil_id: p ? p.appareil_id : null };
+  }
+  return etat;
+}
+
+/* Désigne l'appareil de la connexion `cx` (ligne complète) comme principal de sa catégorie.
+   `remplacer` : true si l'appelant a déjà prouvé son identité (DS-ID) pour prendre une place occupée. */
+async function designerPrincipal(db, cx, { remplacer }) {
+  const cat = categorieDe(cx.type_appareil);
+  const existant = await principalActif(db, cx.user_id, cat);
+  if (existant && existant.appareil_id === cx.appareil_id) return { ok: true, deja: true };
+  if (existant && !remplacer) return { erreur: 'place_occupee', categorie: cat };
+  if (existant) {
+    // L'ancien principal redevient secondaire : ses sessions sont plafonnées à 3 jours à partir de maintenant.
+    await db.prepare('DELETE FROM appareils_principaux WHERE id=?').run(existant.id);
+    const butee = horodatage(DUREE_SECONDAIRE_MS);
+    const sessions = await db.prepare('SELECT id, expire_at FROM connexions WHERE user_id=? AND appareil_id=? AND revoque_at IS NULL').all(cx.user_id, existant.appareil_id);
+    for (const s of sessions) {
+      await db.prepare('UPDATE connexions SET principal=0, expire_at=? WHERE id=?').run(String(s.expire_at || butee) < butee ? s.expire_at : butee, s.id);
+    }
+  }
+  await db.prepare('DELETE FROM appareils_principaux WHERE user_id=? AND appareil_id=?').run(cx.user_id, cx.appareil_id);
+  await db.prepare('INSERT INTO appareils_principaux (user_id, appareil_id, categorie, designe_at, derniere_activite) VALUES (?,?,?,?,?)')
+    .run(cx.user_id, cx.appareil_id, cat, horodatage(), horodatage());
+  await db.prepare('UPDATE connexions SET principal=1, expire_at=? WHERE id=?').run(horodatage(DUREE_PRINCIPAL_MS), cx.id);
+  return { ok: true, categorie: cat, remplace: !!existant };
+}
+
+async function retirerPrincipal(db, cx) {
+  const r = await db.prepare('SELECT id FROM appareils_principaux WHERE user_id=? AND appareil_id=?').get(cx.user_id, cx.appareil_id);
+  if (!r) return false;
+  await db.prepare('DELETE FROM appareils_principaux WHERE user_id=? AND appareil_id=?').run(cx.user_id, cx.appareil_id);
+  const butee = horodatage(DUREE_SECONDAIRE_MS);
+  const sessions = await db.prepare('SELECT id, expire_at FROM connexions WHERE user_id=? AND appareil_id=? AND revoque_at IS NULL').all(cx.user_id, cx.appareil_id);
+  for (const s of sessions) {
+    await db.prepare('UPDATE connexions SET principal=0, expire_at=? WHERE id=?').run(String(s.expire_at || butee) < butee ? s.expire_at : butee, s.id);
+  }
+  return true;
 }
 
 async function compter(db, userId) {
@@ -165,4 +259,4 @@ function cookieAppareilTexte(appareilId, sf) {
   return `${COOKIE_APPAREIL}=${appareilId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${DUREE_COOKIE_APPAREIL_S}${sf || ''}`;
 }
 
-module.exports = { COOKIE_APPAREIL, analyserAppareil, etiquette, horodatage, lireAppareilId, nouvelAppareilId, cookieAppareilTexte, ouvrir, verifier, toucher, lister, compter, revoquer, revoquerAutres };
+module.exports = { categorieDe, etatPrincipaux, designerPrincipal, retirerPrincipal, _viderThrottle, COOKIE_APPAREIL, analyserAppareil, etiquette, horodatage, lireAppareilId, nouvelAppareilId, cookieAppareilTexte, ouvrir, verifier, toucher, lister, compter, revoquer, revoquerAutres };

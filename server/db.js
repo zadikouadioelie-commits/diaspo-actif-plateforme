@@ -5795,6 +5795,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appareils_reconnus ON appareils_reconnus(user_id, appareil_id);
 `);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   APPAREILS PRINCIPAUX (2026-10-05, étape 3 du chantier sécurité des connexions).
+   Au plus 2 par compte : un « mobile » (téléphone ou tablette) et un « ordinateur ». Un appareil
+   principal reste connecté 30 jours (renouvelés à chaque utilisation) ; tout autre appareil est
+   déconnecté de force 3 jours après sa connexion. La désignation est attachée au NAVIGATEUR
+   (appareil_id, cookie da_dev), pas à une session : se déconnecter puis se reconnecter sur le même
+   appareil le garde principal. Une désignation inutilisée depuis 90 jours libère la place.
+   Changer d'appareil principal exige le DS-ID. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS appareils_principaux (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id             INTEGER NOT NULL,
+    appareil_id         TEXT NOT NULL,
+    categorie           TEXT NOT NULL,
+    designe_at          TEXT,
+    derniere_activite   TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_appareils_principaux ON appareils_principaux(user_id, categorie);
+`);
+
 /* =====================================================================
    MODULE "PARTENARIAT" (2026-08-14) — Incrément 1 : fondations du rôle
    "partenaire" (cahier des charges : soumission de projets à Diaspo'Actif
