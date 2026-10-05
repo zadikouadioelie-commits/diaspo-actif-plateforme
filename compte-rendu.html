@@ -11,7 +11,9 @@
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=3">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -299,11 +301,119 @@ async function vueListe() {
 }
 
 /* =================== VUE PUBLIQUE =================== */
-function detailHtml(cr) {
-  const l = (cr.details || []).filter(d => d.texte);
-  if (!l.length) return '';
-  return '<h2>Pour aller plus loin : le retour d\'expérience détaillé</h2><div class="crp-det">' + l.map(d => (cr.type_cr === 'blanc' ? '' : '<h3>' + esc(d.titre) + '</h3>') + '<p>' + mentionHtml(d.texte) + '</p>').join('') + '</div>';
+/* ---------- mise en forme de la page publique (2026-10-06) : logo, illustrations, graphiques automatiques ----------
+   Les graphiques sont calculés à partir du compte-rendu lui-même (parties, résumé, « personnes et organisations
+   mises en lumière ») ; rien n'est affiché quand les données manquent. */
+const IC = {
+  star: '<path d="M12 3l2.5 6 6.5.5-5 4.2 1.7 6.3L12 16.8 6.3 20l1.7-6.3-5-4.2 6.5-.5z"/>',
+  home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/>',
+  tree: '<path d="M12 21v-7"/><circle cx="12" cy="8.5" r="5.5"/><path d="M8.5 21h7"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
+  case: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M3 13h18"/>',
+  mosaic: '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
+  pencil: '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
+  people: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 13.2c.6-.2 1.3-.3 2-.3 2.2 0 4 1.8 4 4"/>',
+  scale: '<path d="M12 4v16M6 20h12M5 7h14"/><path d="M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/>',
+  coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6.5V8m0 8v1.5"/>',
+  book: '<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h10"/>',
+  cross: '<path d="M9 4h6v5h5v6h-5v5H9v-5H4V9h5z"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  flame: '<path d="M12 21c4 0 6-2.5 6-5.5 0-3-2.5-4.5-3-8-2 1-3.5 3-3.5 5.5-1.5-.5-2-2-2-3.5C7 11 6 13 6 15.5 6 18.5 8 21 12 21z"/>',
+  landmark: '<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/>',
+};
+const svgIc = (k, cls) => '<svg class="' + (cls || 'cr2-ic') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (IC[k] || IC.star) + '</svg>';
+const ICONES_CHOIX = [['', 'Automatique'], ['star', 'Étoile'], ['home', 'Maison, association'], ['tree', 'Arbre'], ['globe', 'Globe'], ['heart', 'Cœur'], ['mic', 'Micro'], ['case', 'Mallette'], ['mosaic', 'Mosaïque'],
+  ['pencil', 'Crayon'], ['people', 'Personnes'], ['scale', 'Balance'], ['coin', 'Pièce'], ['book', 'Livre'], ['cross', 'Croix santé'], ['compass', 'Boussole'], ['flame', 'Flamme'], ['landmark', 'Institution']];
+const plat = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+/* Illustration choisie automatiquement d'après les mots du titre (ou de la ligne), si l'auteur n'en a pas choisi. */
+const REGLES_ICONE = [
+  [/associ|syndicat|club/, 'home'], [/mairie|ville de|metropole|institution|reseau|region|ministere|prefecture|consul|elu|conseil/, 'landmark'],
+  [/recueill|hommage|memoire|commemor|deuil|priere/, 'flame'], [/entretien|interview|echange|anim|table ronde|conference|debat|discours|parole|intervention/, 'mic'],
+  [/emploi|insertion|entrepren|exposant|stand|entreprise|business|econom|commerc/, 'case'], [/sante|bien-etre|humain|solidar|accompagn|social|famille/, 'heart'],
+  [/partenair|equipe|benevol|participant|cooperation|collectif/, 'people'], [/droit|justice|juridi/, 'scale'], [/financ|budget|chiffre|cout|invest/, 'coin'],
+  [/livre|auteur|ecriv|education|formation|ecole|lecture/, 'book'], [/artiste|creat|graph|dessin|musique|culture/, 'pencil'],
+  [/mosaique|competence|talent|profil/, 'mosaic'], [/programme|deroule|contexte|objectif|theme|ordre du jour/, 'compass'],
+  [/pays|communaute|nationalit|diaspora|togo|ivoir|tchad|monde|international/, 'globe'],
+];
+function iconeAuto(txt) { const p = plat(txt); for (const [re, k] of REGLES_ICONE) if (re.test(p)) return k; return ''; }
+const iconeDe = d => (d && d.icone && IC[d.icone] ? d.icone : '') || iconeAuto(d && d.titre) || 'star';
+const sansMention = s => String(s || '').replace(/[@*]\[([^\]]+)\]\([uic]:\d+\)/g, '$1');
+
+/* Texte d'une partie : paragraphes, listes à puces (lignes commençant par « • » ou « - ») et, pour un bloc d'au moins
+   6 lignes courtes, une grille de tuiles illustrées. */
+function corpsHtml(texte) {
+  return String(texte || '').split(/\n\s*\n/).filter(b => b.trim()).map(bloc => {
+    const lignes = bloc.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lignes.length >= 6 && lignes.every(l => l.length <= 60 && !/\d/.test(l))) {
+      return '<div class="cr2-mosaique" role="list">' + lignes.map(l => '<div class="cr2-tuile" role="listitem">' + svgIc(iconeAuto(l) || 'people') + '<span>' + esc(sansMention(l).replace(/[.;]$/, '')) + '</span></div>').join('') + '</div>';
+    }
+    const estPuce = l => /^(•|-)\s+/.test(l);
+    const i0 = lignes.findIndex(estPuce);
+    if (i0 >= 0 && lignes.slice(i0).every(estPuce)) {
+      return (i0 ? '<p>' + lignes.slice(0, i0).map(mentionHtml).join('<br>') + '</p>' : '') + '<ul class="cr2-puces">' + lignes.slice(i0).map(l => '<li>' + mentionHtml(l.replace(/^(•|-)\s+/, '')) + '</li>').join('') + '</ul>';
+    }
+    return '<p>' + lignes.map(mentionHtml).join('<br>') + '</p>';
+  }).join('');
 }
+
+const motsDe = t => String(t || '').split(/\s+/).filter(Boolean).length;
+const COULEURS_GRAPH = ['var(--cr-bleu)', 'var(--cr-or)', 'var(--cr-vert)', '#7C3AED', '#E4572E', '#0EA5A5'];
+function partiesDe(cr) { return (cr.details || []).filter(d => d.texte); }
+
+/* « En un coup d'œil » : chiffres et graphiques générés automatiquement. */
+function graphiquesHtml(cr) {
+  const parties = partiesDe(cr), profils = cr.profils || [];
+  if (parties.length < 2 && profils.length < 3) return '';
+  const mots = parties.map(d => motsDe(d.texte)), total = motsDe(cr.resume) + mots.reduce((a, b) => a + b, 0);
+  const groupe = (cle, vide) => { const m = new Map(); profils.forEach(p => { const k = (p[cle] || '').trim() || vide; if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(p.nom); }); return [...m.entries()]; };
+  const cats = groupe('categorie', 'Autres'), comms = groupe('communaute', '');
+  const kpis = [[parties.length, parties.length > 1 ? 'parties détaillées' : 'partie détaillée']];
+  if (profils.length) kpis.push([profils.length, profils.length > 1 ? 'personnes et organisations mises en lumière' : 'personne ou organisation mise en lumière']);
+  if (comms.length) kpis.push([comms.length, comms.length > 1 ? 'communautés représentées' : 'communauté représentée']);
+  kpis.push([Math.max(1, Math.round(total / 220)) + ' min', 'de lecture (' + total + ' mots)']);
+  let h = '<h2 id="cr-coup">En un coup d’œil</h2><div class="cr2-kpis">' + kpis.map(k => '<div class="cr2-kpi"><div class="n">' + esc(k[0]) + '</div><div class="l">' + esc(k[1]) + '</div></div>').join('') + '</div>';
+  if (cats.length) {
+    const max = Math.max(...cats.map(c => c[1].length));
+    h += '<div class="cr2-graph"><h4>Qui a été mis en lumière</h4><p class="src">Personnes et organisations citées, par catégorie.</p>' + cats.map(([k, noms]) =>
+      '<div class="cr2-br"><div class="cr2-br-t"><b>' + esc(k) + '</b><span class="cr2-br-n">' + noms.length + '</span></div><div class="cr2-piste"><div class="cr2-barre" style="width:' + Math.round(noms.length / max * 100) + '%"></div></div><div class="cr2-br-noms">' + noms.map(esc).join(' · ') + '</div></div>').join('') + '</div>';
+  }
+  if (comms.length >= 2) {
+    const tot = comms.reduce((a, c) => a + c[1].length, 0), R = 42, C = 2 * Math.PI * R;
+    let off = 0;
+    const arcs = comms.map(([k, noms], i) => { const len = C * noms.length / tot; const s = '<circle cx="60" cy="60" r="' + R + '" fill="none" stroke="' + COULEURS_GRAPH[i % COULEURS_GRAPH.length] + '" stroke-width="18" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 60 60)"/>'; off += len; return s; }).join('');
+    h += '<div class="cr2-graph"><h4>Les communautés représentées</h4><p class="src">Personnes et organisations mises en lumière, par communauté d’origine.</p><div class="cr2-dn"><svg viewBox="0 0 120 120" class="cr2-donut" role="img" aria-label="Répartition par communauté">' + arcs + '<text x="60" y="60" text-anchor="middle" class="d-n">' + tot + '</text><text x="60" y="75" text-anchor="middle" class="d-l">au total</text></svg><ul class="cr2-leg">'
+      + comms.map(([k, noms], i) => '<li><span class="pt" style="background:' + COULEURS_GRAPH[i % COULEURS_GRAPH.length] + '"></span><span><b>' + esc(k) + '</b> · ' + noms.length + '<br><small>' + noms.map(esc).join(' · ') + '</small></span></li>').join('') + '</ul></div></div>';
+  }
+  if (parties.length >= 2) {
+    const mx = Math.max(...mots);
+    h += '<div class="cr2-graph"><h4>Le récit en un clin d’œil</h4><p class="src">Longueur de chaque partie, calculée automatiquement à partir du texte.</p>' + parties.map((d, i) =>
+      '<div class="cr2-bm"><span class="cr2-bm-t">' + svgIc(iconeDe(d), 'cr2-ic xs') + esc(d.titre || 'Texte') + '</span><span class="cr2-piste"><span class="cr2-barre" style="width:' + Math.round(mots[i] / mx * 100) + '%"></span></span><span class="cr2-bm-n">' + mots[i] + ' mots</span></div>').join('') + '</div>';
+  }
+  return h;
+}
+
+const logoOrga = (cr, ev) => (cr && cr.logo_url) || (ev && ev.organisateur_officiel ? 'assets/logo.png' : '');
+const initialesDe = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+function partenairesHtml(cr, ev) {
+  const ps = cr.partenaires || [], logo = logoOrga(cr, ev);
+  if (!ps.length && !logo) return '';
+  return '<section class="cr2-bloc" id="cr-partenaires"><h3><span class="cr2-bulle">' + svgIc('people') + '</span><span>' + (ps.length ? 'Organisation et partenaires' : 'Organisateur') + '</span></h3>'
+    + '<div class="cr2-orga"><div class="cr2-orga-l">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '') + '<div><b>Organisateur</b><br>' + esc(ev.organisateur_nom || '') + '</div></div></div>'
+    + (ps.length ? '<div class="cr2-parts">' + ps.map(p => '<div class="cr2-part"><div class="cr2-slot">' + (p.logo_url ? '<img src="' + esc(p.logo_url) + '" alt="Logo ' + esc(p.nom) + '" loading="lazy">' : '<span class="ini">' + esc(initialesDe(p.nom)) + '</span>') + '</div>'
+      + '<div class="cr2-part-nom">' + esc(p.nom) + '</div>' + (p.description ? '<p class="cr2-part-txt">' + esc(p.description) + '</p>' : '') + (p.lien ? '<a class="cr2-part-lien" href="' + esc(p.lien) + '" target="_blank" rel="noopener">' + esc(p.lien.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')) + ' ↗</a>' : '') + '</div>').join('') + '</div>' : '')
+    + '</section>';
+}
+
+function detailHtml(cr) {
+  const l = partiesDe(cr);
+  if (!l.length) return '';
+  const libre = cr.type_cr === 'blanc';
+  return '<h2>Pour aller plus loin : le retour d\'expérience détaillé</h2>' + l.map((d, i) => '<section class="cr2-bloc" id="cr-p' + (i + 1) + '">'
+    + (libre ? '' : '<h3><span class="cr2-bulle">' + svgIc(iconeDe(d)) + '</span><span>' + esc(d.titre) + '</span></h3>') + corpsHtml(d.texte) + '</section>').join('');
+}
+
 function etapeHtml(cr) {
   if (!cr.etape_texte && !cr.etape_date) return '';
   return '<div class="cr-etape"><div class="cr-etape-lbl">➡️ L\'étape suivante</div>' + (cr.etape_date ? '<div class="cr-etape-date">📅 ' + esc(fmtDateCourte(cr.etape_date)) + '</div>' : '') + (cr.etape_texte ? '<div class="cr-etape-txt">' + mentionHtml(cr.etape_texte) + '</div>' : '')
@@ -314,25 +424,64 @@ function videoHtml(url) {
   const fichier = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
   return '<div class="cr-video">' + (fichier ? '<video controls preload="metadata"><source src="' + esc(url) + '"></video>' : '<a href="' + esc(url) + '" target="_blank" rel="noopener">▶ Voir la vidéo de l\'événement</a>') + '</div>';
 }
+function typeLibelle(cr) {
+  return cr.type_cr === 'autre' && cr.type_libre ? cr.type_libre : (cr.type_cr && CANEVAS[cr.type_cr] ? CANEVAS[cr.type_cr].label.replace(/^\S+\s/, '') : '');
+}
 function vuePublique() {
   const d = ST.data, cr = d.compte_rendu, ev = d.evenement;
   const root = $('#crp');
+  root.classList.add('crp-wide');
   const brouillon = cr.statut !== 'publie';
+  const parties = partiesDe(cr), graph = graphiquesHtml(cr), parts = partenairesHtml(cr, ev), logo = logoOrga(cr, ev);
+  /* Sommaire : [ancre, illustration, libellé], dans l'ordre de la page. */
+  const items = [['cr-resume', 'star', 'Résumé']];
+  if (graph) items.push(['cr-coup', 'compass', 'En un coup d’œil']);
+  if (cr.type_cr !== 'blanc') parties.forEach((p, i) => items.push(['cr-p' + (i + 1), iconeDe(p), p.titre || 'Texte']));
+  if ((cr.forts || []).length) items.push(['cr-forts', 'star', 'Les temps forts']);
+  if (parts) items.push(['cr-partenaires', 'people', (cr.partenaires || []).length ? 'Organisation et partenaires' : 'Organisateur']);
+  const toc = items.map(it => '<button type="button" class="cr2-toc-i" data-t="' + it[0] + '">' + svgIc(it[1], 'cr2-ic xs') + '<span>' + esc(it[2]) + '</span></button>').join('');
+  const type = typeLibelle(cr);
   root.innerHTML = (brouillon ? '<div class="crp-card" style="background:#FEF3C7;border-color:#F59E0B">Brouillon : seuls vous voyez ce compte-rendu. <a class="cr-link" href="compte-rendu.html?evt=' + ev.id + '&edition=1">Continuer la rédaction</a></div>' : '')
-    + '<div class="crp-card" style="padding:0;overflow:hidden"><div style="padding:0 18px"><div class="cr-cover"><span class="cr-tag">📅 ' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.image ? '<img src="' + esc(ev.image) + '" alt="">' : '') + (ev.ville ? '<span class="cr-lieu">📍 ' + esc(ev.ville) + '</span>' : '') + '</div></div>'
-    + '<div style="padding:4px 18px 18px"><h1>' + esc(cr.titre || ev.titre) + '</h1>'
-    + '<div class="crp-meta">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + (cr.type_cr === 'autre' && cr.type_libre ? ' · ' + esc(cr.type_libre) : (cr.type_cr && CANEVAS[cr.type_cr] ? ' · ' + esc(CANEVAS[cr.type_cr].label.replace(/^\S+\s/, '')) : '')) + '</div>'
+    + '<div class="cr2-tools">Taille du texte <button type="button" class="cr2-fs" id="cr-fsm" aria-label="Réduire le texte">A−</button><button type="button" class="cr2-fs" id="cr-fsp" aria-label="Agrandir le texte">A+</button></div>'
+    + '<div class="cr2-mtoc" id="cr-mtoc">' + toc + '</div>'
+    + '<div class="cr2-layout"><nav class="cr2-toc" aria-label="Sommaire"><h2>Sommaire</h2>' + toc + '</nav>'
+    + '<article class="cr2-page"><header class="cr2-hero">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '')
+    + '<div class="tx"><div class="dev">' + (ev.organisateur_officiel ? 'Actions locales · Impact global' : esc(ev.organisateur_nom || '')) + '</div><h1>' + esc(cr.titre || ev.titre) + '</h1>'
+    + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
+    + '<div class="cr2-in">'
+    + (ev.image ? '<div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' : '')
+    + '<div class="cr2-sous">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + '</div>'
     + '<div class="crp-chips" id="crp-chips">Avec : </div>'
-    + '<div class="crp-sum"><div class="crp-lbl" style="margin:0 0 6px">Résumé</div>' + String(cr.resume || '').split(/\n\s*\n/).filter(Boolean).map(p => '<p>' + mentionHtml(p) + '</p>').join('') + '</div>'
+    + '<div class="cr2-resume" id="cr-resume"><b>RÉSUMÉ</b>' + String(cr.resume || '').split(/\n\s*\n/).filter(Boolean).map(p => '<p>' + mentionHtml(p) + '</p>').join('') + '</div>'
     + etapeHtml(cr) + videoHtml(cr.video_url)
     + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
-    + detailHtml(cr)
-    + ((cr.forts || []).length ? '<h2>Les temps forts</h2><div class="crp-tiles">' + cr.forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
-    + '<div class="cr-btns" style="margin-top:18px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a>' : '') + '</div>'
-    + '<div id="crp-social"></div></div></div>';
+    + graph + detailHtml(cr)
+    + ((cr.forts || []).length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + cr.forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
+    + parts
+    + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a>' : '') + '</div>'
+    + '<div id="crp-social"></div></div></article></div>';
   const z = $('#crp-chips'); z.innerHTML = 'Avec : ' + (d.identifies.length ? chipsIdentifies(d.peut_editer) : '<span class="crp-note">Personne n\'est encore identifié.</span>' + (d.peut_editer ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : ''));
   if (!d.identifies.length && !d.peut_editer) z.remove();
+  initLecture(items.map(i => i[0]));
   chargerSocial();
+}
+
+/* Sommaire (clic = défilement, partie en cours surlignée) et taille du texte réglable (mémorisée). */
+function initLecture(ids) {
+  let fs = 18; try { const s = parseInt(localStorage.getItem('cr-fs2'), 10); if (s >= 14 && s <= 26) fs = s; } catch (_) {}
+  const appliquer = () => { $('#crp').style.setProperty('--cr-fs', fs + 'px'); try { localStorage.setItem('cr-fs2', fs); } catch (_) {} };
+  $('#cr-fsm').onclick = () => { if (fs > 14) { fs -= 1; appliquer(); } };
+  $('#cr-fsp').onclick = () => { if (fs < 26) { fs += 1; appliquer(); } };
+  appliquer();
+  const boutons = $$('.cr2-toc-i');
+  boutons.forEach(b => b.addEventListener('click', () => { const el = document.getElementById(b.dataset.t); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }));
+  const suivre = () => {
+    let cur = ids[0];
+    ids.forEach(id => { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < 150) cur = id; });
+    boutons.forEach(b => b.classList.toggle('on', b.dataset.t === cur));
+    const on = $('#cr-mtoc .cr2-toc-i.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+  };
+  window.addEventListener('scroll', suivre, { passive: true }); suivre();
 }
 
 /* Réactions et commentaires du compte-rendu : ceux de son post du fil (même fil de discussion que le fil d'actualité) ;
@@ -373,12 +522,12 @@ function nouvelEd() {
   const cr = ST.data.compte_rendu;
   const ed = { type: (cr && cr.type_cr) || 'eco', libre: (cr && cr.type_libre) || '', titre: (cr && cr.titre) || ST.data.evenement.titre, resume: (cr && cr.resume) || '',
     forts: cr ? [...(cr.forts || [])] : [], etape_texte: (cr && cr.etape_texte) || '', etape_date: (cr && cr.etape_date) || '', etape_bouton: (cr && cr.etape_bouton) || '', etape_lien: (cr && cr.etape_lien) || '',
-    video: (cr && cr.video_url) || '', medias: cr ? [...(cr.medias || [])] : [], saisie: {}, extras: [] };
-  Object.keys(CANEVAS).forEach(k => ed.saisie[k] = CANEVAS[k].champs.map(() => ''));
+    video: (cr && cr.video_url) || '', medias: cr ? [...(cr.medias || [])] : [], saisie: {}, icones: {}, extras: [], logo: (cr && cr.logo_url) || '', partenaires: cr ? (cr.partenaires || []).map(p => ({ ...p })) : [], profils: cr ? (cr.profils || []).map(p => ({ ...p })) : [] };
+  Object.keys(CANEVAS).forEach(k => { ed.saisie[k] = CANEVAS[k].champs.map(() => ''); ed.icones[k] = CANEVAS[k].champs.map(() => ''); });
   /* Les sections enregistrées sont redistribuées sur les champs du type courant (par titre) ; les autres restent visibles en « Autres sections ». */
   (cr ? cr.details || [] : []).forEach(d => {
     const i = CANEVAS[ed.type].champs.findIndex(c => c[0] === d.titre);
-    if (i >= 0) ed.saisie[ed.type][i] = d.texte; else ed.extras.push({ titre: d.titre, texte: d.texte });
+    if (i >= 0) { ed.saisie[ed.type][i] = d.texte; ed.icones[ed.type][i] = d.icone || ''; } else ed.extras.push({ titre: d.titre, texte: d.texte, icone: d.icone || '' });
   });
   return ed;
 }
@@ -389,8 +538,8 @@ function collecterEd() {
 }
 function bodyEd() {
   const ed = ST.ed;
-  const details = CANEVAS[ed.type].champs.map((c, i) => ({ titre: c[0], texte: ed.saisie[ed.type][i] || '' })).concat(ed.extras);
-  return { titre: ed.titre, type_cr: ed.type, type_libre: ed.type === 'autre' ? ed.libre : '', resume: ed.resume, details, forts: ed.forts, etape_texte: ed.etape_texte, etape_date: ed.etape_date || null, etape_bouton: ed.etape_bouton, etape_lien: ed.etape_lien, video_url: ed.video, medias: ed.medias };
+  const details = CANEVAS[ed.type].champs.map((c, i) => ({ titre: c[0], texte: ed.saisie[ed.type][i] || '', icone: (ed.icones[ed.type] || [])[i] || '' })).concat(ed.extras);
+  return { titre: ed.titre, type_cr: ed.type, type_libre: ed.type === 'autre' ? ed.libre : '', resume: ed.resume, details, forts: ed.forts, etape_texte: ed.etape_texte, etape_date: ed.etape_date || null, etape_bouton: ed.etape_bouton, etape_lien: ed.etape_lien, video_url: ed.video, medias: ed.medias, logo_url: ed.logo, partenaires: ed.partenaires, profils: ed.profils };
 }
 async function sauver(silencieux) {
   collecterEd();
@@ -416,6 +565,11 @@ function vueEditeur() {
     + '<div class="crp-lbl">Niveau 2 · Le retour d\'expérience détaillé</div>'
     + '<div class="crp-fld"><label>Temps forts <em>affichés en vignettes</em></label><div class="crp-chips" id="ed-forts"></div><div class="crp-extform" style="grid-template-columns:1fr auto"><input id="ed-fortin" maxlength="80" placeholder="Ajouter un temps fort (ex. Table ronde, Remise des prix…)"><button type="button" class="cr-btn sec" id="ed-fortadd">＋ Ajouter</button></div></div>'
     + '<div id="ed-champs"></div>'
+    + '<div class="crp-lbl">Identité et partenaires</div>'
+    + '<div class="crp-fld"><label>Logo de l’organisateur <em>facultatif</em></label><div id="ed-logo"></div></div>'
+    + '<div class="crp-fld"><label>Partenaires de l’événement <em>logo, nom, lien : facultatifs, 12 maximum</em></label><div id="ed-parts"></div><button type="button" class="cr-btn sec" id="ed-partadd">＋ Ajouter un partenaire</button></div>'
+    + '<div class="crp-lbl">Personnes et organisations mises en lumière</div>'
+    + '<div class="crp-fld"><label>Qui a été mis en lumière <em>alimente les graphiques de la page</em></label><div id="ed-profils"></div><button type="button" class="cr-btn sec" id="ed-profadd">＋ Ajouter</button><div class="crp-hint">Nom, catégorie (par exemple associations de la diaspora) et communauté d’origine : la page en tire automatiquement ses graphiques.</div></div>'
     + '<div class="crp-fld"><label>Photos</label><button type="button" class="cr-btn out" id="ed-addphoto">＋ Ajouter des photos</button><input type="file" id="ed-photofile" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none"><div class="crp-photos" id="ed-photos"></div></div>'
     + '<div class="crp-fld"><label>Vidéo <em>lien (mp4, YouTube, Vimeo…)</em></label><input id="ed-video" placeholder="https://…"><div class="crp-hint" id="ed-videohint"></div></div>'
     + '<div class="crp-fld"><label>Participants identifiés</label><div class="crp-chips" id="crp-chips"></div><div class="crp-hint">Ils sont notifiés. Vous pouvez aussi identifier depuis la page de l\'événement, même sans compte-rendu.</div></div>'
@@ -427,6 +581,9 @@ function vueEditeur() {
   const cnt = () => { const l = $('#ed-resume').value.length; const c = $('#ed-cnt'); c.textContent = l.toLocaleString('fr-FR') + ' / 2 500 caractères' + (l >= RESUME_MAX ? ' — limite atteinte' : ''); c.classList.toggle('warn', l > 2300); };
   $('#ed-resume').addEventListener('input', cnt); cnt();
   drawTypes(); drawChamps(); drawForts(); drawPhotos(); refreshChips();
+  drawLogo(); drawParts(); drawProfils();
+  $('#ed-partadd').onclick = () => { if (ed.partenaires.length < 12) { ed.partenaires.push({ nom: '', description: '', lien: '', logo_url: '' }); drawParts(); } };
+  $('#ed-profadd').onclick = () => { if (ed.profils.length < 40) { ed.profils.push({ nom: '', categorie: '', communaute: '' }); drawProfils(); } };
   $('#ed-fortadd').onclick = () => { const v = $('#ed-fortin').value.trim(); if (v) { ed.forts.push(v); $('#ed-fortin').value = ''; drawForts(); } };
   $('#ed-fortin').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#ed-fortadd').click(); } });
   $('#ed-addphoto').onclick = () => $('#ed-photofile').click();
@@ -462,12 +619,16 @@ function drawChamps() {
   CANEVAS[ed.type].champs.forEach((c, i) => {
     const d = document.createElement('div'); d.className = 'crp-fld';
     d.innerHTML = '<label>' + esc(c[0]) + ' <em>facultatif</em></label><textarea data-i="' + i + '" maxlength="10000" style="' + (ed.type === 'blanc' ? 'min-height:240px' : '') + '"></textarea><div class="crp-hint">' + esc(c[1]) + '</div>';
-    const t = $('textarea', d); t.value = ed.saisie[ed.type][i] || ''; t.addEventListener('input', () => { ed.saisie[ed.type][i] = t.value; }); attachMention(t); box.appendChild(d);
+    const t = $('textarea', d); t.value = ed.saisie[ed.type][i] || ''; t.addEventListener('input', () => { ed.saisie[ed.type][i] = t.value; }); attachMention(t);
+    if (ed.type !== 'blanc') { d.insertAdjacentHTML('beforeend', selectIcone('data-ic', i, (ed.icones[ed.type] || [])[i] || '')); $('select[data-ic]', d).addEventListener('change', e => { ed.icones[ed.type][i] = e.target.value; }); }
+    box.appendChild(d);
   });
   ed.extras.forEach((x, i) => {
     const d = document.createElement('div'); d.className = 'crp-fld';
     d.innerHTML = '<label>' + esc(x.titre) + ' <em>section conservée d\'un autre canevas</em></label><textarea data-x="' + i + '" maxlength="10000"></textarea>';
-    const t = $('textarea', d); t.value = x.texte || ''; t.addEventListener('input', () => { x.texte = t.value; }); attachMention(t); box.appendChild(d);
+    const t = $('textarea', d); t.value = x.texte || ''; t.addEventListener('input', () => { x.texte = t.value; }); attachMention(t);
+    d.insertAdjacentHTML('beforeend', selectIcone('data-xic', i, x.icone || '')); $('select[data-xic]', d).addEventListener('change', e => { x.icone = e.target.value; });
+    box.appendChild(d);
   });
 }
 function drawForts() {
@@ -479,6 +640,52 @@ function drawPhotos() {
   const ed = ST.ed;
   $('#ed-photos').innerHTML = ed.medias.map((u, i) => '<div><img src="' + esc(u) + '" alt=""><button type="button" data-phrm="' + i + '" title="Retirer">×</button></div>').join('');
   $$('[data-phrm]').forEach(b => b.addEventListener('click', () => { ed.medias.splice(Number(b.dataset.phrm), 1); drawPhotos(); }));
+}
+
+/* ---------- logo de l'organisateur, partenaires, personnes mises en lumière (2026-10-06) ---------- */
+const CATEGORIES_SUGGEREES = ['Associations de la diaspora', 'Accompagnement, santé et emploi', 'Entrepreneurs et exposants', 'Institutions et réseaux', 'Culture et création', 'Intervenants', 'Animation'];
+function selectIcone(attr, idx, val) {
+  return '<div class="crp-ic"><span>Illustration</span><select ' + attr + '="' + idx + '">' + ICONES_CHOIX.map(([k, l]) => '<option value="' + k + '"' + (k === val ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div>';
+}
+async function envoyerLogo(file) {
+  if (!file) return null;
+  if (!/^image\//.test(file.type)) throw new Error('Choisissez une image (PNG, JPEG ou WebP).');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Image trop lourde (5 Mo maximum).');
+  toast('Envoi de ' + file.name + '…');
+  return uploadMedia(file, 'logo');
+}
+function drawLogo() {
+  const ed = ST.ed, ev = ST.data.evenement, defaut = ev.organisateur_officiel ? 'assets/logo.png' : '', cur = ed.logo || defaut;
+  $('#ed-logo').innerHTML = '<div class="crp-logo-prev">' + (cur ? '<img src="' + esc(cur) + '" alt="">' : '<span class="crp-note">Aucun logo</span>') + '</div><div style="flex:1;min-width:200px">'
+    + '<button type="button" class="cr-btn out" id="ed-logobtn">' + (ed.logo ? 'Changer le logo' : 'Ajouter un logo') + '</button>' + (ed.logo ? ' <button type="button" class="cr-btn out" id="ed-logorm">Retirer</button>' : '')
+    + '<input type="file" id="ed-logofile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"><div class="crp-hint">' + (ev.organisateur_officiel && !ed.logo ? 'Le logo Diaspo’Actif est utilisé par défaut.' : 'Facultatif : affiché en tête de la page.') + '</div></div>';
+  $('#ed-logobtn').onclick = () => $('#ed-logofile').click();
+  $('#ed-logofile').onchange = async e => { try { const u = await envoyerLogo(e.target.files[0]); if (u) { ed.logo = u; drawLogo(); } } catch (err) { toast(err.message || 'Échec du téléversement'); } };
+  const rm = $('#ed-logorm'); if (rm) rm.onclick = () => { ed.logo = ''; drawLogo(); };
+}
+function drawParts() {
+  const ed = ST.ed, box = $('#ed-parts');
+  box.innerHTML = ed.partenaires.map((p, i) => '<div class="crp-part"><div class="crp-part-logo">' + (p.logo_url ? '<img src="' + esc(p.logo_url) + '" alt="">' : '<span class="crp-note">Logo</span>')
+    + '<button type="button" class="cr-btn out" data-plogo="' + i + '">' + (p.logo_url ? 'Changer' : 'Ajouter') + '</button><input type="file" data-pfile="' + i + '" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>'
+    + '<div class="crp-part-f"><input data-pn="' + i + '" maxlength="80" placeholder="Nom du partenaire" value="' + esc(p.nom) + '"><input data-pd="' + i + '" maxlength="300" placeholder="Courte présentation (facultatif)" value="' + esc(p.description) + '"><input data-pl="' + i + '" placeholder="https://… lien (facultatif)" value="' + esc(p.lien) + '"></div>'
+    + '<button type="button" class="crp-x" data-prm="' + i + '" title="Retirer ce partenaire">×</button></div>').join('') || '<span class="crp-note">Aucun partenaire.</span>';
+  $$('[data-pn]', box).forEach(x => x.addEventListener('input', () => { ed.partenaires[Number(x.dataset.pn)].nom = x.value; }));
+  $$('[data-pd]', box).forEach(x => x.addEventListener('input', () => { ed.partenaires[Number(x.dataset.pd)].description = x.value; }));
+  $$('[data-pl]', box).forEach(x => x.addEventListener('input', () => { ed.partenaires[Number(x.dataset.pl)].lien = x.value; }));
+  $$('[data-prm]', box).forEach(x => x.addEventListener('click', () => { ed.partenaires.splice(Number(x.dataset.prm), 1); drawParts(); }));
+  $$('[data-plogo]', box).forEach(x => x.addEventListener('click', () => $('[data-pfile="' + x.dataset.plogo + '"]', box).click()));
+  $$('[data-pfile]', box).forEach(x => x.addEventListener('change', async e => { try { const u = await envoyerLogo(e.target.files[0]); if (u) { ed.partenaires[Number(x.dataset.pfile)].logo_url = u; drawParts(); } } catch (err) { toast(err.message || 'Échec du téléversement'); } }));
+  const add = $('#ed-partadd'); if (add) add.disabled = ed.partenaires.length >= 12;
+}
+function drawProfils() {
+  const ed = ST.ed, box = $('#ed-profils');
+  box.innerHTML = ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" placeholder="Nom (personne ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
+    + '<datalist id="dl-cats">' + CATEGORIES_SUGGEREES.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
+  $$('[data-fn]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fn)].nom = x.value; }));
+  $$('[data-fc]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fc)].categorie = x.value; }));
+  $$('[data-fm]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fm)].communaute = x.value; }));
+  $$('[data-frm]', box).forEach(x => x.addEventListener('click', () => { ed.profils.splice(Number(x.dataset.frm), 1); drawProfils(); }));
+  const add = $('#ed-profadd'); if (add) add.disabled = ed.profils.length >= 40;
 }
 
 /* ---------- pré-remplissage depuis l'événement ---------- */

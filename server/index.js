@@ -20034,6 +20034,8 @@ route("POST", "/api/evenements/:id/promouvoir", async (req, res, params) => {
    ══════════════════════════════════════════════════════════════════════════ */
 const CR_RESUME_MAX = 2500;
 const CR_TYPES = ['eco', 'fes', 'pol', 'forum', 'edu', 'spi', 'san', 'ing', 'autre', 'blanc'];
+/* Illustrations choisissables par partie (2026-10-06) : liste fermée, dessinées côté page. */
+const CR_ICONES = ['star', 'home', 'tree', 'globe', 'heart', 'mic', 'case', 'mosaic', 'pencil', 'people', 'scale', 'coin', 'book', 'cross', 'compass', 'flame', 'landmark'];
 const CR_EMOJIS = ['👍', '❤️', '👏', '🔥'];
 const CR_LANCEMENT = '2026-10-05';
 
@@ -20098,7 +20100,8 @@ function crSerialiser(cr) {
     id: cr.id, evenement_id: cr.evenement_id, auteur_id: cr.auteur_id, titre: cr.titre || '', type_cr: cr.type_cr || 'eco', type_libre: cr.type_libre || '',
     resume: cr.resume || '', details: crJson(cr.details_json, []), forts: crJson(cr.forts_json, []),
     etape_texte: cr.etape_texte || '', etape_date: cr.etape_date || '', etape_bouton: cr.etape_bouton || '', etape_lien: cr.etape_lien || '',
-    video_url: cr.video_url || '', medias: crJson(cr.medias_json, []), statut: cr.statut, fil_post_id: cr.fil_post_id || null,
+    video_url: cr.video_url || '', medias: crJson(cr.medias_json, []), logo_url: cr.logo_url || '', partenaires: crJson(cr.partenaires_json, []), profils: crJson(cr.profils_json, []),
+    statut: cr.statut, fil_post_id: cr.fil_post_id || null,
     published_at: cr.published_at || null, updated_at: cr.updated_at || null,
   };
 }
@@ -20117,7 +20120,9 @@ route("GET", "/api/evenements/:id/compte-rendu", async (req, res, params) => {
   const visible = cr && (cr.statut === 'publie' || edit);
   sendJSON(res, 200, {
     evenement: { id: evt.id, titre: evt.titre, date_evt: evt.date_evt, date_fin: evt.date_fin || null, heure_debut: evt.heure_debut || null, lieu: evt.lieu || null, ville: evt.ville || null, pays: evt.pays || null,
-      image: crImageEvenement(evt), organisateur_id: evt.owner_user_id, organisateur_nom: await nomCompteAffichage(evt.owner_user_id), termine: evenementEstTermine(evt), type_evt: evt.type_evt || null },
+      image: crImageEvenement(evt), organisateur_id: evt.owner_user_id, organisateur_nom: await nomCompteAffichage(evt.owner_user_id), termine: evenementEstTermine(evt), type_evt: evt.type_evt || null,
+      /* Comptes officiels Diaspo'Actif : le logo de la plateforme sert de logo par défaut (les autres comptes n'ont de logo que s'ils en ajoutent un). */
+      organisateur_officiel: !!((await db.prepare("SELECT is_official FROM users WHERE id=?").get(evt.owner_user_id) || {}).is_official) },
     compte_rendu: visible ? crSerialiser(cr) : null,
     peut_editer: edit, a_compte_rendu: !!(cr && cr.statut === 'publie'),
     identifies: await crIdentifies(evt.id),
@@ -20132,21 +20137,30 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
 
   const type_cr = CR_TYPES.includes(body.type_cr) ? body.type_cr : 'eco';
   const resume = crTexte(body.resume, CR_RESUME_MAX);
-  const details = (Array.isArray(body.details) ? body.details : []).slice(0, 12)
-    .map(d => ({ titre: crTexte(d && d.titre, 80), texte: crTexte(d && d.texte, 10000) })).filter(d => d.texte);
+  /* On retire les parties vides AVANT de limiter à 12 : les champs vides du canevas ne doivent pas occuper de place. */
+  const details = (Array.isArray(body.details) ? body.details : [])
+    .map(d => ({ titre: crTexte(d && d.titre, 80), texte: crTexte(d && d.texte, 10000), icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' })).filter(d => d.texte).slice(0, 12);
   const forts = (Array.isArray(body.forts) ? body.forts : []).slice(0, 12).map(f => crTexte(f, 80)).filter(Boolean);
   const medias = (Array.isArray(body.medias) ? body.medias : []).slice(0, 20).map(crUrl).filter(Boolean);
+  /* Logo de l'organisateur, partenaires de l'événement (nom, description courte, lien, logo) et personnes/organisations
+     mises en lumière (catégorie et communauté alimentent les graphiques de la page). */
+  const logo_url = crUrl(body.logo_url);
+  const partenaires = (Array.isArray(body.partenaires) ? body.partenaires : []).slice(0, 12)
+    .map(p => ({ nom: crTexte(p && p.nom, 80), description: crTexte(p && p.description, 300), lien: crUrl(p && p.lien), logo_url: crUrl(p && p.logo_url) })).filter(p => p.nom);
+  const profils = (Array.isArray(body.profils) ? body.profils : []).slice(0, 40)
+    .map(p => ({ nom: crTexte(p && p.nom, 80), categorie: crTexte(p && p.categorie, 60), communaute: crTexte(p && p.communaute, 40) })).filter(p => p.nom);
   const champs = [
     crTexte(body.titre, 160) || evt.titre, type_cr, type_cr === 'autre' ? crTexte(body.type_libre, 60) || null : null, resume || null,
     JSON.stringify(details), JSON.stringify(forts), crTexte(body.etape_texte, 500) || null, crDateISO(body.etape_date),
     crTexte(body.etape_bouton, 60) || null, crUrl(body.etape_lien), crUrl(body.video_url), JSON.stringify(medias),
+    logo_url, JSON.stringify(partenaires), JSON.stringify(profils),
   ];
   const existant = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
   if (existant) {
-    await db.prepare(`UPDATE evenement_comptes_rendus SET titre=?, type_cr=?, type_libre=?, resume=?, details_json=?, forts_json=?, etape_texte=?, etape_date=?, etape_bouton=?, etape_lien=?, video_url=?, medias_json=?, updated_at=? WHERE id=?`)
+    await db.prepare(`UPDATE evenement_comptes_rendus SET titre=?, type_cr=?, type_libre=?, resume=?, details_json=?, forts_json=?, etape_texte=?, etape_date=?, etape_bouton=?, etape_lien=?, video_url=?, medias_json=?, logo_url=?, partenaires_json=?, profils_json=?, updated_at=? WHERE id=?`)
       .run(...champs, new Date().toISOString(), existant.id);
   } else {
-    await db.prepare(`INSERT INTO evenement_comptes_rendus (evenement_id, auteur_id, titre, type_cr, type_libre, resume, details_json, forts_json, etape_texte, etape_date, etape_bouton, etape_lien, video_url, medias_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    await db.prepare(`INSERT INTO evenement_comptes_rendus (evenement_id, auteur_id, titre, type_cr, type_libre, resume, details_json, forts_json, etape_texte, etape_date, etape_bouton, etape_lien, video_url, medias_json, logo_url, partenaires_json, profils_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(evt.id, user.id, ...champs);
   }
   const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
