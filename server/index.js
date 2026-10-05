@@ -20139,7 +20139,7 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   const resume = crTexte(body.resume, CR_RESUME_MAX);
   /* On retire les parties vides AVANT de limiter à 12 : les champs vides du canevas ne doivent pas occuper de place. */
   const details = (Array.isArray(body.details) ? body.details : [])
-    .map(d => ({ titre: crTexte(d && d.titre, 80), texte: crTexte(d && d.texte, 10000), icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' })).filter(d => d.texte).slice(0, 12);
+    .map(d => ({ titre: crTexte(d && d.titre, 80), texte: crTexte(d && d.texte, 10000), icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' })).filter(d => d.texte).slice(0, 20);
   const forts = (Array.isArray(body.forts) ? body.forts : []).slice(0, 12).map(f => crTexte(f, 80)).filter(Boolean);
   const medias = (Array.isArray(body.medias) ? body.medias : []).slice(0, 20).map(crUrl).filter(Boolean);
   /* Logo de l'organisateur, partenaires de l'événement (nom, description courte, lien, logo) et personnes/organisations
