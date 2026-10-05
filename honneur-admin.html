@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Comptes à l'honneur (administration)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<style>
+.ha{max-width:1060px;margin:0 auto;padding:22px 16px 80px}
+.ha h1{font-size:22px;margin:0 0 4px}.ha .sub{color:var(--muted,#5B6B82);font-size:13.5px;margin:0 0 16px}
+.ha-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.ha-tabs button{border:1.5px solid #DCE4F0;background:#fff;border-radius:99px;padding:8px 15px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;color:#1f2937}
+.ha-tabs button.on{background:#0D2B4E;color:#fff;border-color:#0D2B4E}
+.ha-card{background:#fff;border:1px solid var(--border,#DCE4F0);border-radius:14px;padding:18px;margin-bottom:16px}
+.ha-card h2{font-size:16px;margin:0 0 10px}
+.ha-note{font-size:12.5px;color:var(--muted,#5B6B82);line-height:1.55}
+.ha-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.ha label{display:block;font-size:12px;font-weight:700;margin:10px 0 4px}
+.ha input,.ha select,.ha textarea{box-sizing:border-box;padding:8px 11px;border:1.5px solid #DCE4F0;border-radius:9px;font:inherit;font-size:13.5px;max-width:100%}
+.ha textarea{width:100%;min-height:60px}
+.ha-btn{border:none;border-radius:9px;padding:9px 15px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit}
+.ha-btn.pri{background:#F26422;color:#1f0e02}.ha-btn.sec{background:#E8F0FD;color:#2E74E0}.ha-btn.out{background:#fff;border:1.5px solid #DCE4F0;color:#1f2937}.ha-btn.red{background:#FEE2E2;color:#B91C1C}
+.ha-btn:disabled{opacity:.55;cursor:default}
+.ha-tw{overflow-x:auto}
+.ha table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.ha th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:#5B6B82;padding:7px 9px;border-bottom:2px solid #DCE4F0;white-space:nowrap}
+.ha td{padding:8px 9px;border-bottom:1px solid #EEF2F8;vertical-align:top}
+.ha tr.lau td{background:#FFF8E1}
+.ha-pill{display:inline-block;font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:99px;background:#EEF2F8;color:#334155}
+.ha-pill.payant{background:#DCFCE7;color:#166534}.ha-pill.accorde{background:#E8F0FD;color:#1E40AF}.ha-pill.promotion{background:#FEF3C7;color:#92400E}.ha-pill.honneur{background:#FDECB4;color:#7A5200}
+.ha-pill.applique{background:#DCFCE7;color:#166534}.ha-pill.echec,.ha-pill.a_traiter{background:#FEE2E2;color:#B91C1C}.ha-pill.clos{background:#DCFCE7;color:#166534}.ha-pill.erreur{background:#FEE2E2;color:#B91C1C}
+.ha-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.ha-kpi{background:#F6F9FE;border-radius:11px;padding:11px 13px}.ha-kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.ha-kpi span{font-size:12px;color:#5B6B82}
+.ha-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0D2B4E;color:#fff;padding:11px 18px;border-radius:12px;font-weight:700;font-size:14px;z-index:10000;max-width:90vw}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar"><div class="topbar-inner">
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+    <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+    <nav class="nav"><a href="index.html">Accueil</a><a href="annonces-admin.html">Annonces</a><a href="dashboard-administrateur.html">Tableau de bord</a></nav>
+    <div class="topbar-right"><select class="lang-select" id="lang-select"></select><div id="auth-area" class="auth-area"></div></div>
+  </div></header>
+  <main class="ha" id="ha"><p class="ha-note">Chargement…</p></main>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function toast(m) { const t = document.createElement('div'); t.className = 'ha-toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 3500); }
+const dFr = d => d ? new Date(String(d).length <= 10 ? d + 'T12:00:00' : d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }) : '—';
+const ORIG = { payant: 'Payant', accorde: 'Accordé', promotion: 'Promotion', honneur: 'Offert (honneur)' };
+const CAT = { utilisateur: 'Membre', initiative: 'Initiative' };
+let ONGLET = 'apercu', ETAT = {};
+
+async function demarrer() {
+  const root = $('#ha');
+  try { ETAT.cycles = await api('GET', '/admin/honneur/cycles'); }
+  catch (e) { root.innerHTML = '<div class="ha-card"><h1>Accès réservé</h1><p class="ha-note">' + esc(e.message || 'Réservé aux administrateurs.') + '</p></div>'; return; }
+  root.innerHTML = '<h1>🏆 Comptes à l\'honneur</h1><p class="sub">Trophée de la Diaspora : classement privé, coups de pouce, historique de tous les comptes récompensés. Rien de ce qui est affiché ici n\'est public.</p>'
+    + '<div class="ha-tabs" id="tabs"></div><div id="corps"></div>';
+  const noms = { apercu: 'Classement', cycles: 'Cycles et réglages', historique: 'Historique des lauréats', pouces: 'Coups de pouce', premium: 'Origine des Premium' };
+  $('#tabs').innerHTML = Object.keys(noms).map(k => '<button data-t="' + k + '" class="' + (k === ONGLET ? 'on' : '') + '">' + noms[k] + '</button>').join('');
+  $('#tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; ONGLET = b.dataset.t; document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b)); afficher(); };
+  afficher();
+}
+async function afficher() {
+  const c = $('#corps'); c.innerHTML = '<p class="ha-note">Chargement…</p>';
+  try { await ({ apercu: vApercu, cycles: vCycles, historique: vHistorique, pouces: vPouces, premium: vPremium })[ONGLET](c); }
+  catch (e) { c.innerHTML = '<div class="ha-card ha-note">' + esc(e.message || 'Erreur') + '</div>'; }
+}
+
+async function vApercu(c, cle) {
+  const d = await api('GET', '/admin/honneur/apercu' + (cle ? '?cle=' + encodeURIComponent(cle) : ''));
+  const lignes = d.lignes.map(l => '<tr class="' + (l.laureat ? 'lau' : '') + '"><td>' + (l.laureat ? '🏆 ' : '') + esc(l.nom) + '<br><span class="ha-note">#' + l.user_id + '</span></td><td>' + CAT[l.categorie] + '</td><td><span class="ha-pill ' + l.origine + '">' + (ORIG[l.origine] || l.origine) + '</span></td><td>' + l.pct_base + ' %</td><td>' + (l.boost ? '+' + l.boost : '—') + '</td><td><b>' + l.total + ' %</b></td><td>' + l.activite + '</td>'
+    + '<td class="ha-note">' + Object.entries(l.valeurs).map(([k, v]) => k + ' ' + v).join(' · ') + '</td></tr>').join('');
+  c.innerHTML = '<div class="ha-card"><h2>' + (d.simulation ? 'Simulation avant lancement' : 'Cycle ' + esc(d.cycle.cle)) + '</h2>'
+    + '<p class="ha-note">Fenêtre mesurée : du ' + dFr(d.fenetre.debut) + ' au ' + dFr(d.fenetre.fin_mesure) + ' (exclu). Éligibilité : <b>' + (d.mode_eligibilite === 'payants' ? 'abonnements payants uniquement' : 'tous les Premium actifs (aucun paiement réel pour l\'instant)') + '</b>.'
+    + (d.simulation ? ' <b>Le programme n\'a pas encore démarré : simulation sur les deux derniers mois, rien n\'est enregistré.</b>' : '') + '</p>'
+    + '<div class="ha-grid"><div class="ha-kpi"><b>' + d.candidats + '</b><span>comptes candidats</span></div><div class="ha-kpi"><b>' + d.eligibles + '</b><span>au barème (≥ 100 %)</span></div><div class="ha-kpi"><b>' + d.nb_laureats.utilisateur + '</b><span>places membres</span></div><div class="ha-kpi"><b>' + d.nb_laureats.initiative + '</b><span>places initiatives</span></div></div></div>'
+    + '<div class="ha-card"><h2>Classement détaillé (200 premiers)</h2><div class="ha-tw"><table><thead><tr><th>Compte</th><th>Catégorie</th><th>Premium</th><th>Base</th><th>Coup de pouce</th><th>Total</th><th>Activité</th><th>Valeurs mesurées</th></tr></thead><tbody>' + (lignes || '<tr><td colspan="8" class="ha-note">Aucun compte candidat.</td></tr>') + '</tbody></table></div>'
+    + '<p class="ha-note">Les lauréats sont les comptes strictement au-dessus de 100 % ; à égalité : activité brute la plus élevée, puis compte le plus ancien.</p></div>';
+}
+
+async function vCycles(c) {
+  const d = await api('GET', '/admin/honneur/cycles'); const p = d.parametres;
+  const lignes = d.cycles.map(x => '<tr><td><b>' + esc(x.cle) + '</b></td><td>' + dFr(x.debut) + ' → ' + dFr(x.fin_mesure) + '</td><td><span class="ha-pill ' + x.statut + '">' + esc(x.statut) + '</span></td><td>' + (x.nb_candidats ?? '—') + '</td><td>' + (x.nb_eligibles ?? '—') + '</td><td>' + (x.cloture_at ? dFr(x.cloture_at) : '—') + '</td></tr>').join('');
+  c.innerHTML = '<div class="ha-card"><h2>Réglages du programme</h2>'
+    + '<label>Date de lancement (début du premier cycle, 1er du mois)</label><input type="date" id="p-debut" value="' + esc(p.honneur_debut) + '">'
+    + '<label>Éligibilité Premium</label><select id="p-elig"><option value="auto">Automatique (payants dès qu\'un compte a payé)</option><option value="payants">Abonnements payants uniquement</option><option value="tous_premium">Tous les Premium actifs</option></select>'
+    + '<label>Mois offert aux lauréats</label><select id="p-mois"><option value="actif">Appliqué automatiquement</option><option value="inactif">À traiter manuellement</option></select>'
+    + '<div class="ha-row"><button class="ha-btn pri" id="p-save">Enregistrer</button></div></div>'
+    + '<div class="ha-card"><h2>Cycles</h2><p class="ha-note">La clôture est automatique chaque jour à 6 h (UTC) dès que les deux mois mesurés sont terminés. Elle est sans danger si répétée. Vous pouvez aussi clôturer à la main un cycle terminé.</p>'
+    + '<div class="ha-tw"><table><thead><tr><th>Cycle</th><th>Mesure</th><th>Statut</th><th>Candidats</th><th>Au barème</th><th>Clôturé</th></tr></thead><tbody>' + (lignes || '<tr><td colspan="6" class="ha-note">Aucun cycle clôturé.</td></tr>') + '</tbody></table></div>'
+    + '<div class="ha-row"><label style="margin:0">Clôturer le cycle</label><input id="cl-cle" placeholder="AAAA-MM (ex. 2027-01)" size="12"><label style="margin:0"><input type="checkbox" id="cl-notif" checked> notifier les lauréats</label><button class="ha-btn out" id="cl-go">Clôturer</button></div></div>';
+  $('#p-elig').value = p.honneur_eligibilite; $('#p-mois').value = p.honneur_mois_offert_auto;
+  $('#p-save').onclick = async () => { try { await api('PUT', '/admin/honneur/parametres', { honneur_debut: $('#p-debut').value, honneur_eligibilite: $('#p-elig').value, honneur_mois_offert_auto: $('#p-mois').value }); toast('Réglages enregistrés'); } catch (e) { toast(e.message); } };
+  $('#cl-go').onclick = async () => {
+    const cle = $('#cl-cle').value.trim(); if (!/^\d{4}-\d{2}$/.test(cle)) return toast('Cycle invalide (AAAA-MM).');
+    if (!confirm('Clôturer le cycle ' + cle + ' ? Les lauréats seront enregistrés, leur mois offert appliqué' + ($('#cl-notif').checked ? ' et ils seront notifiés' : '') + '.')) return;
+    try { const r = await api('POST', '/admin/honneur/cycles/' + cle + '/cloturer', { notifier: $('#cl-notif').checked }); toast(r.deja ? 'Ce cycle était déjà clos.' : r.laureats + ' lauréat(s) enregistré(s).'); afficher(); } catch (e) { toast(e.message); }
+  };
+}
+
+async function vHistorique(c) {
+  const f = ETAT.filtre || {};
+  const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
+  const d = await api('GET', '/admin/honneur/laureats' + (qs ? '?' + qs : ''));
+  const lignes = d.laureats.map(l => '<tr><td><b>' + esc(l.cycle_cle) + '</b></td><td>' + CAT[l.categorie] + ' n°' + l.rang + '</td><td>' + esc(l.nom_snapshot) + '<br><span class="ha-note">compte #' + l.user_id + (l.initiative_id ? ' · initiative #' + l.initiative_id : '') + '</span></td><td><span class="ha-pill ' + esc(l.origine_premium || '') + '">' + (ORIG[l.origine_premium] || '—') + '</span></td><td><span class="ha-pill ' + esc(l.mois_offert_statut || '') + '">' + esc(l.mois_offert_statut || '—') + '</span><br><span class="ha-note">' + esc(l.mois_offert_detail || '') + '</span></td><td>' + dFr(l.created_at) + '</td></tr>').join('');
+  c.innerHTML = '<div class="ha-card"><h2>Historique de tous les comptes récompensés</h2><p class="ha-note">Conservé définitivement (le nom est figé tel qu\'il était à la remise) pour pouvoir identifier plus tard tous les lauréats.</p>'
+    + '<div class="ha-row"><input id="f-q" placeholder="Rechercher un nom" value="' + esc(f.q || '') + '"><input id="f-cycle" placeholder="Cycle AAAA-MM" size="12" value="' + esc(f.cycle || '') + '"><select id="f-cat"><option value="">Toutes catégories</option><option value="utilisateur">Membres</option><option value="initiative">Initiatives</option></select><button class="ha-btn sec" id="f-go">Filtrer</button><button class="ha-btn out" id="f-csv">Exporter en CSV</button></div>'
+    + '<div class="ha-tw"><table><thead><tr><th>Cycle</th><th>Place</th><th>Compte</th><th>Premium</th><th>Mois offert</th><th>Remis le</th></tr></thead><tbody>' + (lignes || '<tr><td colspan="6" class="ha-note">Aucun lauréat enregistré pour l\'instant.</td></tr>') + '</tbody></table></div></div>';
+  $('#f-cat').value = f.categorie || '';
+  const lire = () => ({ q: $('#f-q').value.trim(), cycle: $('#f-cycle').value.trim(), categorie: $('#f-cat').value });
+  $('#f-go').onclick = () => { ETAT.filtre = lire(); afficher(); };
+  $('#f-csv').onclick = async () => {
+    const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(lire()).filter(([, v]) => v)), format: 'csv' }).toString();
+    const r = await fetch('/api/admin/honneur/laureats?' + q, { credentials: 'same-origin' });
+    if (!r.ok) return toast('Export impossible.');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = 'laureats-honneur.csv'; a.click();
+  };
+}
+
+async function vPouces(c) {
+  const d = await api('GET', '/admin/honneur/coups-de-pouce');
+  const lignes = d.coups_de_pouce.map(x => '<tr><td>' + esc(x.nom) + '<br><span class="ha-note">#' + x.user_id + '</span></td><td>' + esc(x.cycle_cle) + '</td><td><b>+' + x.pct + '</b></td><td>' + esc(x.motif) + '</td><td>' + dFr(x.created_at) + '</td><td><button class="ha-btn red" data-del="' + x.id + '">Retirer</button></td></tr>').join('');
+  c.innerHTML = '<div class="ha-card"><h2>Coups de pouce (secrets)</h2><p class="ha-note">Jusqu\'à +' + d.maximum + ' points de pourcentage par initiative et par cycle. Jamais affichés : l\'initiative voit seulement son total. Un motif est obligatoire pour garder la trace de chaque décision.</p>'
+    + '<div class="ha-row"><input id="cp-id" type="number" placeholder="N° du compte initiative" style="width:190px"><select id="cp-pct">' + d.paliers.map(p => '<option>' + p + '</option>').join('') + '</select><input id="cp-motif" placeholder="Motif (obligatoire)" style="flex:1;min-width:200px"><button class="ha-btn pri" id="cp-go">Attribuer</button></div></div>'
+    + '<div class="ha-card"><div class="ha-tw"><table><thead><tr><th>Compte</th><th>Cycle</th><th>Points</th><th>Motif</th><th>Date</th><th></th></tr></thead><tbody>' + (lignes || '<tr><td colspan="6" class="ha-note">Aucun coup de pouce.</td></tr>') + '</tbody></table></div></div>';
+  $('#cp-go').onclick = async () => { try { await api('POST', '/admin/honneur/coup-de-pouce', { user_id: Number($('#cp-id').value), pct: Number($('#cp-pct').value), motif: $('#cp-motif').value }); toast('Coup de pouce enregistré'); afficher(); } catch (e) { toast(e.message); } };
+  c.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (!confirm('Retirer ce coup de pouce ?')) return; try { await api('DELETE', '/admin/honneur/coup-de-pouce/' + b.dataset.del); afficher(); } catch (e) { toast(e.message); } });
+}
+
+async function vPremium(c) {
+  const d = await api('GET', '/admin/honneur/premium-origines');
+  const lignes = d.comptes.map(x => '<tr><td>' + esc(x.nom) + '<br><span class="ha-note">#' + x.user_id + ' · ' + esc(x.role) + '</span></td><td><span class="ha-pill ' + x.origine + '">' + (ORIG[x.origine] || x.origine) + '</span></td><td>' + esc(x.libelle) + '</td><td>' + (x.date_expiration ? dFr(x.date_expiration) : '—') + '</td></tr>').join('');
+  c.innerHTML = '<div class="ha-card"><h2>Origine de chaque Premium actif</h2><p class="ha-note">Seuls les abonnements <b>payants</b> concourent dès qu\'un compte a réellement payé. Mode actuel : <b>' + (d.mode_eligibilite === 'payants' ? 'payants uniquement' : 'tous les Premium (transition)') + '</b>.</p>'
+    + '<div class="ha-grid">' + Object.entries(d.totaux).map(([k, v]) => '<div class="ha-kpi"><b>' + v + '</b><span>' + (ORIG[k] || k) + '</span></div>').join('') + '</div></div>'
+    + '<div class="ha-card"><div class="ha-tw"><table><thead><tr><th>Compte</th><th>Origine</th><th>Détail</th><th>Expire le</th></tr></thead><tbody>' + (lignes || '<tr><td colspan="4" class="ha-note">Aucun Premium actif.</td></tr>') + '</tbody></table></div></div>';
+}
+demarrer();
+</script>
+<script src="assets/cookies-banner.js"></script>
+</body>
+</html>

@@ -1909,6 +1909,17 @@ function injectAdminAnnuaireStyles() {
   document.head.appendChild(st);
 }
 
+/* Administrateur : coup de pouce secret depuis une carte de l'annuaire. */
+async function adminAnnuaireCoupDePouce(userId) {
+  const paliers = [10, 15, 20, 30, 40, 50, 55];
+  const pct = Number(prompt('Coup de pouce (points de pourcentage) — secret, jamais affiché.\nPaliers : ' + paliers.join(', ') + ' (plafond 55 par cycle) :', '10'));
+  if (!paliers.includes(pct)) return pct ? alert('Palier invalide.') : undefined;
+  const motif = prompt('Motif (obligatoire, gardé dans l\'historique administrateur) :');
+  if (!motif || motif.trim().length < 8) return alert('Indiquez un motif de quelques mots au moins.');
+  try { await api('POST', '/admin/honneur/coup-de-pouce', { user_id: userId, pct, motif }); alert('Coup de pouce enregistré.'); }
+  catch (e) { alert(e.message || 'Erreur.'); }
+}
+
 function adminAnnuaireBoutonsHtml(cibleId, estMoi) {
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER || CURRENT_USER.role !== 'administrateur' || estMoi || !cibleId) return '';
   return `
@@ -1916,7 +1927,8 @@ function adminAnnuaireBoutonsHtml(cibleId, estMoi) {
     <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireSupprimer(${cibleId}, this)">🗑️ Supprimer</button>
     <button type="button" class="ann-card-btn admin-ann-btn admin-ann-suspendre" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'suspendre', ${cibleId})">⛔ Suspendre</button>
     <button type="button" class="ann-card-btn admin-ann-btn admin-ann-invisible" onclick="event.stopPropagation(); adminAnnuaireOuvrirDuree(this, 'invisibilite', ${cibleId})">🙈 Invisibilité</button>
-    <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireDemanderAcces(${cibleId}, this)" title="Envoie une demande — rien ne s'ouvre tant que le compte n'a pas accepté">🔐 Demander l'accès</button>`;
+    <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireDemanderAcces(${cibleId}, this)" title="Envoie une demande — rien ne s'ouvre tant que le compte n'a pas accepté">🔐 Demander l'accès</button>
+    <button type="button" class="ann-card-btn admin-ann-btn" onclick="event.stopPropagation(); adminAnnuaireCoupDePouce(${cibleId})" title="Coup de pouce secret pour le programme Comptes à l'honneur (initiatives)">🏆 Coup de pouce</button>`;
 }
 
 /* Vue "100% initiative" sur autorisation (2026-09-29, demande explicite) — remplace toute

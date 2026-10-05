@@ -20395,6 +20395,195 @@ route("POST", "/api/admin/annonces-officielles/:id/retirer", async (req, res, pa
   sendJSON(res, 200, { ok: true });
 });
 
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPTES À L'HONNEUR / TROPHÉE DE LA DIASPORA — routes (moteur : server/honneur.js)
+   Public : seuls le badge et la mise à l'honneur (jamais de points, pourcentages ni coups de pouce).
+   Privé  : chaque compte ne voit que ses propres décomptes (GET /api/honneur/mon-bareme).
+   Admin  : classement détaillé, coups de pouce, origine des Premium, historique des lauréats.
+   ══════════════════════════════════════════════════════════════════════════ */
+const honneur = require("./honneur")({
+  db, dateParisISO, nomCompteAffichage, creerNotif, logError,
+  getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },
+});
+
+async function honneurCycleDe(dateISO) {
+  const debut = await honneur.debutProgramme();
+  return { debut, cycle: honneur.cycleContenant(debut, dateISO) };
+}
+const honneurPct = x => Math.round(x);
+
+/* GET — « Mon barème » : décomptes privés du compte connecté (jamais ceux d'un autre). */
+route("GET", "/api/honneur/mon-bareme", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const categorie = honneur.categorieDe(user.role);
+  const aujourdhui = dateParisISO();
+  const { debut, cycle } = await honneurCycleDe(aujourdhui);
+  const premier = honneur.cycleDepuisDebut(debut);
+  const mode = await honneur.modeEligibilite();
+  const el = await honneur.eligiblePremium(user.id, mode);
+  const base = { concerne: !!categorie, categorie, debut_programme: debut, mode_eligibilite: mode,
+    premium: { actif: el.origine.actif, origine: el.origine.origine, sous_type: el.origine.sous_type, libelle: el.origine.libelle, eligible: el.ok } };
+  if (!categorie) return sendJSON(res, 200, { ...base, message: "Le programme concerne les comptes utilisateurs et les initiatives." });
+
+  /* Avant le lancement : aperçu sur les deux derniers mois, pour que chacun voie où il en est. */
+  let fenetre, phase;
+  if (!cycle) {
+    const mois = aujourdhui.slice(0, 7) + '-01';
+    fenetre = { debut: honneur.ajouterMois(mois, -1).slice(0, 7) + '-01', fin: honneur.ajouterMois(mois, 1).slice(0, 7) + '-01', cle: premier.cle };
+    phase = 'apercu';
+  } else {
+    fenetre = { debut: cycle.debut, fin: cycle.fin_mesure, cle: cycle.cle };
+    phase = aujourdhui < cycle.fin_mesure ? 'mesure' : 'mois_offert_ou_paye';
+  }
+  const u = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
+  const valeurs = await honneur.mesurer(u, fenetre.debut, fenetre.fin);
+  const s = honneur.scorer(valeurs, await honneur.bareme());
+  /* Le coup de pouce est fondu dans le total : jamais renvoyé séparément (secret). */
+  const total = s.pct_base + (await honneur.boostCycle(user.id, fenetre.cle));
+  const statut = total > 100 ? 'au_dessus' : (total >= 100 ? 'bareme' : 'sous_bareme');
+  const historique = await db.prepare("SELECT cycle_cle, categorie, mois_offert_statut FROM honneur_laureats WHERE user_id=? ORDER BY cycle_cle DESC").all(user.id);
+  sendJSON(res, 200, { ...base, phase, apercu: phase === 'apercu', fenetre, premier_cycle: premier, cycle,
+    parametres: s.lignes.map(l => ({ k: l.k, titre: l.titre, desc: l.desc, seuil: l.seuil, unite: l.unite, valeur: l.valeur, pct: l.pct })),
+    pct: honneurPct(total), statut, historique });
+});
+
+/* GET public — comptes actuellement à l'honneur (nom, type, photo, profil) : aucun score. */
+route("GET", "/api/honneur/laureats", async (req, res) => {
+  const r = await honneur.laureatsAffiches();
+  sendJSON(res, 200, { cycle: r.cycle, laureats: r.laureats.map(l => ({
+    categorie: l.categorie, nom: l.nom_snapshot, user_id: Number(l.user_id), initiative_id: l.initiative_id ? Number(l.initiative_id) : null,
+    initiative_slug: l.init_slug || null, ville: l.ville || null, pays: l.pays || null,
+    photo_url: l.categorie === 'initiative' ? (l.logo_url || null) : (l.photo_url || null),
+    profil_url: l.categorie === 'initiative' && l.initiative_id ? `initiative.html?id=${l.initiative_id}` : `profil.html?id=${l.user_id}`,
+  })) });
+});
+
+/* GET public — initiatives porteuses du badge « Co-créateur actif » (jamais le montant). */
+route("GET", "/api/honneur/co-createurs", async (req, res) => {
+  const rows = await db.prepare(`SELECT DISTINCT i.id AS initiative_id, i.owner_user_id AS user_id FROM honneur_coups_de_pouce c JOIN initiatives i ON i.owner_user_id=c.user_id`).all();
+  sendJSON(res, 200, { initiative_ids: rows.map(r => Number(r.initiative_id)), user_ids: rows.map(r => Number(r.user_id)) });
+});
+
+/* ── Administration ── */
+route("GET", "/api/admin/honneur/apercu", async (req, res, params, body, query) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const aujourdhui = dateParisISO();
+  const debut = await honneur.debutProgramme();
+  let cycle = query && query.cle ? honneur.cycleDepuisDebut(String(query.cle).slice(0, 7) + '-01') : honneur.cycleContenant(debut, aujourdhui);
+  if (!cycle) cycle = honneur.cycleDepuisDebut(debut);
+  /* Avant le lancement, aperçu = les 2 derniers mois (même fenêtre que « Mon barème »). */
+  let fenetre = cycle;
+  if (!query?.cle && aujourdhui < debut) { const m = aujourdhui.slice(0, 7) + '-01'; fenetre = { ...cycle, debut: honneur.ajouterMois(m, -1).slice(0, 7) + '-01', fin_mesure: honneur.ajouterMois(m, 1).slice(0, 7) + '-01' }; }
+  const r = await honneur.classerCycle(fenetre);
+  const noms = {};
+  for (const l of r.lignes.slice(0, 200)) noms[l.user_id] = await nomCompteAffichage(l.user_id);
+  sendJSON(res, 200, { cycle, fenetre: { debut: fenetre.debut, fin_mesure: fenetre.fin_mesure }, simulation: aujourdhui < debut, mode_eligibilite: r.mode_eligibilite, candidats: r.candidats, eligibles: r.eligibles,
+    nb_laureats: { utilisateur: honneur.nbLaureats(await honneur.nbComptesCategorie('utilisateur')), initiative: honneur.nbLaureats(await honneur.nbComptesCategorie('initiative')) },
+    lignes: r.lignes.sort((a, b) => b.total - a.total).slice(0, 200).map(l => ({ user_id: l.user_id, nom: noms[l.user_id], categorie: l.categorie, origine: l.origine, pct_base: honneurPct(l.pct_base), boost: l.boost, total: honneurPct(l.total), activite: l.activite, laureat: !!l.laureat, valeurs: l.valeurs })) });
+});
+
+route("GET", "/api/admin/honneur/cycles", async (req, res) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const debut = await honneur.debutProgramme();
+  sendJSON(res, 200, { debut_programme: debut, cycles: await db.prepare("SELECT * FROM honneur_cycles ORDER BY debut DESC").all(), mode_eligibilite: await honneur.modeEligibilite(),
+    parametres: { honneur_debut: debut, honneur_eligibilite: await honneur.parametre('honneur_eligibilite', 'auto'), honneur_mois_offert_auto: await honneur.parametre('honneur_mois_offert_auto', 'actif') } });
+});
+
+route("POST", "/api/admin/honneur/cycles/:cle/cloturer", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const cle = String(params.cle).slice(0, 7);
+  const cycle = honneur.cycleDepuisDebut(cle + '-01');
+  if (!/^\d{4}-\d{2}$/.test(cle)) return sendJSON(res, 400, { error: "Cycle invalide." });
+  if (cycle.fin_mesure > dateParisISO() && !body.forcer) return sendJSON(res, 400, { error: `La mesure de ce cycle n'est pas terminée (fin le ${cycle.fin_mesure}).` });
+  try { const r = await honneur.cloturerCycle(cycle, { notifier: body.notifier !== false }); SEC.logSecurity("honneur_cloture", { uid: Number(admin.id), cycle: cle, ...r }); sendJSON(res, 200, { ok: true, ...r }); }
+  catch (e) { sendJSON(res, 500, SEC.safeError(e, "honneur-cloture")); }
+});
+
+route("PUT", "/api/admin/honneur/parametres", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const ecrire = async (cle, valeur, desc) => db.prepare(`INSERT INTO parametres_plateforme (cle, valeur, type, description, updated_at, updated_by) VALUES (?,?,'texte',?,?,?)
+      ON CONFLICT(cle) DO UPDATE SET valeur=excluded.valeur, updated_at=excluded.updated_at, updated_by=excluded.updated_by`).run(cle, String(valeur), desc, new Date().toISOString(), admin.id);
+  if (body.honneur_debut !== undefined) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.honneur_debut))) return sendJSON(res, 400, { error: "Date de lancement invalide." }); await ecrire('honneur_debut', body.honneur_debut, "Début du premier cycle des Comptes à l'honneur"); }
+  if (body.honneur_eligibilite !== undefined) { if (!['auto', 'payants', 'tous_premium'].includes(body.honneur_eligibilite)) return sendJSON(res, 400, { error: "Mode d'éligibilité invalide." }); await ecrire('honneur_eligibilite', body.honneur_eligibilite, "Éligibilité : auto, payants ou tous_premium"); }
+  if (body.honneur_mois_offert_auto !== undefined) { await ecrire('honneur_mois_offert_auto', body.honneur_mois_offert_auto === 'inactif' ? 'inactif' : 'actif', "Application automatique du mois offert"); }
+  if (Array.isArray(body.honneur_bareme)) {
+    const ok = body.honneur_bareme.every(p => honneur.BAREME_DEFAUT.some(d => d.k === p.k) && Number(p.poids) > 0 && Number(p.seuil) > 0);
+    const somme = body.honneur_bareme.reduce((s, p) => s + Number(p.poids), 0);
+    if (!ok || body.honneur_bareme.length !== honneur.BAREME_DEFAUT.length || Math.round(somme) !== 100) return sendJSON(res, 400, { error: "Barème invalide : 8 paramètres, poids positifs dont la somme vaut 100." });
+    await ecrire('honneur_bareme', JSON.stringify(body.honneur_bareme.map(p => ({ k: p.k, poids: Number(p.poids), seuil: Number(p.seuil) }))), "Poids et seuils du barème des Comptes à l'honneur");
+  }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Historique consultable de toutes les initiatives et tous les comptes récompensés (+ export CSV). */
+route("GET", "/api/admin/honneur/laureats", async (req, res, params, body, query) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const filtres = [], args = [];
+  if (query && query.cycle) { filtres.push("l.cycle_cle=?"); args.push(String(query.cycle).slice(0, 7)); }
+  if (query && ['utilisateur', 'initiative'].includes(query.categorie)) { filtres.push("l.categorie=?"); args.push(query.categorie); }
+  if (query && query.q) { filtres.push("LOWER(l.nom_snapshot) LIKE ?"); args.push('%' + String(query.q).toLowerCase().replace(/[%_]/g, '') + '%'); }
+  const rows = await db.prepare(`SELECT l.id, l.cycle_cle, l.user_id, l.initiative_id, l.categorie, l.rang, l.nom_snapshot, l.origine_premium, l.mois_offert_statut, l.mois_offert_detail, l.created_at, c.debut, c.fin_mesure
+      FROM honneur_laureats l LEFT JOIN honneur_cycles c ON c.cle=l.cycle_cle ${filtres.length ? 'WHERE ' + filtres.join(' AND ') : ''} ORDER BY l.cycle_cle DESC, l.categorie, l.rang LIMIT 2000`).all(...args);
+  if (query && query.format === 'csv') {
+    const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const csv = '﻿' + ['cycle;categorie;rang;nom;compte_id;initiative_id;origine_premium;mois_offert;detail;date'].concat(rows.map(r => [r.cycle_cle, r.categorie, r.rang, r.nom_snapshot, r.user_id, r.initiative_id, r.origine_premium, r.mois_offert_statut, r.mois_offert_detail, r.created_at].map(esc).join(';'))).join('\r\n');
+    res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="laureats-honneur.csv"' });
+    return res.end(csv);
+  }
+  sendJSON(res, 200, { laureats: rows });
+});
+
+/* Coups de pouce (secret : réservé à l'administrateur). */
+route("GET", "/api/admin/honneur/coups-de-pouce", async (req, res, params, body, query) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const rows = await db.prepare(`SELECT c.*, u.nom, u.prenom, u.role FROM honneur_coups_de_pouce c JOIN users u ON u.id=c.user_id ORDER BY c.id DESC LIMIT 500`).all();
+  await corrigerNomsListe(rows, 'user_id');
+  sendJSON(res, 200, { coups_de_pouce: rows.map(r => ({ id: r.id, user_id: r.user_id, nom: [r.prenom, r.nom].filter(Boolean).join(' ') || r.nom, cycle_cle: r.cycle_cle, pct: r.pct, motif: r.motif, created_at: r.created_at })), paliers: honneur.COUP_DE_POUCE_PALIERS, maximum: honneur.COUP_DE_POUCE_MAX });
+});
+route("POST", "/api/admin/honneur/coup-de-pouce", async (req, res, params, body) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  const cible = Number(body.user_id);
+  const u = cible ? await db.prepare("SELECT id, role FROM users WHERE id=? AND nom<>'Compte supprimé'").get(cible) : null;
+  if (!u) return sendJSON(res, 404, { error: "Compte introuvable." });
+  if (u.role !== 'initiative') return sendJSON(res, 400, { error: "Le coup de pouce s'attribue à une initiative." });
+  const pct = Number(body.pct);
+  if (!honneur.COUP_DE_POUCE_PALIERS.includes(pct)) return sendJSON(res, 400, { error: `Palier invalide : ${honneur.COUP_DE_POUCE_PALIERS.join(', ')}.` });
+  const motif = String(body.motif || '').trim().slice(0, 500);
+  if (motif.length < 8) return sendJSON(res, 400, { error: "Indiquez le motif (quelques mots au moins)." });
+  const debut = await honneur.debutProgramme();
+  const cycle = honneur.cycleContenant(debut, dateParisISO()) || honneur.cycleDepuisDebut(debut);
+  const cle = /^\d{4}-\d{2}$/.test(String(body.cycle_cle || '')) ? String(body.cycle_cle) : cycle.cle;
+  const deja = await honneur.boostCycle(u.id, cle);
+  if (deja + pct > honneur.COUP_DE_POUCE_MAX) return sendJSON(res, 400, { error: `Plafond de ${honneur.COUP_DE_POUCE_MAX} atteint pour ce cycle (déjà ${deja}).` });
+  const id = (await db.prepare("INSERT INTO honneur_coups_de_pouce (user_id, cycle_cle, pct, motif, admin_id) VALUES (?,?,?,?,?)").run(u.id, cle, pct, motif, admin.id)).lastInsertRowid;
+  SEC.logSecurity("honneur_coup_de_pouce", { uid: Number(admin.id), cible: Number(u.id), cycle: cle });
+  sendJSON(res, 201, { ok: true, id, cycle_cle: cle });
+});
+route("DELETE", "/api/admin/honneur/coup-de-pouce/:id", async (req, res, params) => {
+  const admin = await exigerAdmin(req, res); if (!admin) return;
+  await db.prepare("DELETE FROM honneur_coups_de_pouce WHERE id=?").run(Number(params.id));
+  SEC.logSecurity("honneur_coup_de_pouce_retire", { uid: Number(admin.id), id: Number(params.id) });
+  sendJSON(res, 200, { ok: true });
+});
+
+/* Origine de chaque Premium actif : payant / accordé / promotion (distinction demandée). */
+route("GET", "/api/admin/honneur/premium-origines", async (req, res, params, body, query) => {
+  if (!(await exigerAdmin(req, res))) return;
+  const comptes = await db.prepare(`SELECT DISTINCT u.id, u.role FROM users u JOIN user_accreditations ua ON ua.user_id=u.id JOIN accred_definitions ad ON ad.id=ua.accred_id
+      WHERE ad.type IN ('initiative_abonne','utilisateur_abonne') AND ua.statut='active' AND u.nom<>'Compte supprimé' AND (u.is_demo IS NULL OR u.is_demo=FALSE) ORDER BY u.id LIMIT 3000`).all();
+  const lignes = [], totaux = { payant: 0, accorde: 0, promotion: 0, honneur: 0 };
+  for (const c of comptes) {
+    const o = await honneur.premiumOrigine(c.id); if (!o.actif) continue;
+    totaux[o.origine] = (totaux[o.origine] || 0) + 1;
+    lignes.push({ user_id: c.id, role: c.role, origine: o.origine, sous_type: o.sous_type, libelle: o.libelle, date_expiration: o.ua.date_expiration || null });
+  }
+  const filtre = query && ['payant', 'accorde', 'promotion', 'honneur'].includes(query.origine) ? query.origine : null;
+  const retenues = filtre ? lignes.filter(l => l.origine === filtre) : lignes;
+  const noms = {}; for (const l of retenues.slice(0, 300)) noms[l.user_id] = await nomCompteAffichage(l.user_id);
+  sendJSON(res, 200, { totaux, mode_eligibilite: await honneur.modeEligibilite(), comptes: retenues.slice(0, 300).map(l => ({ ...l, nom: noms[l.user_id] })) });
+});
+
 route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
   let prefs = {};
@@ -29675,6 +29864,15 @@ async function handleRequest(req, res) {
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
     try { return sendJSON(res, 200, await crRelancerCreateurs({ mode: 'recents', origin: getOrigin(req) })); }
     catch (e) { return sendJSON(res, 500, SEC.safeError(e, "cron-evenements-compte-rendu")); }
+  }
+
+  /* Clôture des cycles « Comptes à l'honneur » dont la mesure est terminée (rattrape un jour manqué ; idempotent). */
+  if (pathname === '/api/cron/honneur') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try { return sendJSON(res, 200, await honneur.cronQuotidien()); }
+    catch (e) { return sendJSON(res, 500, SEC.safeError(e, "cron-honneur")); }
   }
 
   if (pathname === '/api/cron/partenariat-echeances') {

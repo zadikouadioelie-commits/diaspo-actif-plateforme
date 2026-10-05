@@ -368,6 +368,7 @@
     <div id="ad-vitrine-section" data-ad-emplacement="vitrine_section" style="display:none;"></div>
   </div>
 
+  <section id="honneur-mur" style="display:none;" aria-label="Espace d'honneur"></section>
   <div id="ann-page-row">
   <div class="ann-grid" id="init-list">
     <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">Chargement…</div>
@@ -475,6 +476,8 @@
 <script src="/assets/cookies-banner.js"></script>
   <script src="/assets/theme-manager.js"></script>
 <script src="assets/back-button.js"></script>
+<script src="assets/honneur-affichage.js?v=1"></script>
+<script>if (window.HonneurAffichage) { HonneurAffichage.mur('honneur-mur'); HonneurAffichage.decorerAnnuaire('init-list'); }</script>
 </body>
 </html>
 

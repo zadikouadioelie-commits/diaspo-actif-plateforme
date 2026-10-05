@@ -7838,6 +7838,61 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
+  /* Comptes à l'honneur / Trophée de la Diaspora (2026-10-05). Cycles de 3 mois ; scores = DONNÉES PRIVÉES
+     (jamais exposées publiquement) ; lauréats = historique consultable de tous les comptes récompensés. */
+  CREATE TABLE IF NOT EXISTS honneur_cycles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cle TEXT UNIQUE NOT NULL,
+    debut TEXT NOT NULL,
+    fin_mesure TEXT NOT NULL,
+    fin TEXT NOT NULL,
+    statut TEXT NOT NULL DEFAULT 'en_cloture',
+    cloture_at TEXT,
+    nb_candidats INTEGER DEFAULT 0,
+    nb_eligibles INTEGER DEFAULT 0,
+    mode_eligibilite TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS honneur_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_cle TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    categorie TEXT,
+    origine_premium TEXT,
+    valeurs_json TEXT DEFAULT '{}',
+    pct_base REAL DEFAULT 0,
+    boost_pct REAL DEFAULT 0,
+    total REAL DEFAULT 0,
+    rang_cat INTEGER,
+    laureat INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS honneur_laureats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_cle TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    initiative_id INTEGER,
+    categorie TEXT NOT NULL,
+    rang INTEGER,
+    nom_snapshot TEXT,
+    origine_premium TEXT,
+    mois_offert_statut TEXT,
+    mois_offert_detail TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS honneur_coups_de_pouce (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    cycle_cle TEXT NOT NULL,
+    pct REAL NOT NULL,
+    motif TEXT,
+    admin_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   /* Qui a déjà reçu la notification d'une annonce : relancer l'envoi ne double jamais personne. */
   CREATE TABLE IF NOT EXISTS annonce_notifications (
     annonce_id INTEGER NOT NULL,
