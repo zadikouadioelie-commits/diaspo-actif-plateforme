@@ -1213,6 +1213,8 @@ const COLONNES_MIGRATION = [
     ['commandes_vitrine', 'numero_suivi', 'TEXT'],
     ['commandes_vitrine', 'expedie_le', 'TEXT'],
     ['commandes_vitrine', 'livre_le', 'TEXT'],
+    ['commandes_vitrine', 'transporteur', 'TEXT'],
+    ['commandes_vitrine', 'lien_suivi_perso', 'TEXT'],
 ];
 
 async function migratePg(pool) {

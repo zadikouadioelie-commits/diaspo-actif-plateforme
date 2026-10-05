@@ -5191,6 +5191,58 @@ route("GET", "/api/paypal/panier/retour", async (req, res) => {
   res.end();
 });
 
+/* Transporteurs proposés au vendeur pour renseigner le vrai numéro de suivi d'une expédition
+   (2026-10-05) : la plateforme n'est pas le transporteur — le vendeur expédie par ses propres
+   moyens et saisit transporteur + numéro, le lien de suivi est calculé ici, jamais saisi. "autre"
+   accepte un lien fourni par le vendeur (http/https uniquement). Les gabarits d'URL sont ceux
+   publics des transporteurs ; s'ils changent, seul ce tableau est à mettre à jour. */
+const TRANSPORTEURS_SUIVI = {
+  colissimo:    { nom: "Colissimo / La Poste", url: n => `https://www.laposte.fr/outils/suivre-vos-envois?code=${encodeURIComponent(n)}` },
+  chronopost:   { nom: "Chronopost",           url: n => `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${encodeURIComponent(n)}` },
+  dhl:          { nom: "DHL",                  url: n => `https://www.dhl.com/fr-fr/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(n)}` },
+  ups:          { nom: "UPS",                  url: n => `https://www.ups.com/track?tracknum=${encodeURIComponent(n)}` },
+  fedex:        { nom: "FedEx",                url: n => `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(n)}` },
+  mondialrelay: { nom: "Mondial Relay",        url: n => `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${encodeURIComponent(n)}` },
+  gls:          { nom: "GLS",                  url: n => `https://gls-group.com/FR/fr/suivi-colis?match=${encodeURIComponent(n)}` },
+  dpd:          { nom: "DPD",                  url: n => `https://trace.dpd.fr/fr/trace/${encodeURIComponent(n)}` },
+  autre:        { nom: "Autre transporteur",   url: null },
+};
+
+/* Ajoute à une commande les champs d'affichage du suivi (nom lisible du transporteur + lien).
+   Un lien n'existe que si un vrai transporteur est connu : une référence interne DA-xxx
+   (expédition sans transporteur renseigné) n'a volontairement aucun lien. */
+function enrichirSuiviCommande(c) {
+  const t = c.transporteur ? TRANSPORTEURS_SUIVI[c.transporteur] : null;
+  let lien = null;
+  if (t && c.numero_suivi) lien = t.url ? t.url(c.numero_suivi) : (c.lien_suivi_perso || null);
+  return { ...c, transporteur_nom: t ? t.nom : null, lien_suivi: lien };
+}
+
+/* Lit et valide transporteur / numéro / lien saisis par le vendeur. Retourne { error } ou
+   { numero, transporteur, lienPerso } — numero vide = aucun suivi saisi (référence interne). */
+function lireSuiviSaisi(body) {
+  const numero = String(body.numero_suivi || "").trim();
+  if (!numero) return { numero: "", transporteur: null, lienPerso: null };
+  if (!/^[A-Za-z0-9][A-Za-z0-9 ._\/-]{3,39}$/.test(numero)) {
+    return { error: "Numéro de suivi invalide (4 à 40 caractères : lettres, chiffres, espaces, tirets)." };
+  }
+  const transporteur = String(body.transporteur || "").trim();
+  if (!TRANSPORTEURS_SUIVI[transporteur]) return { error: "Choisissez le transporteur." };
+  let lienPerso = null;
+  if (transporteur === "autre") {
+    const brut = String(body.lien_suivi_perso || "").trim();
+    if (brut) {
+      let u = null;
+      try { u = new URL(brut); } catch (e) {}
+      if (!u || !["http:", "https:"].includes(u.protocol) || brut.length > 300) {
+        return { error: "Le lien de suivi doit être une adresse http(s) valide (300 caractères max)." };
+      }
+      lienPerso = u.toString();
+    }
+  }
+  return { numero, transporteur, lienPerso };
+}
+
 /* GET /api/mes-commandes-boutique — historique d'achats de l'acheteur connecté, TOUTES
    boutiques confondues, avec identification du vendeur par ligne (demande explicite : "tous les
    achats et éléments ajoutés au panier avec identification du vendeur"). */
@@ -5209,7 +5261,7 @@ route("GET", "/api/mes-commandes-boutique", async (req, res) => {
     let photos = [];
     try { photos = JSON.parse(c.photos_json || "[]"); } catch (e) {}
     const { photos_json, ...rest } = c;
-    return { ...rest, photo: photos[0] || null };
+    return { ...enrichirSuiviCommande(rest), photo: photos[0] || null };
   });
   sendJSON(res, 200, { ok: true, commandes });
 });
@@ -7702,7 +7754,7 @@ route("GET", "/api/initiatives/:id/commandes", async (req, res, params) => {
     JOIN users u ON u.id=cv.acheteur_id
     WHERE cv.initiative_id=? ORDER BY cv.created_at DESC
   `).all(params.id);
-  sendJSON(res, 200, { commandes: rows });
+  sendJSON(res, 200, { commandes: rows.map(enrichirSuiviCommande) });
 });
 
 /* PATCH /api/commandes_vitrine/:id — owner only, changer statut */
@@ -7742,16 +7794,35 @@ route("PATCH", "/api/commandes_vitrine/:id/livraison", async (req, res, params, 
        sans paiement à attendre — ce cas-là reste autorisé à expédier dès "à traiter". */
     if (cmd.paiement_statut === "en_attente") return sendJSON(res, 400, { error: "Le paiement de cette commande n'est pas encore confirmé." });
     if (cmd.numero_suivi) return sendJSON(res, 400, { error: "Cette commande a déjà été expédiée." });
-    /* Numéro de suivi interne généré automatiquement — pas un vrai transporteur externe (aucun
-       contrat/API La Poste, Colissimo, DHL... n'existe sur cette plateforme), mais une référence
-       unique et vérifiable que l'acheteur peut communiquer au vendeur en cas de question, et qui
-       identifie sans ambiguïté CETTE commande précise. Format : DA-<id sur 6 chiffres>-<4
-       caractères aléatoires>, jamais deux fois le même (id unique + suffixe aléatoire). */
-    const numeroSuivi = `DA-${String(cmd.id).padStart(6, '0')}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-    await db.prepare("UPDATE commandes_vitrine SET statut_livraison='expedie', numero_suivi=?, expedie_le=datetime('now') WHERE id=?").run(numeroSuivi, params.id);
+    /* Le vendeur expédie par ses propres moyens et saisit transporteur + vrai numéro de suivi
+       (2026-10-05) : la plateforme n'est pas le transporteur et n'a aucun contrat avec eux.
+       Sans numéro saisi (remise en main propre, transporteur local...), une référence interne
+       unique est générée — format DA-<id sur 6 chiffres>-<4 caractères aléatoires> — qui
+       identifie sans ambiguïté CETTE commande mais n'a aucun lien de suivi externe. */
+    const saisie = lireSuiviSaisi(body);
+    if (saisie.error) return sendJSON(res, 400, { error: saisie.error });
+    const numeroSuivi = saisie.numero || `DA-${String(cmd.id).padStart(6, '0')}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+    await db.prepare("UPDATE commandes_vitrine SET statut_livraison='expedie', numero_suivi=?, transporteur=?, lien_suivi_perso=?, expedie_le=datetime('now') WHERE id=?")
+      .run(numeroSuivi, saisie.numero ? saisie.transporteur : null, saisie.numero ? saisie.lienPerso : null, params.id);
+    const apres = enrichirSuiviCommande({ transporteur: saisie.numero ? saisie.transporteur : null, numero_suivi: numeroSuivi, lien_suivi_perso: saisie.lienPerso });
     creerNotif(cmd.acheteur_id, "commande_expediee", "Commande expédiée 🚚",
-      `« ${prod?.nom || ''} » a été expédiée. Numéro de suivi : ${numeroSuivi}.`, { commande_id: cmd.id });
-    return sendJSON(res, 200, { ok: true, numero_suivi: numeroSuivi });
+      `« ${prod?.nom || ''} » a été expédiée${apres.transporteur_nom ? ` avec ${apres.transporteur_nom}` : ''}. Numéro de suivi : ${numeroSuivi}.`,
+      { commande_id: cmd.id, lien_suivi: apres.lien_suivi });
+    return sendJSON(res, 200, { ok: true, numero_suivi: numeroSuivi, transporteur: apres.transporteur_nom, lien_suivi: apres.lien_suivi });
+  }
+
+  /* Correction d'une faute de frappe dans le transporteur/numéro déjà saisi, tant que la
+     commande n'est pas livrée — sans nouvelle notification d'expédition à l'acheteur. */
+  if (action === "modifier_suivi") {
+    if (cmd.statut_livraison !== "expedie") return sendJSON(res, 400, { error: "Seule une commande expédiée (non livrée) peut voir son suivi modifié." });
+    const saisie = lireSuiviSaisi(body);
+    if (saisie.error) return sendJSON(res, 400, { error: saisie.error });
+    if (!saisie.numero) return sendJSON(res, 400, { error: "Indiquez le numéro de suivi." });
+    await db.prepare("UPDATE commandes_vitrine SET numero_suivi=?, transporteur=?, lien_suivi_perso=? WHERE id=?")
+      .run(saisie.numero, saisie.transporteur, saisie.lienPerso, params.id);
+    creerNotif(cmd.acheteur_id, "commande_suivi_modifie", "Suivi de colis mis à jour 🚚",
+      `Le suivi de « ${prod?.nom || ''} » a été mis à jour : ${saisie.numero}.`, { commande_id: cmd.id });
+    return sendJSON(res, 200, { ok: true, ...enrichirSuiviCommande({ transporteur: saisie.transporteur, numero_suivi: saisie.numero, lien_suivi_perso: saisie.lienPerso }) });
   }
 
   if (action === "livre") {

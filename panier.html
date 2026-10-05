@@ -254,7 +254,10 @@ async function pnChargerAchats() {
         : '<span class="pn-badge attente">Demande envoyée</span>';
       const liv = c.mode_livraison && c.statut_livraison && c.paiement_statut !== 'echoue'
         ? `<span class="pn-badge livr">${c.mode_livraison === 'expedition' ? '🚚' : '🏬'} ${PN_LIV[c.statut_livraison] || esc(c.statut_livraison)}</span>` : '';
-      const suivi = c.numero_suivi ? `<div class="pn-meta">N° de suivi : <strong>${esc(c.numero_suivi)}</strong></div>` : '';
+      const numSuivi = c.lien_suivi
+        ? `<a href="${esc(c.lien_suivi)}" target="_blank" rel="noopener noreferrer" style="font-weight:700;">${esc(c.numero_suivi)} — Suivre mon colis ↗</a>`
+        : `<strong>${esc(c.numero_suivi || '')}</strong>`;
+      const suivi = c.numero_suivi ? `<div class="pn-meta">${c.transporteur_nom ? esc(c.transporteur_nom) + ' · ' : ''}N° de suivi : ${numSuivi}</div>` : '';
       return `<div class="pn-hist-row">
         ${c.photo ? `<img class="pn-img" src="${esc(c.photo)}" alt="" loading="lazy">` : '<div class="pn-img">🛍️</div>'}
         <div class="pn-info">

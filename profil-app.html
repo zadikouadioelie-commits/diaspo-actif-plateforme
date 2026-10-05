@@ -5807,9 +5807,14 @@ function cmdRenderLivraison(c) {
        tant que ce n'est pas sûr que l'acheteur a bien payé — voir la même garde côté serveur. */
     action = c.paiement_statut === 'en_attente'
       ? `<span style="font-size:12px;color:var(--muted);">⏳ En attente du paiement</span>`
-      : `<button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'expedier')">🚚 Marquer comme expédiée</button>`;
+      : `<button class="btn btn-sm btn-outline" onclick="cmdOuvrirExpedition(${c.id})">🚚 Marquer comme expédiée</button>`;
   } else if (c.mode_livraison === 'expedition' && c.statut_livraison === 'expedie') {
-    action = `<span style="font-size:12px;color:var(--muted);">N° de suivi : <strong>${esc(c.numero_suivi||'')}</strong></span> <button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'livre')">✅ Marquer comme livrée</button>`;
+    const numHtml = c.lien_suivi
+      ? `<a href="${esc(c.lien_suivi)}" target="_blank" rel="noopener noreferrer" style="font-weight:700;">${esc(c.numero_suivi||'')} ↗</a>`
+      : `<strong>${esc(c.numero_suivi||'')}</strong>`;
+    action = `<span style="font-size:12px;color:var(--muted);">${c.transporteur_nom ? esc(c.transporteur_nom) + ' — ' : ''}N° de suivi : ${numHtml}</span>
+      <button class="btn btn-sm btn-outline" onclick='cmdOuvrirExpedition(${c.id}, ${JSON.stringify({ transporteur: c.transporteur || '', numero: c.transporteur ? (c.numero_suivi || '') : '', lien: c.lien_suivi_perso || '' }).replace(/'/g, "&#39;")})'>✏️ Modifier le suivi</button>
+      <button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'livre')">✅ Marquer comme livrée</button>`;
   } else if (c.mode_livraison === 'retrait' && c.statut_livraison === 'pret_retrait') {
     action = `<button class="btn btn-sm btn-outline" onclick="cmdActionLivraison(${c.id},'retire')">✅ Client a récupéré</button>`;
   }
@@ -5820,6 +5825,68 @@ function cmdRenderLivraison(c) {
     </div>
     ${adresseHtml}
   </div>`;
+}
+
+/* Saisie du transporteur et du vrai numéro de suivi par le vendeur (2026-10-05). `modif`
+   renseigné = correction d'un suivi déjà saisi (action serveur "modifier_suivi", aucune
+   nouvelle notification d'expédition). Numéro laissé vide à la première expédition = remise en
+   main propre : le serveur génère alors une référence interne sans lien de suivi. */
+const CMD_TRANSPORTEURS = [
+  ['colissimo', 'Colissimo / La Poste'], ['chronopost', 'Chronopost'], ['dhl', 'DHL'], ['ups', 'UPS'],
+  ['fedex', 'FedEx'], ['mondialrelay', 'Mondial Relay'], ['gls', 'GLS'], ['dpd', 'DPD'], ['autre', 'Autre transporteur'],
+];
+function cmdOuvrirExpedition(id, modif) {
+  const ov = document.createElement('div');
+  ov.id = 'cmd-exp-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const m = modif || null;
+  const fld = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;margin-bottom:12px;';
+  const lbl = 'font-size:13px;font-weight:700;color:#374151;display:block;margin-bottom:4px;';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;">
+      <h2 style="margin:0 0 6px;font-size:17px;">🚚 ${m ? 'Modifier le suivi du colis' : 'Expédition du colis'}</h2>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 16px;">Indiquez le transporteur et le numéro de suivi : l'acheteur recevra le lien de suivi automatiquement. ${m ? '' : "Sans numéro (remise en main propre), une référence interne sera créée."}</p>
+      <label style="${lbl}">Transporteur</label>
+      <select id="cmd-exp-transp" style="${fld}" onchange="document.getElementById('cmd-exp-lien-wrap').style.display=this.value==='autre'?'block':'none'">
+        <option value="">— Choisir —</option>
+        ${CMD_TRANSPORTEURS.map(([v, n]) => `<option value="${v}" ${m && m.transporteur === v ? 'selected' : ''}>${n}</option>`).join('')}
+      </select>
+      <label style="${lbl}">Numéro de suivi</label>
+      <input id="cmd-exp-num" type="text" maxlength="40" placeholder="Ex. 6A12345678901" value="${esc(m ? m.numero : '')}" style="${fld}">
+      <div id="cmd-exp-lien-wrap" style="display:${m && m.transporteur === 'autre' ? 'block' : 'none'};">
+        <label style="${lbl}">Lien de suivi (optionnel)</label>
+        <input id="cmd-exp-lien" type="url" maxlength="300" placeholder="https://…" value="${esc(m ? m.lien : '')}" style="${fld}">
+      </div>
+      <div id="cmd-exp-err" style="color:#dc2626;font-size:12.5px;margin-bottom:10px;display:none;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('cmd-exp-overlay').remove()">Annuler</button>
+        <button class="btn" id="cmd-exp-ok" onclick="cmdValiderExpedition(${id}, ${m ? 'true' : 'false'})">✅ Confirmer</button>
+      </div>
+    </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+async function cmdValiderExpedition(id, modif) {
+  const err = document.getElementById('cmd-exp-err');
+  const transporteur = document.getElementById('cmd-exp-transp').value;
+  const numero = document.getElementById('cmd-exp-num').value.trim();
+  const lien = document.getElementById('cmd-exp-lien')?.value.trim() || '';
+  err.style.display = 'none';
+  if (numero && !transporteur) { err.textContent = 'Choisissez le transporteur.'; err.style.display = 'block'; return; }
+  if (modif && !numero) { err.textContent = 'Indiquez le numéro de suivi.'; err.style.display = 'block'; return; }
+  const btn = document.getElementById('cmd-exp-ok');
+  btn.disabled = true;
+  try {
+    await api('PATCH', `/commandes_vitrine/${id}/livraison`, {
+      action: modif ? 'modifier_suivi' : 'expedier',
+      transporteur: numero ? transporteur : '', numero_suivi: numero, lien_suivi_perso: transporteur === 'autre' ? lien : '',
+    });
+    document.getElementById('cmd-exp-overlay')?.remove();
+    if (_vitrineInit) renderMesCommandes(_vitrineInit.id);
+  } catch (e) {
+    btn.disabled = false;
+    err.textContent = e.message || 'Erreur.'; err.style.display = 'block';
+  }
 }
 
 async function cmdActionLivraison(id, action) {
