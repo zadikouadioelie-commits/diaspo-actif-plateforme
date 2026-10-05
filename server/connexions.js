@@ -155,4 +155,14 @@ async function revoquerAutres(db, userId, exceptId, motif) {
   return cibles.length;
 }
 
-module.exports = { COOKIE_APPAREIL, analyserAppareil, ouvrir, verifier, toucher, lister, compter, revoquer, revoquerAutres };
+/* Identifiant de navigateur (cookie da_dev) : lecture, création et texte du Set-Cookie. */
+function lireAppareilId(req) {
+  const v = parseCookies(req)[COOKIE_APPAREIL];
+  return ID_RE.test(v || '') ? v : null;
+}
+function nouvelAppareilId() { return crypto.randomBytes(16).toString('hex'); }
+function cookieAppareilTexte(appareilId, sf) {
+  return `${COOKIE_APPAREIL}=${appareilId}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${DUREE_COOKIE_APPAREIL_S}${sf || ''}`;
+}
+
+module.exports = { COOKIE_APPAREIL, analyserAppareil, etiquette, horodatage, lireAppareilId, nouvelAppareilId, cookieAppareilTexte, ouvrir, verifier, toucher, lister, compter, revoquer, revoquerAutres };

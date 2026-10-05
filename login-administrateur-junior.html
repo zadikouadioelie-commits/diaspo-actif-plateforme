@@ -76,6 +76,7 @@ footer.footer { background: transparent !important; color: rgba(255,255,255,.35)
 </div>
 
 <script src="assets/app.js?v=13"></script>
+<script src="assets/confirmation-appareil.js?v=1"></script>
 <script>
   document.getElementById("login-form").addEventListener("submit", async (e)=>{
     e.preventDefault();
@@ -84,7 +85,7 @@ footer.footer { background: transparent !important; color: rgba(255,255,255,.35)
     const errBox = document.getElementById("login-error");
     errBox.style.display = "none";
     try {
-      const r = await api("POST", "/auth/login", { email, password });
+      const r = await loginAvecConfirmation(email, password);
       const dest = ROLE_DASHBOARD[r.user.role] || "index.html";
       window.location.href = dest;
     } catch (err) {

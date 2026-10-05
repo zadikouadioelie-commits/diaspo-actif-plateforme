@@ -5751,6 +5751,50 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_connexions_appareil ON connexions(appareil_id, revoque_at);
 `);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIRMATION D'UN NOUVEL APPAREIL (2026-10-05, étape 2 du chantier sécurité des connexions).
+   Quand le bon mot de passe est saisi depuis un appareil inconnu alors que le compte est déjà ouvert
+   (activité < 24 h) sur un autre, aucune session n'est ouverte : un « défi » est créé ici et la
+   personne doit prouver qu'elle est bien le titulaire — Code de Sécurité (DS-ID) du compte ou d'un
+   compte lié, ou à défaut un code à 6 chiffres envoyé par e-mail. 5 essais par défi. Le défi
+   en attente est aussi présenté sur l'appareil déjà connecté (« Ce n'est pas vous ? Bloquer »).
+   statut : en_attente | confirmee | refusee (bloquée par le titulaire) | bloquee (trop d'essais).
+   appareils_reconnus : un appareil confirmé n'est plus requestionné pendant 30 jours. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS confirmations_appareil (
+    id                 TEXT PRIMARY KEY,
+    user_id            INTEGER NOT NULL,
+    appareil_id        TEXT NOT NULL,
+    type_appareil      TEXT,
+    navigateur         TEXT,
+    os                 TEXT,
+    ville              TEXT,
+    pays               TEXT,
+    ip_masquee         TEXT,
+    statut             TEXT NOT NULL DEFAULT 'en_attente',
+    essais             INTEGER DEFAULT 0,
+    code_email_hash    TEXT,
+    code_email_expire  TEXT,
+    envois_email       INTEGER DEFAULT 0,
+    created_at         TEXT,
+    expire_at          TEXT,
+    resolu_at          TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_confirmations_appareil_user ON confirmations_appareil(user_id, statut);
+
+  CREATE TABLE IF NOT EXISTS appareils_reconnus (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    appareil_id  TEXT NOT NULL,
+    via          TEXT,
+    confirme_at  TEXT,
+    expire_at    TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_appareils_reconnus ON appareils_reconnus(user_id, appareil_id);
+`);
+
 /* =====================================================================
    MODULE "PARTENARIAT" (2026-08-14) — Incrément 1 : fondations du rôle
    "partenaire" (cahier des charges : soumission de projets à Diaspo'Actif

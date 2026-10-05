@@ -1046,4 +1046,40 @@ function emailCompteRenduDiffusion({ to, prenom, objet, evenementTitre, auteurNo
   });
 }
 
-module.exports = { emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
+/* Code de confirmation d'un nouvel appareil (2026-10-05) — secours du DS-ID. Valable 10 minutes. */
+function emailCodeConfirmationAppareil({ email, code, appareil, lieu }) {
+  return sendEmail({
+    to: email,
+    subject: `Votre code de confirmation : ${code} — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0D1B2A;">Confirmez que c'est bien vous</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 20px;">
+        Une connexion à votre compte est en cours depuis <strong>${appareil || 'un nouvel appareil'}</strong>${lieu ? ' (' + lieu + ')' : ''}, alors que votre compte est déjà ouvert sur un autre appareil.<br>
+        Saisissez ce code pour l'autoriser — il est valable <strong>10 minutes</strong> :
+      </p>
+      <div style="text-align:center;margin:28px 0;">
+        <div style="display:inline-block;background:#F0F4FF;border:2px dashed #2563EB;border-radius:12px;padding:14px 32px;font-size:34px;font-weight:900;letter-spacing:.35em;color:#0D1B2A;">${code}</div>
+      </div>
+      <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+        Ce n'est pas vous ? Ne communiquez ce code à personne, et changez votre mot de passe dès maintenant.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { emailCodeConfirmationAppareil, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };

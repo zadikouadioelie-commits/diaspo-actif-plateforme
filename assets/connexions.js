@@ -47,6 +47,14 @@
 .cx-aide a{color:#b45309;font-weight:700;}
 .cx-msg{font-size:12.5px;color:#15803d;font-weight:700;min-height:1em;}
 .cx-vide{padding:24px;text-align:center;color:#6b7280;font-size:13px;}
+.cx-bandeau{display:none;position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:2600;width:calc(100% - 24px);max-width:760px;background:#7f1d1d;color:#fff;border-radius:14px;padding:12px 16px;box-shadow:0 10px 40px rgba(0,0,0,.4);align-items:center;gap:14px;flex-wrap:wrap;}
+.cx-bandeau-txt{flex:1;min-width:220px;font-size:13px;line-height:1.45;}
+.cx-bandeau-txt span{opacity:.92;font-size:12.5px;}
+.cx-bandeau-act{display:flex;gap:8px;flex-wrap:wrap;}
+.cx-b-rouge,.cx-b-gris{border:none;border-radius:8px;padding:9px 14px;font-weight:800;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block;}
+.cx-b-rouge{background:#fff;color:#991b1b;}
+.cx-b-gris{background:rgba(255,255,255,.18);color:#fff;}
+.cx-b-rouge:disabled{opacity:.6;cursor:default;}
 `;
     document.head.appendChild(st);
   }
@@ -79,9 +87,71 @@
   async function charger() {
     try {
       const r = await api('GET', '/auth/connexions');
-      etat = { connexions: r.connexions || [], total: r.total || 0, comptes_lies: r.comptes_lies || [] };
+      etat = { connexions: r.connexions || [], total: r.total || 0, comptes_lies: r.comptes_lies || [], en_attente: r.en_attente || [], incidents: r.incidents_30j || 0 };
       majBouton();
+      majBandeau();
     } catch (e) { /* silencieux : la pastille reste masquée */ }
+  }
+
+  /* ── Bandeau d'alerte (étape 2) : une connexion attend confirmation depuis un autre appareil, ou
+     plusieurs tentatives suspectes ont eu lieu ces 30 derniers jours (=> on recommande de changer
+     de mot de passe). Affiché sur l'appareil DÉJÀ connecté, mis à jour toutes les 30 s. ── */
+  const ignorees = new Set();
+  function bandeau() {
+    let b = document.getElementById('cx-bandeau');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'cx-bandeau';
+      b.className = 'cx-bandeau';
+      b.setAttribute('role', 'alert');
+      document.body.appendChild(b);
+    }
+    return b;
+  }
+  function cacherBandeau() { const b = document.getElementById('cx-bandeau'); if (b) b.style.display = 'none'; }
+  function aujourdhui() { return new Date().toISOString().slice(0, 10); }
+  function rappelMdpDejaVu() { try { return localStorage.getItem('cx_mdp_rappel') === aujourdhui(); } catch (_) { return false; } }
+  function noterRappelMdp() { try { localStorage.setItem('cx_mdp_rappel', aujourdhui()); } catch (_) {} }
+
+  function majBandeau() {
+    const attente = (etat.en_attente || []).filter(d => !ignorees.has(d.id));
+    if (attente.length) {
+      const d = attente[0];
+      const b = bandeau();
+      b.style.display = 'flex';
+      b.innerHTML = `<div class="cx-bandeau-txt"><strong>⚠️ Une connexion à votre compte attend votre confirmation</strong><br>
+        <span>Depuis ${esc(d.etiquette)}${d.lieu ? ' — ' + esc(d.lieu) : ''}. Si c'est vous, saisissez votre Code de Sécurité sur cet appareil ; sinon, bloquez-la.</span></div>
+        <div class="cx-bandeau-act">
+          <button type="button" class="cx-b-rouge" data-id="${esc(d.id)}">Ce n'est pas moi — Bloquer</button>
+          <button type="button" class="cx-b-gris" data-id="${esc(d.id)}">C'est moi</button>
+        </div>`;
+      b.querySelector('.cx-b-rouge').onclick = async (e) => {
+        e.target.disabled = true;
+        try {
+          const r = await api('POST', '/auth/connexions/en-attente/' + encodeURIComponent(d.id) + '/bloquer');
+          ignorees.add(d.id);
+          etat.incidents = r.incidents_30j || etat.incidents + 1;
+          await charger();
+          if (etat.incidents >= 2) montrerRappelMdp(true); else cacherBandeau();
+        } catch (err) { e.target.disabled = false; }
+      };
+      b.querySelector('.cx-b-gris').onclick = () => { ignorees.add(d.id); majBandeau(); };
+      return;
+    }
+    if ((etat.incidents || 0) >= 2 && !rappelMdpDejaVu()) { montrerRappelMdp(false); return; }
+    cacherBandeau();
+  }
+
+  function montrerRappelMdp(apresBlocage) {
+    const b = bandeau();
+    b.style.display = 'flex';
+    b.innerHTML = `<div class="cx-bandeau-txt"><strong>🔒 ${apresBlocage ? 'Connexion bloquée.' : 'Plusieurs tentatives suspectes.'} Changez votre mot de passe.</strong><br>
+      <span>Des connexions inhabituelles à votre compte ont été signalées à ${etat.incidents} reprises ces 30 derniers jours. Changer votre mot de passe déconnecte aussitôt tous les autres appareils.</span></div>
+      <div class="cx-bandeau-act">
+        <a class="cx-b-rouge" href="parametres-compte.html">Changer mon mot de passe</a>
+        <button type="button" class="cx-b-gris" id="cx-plus-tard">Plus tard</button>
+      </div>`;
+    document.getElementById('cx-plus-tard').onclick = () => { noterRappelMdp(); cacherBandeau(); };
   }
 
   const ICONES = { mobile: '📱', tablette: '📟', ordinateur: '💻' };
@@ -176,4 +246,6 @@
 
   injecterStyles();
   charger();
+  // Rafraîchissement discret : une connexion en attente doit apparaître sans recharger la page.
+  setInterval(() => { if (!document.hidden) charger(); }, 30000);
 })();

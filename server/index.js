@@ -140,6 +140,8 @@ const { hashPassword, verifyPassword, createSession, getSession, destroySession,
 const SEC = require("./security");
 /* Registre des connexions (2026-10-05) — voir server/connexions.js. */
 const Connexions = require("./connexions");
+/* Confirmation d'un nouvel appareil (étape 2 du chantier sécurité des connexions) — server/confirmation-appareil.js. */
+const ConfirmationAppareil = require("./confirmation-appareil");
 
 /* Journal d'erreurs maison (table error_logs) — sans service externe (Sentry).
    Best-effort : ne doit jamais lui-même faire planter le serveur. */
@@ -197,6 +199,34 @@ async function send(res, status, data, headers = {}) {
 async function ouvrirConnexion(req, userId, sidToken) {
   try { return await Connexions.ouvrir(db, { req, userId, sidToken, ip: SEC.clientIp(req) }); }
   catch (e) { console.error('[connexions.ouvrir]', e.message); return null; }
+}
+
+/* Étape 2 du chantier sécurité des connexions : faut-il confirmer cet appareil avant d'ouvrir la session ?
+   Renvoie { reponse(res) } si la connexion doit s'arrêter ici (défi, blocage…), {} sinon. En cas d'erreur
+   interne on laisse passer (et on journalise) : une panne de ce garde-fou ne doit pas couper tout le site. */
+async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
+  try {
+    const v = await ConfirmationAppareil.evaluer(db, {
+      req, user, ip, creerDefi: !viaDsId,
+      notifier: (d) => creerNotif(user.id, "connexion_suspecte", "Connexion en attente de confirmation",
+        `Une connexion est en cours depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. Si ce n'est pas vous, bloquez-la depuis le bandeau « Mes connexions ».`,
+        { lien: "parametres-compte.html" }),
+    });
+    if (v.bloque) {
+      SEC.logSecurity("login_appareil_verrouille", { ip, uid: Number(user.id) });
+      return { reponse: (res) => sendJSON(res, 429, { error: `Trop de tentatives de confirmation depuis cet appareil. Réessayez dans ${Math.ceil(v.reessayerDans / 60)} min.` }) };
+    }
+    if (v.requis) {
+      return { reponse: (res) => sendJSON(res, 403, { error: "Ce compte est déjà ouvert sur un autre appareil. Pour autoriser celui-ci, connectez-vous d'abord depuis la page de connexion (mot de passe puis Code de Sécurité), puis revenez ici." }) };
+    }
+    if (v.defi) {
+      SEC.logSecurity("login_appareil_a_confirmer", { ip, uid: Number(user.id) });
+      return { reponse: (res) => sendJSON(res, 200,
+        { confirmation_requise: true, defi: v.defi.id, methodes: ["ds_id", "email"], email_masque: ConfirmationAppareil.masquerEmail(user.email), expire_dans: 600 },
+        { "Set-Cookie": [Connexions.cookieAppareilTexte(v.appareilId, cookieSecureFlag(req))] }) };
+    }
+  } catch (e) { console.error("[confirmation-appareil.evaluer]", e.message); }
+  return {};
 }
 
 function cookieSecureFlag(req) {
@@ -1591,6 +1621,13 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     });
   }
 
+  /* Confirmation d'un nouvel appareil (2026-10-05, demande explicite) : bon mot de passe, mais le
+     compte est déjà ouvert ailleurs (activité < 24 h) et cet appareil n'est pas reconnu => aucune
+     session n'est ouverte, la personne doit prouver qu'elle est bien le titulaire (DS-ID, ou code
+     par e-mail). Voir server/confirmation-appareil.js. Le client rejoue ensuite la connexion. */
+  const verdict = await evaluerNouvelAppareil(req, user, ip);
+  if (verdict.reponse) return verdict.reponse(res);
+
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
@@ -2246,7 +2283,67 @@ route("GET", "/api/auth/connexions", async (req, res) => {
   const connexions = await Connexions.lister(db, user.id, courant);
   const comptesLies = [];
   for (const m of await membresDuGroupe(user.id)) comptesLies.push({ id: Number(m.id), nom: m.nom, total: await Connexions.compter(db, m.id) });
-  sendJSON(res, 200, { connexions, total: connexions.length, comptes_lies: comptesLies }, cookiesSortie.length ? { "Set-Cookie": cookiesSortie } : undefined);
+  const enAttente = await ConfirmationAppareil.enAttente(db, user.id);
+  const incidents = await ConfirmationAppareil.incidents30j(db, user.id);
+  sendJSON(res, 200, { connexions, total: connexions.length, comptes_lies: comptesLies, en_attente: enAttente, incidents_30j: incidents }, cookiesSortie.length ? { "Set-Cookie": cookiesSortie } : undefined);
+});
+
+/* ── Confirmation d'un nouvel appareil (étape 2) ───────────────────────────────────────────────
+   Appelées depuis la page de connexion, SANS session (le mot de passe vient d'être validé et un
+   défi a été créé). Le défi n'est actionnable que depuis le navigateur qui l'a reçu (cookie da_dev). */
+route("POST", "/api/auth/confirmer-appareil", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const lim = SEC.rateLimit(`confirm:ip:${ip}`, 30, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
+  const c = await ConfirmationAppareil.charger(db, req, body && body.defi);
+  if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
+  const d = c.defi;
+  const dsId = body && body.ds_id, code = body && body.code;
+  if (!dsId && !code) return sendJSON(res, 400, { error: "Saisissez votre Code de Sécurité (DS-ID) ou le code reçu par e-mail." });
+  const ok = dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
+  if (!ok) {
+    const r = await ConfirmationAppareil.compterEchec(db, d);
+    SEC.logSecurity("confirmation_appareil_echec", { ip, uid: Number(d.user_id), restants: r.restants });
+    if (r.bloque) {
+      try { await creerNotif(d.user_id, "connexion_suspecte", "Tentatives de connexion bloquées", `Plusieurs codes incorrects ont été saisis pour ouvrir votre compte depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. La connexion a été bloquée.`, { lien: "parametres-compte.html" }); } catch (_) {}
+      return sendJSON(res, 429, { error: "Trop d'essais : cette connexion est bloquée pendant 15 minutes.", bloque: true });
+    }
+    return sendJSON(res, 401, { error: dsId ? "Code de Sécurité incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
+  }
+  await ConfirmationAppareil.valider(db, d, dsId ? "ds_id" : "email");
+  SEC.logSecurity("confirmation_appareil_ok", { ip, uid: Number(d.user_id), via: dsId ? "ds_id" : "email" });
+  try { await creerNotif(d.user_id, "appareil_confirme", "Nouvel appareil autorisé", `${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""} a été autorisé à ouvrir votre compte. Ce n'est pas vous ? Déconnectez-le depuis « Mes connexions » et changez votre mot de passe.`, { lien: "parametres-compte.html" }); } catch (_) {}
+  sendJSON(res, 200, { ok: true });
+});
+
+route("POST", "/api/auth/confirmer-appareil/envoyer-code", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  const lim = SEC.rateLimit(`confirm-mail:ip:${ip}`, 10, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de demandes. Réessayez dans ${lim.retryAfter}s.` });
+  const c = await ConfirmationAppareil.charger(db, req, body && body.defi);
+  if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
+  const d = c.defi;
+  const u = await db.prepare("SELECT email FROM users WHERE id=?").get(d.user_id);
+  if (!u || !u.email) return sendJSON(res, 400, { error: "Aucune adresse e-mail sur ce compte : utilisez votre Code de Sécurité (DS-ID)." });
+  const prep = await ConfirmationAppareil.preparerCodeEmail(db, d);
+  if (prep.erreur) return sendJSON(res, prep.code, { error: prep.erreur });
+  const { emailCodeConfirmationAppareil } = require("./mailer");
+  const envoi = await emailCodeConfirmationAppareil({ email: u.email, code: prep.code, appareil: Connexions.etiquette(d), lieu: [d.ville, d.pays].filter(Boolean).join(", ") });
+  if (!envoi || !envoi.ok) {
+    await logError(new Error(`Code de confirmation d'appareil non envoyé : ${JSON.stringify(envoi && (envoi.error || envoi.reason) || "raison inconnue")}`), "confirmation-appareil-email", req);
+    return sendJSON(res, 502, { error: "L'envoi du code par e-mail est momentanément impossible. Utilisez votre Code de Sécurité (DS-ID)." });
+  }
+  sendJSON(res, 200, { ok: true, email_masque: ConfirmationAppareil.masquerEmail(u.email) });
+});
+
+/* Sur l'appareil DÉJÀ connecté : « Ce n'est pas moi » refuse la connexion en attente. */
+route("POST", "/api/auth/connexions/en-attente/:id/bloquer", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ok = await ConfirmationAppareil.refuser(db, user.id, params.id);
+  if (!ok) return sendJSON(res, 404, { error: "Demande introuvable ou déjà traitée." });
+  SEC.logSecurity("confirmation_appareil_refusee", { uid: Number(user.id) });
+  sendJSON(res, 200, { ok: true, incidents_30j: await ConfirmationAppareil.incidents30j(db, user.id) });
 });
 
 route("POST", "/api/auth/connexions/deconnecter-autres", async (req, res, params, body) => {
@@ -11993,6 +12090,12 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
      et ne connaît pas ce nouveau cas d'usage. ds_id_validations (action_type en TEXT libre,
      déjà utilisé par verifyVoteDsId) journalise cette connexion sans y toucher. */
   await db.prepare(`INSERT INTO ds_id_validations (user_id, action_type, action_ref, succes, ip, user_agent) VALUES (?,?,?,?,?,?)`).run(user.id, 'connexion_module', 'mon_associe', 1, ip, req.headers['user-agent'] || null);
+
+  /* Connexion par DS-ID seul (pas de mot de passe) : si le compte est déjà ouvert ailleurs et que cet
+     appareil n'est pas reconnu, on n'ouvre rien — l'appareil se confirme d'abord depuis la page de
+     connexion (mot de passe + DS-ID), après quoi cette entrée fonctionne normalement (2026-10-05). */
+  const verdict = await evaluerNouvelAppareil(req, user, ip, { viaDsId: true });
+  if (verdict.reponse) return verdict.reponse(res);
 
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
