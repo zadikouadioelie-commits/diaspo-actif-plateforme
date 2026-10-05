@@ -5716,6 +5716,41 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_admin_acces_demandes_cible ON admin_acces_demandes(cible_id, statut);
 `);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   REGISTRE DES CONNEXIONS (2026-10-05, demande explicite : voir sur combien d'appareils un compte
+   est ouvert, pouvoir en déconnecter un ou tous les autres, détecter une session qui n'est pas la
+   sienne). Jusqu'ici la session était un jeton signé « sans état » (cookie auth, 7 jours) : le
+   serveur ne gardait aucune trace des appareils connectés, donc ne pouvait ni les compter, ni en
+   couper un seul. Chaque connexion ouverte (connexion, inscription, bascule de compte lié…)
+   écrit désormais une ligne ici ; son identifiant (id) est embarqué dans le jeton (champ jti) et
+   revérifié à chaque requête : une ligne révoquée = session morte immédiatement.
+   Dates en texte UTC « AAAA-MM-JJ HH:MM:SS » générées côté JS (comparables telles quelles).
+   appareil_id = cookie persistant du navigateur (da_dev) : un même navigateur ne cumule jamais
+   plusieurs lignes actives. principal : réservé aux appareils principaux (étape ultérieure). */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS connexions (
+    id             TEXT PRIMARY KEY,
+    user_id        INTEGER NOT NULL,
+    sid_token      TEXT,
+    appareil_id    TEXT,
+    type_appareil  TEXT,
+    navigateur     TEXT,
+    os             TEXT,
+    ville          TEXT,
+    pays           TEXT,
+    ip_masquee     TEXT,
+    created_at     TEXT,
+    last_seen_at   TEXT,
+    expire_at      TEXT,
+    principal      INTEGER DEFAULT 0,
+    revoque_at     TEXT,
+    revoque_motif  TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_connexions_user ON connexions(user_id, revoque_at);
+  CREATE INDEX IF NOT EXISTS idx_connexions_appareil ON connexions(appareil_id, revoque_at);
+`);
+
 /* =====================================================================
    MODULE "PARTENARIAT" (2026-08-14) — Incrément 1 : fondations du rôle
    "partenaire" (cahier des charges : soumission de projets à Diaspo'Actif

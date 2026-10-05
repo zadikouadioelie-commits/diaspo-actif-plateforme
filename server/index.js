@@ -138,6 +138,8 @@ async function consommerCodePromo(codeId, userId, ticketIds, quantite) {
 const { hashPassword, verifyPassword, createSession, getSession, destroySession, parseCookies, signAuthToken, verifyAuthToken, TOKEN_TTL } = require("./auth");
 // verifyPassword(password, salt, expectedHash) → boolean
 const SEC = require("./security");
+/* Registre des connexions (2026-10-05) — voir server/connexions.js. */
+const Connexions = require("./connexions");
 
 /* Journal d'erreurs maison (table error_logs) — sans service externe (Sentry).
    Best-effort : ne doit jamais lui-même faire planter le serveur. */
@@ -189,6 +191,14 @@ async function send(res, status, data, headers = {}) {
    (production Vercel via x-forwarded-proto, ou TLS direct) — sinon le navigateur
    refuse purement et simplement de poser le cookie, ce qui casserait la connexion
    en développement local (http://localhost). */
+/* Ouvre une connexion dans le registre (server/connexions.js) pour la session qu'on s'apprête à
+   émettre. Ne bloque jamais l'ouverture de session : en cas d'erreur, la session est émise sans
+   jti (comportement d'avant cette fonctionnalité) et l'erreur est journalisée. */
+async function ouvrirConnexion(req, userId, sidToken) {
+  try { return await Connexions.ouvrir(db, { req, userId, sidToken, ip: SEC.clientIp(req) }); }
+  catch (e) { console.error('[connexions.ouvrir]', e.message); return null; }
+}
+
 function cookieSecureFlag(req) {
   const proto = req.headers["x-forwarded-proto"] || (req.socket && req.socket.encrypted ? "https" : "http");
   return proto === "https" ? "; Secure" : "";
@@ -226,7 +236,19 @@ async function getCurrentUser(req) {
   const authCookie = cookies.auth;
   if (authCookie) {
     const payload = verifyAuthToken(authCookie);
-    if (payload?.uid) {
+    /* Registre des connexions (2026-10-05) : un jeton qui porte un jti n'est valide que tant que sa
+       ligne existe, n'est ni révoquée ni expirée (déconnexion à distance, mot de passe changé…).
+       Jeton sans jti = émis avant cette fonctionnalité, toujours accepté (transition). En cas
+       d'erreur de lecture du registre on laisse passer plutôt que de couper tout le site. */
+    let connexionOk = true;
+    if (payload?.uid && payload.jti) {
+      try {
+        const cx = await Connexions.verifier(db, payload.jti);
+        if (cx) { req._connexionId = cx.id; Connexions.toucher(db, cx.id); }
+        else connexionOk = false;
+      } catch (e) { console.error('[connexions.verifier]', e.message); }
+    }
+    if (payload?.uid && connexionOk) {
       const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, profil_json, photo_url, email_verifie, nb_connexions, pwa_prompt_dismiss, temoignage_statut, temoignage_derniere_demande, demo_vue, da_id, identite_verifiee, credential_version FROM users WHERE id = ?").get(payload.uid);
       /* credential_version (2026-08-08, transfert de gestionnaire) : le token 'auth' est
          stateless (aucun état serveur, survit à un DELETE FROM sessions) — c'est le SEUL
@@ -748,7 +770,8 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
 
   const token = createSession(id);
   const user = await db.prepare("SELECT id, nom, prenom, email, role, ville, pays, statut_verification, email_verifie FROM users WHERE id = ?").get(id);
-  const authTok = signAuthToken({ uid: id, role: user.role, cv: 1, exp: Math.floor(Date.now()/1000) + TOKEN_TTL }); // nouveau compte : credential_version démarre toujours à 1
+  const cx = await ouvrirConnexion(req, id, token);
+  const authTok = signAuthToken({ uid: id, role: user.role, cv: 1, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL }); // nouveau compte : credential_version démarre toujours à 1
 
   // Email de bienvenue + "Sceau" (non bloquant) + notification in-app (2026-09-07 : canal
   // "les deux" demandé explicitement). Nom complet (prénom+nom), jamais le prénom seul.
@@ -894,7 +917,7 @@ route("POST", "/api/auth/signup", async (req, res, params, body) => {
     }
   }
 
-  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
+  { const sf = cookieSecureFlag(req); sendJSON(res, 201, { user: publicUser(user) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
 });
 
 /* ════════════════ PARRAINAGE & INVITATIONS — Phase 1 ════════════════
@@ -1571,7 +1594,8 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const cx = await ouvrirConnexion(req, user.id, token);
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   if (user.role === 'administrateur_junior') {
     /* Fige les droits actuels pour toute la session à venir — voir le commentaire sur
        actualiserSnapshotPermissions() : c'est ce qui garantit qu'une révocation faite par
@@ -1607,7 +1631,7 @@ route("POST", "/api/auth/login", async (req, res, params, body) => {
     }
   } catch (e) { console.error('[fusion-cagnotte-login]', e.message); }
 
-  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] }); }
+  { const sf = cookieSecureFlag(req); sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] }); }
 });
 
 /* POST /api/auth/forgot-password — demande de réinitialisation */
@@ -1645,6 +1669,12 @@ route("POST", "/api/auth/reset-password", async (req, res, params, body) => {
   if (Date.now() > user.reset_expires) return sendJSON(res, 400, { error: "Lien expiré, veuillez faire une nouvelle demande" });
   const { hash, salt } = hashPassword(password);
   await db.prepare("UPDATE users SET password_hash=?, password_salt=?, reset_token=NULL, reset_expires=NULL WHERE id=?").run(hash, salt, user.id);
+  /* Réinitialiser son mot de passe signifie souvent « quelqu'un d'autre l'a » : toutes les sessions
+     ouvertes (registre + anciens jetons sans jti) sont fermées (2026-10-05). */
+  try {
+    await Connexions.revoquerAutres(db, user.id, null, 'mot_de_passe_reinitialise');
+    await db.prepare("UPDATE users SET credential_version=credential_version+1 WHERE id=?").run(user.id);
+  } catch (e) { console.error('[reset-password:revocation]', e.message); }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -1758,6 +1788,7 @@ route("DELETE", "/api/auth/account", async (req, res, params, body) => {
 
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);
+  await revoquerConnexionDuCookie(req, 'compte_masque');
   sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
 });
 
@@ -2178,7 +2209,80 @@ route("PUT", "/api/profil/origine-institution", async (req, res, params, body) =
 route("POST", "/api/auth/logout", async (req, res) => {
   const cookies = parseCookies(req);
   if (cookies.sid) destroySession(cookies.sid);
+  await revoquerConnexionDuCookie(req, 'deconnexion');
   sendJSON(res, 200, { ok: true }, { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] });
+});
+
+/* ── Registre des connexions : « Mes connexions » (2026-10-05, demande explicite) ────────────────
+   Voir sur combien d'appareils le compte est ouvert, en déconnecter un, ou tous les autres (et
+   éventuellement tous les comptes liés). Une session ouverte AVANT cette fonctionnalité (jeton
+   sans jti) est enregistrée ici à sa première lecture, pour que le décompte soit juste. */
+async function revoquerConnexionDuCookie(req, motif) {
+  try {
+    const payload = verifyAuthToken(parseCookies(req).auth);
+    if (payload && payload.jti && payload.uid) await Connexions.revoquer(db, payload.uid, payload.jti, motif);
+  } catch (e) { console.error('[connexions.revoquer-cookie]', e.message); }
+}
+async function reemettreCookieAuth(req, userId, jti) {
+  const u = await db.prepare("SELECT role, credential_version FROM users WHERE id=?").get(userId);
+  const authTok = signAuthToken({ uid: userId, role: u.role, cv: u.credential_version, ...(jti ? { jti } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  return `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${cookieSecureFlag(req)}`;
+}
+async function membresDuGroupe(userId) {
+  const m = await db.prepare("SELECT groupe_id FROM comptes_lies_membres WHERE user_id=?").get(userId);
+  if (!m) return [];
+  return (await db.prepare("SELECT u.id, u.nom FROM comptes_lies_membres cm JOIN users u ON u.id=cm.user_id WHERE cm.groupe_id=? AND cm.user_id<>?").all(m.groupe_id, userId));
+}
+
+route("GET", "/api/auth/connexions", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  let courant = req._connexionId || null;
+  const cookiesSortie = [];
+  if (!courant) {
+    const cx = await ouvrirConnexion(req, user.id, parseCookies(req).sid || null);
+    if (cx) { courant = cx.id; cookiesSortie.push(await reemettreCookieAuth(req, user.id, cx.id), cx.cookieAppareil(cookieSecureFlag(req))); }
+  }
+  const connexions = await Connexions.lister(db, user.id, courant);
+  const comptesLies = [];
+  for (const m of await membresDuGroupe(user.id)) comptesLies.push({ id: Number(m.id), nom: m.nom, total: await Connexions.compter(db, m.id) });
+  sendJSON(res, 200, { connexions, total: connexions.length, comptes_lies: comptesLies }, cookiesSortie.length ? { "Set-Cookie": cookiesSortie } : undefined);
+});
+
+route("POST", "/api/auth/connexions/deconnecter-autres", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  let courant = req._connexionId || null;
+  const cookiesSortie = [];
+  if (!courant) {
+    const cx = await ouvrirConnexion(req, user.id, parseCookies(req).sid || null);
+    if (cx) { courant = cx.id; cookiesSortie.push(cx.cookieAppareil(cookieSecureFlag(req))); }
+  }
+  const nb = await Connexions.revoquerAutres(db, user.id, courant, 'deconnexion_des_autres');
+  // Monter la version des identifiants invalide aussi les jetons émis avant le registre (sans jti).
+  await db.prepare("UPDATE users SET credential_version=credential_version+1 WHERE id=?").run(user.id);
+  let nbLies = 0;
+  if (body && body.tous_les_comptes_lies) {
+    for (const m of await membresDuGroupe(user.id)) {
+      nbLies += await Connexions.revoquerAutres(db, m.id, null, 'deconnexion_groupe');
+      await db.prepare("UPDATE users SET credential_version=credential_version+1 WHERE id=?").run(m.id);
+    }
+  }
+  cookiesSortie.push(await reemettreCookieAuth(req, user.id, courant));
+  SEC.logSecurity("connexions_deconnexion_autres", { uid: Number(user.id), autres: nb, comptes_lies: nbLies });
+  sendJSON(res, 200, { ok: true, deconnectees: nb, deconnectees_comptes_lies: nbLies }, { "Set-Cookie": cookiesSortie });
+});
+
+route("POST", "/api/auth/connexions/:id/deconnecter", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ok = await Connexions.revoquer(db, user.id, params.id, 'deconnexion_manuelle');
+  if (!ok) return sendJSON(res, 404, { error: "Connexion introuvable ou déjà fermée." });
+  SEC.logSecurity("connexions_deconnexion", { uid: Number(user.id) });
+  // Si c'est la connexion de CET appareil, les cookies sont aussi supprimés.
+  const estCourante = req._connexionId && req._connexionId === params.id;
+  sendJSON(res, 200, { ok: true, courante: !!estCourante },
+    estCourante ? { "Set-Cookie": ["sid=; HttpOnly; Path=/; Max-Age=0", "auth=; HttpOnly; Path=/; Max-Age=0"] } : undefined);
 });
 
 route("GET", "/api/auth/me", async (req, res) => {
@@ -11220,9 +11324,10 @@ route("POST", "/api/partenariat/inscription/:token", async (req, res, params, bo
   }
 
   const sessionToken = createSession(userId);
-  const authTok = signAuthToken({ uid: userId, role: "partenaire", cv: 1, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
+  const cx = await ouvrirConnexion(req, userId, sessionToken);
+  const authTok = signAuthToken({ uid: userId, role: "partenaire", cv: 1, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now() / 1000) + TOKEN_TTL });
   const sf = cookieSecureFlag(req);
-  sendJSON(res, 200, { ok: true, user_id: userId }, { "Set-Cookie": [`sid=${sessionToken}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
+  sendJSON(res, 200, { ok: true, user_id: userId }, { "Set-Cookie": [`sid=${sessionToken}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
 });
 
 /* ── Incrément 3 : cartouches admin, notes privées, périodes historisées, suppression ──
@@ -11591,9 +11696,10 @@ route("POST", "/api/comptes-lies/basculer", async (req, res, params, body) => {
   await db.prepare(`INSERT INTO comptes_lies_journal (groupe_id, user_id, compte_concerne_id, action, details) VALUES (?,?,?,?,?)`).run(monMembre.groupe_id, user.id, cibleId, 'changement_compte_actif', `Bascule vers ${cible.nom || cible.id}`);
 
   const token = createSession(cible.id);
-  const authTok = signAuthToken({ uid: cible.id, role: cible.role, cv: cible.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const cx = await ouvrirConnexion(req, cible.id, token);
+  const authTok = signAuthToken({ uid: cible.id, role: cible.role, cv: cible.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   const sf = cookieSecureFlag(req);
-  sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
+  sendJSON(res, 200, { user: publicUser(cible) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
 });
 
 /* Retirer une liaison (Étape 5). N'importe quel membre du groupe peut retirer n'importe
@@ -11891,10 +11997,11 @@ route("POST", "/api/mon-associe/connexion", async (req, res, params, body) => {
   await db.prepare("UPDATE users SET nb_connexions = COALESCE(nb_connexions,0) + 1 WHERE id=?").run(user.id);
   const fresh = await db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
   const token = createSession(user.id);
-  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
+  const cx = await ouvrirConnexion(req, user.id, token);
+  const authTok = signAuthToken({ uid: user.id, role: user.role, cv: fresh.credential_version, ...(cx ? { jti: cx.id } : {}), exp: Math.floor(Date.now()/1000) + TOKEN_TTL });
   SEC.logSecurity("associe_dsid_success", { ip, uid: Number(user.id) });
   const sf = cookieSecureFlag(req);
-  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`] });
+  sendJSON(res, 200, { user: publicUser(fresh) }, { "Set-Cookie": [`sid=${token}; HttpOnly; Path=/; SameSite=Lax${sf}`, `auth=${authTok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${TOKEN_TTL}${sf}`, ...(cx ? [cx.cookieAppareil(sf)] : [])] });
 });
 
 /* ══ Mon Associé — garde d'accès à la publication ══
@@ -17190,7 +17297,22 @@ route("PUT", "/api/profil/mot-de-passe", async (req, res, params, body) => {
   }
   const { hash, salt } = hashPassword(nouveau_mot_de_passe);
   await db.prepare("UPDATE users SET password_hash=?, password_salt=? WHERE id=?").run(hash, salt, user.id);
-  sendJSON(res, 200, { ok: true });
+  /* Les autres appareils sont déconnectés (2026-10-05) ; la session courante est conservée et son
+     cookie réémis avec la nouvelle version des identifiants. */
+  let cookiesMdp;
+  try {
+    let courant = req._connexionId || null;
+    const sortie = [];
+    if (!courant) {
+      const cx = await ouvrirConnexion(req, user.id, parseCookies(req).sid || null);
+      if (cx) { courant = cx.id; sortie.push(cx.cookieAppareil(cookieSecureFlag(req))); }
+    }
+    await Connexions.revoquerAutres(db, user.id, courant, 'mot_de_passe_change');
+    await db.prepare("UPDATE users SET credential_version=credential_version+1 WHERE id=?").run(user.id);
+    sortie.push(await reemettreCookieAuth(req, user.id, courant));
+    cookiesMdp = { "Set-Cookie": sortie };
+  } catch (e) { console.error('[mot-de-passe:revocation]', e.message); }
+  sendJSON(res, 200, { ok: true }, cookiesMdp);
 });
 
 /* ---------- Profil — Fil d'activité publique ---------- */

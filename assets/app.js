@@ -1314,6 +1314,17 @@ function initCompactMenu() {
   mq.addEventListener('change', e => appliquer(e.matches));
 }
 
+/* « Mes connexions » (2026-10-05) : script chargé à la demande, une seule fois par page, une fois
+   l'utilisateur connu — voir assets/connexions.js. */
+function chargerConnexionsUI() {
+  if (window.__cxChargement) return;
+  window.__cxChargement = true;
+  const sc = document.createElement('script');
+  sc.src = '/assets/connexions.js?v=1';
+  sc.defer = true;
+  document.head.appendChild(sc);
+}
+
 async function initComptesLiesSwitcher(user) {
   let comptes;
   try {
@@ -1549,6 +1560,10 @@ async function applyAuthState() {
       <span class="cl-switch-wrap" id="cl-switch-wrap" style="display:none;position:relative;">
         <button type="button" id="cl-switch-btn" class="cl-switch-btn" title="Changer de compte">▾</button>
       </span>
+      <!-- Pastille « Mes connexions » (2026-10-05) : nombre d'appareils sur lesquels le compte est
+           ouvert, orange dès qu'il y en a plus d'un. Cachée tant que assets/connexions.js n'a pas
+           répondu (voir chargerConnexionsUI). -->
+      <button type="button" id="cx-btn" class="cx-btn" style="display:none;" onclick="window.ouvrirMesConnexions && ouvrirMesConnexions()" aria-label="Mes connexions">🛡 <span class="cx-n">1</span></button>
       <!-- Sorti de .cl-switch-wrap (2026-09-19, bug réel) : ce menu est en position:fixed et
            partagé par le déclencheur desktop (▾ ci-dessus) ET le bouton "Comptes" de la barre
            du bas mobile (#mobile-nav-comptes-toggle, voir renderMobileBottomNavAuto). Mais
@@ -1572,6 +1587,7 @@ async function applyAuthState() {
         <div class="compact-menu-dd" id="compact-menu-dd">
           <a href="${ROLE_DASHBOARD[user.role] || '#'}">📊 Tableau de bord</a>
           <a href="parametres-compte.html">⚙️ Paramètres</a>
+          <a href="#" onclick="window.ouvrirMesConnexions ? ouvrirMesConnexions() : null;return false;">🛡 Mes connexions</a>
           <a href="#" onclick="document.getElementById('notif-bell-btn')?.click();return false;">🔔 Notifications</a>
           <a href="site-vitrine.html">🌐 Site Diaspo'Actif</a>
         </div>
@@ -1584,6 +1600,7 @@ async function applyAuthState() {
     });
     initComptesLiesSwitcher(user);
     initCompactMenu();
+    chargerConnexionsUI();
     // Bouton "Passer à Premium" : visible seulement si pas déjà abonné — retiré pour le
     // rôle utilisateur (2026-07-26, voir module "Bientôt disponible"), gardé pour initiative
     if (user.role === 'initiative') {
