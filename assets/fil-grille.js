@@ -97,10 +97,14 @@
   function vignettePost(p) {
     const promo = p.type === 'evenement_promo' && p.evenement_promo && p.evenement_promo.promo_active ? p.evenement_promo : null;
     if (p.type === 'evenement_promo' && !promo) return '';
-    const media = promo ? (promo.image ? { kind: 'image', url: promo.image, nb: 1 } : null) : mediaPrincipal(p);
-    const titre = promo ? promo.titre : texteSeul(p.titre);
+    /* Compte-rendu d'événement (2026-10-05) : image de l'événement, titre du compte-rendu,
+       aperçu du résumé quand il n'y a pas d'image. */
+    const cr = p.type === 'compte_rendu' && p.compte_rendu ? p.compte_rendu : null;
+    const media = promo ? (promo.image ? { kind: 'image', url: promo.image, nb: 1 } : null)
+      : (cr ? (cr.image ? { kind: 'image', url: cr.image, nb: 1 } : null) : mediaPrincipal(p));
+    const titre = promo ? promo.titre : (cr ? cr.titre : texteSeul(p.titre));
     const estRepost = (p.pub_type === 'repost' || p.type === 'repost') && p.original_post;
-    const texte = texteSeul(estRepost && !(p.corps || p.contenu)
+    const texte = cr ? texteSeul(cr.resume) : texteSeul(estRepost && !(p.corps || p.contenu)
       ? p.original_post.contenu
       : (p.pub_type === 'article' ? p.article_contenu : (p.corps != null ? p.corps : p.contenu)));
     let vignette;
@@ -113,7 +117,8 @@
       vignette = `<div class="fg-texte" style="background:linear-gradient(135deg,${c},${c}bb)"><span>${esc((texte || titre).slice(0, 150))}${(texte || titre).length > 150 ? '…' : ''}</span></div>`;
     }
     const badges = [];
-    if (promo) badges.push(`<span class="fg-badge fg-badge-promo">🔥 J-${Math.max(0, promo.jours_restants == null ? 0 : promo.jours_restants)}</span>`);
+    if (cr) badges.push(`<span class="fg-badge fg-badge-promo">📄 Compte-rendu</span>`);
+    else if (promo) badges.push(`<span class="fg-badge fg-badge-promo">🔥 J-${Math.max(0, promo.jours_restants == null ? 0 : promo.jours_restants)}</span>`);
     else if (p.categorie && p.categorie !== 'Publication') badges.push(`<span class="fg-badge">${esc(p.categorie)}</span>`);
     if (estRepost) badges.push(`<span class="fg-badge">🔁 Republié</span>`);
     if (media && media.nb > 1) badges.push(`<span class="fg-badge fg-badge-nb">⧉ ${media.nb}</span>`);

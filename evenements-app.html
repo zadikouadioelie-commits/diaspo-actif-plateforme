@@ -972,7 +972,7 @@ function renderEvts() {
         <div class="evt-actions">
           <button class="btn btn-outline" style="font-size:12px" onclick="openDetail(${evt.id})">Voir</button>
           <button class="btn btn-outline" style="font-size:12px" onclick="partagerEvenement(${evt.id})">📤 Partager</button>
-          ${evt.est_termine ? evtBoutonTermine(evt, inscrit, 12) : evt.inscription_ouverte === 0
+          ${evt.est_termine ? evtBoutonTermine(evt, inscrit, 12) + evtBoutonCompteRendu(evt, peutGerer, 12) : evt.inscription_ouverte === 0
             ? `<span class="btn btn-outline" style="font-size:12px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Informatif</span>`
             : (evt.lien_inscription
             ? `<a class="btn btn-orange" style="font-size:12px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
@@ -1002,6 +1002,70 @@ function renderEvts() {
 // Bouton affiché à la place de « S'inscrire » une fois l'événement terminé (liste et détail).
 function evtBoutonTermine(evt, inscrit, taille) {
   return `<span class="btn btn-outline" style="font-size:${taille}px;cursor:default;opacity:.8;" title="Les inscriptions sont closes">🏁 ${inscrit ? 'Terminé · vous étiez inscrit' : 'Événement terminé'}</span>`;
+}
+/* Compte-rendu d'événement (2026-10-05, demande explicite) : bouton bien visible sur tout événement
+   terminé. Publié → « Compte-rendu » pour tout le monde ; sinon, seul le créateur voit « Rédiger ». */
+function evtBoutonCompteRendu(evt, peutGerer, taille) {
+  const st = `font-size:${taille}px;text-decoration:none;font-weight:800;`;
+  if (evt.cr_statut === 'publie') return `<a class="btn btn-orange" style="${st}" href="compte-rendu.html?evt=${evt.id}">📄 Compte-rendu</a>`;
+  if (peutGerer) return `<a class="btn btn-orange" style="${st}" href="compte-rendu.html?evt=${evt.id}&edition=1">✍️ ${evt.cr_statut === 'brouillon' ? 'Reprendre le compte-rendu' : 'Rédiger le compte-rendu'}</a>`;
+  return '';
+}
+
+/* Zone « Ils ont participé » + réactions + commentaires, au bas du détail d'un événement : disponible
+   même sans compte-rendu (identifier les participants reste possible dans tous les cas). */
+const EVT_REACTIONS = ['👍', '❤️', '👏', '🔥'];
+async function evtChargerZoneCr(evt) {
+  const zone = document.getElementById('evt-cr-zone-' + evt.id); if (!zone) return;
+  const peutGerer = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (Number(CURRENT_USER.id) === Number(evt.owner_user_id) || CURRENT_USER.role === 'administrateur');
+  let ident = [], inter = { reactions: {}, mes_reactions: [], commentaires: [] };
+  try { ident = (await api('GET', '/evenements/' + evt.id + '/identifications')).identifies || []; } catch (e) {}
+  try { inter = await api('GET', '/evenements/' + evt.id + '/interactions'); } catch (e) {}
+  const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
+  zone.innerHTML = `
+    <div style="padding:0 20px 18px;">
+      <div class="section-divider">🤝 Ils ont participé</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+        ${ident.map(i => `<a href="profil.html?id=${i.user_id}" class="evt-tag" style="text-decoration:none;color:#2E74E0;font-weight:700;">@${esc(i.nom)}${peutGerer ? ` <span style="cursor:pointer;opacity:.7;" onclick="event.preventDefault();evtRetirerIdent(${evt.id},${i.user_id})" title="Retirer">×</span>` : ''}</a>`).join('') || '<span style="font-size:12.5px;color:var(--muted);">Personne n\'est encore identifié.</span>'}
+        ${peutGerer ? `<button type="button" class="btn btn-outline" style="font-size:12px;" onclick="evtIdentModal(${evt.id})">＋ Identifier un participant</button>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--border);padding-top:10px;margin-top:10px;">
+        ${EVT_REACTIONS.map(e => `<button type="button" class="btn btn-outline" style="font-size:13px;padding:4px 11px;${inter.mes_reactions.includes(e) ? 'background:#E8F0FD;border-color:#2E74E0;color:#2E74E0;' : ''}" onclick="evtReagir(${evt.id},'${e}')">${e} ${inter.reactions[e] || 0}</button>`).join('')}
+        <span style="margin-left:auto;font-size:12.5px;color:var(--muted);">${inter.commentaires.length} commentaire${inter.commentaires.length > 1 ? 's' : ''}</span>
+      </div>
+      ${inter.commentaires.map(c => `<div style="display:flex;gap:9px;margin-top:10px;font-size:14px;"><div style="width:32px;height:32px;border-radius:50%;background:#2E74E0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none;">${esc(String(c.auteur_nom || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase())}</div><div style="background:var(--bg);border-radius:12px;padding:7px 11px;"><b>${esc(c.auteur_nom)}</b> ${esc(c.contenu)}${c.supprimable ? ` <span style="cursor:pointer;color:#B91C1C;font-size:12px;" onclick="evtSupprimerCom(${evt.id},${c.id})" title="Supprimer">🗑</span>` : ''}</div></div>`).join('')}
+      ${connecte ? `<div style="display:flex;gap:8px;margin-top:12px;"><input id="evt-com-in-${evt.id}" maxlength="1000" placeholder="Écrire un commentaire…" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;font-size:14px;" onkeydown="if(event.key==='Enter'){event.preventDefault();evtCommenter(${evt.id});}"><button type="button" class="btn btn-orange" style="font-size:13px;" onclick="evtCommenter(${evt.id})">Commenter</button></div>` : '<p style="font-size:12.5px;color:var(--muted);margin-top:12px;"><a href="login.html" style="color:var(--orange);font-weight:700;">Connectez-vous</a> pour réagir et commenter.</p>'}
+    </div>`;
+}
+async function evtReagir(id, emoji) { try { await api('POST', '/evenements/' + id + '/reactions', { emoji }); evtChargerZoneCr(evtDetailCourant); } catch (e) { alert(e.message || 'Erreur'); } }
+async function evtCommenter(id) {
+  const inp = document.getElementById('evt-com-in-' + id); const t = inp ? inp.value.trim() : ''; if (!t) return;
+  try { await api('POST', '/evenements/' + id + '/commentaires', { contenu: t }); evtChargerZoneCr(evtDetailCourant); } catch (e) { alert(e.message || 'Erreur'); }
+}
+async function evtSupprimerCom(id, cid) { if (!confirm('Supprimer ce commentaire ?')) return; try { await api('DELETE', '/evenements/' + id + '/commentaires/' + cid); evtChargerZoneCr(evtDetailCourant); } catch (e) { alert(e.message || 'Erreur'); } }
+async function evtRetirerIdent(id, uid) { try { await api('DELETE', '/evenements/' + id + '/identifications/' + uid); evtChargerZoneCr(evtDetailCourant); } catch (e) { alert(e.message || 'Erreur'); } }
+function evtIdentModal(id) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(8,16,30,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10050;';
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:20px;">
+    <h3 style="margin:0 0 6px;">Identifier des participants</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;">Les comptes choisis reçoivent une notification. Possible même sans compte-rendu.</p>
+    <input id="evt-id-q" placeholder="Rechercher un nom…" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;font-size:14px;">
+    <div id="evt-id-l" style="border:1px solid var(--border);border-radius:12px;max-height:260px;overflow:auto;margin:10px 0;"></div>
+    <div style="text-align:right;"><button type="button" class="btn btn-orange" id="evt-id-ok" style="font-size:13px;">Terminé</button></div></div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+  const draw = async () => {
+    const q = document.getElementById('evt-id-q').value.trim(); let r = { suggestions: [] };
+    try { r = await api('GET', '/evenements/' + id + '/identifications/suggestions?q=' + encodeURIComponent(q)); } catch (e) {}
+    const l = document.getElementById('evt-id-l');
+    l.innerHTML = (r.suggestions || []).map(c => `<div data-u="${c.user_id}" style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;"><b>${esc(c.nom)}</b><span class="evt-tag" style="margin-left:auto;">${esc(c.detail || '')}</span></div>`).join('') || '<div style="padding:12px;font-size:12.5px;color:var(--muted);">Aucun résultat. Tapez au moins 2 lettres pour chercher un compte.</div>';
+    l.querySelectorAll('[data-u]').forEach(d => d.addEventListener('click', async () => {
+      try { await api('POST', '/evenements/' + id + '/identifications', { user_id: Number(d.dataset.u) }); draw(); evtChargerZoneCr(evtDetailCourant); } catch (e) { alert(e.message || 'Erreur'); }
+    }));
+  };
+  let t; document.getElementById('evt-id-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(draw, 250); });
+  document.getElementById('evt-id-ok').onclick = () => ov.remove(); draw();
 }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -1937,6 +2001,7 @@ window.openDetail = async function(id) {
     evtDetailCourant = evt;
     document.getElementById('evt-detail-content').innerHTML = renderEventDetail(evt, false);
     initCarousel('detail-carousel');
+    evtChargerZoneCr(evt);
     /* Bouton "Faire un don" partagé (2026-09-28, demande explicite) — distinct du bloc
        "Cagnottes liées" ci-dessus (campagnes explicitement associées à CET événement) : ici,
        le don mis en avant "partout" par le compte organisateur, quelle que soit sa nature. */
@@ -2135,7 +2200,7 @@ function renderEventDetail(evt, isPreview) {
         <strong style="font-size:13px;color:#166534;">Rejoindre la chaîne WhatsApp de l'événement</strong>
       </a>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-        ${evt.est_termine ? evtBoutonTermine(evt, inscritSet.has(evt.id), 13) : evt.inscription_ouverte === 0
+        ${evt.est_termine ? evtBoutonTermine(evt, inscritSet.has(evt.id), 13) + evtBoutonCompteRendu(evt, peutGererDetail && !isPreview, 13) : evt.inscription_ouverte === 0
           ? `<span class="btn btn-outline" style="font-size:13px;cursor:default;opacity:.75;" title="Événement informatif, sans inscription">ℹ️ Événement informatif — sans inscription</span>`
           : (evt.lien_inscription
           ? `<a class="btn btn-orange" style="font-size:13px;text-decoration:none;" href="${esc(evt.lien_inscription)}" target="_blank" rel="noopener">↗ S'inscrire</a>`
@@ -2177,6 +2242,7 @@ function renderEventDetail(evt, isPreview) {
     ${thumbsHTML}
     ${videosHTML}
     ${pdfHTML}
+    ${!isPreview ? `<div id="evt-cr-zone-${evt.id}"></div>` : ''}
   `;
 }
 

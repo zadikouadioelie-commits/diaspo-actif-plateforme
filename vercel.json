@@ -22,7 +22,8 @@
     { "path": "/api/cron/parrainage-expiration", "schedule": "0 18 * * *" },
     { "path": "/api/cron/junior-admin-rotation", "schedule": "0 4 1 * *" },
     { "path": "/api/cron/partenariat-echeances", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/recensement-purge", "schedule": "0 19 * * *" }
+    { "path": "/api/cron/recensement-purge", "schedule": "0 19 * * *" },
+    { "path": "/api/cron/evenements-compte-rendu", "schedule": "0 10 * * *" }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },

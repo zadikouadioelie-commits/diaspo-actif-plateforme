@@ -38,7 +38,7 @@ async function sendEmail({ to, subject, html }) {
    reprise du pourtour gravé du logo lui-même — jamais utilisée ailleurs sur la plateforme,
    ce qui la rend, elle aussi, spécifique à ce sceau. Table HTML + styles inline (pas de
    CSS externe, pas de background-clip:text) pour un rendu identique sur Gmail/Outlook. */
-function sceauHtml() {
+function sceauHtml(libelle = "L'Administration") {
   return `
       <div style="margin:34px 0 4px;padding-top:24px;border-top:1px solid #E2E8F0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
@@ -49,7 +49,7 @@ function sceauHtml() {
             <td style="vertical-align:middle;border-left:2px solid #F2761F;padding-left:18px;">
               <div style="font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:17px;letter-spacing:-.01em;color:#20242E;">DIASPO<span style="color:#F2761F;">'</span>ACTIF</div>
               <div style="font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C9460B;margin-top:3px;">Du Sud au Nord</div>
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#64748B;margin-top:7px;">L'Administration</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#64748B;margin-top:7px;">${libelle}</div>
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#94A3B8;margin-top:6px;">Actions locales <span style="color:#F2761F;">•</span> Impact global</div>
             </td>
           </tr>
@@ -943,4 +943,107 @@ function emailCommunicationInscription({ email, prenom, objet, message, evenemen
   });
 }
 
-module.exports = { sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
+/* ── Compte-rendu d'événement (2026-10-05, demande explicite) ── */
+
+const escMail = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Relance envoyée au créateur d'un événement terminé : félicitations, invitation à écrire le
+   compte-rendu (informer ceux qui n'étaient pas là, remercier ceux qui étaient là, garder la
+   trace de l'aventure), signée de l'équipe. `evenements` = liste {titre, date, lien} : un seul
+   événement (cas normal) ou plusieurs événements passés regroupés en un seul message. */
+function emailCompteRenduRelance({ to, prenom, evenements }) {
+  const liste = Array.isArray(evenements) ? evenements : [];
+  const unique = liste.length === 1;
+  const sujet = unique
+    ? `Bravo pour « ${liste[0].titre} » : racontez-nous cette belle journée`
+    : `Bravo pour vos ${liste.length} événements : racontez-nous ces belles aventures`;
+  const bloc = liste.slice(0, 8).map(e => `
+        <tr><td style="padding:10px 0;border-bottom:1px solid #E8EFFE;">
+          <div style="font-weight:800;color:#0D1B2A;font-size:15px;">${escMail(e.titre)}</div>
+          ${e.date ? `<div style="font-size:12.5px;color:#64748B;margin-top:2px;">${escMail(e.date)}</div>` : ""}
+          <a href="${escMail(e.lien)}" style="display:inline-block;margin-top:8px;background:#F26422;color:#1f0e02;text-decoration:none;font-weight:800;font-size:13.5px;padding:9px 18px;border-radius:9px;">Rédiger le compte-rendu →</a>
+        </td></tr>`).join("");
+  const reste = liste.length > 8 ? `<p style="color:#64748B;font-size:13px;margin:12px 0 0;">… et ${liste.length - 8} autre(s) événement(s) à retrouver dans votre espace.</p>` : "";
+  return sendEmail({
+    to,
+    subject: `${sujet} — Diaspo'Actif`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#FFF7ED;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:580px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(242,100,34,.12);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:30px;text-align:center;">
+      <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+      <div style="color:rgba(255,255,255,.65);font-size:13px;margin-top:4px;">Du Sud au Nord</div>
+    </div>
+    <div style="padding:34px 32px;">
+      <h1 style="margin:0 0 14px;font-size:22px;font-weight:900;color:#0D1B2A;line-height:1.3;">🎉 Félicitations${prenom ? ", " + escMail(prenom) : ""} !</h1>
+      <p style="color:#334155;line-height:1.75;margin:0 0 14px;font-size:15px;">
+        ${unique ? "Votre événement est terminé" : "Vos événements sont terminés"}, et c'est une belle réussite : organiser, mobiliser, accueillir, tout cela demande du temps, de l'énergie et du cœur. <b>Toute l'équipe de Diaspo'Actif vous adresse ses plus chaleureuses félicitations.</b>
+      </p>
+      <p style="color:#334155;line-height:1.75;margin:0 0 10px;font-size:15px;">Nous vous encourageons à écrire un <b>compte-rendu</b>. C'est simple (un canevas vous guide pas à pas) et il sert à plusieurs choses :</p>
+      <ul style="color:#334155;line-height:1.8;margin:0 0 18px;padding-left:20px;font-size:14.5px;">
+        <li><b>Informer</b> celles et ceux qui n'ont pas pu être présents ;</li>
+        <li><b>Remercier</b> les personnes présentes, les bénévoles et les partenaires ;</li>
+        <li><b>Garder une trace</b> de cette belle aventure, pour vous et pour la communauté.</li>
+      </ul>
+      <p style="color:#334155;line-height:1.75;margin:0 0 6px;font-size:15px;">Il sera publié dans le fil d'actualité et rattaché à l'événement, avec les photos, la vidéo et les personnes que vous identifiez. Vous pouvez aussi l'envoyer par e-mail à vos participants.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:14px 0 4px;">${bloc}</table>
+      ${reste}
+      <p style="color:#334155;line-height:1.75;margin:22px 0 0;font-size:15px;">Merci de faire vivre la diaspora, et encore bravo !</p>
+      ${sceauHtml("L'équipe Diaspo'Actif")}
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+/* Diffusion du compte-rendu par le créateur à ses participants / contacts. Le résumé complet est
+   envoyé (texte), avec un lien vers la version détaillée, l'étape suivante en évidence et un lien
+   de désinscription (un destinataire qui l'utilise n'est plus jamais ciblé par ces envois). */
+function emailCompteRenduDiffusion({ to, prenom, objet, evenementTitre, auteurNom, resume, etapeTexte, etapeDate, lien, lienDesinscription }) {
+  const paragraphes = String(resume || "").split(/\n\s*\n/).map(p => `<p style="margin:0 0 12px;color:#334155;line-height:1.75;font-size:15px;">${escMail(p).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, "@$1").replace(/\n/g, "<br>")}</p>`).join("");
+  const etape = (etapeTexte || etapeDate) ? `
+      <div style="border:2px solid #F26422;background:#FFF1E8;border-radius:12px;padding:14px 16px;margin:18px 0;">
+        <div style="font-size:11.5px;font-weight:800;letter-spacing:.06em;color:#C9460B;">L'ÉTAPE SUIVANTE</div>
+        ${etapeDate ? `<div style="font-weight:800;color:#0D1B2A;margin-top:4px;">${escMail(etapeDate)}</div>` : ""}
+        ${etapeTexte ? `<div style="color:#334155;margin-top:4px;line-height:1.6;font-size:14.5px;">${escMail(etapeTexte)}</div>` : ""}
+      </div>` : "";
+  return sendEmail({
+    to,
+    subject: objet || `Compte-rendu : ${evenementTitre}`,
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F3F6FB;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:600px;margin:36px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(13,43,78,.12);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:26px 30px;">
+      <div style="font-size:12px;color:rgba(255,255,255,.65);letter-spacing:.08em;text-transform:uppercase;">Compte-rendu</div>
+      <div style="font-size:21px;font-weight:900;color:#fff;margin-top:4px;line-height:1.3;">${escMail(evenementTitre)}</div>
+    </div>
+    <div style="padding:30px 32px;">
+      <p style="margin:0 0 14px;color:#0D1B2A;font-weight:800;font-size:15px;">Bonjour${prenom ? " " + escMail(prenom) : ""},</p>
+      ${paragraphes}
+      ${etape}
+      <div style="text-align:center;margin:26px 0 6px;">
+        <a href="${escMail(lien)}" style="display:inline-block;background:#F26422;color:#1f0e02;text-decoration:none;font-weight:800;font-size:15px;padding:13px 30px;border-radius:10px;">Lire le compte-rendu complet →</a>
+      </div>
+      <p style="margin:22px 0 0;color:#64748B;font-size:13px;">Message de ${escMail(auteurNom)}, envoyé via Diaspo'Actif.</p>
+    </div>
+    <div style="background:#F8FAFF;padding:14px 30px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;line-height:1.6;">Vous recevez ce message parce que vous êtes inscrit à cet événement ou parce que l'organisateur a choisi de vous l'envoyer.<br>
+      <a href="${escMail(lienDesinscription)}" style="color:#64748B;">Ne plus recevoir ces comptes-rendus</a> · Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };

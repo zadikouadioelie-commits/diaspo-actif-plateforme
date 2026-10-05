@@ -127,6 +127,7 @@ const IA_TABS = [
   { key: 'traitement_candidatures', label: 'Traitement candidatures', emoji: '📋' },
   { key: 'validation', label: 'Validation', emoji: '✅' },
   { key: 'public', label: 'Aperçu public', emoji: '🌐' },
+  { key: 'programme', label: 'Programme', emoji: '🗓️' },
   { key: 'communication', label: 'Communication', emoji: '📧' },
   { key: 'qr', label: 'Contrôle QR', emoji: '🎟️' },
   { key: 'presences', label: 'Présences', emoji: '👥' },
@@ -1306,6 +1307,7 @@ function renderTabContent() {
     case 'candidature': return renderCandidature();
     case 'traitement_candidatures': return renderTraitementCandidatures();
     case 'public': return renderPublic();
+    case 'programme': return renderProgramme();
     case 'communication': return renderCommunication();
     case 'qr': return renderQr();
     case 'presences': return renderPresences();
@@ -2287,6 +2289,34 @@ function iaRenderLogosApercu(titre, jsonStr) {
     </div>`;
 }
 
+// ---- Programme (2026-10-05, demande explicite) ----
+/* Programme de la journée : texte + pièce jointe (PDF ou image). Même contenu que « Programme / Déroulé »
+   de l'événement : l'organisateur renseigne l'un OU l'autre, le compte-rendu lit les deux. */
+let IA_PROG_FICHIER = undefined; // undefined = inchangé ; {url, nom} = nouveau ; null = retiré
+function renderProgramme() {
+  const f = (state.ficheDetail && state.ficheDetail.fiche) || {};
+  const fichier = IA_PROG_FICHIER !== undefined ? IA_PROG_FICHIER : (f.programme_fichier_url ? { url: f.programme_fichier_url, nom: f.programme_fichier_nom } : null);
+  return `
+    ${iaConsigne("Le programme de la journée : horaires, ateliers, temps forts. Il est utilisé pour pré-remplir le compte-rendu après l'événement. Vous pouvez aussi le saisir à la création de l'événement : le compte-rendu lit les deux emplacements.")}
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;max-width:760px;">
+      <h3 style="margin:0 0 12px;font-size:15px;font-weight:700;">🗓️ Programme de l'événement</h3>
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Déroulé <span style="font-weight:400;color:oklch(0.55 0.006 30);">(une ligne par temps fort)</span></label>
+      <textarea id="ia-prog-texte" maxlength="8000" placeholder="9h00 — Accueil&#10;10h00 — Table ronde&#10;12h30 — Déjeuner networking&#10;14h00 — Clôture" style="width:100%;min-height:160px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;">${escH(f.programme_texte || '')}</textarea>
+      <div style="margin:14px 0 6px;font-size:12px;font-weight:600;">Pièce jointe <span style="font-weight:400;color:oklch(0.55 0.006 30);">(PDF ou image, 15 Mo max)</span></div>
+      ${fichier ? `<div style="display:flex;align-items:center;gap:10px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;padding:8px 10px;margin-bottom:8px;">
+          <span>📄</span><a href="${escH(fichier.url)}" target="_blank" rel="noopener" style="flex:1;font-size:13px;color:oklch(0.2 0.006 30);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escH(fichier.nom || 'Programme')}</a>
+          <button style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:15px;cursor:pointer;" data-action="programmeRetirerFichier" title="Retirer">✕</button></div>` : ''}
+      <label style="display:inline-block;background:#fff;border:1.5px dashed oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;">
+        ${fichier ? 'Remplacer le fichier' : '+ Ajouter un fichier'}
+        <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" data-action="programmeFichier" style="display:none;">
+      </label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;">
+        <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:10px 18px;border-radius:8px;cursor:pointer;" data-action="programmeEnregistrer">💾 Enregistrer le programme</button>
+        <button style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;" data-action="programmeReprendre" title="Reprendre le programme saisi à la création de l'événement lié">↩︎ Reprendre le programme de l'événement</button>
+      </div>
+    </div>`;
+}
+
 // ---- Communication ----
 function renderCommunication() {
   const types = currentTypes().map(buildTypeVM);
@@ -3025,6 +3055,40 @@ const actions = {
       IA_STAGED_MEDIA = null;
       ia_toast('Document ajouté.', true);
       await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  /* Programme de la fiche (2026-10-05) — le texte saisi n'est pas perdu quand on change de fichier :
+     il est relu depuis le champ avant chaque nouvel affichage de l'onglet. */
+  async programmeFichier(el) {
+    const file = el.files[0]; if (!file) return;
+    const texte = document.getElementById('ia-prog-texte')?.value || '';
+    try {
+      const url = await uploadMedia(file, 'document');
+      state.ficheDetail.fiche.programme_texte = texte; IA_PROG_FICHIER = { url, nom: file.name };
+      render();
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  programmeRetirerFichier() {
+    state.ficheDetail.fiche.programme_texte = document.getElementById('ia-prog-texte')?.value || '';
+    IA_PROG_FICHIER = null; render();
+  },
+  async programmeEnregistrer() {
+    const f = state.ficheDetail.fiche;
+    const fichier = IA_PROG_FICHIER !== undefined ? IA_PROG_FICHIER : (f.programme_fichier_url ? { url: f.programme_fichier_url, nom: f.programme_fichier_nom } : null);
+    try {
+      await api('PUT', `/insc/fiches/${state.selectedFicheId}`, { programme_texte: document.getElementById('ia-prog-texte').value, programme_fichier_url: fichier ? fichier.url : null, programme_fichier_nom: fichier ? fichier.nom : null });
+      IA_PROG_FICHIER = undefined; ia_toast('Programme enregistré.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  async programmeReprendre() {
+    try {
+      const r = await api('GET', `/insc/fiches/${state.selectedFicheId}/programme-evenement`);
+      const p = (r.programmes || [])[0];
+      if (!p) { ia_toast("Aucun programme n'est renseigné sur l'événement lié.", false); return; }
+      state.ficheDetail.fiche.programme_texte = p.texte || '';
+      if (p.fichier_url) IA_PROG_FICHIER = { url: p.fichier_url, nom: p.fichier_nom || 'Programme' };
+      render(); ia_toast("Programme repris de « " + p.titre + " » : vérifiez puis enregistrez.", true);
     } catch (e) { ia_toast(e.message, false); }
   },
   async supprimerMedia(el) {

@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/assets/logo.png">
+<title>Diaspo'Actif — Compte-rendu d'événement</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Diaspo'Actif">
+<meta property="og:title" content="Diaspo'Actif — Compte-rendu d'événement">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="assets/styles.v2.css">
+<link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
+<link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=1">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6b00">
+<style>
+.crp{max-width:900px;margin:0 auto;padding:20px 16px 80px;color:var(--text,#1f2937)}
+.crp h1{font-size:24px;line-height:1.25;margin:0 0 6px}
+.crp h2{font-size:18px;margin:26px 0 8px;color:#0D2B4E}
+.crp h3{font-size:15px;margin:16px 0 4px}
+.crp-card{background:#fff;border:1px solid var(--border,#DCE4F0);border-radius:14px;padding:18px;margin-bottom:16px}
+.crp-meta{color:var(--muted,#5B6B82);font-size:13px;margin-bottom:12px}
+.crp-note{font-size:12.5px;color:var(--muted,#5B6B82)}
+.crp-lbl{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#2E74E0;margin:18px 0 6px}
+.crp-sum{background:#E8F0FD;border-left:4px solid #2E74E0;border-radius:0 12px 12px 0;padding:14px 16px}
+.crp-sum p{margin:0 0 10px;line-height:1.7}.crp-sum p:last-child{margin:0}
+.crp-det p{white-space:pre-wrap;margin:0 0 6px;line-height:1.7}
+.crp-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.crp-tile{height:90px;border-radius:10px;color:#fff;display:flex;align-items:flex-end;padding:8px 10px;font-size:13px;font-weight:700}
+.crp-fld{margin-bottom:14px;position:relative}
+.crp-fld>label{display:flex;justify-content:space-between;font-weight:700;font-size:14px;margin-bottom:4px;gap:8px}
+.crp-fld>label em{font-weight:500;color:var(--muted,#5B6B82);font-style:normal;font-size:12.5px}
+.crp input,.crp textarea,.crp select{font:inherit;font-size:14px;border:1.5px solid var(--border,#DCE4F0);border-radius:10px;padding:9px 12px;background:#fff;color:inherit}
+.crp-fld input,.crp-fld textarea,.crp-fld select{width:100%;box-sizing:border-box}
+.crp textarea{min-height:84px;resize:vertical}
+.crp-hint{font-size:12.5px;color:var(--muted,#5B6B82);margin-top:3px}
+.crp-count{font-size:12.5px;color:var(--muted,#5B6B82);text-align:right;font-variant-numeric:tabular-nums}
+.crp-count.warn{color:#F26422;font-weight:700}
+.crp-seg{display:flex;gap:6px;flex-wrap:wrap}
+.crp-seg button{border:1.5px solid var(--border,#DCE4F0);background:#fff;border-radius:99px;padding:6px 13px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.crp-seg button.on{background:#0D2B4E;color:#fff;border-color:#0D2B4E}
+.crp-prefill{border:1.5px dashed #2E74E0;background:#E8F0FD;border-radius:12px;padding:12px 14px;margin:0 0 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.crp-prefill div{flex:1;min-width:220px;font-size:13.5px}
+.crp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.crp-chip{background:#E8F0FD;color:#2E74E0;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700;display:inline-flex;gap:6px;align-items:center;text-decoration:none}
+.crp-chip .x{cursor:pointer;opacity:.7;font-weight:800}
+.crp-chip.add{background:none;border:1.5px dashed var(--border,#DCE4F0);color:var(--muted,#5B6B82);cursor:pointer;font-family:inherit}
+.crp-chip.ext{background:#E3F5EB;color:#16794C}
+.crp-photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.crp-photos div{position:relative;width:84px;height:84px;border-radius:10px;overflow:hidden;background:#eee}
+.crp-photos img{width:100%;height:100%;object-fit:cover}
+.crp-photos button{position:absolute;top:3px;right:3px;border:none;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;padding:0}
+.crp-grp{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0}
+.crp-grp label{display:flex;gap:8px;align-items:center;border:1.5px solid var(--border,#DCE4F0);border-radius:10px;padding:10px 12px;cursor:pointer;font-weight:700;font-size:14px}
+.crp-grp label.sel{border-color:#2E74E0;background:#E8F0FD}
+.crp-grp small{display:block;color:var(--muted,#5B6B82);font-weight:500}
+.crp-list{border:1px solid var(--border,#DCE4F0);border-radius:12px;max-height:240px;overflow:auto}
+.crp-list label{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border,#DCE4F0);font-size:14px;cursor:pointer}
+.crp-list label:last-child{border-bottom:none}
+.crp-list label.inc{opacity:.55}
+.crp-q{margin-left:auto;font-size:12px;font-weight:700;color:#2E74E0;background:#E8F0FD;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.crp-extform{display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px}
+.crp-ev{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border,#DCE4F0);flex-wrap:wrap}
+.crp-ev:last-child{border-bottom:none}
+.crp-ev b{display:block}
+.crp-st{font-size:11.5px;font-weight:800;border-radius:99px;padding:2px 10px;white-space:nowrap}
+.crp-st.todo{background:#FFF1E8;color:#C9460B}.crp-st.draft{background:#FEF3C7;color:#92400E}.crp-st.pub{background:#DCFCE7;color:#166534}
+.crp-ov{position:fixed;inset:0;background:rgba(8,16,30,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9999}
+.crp-modal{background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:20px}
+.crp-modal h2{margin:0 0 10px}
+.crp-pick{border:1px solid var(--border,#DCE4F0);border-radius:12px;max-height:260px;overflow:auto;margin:10px 0}
+.crp-pick>div{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border,#DCE4F0);cursor:pointer}
+.crp-pick>div:hover{background:#E8F0FD}.crp-pick>div:last-child{border-bottom:none}
+.crp-src{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid var(--border,#DCE4F0);font-size:14px}
+.crp-src:last-child{border-bottom:none}
+.crp-src small{display:block;color:var(--muted,#5B6B82)}
+.crp-ac{position:absolute;z-index:20;background:#fff;border:1px solid var(--border,#DCE4F0);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:230px;max-height:200px;overflow:auto}
+.crp-ac div{padding:8px 12px;cursor:pointer;font-size:13.5px}.crp-ac div.act,.crp-ac div:hover{background:#E8F0FD}
+.crp-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0D2B4E;color:#fff;padding:11px 18px;border-radius:12px;font-weight:700;font-size:14px;z-index:10000;max-width:90vw}
+.crp-react{display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border,#DCE4F0);padding-top:10px;margin-top:14px}
+.crp-r{border:1.5px solid var(--border,#DCE4F0);background:#fff;border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;font-weight:600;font-family:inherit}
+.crp-r.on{background:#E8F0FD;border-color:#2E74E0;color:#2E74E0}
+.crp-cm{display:flex;gap:9px;margin-top:10px;font-size:14px}
+.crp-cm .av{width:32px;height:32px;border-radius:50%;background:#2E74E0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none}
+.crp-cm .bub{background:var(--bg,#F3F6FB);border-radius:12px;padding:7px 11px}
+.crp-cm small{display:block;color:var(--muted,#5B6B82);font-size:11.5px}
+.crp-cin{display:flex;gap:8px;margin-top:12px;position:relative}.crp-cin input{flex:1}
+@media (max-width:560px){.crp-extform{grid-template-columns:1fr}.crp h1{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Menu">&#9776;</button>
+      <div class="logo"><img loading="lazy" class="logo-img" src="assets/logo.png" alt="Diaspo'Actif"> DIASPO'ACTIF</div>
+      <nav class="nav">
+        <a href="index.html">Accueil</a>
+        <a href="annuaire.html">Annuaire</a>
+        <a href="vitrines.html">Boutiques</a>
+        <a href="fil-actualite.html">Fil</a>
+        <a href="formations.html">Formations</a>
+        <a href="messagerie.html">Messages</a>
+      </nav>
+      <div class="topbar-right">
+        <select class="lang-select" id="lang-select"></select>
+        <div id="auth-area" class="auth-area"></div>
+      </div>
+    </div>
+  </header>
+  <main class="crp" id="crp"><div class="crp-note">Chargement…</div></main>
+</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/demo.js?v=2"></script>
+<script src="assets/app.js?v=13"></script>
+<script src="assets/upload-media.js"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const RESUME_MAX = 2500;
+const GRAD = [['#2E74E0', '#0D2B4E'], ['#F26422', '#0D2B4E'], ['#16794C', '#0D2B4E'], ['#8B5CF6', '#0D2B4E'], ['#D9467A', '#0D2B4E'], ['#0E8FA6', '#0D2B4E']];
+const FIL_REACTIONS = [{ type: 'like', emoji: '❤️' }, { type: 'applause', emoji: '👏' }, { type: 'feliciter', emoji: '🎉' }, { type: 'inspirant', emoji: '🔥' }];
+
+/* Canevas par type d'événement : [titre de section, consigne]. Tout est facultatif. */
+const CANEVAS = {
+  eco:   { label: '🤝 Économique', hint: "Chiffres, partenariats et retombées : pensé pour les rencontres d'affaires, salons et forums.", champs: [
+    ['Contexte et objectifs', "Pourquoi cet événement ? Quels objectifs ? Ont-ils été atteints ?"],
+    ['Déroulé', "Les temps forts dans l'ordre, avec les heures."],
+    ['Participation', "Nombre de présents, répartition par profil."],
+    ['Résultats et chiffres', "Contacts noués, fonds collectés, actions menées."],
+    ['Partenariats et contacts', "Accords signés, pistes ouvertes, personnes à recontacter."],
+    ['Difficultés et leçons apprises', "Ce qui n'a pas marché, ce que vous referiez autrement."],
+    ['Décisions et suites', "Qui fait quoi, pour quand ?"],
+    ['Remerciements', "Participants, bénévoles, partenaires. @ ou * pour les identifier."]] },
+  fes:   { label: '🎉 Festif', hint: "Ambiance, animations et souvenirs : pensé pour les fêtes, concerts et rencontres conviviales.", champs: [
+    ["L'ambiance", "Comment s'est passée la journée ? Quelle atmosphère ?"],
+    ['Programme et animations', "Ce qui s'est passé, dans l'ordre."],
+    ['Les moments forts', "Ce dont on se souviendra."],
+    ['Participation', "Combien de personnes ? Quels publics ?"],
+    ['Coulisses et organisation', "Ce que le public n'a pas vu."],
+    ["Ce qu'on referait autrement", "Idées pour la prochaine fois."],
+    ['Remerciements', "Bénévoles, artistes, partenaires. @ ou * pour les identifier."]] },
+  pol:   { label: '🏛️ Politique', hint: "Enjeux, positions et engagements : pensé pour les débats, conférences et réunions publiques.", champs: [
+    ['Contexte et enjeux', "Pourquoi cette rencontre ? Quels enjeux ?"],
+    ['Positions exprimées', "Les grandes positions, par intervenant ou par camp."],
+    ['Débats marquants', "Les échanges importants, les points de désaccord."],
+    ['Engagements pris', "Ce qui a été promis, par qui, pour quand."],
+    ['Participation', "Qui était là ?"],
+    ['Suites', "Les prochaines étapes."],
+    ['Remerciements', "Intervenants, organisateurs. @ ou * pour les identifier."]] },
+  forum: { label: '💬 Forum', hint: "Thèmes, ateliers et échanges : pensé pour les forums, colloques et conférences à plusieurs interventions.", champs: [
+    ['Thème et problématique', "Quel était le thème ? Quelle question centrale ?"],
+    ['Programme et ateliers', "Les conférences, tables rondes et ateliers, avec les horaires."],
+    ['Intervenants', "Qui est intervenu, sur quel sujet ?"],
+    ['Idées et conclusions des ateliers', "Ce qui est ressorti des échanges."],
+    ['Participation', "Combien de personnes ? Quels profils ?"],
+    ['Recommandations et suites', "Les recommandations formulées, les actions à mener."],
+    ['Remerciements', "Intervenants, partenaires, organisateurs. @ ou * pour les identifier."]] },
+  edu:   { label: '🎓 Éducatif', hint: "Apprentissages, public visé et suites pédagogiques : pensé pour les formations, ateliers et journées d'orientation.", champs: [
+    ['Public visé et objectifs pédagogiques', "À qui s'adressait l'événement ? Que devait-on apprendre ?"],
+    ['Contenu et déroulé', "Les séquences, les intervenants, les méthodes."],
+    ['Participation', "Nombre d'apprenants, âges, établissements."],
+    ['Ce qui a été appris ou produit', "Compétences acquises, travaux réalisés, retours."],
+    ['Évaluation et retours des participants', "Satisfaction, points à améliorer."],
+    ['Suites et ressources', "Supports remis, prochaines sessions."],
+    ['Remerciements', "Intervenants, établissements, bénévoles. @ ou * pour les identifier."]] },
+  spi:   { label: '🕊️ Spirituel', hint: "Recueillement, partage et communauté : pensé pour les célébrations, retraites et rencontres de foi.", champs: [
+    ['Le sens de la rencontre', "Pourquoi se retrouver ? Quelle intention ?"],
+    ['Déroulé', "Les temps de prière, de partage, d'enseignement."],
+    ['Les temps forts', "Les moments marquants, les messages reçus."],
+    ['Participation', "Combien de personnes, quelles communautés ?"],
+    ['Témoignages', "Paroles de participants."],
+    ['Suites', "Prochaines rencontres, engagements pris."],
+    ['Remerciements', "Équipe, bénévoles, lieu d'accueil. @ ou * pour les identifier."]] },
+  san:   { label: '🩺 Santé', hint: "Prévention, dépistage et information : pensé pour les journées santé, campagnes et actions médicales.", champs: [
+    ['Enjeu de santé et public visé', "Quelle problématique ? Quel public ?"],
+    ['Actions menées', "Dépistages, consultations, ateliers, informations."],
+    ['Intervenants et professionnels', "Médecins, infirmiers, associations présentes."],
+    ['Chiffres clés', "Nombre de personnes reçues, de dépistages, d'orientations."],
+    ['Constats et besoins repérés', "Ce que l'événement a révélé."],
+    ['Suivi et orientation', "Que devient-on après ? Relais, rendez-vous, partenaires de soins."],
+    ['Remerciements', "Professionnels, bénévoles, partenaires. @ ou * pour les identifier."]] },
+  ing:   { label: '⚙️ Ingénierie', hint: "Projets techniques, démonstrations et solutions : pensé pour les salons techniques, hackathons et ateliers d'ingénierie.", champs: [
+    ['Problématique technique et objectifs', "Quel défi technique ? Quels objectifs ?"],
+    ['Projets et solutions présentés', "Projets, prototypes, démonstrations."],
+    ['Déroulé', "Les sessions, démonstrations, ateliers."],
+    ['Participants et compétences', "Profils, domaines d'expertise, équipes."],
+    ['Résultats techniques', "Prototypes réalisés, tests, mesures, livrables."],
+    ['Difficultés et enseignements', "Obstacles techniques, enseignements."],
+    ['Suites et collaborations', "Industrialisation, partenariats, prochaines étapes."],
+    ['Remerciements', "Ingénieurs, partenaires, structures d'accueil. @ ou * pour les identifier."]] },
+  autre: { label: '✍️ Autre type', hint: "Votre type d'événement n'est pas dans la liste ? Écrivez-le ci-dessous : un canevas général vous guide.", champs: [
+    ['Contexte et objectifs', "Pourquoi cet événement ? Quels objectifs ?"],
+    ['Déroulé', "Les temps forts dans l'ordre."],
+    ['Participation', "Nombre de présents, profils."],
+    ['Résultats', "Ce qui a été accompli."],
+    ['Difficultés et leçons apprises', "Ce que vous referiez autrement."],
+    ['Suites', "Qui fait quoi, pour quand ?"],
+    ['Remerciements', "Participants, partenaires. @ ou * pour les identifier."]] },
+  blanc: { label: '📄 Page blanche', hint: "Aucun guide : un seul grand espace de rédaction libre.", champs: [['Texte libre', "Écrivez comme vous le souhaitez."]] },
+};
+
+const ST = { evtId: null, data: null, user: null, ed: null, mail: null };
+
+/* ---------- utilitaires ---------- */
+function toast(m) { const t = document.createElement('div'); t.className = 'crp-toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 3000); }
+function modal(html, onReady) {
+  const ov = document.createElement('div'); ov.className = 'crp-ov'; ov.innerHTML = '<div class="crp-modal">' + html + '</div>';
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov); if (onReady) onReady(ov, () => ov.remove()); return ov;
+}
+function mentionHtml(s) {
+  let h = esc(s || '');
+  h = h.replace(/[@*]\[([^\]]+)\]\(([uic]):(\d+)\)/g, (m, nom, t, id) => {
+    const href = { u: 'profil.html?id=', i: 'initiative.html?id=', c: 'profil-collectivite.html?id=' }[t] + id;
+    return '<a href="' + href + '" class="crp-chip" style="padding:0 6px">@' + nom + '</a>';
+  });
+  return h.replace(/\n/g, '<br>');
+}
+const fmtDate = d => d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+const fmtDateCourte = d => d ? new Date(String(d).slice(0, 10) + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+
+/* ---------- autocomplétion @ et * (propositions : inscrits de l'événement + recherche de comptes) ---------- */
+function attachMention(el) {
+  let box = null, idx = 0, items = [], timer = null;
+  const close = () => { if (box) box.remove(); box = null; };
+  async function chercher(q) {
+    try { const r = await api('GET', `/evenements/${ST.evtId}/identifications/suggestions?q=${encodeURIComponent(q)}`); items = (r.suggestions || []).slice(0, 6); } catch (_) { items = []; }
+    if (!items.length) { close(); return; }
+    idx = 0;
+    if (!box) { box = document.createElement('div'); box.className = 'crp-ac'; el.parentNode.style.position = 'relative'; el.parentNode.appendChild(box); box.style.left = '0'; box.style.top = (el.offsetTop + el.offsetHeight + 2) + 'px'; }
+    box.innerHTML = items.map((c, i) => '<div class="' + (i === 0 ? 'act' : '') + '" data-i="' + i + '"><b>' + esc(c.nom) + '</b> <span class="crp-note">' + esc(c.detail || '') + '</span></div>').join('');
+    $$('div', box).forEach(d => d.addEventListener('mousedown', ev => { ev.preventDefault(); pick(items[d.dataset.i]); }));
+  }
+  function pick(c) {
+    const pos = el.selectionStart, before = el.value.slice(0, pos), after = el.value.slice(pos);
+    const nb = before.replace(/[@*]([^@*\n]*)$/, '@[' + c.nom + '](u:' + c.user_id + ') ');
+    el.value = nb + after; el.setSelectionRange(nb.length, nb.length); close(); el.focus(); el.dispatchEvent(new Event('input'));
+  }
+  el.addEventListener('input', () => {
+    const before = el.value.slice(0, el.selectionStart), m = before.match(/(^|\s)[@*]([^\s@*\[][^@*\n\[]{0,24}|)$/);
+    if (!m) { close(); return; }
+    clearTimeout(timer); timer = setTimeout(() => chercher(m[2].toLowerCase()), 180);
+  });
+  el.addEventListener('keydown', e => {
+    if (!box) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); }
+    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pick(items[idx]); return; }
+    else if (e.key === 'Escape') { close(); return; } else return;
+    $$('div', box).forEach((d, i) => d.classList.toggle('act', i === idx));
+  });
+  el.addEventListener('blur', () => setTimeout(close, 150));
+}
+
+/* ---------- identification des participants ---------- */
+function chipsIdentifies(editable) {
+  const l = (ST.data.identifies || []).map(i => '<a class="crp-chip" href="profil.html?id=' + i.user_id + '">@' + esc(i.nom) + '</a>' + '').join('');
+  const removable = (ST.data.identifies || []).map(i => '<span class="crp-chip">@' + esc(i.nom) + ' <span class="x" data-idrm="' + i.user_id + '">×</span></span>').join('');
+  return (editable ? removable : l) + (editable ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : '');
+}
+async function identModal() {
+  modal('<h2>Identifier des participants</h2><p class="crp-note">Choisissez les comptes qui ont participé à l\'événement. Ils reçoivent une notification. Vous pouvez le faire même sans compte-rendu.</p><input id="idq" placeholder="Rechercher un nom…" style="width:100%;box-sizing:border-box"><div class="crp-pick" id="idl"></div><div style="text-align:right"><button class="cr-btn pri" id="idok">Terminé</button></div>', (ov, close) => {
+    const draw = async () => {
+      const q = $('#idq', ov).value.trim();
+      let r = { suggestions: [] }; try { r = await api('GET', `/evenements/${ST.evtId}/identifications/suggestions?q=${encodeURIComponent(q)}`); } catch (_) {}
+      $('#idl', ov).innerHTML = (r.suggestions || []).map(c => '<div data-u="' + c.user_id + '"><b>' + esc(c.nom) + '</b><span class="crp-q">' + esc(c.detail || '') + '</span></div>').join('') || '<div class="crp-note" style="cursor:default">Aucun résultat. Tapez au moins 2 lettres pour chercher un compte.</div>';
+      $$('#idl > div[data-u]', ov).forEach(d => d.addEventListener('click', async () => {
+        try { const rr = await api('POST', `/evenements/${ST.evtId}/identifications`, { user_id: Number(d.dataset.u) }); ST.data.identifies = rr.identifies; refreshChips(); toast('Identifié(e) : notification envoyée'); draw(); }
+        catch (e) { toast(e.message || 'Erreur'); }
+      }));
+    };
+    let t; $('#idq', ov).addEventListener('input', () => { clearTimeout(t); t = setTimeout(draw, 250); }); draw(); $('#idok', ov).onclick = close;
+  });
+}
+function refreshChips() { const z = $('#crp-chips'); if (z) z.innerHTML = chipsIdentifies(!!(ST.ed || ST.data.peut_editer)); }
+document.addEventListener('click', async e => {
+  if (e.target.closest('[data-ident]')) { identModal(); return; }
+  const rm = e.target.closest('[data-idrm]');
+  if (rm) { try { const r = await api('DELETE', `/evenements/${ST.evtId}/identifications/${rm.dataset.idrm}`); ST.data.identifies = r.identifies; refreshChips(); } catch (err) { toast(err.message || 'Erreur'); } }
+});
+
+/* =================== LISTE : mes événements terminés =================== */
+async function vueListe() {
+  const root = $('#crp');
+  try {
+    const r = await api('GET', '/mes-evenements-compte-rendu');
+    const l = r.evenements || [];
+    root.innerHTML = '<h1>📄 Mes comptes-rendus</h1><p class="crp-note" style="margin:0 0 16px">Racontez vos événements terminés : informer ceux qui n\'ont pas pu venir, remercier ceux qui étaient là, garder une trace.</p>'
+      + '<div class="crp-card">' + (l.length ? l.map(e => {
+        const st = e.cr_statut === 'publie' ? '<span class="crp-st pub">Publié</span>' : e.cr_statut === 'brouillon' ? '<span class="crp-st draft">Brouillon</span>' : '<span class="crp-st todo">À rédiger</span>';
+        return '<div class="crp-ev"><div style="flex:1;min-width:200px"><b>' + esc(e.titre) + '</b><span class="crp-note">' + esc(fmtDateCourte(e.date_evt)) + (e.ville ? ' · ' + esc(e.ville) : '') + '</span></div>' + st
+          + '<a class="cr-btn ' + (e.cr_statut === 'publie' ? 'sec' : 'pri') + '" href="compte-rendu.html?evt=' + e.id + (e.cr_statut === 'publie' ? '&edition=1' : '') + '">' + (e.cr_statut === 'publie' ? 'Modifier' : e.cr_statut === 'brouillon' ? 'Reprendre' : 'Rédiger') + '</a></div>';
+      }).join('') : '<div class="crp-note" style="padding:18px 4px">Aucun événement terminé pour le moment.</div>') + '</div>';
+  } catch (e) { root.innerHTML = '<div class="crp-note">Impossible de charger vos événements.</div>'; }
+}
+
+/* =================== VUE PUBLIQUE =================== */
+function detailHtml(cr) {
+  const l = (cr.details || []).filter(d => d.texte);
+  if (!l.length) return '';
+  return '<h2>Pour aller plus loin : le retour d\'expérience détaillé</h2><div class="crp-det">' + l.map(d => (cr.type_cr === 'blanc' ? '' : '<h3>' + esc(d.titre) + '</h3>') + '<p>' + mentionHtml(d.texte) + '</p>').join('') + '</div>';
+}
+function etapeHtml(cr) {
+  if (!cr.etape_texte && !cr.etape_date) return '';
+  return '<div class="cr-etape"><div class="cr-etape-lbl">➡️ L\'étape suivante</div>' + (cr.etape_date ? '<div class="cr-etape-date">📅 ' + esc(fmtDateCourte(cr.etape_date)) + '</div>' : '') + (cr.etape_texte ? '<div class="cr-etape-txt">' + mentionHtml(cr.etape_texte) + '</div>' : '')
+    + (cr.etape_bouton && cr.etape_lien ? '<div class="cr-btns"><a class="cr-btn pri" href="' + esc(cr.etape_lien) + '" target="_blank" rel="noopener">' + esc(cr.etape_bouton) + '</a></div>' : '') + '</div>';
+}
+function videoHtml(url) {
+  if (!url) return '';
+  const fichier = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
+  return '<div class="cr-video">' + (fichier ? '<video controls preload="metadata"><source src="' + esc(url) + '"></video>' : '<a href="' + esc(url) + '" target="_blank" rel="noopener">▶ Voir la vidéo de l\'événement</a>') + '</div>';
+}
+function vuePublique() {
+  const d = ST.data, cr = d.compte_rendu, ev = d.evenement;
+  const root = $('#crp');
+  const brouillon = cr.statut !== 'publie';
+  root.innerHTML = (brouillon ? '<div class="crp-card" style="background:#FEF3C7;border-color:#F59E0B">Brouillon : seuls vous voyez ce compte-rendu. <a class="cr-link" href="compte-rendu.html?evt=' + ev.id + '&edition=1">Continuer la rédaction</a></div>' : '')
+    + '<div class="crp-card" style="padding:0;overflow:hidden"><div style="padding:0 18px"><div class="cr-cover"><span class="cr-tag">📅 ' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.image ? '<img src="' + esc(ev.image) + '" alt="">' : '') + (ev.ville ? '<span class="cr-lieu">📍 ' + esc(ev.ville) + '</span>' : '') + '</div></div>'
+    + '<div style="padding:4px 18px 18px"><h1>' + esc(cr.titre || ev.titre) + '</h1>'
+    + '<div class="crp-meta">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + (cr.type_cr === 'autre' && cr.type_libre ? ' · ' + esc(cr.type_libre) : (cr.type_cr && CANEVAS[cr.type_cr] ? ' · ' + esc(CANEVAS[cr.type_cr].label.replace(/^\S+\s/, '')) : '')) + '</div>'
+    + '<div class="crp-chips" id="crp-chips">Avec : </div>'
+    + '<div class="crp-sum"><div class="crp-lbl" style="margin:0 0 6px">Résumé</div>' + String(cr.resume || '').split(/\n\s*\n/).filter(Boolean).map(p => '<p>' + mentionHtml(p) + '</p>').join('') + '</div>'
+    + etapeHtml(cr) + videoHtml(cr.video_url)
+    + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
+    + detailHtml(cr)
+    + ((cr.forts || []).length ? '<h2>Les temps forts</h2><div class="crp-tiles">' + cr.forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
+    + '<div class="cr-btns" style="margin-top:18px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a>' : '') + '</div>'
+    + '<div id="crp-social"></div></div></div>';
+  const z = $('#crp-chips'); z.innerHTML = 'Avec : ' + (d.identifies.length ? chipsIdentifies(d.peut_editer) : '<span class="crp-note">Personne n\'est encore identifié.</span>' + (d.peut_editer ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : ''));
+  if (!d.identifies.length && !d.peut_editer) z.remove();
+  chargerSocial();
+}
+
+/* Réactions et commentaires du compte-rendu : ceux de son post du fil (même fil de discussion que le fil d'actualité) ;
+   à défaut de post (événement non public), ceux de l'événement. */
+async function chargerSocial() {
+  const box = $('#crp-social'); if (!box) return;
+  const cr = ST.data.compte_rendu, postId = cr.statut === 'publie' ? cr.fil_post_id : null;
+  const connecte = !!ST.user;
+  let reacts = {}, mine = {}, coms = [];
+  try {
+    if (postId) {
+      const [p, c] = await Promise.all([api('GET', `/fil/${postId}`), api('GET', `/fil/${postId}/commentaires`)]);
+      reacts = (p.post && p.post.reactions) || {}; coms = (c.commentaires || c.comments || c || []);
+      if (p.post && p.post.user_a_aime) mine.like = true;
+    } else {
+      const r = await api('GET', `/evenements/${ST.evtId}/interactions`);
+      reacts = r.reactions || {}; (r.mes_reactions || []).forEach(e => mine[e] = true);
+      coms = (r.commentaires || []).map(c => ({ id: c.id, auteur_nom: c.auteur_nom, contenu: c.contenu, created_at: c.created_at }));
+    }
+  } catch (_) {}
+  const types = postId ? FIL_REACTIONS.map(r => [r.type, r.emoji]) : Object.keys(reacts).map(e => [e, e]);
+  box.innerHTML = '<div class="crp-react">' + types.map(([k, em]) => '<button type="button" class="crp-r ' + (mine[k] ? 'on' : '') + '" data-rk="' + esc(k) + '">' + em + ' ' + (reacts[k] || 0) + '</button>').join('') + '<span class="crp-note" style="margin-left:auto">' + coms.length + ' commentaire' + (coms.length > 1 ? 's' : '') + '</span></div>'
+    + coms.map(c => '<div class="crp-cm"><div class="av">' + esc(String(c.auteur_nom || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()) + '</div><div class="bub"><b>' + esc(c.auteur_nom || '') + '</b> ' + mentionHtml(c.contenu) + '</div></div>').join('')
+    + (connecte ? '<div class="crp-cin"><input id="crp-cin" placeholder="Écrire un commentaire…"><button type="button" class="cr-btn sec" id="crp-cpost">Commenter</button></div>' : '<p class="crp-note" style="margin-top:12px"><a href="login.html" class="cr-link">Connectez-vous</a> pour réagir et commenter.</p>');
+  $$('[data-rk]', box).forEach(b => b.addEventListener('click', async () => {
+    if (!connecte) { location.href = 'login.html'; return; }
+    try { postId ? await api('POST', `/fil/${postId}/react`, { type: b.dataset.rk }) : await api('POST', `/evenements/${ST.evtId}/reactions`, { emoji: b.dataset.rk }); chargerSocial(); } catch (e) { toast(e.message || 'Erreur'); }
+  }));
+  const post = $('#crp-cpost', box);
+  if (post) post.addEventListener('click', async () => {
+    const t = $('#crp-cin', box).value.trim(); if (!t) return;
+    try { postId ? await api('POST', `/fil/${postId}/commentaires`, { contenu: t }) : await api('POST', `/evenements/${ST.evtId}/commentaires`, { contenu: t }); chargerSocial(); } catch (e) { toast(e.message || 'Erreur'); }
+  });
+}
+
+/* =================== ÉDITEUR =================== */
+function nouvelEd() {
+  const cr = ST.data.compte_rendu;
+  const ed = { type: (cr && cr.type_cr) || 'eco', libre: (cr && cr.type_libre) || '', titre: (cr && cr.titre) || ST.data.evenement.titre, resume: (cr && cr.resume) || '',
+    forts: cr ? [...(cr.forts || [])] : [], etape_texte: (cr && cr.etape_texte) || '', etape_date: (cr && cr.etape_date) || '', etape_bouton: (cr && cr.etape_bouton) || '', etape_lien: (cr && cr.etape_lien) || '',
+    video: (cr && cr.video_url) || '', medias: cr ? [...(cr.medias || [])] : [], saisie: {}, extras: [] };
+  Object.keys(CANEVAS).forEach(k => ed.saisie[k] = CANEVAS[k].champs.map(() => ''));
+  /* Les sections enregistrées sont redistribuées sur les champs du type courant (par titre) ; les autres restent visibles en « Autres sections ». */
+  (cr ? cr.details || [] : []).forEach(d => {
+    const i = CANEVAS[ed.type].champs.findIndex(c => c[0] === d.titre);
+    if (i >= 0) ed.saisie[ed.type][i] = d.texte; else ed.extras.push({ titre: d.titre, texte: d.texte });
+  });
+  return ed;
+}
+function collecterEd() {
+  const ed = ST.ed;
+  ed.titre = $('#ed-titre').value.trim(); ed.resume = $('#ed-resume').value; ed.libre = ($('#ed-libre') || {}).value || ed.libre;
+  ed.etape_texte = $('#ed-etxt').value; ed.etape_date = $('#ed-edate').value; ed.etape_bouton = $('#ed-ebtn').value; ed.etape_lien = $('#ed-elien').value; ed.video = $('#ed-video').value.trim();
+}
+function bodyEd() {
+  const ed = ST.ed;
+  const details = CANEVAS[ed.type].champs.map((c, i) => ({ titre: c[0], texte: ed.saisie[ed.type][i] || '' })).concat(ed.extras);
+  return { titre: ed.titre, type_cr: ed.type, type_libre: ed.type === 'autre' ? ed.libre : '', resume: ed.resume, details, forts: ed.forts, etape_texte: ed.etape_texte, etape_date: ed.etape_date || null, etape_bouton: ed.etape_bouton, etape_lien: ed.etape_lien, video_url: ed.video, medias: ed.medias };
+}
+async function sauver(silencieux) {
+  collecterEd();
+  const r = await api('PUT', `/evenements/${ST.evtId}/compte-rendu`, bodyEd());
+  ST.data.compte_rendu = r.compte_rendu;
+  if (!silencieux) toast('Brouillon enregistré');
+  return r;
+}
+function vueEditeur() {
+  const d = ST.data, ev = d.evenement, ed = ST.ed, cr = d.compte_rendu, publie = cr && cr.statut === 'publie';
+  const root = $('#crp');
+  root.innerHTML = '<h1>' + (publie ? '✏️ Modifier le compte-rendu' : '✍️ Rédiger le compte-rendu') + '</h1><div class="crp-meta">' + esc(ev.titre) + ' · ' + esc(fmtDateCourte(ev.date_evt)) + (ev.ville ? ' · ' + esc(ev.ville) : '') + '</div>'
+    + '<div class="crp-card">'
+    + '<div class="crp-prefill"><div><b>✨ Partir de l\'événement</b><br>Pré-remplir à partir de ce qui existe déjà : programme, fiche conceptuelle, photos, chiffres de la fiche d\'inscription et partenaires.</div><button class="cr-btn pri" id="ed-prefill">✨ Pré-remplir depuis l\'événement</button></div>'
+    + '<div class="crp-fld"><label>Titre</label><input id="ed-titre" maxlength="160"></div>'
+    + '<div class="crp-fld"><label>Type d\'événement</label><div class="crp-seg" id="ed-types"></div><div class="crp-hint" id="ed-typehint"></div><input id="ed-libre" maxlength="60" placeholder="Écrivez votre type d\'événement (ex. sportif, culturel, caritatif…)" style="display:none;margin-top:8px"></div>'
+    + '<div class="crp-lbl">Niveau 1 · Le résumé (affiché dans le fil)</div>'
+    + '<div class="crp-fld"><label>Résumé <em>1 page A4, police 14</em></label><textarea id="ed-resume" maxlength="' + RESUME_MAX + '" style="min-height:200px"></textarea><div class="crp-count" id="ed-cnt"></div><div class="crp-hint">Où, quand, avec qui, pourquoi, et ce qu\'il faut retenir. Tapez <b>@</b> ou <b>*</b> pour identifier un compte.</div></div>'
+    + '<div class="crp-lbl">L\'étape suivante · ce qui arrive après l\'événement</div>'
+    + '<div class="crp-fld"><label>Et maintenant ? <em>mis en avant dans le fil, la page et l\'e-mail</em></label><textarea id="ed-etxt" maxlength="500" style="min-height:80px"></textarea><div class="crp-hint">La prochaine date, l\'action à venir, ce que les participants peuvent faire maintenant.</div></div>'
+    + '<div class="crp-fld"><label>Date de la prochaine étape <em>facultatif</em></label><input type="date" id="ed-edate" style="max-width:220px"></div>'
+    + '<div class="crp-fld"><label>Bouton d\'action <em>facultatif</em></label><div class="crp-extform" style="grid-template-columns:1fr 1.4fr"><input id="ed-ebtn" maxlength="60" placeholder="Texte du bouton"><input id="ed-elien" placeholder="https://… (lien du bouton)"></div></div>'
+    + '<div class="crp-lbl">Niveau 2 · Le retour d\'expérience détaillé</div>'
+    + '<div class="crp-fld"><label>Temps forts <em>affichés en vignettes</em></label><div class="crp-chips" id="ed-forts"></div><div class="crp-extform" style="grid-template-columns:1fr auto"><input id="ed-fortin" maxlength="80" placeholder="Ajouter un temps fort (ex. Table ronde, Remise des prix…)"><button type="button" class="cr-btn sec" id="ed-fortadd">＋ Ajouter</button></div></div>'
+    + '<div id="ed-champs"></div>'
+    + '<div class="crp-fld"><label>Photos</label><button type="button" class="cr-btn out" id="ed-addphoto">＋ Ajouter des photos</button><input type="file" id="ed-photofile" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none"><div class="crp-photos" id="ed-photos"></div></div>'
+    + '<div class="crp-fld"><label>Vidéo <em>lien (mp4, YouTube, Vimeo…)</em></label><input id="ed-video" placeholder="https://…"><div class="crp-hint" id="ed-videohint"></div></div>'
+    + '<div class="crp-fld"><label>Participants identifiés</label><div class="crp-chips" id="crp-chips"></div><div class="crp-hint">Ils sont notifiés. Vous pouvez aussi identifier depuis la page de l\'événement, même sans compte-rendu.</div></div>'
+    + '<div class="cr-btns"><button class="cr-btn pri" id="ed-publier">' + (publie ? 'Mettre à jour la publication' : 'Publier dans le fil') + '</button><button class="cr-btn out" id="ed-brouillon">Enregistrer le brouillon</button>'
+    + (publie ? '<button class="cr-btn sec" id="ed-mail">✉️ Envoyer par e-mail</button><button class="cr-btn out" id="ed-depublier" style="color:#B91C1C">Dépublier</button>' : '') + '<a class="cr-btn out" href="compte-rendu.html' + (cr ? '?evt=' + ev.id : '') + '">Annuler</a></div>'
+    + '<p class="crp-note" id="ed-err" style="color:#dc2626;display:none"></p></div><div id="ed-mailzone"></div>';
+  $('#ed-titre').value = ed.titre; $('#ed-resume').value = ed.resume; $('#ed-etxt').value = ed.etape_texte; $('#ed-edate').value = ed.etape_date; $('#ed-ebtn').value = ed.etape_bouton; $('#ed-elien').value = ed.etape_lien; $('#ed-video').value = ed.video; $('#ed-libre').value = ed.libre;
+  attachMention($('#ed-resume')); attachMention($('#ed-etxt'));
+  const cnt = () => { const l = $('#ed-resume').value.length; const c = $('#ed-cnt'); c.textContent = l.toLocaleString('fr-FR') + ' / 2 500 caractères' + (l >= RESUME_MAX ? ' — limite atteinte' : ''); c.classList.toggle('warn', l > 2300); };
+  $('#ed-resume').addEventListener('input', cnt); cnt();
+  drawTypes(); drawChamps(); drawForts(); drawPhotos(); refreshChips();
+  $('#ed-fortadd').onclick = () => { const v = $('#ed-fortin').value.trim(); if (v) { ed.forts.push(v); $('#ed-fortin').value = ''; drawForts(); } };
+  $('#ed-fortin').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#ed-fortadd').click(); } });
+  $('#ed-addphoto').onclick = () => $('#ed-photofile').click();
+  $('#ed-photofile').onchange = async e => {
+    for (const f of [...e.target.files].slice(0, 10)) {
+      if (ed.medias.length >= 20) break;
+      try { toast('Envoi de ' + f.name + '…'); ed.medias.push(await uploadMedia(f, 'post')); drawPhotos(); } catch (err) { toast(err.message || 'Échec du téléversement'); }
+    }
+    e.target.value = '';
+  };
+  $('#ed-prefill').onclick = prefillModal;
+  const erreur = m => { const x = $('#ed-err'); x.textContent = m; x.style.display = m ? 'block' : 'none'; };
+  $('#ed-brouillon').onclick = async () => { erreur(''); try { await sauver(); } catch (e) { erreur(e.message); } };
+  $('#ed-publier').onclick = async () => {
+    erreur(''); collecterEd();
+    if (!ST.ed.resume.trim()) { erreur('Écrivez au moins le résumé avant de publier.'); return; }
+    const b = $('#ed-publier'); b.disabled = true;
+    try { await sauver(true); const r = await api('POST', `/evenements/${ST.evtId}/compte-rendu/publier`, {}); toast(r.dans_le_fil ? 'Publié dans le fil d\'actualité' : 'Publié (page de l\'événement)'); location.href = 'compte-rendu.html?evt=' + ST.evtId; }
+    catch (e) { erreur(e.message); b.disabled = false; }
+  };
+  const dep = $('#ed-depublier'); if (dep) dep.onclick = async () => { if (!confirm('Dépublier ce compte-rendu ? Il disparaît du fil et de la page ; vous gardez le brouillon.')) return; try { await api('DELETE', `/evenements/${ST.evtId}/compte-rendu/publier`); location.href = 'compte-rendu.html?evt=' + ST.evtId + '&edition=1'; } catch (e) { erreur(e.message); } };
+  const ml = $('#ed-mail'); if (ml) ml.onclick = async () => { try { await sauver(true); } catch (_) {} vueMail(); };
+}
+function drawTypes() {
+  const ed = ST.ed;
+  $('#ed-types').innerHTML = Object.keys(CANEVAS).map(k => '<button type="button" class="' + (k === ed.type ? 'on' : '') + '" data-type="' + k + '">' + CANEVAS[k].label + '</button>').join('');
+  $('#ed-typehint').textContent = CANEVAS[ed.type].hint; $('#ed-libre').style.display = ed.type === 'autre' ? 'block' : 'none';
+  $$('#ed-types button').forEach(b => b.addEventListener('click', () => { collecterChamps(); ed.type = b.dataset.type; drawTypes(); drawChamps(); if (ed.type === 'autre') $('#ed-libre').focus(); }));
+}
+function collecterChamps() { $$('#ed-champs textarea[data-i]').forEach(t => { ST.ed.saisie[ST.ed.type][Number(t.dataset.i)] = t.value; }); $$('#ed-champs textarea[data-x]').forEach(t => { ST.ed.extras[Number(t.dataset.x)].texte = t.value; }); }
+function drawChamps() {
+  const ed = ST.ed, box = $('#ed-champs'); box.innerHTML = '';
+  CANEVAS[ed.type].champs.forEach((c, i) => {
+    const d = document.createElement('div'); d.className = 'crp-fld';
+    d.innerHTML = '<label>' + esc(c[0]) + ' <em>facultatif</em></label><textarea data-i="' + i + '" maxlength="10000" style="' + (ed.type === 'blanc' ? 'min-height:240px' : '') + '"></textarea><div class="crp-hint">' + esc(c[1]) + '</div>';
+    const t = $('textarea', d); t.value = ed.saisie[ed.type][i] || ''; t.addEventListener('input', () => { ed.saisie[ed.type][i] = t.value; }); attachMention(t); box.appendChild(d);
+  });
+  ed.extras.forEach((x, i) => {
+    const d = document.createElement('div'); d.className = 'crp-fld';
+    d.innerHTML = '<label>' + esc(x.titre) + ' <em>section conservée d\'un autre canevas</em></label><textarea data-x="' + i + '" maxlength="10000"></textarea>';
+    const t = $('textarea', d); t.value = x.texte || ''; t.addEventListener('input', () => { x.texte = t.value; }); attachMention(t); box.appendChild(d);
+  });
+}
+function drawForts() {
+  const ed = ST.ed;
+  $('#ed-forts').innerHTML = ed.forts.map((f, i) => '<span class="crp-chip">' + esc(f) + ' <span class="x" data-fortrm="' + i + '">×</span></span>').join('') || '<span class="crp-note">Aucun temps fort.</span>';
+  $$('[data-fortrm]').forEach(x => x.addEventListener('click', () => { ed.forts.splice(Number(x.dataset.fortrm), 1); drawForts(); }));
+}
+function drawPhotos() {
+  const ed = ST.ed;
+  $('#ed-photos').innerHTML = ed.medias.map((u, i) => '<div><img src="' + esc(u) + '" alt=""><button type="button" data-phrm="' + i + '" title="Retirer">×</button></div>').join('');
+  $$('[data-phrm]').forEach(b => b.addEventListener('click', () => { ed.medias.splice(Number(b.dataset.phrm), 1); drawPhotos(); }));
+}
+
+/* ---------- pré-remplissage depuis l'événement ---------- */
+async function prefillModal() {
+  let r;
+  try { r = await api('GET', `/evenements/${ST.evtId}/compte-rendu/sources`); } catch (e) { toast(e.message || 'Erreur'); return; }
+  const lignes = (r.sources || []).map(s => '<div class="crp-src"><span style="font-weight:800;color:' + (s.trouve ? '#16794C' : '#F26422') + '">' + (s.trouve ? '✓' : '!') + '</span><span><b>' + esc(s.libelle) + '</b><small>' + esc(s.detail) + '</small></span></div>').join('');
+  const progs = r.programmes || [];
+  modal('<h2>✨ Pré-remplir depuis l\'événement</h2><p class="crp-note">Voici ce qui a été lu. Ce qui n\'existe pas est signalé, jamais inventé. Vous relisez et complétez ensuite.</p><div class="crp-pick" style="max-height:none">' + lignes + '</div>'
+    + (progs.length > 1 ? '<div class="crp-fld"><label>Deux programmes ont été trouvés, lequel utiliser pour le déroulé ?</label><select id="pf-prog">' + progs.map((p, i) => '<option value="' + i + '">' + (p.origine === 'fiche' ? "Fiche d'inscription" : "Événement") + '</option>').join('') + '</select></div>' : '')
+    + (progs.some(p => p.fichier_url && !p.texte) ? '<p class="crp-note">Un programme est fourni en pièce jointe (image ou PDF) : il n\'est pas lu automatiquement, consultez-le et saisissez le déroulé.</p>' : '')
+    + '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="cr-btn out" id="pf-no">Annuler</button><button class="cr-btn pri" id="pf-ok">Pré-remplir</button></div>', (ov, close) => {
+    $('#pf-no', ov).onclick = close;
+    $('#pf-ok', ov).onclick = () => {
+      collecterEd(); collecterChamps(); const ed = ST.ed, sg = r.suggestions || {}; let n = 0;
+      if (sg.forts && sg.forts.length) { ed.forts = sg.forts.slice(0, 8); n++; }
+      const idx = progs.length > 1 ? Number(($('#pf-prog', ov) || { value: 0 }).value) : 0;
+      const deroule = progs[idx] && progs[idx].texte ? progs[idx].texte : '';
+      CANEVAS[ed.type].champs.forEach((c, i) => {
+        if (/^(Déroulé|Programme|Contenu et déroulé)/.test(c[0]) && deroule) { ed.saisie[ed.type][i] = deroule; n++; }
+        else if (/^Participation/.test(c[0]) && sg.participation_texte) { ed.saisie[ed.type][i] = sg.participation_texte; n++; }
+      });
+      if (sg.video_url && !ed.video) { ed.video = sg.video_url; $('#ed-video').value = ed.video; n++; }
+      if (!ed.resume.trim() && r.resume_fiche && r.resume_fiche.resume) { /* ne remplace jamais un résumé existant */ }
+      drawForts(); drawChamps(); close(); toast(n ? 'Pré-rempli : relisez et complétez' : 'Rien à pré-remplir : aucune donnée trouvée');
+    };
+  });
+}
+
+/* ---------- envoi par e-mail ---------- */
+async function vueMail() {
+  const zone = $('#ed-mailzone'); zone.innerHTML = '<div class="crp-card"><div class="crp-note">Chargement des destinataires…</div></div>';
+  let d = { fiche: null, groupes: [], personnes: [] }, envois = [];
+  try { d = await api('GET', `/evenements/${ST.evtId}/compte-rendu/destinataires`); } catch (_) {}
+  try { envois = (await api('GET', `/evenements/${ST.evtId}/compte-rendu/envois`)).envois || []; } catch (_) {}
+  const M = ST.mail = { g: new Set(), p: new Set(), ext: [], objet: "Compte-rendu : " + ST.data.evenement.titre };
+  const nb = () => { let n = 0; d.groupes.forEach(g => { if (M.g.has(g.type_id)) n += g.nb; }); d.personnes.forEach(p => { if (!M.g.has(p.type_id) && M.p.has(p.id)) n++; }); return n + M.ext.length; };
+  zone.innerHTML = '<div class="crp-card"><h2 style="margin-top:0">Envoyer le compte-rendu par e-mail</h2>'
+    + '<p class="crp-note">' + (d.fiche ? 'Les adresses viennent de la fiche d\'inscription « ' + esc(d.fiche.nom) + ' ». Les groupes sont ses types d\'inscription.' : 'Cet événement n\'a pas de fiche d\'inscription liée : ajoutez simplement les adresses ci-dessous.') + '</p>'
+    + (d.groupes.length ? '<div class="crp-lbl">Groupes de la fiche</div><div class="crp-grp" id="mg"></div><div class="crp-lbl">Ou des personnes de la fiche en particulier</div><input id="mrech" placeholder="Rechercher une personne…" style="width:100%;box-sizing:border-box;margin-bottom:8px"><div class="crp-list" id="mp"></div>' : '')
+    + '<div class="crp-lbl">Ajouter une adresse e-mail <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--muted)">· pour quelqu\'un qui n\'est pas dans la fiche</span></div>'
+    + '<div class="crp-extform"><input id="mxn" placeholder="Nom"><input id="mxm" type="email" placeholder="adresse@exemple.com"><button type="button" class="cr-btn sec" id="mxa">＋ Ajouter</button></div><div class="crp-note" id="mxe" style="color:#F26422;display:none"></div><div class="crp-chips" id="mxl" style="margin-top:8px"></div>'
+    + '<p class="crp-note"><b id="mnb">0</b> destinataire(s) sélectionné(s).</p>'
+    + '<div class="crp-fld"><label>Objet</label><input id="mobj" maxlength="200"></div>'
+    + '<div class="cr-btns"><button class="cr-btn pri" id="menv">Envoyer</button><button class="cr-btn out" id="mtest">M\'envoyer un test</button></div><p class="crp-note" id="mres"></p>'
+    + (envois.length ? '<div class="crp-lbl">Historique des envois</div>' + envois.map(e => '<div class="crp-note" style="padding:4px 0;border-bottom:1px solid var(--border)">✓ ' + esc(e.created_at) + ' — ' + e.nb_envoyes + '/' + e.nb_destinataires + ' envoyé(s) · ' + esc(e.objet || '') + '</div>').join('') : '')
+    + '</div>';
+  $('#mobj').value = M.objet;
+  const draw = () => {
+    const g = $('#mg'); if (g) g.innerHTML = d.groupes.map(x => '<label class="' + (M.g.has(x.type_id) ? 'sel' : '') + '"><input type="checkbox" data-g="' + x.type_id + '" ' + (M.g.has(x.type_id) ? 'checked' : '') + '> <span>' + esc(x.label) + '<small>' + x.nb + ' adresse(s)</small></span></label>').join('');
+    const q = ($('#mrech') || { value: '' }).value.toLowerCase(), pl = $('#mp');
+    if (pl) pl.innerHTML = d.personnes.filter(p => (p.prenom + ' ' + p.nom + ' ' + (p.type_label || '')).toLowerCase().includes(q)).map(p => { const inc = M.g.has(p.type_id); return '<label class="' + (inc ? 'inc' : '') + '"><input type="checkbox" data-p="' + p.id + '" ' + (inc || M.p.has(p.id) ? 'checked' : '') + ' ' + (inc ? 'disabled' : '') + '> ' + esc((p.prenom + ' ' + p.nom).trim()) + '<span class="crp-q">' + esc(p.type_label || '') + (inc ? ' · via le groupe' : '') + '</span></label>'; }).join('') || '<div class="crp-note" style="padding:10px">Aucun résultat.</div>';
+    $$('[data-g]').forEach(i => i.addEventListener('change', () => { const id = Number(i.dataset.g); i.checked ? M.g.add(id) : M.g.delete(id); draw(); }));
+    $$('[data-p]').forEach(i => i.addEventListener('change', () => { const id = Number(i.dataset.p); i.checked ? M.p.add(id) : M.p.delete(id); $('#mnb').textContent = nb(); }));
+    $('#mxl').innerHTML = M.ext.map((x, i) => '<span class="crp-chip ext">✉️ ' + esc(x.nom) + ' · ' + esc(x.email) + ' <span class="x" data-xrm="' + i + '">×</span></span>').join('');
+    $$('[data-xrm]').forEach(x => x.addEventListener('click', () => { M.ext.splice(Number(x.dataset.xrm), 1); draw(); }));
+    $('#mnb').textContent = nb();
+  };
+  const rech = $('#mrech'); if (rech) rech.addEventListener('input', draw);
+  const addExt = () => {
+    const nom = $('#mxn').value.trim(), email = $('#mxm').value.trim(), er = $('#mxe'); const show = m => { er.textContent = m; er.style.display = 'block'; };
+    if (!nom) { show('Indiquez le nom de la personne.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { show("Cette adresse e-mail n'a pas un format valide."); return; }
+    if (M.ext.some(x => x.email.toLowerCase() === email.toLowerCase())) { show('Cette adresse est déjà dans la liste.'); return; }
+    er.style.display = 'none'; M.ext.push({ nom, email }); $('#mxn').value = ''; $('#mxm').value = ''; draw(); $('#mxn').focus();
+  };
+  $('#mxa').onclick = addExt; ['#mxn', '#mxm'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addExt(); } }));
+  const envoyer = async test => {
+    const n = test ? 1 : nb(); if (!n) { toast('Choisissez un groupe, une personne ou ajoutez une adresse'); return; }
+    if (!test && !confirm('Envoyer le compte-rendu à ' + n + ' personne(s) ?')) return;
+    const res = $('#mres'); res.textContent = 'Envoi en cours…';
+    try {
+      const r = await api('POST', `/evenements/${ST.evtId}/compte-rendu/envoyer`, { test, objet: $('#mobj').value, groupes: [...M.g], personnes: [...M.p], externes: M.ext });
+      res.textContent = r.mail_non_configure ? "L'envoi d'e-mails n'est pas configuré sur ce serveur : aucun message n'est parti."
+        : (test ? 'Test envoyé à votre adresse.' : r.envoyes + ' e-mail(s) envoyé(s) sur ' + r.destinataires + (r.ignores_desinscrits ? ' · ' + r.ignores_desinscrits + ' désinscrit(s) ignoré(s)' : '') + (r.echecs ? ' · ' + r.echecs + ' échec(s)' : '') + (r.non_traites ? ' · ' + r.non_traites + ' restant(s) : relancez l\'envoi' : ''));
+    } catch (e) { res.textContent = e.message || 'Erreur'; }
+  };
+  $('#menv').onclick = () => envoyer(false); $('#mtest').onclick = () => envoyer(true);
+  draw(); zone.scrollIntoView({ behavior: 'smooth' });
+}
+
+/* =================== AIGUILLAGE =================== */
+async function init() {
+  const p = new URLSearchParams(location.search);
+  ST.evtId = Number(p.get('evt')) || null;
+  ST.user = await fetchCurrentUser().catch(() => null);
+  const root = $('#crp');
+  if (!ST.evtId) {
+    if (!ST.user) { location.href = 'login.html'; return; }
+    return vueListe();
+  }
+  try { ST.data = await api('GET', `/evenements/${ST.evtId}/compte-rendu`); }
+  catch (e) { root.innerHTML = '<div class="crp-card"><h1>Compte-rendu introuvable</h1><p class="crp-note">' + esc(e.message || "Cet événement n'existe pas ou n'est pas accessible.") + '</p></div>'; return; }
+  document.title = "Diaspo'Actif — Compte-rendu : " + ST.data.evenement.titre;
+  const d = ST.data, edition = p.get('edition') === '1';
+  if (d.peut_editer && (edition || !d.compte_rendu)) {
+    if (!d.evenement.termine && (!ST.user || ST.user.role !== 'administrateur')) {
+      root.innerHTML = '<div class="crp-card"><h1>Pas encore</h1><p class="crp-note">Le compte-rendu s\'écrit une fois l\'événement terminé. En attendant, vous pouvez déjà identifier des participants depuis <a class="cr-link" href="evenements.html?evt=' + d.evenement.id + '">la page de l\'événement</a>.</p></div>';
+      return;
+    }
+    ST.ed = nouvelEd(); return vueEditeur();
+  }
+  if (d.compte_rendu) return vuePublique();
+  root.innerHTML = '<div class="crp-card"><h1>' + esc(d.evenement.titre) + '</h1><p class="crp-note">Aucun compte-rendu n\'a été publié pour cet événement.</p><div class="cr-btns"><a class="cr-btn sec" href="evenements.html?evt=' + d.evenement.id + '">ℹ️ Voir l\'événement</a></div></div>';
+}
+init();
+</script>
+<script src="assets/chatbot.js"></script>
+<script src="/assets/cookies-banner.js"></script>
+<script src="/assets/theme-manager.js"></script>
+<script src="assets/back-button.js"></script>
+</body>
+</html>

@@ -19432,6 +19432,8 @@ async function enrichirAvecFicheMedia(rows) {
   if (!rows.length) return rows;
   const ids = rows.map(r => r.id);
   const ph = ids.map(() => '?').join(',');
+  const crParEvt = {};
+  try { (await db.prepare(`SELECT evenement_id, statut FROM evenement_comptes_rendus WHERE evenement_id IN (${ph})`).all(...ids)).forEach(c => { crParEvt[c.evenement_id] = c.statut; }); } catch (_) {}
   const liensNatifs = await db.prepare(`SELECT evenement_id, fiche_id FROM insc_fiches_evenements WHERE evenement_id IN (${ph})`).all(...ids);
   const ficheParEvt = {};
   liensNatifs.forEach(l => { ficheParEvt[l.evenement_id] = l.fiche_id; });
@@ -19473,7 +19475,7 @@ async function enrichirAvecFicheMedia(rows) {
        si elle est réellement publiée — une fiche encore en brouillon resterait invisible pour
        un visiteur (voir GET /api/insc/public/:slug), le bouton doit alors garder l'ancien
        formulaire minimal plutôt que de mener à une impasse "Fiche introuvable". */
-    return avecStatutTemporel({ ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null });
+    return avecStatutTemporel({ ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null, cr_statut: crParEvt[r.id] || null });
   });
 }
 
@@ -19687,6 +19689,512 @@ route("POST", "/api/evenements/:id/promouvoir", async (req, res, params) => {
     if (!postId) { try { await db.prepare("UPDATE evenements SET promo_lancee_at=NULL WHERE id=?").run(evt.id); } catch (_) {} }
     return sendJSON(res, 500, SEC.safeError(err, "promotion evenement"));
   }
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MODULE COMPTE-RENDU D'ÉVÉNEMENT (2026-10-05, demande explicite)
+   - Relance du créateur à la fin de l'événement : notification Diaspo'Actif ET e-mail
+     (félicitations, signé de l'équipe), une seule fois par événement (evenements.cr_relance_at).
+   - Rédaction en deux niveaux : résumé (≤ 2 500 caractères, une page A4 en police 14) + parties
+     détaillées d'un canevas selon le type d'événement ; étape suivante ; temps forts ; vidéo.
+   - Publication dans le fil (fil_posts.compte_rendu_evenement_id) et page dédiée.
+   - Identification des participants, commentaires et réactions sur l'événement lui-même, même
+     sans compte-rendu. Les commentaires/réactions du compte-rendu publié vivent sur son post.
+   - Envoi par e-mail aux inscrits (groupes = types de la fiche), à des personnes choisies ou à
+     des adresses ajoutées à la main, avec lien de désinscription.
+   Les événements terminés AVANT CR_LANCEMENT (« anciens ») ne sont relancés que sur demande d'un
+   administrateur (aperçu par défaut) : jamais d'envoi massif d'e-mails automatique le jour du
+   déploiement.
+   ══════════════════════════════════════════════════════════════════════════ */
+const CR_RESUME_MAX = 2500;
+const CR_TYPES = ['eco', 'fes', 'pol', 'forum', 'edu', 'spi', 'san', 'ing', 'autre', 'blanc'];
+const CR_EMOJIS = ['👍', '❤️', '👏', '🔥'];
+const CR_LANCEMENT = '2026-10-05';
+
+function crTexte(v, max) { return String(v == null ? '' : v).replace(/\r\n/g, '\n').replace(/\u0000/g, '').trim().slice(0, max); }
+function crUrl(v) { const s = String(v || '').trim(); return /^https?:\/\/[^\s]+$/i.test(s) ? s.slice(0, 1000) : null; }
+function crDateISO(v) { const s = String(v || '').trim().slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; }
+function crJson(v, repli) { try { const x = JSON.parse(v || ''); return x == null ? repli : x; } catch (_) { return repli; } }
+function crEstEditeur(user, evt) { return !!user && !!evt && (Number(evt.owner_user_id) === Number(user.id) || user.role === 'administrateur'); }
+function crImageEvenement(evt) {
+  const g = crJson(evt.galerie_photos, []);
+  const premiere = (Array.isArray(g) ? g : []).map(x => (x && typeof x === 'object') ? (x.url || x.src) : x).filter(Boolean)[0];
+  const img = evt.image_couverture || evt.image_url || premiere || null;
+  /* Certains événements stockent leur image en base64 : embarquée dans chaque post du fil, une
+     image de plusieurs Mo ferait exploser la taille des réponses — au-delà de ~300 Ko, on
+     n'affiche pas l'image (dégradé de remplacement côté client) plutôt que de la recopier. */
+  return (img && /^data:/i.test(img) && img.length > 300000) ? null : img;
+}
+
+/* Carte du compte-rendu pour le fil (jointe aux posts de type 'compte_rendu', comme evenement_promo). */
+async function carteCompteRenduPost(evenementId) {
+  const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(evenementId);
+  const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=? AND statut='publie'").get(evenementId);
+  if (!evt || !cr) return null;
+  const identifies = (await crIdentifies(evt.id)).slice(0, 6);
+  return {
+    evenement_id: Number(evt.id), titre: cr.titre || evt.titre, evenement_titre: evt.titre, date_evt: evt.date_evt, date_fin: evt.date_fin || null,
+    ville: evt.ville || null, image: crImageEvenement(evt), resume: cr.resume || '', video_url: cr.video_url || null,
+    etape_texte: cr.etape_texte || '', etape_date: cr.etape_date || '', etape_bouton: cr.etape_bouton || '', etape_lien: cr.etape_lien || '',
+    identifies, organisateur: await nomCompteAffichage(evt.owner_user_id),
+  };
+}
+/* Fiches d'inscription liées à un événement : lien natif (insc_fiches_evenements) OU fiche de
+   l'événement source (events.insc_fiche_id) — même règle que enrichirAvecFicheMedia(). */
+async function crFicheIds(evt) {
+  const ids = new Set((await db.prepare("SELECT fiche_id FROM insc_fiches_evenements WHERE evenement_id=?").all(evt.id)).map(r => Number(r.fiche_id)));
+  if (evt.source_events_id) {
+    const e = await db.prepare("SELECT insc_fiche_id FROM events WHERE id=?").get(evt.source_events_id);
+    if (e && e.insc_fiche_id) ids.add(Number(e.insc_fiche_id));
+  }
+  return [...ids];
+}
+function crCibleSignature(email) { return crypto.createHmac('sha256', TICKET_SECRET).update('cr-desinscription:' + String(email).toLowerCase()).digest('base64url'); }
+
+/* Charge l'événement et vérifie qu'on a le droit de le voir (public pour tous ; sinon éditeur seul). */
+async function crChargerEvenement(req, res, id, { editeur = false } = {}) {
+  const user = await getCurrentUser(req);
+  const evt = await db.prepare("SELECT e.*, u.nom AS createur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(id);
+  if (!evt) { sendJSON(res, 404, { error: "Événement introuvable." }); return null; }
+  const edit = crEstEditeur(user, evt);
+  if (editeur) {
+    if (!user) { sendJSON(res, 401, { error: "Connexion requise." }); return null; }
+    if (!edit) { sendJSON(res, 403, { error: "Réservé au créateur de l'événement." }); return null; }
+  } else if ((evt.visibilite || 'public') !== 'public' && !edit) {
+    sendJSON(res, 403, { error: "Cet événement n'est pas public." }); return null;
+  }
+  return { user, evt, edit };
+}
+
+function crSerialiser(cr) {
+  if (!cr) return null;
+  return {
+    id: cr.id, evenement_id: cr.evenement_id, auteur_id: cr.auteur_id, titre: cr.titre || '', type_cr: cr.type_cr || 'eco', type_libre: cr.type_libre || '',
+    resume: cr.resume || '', details: crJson(cr.details_json, []), forts: crJson(cr.forts_json, []),
+    etape_texte: cr.etape_texte || '', etape_date: cr.etape_date || '', etape_bouton: cr.etape_bouton || '', etape_lien: cr.etape_lien || '',
+    video_url: cr.video_url || '', medias: crJson(cr.medias_json, []), statut: cr.statut, fil_post_id: cr.fil_post_id || null,
+    published_at: cr.published_at || null, updated_at: cr.updated_at || null,
+  };
+}
+
+async function crIdentifies(evenementId) {
+  const rows = await db.prepare(`SELECT i.user_id, u.nom, u.prenom, u.role, u.photo_url FROM evenement_identifications i JOIN users u ON u.id=i.user_id WHERE i.evenement_id=? ORDER BY i.id`).all(evenementId);
+  await corrigerNomsListe(rows, 'user_id');
+  return rows.map(r => ({ user_id: Number(r.user_id), nom: [r.prenom, r.nom].filter(Boolean).join(' ') || r.nom, role: r.role, photo_url: r.photo_url || null }));
+}
+
+/* GET — page du compte-rendu : l'événement, le compte-rendu (publié, ou brouillon pour son éditeur), les identifiés. */
+route("GET", "/api/evenements/:id/compte-rendu", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  const { user, evt, edit } = ctx;
+  const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  const visible = cr && (cr.statut === 'publie' || edit);
+  sendJSON(res, 200, {
+    evenement: { id: evt.id, titre: evt.titre, date_evt: evt.date_evt, date_fin: evt.date_fin || null, heure_debut: evt.heure_debut || null, lieu: evt.lieu || null, ville: evt.ville || null, pays: evt.pays || null,
+      image: crImageEvenement(evt), organisateur_id: evt.owner_user_id, organisateur_nom: await nomCompteAffichage(evt.owner_user_id), termine: evenementEstTermine(evt), type_evt: evt.type_evt || null },
+    compte_rendu: visible ? crSerialiser(cr) : null,
+    peut_editer: edit, a_compte_rendu: !!(cr && cr.statut === 'publie'),
+    identifies: await crIdentifies(evt.id),
+  });
+});
+
+/* PUT — enregistre le compte-rendu (création ou mise à jour), sans le publier. */
+route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const { user, evt } = ctx;
+  if (!evenementEstTermine(evt) && user.role !== 'administrateur') return sendJSON(res, 400, { error: "Le compte-rendu s'écrit une fois l'événement terminé." });
+
+  const type_cr = CR_TYPES.includes(body.type_cr) ? body.type_cr : 'eco';
+  const resume = crTexte(body.resume, CR_RESUME_MAX);
+  const details = (Array.isArray(body.details) ? body.details : []).slice(0, 12)
+    .map(d => ({ titre: crTexte(d && d.titre, 80), texte: crTexte(d && d.texte, 10000) })).filter(d => d.texte);
+  const forts = (Array.isArray(body.forts) ? body.forts : []).slice(0, 12).map(f => crTexte(f, 80)).filter(Boolean);
+  const medias = (Array.isArray(body.medias) ? body.medias : []).slice(0, 20).map(crUrl).filter(Boolean);
+  const champs = [
+    crTexte(body.titre, 160) || evt.titre, type_cr, type_cr === 'autre' ? crTexte(body.type_libre, 60) || null : null, resume || null,
+    JSON.stringify(details), JSON.stringify(forts), crTexte(body.etape_texte, 500) || null, crDateISO(body.etape_date),
+    crTexte(body.etape_bouton, 60) || null, crUrl(body.etape_lien), crUrl(body.video_url), JSON.stringify(medias),
+  ];
+  const existant = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  if (existant) {
+    await db.prepare(`UPDATE evenement_comptes_rendus SET titre=?, type_cr=?, type_libre=?, resume=?, details_json=?, forts_json=?, etape_texte=?, etape_date=?, etape_bouton=?, etape_lien=?, video_url=?, medias_json=?, updated_at=? WHERE id=?`)
+      .run(...champs, new Date().toISOString(), existant.id);
+  } else {
+    await db.prepare(`INSERT INTO evenement_comptes_rendus (evenement_id, auteur_id, titre, type_cr, type_libre, resume, details_json, forts_json, etape_texte, etape_date, etape_bouton, etape_lien, video_url, medias_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(evt.id, user.id, ...champs);
+  }
+  const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  /* Déjà publié : la publication du fil suit la modification (titre + texte d'aperçu). */
+  if (cr.statut === 'publie' && cr.fil_post_id) {
+    try { await db.prepare("UPDATE fil_posts SET titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, cr.resume || '', crContenuFil(cr), cr.fil_post_id); } catch (_) {}
+  }
+  sendJSON(res, 200, { ok: true, compte_rendu: crSerialiser(cr) });
+});
+
+function crContenuFil(cr) { return `📄 ${cr.titre || 'Compte-rendu'}\n\n${String(cr.resume || '').replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1').slice(0, 600)}`; }
+
+/* POST — publie le compte-rendu : page visible + post dans le fil (événement public seulement). */
+route("POST", "/api/evenements/:id/compte-rendu/publier", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const { user, evt } = ctx;
+  const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  if (!cr || !String(cr.resume || '').trim()) return sendJSON(res, 400, { error: "Rédigez d'abord le résumé du compte-rendu." });
+  const publicEvt = (evt.visibilite || 'public') === 'public';
+  let postId = cr.fil_post_id || null;
+  if (publicEvt) {
+    const auteurNom = await nomCompteAffichage(evt.owner_user_id);
+    if (postId && await db.prepare("SELECT id FROM fil_posts WHERE id=?").get(postId)) {
+      await db.prepare("UPDATE fil_posts SET statut='publie', titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, cr.resume, crContenuFil(cr), postId);
+    } else {
+      postId = (await db.prepare(`INSERT INTO fil_posts
+        (auteur_id, auteur_nom, type, pub_type, categorie, titre, corps, contenu, visibilite, medias, hashtags, statut, localisation_pays, localisation_ville, compte_rendu_evenement_id)
+        VALUES (?, ?, 'compte_rendu', 'compte_rendu', 'Événement', ?, ?, ?, 'public', '[]', '[]', 'publie', ?, ?, ?)`)
+        .run(evt.owner_user_id, auteurNom, cr.titre, cr.resume, crContenuFil(cr), evt.pays || null, evt.ville || null, evt.id)).lastInsertRowid;
+    }
+  }
+  await db.prepare("UPDATE evenement_comptes_rendus SET statut='publie', fil_post_id=?, published_at=COALESCE(published_at, ?), updated_at=? WHERE id=?")
+    .run(postId, new Date().toISOString(), new Date().toISOString(), cr.id);
+  await db.prepare("UPDATE evenements SET cr_relance_at=COALESCE(cr_relance_at, ?) WHERE id=?").run(new Date().toISOString(), evt.id);
+  /* Comptes mentionnés (@ ou *) dans le résumé, les sections ou l'étape suivante : notifiés une seule
+     fois, à la première publication (republier après une correction ne les prévient pas à nouveau). */
+  if (!cr.published_at) {
+    const texte = [cr.resume, cr.etape_texte, ...crJson(cr.details_json, []).map(d => d && d.texte)].join(' ');
+    const MENTION_RE = /[@*]\[([^\]]+)\]\(([ui]):(\d+)\)/g; const vus = new Set([Number(user.id)]); let m;
+    while ((m = MENTION_RE.exec(texte)) !== null) {
+      let cible = Number(m[3]);
+      if (m[2] === 'i') { const o = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cible); cible = o ? Number(o.owner_user_id) : 0; }
+      if (!cible || vus.has(cible)) continue; vus.add(cible);
+      creerNotif(cible, 'mention', `${await nomCompteAffichage(evt.owner_user_id)} vous a mentionné(e) dans un compte-rendu`, `« ${cr.titre || evt.titre} »`, { evenement_id: Number(evt.id), post_id: postId ? Number(postId) : undefined, lien: `compte-rendu.html?evt=${evt.id}` });
+    }
+  }
+  SEC.logSecurity("compte_rendu_publie", { uid: Number(user.id), evenement_id: Number(evt.id), post_id: postId });
+  sendJSON(res, 200, { ok: true, fil_post_id: postId, dans_le_fil: !!postId });
+});
+
+/* DELETE — dépublie (retour en brouillon, retiré du fil). */
+route("DELETE", "/api/evenements/:id/compte-rendu/publier", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(ctx.evt.id);
+  if (!cr) return sendJSON(res, 404, { error: "Aucun compte-rendu." });
+  await db.prepare("UPDATE evenement_comptes_rendus SET statut='brouillon', updated_at=? WHERE id=?").run(new Date().toISOString(), cr.id);
+  if (cr.fil_post_id) { try { await db.prepare("UPDATE fil_posts SET statut='archive' WHERE id=?").run(cr.fil_post_id); } catch (_) {} }
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Identification des participants ── */
+route("GET", "/api/evenements/:id/identifications", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  sendJSON(res, 200, { identifies: await crIdentifies(ctx.evt.id), peut_editer: ctx.edit });
+});
+
+route("GET", "/api/evenements/:id/identifications/suggestions", async (req, res, params, body, query) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const q = String((query && query.q) || '').trim().toLowerCase();
+  const ficheIdsSug = await crFicheIds(ctx.evt);
+  const inscrits = await db.prepare(`SELECT DISTINCT i.user_id, i.nom, i.prenom, i.statut, t.label AS type_label
+      FROM insc_inscriptions i LEFT JOIN insc_types t ON t.id=i.type_id
+      WHERE i.user_id IS NOT NULL AND i.statut NOT IN ('annule','liste_attente')
+        AND (i.evenement_id=?${ficheIdsSug.length ? ` OR i.fiche_id IN (${ficheIdsSug.map(() => '?').join(',')})` : ''})
+      ORDER BY (i.statut='present') DESC, i.nom LIMIT 300`).all(ctx.evt.id, ...ficheIdsSug);
+  const deja = new Set((await crIdentifies(ctx.evt.id)).map(x => x.user_id));
+  const vus = new Set();
+  let liste = [];
+  for (const r of inscrits) {
+    const uid = Number(r.user_id); if (vus.has(uid) || deja.has(uid)) continue; vus.add(uid);
+    liste.push({ user_id: uid, nom: [r.prenom, r.nom].filter(Boolean).join(' '), detail: (r.statut === 'present' ? 'Présent · ' : 'Inscrit · ') + (r.type_label || ''), source: 'inscrit' });
+  }
+  if (q) liste = liste.filter(x => x.nom.toLowerCase().includes(q));
+  if (q.length >= 2) {
+    const like = '%' + q.replace(/[%_]/g, '') + '%';
+    const autres = await db.prepare(`SELECT id AS user_id, nom, prenom, role FROM users WHERE role IN ('utilisateur','initiative','collectivite') AND (compte_masque IS NULL OR compte_masque=0)
+      AND COALESCE(suspendu_definitif,0)=0 AND nom<>'Compte supprimé' AND (LOWER(nom) LIKE ? OR LOWER(prenom) LIKE ?) LIMIT 10`).all(like, like);
+    await corrigerNomsListe(autres, 'user_id');
+    for (const r of autres) {
+      const uid = Number(r.user_id); if (vus.has(uid) || deja.has(uid)) continue; vus.add(uid);
+      liste.push({ user_id: uid, nom: [r.prenom, r.nom].filter(Boolean).join(' ') || r.nom, detail: r.role === 'utilisateur' ? 'Membre' : 'Compte professionnel', source: 'recherche' });
+    }
+  }
+  sendJSON(res, 200, { suggestions: liste.slice(0, 25) });
+});
+
+route("POST", "/api/evenements/:id/identifications", async (req, res, params, body) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const { user, evt } = ctx;
+  const cible = Number(body.user_id);
+  const u = cible ? await db.prepare("SELECT id FROM users WHERE id=? AND nom<>'Compte supprimé'").get(cible) : null;
+  if (!u) return sendJSON(res, 404, { error: "Compte introuvable." });
+  const r = await db.prepare("INSERT OR IGNORE INTO evenement_identifications (evenement_id, user_id, ajoute_par) VALUES (?,?,?)").run(evt.id, cible, user.id);
+  if (r.changes && cible !== Number(user.id)) {
+    creerNotif(cible, 'evenement_identification', `Vous avez été identifié(e) sur « ${evt.titre} »`,
+      `${await nomCompteAffichage(evt.owner_user_id)} vous a identifié(e) parmi les participants de cet événement.`,
+      { evenement_id: Number(evt.id), lien: `evenements.html?evt=${evt.id}` });
+  }
+  sendJSON(res, 200, { ok: true, identifies: await crIdentifies(evt.id) });
+});
+
+route("DELETE", "/api/evenements/:id/identifications/:uid", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  await db.prepare("DELETE FROM evenement_identifications WHERE evenement_id=? AND user_id=?").run(ctx.evt.id, Number(params.uid));
+  sendJSON(res, 200, { ok: true, identifies: await crIdentifies(ctx.evt.id) });
+});
+
+/* ── Commentaires et réactions sur l'événement lui-même (même sans compte-rendu) ── */
+route("GET", "/api/evenements/:id/interactions", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  const { user, evt } = ctx;
+  const comptes = await db.prepare("SELECT emoji, COUNT(*) AS n FROM evenement_reactions WHERE evenement_id=? GROUP BY emoji").all(evt.id);
+  const reactions = {}; CR_EMOJIS.forEach(e => reactions[e] = 0); comptes.forEach(c => { reactions[c.emoji] = Number(c.n); });
+  const mes = user ? (await db.prepare("SELECT emoji FROM evenement_reactions WHERE evenement_id=? AND user_id=?").all(evt.id, user.id)).map(r => r.emoji) : [];
+  const coms = await db.prepare(`SELECT c.id, c.auteur_id, c.contenu, c.created_at, u.nom, u.prenom, u.role, u.photo_url FROM evenement_commentaires c JOIN users u ON u.id=c.auteur_id WHERE c.evenement_id=? ORDER BY c.id DESC LIMIT 100`).all(evt.id);
+  await corrigerNomsListe(coms, 'auteur_id');
+  sendJSON(res, 200, { reactions, mes_reactions: mes, commentaires: coms.reverse().map(c => ({ id: c.id, auteur_id: c.auteur_id, auteur_nom: [c.prenom, c.nom].filter(Boolean).join(' ') || c.nom, photo_url: c.photo_url || null, contenu: c.contenu, created_at: c.created_at, supprimable: !!user && (Number(user.id) === Number(c.auteur_id) || crEstEditeur(user, evt)) })) });
+});
+
+route("POST", "/api/evenements/:id/reactions", async (req, res, params, body) => {
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  const { user, evt } = ctx;
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const emoji = CR_EMOJIS.includes(body.emoji) ? body.emoji : null;
+  if (!emoji) return sendJSON(res, 400, { error: "Réaction inconnue." });
+  const existe = await db.prepare("SELECT id FROM evenement_reactions WHERE evenement_id=? AND user_id=? AND emoji=?").get(evt.id, user.id, emoji);
+  if (existe) await db.prepare("DELETE FROM evenement_reactions WHERE id=?").run(existe.id);
+  else await db.prepare("INSERT INTO evenement_reactions (evenement_id, user_id, emoji) VALUES (?,?,?)").run(evt.id, user.id, emoji);
+  sendJSON(res, 200, { ok: true, actif: !existe });
+});
+
+route("POST", "/api/evenements/:id/commentaires", async (req, res, params, body) => {
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  const { user, evt } = ctx;
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const contenu = crTexte(body.contenu, 1000);
+  if (!contenu) return sendJSON(res, 400, { error: "Écrivez un commentaire." });
+  const id = (await db.prepare("INSERT INTO evenement_commentaires (evenement_id, auteur_id, contenu) VALUES (?,?,?)").run(evt.id, user.id, contenu)).lastInsertRowid;
+  const nom = await nomCompteAffichage(user.id);
+  const notifies = new Set([Number(user.id)]);
+  if (!notifies.has(Number(evt.owner_user_id))) { notifies.add(Number(evt.owner_user_id)); creerNotif(evt.owner_user_id, 'evenement_commentaire', `Nouveau commentaire sur « ${evt.titre} »`, `${nom} : « ${contenu.replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1').slice(0, 80)} »`, { evenement_id: Number(evt.id), lien: `evenements.html?evt=${evt.id}` }); }
+  const MENTION_RE = /@\[([^\]]+)\]\(([ui]):(\d+)\)/g; let m;
+  while ((m = MENTION_RE.exec(contenu)) !== null) {
+    let cible = Number(m[3]);
+    if (m[2] === 'i') { const o = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(cible); cible = o ? Number(o.owner_user_id) : 0; }
+    if (!cible || notifies.has(cible)) continue; notifies.add(cible);
+    creerNotif(cible, 'mention', `${nom} vous a mentionné(e) dans un commentaire`, `Sur « ${evt.titre} »`, { evenement_id: Number(evt.id), lien: `evenements.html?evt=${evt.id}` });
+  }
+  sendJSON(res, 201, { ok: true, id });
+});
+
+route("DELETE", "/api/evenements/:id/commentaires/:cid", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  const { user, evt } = ctx;
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const c = await db.prepare("SELECT * FROM evenement_commentaires WHERE id=? AND evenement_id=?").get(Number(params.cid), evt.id);
+  if (!c) return sendJSON(res, 404, { error: "Commentaire introuvable." });
+  if (Number(c.auteur_id) !== Number(user.id) && !crEstEditeur(user, evt)) return sendJSON(res, 403, { error: "Action non autorisée." });
+  await db.prepare("DELETE FROM evenement_commentaires WHERE id=?").run(c.id);
+  sendJSON(res, 200, { ok: true });
+});
+
+/* ── Sources du pré-remplissage : ce qui existe déjà sur l'événement (jamais inventé) ── */
+function crTempsFortsDepuisProgramme(texte) {
+  const generiques = /^(accueil|pause|d[ée]jeuner|caf[ée]|cl[ôo]ture|fin|ouverture|mot d['’]accueil|installation|inscriptions?)\b/i;
+  const vus = new Set(); const forts = [];
+  String(texte || '').replace(/<[^>]+>/g, '\n').split(/\n+/).forEach(l => {
+    const t = l.replace(/^[\s•\-–—*]+/, '').replace(/^\d{1,2}\s*[hH:]\s*\d{0,2}\s*[-–—:·]?\s*/, '').replace(/^\d{1,2}\s*[hH]\s*[-–—:·]\s*/, '').trim();
+    if (t.length < 4 || t.length > 70 || generiques.test(t)) return;
+    const cle = t.toLowerCase(); if (vus.has(cle)) return; vus.add(cle); forts.push(t);
+  });
+  return forts.slice(0, 6);
+}
+route("GET", "/api/evenements/:id/compte-rendu/sources", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const { evt } = ctx;
+  const sources = [];
+  const programmes = [];
+  const fcLiee = evt.source_events_id ? await db.prepare("SELECT fc_resume, fc_objectifs, fc_public, fc_programme, fc_programme_fichier_url, fc_programme_fichier_nom, pdf_url, pdf_nom FROM events WHERE id=?").get(evt.source_events_id) : null;
+  if (fcLiee && (fcLiee.fc_programme || fcLiee.fc_programme_fichier_url)) {
+    programmes.push({ origine: 'evenement', texte: String(fcLiee.fc_programme || '').replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim(), fichier_url: fcLiee.fc_programme_fichier_url || null, fichier_nom: fcLiee.fc_programme_fichier_nom || null });
+  }
+  const ficheIdsSrc = await crFicheIds(evt);
+  const fiches = ficheIdsSrc.length ? await db.prepare(`SELECT f.id, f.nom, f.programme_texte, f.programme_fichier_url, f.programme_fichier_nom, f.partenaires_json, f.sponsors_json
+      FROM insc_fiches f WHERE f.id IN (${ficheIdsSrc.map(() => '?').join(',')})`).all(...ficheIdsSrc) : [];
+  fiches.forEach(f => { if (f.programme_texte || f.programme_fichier_url) programmes.push({ origine: 'fiche', texte: String(f.programme_texte || '').trim(), fichier_url: f.programme_fichier_url || null, fichier_nom: f.programme_fichier_nom || null, fiche_nom: f.nom }); });
+  sources.push({ cle: 'programme', libelle: 'Programme', trouve: programmes.length > 0, detail: programmes.length ? programmes.map(p => p.origine === 'fiche' ? 'fiche d\'inscription' : 'événement').join(' + ') : 'Aucun programme renseigné (ni sur l\'événement, ni sur la fiche d\'inscription).' });
+  const fiche_conceptuelle = !!(fcLiee && (fcLiee.fc_resume || fcLiee.fc_objectifs || evt.pdf_url));
+  sources.push({ cle: 'fiche_conceptuelle', libelle: 'Fiche conceptuelle', trouve: fiche_conceptuelle, detail: fiche_conceptuelle ? 'Objectifs et résumé disponibles.' : 'Aucune fiche conceptuelle.' });
+  const galerie = (Array.isArray(crJson(evt.galerie_photos, [])) ? crJson(evt.galerie_photos, []) : []);
+  const legendes = galerie.map(x => (x && typeof x === 'object') ? (x.legende || x.caption || x.titre || '') : '').map(s => String(s).trim()).filter(Boolean);
+  sources.push({ cle: 'photos', libelle: 'Photos', trouve: galerie.length > 0, detail: galerie.length ? `${galerie.length} photo(s)${legendes.length ? ', légendes : ' + legendes.join(' · ') : ''}` : 'Aucune photo.' });
+  const video = evt.video1_url || evt.video2_url || null;
+  sources.push({ cle: 'video', libelle: 'Vidéo', trouve: !!video, detail: video ? 'Vidéo disponible.' : 'Aucune vidéo.' });
+  let participation = null;
+  const stats = await db.prepare(`SELECT t.label, COUNT(*) AS inscrits, SUM(CASE WHEN i.statut='present' THEN 1 ELSE 0 END) AS presents
+      FROM insc_inscriptions i LEFT JOIN insc_types t ON t.id=i.type_id
+      WHERE i.statut NOT IN ('annule','liste_attente') AND (i.evenement_id=?${ficheIdsSrc.length ? ` OR i.fiche_id IN (${ficheIdsSrc.map(() => '?').join(',')})` : ''}) GROUP BY t.label`).all(evt.id, ...ficheIdsSrc);
+  if (stats.length) {
+    const inscrits = stats.reduce((s, r) => s + Number(r.inscrits), 0), presents = stats.reduce((s, r) => s + Number(r.presents || 0), 0);
+    participation = { inscrits, presents, par_type: stats.map(r => ({ label: r.label || 'Autre', inscrits: Number(r.inscrits), presents: Number(r.presents || 0) })) };
+  }
+  sources.push({ cle: 'inscriptions', libelle: "Fiche d'inscription", trouve: !!participation, detail: participation ? `${participation.inscrits} inscrit(s)${participation.presents ? ', ' + participation.presents + ' présent(s)' : ''}` : "Aucune fiche d'inscription liée." });
+  const partenaires = []; fiches.forEach(f => { [crJson(f.partenaires_json, []), crJson(f.sponsors_json, [])].forEach(arr => (Array.isArray(arr) ? arr : []).forEach(p => { const n = (p && (p.nom || p.name)) || (typeof p === 'string' ? p : ''); if (n) partenaires.push(String(n)); })); });
+  sources.push({ cle: 'partenaires', libelle: 'Partenaires', trouve: partenaires.length > 0, detail: partenaires.length ? [...new Set(partenaires)].join(', ') : 'Aucun partenaire renseigné.' });
+  const textesProg = programmes.map(p => p.texte).filter(Boolean).join('\n');
+  const forts = [...crTempsFortsDepuisProgramme(textesProg)];
+  legendes.forEach(l => { if (!forts.some(f => f.toLowerCase() === l.toLowerCase())) forts.push(l); });
+  sendJSON(res, 200, {
+    sources, programmes, participation, partenaires: [...new Set(partenaires)],
+    suggestions: { forts: forts.slice(0, 8), deroule: textesProg || '', participation_texte: participation ? `${participation.inscrits} inscrit(s)${participation.presents ? ', dont ' + participation.presents + ' présent(s) (contrôle d\'entrée)' : ''}. ${participation.par_type.map(t => `${t.label} : ${t.inscrits}`).join(' · ')}.` : '', video_url: video },
+    resume_fiche: fcLiee ? { resume: fcLiee.fc_resume || '', objectifs: fcLiee.fc_objectifs || '' } : null,
+  });
+});
+
+/* ── Envoi par e-mail : destinataires de la fiche, envoi, désinscription ── */
+route("GET", "/api/evenements/:id/compte-rendu/destinataires", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const evt = ctx.evt;
+  const ficheIdsDest = await crFicheIds(evt);
+  const fiches = ficheIdsDest.length ? await db.prepare(`SELECT f.id, f.nom FROM insc_fiches f WHERE f.id IN (${ficheIdsDest.map(() => '?').join(',')})`).all(...ficheIdsDest) : [];
+  if (!fiches.length) return sendJSON(res, 200, { fiche: null, groupes: [], personnes: [] });
+  const ids = fiches.map(f => f.id), ph = ids.map(() => '?').join(',');
+  const groupes = await db.prepare(`SELECT t.id AS type_id, t.label, COUNT(i.id) AS nb FROM insc_types t LEFT JOIN insc_inscriptions i ON i.type_id=t.id AND i.statut NOT IN ('annule','liste_attente') AND i.email IS NOT NULL AND i.email<>''
+      WHERE t.fiche_id IN (${ph}) AND t.actif=1 GROUP BY t.id, t.label, t.ordre ORDER BY t.ordre, t.id`).all(...ids);
+  const personnes = await db.prepare(`SELECT i.id, i.nom, i.prenom, i.email, i.statut, i.type_id, t.label AS type_label FROM insc_inscriptions i LEFT JOIN insc_types t ON t.id=i.type_id
+      WHERE i.fiche_id IN (${ph}) AND i.statut NOT IN ('annule','liste_attente') AND i.email IS NOT NULL AND i.email<>'' ORDER BY i.nom, i.prenom LIMIT 1000`).all(...ids);
+  sendJSON(res, 200, { fiche: { id: fiches[0].id, nom: fiches[0].nom }, groupes: groupes.map(g => ({ type_id: Number(g.type_id), label: g.label, nb: Number(g.nb) })), personnes });
+});
+
+route("POST", "/api/evenements/:id/compte-rendu/envoyer", async (req, res, params, body) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const { user, evt } = ctx;
+  const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  if (!cr || cr.statut !== 'publie') return sendJSON(res, 400, { error: "Publiez d'abord le compte-rendu : le lien « Lire le compte-rendu complet » de l'e-mail doit mener à une page visible." });
+  const { emailCompteRenduDiffusion } = require("./mailer");
+  const origin = getOrigin(req);
+  const objet = crTexte(body.objet, 200) || `Compte-rendu : ${evt.titre}`;
+
+  const ficheIds = await crFicheIds(evt);
+  const cibles = new Map(); // email(minuscule) → {nom, email}
+  const ajouter = (nom, email) => { const e = String(email || '').trim().toLowerCase(); if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e) && e.length <= 254 && !cibles.has(e)) cibles.set(e, { nom: String(nom || '').trim().slice(0, 80), email: e }); };
+  if (ficheIds.length) {
+    const ph = ficheIds.map(() => '?').join(',');
+    const typeIds = (Array.isArray(body.groupes) ? body.groupes : []).map(Number).filter(Boolean);
+    if (typeIds.length) {
+      (await db.prepare(`SELECT prenom, nom, email FROM insc_inscriptions WHERE fiche_id IN (${ph}) AND type_id IN (${typeIds.map(() => '?').join(',')}) AND statut NOT IN ('annule','liste_attente') AND email IS NOT NULL`).all(...ficheIds, ...typeIds))
+        .forEach(r => ajouter(r.prenom, r.email));
+    }
+    const persIds = (Array.isArray(body.personnes) ? body.personnes : []).map(Number).filter(Boolean).slice(0, 1000);
+    if (persIds.length) {
+      (await db.prepare(`SELECT prenom, nom, email FROM insc_inscriptions WHERE fiche_id IN (${ph}) AND id IN (${persIds.map(() => '?').join(',')}) AND email IS NOT NULL`).all(...ficheIds, ...persIds))
+        .forEach(r => ajouter(r.prenom, r.email));
+    }
+  }
+  (Array.isArray(body.externes) ? body.externes : []).slice(0, 200).forEach(x => ajouter(x && x.nom, x && x.email));
+  const test = !!body.test;
+  if (test) { cibles.clear(); ajouter(user.prenom || user.nom, user.email); }
+  if (!cibles.size) return sendJSON(res, 400, { error: "Aucun destinataire valide : choisissez un groupe, une personne ou ajoutez une adresse." });
+  if (cibles.size > 1000) return sendJSON(res, 400, { error: "Limite de 1 000 destinataires par envoi." });
+
+  const desinscrits = new Set((await db.prepare("SELECT email FROM cr_desinscriptions").all()).map(r => String(r.email).toLowerCase()));
+  const liste = [...cibles.values()].filter(c => test || !desinscrits.has(c.email));
+  const ignores = cibles.size - liste.length;
+  const lienCr = `${origin}/compte-rendu.html?evt=${evt.id}`;
+  const auteurNom = await nomCompteAffichage(evt.owner_user_id);
+  const dateEtape = cr.etape_date ? new Date(cr.etape_date + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }) : '';
+  let envoyes = 0, echecs = 0, sansCle = false; const debut = Date.now(); let restant = 0;
+  for (let i = 0; i < liste.length; i += 8) {
+    if (Date.now() - debut > 22000) { restant = liste.length - i; break; }
+    await Promise.all(liste.slice(i, i + 8).map(async c => {
+      const r = await emailCompteRenduDiffusion({ to: c.email, prenom: c.nom, objet, evenementTitre: evt.titre, auteurNom, resume: cr.resume, etapeTexte: cr.etape_texte, etapeDate: dateEtape, lien: lienCr,
+        lienDesinscription: `${origin}/api/cr/desinscription?e=${Buffer.from(c.email).toString('base64url')}&t=${crCibleSignature(c.email)}` });
+      if (r && r.ok) envoyes++; else { echecs++; if (r && r.reason === 'no_key') sansCle = true; }
+    }));
+  }
+  if (!test) {
+    await db.prepare("INSERT INTO evenement_cr_envois (evenement_id, auteur_id, objet, nb_destinataires, nb_envoyes, detail) VALUES (?,?,?,?,?,?)")
+      .run(evt.id, user.id, objet, liste.length, envoyes, JSON.stringify({ echecs, ignores_desinscrits: ignores, non_traites: restant }));
+  }
+  SEC.logSecurity("compte_rendu_envoi", { uid: Number(user.id), evenement_id: Number(evt.id), destinataires: liste.length, envoyes, test });
+  sendJSON(res, 200, { ok: true, test, destinataires: liste.length, envoyes, echecs, ignores_desinscrits: ignores, non_traites: restant, mail_non_configure: sansCle });
+});
+
+route("GET", "/api/evenements/:id/compte-rendu/envois", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  sendJSON(res, 200, { envois: await db.prepare("SELECT id, objet, nb_destinataires, nb_envoyes, detail, created_at FROM evenement_cr_envois WHERE evenement_id=? ORDER BY id DESC LIMIT 50").all(ctx.evt.id) });
+});
+
+route("GET", "/api/cr/desinscription", async (req, res, params, body, query) => {
+  let email = '';
+  try { email = Buffer.from(String((query && query.e) || ''), 'base64url').toString('utf8').toLowerCase(); } catch (_) {}
+  const sig = String((query && query.t) || '');
+  const h = x => crypto.createHash('sha256').update(String(x)).digest();
+  const ok = !!email && email.length <= 254 && sig.length > 10 && crypto.timingSafeEqual(h(crCibleSignature(email)), h(sig));
+  if (ok) { try { await db.prepare("INSERT OR IGNORE INTO cr_desinscriptions (email) VALUES (?)").run(email); } catch (_) {} }
+  res.writeHead(ok ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diaspo'Actif</title></head><body style="font-family:Arial,sans-serif;background:#F3F6FB;margin:0;padding:48px 16px;text-align:center;color:#0D1B2A;"><div style="max-width:460px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 8px 32px rgba(13,43,78,.12);"><h1 style="font-size:20px;margin:0 0 12px;">${ok ? 'Désinscription enregistrée' : 'Lien invalide'}</h1><p style="color:#475569;line-height:1.6;margin:0;">${ok ? "Vous ne recevrez plus de comptes-rendus d'événements envoyés par e-mail via Diaspo'Actif." : "Ce lien de désinscription n'est pas valide ou a expiré."}</p></div></body></html>`);
+});
+
+/* ── Mes événements terminés et l'état de leur compte-rendu (page d'accueil du module) ── */
+route("GET", "/api/mes-evenements-compte-rendu", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const auj = dateParisISO();
+  const rows = await db.prepare(`SELECT e.id, e.titre, e.date_evt, e.date_fin, e.ville, c.statut AS cr_statut FROM evenements e
+      LEFT JOIN evenement_comptes_rendus c ON c.evenement_id=e.id
+      WHERE e.owner_user_id=? AND COALESCE(e.statut,'') NOT IN ('brouillon','annule','annulé')
+        AND SUBSTR(COALESCE(NULLIF(e.date_fin,''), e.date_evt),1,10) < ? ORDER BY e.date_evt DESC LIMIT 100`).all(user.id, auj);
+  sendJSON(res, 200, { evenements: rows.map(r => ({ ...r, cr_statut: r.cr_statut || null })) });
+});
+
+/* ── Relance des créateurs (notification + e-mail), partagée par le cron et l'admin ──
+   mode 'recents' : événements terminés à partir de CR_LANCEMENT (cron quotidien).
+   mode 'anciens' : événements terminés avant CR_LANCEMENT (déclenché par un administrateur, aperçu par défaut).
+   Un message par créateur : un événement → notification individuelle ; plusieurs → notification
+   groupée (une seule). Chaque événement n'est relancé qu'une fois (cr_relance_at). */
+async function crRelancerCreateurs({ mode, origin, dryRun = false, budgetMs = 22000, limite = 300 }) {
+  const auj = dateParisISO();
+  const fin = "SUBSTR(COALESCE(NULLIF(e.date_fin,''), e.date_evt),1,10)";
+  const rows = await db.prepare(`SELECT e.id, e.titre, e.date_evt, e.date_fin, e.owner_user_id, u.email, u.prenom, u.nom, u.role
+      FROM evenements e JOIN users u ON u.id=e.owner_user_id
+      WHERE e.cr_relance_at IS NULL AND ${fin} < ? AND ${fin} ${mode === 'anciens' ? '<' : '>='} ? AND ${fin} <> ''
+        AND COALESCE(e.statut,'') NOT IN ('brouillon','annule','annulé')
+        AND NOT EXISTS (SELECT 1 FROM evenement_comptes_rendus c WHERE c.evenement_id=e.id)
+        AND (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé'
+      ORDER BY e.owner_user_id, ${fin} DESC LIMIT ${Number(limite)}`).all(auj, CR_LANCEMENT);
+  const parCreateur = new Map();
+  rows.forEach(r => { if (!parCreateur.has(r.owner_user_id)) parCreateur.set(r.owner_user_id, []); parCreateur.get(r.owner_user_id).push(r); });
+  const apercu = { createurs: parCreateur.size, evenements: rows.length, exemples: [...parCreateur.values()].slice(0, 10).map(l => ({ createur_id: l[0].owner_user_id, evenements: l.map(e => e.titre).slice(0, 5), nb: l.length })) };
+  if (dryRun) return { dryRun: true, ...apercu };
+  const { emailCompteRenduRelance } = require("./mailer");
+  const debut = Date.now(); let notifs = 0, mails = 0, traites = 0;
+  for (const [uid, liste] of parCreateur) {
+    if (Date.now() - debut > budgetMs) break;
+    const unique = liste.length === 1;
+    const e0 = liste[0];
+    const lien = unique ? `compte-rendu.html?evt=${e0.id}` : 'compte-rendu.html';
+    await creerNotif(uid, 'compte_rendu_relance',
+      unique ? `🎉 Bravo pour « ${e0.titre} » !` : `🎉 Bravo pour vos ${liste.length} événements !`,
+      unique ? "Votre événement est terminé : racontez-le dans un compte-rendu (informer, remercier, garder une trace)."
+             : `${liste.length} de vos événements sont terminés : écrivez leur compte-rendu pour informer, remercier et garder une trace.`,
+      { evenement_id: Number(e0.id), lien });
+    notifs++;
+    if (e0.email) {
+      const r = await emailCompteRenduRelance({ to: e0.email, prenom: e0.prenom || '', evenements: liste.map(e => ({
+        titre: e.titre, date: e.date_evt ? new Date(String(e.date_evt).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' }) : '',
+        lien: `${origin}/compte-rendu.html?evt=${e.id}` })) });
+      if (r && r.ok) mails++;
+    }
+    await db.prepare(`UPDATE evenements SET cr_relance_at=? WHERE id IN (${liste.map(() => '?').join(',')})`).run(new Date().toISOString(), ...liste.map(e => e.id));
+    traites += liste.length;
+  }
+  return { dryRun: false, ...apercu, notifications: notifs, emails: mails, evenements_traites: traites, restants: Math.max(0, rows.length - traites) };
+}
+
+route("POST", "/api/admin/evenements/compte-rendu-anciens", async (req, res, params, body) => {
+  const admin = await getCurrentUser(req);
+  if (!admin || admin.role !== 'administrateur') return sendJSON(res, 403, { error: "Réservé aux administrateurs." });
+  /* Aperçu par défaut : rien n'est envoyé tant que dryRun n'est pas explicitement false. */
+  const dryRun = body.dryRun !== false;
+  const limite = Math.min(300, Math.max(1, Number(body.limite) || 300)); // lots : l'administrateur peut avancer par petites vagues
+  try { sendJSON(res, 200, await crRelancerCreateurs({ mode: 'anciens', origin: getOrigin(req), dryRun, limite })); }
+  catch (e) { sendJSON(res, 500, SEC.safeError(e, "cr-relance-anciens")); }
 });
 
 route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
@@ -22654,7 +23162,9 @@ async function enrichPost(p, cu) {
      cartouche) pour que le front l'affiche avec le design promo, boutons compris. */
   let evenement_promo = null;
   if (p.promo_evenement_id) { try { evenement_promo = await cartePromoEvenement(p.promo_evenement_id); } catch (_) {} }
-  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo };
+  let compte_rendu = null;
+  if (p.compte_rendu_evenement_id) { try { compte_rendu = await carteCompteRenduPost(p.compte_rendu_evenement_id); } catch (_) {} }
+  return { ...titrePostComplet(p), auteur_nom, reactions: counts, nb_commentaires, user_a_aime, auteur_profil: auteur, auteur_certif, auteur_accreditations, score, original_post, evenement_promo, compte_rendu };
 }
 
 /* ---------- Fil intelligent ---------- */
@@ -28944,6 +29454,17 @@ async function handleRequest(req, res) {
      90/60/30/7 jours avant expiration (seuils configurables via parametres_plateforme,
      clé 'partenariat_periode_alerte_jours', JSON). Anti-doublon via
      partenariat_notifications_echeance (UNIQUE(periode_id, delai_jours)). */
+  /* Relance quotidienne des créateurs d'événements terminés (notification + e-mail) — compte-rendu.
+     Ne traite que les événements terminés à partir de CR_LANCEMENT ; les anciens passent par
+     POST /api/admin/evenements/compte-rendu-anciens (aperçu par défaut). Une seule relance par événement. */
+  if (pathname === '/api/cron/evenements-compte-rendu') {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers['authorization'] || '';
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) return sendJSON(res, 401, { error: "Non autorisé." });
+    try { return sendJSON(res, 200, await crRelancerCreateurs({ mode: 'recents', origin: getOrigin(req) })); }
+    catch (e) { return sendJSON(res, 500, SEC.safeError(e, "cron-evenements-compte-rendu")); }
+  }
+
   if (pathname === '/api/cron/partenariat-echeances') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers['authorization'] || '';
@@ -44531,6 +45052,21 @@ route("GET", "/api/insc/fiches/:id", async (req, res, params) => {
   sendJSON(res, 200, { fiche, evenements, types, medias, candidature });
 });
 
+/* Programme déjà saisi sur l'événement (fiche conceptuelle, « Programme / Déroulé ») des événements liés à
+   cette fiche — pour le reprendre en un clic dans l'onglet Programme de la fiche. */
+route("GET", "/api/insc/fiches/:id/programme-evenement", async (req, res, params) => {
+  const { erreur, msg, fiche } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const lignes = await db.prepare(`SELECT e.id AS evenement_id, e.titre, ev.fc_programme, ev.fc_programme_fichier_url, ev.fc_programme_fichier_nom
+      FROM insc_fiches_evenements fe JOIN evenements e ON e.id=fe.evenement_id JOIN events ev ON ev.id=e.source_events_id
+      WHERE fe.fiche_id=?`).all(fiche.id);
+  const programmes = lignes.filter(l => l.fc_programme || l.fc_programme_fichier_url).map(l => ({
+    evenement_id: l.evenement_id, titre: l.titre, texte: String(l.fc_programme || '').replace(/<[^>]+>/g, '\n').replace(/\n{3,}/g, '\n\n').trim(),
+    fichier_url: /^https?:\/\//i.test(l.fc_programme_fichier_url || '') ? l.fc_programme_fichier_url : null, fichier_nom: l.fc_programme_fichier_nom || null,
+  }));
+  sendJSON(res, 200, { programmes });
+});
+
 route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
@@ -44551,6 +45087,15 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
   if (Array.isArray(body.partenaires)) {
     set.push("partenaires_json=?");
     vals.push(JSON.stringify(body.partenaires.filter(s => s?.nom).map(s => ({ nom: String(s.nom).trim(), logo_url: s.logo_url || null }))));
+  }
+  /* Programme de la fiche (2026-10-05, demande explicite) : texte libre + pièce jointe (PDF ou
+     image), mêmes champs que « Programme / Déroulé » de l'événement (fc_programme). Le compte-rendu
+     lit les deux emplacements. Chaîne vide ou null = programme retiré. */
+  if (body.programme_texte !== undefined) { set.push("programme_texte=?"); vals.push(body.programme_texte ? String(body.programme_texte).replace(/\u0000/g, '').trim().slice(0, 8000) || null : null); }
+  if (body.programme_fichier_url !== undefined) {
+    const u = body.programme_fichier_url ? String(body.programme_fichier_url).trim() : '';
+    set.push("programme_fichier_url=?"); vals.push(/^https?:\/\/[^\s]+$/i.test(u) ? u.slice(0, 1000) : null);
+    set.push("programme_fichier_nom=?"); vals.push(u && body.programme_fichier_nom ? String(body.programme_fichier_nom).slice(0, 200) : null);
   }
   /* Lien de parrainage (2026-09-28, demande explicite) — un seul lien d'invitation par fiche,
      choisi par l'organisateur parmi SES PROPRES invitations (jamais celles d'un tiers, même

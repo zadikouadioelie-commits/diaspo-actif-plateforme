@@ -385,6 +385,48 @@ function renderEvenementPromoCard(post) {
 </article>`;
 }
 
+/* Compte-rendu d'événement (2026-10-05, demande explicite) — publié dans le fil comme une
+   publication ordinaire (mêmes réactions, commentaires, partage, menu) ; seul le CORPS change :
+   image de l'événement, aperçu du résumé (« Lire la suite »), vidéo, étape suivante, personnes
+   identifiées, puis « Lire le compte-rendu complet » et « En savoir plus » sur l'événement. */
+function ensureCrCss() {
+  if (document.getElementById('compte-rendu-css')) return;
+  const l = document.createElement('link');
+  l.id = 'compte-rendu-css'; l.rel = 'stylesheet'; l.href = 'assets/compte-rendu.css?v=1';
+  document.head.appendChild(l);
+}
+function renderCompteRenduBloc(post) {
+  const c = post.compte_rendu;
+  if (!c) return '';
+  ensureCrCss();
+  const dateTxt = c.date_evt ? new Date(String(c.date_evt).slice(0,10) + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) : '';
+  const etapeDate = c.etape_date ? new Date(c.etape_date + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) : '';
+  const paras = String(c.resume || '').split(/\n\s*\n/).filter(Boolean).map(p => `<p>${processContent(p)}</p>`).join('');
+  const long = String(c.resume || '').length > 380;
+  const isFile = /\.(mp4|webm|ogg)(\?|$)/i.test(c.video_url || '');
+  const video = c.video_url
+    ? `<div class="cr-video">${isFile ? `<video controls preload="metadata"><source src="${escHtml(c.video_url)}"></video>` : `<a href="${escHtml(c.video_url)}" target="_blank" rel="noopener">▶ Voir la vidéo de l'événement</a>`}</div>` : '';
+  const etape = (c.etape_texte || c.etape_date)
+    ? `<div class="cr-etape"><div class="cr-etape-lbl">➡️ L'étape suivante</div>${etapeDate ? `<div class="cr-etape-date">📅 ${escHtml(etapeDate)}</div>` : ''}${c.etape_texte ? `<div class="cr-etape-txt">${processContent(c.etape_texte)}</div>` : ''}${c.etape_bouton && c.etape_lien ? `<div class="cr-btns"><a class="cr-btn pri" href="${escHtml(c.etape_lien)}" target="_blank" rel="noopener">${escHtml(c.etape_bouton)}</a></div>` : ''}</div>` : '';
+  const avec = (c.identifies || []).length
+    ? `<div class="cr-avec">Avec : ${c.identifies.map(i => `<a class="cr-chip" href="profil.html?id=${i.user_id}">@${escHtml(i.nom)}</a>`).join('')}</div>` : '';
+  return `
+  <div class="cr-cover">
+    <span class="cr-tag">📄 Compte-rendu${dateTxt ? ' · ' + escHtml(dateTxt) : ''}</span>
+    ${c.image ? `<img src="${escHtml(c.image)}" alt="" loading="lazy">` : ''}
+    ${c.ville ? `<span class="cr-lieu">📍 ${escHtml(c.ville)}</span>` : ''}
+  </div>
+  <div class="cr-resume${long ? ' cr-clamp' : ''}" id="cr-resume-${post.id}">${paras}</div>
+  ${long ? `<button type="button" class="cr-link" onclick="var e=document.getElementById('cr-resume-${post.id}');var o=e.classList.toggle('cr-clamp');this.textContent=o?'Lire la suite…':'Réduire';">Lire la suite…</button>` : ''}
+  ${etape}
+  ${video}
+  ${avec}
+  <div class="cr-btns">
+    <a class="cr-btn pri" href="compte-rendu.html?evt=${c.evenement_id}">📄 Lire le compte-rendu complet</a>
+    <a class="cr-btn sec" href="evenements.html?evt=${c.evenement_id}">ℹ️ En savoir plus sur l'événement</a>
+  </div>`;
+}
+
 function renderPostCard(post, options = {}) {
   if (post.type === 'carte_vitrine') return renderVitrineCard(post);
   if (post.type === 'evenement_promo') return renderEvenementPromoCard(post);
@@ -435,7 +477,10 @@ function renderPostCard(post, options = {}) {
         </div>
        </div>` : '';
 
-  const menuItems = isAuteur
+  const crBloc = (post.type === 'compte_rendu' && post.compte_rendu) ? renderCompteRenduBloc(post) : '';
+  const menuItems = (isAuteur && crBloc)
+    ? `<a class="post-menu-item" style="text-decoration:none;display:block;" href="compte-rendu.html?evt=${post.compte_rendu.evenement_id}&edition=1">✏️ Modifier le compte-rendu</a>`
+    : isAuteur
     ? `<button class="post-menu-item" onclick="Posts.editPost(${post.id})">✏️ Modifier</button>
        <button class="post-menu-item" onclick="Posts.archivePost(${post.id})">📁 Archiver</button>
        ${showStats ? `<button class="post-menu-item" onclick="Posts.showStats(${post.id})">📊 Statistiques</button>` : ''}`
@@ -474,9 +519,9 @@ function renderPostCard(post, options = {}) {
 
   ${titreHtml}
 
-  ${renderMedias(post)}
+  ${crBloc || renderMedias(post)}
 
-  <div class="post-body" data-expanded="${texteTronque ? 'false' : 'true'}"${texteBrut ? '' : ' style="display:none"'}>
+  <div class="post-body" data-expanded="${texteTronque ? 'false' : 'true'}"${(texteBrut && !crBloc) ? '' : ' style="display:none"'}>
     <div class="post-body-preview"${texteTronque ? '' : ' style="display:none"'}>${contenuApercuHTML}</div>
     <div class="post-body-full"${texteTronque ? ' style="display:none"' : ''}>${contenuHTML}</div>
     ${texteTronque ? `<button type="button" class="post-voir-plus" onclick="Posts.toggleExpand(${post.id}, this)">Voir plus</button>` : ''}
@@ -514,7 +559,7 @@ function renderPostCard(post, options = {}) {
     <button class="post-action-btn" onclick="Posts.share(${post.id})" title="Partager">
       📤
     </button>
-    ${isAuteur ? `<button class="post-action-btn post-action-btn-danger" onclick="Posts.deletePost(${post.id})" title="Supprimer la publication">
+    ${(isAuteur && !crBloc) ? `<button class="post-action-btn post-action-btn-danger" onclick="Posts.deletePost(${post.id})" title="Supprimer la publication">
       🗑️
     </button>` : ''}
   </div>
@@ -1515,7 +1560,12 @@ const Posts = {
 
   _renderDetailPost(post) {
     const promoEvt = post.type === 'evenement_promo' && post.evenement_promo && post.evenement_promo.promo_active ? post.evenement_promo : null;
-    document.getElementById('pd-media').innerHTML = renderMedias(post) ||
+    const crDetail = post.type === 'compte_rendu' && post.compte_rendu ? post.compte_rendu : null;
+    document.getElementById('pd-media').innerHTML = (crDetail
+      ? (crDetail.image
+          ? `<img src="${escHtml(crDetail.image)}" alt="${escHtml(crDetail.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
+          : `<div style="color:#fff;padding:60px;text-align:center;font-weight:800;font-size:20px;">📄 ${escHtml(crDetail.titre)}</div>`)
+      : renderMedias(post)) ||
       (promoEvt && promoEvt.image
         ? `<img src="${escHtml(promoEvt.image)}" alt="${escHtml(promoEvt.titre)}" style="max-width:100%;max-height:100%;object-fit:contain;">`
         : `<div style="color:#fff;padding:60px;text-align:center;">${escHtml(promoEvt ? promoEvt.titre : post.auteur_nom)}</div>`);
@@ -1536,7 +1586,9 @@ const Posts = {
 
     const estArticle = post.pub_type === 'article';
     const texteBrut = estArticle ? (post.article_contenu || '') : (post.corps != null ? post.corps : (post.contenu || ''));
-    document.getElementById('pd-caption').innerHTML = promoEvt
+    document.getElementById('pd-caption').innerHTML = crDetail
+      ? titrePostHtml(post) + renderCompteRenduBloc(post).replace(/<div class="cr-cover">[\s\S]*?<\/div>\s*(?=<div class="cr-resume)/, '')
+      : promoEvt
       ? `<h3 class="post-titre">${escHtml(promoEvt.titre)}</h3><a href="evenements.html?evt=${promoEvt.id}" style="color:var(--orange,#ff6b00);font-weight:700;">Voir l'événement →</a>`
       : titrePostHtml(post) + processContent(texteBrut);
 

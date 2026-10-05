@@ -2085,6 +2085,15 @@ const MIGRATIONS = [
   ["evenements", "promo_nb_cibles INTEGER"],
   ["evenements", "promo_post_id INTEGER"],
   ["fil_posts", "promo_evenement_id INTEGER"],
+  /* Compte-rendu d'événement (2026-10-05, demande explicite) : date de la relance envoyée au
+     créateur (une seule fois par événement, NULL = pas encore relancé), publication dans le fil
+     (fil_posts.compte_rendu_evenement_id) et emplacement « Programme » de la fiche d'inscription
+     (texte + pièce jointe, mêmes champs que fc_programme de l'événement). */
+  ["evenements", "cr_relance_at TEXT"],
+  ["fil_posts", "compte_rendu_evenement_id INTEGER"],
+  ["insc_fiches", "programme_texte TEXT"],
+  ["insc_fiches", "programme_fichier_url TEXT"],
+  ["insc_fiches", "programme_fichier_nom TEXT"],
   // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08, demande explicite) —
   // les deux tables, comme prix_min/whatsapp_lien/origine plus haut.
   ["events", "masquer_inscrits INTEGER DEFAULT 0"],
@@ -7737,6 +7746,87 @@ db.exec(`
     UNIQUE(user_id, produit_id, mode_livraison),
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(produit_id) REFERENCES produits_vitrine(id)
+  );
+`);
+
+/* Compte-rendu d'événement (2026-10-05, demande explicite). Un seul compte-rendu par événement
+   (UNIQUE) : résumé court (affiché dans le fil), parties détaillées du canevas, temps forts,
+   étape suivante, vidéo. Les commentaires/réactions du compte-rendu publié vivent sur son post du
+   fil (fil_post_id) ; ceux de l'événement lui-même ont leurs propres tables ci-dessous. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS evenement_comptes_rendus (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL UNIQUE,
+    auteur_id INTEGER NOT NULL,
+    titre TEXT,
+    type_cr TEXT DEFAULT 'eco',
+    type_libre TEXT,
+    resume TEXT,
+    details_json TEXT DEFAULT '[]',
+    forts_json TEXT DEFAULT '[]',
+    etape_texte TEXT,
+    etape_date TEXT,
+    etape_bouton TEXT,
+    etape_lien TEXT,
+    video_url TEXT,
+    medias_json TEXT DEFAULT '[]',
+    statut TEXT NOT NULL DEFAULT 'brouillon',
+    fil_post_id INTEGER,
+    published_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(auteur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS evenement_identifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    ajoute_par INTEGER,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(evenement_id, user_id),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS evenement_commentaires (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL,
+    auteur_id INTEGER NOT NULL,
+    contenu TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(auteur_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS evenement_reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    emoji TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(evenement_id, user_id, emoji),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  /* Adresses qui ont utilisé le lien « Ne plus recevoir ces comptes-rendus » : jamais ciblées par un envoi. */
+  CREATE TABLE IF NOT EXISTS cr_desinscriptions (
+    email TEXT PRIMARY KEY,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS evenement_cr_envois (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL,
+    auteur_id INTEGER NOT NULL,
+    objet TEXT,
+    nb_destinataires INTEGER DEFAULT 0,
+    nb_envoyes INTEGER DEFAULT 0,
+    detail TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id)
   );
 `);
 
