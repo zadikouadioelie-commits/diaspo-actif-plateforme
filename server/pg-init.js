@@ -466,6 +466,11 @@ const COLONNES_MIGRATION = [
     ['events', 'origine1', 'TEXT'],
     ['events', 'origine2', 'TEXT'],
     ['evenements', 'origine2', 'TEXT'],
+    // Promotion J-7 d'un événement (2026-10-05) — miroir exact des ALTER db.js.
+    ['evenements', 'promo_lancee_at', 'TEXT'],
+    ['evenements', 'promo_nb_cibles', 'INTEGER'],
+    ['evenements', 'promo_post_id', 'INTEGER'],
+    ['fil_posts', 'promo_evenement_id', 'INTEGER'],
     // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08) — miroir exact de l'ALTER db.js.
     ['events', 'masquer_inscrits', 'INTEGER DEFAULT 0'],
     ['evenements', 'masquer_inscrits', 'INTEGER DEFAULT 0'],

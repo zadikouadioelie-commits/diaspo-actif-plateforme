@@ -479,6 +479,7 @@ function injectNotifStyles() {
 .notif-icon.mention { background:#C7D2FE; }
 .notif-icon.nouveau_abonne { background:#BBF7D0; }
 .notif-icon.nouvelle_publication { background:#FDE68A; }
+.notif-icon.evenement_promo { background:linear-gradient(135deg,#DDD6FE,#FBCFE8); }
 .notif-icon.reaction { background:#FBCFE8; }
 .notif-icon.pub_like { background:#FBCFE8; }
 .notif-icon.pub_commentaire { background:#BAE6FD; }
@@ -507,6 +508,7 @@ const NOTIF_ICONS = {
   abonnement: "⭐",
   nouveau_abonne: "👤",
   nouvelle_publication: "📰",
+  evenement_promo: "🎯",
   pub_commentaire: "💬",
   pub_like: "❤️",
   demande_contact: "📩",

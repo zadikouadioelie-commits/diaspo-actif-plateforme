@@ -19423,7 +19423,9 @@ function evenementEstTermine(evt) {
 }
 function avecStatutTemporel(r) {
   const st = statutTemporelEvenement(r);
-  return { ...r, statut_temporel: st, est_termine: st === 'termine' };
+  /* promo_active : design « J-7 » affiché tant que la promotion est lancée ET l'événement pas
+     terminé — calculé ici à la lecture (aucun cron, Vercel n'a pas de process persistant). */
+  return { ...r, statut_temporel: st, est_termine: st === 'termine', promo_active: !!r.promo_lancee_at && st !== 'termine', promo_jours: (r.promo_lancee_at && st !== 'termine') ? joursAvantEvenement(r.date_evt) : null };
 }
 
 async function enrichirAvecFicheMedia(rows) {
@@ -19474,6 +19476,218 @@ async function enrichirAvecFicheMedia(rows) {
     return avecStatutTemporel({ ...r, fiche_media: fiche, fiche_id: fid || null, fiche_slug: (fiche && fiche.statut === 'publiee') ? fiche.slug : null });
   });
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROMOTION J-7 D'UN ÉVÉNEMENT (2026-10-05, demande explicite)
+   Un seul bouton pour le titulaire, utilisable UNE fois, de J-7 à la veille. Au clic :
+   (1) notification Diaspo'Actif (jamais d'e-mail — décision explicite, aucun frais d'envoi) à
+       tous les membres correspondant à la cible de l'événement ;
+   (2) un post dans le fil d'actualité, mis en avant pour les membres ciblés ;
+   (3) le design « promo » (voir evenements-app.html et assets/posts.js) sur la cartouche ET sur
+       le post, uniquement tant que l'événement n'est pas terminé.
+   Aucune IA externe, aucun contenu nouveau : tout vient de l'événement existant (titre,
+   description, image choisie par le propriétaire, fiche d'inscription liée). Le bouton
+   « S'inscrire » du post/de la cartouche promo suit EXACTEMENT le même chemin que la cartouche
+   normale (voir promoCibleInscription) — pas un second parcours, une autre porte vers le même.
+   Aucun cron (Vercel n'a pas de process persistant) : « promo active » = lancée ET événement
+   pas terminé, calculé à la lecture (promo_active, voir avecStatutTemporel).
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PROMO_FENETRE_JOURS = 7;
+const PROMO_AUDIENCE_MAX = 50000;
+
+function joursAvantEvenement(dateEvt) {
+  const d = String(dateEvt || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  return Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(dateParisISO() + 'T00:00:00Z')) / 86400000);
+}
+/* Clé de comparaison géographique : ISO2 quand le nom de pays/nationalité est connu (« Cameroun »,
+   « camerounaise », « Cameroonian »… se rejoignent), sinon texte normalisé sans accents. */
+function cleGeoPromo(s) { return paysNomVersISO2(s) || normaliserTexte(s); }
+
+/* Même logique que le bouton « S'inscrire » de la cartouche (evenements-app.html, renderEvts) :
+   informatif → rien ; lien externe → ce lien ; fiche publiée → inscription-publique ; sinon la
+   page de l'événement (où vit le formulaire intégré). Source unique pour le post du fil. */
+function promoCibleInscription(evt) {
+  if (Number(evt.inscription_ouverte) === 0) return { type: 'info', href: null };
+  if (evt.lien_inscription) return { type: 'externe', href: evt.lien_inscription };
+  if (evt.fiche_id && evt.fiche_slug) return { type: 'fiche', href: `inscription-publique.html?slug=${encodeURIComponent(evt.fiche_slug)}` };
+  return { type: 'evenement', href: `evenements.html?evt=${evt.id}` };
+}
+
+/* Carte promo d'un événement (données déjà publiques sur sa cartouche) — jointe aux posts du fil. */
+async function cartePromoEvenement(evtId) {
+  const row = await db.prepare("SELECT e.*, u.nom AS organisateur_nom FROM evenements e LEFT JOIN users u ON u.id=e.owner_user_id WHERE e.id=?").get(evtId);
+  if (!row) return null;
+  const evt = (await enrichirAvecFicheMedia([row]))[0];
+  let galerie = []; try { galerie = Array.isArray(evt.galerie_photos) ? evt.galerie_photos : JSON.parse(evt.galerie_photos || '[]'); } catch (_) {}
+  const cover = evt.image_couverture || evt.image_url || (galerie.filter(Boolean)[0]) || (evt.fiche_media && evt.fiche_media.affiche_url) || null;
+  const desc = String(evt.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const cible = promoCibleInscription(evt);
+  return {
+    id: evt.id, titre: evt.titre, date_evt: evt.date_evt, date_fin: evt.date_fin || null, heure_debut: evt.heure_debut || null,
+    lieu: evt.lieu || null, ville: evt.ville || null, pays: evt.pays || null, type_evt: evt.type_evt || null, domaine: evt.domaine || null,
+    image: cover, description: desc.length > 200 ? desc.slice(0, 200).trim() + '…' : desc,
+    organisateur: evt.organisateur_nom || evt.organisateur || null, prix_min: evt.prix_min || null,
+    inscription: cible, jours_restants: joursAvantEvenement(evt.date_evt),
+    promo_active: !!evt.promo_lancee_at && evt.statut_temporel !== 'termine',
+  };
+}
+
+/* Éligibilité du bouton « Promouvoir » (aussi relue côté serveur à chaque clic). */
+async function promoEligibilite(evt) {
+  if (!evt) return { ok: false, code: 404, raison: "Événement introuvable." };
+  if (evt.promo_lancee_at) return { ok: false, code: 409, raison: "La promotion de cet événement a déjà été lancée." };
+  const st = String(evt.statut || '').toLowerCase();
+  if (['brouillon', 'annule', 'annulé', 'ferme', 'clos', 'termine'].includes(st)) return { ok: false, code: 400, raison: "Cet événement n'est pas publié : impossible de le promouvoir." };
+  if ((evt.visibilite || 'public') !== 'public') return { ok: false, code: 400, raison: "Seuls les événements publics peuvent être promus (pas les événements privés, réservés aux abonnés ou affichés uniquement sur la boutique)." };
+  const j = joursAvantEvenement(evt.date_evt);
+  if (j === null) return { ok: false, code: 400, raison: "La date de l'événement est invalide." };
+  if (j > PROMO_FENETRE_JOURS) return { ok: false, code: 400, raison: `Disponible à partir de J-${PROMO_FENETRE_JOURS} (dans ${j - PROMO_FENETRE_JOURS} jour${j - PROMO_FENETRE_JOURS > 1 ? 's' : ''}).`, jours: j };
+  if (j < 1) return { ok: false, code: 400, raison: "La promotion n'est possible que jusqu'à la veille de l'événement.", jours: j };
+  /* Fiche d'inscription liée : sa publication, sa visibilité et sa fenêtre d'inscription
+     conditionnent la promotion — inutile (et trompeur) de pousser un « S'inscrire » qui mène à
+     une fiche privée, non publiée ou déjà fermée. */
+  const enrichi = (await enrichirAvecFicheMedia([evt]))[0];
+  if (enrichi.fiche_id) {
+    const f = await db.prepare("SELECT statut, visibilite, date_fermeture_inscriptions, gele_le FROM insc_fiches WHERE id=?").get(enrichi.fiche_id);
+    if (f) {
+      if (!['publiee', 'programmee'].includes(f.statut)) return { ok: false, code: 400, raison: "La fiche d'inscription liée n'est pas publiée : publiez-la avant de lancer la promotion." };
+      if (['prive', 'invitation'].includes(f.visibilite)) return { ok: false, code: 400, raison: "La fiche d'inscription liée est privée ou sur invitation : la promotion publique n'est pas possible." };
+      if (f.gele_le) return { ok: false, code: 400, raison: "La fiche d'inscription liée est gelée." };
+      const fermeture = String(f.date_fermeture_inscriptions || '').slice(0, 10);
+      if (fermeture && fermeture < dateParisISO()) return { ok: false, code: 400, raison: "Les inscriptions de la fiche liée sont déjà fermées." };
+    }
+  }
+  return { ok: true, jours: j, evt: enrichi };
+}
+
+/* Ville → région/département dominants parmi les membres de cette ville : le formulaire de
+   création n'a ni région ni département, alors que « zone de diffusion » peut valoir Région ou
+   Département — on les déduit de ce que les membres de la ville ont eux-mêmes déclaré. */
+async function zoneDominanteMembres(colonne, ville) {
+  const col = colonne === 'departement' ? 'departement' : 'region';
+  if (!ville) return null;
+  try {
+    const r = await db.prepare(`SELECT ${col} AS v, COUNT(*) AS n FROM users WHERE LOWER(ville)=LOWER(?) AND ${col} IS NOT NULL AND ${col}<>'' GROUP BY ${col} ORDER BY n DESC LIMIT 1`).get(ville);
+    return r && r.v ? normaliserTexte(r.v) : null;
+  } catch (_) { return null; }
+}
+
+/* Ciblage : origine(s) visée(s) à la création (vide = toutes les diasporas) ET portée géographique
+   (zone de diffusion). « Issu de la diaspora X » = origine1/origine2/nationalités déclarées ;
+   « résident » = vit dans le pays X. Exclut propriétaire, démos, comptes masqués/suspendus. */
+async function audiencePromoEvenement(evt) {
+  const zone = normaliserTexte(evt.zone_diffusion);
+  const villeEvt = normaliserTexte(evt.ville || evt.lieu);
+  const paysEvt = evt.pays ? cleGeoPromo(evt.pays) : '';
+  const cibles = new Set([evt.origine, evt.origine2].filter(Boolean).map(cleGeoPromo));
+  let regionEvt = normaliserTexte(evt.region), deptEvt = normaliserTexte(evt.departement);
+  if (zone === 'region' && !regionEvt) regionEvt = await zoneDominanteMembres('region', evt.ville || evt.lieu);
+  if (zone === 'departement' && !deptEvt) deptEvt = await zoneDominanteMembres('departement', evt.ville || evt.lieu);
+
+  const rows = await db.prepare(`SELECT id, ville, pays, region, departement, origine1, origine2, nationalite1, nationalite2, nationalite3
+    FROM users WHERE role IN ('utilisateur','initiative') AND (compte_masque IS NULL OR compte_masque=0)
+      AND (is_demo IS NULL OR is_demo=FALSE) AND COALESCE(suspendu_definitif,0)=0
+      AND (suspendu_jusqu_au IS NULL OR suspendu_jusqu_au='' OR suspendu_jusqu_au < ?)
+      AND id<>? AND nom<>'Compte supprimé' LIMIT ${PROMO_AUDIENCE_MAX}`).all(new Date().toISOString(), evt.owner_user_id);
+
+  const geoOk = (u) => {
+    if (zone === 'international') return true;
+    const uVille = normaliserTexte(u.ville);
+    const memeVille = !!villeEvt && uVille === villeEvt;
+    if (zone === 'ville' || zone === 'commune') return memeVille && (!paysEvt || cleGeoPromo(u.pays) === paysEvt);
+    if (zone === 'region') return memeVille || (!!regionEvt && normaliserTexte(u.region) === regionEvt);
+    if (zone === 'departement') return memeVille || (!!deptEvt && normaliserTexte(u.departement) === deptEvt);
+    return !paysEvt || cleGeoPromo(u.pays) === paysEvt; // National, ou zone non précisée — un pays non renseigné ne prouve pas la présence dans le rayon
+  };
+  const origineOk = (u) => {
+    if (!cibles.size) return true; // toutes les diasporas
+    return [u.origine1, u.origine2, u.nationalite1, u.nationalite2, u.nationalite3, u.pays].filter(Boolean).some(v => cibles.has(cleGeoPromo(v)));
+  };
+  const ids = rows.filter(u => origineOk(u) && geoOk(u)).map(u => Number(u.id));
+  return { ids, criteres: { origines: [evt.origine, evt.origine2].filter(Boolean), zone: evt.zone_diffusion || 'National' } };
+}
+
+/* Aperçu (portée estimée) affiché avant confirmation du clic — sans rien envoyer. */
+route("GET", "/api/evenements/:id/promouvoir", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au titulaire de l'événement." });
+  const elig = await promoEligibilite(evt);
+  if (!elig.ok) return sendJSON(res, 200, { eligible: false, raison: elig.raison, jours: elig.jours ?? joursAvantEvenement(evt.date_evt), deja_lancee: !!evt.promo_lancee_at, nb_cibles: evt.promo_nb_cibles ?? null });
+  const aud = await audiencePromoEvenement(elig.evt);
+  sendJSON(res, 200, { eligible: true, jours: elig.jours, nb_cibles: aud.ids.length, criteres: aud.criteres });
+});
+
+route("POST", "/api/evenements/:id/promouvoir", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
+  if (!evt) return sendJSON(res, 404, { error: "Événement introuvable." });
+  if (Number(evt.owner_user_id) !== Number(user.id) && user.role !== "administrateur") return sendJSON(res, 403, { error: "Réservé au titulaire de l'événement." });
+  const elig = await promoEligibilite(evt);
+  if (!elig.ok) return sendJSON(res, elig.code || 400, { error: elig.raison });
+
+  /* « Utilisable une seule fois » : réservation atomique AVANT tout effet de bord — deux clics
+     simultanés (double-clic, deux onglets) ne peuvent jamais envoyer deux campagnes. Relâchée
+     seulement si rien n'a encore été envoyé (échec avant les notifications). */
+  const claim = await db.prepare("UPDATE evenements SET promo_lancee_at=? WHERE id=? AND promo_lancee_at IS NULL").run(new Date().toISOString(), evt.id);
+  if (!claim.changes) return sendJSON(res, 409, { error: "La promotion de cet événement a déjà été lancée." });
+
+  let ids = [], postId = null;
+  try {
+    const e = elig.evt;
+    const aud = await audiencePromoEvenement(e);
+    ids = aud.ids;
+    const jours = elig.jours;
+    const dateTxt = new Date(String(e.date_evt).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+    const organisateur = await nomCompteAffichage(evt.owner_user_id);
+
+    // (2) Post du fil — mis en avant, contenu tiré de l'événement (aucun texte inventé).
+    postId = (await db.prepare(`INSERT INTO fil_posts
+      (auteur_id, auteur_nom, type, pub_type, categorie, contenu, visibilite, medias, hashtags, statut, localisation_pays, localisation_ville, promo_evenement_id)
+      VALUES (?, ?, 'evenement_promo', 'evenement_promo', 'Événement', ?, 'public', '[]', '[]', 'publie', ?, ?, ?)`)
+      .run(evt.owner_user_id, organisateur, `📅 J-${jours} · ${e.titre} — ${dateTxt}`, e.pays || null, e.ville || null, evt.id)).lastInsertRowid;
+    await db.prepare("UPDATE evenements SET promo_post_id=?, promo_nb_cibles=? WHERE id=?").run(postId, ids.length, evt.id);
+
+    // (1) Notifications Diaspo'Actif — insertion groupée (un seul aller-retour par lot de 200).
+    const titre = `🎯 J-${jours} · ${e.titre}`.slice(0, 160);
+    const lieuTxt = e.lieu || e.ville || (e.mode_participation === 'distanciel' ? 'En ligne' : '');
+    const heure = e.heure_debut ? ` à ${e.heure_debut}` : '';
+    const contenu = `${dateTxt}${heure}${lieuTxt ? ' · ' + lieuTxt : ''} — par ${organisateur}`.slice(0, 240);
+    const data = JSON.stringify({ evenement_id: Number(evt.id), post_id: Number(postId), lien: `evenements.html?evt=${evt.id}` });
+    let envoyees = 0;
+    for (let i = 0; i < ids.length; i += 200) {
+      const lot = ids.slice(i, i + 200);
+      try {
+        await db.prepare(`INSERT INTO notifications (user_id,type,titre,contenu,data_json) VALUES ${lot.map(() => '(?,?,?,?,?)').join(',')}`)
+          .run(...lot.flatMap(uid => [uid, 'evenement_promo', titre, contenu, data]));
+        envoyees += lot.length;
+      } catch (err) { console.error('[promo-evenement] lot de notifications échoué', err.message); }
+    }
+    // Push téléphone : seulement les membres qui ont un abonnement push, avec un budget de temps
+    // (pas de process persistant sur Vercel : ce qui n'est pas fini avant la réponse est perdu).
+    try {
+      const push = require("./push");
+      const debut = Date.now();
+      for (let i = 0; i < ids.length && Date.now() - debut < 8000; i += 200) {
+        const lot = ids.slice(i, i + 200);
+        const avecPush = await db.prepare(`SELECT DISTINCT user_id FROM push_subscriptions WHERE user_id IN (${lot.map(() => '?').join(',')})`).all(...lot);
+        for (let k = 0; k < avecPush.length && Date.now() - debut < 8000; k += 25) {
+          await Promise.all(avecPush.slice(k, k + 25).map(r => push.envoyerPush(r.user_id, { titre, contenu, data: JSON.parse(data) })));
+        }
+      }
+    } catch (_) {}
+    SEC.logSecurity("promo_evenement", { uid: Number(user.id), evenement_id: Number(evt.id), cibles: ids.length, envoyees });
+    return sendJSON(res, 200, { ok: true, post_id: postId, nb_cibles: ids.length, nb_notifications: envoyees, criteres: aud.criteres });
+  } catch (err) {
+    // Rien d'envoyé si on échoue avant le post : on relâche la réservation pour permettre de réessayer.
+    if (!postId) { try { await db.prepare("UPDATE evenements SET promo_lancee_at=NULL WHERE id=?").run(evt.id); } catch (_) {} }
+    return sendJSON(res, 500, SEC.safeError(err, "promotion evenement"));
+  }
+});
 
 route("GET", "/api/evenements/recommandes", async (req, res, params, body, query) => {
   const me = await getCurrentUser(req);
@@ -22547,7 +22761,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   /* Une publication archivée (menu « Archiver ») ou en brouillon ne doit plus apparaître dans
      aucun fil (2026-10-05) : rien ne filtrait leur statut, elles restaient visibles de tous.
      Ajouté ici car cette clause est reprise par toutes les requêtes de chaque mode du fil. */
-  const catClause = (catFiltre ? " AND p.categorie=?" : "") + " AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')";
+  /* Post de promotion J-7 : retiré du fil dès que l'événement est terminé (calcul à la lecture,
+     aucun cron — voir PROMO_FENETRE_JOURS). Même clause reprise par tous les modes du fil. */
+  const promoExpireClause = ` AND (p.promo_evenement_id IS NULL OR EXISTS (SELECT 1 FROM evenements pe WHERE pe.id=p.promo_evenement_id AND COALESCE(NULLIF(pe.date_fin,''), pe.date_evt) >= '${dateParisISO()}'))`;
+  const catClause = (catFiltre ? " AND p.categorie=?" : "") + " AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')" + promoExpireClause;
   const catArgs = catFiltre ? [catFiltre] : [];
 
   // ─── MODE SUIVIS ───────────────────────────────────────────────────────────
@@ -22621,6 +22838,20 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // Algorithme : suivis en premier, puis populaires, puis reste chronologique
   let orderedIds = new Set();
   const allPosts = [];
+
+  /* 0) Mise en avant des promotions J-7 destinées à ce membre (2026-10-05) : en tête du fil, avant
+     tout autre critère — uniquement celles dont il a reçu la notification (donc ciblé), et
+     seulement tant que l'événement n'est pas terminé (promoExpireClause, via catClause). */
+  if (cu && !catFiltre) {
+    try {
+      const notifsPromo = await db.prepare("SELECT data_json FROM notifications WHERE user_id=? AND type='evenement_promo' ORDER BY id DESC LIMIT 10").all(cu.id);
+      const promoIds = [...new Set(notifsPromo.map(r => { try { return Number(JSON.parse(r.data_json || '{}').post_id); } catch (_) { return 0; } }).filter(Boolean))];
+      if (promoIds.length) {
+        (await db.prepare(`SELECT p.* FROM fil_posts p WHERE p.id IN (${promoIds.map(() => '?').join(',')})${catClause} ORDER BY p.created_at DESC LIMIT 3`).all(...promoIds, ...catArgs))
+          .forEach(p => { if (!orderedIds.has(p.id)) { orderedIds.add(p.id); allPosts.push({ ...p, source: "promo" }); } });
+      }
+    } catch (_) { /* mise en avant facultative : ne jamais faire échouer le fil */ }
+  }
 
   if (cu) {
     // 1) Posts des profils/initiatives suivis (récents d'abord)

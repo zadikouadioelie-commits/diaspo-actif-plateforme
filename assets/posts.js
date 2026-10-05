@@ -330,8 +330,64 @@ function renderVitrineCard(card) {
   </div>`;
 }
 
+/* Post de promotion J-7 d'un événement (2026-10-05, demande explicite) — mise en avant de
+   l'événement EXISTANT, pas un contenu séparé : mêmes données que sa cartouche, image choisie
+   par le propriétaire conservée, et « S'inscrire » ouvre exactement le même chemin que la
+   cartouche (évenement.inscription, calculé par le serveur avec la même règle). Rien n'est
+   affiché une fois l'événement terminé (promo_active faux). */
+function ensurePromoCss() {
+  if (document.getElementById('evenement-promo-css')) return;
+  const l = document.createElement('link');
+  l.id = 'evenement-promo-css'; l.rel = 'stylesheet'; l.href = 'assets/evenement-promo.css?v=1';
+  document.head.appendChild(l);
+}
+function renderEvenementPromoCard(post) {
+  const e = post.evenement_promo;
+  if (!e || !e.promo_active) return '';
+  ensurePromoCss();
+  const j = e.jours_restants;
+  const compte = j === null || j === undefined ? '' : (j <= 0 ? "Aujourd'hui !" : j === 1 ? 'Demain !' : `Plus que ${j} jours`);
+  const dateTxt = e.date_evt ? new Date(String(e.date_evt).slice(0,10) + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' }) : '';
+  const lieu = [e.lieu, e.ville].filter((v, i, a) => v && a.indexOf(v) === i).join(', ');
+  const prix = e.inscription && e.inscription.type === 'info' ? '' : (e.prix_min ? `💶 À partir de ${escHtml(String(e.prix_min))} €` : '🟢 Gratuit');
+  const insc = e.inscription || { type: 'evenement', href: 'evenements.html?evt=' + e.id };
+  const cta = insc.type === 'info'
+    ? `<div class="promo-info">ℹ️ Événement informatif — aucune inscription</div>`
+    : `<a class="promo-cta" href="${escHtml(insc.href)}"${insc.type === 'externe' ? ' target="_blank" rel="noopener"' : ''}>🎟️ S'inscrire</a>`;
+  const hero = e.image
+    ? `<div class="promo-hero-bg" style="background-image:url('${escHtml(e.image).replace(/'/g, '%27')}')"></div><img class="promo-hero-img" src="${escHtml(e.image)}" alt="${escHtml(e.titre)}" loading="lazy">`
+    : `<div class="promo-hero-vide">📅</div>`;
+  return `
+<article class="post-card post-promo" id="post-${post.id}" data-post-id="${post.id}">
+  <div class="promo-tete">
+    ${avatarHTML(post)}
+    <span>Organisé par <strong>${escHtml(e.organisateur || post.auteur_nom || '')}</strong></span>
+    <span class="promo-tag">🔥 J-${Math.max(0, j ?? 0)}</span>
+  </div>
+  <div class="promo-hero">
+    ${hero}
+    ${compte ? `<div class="promo-band">⏳ ${escHtml(compte)}</div>` : ''}
+  </div>
+  <div class="promo-corps">
+    <h3 class="promo-titre">${escHtml(e.titre)}</h3>
+    <div class="promo-puces">
+      ${dateTxt ? `<span class="promo-puce">📅 ${escHtml(dateTxt)}${e.heure_debut ? ' · ' + escHtml(e.heure_debut) : ''}</span>` : ''}
+      ${lieu ? `<span class="promo-puce">📍 ${escHtml(lieu)}</span>` : ''}
+      ${prix ? `<span class="promo-puce promo-puce-prix">${prix}</span>` : ''}
+    </div>
+    ${e.description ? `<p class="promo-desc">${escHtml(e.description)}</p>` : ''}
+  </div>
+  <div class="promo-actions">
+    ${cta}
+    <a class="promo-sec" href="evenements.html?evt=${e.id}">Voir l'événement</a>
+    <button type="button" class="promo-sec" onclick="Posts.share(${post.id})">📤 Partager</button>
+  </div>
+</article>`;
+}
+
 function renderPostCard(post, options = {}) {
   if (post.type === 'carte_vitrine') return renderVitrineCard(post);
+  if (post.type === 'evenement_promo') return renderEvenementPromoCard(post);
   const { currentUserId, showStats } = options;
   const isAuteur = currentUserId && post.auteur_id === currentUserId;
   const reactions = post.reactions || {};

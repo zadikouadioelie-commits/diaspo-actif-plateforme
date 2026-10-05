@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="assets/styles.v2.css">
 <link rel="stylesheet" href="/assets/responsive.v2.css?v=2">
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
+<link rel="stylesheet" href="/assets/evenement-promo.css?v=1">
 <link rel="stylesheet" href="assets/annuaire-cards.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
@@ -941,10 +942,15 @@ function renderEvts() {
     // titre Trophée bien visible comme un cachet") — voir .evt-card-trophee/.trophee-cachet.
     const estTrophee = evt.type_evt === 'trophee_diaspora';
     const cachetHtml = estTrophee ? `<div class="trophee-cachet" title="Événement Trophée diaspora"><span class="ic">🏆</span><span class="tx">Trophée</span></div>` : '';
-    return `<div class="evt-card${estTrophee ? ' evt-card-trophee' : ''}${evt.est_termine ? ' evt-card-termine' : ''}" data-evt-id="${evt.id}">
+    /* Design « Promo J-7 » (2026-10-05) : uniquement tant que la promotion est lancée ET que
+       l'événement n'est pas terminé (evt.promo_active, calculé côté serveur à la lecture). */
+    const promoBand = evt.promo_active
+      ? `<div class="promo-band"><span class="promo-j">J-${Math.max(0, evt.promo_jours ?? 0)}</span> ${evt.promo_jours <= 0 ? "Aujourd'hui !" : evt.promo_jours === 1 ? 'Demain !' : 'Plus que ' + evt.promo_jours + ' jours'}</div>` : '';
+    const promouvoirHtml = promoBoutonHtml(evt, peutGerer);
+    return `<div class="evt-card${estTrophee ? ' evt-card-trophee' : ''}${evt.est_termine ? ' evt-card-termine' : ''}${evt.promo_active ? ' evt-card-promo' : ''}" data-evt-id="${evt.id}">
       ${peutGerer ? `<button class="evt-delete-float" onclick="supprimerEvenement(${evt.id},this)" title="Supprimer cet événement">🗑</button>` : ''}
       ${evt.whatsapp_lien ? `<a href="${esc(evt.whatsapp_lien)}" target="_blank" rel="noopener" title="Rejoindre la chaîne WhatsApp de l'événement" class="evt-whatsapp-float"><svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#25D366"/><path fill="#fff" d="M23.47 8.52A10.6 10.6 0 0 0 16.02 5.4c-5.86 0-10.62 4.76-10.62 10.62 0 1.87.49 3.7 1.42 5.31L5.3 26.6l5.4-1.42a10.6 10.6 0 0 0 5.31 1.35h.01c5.86 0 10.62-4.76 10.62-10.62 0-2.84-1.1-5.5-3.17-7.39Zm-7.45 16.34h-.01a8.8 8.8 0 0 1-4.5-1.23l-.32-.19-3.35.88.89-3.26-.21-.34a8.79 8.79 0 0 1-1.35-4.7c0-4.86 3.96-8.82 8.83-8.82 2.36 0 4.57.92 6.24 2.6a8.75 8.75 0 0 1 2.58 6.23c0 4.86-3.96 8.83-8.8 8.83Zm4.83-6.61c-.26-.13-1.57-.78-1.82-.86-.24-.09-.42-.13-.6.13-.18.26-.68.86-.84 1.04-.15.18-.31.2-.57.07-.26-.13-1.1-.4-2.1-1.29-.78-.69-1.3-1.55-1.46-1.81-.15-.26-.02-.4.11-.53.12-.12.26-.31.39-.47.13-.15.17-.26.26-.44.09-.18.04-.33-.02-.46-.07-.13-.6-1.44-.82-1.98-.22-.51-.44-.44-.6-.45h-.51c-.18 0-.46.07-.7.33-.24.26-.92.9-.92 2.19s.94 2.54 1.08 2.72c.13.18 1.85 2.83 4.49 3.97.63.27 1.12.43 1.5.55.63.2 1.2.17 1.66.1.5-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.16-1.26-.07-.12-.24-.19-.5-.32Z"/></svg></a>` : ''}
-      <div class="evt-img${estTrophee ? ' trophee-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}</div>
+      <div class="evt-img${estTrophee ? ' trophee-shimmer' : ''}">${cover ? `<img src="${esc(cover)}" alt="${esc(evt.titre)}" loading="lazy" onerror="this.parentNode.innerHTML='${icon}'">` : icon}${cachetHtml}${promoBand}</div>
       <div class="evt-body">
         <div class="evt-date">${fmtDate(evt.date_evt)}${evt.heure_debut?' · '+evt.heure_debut:''}${EvtTemporel.badge(evt)}</div>
         <div class="evt-title">${esc(evt.titre)}</div>
@@ -986,7 +992,7 @@ function renderEvts() {
             )
           }
         </div>
-        ${peutGerer ? `<div class="evt-actions-gerer">${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}</div>` : ''}
+        ${peutGerer ? `<div class="evt-actions-gerer">${promouvoirHtml}${modifierHtml}${gererHtml}${lierFicheHtml}${gererTarifHtml}</div>` : ''}
       </div>
     </div>`;
   }).join('') + (actif === 'termine' && tousOnglet.length > evtTerminesMax
@@ -1118,6 +1124,47 @@ async function quitter(id, btn) {
 /* Suppression depuis la page publique (2026-09-07, demande explicite) — visible uniquement au
    propriétaire (voir la condition côté rendu de la carte), mais le serveur revérifie de toute
    façon l'accès. */
+/* Bouton « Promouvoir » (2026-10-05, demande explicite) — visible du titulaire uniquement, de J-7
+   à la veille, pour un événement public publié ; remplacé par « Promotion lancée » après le
+   clic (une seule fois par événement — le serveur reste l'arbitre, voir POST
+   /api/evenements/:id/promouvoir). Avant J-7 : rien (disponible seulement sept jours avant). */
+function promoBoutonHtml(evt, peutGerer) {
+  if (!peutGerer) return '';
+  if (evt.promo_lancee_at) return `<button type="button" class="btn btn-promo-lancee" disabled style="font-size:12px;" title="La promotion de cet événement a déjà été lancée (une seule fois)">✅ Promotion lancée</button>`;
+  if (evt.est_termine || evt.statut === 'brouillon' || (evt.visibilite && evt.visibilite !== 'public')) return '';
+  const m = String(evt.date_evt || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const n = new Date();
+  const j = Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())) / 86400000);
+  if (j < 1 || j > 7) return '';
+  return `<button type="button" class="btn btn-promo-lancer" style="font-size:12px;" onclick="promouvoirEvenement(${evt.id},this)" title="Notifier les membres concernés et mettre l'événement en avant — utilisable une seule fois">🚀 Promouvoir (J-${j})</button>`;
+}
+async function promouvoirEvenement(id, btn) {
+  const orig = btn.innerHTML;
+  const reset = () => { btn.disabled = false; btn.innerHTML = orig; };
+  btn.disabled = true; btn.innerHTML = '⏳ Vérification…';
+  try {
+    const ap = await api('GET', '/evenements/' + id + '/promouvoir');
+    if (!ap.eligible) {
+      alert(ap.raison || "La promotion n'est pas disponible pour cet événement.");
+      reset();
+      if (ap.deja_lancee && typeof loadEvts === 'function') loadEvts();
+      return;
+    }
+    const crit = ap.criteres || {};
+    const cible = (crit.origines && crit.origines.length) ? 'la diaspora ' + crit.origines.join(' / ') : 'toutes les diasporas';
+    const n = ap.nb_cibles || 0;
+    if (!confirm(`Lancer la promotion de cet événement ?\n\n• Notification Diaspo'Actif à environ ${n} membre${n > 1 ? 's' : ''} (${cible} — zone : ${crit.zone || 'National'})\n• Publication mise en avant dans le fil d'actualité\n• Design promotionnel jusqu'à la fin de l'événement\n\nUtilisable une seule fois.`)) { reset(); return; }
+    btn.innerHTML = '⏳ Envoi…';
+    const r = await api('POST', '/evenements/' + id + '/promouvoir');
+    alert(`✅ Promotion lancée : ${r.nb_notifications} membre${r.nb_notifications > 1 ? 's' : ''} notifié${r.nb_notifications > 1 ? 's' : ''} et événement mis en avant dans le fil d'actualité.`);
+    if (typeof loadEvts === 'function') loadEvts();
+    if (typeof loadMesEvts === 'function') loadMesEvts();
+  } catch (e) {
+    alert(e.message || 'Impossible de lancer la promotion.');
+    reset();
+  }
+}
 async function supprimerEvenement(id, btn) {
   if (!confirm('Supprimer définitivement cet événement ?\n\nCette action est irréversible.')) return;
   btn.disabled = true;

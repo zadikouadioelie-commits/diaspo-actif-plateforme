@@ -1,0 +1,126 @@
+/* Design « Promo J-7 » d'un événement (2026-10-05, demande explicite) — partagé entre la
+   cartouche de la page Événements (.evt-card-promo, evenements-app.html) et le post du fil
+   d'actualité (.post-promo, assets/posts.js). Affiché UNIQUEMENT tant que la promotion est
+   lancée et que l'événement n'est pas terminé (evt.promo_active, calculé côté serveur) : passé
+   ce délai, la cartouche reprend son apparence normale. Aucune image générée : l'image choisie
+   par le propriétaire est conservée telle quelle. */
+
+@keyframes promoGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(124,58,237,.35), 0 8px 26px rgba(124,58,237,.26); }
+  50%      { box-shadow: 0 0 0 1px rgba(236,72,153,.5),  0 12px 34px rgba(236,72,153,.34); }
+}
+@keyframes promoShine {
+  0%   { transform: translateX(-130%) skewX(-20deg); }
+  55%, 100% { transform: translateX(330%) skewX(-20deg); }
+}
+@keyframes promoPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* ── Bandeau « J-n » partagé ─────────────────────────────────────────── */
+.promo-band {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 7px 12px; overflow: hidden;
+  background: linear-gradient(90deg, rgba(109,40,217,.94), rgba(219,39,119,.94));
+  color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+}
+.promo-band::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation: promoShine 3.4s ease-in-out infinite;
+}
+.promo-band .promo-j {
+  background: #fff; color: #6d28d9; border-radius: 99px; padding: 1px 9px;
+  font-weight: 900; animation: promoPulse 2s ease-in-out infinite;
+}
+
+/* ── Cartouche de la page Événements ─────────────────────────────────── */
+.evt-card.evt-card-promo {
+  position: relative;
+  border: 2px solid transparent;
+  background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #7c3aed, #ec4899, #f59e0b) border-box;
+  animation: promoGlow 3.2s ease-in-out infinite;
+}
+.evt-card-promo .evt-img { position: relative; }
+.evt-card-promo .evt-title { color: #4c1d95; }
+.evt-card-promo .evt-date { color: #be185d; }
+.evt-card-promo .evt-actions .btn-orange {
+  /* !important : assets/design-upgrade.v2.css impose déjà son dégradé bleu en !important. */
+  background: linear-gradient(135deg, #7c3aed, #ec4899) !important; border: none !important; color: #fff !important;
+  box-shadow: 0 6px 16px rgba(124,58,237,.35) !important; font-weight: 800;
+}
+.evt-card-promo .evt-actions .btn-orange:hover { filter: brightness(1.08); }
+
+/* Bouton « Promouvoir » (titulaire, de J-7 à la veille) */
+.btn-promo-lancer {
+  background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff; border: none; font-weight: 800;
+  box-shadow: 0 4px 14px rgba(124,58,237,.35);
+}
+.btn-promo-lancer:hover { filter: brightness(1.08); }
+.btn-promo-lancer[disabled], .btn-promo-lancee {
+  background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; box-shadow: none; cursor: default; filter: none;
+}
+
+/* ── Post du fil d'actualité ─────────────────────────────────────────── */
+.post-card.post-promo {
+  padding: 0; overflow: hidden; position: relative;
+  border: 2px solid transparent;
+  background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #7c3aed, #ec4899, #f59e0b) border-box;
+  animation: promoGlow 3.2s ease-in-out infinite;
+}
+.post-promo .promo-tete {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  background: linear-gradient(90deg, #f5f3ff, #fdf2f8); font-size: 12.5px; color: #5b21b6;
+}
+.post-promo .promo-tete strong { color: #4c1d95; }
+.post-promo .promo-tete .promo-tag {
+  margin-left: auto; background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff;
+  border-radius: 99px; padding: 3px 10px; font-weight: 800; font-size: 11px; letter-spacing: .04em; white-space: nowrap;
+}
+.post-promo .promo-hero {
+  position: relative; height: 260px; overflow: hidden; background: #1e1b4b;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Fond flouté tiré de la même image : aucun vide visible autour d'une affiche étroite, et
+   l'image choisie par le propriétaire reste entière au premier plan (jamais recadrée). */
+.post-promo .promo-hero-bg {
+  position: absolute; inset: -20px; background-size: cover; background-position: center;
+  filter: blur(22px) brightness(.7); transform: scale(1.1);
+}
+.post-promo .promo-hero img.promo-hero-img {
+  position: relative; z-index: 2; max-width: 100%; max-height: 100%; object-fit: contain;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.post-promo .promo-hero-vide { position: relative; z-index: 2; font-size: 64px; }
+.post-promo .promo-corps { padding: 14px 16px 6px; }
+.post-promo .promo-titre { margin: 0 0 8px; font-size: 20px; line-height: 1.25; color: #4c1d95; font-weight: 800; }
+.post-promo .promo-puces { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.post-promo .promo-puce {
+  background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6; border-radius: 99px;
+  padding: 4px 11px; font-size: 12.5px; font-weight: 600;
+}
+.post-promo .promo-puce.promo-puce-prix { background: #fdf2f8; border-color: #fbcfe8; color: #9d174d; }
+.post-promo .promo-desc { font-size: 13.5px; color: #374151; line-height: 1.55; margin: 0 0 12px; }
+.post-promo .promo-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
+.post-promo .promo-cta {
+  flex: 1 1 160px; text-align: center; text-decoration: none; cursor: pointer; border: none;
+  background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff; font-weight: 800; font-size: 14px;
+  padding: 11px 16px; border-radius: 10px; box-shadow: 0 8px 20px rgba(124,58,237,.35);
+}
+.post-promo .promo-cta:hover { filter: brightness(1.08); }
+.post-promo .promo-sec {
+  text-decoration: none; cursor: pointer; background: #fff; color: #5b21b6; border: 1.5px solid #ddd6fe;
+  font-weight: 700; font-size: 13.5px; padding: 10px 14px; border-radius: 10px;
+}
+.post-promo .promo-sec:hover { background: #f5f3ff; }
+.post-promo .promo-info { flex: 1 1 160px; text-align: center; color: #6b7280; font-size: 13px; padding: 11px 8px; }
+
+@media (max-width: 560px) {
+  .post-promo .promo-hero { height: 210px; }
+  .post-promo .promo-titre { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evt-card.evt-card-promo, .post-card.post-promo, .promo-band::after, .promo-band .promo-j { animation: none; }
+}

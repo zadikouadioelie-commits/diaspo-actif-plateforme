@@ -2079,6 +2079,12 @@ const MIGRATIONS = [
   ["events", "origine1 TEXT"],
   ["events", "origine2 TEXT"],
   ["evenements", "origine2 TEXT"],
+  // Promotion J-7 d'un événement (2026-10-05, demande explicite) : date de lancement (NULL = jamais lancée,
+  // un seul lancement par événement), nombre de membres notifiés et post du fil créé.
+  ["evenements", "promo_lancee_at TEXT"],
+  ["evenements", "promo_nb_cibles INTEGER"],
+  ["evenements", "promo_post_id INTEGER"],
+  ["fil_posts", "promo_evenement_id INTEGER"],
   // Masquer le nombre d'inscrits sur la fiche publique (2026-09-08, demande explicite) —
   // les deux tables, comme prix_min/whatsapp_lien/origine plus haut.
   ["events", "masquer_inscrits INTEGER DEFAULT 0"],
