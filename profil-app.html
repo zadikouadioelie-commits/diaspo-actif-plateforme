@@ -801,8 +801,11 @@ html, body { overflow-x:clip; }
 .pvz-pub-av { width:40px; height:40px; border-radius:50%; flex:none; background-image:linear-gradient(135deg,var(--tp,#2F6BED),var(--tp-dark,#1a3f8a)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
 .pvz-pub-name { font-size:13.5px; font-weight:600; color:#122A4D; }
 .pvz-pub-date { font-size:11.5px; color:#8794A7; }
-.pvz-pub-text { margin:0 0 12px; font-size:14px; line-height:1.55; color:#3B4658; white-space:pre-wrap; }
-.pvz-pub-img { width:100%; max-height:340px; object-fit:cover; border-radius:12px; }
+.pvz-pub-title { margin:0 0 8px; font-size:15.5px; font-weight:800; line-height:1.35; color:#122A4D; }
+.pvz-pub-text { margin:0 0 6px; font-size:14px; line-height:1.55; color:#3B4658; white-space:pre-wrap; }
+.pvz-pub-img { display:block; width:100%; max-height:280px; object-fit:cover; border-radius:12px; margin:0 0 10px; }
+.pvz-pub-more { background:none; border:none; padding:2px 0; margin:0 0 4px; color:var(--tp,#2F6BED); font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.pvz-pub-more:hover { text-decoration:underline; }
 .pvz-pub-meta { display:flex; gap:20px; margin-top:12px; font-size:13px; color:#6B7686; }
 
 /* Initiatives / suggestions (colonne droite) */
@@ -1952,6 +1955,46 @@ function render() {
    ====================================================== */
 
 /* Extrait la 1re image d'une publication (medias JSON ou media_url) */
+/* Publication = titre + (image) + aperçu + « Voir plus » (2026-10-05, demande explicite : les
+   posts trop longs noyaient la page). Une publication ordinaire n'a pas de champ titre : on prend
+   sa première ligne (ou, si elle est très longue, ses ~110 premiers caractères) ; un article
+   garde son vrai titre. Le reste du texte devient l'aperçu (~220 caractères, coupé sur un mot). */
+function pvzPubParts(p) {
+  const estArticle = p.pub_type === 'article';
+  const brut = String(estArticle ? (p.article_contenu || '') : (p.contenu || '')).replace(/\r/g, '').trim();
+  let titre, reste;
+  if (estArticle) {
+    titre = String(p.article_titre || p.contenu || '').trim();
+    reste = brut;
+  } else {
+    const lignes = brut.split('\n');
+    const premiere = (lignes.shift() || '').trim();
+    if (premiere.length <= 120) { titre = premiere; reste = lignes.join('\n').trim(); }
+    else {
+      let coupe = premiere.slice(0, 110);
+      const sp = coupe.lastIndexOf(' ');
+      if (sp > 70) coupe = coupe.slice(0, sp);
+      titre = coupe + '…'; reste = brut;
+    }
+  }
+  const compact = reste.replace(/\s+/g, ' ');
+  let apercu = compact, tronque = false;
+  if (compact.length > 220) {
+    apercu = compact.slice(0, 220);
+    const sp = apercu.lastIndexOf(' ');
+    if (sp > 150) apercu = apercu.slice(0, sp);
+    apercu += '…'; tronque = true;
+  }
+  return { titre, apercu, complet: reste, tronque };
+}
+function pvzTogglePub(btn) {
+  const art = btn.closest('.pvz-pub');
+  const ap = art.querySelector('.pvz-pub-apercu'), full = art.querySelector('.pvz-pub-complet');
+  const ouvert = full.style.display !== 'none';
+  full.style.display = ouvert ? 'none' : '';
+  ap.style.display = ouvert ? '' : 'none';
+  btn.textContent = ouvert ? 'Voir plus' : 'Voir moins';
+}
 function pvzFirstImage(p) {
   let medias = p.medias;
   if (typeof medias === 'string') { try { medias = JSON.parse(medias); } catch(e){ medias = null; } }
@@ -2149,6 +2192,7 @@ function renderVisitorProfile() {
       const dateStr = isNaN(d) ? 'Récemment' : `${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
       const cat = p.categorie || (p.type==='article'?'Article':'Publication');
       const img = pvzFirstImage(p);
+      const pp = pvzPubParts(p);
       return `<article class="pvz-pub">
         <div class="pvz-pub-head">
           <div class="pvz-pub-av">${pubAv}</div>
@@ -2157,8 +2201,10 @@ function renderVisitorProfile() {
             <div class="pvz-pub-date">${dateStr}</div>
           </div>
         </div>
-        ${p.contenu?`<p class="pvz-pub-text">${esc(p.contenu)}</p>`:''}
+        ${pp.titre?`<h4 class="pvz-pub-title">${esc(pp.titre)}</h4>`:''}
         ${img?`<img class="pvz-pub-img" loading="lazy" src="${esc(img)}" alt="">`:''}
+        ${pp.apercu?`<p class="pvz-pub-text pvz-pub-apercu">${esc(pp.apercu)}</p>`:''}
+        ${pp.tronque?`<p class="pvz-pub-text pvz-pub-complet" style="display:none;">${esc(pp.complet)}</p><button type="button" class="pvz-pub-more" onclick="pvzTogglePub(this)">Voir plus</button>`:''}
         <div class="pvz-pub-meta"><span style="color:#E5484D;font-weight:600;">♥ ${p.nb_reactions||0}</span><span>💬 ${p.nb_commentaires||0} commentaires</span></div>
       </article>`;
     }).join('');

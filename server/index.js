@@ -16730,12 +16730,13 @@ route("GET", "/api/profil/:id", async (req, res, params) => {
   const usersSuivis  = await db.prepare("SELECT u2.id,u2.nom,u2.prenom,u2.titre_pro,u2.ville,u2.photo_url FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé' LIMIT 12").all(u.id);
   const publications = await db.prepare(`
     SELECT p.id, p.type, p.categorie, p.contenu, p.created_at, p.medias, p.media_url, p.media_type,
+      p.pub_type, p.article_titre, p.article_contenu,
       COUNT(DISTINCT r.id) AS nb_reactions,
       COUNT(DISTINCT c.id) AS nb_commentaires
     FROM fil_posts p
     LEFT JOIN fil_reactions r ON r.post_id = p.id
     LEFT JOIN fil_commentaires c ON c.post_id = p.id
-    WHERE p.auteur_id = ?
+    WHERE p.auteur_id = ? AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')
     GROUP BY p.id ORDER BY p.id DESC LIMIT 10`).all(u.id);
   const po = await db.prepare("SELECT statut,domaines_expertise,pays_intervention,services,description_complete,site_web,liens_utiles,date_attribution FROM partenaires_officiels WHERE user_id=?").get(u.id);
   /* Affiliations officielles (module Initiative → Utilisateur, 2026-07-27) : uniquement les
@@ -17159,9 +17160,9 @@ route("GET", "/api/profil/:id/publications", async (req, res, params) => {
   const LIMIT = 15, OFFSET = (page-1)*LIMIT;
   let rows;
   if (cat === 'all') {
-    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon') ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, LIMIT, OFFSET);
   } else {
-    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND (categorie=? OR type=?) ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
+    rows = await db.prepare(`SELECT * FROM fil_posts WHERE auteur_id=? AND COALESCE(statut,'publie') NOT IN ('archive','brouillon') AND (categorie=? OR type=?) ORDER BY id DESC LIMIT ? OFFSET ?`).all(uid, cat, cat, LIMIT, OFFSET);
   }
   if (q) rows = rows.filter(r => (r.contenu||'').toLowerCase().includes(q));
   const isOwner = cu && Number(cu.id) === uid;
@@ -22315,7 +22316,10 @@ route("GET", "/api/fil", async (req, res, params, body, query) => {
   // appliqué dans aucun des 4 modes ci-dessous : cliquer sur un onglet de catégorie ne
   // changeait donc jamais la liste affichée. Corrigé le 2026-09-16.
   const catFiltre = query.categorie ? String(query.categorie) : null;
-  const catClause = catFiltre ? " AND p.categorie=?" : "";
+  /* Une publication archivée (menu « Archiver ») ou en brouillon ne doit plus apparaître dans
+     aucun fil (2026-10-05) : rien ne filtrait leur statut, elles restaient visibles de tous.
+     Ajouté ici car cette clause est reprise par toutes les requêtes de chaque mode du fil. */
+  const catClause = (catFiltre ? " AND p.categorie=?" : "") + " AND COALESCE(p.statut,'publie') NOT IN ('archive','brouillon')";
   const catArgs = catFiltre ? [catFiltre] : [];
 
   // ─── MODE SUIVIS ───────────────────────────────────────────────────────────
