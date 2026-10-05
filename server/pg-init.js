@@ -1446,7 +1446,7 @@ async function migratePg(pool) {
         "SELECT id FROM accred_tarifs_categorie WHERE accred_id=$1 AND role='initiative' AND categorie='association'", [initAboId]);
       if (!catAsso[0]) {
         await pool.query(
-          "INSERT INTO accred_tarifs_categorie (accred_id,role,categorie,montant,devise,reduction_annuelle_pct) VALUES ($1,'initiative','association',9.99,'EUR',15)",
+          "INSERT INTO accred_tarifs_categorie (accred_id,role,categorie,montant,devise,reduction_annuelle_pct) VALUES ($1,'initiative','association',12.99,'EUR',15)",
           [initAboId]);
         console.log('[pg-init] Tarif catégorie "association" seedé pour initiative_abonne.');
       }

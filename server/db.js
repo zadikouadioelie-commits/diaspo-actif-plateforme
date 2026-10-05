@@ -4784,14 +4784,16 @@ db.exec(`
 `);
 
 /* Tarification Premium — tarif de base catégorie Association (initiative_abonne reste la
-   base Entreprise à 12,99€ dans accred_tarifs). */
+   base Entreprise à 12,99€ dans accred_tarifs). Depuis le 2026-10-05 (demande explicite) TOUTES les
+   initiatives (entreprise, association, ONG…) sont à 12,99€/mois quelle que soit leur taille : tous les
+   paliers de taille valent coefficient 1, la réduction annuelle reste en pourcentage (donc au prorata). */
 ;(function seedTarifCategorieAssociation() {
   const def = db.prepare("SELECT id FROM accred_definitions WHERE type='initiative_abonne'").get();
   if (!def) return;
   const exists = db.prepare("SELECT id FROM accred_tarifs_categorie WHERE accred_id=? AND role='initiative' AND categorie='association'").get(def.id);
   if (exists) return;
   db.prepare(`INSERT INTO accred_tarifs_categorie (accred_id,role,categorie,montant,devise,reduction_annuelle_pct) VALUES (?,?,?,?,?,?)`)
-    .run(def.id, 'initiative', 'association', 9.99, 'EUR', 15);
+    .run(def.id, 'initiative', 'association', 12.99, 'EUR', 15);
 })();
 
 /* Tarification Premium — ramène Utilisateur Abonné à 3,99€/mois (mise à jour de la grille
