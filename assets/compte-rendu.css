@@ -126,3 +126,17 @@
 .crp-ic{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;color:var(--muted,#5B6B82)}
 .crp-ic select{font-size:13px;padding:4px 8px;border-radius:8px}
 @media(max-width:560px){.crp-prof{grid-template-columns:1fr}.crp-part{flex-direction:column}}
+
+/* Texte riche (2026-10-06) : résumé et parties mis en forme depuis l'éditeur complet */
+.cr2-rich>*:first-child{margin-top:0}
+.cr2-rich h2{font-size:calc(var(--cr-fs) + 4px);font-weight:800;color:var(--cr-bleu2);margin:22px 0 8px;line-height:1.25;text-wrap:balance}
+.cr2-rich h3{font-size:calc(var(--cr-fs) + 1px);font-weight:800;color:var(--cr-bleu);margin:18px 0 6px;line-height:1.3}
+.cr2-rich h4{font-size:var(--cr-fs);font-weight:800;color:var(--cr-ink);margin:14px 0 6px}
+.cr2-rich ol{margin:0 0 14px;padding-left:26px;font-size:var(--cr-fs);line-height:1.65}
+.cr2-rich ol li{margin-bottom:6px;padding-left:4px}
+.cr2-rich blockquote{margin:12px 0;padding:10px 16px;border-left:4px solid var(--cr-or);background:var(--cr-or-soft);border-radius:0 12px 12px 0;font-style:italic;font-size:var(--cr-fs);line-height:1.65}
+.cr2-rich strong,.cr2-rich b{font-weight:800}
+.cr2-rich a:not(.crp-chip){color:var(--cr-bleu);text-decoration:underline;text-decoration-color:var(--cr-or);text-underline-offset:3px}
+.cr2-resume .cr2-rich ul.cr2-puces li,.cr2-resume .cr2-rich ol{font-size:inherit}
+.crp-mention{cursor:default;user-select:all}
+#ed-resume+.rich-editor-wrap .rich-editor-area{min-height:220px}

@@ -20044,6 +20044,26 @@ const CR_EMOJIS = ['👍', '❤️', '👏', '🔥'];
 const CR_LANCEMENT = '2026-10-05';
 
 function crTexte(v, max) { return String(v == null ? '' : v).replace(/\r\n/g, '\n').replace(/\u0000/g, '').trim().slice(0, max); }
+/* Texte riche (2026-10-06) : le résumé et les parties peuvent contenir du HTML mis en forme (gras, listes, titres, liens…),
+   nettoyé par SEC.sanitizeRichHtml à l'écriture. Les anciens textes (texte simple) restent valables tels quels. Le fil, les
+   e-mails et les notifications n'affichent que du texte simple : crBrut() en tire la version sans balises. */
+const CR_HTML_RE = /<(p|h[1-6]|ul|ol|li|blockquote|br|strong|em|b|i|u|a)[\s>\/]/i;
+function crEstHtml(s) { return CR_HTML_RE.test(String(s || '')); }
+function crBrut(s) {
+  const t = String(s == null ? '' : s);
+  if (!crEstHtml(t)) return t;
+  return t.replace(/<\/(p|h[1-6]|li|blockquote|ul|ol)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<li[^>]*>/gi, '• ').replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+/* Retourne { texte } ou { erreur: true } si le texte brut dépasse maxBrut (jamais de coupe au milieu d'une balise). */
+function crRiche(v, maxBrut, maxHtml) {
+  const s = String(v == null ? '' : v).replace(/\r\n/g, '\n').replace(/\u0000/g, '').trim();
+  if (!crEstHtml(s)) return { texte: s.slice(0, maxBrut) };
+  const propre = SEC.sanitizeRichHtml(s.slice(0, maxHtml));
+  if (crBrut(propre).length > maxBrut) return { erreur: true };
+  return { texte: crBrut(propre).trim() ? propre : '' };
+}
 function crUrl(v) { const s = String(v || '').trim(); return /^https?:\/\/[^\s]+$/i.test(s) ? s.slice(0, 1000) : null; }
 function crDateISO(v) { const s = String(v || '').trim().slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; }
 function crJson(v, repli) { try { const x = JSON.parse(v || ''); return x == null ? repli : x; } catch (_) { return repli; } }
@@ -20066,7 +20086,7 @@ async function carteCompteRenduPost(evenementId) {
   const identifies = (await crIdentifies(evt.id)).slice(0, 6);
   return {
     evenement_id: Number(evt.id), titre: cr.titre || evt.titre, evenement_titre: evt.titre, date_evt: evt.date_evt, date_fin: evt.date_fin || null,
-    ville: evt.ville || null, image: crImageEvenement(evt), resume: cr.resume || '', video_url: cr.video_url || null,
+    ville: evt.ville || null, image: crImageEvenement(evt), resume: crBrut(cr.resume), video_url: cr.video_url || null,
     etape_texte: cr.etape_texte || '', etape_date: cr.etape_date || '', etape_bouton: cr.etape_bouton || '', etape_lien: cr.etape_lien || '',
     identifies, organisateur: await nomCompteAffichage(evt.owner_user_id),
   };
@@ -20140,10 +20160,14 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   if (!evenementEstTermine(evt) && user.role !== 'administrateur') return sendJSON(res, 400, { error: "Le compte-rendu s'écrit une fois l'événement terminé." });
 
   const type_cr = CR_TYPES.includes(body.type_cr) ? body.type_cr : 'eco';
-  const resume = crTexte(body.resume, CR_RESUME_MAX);
-  /* On retire les parties vides AVANT de limiter à 12 : les champs vides du canevas ne doivent pas occuper de place. */
+  const rr = crRiche(body.resume, CR_RESUME_MAX, 20000);
+  if (rr.erreur) return sendJSON(res, 400, { error: `Le résumé dépasse ${CR_RESUME_MAX} caractères.` });
+  const resume = rr.texte;
+  /* On retire les parties vides AVANT de limiter à 20 : les champs vides du canevas ne doivent pas occuper de place. */
+  let partieTropLongue = false;
   const details = (Array.isArray(body.details) ? body.details : [])
-    .map(d => ({ titre: crTexte(d && d.titre, 80), texte: crTexte(d && d.texte, 10000), icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' })).filter(d => d.texte).slice(0, 20);
+    .map(d => { const r = crRiche(d && d.texte, 10000, 40000); if (r.erreur) partieTropLongue = true; return { titre: crTexte(d && d.titre, 80), texte: r.texte || '', icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' }; }).filter(d => d.texte).slice(0, 20);
+  if (partieTropLongue) return sendJSON(res, 400, { error: 'Une partie dépasse 10 000 caractères.' });
   const forts = (Array.isArray(body.forts) ? body.forts : []).slice(0, 12).map(f => crTexte(f, 80)).filter(Boolean);
   const medias = (Array.isArray(body.medias) ? body.medias : []).slice(0, 20).map(crUrl).filter(Boolean);
   /* Logo de l'organisateur, partenaires de l'événement (nom, description courte, lien, logo) et personnes/organisations
@@ -20170,30 +20194,30 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
   /* Déjà publié : la publication du fil suit la modification (titre + texte d'aperçu). */
   if (cr.statut === 'publie' && cr.fil_post_id) {
-    try { await db.prepare("UPDATE fil_posts SET titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, cr.resume || '', crContenuFil(cr), cr.fil_post_id); } catch (_) {}
+    try { await db.prepare("UPDATE fil_posts SET titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, crBrut(cr.resume), crContenuFil(cr), cr.fil_post_id); } catch (_) {}
   }
   sendJSON(res, 200, { ok: true, compte_rendu: crSerialiser(cr) });
 });
 
-function crContenuFil(cr) { return `📄 ${cr.titre || 'Compte-rendu'}\n\n${String(cr.resume || '').replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1').slice(0, 600)}`; }
+function crContenuFil(cr) { return `📄 ${cr.titre || 'Compte-rendu'}\n\n${crBrut(cr.resume).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1').slice(0, 600)}`; }
 
 /* POST — publie le compte-rendu : page visible + post dans le fil (événement public seulement). */
 route("POST", "/api/evenements/:id/compte-rendu/publier", async (req, res, params) => {
   const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
   const { user, evt } = ctx;
   const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
-  if (!cr || !String(cr.resume || '').trim()) return sendJSON(res, 400, { error: "Rédigez d'abord le résumé du compte-rendu." });
+  if (!cr || !crBrut(cr.resume).trim()) return sendJSON(res, 400, { error: "Rédigez d'abord le résumé du compte-rendu." });
   const publicEvt = (evt.visibilite || 'public') === 'public';
   let postId = cr.fil_post_id || null;
   if (publicEvt) {
     const auteurNom = await nomCompteAffichage(evt.owner_user_id);
     if (postId && await db.prepare("SELECT id FROM fil_posts WHERE id=?").get(postId)) {
-      await db.prepare("UPDATE fil_posts SET statut='publie', titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, cr.resume, crContenuFil(cr), postId);
+      await db.prepare("UPDATE fil_posts SET statut='publie', titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, crBrut(cr.resume), crContenuFil(cr), postId);
     } else {
       postId = (await db.prepare(`INSERT INTO fil_posts
         (auteur_id, auteur_nom, type, pub_type, categorie, titre, corps, contenu, visibilite, medias, hashtags, statut, localisation_pays, localisation_ville, compte_rendu_evenement_id)
         VALUES (?, ?, 'compte_rendu', 'compte_rendu', 'Événement', ?, ?, ?, 'public', '[]', '[]', 'publie', ?, ?, ?)`)
-        .run(evt.owner_user_id, auteurNom, cr.titre, cr.resume, crContenuFil(cr), evt.pays || null, evt.ville || null, evt.id)).lastInsertRowid;
+        .run(evt.owner_user_id, auteurNom, cr.titre, crBrut(cr.resume), crContenuFil(cr), evt.pays || null, evt.ville || null, evt.id)).lastInsertRowid;
     }
   }
   await db.prepare("UPDATE evenement_comptes_rendus SET statut='publie', fil_post_id=?, published_at=COALESCE(published_at, ?), updated_at=? WHERE id=?")
@@ -20446,7 +20470,7 @@ route("POST", "/api/evenements/:id/compte-rendu/envoyer", async (req, res, param
   for (let i = 0; i < liste.length; i += 8) {
     if (Date.now() - debut > 22000) { restant = liste.length - i; break; }
     await Promise.all(liste.slice(i, i + 8).map(async c => {
-      const r = await emailCompteRenduDiffusion({ to: c.email, prenom: c.nom, objet, evenementTitre: evt.titre, auteurNom, resume: cr.resume, etapeTexte: cr.etape_texte, etapeDate: dateEtape, lien: lienCr,
+      const r = await emailCompteRenduDiffusion({ to: c.email, prenom: c.nom, objet, evenementTitre: evt.titre, auteurNom, resume: crBrut(cr.resume), etapeTexte: cr.etape_texte, etapeDate: dateEtape, lien: lienCr,
         lienDesinscription: `${origin}/api/cr/desinscription?e=${Buffer.from(c.email).toString('base64url')}&t=${crCibleSignature(c.email)}` });
       if (r && r.ok) envoyes++; else { echecs++; if (r && r.reason === 'no_key') sansCle = true; }
     }));
