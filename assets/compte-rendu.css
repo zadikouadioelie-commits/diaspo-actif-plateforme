@@ -143,3 +143,31 @@
 .cr2-resume .cr2-rich ul.cr2-puces li,.cr2-resume .cr2-rich ol{font-size:inherit}
 .crp-mention{cursor:default;user-select:all}
 #ed-resume+.rich-editor-wrap .rich-editor-area{min-height:220px}
+
+/* Bouton d'action tout en haut de la page : or lumineux (2026-10-06) */
+.cr2-cta-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin:2px 0 22px}
+.cr2-cta{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:12px;max-width:100%;box-sizing:border-box;padding:16px 32px;border-radius:999px;font-weight:800;font-size:calc(var(--cr-fs) + 1px);line-height:1.25;text-align:center;text-decoration:none;color:#3A2A00;background:linear-gradient(135deg,#F9DC7C 0%,#E5AB2D 48%,#F7D56A 100%);box-shadow:0 0 0 3px rgba(229,171,45,.38),0 10px 28px rgba(201,162,75,.55);overflow:hidden;isolation:isolate;transition:transform .2s,box-shadow .2s}
+.cr2-cta:before{content:"";position:absolute;top:0;bottom:0;left:0;width:45%;background:linear-gradient(110deg,transparent,rgba(255,255,255,.8),transparent);transform:translateX(-130%) skewX(-18deg);z-index:-1}
+.cr2-cta:hover,.cr2-cta:focus-visible{transform:translateY(-2px);box-shadow:0 0 0 4px rgba(229,171,45,.5),0 14px 34px rgba(201,162,75,.7);outline:none}
+.cr2-cta:focus-visible{outline:3px solid var(--cr-bleu);outline-offset:3px}
+.cr2-cta svg{width:24px;height:24px;flex:none}
+.cr2-cta i{font-style:normal;font-size:1.25em;transition:transform .2s}
+.cr2-cta:hover i{transform:translateX(4px)}
+.cr2-cta-wrap small{color:var(--cr-ink2);font-size:13.5px}
+@media(prefers-reduced-motion:no-preference){
+  .cr2-cta{animation:cr2-halo 2.6s ease-in-out infinite}
+  .cr2-cta:before{animation:cr2-reflet 3.4s ease-in-out infinite}
+}
+@keyframes cr2-halo{0%,100%{box-shadow:0 0 0 3px rgba(229,171,45,.38),0 10px 28px rgba(201,162,75,.5)}50%{box-shadow:0 0 0 9px rgba(229,171,45,.16),0 12px 38px rgba(229,171,45,.85)}}
+@keyframes cr2-reflet{0%,55%{transform:translateX(-130%) skewX(-18deg)}100%{transform:translateX(330%) skewX(-18deg)}}
+
+/* Gérer mes comptes-rendus : réponses reçues */
+.cr-btn.gold{background:linear-gradient(135deg,#F9DC7C,#E5AB2D);color:#3A2A00;border:none;font-weight:800}
+.crp-ev-wrap{border-bottom:1px solid var(--cr-line,#DADFEE)}
+.crp-ev-wrap:last-child{border-bottom:none}
+.crp-rep{padding:4px 4px 16px}
+.crp-rep-t{overflow-x:auto}
+.crp-rep table{border-collapse:collapse;width:100%;font-size:13.5px}
+.crp-rep th{text-align:left;font-size:12px;color:var(--muted,#5B6B82);padding:6px 8px;border-bottom:2px solid var(--cr-or,#C9A24B);white-space:nowrap}
+.crp-rep td{vertical-align:top;padding:8px;border-bottom:1px solid var(--cr-line,#DADFEE)}
+.crp-rep td a{color:var(--cr-bleu,#13369C);font-weight:700}

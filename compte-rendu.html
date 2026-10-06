@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=7">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=8">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -407,18 +407,49 @@ document.addEventListener('click', async e => {
 });
 
 /* =================== LISTE : mes événements terminés =================== */
+/* Le bouton d'action d'un compte-rendu garde ses deux champs (texte + lien). Son lien peut être celui d'un formulaire de réponse
+   (fiche d'inscription du module Formulaires & Inscriptions) ou d'une cagnotte : on le reconnaît à son adresse (2026-10-06). */
+const SLUG_FICHE = /inscription-publique\.html\?slug=([^&#]+)/, SLUG_DON = /cagnotte\.html\?slug=([^&#]+)/;
+const slugDe = (re, lien) => { const m = re.exec(String(lien || '')); if (!m) return ''; try { return decodeURIComponent(m[1]); } catch (_) { return m[1]; } };
+const modeAction = lien => SLUG_FICHE.test(lien || '') ? 'fiche' : SLUG_DON.test(lien || '') ? 'don' : 'lien';
+
 async function vueListe() {
   const root = $('#crp');
   try {
     const r = await api('GET', '/mes-evenements-compte-rendu');
+    let fiches = []; try { fiches = (await api('GET', '/insc/fiches')).fiches || []; } catch (_) {}
+    const parSlug = {}; fiches.forEach(f => { parSlug[f.slug] = f; });
     const l = r.evenements || [];
-    root.innerHTML = '<h1>📄 Mes comptes-rendus</h1><p class="crp-note" style="margin:0 0 16px">Racontez vos événements terminés : informer ceux qui n\'ont pas pu venir, remercier ceux qui étaient là, garder une trace.</p>'
+    root.innerHTML = '<h1>📄 Gérer mes comptes-rendus</h1><p class="crp-note" style="margin:0 0 16px">Racontez vos événements terminés : informer ceux qui n\'ont pas pu venir, remercier ceux qui étaient là, garder une trace. Les réponses reçues à vos boutons d\'action (engagement, bénévolat, contact…) se consultent ici.</p>'
       + '<div class="crp-card">' + (l.length ? l.map(e => {
         const st = e.cr_statut === 'publie' ? '<span class="crp-st pub">Publié</span>' : e.cr_statut === 'brouillon' ? '<span class="crp-st draft">Brouillon</span>' : '<span class="crp-st todo">À rédiger</span>';
-        return '<div class="crp-ev"><div style="flex:1;min-width:200px"><b>' + esc(e.titre) + '</b><span class="crp-note">' + esc(fmtDateCourte(e.date_evt)) + (e.ville ? ' · ' + esc(e.ville) : '') + '</span></div>' + st
-          + '<a class="cr-btn ' + (e.cr_statut === 'publie' ? 'sec' : 'pri') + '" href="compte-rendu.html?evt=' + e.id + (e.cr_statut === 'publie' ? '&edition=1' : '') + '">' + (e.cr_statut === 'publie' ? 'Modifier' : e.cr_statut === 'brouillon' ? 'Reprendre' : 'Rédiger') + '</a></div>';
+        const fiche = parSlug[slugDe(SLUG_FICHE, e.etape_lien)], slugD = slugDe(SLUG_DON, e.etape_lien);
+        const action = fiche ? '<button type="button" class="cr-btn gold" data-rep="' + fiche.id + '" data-evt="' + e.id + '">💬 Réponses (' + Number(fiche.nb_inscriptions || 0) + ')</button>'
+          : slugD ? '<a class="cr-btn out" href="cagnotte.html?slug=' + encodeURIComponent(slugD) + '">💛 Voir la cagnotte</a>' : '';
+        return '<div class="crp-ev-wrap"><div class="crp-ev"><div style="flex:1;min-width:200px"><b>' + esc(e.titre) + '</b><span class="crp-note">' + esc(fmtDateCourte(e.date_evt)) + (e.ville ? ' · ' + esc(e.ville) : '') + '</span></div>' + st + action
+          + '<a class="cr-btn ' + (e.cr_statut === 'publie' ? 'sec' : 'pri') + '" href="compte-rendu.html?evt=' + e.id + (e.cr_statut === 'publie' ? '&edition=1' : '') + '">' + (e.cr_statut === 'publie' ? 'Modifier' : e.cr_statut === 'brouillon' ? 'Reprendre' : 'Rédiger') + '</a></div><div class="crp-rep" id="rep-' + e.id + '" hidden></div></div>';
       }).join('') : '<div class="crp-note" style="padding:18px 4px">Aucun événement terminé pour le moment.</div>') + '</div>';
+    $$('[data-rep]').forEach(b => b.addEventListener('click', () => {
+      const z = $('#rep-' + b.dataset.evt);
+      if (!z.hidden) { z.hidden = true; return; }
+      z.hidden = false; chargerReponses(Number(b.dataset.rep), z);
+    }));
   } catch (e) { root.innerHTML = '<div class="crp-note">Impossible de charger vos événements.</div>'; }
+}
+/* Réponses reçues par un formulaire (lecture réservée au propriétaire de la fiche : l'API vérifie l'accès). */
+async function chargerReponses(ficheId, zone) {
+  zone.innerHTML = '<div class="crp-note">Chargement des réponses…</div>';
+  try {
+    const [ins, fi] = await Promise.all([api('GET', `/insc/fiches/${ficheId}/inscriptions`), api('GET', `/insc/fiches/${ficheId}`)]);
+    const libelles = {}; (fi.types || []).forEach(t => (t.champs || []).forEach(c => { libelles[c.nom] = c.libelle; }));
+    const rows = ins.inscriptions || [];
+    const reps = i => { let o = {}; try { o = JSON.parse(i.reponses_json || '{}') || {}; } catch (_) {}
+      return Object.keys(o).filter(k => o[k] !== '' && o[k] != null && !(Array.isArray(o[k]) && !o[k].length)).map(k => '<div><b>' + esc(libelles[k] || k) + '</b> : ' + esc(Array.isArray(o[k]) ? o[k].join(', ') : String(o[k])) + '</div>').join(''); };
+    zone.innerHTML = (rows.length ? '<div class="crp-rep-t"><table><thead><tr><th>Date</th><th>Nom et prénom</th><th>Téléphone</th><th>E-mail</th><th>Réponses</th></tr></thead><tbody>'
+      + rows.map(i => '<tr><td>' + esc(String(i.created_at || '').slice(0, 10)) + '</td><td>' + esc([i.prenom, i.nom].filter(Boolean).join(' ')) + '</td><td>' + (i.telephone ? '<a href="tel:' + esc(String(i.telephone).replace(/[^\d+]/g, '')) + '">' + esc(i.telephone) + '</a>' : '') + '</td><td>' + esc(i.email || '') + '</td><td>' + reps(i) + '</td></tr>').join('') + '</tbody></table></div>'
+      : '<div class="crp-note">Aucune réponse pour le moment.</div>')
+      + '<div class="crp-note" style="margin-top:8px">Ces coordonnées sont réservées à l\'organisateur. <a class="cr-link" href="inscriptions-admin.html?fiche=' + ficheId + '" target="_blank" rel="noopener">Ouvrir la gestion complète du formulaire ↗</a></div>';
+  } catch (e) { zone.innerHTML = '<div class="crp-note" style="color:#B91C1C">' + esc(e.message || 'Impossible de charger les réponses.') + '</div>'; }
 }
 
 /* =================== VUE PUBLIQUE =================== */
@@ -540,8 +571,15 @@ function detailHtml(cr) {
 
 function etapeHtml(cr) {
   if (!cr.etape_texte && !cr.etape_date) return '';
-  return '<div class="cr-etape"><div class="cr-etape-lbl">➡️ L\'étape suivante</div>' + (cr.etape_date ? '<div class="cr-etape-date">📅 ' + esc(fmtDateCourte(cr.etape_date)) + '</div>' : '') + (cr.etape_texte ? '<div class="cr-etape-txt">' + mentionHtml(cr.etape_texte) + '</div>' : '')
-    + (cr.etape_bouton && cr.etape_lien ? '<div class="cr-btns"><a class="cr-btn pri" href="' + esc(cr.etape_lien) + '" target="_blank" rel="noopener">' + esc(cr.etape_bouton) + '</a></div>' : '') + '</div>';
+  /* Le bouton d'action n'est plus ici : il est affiché tout en haut de la page (ctaHtml). */
+  return '<div class="cr-etape"><div class="cr-etape-lbl">➡️ L\'étape suivante</div>' + (cr.etape_date ? '<div class="cr-etape-date">📅 ' + esc(fmtDateCourte(cr.etape_date)) + '</div>' : '') + (cr.etape_texte ? '<div class="cr-etape-txt">' + mentionHtml(cr.etape_texte) + '</div>' : '') + '</div>';
+}
+/* Bouton d'action tout en haut de la page : or lumineux pour attirer le regard (formulaire de réponse, don ou simple lien). */
+function ctaHtml(cr) {
+  if (!cr.etape_bouton || !/^https?:\/\//i.test(cr.etape_lien || '')) return '';
+  const mode = modeAction(cr.etape_lien);
+  const sous = mode === 'fiche' ? 'Quelques secondes, sans créer de compte.' : mode === 'don' ? 'Chaque geste compte.' : '';
+  return '<div class="cr2-cta-wrap"><a class="cr2-cta" href="' + esc(cr.etape_lien) + '" target="_blank" rel="noopener">' + svgIc(mode === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(cr.etape_bouton) + '</span><i aria-hidden="true">→</i></a>' + (sous ? '<small>' + sous + '</small>' : '') + '</div>';
 }
 function videoHtml(url) {
   if (!url) return '';
@@ -573,6 +611,7 @@ function vuePublique() {
     + '<div class="tx"><div class="dev">' + (ev.organisateur_officiel ? 'Actions locales · Impact global' : esc(ev.organisateur_nom || '')) + '</div><h1>' + esc(cr.titre || ev.titre) + '</h1>'
     + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
     + '<div class="cr2-in">'
+    + ctaHtml(cr)
     + (ev.image ? '<div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' : '')
     + '<div class="cr2-sous">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + '</div>'
     + '<div class="crp-chips" id="crp-chips">Avec : </div>'
@@ -582,7 +621,7 @@ function vuePublique() {
     + graph + detailHtml(cr)
     + ((cr.forts || []).length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + cr.forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
     + parts
-    + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a>' : '') + '</div>'
+    + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a>' : '') + '</div>'
     + '<div id="crp-social"></div></div></article></div>';
   const z = $('#crp-chips'); z.innerHTML = 'Avec : ' + (d.identifies.length ? chipsIdentifies(d.peut_editer) : '<span class="crp-note">Personne n\'est encore identifié.</span>' + (d.peut_editer ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : ''));
   if (!d.identifies.length && !d.peut_editer) z.remove();
@@ -658,7 +697,7 @@ function nouvelEd() {
 function collecterEd() {
   const ed = ST.ed;
   ed.titre = $('#ed-titre').value.trim(); ed.resume = pourEnvoi($('#ed-resume').value); ed.libre = ($('#ed-libre') || {}).value || ed.libre;
-  ed.etape_texte = $('#ed-etxt').value; ed.etape_date = $('#ed-edate').value; ed.etape_bouton = $('#ed-ebtn').value; ed.etape_lien = $('#ed-elien').value; ed.video = $('#ed-video').value.trim();
+  ed.etape_texte = $('#ed-etxt').value; ed.etape_date = $('#ed-edate').value; ed.video = $('#ed-video').value.trim();
 }
 function bodyEd() {
   const ed = ST.ed;
@@ -685,7 +724,7 @@ function vueEditeur() {
     + '<div class="crp-lbl">L\'étape suivante · ce qui arrive après l\'événement</div>'
     + '<div class="crp-fld"><label>Et maintenant ? <em>mis en avant dans le fil, la page et l\'e-mail</em></label><textarea id="ed-etxt" maxlength="500" style="min-height:80px"></textarea><div class="crp-hint">La prochaine date, l\'action à venir, ce que les participants peuvent faire maintenant.</div></div>'
     + '<div class="crp-fld"><label>Date de la prochaine étape <em>facultatif</em></label><input type="date" id="ed-edate" style="max-width:220px"></div>'
-    + '<div class="crp-fld"><label>Bouton d\'action <em>facultatif</em></label><div class="crp-extform" style="grid-template-columns:1fr 1.4fr"><input id="ed-ebtn" maxlength="60" placeholder="Texte du bouton"><input id="ed-elien" placeholder="https://… (lien du bouton)"></div></div>'
+    + '<div class="crp-fld"><label>Bouton d\'action <em>facultatif · affiché tout en haut de la page, en or lumineux</em></label><div id="ed-action"></div></div>'
     + '<div class="crp-lbl">Niveau 2 · Le retour d\'expérience détaillé</div>'
     + '<div class="crp-fld"><label>Temps forts <em>affichés en vignettes</em></label><div class="crp-chips" id="ed-forts"></div><div class="crp-extform" style="grid-template-columns:1fr auto"><input id="ed-fortin" maxlength="80" placeholder="Ajouter un temps fort (ex. Table ronde, Remise des prix…)"><button type="button" class="cr-btn sec" id="ed-fortadd">＋ Ajouter</button></div></div>'
     + '<div id="ed-champs"></div>'
@@ -698,14 +737,14 @@ function vueEditeur() {
     + '<div class="crp-fld"><label>Vidéo <em>lien (mp4, YouTube, Vimeo…)</em></label><input id="ed-video" placeholder="https://…"><div class="crp-hint" id="ed-videohint"></div></div>'
     + '<div class="crp-fld"><label>Participants identifiés</label><div class="crp-chips" id="crp-chips"></div><div class="crp-hint">Ils sont notifiés. Vous pouvez aussi identifier depuis la page de l\'événement, même sans compte-rendu.</div></div>'
     + '<div class="cr-btns"><button class="cr-btn pri" id="ed-publier">' + (publie ? 'Mettre à jour la publication' : 'Publier dans le fil') + '</button><button class="cr-btn out" id="ed-brouillon">Enregistrer le brouillon</button>'
-    + (publie ? '<button class="cr-btn sec" id="ed-mail">✉️ Envoyer par e-mail</button><button class="cr-btn out" id="ed-depublier" style="color:#B91C1C">Dépublier</button>' : '') + '<a class="cr-btn out" href="compte-rendu.html' + (cr ? '?evt=' + ev.id : '') + '">Annuler</a></div>'
+    + (publie ? '<button class="cr-btn sec" id="ed-mail">✉️ Envoyer par e-mail</button><button class="cr-btn out" id="ed-depublier" style="color:#B91C1C">Dépublier</button>' : '') + '<a class="cr-btn out" href="compte-rendu.html' + (cr ? '?evt=' + ev.id : '') + '">Annuler</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a></div>'
     + '<p class="crp-note" id="ed-err" style="color:#dc2626;display:none"></p></div><div id="ed-mailzone"></div>';
-  $('#ed-titre').value = ed.titre; $('#ed-resume').value = ed.resume || ''; $('#ed-etxt').value = ed.etape_texte; $('#ed-edate').value = ed.etape_date; $('#ed-ebtn').value = ed.etape_bouton; $('#ed-elien').value = ed.etape_lien; $('#ed-video').value = ed.video; $('#ed-libre').value = ed.libre;
+  $('#ed-titre').value = ed.titre; $('#ed-resume').value = ed.resume || ''; $('#ed-etxt').value = ed.etape_texte; $('#ed-edate').value = ed.etape_date; $('#ed-video').value = ed.video; $('#ed-libre').value = ed.libre;
   riche($('#ed-resume'), 'Écrivez le résumé de l’événement…'); attachMention($('#ed-etxt'));
   const cnt = () => { const l = brut(pastillesVersTokens($('#ed-resume').value)).trim().length; const c = $('#ed-cnt'); c.textContent = l.toLocaleString('fr-FR') + ' / 2 500 caractères' + (l > RESUME_MAX ? ' — limite dépassée : raccourcissez pour enregistrer' : ''); c.classList.toggle('warn', l > 2300); };
   $('#ed-resume').addEventListener('input', cnt); cnt();
   drawTypes(); drawChamps(); drawForts(); drawPhotos(); refreshChips();
-  drawLogo(); drawParts(); drawProfils();
+  drawLogo(); drawParts(); drawProfils(); ST.act = null; drawAction();
   $('#ed-partadd').onclick = () => { if (ed.partenaires.length < 12) { ed.partenaires.push({ nom: '', description: '', lien: '', logo_url: '' }); drawParts(); } };
   $('#ed-profadd').onclick = () => { if (ed.profils.length < 40) { ed.profils.push({ nom: '', categorie: '', communaute: '', lien: '' }); drawProfils(); } };
   $('#ed-fortadd').onclick = () => { const v = $('#ed-fortin').value.trim(); if (v) { ed.forts.push(v); $('#ed-fortin').value = ''; drawForts(); } };
@@ -752,6 +791,61 @@ function drawChamps() {
     const t = $('textarea', d); t.value = x.texte || ''; box.appendChild(d); riche(t); t.addEventListener('input', () => { x.texte = pourEnvoi(t.value); });
     d.insertAdjacentHTML('beforeend', selectIcone('data-xic', i, x.icone || '')); $('select[data-xic]', d).addEventListener('change', e => { x.icone = e.target.value; });
   });
+}
+/* ---------- bouton d'action : simple lien, formulaire de réponse ou don (2026-10-06) ---------- */
+const lienFiche = f => location.origin + '/inscription-publique.html?slug=' + encodeURIComponent(f.slug);
+const lienCag = c => location.origin + '/cagnotte.html?slug=' + encodeURIComponent(c.slug);
+const TEXTES_BOUTON = { fiche: 'Je souhaite participer à la vision de Diaspo’Actif', don: 'Faire un don' };
+const OPTIONS_ENGAGEMENT = ['Être contacté(e) pour participer à la vision de Diaspo’Actif et à son développement', 'Devenir bénévole', 'Contribuer à des actions', 'Soutenir par un don'];
+async function drawAction() {
+  const ed = ST.ed, box = $('#ed-action'); if (!box) return;
+  if (!ST.act) ST.act = { mode: modeAction(ed.etape_lien), fiches: null, cags: null };
+  const A = ST.act;
+  if (A.fiches === null) { try { A.fiches = (await api('GET', '/insc/fiches')).fiches || []; } catch (_) { A.fiches = []; } }
+  if (A.cags === null) { try { A.cags = (await api('GET', '/cagnottes/mes')).cagnottes || []; } catch (_) { A.cags = []; } }
+  if (!$('#ed-action')) return;
+  const fiche = A.fiches.find(f => f.slug === slugDe(SLUG_FICHE, ed.etape_lien)), cag = A.cags.find(c => c.slug === slugDe(SLUG_DON, ed.etape_lien));
+  const modes = [['lien', '🔗 Simple lien'], ['fiche', '🤝 Formulaire de réponse'], ['don', '💛 Faire un don']];
+  let h = '<div class="crp-seg" id="ed-amodes">' + modes.map(m => '<button type="button" class="' + (m[0] === A.mode ? 'on' : '') + '" data-am="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>'
+    + '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:8px"><input id="ed-ebtn" maxlength="60" placeholder="Texte du bouton (ex. ' + esc(TEXTES_BOUTON[A.mode] || 'Découvrir la suite') + ')" value="' + esc(ed.etape_bouton) + '"></div>';
+  if (A.mode === 'lien') h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input id="ed-elien" placeholder="https://… (lien du bouton)" value="' + esc(ed.etape_lien) + '"></div>';
+  if (A.mode === 'fiche') {
+    h += '<div class="crp-extform" style="grid-template-columns:1fr auto;margin-top:6px"><select id="ed-efiche"><option value="">— Choisir un formulaire —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select>'
+      + '<button type="button" class="cr-btn sec" id="ed-fcreer">＋ Créer un formulaire d’engagement</button></div>'
+      + '<div class="crp-hint">Le lecteur remplit le formulaire sans créer de compte (nom, prénom, téléphone ou e-mail, options). Vous retrouvez les réponses dans « Gérer mes comptes-rendus ». Le formulaire d’engagement proposé comprend : être contacté(e), bénévolat, actions, don, et une case de consentement.</div>'
+      + (fiche ? '<div class="cr-btns" style="margin-top:6px"><a class="cr-btn out" target="_blank" rel="noopener" href="inscriptions-admin.html?fiche=' + fiche.id + '">⚙️ Personnaliser les champs et les options</a>'
+        + (fiche.statut !== 'publiee' ? '<button type="button" class="cr-btn pri" id="ed-fpub">Publier ce formulaire</button>' : '') + '</div>'
+        + (fiche.statut !== 'publiee' ? '<div class="crp-hint" style="color:#B45309">Ce formulaire n’est pas publié : les lecteurs ne pourront pas répondre tant qu’il ne l’est pas.</div>' : '') : '');
+  }
+  if (A.mode === 'don') {
+    h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><select id="ed-ecag"><option value="">— Choisir une de mes cagnottes —</option>' + A.cags.map(c => '<option value="' + esc(c.slug) + '"' + (cag && cag.id === c.id ? ' selected' : '') + '>' + esc(c.titre) + '</option>').join('') + '</select></div>'
+      + (A.cags.length ? '' : '<div class="crp-hint">Vous n’avez pas encore de cagnotte. Créez-en une depuis votre tableau de bord, puis revenez ici.</div>');
+  }
+  box.innerHTML = h;
+  $$('[data-am]', box).forEach(b => b.addEventListener('click', () => {
+    const m = b.dataset.am; if (m === A.mode) return;
+    A.mode = m; ed.etape_lien = ''; if (!ed.etape_bouton && TEXTES_BOUTON[m]) ed.etape_bouton = TEXTES_BOUTON[m]; drawAction();
+  }));
+  $('#ed-ebtn').addEventListener('input', e => { ed.etape_bouton = e.target.value; });
+  const el = $('#ed-elien'); if (el) el.addEventListener('input', e => { ed.etape_lien = e.target.value.trim(); });
+  const sf = $('#ed-efiche'); if (sf) sf.addEventListener('change', e => { const f = A.fiches.find(x => x.slug === e.target.value); ed.etape_lien = f ? lienFiche(f) : ''; if (f && !ed.etape_bouton) ed.etape_bouton = TEXTES_BOUTON.fiche; drawAction(); });
+  const sc = $('#ed-ecag'); if (sc) sc.addEventListener('change', e => { const c = A.cags.find(x => x.slug === e.target.value); ed.etape_lien = c ? lienCag(c) : ''; if (c && !ed.etape_bouton) ed.etape_bouton = TEXTES_BOUTON.don; drawAction(); });
+  const fp = $('#ed-fpub'); if (fp) fp.onclick = async () => { try { await api('PATCH', `/insc/fiches/${fiche.id}/statut`, { statut: 'publiee' }); fiche.statut = 'publiee'; toast('Formulaire publié'); drawAction(); } catch (e) { toast(e.message || 'Erreur'); } };
+  const fc = $('#ed-fcreer'); if (fc) fc.onclick = creerFormulaireEngagement;
+}
+/* Crée un formulaire d'engagement avec les routes existantes du module Formulaires & Inscriptions : une fiche indépendante de
+   tout événement (une fiche liée à un événement terminé refuse les réponses), un type gratuit, la liste d'options et le consentement. */
+async function creerFormulaireEngagement() {
+  const b = $('#ed-fcreer'); b.disabled = true; b.textContent = 'Création…';
+  try {
+    const f = (await api('POST', '/insc/fiches', { nom: 'Engagement — ' + ST.data.evenement.titre, description: '<p>Merci de laisser votre nom, votre prénom et votre numéro de téléphone : nous reviendrons vers vous.</p>' })).fiche;
+    const t = await api('POST', `/insc/fiches/${f.id}/types`, { label: 'Engagement', gratuit: true, validation_auto: false });
+    await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Je souhaite…', type_champ: 'choix_multiple', obligatoire: true, options: OPTIONS_ENGAGEMENT });
+    await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Consentement', type_champ: 'case_a_cocher', obligatoire: true, placeholder: 'J’accepte d’être contacté(e) au sujet de ma réponse et que mes coordonnées soient transmises à l’organisateur.' });
+    await api('PATCH', `/insc/fiches/${f.id}/statut`, { statut: 'publiee' });
+    ST.act.fiches = null; ST.act.mode = 'fiche'; ST.ed.etape_lien = lienFiche(f); if (!ST.ed.etape_bouton) ST.ed.etape_bouton = TEXTES_BOUTON.fiche;
+    toast('Formulaire d’engagement créé et publié'); await drawAction();
+  } catch (e) { toast(e.message || 'Création impossible'); b.disabled = false; b.textContent = '＋ Créer un formulaire d’engagement'; }
 }
 function drawForts() {
   const ed = ST.ed;

@@ -20504,7 +20504,7 @@ route("GET", "/api/mes-evenements-compte-rendu", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const auj = dateParisISO();
-  const rows = await db.prepare(`SELECT e.id, e.titre, e.date_evt, e.date_fin, e.ville, c.statut AS cr_statut FROM evenements e
+  const rows = await db.prepare(`SELECT e.id, e.titre, e.date_evt, e.date_fin, e.ville, c.statut AS cr_statut, c.etape_bouton, c.etape_lien FROM evenements e
       LEFT JOIN evenement_comptes_rendus c ON c.evenement_id=e.id
       WHERE e.owner_user_id=? AND COALESCE(e.statut,'') NOT IN ('brouillon','annule','annulé')
         AND SUBSTR(COALESCE(NULLIF(e.date_fin,''), e.date_evt),1,10) < ? ORDER BY e.date_evt DESC LIMIT 100`).all(user.id, auj);
