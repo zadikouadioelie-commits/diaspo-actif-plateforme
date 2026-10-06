@@ -20261,7 +20261,8 @@ route("GET", "/api/evenements/:id/identifications", async (req, res, params) => 
 
 route("GET", "/api/evenements/:id/identifications/suggestions", async (req, res, params, body, query) => {
   const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
-  const q = String((query && query.q) || '').trim().toLowerCase();
+  /* Le « @ » ou « * » tapé en tête est ignoré (le champ de recherche n'en a pas besoin). */
+  const q = String((query && query.q) || '').replace(/^[@*\s]+/, '').trim().toLowerCase();
   const ficheIdsSug = await crFicheIds(ctx.evt);
   const inscrits = await db.prepare(`SELECT DISTINCT i.user_id, i.nom, i.prenom, i.statut, t.label AS type_label
       FROM insc_inscriptions i LEFT JOIN insc_types t ON t.id=i.type_id
@@ -20278,8 +20279,12 @@ route("GET", "/api/evenements/:id/identifications/suggestions", async (req, res,
   if (q) liste = liste.filter(x => x.nom.toLowerCase().includes(q));
   if (q.length >= 2) {
     const like = '%' + q.replace(/[%_]/g, '') + '%';
-    const autres = await db.prepare(`SELECT id AS user_id, nom, prenom, role FROM users WHERE role IN ('utilisateur','initiative','collectivite') AND (compte_masque IS NULL OR compte_masque=0)
-      AND COALESCE(suspendu_definitif,0)=0 AND nom<>'Compte supprimé' AND (LOWER(nom) LIKE ? OR LOWER(prenom) LIKE ?) LIMIT 10`).all(like, like);
+    /* La recherche couvre aussi le NOM DE STRUCTURE (initiative, collectivité) : c'est celui que les gens connaissent et qui
+       est affiché pour ces comptes (voir nomCompteAffichage), pas le nom du responsable. */
+    const autres = await db.prepare(`SELECT u.id AS user_id, u.nom, u.prenom, u.role FROM users u LEFT JOIN initiatives ini ON ini.owner_user_id=u.id
+      WHERE u.role IN ('utilisateur','initiative','collectivite') AND (u.compte_masque IS NULL OR u.compte_masque=0)
+      AND COALESCE(u.suspendu_definitif,0)=0 AND u.nom<>'Compte supprimé'
+      AND (LOWER(u.nom) LIKE ? OR LOWER(u.prenom) LIKE ? OR LOWER(COALESCE(ini.nom,'')) LIKE ? OR LOWER(COALESCE(u.nom_institution,'')) LIKE ?) LIMIT 10`).all(like, like, like, like);
     await corrigerNomsListe(autres, 'user_id');
     for (const r of autres) {
       const uid = Number(r.user_id); if (vus.has(uid) || deja.has(uid)) continue; vus.add(uid);

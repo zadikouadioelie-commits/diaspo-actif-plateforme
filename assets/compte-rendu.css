@@ -29,14 +29,16 @@
 /* ═══ Page publique du compte-rendu — mise en forme aux couleurs du logo (2026-10-06) ═══
    Bleu roi et or du médaillon Diaspo'Actif ; titres en slab condensé comme le logo. */
 .crp{--cr-bleu:#13369C;--cr-bleu2:#0B1F5C;--cr-bleu-soft:#E6EBFA;--cr-or:#C9A24B;--cr-or-soft:#F7EFD8;--cr-creme:#F6F1E4;--cr-vert:#2E8B6A;--cr-ink:#16224D;--cr-ink2:#4A5578;--cr-line:#DADFEE;--cr-fs:18px}
-.crp.crp-wide{max-width:1140px;width:100%;min-width:0;box-sizing:border-box}
+.crp.crp-wide{max-width:1400px;width:100%;min-width:0;box-sizing:border-box}
 .cr2-tools{display:flex;justify-content:flex-end;align-items:center;gap:8px;color:var(--cr-ink2);font-size:13.5px;font-weight:700;margin:0 0 10px}
 .cr2-fs{border:1px solid var(--cr-line);background:#fff;color:var(--cr-ink);font:inherit;font-weight:800;border-radius:10px;width:40px;height:36px;cursor:pointer}
 .cr2-fs:focus-visible,.cr2-toc-i:focus-visible{outline:3px solid var(--cr-or);outline-offset:2px}
-.cr2-layout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:22px;align-items:start}
+.cr2-layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:26px;align-items:start}
 .cr2-toc{position:sticky;top:78px;max-height:calc(100vh - 92px);overflow:auto;background:#fff;border:1px solid var(--cr-line);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:2px}
 .cr2-toc h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--cr-ink2);margin:4px 8px 8px}
-.cr2-toc-i{display:flex;align-items:center;gap:9px;text-align:left;border:0;background:transparent;color:var(--cr-ink);font:inherit;font-size:14px;line-height:1.3;padding:8px 10px;border-radius:10px;cursor:pointer}
+.cr2-toc-i{display:flex;align-items:center;gap:9px;text-align:left;border:0;background:transparent;color:var(--cr-ink);font:inherit;font-size:14px;line-height:1.3;padding:8px 10px;border-radius:10px;cursor:pointer;flex:none}
+.cr2-toc-i span{min-width:0;overflow-wrap:anywhere}
+.cr2-toc-g{flex:none;font-size:11.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--cr-bleu);margin:12px 8px 3px;padding-bottom:3px;border-bottom:2px solid var(--cr-or-soft)}
 .cr2-toc-i:hover{background:var(--cr-bleu-soft)}
 .cr2-toc-i.on{background:var(--cr-bleu-soft);color:var(--cr-bleu);font-weight:800;box-shadow:inset 3px 0 0 var(--cr-or)}
 .cr2-ic{width:24px;height:24px;flex:none}.cr2-ic.xs{width:17px;height:17px}
@@ -50,7 +52,7 @@
 .cr2-hero h1{font-family:'Alfa Slab One',Georgia,serif;font-weight:400;font-size:clamp(26px,4.4vw,40px);line-height:1.12;margin:6px 0 10px;color:#fff;text-wrap:balance}
 .cr2-hero .puces{display:flex;flex-wrap:wrap;gap:8px}
 .cr2-hero .puces span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:4px 12px;font-size:14px;font-weight:600}
-.cr2-in{padding:22px clamp(16px,4vw,40px) 40px;max-width:80ch;margin:0 auto}
+.cr2-in{padding:24px clamp(16px,4vw,48px) 44px;max-width:108ch;margin:0 auto}
 .cr2-affiche{margin:0 0 14px}.cr2-affiche img{display:block;max-width:100%;max-height:420px;margin:0 auto;border-radius:14px}
 .cr2-sous{color:var(--cr-ink2);font-size:14.5px;margin-bottom:6px}
 .cr2-resume{background:var(--cr-or-soft);border-left:5px solid var(--cr-or);border-radius:6px 16px 16px 6px;padding:14px 18px;margin:18px 0 26px;font-size:calc(var(--cr-fs) - 1px);scroll-margin-top:90px}

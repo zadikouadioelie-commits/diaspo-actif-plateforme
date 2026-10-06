@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=8">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=11">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -596,17 +596,20 @@ function vuePublique() {
   const brouillon = cr.statut !== 'publie';
   const parties = partiesDe(cr), graph = graphiquesHtml(cr), parts = partenairesHtml(cr, ev), logo = logoOrga(cr, ev);
   /* Sommaire : [ancre, illustration, libellé], dans l'ordre de la page. */
-  const items = [['cr-resume', 'star', 'Résumé']];
-  if (graph) items.push(['cr-coup', 'compass', 'En un coup d’œil']);
-  if (cr.type_cr !== 'blanc') parties.forEach((p, i) => items.push(['cr-p' + (i + 1), iconeDe(p), p.titre || 'Texte']));
-  if ((cr.forts || []).length) items.push(['cr-forts', 'star', 'Les temps forts']);
-  if (parts) items.push(['cr-partenaires', 'people', (cr.partenaires || []).length ? 'Organisation et partenaires' : 'Organisateur']);
-  const toc = items.map(it => '<button type="button" class="cr2-toc-i" data-t="' + it[0] + '">' + svgIc(it[1], 'cr2-ic xs') + '<span>' + esc(it[2]) + '</span></button>').join('');
+  const items = [['cr-resume', 'star', 'Résumé', 'L’essentiel']];
+  if (graph) items.push(['cr-coup', 'compass', 'En un coup d’œil', 'L’essentiel']);
+  if (cr.type_cr !== 'blanc') parties.forEach((p, i) => items.push(['cr-p' + (i + 1), iconeDe(p), p.titre || 'Texte', 'Le récit détaillé']));
+  if ((cr.forts || []).length) items.push(['cr-forts', 'star', 'Les temps forts', 'En bref']);
+  if (parts) items.push(['cr-partenaires', 'people', (cr.partenaires || []).length ? 'Organisation et partenaires' : 'Organisateur', 'En bref']);
+  const btnToc = it => '<button type="button" class="cr2-toc-i" data-t="' + it[0] + '">' + svgIc(it[1], 'cr2-ic xs') + '<span>' + esc(it[2]) + '</span></button>';
+  const toc = items.map(btnToc).join('');
+  /* Sommaire de bureau : trois groupes avec un titre (sur mobile, la barre horizontale reste sans titres). */
+  const tocGroupe = items.map((it, i) => (i === 0 || items[i - 1][3] !== it[3] ? '<div class="cr2-toc-g">' + esc(it[3]) + '</div>' : '') + btnToc(it)).join('');
   const type = typeLibelle(cr);
   root.innerHTML = (brouillon ? '<div class="crp-card" style="background:#FEF3C7;border-color:#F59E0B">Brouillon : seuls vous voyez ce compte-rendu. <a class="cr-link" href="compte-rendu.html?evt=' + ev.id + '&edition=1">Continuer la rédaction</a></div>' : '')
     + '<div class="cr2-tools">Taille du texte <button type="button" class="cr2-fs" id="cr-fsm" aria-label="Réduire le texte">A−</button><button type="button" class="cr2-fs" id="cr-fsp" aria-label="Agrandir le texte">A+</button></div>'
     + '<div class="cr2-mtoc" id="cr-mtoc">' + toc + '</div>'
-    + '<div class="cr2-layout"><nav class="cr2-toc" aria-label="Sommaire"><h2>Sommaire</h2>' + toc + '</nav>'
+    + '<div class="cr2-layout"><nav class="cr2-toc" aria-label="Sommaire"><h2>Sommaire</h2>' + tocGroupe + '</nav>'
     + '<article class="cr2-page"><header class="cr2-hero">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '')
     + '<div class="tx"><div class="dev">' + (ev.organisateur_officiel ? 'Actions locales · Impact global' : esc(ev.organisateur_nom || '')) + '</div><h1>' + esc(cr.titre || ev.titre) + '</h1>'
     + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
