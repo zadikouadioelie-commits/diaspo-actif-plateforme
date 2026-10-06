@@ -809,9 +809,12 @@ async function drawAction() {
   let h = '<div class="crp-seg" id="ed-amodes">' + modes.map(m => '<button type="button" class="' + (m[0] === A.mode ? 'on' : '') + '" data-am="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>'
     + '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:8px"><input id="ed-ebtn" maxlength="60" placeholder="Texte du bouton (ex. ' + esc(TEXTES_BOUTON[A.mode] || 'Découvrir la suite') + ')" value="' + esc(ed.etape_bouton) + '"></div>';
   if (A.mode === 'lien') h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input id="ed-elien" placeholder="https://… (lien du bouton)" value="' + esc(ed.etape_lien) + '"></div>';
+  /* La création de formulaires est réservée aux comptes Initiative et aux administrateurs (même règle que le module Formulaires & Inscriptions). */
+  const peutCreer = !!ST.user && (ST.user.role === 'initiative' || ST.user.role === 'administrateur');
   if (A.mode === 'fiche') {
-    h += '<div class="crp-extform" style="grid-template-columns:1fr auto;margin-top:6px"><select id="ed-efiche"><option value="">— Choisir un formulaire —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select>'
-      + '<button type="button" class="cr-btn sec" id="ed-fcreer">＋ Créer un formulaire d’engagement</button></div>'
+    h += '<div class="crp-extform" style="grid-template-columns:' + (peutCreer ? '1fr auto' : '1fr') + ';margin-top:6px"><select id="ed-efiche"><option value="">— Choisir un formulaire —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select>'
+      + (peutCreer ? '<button type="button" class="cr-btn sec" id="ed-fcreer">＋ Créer un formulaire d’engagement</button>' : '') + '</div>'
+      + (peutCreer ? '' : '<div class="crp-hint">ℹ️ La création de formulaires est réservée aux comptes <b>Initiative</b> (et aux administrateurs). Vous pouvez choisir ci-dessus un formulaire existant.</div>')
       + '<div class="crp-hint">Le lecteur remplit le formulaire sans créer de compte (nom, prénom, téléphone ou e-mail, options). Vous retrouvez les réponses dans « Gérer mes comptes-rendus ». Le formulaire d’engagement proposé comprend : être contacté(e), bénévolat, actions, don, et une case de consentement.</div>'
       + (fiche ? '<div class="cr-btns" style="margin-top:6px"><a class="cr-btn out" target="_blank" rel="noopener" href="inscriptions-admin.html?fiche=' + fiche.id + '">⚙️ Personnaliser les champs et les options</a>'
         + (fiche.statut !== 'publiee' ? '<button type="button" class="cr-btn pri" id="ed-fpub">Publier ce formulaire</button>' : '') + '</div>'
