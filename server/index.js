@@ -45735,8 +45735,10 @@ route("GET", "/api/insc/fiches", async (req, res) => {
    compte pilote diaspo.actif@gmail.com le temps de la phase de test (2026-09-09) — il est
    maintenant accessible à tout compte Initiative, les administrateurs restant toujours
    autorisés (ils supervisent déjà tout le module). */
+/* 2026-10-06 (demande explicite) : tous les comptes autorisés à créer un événement (Initiative, Collectivité,
+   Administrateur) disposent des mêmes fonctions ; seul le compte utilisateur en est exclu. */
 function inscBetaAutorise(user) {
-  return user.role === "administrateur" || user.role === "initiative";
+  return user.role === "administrateur" || user.role === "initiative" || user.role === "collectivite";
 }
 /* Partenaires & sponsors PAR DÉFAUT d'une initiative (2026-09-28, demande explicite : "on va
    garder la vitrine en dehors de tout ça... simple avec partenariat et sponsors qui seront
@@ -45768,7 +45770,7 @@ route("PUT", "/api/insc/mes-partenaires-sponsors-defaut", async (req, res, param
 route("POST", "/api/insc/fiches", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est réservé aux comptes Initiative." });
+  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est réservé aux comptes Initiative et Collectivité." });
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
   const init = await db.prepare("SELECT id, partenaires_evenements_json, sponsors_evenements_json FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = await inscSlugUnique(body.nom);
