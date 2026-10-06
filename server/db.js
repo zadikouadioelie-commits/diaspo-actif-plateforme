@@ -2520,6 +2520,11 @@ const MIGRATIONS = [
   ["insc_candidature_uploads", "motif_refus TEXT"],
   ["insc_candidature_visiteur_uploads", "statut TEXT NOT NULL DEFAULT 'en_attente'"],
   ["insc_candidature_visiteur_uploads", "motif_refus TEXT"],
+  // Mini-formulaire de candidature (2026-10-06, demande explicite) : définition (champs demandés/obligatoires) sur la
+  // configuration + réponses du candidat (connecté ou visiteur). Miroir manuel dans server/pg-init.js.
+  ["insc_candidature_config", "formulaire_json TEXT"],
+  ["insc_candidature_declarations", "reponses_json TEXT"],
+  ["insc_candidature_declarations_visiteurs", "reponses_json TEXT"],
   // Partenaires & sponsors PAR DÉFAUT d'une initiative (2026-09-28, demande explicite) — liste
   // [{nom, logo_url}] indépendante de vitrine_partenaires_json (la vitrine reste en saisie
   // manuelle, décision explicite) : sert uniquement de point de départ recopié sur CHAQUE

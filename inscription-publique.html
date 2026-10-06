@@ -772,6 +772,7 @@ function ipOuvrirCandidature() {
       ${emailHtml}
       ${ipRenderFormulaireReponse(cand, connecte, visiteurValide)}
     </div>`;
+  if (connecte) ipCandPrefill(cand.mes_reponses);
 }
 /* Formulaire "Répondre à la candidature" (2026-09-28, demande explicite) — remplace l'ancien
    bouton "J'ai candidaté" purement déclaratif. Connecté : identité reprise automatiquement du
@@ -784,23 +785,59 @@ function ipRenderFormulaireReponse(cand, connecte, visiteurValide) {
   if (visiteurValide) {
     return `<div style="font-size:12.5px;color:#1C8A0E;font-weight:700;background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:10px 12px;">✅ Votre réponse est enregistrée — vous pouvez déposer vos documents ci-dessus.</div>`;
   }
+  /* Mini-formulaire (2026-10-06) : l'organisateur choisit ce qui est demandé et ce qui est obligatoire ; sans réglage
+     enregistré, comportement d'avant (nom, prénom, e-mail obligatoires ; organisme, téléphone, message facultatifs). */
+  const form = cand.formulaire || { identite: { prenom: { demande: true, obligatoire: true }, nom: { demande: true, obligatoire: true }, email: { demande: true, obligatoire: true }, telephone: { demande: true, obligatoire: false }, organisme: { demande: true, obligatoire: false }, message: { demande: true, obligatoire: false } }, champs: [] };
+  const idt = form.identite;
+  const etoile = k => idt[k].obligatoire ? ' *' : '';
+  const champCss = 'height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;';
+  const saisies = [
+    idt.nom.demande ? `<input id="ip-cand-nom" type="text" placeholder="Nom${etoile('nom')}" style="${champCss}">` : '',
+    idt.prenom.demande ? `<input id="ip-cand-prenom" type="text" placeholder="Prénom${etoile('prenom')}" style="${champCss}">` : '',
+    idt.organisme.demande ? `<input id="ip-cand-organisme" type="text" placeholder="Nom de l'organisme${etoile('organisme')}" style="${champCss}">` : '',
+    idt.email.demande ? `<input id="ip-cand-email" type="email" placeholder="Adresse e-mail${etoile('email')}" style="${champCss}">` : '',
+    idt.telephone.demande ? `<input id="ip-cand-telephone" type="tel" placeholder="Téléphone${etoile('telephone')}" style="${champCss}">` : '',
+  ].filter(Boolean);
+  const contactEtOu = idt.email.demande && idt.telephone.demande && !idt.email.obligatoire && !idt.telephone.obligatoire
+    ? '<div style="font-size:11.5px;color:oklch(0.5 0.006 30);">Indiquez au moins une adresse e-mail ou un numéro de téléphone.</div>' : '';
   const identiteHtml = connecte
     ? `<div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin-bottom:10px;">Vous répondez en tant que <strong>${escH([CURRENT_USER.prenom, CURRENT_USER.nom].filter(Boolean).join(' ') || CURRENT_USER.email)}</strong>${cand.mon_organisme ? ` — ${escH(cand.mon_organisme)}` : ''}${CURRENT_USER.email ? ` (${escH(CURRENT_USER.email)})` : ''}</div>`
-    : `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
-        <input id="ip-cand-nom" type="text" placeholder="Nom *" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
-        <input id="ip-cand-prenom" type="text" placeholder="Prénom *" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
-        <input id="ip-cand-organisme" type="text" placeholder="Nom de l'organisme" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
-        <input id="ip-cand-email" type="email" placeholder="Adresse e-mail *" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
-        <input id="ip-cand-telephone" type="tel" placeholder="Téléphone" style="height:38px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
-      </div>`;
+    : (saisies.length ? `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">${saisies.join('')}${contactEtOu}</div>` : '');
+  /* Questions de l'organisateur : rendues par ipChampHtml (mêmes types de champ que les formulaires d'inscription). */
+  const champsLibres = (form.champs || []).filter(c => c.demande !== false);
+  const questionsHtml = champsLibres.length
+    ? `<div id="ip-cand-champs" style="display:flex;flex-direction:column;gap:12px;margin-bottom:12px;">${champsLibres.map(c => ipChampHtml({ nom: c.nom, libelle: c.libelle, type_champ: c.type_champ, obligatoire: c.obligatoire ? 1 : 0, options_json: JSON.stringify(c.options || []), placeholder: c.placeholder || '', description_aide: c.aide || '', valeur_defaut: '' })).join('')}</div>` : '';
+  const commentaireHtml = idt.message.demande
+    ? `<textarea id="ip-cand-message" placeholder="Commentaire libre — exprimez-vous simplement${idt.message.obligatoire ? ' *' : ' (facultatif)'}" style="width:100%;min-height:70px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">${connecte ? escH(cand.mon_message || '') : ''}</textarea>` : '';
   return `
     <div style="border-top:1px solid oklch(0.92 0.004 30);margin-top:14px;padding-top:14px;">
       <div class="ip-cand-titre" style="font-size:13.5px;margin-bottom:8px;">✍️ Répondre à la candidature</div>
       ${identiteHtml}
-      <textarea id="ip-cand-message" placeholder="Message pour l'organisateur (facultatif)" style="width:100%;min-height:70px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">${connecte ? escH(cand.mon_message || '') : ''}</textarea>
+      ${questionsHtml}
+      ${commentaireHtml}
       <button class="ip-cand-declare-btn" onclick="ipRepondreCandidature(this)">${connecte && cand.deja_declare ? 'Mettre à jour ma réponse' : '✍️ Valider ma réponse'}</button>
       ${!connecte ? `<div style="text-align:center;margin-top:10px;"><a href="inscription.html" target="_blank" rel="noopener" style="font-size:12px;color:#6B0FA3;font-weight:700;text-decoration:none;">Créer un compte Diaspo'Actif →</a></div>` : ''}
     </div>`;
+}
+/* Réponses aux questions du mini-formulaire : lit les champs du bloc #ip-cand-champs (cases multiples en liste). */
+function ipCandCollecterReponses() {
+  const box = document.getElementById('ip-cand-champs'), rep = {};
+  if (!box) return rep;
+  box.querySelectorAll('[name]').forEach(el => {
+    let n = el.name; const multi = n.endsWith('[]'); if (multi) n = n.slice(0, -2);
+    if (el.type === 'checkbox') { if (!el.checked) return; if (multi) (rep[n] = rep[n] || []).push(el.value); else rep[n] = el.value; }
+    else rep[n] = el.value;
+  });
+  return rep;
+}
+/* Réaffiche les réponses déjà données par un candidat connecté (le formulaire est reconstruit à chaque affichage). */
+function ipCandPrefill(reponses) {
+  const box = document.getElementById('ip-cand-champs'); if (!box || !reponses) return;
+  box.querySelectorAll('[name]').forEach(el => {
+    const n = el.name.replace(/\[\]$/, ''), v = reponses[n]; if (v === undefined) return;
+    if (el.type === 'checkbox') el.checked = Array.isArray(v) ? v.includes(el.value) : v === el.value;
+    else el.value = Array.isArray(v) ? v.join(', ') : v;
+  });
 }
 async function ipRepondreCandidature(btn) {
   const connecte = typeof CURRENT_USER !== 'undefined' && !!CURRENT_USER;
@@ -808,17 +845,14 @@ async function ipRepondreCandidature(btn) {
   btn.disabled = true; btn.textContent = 'Envoi…';
   try {
     const message = document.getElementById('ip-cand-message')?.value || '';
+    const reponses = ipCandCollecterReponses();
     if (connecte) {
-      await api('POST', `/insc/public/${IP_SLUG}/candidature/declarer`, { message });
-      if (IP_CANDIDATURE) { IP_CANDIDATURE.deja_declare = true; IP_CANDIDATURE.mon_message = message; }
+      await api('POST', `/insc/public/${IP_SLUG}/candidature/declarer`, { message, reponses });
+      if (IP_CANDIDATURE) { IP_CANDIDATURE.deja_declare = true; IP_CANDIDATURE.mon_message = message; IP_CANDIDATURE.mes_reponses = reponses; }
     } else {
-      const nom = (document.getElementById('ip-cand-nom')?.value || '').trim();
-      const prenom = (document.getElementById('ip-cand-prenom')?.value || '').trim();
-      const nom_organisme = (document.getElementById('ip-cand-organisme')?.value || '').trim();
-      const email = (document.getElementById('ip-cand-email')?.value || '').trim();
-      const telephone = (document.getElementById('ip-cand-telephone')?.value || '').trim();
-      if (!nom || !prenom || !email) { alert('Nom, prénom et e-mail sont requis.'); btn.disabled = false; btn.textContent = texteOriginal; return; }
-      const r = await api('POST', `/insc/public/${IP_SLUG}/candidature/repondre-visiteur`, { nom, prenom, nom_organisme, email, telephone, message });
+      /* Les contrôles « obligatoire » sont faits par le serveur (il connaît les réglages) : son message s'affiche ci-dessous. */
+      const lire = id => (document.getElementById(id)?.value || '').trim();
+      const r = await api('POST', `/insc/public/${IP_SLUG}/candidature/repondre-visiteur`, { nom: lire('ip-cand-nom'), prenom: lire('ip-cand-prenom'), nom_organisme: lire('ip-cand-organisme'), email: lire('ip-cand-email'), telephone: lire('ip-cand-telephone'), message, reponses });
       IP_CAND_VISITEUR_ID = r.declaration_id;
     }
     ipOuvrirCandidature();

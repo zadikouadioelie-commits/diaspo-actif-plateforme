@@ -1796,6 +1796,9 @@ function renderFields() {
                "Option payante"/"Sondage" ci-dessus, en vert néon plutôt que violet. -->
           <button style="background:#fff; border:1.5px solid #39FF14; color:#1C8A0E; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(57,255,20,.45);" data-action="ouvrirCandidature">💼 Candidature</button>
           <button style="background:#fff; border:1.5px solid #1565C0; color:#1565C0; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(21,101,192,.35);" data-action="ouvrirLiensUtiles">🔗 Liens utiles</button>
+          <!-- "💬 Commentaire libre" (2026-10-06, demande explicite) — ajoute en un clic une zone d'expression libre
+               (texte long, facultative) où la personne s'exprime simplement. -->
+          <button style="background:#fff; border:1.5px solid #0E8F8F; color:#0B6E6E; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(14,143,143,.35);" data-action="ajouterCommentaireLibre">💬 Commentaire libre</button>
         </div>
         ${panelSuggestions}
       </div>
@@ -1879,6 +1882,83 @@ function renderParrainageEssentielle() {
 // envoie par e-mail hors plateforme, puis peut déclarer sa candidature (bouton "J'ai
 // candidaté", compte requis côté public). Aucun remplissage ni détection dans l'application —
 // écarté explicitement par l'utilisateur. ----
+/* ---- Mini-formulaire de candidature (2026-10-06, demande explicite) ----
+   Pour chaque information : « Demandé » (oui/non) et « Obligatoire » (oui/non). Identité du visiteur sans compte +
+   champs libres créés par l'organisateur. Enregistré avec la configuration (formulaire_json). L'écran est reconstruit
+   à chaque action : iaCandCollecter() relit d'abord les saisies en cours pour ne rien perdre. */
+const IA_CAND_IDENTITE = [['prenom', 'Prénom'], ['nom', 'Nom'], ['email', 'Adresse e-mail'], ['telephone', 'Téléphone'], ['organisme', 'Nom de l’organisme'], ['message', 'Commentaire libre (la personne s’exprime simplement)']];
+const IA_CAND_DEFAUT = { prenom: [true, true], nom: [true, true], email: [true, true], telephone: [true, false], organisme: [true, false], message: [true, false] };
+const IA_CAND_TYPES = [['texte_court', 'Texte court'], ['texte_long', 'Texte long'], ['nombre', 'Nombre'], ['email', 'E-mail'], ['telephone', 'Téléphone'], ['date', 'Date'], ['adresse', 'Adresse'], ['liste_deroulante', 'Liste déroulante'], ['choix_unique', 'Choix unique'], ['choix_multiple', 'Choix multiples'], ['oui_non', 'Oui / Non'], ['case_a_cocher', 'Case à cocher'], ['url', 'Lien web']];
+const IA_CAND_SUGGESTIONS = [
+  { libelle: 'Motivation', type_champ: 'texte_long' }, { libelle: 'Domaines d’expérience', type_champ: 'texte_long' },
+  { libelle: 'Date de naissance', type_champ: 'date' }, { libelle: 'Adresse postale', type_champ: 'adresse' },
+  { libelle: 'Profession', type_champ: 'texte_court' }, { libelle: 'Pays d’origine', type_champ: 'texte_court' },
+  { libelle: 'Ville de résidence', type_champ: 'texte_court' }, { libelle: 'Site web ou profil en ligne', type_champ: 'url' },
+  { libelle: 'Disponibilités', type_champ: 'texte_long' },
+];
+function iaCandFormulaire() {
+  const config = currentCandidature()?.config;
+  const cle = config ? `${config.id}:${config.updated_at || ''}:${config.formulaire_json ? config.formulaire_json.length : 0}` : '';
+  if (state.candFormCle !== cle) {
+    state.candFormCle = cle;
+    let f = {}; try { f = JSON.parse(config?.formulaire_json || '{}') || {}; } catch (e) { f = {}; }
+    const identite = {};
+    IA_CAND_IDENTITE.forEach(([k]) => {
+      const s = (f.identite || {})[k] || {}, d = IA_CAND_DEFAUT[k];
+      const demande = s.demande === undefined ? d[0] : !!s.demande;
+      identite[k] = { demande, obligatoire: demande && (s.obligatoire === undefined ? d[1] : !!s.obligatoire) };
+    });
+    state.candForm = { identite, champs: (Array.isArray(f.champs) ? f.champs : []).map(c => ({ ...c, options: Array.isArray(c.options) ? c.options : [] })) };
+  }
+  return state.candForm;
+}
+function iaCandCollecter() {
+  const f = state.candForm; if (!f) return;
+  document.querySelectorAll('[data-cand-champ]').forEach(row => {
+    const c = f.champs[Number(row.dataset.candChamp)]; if (!c) return;
+    c.libelle = row.querySelector('[data-cand-prop="libelle"]')?.value || '';
+    const opt = row.querySelector('[data-cand-prop="options"]');
+    if (opt) c.options = opt.value.split(',').map(s => s.trim()).filter(Boolean);
+  });
+}
+function iaRenderCandFormulaire(actif) {
+  const f = iaCandFormulaire();
+  const dis = actif ? '' : 'disabled';
+  const caseHtml = (checked, action, attrs, label, couleur, disabled) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:${disabled ? 'not-allowed' : 'pointer'};white-space:nowrap;${disabled ? 'opacity:.45;' : ''}"><input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} data-action="${action}" ${attrs} style="width:15px;height:15px;accent-color:${couleur};"/>${label}</label>`;
+  const identiteHtml = IA_CAND_IDENTITE.map(([k, label]) => {
+    const s = f.identite[k];
+    return `<div style="display:flex;align-items:center;gap:14px;padding:8px 12px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;background:oklch(0.99 0.001 30);flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;font-size:13px;font-weight:600;">${escH(label)}</div>
+      ${caseHtml(s.demande, 'toggleCandIdentite', `data-champ="${k}" data-prop="demande"`, 'Demandé', '#1C8A0E', !actif)}
+      ${caseHtml(s.obligatoire, 'toggleCandIdentite', `data-champ="${k}" data-prop="obligatoire"`, '🔴 Obligatoire', '#DC2626', !actif || !s.demande)}
+    </div>`;
+  }).join('');
+  const champsHtml = f.champs.map((c, i) => `
+    <div data-cand-champ="${i}" style="padding:10px 12px;border:1px solid oklch(0.92 0.004 30);border-radius:8px;background:oklch(0.99 0.001 30);display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <input type="text" data-cand-prop="libelle" ${dis} maxlength="120" placeholder="Intitulé de la question" value="${escH(c.libelle || '')}" style="flex:1;min-width:180px;height:36px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:13px;box-sizing:border-box;">
+        <select data-action="changerCandType" data-index="${i}" ${dis} style="height:36px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 8px;font-size:12.5px;background:#fff;">${IA_CAND_TYPES.map(([v, l]) => `<option value="${v}" ${c.type_champ === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        ${caseHtml(c.demande !== false, 'toggleCandChamp', `data-index="${i}" data-prop="demande"`, 'Demandé', '#1C8A0E', !actif)}
+        ${caseHtml(!!c.obligatoire, 'toggleCandChamp', `data-index="${i}" data-prop="obligatoire"`, '🔴 Obligatoire', '#DC2626', !actif || c.demande === false)}
+        <button type="button" ${dis} title="Supprimer cette question" style="background:none;border:none;color:oklch(0.6 0.006 30);font-size:15px;cursor:pointer;padding:2px 6px;" data-action="supprimerCandChamp" data-index="${i}">✕</button>
+      </div>
+      ${['liste_deroulante', 'choix_unique', 'choix_multiple'].includes(c.type_champ) ? `<input type="text" data-cand-prop="options" ${dis} placeholder="Les choix, séparés par des virgules (ex. Bénévolat, Mentorat, Don)" value="${escH((c.options || []).join(', '))}" style="height:36px;border:1px solid oklch(0.85 0.004 30);border-radius:8px;padding:0 10px;font-size:12.5px;box-sizing:border-box;">` : ''}
+    </div>`).join('') || '<div style="color:oklch(0.55 0.006 30);font-size:13px;">Aucune question ajoutée. Choisissez-en une ci-dessous ou créez la vôtre.</div>';
+  const deja = new Set(f.champs.map(c => (c.libelle || '').toLowerCase()));
+  const suggestionsHtml = IA_CAND_SUGGESTIONS.filter(s => !deja.has(s.libelle.toLowerCase())).map(s => `<button type="button" ${dis} data-action="ajouterCandSuggestion" data-libelle="${escH(s.libelle)}" data-type="${s.type_champ}" style="background:#fff;border:1.5px solid oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:20px;cursor:pointer;">+ ${escH(s.libelle)}</button>`).join('');
+  return `
+    <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;padding:20px;margin-bottom:16px;${actif ? '' : 'opacity:.6;'}">
+      <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;">Mini-formulaire de candidature</h3>
+      <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:14px;">En plus des documents, le candidat répond à quelques questions directement sur la page. Pour chaque information, choisissez si elle est <b>demandée</b> et si elle est <b>obligatoire</b>.${actif ? '' : ' (Activez la candidature pour le modifier.)'}</div>
+      <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:oklch(0.5 0.006 30);margin-bottom:6px;">Informations sur le candidat</div>
+      <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:8px;">Pour un candidat connecté, ces informations sont reprises de son compte. « E-mail et/ou téléphone » : si les deux sont demandés sans qu'aucun soit obligatoire, au moins un des deux est exigé.</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;">${identiteHtml}</div>
+      <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:oklch(0.5 0.006 30);margin-bottom:8px;">Vos questions</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">${champsHtml}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">${suggestionsHtml}<button type="button" ${dis} data-action="ajouterCandChampLibre" style="background:#fff;border:1.5px dashed oklch(0.8 0.006 30);color:oklch(0.4 0.006 30);font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:20px;cursor:pointer;">＋ Question personnalisée</button></div>
+      <button type="button" ${dis} data-action="enregistrerCandFormulaire" style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13px;font-weight:700;padding:10px 22px;border-radius:8px;cursor:pointer;${actif ? '' : 'opacity:.5;cursor:not-allowed;'}">Enregistrer le mini-formulaire</button>
+    </div>`;
+}
 function renderCandidature() {
   const fiche = selectedFiche();
   const cand = currentCandidature();
@@ -1960,6 +2040,7 @@ function renderCandidature() {
           <input type="file" accept="application/pdf" data-action="stagerCandidatureDoc" style="display:none;">
         </label>`}
     </div>
+    ${iaRenderCandFormulaire(actif)}
     <div style="background:#fff; border:1px solid oklch(0.9 0.004 30); border-radius:12px; padding:20px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
         <h3 style="margin:0; font-size:15px; font-weight:700;">Candidatures déclarées</h3>
@@ -2112,6 +2193,19 @@ function iaOuvrirDocumentViewer(declarationId, visiteur, docIndex) {
   const btnRefuser = overlay.querySelector('#idv-refuser');
   if (btnRefuser) btnRefuser.addEventListener('click', () => { overlay.remove(); iaOuvrirDecisionCandidature(declarationId, visiteur, 'refusee'); });
 }
+/* Téléphone, organisme, commentaire libre et réponses aux questions du mini-formulaire d'une candidature reçue. */
+function iaCandInfosHtml(d) {
+  const champsMap = {}; (iaCandFormulaire().champs || []).forEach(c => { champsMap[c.nom] = c; });
+  let reps = {}; try { reps = JSON.parse(d.reponses_json || '{}') || {}; } catch (e) { reps = {}; }
+  const tel = String(d.telephone || '').trim();
+  const lignes = [
+    tel ? `<div>📞 <a href="tel:${escH(tel.replace(/[^\d+]/g, ''))}" style="color:#6B0FA3;font-weight:600;text-decoration:none;">${escH(tel)}</a></div>` : '',
+    d.nom_organisme ? `<div>🏢 ${escH(d.nom_organisme)}</div>` : '',
+    d.message ? `<div style="margin-top:6px;padding:8px 10px;border-radius:8px;background:oklch(0.97 0.004 258);font-style:italic;white-space:pre-wrap;">💬 ${escH(d.message)}</div>` : '',
+  ].filter(Boolean).join('');
+  const reponses = Object.keys(reps).length ? `<div style="font-size:12.5px;margin:8px 0;">${iaRenderReponses(reps, champsMap)}</div>` : '';
+  return (lignes ? `<div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin:6px 0;display:flex;flex-direction:column;gap:3px;">${lignes}</div>` : '') + reponses;
+}
 function renderTraitementCandidatures() {
   const cand = currentCandidature();
   if (!cand?.config) return `${iaConsigne("Activez d'abord la candidature (onglet Candidature) pour pouvoir traiter les dossiers déclarés.")}<div style="color:oklch(0.55 0.006 30);">Aucune candidature configurée sur cette fiche.</div>`;
@@ -2162,6 +2256,7 @@ function renderTraitementCandidatures() {
         <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${bg};color:${color};white-space:nowrap;">${IA_CANDIDATURE_STATUT_LABEL[d.statut]}</span>
       </div>
       <div style="font-size:12.5px;color:oklch(0.4 0.006 30);margin:8px 0;">${emailHtml}</div>
+      ${iaCandInfosHtml(d)}
       <div style="font-size:11.5px;color:oklch(0.55 0.006 30);font-family:'IBM Plex Mono', monospace;">Déclarée le ${escH((d.declare_le || '').slice(0,16).replace('T',' · '))}</div>
       ${depotsHtml}
       <div style="display:flex;gap:8px;padding-top:12px;margin-top:10px;border-top:1px solid oklch(0.92 0.004 30);">
@@ -3223,6 +3318,59 @@ const actions = {
   async ouvrirCandidature() {
     state.activeTab = 'candidature';
     try { await iaChargerOnglet(state.activeTab); } catch (e) { ia_toast(e.message, false); }
+  },
+  /* Commentaire libre (2026-10-06, demande explicite) : une zone de texte long, facultative, pour que la personne
+     s'exprime simplement. Un seul par type d'inscription. */
+  async ajouterCommentaireLibre() {
+    const type = selectedType(); if (!type) return;
+    if ((type.champs || []).some(c => String(c.libelle || '').toLowerCase().startsWith('commentaire libre'))) { ia_toast('Ce formulaire a déjà un commentaire libre.', false); return; }
+    try {
+      await api('POST', `/insc/types/${type.id}/champs`, {
+        libelle: 'Commentaire libre', type_champ: 'texte_long', obligatoire: false,
+        placeholder: 'Exprimez-vous librement…', description_aide: 'Écrivez simplement ce que vous souhaitez nous dire.',
+      });
+      ia_toast('Champ « Commentaire libre » ajouté.', true);
+      await iaChargerFiche(state.selectedFicheId);
+    } catch (e) { ia_toast(e.message, false); }
+  },
+  /* Mini-formulaire de candidature (2026-10-06) — chaque action relit d'abord les saisies en cours (l'écran est
+     reconstruit après chaque action), puis modifie l'état local ; seul « Enregistrer » écrit côté serveur. */
+  toggleCandIdentite(el) {
+    iaCandCollecter(); const f = iaCandFormulaire(), s = f.identite[el.dataset.champ]; if (!s) return;
+    s[el.dataset.prop] = !!el.checked;
+    if (el.dataset.prop === 'demande' && !el.checked) s.obligatoire = false;
+  },
+  toggleCandChamp(el) {
+    iaCandCollecter(); const c = iaCandFormulaire().champs[Number(el.dataset.index)]; if (!c) return;
+    c[el.dataset.prop] = !!el.checked;
+    if (el.dataset.prop === 'demande' && !el.checked) c.obligatoire = false;
+  },
+  changerCandType(el) {
+    iaCandCollecter(); const c = iaCandFormulaire().champs[Number(el.dataset.index)]; if (!c) return;
+    c.type_champ = el.value;
+  },
+  supprimerCandChamp(el) {
+    iaCandCollecter(); iaCandFormulaire().champs.splice(Number(el.dataset.index), 1);
+  },
+  ajouterCandSuggestion(el) {
+    iaCandCollecter(); const f = iaCandFormulaire();
+    if (f.champs.length >= 30) { ia_toast('30 questions au maximum.', false); return; }
+    f.champs.push({ libelle: el.dataset.libelle, type_champ: el.dataset.type, demande: true, obligatoire: false, options: [] });
+  },
+  ajouterCandChampLibre() {
+    iaCandCollecter(); const f = iaCandFormulaire();
+    if (f.champs.length >= 30) { ia_toast('30 questions au maximum.', false); return; }
+    f.champs.push({ libelle: '', type_champ: 'texte_court', demande: true, obligatoire: false, options: [] });
+  },
+  async enregistrerCandFormulaire() {
+    iaCandCollecter(); const f = iaCandFormulaire();
+    const sansIntitule = f.champs.findIndex(c => !String(c.libelle || '').trim());
+    if (sansIntitule >= 0) { ia_toast(`La question ${sansIntitule + 1} n'a pas d'intitulé.`, false); return; }
+    const sansChoix = f.champs.find(c => ['liste_deroulante', 'choix_unique', 'choix_multiple'].includes(c.type_champ) && !(c.options || []).length);
+    if (sansChoix) { ia_toast(`« ${sansChoix.libelle} » : indiquez les choix possibles, séparés par des virgules.`, false); return; }
+    await api('PUT', `/insc/fiches/${state.selectedFicheId}/candidature`, { formulaire: f });
+    ia_toast('Mini-formulaire enregistré.', true);
+    await iaChargerFiche(state.selectedFicheId);
   },
   async ajouterChampSuggere(el) {
     const suggestion = (IA_FIELD_SUGGESTIONS[el.dataset.categorie] || [])[parseInt(el.dataset.idx)];

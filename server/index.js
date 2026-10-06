@@ -45957,10 +45957,88 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
 
 /* Upsert de la configuration — enregistrement immédiat, pas de brouillon,
    même convention que les "Informations générales" de la fiche elle-même. */
+/* ── Mini-formulaire de candidature (2026-10-06, demande explicite) ──
+   L'organisateur choisit, pour chaque information, si elle est DEMANDÉE et si elle est OBLIGATOIRE : les informations
+   d'identité du visiteur sans compte (prénom, nom, e-mail, téléphone, organisme, message) et des champs libres de son
+   choix (motivation, domaines d'expérience, date de naissance, adresse postale…). Stocké en JSON sur la configuration
+   (insc_candidature_config.formulaire_json), réponses dans reponses_json des déclarations. Sans définition enregistrée,
+   le comportement reste exactement celui d'avant : prénom, nom et e-mail obligatoires, le reste facultatif. */
+const CAND_TYPES_CHAMP = ["texte_court", "texte_long", "nombre", "email", "telephone", "date", "adresse", "liste_deroulante", "choix_unique", "choix_multiple", "oui_non", "case_a_cocher", "url"];
+const CAND_IDENTITE_DEFAUT = {
+  prenom: { demande: true, obligatoire: true }, nom: { demande: true, obligatoire: true }, email: { demande: true, obligatoire: true },
+  telephone: { demande: true, obligatoire: false }, organisme: { demande: true, obligatoire: false }, message: { demande: true, obligatoire: false },
+};
+function candFormulaireLire(config) {
+  let f = {}; try { f = JSON.parse((config && config.formulaire_json) || "{}") || {}; } catch (_) { f = {}; }
+  const identite = {};
+  for (const k of Object.keys(CAND_IDENTITE_DEFAUT)) {
+    const d = CAND_IDENTITE_DEFAUT[k], s = (f.identite && f.identite[k]) || {};
+    const demande = s.demande === undefined ? d.demande : !!s.demande;
+    identite[k] = { demande, obligatoire: demande && (s.obligatoire === undefined ? d.obligatoire : !!s.obligatoire) };
+  }
+  const champs = (Array.isArray(f.champs) ? f.champs : []).filter(c => c && c.nom && c.libelle);
+  return { identite, champs };
+}
+function candFormulaireNettoyer(v) {
+  const src = (v && typeof v === "object") ? v : {};
+  const identite = {};
+  for (const k of Object.keys(CAND_IDENTITE_DEFAUT)) {
+    const s = (src.identite && src.identite[k]) || {};
+    const demande = s.demande === undefined ? CAND_IDENTITE_DEFAUT[k].demande : !!s.demande;
+    identite[k] = { demande, obligatoire: demande && !!s.obligatoire };
+  }
+  const vus = new Set(), champs = [];
+  for (const c of (Array.isArray(src.champs) ? src.champs : []).slice(0, 30)) {
+    const libelle = String((c && c.libelle) || "").trim().slice(0, 120);
+    if (!libelle) continue;
+    const type_champ = CAND_TYPES_CHAMP.includes(c.type_champ) ? c.type_champ : "texte_court";
+    let nom = inscSlugify(String(c.nom || libelle)).replace(/-/g, "_").slice(0, 50) || "champ";
+    let n = nom, i = 2; while (vus.has(n)) n = `${nom}_${i++}`; vus.add(n);
+    const options = ["liste_deroulante", "choix_unique", "choix_multiple"].includes(type_champ)
+      ? (Array.isArray(c.options) ? c.options : []).map(o => String(o || "").trim().slice(0, 120)).filter(Boolean).slice(0, 30) : [];
+    const demande = c.demande === undefined ? true : !!c.demande;
+    champs.push({ nom: n, libelle, type_champ, demande, obligatoire: demande && !!c.obligatoire, options,
+      placeholder: String(c.placeholder || "").trim().slice(0, 200), aide: String(c.aide || "").trim().slice(0, 300) });
+  }
+  return { identite, champs };
+}
+/* Valide les réponses aux champs libres demandés ; retourne { reponses } ou { erreur }. */
+function candValiderReponses(form, brutes) {
+  const reponses = {}, src = (brutes && typeof brutes === "object") ? brutes : {};
+  for (const c of form.champs) {
+    if (c.demande === false) continue;
+    let v = src[c.nom];
+    if (Array.isArray(v)) v = v.map(x => String(x == null ? "" : x).trim().slice(0, 500)).filter(Boolean).slice(0, 30);
+    else v = String(v == null ? "" : v).replace(/\u0000/g, "").trim().slice(0, 2000);
+    const vide = Array.isArray(v) ? !v.length : !v;
+    if (vide) { if (c.obligatoire) return { erreur: `Le champ « ${c.libelle} » est obligatoire.` }; continue; }
+    const options = Array.isArray(c.options) ? c.options : [];
+    if (c.type_champ === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return { erreur: `« ${c.libelle} » : adresse e-mail invalide.` };
+    if (c.type_champ === "url" && !/^https?:\/\/\S+$/i.test(v)) return { erreur: `« ${c.libelle} » : l'adresse doit commencer par http:// ou https://.` };
+    if (c.type_champ === "nombre" && !Number.isFinite(Number(v))) return { erreur: `« ${c.libelle} » : un nombre est attendu.` };
+    if (c.type_champ === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return { erreur: `« ${c.libelle} » : date invalide.` };
+    if (c.type_champ === "oui_non" && !["oui", "non"].includes(v)) return { erreur: `« ${c.libelle} » : répondez par oui ou non.` };
+    if (c.type_champ === "case_a_cocher" && v !== "oui") return { erreur: `« ${c.libelle} » : case à cocher invalide.` };
+    if (["liste_deroulante", "choix_unique"].includes(c.type_champ) && options.length && !options.includes(v)) return { erreur: `« ${c.libelle} » : choix invalide.` };
+    if (c.type_champ === "choix_multiple") { if (!Array.isArray(v)) v = [v]; if (options.length && v.some(x => !options.includes(x))) return { erreur: `« ${c.libelle} » : choix invalide.` }; }
+    reponses[c.nom] = v;
+  }
+  return { reponses };
+}
 route("PUT", "/api/insc/fiches/:id/candidature", async (req, res, params, body) => {
   const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
   if (erreur) return sendJSON(res, erreur, { error: msg });
   const existant = await db.prepare("SELECT id FROM insc_candidature_config WHERE fiche_id=?").get(fiche.id);
+  /* Mini-formulaire : enregistré à part (colonne ajoutée le 2026-10-06) pour qu'un manque de mise à jour de la base ne
+     bloque jamais le reste de la configuration. */
+  if (body.formulaire !== undefined && existant) {
+    try {
+      await db.prepare("UPDATE insc_candidature_config SET formulaire_json=?, updated_at=datetime('now') WHERE id=?").run(JSON.stringify(candFormulaireNettoyer(body.formulaire)), existant.id);
+    } catch (e) {
+      console.error('[candidature/formulaire]', e.message);
+      return sendJSON(res, 500, { error: "Le mini-formulaire nécessite une mise à jour de la base : utilisez « Réparer la base » dans le tableau de bord administrateur, puis réessayez." });
+    }
+  }
   const champs = ["actif", "titre", "description", "instructions", "message_candidat", "email_reception", "date_ouverture", "date_fermeture"];
   if (existant) {
     const set = [], vals = [];
@@ -46227,13 +46305,27 @@ route("POST", "/api/insc/public/:slug/candidature/declarer", async (req, res, pa
   if (config.date_ouverture && new Date(config.date_ouverture) > now) return sendJSON(res, 400, { error: "Les candidatures ne sont pas encore ouvertes." });
   if (config.date_fermeture && new Date(config.date_fermeture) < now) return sendJSON(res, 400, { error: "Les candidatures sont désormais fermées." });
   const initiative = await db.prepare("SELECT nom FROM initiatives WHERE owner_user_id=?").get(user.id);
-  const message = (body?.message || "").trim().slice(0, 2000) || null;
+  /* Mini-formulaire (2026-10-06) : identité reprise du compte ; le message et les champs libres suivent les réglages « demandé / obligatoire ». */
+  const form = candFormulaireLire(config);
+  const message = form.identite.message.demande ? ((body?.message || "").trim().slice(0, 2000) || null) : null;
+  if (form.identite.message.obligatoire && !message) return sendJSON(res, 400, { error: "Le message est obligatoire." });
+  const val = candValiderReponses(form, body?.reponses);
+  if (val.erreur) return sendJSON(res, 400, { error: val.erreur });
+  const avecReponses = form.champs.length > 0;
   try {
-    await db.prepare(`
-      INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email, nom_organisme, telephone, message)
-      VALUES (?,?,?,?,?,?,?,?)
-      ON CONFLICT(config_id, user_id) DO UPDATE SET message=excluded.message
-    `).run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null, initiative?.nom || null, user.telephone || null, message);
+    if (avecReponses) {
+      await db.prepare(`
+        INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email, nom_organisme, telephone, message, reponses_json)
+        VALUES (?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(config_id, user_id) DO UPDATE SET message=excluded.message, reponses_json=excluded.reponses_json
+      `).run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null, initiative?.nom || null, user.telephone || null, message, JSON.stringify(val.reponses));
+    } else {
+      await db.prepare(`
+        INSERT INTO insc_candidature_declarations (config_id, user_id, nom, prenom, email, nom_organisme, telephone, message)
+        VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(config_id, user_id) DO UPDATE SET message=excluded.message
+      `).run(config.id, user.id, user.nom || null, user.prenom || null, user.email || null, initiative?.nom || null, user.telephone || null, message);
+    }
   } catch (e) { console.error('[candidature/declarer]', e.message); return sendJSON(res, 500, { error: "Erreur serveur." }); }
   sendJSON(res, 200, { ok: true });
 });
@@ -46248,11 +46340,6 @@ route("POST", "/api/insc/public/:slug/candidature/repondre-visiteur", async (req
   const ip = SEC.clientIp(req);
   const ipLimit = SEC.rateLimit(`insc-candidature-repondre-visiteur:ip:${ip}`, 10, 15 * 60 * 1000);
   if (!ipLimit.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${ipLimit.retryAfter}s.` });
-  const nom = (body?.nom || "").trim();
-  const prenom = (body?.prenom || "").trim();
-  const email = (body?.email || "").trim();
-  if (!nom || !prenom || !email) return sendJSON(res, 400, { error: "Nom, prénom et e-mail sont requis." });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE slug=? AND statut='publiee'").get(params.slug);
   if (!fiche) return sendJSON(res, 404, { error: "Fiche introuvable ou non publiée." });
   const config = await db.prepare("SELECT * FROM insc_candidature_config WHERE fiche_id=? AND actif=1").get(fiche.id);
@@ -46260,13 +46347,33 @@ route("POST", "/api/insc/public/:slug/candidature/repondre-visiteur", async (req
   const now = new Date();
   if (config.date_ouverture && new Date(config.date_ouverture) > now) return sendJSON(res, 400, { error: "Les candidatures ne sont pas encore ouvertes." });
   if (config.date_fermeture && new Date(config.date_fermeture) < now) return sendJSON(res, 400, { error: "Les candidatures sont désormais fermées." });
-  const nomOrganisme = (body?.nom_organisme || "").trim().slice(0, 200) || null;
-  const telephone = (body?.telephone || "").trim().slice(0, 40) || null;
-  const message = (body?.message || "").trim().slice(0, 2000) || null;
-  const id = (await db.prepare(`
-    INSERT INTO insc_candidature_declarations_visiteurs (config_id, nom, prenom, nom_organisme, email, telephone, message)
-    VALUES (?,?,?,?,?,?,?)
-  `).run(config.id, nom.slice(0, 100), prenom.slice(0, 100), nomOrganisme, email.slice(0, 200), telephone, message)).lastInsertRowid;
+  /* Mini-formulaire (2026-10-06) : chaque information est demandée ou non, obligatoire ou non, selon les réglages de
+     l'organisateur. Une information non demandée est ignorée même si le navigateur l'envoie. Par défaut (aucun
+     réglage), prénom, nom et e-mail restent obligatoires comme avant. */
+  const form = candFormulaireLire(config), idt = form.identite;
+  const lire = (cle, max) => idt[cle].demande ? String(body?.[cle === "organisme" ? "nom_organisme" : cle] || "").replace(/\u0000/g, "").trim().slice(0, max) : "";
+  const nom = lire("nom", 100), prenom = lire("prenom", 100), email = lire("email", 200), telephone = lire("telephone", 40), nomOrganisme = lire("organisme", 200), message = lire("message", 2000);
+  const libelles = { prenom: "Le prénom", nom: "Le nom", email: "L'adresse e-mail", telephone: "Le téléphone", organisme: "Le nom de l'organisme", message: "Le message" };
+  const valeurs = { prenom, nom, email, telephone, organisme: nomOrganisme, message };
+  for (const k of Object.keys(valeurs)) if (idt[k].obligatoire && !valeurs[k]) return sendJSON(res, 400, { error: `${libelles[k]} est obligatoire.` });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  if (telephone && !/^[+\d][\d\s().-]{5,}$/.test(telephone)) return sendJSON(res, 400, { error: "Numéro de téléphone invalide." });
+  /* « E-mail et/ou téléphone » : si les deux sont demandés sans qu'aucun soit obligatoire, au moins un des deux est exigé. */
+  if (idt.email.demande && idt.telephone.demande && !idt.email.obligatoire && !idt.telephone.obligatoire && !email && !telephone) return sendJSON(res, 400, { error: "Indiquez au moins une adresse e-mail ou un numéro de téléphone." });
+  const val = candValiderReponses(form, body?.reponses);
+  if (val.erreur) return sendJSON(res, 400, { error: val.erreur });
+  let id;
+  if (form.champs.length) {
+    id = (await db.prepare(`
+      INSERT INTO insc_candidature_declarations_visiteurs (config_id, nom, prenom, nom_organisme, email, telephone, message, reponses_json)
+      VALUES (?,?,?,?,?,?,?,?)
+    `).run(config.id, nom, prenom, nomOrganisme || null, email, telephone || null, message || null, JSON.stringify(val.reponses))).lastInsertRowid;
+  } else {
+    id = (await db.prepare(`
+      INSERT INTO insc_candidature_declarations_visiteurs (config_id, nom, prenom, nom_organisme, email, telephone, message)
+      VALUES (?,?,?,?,?,?,?)
+    `).run(config.id, nom, prenom, nomOrganisme || null, email, telephone || null, message || null)).lastInsertRowid;
+  }
   sendJSON(res, 201, { ok: true, declaration_id: id });
 });
 
@@ -46963,6 +47070,9 @@ route("GET", "/api/insc/public/:slug", async (req, res, params) => {
         deja_declare: !!maDeclaration,
         mon_organisme: monOrganisme,
         mon_message: maDeclaration?.message || null,
+        /* Mini-formulaire (2026-10-06) : réglages « demandé / obligatoire » (avec défauts) et réponses déjà données. */
+        formulaire: candFormulaireLire(config),
+        mes_reponses: (() => { try { return JSON.parse(maDeclaration?.reponses_json || "{}") || {}; } catch (_) { return {}; } })(),
       };
     }
   } catch (e) { console.error('[insc-public-candidature]', e.message); }
