@@ -8094,6 +8094,10 @@ route("PATCH", "/api/commandes_vitrine/:id/livraison", async (req, res, params, 
        jamais reçu si l'acheteur a abandonné le paiement) ; 'aucun' = produit sur devis/service,
        sans paiement à attendre — ce cas-là reste autorisé à expédier dès "à traiter". */
     if (cmd.paiement_statut === "en_attente") return sendJSON(res, 400, { error: "Le paiement de cette commande n'est pas encore confirmé." });
+    /* Paiement échoué/expiré (2026-10-06, trouvé en testant toute la chaîne d'achat) : seul
+       'en_attente' était bloqué — une commande dont la session de paiement a expiré ('echoue')
+       pouvait être « expédiée » et notifiait l'acheteur d'une expédition jamais payée. */
+    if (!["paye", "aucun"].includes(cmd.paiement_statut || "aucun")) return sendJSON(res, 400, { error: "Cette commande n'a pas été payée (paiement échoué ou annulé) : elle ne peut pas être expédiée." });
     if (cmd.numero_suivi) return sendJSON(res, 400, { error: "Cette commande a déjà été expédiée." });
     /* Le vendeur expédie par ses propres moyens et saisit transporteur + vrai numéro de suivi
        (2026-10-05) : la plateforme n'est pas le transporteur et n'a aucun contrat avec eux.

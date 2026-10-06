@@ -5763,8 +5763,10 @@ async function renderMesCommandes(initiativeId) {
             ${c.message ? `<div style="font-size:12px;color:#334155;margin-top:2px;">"${esc(c.message)}"</div>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <span class="evt-tag" style="background:${c.statut==='traitee'?'#dcfce7':c.statut==='annulee'?'#fef2f2':'#fef3c7'};">${c.statut}</span>
-            ${c.statut==='en_attente' ? `<button class="btn btn-sm btn-outline" onclick="updateCommandeStatut(${c.id},'traitee')">✅ Traiter</button>` : ''}
+            ${c.paiement_statut==='echoue'
+              ? `<span class="evt-tag" style="background:#fef2f2;color:#B91C1C;">paiement échoué</span>`
+              : `<span class="evt-tag" style="background:${c.statut==='traitee'?'#dcfce7':c.statut==='annulee'?'#fef2f2':'#fef3c7'};">${c.statut}</span>`}
+            ${c.statut==='en_attente' && c.paiement_statut!=='echoue' ? `<button class="btn btn-sm btn-outline" onclick="updateCommandeStatut(${c.id},'traitee')">✅ Traiter</button>` : ''}
           </div>
         </div>
         ${cmdRenderLivraison(c)}
@@ -5796,7 +5798,9 @@ function cmdRenderLivraison(c) {
        tant que ce n'est pas sûr que l'acheteur a bien payé — voir la même garde côté serveur. */
     action = c.paiement_statut === 'en_attente'
       ? `<span style="font-size:12px;color:var(--muted);">⏳ En attente du paiement</span>`
-      : `<button class="btn btn-sm btn-outline" onclick="cmdOuvrirExpedition(${c.id})">🚚 Marquer comme expédiée</button>`;
+      : (c.paiement_statut === 'echoue'
+        ? `<span style="font-size:12px;color:#B91C1C;">❌ Paiement échoué ou annulé — rien à expédier</span>`
+        : `<button class="btn btn-sm btn-outline" onclick="cmdOuvrirExpedition(${c.id})">🚚 Marquer comme expédiée</button>`);
   } else if (c.mode_livraison === 'expedition' && c.statut_livraison === 'expedie') {
     const numHtml = c.lien_suivi
       ? `<a href="${esc(c.lien_suivi)}" target="_blank" rel="noopener noreferrer" style="font-weight:700;">${esc(c.numero_suivi||'')} ↗</a>`
