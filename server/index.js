@@ -20152,7 +20152,7 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   const partenaires = (Array.isArray(body.partenaires) ? body.partenaires : []).slice(0, 12)
     .map(p => ({ nom: crTexte(p && p.nom, 80), description: crTexte(p && p.description, 300), lien: crUrl(p && p.lien), logo_url: crUrl(p && p.logo_url) })).filter(p => p.nom);
   const profils = (Array.isArray(body.profils) ? body.profils : []).slice(0, 40)
-    .map(p => ({ nom: crTexte(p && p.nom, 80), categorie: crTexte(p && p.categorie, 60), communaute: crTexte(p && p.communaute, 40) })).filter(p => p.nom);
+    .map(p => ({ nom: crTexte(p && p.nom, 80), categorie: crTexte(p && p.categorie, 60), communaute: crTexte(p && p.communaute, 40), lien: crUrl(p && p.lien) })).filter(p => p.nom);
   const champs = [
     crTexte(body.titre, 160) || evt.titre, type_cr, type_cr === 'autre' ? crTexte(body.type_libre, 60) || null : null, resume || null,
     JSON.stringify(details), JSON.stringify(forts), crTexte(body.etape_texte, 500) || null, crDateISO(body.etape_date),

@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=3">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=4">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -367,7 +367,9 @@ function graphiquesHtml(cr) {
   const parties = partiesDe(cr), profils = cr.profils || [];
   if (parties.length < 2 && profils.length < 3) return '';
   const mots = parties.map(d => motsDe(d.texte)), total = motsDe(cr.resume) + mots.reduce((a, b) => a + b, 0);
-  const groupe = (cle, vide) => { const m = new Map(); profils.forEach(p => { const k = (p[cle] || '').trim() || vide; if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(p.nom); }); return [...m.entries()]; };
+  const groupe = (cle, vide) => { const m = new Map(); profils.forEach(p => { const k = (p[cle] || '').trim() || vide; if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(p); }); return [...m.entries()]; };
+  /* Le nom devient cliquable quand un lien a été renseigné pour cette personne ou organisation. */
+  const nomLien = p => /^https?:\/\//i.test(p.lien || '') ? '<a class="cr2-nom-lien" href="' + esc(p.lien) + '" target="_blank" rel="noopener noreferrer">' + esc(p.nom) + '</a>' : esc(p.nom);
   const cats = groupe('categorie', 'Autres'), comms = groupe('communaute', '');
   const kpis = [[parties.length, parties.length > 1 ? 'parties détaillées' : 'partie détaillée']];
   if (profils.length) kpis.push([profils.length, profils.length > 1 ? 'personnes et organisations mises en lumière' : 'personne ou organisation mise en lumière']);
@@ -377,14 +379,14 @@ function graphiquesHtml(cr) {
   if (cats.length) {
     const max = Math.max(...cats.map(c => c[1].length));
     h += '<div class="cr2-graph"><h4>Qui a été mis en lumière</h4><p class="src">Personnes et organisations citées, par catégorie.</p>' + cats.map(([k, noms]) =>
-      '<div class="cr2-br"><div class="cr2-br-t"><b>' + esc(k) + '</b><span class="cr2-br-n">' + noms.length + '</span></div><div class="cr2-piste"><div class="cr2-barre" style="width:' + Math.round(noms.length / max * 100) + '%"></div></div><div class="cr2-br-noms">' + noms.map(esc).join(' · ') + '</div></div>').join('') + '</div>';
+      '<div class="cr2-br"><div class="cr2-br-t"><b>' + esc(k) + '</b><span class="cr2-br-n">' + noms.length + '</span></div><div class="cr2-piste"><div class="cr2-barre" style="width:' + Math.round(noms.length / max * 100) + '%"></div></div><div class="cr2-br-noms">' + noms.map(nomLien).join(' · ') + '</div></div>').join('') + '</div>';
   }
   if (comms.length >= 2) {
     const tot = comms.reduce((a, c) => a + c[1].length, 0), R = 42, C = 2 * Math.PI * R;
     let off = 0;
     const arcs = comms.map(([k, noms], i) => { const len = C * noms.length / tot; const s = '<circle cx="60" cy="60" r="' + R + '" fill="none" stroke="' + COULEURS_GRAPH[i % COULEURS_GRAPH.length] + '" stroke-width="18" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 60 60)"/>'; off += len; return s; }).join('');
     h += '<div class="cr2-graph"><h4>Les communautés représentées</h4><p class="src">Personnes et organisations mises en lumière, par communauté d’origine.</p><div class="cr2-dn"><svg viewBox="0 0 120 120" class="cr2-donut" role="img" aria-label="Répartition par communauté">' + arcs + '<text x="60" y="60" text-anchor="middle" class="d-n">' + tot + '</text><text x="60" y="75" text-anchor="middle" class="d-l">au total</text></svg><ul class="cr2-leg">'
-      + comms.map(([k, noms], i) => '<li><span class="pt" style="background:' + COULEURS_GRAPH[i % COULEURS_GRAPH.length] + '"></span><span><b>' + esc(k) + '</b> · ' + noms.length + '<br><small>' + noms.map(esc).join(' · ') + '</small></span></li>').join('') + '</ul></div></div>';
+      + comms.map(([k, noms], i) => '<li><span class="pt" style="background:' + COULEURS_GRAPH[i % COULEURS_GRAPH.length] + '"></span><span><b>' + esc(k) + '</b> · ' + noms.length + '<br><small>' + noms.map(nomLien).join(' · ') + '</small></span></li>').join('') + '</ul></div></div>';
   }
   if (parties.length >= 2) {
     const mx = Math.max(...mots);
@@ -583,7 +585,7 @@ function vueEditeur() {
   drawTypes(); drawChamps(); drawForts(); drawPhotos(); refreshChips();
   drawLogo(); drawParts(); drawProfils();
   $('#ed-partadd').onclick = () => { if (ed.partenaires.length < 12) { ed.partenaires.push({ nom: '', description: '', lien: '', logo_url: '' }); drawParts(); } };
-  $('#ed-profadd').onclick = () => { if (ed.profils.length < 40) { ed.profils.push({ nom: '', categorie: '', communaute: '' }); drawProfils(); } };
+  $('#ed-profadd').onclick = () => { if (ed.profils.length < 40) { ed.profils.push({ nom: '', categorie: '', communaute: '', lien: '' }); drawProfils(); } };
   $('#ed-fortadd').onclick = () => { const v = $('#ed-fortin').value.trim(); if (v) { ed.forts.push(v); $('#ed-fortin').value = ''; drawForts(); } };
   $('#ed-fortin').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#ed-fortadd').click(); } });
   $('#ed-addphoto').onclick = () => $('#ed-photofile').click();
@@ -679,11 +681,12 @@ function drawParts() {
 }
 function drawProfils() {
   const ed = ST.ed, box = $('#ed-profils');
-  box.innerHTML = ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" placeholder="Nom (personne ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
+  box.innerHTML = ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" placeholder="Nom (personne ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><input data-fl="' + i + '" placeholder="https://… lien (facultatif)" value="' + esc(p.lien) + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
     + '<datalist id="dl-cats">' + CATEGORIES_SUGGEREES.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
   $$('[data-fn]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fn)].nom = x.value; }));
   $$('[data-fc]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fc)].categorie = x.value; }));
   $$('[data-fm]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fm)].communaute = x.value; }));
+  $$('[data-fl]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fl)].lien = x.value; }));
   $$('[data-frm]', box).forEach(x => x.addEventListener('click', () => { ed.profils.splice(Number(x.dataset.frm), 1); drawProfils(); }));
   const add = $('#ed-profadd'); if (add) add.disabled = ed.profils.length >= 40;
 }

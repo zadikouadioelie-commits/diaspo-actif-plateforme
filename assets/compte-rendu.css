@@ -70,6 +70,8 @@
 .cr2-piste{display:block;background:var(--cr-bleu-soft);border-radius:999px;height:12px;overflow:hidden;margin:5px 0 4px}
 .cr2-barre{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cr-bleu),#4C74E6)}
 .cr2-br-noms{font-size:13px;color:var(--cr-ink2)}
+.cr2-nom-lien{color:var(--cr-bleu);font-weight:600;text-decoration:none;border-bottom:1px solid var(--cr-or)}
+.cr2-nom-lien:hover,.cr2-nom-lien:focus-visible{background:var(--cr-or-soft);outline:none}
 .cr2-dn{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .cr2-donut{width:150px;height:150px;flex:none}
 .cr2-donut .d-n{font-family:'Alfa Slab One',serif;font-size:26px;fill:var(--cr-ink)}.cr2-donut .d-l{font-size:9px;fill:var(--cr-ink2)}
@@ -119,7 +121,7 @@
 .crp-part-logo .cr-btn{padding:6px 10px;font-size:12.5px}
 .crp-part-f{flex:1;min-width:0;display:grid;gap:6px}.crp-part-f input{width:100%;box-sizing:border-box}
 .crp-x{border:none;background:none;color:#B91C1C;font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
-.crp-prof{display:grid;grid-template-columns:1.4fr 1.2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center}
+.crp-prof{display:grid;grid-template-columns:1.3fr 1.1fr .9fr 1.3fr auto;gap:6px;margin-bottom:6px;align-items:center}
 .crp-prof input{width:100%;box-sizing:border-box;min-width:0}
 .crp-ic{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;color:var(--muted,#5B6B82)}
 .crp-ic select{font-size:13px;padding:4px 8px;border-radius:8px}
