@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=11">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=13">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -589,6 +589,63 @@ function videoHtml(url) {
 function typeLibelle(cr) {
   return cr.type_cr === 'autre' && cr.type_libre ? cr.type_libre : (cr.type_cr && CANEVAS[cr.type_cr] ? CANEVAS[cr.type_cr].label.replace(/^\S+\s/, '') : '');
 }
+/* ---------- Synthèse (2026-10-06, demande explicite) : l'essentiel du compte-rendu sur un seul écran ----------
+   Composée automatiquement à partir de ce qui est déjà saisi (aucune rédaction supplémentaire) : identité de
+   l'événement, résumé, chiffres clés, temps forts, personnes mises en lumière, partenaires, étape suivante.
+   Ouverte par le bouton « Synthèse » ou par l'adresse ?synthese=1 ; imprimable (PDF) et partageable. */
+const resumePageHtml = cr => estHtml(cr.resume) ? richeVersPage(cr.resume) : String(cr.resume || '').split(/\n\s*\n/).filter(Boolean).map(p => '<p>' + mentionHtml(p) + '</p>').join('');
+function syntheseHtml(d) {
+  const cr = d.compte_rendu, ev = d.evenement, logo = logoOrga(cr, ev), type = typeLibelle(cr);
+  const parties = partiesDe(cr), profils = cr.profils || [], forts = cr.forts || [], parts = cr.partenaires || [];
+  const comms = [...new Set(profils.map(p => (p.communaute || '').trim()).filter(Boolean))];
+  const kpis = [[parties.length, parties.length > 1 ? 'parties détaillées' : 'partie détaillée']];
+  if (profils.length) kpis.push([profils.length, profils.length > 1 ? 'personnes et organisations mises en lumière' : 'personne ou organisation mise en lumière']);
+  if (comms.length) kpis.push([comms.length, comms.length > 1 ? 'communautés représentées' : 'communauté représentée']);
+  if (forts.length) kpis.push([forts.length, forts.length > 1 ? 'temps forts' : 'temps fort']);
+  const cats = new Map(); profils.forEach(p => { const k = (p.categorie || '').trim() || 'Autres'; if (!cats.has(k)) cats.set(k, []); cats.get(k).push(p); });
+  const nomP = p => /^https?:\/\//i.test(p.lien || '') ? '<a class="cr2-nom-lien" href="' + esc(p.lien) + '" target="_blank" rel="noopener noreferrer">' + esc(p.nom) + '</a>' : esc(p.nom);
+  const etape = (cr.etape_texte || cr.etape_date)
+    ? '<div class="cr-etape"><div class="cr-etape-lbl">➡️ L\'étape suivante</div>' + (cr.etape_date ? '<div class="cr-etape-date">📅 ' + esc(fmtDateCourte(cr.etape_date)) + '</div>' : '') + (cr.etape_texte ? '<div class="cr-etape-txt">' + mentionHtml(cr.etape_texte) + '</div>' : '') + '</div>' : '';
+  return '<header class="cr-synth-head">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '')
+    + '<div><div class="dev">Synthèse du compte-rendu</div><h2 id="cr-synth-titre">' + esc(cr.titre || ev.titre) + '</h2>'
+    + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
+    + '<div class="cr2-resume"><b>RÉSUMÉ</b>' + resumePageHtml(cr) + '</div>'
+    + '<div class="cr2-kpis">' + kpis.map(k => '<div class="cr2-kpi"><div class="n">' + esc(k[0]) + '</div><div class="l">' + esc(k[1]) + '</div></div>').join('') + '</div>'
+    + (forts.length ? '<h3 class="cr-synth-h">Les temps forts</h3><ul class="cr-synth-forts">' + forts.map(f => '<li>' + esc(f) + '</li>').join('') + '</ul>' : '')
+    + (cats.size ? '<h3 class="cr-synth-h">Personnes et organisations mises en lumière</h3><div class="cr-synth-cats">' + [...cats.entries()].map(([k, l]) => '<div><b>' + esc(k) + '</b><span>' + l.map(nomP).join(' · ') + '</span></div>').join('') + '</div>' : '')
+    + (parts.length ? '<h3 class="cr-synth-h">Partenaires</h3><div class="cr-synth-parts">' + parts.map(p => '<div class="cr-synth-part"><div class="sl">' + (p.logo_url ? '<img src="' + esc(p.logo_url) + '" alt="Logo ' + esc(p.nom) + '">' : '<span class="ini">' + esc(initialesDe(p.nom)) + '</span>') + '</div><span>' + (/^https?:\/\//i.test(p.lien || '') ? '<a href="' + esc(p.lien) + '" target="_blank" rel="noopener noreferrer">' + esc(p.nom) + '</a>' : esc(p.nom)) + '</span></div>').join('') + '</div>' : '')
+    + (etape || ctaHtml(cr) ? '<h3 class="cr-synth-h">Et maintenant ?</h3>' + etape + ctaHtml(cr) : '');
+}
+let SYNTH_RETOUR = null, SYNTH_TOUCHE = null;
+function lienSynthese() { return location.origin + location.pathname + '?evt=' + ST.evtId + '&synthese=1'; }
+function majUrlSynthese(actif) { try { const u = new URL(location.href); if (actif) u.searchParams.set('synthese', '1'); else u.searchParams.delete('synthese'); history.replaceState(null, '', u.pathname + u.search); } catch (_) {} }
+function ouvrirSynthese() {
+  if (!ST.data || !ST.data.compte_rendu || $('#cr-synth')) return;
+  SYNTH_RETOUR = document.activeElement;
+  const ov = document.createElement('div'); ov.id = 'cr-synth'; ov.className = 'cr-synth'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'cr-synth-titre');
+  ov.innerHTML = '<div class="cr-synth-card"><div class="cr-synth-bar"><span>📋 Synthèse</span><div class="cr-synth-bar-btns"><button type="button" class="cr-btn out" id="cr-synth-print" aria-label="Imprimer ou enregistrer en PDF" title="Imprimer ou enregistrer en PDF">🖨️<span class="cr-synth-lbl"> Imprimer / PDF</span></button><button type="button" class="cr-btn out" id="cr-synth-copy" aria-label="Copier le lien de la synthèse" title="Copier le lien de la synthèse">🔗<span class="cr-synth-lbl"> Copier le lien</span></button><button type="button" class="cr-btn pri" id="cr-synth-close">✕ Fermer</button></div></div>'
+    + '<div class="cr-synth-body">' + syntheseHtml(ST.data) + '<div class="cr-btns" style="margin-top:18px"><button type="button" class="cr-btn sec" id="cr-synth-full">📖 Lire le compte-rendu complet</button></div></div></div>';
+  document.body.appendChild(ov); document.body.classList.add('cr-synth-open'); majUrlSynthese(true);
+  $('#cr-synth-close').onclick = $('#cr-synth-full').onclick = fermerSynthese;
+  $('#cr-synth-print').onclick = () => window.print();
+  $('#cr-synth-copy').onclick = async () => { const u = lienSynthese(); try { await navigator.clipboard.writeText(u); toast('Lien copié'); } catch (_) { window.prompt('Copiez ce lien :', u); } };
+  ov.addEventListener('click', e => { if (e.target === ov) fermerSynthese(); });
+  SYNTH_TOUCHE = e => {
+    if (e.key === 'Escape') { e.preventDefault(); fermerSynthese(); return; }
+    if (e.key !== 'Tab') return;
+    const f = $$('button, a[href], [tabindex]:not([tabindex="-1"])', ov).filter(x => !x.disabled && x.offsetParent !== null); if (!f.length) return;
+    const premier = f[0], dernier = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier.focus(); } else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier.focus(); }
+  };
+  document.addEventListener('keydown', SYNTH_TOUCHE);
+  $('#cr-synth-close').focus();
+}
+function fermerSynthese() {
+  const ov = $('#cr-synth'); if (!ov) return;
+  ov.remove(); document.body.classList.remove('cr-synth-open'); majUrlSynthese(false);
+  if (SYNTH_TOUCHE) { document.removeEventListener('keydown', SYNTH_TOUCHE); SYNTH_TOUCHE = null; }
+  if (SYNTH_RETOUR && SYNTH_RETOUR.focus) { try { SYNTH_RETOUR.focus(); } catch (_) {} }
+}
 function vuePublique() {
   const d = ST.data, cr = d.compte_rendu, ev = d.evenement;
   const root = $('#crp');
@@ -607,18 +664,18 @@ function vuePublique() {
   const tocGroupe = items.map((it, i) => (i === 0 || items[i - 1][3] !== it[3] ? '<div class="cr2-toc-g">' + esc(it[3]) + '</div>' : '') + btnToc(it)).join('');
   const type = typeLibelle(cr);
   root.innerHTML = (brouillon ? '<div class="crp-card" style="background:#FEF3C7;border-color:#F59E0B">Brouillon : seuls vous voyez ce compte-rendu. <a class="cr-link" href="compte-rendu.html?evt=' + ev.id + '&edition=1">Continuer la rédaction</a></div>' : '')
-    + '<div class="cr2-tools">Taille du texte <button type="button" class="cr2-fs" id="cr-fsm" aria-label="Réduire le texte">A−</button><button type="button" class="cr2-fs" id="cr-fsp" aria-label="Agrandir le texte">A+</button></div>'
+    + '<div class="cr2-tools"><button type="button" class="cr2-synth-mini" data-synth>📋 Synthèse</button>Taille du texte <button type="button" class="cr2-fs" id="cr-fsm" aria-label="Réduire le texte">A−</button><button type="button" class="cr2-fs" id="cr-fsp" aria-label="Agrandir le texte">A+</button></div>'
     + '<div class="cr2-mtoc" id="cr-mtoc">' + toc + '</div>'
     + '<div class="cr2-layout"><nav class="cr2-toc" aria-label="Sommaire"><h2>Sommaire</h2>' + tocGroupe + '</nav>'
     + '<article class="cr2-page"><header class="cr2-hero">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '')
     + '<div class="tx"><div class="dev">' + (ev.organisateur_officiel ? 'Actions locales · Impact global' : esc(ev.organisateur_nom || '')) + '</div><h1>' + esc(cr.titre || ev.titre) + '</h1>'
     + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
     + '<div class="cr2-in">'
-    + ctaHtml(cr)
+    + '<div class="cr2-actions"><button type="button" class="cr2-synth-btn" data-synth aria-haspopup="dialog"><span aria-hidden="true">📋</span><span>Synthèse<small>L’essentiel en un coup d’œil</small></span></button>' + ctaHtml(cr) + '</div>'
     + (ev.image ? '<div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' : '')
     + '<div class="cr2-sous">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + '</div>'
     + '<div class="crp-chips" id="crp-chips">Avec : </div>'
-    + '<div class="cr2-resume" id="cr-resume"><b>RÉSUMÉ</b>' + (estHtml(cr.resume) ? richeVersPage(cr.resume) : String(cr.resume || '').split(/\n\s*\n/).filter(Boolean).map(p => '<p>' + mentionHtml(p) + '</p>').join('')) + '</div>'
+    + '<div class="cr2-resume" id="cr-resume"><b>RÉSUMÉ</b>' + resumePageHtml(cr) + '</div>'
     + etapeHtml(cr) + videoHtml(cr.video_url)
     + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
     + graph + detailHtml(cr)
@@ -630,6 +687,8 @@ function vuePublique() {
   if (!d.identifies.length && !d.peut_editer) z.remove();
   initLecture(items.map(i => i[0]));
   chargerSocial();
+  $$('[data-synth]').forEach(b => b.addEventListener('click', ouvrirSynthese));
+  if (new URLSearchParams(location.search).get('synthese') === '1') ouvrirSynthese();
 }
 
 /* Sommaire (clic = défilement, partie en cours surlignée) et taille du texte réglable (mémorisée). */
