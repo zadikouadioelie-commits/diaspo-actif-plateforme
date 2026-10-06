@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=5">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=7">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -801,7 +801,8 @@ function drawParts() {
 }
 function drawProfils() {
   const ed = ST.ed, box = $('#ed-profils');
-  box.innerHTML = ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" placeholder="Nom (personne ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><input data-fl="' + i + '" placeholder="https://… lien (facultatif)" value="' + esc(p.lien) + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
+  box.innerHTML = (ed.profils.length ? '<div class="crp-prof crp-prof-h" aria-hidden="true"><span>Nom et prénom <em>(ou organisation)</em></span><span>Catégorie</span><span>Communauté d’origine</span><span>Lien <em>(facultatif)</em></span><span></span></div>' : '')
+    + ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" aria-label="Nom et prénom" placeholder="Nom et prénom (ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" aria-label="Catégorie" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" aria-label="Communauté d’origine" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><input data-fl="' + i + '" aria-label="Lien" placeholder="https://… lien (facultatif)" value="' + esc(p.lien) + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
     + '<datalist id="dl-cats">' + CATEGORIES_SUGGEREES.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
   $$('[data-fn]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fn)].nom = x.value; }));
   $$('[data-fc]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fc)].categorie = x.value; }));

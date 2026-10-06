@@ -121,11 +121,14 @@
 .crp-part-logo .cr-btn{padding:6px 10px;font-size:12.5px}
 .crp-part-f{flex:1;min-width:0;display:grid;gap:6px}.crp-part-f input{width:100%;box-sizing:border-box}
 .crp-x{border:none;background:none;color:#B91C1C;font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
-.crp-prof{display:grid;grid-template-columns:1.3fr 1.1fr .9fr 1.3fr auto;gap:6px;margin-bottom:6px;align-items:center}
+.crp-prof{display:grid;grid-template-columns:1.2fr 1.8fr .9fr 1.2fr 34px;gap:6px;margin-bottom:6px;align-items:center}
+.crp-prof-h{margin-bottom:2px}
+.crp-prof-h span{font-size:12px;font-weight:700;color:var(--muted,#5B6B82);letter-spacing:.02em}
+.crp-prof-h em{font-weight:500;font-style:normal}
 .crp-prof input{width:100%;box-sizing:border-box;min-width:0}
 .crp-ic{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;color:var(--muted,#5B6B82)}
 .crp-ic select{font-size:13px;padding:4px 8px;border-radius:8px}
-@media(max-width:560px){.crp-prof{grid-template-columns:1fr}.crp-part{flex-direction:column}}
+@media(max-width:560px){.crp-prof{grid-template-columns:1fr}.crp-prof-h{display:none}.crp-part{flex-direction:column}}
 
 /* Texte riche (2026-10-06) : résumé et parties mis en forme depuis l'éditeur complet */
 .cr2-rich>*:first-child{margin-top:0}
