@@ -15050,7 +15050,11 @@ const PREMIUM_PALIERS_RELANCE = [
 
    Les abonnements PAYANTS en sont exclus : leur échéance propre fait foi, on ne prolonge
    jamais gratuitement un abonnement acheté. */
-const PREMIUM_DATE_PLANCHER = new Date(process.env.PREMIUM_DATE_PLANCHER || '2026-07-26T00:00:00.000Z');
+/* MISE À JOUR du 2026-10-06 (demande de l'utilisateur : « mettre à jour le Premium test à partir du
+   3 octobre ») : la date plancher passe du 26 juillet au 3 octobre 2026, donc la gratuité des comptes
+   existants court désormais jusqu'au 3 janvier 2027 (3 mois). Les abonnements payants ne bougent pas.
+   Pour revenir en arrière : remettre '2026-07-26T00:00:00.000Z' (ou poser PREMIUM_DATE_PLANCHER sur Vercel). */
+const PREMIUM_DATE_PLANCHER = new Date(process.env.PREMIUM_DATE_PLANCHER || '2026-10-03T00:00:00.000Z');
 
 /* Fin de la période gratuite d'un compte, en tenant compte de la remise à zéro. */
 function finPeriodeGratuite(createdAt) {
