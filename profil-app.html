@@ -641,7 +641,10 @@ html, body { overflow-x:clip; }
 /* ===== BANNER UPLOAD ===== */
 .p-banner-edit { display:none; }
 .is-own .p-banner-edit { display:flex; align-items:center; gap:6px; }
-.banner-crop-overlay { position:absolute; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity .2s; }
+.banner-crop-overlay { position:absolute; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; gap:8px; opacity:0; transition:opacity .2s; }
+/* Changer / Télécharger / Supprimer la bannière : propriétaire uniquement (2026-10-06) — un
+   visiteur voyait ces boutons au survol de la bannière d'un autre compte. */
+.is-own .banner-crop-overlay { display:flex; }
 .p-banner:hover .banner-crop-overlay { opacity:1; }
 .banner-btn { background:rgba(255,255,255,.92); color:#0D1B2A; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; }
 
