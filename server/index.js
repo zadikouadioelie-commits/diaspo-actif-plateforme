@@ -20122,9 +20122,17 @@ async function crChargerEvenement(req, res, id, { editeur = false } = {}) {
   return { user, evt, edit };
 }
 
+/* Actions du compte-rendu : la liste enregistrée, sinon le bouton d'action historique (etape_bouton + etape_lien). */
+function crActions(cr) {
+  const l = crJson(cr.actions_json, []);
+  const a = (Array.isArray(l) ? l : []).filter(x => x && x.bouton && crUrl(x.lien));
+  if (a.length) return a.map(x => ({ bouton: String(x.bouton), lien: String(x.lien) }));
+  return (cr.etape_bouton && cr.etape_lien) ? [{ bouton: cr.etape_bouton, lien: cr.etape_lien }] : [];
+}
 function crSerialiser(cr) {
   if (!cr) return null;
   return {
+    actions: crActions(cr),
     id: cr.id, evenement_id: cr.evenement_id, auteur_id: cr.auteur_id, titre: cr.titre || '', type_cr: cr.type_cr || 'eco', type_libre: cr.type_libre || '',
     resume: cr.resume || '', details: crJson(cr.details_json, []), forts: crJson(cr.forts_json, []),
     etape_texte: cr.etape_texte || '', etape_date: cr.etape_date || '', etape_bouton: cr.etape_bouton || '', etape_lien: cr.etape_lien || '',
@@ -20195,12 +20203,22 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
     await db.prepare(`INSERT INTO evenement_comptes_rendus (evenement_id, auteur_id, titre, type_cr, type_libre, resume, details_json, forts_json, etape_texte, etape_date, etape_bouton, etape_lien, video_url, medias_json, logo_url, partenaires_json, profils_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(evt.id, user.id, ...champs);
   }
+  /* Actions cumulables (2026-10-06) : jusqu'à 6 boutons d'action (formulaire de réponse, don, lien), le lecteur choisit.
+     La première est aussi enregistrée dans etape_bouton / etape_lien (fil, e-mails). Écriture à part : si la colonne
+     actions_json n'existe pas encore (« Réparer la base »), la sauvegarde du reste n'est jamais bloquée. */
+  let avertissement = null;
+  if (body.actions !== undefined) {
+    const actions = (Array.isArray(body.actions) ? body.actions : []).slice(0, 6)
+      .map(x => ({ bouton: crTexte(x && x.bouton, 60), lien: crUrl(x && x.lien) })).filter(x => x.bouton && x.lien);
+    try { await db.prepare("UPDATE evenement_comptes_rendus SET actions_json=? WHERE evenement_id=?").run(JSON.stringify(actions), evt.id); }
+    catch (e) { console.error('[compte-rendu/actions]', e.message); if (actions.length > 1) avertissement = "Les actions supplémentaires n'ont pas pu être enregistrées : utilisez « Réparer la base » dans le tableau de bord administrateur, puis réenregistrez."; }
+  }
   const cr = await db.prepare("SELECT * FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
   /* Déjà publié : la publication du fil suit la modification (titre + texte d'aperçu). */
   if (cr.statut === 'publie' && cr.fil_post_id) {
     try { await db.prepare("UPDATE fil_posts SET titre=?, corps=?, contenu=? WHERE id=?").run(cr.titre, crBrut(cr.resume), crContenuFil(cr), cr.fil_post_id); } catch (_) {}
   }
-  sendJSON(res, 200, { ok: true, compte_rendu: crSerialiser(cr) });
+  sendJSON(res, 200, { ok: true, compte_rendu: crSerialiser(cr), avertissement });
 });
 
 function crContenuFil(cr) { return `📄 ${cr.titre || 'Compte-rendu'}\n\n${crBrut(cr.resume).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1').slice(0, 600)}`; }
@@ -23917,6 +23935,9 @@ async function enrichPost(p, cu) {
       const orig_reactions = await db.prepare("SELECT type,COUNT(*) AS n FROM fil_reactions WHERE post_id=? GROUP BY type").all(orig.id);
       const orig_counts = {}; orig_reactions.forEach(r => orig_counts[r.type] = r.n);
       original_post = { ...orig, auteur_nom: orig_auteur_nom, reactions: orig_counts, auteur_profil: orig_auteur };
+      /* Republication d'un compte-rendu (2026-10-06) : on joint sa carte (titre, image, résumé, lien) pour que l'article
+         apparaisse sur le profil de la personne qui republie avec son bouton « Lire le compte-rendu complet ». */
+      if (orig.compte_rendu_evenement_id) { try { original_post.compte_rendu = await carteCompteRenduPost(orig.compte_rendu_evenement_id); } catch (_) {} }
     }
   }
   const auteur_accreditations = p.auteur_id

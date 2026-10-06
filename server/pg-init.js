@@ -1213,6 +1213,7 @@ const COLONNES_MIGRATION = [
     ['insc_candidature_visiteur_uploads', 'statut', "TEXT NOT NULL DEFAULT 'en_attente'"],
     ['insc_candidature_visiteur_uploads', 'motif_refus', "TEXT"],
     // Mini-formulaire de candidature (2026-10-06) — miroir des ALTER de server/db.js.
+    ['evenement_comptes_rendus', 'actions_json', 'TEXT'],
     ['insc_candidature_config', 'formulaire_json', 'TEXT'],
     ['insc_candidature_declarations', 'reponses_json', 'TEXT'],
     ['insc_candidature_declarations_visiteurs', 'reponses_json', 'TEXT'],

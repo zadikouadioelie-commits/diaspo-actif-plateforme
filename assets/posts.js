@@ -513,7 +513,16 @@ function renderPostCard(post, options = {}) {
         <span>🔁 Republié par ${escHtml(post.auteur_nom)}</span>
         <div class="post-repost-original">
           <strong>${escHtml(post.original_post.auteur_nom)}</strong>
-          <p>${escHtml((post.original_post.contenu||'').slice(0,150))}${(post.original_post.contenu||'').length>150?'…':''}</p>
+          ${post.original_post.compte_rendu
+            ? `<div class="post-repost-cr">
+                ${post.original_post.compte_rendu.image ? `<img src="${escHtml(post.original_post.compte_rendu.image)}" alt="" loading="lazy">` : ''}
+                <div>
+                  <div class="post-repost-cr-t">📄 ${escHtml(post.original_post.compte_rendu.titre || '')}</div>
+                  <p>${escHtml((post.original_post.compte_rendu.resume||'').slice(0,240))}${(post.original_post.compte_rendu.resume||'').length>240?'…':''}</p>
+                  <a class="cr-btn pri" href="compte-rendu.html?evt=${Number(post.original_post.compte_rendu.evenement_id)}">📄 Lire le compte-rendu complet</a>
+                </div>
+              </div>`
+            : `<p>${escHtml((post.original_post.contenu||'').slice(0,150))}${(post.original_post.contenu||'').length>150?'…':''}</p>`}
         </div>
        </div>` : '';
 
@@ -869,6 +878,11 @@ function injectStyles() {
 .post-repost-original{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:.88rem;}
 .post-repost-original strong{display:block;margin-bottom:4px;}
 .post-repost-original p{color:#4b5563;margin:0;}
+.post-repost-cr{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;}
+.post-repost-cr img{width:110px;height:82px;object-fit:cover;border-radius:8px;flex:none;}
+.post-repost-cr>div{flex:1;min-width:200px;}
+.post-repost-cr-t{font-weight:800;font-size:1rem;color:#0D2B4E;margin-bottom:4px;}
+.post-repost-cr .cr-btn{display:inline-block;margin-top:8px;}
 /* Stats bar */
 .post-stats-bar{display:flex;gap:16px;padding:4px 16px;font-size:.8rem;color:#6b7280;border-top:1px solid #f3f4f6;border-bottom:1px solid #f3f4f6;}
 .post-stats-item{cursor:default;}

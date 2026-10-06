@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=13">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=15">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -576,10 +576,17 @@ function etapeHtml(cr) {
 }
 /* Bouton d'action tout en haut de la page : or lumineux pour attirer le regard (formulaire de réponse, don ou simple lien). */
 function ctaHtml(cr) {
-  if (!cr.etape_bouton || !/^https?:\/\//i.test(cr.etape_lien || '')) return '';
-  const mode = modeAction(cr.etape_lien);
-  const sous = mode === 'fiche' ? 'Quelques secondes, sans créer de compte.' : mode === 'don' ? 'Chaque geste compte.' : '';
-  return '<div class="cr2-cta-wrap"><a class="cr2-cta" href="' + esc(cr.etape_lien) + '" target="_blank" rel="noopener">' + svgIc(mode === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(cr.etape_bouton) + '</span><i aria-hidden="true">→</i></a>' + (sous ? '<small>' + sous + '</small>' : '') + '</div>';
+  /* Une ou plusieurs actions cumulées (2026-10-06) : le lecteur choisit. Sans liste, repli sur le bouton historique. */
+  const liste = (Array.isArray(cr.actions) && cr.actions.length ? cr.actions : (cr.etape_bouton && cr.etape_lien ? [{ bouton: cr.etape_bouton, lien: cr.etape_lien }] : []))
+    .filter(a => a && a.bouton && /^https?:\/\//i.test(a.lien || ''));
+  if (!liste.length) return '';
+  const un = a => {
+    const mode = modeAction(a.lien);
+    const sous = mode === 'fiche' ? 'Quelques secondes, sans créer de compte.' : mode === 'don' ? 'Chaque geste compte.' : '';
+    return '<div class="cr2-cta-wrap"><a class="cr2-cta" href="' + esc(a.lien) + '" target="_blank" rel="noopener">' + svgIc(mode === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>' + (sous ? '<small>' + sous + '</small>' : '') + '</div>';
+  };
+  if (liste.length === 1) return un(liste[0]);
+  return '<div class="cr2-cta-multi"><div class="cr2-cta-multi-t">Choisissez comment agir</div><div class="cr2-cta-grid">' + liste.map(un).join('') + '</div></div>';
 }
 function videoHtml(url) {
   if (!url) return '';
@@ -624,10 +631,13 @@ function ouvrirSynthese() {
   SYNTH_RETOUR = document.activeElement;
   const ov = document.createElement('div'); ov.id = 'cr-synth'; ov.className = 'cr-synth'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'cr-synth-titre');
   ov.innerHTML = '<div class="cr-synth-card"><div class="cr-synth-bar"><span>📋 Synthèse</span><div class="cr-synth-bar-btns"><button type="button" class="cr-btn out" id="cr-synth-print" aria-label="Imprimer ou enregistrer en PDF" title="Imprimer ou enregistrer en PDF">🖨️<span class="cr-synth-lbl"> Imprimer / PDF</span></button><button type="button" class="cr-btn out" id="cr-synth-copy" aria-label="Copier le lien de la synthèse" title="Copier le lien de la synthèse">🔗<span class="cr-synth-lbl"> Copier le lien</span></button><button type="button" class="cr-btn pri" id="cr-synth-close">✕ Fermer</button></div></div>'
-    + '<div class="cr-synth-body">' + syntheseHtml(ST.data) + '<div class="cr-btns" style="margin-top:18px"><button type="button" class="cr-btn sec" id="cr-synth-full">📖 Lire le compte-rendu complet</button></div></div></div>';
+    + '<div class="cr-synth-body">' + syntheseHtml(ST.data) + '<div class="cr-btns" style="margin-top:18px"><button type="button" class="cr-btn sec" id="cr-synth-full">📖 Lire le compte-rendu complet</button>'
+    + (ST.data.compte_rendu.statut === 'publie' && ST.data.compte_rendu.fil_post_id ? '<button type="button" class="cr-btn out" id="cr-synth-repost">🔁 Republier</button>' : '') + '<button type="button" class="cr-btn out" id="cr-synth-share">📤 Partager</button></div></div></div>';
   document.body.appendChild(ov); document.body.classList.add('cr-synth-open'); majUrlSynthese(true);
   $('#cr-synth-close').onclick = $('#cr-synth-full').onclick = fermerSynthese;
   $('#cr-synth-print').onclick = () => window.print();
+  const rp = $('#cr-synth-repost'); if (rp) rp.onclick = republierCr;
+  $('#cr-synth-share').onclick = partagerCr;
   $('#cr-synth-copy').onclick = async () => { const u = lienSynthese(); try { await navigator.clipboard.writeText(u); toast('Lien copié'); } catch (_) { window.prompt('Copiez ce lien :', u); } };
   ov.addEventListener('click', e => { if (e.target === ov) fermerSynthese(); });
   SYNTH_TOUCHE = e => {
@@ -671,7 +681,8 @@ function vuePublique() {
     + '<div class="tx"><div class="dev">' + (ev.organisateur_officiel ? 'Actions locales · Impact global' : esc(ev.organisateur_nom || '')) + '</div><h1>' + esc(cr.titre || ev.titre) + '</h1>'
     + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
     + '<div class="cr2-in">'
-    + '<div class="cr2-actions"><button type="button" class="cr2-synth-btn" data-synth aria-haspopup="dialog"><span aria-hidden="true">📋</span><span>Synthèse<small>L’essentiel en un coup d’œil</small></span></button>' + ctaHtml(cr) + '</div>'
+    + '<div class="cr2-actions"><div class="cr2-synth-row"><span class="cr2-help-wrap"><button type="button" class="cr2-help" data-help aria-label="À quoi sert la synthèse ?" aria-expanded="false" aria-controls="cr-help-pop">?</button><span class="cr2-help-pop" id="cr-help-pop" role="tooltip" hidden>La synthèse réunit l’essentiel du compte-rendu sur un seul écran : résumé, chiffres clés, temps forts, personnes mises en lumière, partenaires et suite à donner. Idéale pour aller vite, l’imprimer ou la partager.</span></span>'
+      + '<button type="button" class="cr2-synth-btn" data-synth aria-haspopup="dialog"><span aria-hidden="true">📋</span><span>Synthèse<small>Lire la synthèse</small></span></button></div>' + ctaHtml(cr) + '</div>'
     + (ev.image ? '<div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' : '')
     + '<div class="cr2-sous">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + '</div>'
     + '<div class="crp-chips" id="crp-chips">Avec : </div>'
@@ -688,6 +699,14 @@ function vuePublique() {
   initLecture(items.map(i => i[0]));
   chargerSocial();
   $$('[data-synth]').forEach(b => b.addEventListener('click', ouvrirSynthese));
+  /* « ? » : bulle d'explication de la synthèse (clic ou touche Entrée ; se ferme par Échap ou un clic ailleurs). */
+  const aide = $('[data-help]'), bulle = $('#cr-help-pop');
+  if (aide && bulle) {
+    const basculer = ouvrir => { bulle.hidden = !ouvrir; aide.setAttribute('aria-expanded', ouvrir ? 'true' : 'false'); };
+    aide.addEventListener('click', e => { e.stopPropagation(); basculer(bulle.hidden); });
+    document.addEventListener('click', e => { if (!bulle.hidden && !e.target.closest('.cr2-help-wrap')) basculer(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !bulle.hidden && !$('#cr-synth')) basculer(false); });
+  }
   if (new URLSearchParams(location.search).get('synthese') === '1') ouvrirSynthese();
 }
 
@@ -711,6 +730,25 @@ function initLecture(ids) {
 
 /* Réactions et commentaires du compte-rendu : ceux de son post du fil (même fil de discussion que le fil d'actualité) ;
    à défaut de post (événement non public), ceux de l'événement. */
+/* Republier / partager (2026-10-06) : republier crée, comme dans le fil, une publication sur le profil de la personne
+   (avec sa carte « Lire le compte-rendu complet ») ; partager ouvre le partage du téléphone ou copie le lien de la page. */
+async function republierCr() {
+  const cr = ST.data.compte_rendu, postId = cr.statut === 'publie' ? cr.fil_post_id : null;
+  if (!postId) { toast('Ce compte-rendu n’est pas dans le fil : seul le partage est possible.'); return; }
+  if (!ST.user) { location.href = 'login.html'; return; }
+  const commentaire = window.prompt('Ajouter un commentaire à votre republication (facultatif) :');
+  if (commentaire === null) return;
+  try { await api('POST', `/fil/${postId}/republier`, { commentaire }); toast('Republié : le compte-rendu apparaît maintenant sur votre profil.'); }
+  catch (e) { toast(e.message || 'Republication impossible'); }
+}
+async function partagerCr() {
+  const cr = ST.data.compte_rendu, url = location.origin + location.pathname + '?evt=' + ST.evtId;
+  if (navigator.share) {
+    try { await navigator.share({ title: cr.titre || ST.data.evenement.titre, text: brut(cr.resume).slice(0, 160), url }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Lien copié'); } catch (_) { window.prompt('Copiez ce lien :', url); }
+}
 async function chargerSocial() {
   const box = $('#crp-social'); if (!box) return;
   const cr = ST.data.compte_rendu, postId = cr.statut === 'publie' ? cr.fil_post_id : null;
@@ -728,13 +766,15 @@ async function chargerSocial() {
     }
   } catch (_) {}
   const types = postId ? FIL_REACTIONS.map(r => [r.type, r.emoji]) : Object.keys(reacts).map(e => [e, e]);
-  box.innerHTML = '<div class="crp-react">' + types.map(([k, em]) => '<button type="button" class="crp-r ' + (mine[k] ? 'on' : '') + '" data-rk="' + esc(k) + '">' + em + ' ' + (reacts[k] || 0) + '</button>').join('') + '<span class="crp-note" style="margin-left:auto">' + coms.length + ' commentaire' + (coms.length > 1 ? 's' : '') + '</span></div>'
+  box.innerHTML = '<div class="crp-react">' + types.map(([k, em]) => '<button type="button" class="crp-r ' + (mine[k] ? 'on' : '') + '" data-rk="' + esc(k) + '">' + em + ' ' + (reacts[k] || 0) + '</button>').join('') + (postId ? '<button type="button" class="crp-r" data-repost title="Republier sur votre profil">🔁 Republier</button>' : '') + '<button type="button" class="crp-r" data-share title="Partager ce compte-rendu">📤 Partager</button><span class="crp-note" style="margin-left:auto">' + coms.length + ' commentaire' + (coms.length > 1 ? 's' : '') + '</span></div>'
     + coms.map(c => '<div class="crp-cm"><div class="av">' + esc(String(c.auteur_nom || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()) + '</div><div class="bub"><b>' + esc(c.auteur_nom || '') + '</b> ' + mentionHtml(c.contenu) + '</div></div>').join('')
     + (connecte ? '<div class="crp-cin"><input id="crp-cin" placeholder="Écrire un commentaire…"><button type="button" class="cr-btn sec" id="crp-cpost">Commenter</button></div>' : '<p class="crp-note" style="margin-top:12px"><a href="login.html" class="cr-link">Connectez-vous</a> pour réagir et commenter.</p>');
   $$('[data-rk]', box).forEach(b => b.addEventListener('click', async () => {
     if (!connecte) { location.href = 'login.html'; return; }
     try { postId ? await api('POST', `/fil/${postId}/react`, { type: b.dataset.rk }) : await api('POST', `/evenements/${ST.evtId}/reactions`, { emoji: b.dataset.rk }); chargerSocial(); } catch (e) { toast(e.message || 'Erreur'); }
   }));
+  $$('[data-repost]', box).forEach(b => b.addEventListener('click', republierCr));
+  $$('[data-share]', box).forEach(b => b.addEventListener('click', partagerCr));
   const post = $('#crp-cpost', box);
   if (post) post.addEventListener('click', async () => {
     const t = $('#crp-cin', box).value.trim(); if (!t) return;
@@ -746,7 +786,7 @@ async function chargerSocial() {
 function nouvelEd() {
   const cr = ST.data.compte_rendu;
   const ed = { type: (cr && cr.type_cr) || 'eco', libre: (cr && cr.type_libre) || '', titre: (cr && cr.titre) || ST.data.evenement.titre, resume: (cr && cr.resume) || '',
-    forts: cr ? [...(cr.forts || [])] : [], etape_texte: (cr && cr.etape_texte) || '', etape_date: (cr && cr.etape_date) || '', etape_bouton: (cr && cr.etape_bouton) || '', etape_lien: (cr && cr.etape_lien) || '',
+    forts: cr ? [...(cr.forts || [])] : [], etape_texte: (cr && cr.etape_texte) || '', etape_date: (cr && cr.etape_date) || '', actions: (cr && Array.isArray(cr.actions)) ? cr.actions.map(x => ({ bouton: x.bouton, lien: x.lien })) : [],
     video: (cr && cr.video_url) || '', medias: cr ? [...(cr.medias || [])] : [], saisie: {}, icones: {}, extras: [], logo: (cr && cr.logo_url) || '', partenaires: cr ? (cr.partenaires || []).map(p => ({ ...p })) : [], profils: cr ? (cr.profils || []).map(p => ({ ...p })) : [] };
   Object.keys(CANEVAS).forEach(k => { ed.saisie[k] = CANEVAS[k].champs.map(() => ''); ed.icones[k] = CANEVAS[k].champs.map(() => ''); });
   /* Les sections enregistrées sont redistribuées sur les champs du type courant (par titre) ; les autres restent visibles en « Autres sections ». */
@@ -764,12 +804,13 @@ function collecterEd() {
 function bodyEd() {
   const ed = ST.ed;
   const details = CANEVAS[ed.type].champs.map((c, i) => ({ titre: c[0], texte: ed.saisie[ed.type][i] || '', icone: (ed.icones[ed.type] || [])[i] || '' })).concat(ed.extras);
-  return { titre: ed.titre, type_cr: ed.type, type_libre: ed.type === 'autre' ? ed.libre : '', resume: ed.resume, details, forts: ed.forts, etape_texte: ed.etape_texte, etape_date: ed.etape_date || null, etape_bouton: ed.etape_bouton, etape_lien: ed.etape_lien, video_url: ed.video, medias: ed.medias, logo_url: ed.logo, partenaires: ed.partenaires, profils: ed.profils };
+  return { titre: ed.titre, type_cr: ed.type, type_libre: ed.type === 'autre' ? ed.libre : '', resume: ed.resume, details, forts: ed.forts, etape_texte: ed.etape_texte, etape_date: ed.etape_date || null, etape_bouton: (ed.actions.find(x => x.bouton && x.lien) || {}).bouton || '', etape_lien: (ed.actions.find(x => x.bouton && x.lien) || {}).lien || '', actions: ed.actions.filter(x => x.bouton && x.lien), video_url: ed.video, medias: ed.medias, logo_url: ed.logo, partenaires: ed.partenaires, profils: ed.profils };
 }
 async function sauver(silencieux) {
   collecterEd();
   const r = await api('PUT', `/evenements/${ST.evtId}/compte-rendu`, bodyEd());
   ST.data.compte_rendu = r.compte_rendu;
+  if (r.avertissement) toast(r.avertissement);
   if (!silencieux) toast('Brouillon enregistré');
   return r;
 }
@@ -859,56 +900,77 @@ const lienFiche = f => location.origin + '/inscription-publique.html?slug=' + en
 const lienCag = c => location.origin + '/cagnotte.html?slug=' + encodeURIComponent(c.slug);
 const TEXTES_BOUTON = { fiche: 'Je souhaite participer à la vision de Diaspo’Actif', don: 'Faire un don' };
 const OPTIONS_ENGAGEMENT = ['Être contacté(e) pour participer à la vision de Diaspo’Actif et à son développement', 'Devenir bénévole', 'Contribuer à des actions', 'Soutenir par un don'];
+const MAX_ACTIONS = 5;
+/* Actions cumulables (2026-10-06) : jusqu'à 5 boutons (formulaire de réponse, don, lien). Le lecteur choisit ; la première
+   est mise en avant dans le fil et par e-mail. Chaque action : { bouton, lien }, son type se déduit de l'adresse. */
 async function drawAction() {
   const ed = ST.ed, box = $('#ed-action'); if (!box) return;
-  if (!ST.act) ST.act = { mode: modeAction(ed.etape_lien), fiches: null, cags: null };
+  if (!ST.act) ST.act = { fiches: null, cags: null, modes: [] };
   const A = ST.act;
   if (A.fiches === null) { try { A.fiches = (await api('GET', '/insc/fiches')).fiches || []; } catch (_) { A.fiches = []; } }
   if (A.cags === null) { try { A.cags = (await api('GET', '/cagnottes/mes')).cagnottes || []; } catch (_) { A.cags = []; } }
   if (!$('#ed-action')) return;
-  const fiche = A.fiches.find(f => f.slug === slugDe(SLUG_FICHE, ed.etape_lien)), cag = A.cags.find(c => c.slug === slugDe(SLUG_DON, ed.etape_lien));
-  const modes = [['lien', '🔗 Simple lien'], ['fiche', '🤝 Formulaire de réponse'], ['don', '💛 Faire un don']];
-  let h = '<div class="crp-seg" id="ed-amodes">' + modes.map(m => '<button type="button" class="' + (m[0] === A.mode ? 'on' : '') + '" data-am="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>'
-    + '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:8px"><input id="ed-ebtn" maxlength="60" placeholder="Texte du bouton (ex. ' + esc(TEXTES_BOUTON[A.mode] || 'Découvrir la suite') + ')" value="' + esc(ed.etape_bouton) + '"></div>';
-  if (A.mode === 'lien') h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input id="ed-elien" placeholder="https://… (lien du bouton)" value="' + esc(ed.etape_lien) + '"></div>';
+  if (!ed.actions.length) ed.actions.push({ bouton: '', lien: '' });
+  ed.actions.forEach((a, i) => { if (!A.modes[i]) A.modes[i] = modeAction(a.lien); });
   /* Comme la création d'un événement : comptes Initiative, Collectivité et administrateurs ; seul le compte utilisateur en est exclu. */
   const peutCreer = !!ST.user && ['initiative', 'collectivite', 'administrateur'].includes(ST.user.role);
-  if (A.mode === 'fiche') {
-    h += '<div class="crp-extform" style="grid-template-columns:' + (peutCreer ? '1fr auto' : '1fr') + ';margin-top:6px"><select id="ed-efiche"><option value="">— Choisir un formulaire —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select>'
-      + (peutCreer ? '<button type="button" class="cr-btn sec" id="ed-fcreer">＋ Créer un formulaire d’engagement</button>' : '') + '</div>'
-      + (peutCreer ? '' : '<div class="crp-hint">ℹ️ La création de formulaires est réservée aux comptes <b>Initiative</b> et <b>Collectivité</b> (et aux administrateurs), pas au compte utilisateur. Vous pouvez choisir ci-dessus un formulaire existant.</div>')
-      + '<div class="crp-hint">Le lecteur remplit le formulaire sans créer de compte (nom, prénom, téléphone ou e-mail, options). Vous retrouvez les réponses dans « Gérer mes comptes-rendus ». Le formulaire d’engagement proposé comprend : être contacté(e), bénévolat, actions, don, et une case de consentement.</div>'
-      + (fiche ? '<div class="cr-btns" style="margin-top:6px"><a class="cr-btn out" target="_blank" rel="noopener" href="inscriptions-admin.html?fiche=' + fiche.id + '">⚙️ Personnaliser les champs et les options</a>'
-        + (fiche.statut !== 'publiee' ? '<button type="button" class="cr-btn pri" id="ed-fpub">Publier ce formulaire</button>' : '') + '</div>'
-        + (fiche.statut !== 'publiee' ? '<div class="crp-hint" style="color:#B45309">Ce formulaire n’est pas publié : les lecteurs ne pourront pas répondre tant qu’il ne l’est pas.</div>' : '') : '');
-  }
-  if (A.mode === 'don') {
-    h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><select id="ed-ecag"><option value="">— Choisir une de mes cagnottes —</option>' + A.cags.map(c => '<option value="' + esc(c.slug) + '"' + (cag && cag.id === c.id ? ' selected' : '') + '>' + esc(c.titre) + '</option>').join('') + '</select></div>'
-      + (A.cags.length ? '' : '<div class="crp-hint">Vous n’avez pas encore de cagnotte. Créez-en une depuis votre tableau de bord, puis revenez ici.</div>');
-  }
+  const modes = [['lien', '🔗 Simple lien'], ['fiche', '🤝 Formulaire de réponse'], ['don', '💛 Faire un don']];
+  const plusieurs = ed.actions.length > 1;
+  let h = '';
+  ed.actions.forEach((a, i) => {
+    const mode = A.modes[i];
+    const fiche = A.fiches.find(f => f.slug === slugDe(SLUG_FICHE, a.lien)), cag = A.cags.find(c => c.slug === slugDe(SLUG_DON, a.lien));
+    h += '<div class="crp-act" data-ai="' + i + '"><div class="crp-act-h"><span><b>Action ' + (i + 1) + '</b>' + (i === 0 && plusieurs ? ' <span class="crp-act-badge">mise en avant dans le fil et par e-mail</span>' : '') + '</span>'
+      + (plusieurs || a.bouton || a.lien ? '<button type="button" class="crp-act-x" data-arm="' + i + '" title="Retirer cette action">✕ Retirer</button>' : '') + '</div>'
+      + '<div class="crp-seg">' + modes.map(m => '<button type="button" class="' + (m[0] === mode ? 'on' : '') + '" data-am="' + m[0] + '" data-ai="' + i + '">' + m[1] + '</button>').join('') + '</div>'
+      + '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:8px"><input data-abtn="' + i + '" maxlength="60" placeholder="Texte du bouton (ex. ' + esc(TEXTES_BOUTON[mode] || 'Découvrir la suite') + ')" value="' + esc(a.bouton) + '"></div>';
+    if (mode === 'lien') h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input data-alien="' + i + '" placeholder="https://… (lien du bouton)" value="' + esc(a.lien) + '"></div>';
+    if (mode === 'fiche') {
+      h += '<div class="crp-extform" style="grid-template-columns:' + (peutCreer ? '1fr auto' : '1fr') + ';margin-top:6px"><select data-afiche="' + i + '"><option value="">— Choisir un formulaire —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select>'
+        + (peutCreer ? '<button type="button" class="cr-btn sec" data-fcreer="' + i + '">＋ Créer un formulaire d’engagement</button>' : '') + '</div>'
+        + (peutCreer ? '' : '<div class="crp-hint">ℹ️ La création de formulaires est réservée aux comptes <b>Initiative</b> et <b>Collectivité</b> (et aux administrateurs), pas au compte utilisateur. Vous pouvez choisir ci-dessus un formulaire existant.</div>')
+        + '<div class="crp-hint">Le lecteur remplit le formulaire sans créer de compte (nom, prénom, téléphone ou e-mail, options). Vous retrouvez les réponses dans « Gérer mes comptes-rendus ». Le formulaire d’engagement proposé comprend : être contacté(e), bénévolat, actions, don, et une case de consentement.</div>'
+        + (fiche ? '<div class="cr-btns" style="margin-top:6px"><a class="cr-btn out" target="_blank" rel="noopener" href="inscriptions-admin.html?fiche=' + fiche.id + '">⚙️ Personnaliser les champs et les options</a>'
+          + (fiche.statut !== 'publiee' ? '<button type="button" class="cr-btn pri" data-fpub="' + i + '">Publier ce formulaire</button>' : '') + '</div>'
+          + (fiche.statut !== 'publiee' ? '<div class="crp-hint" style="color:#B45309">Ce formulaire n’est pas publié : les lecteurs ne pourront pas répondre tant qu’il ne l’est pas.</div>' : '') : '');
+    }
+    if (mode === 'don') {
+      h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><select data-acag="' + i + '"><option value="">— Choisir une de mes cagnottes —</option>' + A.cags.map(c => '<option value="' + esc(c.slug) + '"' + (cag && cag.id === c.id ? ' selected' : '') + '>' + esc(c.titre) + '</option>').join('') + '</select></div>'
+        + (A.cags.length ? '' : '<div class="crp-hint">Vous n’avez pas encore de cagnotte. Créez-en une depuis votre tableau de bord, puis revenez ici.</div>');
+    }
+    h += '</div>';
+  });
+  if (ed.actions.length < MAX_ACTIONS) h += '<button type="button" class="cr-btn sec" id="ed-aadd">＋ Ajouter une action</button>';
+  h += '<div class="crp-hint">Vous pouvez <b>cumuler jusqu’à ' + MAX_ACTIONS + ' actions</b> (par exemple : faire un don, rejoindre comme bénévole, être contacté…). Le lecteur choisit celle qui lui convient.</div>';
   box.innerHTML = h;
+  const idx = el => Number(el.dataset.ai !== undefined ? el.dataset.ai : (el.dataset.abtn ?? el.dataset.alien ?? el.dataset.afiche ?? el.dataset.acag ?? el.dataset.arm ?? el.dataset.fcreer ?? el.dataset.fpub));
   $$('[data-am]', box).forEach(b => b.addEventListener('click', () => {
-    const m = b.dataset.am; if (m === A.mode) return;
-    A.mode = m; ed.etape_lien = ''; if (!ed.etape_bouton && TEXTES_BOUTON[m]) ed.etape_bouton = TEXTES_BOUTON[m]; drawAction();
+    const i = idx(b), m = b.dataset.am; if (m === A.modes[i]) return;
+    A.modes[i] = m; ed.actions[i].lien = ''; if (!ed.actions[i].bouton && TEXTES_BOUTON[m]) ed.actions[i].bouton = TEXTES_BOUTON[m]; drawAction();
   }));
-  $('#ed-ebtn').addEventListener('input', e => { ed.etape_bouton = e.target.value; });
-  const el = $('#ed-elien'); if (el) el.addEventListener('input', e => { ed.etape_lien = e.target.value.trim(); });
-  const sf = $('#ed-efiche'); if (sf) sf.addEventListener('change', e => { const f = A.fiches.find(x => x.slug === e.target.value); ed.etape_lien = f ? lienFiche(f) : ''; if (f && !ed.etape_bouton) ed.etape_bouton = TEXTES_BOUTON.fiche; drawAction(); });
-  const sc = $('#ed-ecag'); if (sc) sc.addEventListener('change', e => { const c = A.cags.find(x => x.slug === e.target.value); ed.etape_lien = c ? lienCag(c) : ''; if (c && !ed.etape_bouton) ed.etape_bouton = TEXTES_BOUTON.don; drawAction(); });
-  const fp = $('#ed-fpub'); if (fp) fp.onclick = async () => { try { await api('PATCH', `/insc/fiches/${fiche.id}/statut`, { statut: 'publiee' }); fiche.statut = 'publiee'; toast('Formulaire publié'); drawAction(); } catch (e) { toast(e.message || 'Erreur'); } };
-  const fc = $('#ed-fcreer'); if (fc) fc.onclick = creerFormulaireEngagement;
+  $$('[data-abtn]', box).forEach(x => x.addEventListener('input', () => { ed.actions[idx(x)].bouton = x.value; }));
+  $$('[data-alien]', box).forEach(x => x.addEventListener('input', () => { ed.actions[idx(x)].lien = x.value.trim(); }));
+  $$('[data-afiche]', box).forEach(x => x.addEventListener('change', () => { const i = idx(x), f = A.fiches.find(y => y.slug === x.value); ed.actions[i].lien = f ? lienFiche(f) : ''; if (f && !ed.actions[i].bouton) ed.actions[i].bouton = TEXTES_BOUTON.fiche; drawAction(); }));
+  $$('[data-acag]', box).forEach(x => x.addEventListener('change', () => { const i = idx(x), c = A.cags.find(y => y.slug === x.value); ed.actions[i].lien = c ? lienCag(c) : ''; if (c && !ed.actions[i].bouton) ed.actions[i].bouton = TEXTES_BOUTON.don; drawAction(); }));
+  $$('[data-fpub]', box).forEach(b => b.addEventListener('click', async () => {
+    const i = idx(b), f = A.fiches.find(y => y.slug === slugDe(SLUG_FICHE, ed.actions[i].lien)); if (!f) return;
+    try { await api('PATCH', `/insc/fiches/${f.id}/statut`, { statut: 'publiee' }); f.statut = 'publiee'; toast('Formulaire publié'); drawAction(); } catch (e) { toast(e.message || 'Erreur'); }
+  }));
+  $$('[data-fcreer]', box).forEach(b => b.addEventListener('click', () => creerFormulaireEngagement(idx(b), b)));
+  $$('[data-arm]', box).forEach(b => b.addEventListener('click', () => { const i = idx(b); ed.actions.splice(i, 1); A.modes.splice(i, 1); drawAction(); }));
+  const add = $('#ed-aadd'); if (add) add.onclick = () => { ed.actions.push({ bouton: '', lien: '' }); A.modes.push('lien'); drawAction(); };
 }
 /* Crée un formulaire d'engagement avec les routes existantes du module Formulaires & Inscriptions : une fiche indépendante de
    tout événement (une fiche liée à un événement terminé refuse les réponses), un type gratuit, la liste d'options et le consentement. */
-async function creerFormulaireEngagement() {
-  const b = $('#ed-fcreer'); b.disabled = true; b.textContent = 'Création…';
+async function creerFormulaireEngagement(i, b) {
+  b.disabled = true; b.textContent = 'Création…';
   try {
     const f = (await api('POST', '/insc/fiches', { nom: 'Engagement — ' + ST.data.evenement.titre, description: '<p>Merci de laisser votre nom, votre prénom et votre numéro de téléphone : nous reviendrons vers vous.</p>' })).fiche;
     const t = await api('POST', `/insc/fiches/${f.id}/types`, { label: 'Engagement', gratuit: true, validation_auto: false });
     await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Je souhaite…', type_champ: 'choix_multiple', obligatoire: true, options: OPTIONS_ENGAGEMENT });
     await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Consentement', type_champ: 'case_a_cocher', obligatoire: true, placeholder: 'J’accepte d’être contacté(e) au sujet de ma réponse et que mes coordonnées soient transmises à l’organisateur.' });
     await api('PATCH', `/insc/fiches/${f.id}/statut`, { statut: 'publiee' });
-    ST.act.fiches = null; ST.act.mode = 'fiche'; ST.ed.etape_lien = lienFiche(f); if (!ST.ed.etape_bouton) ST.ed.etape_bouton = TEXTES_BOUTON.fiche;
+    ST.act.fiches = null; ST.act.modes[i] = 'fiche'; ST.ed.actions[i].lien = lienFiche(f); if (!ST.ed.actions[i].bouton) ST.ed.actions[i].bouton = TEXTES_BOUTON.fiche;
     toast('Formulaire d’engagement créé et publié'); await drawAction();
   } catch (e) { toast(e.message || 'Création impossible'); b.disabled = false; b.textContent = '＋ Créer un formulaire d’engagement'; }
 }

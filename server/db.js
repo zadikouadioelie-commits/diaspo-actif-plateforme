@@ -2522,6 +2522,8 @@ const MIGRATIONS = [
   ["insc_candidature_visiteur_uploads", "motif_refus TEXT"],
   // Mini-formulaire de candidature (2026-10-06, demande explicite) : définition (champs demandés/obligatoires) sur la
   // configuration + réponses du candidat (connecté ou visiteur). Miroir manuel dans server/pg-init.js.
+  // Compte-rendu : plusieurs boutons d'action cumulables (2026-10-06), miroir dans server/pg-init.js.
+  ["evenement_comptes_rendus", "actions_json TEXT"],
   ["insc_candidature_config", "formulaire_json TEXT"],
   ["insc_candidature_declarations", "reponses_json TEXT"],
   ["insc_candidature_declarations_visiteurs", "reponses_json TEXT"],
