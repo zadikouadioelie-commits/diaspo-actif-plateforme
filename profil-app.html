@@ -5236,7 +5236,10 @@ let _devisState = null;
 let _devisFormTs = 0;
 
 function openDevisModal(productId) {
-  const prod = _produitsVitrine.find(p => p.id === productId);
+  /* Number() des deux côtés : en production l'id d'un produit arrive en CHAÎNE (BIGINT Postgres,
+     « 4 ») alors que onclick="…(${p.id})" le renvoie en nombre — la comparaison stricte ne trouvait
+     jamais le produit et la fonction s'arrêtait en silence (même bug que ajouterAuPanier). */
+  const prod = _produitsVitrine.find(p => Number(p.id) === Number(productId));
   if (!prod) return;
   _devisState = { attachment_url: null, attachment_nom: null };
   _devisFormTs = Date.now();
@@ -5365,7 +5368,7 @@ function devisRenderRecap(prod) {
       </div>
       <p id="dv-recap-err" style="color:#dc2626;font-size:12px;display:none;margin-bottom:8px;"></p>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button onclick="devisRenderForm(_produitsVitrine.find(p=>p.id===${prod.id}))" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">← Retour</button>
+        <button onclick="devisRenderForm(_produitsVitrine.find(p=>Number(p.id)===${Number(prod.id)}))" style="padding:9px 16px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:#374151;font-weight:600;cursor:pointer;">← Retour</button>
         <button id="dv-send" style="padding:9px 16px;border-radius:8px;border:none;background:var(--tp);color:#fff;font-weight:700;cursor:pointer;">📩 Envoyer la demande</button>
       </div>
     </div>`;
@@ -5608,7 +5611,10 @@ async function toggleProduitVedette(id) {
    e-commerçant, la personnalisation vient après, pas avant. */
 async function ajouterAuPanier(productId) {
   if (!CU) { window.location.href = 'login.html'; return; }
-  const prod = (_produitsVitrine || []).find(p => p.id === productId);
+  /* Number() des deux côtés (2026-10-06, bug réel signalé : « ajouter au panier ne fonctionne pas ») :
+     en production p.id est une CHAÎNE (BIGINT Postgres) alors que le bouton passe un nombre — le
+     find strict échouait et la fonction retournait sans rien afficher. */
+  const prod = (_produitsVitrine || []).find(p => Number(p.id) === Number(productId));
   if (!prod) return;
   const expeditionDispo = Number(prod.livraison_expedition) === 1;
   const retraitDispo = Number(prod.livraison_retrait) !== 0;
@@ -5632,8 +5638,8 @@ function panierToast(msg) {
 /* ---- Modale "Commander" (visiteur — demande de contact, PAS de paiement) ---- */
 function openCommanderModal(productId, publicationId) {
   if (!CU) { window.location.href = 'login.html'; return; }
-  let prod = _produitsVitrine.find(p => p.id === productId);
-  if (!prod) prod = (_publications || []).map(x => x.produit).find(x => x && x.id === productId);
+  let prod = _produitsVitrine.find(p => Number(p.id) === Number(productId));
+  if (!prod) prod = (_publications || []).map(x => x.produit).find(x => x && Number(x.id) === Number(productId));
   if (!prod) return;
   const overlay = document.createElement('div');
   overlay.id = 'cmd-modal-overlay';
