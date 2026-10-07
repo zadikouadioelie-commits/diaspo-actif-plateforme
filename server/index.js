@@ -46070,7 +46070,7 @@ route("PUT", "/api/insc/mes-partenaires-sponsors-defaut", async (req, res, param
 route("POST", "/api/insc/fiches", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires & Inscriptions est réservé aux comptes Initiative et Collectivité." });
+  if (!inscBetaAutorise(user)) return sendJSON(res, 403, { error: "Le module Formulaires de réponse et d'inscription est réservé aux comptes Initiative et Collectivité." });
   if (!body?.nom || !String(body.nom).trim()) return sendJSON(res, 400, { error: "Le nom de la fiche est requis." });
   const init = await db.prepare("SELECT id, partenaires_evenements_json, sponsors_evenements_json FROM initiatives WHERE owner_user_id=?").get(user.id);
   const slug = await inscSlugUnique(body.nom);
@@ -46099,6 +46099,15 @@ route("POST", "/api/insc/fiches", async (req, res, params, body) => {
     }
     await inscSyncPrixMinEvenements(id);
     if (body.evenement_ids.length) await inscPublierSiBrouillon(id);
+  }
+  /* Formulaire « Bouton d'action » (2026-10-07) : créé depuis l'éditeur d'un compte-rendu, il porte le titre du bouton et le nom de
+     l'événement (cartouche bleue pailletée). Dans un try : colonnes absentes tant que « Réparer la base » n'a pas été lancé. */
+  if (body.est_bouton_action) {
+    try {
+      const titreBouton = String(body.action_bouton_titre || body.nom || '').trim().slice(0, 60);
+      await db.prepare("UPDATE insc_fiches SET est_bouton_action=1, action_bouton_titre=?, action_evenement_titre=? WHERE id=?")
+        .run(titreBouton || null, body.action_evenement_titre ? String(body.action_evenement_titre).trim().slice(0, 200) : null, id);
+    } catch (e) { logError(e, 'insc-fiche-bouton-action'); }
   }
   await inscJournaliser(id, user, "creation", `Fiche « ${body.nom} » créée.`);
   const fiche = await db.prepare("SELECT * FROM insc_fiches WHERE id=?").get(id);
@@ -46196,9 +46205,28 @@ route("PUT", "/api/insc/fiches/:id", async (req, res, params, body) => {
       if (invitation) { set.push("parrainage_invitation_id=?"); vals.push(invitation.id); }
     }
   }
+  /* Titre du bouton d'action (2026-10-07) : modifiable depuis la cartouche bleue de la fiche ; il se propage automatiquement au texte du
+     bouton des comptes-rendus qui pointent vers cette fiche (le lecteur voit toujours le titre à jour). */
+  let titreBoutonAPropager = null;
+  if (body.action_bouton_titre !== undefined && Number(fiche.est_bouton_action)) {
+    const titre = String(body.action_bouton_titre || '').trim().slice(0, 60);
+    set.push("action_bouton_titre=?"); vals.push(titre || null);
+    if (titre) titreBoutonAPropager = titre;
+  }
   if (set.length) {
     set.push("updated_at=datetime('now')");
     await db.prepare(`UPDATE insc_fiches SET ${set.join(",")} WHERE id=?`).run(...vals, fiche.id);
+  }
+  if (titreBoutonAPropager && fiche.slug) {
+    try {
+      const cible = 'slug=' + encodeURIComponent(fiche.slug);
+      const crs = await db.prepare("SELECT evenement_id, actions_json FROM evenement_comptes_rendus WHERE actions_json LIKE ?").all('%' + cible + '%');
+      for (const cr of crs) {
+        let change = false;
+        const actions = crJson(cr.actions_json, []).map(a => (a && typeof a.lien === 'string' && a.lien.includes(cible)) ? (change = true, { ...a, bouton: titreBoutonAPropager }) : a);
+        if (change) await db.prepare("UPDATE evenement_comptes_rendus SET actions_json=? WHERE evenement_id=?").run(JSON.stringify(actions), cr.evenement_id);
+      }
+    } catch (e) { logError(e, 'insc-fiche-bouton-action-sync'); }
   }
   if (Array.isArray(body.evenement_ids)) {
     /* Lier un événement redirige automatiquement son bouton "S'inscrire" vers cette fiche

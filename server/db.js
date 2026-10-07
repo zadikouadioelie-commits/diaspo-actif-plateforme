@@ -2096,6 +2096,10 @@ const MIGRATIONS = [
   ["insc_fiches", "programme_texte TEXT"],
   ["insc_fiches", "programme_fichier_url TEXT"],
   ["insc_fiches", "programme_fichier_nom TEXT"],
+  // Formulaire « Bouton d'action » créé depuis un compte-rendu (2026-10-07) : cartouche bleue pailletée, titre du bouton, nom de l'événement.
+  ["insc_fiches", "est_bouton_action INTEGER DEFAULT 0"],
+  ["insc_fiches", "action_bouton_titre TEXT"],
+  ["insc_fiches", "action_evenement_titre TEXT"],
   // Compte-rendu : logo de l'organisateur, partenaires (nom/logo/lien) et personnes mises en lumière (alimentent les graphiques) — 2026-10-06.
   ["evenement_comptes_rendus", "logo_url TEXT"],
   ["evenement_comptes_rendus", "partenaires_json TEXT DEFAULT '[]'"],

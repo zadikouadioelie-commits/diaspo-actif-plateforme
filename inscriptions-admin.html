@@ -44,6 +44,15 @@
 @keyframes iaLiaisonGlow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.06);}50%{box-shadow:0 0 16px 3px rgba(188,19,254,.55);}}
 @keyframes iaLiaisonSweep{0%{left:-60%;}55%,100%{left:130%;}}
 @media (prefers-reduced-motion: reduce){ .ia-liaison-essentielle, .ia-liaison-essentielle::after{animation:none;} }
+/* Cartouche « Bouton d'action » (2026-10-07) : entièrement bleue et pailletée, pour qu'on ne la confonde avec aucune autre cartouche.
+   Paillettes = trois trames de points lumineux qui scintillent, plus un reflet qui balaie la cartouche. */
+.ia-ba{position:relative;overflow:hidden;border-radius:12px;color:#fff;background:linear-gradient(135deg,#0A2F7A 0%,#1558C8 45%,#2E8BFF 100%);box-shadow:0 0 0 1px rgba(160,205,255,.55),0 6px 20px rgba(46,116,224,.35);}
+.ia-ba > *{position:relative;z-index:1;}
+.ia-ba::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(190,225,255,.9) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.8) 0 1.5px,transparent 2.1px);background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:iaBaTwinkle 3.2s ease-in-out infinite;}
+.ia-ba::after{content:'';position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.4),transparent);animation:iaBaSweep 4.2s ease-in-out infinite;pointer-events:none;}
+@keyframes iaBaTwinkle{0%,100%{opacity:.5;}50%{opacity:1;}}
+@keyframes iaBaSweep{0%{left:-60%;}55%,100%{left:130%;}}
+@media (prefers-reduced-motion: reduce){ .ia-ba::before, .ia-ba::after{animation:none;} }
 /* Encart "Lien de parrainage" (2026-09-28, demande explicite : "une autre carte en dessous
    avec une couleur néon différente") — même patron scintillant que .ia-liaison-essentielle
    ci-dessus, réutilise iaLiaisonSweep (le reflet ne dépend pas de la couleur), mais en bleu
@@ -1107,16 +1116,42 @@ async function iaChargerCandidatureDeclarations() {
 // Rendu — Liste des fiches
 // ---------------------------------------------------------------------------
 
+/* Cartouche « Bouton d'action » : mention, nom de l'événement, titre du bouton. Modifiable (editable) dans l'éditeur de la fiche. */
+function iaBaCartouche(f, editable, marge) {
+  if (!f || !Number(f.est_bouton_action)) return '';
+  const titre = f.action_bouton_titre || '';
+  return `<div class="ia-ba" style="padding:14px 18px;margin:${marge || '0'};">
+      <div style="font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#CFE6FF;">⚡ Bouton d’action</div>
+      <div style="font-size:15px;font-weight:700;margin-top:4px;">📅 ${escH(f.action_evenement_titre || 'Événement')}</div>
+      ${editable
+        ? `<div style="font-size:12px;font-weight:700;margin:10px 0 4px;color:#CFE6FF;">Titre du bouton d’action</div>
+           <div style="display:flex;gap:8px;flex-wrap:wrap;"><input id="ia-ba-titre" maxlength="60" value="${escH(titre)}" placeholder="Titre du bouton d’action" style="flex:1;min-width:220px;padding:9px 12px;border-radius:9px;border:1.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.95);color:#0A2F7A;font:inherit;font-size:14px;font-weight:600;">
+           <button type="button" id="ia-ba-save" onclick="iaBaEnregistrer()" style="padding:9px 16px;border-radius:9px;border:none;background:#fff;color:#0A2F7A;font-weight:800;font-size:13px;cursor:pointer;">Enregistrer</button></div>
+           <div style="font-size:11.5px;color:#CFE6FF;margin-top:6px;">Ce titre devient le texte du bouton dans le compte-rendu, partout où il est affiché.</div>`
+        : `<div style="margin-top:6px;font-size:14px;"><span style="opacity:.85;">Titre du bouton :</span> <b>« ${escH(titre)} »</b></div>`}
+    </div>`;
+}
+async function iaBaEnregistrer() {
+  const f = selectedFiche(), inp = document.getElementById('ia-ba-titre'), btn = document.getElementById('ia-ba-save');
+  if (!f || !inp || !btn) return;
+  const t = inp.value.trim();
+  if (t.length < 3) { alert('Le titre du bouton d’action doit comporter au moins 3 caractères.'); return; }
+  btn.disabled = true;
+  try { await api('PUT', '/insc/fiches/' + f.id, { action_bouton_titre: t }); f.action_bouton_titre = t; btn.textContent = 'Enregistré ✓'; setTimeout(() => { btn.textContent = 'Enregistrer'; btn.disabled = false; }, 1600); }
+  catch (e) { alert(e.message || 'Enregistrement impossible.'); btn.disabled = false; }
+}
+
 function renderListView() {
   const cards = state.fiches.map(f => {
     const [bg, color] = IA_STATUS_STYLES[f.statut] || IA_STATUS_STYLES['brouillon'];
     return `
-      <div style="background:#fff;border:1px solid oklch(0.9 0.004 30);border-radius:12px;overflow:hidden;cursor:pointer;position:relative;" data-action="selectFiche" data-id="${f.id}">
+      <div style="background:#fff;${Number(f.est_bouton_action) ? 'border:2px solid #2E8BFF;box-shadow:0 0 14px rgba(46,139,255,.45);' : 'border:1px solid oklch(0.9 0.004 30);'}border-radius:12px;overflow:hidden;cursor:pointer;position:relative;" data-action="selectFiche" data-id="${f.id}">
         <button title="Supprimer la fiche" data-action="supprimerFicheListe" data-id="${f.id}" data-nom="${escH(f.nom)}" style="position:absolute;top:8px;right:8px;z-index:1;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>
         <div style="height:120px;background:${f.affiche_url ? `oklch(0.9 0.004 30) center/cover no-repeat url('${escH(f.affiche_url)}')` : 'oklch(0.94 0.01 258)'};display:flex;align-items:center;justify-content:center;">
           ${f.affiche_url ? '' : '<span style="font-size:28px;opacity:.5;">📅</span>'}
         </div>
         <div style="padding:18px;">
+          ${iaBaCartouche(f, false, '0 0 12px')}
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;">
             <div style="font-weight:700;font-size:15px;">${escH(f.nom)}</div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
@@ -1279,7 +1314,8 @@ function renderDetailView() {
   const main = state.icTransitionVisible
     ? `<main style="max-width:1180px; margin:0 auto; padding:28px;">${renderTransitionCreationGestion()}</main>`
     : `<main style="max-width:1180px; margin:0 auto; padding:28px;">${prevBtn}${renderTabContent()}${enCreation ? renderWizardFooter() : ''}</main>`;
-  return suspendedBanner + header + nav + main;
+  const baHtml = iaBaCartouche(fiche, true);
+  return suspendedBanner + header + (baHtml ? '<div style="padding:14px 28px 0;">' + baHtml + '</div>' : '') + nav + main;
 }
 
 // ---- Pied de page de l'assistant de création (Suivant / Brouillon) ----
@@ -3620,6 +3656,9 @@ root.addEventListener('change', function (e) {
     if (ficheIdParam && state.fiches.some(f => f.id === parseInt(ficheIdParam))) {
       state.selectedFicheId = parseInt(ficheIdParam); state.view = 'detail';
       await iaChargerFiche(state.selectedFicheId);
+      /* ?onglet=fields : ouvre directement l'espace « Formulaire » (champs et options) — utilisé après la création d'un formulaire d'engagement. */
+      const ongletParam = new URLSearchParams(location.search).get('onglet');
+      if (ongletParam && IA_TABS.some(tb => tb.key === ongletParam)) { state.activeTab = ongletParam; try { await iaChargerOnglet(ongletParam); } catch (e) {} }
     }
     /* Lien direct depuis une notification "Nouvelle inscription" (2026-10-01, demande explicite :
        "cliquer sur une inscription dans les notifications devrait conduire directement à

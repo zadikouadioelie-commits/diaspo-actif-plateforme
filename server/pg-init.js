@@ -479,6 +479,10 @@ const COLONNES_MIGRATION = [
     ['insc_fiches', 'programme_texte', 'TEXT'],
     ['insc_fiches', 'programme_fichier_url', 'TEXT'],
     ['insc_fiches', 'programme_fichier_nom', 'TEXT'],
+    // Formulaire « Bouton d'action » (2026-10-07) — miroir exact des ALTER db.js.
+    ['insc_fiches', 'est_bouton_action', 'INTEGER DEFAULT 0'],
+    ['insc_fiches', 'action_bouton_titre', 'TEXT'],
+    ['insc_fiches', 'action_evenement_titre', 'TEXT'],
     // Compte-rendu : logo organisateur, partenaires, personnes mises en lumière (2026-10-06) — miroir des ALTER db.js.
     ['evenement_comptes_rendus', 'logo_url', 'TEXT'],
     ['evenement_comptes_rendus', 'partenaires_json', "TEXT DEFAULT '[]'"],

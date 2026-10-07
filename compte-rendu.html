@@ -987,7 +987,7 @@ const MAX_ACTIONS = 5;
 async function drawAction() {
   const ed = ST.ed, box = $('#ed-action'); if (!box) return;
   if (!ST.act) ST.act = { fiches: null, cags: null, modes: [] };
-  const A = ST.act;
+  const A = ST.act; if (!A.titres) A.titres = []; if (!A.synced) A.synced = {};
   if (A.fiches === null) { try { A.fiches = (await api('GET', '/insc/fiches')).fiches || []; } catch (_) { A.fiches = []; } }
   if (A.cags === null) { try { A.cags = (await api('GET', '/cagnottes/mes')).cagnottes || []; } catch (_) { A.cags = []; } }
   if (!$('#ed-action')) return;
@@ -1001,14 +1001,18 @@ async function drawAction() {
   ed.actions.forEach((a, i) => {
     const mode = A.modes[i];
     const fiche = A.fiches.find(f => f.slug === slugDe(SLUG_FICHE, a.lien)), cag = A.cags.find(c => c.slug === slugDe(SLUG_DON, a.lien));
+    /* Formulaire « Bouton d'action » : son titre fait foi pour le texte du bouton (repris une fois à l'ouverture de l'éditeur). */
+    if (fiche && Number(fiche.est_bouton_action) && fiche.action_bouton_titre && A.synced[i] !== fiche.id) { A.synced[i] = fiche.id; a.bouton = fiche.action_bouton_titre; }
     h += '<div class="crp-act" data-ai="' + i + '"><div class="crp-act-h"><span><b>Action ' + (i + 1) + '</b>' + (i === 0 && plusieurs ? ' <span class="crp-act-badge">mise en avant dans le fil et par e-mail</span>' : '') + '</span>'
       + (plusieurs || a.bouton || a.lien ? '<button type="button" class="crp-act-x" data-arm="' + i + '" title="Retirer cette action">✕ Retirer</button>' : '') + '</div>'
       + '<div class="crp-seg">' + modes.map(m => '<button type="button" class="' + (m[0] === mode ? 'on' : '') + '" data-am="' + m[0] + '" data-ai="' + i + '">' + m[1] + '</button>').join('') + '</div>'
       + '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:8px"><input data-abtn="' + i + '" maxlength="60" placeholder="Texte du bouton (ex. ' + esc(TEXTES_BOUTON[mode] || 'Découvrir la suite') + ')" value="' + esc(a.bouton) + '"></div>';
     if (mode === 'lien') h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input data-alien="' + i + '" placeholder="https://… (lien du bouton)" value="' + esc(a.lien) + '"></div>';
     if (mode === 'fiche') {
-      h += '<div class="crp-extform" style="grid-template-columns:' + (peutCreer ? '1fr auto' : '1fr') + ';margin-top:6px"><select data-afiche="' + i + '"><option value="">— Choisir un formulaire —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select>'
-        + (peutCreer ? '<button type="button" class="cr-btn sec" data-fcreer="' + i + '">＋ Créer un formulaire d’engagement</button>' : '') + '</div>'
+      /* Créer un formulaire : le TITRE d'abord (obligatoire, choisi consciencieusement), puis seulement le bouton de création, qui reprend ce titre. */
+      if (peutCreer && !fiche) h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input data-ftitre="' + i + '" maxlength="60" placeholder="Titre du formulaire (obligatoire) — ex. Je veux devenir bénévole" value="' + esc(A.titres[i] || '') + '"></div>'
+        + '<div data-fcreer-zone="' + i + '">' + zoneCreation(i) + '</div>';
+      h += '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><select data-afiche="' + i + '"><option value="">— ' + (peutCreer && !fiche ? 'Ou choisir un formulaire existant' : 'Choisir un formulaire') + ' —</option>' + A.fiches.map(f => '<option value="' + esc(f.slug) + '"' + (fiche && fiche.id === f.id ? ' selected' : '') + '>' + esc(f.nom) + (f.statut !== 'publiee' ? ' (' + esc(f.statut) + ')' : '') + '</option>').join('') + '</select></div>'
         + (peutCreer ? '' : '<div class="crp-hint">ℹ️ La création de formulaires est réservée aux comptes <b>Initiative</b> et <b>Collectivité</b> (et aux administrateurs), pas au compte utilisateur. Vous pouvez choisir ci-dessus un formulaire existant.</div>')
         + '<div class="crp-hint">Le lecteur remplit le formulaire sans créer de compte (nom, prénom, téléphone ou e-mail, options). Vous retrouvez les réponses dans « Gérer mes comptes-rendus ». Le formulaire d’engagement proposé comprend : être contacté(e), bénévolat, actions, don, et une case de consentement.</div>'
         + (fiche ? '<div class="cr-btns" style="margin-top:6px"><a class="cr-btn out" target="_blank" rel="noopener" href="inscriptions-admin.html?fiche=' + fiche.id + '">⚙️ Personnaliser les champs et les options</a>'
@@ -1024,7 +1028,7 @@ async function drawAction() {
   if (ed.actions.length < MAX_ACTIONS) h += '<button type="button" class="cr-btn sec" id="ed-aadd">＋ Ajouter une action</button>';
   h += '<div class="crp-hint">Vous pouvez <b>cumuler jusqu’à ' + MAX_ACTIONS + ' actions</b> (par exemple : faire un don, rejoindre comme bénévole, être contacté…). Le lecteur choisit celle qui lui convient.</div>';
   box.innerHTML = h;
-  const idx = el => Number(el.dataset.ai !== undefined ? el.dataset.ai : (el.dataset.abtn ?? el.dataset.alien ?? el.dataset.afiche ?? el.dataset.acag ?? el.dataset.arm ?? el.dataset.fcreer ?? el.dataset.fpub));
+  const idx = el => Number(el.dataset.ai !== undefined ? el.dataset.ai : (el.dataset.abtn ?? el.dataset.alien ?? el.dataset.afiche ?? el.dataset.acag ?? el.dataset.arm ?? el.dataset.fcreer ?? el.dataset.fpub ?? el.dataset.ftitre));
   $$('[data-am]', box).forEach(b => b.addEventListener('click', () => {
     const i = idx(b), m = b.dataset.am; if (m === A.modes[i]) return;
     A.modes[i] = m; ed.actions[i].lien = ''; if (!ed.actions[i].bouton && TEXTES_BOUTON[m]) ed.actions[i].bouton = TEXTES_BOUTON[m]; drawAction();
@@ -1037,23 +1041,41 @@ async function drawAction() {
     const i = idx(b), f = A.fiches.find(y => y.slug === slugDe(SLUG_FICHE, ed.actions[i].lien)); if (!f) return;
     try { await api('PATCH', `/insc/fiches/${f.id}/statut`, { statut: 'publiee' }); f.statut = 'publiee'; toast('Formulaire publié'); drawAction(); } catch (e) { toast(e.message || 'Erreur'); }
   }));
-  $$('[data-fcreer]', box).forEach(b => b.addEventListener('click', () => creerFormulaireEngagement(idx(b), b)));
+  $$('[data-ftitre]', box).forEach(x => x.addEventListener('input', () => { const i = idx(x); A.titres[i] = x.value; const z = box.querySelector('[data-fcreer-zone="' + i + '"]'); if (z) z.innerHTML = zoneCreation(i); }));
+  if (!box.dataset.fcreerLie) { box.dataset.fcreerLie = '1'; box.addEventListener('click', e => { const b = e.target.closest('[data-fcreer]'); if (b) creerFormulaireEngagement(Number(b.dataset.fcreer), b); }); }
   $$('[data-arm]', box).forEach(b => b.addEventListener('click', () => { const i = idx(b); ed.actions.splice(i, 1); A.modes.splice(i, 1); drawAction(); }));
   const add = $('#ed-aadd'); if (add) add.onclick = () => { ed.actions.push({ bouton: '', lien: '' }); A.modes.push('lien'); drawAction(); };
 }
 /* Crée un formulaire d'engagement avec les routes existantes du module Formulaires & Inscriptions : une fiche indépendante de
    tout événement (une fiche liée à un événement terminé refuse les réponses), un type gratuit, la liste d'options et le consentement. */
+/* Zone du bouton de création : invisible tant que le titre du formulaire n'est pas écrit, puis « Créer un formulaire d'engagement (titre) ». */
+function zoneCreation(i) {
+  const t = ((ST.act && ST.act.titres && ST.act.titres[i]) || '').trim();
+  return t.length >= 3
+    ? '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><button type="button" class="cr-btn sec" data-fcreer="' + i + '">＋ Créer un formulaire d’engagement (' + esc(t) + ')</button></div>'
+    : '<div class="crp-hint">Écrivez d’abord le titre du formulaire (3 caractères au moins) : le bouton « Créer un formulaire d’engagement » apparaîtra juste en dessous.</div>';
+}
 async function creerFormulaireEngagement(i, b) {
+  const titre = ((ST.act.titres && ST.act.titres[i]) || '').trim();
+  if (titre.length < 3) { toast('Écrivez d’abord le titre du formulaire.'); return; }
+  /* L'onglet de personnalisation est ouvert dans le geste du clic (sinon le navigateur bloque la fenêtre) puis dirigé vers la fiche
+     une fois créée : l'éditeur du compte-rendu, non enregistré, reste intact derrière. */
+  const fenetre = window.open('about:blank', '_blank');
+  const evt = ST.data.evenement, libelle = b.textContent;
   b.disabled = true; b.textContent = 'Création…';
   try {
-    const f = (await api('POST', '/insc/fiches', { nom: 'Engagement — ' + ST.data.evenement.titre, description: '<p>Merci de laisser votre nom, votre prénom et votre numéro de téléphone : nous reviendrons vers vous.</p>' })).fiche;
+    const f = (await api('POST', '/insc/fiches', { nom: titre, description: '<p>Merci de laisser votre nom, votre prénom et votre numéro de téléphone : nous reviendrons vers vous.</p>',
+      affiche_url: evt.image || undefined, organisateur: evt.organisateur_nom || undefined, est_bouton_action: true, action_bouton_titre: titre, action_evenement_titre: evt.titre })).fiche;
     const t = await api('POST', `/insc/fiches/${f.id}/types`, { label: 'Engagement', gratuit: true, validation_auto: false });
     await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Je souhaite…', type_champ: 'choix_multiple', obligatoire: true, options: OPTIONS_ENGAGEMENT });
     await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Consentement', type_champ: 'case_a_cocher', obligatoire: true, placeholder: 'J’accepte d’être contacté(e) au sujet de ma réponse et que mes coordonnées soient transmises à l’organisateur.' });
     await api('PATCH', `/insc/fiches/${f.id}/statut`, { statut: 'publiee' });
-    ST.act.fiches = null; ST.act.modes[i] = 'fiche'; ST.ed.actions[i].lien = lienFiche(f); if (!ST.ed.actions[i].bouton) ST.ed.actions[i].bouton = TEXTES_BOUTON.fiche;
-    toast('Formulaire d’engagement créé et publié'); await drawAction();
-  } catch (e) { toast(e.message || 'Création impossible'); b.disabled = false; b.textContent = '＋ Créer un formulaire d’engagement'; }
+    ST.act.fiches = null; ST.act.modes[i] = 'fiche'; ST.ed.actions[i].lien = lienFiche(f); ST.ed.actions[i].bouton = titre; ST.act.titres[i] = '';
+    const dest = 'inscriptions-admin.html?fiche=' + f.id + '&onglet=fields';
+    if (fenetre) { try { fenetre.location.href = dest; } catch (_) { window.open(dest, '_blank'); } toast('Formulaire créé et publié — personnalisation ouverte dans un nouvel onglet'); }
+    else toast('Formulaire créé et publié — cliquez sur « Personnaliser les champs et les options »');
+    await drawAction();
+  } catch (e) { if (fenetre) { try { fenetre.close(); } catch (_) {} } toast(e.message || 'Création impossible'); b.disabled = false; b.textContent = libelle; }
 }
 function drawForts() {
   const ed = ST.ed;
