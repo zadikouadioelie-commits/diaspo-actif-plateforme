@@ -38,13 +38,16 @@
     var phone = /Android.*Mobile|iPhone|iPod|Windows Phone/i.test(ua) && !/iPad|Tablet/i.test(ua);
     return phone && largeurEcran <= 600 && tactile !== false;
   }
-  /* Un lien « Ouvrir sur le site » de l'appli ne doit pas renvoyer aussitôt dans l'appli : si l'on arrive depuis m.html, on reste sur le site pour la session. */
+  /* Conservé pour les tests uniquement : la bascule ne s'en sert plus (voir plus bas). */
   function venantDeLApp(ref) { return /^https?:\/\/[^\/]+\/m\.html/i.test(String(ref || '')); }
   root.MRedirect = { cible: cible, telephone: telephone, venantDeLApp: venantDeLApp, PAGES: PAGES };
   if (typeof window === 'undefined' || !window.location) return;
   try {
     if (/[?&]version=ordinateur\b/.test(location.search)) { sessionStorage.setItem('da_version_ordinateur', '1'); return; }
-    if (venantDeLApp(document.referrer)) { sessionStorage.setItem('da_version_ordinateur', '1'); return; }
+    /* Plus de drapeau « venu de l'appli » (2026-10-07, signalé : le téléphone passait au hasard de la nouvelle à l'ancienne
+       interface) : il désactivait la bascule pour toute la session dès qu'on suivait UN lien de l'appli vers une page du
+       site, puis chaque page du site s'affichait à l'ancienne. Une page de l'ancien site qui a un équivalent dans l'appli
+       renvoie toujours dans l'appli ; seul le choix explicite « Version ordinateur » est mémorisé. */
     if (sessionStorage.getItem('da_version_ordinateur')) return;
     if (!telephone(navigator.userAgent, Math.min(screen.width, screen.height), navigator.maxTouchPoints > 0)) return;
     var h = cible(location.pathname, location.search);
