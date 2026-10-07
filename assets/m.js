@@ -48,6 +48,7 @@
     people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14a5 5 0 0 1 4.5 5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     dir: '<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M17 5h4M17 9h4M17 13h4"/>',
@@ -209,12 +210,13 @@
   function renderTop() {
     const top = $('#top');
     const right = S.me
-      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `<button class="ibtn" id="top-menu" aria-label="Menu des modules">${ic('menu')}</button><button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       : `<button class="pill-cta" id="top-login">Connexion</button>`;
     top.innerHTML = `<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
       <h1><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
     const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
+    const mn = $('#top-menu'); if (mn) mn.onclick = openMenu;
     paintBadges();
   }
   function renderTabs() {
@@ -870,15 +872,9 @@
     if (S.tab === 'moi') viewMoi();
   }
   function premiumLocked(level) { return level === 2 && !!S.premium && S.premium.concerne && !S.premium.actif; }
-  function viewMoi() {
-    const el = $('#t-moi');
-    if (!S.me) {
-      el.innerHTML = `${loginCard('Connectez-vous pour accéder à vos modules, vos billets et vos paramètres.')}<div class="lst" style="margin-top:6px"><a class="li" href="index.html"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Découvrir Diaspo’Actif</span><br><span class="d">Présentation de la plateforme</span></span><span class="ch">${ic('chev', 's')}</span></a></div>`;
-      $('#go-login').onclick = () => openLogin(); return;
-    }
-    const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
-    const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email; const nm = m.nom_affichage || resp;
-    const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
+  /* Lignes des modules visibles pour ce compte (type de compte + Premium) — partagées par l'onglet « Moi » et le menu rapide du haut. */
+  function modulesHtml(m) {
+    const role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
     const lvl = x => role ? (x.r[role] || 0) : (x.r.utilisateur === 1 && x.r.initiative === 1 ? 1 : 0);
     const li = x => {
       const l = lvl(x); if (!l) return '';
@@ -888,7 +884,35 @@
       if (locked) return `<a class="li dim" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
       return `<a class="li" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
     };
-    const mods = MODS.map(li).join(''), compte = MODS_COMPTE.map(li).join('');
+    return { role, mods: MODS.map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
+  }
+  function openMenu() {
+    if (!S.me) { openLogin(); return; }
+    const m = S.me, resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email, nm = m.nom_affichage || resp;
+    const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
+    const { mods, compte } = modulesHtml(m);
+    const close = openSheet(`<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>
+      <div class="h2" style="margin-top:12px">MENU DES MODULES</div>
+      <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a>${mods}</div>
+      <div class="h2">MON COMPTE</div><div class="lst">${compte}<a class="li" href="#/moi"><span class="ic">${ic('user')}</span><span class="sp"><span class="t">Mon espace</span><br><span class="d">Profil, tout le menu et les outils sur ordinateur</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
+      <button class="btn out block" id="menu-switch" style="margin-top:14px">${ic('people', 's')} Changer de compte</button>
+      <button class="btn out block" id="menu-logout" style="margin-top:10px">${ic('logout', 's')} Se déconnecter</button>`);
+    const sh = $('#sheet');
+    /* un lien du menu referme la feuille ; les verrous Premium et le changement de compte ouvrent leur propre feuille */
+    $$('a.li', sh).forEach(a => a.addEventListener('click', () => { if (!a.dataset.lock && !a.dataset.act) close(); }));
+    $('#menu-switch').onclick = () => { close(); openSwitcher(); };
+    $('#menu-logout').onclick = () => { close(); logout(); };
+  }
+  function viewMoi() {
+    const el = $('#t-moi');
+    if (!S.me) {
+      el.innerHTML = `${loginCard('Connectez-vous pour accéder à vos modules, vos billets et vos paramètres.')}<div class="lst" style="margin-top:6px"><a class="li" href="index.html"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Découvrir Diaspo’Actif</span><br><span class="d">Présentation de la plateforme</span></span><span class="ch">${ic('chev', 's')}</span></a></div>`;
+      $('#go-login').onclick = () => openLogin(); return;
+    }
+    const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
+    const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email; const nm = m.nom_affichage || resp;
+    const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
+    const { mods, compte } = modulesHtml(m);
     el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
       <div class="h2">MES MODULES</div><div class="lst">${mods}</div>
