@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=21">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=22">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -1041,7 +1041,7 @@ async function drawAction() {
     h += '</div>';
   });
   if (ed.actions.length < MAX_ACTIONS) h += '<button type="button" class="cr-btn sec" id="ed-aadd">＋ Ajouter une action</button>';
-  h += '<div class="crp-hint">Vous pouvez <b>cumuler jusqu’à ' + MAX_ACTIONS + ' actions</b> (par exemple : faire un don, rejoindre comme bénévole, être contacté…). Le lecteur choisit celle qui lui convient.</div>';
+  h += '<div class="crp-hint">Vous pouvez <b>cumuler jusqu’à ' + MAX_ACTIONS + ' actions</b> (par exemple : faire un don, rejoindre comme bénévole, être contacté…). Le lecteur choisit celle qui lui convient. <b>Les boutons s’affichent aux lecteurs dès que vous enregistrez le compte-rendu.</b></div>';
   box.innerHTML = h;
   const idx = el => Number(el.dataset.ai !== undefined ? el.dataset.ai : (el.dataset.abtn ?? el.dataset.alien ?? el.dataset.afiche ?? el.dataset.acag ?? el.dataset.arm ?? el.dataset.fcreer ?? el.dataset.fpub ?? el.dataset.ftitre));
   $$('[data-am]', box).forEach(b => b.addEventListener('click', () => {
@@ -1086,9 +1086,11 @@ async function creerFormulaireEngagement(i, b) {
     await api('POST', `/insc/types/${t.id}/champs`, { libelle: 'Consentement', type_champ: 'case_a_cocher', obligatoire: true, placeholder: 'J’accepte d’être contacté(e) au sujet de ma réponse et que mes coordonnées soient transmises à l’organisateur.' });
     await api('PATCH', `/insc/fiches/${f.id}/statut`, { statut: 'publiee' });
     ST.act.fiches = null; ST.act.modes[i] = 'fiche'; ST.ed.actions[i].lien = lienFiche(f); ST.ed.actions[i].bouton = titre; ST.act.titres[i] = '';
+    /* Le bouton doit apparaître aux lecteurs sans autre manipulation : on enregistre aussitôt les seules actions (si le compte-rendu existe déjà). */
+    let bouton_visible = false; try { await api('PUT', `/evenements/${ST.evtId}/compte-rendu/actions`, { actions: ST.ed.actions }); bouton_visible = true; } catch (_) {}
     const dest = 'inscriptions-admin.html?fiche=' + f.id + '&onglet=fields';
-    if (fenetre) { try { fenetre.location.href = dest; } catch (_) { window.open(dest, '_blank'); } toast('Formulaire créé et publié — personnalisation ouverte dans un nouvel onglet'); }
-    else toast('Formulaire créé et publié — cliquez sur « Personnaliser les champs et les options »');
+    if (fenetre) { try { fenetre.location.href = dest; } catch (_) { window.open(dest, '_blank'); } toast('Formulaire créé et publié' + (bouton_visible ? ' — le bouton est affiché aux lecteurs' : ' — enregistrez le compte-rendu pour afficher le bouton aux lecteurs') + '. Personnalisation ouverte dans un nouvel onglet.'); }
+    else toast('Formulaire créé et publié' + (bouton_visible ? ' — le bouton est affiché aux lecteurs' : ' — enregistrez le compte-rendu pour afficher le bouton aux lecteurs') + '. Cliquez sur « Personnaliser les champs et les options ».');
     await drawAction();
   } catch (e) { if (fenetre) { try { fenetre.close(); } catch (_) {} } toast(e.message || 'Création impossible'); b.disabled = false; b.textContent = libelle; }
 }

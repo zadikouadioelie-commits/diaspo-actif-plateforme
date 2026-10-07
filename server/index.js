@@ -20330,6 +20330,24 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   sendJSON(res, 200, { ok: true, compte_rendu: crSerialiser(cr), avertissement });
 });
 
+/* PUT — enregistre SEULEMENT les boutons d'action du compte-rendu (2026-10-07). Appelé dès qu'un formulaire d'engagement vient d'être créé : le bouton
+   apparaît aussitôt aux lecteurs, sans enregistrer le reste de l'éditeur (un brouillon de texte non terminé ne devient jamais public par ce chemin).
+   Le compte-rendu doit déjà exister. Mêmes règles que PUT /compte-rendu : 6 actions au plus, texte ≤ 60, adresse http(s) ; la première est
+   aussi recopiée dans etape_bouton / etape_lien (fil, e-mails). */
+route("PUT", "/api/evenements/:id/compte-rendu/actions", async (req, res, params, body) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const { evt } = ctx;
+  const existant = await db.prepare("SELECT id FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  if (!existant) return sendJSON(res, 404, { error: "Enregistrez d'abord le compte-rendu." });
+  const actions = (Array.isArray(body.actions) ? body.actions : []).slice(0, 6)
+    .map(x => ({ bouton: crTexte(x && x.bouton, 60), lien: crUrl(x && x.lien) })).filter(x => x.bouton && x.lien);
+  try {
+    await db.prepare("UPDATE evenement_comptes_rendus SET actions_json=?, etape_bouton=?, etape_lien=?, updated_at=? WHERE id=?")
+      .run(JSON.stringify(actions), actions[0] ? actions[0].bouton : null, actions[0] ? actions[0].lien : null, new Date().toISOString(), existant.id);
+  } catch (e) { return sendJSON(res, 500, SEC.safeError(e, "compte-rendu-actions")); }
+  sendJSON(res, 200, { ok: true, actions });
+});
+
 function crContenuFil(cr) { return `📄 ${cr.titre || 'Compte-rendu'}\n\n${crBrut(cr.resume).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1').slice(0, 600)}`; }
 
 /* POST — publie le compte-rendu : page visible + post dans le fil (événement public seulement). */
