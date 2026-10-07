@@ -2151,7 +2151,18 @@ function renderEventDetail(evt, isPreview) {
         </div>
       </div>`).join('')}
     </div>
-  ` : '';
+  ` : (evt.pdf_reserve ? `
+    <div style="padding:0 20px 14px;">
+      <div class="section-divider">📄 Document</div>
+      <div class="pdf-preview-bar" style="margin-bottom:8px;">
+        <span style="font-size:32px;flex-shrink:0;">🔒</span>
+        <div class="pdf-preview-info">
+          <div class="pdf-preview-title">${esc(evt.pdf_nom || 'Document PDF')}</div>
+          <div style="font-size:12px;color:var(--muted);">Document réservé aux inscrits : inscrivez-vous à cet événement pour y accéder.</div>
+        </div>
+      </div>
+    </div>
+  ` : '');
 
   // Même correctif que dans renderEvts() ci-dessus (2026-09-22) : un événement natif (sans
   // source_events_id) ouvre désormais sa propre modale d'édition au lieu de retomber sur une

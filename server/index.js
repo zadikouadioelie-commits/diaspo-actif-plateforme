@@ -371,6 +371,31 @@ function robotIABloque(req, pathname) {
    général de l'API (240/min), sans gêner une navigation normale (une page d'annuaire en fait ~5). */
 const RE_LISTES_PUBLIQUES = /^\/api\/(annuaire\/(recherche|utilisateurs)|initiatives|vitrines|evenements|talents-diaspora|fil\/profiles|profil\/\d+)$/;
 
+/* Document PDF « réservé aux inscrits » d'un événement (2026-10-07) : le choix existait dans les formulaires
+   (pdf_acces = 'inscrits') mais n'était appliqué nulle part — le fichier partait à tous les visiteurs dans les listes.
+   Est « inscrit » : l'organisateur, l'administrateur, ou le compte présent dans l'un des trois systèmes
+   d'inscription (participation simple, fiche d'inscription, billetterie sécurisée), hors annulation. */
+async function estInscritEvenement(evt, user) {
+  if (!user) return false;
+  if (user.role === 'administrateur' || Number(user.id) === Number(evt.owner_user_id)) return true;
+  const essaie = async (sql, ...args) => { try { return !!(await db.prepare(sql).get(...args)); } catch (_) { return false; } };
+  if (await essaie("SELECT 1 FROM evenements_participants WHERE evenement_id=? AND user_id=?", evt.id, user.id)) return true;
+  if (await essaie("SELECT 1 FROM insc_inscriptions WHERE evenement_id=? AND user_id=? AND statut NOT IN ('annule','liste_attente')", evt.id, user.id)) return true;
+  if (evt.source_events_id && await essaie("SELECT 1 FROM event_inscriptions_securisees WHERE event_id=? AND user_id=? AND statut<>'annule'", evt.source_events_id, user.id)) return true;
+  return false;
+}
+async function protegerPdfListe(rows, req) {
+  const reserves = rows.filter(r => r && r.pdf_acces === 'inscrits' && r.pdf_url);
+  if (!reserves.length) return rows;
+  const moi = await getCurrentUser(req);
+  for (const r of reserves) {
+    if (await estInscritEvenement(r, moi)) continue;
+    r.pdf_url = null;
+    r.pdf_reserve = true;
+  }
+  return rows;
+}
+
 function publicUser(u) {
   if (!u) return null;
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
@@ -21031,7 +21056,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
        ?owner=, contrairement à "Mes événements"/la page boutique : aucune raison de jamais les
        inclure ici, l'exclusion est donc inconditionnelle. */
     const rows = (await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all()).filter(r => r.statut !== 'brouillon' && r.visibilite !== 'boutique');
-    return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: null });
+    return sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(await withCounts(rows)), req), niveau_priorite: null });
   }
 
   const filtresBase = [];
@@ -21093,7 +21118,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
   // Brouillon + visibilité "boutique" — mêmes exclusions inconditionnelles que la branche
   // !hasPrefs ci-dessus (voir son commentaire : jamais de ?owner= sur cette route).
   rows = rows.filter(r => r.statut !== 'brouillon' && r.visibilite !== 'boutique');
-  return sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(await withCounts(rows)), niveau_priorite: niveauRetenu });
+  return sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(await withCounts(rows)), req), niveau_priorite: niveauRetenu });
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
@@ -21150,7 +21175,7 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   else if (query.gratuit === 'partiel') rows = rows.filter(r => participationEffective(r) === 'partiellement_payant');
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
-  sendJSON(res, 200, { evenements: await enrichirAvecFicheMedia(withCounts) });
+  sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(withCounts), req) });
 });
 
 // Classification effective Gratuit/Partiellement payant/Payant (2026-09-24, "faciliter le
@@ -22577,7 +22602,7 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
     "SELECT id, slug, titre, image_url, objectif_montant, montant_collecte, devise, statut_manuel, est_publiee, date_fin FROM cagnottes WHERE evenement_id=? AND est_publiee=1 AND visibilite='publique'"
   ).all(params.id)).map(cagnotteAvecStatut);
   if (row.owner_user_id) { row.organisateur_nom = (await nomCompteAffichage(row.owner_user_id)) || row.organisateur_nom; }
-  const [rowAvecFiche] = await enrichirAvecFicheMedia([row]);
+  const [rowAvecFiche] = await protegerPdfListe(await enrichirAvecFicheMedia([row]), req);
   sendJSON(res, 200, { evenement: rowAvecFiche, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
 });
 
