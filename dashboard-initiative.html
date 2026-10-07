@@ -1165,6 +1165,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
           </label>
           <button class="btn btn-outline" onclick="adhOuvrirRelancesConfig()" title="Choisissez à quel moment les rappels de renouvellement sont envoyés (avant et/ou après expiration).">⏰ Délais de relance</button>
           <button class="btn btn-outline" onclick="adhOuvrirModelesConfig()" title="Personnalisez le texte des e-mails de relance et de reçu de paiement.">📝 Modèles de texte</button>
+          <button class="btn" style="background:#7C3AED;color:#fff;" onclick="adhOuvrirCreationFormule(true)" title="Crée directement la formule ciblée par le bouton public « Adhérer à l'initiative » (annuaire, boutiques, profil) — même formulaire que ci-contre (durée, coût, informations demandées…), marquée Officielle dès l'enregistrement.">⭐ Créer l'adhésion officielle</button>
           <button class="btn btn-orange" onclick="adhOuvrirCreationFormule()">➕ Créer une formule d'adhésion</button>
         </div>
       </div>
@@ -7691,10 +7692,10 @@ async function adhChoisirModeListe(mode){
   }
 }
 
-function adhOuvrirCreationFormule(){
+function adhOuvrirCreationFormule(officielle){
   ADH_EDIT_FORMULE_ID = null;
   ADH_F_MEDIA = { type: null, url: null, duree: null };
-  ADH_F_OFFICIELLE = false;
+  ADH_F_OFFICIELLE = !!officielle;
   adhRenderBoutonOfficielle();
   document.getElementById('adh-f-liste-nom').value = '';
   adhChoisirModeListe('');
