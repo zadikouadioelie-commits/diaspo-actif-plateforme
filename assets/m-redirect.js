@@ -31,7 +31,7 @@
     var q = {}; String(search || '').replace(/^\?/, '').split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); });
     if (f === 'initiative.html' && q.id) return '#/profil/i/' + encodeURIComponent(q.id);
     if ((f === 'profil.html' || f === 'profil-app.html') && q.id) return '#/profil/' + encodeURIComponent(q.id);
-    if (f === 'compte-rendu.html' && q.evt && !q.edition) return '#/cr/' + encodeURIComponent(q.evt);
+    if (f === 'compte-rendu.html' && q.evt && !q.edition) return '#/cr/' + encodeURIComponent(q.evt) + (q.synthese === '1' ? '/synthese' : '');
     if (f === 'videos-tutoriels.html' && q.v) return '#/video/' + encodeURIComponent(q.v);
     if (f === 'compte-rendu.html' || f === 'profil.html' || f === 'profil-app.html' || f === 'initiative.html') return '';
     return Object.prototype.hasOwnProperty.call(PAGES, f) ? PAGES[f] : '';

@@ -904,13 +904,99 @@
     })(doc.body.firstChild);
     return doc.body.firstChild.innerHTML;
   }
-  async function paneCR(id) {
+  /* ---------- Compte-rendu : bloc d'action, barre « Synthèse / Agir » et synthèse (2026-10-07) ----------
+     Mêmes règles que compte-rendu.html : actions choisies par l'auteur (liens http/https) + « Laisser un message à l'organisateur » toujours
+     proposé en dernier ; la synthèse est composée automatiquement de ce que l'auteur a déjà saisi. */
+  const CR_TYPES = { eco: 'Économique', fes: 'Festif', pol: 'Politique', forum: 'Forum', edu: 'Éducatif', spi: 'Spirituel', san: 'Santé', ing: 'Ingénierie', blanc: 'Page blanche' };
+  const CR_SOUS = { fiche: 'Quelques secondes, sans créer de compte.', don: 'Chaque geste compte.', message: 'Nom, prénom, e-mail et un petit mot : l’organisateur vous répond.', lien: '' };
+  function crActions(c) {
+    const l = Array.isArray(c.actions) && c.actions.length ? c.actions : (c.etape_bouton && c.etape_lien ? [{ bouton: c.etape_bouton, lien: c.etape_lien }] : []);
+    return [...l.filter(a => a && a.bouton && /^https?:\/\//i.test(a.lien || '')), { bouton: 'Laisser un message à l’organisateur', message: true }];
+  }
+  const crKind = a => a.message ? 'message' : /inscription-publique\.html\?slug=/.test(a.lien) ? 'fiche' : /cagnotte\.html\?slug=/.test(a.lien) ? 'don' : 'lien';
+  const crIcon = a => ic(crKind(a) === 'message' ? 'chat' : crKind(a) === 'don' ? 'heart' : 'star');
+  function crBtnBleu(a) {
+    const s = CR_SOUS[crKind(a)];
+    return (a.message ? '<button type="button" class="cr-bleu" data-cr-msg>' : `<a class="cr-bleu" href="${attrUrl(a.lien)}" target="_blank" rel="noopener">`)
+      + `${crIcon(a)}<span>${esc(a.bouton)}</span><i aria-hidden="true">→</i>` + (a.message ? '</button>' : '</a>') + (s ? `<small>${esc(s)}</small>` : '');
+  }
+  /* Bloc d'action : l'élément clé du compte-rendu (décider et agir), juste sous l'affiche, nettement séparé du récit. */
+  function crAgirBloc(c) {
+    return `<section class="cr-agir" aria-labelledby="cr-agir-t"><div class="cr-agir-t" id="cr-agir-t">★ Passez à l’action</div><p class="cr-agir-d">Vous avez lu : à vous de décider. Choisissez comment vous engager.</p>${crActions(c).map(crBtnBleu).join('')}</section>`;
+  }
+  function crBarHtml(c) {
+    const solo = crActions(c).length === 1;
+    return `<button type="button" class="cr-synth" id="cr-synth"><span aria-hidden="true">📋</span> Synthèse</button><button type="button" class="cr-qm" id="cr-qm" aria-label="À quoi sert la synthèse ?" aria-expanded="false">?</button><button type="button" class="cr-agir-btn" id="cr-agir">★ ${solo ? 'Laisser un message' : 'Agir'}</button>
+      <div class="cr-bulle" id="cr-bulle" hidden role="tooltip"><b>La synthèse</b> met l’essentiel du compte-rendu sur un seul écran : résumé, chiffres clés, temps forts, personnes à l’honneur, partenaires et étape suivante. Vous pouvez la partager.</div>`;
+  }
+  function crMessage(id, ev) {
+    const u = S.me || {};
+    const fld = (i, ph, v, t) => `<div class="search" style="border-radius:12px;margin:0 0 8px"><input id="${i}" ${t ? `type="${t}" ` : ''}maxlength="160" placeholder="${ph}" value="${esc(v || '')}"></div>`;
+    const close = openSheet(`<h2 style="margin:4px 0 2px;font-size:20px">💬 Laisser un message</h2><p class="muted small" style="margin:0 0 12px">Votre message est transmis à ${esc(ev.organisateur_nom || 'l’organisateur')}, qui pourra vous répondre par e-mail. Aucun compte n’est nécessaire.</p>
+      <div class="row" style="gap:8px"><div class="sp">${fld('crm-p', 'Prénom', u.prenom)}</div><div class="sp">${fld('crm-n', 'Nom', u.nom)}</div></div>${fld('crm-e', 'Adresse e-mail', u.email, 'email')}
+      <textarea id="crm-m" maxlength="1500" rows="5" placeholder="Votre message (ex. Je suis très intéressé(e), pouvez-vous me recontacter ?)" style="width:100%;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:16px;background:var(--card)"></textarea>
+      <input id="crm-x" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
+      <p id="crm-err" class="small" style="color:var(--red);min-height:20px;margin:6px 2px" role="alert"></p>
+      <button type="button" class="btn block" id="crm-ok">Envoyer</button><button type="button" class="btn out block" id="crm-non" style="margin-top:10px">Annuler</button>`);
+    $('#crm-non').onclick = close;
+    $('#crm-ok').onclick = async () => {
+      const prenom = $('#crm-p').value.trim(), nom = $('#crm-n').value.trim(), email = $('#crm-e').value.trim(), message = $('#crm-m').value.trim(), err = $('#crm-err');
+      if (!prenom || !nom) { err.textContent = 'Indiquez votre prénom et votre nom.'; return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = 'Indiquez une adresse e-mail valide.'; return; }
+      if (message.length < 3) { err.textContent = 'Écrivez un petit message.'; return; }
+      err.textContent = ''; const b = $('#crm-ok'); b.disabled = true; b.textContent = 'Envoi…';
+      try {
+        await api(`/api/evenements/${encodeURIComponent(id)}/compte-rendu/messages`, { method: 'POST', body: { prenom, nom, email, message, site_perso: $('#crm-x').value } });
+        $('#sheet .sb').innerHTML = `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>Message envoyé ✓</b>Merci ! ${esc(ev.organisateur_nom || 'L’organisateur')} a bien reçu votre message et pourra vous répondre à l’adresse indiquée.<br><br><button class="btn" id="crm-fin">Fermer</button></div>`;
+        $('#crm-fin').onclick = close;
+      } catch (e) { err.textContent = e.message || 'Envoi impossible, réessayez.'; b.disabled = false; b.textContent = 'Envoyer'; }
+    };
+  }
+  function crAgir(r, id) {
+    const c = r.compte_rendu, ev = r.evenement || {}, l = crActions(c);
+    if (l.length === 1) { crMessage(id, ev); return; }
+    const close = openSheet(`<h2 style="margin:4px 0 10px;font-size:20px">★ Choisissez comment agir</h2><div class="cr-choix">${l.map(crBtnBleu).join('')}</div><button type="button" class="btn out block" id="cra-non" style="margin-top:12px">Fermer</button>`);
+    $('#cra-non').onclick = close;
+    $$('#sheet [data-cr-msg]').forEach(b => b.onclick = () => { close(); crMessage(id, ev); });
+  }
+  function crSyntheseHtml(r) {
+    const c = r.compte_rendu, ev = r.evenement || {};
+    const parties = (c.details || []).filter(d => d.texte), profils = c.profils || [], forts = c.forts || [], parts = c.partenaires || [];
+    const comms = [...new Set(profils.map(p => (p.communaute || '').trim()).filter(Boolean))];
+    const kpis = [[parties.length, parties.length > 1 ? 'parties détaillées' : 'partie détaillée']];
+    if (profils.length) kpis.push([profils.length, profils.length > 1 ? 'personnes et organisations à l’honneur' : 'personne ou organisation à l’honneur']);
+    if (comms.length) kpis.push([comms.length, comms.length > 1 ? 'communautés représentées' : 'communauté représentée']);
+    if (forts.length) kpis.push([forts.length, forts.length > 1 ? 'temps forts' : 'temps fort']);
+    const cats = new Map(); profils.forEach(p => { const k = (p.categorie || '').trim() || 'Autres'; if (!cats.has(k)) cats.set(k, []); cats.get(k).push(p); });
+    const nomP = p => /^https?:\/\//i.test(p.lien || '') ? `<a href="${attrUrl(p.lien)}" target="_blank" rel="noopener">${esc(p.nom)}</a>` : esc(p.nom);
+    const type = c.type_cr === 'autre' && c.type_libre ? c.type_libre : (CR_TYPES[c.type_cr] || '');
+    const logo = c.logo_url || (ev.organisateur_officiel ? 'assets/logo.png' : '');
+    const etape = (c.etape_texte || c.etape_date) ? `<div class="cr-s-etape"><b>➡️ L’étape suivante</b>${c.etape_date ? `<div class="small">📅 ${esc(dateLong(c.etape_date))}</div>` : ''}${c.etape_texte ? `<p style="margin:4px 0 0">${esc(c.etape_texte)}</p>` : ''}</div>` : '';
+    return `<div class="cr-s-head">${logo ? `<img src="${attrUrl(logo)}" alt="" onerror="this.remove()">` : ''}<div><div class="small muted">Synthèse du compte-rendu</div><h2>${esc(c.titre || ev.titre)}</h2>
+        <div class="tags" style="margin:4px 0 0"><span class="badge">${esc(dateLong(ev.date_evt))}</span>${ev.ville ? `<span class="badge">${esc(ev.ville)}</span>` : ''}${type ? `<span class="badge">${esc(type)}</span>` : ''}</div></div></div>
+      ${c.resume ? `<div class="cr-s-resume"><b>RÉSUMÉ</b><div class="rich">${richHtml(c.resume)}</div></div>` : ''}
+      <div class="cr-s-kpis">${kpis.map(k => `<div><span>${esc(k[0])}</span>${esc(k[1])}</div>`).join('')}</div>
+      ${forts.length ? `<h3 class="cr-s-h">Les temps forts</h3><ul class="cr-s-forts">${forts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+      ${cats.size ? `<h3 class="cr-s-h">Personnes et organisations à l’honneur</h3>${[...cats.entries()].map(([k, l]) => `<div class="cr-s-cat"><b>${esc(k)}</b><span>${l.map(nomP).join(' · ')}</span></div>`).join('')}` : ''}
+      ${parts.length ? `<h3 class="cr-s-h">Partenaires</h3><div class="cr-s-parts">${parts.map(p => `<div>${p.logo_url ? `<img src="${attrUrl(p.logo_url)}" alt="" onerror="this.remove()">` : `<span class="ini">${esc(initials(p.nom))}</span>`}<span>${p.lien && /^https?:\/\//i.test(p.lien) ? `<a href="${attrUrl(p.lien)}" target="_blank" rel="noopener">${esc(p.nom)}</a>` : esc(p.nom)}</span></div>`).join('')}</div>` : ''}
+      <h3 class="cr-s-h">Et maintenant ?</h3>${etape}<div class="cr-choix">${crActions(c).map(crBtnBleu).join('')}</div>`;
+  }
+  function crSynthese(r, id) {
+    const ev = r.evenement || {}, lien = `${location.origin}/compte-rendu.html?evt=${encodeURIComponent(id)}&synthese=1`;
+    const close = openSheet(`<div class="cr-s">${crSyntheseHtml(r)}</div><div class="cr-s-pied"><button type="button" class="btn out" id="crs-copie">Copier le lien</button><button type="button" class="btn out" id="crs-part">Partager</button></div><button type="button" class="btn block" id="crs-plein" style="margin-top:10px">📖 Lire le compte-rendu complet</button>`);
+    $('#crs-plein').onclick = close;
+    $('#crs-copie').onclick = async () => { try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (e) { window.prompt('Copiez ce lien :', lien); } };
+    $('#crs-part').onclick = async () => { try { if (navigator.share) await navigator.share({ title: (r.compte_rendu && r.compte_rendu.titre) || ev.titre, url: lien }); else { await navigator.clipboard.writeText(lien); toast('Lien copié'); } } catch (e) { /* partage annulé */ } };
+    $$('#sheet [data-cr-msg]').forEach(b => b.onclick = () => { close(); crMessage(id, ev); });
+  }
+  async function paneCR(id, sous) {
     setPane('Compte-rendu', '<div class="sk skc"></div><div class="sk skc" style="height:120px"></div>');
     let r; try { r = await api(`/api/evenements/${encodeURIComponent(id)}/compte-rendu`); } catch (e) { return setPane('Compte-rendu', `<div class="empty"><b>Compte-rendu indisponible</b>${esc(e.message)}</div>`); }
     const ev = r.evenement || {}, c = r.compte_rendu;
     if (!c) return setPane('Compte-rendu', `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Pas encore de compte-rendu</b>L’organisateur ne l’a pas encore publié.<br><br><a class="btn" href="#/evenement/${esc(id)}">Voir l’événement</a></div>`);
     const medias = (c.medias || []).map(m => typeof m === 'string' ? m : (m && m.url)).filter(Boolean);
     const html = `${ev.image ? mediaBlock(ev.image, { alt: ev.titre }) : ''}
+      ${crAgirBloc(c)}
       <div class="card" style="margin-top:12px"><div class="pad"><div class="small muted" style="margin-bottom:4px">${ic('doc', 's')} Compte-rendu${c.published_at ? ' · ' + esc(ago(c.published_at)) : ''}</div>
         <h2 style="margin:0 0 8px;font-size:21px;line-height:1.25">${esc(c.titre || ev.titre)}</h2>
         <div class="meta">${ic('cal', 's')}<span>${esc(ev.titre || '')} · ${esc(dateLong(ev.date_evt))}</span></div>
@@ -924,11 +1010,17 @@
       ${(c.partenaires || []).length ? `<div class="h2">PARTENAIRES</div><div class="lst">${c.partenaires.map(p => `<a class="li" ${p.lien ? `href="${attrUrl(p.lien)}" target="_blank" rel="noopener"` : ''}><span class="ic">${p.logo_url ? `<img src="${attrUrl(p.logo_url)}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:10px">` : ic('people')}</span><span class="sp"><span class="t">${esc(p.nom)}</span>${p.description ? `<br><span class="d">${esc(p.description)}</span>` : ''}</span></a>`).join('')}</div>` : ''}
       ${(r.identifies || []).length ? `<div class="h2">IDENTIFIÉS</div><div class="card"><div class="pad"><div class="tags" style="margin:0">${r.identifies.map(p => `<a class="badge" href="profil.html?id=${esc(p.user_id)}">${esc(p.nom)}</a>`).join('')}</div></div></div>` : ''}
       ${c.etape_texte ? `<div class="card"><div class="pad"><div class="small muted">Prochaine étape${c.etape_date ? ' · ' + esc(dateLong(c.etape_date)) : ''}</div><p style="margin:4px 0 0">${esc(c.etape_texte)}</p></div></div>` : ''}
-      ${(c.actions || []).length ? c.actions.map(a => `<a class="btn block" style="margin-bottom:10px" href="${attrUrl(a.lien)}" target="_blank" rel="noopener">${esc(a.bouton)} ${ic('out', 's')}</a>`).join('') : (c.etape_bouton && c.etape_lien ? `<a class="btn block" style="margin-bottom:10px" href="${attrUrl(c.etape_lien)}" target="_blank" rel="noopener">${esc(c.etape_bouton)} ${ic('out', 's')}</a>` : '')}
       <button type="button" class="btn block" id="crmsg" style="margin-bottom:10px">💬 Laisser un message à l’organisateur</button>
       ${r.peut_editer ? '<button type="button" class="btn out block" id="crrecus" style="margin-bottom:10px">📨 Messages reçus</button>' : ''}
       <a class="btn out block" href="compte-rendu.html?evt=${esc(id)}">Ouvrir la version complète ${ic('out', 's')}</a>`;
-    setPane(c.titre || 'Compte-rendu', html);
+    setPane(c.titre || 'Compte-rendu', html, crBarHtml(c));
+    /* barre du bas, toujours visible : « Synthèse » (+ « ? » qui l'explique) et « Agir » ; bloc d'action du haut : message à l'organisateur */
+    const bulle = $('#cr-bulle'), qm = $('#cr-qm');
+    $('#cr-synth').onclick = () => { bulle.hidden = true; qm.setAttribute('aria-expanded', 'false'); crSynthese(r, id); };
+    qm.onclick = () => { bulle.hidden = !bulle.hidden; qm.setAttribute('aria-expanded', String(!bulle.hidden)); };
+    $('#cr-agir').onclick = () => { bulle.hidden = true; crAgir(r, id); };
+    $$('#pane-body [data-cr-msg]').forEach(b => b.onclick = () => crMessage(id, ev));
+    if (sous === 'synthese') crSynthese(r, id);
     const bm = $('#crmsg'); if (bm) bm.onclick = () => crMessageSheet(id, ev);
     const br = $('#crrecus'); if (br) br.onclick = () => crMessagesRecus(id, c.titre || ev.titre);
   }
@@ -1398,7 +1490,7 @@
     else if (a === 'billets') paneBillets();
     else if (a === 'billet') paneBillet(b, c);
     else if (a === 'notifs') paneNotifs();
-    else if (a === 'cr') paneCR(b);
+    else if (a === 'cr') paneCR(b, c);
     else if (a === 'cagnottes') paneCagnottes(b);
     else if (a === 'videos') paneVideos();
     else if (a === 'video') paneVideo(b);
