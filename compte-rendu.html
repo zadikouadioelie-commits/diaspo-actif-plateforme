@@ -610,6 +610,19 @@ function ctaHtml(cr) {
   if (liste.length === 1) return un(liste[0]);
   return '<div class="cr2-cta-multi"><div class="cr2-cta-multi-t">Choisissez comment agir</div><div class="cr2-cta-grid">' + liste.map(un).join('') + '</div></div>';
 }
+/* Action concrète pour le lecteur (2026-10-07, demande explicite) : bouton(s) bleu(s) scintillant(s), sous l'affiche, dans le même bleu pailleté
+   que la cartouche « Bouton d'action » du formulaire. Même source que le grand bouton d'avant (actionsDe) : rien à ressaisir. */
+function ctaBleuHtml(cr) {
+  const liste = actionsDe(cr);
+  if (!liste.length) return '';
+  return '<div class="cr2-agir-bleu" id="cr-agir-bleu"><div class="cr2-agir-bleu-t">Action concrète pour vous</div>'
+    + liste.map(a => {
+      const mode = modeAction(a.lien);
+      const sous = mode === 'fiche' ? 'Quelques secondes, sans créer de compte.' : mode === 'don' ? 'Chaque geste compte.' : '';
+      return '<a class="cr2-btn-bleu" href="' + esc(a.lien) + '" target="_blank" rel="noopener">' + svgIc(mode === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>'
+        + (sous ? '<small>' + esc(sous) + '</small>' : '');
+    }).join('') + '</div>';
+}
 function videoHtml(url) {
   if (!url) return '';
   const fichier = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
@@ -684,7 +697,7 @@ function vuePublique() {
   root.classList.add('crp-wide');
   const brouillon = cr.statut !== 'publie';
   const parties = partiesDe(cr), graph = graphiquesHtml(cr), parts = partenairesHtml(cr, ev), logo = logoOrga(cr, ev);
-  const actions = ctaHtml(cr), agirNav = agirNavHtml(cr), forts = cr.forts || [], type = typeLibelle(cr);
+  const bleu = ctaBleuHtml(cr), agirNav = agirNavHtml(cr), forts = cr.forts || [], type = typeLibelle(cr);
   const recitOk = cr.type_cr !== 'blanc' && parties.length > 0;
   /* Barre de navigation fixe (2026-10-07, demande explicite : tout à portée de souris sans trop défiler) : les grandes
      sections, un menu « Le récit » qui liste les parties, « Agir » et « Synthèse » toujours visibles. */
@@ -709,12 +722,13 @@ function vuePublique() {
     + '<div class="cr2-in">'
     /* Début de page côte à côte : l'affiche à gauche, le résumé, les boutons et la suite à droite. */
     + '<div class="cr2-top' + (ev.image ? '' : ' sans') + '">'
-    + (ev.image ? '<div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' : '')
+    /* Colonne de gauche : l'affiche, puis l'action concrète pour le lecteur juste en dessous. */
+    + (ev.image ? '<div class="cr2-gauche"><div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' + bleu + '</div>' : '')
     + '<div class="cr2-top-r">'
     + '<div class="cr2-sous">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + '</div>'
     + '<div class="crp-chips" id="crp-chips">Avec : </div>'
     + '<div class="cr2-resume" id="cr-resume"><b>RÉSUMÉ</b>' + resumePageHtml(cr) + '</div>'
-    + '<div class="cr2-actions" id="cr-agir">' + synthese + actions + '</div>'
+    + '<div class="cr2-actions" id="cr-agir">' + synthese + (ev.image ? '' : bleu) + '</div>'
     + etapeHtml(cr)
     + '</div></div>'
     + videoHtml(cr.video_url)

@@ -349,3 +349,21 @@ body.cr-synth-open{overflow:hidden}
 @media(min-width:1700px){
   .cr2-top:not(.sans) .cr2-resume{column-count:2;column-gap:30px}
 }
+
+/* Action concrète pour vous (2026-10-07) : bouton bleu scintillant sous l'affiche — même bleu pailleté que la cartouche « Bouton d'action » des formulaires. */
+.cr2-gauche{min-width:0}
+.cr2-agir-bleu{margin:14px 0 0;display:flex;flex-direction:column;gap:8px}
+.cr2-agir-bleu-t{font-weight:800;font-size:calc(var(--cr-fs) + 1px);color:var(--cr-bleu2,#0D2B4E);text-align:center}
+.cr2-agir-bleu small{color:var(--cr-ink2,#5B6B82);font-size:13px;text-align:center;margin:-2px 0 4px}
+.cr2-btn-bleu{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:12px;box-sizing:border-box;width:100%;padding:16px 22px;border-radius:16px;text-decoration:none;font-weight:800;font-size:calc(var(--cr-fs) + 1px);line-height:1.25;text-align:center;color:#fff;background:linear-gradient(135deg,#0A2F7A 0%,#1558C8 45%,#2E8BFF 100%);box-shadow:0 0 0 1px rgba(160,205,255,.55),0 8px 22px rgba(46,116,224,.4);transition:transform .2s,box-shadow .2s}
+.cr2-btn-bleu>*{position:relative;z-index:1}
+.cr2-btn-bleu:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(190,225,255,.9) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.8) 0 1.5px,transparent 2.1px);background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:cr2-bleu-scint 3.2s ease-in-out infinite}
+.cr2-btn-bleu:after{content:"";position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.45),transparent);animation:cr2-bleu-reflet 4.2s ease-in-out infinite;pointer-events:none}
+.cr2-btn-bleu svg{width:22px;height:22px;flex:none}
+.cr2-btn-bleu i{font-style:normal;font-size:1.2em;transition:transform .2s}
+.cr2-btn-bleu:hover,.cr2-btn-bleu:focus-visible{transform:translateY(-2px);box-shadow:0 0 0 3px rgba(160,205,255,.85),0 12px 30px rgba(46,116,224,.6);outline:none}
+.cr2-btn-bleu:hover i{transform:translateX(4px)}
+@keyframes cr2-bleu-scint{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes cr2-bleu-reflet{0%{left:-60%}55%,100%{left:130%}}
+@media (prefers-reduced-motion:reduce){.cr2-btn-bleu:before,.cr2-btn-bleu:after{animation:none}}
+@media print{.cr2-agir-bleu{display:none}}
