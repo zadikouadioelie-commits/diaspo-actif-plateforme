@@ -1124,6 +1124,95 @@ function iaDateCreation(v) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 }
+/* « 💛 Don / Cagnotte » (2026-10-07, demande explicite) — relie CE formulaire à un don ou à une cagnotte de l'organisateur, avec la
+   possibilité d'en créer un(e) sur place quand il n'y en a pas encore. Aucun nouveau type de champ ni nouvelle route : on réutilise le
+   lien déjà existant cagnottes.insc_fiche_id (PUT /api/cagnottes/:id) ; la page publique du formulaire affiche déjà le bouton « Soutenir »
+   pour les dons/cagnottes publiés liés à la fiche (ipRenderDonLie, GET /api/cagnottes/pour-fiche/:id). Un don ou une cagnotte ne peut être
+   lié(e) qu'à une seule fiche : en choisir un(e) déjà lié(e) ailleurs le/la déplace ici (signalé dans la liste). */
+async function iaOuvrirDonCagnotte() {
+  const fiche = selectedFiche();
+  if (!fiche) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  document.body.appendChild(overlay);
+  let cags = [], erreur = '', creation = null;
+  const libelleType = c => c.type_don === 'campagne' ? 'Cagnotte' : (c.type_don === 'recurrent' ? 'Don récurrent' : 'Don');
+  const champ = 'width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid oklch(0.85 0.004 30);border-radius:9px;font:inherit;font-size:13.5px;margin-top:8px;';
+  const charger = async () => { try { cags = (await api('GET', '/cagnottes/mes')).cagnottes || []; erreur = ''; } catch (e) { cags = []; erreur = e.message || 'Chargement impossible.'; } };
+  const dessiner = () => {
+    const lignes = cags.map(c => {
+      const lie = Number(c.insc_fiche_id) === Number(fiche.id), ailleurs = c.insc_fiche_id && !lie;
+      return `<label style="display:flex;align-items:center;gap:10px;border:1.5px solid ${lie ? '#E3B84A' : 'oklch(0.9 0.004 30)'};background:${lie ? '#FFF8E1' : '#fff'};border-radius:10px;padding:10px 12px;cursor:pointer;">
+        <input type="checkbox" data-idc="${c.id}" ${lie ? 'checked' : ''} style="width:17px;height:17px;flex-shrink:0;">
+        <span style="flex:1;min-width:0;"><b style="font-size:13.5px;">${escH(c.titre)}</b><br><span style="font-size:11.5px;color:oklch(0.5 0.006 30);">${libelleType(c)} · ${c.est_publiee ? 'Publié(e)' : 'Brouillon — pas encore visible du public'}${ailleurs ? ' · actuellement lié(e) à un autre formulaire (sera déplacé(e) ici)' : ''}</span></span>
+      </label>`;
+    }).join('');
+    const formCreation = !creation ? '' : `
+      <div style="border:1.5px solid #F2C94C;background:#FFFBEA;border-radius:12px;padding:14px;margin-top:12px;">
+        <div style="font-weight:800;font-size:14px;">${creation === 'don' ? '💛 Nouveau don' : '🎯 Nouvelle cagnotte'}</div>
+        <input id="idc-titre" maxlength="120" value="${escH((creation === 'don' ? 'Soutenir — ' : 'Cagnotte — ') + fiche.nom)}" placeholder="Titre" style="${champ}">
+        ${creation === 'cagnotte' ? `<input id="idc-objectif" type="number" min="1" step="1" placeholder="Objectif à atteindre, en euros (obligatoire)" style="${champ}">` : ''}
+        <textarea id="idc-desc" rows="2" maxlength="600" placeholder="Description courte (facultative)" style="${champ}resize:vertical;"></textarea>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;margin-top:10px;font-weight:500;"><input type="checkbox" id="idc-publier" checked style="margin-top:2px;"><span>Publier tout de suite (une annonce apparaît alors dans le fil d’actualité). Décochez pour le garder en brouillon.</span></label>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+          <button type="button" data-idc-creer style="background:#F26422;border:none;color:#1f0e02;font-weight:800;font-size:13px;padding:10px 16px;border-radius:9px;cursor:pointer;">Créer et lier à ce formulaire</button>
+          <button type="button" data-idc-annuler style="background:#fff;border:1.5px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-weight:600;font-size:13px;padding:10px 16px;border-radius:9px;cursor:pointer;">Annuler</button>
+        </div>
+      </div>`;
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px;">
+          <h3 style="margin:0;font-size:17px;color:#8A5A00;">💛 Don ou cagnotte lié(e) à ce formulaire</h3>
+          <button type="button" data-idc-fermer style="background:none;border:none;font-size:20px;cursor:pointer;color:oklch(0.55 0.006 30);flex-shrink:0;">✕</button>
+        </div>
+        <p style="font-size:12.5px;color:oklch(0.55 0.006 30);margin:0 0 14px;">Les personnes qui ouvrent « ${escH(fiche.nom)} » voient un bouton « Soutenir » vers le don ou la cagnotte que vous cochez. Il apparaît dès que le don ou la cagnotte est publié(e).</p>
+        ${erreur ? `<div style="background:#FEF2F2;color:#B91C1C;border-radius:9px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;">${escH(erreur)}</div>` : ''}
+        <div style="display:flex;flex-direction:column;gap:8px;">${lignes || `<div style="background:oklch(0.97 0.004 30);border-radius:10px;padding:14px;font-size:13px;color:oklch(0.45 0.006 30);">Vous n’avez encore <b>ni don ni cagnotte</b>. Créez-en un(e) ci-dessous : il ou elle sera aussitôt lié(e) à ce formulaire.</div>`}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+          <button type="button" data-idc-nouveau="don" style="flex:1;min-width:190px;background:#fff;border:1.5px dashed #E3B84A;color:#8A5A00;font-weight:800;font-size:13px;padding:11px;border-radius:10px;cursor:pointer;">＋ Créer un don</button>
+          <button type="button" data-idc-nouveau="cagnotte" style="flex:1;min-width:190px;background:#fff;border:1.5px dashed #E3B84A;color:#8A5A00;font-weight:800;font-size:13px;padding:11px;border-radius:10px;cursor:pointer;">＋ Créer une cagnotte</button>
+        </div>
+        ${formCreation}
+      </div>`;
+  };
+  const maj = async () => { await charger(); dessiner(); };
+  overlay.addEventListener('click', async (e) => {
+    if (e.target === overlay || e.target.closest('[data-idc-fermer]')) { overlay.remove(); return; }
+    const nouveau = e.target.closest('[data-idc-nouveau]');
+    if (nouveau) { creation = nouveau.dataset.idcNouveau; dessiner(); const t = overlay.querySelector('#idc-titre'); if (t) { t.focus(); t.select(); } return; }
+    if (e.target.closest('[data-idc-annuler]')) { creation = null; dessiner(); return; }
+    const creer = e.target.closest('[data-idc-creer]');
+    if (!creer) return;
+    const titre = overlay.querySelector('#idc-titre').value.trim();
+    const objectifSaisi = overlay.querySelector('#idc-objectif');
+    const objectif = objectifSaisi ? Number(objectifSaisi.value) : null;
+    if (titre.length < 3) { ia_toast('Écrivez un titre (3 caractères au moins).', false); return; }
+    if (creation === 'cagnotte' && !(objectif > 0)) { ia_toast('Indiquez l’objectif de la cagnotte, en euros.', false); return; }
+    creer.disabled = true; creer.textContent = 'Création…';
+    try {
+      const corps = { titre, description: overlay.querySelector('#idc-desc').value.trim() || undefined, type_don: creation === 'don' ? 'occasionnel' : 'campagne', insc_fiche_id: fiche.id };
+      if (creation === 'cagnotte') corps.objectif_montant = objectif;
+      const r = await api('POST', '/cagnottes', corps);
+      let publie = false;
+      if (overlay.querySelector('#idc-publier').checked) { await api('PATCH', `/cagnottes/${r.cagnotte.id}/statut`, { action: 'publier' }); publie = true; }
+      ia_toast(`${creation === 'don' ? 'Don' : 'Cagnotte'} créé(e) et lié(e) à ce formulaire${publie ? ' — publié(e)' : ' (brouillon)'}.`, true);
+      creation = null;
+      await maj();
+    } catch (err) { ia_toast(err.message || 'Création impossible.', false); creer.disabled = false; creer.textContent = 'Créer et lier à ce formulaire'; }
+  });
+  overlay.addEventListener('change', async (e) => {
+    const cb = e.target.closest('[data-idc]');
+    if (!cb) return;
+    cb.disabled = true;
+    try {
+      await api('PUT', `/cagnottes/${cb.dataset.idc}`, { insc_fiche_id: cb.checked ? fiche.id : null });
+      ia_toast(cb.checked ? 'Lié(e) à ce formulaire.' : 'Délié(e) de ce formulaire.', true);
+    } catch (err) { cb.checked = !cb.checked; ia_toast(err.message || 'Modification impossible.', false); }
+    await maj();
+  });
+  await maj();
+}
+
 /* Cartouche « Bouton d'action » : mention, nom de l'événement, titre du bouton. Modifiable (editable) dans l'éditeur de la fiche. */
 function iaBaCartouche(f, editable, marge) {
   if (!f || !Number(f.est_bouton_action)) return '';
@@ -1853,6 +1942,8 @@ function renderFields() {
           <!-- "💬 Commentaire libre" (2026-10-06, demande explicite) — ajoute en un clic une zone d'expression libre
                (texte long, facultative) où la personne s'exprime simplement. -->
           <button style="background:#fff; border:1.5px solid #0E8F8F; color:#0B6E6E; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(14,143,143,.35);" data-action="ajouterCommentaireLibre">💬 Commentaire libre</button>
+          <!-- "💛 Don / Cagnotte" (2026-10-07, demande explicite) — relie ce formulaire à un don ou une cagnotte, ou en crée un(e) sur place. -->
+          <button style="background:#fff; border:1.5px solid #E3B84A; color:#8A5A00; font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:8px; cursor:pointer; box-shadow:0 0 6px rgba(227,184,74,.5);" data-action="ouvrirDonCagnotte">💛 Don / Cagnotte</button>
         </div>
         ${panelSuggestions}
       </div>
@@ -3364,6 +3455,7 @@ const actions = {
   ouvrirPartenaires() { iaOuvrirSponsorsPartenaires('partenaires'); },
   ouvrirSondage() { iaOuvrirSondage(); },
   ouvrirLiensUtiles() { iaOuvrirLiensUtiles(); },
+  ouvrirDonCagnotte() { iaOuvrirDonCagnotte(); },
   modifierLiensUtiles(el) { iaOuvrirLiensUtiles(parseInt(el.dataset.id)); },
   // "💼 Candidature" (2026-09-27) — la fonctionnalité (onglet dédié, renderCandidature()) a été
   // construite séparément depuis ce bouton placeholder, jamais mis à jour pour y naviguer (bug
