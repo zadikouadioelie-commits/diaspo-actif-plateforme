@@ -36450,8 +36450,12 @@ ${jsonLd}
       return (await db.prepare(`SELECT COUNT(*) as c FROM reseau_recommandations WHERE initiative_id=?`).get(initId))?.c || 0;
     }
     /* Helper — enrichir fiche init pour le réseau */
-    async function enrichInit(row) {
+    /* Champs privés du responsable : jamais exposés par les routes publiques du Réseau Pro (la page affirme
+       qu'aucun téléphone ni e-mail n'est affiché). Seule la propre initiative du compte (« moi ») les garde. */
+    const RESEAU_CHAMPS_PRIVES = ['email_responsable', 'tel_responsable', 'tel_responsable_2', 'tel_responsable_3', 'stripe_identity_session_id', 'numero_fiscal'];
+    async function enrichInit(row, garderPrive) {
       if (!row) return null;
+      if (!garderPrive) { row = { ...row }; RESEAU_CHAMPS_PRIVES.forEach(k => { delete row[k]; }); }
       return {
         ...row,
         services: safeParseArray(row.services),
@@ -36513,7 +36517,7 @@ ${jsonLd}
         ORDER BY i.nom ASC
       `).all(myInit.id);
       return sendJSON(res, 200, {
-        moi: await enrichInit(myInit),
+        moi: await enrichInit(myInit, true),
         mon_reseau: await Promise.all(affilies.map(async r => ({ ...(await enrichInit(r)), mise_en_avant: r.mise_en_avant }))),
         membre_de: await Promise.all(membrede.map(enrichInit)),
       });
