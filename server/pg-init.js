@@ -1141,6 +1141,8 @@ const COLONNES_MIGRATION = [
     ['initiatives', 'adhesion_modele_relance', 'TEXT'],
     ['initiatives', 'adhesion_modele_recu', 'TEXT'],
     ['initiatives', 'adhesion_liens_relance', 'TEXT'],
+    // Case « Afficher mon adresse publiquement » (2026-10-07) — miroir exact de l'ALTER db.js.
+    ['initiatives', 'adresse_visible', 'INTEGER DEFAULT 1'],
     // Module Adhésions — mode de validité individuel/collectif (miroir de l'ALTER db.js)
     ['adhesion_formules', 'mode_validite', "TEXT DEFAULT 'individuel'"],
     ['adhesion_formules', 'periode_collective_debut', 'TEXT'],

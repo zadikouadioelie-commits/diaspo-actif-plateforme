@@ -835,7 +835,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
       init.vitrine_tel_pro && ['📞', renderMaskedPhone(init.vitrine_tel_pro)],
       init.vitrine_email_pro && ['✉️', esc2(init.vitrine_email_pro)],
       init.site_web && ['🌐', `<a href="${esc2(init.site_web)}" target="_blank" style="color:#2563EB;">${esc2(init.site_web.replace(/^https?:\/\//,''))}</a>`],
-      (init.adresse || init.ville) && ['📍', esc2([init.adresse, init.ville, init.pays].filter(Boolean).join(', '))],
+      (init.adresse || init.ville) && ['📍', esc2([init.adresse, init.ville, init.pays].filter(Boolean).join(', ')) + (isOwner && Number(init.adresse_visible) === 0 ? ' <span style="font-size:11px;color:var(--muted);">🙈 adresse masquée au public</span>' : '')],
     ].filter(Boolean);
     const hasLatLon = init.lat != null && init.lon != null;
     const mapSrc = hasLatLon
@@ -1165,6 +1165,11 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
         + champ('ec-email', 'E-mail de la boutique', init.vitrine_email_pro, 'contact@exemple.org', 'email')
         + champ('ec-web', 'Site web', init.site_web, 'https://exemple.org', 'url')
         + champ('ec-adresse', 'Adresse', init.adresse, '12 rue des Diasporas')
+        + `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 2px;font-size:12.5px;cursor:pointer;">
+             <input type="checkbox" id="ec-adresse-visible" ${Number(init.adresse_visible) === 0 ? '' : 'checked'} style="width:16px;height:16px;">
+             <span>Afficher mon adresse publiquement</span>
+           </label>
+           <p style="font-size:11.5px;color:var(--muted);margin:0 0 4px;">Décoché, l'adresse, le code postal et la carte sont masqués aux visiteurs : seules la ville et le pays restent affichés. Vous les voyez toujours. Attention : si votre boutique propose un retrait sur place, vos clients ne verront plus l'adresse.</p>`
         + champ('ec-ville', 'Ville', init.vitrine_ville || init.ville, 'Paris'),
         async ov => {
           const v = id => ov.querySelector('#' + id).value.trim();
@@ -1182,6 +1187,7 @@ const THEME_VITRINE_LABELS = { bordeaux:'Bordeaux', ocean:'Ocean', emeraude:'Eme
             adresse: v('ec-adresse'),
             vitrine_ville: v('ec-ville'),
           });
+          await api('PUT', `/initiatives/${init.id}/adresse-visibilite`, { visible: ov.querySelector('#ec-adresse-visible').checked });
           const r = await api('GET', `/initiatives/${init.id}`);
           Object.assign(init, r.initiative);
           renderColLeft(); renderColRight();

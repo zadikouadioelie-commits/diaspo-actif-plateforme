@@ -1897,6 +1897,8 @@ const MIGRATIONS = [
   // Affichage public des membres, choisi par l'association (incrément 6) : 'tous' (défaut,
   // comportement historique inchangé) / 'dirigeants' / 'nombre' / 'masque'.
   ["initiatives", "affichage_membres TEXT DEFAULT 'tous'"],
+  // Case « Afficher mon adresse publiquement » (2026-10-07) : 1 = visible (défaut), 0 = adresse, code postal, GPS et carte masqués au public.
+  ["initiatives", "adresse_visible INTEGER DEFAULT 1"],
   // Demande d'affiliation à l'initiative du côté du compte utilisateur (2026-09-09) :
   // distingue qui a lancé la relation. 'invitation' (défaut, comportement historique
   // inchangé) = l'initiative a invité le compte. 'demande' = le compte a lui-même demandé

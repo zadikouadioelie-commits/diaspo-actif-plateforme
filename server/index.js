@@ -341,6 +341,11 @@ function assainirInitiativePublique(row, moi) {
   if (!row) return row;
   if (moi && (Number(moi.id) === Number(row.owner_user_id) || moi.role === 'administrateur')) return row;
   CHAMPS_INITIATIVE_PRIVES.forEach(c => { if (c in row) row[c] = null; });
+  /* Adresse masquée par son propriétaire (2026-10-07, case « Afficher mon adresse publiquement ») : adresse, code postal, coordonnées GPS et lien
+     de carte retirés ; la ville et le pays restent affichés. NULL = jamais choisi = visible (comportement d'avant). */
+  if (row.adresse_visible !== null && row.adresse_visible !== undefined && Number(row.adresse_visible) === 0) {
+    ['adresse', 'code_postal', 'lat', 'lon', 'vitrine_google_maps_url'].forEach(c => { if (c in row) row[c] = null; });
+  }
   /* Renseigner un numéro de vitrine ne vaut pas consentement à le publier. */
   if (Number(row.vitrine_tel_visible) !== 1) { if ('vitrine_tel_pro' in row) row.vitrine_tel_pro = null; if ('vitrine_whatsapp' in row) row.vitrine_whatsapp = null; }
   return row;
@@ -10180,6 +10185,19 @@ route("GET", "/api/initiatives/:id/stats-impact", async (req, res, params) => {
 });
 
 /* ── Mise à jour des champs du profil public enrichi (owner uniquement) ── */
+/* PUT /api/initiatives/:id/adresse-visibilite — case « Afficher mon adresse publiquement » (2026-10-07). Réservé au propriétaire ; sans effet sur la ville et le pays. */
+route("PUT", "/api/initiatives/:id/adresse-visibilite", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const init = await db.prepare("SELECT owner_user_id FROM initiatives WHERE id=?").get(params.id);
+  if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  if (Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  const visible = body && body.visible === false ? 0 : 1;
+  try { await db.prepare("UPDATE initiatives SET adresse_visible=?, updated_at=datetime('now') WHERE id=?").run(visible, params.id); }
+  catch (e) { return sendJSON(res, 500, SEC.safeError(e, "adresse-visibilite")); }
+  sendJSON(res, 200, { ok: true, adresse_visible: visible });
+});
+
 route("PUT", "/api/initiatives/:id/profil-public", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
