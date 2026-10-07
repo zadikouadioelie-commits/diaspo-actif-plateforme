@@ -185,9 +185,11 @@
   function confirmerAppareil(rep, sh) {
     return new Promise(resolve => {
       sh.hidden = false;
+      const ouvert = (rep.deja_ouvert_sur || []).map(a => esc(a.libelle) + (a.il_y_a_min != null ? ' (actif ' + (a.il_y_a_min < 2 ? 'à l’instant' : a.il_y_a_min < 90 ? 'il y a ' + a.il_y_a_min + ' min' : a.il_y_a_min < 2880 ? 'il y a ' + Math.round(a.il_y_a_min / 60) + ' h' : 'il y a plus de 2 jours') + ')' : '')).join(' · ');
       sh.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-label="Confirmer la connexion"><div class="grip"></div><div class="sb">
         <h2 style="margin:4px 0 2px;font-size:20px">Confirmez que c’est bien vous</h2>
-        <p class="muted small" style="margin:0 0 14px">Votre compte est déjà ouvert sur un autre appareil. Pour votre sécurité, prouvez que vous en êtes le titulaire.</p>
+        <p class="muted small" style="margin:0 0 ${ouvert ? 6 : 14}px">Ce compte est déjà connecté ailleurs. Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
+        ${ouvert ? `<p class="small" style="margin:0 0 14px;padding:8px 10px;background:var(--sky-l);border-radius:10px"><b>Déjà connecté sur :</b> ${ouvert}</p>` : ''}
         <div id="ca-dsid-box">
           <label class="small muted" for="ca-dsid">Votre Code de Sécurité (DS-ID)</label>
           <div class="search" style="border-radius:12px;margin:4px 0 8px"><input id="ca-dsid" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DS-ID de ce compte ou d’un compte lié"></div>

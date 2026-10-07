@@ -47,7 +47,7 @@ async function evaluer(db, { req, user, ip, notifier, creerDefi = true }) {
   let appareilId = Connexions.lireAppareilId(req);
   if (appareilId && await estReconnu(db, user.id, appareilId)) return { ok: true };
 
-  const lignes = await db.prepare('SELECT appareil_id, last_seen_at, expire_at FROM connexions WHERE user_id=? AND revoque_at IS NULL').all(user.id);
+  const lignes = await db.prepare('SELECT appareil_id, last_seen_at, expire_at, type_appareil, navigateur, os FROM connexions WHERE user_id=? AND revoque_at IS NULL').all(user.id);
   const maintenant = horodatage(), limite = horodatage(-ACTIVITE_RECENTE_MS);
   const autresActives = lignes.filter(l => l.appareil_id !== appareilId
     && (!l.expire_at || String(l.expire_at) >= maintenant) && String(l.last_seen_at || '') >= limite);
@@ -76,7 +76,13 @@ async function evaluer(db, { req, user, ip, notifier, creerDefi = true }) {
     defi = await db.prepare('SELECT * FROM confirmations_appareil WHERE id=?').get(id);
     if (notifier) { try { await notifier(defi); } catch (_) { /* l'alerte est best-effort */ } }
   }
-  return { defi, appareilId, nouveauCookie };
+  /* Où le compte est-il déjà ouvert ? Affiché dans la fenêtre de confirmation pour que la personne comprenne de quel appareil on parle
+     (type, système, navigateur, ancienneté — jamais la ville ni l'adresse IP). */
+  const autres = autresActives.map(l => {
+    const t = new Date(String(l.last_seen_at || '').replace(' ', 'T') + 'Z').getTime();
+    return { libelle: Connexions.etiquette(l), il_y_a_min: isNaN(t) ? null : Math.max(0, Math.round((Date.now() - t) / 60000)) };
+  });
+  return { defi, appareilId, nouveauCookie, autres };
 }
 
 /* Charge un défi en vérifiant qu'il est actionnable depuis CE navigateur. */

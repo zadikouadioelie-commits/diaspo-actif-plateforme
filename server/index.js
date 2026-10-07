@@ -231,7 +231,7 @@ async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
     if (v.defi) {
       SEC.logSecurity("login_appareil_a_confirmer", { ip, uid: Number(user.id) });
       return { reponse: (res) => sendJSON(res, 200,
-        { confirmation_requise: true, defi: v.defi.id, methodes: ["ds_id", "email"], email_masque: ConfirmationAppareil.masquerEmail(user.email), expire_dans: 600 },
+        { confirmation_requise: true, defi: v.defi.id, methodes: ["ds_id", "email"], email_masque: ConfirmationAppareil.masquerEmail(user.email), expire_dans: 600, deja_ouvert_sur: v.autres || [] },
         { "Set-Cookie": [Connexions.cookieAppareilTexte(v.appareilId, cookieSecureFlag(req))] }) };
     }
   } catch (e) { console.error("[confirmation-appareil.evaluer]", e.message); }

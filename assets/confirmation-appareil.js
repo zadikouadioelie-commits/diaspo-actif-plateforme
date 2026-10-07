@@ -44,9 +44,11 @@
       ov.setAttribute('role', 'dialog');
       ov.setAttribute('aria-modal', 'true');
       ov.setAttribute('aria-labelledby', 'ca-titre');
+      const ouvert = (rep.deja_ouvert_sur || []).map(a => esc(a.libelle) + (a.il_y_a_min != null ? ' (actif ' + (a.il_y_a_min < 2 ? 'à l\'instant' : a.il_y_a_min < 90 ? 'il y a ' + a.il_y_a_min + ' min' : a.il_y_a_min < 2880 ? 'il y a ' + Math.round(a.il_y_a_min / 60) + ' h' : 'il y a plus de 2 jours') + ')' : '')).join(' · ');
       ov.innerHTML = `<div class="ca-box">
         <h3 id="ca-titre">🔐 Confirmez que c'est bien vous</h3>
-        <p>Votre compte est déjà ouvert sur un autre appareil. Pour votre sécurité, prouvez que vous en êtes le titulaire.</p>
+        <p>Ce compte est déjà connecté ailleurs. Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
+        ${ouvert ? `<p><strong>Déjà connecté sur :</strong> ${ouvert}</p>` : ''}
         <div id="ca-mode-dsid">
           <label for="ca-dsid">Votre Code de Sécurité (DS-ID)</label>
           <input id="ca-dsid" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DS-ID de ce compte ou d'un compte lié">
