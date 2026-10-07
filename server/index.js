@@ -352,6 +352,25 @@ function publicUserVisiteur(u, moi) {
   return { ...base, email: null, nb_connexions: 0, pwa_prompt_dismiss: false, temoignage_statut: 'non_demande', temoignage_derniere_demande: null, demo_vue: 0 };
 }
 
+/* ── Robots d'intelligence artificielle (2026-10-07, demande de l'utilisateur) ──────────────────────────
+   Les robots d'IA qui s'annoncent par leur identifiant (user-agent) reçoivent un 403 sur tout le site, sauf
+   /robots.txt et /sitemap.xml. Claude-User (l'assistant qui travaille avec le propriétaire) n'est pas dans la liste.
+   Honnêteté : cela n'arrête que les robots qui disent qui ils sont — un robot déguisé en navigateur passe ;
+   la vraie protection reste de ne rien exposer en accès libre (voir assainirInitiativePublique). Exception
+   explicite : l'en-tête x-da-acces égal à la variable d'environnement DA_ACCES_AUTORISE (si elle est posée). */
+const ROBOTS_IA_BLOQUES = /(GPTBot|OAI-SearchBot|ChatGPT-User|CCBot|PerplexityBot|Perplexity-User|Bytespider|Amazonbot|Meta-ExternalAgent|Meta-ExternalFetcher|cohere-ai|cohere-training-data-crawler|Diffbot|ImagesiftBot|Omgilibot|anthropic-ai|ClaudeBot|Claude-Web|Claude-SearchBot|YouBot|Timpibot|AI2Bot|DuckAssistBot|MistralAI-User|PanguBot|PetalBot|Webzio|Kangaroo Bot|ICC-Crawler)/i;
+function robotIABloque(req, pathname) {
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname.startsWith('/api/stripe/webhook') || pathname.startsWith('/api/cron/')) return false;
+  const ua = String(req.headers['user-agent'] || '');
+  if (!ROBOTS_IA_BLOQUES.test(ua)) return false;
+  const secret = process.env.DA_ACCES_AUTORISE;
+  if (secret && req.headers['x-da-acces'] === secret) return false;
+  return true;
+}
+/* Routes publiques de listes/profils, les plus exposées au moissonnage : plafond par IP plus bas que le plafond
+   général de l'API (240/min), sans gêner une navigation normale (une page d'annuaire en fait ~5). */
+const RE_LISTES_PUBLIQUES = /^\/api\/(annuaire\/(recherche|utilisateurs)|initiatives|vitrines|evenements|talents-diaspora|fil\/profiles|profil\/\d+)$/;
+
 function publicUser(u) {
   if (!u) return null;
   return { id: Number(u.id), nom: u.nom, prenom: u.prenom, email: u.email, role: u.role, ville: u.ville, pays: u.pays, profil: safeParse(u.profil_json),
@@ -29511,6 +29530,13 @@ async function handleRequest(req, res) {
     }
   }
 
+  /* ── Robots d'IA : refus net (voir ROBOTS_IA_BLOQUES) ── */
+  if (robotIABloque(req, pathname)) {
+    SEC.logSecurity("robot_ia_refuse", { path: pathname, ua: String(req.headers['user-agent'] || '').slice(0, 80) });
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end("Accès refusé aux robots d'intelligence artificielle. Contact : contact@diaspoactif.com");
+  }
+
   /* ── Sauvegarde automatique quotidienne (Vercel Cron → zone Bunny privée dédiée) ──
      Filet de sécurité en complément du PITR Neon. Le fichier n'est jamais public :
      zone Bunny distincte de celle des médias, sans CDN/Pull Zone associée. */
@@ -30966,6 +30992,13 @@ ${jsonLd}
     const _apiGlobalLimit = SEC.rateLimit(`api:global:${_apiIp}`, 240, 60 * 1000);
     if (!_apiGlobalLimit.allowed) {
       return sendJSON(res, 429, { error: "Trop de requêtes, réessayez dans quelques instants." }, { "Retry-After": String(_apiGlobalLimit.retryAfter) });
+    }
+
+    if (req.method === "GET" && RE_LISTES_PUBLIQUES.test(pathname)) {
+      const _listesLimit = SEC.rateLimit(`api:listes:${_apiIp}`, 90, 60 * 1000);
+      if (!_listesLimit.allowed) {
+        return sendJSON(res, 429, { error: "Trop de requêtes sur les listes, réessayez dans quelques instants." }, { "Retry-After": String(_listesLimit.retryAfter) });
+      }
     }
 
     // Enregistrer l'activité de l'utilisateur connecté (pour DAU/WAU/MAU)
