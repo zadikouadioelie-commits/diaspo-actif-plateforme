@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=19">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=21">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -581,10 +581,25 @@ function etapeHtml(cr) {
   return '<div class="cr-etape"><div class="cr-etape-lbl">➡️ L\'étape suivante</div>' + (cr.etape_date ? '<div class="cr-etape-date">📅 ' + esc(fmtDateCourte(cr.etape_date)) + '</div>' : '') + (cr.etape_texte ? '<div class="cr-etape-txt">' + mentionHtml(cr.etape_texte) + '</div>' : '') + '</div>';
 }
 /* Bouton d'action tout en haut de la page : or lumineux pour attirer le regard (formulaire de réponse, don ou simple lien). */
-function ctaHtml(cr) {
+/* Actions valides réglées dans « Bouton d'action » de l'éditeur — source unique du grand bouton du haut ET du bouton de la barre de navigation. */
+function actionsDe(cr) {
   /* Une ou plusieurs actions cumulées (2026-10-06) : le lecteur choisit. Sans liste, repli sur le bouton historique. */
-  const liste = (Array.isArray(cr.actions) && cr.actions.length ? cr.actions : (cr.etape_bouton && cr.etape_lien ? [{ bouton: cr.etape_bouton, lien: cr.etape_lien }] : []))
+  return (Array.isArray(cr.actions) && cr.actions.length ? cr.actions : (cr.etape_bouton && cr.etape_lien ? [{ bouton: cr.etape_bouton, lien: cr.etape_lien }] : []))
     .filter(a => a && a.bouton && /^https?:\/\//i.test(a.lien || ''));
+}
+/* Bouton d'appel à l'action de la barre de navigation (or scintillant) : une action = lien direct ; plusieurs = petit menu où le lecteur choisit. */
+function agirNavHtml(cr) {
+  const l = actionsDe(cr);
+  if (!l.length) return { btn: '', pop: '' };
+  if (l.length === 1) return { btn: '<a class="cr2-nav-agir" href="' + esc(l[0].lien) + '" target="_blank" rel="noopener" title="' + esc(l[0].bouton) + '"><span class="cr2-nav-agir-t">★ ' + esc(l[0].bouton) + '</span></a>', pop: '' };
+  return {
+    btn: '<button type="button" class="cr2-nav-agir" id="cr-agir-btn" aria-haspopup="true" aria-expanded="false" aria-controls="cr-agir-pop"><span class="cr2-nav-agir-t">★ Agir ▾</span></button>',
+    pop: '<div class="cr2-nav-pop cr2-nav-pop-agir" id="cr-agir-pop" hidden><div class="cr2-nav-pop-t">Choisissez comment agir</div>'
+      + l.map(a => '<a href="' + esc(a.lien) + '" target="_blank" rel="noopener">' + svgIc(modeAction(a.lien) === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>').join('') + '</div>'
+  };
+}
+function ctaHtml(cr) {
+  const liste = actionsDe(cr);
   if (!liste.length) return '';
   const un = a => {
     const mode = modeAction(a.lien);
@@ -668,7 +683,7 @@ function vuePublique() {
   root.classList.add('crp-wide');
   const brouillon = cr.statut !== 'publie';
   const parties = partiesDe(cr), graph = graphiquesHtml(cr), parts = partenairesHtml(cr, ev), logo = logoOrga(cr, ev);
-  const actions = ctaHtml(cr), forts = cr.forts || [], type = typeLibelle(cr);
+  const actions = ctaHtml(cr), agirNav = agirNavHtml(cr), forts = cr.forts || [], type = typeLibelle(cr);
   const recitOk = cr.type_cr !== 'blanc' && parties.length > 0;
   /* Barre de navigation fixe (2026-10-07, demande explicite : tout à portée de souris sans trop défiler) : les grandes
      sections, un menu « Le récit » qui liste les parties, « Agir » et « Synthèse » toujours visibles. */
@@ -680,8 +695,8 @@ function vuePublique() {
       + parties.map((p, i) => '<button type="button" data-part="cr-p' + (i + 1) + '">' + svgIc(iconeDe(p), 'cr2-ic xs') + '<span>' + esc(p.titre || 'Texte') + '</span></button>').join('') + '</div></div>' : '';
   const nav = '<nav class="cr2-nav" id="cr-nav" aria-label="Navigation du compte-rendu"><div class="cr2-nav-in">'
     + bouton('cr-resume', 'Résumé') + (graph ? bouton('cr-coup', 'Chiffres') : '') + menuRecit + (forts.length ? bouton('cr-forts', 'Temps forts') : '') + (parts ? bouton('cr-partenaires', 'Partenaires') : '')
-    + '<span class="cr2-nav-grow"></span>' + (actions ? '<button type="button" class="cr2-nav-agir" data-t="cr-agir">★ Agir</button>' : '')
-    + '<button type="button" class="cr2-nav-synth" data-synth aria-haspopup="dialog">📋 Synthèse</button></div>' + popRecit + '</nav>';
+    + '<span class="cr2-nav-grow"></span>' + agirNav.btn
+    + '<button type="button" class="cr2-nav-synth" data-synth aria-haspopup="dialog">📋 Synthèse</button></div>' + popRecit + agirNav.pop + '</nav>';
   const synthese = '<div class="cr2-synth-row"><span class="cr2-help-wrap"><button type="button" class="cr2-help" data-help aria-label="À quoi sert la synthèse ?" aria-expanded="false" aria-controls="cr-help-pop">?</button><span class="cr2-help-pop" id="cr-help-pop" role="tooltip" hidden>La synthèse réunit l’essentiel du compte-rendu sur un seul écran : résumé, chiffres clés, temps forts, personnes mises en lumière, partenaires et suite à donner. Idéale pour aller vite, l’imprimer ou la partager.</span></span>'
     + '<button type="button" class="cr2-synth-btn" data-synth aria-haspopup="dialog"><span aria-hidden="true">📋</span><span>Synthèse<small>Lire la synthèse</small></span></button></div>';
   root.innerHTML = (brouillon ? '<div class="crp-card" style="background:#FEF3C7;border-color:#F59E0B">Brouillon : seuls vous voyez ce compte-rendu. <a class="cr-link" href="compte-rendu.html?evt=' + ev.id + '&edition=1">Continuer la rédaction</a></div>' : '')
@@ -749,6 +764,13 @@ function initNav() {
     }));
     document.addEventListener('click', e => { if (!pop.hidden && !e.target.closest('.cr2-nav')) basculer(false); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden && !$('#cr-synth')) { basculer(false); menu.focus(); } });
+  }
+  const agirB = $('#cr-agir-btn'), agirP = $('#cr-agir-pop');
+  if (agirB && agirP) {
+    const basc = o => { agirP.hidden = !o; agirB.setAttribute('aria-expanded', o ? 'true' : 'false'); };
+    agirB.addEventListener('click', e => { e.stopPropagation(); basc(agirP.hidden); });
+    document.addEventListener('click', e => { if (!agirP.hidden && !e.target.closest('.cr2-nav-pop-agir')) basc(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !agirP.hidden && !$('#cr-synth')) { basc(false); agirB.focus(); } });
   }
   /* Barre fixée par script : le « position:sticky » CSS ne marche pas ici (le corps de page du site porte un overflow qui en
      fait un conteneur de défilement). Un repère invisible garde la place pour éviter tout saut de mise en page. */
@@ -973,7 +995,7 @@ async function drawAction() {
   ed.actions.forEach((a, i) => { if (!A.modes[i]) A.modes[i] = modeAction(a.lien); });
   /* Comme la création d'un événement : comptes Initiative, Collectivité et administrateurs ; seul le compte utilisateur en est exclu. */
   const peutCreer = !!ST.user && ['initiative', 'collectivite', 'administrateur'].includes(ST.user.role);
-  const modes = [['lien', '🔗 Simple lien'], ['fiche', '🤝 Formulaire de réponse'], ['don', '💛 Faire un don']];
+  const modes = [['lien', '🔗 Simple lien'], ['fiche', '📝 Formulaire d’inscription / réponse'], ['don', '💛 Faire un don']];
   const plusieurs = ed.actions.length > 1;
   let h = '';
   ed.actions.forEach((a, i) => {
