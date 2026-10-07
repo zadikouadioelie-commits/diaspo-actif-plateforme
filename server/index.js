@@ -36499,7 +36499,7 @@ ${jsonLd}
         const accredsByRow = await Promise.all(rows.map(r => initAccreds(r.id)));
         rows = rows.filter((r, i) => accredsByRow[i].includes(accreditation));
       }
-      return sendJSON(res, 200, { initiatives: await Promise.all(rows.map(enrichInit)) });
+      return sendJSON(res, 200, { initiatives: await Promise.all(rows.map(r => enrichInit(r))) });
     }
 
     /* GET /api/reseau/me — mon réseau (initiative connectée) */
@@ -36524,7 +36524,7 @@ ${jsonLd}
       return sendJSON(res, 200, {
         moi: await enrichInit(myInit, true),
         mon_reseau: await Promise.all(affilies.map(async r => ({ ...(await enrichInit(r)), mise_en_avant: r.mise_en_avant }))),
-        membre_de: await Promise.all(membrede.map(enrichInit)),
+        membre_de: await Promise.all(membrede.map(r => enrichInit(r))),
       });
     }
 
