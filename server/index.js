@@ -12289,6 +12289,11 @@ route("GET", "/api/mon-associe/annonces", async (req, res, params, body, query) 
     if (premiumCache.get(r.auteur_id)) visibles.push(r);
     if (visibles.length >= 100) break;
   }
+  const nomsAuteurs = new Map();
+  for (const r of visibles) {
+    if (!nomsAuteurs.has(r.auteur_id)) nomsAuteurs.set(r.auteur_id, await nomCompteAffichage(r.auteur_id));
+    r.auteur_nom = nomsAuteurs.get(r.auteur_id) || r.auteur_nom;
+  }
   const ids = visibles.map(r => r.id);
   const compteurs = ids.length ? await db.prepare(`SELECT annonce_id, COUNT(*) AS n FROM associe_candidatures WHERE annonce_id IN (${ids.map(()=>'?').join(',')}) GROUP BY annonce_id`).all(...ids) : [];
   const compteurMap = new Map(compteurs.map(c => [c.annonce_id, c.n]));
@@ -26796,7 +26801,7 @@ async function enrichOffreOrganisme(o) {
     };
   }
   return {
-    organisme_nom: o.createur_nom,
+    organisme_nom: (o.createur_id && o.createur_role !== 'utilisateur') ? ((await nomCompteAffichage(o.createur_id)) || o.createur_nom) : o.createur_nom,
     organisme_logo: o.createur_photo || null,
     organisme_verifie: o.createur_role === 'administrateur' || o.createur_role === 'collectivite',
     organisme_profil_url: `profil.html?id=${o.createur_id}`,
