@@ -1116,6 +1116,14 @@ async function iaChargerCandidatureDeclarations() {
 // Rendu — Liste des fiches
 // ---------------------------------------------------------------------------
 
+/* Date de création d'une fiche, en français et à l'heure de Paris (SQLite renvoie « AAAA-MM-JJ hh:mm:ss » en UTC, PostgreSQL une date ISO). */
+function iaDateCreation(v) {
+  if (!v) return '';
+  let s = String(v);
+  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s = s.replace(' ', 'T') + 'Z';
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+}
 /* Cartouche « Bouton d'action » : mention, nom de l'événement, titre du bouton. Modifiable (editable) dans l'éditeur de la fiche. */
 function iaBaCartouche(f, editable, marge) {
   if (!f || !Number(f.est_bouton_action)) return '';
@@ -1161,6 +1169,7 @@ function renderListView() {
                 : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;background:oklch(0.94 0.05 150);color:oklch(0.4 0.13 150);">🟢 Événement gratuit</span>`}
             </div>
           </div>
+          ${f.created_at ? `<div style="font-size:11.5px;color:oklch(0.55 0.006 30);margin-bottom:6px;">🗓️ Créée le ${escH(iaDateCreation(f.created_at))}</div>` : ''}
           <div style="font-size:12.5px;color:oklch(0.5 0.006 30);margin-bottom:${f.description ? '6px' : '14px'};">📅 ${escH(f.apercu_date || 'Date à définir')} &nbsp;·&nbsp; 📍 ${escH(f.apercu_lieu || 'Lieu à définir')}</div>
           ${f.description ? `<div style="font-size:12.5px;color:oklch(0.55 0.006 30);line-height:1.5;margin-bottom:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${escH(stripRichTags(f.description))}</div>` : ''}
           <!-- Programmation ouverture/fermeture, accès rapide depuis la cartouche (2026-09-28,
@@ -1274,6 +1283,7 @@ function renderDetailView() {
       <div style="display:flex; gap:20px; margin-top:10px; font-size:13px; color:oklch(0.5 0.006 30); flex-wrap:wrap;">
         <span>📅 ${escH(fiche.date_ouverture_inscriptions ? fiche.date_ouverture_inscriptions.slice(0,10) : 'Ouverture à définir')} → ${escH(fiche.date_fermeture_inscriptions ? fiche.date_fermeture_inscriptions.slice(0,10) : 'fermeture à définir')}</span>
         <span>👤 Organisateur : ${escH(fiche.organisateur || "Diaspo'Actif")}</span>
+        ${fiche.created_at ? `<span>🗓️ Créée le ${escH(iaDateCreation(fiche.created_at))}</span>` : ''}
       </div>
       ${progressBar}
     </header>`;
