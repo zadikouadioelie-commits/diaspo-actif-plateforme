@@ -20274,6 +20274,46 @@ route("GET", "/api/evenements/:id/compte-rendu", async (req, res, params) => {
   });
 });
 
+/* ── Messages des lecteurs d'un compte-rendu (2026-10-07, demande explicite) ──
+   Action PAR DÉFAUT de tous les comptes-rendus : nom, prénom, e-mail, petit commentaire, sans compte et
+   sans que l'auteur ait rien à configurer. L'auteur (et les administrateurs) les consulte ici, et reçoit
+   une notification à chaque message. Anti-spam : champ piège, limite par adresse IP et par e-mail. */
+route("POST", "/api/evenements/:id/compte-rendu/messages", async (req, res, params, body) => {
+  const ip = SEC.clientIp(req);
+  if (body.site_perso) { SEC.logSecurity("cr_message_honeypot", { ip }); return sendJSON(res, 400, { error: "Requête invalide." }); }
+  const lim = SEC.rateLimit(`crmsg:ip:${ip}`, 8, 3600000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de messages envoyés depuis cette connexion. Réessayez dans ${lim.retryAfter}s.` });
+  const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
+  const { user, evt } = ctx;
+  const cr = await db.prepare("SELECT statut, titre FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id);
+  if (!cr || cr.statut !== 'publie') return sendJSON(res, 404, { error: "Ce compte-rendu n'est pas publié." });
+  const nom = crTexte(body.nom, 80), prenom = crTexte(body.prenom, 80), message = crTexte(body.message, 1500);
+  const email = String(body.email || '').trim().toLowerCase().slice(0, 160);
+  if (!nom || !prenom) return sendJSON(res, 400, { error: "Indiquez votre nom et votre prénom." });
+  if (!SEC.isValidEmail(email)) return sendJSON(res, 400, { error: "Adresse e-mail invalide." });
+  if (message.length < 3) return sendJSON(res, 400, { error: "Écrivez un petit message." });
+  const limMail = SEC.rateLimit(`crmsg:mail:${evt.id}:${email}`, 5, 86400000);
+  if (!limMail.allowed) return sendJSON(res, 429, { error: "Vous avez déjà envoyé plusieurs messages aujourd'hui pour cet événement." });
+  await db.prepare("INSERT INTO evenement_cr_messages (evenement_id, user_id, nom, prenom, email, message) VALUES (?,?,?,?,?,?)")
+    .run(evt.id, user ? user.id : null, nom, prenom, email, message);
+  if (!user || Number(user.id) !== Number(evt.owner_user_id)) {
+    const extrait = message.length > 140 ? message.slice(0, 140).trim() + '…' : message;
+    await creerNotif(evt.owner_user_id, 'cr_message', `💬 Nouveau message sur « ${cr.titre || evt.titre} »`,
+      `${prenom} ${nom} : « ${extrait} »`, { evenement_id: Number(evt.id), lien: `compte-rendu.html?evt=${evt.id}&messages=1` });
+  }
+  sendJSON(res, 201, { ok: true });
+});
+route("GET", "/api/evenements/:id/compte-rendu/messages", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  const messages = await db.prepare("SELECT id, user_id, nom, prenom, email, message, lu, created_at FROM evenement_cr_messages WHERE evenement_id=? ORDER BY created_at DESC, id DESC LIMIT 500").all(ctx.evt.id);
+  sendJSON(res, 200, { messages, non_lus: messages.filter(m => !Number(m.lu)).length });
+});
+route("POST", "/api/evenements/:id/compte-rendu/messages/lus", async (req, res, params) => {
+  const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
+  await db.prepare("UPDATE evenement_cr_messages SET lu=1 WHERE evenement_id=? AND lu=0").run(ctx.evt.id);
+  sendJSON(res, 200, { ok: true });
+});
+
 /* PUT — enregistre le compte-rendu (création ou mise à jour), sans le publier. */
 route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) => {
   const ctx = await crChargerEvenement(req, res, params.id, { editeur: true }); if (!ctx) return;
@@ -20658,7 +20698,9 @@ route("GET", "/api/mes-evenements-compte-rendu", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const auj = dateParisISO();
-  const rows = await db.prepare(`SELECT e.id, e.titre, e.date_evt, e.date_fin, e.ville, c.statut AS cr_statut, c.etape_bouton, c.etape_lien FROM evenements e
+  const rows = await db.prepare(`SELECT e.id, e.titre, e.date_evt, e.date_fin, e.ville, c.statut AS cr_statut, c.etape_bouton, c.etape_lien,
+        (SELECT COUNT(*) FROM evenement_cr_messages m WHERE m.evenement_id=e.id) AS nb_messages,
+        (SELECT COUNT(*) FROM evenement_cr_messages m WHERE m.evenement_id=e.id AND COALESCE(m.lu,0)=0) AS nb_messages_non_lus FROM evenements e
       LEFT JOIN evenement_comptes_rendus c ON c.evenement_id=e.id
       WHERE e.owner_user_id=? AND COALESCE(e.statut,'') NOT IN ('brouillon','annule','annulé')
         AND SUBSTR(COALESCE(NULLIF(e.date_fin,''), e.date_evt),1,10) < ? ORDER BY e.date_evt DESC LIMIT 100`).all(user.id, auj);

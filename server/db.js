@@ -8035,6 +8035,23 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY(evenement_id) REFERENCES evenements(id)
   );
+
+  /* Messages laissés par les lecteurs d'un compte-rendu (2026-10-07, demande explicite : bouton d'action
+     par défaut sur TOUS les comptes-rendus — nom, prénom, e-mail, petit commentaire — consultable par
+     l'auteur sans rien configurer). Sans compte requis : user_id seulement si le lecteur est connecté. */
+  CREATE TABLE IF NOT EXISTS evenement_cr_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evenement_id INTEGER NOT NULL,
+    user_id INTEGER,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    email TEXT NOT NULL,
+    message TEXT NOT NULL,
+    lu INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(evenement_id) REFERENCES evenements(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_cr_messages_evt ON evenement_cr_messages(evenement_id, created_at);
 `);
 
 /* Second passage de appliquerMigrations() (voir sa définition ~ligne 2679) : 13 tables

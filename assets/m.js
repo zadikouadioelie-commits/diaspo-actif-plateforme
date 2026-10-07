@@ -925,8 +925,38 @@
       ${(r.identifies || []).length ? `<div class="h2">IDENTIFIÉS</div><div class="card"><div class="pad"><div class="tags" style="margin:0">${r.identifies.map(p => `<a class="badge" href="profil.html?id=${esc(p.user_id)}">${esc(p.nom)}</a>`).join('')}</div></div></div>` : ''}
       ${c.etape_texte ? `<div class="card"><div class="pad"><div class="small muted">Prochaine étape${c.etape_date ? ' · ' + esc(dateLong(c.etape_date)) : ''}</div><p style="margin:4px 0 0">${esc(c.etape_texte)}</p></div></div>` : ''}
       ${(c.actions || []).length ? c.actions.map(a => `<a class="btn block" style="margin-bottom:10px" href="${attrUrl(a.lien)}" target="_blank" rel="noopener">${esc(a.bouton)} ${ic('out', 's')}</a>`).join('') : (c.etape_bouton && c.etape_lien ? `<a class="btn block" style="margin-bottom:10px" href="${attrUrl(c.etape_lien)}" target="_blank" rel="noopener">${esc(c.etape_bouton)} ${ic('out', 's')}</a>` : '')}
+      <button type="button" class="btn block" id="crmsg" style="margin-bottom:10px">💬 Laisser un message à l’organisateur</button>
+      ${r.peut_editer ? '<button type="button" class="btn out block" id="crrecus" style="margin-bottom:10px">📨 Messages reçus</button>' : ''}
       <a class="btn out block" href="compte-rendu.html?evt=${esc(id)}">Ouvrir la version complète ${ic('out', 's')}</a>`;
     setPane(c.titre || 'Compte-rendu', html);
+    const bm = $('#crmsg'); if (bm) bm.onclick = () => crMessageSheet(id, ev);
+    const br = $('#crrecus'); if (br) br.onclick = () => crMessagesRecus(id, c.titre || ev.titre);
+  }
+  /* Action par défaut de tous les comptes-rendus (2026-10-07) : nom, prénom, e-mail, petit message — sans compte. */
+  function crMessageSheet(id, ev) {
+    const me = S.me || {};
+    const close = openSheet('<h3 style="margin:0 0 4px">💬 Laisser un message</h3><p class="small muted" style="margin:0 0 10px">Transmis à ' + esc(ev.organisateur_nom || 'l’organisateur') + ', qui pourra vous répondre par e-mail. Aucun compte nécessaire.</p>'
+      + '<label class="fl" for="crm-p">Prénom</label><input class="fi" id="crm-p" maxlength="80" autocomplete="given-name" value="' + esc(me.prenom || '') + '">'
+      + '<label class="fl" for="crm-n">Nom</label><input class="fi" id="crm-n" maxlength="80" autocomplete="family-name" value="' + esc(me.nom || '') + '">'
+      + '<label class="fl" for="crm-e">Adresse e-mail</label><input class="fi" id="crm-e" type="email" maxlength="160" autocomplete="email" value="' + esc(me.email || '') + '">'
+      + '<label class="fl" for="crm-m">Votre message</label><textarea class="fi" id="crm-m" rows="4" maxlength="1500" placeholder="Ex. Je suis très intéressé(e), pouvez-vous me recontacter ?"></textarea>'
+      + '<input id="crm-t" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">'
+      + '<button type="button" class="btn block" id="crm-ok" style="margin-top:12px">Envoyer</button>');
+    $('#crm-ok').onclick = async () => {
+      const prenom = $('#crm-p').value.trim(), nom = $('#crm-n').value.trim(), email = $('#crm-e').value.trim(), message = $('#crm-m').value.trim();
+      if (!prenom || !nom) return toast('Indiquez votre prénom et votre nom.', true);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return toast('Indiquez une adresse e-mail valide.', true);
+      if (message.length < 3) return toast('Écrivez un petit message.', true);
+      const b = $('#crm-ok'); b.disabled = true;
+      try { await api('/api/evenements/' + encodeURIComponent(id) + '/compte-rendu/messages', { method: 'POST', body: { prenom, nom, email, message, site_perso: $('#crm-t').value } }); close(); toast('Message envoyé ✅'); }
+      catch (e) { toast(e.message || 'Envoi impossible.', true); b.disabled = false; }
+    };
+  }
+  async function crMessagesRecus(id, titre) {
+    let r; try { r = await api('/api/evenements/' + encodeURIComponent(id) + '/compte-rendu/messages'); } catch (e) { return toast(e.message || 'Erreur', true); }
+    const l = r.messages || [];
+    openSheet('<h3 style="margin:0 0 10px">📨 Messages reçus (' + l.length + ')</h3>' + (l.length ? l.map(m => '<div class="card" style="margin-bottom:8px"><div class="pad"><b>' + esc(m.prenom) + ' ' + esc(m.nom) + '</b> <span class="small muted">· ' + esc(ago(m.created_at)) + '</span><div style="margin:4px 0;white-space:pre-wrap">' + esc(m.message) + '</div><a href="mailto:' + esc(m.email) + '?subject=' + encodeURIComponent('Votre message sur « ' + titre + ' »') + '">✉️ ' + esc(m.email) + '</a></div></div>').join('') : '<p class="small muted">Aucun message pour le moment.</p>'));
+    if (r.non_lus) { try { await api('/api/evenements/' + encodeURIComponent(id) + '/compte-rendu/messages/lus', { method: 'POST', body: {} }); } catch (_) {} }
   }
 
   /* ============================================================

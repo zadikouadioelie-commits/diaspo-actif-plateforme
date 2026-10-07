@@ -407,12 +407,58 @@ document.addEventListener('click', async e => {
   if (rm) { try { const r = await api('DELETE', `/evenements/${ST.evtId}/identifications/${rm.dataset.idrm}`); ST.data.identifies = r.identifies; refreshChips(); } catch (err) { toast(err.message || 'Erreur'); } }
 });
 
+/* =================== MESSAGES DES LECTEURS (action par défaut, 2026-10-07) =================== */
+document.addEventListener('click', e => { const b = e.target.closest('[data-cr-msg]'); if (b) { e.preventDefault(); ouvrirMessage(); } });
+function ouvrirMessage() {
+  if (!ST.data || !ST.data.evenement) return;
+  const ev = ST.data.evenement, u = ST.user || {};
+  const champ = (id, ph, val, type) => '<input id="' + id + '" ' + (type ? 'type="' + type + '" ' : '') + 'maxlength="160" placeholder="' + ph + '" value="' + esc(val || '') + '" style="width:100%;box-sizing:border-box">';
+  modal('<h2>💬 Laisser un message</h2>'
+    + '<p class="crp-note" style="margin:0 0 12px">Votre message est transmis à ' + esc(ev.organisateur_nom || 'l’organisateur') + ', qui pourra vous répondre par e-mail. Aucun compte n’est nécessaire.</p>'
+    + '<div style="display:grid;gap:8px"><div class="crp-extform" style="grid-template-columns:1fr 1fr">' + champ('crm-prenom', 'Prénom', u.prenom) + champ('crm-nom', 'Nom', u.nom) + '</div>'
+    + champ('crm-email', 'Adresse e-mail', u.email, 'email')
+    + '<textarea id="crm-msg" maxlength="1500" rows="5" placeholder="Votre message (ex. Je suis très intéressé(e), pouvez-vous me recontacter ?)" style="width:100%;box-sizing:border-box;font:inherit;padding:10px 12px;border:1px solid #D5DEEA;border-radius:10px;resize:vertical"></textarea>'
+    + '<input id="crm-piege" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0"></div>'
+    + '<div class="crp-note" id="crm-err" style="color:#B91C1C;display:none;margin-top:8px"></div>'
+    + '<div class="cr-btns" style="margin-top:14px;justify-content:flex-end"><button type="button" class="cr-btn out" id="crm-x">Annuler</button><button type="button" class="cr-btn pri" id="crm-ok">Envoyer</button></div>',
+  (ov, fermer) => {
+    $('#crm-x', ov).addEventListener('click', fermer);
+    $('#crm-ok', ov).addEventListener('click', async () => {
+      const err = $('#crm-err', ov), btn = $('#crm-ok', ov);
+      const prenom = $('#crm-prenom', ov).value.trim(), nom = $('#crm-nom', ov).value.trim(), email = $('#crm-email', ov).value.trim(), message = $('#crm-msg', ov).value.trim();
+      const montrer = t => { err.textContent = t; err.style.display = ''; };
+      if (!prenom || !nom) return montrer('Indiquez votre prénom et votre nom.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return montrer('Indiquez une adresse e-mail valide.');
+      if (message.length < 3) return montrer('Écrivez un petit message.');
+      err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Envoi…';
+      try {
+        await api('POST', `/evenements/${ST.evtId}/compte-rendu/messages`, { prenom, nom, email, message, site_perso: $('#crm-piege', ov).value });
+        $('.crp-modal', ov).innerHTML = '<h2>✅ Message envoyé</h2><p>Merci ! ' + esc(ev.organisateur_nom || 'L’organisateur') + ' a bien reçu votre message et pourra vous répondre à l’adresse indiquée.</p><div class="cr-btns" style="justify-content:flex-end"><button type="button" class="cr-btn pri" id="crm-fin">Fermer</button></div>';
+        $('#crm-fin', ov).addEventListener('click', fermer);
+      } catch (e) { montrer(e.message || 'Envoi impossible, réessayez.'); btn.disabled = false; btn.textContent = 'Envoyer'; }
+    });
+  });
+}
+/* Côté auteur : « Messages reçus » (aucune configuration), marqués lus à l'ouverture. */
+async function ouvrirMessagesRecus() {
+  let r; try { r = await api('GET', `/evenements/${ST.evtId}/compte-rendu/messages`); } catch (e) { toast(e.message || 'Erreur'); return; }
+  const l = r.messages || [];
+  modal('<h2>📨 Messages reçus (' + l.length + ')</h2>'
+    + (l.length ? l.map(m => '<div style="border:1px solid #E1E8F2;border-radius:12px;padding:10px 12px;margin-bottom:8px' + (Number(m.lu) ? '' : ';background:#FFF8E6') + '"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + esc(m.prenom) + ' ' + esc(m.nom) + '</b><span class="crp-note">' + esc(fmtDateCourte(String(m.created_at || '').slice(0, 10))) + '</span></div>'
+      + '<div style="margin:4px 0;white-space:pre-wrap">' + esc(m.message) + '</div><a class="cr-link" href="mailto:' + esc(m.email) + '?subject=' + encodeURIComponent('Votre message sur « ' + (ST.data.compte_rendu && ST.data.compte_rendu.titre || ST.data.evenement.titre) + ' »') + '">✉️ ' + esc(m.email) + '</a></div>').join('')
+      : '<p class="crp-note">Aucun message pour le moment. Les messages laissés par les lecteurs apparaîtront ici.</p>')
+    + '<div class="cr-btns" style="justify-content:flex-end"><button type="button" class="cr-btn out" data-fermer>Fermer</button></div>',
+  (ov, fermer) => { $('[data-fermer]', ov).addEventListener('click', fermer); });
+  if (r.non_lus) { try { await api('POST', `/evenements/${ST.evtId}/compte-rendu/messages/lus`); } catch (_) {} const b = $('[data-msgs-recus] .n'); if (b) b.remove(); }
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-msgs-recus]')) ouvrirMessagesRecus(); });
+
 /* =================== LISTE : mes événements terminés =================== */
 /* Le bouton d'action d'un compte-rendu garde ses deux champs (texte + lien). Son lien peut être celui d'un formulaire de réponse
    (fiche d'inscription du module Formulaires & Inscriptions) ou d'une cagnotte : on le reconnaît à son adresse (2026-10-06). */
 const SLUG_FICHE = /inscription-publique\.html\?slug=([^&#]+)/, SLUG_DON = /cagnotte\.html\?slug=([^&#]+)/;
 const slugDe = (re, lien) => { const m = re.exec(String(lien || '')); if (!m) return ''; try { return decodeURIComponent(m[1]); } catch (_) { return m[1]; } };
-const modeAction = lien => SLUG_FICHE.test(lien || '') ? 'fiche' : SLUG_DON.test(lien || '') ? 'don' : 'lien';
+const modeAction = lien => lien === '#cr-message' ? 'message' : SLUG_FICHE.test(lien || '') ? 'fiche' : SLUG_DON.test(lien || '') ? 'don' : 'lien';
 
 async function vueListe() {
   const root = $('#crp');
@@ -428,6 +474,7 @@ async function vueListe() {
         const action = fiche ? '<button type="button" class="cr-btn gold" data-rep="' + fiche.id + '" data-evt="' + e.id + '">💬 Réponses (' + Number(fiche.nb_inscriptions || 0) + ')</button>'
           : slugD ? '<a class="cr-btn out" href="cagnotte.html?slug=' + encodeURIComponent(slugD) + '">💛 Voir la cagnotte</a>' : '';
         return '<div class="crp-ev-wrap"><div class="crp-ev"><div style="flex:1;min-width:200px"><b>' + esc(e.titre) + '</b><span class="crp-note">' + esc(fmtDateCourte(e.date_evt)) + (e.ville ? ' · ' + esc(e.ville) : '') + '</span></div>' + st + action
+          + (e.cr_statut === 'publie' ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + e.id + '&messages=1">📨 Messages (' + Number(e.nb_messages || 0) + ')' + (Number(e.nb_messages_non_lus) ? ' <span style="background:#E11D48;color:#fff;border-radius:99px;padding:1px 7px;font-size:12px">' + Number(e.nb_messages_non_lus) + ' nouveau' + (Number(e.nb_messages_non_lus) > 1 ? 'x' : '') + '</span>' : '') + '</a>' : '')
           + '<a class="cr-btn ' + (e.cr_statut === 'publie' ? 'sec' : 'pri') + '" href="compte-rendu.html?evt=' + e.id + (e.cr_statut === 'publie' ? '&edition=1' : '') + '">' + (e.cr_statut === 'publie' ? 'Modifier' : e.cr_statut === 'brouillon' ? 'Reprendre' : 'Rédiger') + '</a></div><div class="crp-rep" id="rep-' + e.id + '" hidden></div></div>';
       }).join('') : '<div class="crp-note" style="padding:18px 4px">Aucun événement terminé pour le moment.</div>') + '</div>';
     $$('[data-rep]').forEach(b => b.addEventListener('click', () => {
@@ -475,6 +522,7 @@ const IC = {
   compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   flame: '<path d="M12 21c4 0 6-2.5 6-5.5 0-3-2.5-4.5-3-8-2 1-3.5 3-3.5 5.5-1.5-.5-2-2-2-3.5C7 11 6 13 6 15.5 6 18.5 8 21 12 21z"/>',
   landmark: '<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/>',
+  message: '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z"/><path d="M8 10h8M8 13h5"/>',
 };
 const svgIc = (k, cls) => '<svg class="' + (cls || 'cr2-ic') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (IC[k] || IC.star) + '</svg>';
 const ICONES_CHOIX = [['', 'Automatique'], ['star', 'Étoile'], ['home', 'Maison, association'], ['tree', 'Arbre'], ['globe', 'Globe'], ['heart', 'Cœur'], ['mic', 'Micro'], ['case', 'Mallette'], ['mosaic', 'Mosaïque'],
@@ -583,29 +631,36 @@ function etapeHtml(cr) {
 }
 /* Bouton d'action tout en haut de la page : or lumineux pour attirer le regard (formulaire de réponse, don ou simple lien). */
 /* Actions valides réglées dans « Bouton d'action » de l'éditeur — source unique du grand bouton du haut ET du bouton de la barre de navigation. */
+/* Action PAR DÉFAUT de tous les comptes-rendus (2026-10-07, demande explicite) : « Laisser un message » (nom, prénom, e-mail, commentaire),
+   toujours proposée EN DERNIER, en plus des actions choisies par l'auteur ; sans rien d'autre, c'est le seul bouton. L'auteur retrouve les
+   messages dans « Messages reçus ». Elle ouvre un formulaire (pas un lien) : attrAction() lui donne data-cr-msg au lieu d'une adresse. */
+const ACTION_MESSAGE = { bouton: 'Laisser un message à l’organisateur', lien: '#cr-message', message: true };
+const attrAction = a => a.message ? 'href="#cr-message" data-cr-msg' : 'href="' + esc(a.lien) + '" target="_blank" rel="noopener"';
+const iconeAction = a => { const m = modeAction(a.lien); return m === 'message' ? 'message' : m === 'don' ? 'heart' : 'star'; };
+const sousAction = a => { const m = modeAction(a.lien); return m === 'fiche' ? 'Quelques secondes, sans créer de compte.' : m === 'don' ? 'Chaque geste compte.' : m === 'message' ? 'Nom, prénom, e-mail et un petit mot : l’organisateur vous répond.' : ''; };
 function actionsDe(cr) {
   /* Une ou plusieurs actions cumulées (2026-10-06) : le lecteur choisit. Sans liste, repli sur le bouton historique. */
-  return (Array.isArray(cr.actions) && cr.actions.length ? cr.actions : (cr.etape_bouton && cr.etape_lien ? [{ bouton: cr.etape_bouton, lien: cr.etape_lien }] : []))
+  const choisies = (Array.isArray(cr.actions) && cr.actions.length ? cr.actions : (cr.etape_bouton && cr.etape_lien ? [{ bouton: cr.etape_bouton, lien: cr.etape_lien }] : []))
     .filter(a => a && a.bouton && /^https?:\/\//i.test(a.lien || ''));
+  return [...choisies, ACTION_MESSAGE];
 }
 /* Bouton d'appel à l'action de la barre de navigation (or scintillant) : une action = lien direct ; plusieurs = petit menu où le lecteur choisit. */
 function agirNavHtml(cr) {
   const l = actionsDe(cr);
   if (!l.length) return { btn: '', pop: '' };
-  if (l.length === 1) return { btn: '<a class="cr2-nav-agir" href="' + esc(l[0].lien) + '" target="_blank" rel="noopener" title="' + esc(l[0].bouton) + '"><span class="cr2-nav-agir-t">★ ' + esc(l[0].bouton) + '</span></a>', pop: '' };
+  if (l.length === 1) return { btn: '<a class="cr2-nav-agir" ' + attrAction(l[0]) + ' title="' + esc(l[0].bouton) + '"><span class="cr2-nav-agir-t">★ ' + esc(l[0].message ? 'Laisser un message' : l[0].bouton) + '</span></a>', pop: '' };
   return {
     btn: '<button type="button" class="cr2-nav-agir" id="cr-agir-btn" aria-haspopup="true" aria-expanded="false" aria-controls="cr-agir-pop"><span class="cr2-nav-agir-t">★ Agir ▾</span></button>',
     pop: '<div class="cr2-nav-pop cr2-nav-pop-agir" id="cr-agir-pop" hidden><div class="cr2-nav-pop-t">Choisissez comment agir</div>'
-      + l.map(a => '<a href="' + esc(a.lien) + '" target="_blank" rel="noopener">' + svgIc(modeAction(a.lien) === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>').join('') + '</div>'
+      + l.map(a => '<a ' + attrAction(a) + '>' + svgIc(iconeAction(a), 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>').join('') + '</div>'
   };
 }
 function ctaHtml(cr) {
   const liste = actionsDe(cr);
   if (!liste.length) return '';
   const un = a => {
-    const mode = modeAction(a.lien);
-    const sous = mode === 'fiche' ? 'Quelques secondes, sans créer de compte.' : mode === 'don' ? 'Chaque geste compte.' : '';
-    return '<div class="cr2-cta-wrap"><a class="cr2-cta" href="' + esc(a.lien) + '" target="_blank" rel="noopener">' + svgIc(mode === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>' + (sous ? '<small>' + sous + '</small>' : '') + '</div>';
+    const sous = sousAction(a);
+    return '<div class="cr2-cta-wrap"><a class="cr2-cta" ' + attrAction(a) + '>' + svgIc(iconeAction(a), 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>' + (sous ? '<small>' + sous + '</small>' : '') + '</div>';
   };
   if (liste.length === 1) return un(liste[0]);
   return '<div class="cr2-cta-multi"><div class="cr2-cta-multi-t">Choisissez comment agir</div><div class="cr2-cta-grid">' + liste.map(un).join('') + '</div></div>';
@@ -617,9 +672,8 @@ function ctaBleuHtml(cr) {
   if (!liste.length) return '';
   return '<div class="cr2-agir-bleu" id="cr-agir-bleu"><div class="cr2-agir-bleu-t">Action concrète pour vous</div>'
     + liste.map(a => {
-      const mode = modeAction(a.lien);
-      const sous = mode === 'fiche' ? 'Quelques secondes, sans créer de compte.' : mode === 'don' ? 'Chaque geste compte.' : '';
-      return '<a class="cr2-btn-bleu" href="' + esc(a.lien) + '" target="_blank" rel="noopener">' + svgIc(mode === 'don' ? 'heart' : 'star', 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>'
+      const sous = sousAction(a);
+      return '<a class="cr2-btn-bleu" ' + attrAction(a) + '>' + svgIc(iconeAction(a), 'cr2-ic') + '<span>' + esc(a.bouton) + '</span><i aria-hidden="true">→</i></a>'
         + (sous ? '<small>' + esc(sous) + '</small>' : '');
     }).join('') + '</div>';
 }
@@ -736,7 +790,7 @@ function vuePublique() {
     + graph + detailHtml(cr)
     + (forts.length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
     + parts
-    + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a>' : '') + '</div>'
+    + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<button type="button" class="cr-btn out" data-msgs-recus>📨 Messages reçus</button><a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a>' : '') + '</div>'
     + '<div id="crp-social"></div></div></article></div>';
   const z = $('#crp-chips'); z.innerHTML = 'Avec : ' + (d.identifies.length ? chipsIdentifies(d.peut_editer) : '<span class="crp-note">Personne n\'est encore identifié.</span>' + (d.peut_editer ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : ''));
   if (!d.identifies.length && !d.peut_editer) z.remove();
@@ -753,6 +807,15 @@ function vuePublique() {
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !bulle.hidden && !$('#cr-synth')) basculer(false); });
   }
   if (new URLSearchParams(location.search).get('synthese') === '1') ouvrirSynthese();
+  if (d.peut_editer) chargerBadgeMessages();
+}
+/* Pastille du nombre de messages non lus sur « Messages reçus » (auteur) ; ?messages=1 (notification) ouvre directement la liste. */
+async function chargerBadgeMessages() {
+  try {
+    const r = await api('GET', `/evenements/${ST.evtId}/compte-rendu/messages`), b = $('[data-msgs-recus]'); if (!b) return;
+    if (r.non_lus) b.insertAdjacentHTML('beforeend', ' <span class="n" style="background:#E11D48;color:#fff;border-radius:99px;padding:1px 7px;font-size:12px">' + r.non_lus + '</span>');
+    if (new URLSearchParams(location.search).get('messages') === '1') ouvrirMessagesRecus();
+  } catch (_) {}
 }
 
 /* Cartes du récit : aperçu replié, « Lire la suite » seulement quand le texte déborde, « Tout déplier / Tout replier ». */
@@ -1041,6 +1104,7 @@ async function drawAction() {
     h += '</div>';
   });
   if (ed.actions.length < MAX_ACTIONS) h += '<button type="button" class="cr-btn sec" id="ed-aadd">＋ Ajouter une action</button>';
+  h += '<div class="crp-act" style="background:#EEF5FF"><div class="crp-act-h"><span><b>💬 Laisser un message à l’organisateur</b> <span class="crp-act-badge">toujours proposé, en dernier</span></span></div><div class="crp-hint" style="margin:0">Ajouté automatiquement à tous vos comptes-rendus, sans rien configurer : le lecteur laisse son nom, son prénom, son e-mail et un petit mot. Vous les retrouvez dans « 📨 Messages reçus » (sur la page du compte-rendu et dans « Gérer mes comptes-rendus »), avec une notification à chaque message.</div></div>';
   h += '<div class="crp-hint">Vous pouvez <b>cumuler jusqu’à ' + MAX_ACTIONS + ' actions</b> (par exemple : faire un don, rejoindre comme bénévole, être contacté…). Le lecteur choisit celle qui lui convient. <b>Les boutons s’affichent aux lecteurs dès que vous enregistrez le compte-rendu.</b></div>';
   box.innerHTML = h;
   const idx = el => Number(el.dataset.ai !== undefined ? el.dataset.ai : (el.dataset.abtn ?? el.dataset.alien ?? el.dataset.afiche ?? el.dataset.acag ?? el.dataset.arm ?? el.dataset.fcreer ?? el.dataset.fpub ?? el.dataset.ftitre));
