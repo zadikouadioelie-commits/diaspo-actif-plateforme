@@ -367,3 +367,16 @@ body.cr-synth-open{overflow:hidden}
 @keyframes cr2-bleu-reflet{0%{left:-60%}55%,100%{left:130%}}
 @media (prefers-reduced-motion:reduce){.cr2-btn-bleu:before,.cr2-btn-bleu:after{animation:none}}
 @media print{.cr2-agir-bleu{display:none}}
+
+/* Cartouche « Laisser un message » : fonctionnement automatique, isolé et non modifiable (2026-10-07) */
+.crp-auto-sep{display:flex;align-items:center;gap:12px;margin:30px 0 12px;color:#64748B;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.crp-auto-sep:before,.crp-auto-sep:after{content:"";flex:1;height:2px;background:repeating-linear-gradient(90deg,#CBD5E1 0 8px,transparent 8px 14px)}
+.crp-auto{padding:14px 16px;border:2px dashed #94A3B8;border-radius:14px;color:#475569;background:repeating-linear-gradient(135deg,#F8FAFC 0 12px,#F1F5F9 12px 24px);cursor:default;user-select:text}
+.crp-auto-h{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.crp-auto-ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#E2E8F0;font-size:18px;flex:none}
+.crp-auto-tt{flex:1;min-width:200px}
+.crp-auto-t{font-weight:800;font-size:15.5px;color:#334155}
+.crp-auto-s{font-size:12.5px;font-weight:700;color:#64748B;margin-top:2px}
+.crp-auto-badge{background:#334155;color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
+.crp-auto-b{font-size:13.5px;line-height:1.55;color:#475569}
+.crp-auto-b b{color:#1E293B}

@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=22">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=23">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -1104,8 +1104,11 @@ async function drawAction() {
     h += '</div>';
   });
   if (ed.actions.length < MAX_ACTIONS) h += '<button type="button" class="cr-btn sec" id="ed-aadd">＋ Ajouter une action</button>';
-  h += '<div class="crp-act" style="background:#EEF5FF"><div class="crp-act-h"><span><b>💬 Laisser un message à l’organisateur</b> <span class="crp-act-badge">toujours proposé, en dernier</span></span></div><div class="crp-hint" style="margin:0">Ajouté automatiquement à tous vos comptes-rendus, sans rien configurer : le lecteur laisse son nom, son prénom, son e-mail et un petit mot. Vous les retrouvez dans « 📨 Messages reçus » (sur la page du compte-rendu et dans « Gérer mes comptes-rendus »), avec une notification à chaque message.</div></div>';
   h += '<div class="crp-hint">Vous pouvez <b>cumuler jusqu’à ' + MAX_ACTIONS + ' actions</b> (par exemple : faire un don, rejoindre comme bénévole, être contacté…). Le lecteur choisit celle qui lui convient. <b>Les boutons s’affichent aux lecteurs dès que vous enregistrez le compte-rendu.</b></div>';
+  /* Fonctionnalité automatique, volontairement à part et d'apparence « verrouillée » : on ne la confond pas avec une action à configurer. */
+  h += '<div class="crp-auto-sep" aria-hidden="true"><span>Fonctionnement automatique</span></div>'
+    + '<div class="crp-auto" role="note"><div class="crp-auto-h"><span class="crp-auto-ic" aria-hidden="true">🔒</span><div class="crp-auto-tt"><div class="crp-auto-t">💬 Laisser un message à l’organisateur</div><div class="crp-auto-s">Inclus automatiquement · non modifiable · rien à faire</div></div><span class="crp-auto-badge">Automatique</span></div>'
+    + '<div class="crp-auto-b">Ce bouton est <b>automatiquement lié à tous vos comptes-rendus</b> : vous n’avez rien à configurer, vous ne pouvez ni le modifier ni le retirer. Le lecteur y laisse son nom, son prénom, son e-mail et un petit mot. Vous retrouvez les messages dans « 📨 Messages reçus » (sur la page du compte-rendu et dans « Gérer mes comptes-rendus »), avec une notification à chaque message.</div></div>';
   box.innerHTML = h;
   const idx = el => Number(el.dataset.ai !== undefined ? el.dataset.ai : (el.dataset.abtn ?? el.dataset.alien ?? el.dataset.afiche ?? el.dataset.acag ?? el.dataset.arm ?? el.dataset.fcreer ?? el.dataset.fpub ?? el.dataset.ftitre));
   $$('[data-am]', box).forEach(b => b.addEventListener('click', () => {
