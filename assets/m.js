@@ -48,6 +48,8 @@
     people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14a5 5 0 0 1 4.5 5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+    swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     dir: '<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M17 5h4M17 9h4M17 13h4"/>',
     doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>'
   };
@@ -124,14 +126,14 @@
     ann: { type: '', q: '', items: [], total: 0, shown: 30, loaded: false },
     myInsc: new Set(), pane: null, chatTimer: null, convNames: {}
   };
-  const TABS = ['fil', 'evenements', 'annuaire', 'messages', 'boutiques', 'moi'];
-  const TITLES = { fil: "Fil d'actualité", evenements: 'Événements', annuaire: 'Annuaire', messages: 'Messages', boutiques: 'Boutiques', moi: 'Mon espace' };
+  const TABS = ['accueil', 'evenements', 'annuaire', 'messages', 'boutiques', 'moi'];
+  const TITLES = { accueil: 'Accueil', evenements: 'Événements', annuaire: 'Annuaire', messages: 'Messages', boutiques: 'Boutiques', moi: 'Mon espace' };
   const scrollMem = {};
 
   /* ---------- connexion ---------- */
   async function loadMe() {
     try { const r = await api('/api/auth/me'); S.me = r.user || null; } catch (e) { S.me = null; }
-    if (S.me) { refreshBadges(); loadMyInsc(); }
+    if (S.me) { refreshBadges(); loadMyInsc(); loadPremium(); }
     renderTop();
   }
   async function loadMyInsc() {
@@ -193,7 +195,7 @@
   }
   async function needLogin(reason) { if (S.me) return true; return openLogin(reason); }
   async function afterAuthChange() {
-    S.fil = { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false };
+    S.fil = { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false }; S.home.loaded = false;
     S.ev.loaded = false; S.boutiques.loaded = false; S.ann.loaded = false;
     await loadMe(); route(true);
   }
@@ -207,15 +209,16 @@
   function renderTop() {
     const top = $('#top');
     const right = S.me
-      ? `<a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       : `<button class="pill-cta" id="top-login">Connexion</button>`;
     top.innerHTML = `<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
       <h1><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
+    const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
     paintBadges();
   }
   function renderTabs() {
-    const items = [['fil', 'Fil', 'fil'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user']];
+    const items = [['accueil', 'Accueil', 'home'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user']];
     $('#tabs').innerHTML = items.map(([k, l, i]) => `<button data-tab="${k}" aria-label="${l}" ${S.tab === k ? 'aria-current="page"' : ''} class="${S.tab === k ? 'on' : ''}">${ic(i)}<span>${l}</span>${k === 'messages' ? '<span class="dot" id="tab-badge-messages" hidden></span>' : ''}</button>`).join('');
     $$('#tabs button').forEach(b => b.onclick = () => {
       if (S.tab === b.dataset.tab && !S.pane) { window.scrollTo({ top: 0, behavior: 'smooth' }); refreshTab(b.dataset.tab); }
@@ -226,8 +229,9 @@
 
   /* ---------- routage ---------- */
   function route(force) {
-    const h = location.hash.replace(/^#\/?/, '') || 'fil';
-    const [a, b, c] = h.split('/');
+    const h = location.hash.replace(/^#\/?/, '') || 'accueil';
+    let [a, b, c] = h.split('/');
+    if (a === 'fil') a = 'accueil';
     if (TABS.includes(a)) {
       closePane(true);
       if (S.tab && S.tab !== a) scrollMem[S.tab] = window.scrollY;
@@ -242,10 +246,10 @@
     }
   }
   function renderTab(t) {
-    ({ fil: viewFil, evenements: viewEvents, annuaire: viewAnnuaire, messages: viewMessages, boutiques: viewBoutiques, moi: viewMoi })[t]();
+    ({ accueil: viewAccueil, evenements: viewEvents, annuaire: viewAnnuaire, messages: viewMessages, boutiques: viewBoutiques, moi: viewMoi })[t]();
   }
   function refreshTab(t) {
-    if (t === 'fil') { S.fil = { mode: S.fil.mode, page: 1, pages: 1, posts: [], loaded: false }; }
+    if (t === 'accueil') { S.fil = { mode: S.fil.mode, page: 1, pages: 1, posts: [], loaded: false }; S.home.loaded = false; }
     if (t === 'evenements') S.ev.loaded = false;
     if (t === 'boutiques') S.boutiques.loaded = false;
     if (t === 'annuaire') S.ann.loaded = false;
@@ -257,7 +261,7 @@
      ============================================================ */
   const FIL_MODES = [['tous', 'Pour vous'], ['suivis', 'Mes abonnements'], ['populaires', 'Populaires'], ['organisations', 'Organisations']];
   function viewFil() {
-    const el = $('#t-fil');
+    const el = $('#home-feed');
     el.innerHTML = `<div class="chips" role="tablist">${FIL_MODES.map(([k, l]) => `<button class="chip ${S.fil.mode === k ? 'on' : ''}" data-mode="${k}" role="tab" aria-selected="${S.fil.mode === k}">${l}</button>`).join('')}</div><div id="fil-list"></div><div id="fil-more"></div>`;
     $$('.chip', el).forEach(c => c.onclick = async () => {
       if (c.dataset.mode === 'suivis' && !(await needLogin('Connectez-vous pour voir les publications de vos abonnements.'))) return;
@@ -676,37 +680,226 @@
   /* ============================================================
      MOI — menu réduit pour téléphone
      ============================================================ */
-  const MENU_KEEP = [
-    ['billets', 'ticket', 'Mes billets', 'Vos inscriptions et QR codes d’entrée', '#/billets'],
-    ['formations', 'book', 'Formations', 'Vos formations en cours', 'formations.html'],
-    ['parrainage', 'gift', 'Parrainage', 'Invitez vos proches', 'parrainage.html']
+  /* ============================================================
+     ACCUEIL — reprend l'accueil général du site, version téléphone
+     ============================================================ */
+  S.home = { loaded: false };
+  const ytId = u => { const m = /(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/.exec(String(u || '')); return m ? m[1] : null; };
+  const fmtDuree = s => { s = Number(s) || 0; if (!s) return ''; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function money(n, dev) {
+    try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: dev || 'EUR', maximumFractionDigits: 0 }).format(Number(n) || 0); }
+    catch (e) { return (Number(n) || 0) + ' ' + (dev || '€'); }
+  }
+  function videoThumb(v) {
+    if (v.miniature_url) return `<img src="${attrUrl(v.miniature_url)}" alt="" loading="lazy">`;
+    const y = v.type_source === 'youtube' ? ytId(v.url) : null;
+    if (y) return `<img src="https://img.youtube.com/vi/${y}/mqdefault.jpg" alt="" loading="lazy">`;
+    return `<span style="font-size:34px">${esc(v.icone || '🎬')}</span>`;
+  }
+  function videoCard(v, wide) {
+    const bientot = v.type_source === 'bientot';
+    return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
+  }
+  const miniCard = (href, photo, nom, sub, round) => `<a class="mc" href="${href}"><div class="av big" style="border-radius:${round ? '50%' : '16px'};margin:0 auto 8px">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nom))}</div><div class="mn">${esc(nom)}</div>${sub ? `<div class="small muted ell">${esc(sub)}</div>` : ''}</a>`;
+  const homeBlock = (id, titre, html, more) => { const el = $('#' + id); if (!el || !html) return; el.innerHTML = `<div class="h2 row"><span class="sp">${esc(titre)}</span>${more || ''}</div>${html}`; };
+
+  function viewAccueil() {
+    const el = $('#t-accueil');
+    if (S.home.loaded && $('#home-feed', el)) return;
+    S.home.loaded = true;
+    el.innerHTML = `<div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>
+      <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
+        <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
+        <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
+        <div class="row" style="flex-wrap:wrap;gap:8px">${S.me ? '' : '<a class="btn sm" href="inscription.html">Rejoindre la communauté</a>'}<a class="btn sm out" href="#/annuaire">Explorer l’annuaire</a></div></div></div>
+      <div class="card"><div class="pad"><div class="small muted" style="font-weight:700;margin-bottom:6px">POURQUOI DIASPO’ACTIF ?</div>
+        <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
+        <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
+      <div id="home-init"></div><div id="home-shops"></div><div id="home-temo"></div><div id="home-part"></div>
+      <div class="h2">CE QUI SE PASSE EN CE MOMENT</div><div id="home-feed"></div>`;
+    loadHome();
+    viewFil();
+  }
+  function loadHome() {
+    const safe = fn => fn().catch(() => { });
+    safe(async () => {
+      const a = ((await api('/api/annonces-officielles/actives')).annonces || [])[0]; if (!a) return;
+      $('#home-annonce').innerHTML = `<div class="card">${a.image_url ? mediaBlock(a.image_url, { alt: a.titre }) : ''}<div class="pad"><span class="badge o">Annonce officielle</span><h3 style="margin:8px 0 4px;font-size:18px">${esc(a.titre)}</h3>${a.accroche ? `<p class="muted" style="margin:0 0 8px">${esc(strip(a.accroche))}</p>` : ''}${a.evenement_id ? `<a class="btn sm" href="#/evenement/${a.evenement_id}">Voir l’événement</a>` : ''}</div></div>`;
+    });
+    safe(async () => {
+      const l = (await api('/api/honneur/laureats')).laureats || []; if (!l.length) return;
+      homeBlock('home-honneur', 'COMPTES À L’HONNEUR', `<div class="hs">${l.map(x => miniCard(esc(x.profil_url), x.photo_url, x.nom, [x.ville, x.pays].filter(Boolean).join(', '), x.categorie !== 'initiative')).join('')}</div>`);
+    });
+    safe(async () => {
+      const v = (await api('/api/videos-tutoriels?limit=8')).videos || []; if (!v.length) return;
+      homeBlock('home-videos', 'TUTORIELS VIDÉO', `<div class="hs">${v.map(x => videoCard(x)).join('')}</div>`, '<a href="#/videos" class="small" style="color:var(--navy2);font-weight:700;text-transform:none;letter-spacing:0">Tout voir ›</a>');
+    });
+    safe(async () => {
+      const r = await api('/api/annuaire/recherche?type=Initiative&q='); const l = (r.initiatives || []).slice(0, 10); if (!l.length) return;
+      homeBlock('home-init', 'INITIATIVES À DÉCOUVRIR', `<div class="hs">${l.map(x => miniCard('initiative.html?id=' + encodeURIComponent(x.slug || x.id), x.logo_url, x.nom, [x.ville, x.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/annuaire" class="small" style="color:var(--navy2);font-weight:700;text-transform:none;letter-spacing:0">Annuaire ›</a>');
+    });
+    safe(async () => {
+      const l = ((await api('/api/vitrines')).vitrines || []).slice(0, 10); if (!l.length) return;
+      homeBlock('home-shops', 'BOUTIQUES DE LA DIASPORA', `<div class="hs">${l.map(v => miniCard('profil.html?id=' + encodeURIComponent(v.owner_user_id) + '&vitrine=1', v.logo_url, v.boutique_nom || v.nom, [v.ville, v.pays].filter(Boolean).join(', '))).join('')}</div>`, '<a href="#/boutiques" class="small" style="color:var(--navy2);font-weight:700;text-transform:none;letter-spacing:0">Toutes ›</a>');
+    });
+    safe(async () => {
+      const l = (await api('/api/temoignages/public?limit=8')).temoignages || []; if (!l.length) return;
+      homeBlock('home-temo', 'ILS ONT REJOINT DIASPO’ACTIF', `<div class="hs">${l.map(t => `<div class="card tm"><div class="pad">${t.note ? `<div style="color:#E0A100;letter-spacing:2px">${'★'.repeat(t.note)}${'☆'.repeat(5 - t.note)}</div>` : ''}<p style="margin:6px 0 8px">« ${esc(String(t.description || '').slice(0, 200))}${String(t.description || '').length > 200 ? '…' : ''} »</p><div class="small"><b>${esc(t.nom_affichage || 'Membre Diaspo’Actif')}</b>${t.pays_utilisateur ? ' · ' + esc(t.pays_utilisateur) : ''}</div></div></div>`).join('')}</div>`);
+    });
+    safe(async () => {
+      const l = (await api('/api/partenaires/carousel?limit=12')).partenaires || []; if (!l.length) return;
+      homeBlock('home-part', 'PARTENAIRES OFFICIELS', `<div class="hs">${l.map(p => miniCard('profil.html?id=' + encodeURIComponent(p.user_id), p.photo_url, [p.prenom, p.nom].filter(Boolean).join(' ') || p.nom, (p.domaines_expertise || []).slice(0, 2).join(' · '), true)).join('')}</div>`);
+    });
+  }
+
+  /* ---------- tutoriels vidéo ---------- */
+  async function paneVideos() {
+    setPane('Tutoriels vidéo', '<div class="sk skc"></div>');
+    let r; try { r = await api('/api/videos-tutoriels'); } catch (e) { return setPane('Tutoriels vidéo', `<div class="empty"><b>Indisponible</b>${esc(e.message)}</div>`); }
+    const vids = r.videos || [], cats = [...new Set(vids.map(v => v.categorie).filter(Boolean))]; let cat = '';
+    const draw = () => {
+      const l = vids.filter(v => !cat || v.categorie === cat);
+      setPane('Tutoriels vidéo', `${cats.length ? `<div class="chips"><button class="chip ${cat ? '' : 'on'}" data-c="">Toutes</button>${cats.map(c => `<button class="chip ${cat === c ? 'on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
+        ${l.length ? `<div class="vgrid">${l.map(v => videoCard(v, true)).join('')}</div>` : `<div class="empty"><div class="ei">${ic('fil', 'l')}</div><b>Aucune vidéo</b>Les tutoriels arrivent bientôt.</div>`}`);
+      $$('#pane-body .chip').forEach(b => b.onclick = () => { cat = b.dataset.c; draw(); });
+    };
+    draw();
+  }
+  async function paneVideo(id) {
+    setPane('Tutoriel vidéo', '<div class="sk skc"></div>');
+    let v; try { v = (await api('/api/videos-tutoriels/' + encodeURIComponent(id))).video; } catch (e) { return setPane('Tutoriel vidéo', `<div class="empty"><b>Vidéo introuvable</b>${esc(e.message)}</div>`); }
+    const y = v.type_source === 'youtube' ? ytId(v.url) : null;
+    const player = y ? `<div class="vwrap"><iframe src="https://www.youtube-nocookie.com/embed/${y}?rel=0&playsinline=1" title="${esc(v.titre)}" allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`
+      : v.type_source === 'mp4' ? videoBlock(v.url)
+        : `<div class="empty"><div class="ei">${ic('clock', 'l')}</div><b>Bientôt disponible</b>Cette vidéo sera publiée prochainement.</div>`;
+    setPane(v.titre, `${player}<div class="card" style="margin-top:12px"><div class="pad"><h2 style="margin:0 0 6px;font-size:19px">${esc(v.titre)}</h2><div class="tags" style="margin:0 0 8px">${v.categorie ? `<span class="badge">${esc(v.categorie)}</span>` : ''}${v.duree_secondes ? `<span class="badge">${fmtDuree(v.duree_secondes)}</span>` : ''}${v.vues ? `<span class="badge">${v.vues} vues</span>` : ''}</div>${v.description ? `<div class="rich" style="white-space:pre-line">${esc(strip(v.description))}</div>` : ''}</div></div>
+      <a class="btn out block" href="#/videos">Toutes les vidéos</a>`);
+  }
+
+  /* ---------- cagnottes et dons ---------- */
+  function cagnotteCard(c) {
+    const obj = Number(c.objectif_montant) || 0, got = Number(c.montant_collecte) || 0, pct = obj ? Math.min(100, Math.round(got * 100 / obj)) : null;
+    const montants = c.afficher_montants !== 0;
+    return `<article class="card cg">${c.image_url ? mediaBlock(c.image_url, { alt: c.titre }) : ''}<div class="pad">
+      <div class="tags" style="margin:0 0 6px">${c.categorie ? `<span class="badge">${esc(c.categorie)}</span>` : ''}${c.type_don === 'recurrent' ? '<span class="badge o">Don récurrent</span>' : ''}</div>
+      <h3 style="margin:0 0 4px;font-size:17px;line-height:1.25">${esc(md(strip(c.titre)))}</h3>
+      ${c.description ? `<p class="muted small" style="margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(strip(c.description))}</p>` : ''}
+      ${pct !== null && montants ? `<div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ''}
+      <div class="row small" style="margin:6px 0 12px">${montants ? `<span><b>${esc(money(got, c.devise))}</b>${obj ? ' sur ' + esc(money(obj, c.devise)) : ' collectés'}</span>` : '<span></span>'}<span class="sp"></span>${c.nb_contributeurs ? `<span class="muted">${c.nb_contributeurs} donateur${c.nb_contributeurs > 1 ? 's' : ''}</span>` : ''}</div>
+      <a class="btn block sm" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}">${ic('heart', 's')} Donner</a></div></article>`;
+  }
+  async function paneCagnottes() {
+    setPane('Cagnottes et dons', '<div class="sk skc"></div><div class="sk skc"></div>');
+    let pub = [], mes = null;
+    try { pub = (await api('/api/cagnottes/publiques')).cagnottes || []; } catch (e) { return setPane('Cagnottes et dons', `<div class="empty"><b>Indisponible</b>${esc(e.message)}</div>`); }
+    if (S.me && S.me.role === 'initiative') { try { mes = (await api('/api/cagnottes/mes')).cagnottes || []; } catch (e) { mes = []; } }
+    let html = '';
+    if (mes) {
+      const total = mes.reduce((n, c) => n + (Number(c.montant_collecte) || 0), 0);
+      const lock = premiumLocked(2);
+      html += `<div class="h2" style="margin-top:2px">MES CAGNOTTES</div><div class="card"><div class="pad">
+        <div class="row"><div class="sp"><b style="font-size:20px">${mes.length}</b> <span class="muted small">cagnotte${mes.length > 1 ? 's' : ''}</span></div><div><b>${esc(money(total))}</b> <span class="muted small">collectés</span></div></div>
+        ${mes.slice(0, 5).map(c => `<div class="kv"><span class="ell" style="max-width:62%">${esc(md(strip(c.titre)))}</span><span>${esc(money(c.montant_collecte, c.devise))}</span></div>`).join('')}
+        <a class="btn block sm ${lock ? 'out' : ''}" style="margin-top:12px" ${lock ? 'data-lock="1" href="#"' : 'href="dashboard-initiative.html#cagnottes"'}>${lock ? ic('lock', 's') + ' ' : ''}Gérer mes cagnottes ${lock ? '👑' : ''}</a></div></div>`;
+    }
+    html += `<div class="h2" ${mes ? '' : 'style="margin-top:2px"'}>CAGNOTTES OUVERTES</div>` + (pub.length ? pub.map(cagnotteCard).join('') : `<div class="empty"><div class="ei">${ic('heart', 'l')}</div><b>Aucune cagnotte ouverte</b>Revenez bientôt.</div>`);
+    setPane('Cagnottes et dons', html);
+  }
+
+  /* ---------- changement de compte (Liaison de comptes) ---------- */
+  const ROLE_LABEL = { utilisateur: 'Utilisateur', initiative: 'Initiative', collectivite: 'Collectivité', administrateur: 'Administrateur', institutionnel: 'Institution', officiel: 'Officiel' };
+  async function openSwitcher() {
+    if (!(await needLogin('Connectez-vous pour gérer vos comptes.'))) return;
+    const sh = $('#sheet'); sh.hidden = false;
+    const close = () => { sh.hidden = true; sh.innerHTML = ''; };
+    sh.onclick = e => { if (e.target === sh) close(); };
+    sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true" aria-label="Changer de compte"><div class="grip"></div><div class="sb"><div class="sk" style="height:70px"></div></div></div>';
+    let list = [];
+    try { list = (await api('/api/comptes-lies')).comptes || []; } catch (e) { toast(e.message, true); }
+    const body = list.length ? list.map(c => {
+      const nm = [c.prenom, c.nom].filter(Boolean).join(' ') || c.nom; const actif = Number(c.id) === Number(S.me.id);
+      return `<div class="li" style="cursor:default"><div class="av">${c.photo_url ? `<img src="${attrUrl(c.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><span class="sp"><span class="t">${esc(nm)}</span><br><span class="d">${esc(ROLE_LABEL[c.role] || c.role)}${c.statut === 'suspendu' ? ' · suspendu' : ''}</span></span>${actif ? '<span class="badge g">Actif</span>' : (c.statut === 'suspendu' ? '' : `<button class="btn sm" data-sw="${c.id}">Basculer</button>`)}</div>`;
+    }).join('') : `<div class="empty" style="padding:22px"><div class="ei">${ic('people', 'l')}</div><b>Aucun compte lié</b>Reliez vos comptes (personnel, initiative…) pour passer de l’un à l’autre sans vous reconnecter.</div>`;
+    sh.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-label="Changer de compte"><div class="grip"></div><h2 style="margin:0 0 8px;font-size:18px">Changer de compte</h2><div class="sb"><div class="lst">${list.length ? body : ''}</div>${list.length ? '' : body}</div>
+      <a class="btn out block" style="margin-top:12px" href="comptes-lies.html">${ic('plus', 's')} ${list.length ? 'Gérer / lier un compte' : 'Lier un compte'}</a></div>`;
+    $$('[data-sw]', sh).forEach(b => b.onclick = async () => {
+      b.disabled = true; b.textContent = '…';
+      try { const r = await api('/api/comptes-lies/basculer', { method: 'POST', body: { user_id: Number(b.dataset.sw) } }); S.me = r.user || S.me; close(); toast('Compte changé ✓'); S.premium = null; await afterAuthChange(); location.hash = '#/accueil'; }
+      catch (e) { toast(e.message, true); b.disabled = false; b.textContent = 'Basculer'; }
+    });
+  }
+  function premiumSheet(nom) {
+    const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
+    sh.onclick = e => { if (e.target === sh) close(); };
+    sh.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-label="Module Premium"><div class="grip"></div><div class="sb" style="text-align:center;padding:6px 4px 12px"><div class="ei" style="width:64px;height:64px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);display:flex;align-items:center;justify-content:center;margin:4px auto 10px">${ic('lock', 'l')}</div>
+      <h2 style="margin:0 0 6px;font-size:19px">Module Premium 👑</h2><p class="muted" style="margin:0 0 14px">${esc(nom || 'Ce module')} fait partie de l’abonnement Premium. Votre abonnement est arrivé à expiration : renouvelez-le pour retrouver l’accès.</p>
+      <a class="btn block" href="mon-abonnement.html">Voir mon abonnement</a><button class="btn out block" id="ps-close" style="margin-top:10px">Plus tard</button></div></div>`;
+    $('#ps-close').onclick = close;
+  }
+  document.addEventListener('click', e => {
+    const lk = e.target.closest('[data-lock]'); if (lk) { e.preventDefault(); premiumSheet(lk.dataset.name || ''); return; }
+    if (e.target.closest('[data-act=switch]')) { e.preventDefault(); openSwitcher(); }
+  });
+
+  /* ============================================================
+     MOI — menu des modules selon le type de compte et le Premium
+     r[rôle] : 0 absent · 1 libre · 2 Premium (verrouillé si expiré) · 3 libre, une partie est Premium
+     ============================================================ */
+  const MODS = [
+    { t: 'Mes événements', i: 'cal', h: 'dashboard-initiative.html#evenements', d: 'Créer et gérer vos événements', r: { initiative: 2 } },
+    { t: 'Cotisations et adhésions', i: 'people', h: 'dashboard-initiative.html#adhesions-init', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
+    { t: 'Messages de la boutique', i: 'shop', h: 'dashboard-initiative.html#messages-vitrine', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
+    { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mes billets', i: 'ticket', h: '#/billets', d: 'Inscriptions et QR codes d’entrée', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Cagnottes et dons', i: 'heart', h: '#/cagnottes', d: { utilisateur: 'Soutenir les cagnottes ouvertes', initiative: 'Vos cagnottes et les dons reçus' }, r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mon Associé', i: 'people', h: 'mon-associe.html', d: { utilisateur: 'Consulter les annonces, candidater', initiative: 'Annonces d’associés · publier = Premium' }, r: { utilisateur: 1, initiative: 3 } },
+    { t: 'Mon Réseau Pro', i: 'brief', h: 'reseau.html', d: 'Contacts et réseau professionnel', r: { utilisateur: 2, initiative: 1 } },
+    { t: 'Business Plans', i: 'file', h: 'business-plan.html', d: 'Construire et défendre vos projets', r: { utilisateur: 2, initiative: 2 } },
+    { t: 'Formations', i: 'book', h: 'formations.html', d: 'Catalogue et formations suivies', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'CV, lettres, candidatures', i: 'doc', h: 'dashboard-utilisateur.html', d: 'Vos documents de candidature', r: { utilisateur: 1 } },
+    { t: 'Parrainage', i: 'gift', h: 'parrainage.html', d: 'Invitez vos proches', r: { utilisateur: 1, initiative: 1 } }
   ];
-  const MENU_LIGHT = [
-    ['emploi', 'brief', 'Emploi et stages', 'Offres et candidatures', 'emplois-stages.html'],
-    ['paiements', 'card', 'Paiements', 'Historique et reçus', 'mes-paiements.html'],
-    ['devis', 'file', 'Mes demandes de devis', 'Suivi des devis boutique', 'mes-devis.html'],
-    ['abo', 'star', 'Mon abonnement', 'Premium et échéances', 'mon-abonnement.html'],
-    ['confid', 'lock', 'Confidentialité', 'Vos données et visibilité', 'confidentialite.html'],
-    ['loc', 'pin', 'Ma localisation', 'Ville et pays affichés', 'dashboard-utilisateur.html']
+  const MODS_COMPTE = [
+    { t: 'Confidentialité', i: 'lock', h: 'confidentialite.html', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mon abonnement', i: 'star', h: 'mon-abonnement.html', d: 'Premium et échéances', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Liaison de comptes', i: 'people', h: '#', act: 'switch', d: 'Passer d’un compte à un autre', r: { utilisateur: 1, initiative: 1 } }
   ];
-  const MENU_DESK = ['Business plans', 'CV, lettres et candidatures', 'Soumettre à Diaspo’Actif', 'Mes projets', 'Évaluation de projet', 'Réseau Pro', 'CRM partagé', 'Programmation', 'Liaison de comptes', 'Support pilote', 'Apparence', 'Mes statistiques'];
+  const MENU_DESK = ['Soumettre à Diaspo’Actif', 'Mes projets', 'Évaluation de projet', 'CRM partagé', 'Emploi et stages', 'Paiements', 'Mes demandes de devis', 'Ma localisation', 'Programmation', 'Support pilote', 'Apparence', 'Mes statistiques'];
+  async function loadPremium() {
+    try { S.premium = await api('/api/premium/statut'); } catch (e) { S.premium = null; }
+    if (S.tab === 'moi') viewMoi();
+  }
+  function premiumLocked(level) { return level === 2 && !!S.premium && S.premium.concerne && !S.premium.actif; }
   function viewMoi() {
     const el = $('#t-moi');
     if (!S.me) {
-      el.innerHTML = `${loginCard('Connectez-vous pour accéder à votre espace, vos billets et vos paramètres.')}<div class="lst" style="margin-top:6px"><a class="li" href="index.html"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Découvrir Diaspo’Actif</span><br><span class="d">Présentation de la plateforme</span></span><span class="ch">${ic('chev', 's')}</span></a></div>`;
+      el.innerHTML = `${loginCard('Connectez-vous pour accéder à vos modules, vos billets et vos paramètres.')}<div class="lst" style="margin-top:6px"><a class="li" href="index.html"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">Découvrir Diaspo’Actif</span><br><span class="d">Présentation de la plateforme</span></span><span class="ch">${ic('chev', 's')}</span></a></div>`;
       $('#go-login').onclick = () => openLogin(); return;
     }
-    const m = S.me; const nm = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email;
-    const li = ([k, i, t, d, h], dim) => `<a class="li ${dim ? 'dim' : ''}" href="${h}"><span class="ic">${ic(i)}</span><span class="sp"><span class="t">${esc(t)}</span><br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span></a>`;
-    el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc([m.ville, m.pays].filter(Boolean).join(', ') || m.email)}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div></div></a>
-      <div class="h2">ESSENTIEL</div><div class="lst">${MENU_KEEP.map(x => li(x)).join('')}</div>
-      <div class="h2">MON COMPTE</div><div class="lst">${MENU_LIGHT.map(x => li(x)).join('')}</div>
+    const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
+    const nm = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email;
+    const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
+    const lvl = x => role ? (x.r[role] || 0) : (x.r.utilisateur === 1 && x.r.initiative === 1 ? 1 : 0);
+    const li = x => {
+      const l = lvl(x); if (!l) return '';
+      const locked = premiumLocked(l), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
+      const tag = l === 2 ? `<span class="prem">${locked ? '🔒' : '👑'} Premium</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">👑 publier</span>' : '');
+      const inner = `<span class="ic">${ic(locked ? 'lock' : x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span> ${tag}<br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span>`;
+      if (locked) return `<a class="li dim" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
+      return `<a class="li" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
+    };
+    const mods = MODS.map(li).join(''), compte = MODS_COMPTE.map(li).join('');
+    el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div></div></a>
+      <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
+      <div class="h2">MES MODULES</div><div class="lst">${mods}</div>
+      <div class="h2">MON COMPTE</div><div class="lst">${compte}</div>
+      ${role ? '' : '<p class="small muted" style="margin:12px 4px 0">Ce type de compte retrouve ses outils complets sur le site : <a href="dashboard-' + esc(m.role === 'administrateur' ? 'administrateur' : 'collectivite') + '.html" style="text-decoration:underline">ouvrir mon tableau de bord</a>.</p>'}
       <button class="toggle" id="desk-toggle" aria-expanded="false">${ic('desk', 's')} Disponible sur ordinateur (${MENU_DESK.length})</button>
       <div id="desk-list" hidden><p class="small muted" style="margin:10px 4px">Ces outils sont plus confortables sur grand écran. Ouvrez Diaspo’Actif depuis votre ordinateur pour les utiliser.</p><div class="lst">${MENU_DESK.map(t => `<div class="li dim"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">${esc(t)}</span></span></div>`).join('')}</div></div>
       <button class="btn out block" id="logout" style="margin-top:18px">${ic('logout', 's')} Se déconnecter</button>
-      <p class="small muted" style="text-align:center;margin:14px 0 0">Version téléphone · <a href="dashboard-utilisateur.html" style="text-decoration:underline">Ouvrir le site complet</a></p>`;
+      <p class="small muted" style="text-align:center;margin:14px 0 0">Version téléphone · <a href="dashboard-${esc(m.role === 'initiative' ? 'initiative' : (m.role === 'utilisateur' ? 'utilisateur' : 'collectivite'))}.html" style="text-decoration:underline">Ouvrir le site complet</a></p>`;
     $('#desk-toggle').onclick = e => { const l = $('#desk-list'); l.hidden = !l.hidden; e.currentTarget.setAttribute('aria-expanded', String(!l.hidden)); };
-    $('#logout').onclick = logout;
+    $('#logout').onclick = logout; $('#me-switch').onclick = openSwitcher;
   }
 
   /* ---------- billets ---------- */
@@ -778,6 +971,9 @@
     else if (a === 'billet') paneBillet(b, c);
     else if (a === 'notifs') paneNotifs();
     else if (a === 'cr') paneCR(b);
+    else if (a === 'cagnottes') paneCagnottes();
+    else if (a === 'videos') paneVideos();
+    else if (a === 'video') paneVideo(b);
     else { location.hash = '#/fil'; return; }
     done();
   }
