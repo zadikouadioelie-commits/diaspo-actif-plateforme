@@ -1136,6 +1136,7 @@ html, body { overflow-x:clip; }
 <script src="assets/recherche-contacts.js"></script>
 <script src="assets/signalement.js"></script>
 <script src="/assets/don-banner.js"></script>
+<script src="/assets/soutenir.js"></script>
 <script>
 /* ===================================================
    PROFIL UTILISATEUR — logique complète
@@ -2076,6 +2077,12 @@ function renderVisitorProfile() {
       : _statutAdhesion === 'en_attente' ? `<button class="pvz-btn" disabled>⏳ Demande envoyée</button>`
       : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn adherer" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer à l'initiative</button>` : '')
     : '';
+  /* « Soutenir » (2026-10-07) : cartouche regroupant dons, cagnottes, adhésion, boutique et
+     billets d'événements (assets/soutenir.js). Masqué tant que le serveur n'a pas confirmé au
+     moins un chemin ouvert (hydrate() plus bas), jamais affiché au propriétaire sur son propre
+     profil. */
+  const soutenirBtn = (!isOwn && isInit && window.Soutenir)
+    ? Soutenir.buttonHtml(profil.id, { cls: 'pvz-btn', nom: profil.nom || '' }) : '';
   const msgBtn = `<span data-relation-user="${profil.id}" data-relation-origine="profil" data-relation-classe="pvz-btn"></span>`;
   const shareBtn = `<button class="pvz-btn" onclick="pvzShare()">↗ Partager</button>`;
   const reportBtn = CU ? `<button class="pvz-btn" style="color:#dc2626;" onclick="ouvrirSignalementModal(${profil.id},'${esc(profil.nom || '').replace(/'/g,"\\'")}')" title="Signaler ce compte">🚩 Signaler</button>` : '';
@@ -2135,7 +2142,7 @@ function renderVisitorProfile() {
             ${chips.length ? `<div class="pvz-chips pvz-mode-profil">${chips.join('')}</div>` : ''}
             ${vitrineBadgesLine}
           </div>
-          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+adhererBtn+msgBtn+shareBtn+reportBtn}</div>
+          <div class="pvz-actions">${isOwn ? ownerActionsRow : followBtn+adhererBtn+soutenirBtn+msgBtn+shareBtn+reportBtn}</div>
         </div>
       </div>
     </div>
@@ -2232,6 +2239,7 @@ function renderVisitorProfile() {
   /* Le profil est rendu APRÈS le chargement de la page : sans cet appel, l'emplacement du
      bouton de mise en relation resterait vide, le composant ne balayant le DOM qu'au démarrage. */
   window.initBoutonsRelation && window.initBoutonsRelation(root);
+  if (window.Soutenir) Soutenir.hydrate(root);
 
   // Avis + droit de réponse (cahier des charges "Avis + droit de réponse") — visible sur
   // l'onglet Profil pour tout type de compte non-Utilisateur (Initiative/Collectivité/

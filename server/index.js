@@ -21652,6 +21652,106 @@ route("GET", "/api/cagnottes/vedette-lot", async (req, res, params, body, query)
   sendJSON(res, 200, { dons });
 });
 
+/* ── Bouton « Soutenir » (2026-10-07, demande explicite) ──
+   Rassemble en un seul endroit TOUS les chemins par lesquels un visiteur peut soutenir une
+   initiative avec de l'argent : dons/cagnottes (récurrent, ponctuel, campagnes), adhésion,
+   boutique, billets d'événements. Les règles d'éligibilité vivent ici, jamais dans le
+   navigateur : le bouton n'apparaît que s'il existe au moins un chemin réellement ouvert.
+   Mêmes filtres que les routes publiques existantes (cagnottes publiées/publiques/non
+   clôturées, événements ni brouillon ni « boutique uniquement » ni terminés, boutique visible
+   avec au moins un produit disponible, adhésions ouvertes pour Association/ONG). */
+async function chargerSoutiens(ownerIds) {
+  const ids = [...new Set(ownerIds.map(Number).filter(Boolean))].slice(0, 100);
+  const resultat = {};
+  if (!ids.length) return resultat;
+  const ph = ids.map(() => "?").join(",");
+  const inits = await db.prepare(`SELECT id, owner_user_id, nom, type, vitrine_active, adhesions_ouvertes FROM initiatives WHERE owner_user_id IN (${ph}) ORDER BY id ASC`).all(...ids);
+  const initParOwner = {};
+  for (const i of inits) if (!initParOwner[i.owner_user_id]) initParOwner[i.owner_user_id] = i;
+
+  const cagnottes = await db.prepare(
+    `SELECT * FROM cagnottes WHERE owner_user_id IN (${ph}) AND est_publiee=1 AND visibilite='publique' AND (statut_manuel IS NULL OR statut_manuel != 'cloturee') ORDER BY created_at DESC`
+  ).all(...ids);
+  const ORDRE_DON = { recurrent: 0, occasionnel: 1, campagne: 2 };
+  const donsParOwner = {};
+  for (const c of cagnottes) {
+    if (calculerStatutCagnotte(c) !== "active") continue;
+    (donsParOwner[c.owner_user_id] = donsParOwner[c.owner_user_id] || []).push(cagnotteAvecStatut(c));
+  }
+  Object.values(donsParOwner).forEach(l => l.sort((a, b) => (ORDRE_DON[a.type_don] ?? 2) - (ORDRE_DON[b.type_don] ?? 2)));
+
+  const evts = await db.prepare(
+    `SELECT * FROM evenements WHERE owner_user_id IN (${ph}) AND (statut IS NULL OR statut != 'brouillon') ORDER BY date_evt ASC, heure_debut ASC`
+  ).all(...ids);
+  const evtsParOwner = {};
+  for (const e of evts) {
+    if (e.visibilite && e.visibilite !== "public") continue;
+    if (avecStatutTemporel(e).est_termine) continue;
+    (evtsParOwner[e.owner_user_id] = evtsParOwner[e.owner_user_id] || []).push(e);
+  }
+
+  const initIds = inits.map(i => i.id);
+  const produitsParInit = {};
+  if (initIds.length) {
+    const ph2 = initIds.map(() => "?").join(",");
+    const lignes = await db.prepare(`SELECT initiative_id, COUNT(*) AS n FROM produits_vitrine WHERE initiative_id IN (${ph2}) AND disponible=1 GROUP BY initiative_id`).all(...initIds);
+    lignes.forEach(l => { produitsParInit[l.initiative_id] = Number(l.n); });
+  }
+
+  for (const id of ids) {
+    const init = initParOwner[id] || null;
+    const boutiqueOuverte = !!init && init.vitrine_active !== 0 && (produitsParInit[init.id] || 0) > 0;
+    const adhesionOuverte = !!init && ["Association", "ONG"].includes(init.type) && (init.adhesions_ouvertes == null || !!init.adhesions_ouvertes);
+    resultat[id] = {
+      initiative: init ? { id: init.id, nom: init.nom, type: init.type } : null,
+      dons: donsParOwner[id] || [],
+      evenements: evtsParOwner[id] || [],
+      boutique: boutiqueOuverte ? { nb_produits: produitsParInit[init.id] } : null,
+      adhesion: adhesionOuverte ? { initiative_id: init.id } : null,
+    };
+  }
+  return resultat;
+}
+
+/* GET /api/soutenir-lot?owner_user_ids=1,2,3 — une requête pour toute une page de liste
+   (annuaire) : seuls les comptes qui ont AU MOINS un chemin de soutien sont renvoyés, avec de
+   simples compteurs — le détail ne se charge qu'à l'ouverture de la cartouche. */
+route("GET", "/api/soutenir-lot", async (req, res, params, body, query) => {
+  const ids = String(query?.owner_user_ids || "").split(",").map(Number).filter(Boolean).slice(0, 100);
+  const tous = await chargerSoutiens(ids);
+  const soutiens = {};
+  for (const [id, s] of Object.entries(tous)) {
+    if (s.dons.length || s.evenements.length || s.boutique || s.adhesion) {
+      soutiens[id] = { dons: s.dons.length, evenements: s.evenements.length, boutique: !!s.boutique, adhesion: !!s.adhesion };
+    }
+  }
+  sendJSON(res, 200, { soutiens });
+});
+
+/* GET /api/soutenir/:ownerUserId — détail présenté dans la cartouche « Soutenir ». */
+route("GET", "/api/soutenir/:ownerUserId", async (req, res, params) => {
+  const id = Number(params.ownerUserId);
+  if (!id) return sendJSON(res, 400, { error: "Compte invalide." });
+  const s = (await chargerSoutiens([id]))[id];
+  if (!s || !s.initiative) return sendJSON(res, 404, { error: "Initiative introuvable." });
+  sendJSON(res, 200, {
+    ok: true,
+    initiative: s.initiative,
+    dons: s.dons.map(c => ({
+      slug: c.slug, titre: c.titre, description: c.description, image_url: c.image_url, type_don: c.type_don || "campagne",
+      recurrence_periodicite: c.recurrence_periodicite, devise: c.devise || "EUR", objectif_montant: c.objectif_montant,
+      montant_collecte: c.montant_collecte, pourcentage: c.pourcentage, nb_contributeurs: c.nb_contributeurs, date_fin: c.date_fin,
+    })),
+    adhesion: s.adhesion,
+    boutique: s.boutique,
+    evenements: s.evenements.slice(0, 6).map(e => ({
+      id: e.id, titre: e.titre, date_evt: e.date_evt, heure_debut: e.heure_debut, ville: e.ville, pays: e.pays,
+      participation: participationEffective(e), prix_min: e.prix_min,
+    })),
+    nb_evenements: s.evenements.length,
+  });
+});
+
 /* GET /api/cagnottes/pour-fiche/:ficheId — publique. Alimente ipRenderDonLie() sur
    inscription-publique.html : le(s) don(s) occasionnel(s) explicitement liés à CETTE fiche
    (insc_fiche_id), distinct du bouton "Faire un don" global (vedette) — une fiche peut afficher

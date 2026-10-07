@@ -2196,6 +2196,7 @@ function renderInitiativeCard(it){
             ? `<a href="dashboard-initiative.html#adhesions-init" class="ann-card-btn ann-card-btn-adherer" onclick="event.stopPropagation()">⚙️ Gérer les adhésions</a>`
             : `<button type="button" class="ann-card-btn ann-card-btn-adherer" data-adherer-init="${it.id}" onclick="event.stopPropagation(); demanderAdhesion(${it.id}, this)">🤝 Adhérer à l'initiative</button>`
         ) : ''}
+        ${(!isOwnInit && it.owner_user_id && window.Soutenir) ? Soutenir.buttonHtml(it.owner_user_id, { cls: 'ann-card-btn', nom: it.nom }) : ''}
         ${adminAnnuaireBoutonsHtml(it.owner_user_id, isOwnInit)}
       </div>
     </div>
@@ -2627,6 +2628,9 @@ async function initAnnuaire(){
       (r.initiatives || []).forEach(it => { if (it.owner_user_id) mapping[it.owner_user_id] = document.getElementById('ann-donban-' + it.id); });
       DonBanner.renderLot(mapping);
     }
+    /* Bouton « Soutenir » (2026-10-07) : masqué sur chaque carte, révélé seulement pour les
+       comptes qui ont au moins un chemin de soutien — UNE requête groupée pour la page. */
+    if (window.Soutenir) Soutenir.hydrate(list);
   }
 
   /* ── Appliquer les filtres ── */
