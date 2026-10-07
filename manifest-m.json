@@ -1,0 +1,12 @@
+{
+  "name": "Diaspo'Actif",
+  "short_name": "Diaspo'Actif",
+  "description": "La plateforme de la diaspora — version téléphone",
+  "start_url": "/m.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0D2B4E",
+  "theme_color": "#0D2B4E",
+  "lang": "fr",
+  "icons": [{ "src": "/assets/logo.png", "sizes": "any", "type": "image/png", "purpose": "any" }]
+}
