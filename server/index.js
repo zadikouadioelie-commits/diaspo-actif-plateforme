@@ -6128,9 +6128,9 @@ route("PUT", "/api/initiatives/:id/adhesion-relances-config", async (req, res, p
   if (!init || Number(init.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const jours = Array.isArray(body?.jours)
-    ? [...new Set(body.jours.map(j => Math.round(Number(j))).filter(j => Number.isFinite(j) && j >= -90 && j <= 90))].sort((a, b) => b - a).slice(0, 10)
+    ? [...new Set(body.jours.map(j => Math.round(Number(j))).filter(j => Number.isFinite(j) && j >= -10 && j <= 90))].sort((a, b) => b - a).slice(0, 10)
     : [];
-  if (!jours.length) return sendJSON(res, 400, { error: "Au moins un délai valide requis (entre -90 et 90 jours)." });
+  if (!jours.length) return sendJSON(res, 400, { error: "Au moins un délai valide requis (de J-90 à J+10)." });
   await db.prepare("UPDATE initiatives SET adhesion_relances_jours=? WHERE id=?").run(JSON.stringify(jours), params.id);
   sendJSON(res, 200, { ok: true, jours });
 });

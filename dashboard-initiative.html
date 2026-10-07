@@ -1190,10 +1190,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div id="modal-adh-relances" class="modal-overlay" style="display:none;">
         <div class="modal-box" style="max-width:440px;">
           <h3 style="margin:0 0 6px;">⏰ Délais de relance</h3>
-          <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Un rappel (notification + email) est envoyé à chacun de ces décalages par rapport à la date d'expiration. Positif = avant, négatif = après. Un seul rappel par décalage et par cycle d'adhésion.</p>
-          <div id="adh-relances-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.5;">Cliquez sur les moments où un rappel (notification + e-mail) doit partir, par rapport à la date d'expiration de l'adhésion : <b>J-8</b> = 8 jours avant, <b>J+3</b> = 3 jours après (jusqu'à J+10). Vous pouvez en choisir plusieurs, 10 au plus. Un seul rappel par moment et par cycle d'adhésion.</p>
+          <div id="adh-relances-chips"></div>
+          <div id="adh-relances-resume" style="font-size:12.5px;font-weight:700;margin:12px 0 10px;"></div>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">Un autre délai ? Saisissez un nombre de jours : positif = avant (jusqu'à 90), négatif = après (jusqu'à -10).</div>
           <div style="display:flex;gap:8px;margin-bottom:14px;">
-            <input type="number" id="adh-relances-nouveau" class="input" placeholder="ex. 14" style="flex:1;" min="-90" max="90">
+            <input type="number" id="adh-relances-nouveau" class="input" placeholder="ex. 14" style="flex:1;" min="-10" max="90">
             <button class="btn btn-sm btn-outline" onclick="adhAjouterDelaiRelance()">➕ Ajouter</button>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -7421,13 +7423,30 @@ function adhLibelleDelai(j){
   if (j === 0) return 'Jour J';
   return `J+${-j}`;
 }
+const ADH_RELANCES_MAX = 10;
+const ADH_RELANCES_AVANT = [60, 45, 30, 21, 15, 10, 8, 7, 5, 3, 2, 1];
+const ADH_RELANCES_APRES = [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10];
+/* Chaque délai est une puce sur laquelle on clique pour l'activer ou la désactiver (2026-10-07, demande explicite : « propose d'en mettre plusieurs…
+   permet d'aller jusqu'à J+10 ») ; les délais personnalisés déjà enregistrés restent visibles, dans un groupe « Autres ». */
+function adhPuceDelai(j){
+  const actif = ADH_RELANCES_JOURS.includes(j);
+  return `<button type="button" onclick="adhBasculerDelaiRelance(${j})" aria-pressed="${actif}" style="cursor:pointer;border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:700;border:1.5px solid ${actif ? '#2E74E0' : 'var(--border)'};background:${actif ? '#2E74E0' : 'var(--bg)'};color:${actif ? '#fff' : 'inherit'};">${actif ? '✓ ' : ''}${adhLibelleDelai(j)}</button>`;
+}
 function adhRenderRelancesChips(){
   const zone = document.getElementById('adh-relances-chips');
-  zone.innerHTML = ADH_RELANCES_JOURS.slice().sort((a,b)=>b-a).map(j => `
-    <span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:5px 6px 5px 12px;font-size:12.5px;font-weight:700;">
-      ${adhLibelleDelai(j)}
-      <button type="button" onclick="adhRetirerDelaiRelance(${j})" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 4px;">✕</button>
-    </span>`).join('') || '<span style="font-size:12.5px;color:var(--muted);">Aucun délai configuré.</span>';
+  const groupe = (titre, liste) => liste.length ? `<div style="margin-bottom:10px;"><div style="font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">${titre}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${liste.map(adhPuceDelai).join('')}</div></div>` : '';
+  const connus = [...ADH_RELANCES_AVANT, 0, ...ADH_RELANCES_APRES];
+  const autres = ADH_RELANCES_JOURS.filter(j => !connus.includes(j)).sort((a, b) => b - a);
+  zone.innerHTML = groupe('Avant l\'expiration', ADH_RELANCES_AVANT) + groupe('Le jour de l\'expiration', [0]) + groupe('Après l\'expiration', ADH_RELANCES_APRES) + groupe('Autres délais enregistrés', autres);
+  const choisis = ADH_RELANCES_JOURS.slice().sort((a, b) => b - a);
+  const resume = document.getElementById('adh-relances-resume');
+  if (resume) resume.innerHTML = choisis.length ? `Vos rappels : ${choisis.map(adhLibelleDelai).join(' · ')} <span style="font-weight:500;color:var(--muted);">(${choisis.length} sur ${ADH_RELANCES_MAX})</span>` : '<span style="font-weight:500;color:var(--muted);">Aucun délai choisi.</span>';
+}
+function adhBasculerDelaiRelance(j){
+  if (ADH_RELANCES_JOURS.includes(j)) ADH_RELANCES_JOURS = ADH_RELANCES_JOURS.filter(x => x !== j);
+  else if (ADH_RELANCES_JOURS.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum : désactivez-en un avant d'en ajouter.`, 'warning'); return; }
+  else ADH_RELANCES_JOURS.push(j);
+  adhRenderRelancesChips();
 }
 async function adhOuvrirRelancesConfig(){
   const initId = window.__vitrineInitId;
@@ -7444,8 +7463,8 @@ async function adhOuvrirRelancesConfig(){
 function adhAjouterDelaiRelance(){
   const input = document.getElementById('adh-relances-nouveau');
   const v = Math.round(Number(input.value));
-  if (!Number.isFinite(v) || v < -90 || v > 90) { showToast?.('Délai invalide (entre -90 et 90 jours).', 'warning'); return; }
-  if (!ADH_RELANCES_JOURS.includes(v)) ADH_RELANCES_JOURS.push(v);
+  if (!Number.isFinite(v) || v < -10 || v > 90) { showToast?.('Délai invalide : de 90 jours avant (90) à 10 jours après (-10).', 'warning'); return; }
+  if (!ADH_RELANCES_JOURS.includes(v)) { if (ADH_RELANCES_JOURS.length >= ADH_RELANCES_MAX) { showToast?.(`${ADH_RELANCES_MAX} rappels au maximum.`, 'warning'); return; } ADH_RELANCES_JOURS.push(v); }
   input.value = '';
   adhRenderRelancesChips();
 }
