@@ -389,15 +389,47 @@ async function estInscritEvenement(evt, user) {
   if (evt.source_events_id && await essaie("SELECT 1 FROM event_inscriptions_securisees WHERE event_id=? AND user_id=? AND statut<>'annule'", evt.source_events_id, user.id)) return true;
   return false;
 }
-async function protegerPdfListe(rows, req) {
+/* Lecture automatique du PDF d'un programme (2026-10-07) : le texte du PDF alimente le déroulé et les temps forts proposés au compte-rendu, au lieu d'un
+   simple lien. Accepte un PDF en base64 (data:), un fichier du dossier /uploads ou une adresse https hébergée par la plateforme (même hôte ou média Bunny) ;
+   refuse tout autre hôte (pas d'appel vers une adresse quelconque), plus de 8 Mo, ou un fichier qui n'est pas un PDF. Renvoie '' en cas d'échec : la
+   suggestion tombe alors simplement sur le texte saisi à la main. */
+async function crTextePdf(src) {
+  try {
+    src = String(src || '');
+    let buf = null;
+    if (/^data:application\/pdf;base64,/i.test(src)) buf = Buffer.from(src.split(',')[1] || '', 'base64');
+    else if (/^\/uploads\/[\w.\-]+$/.test(src)) { const p = path.join(__dirname, src); if (fs.existsSync(p)) buf = fs.readFileSync(p); }
+    else if (/^https:\/\//i.test(src)) {
+      const h = new URL(src).hostname.toLowerCase();
+      if (!['diaspoactif-media.b-cdn.net', 'diaspoactif.com', 'www.diaspoactif.com'].includes(h)) return '';
+      const r = await fetch(src, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return '';
+      buf = Buffer.from(await r.arrayBuffer());
+    }
+    if (!buf || buf.length < 100 || buf.length > 8 * 1024 * 1024 || buf.slice(0, 5).toString('latin1') !== '%PDF-') return '';
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
+    const r = await Promise.race([pdfParse(buf, { max: 12 }), new Promise((_, rej) => setTimeout(() => rej(new Error('délai dépassé')), 10000))]);
+    return String(r.text || '').replace(/\u0000/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 8000);
+  } catch (e) { return ''; }
+}
+
+async function protegerPdfListe(rows, req, opts) {
   const reserves = rows.filter(r => r && r.pdf_acces === 'inscrits' && r.pdf_url);
-  if (!reserves.length) return rows;
-  const moi = await getCurrentUser(req);
-  for (const r of reserves) {
-    if (await estInscritEvenement(r, moi)) continue;
-    r.pdf_url = null;
-    r.pdf_reserve = true;
+  if (reserves.length) {
+    const moi = await getCurrentUser(req);
+    for (const r of reserves) {
+      if (await estInscritEvenement(r, moi)) continue;
+      r.pdf_url = null;
+      r.pdf_reserve = true;
+    }
   }
+  /* Listes publiques allégées (2026-10-07) : un PDF stocké en base64 pesait jusqu'à ~300 Ko PAR événement dans chaque liste (1,3 Mo pour 20 événements).
+     Les listes n'en gardent que le nom et un drapeau pdf_present ; le détail d'un événement (GET /api/evenements/:id) renvoie toujours le fichier. */
+  if (opts && opts.alleger) rows.forEach(r => {
+    if (r && r.pdf_url && /^data:/i.test(r.pdf_url)) { r.pdf_url = null; r.pdf_present = true; }
+    /* image_url et image_couverture portent souvent la MÊME image (parfois en base64, ~100 Ko chacune) : toutes les pages lisent « image_couverture || image_url », une seule copie suffit. */
+    if (r && r.image_url && r.image_url === r.image_couverture) r.image_url = null;
+  });
   return rows;
 }
 
@@ -20626,6 +20658,14 @@ route("GET", "/api/evenements/:id/compte-rendu/sources", async (req, res, params
   const fiches = ficheIdsSrc.length ? await db.prepare(`SELECT f.id, f.nom, f.programme_texte, f.programme_fichier_url, f.programme_fichier_nom, f.partenaires_json, f.sponsors_json
       FROM insc_fiches f WHERE f.id IN (${ficheIdsSrc.map(() => '?').join(',')})`).all(...ficheIdsSrc) : [];
   fiches.forEach(f => { if (f.programme_texte || f.programme_fichier_url) programmes.push({ origine: 'fiche', texte: String(f.programme_texte || '').trim(), fichier_url: f.programme_fichier_url || null, fichier_nom: f.programme_fichier_nom || null, fiche_nom: f.nom }); });
+  /* Programme déposé en PDF seulement : on lit automatiquement son texte (jamais écrasé s'il y a déjà un texte saisi). */
+  for (const p of programmes) {
+    const nomPdf = String(p.fichier_nom || p.fichier_url || '');
+    if (!p.texte && p.fichier_url && (/\.pdf(\?|$)/i.test(nomPdf) || /^data:application\/pdf/i.test(p.fichier_url))) {
+      const lu = await crTextePdf(p.fichier_url);
+      if (lu) { p.texte = lu; p.texte_extrait = true; }
+    }
+  }
   sources.push({ cle: 'programme', libelle: 'Programme', trouve: programmes.length > 0, detail: programmes.length ? programmes.map(p => p.origine === 'fiche' ? 'fiche d\'inscription' : 'événement').join(' + ') : 'Aucun programme renseigné (ni sur l\'événement, ni sur la fiche d\'inscription).' });
   const fiche_conceptuelle = !!(fcLiee && (fcLiee.fc_resume || fcLiee.fc_objectifs || evt.pdf_url));
   sources.push({ cle: 'fiche_conceptuelle', libelle: 'Fiche conceptuelle', trouve: fiche_conceptuelle, detail: fiche_conceptuelle ? 'Objectifs et résumé disponibles.' : 'Aucune fiche conceptuelle.' });
@@ -21221,7 +21261,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
        ?owner=, contrairement à "Mes événements"/la page boutique : aucune raison de jamais les
        inclure ici, l'exclusion est donc inconditionnelle. */
     const rows = (await db.prepare(baseSelect + ' ORDER BY e.date_evt ASC').all()).filter(r => r.statut !== 'brouillon' && r.visibilite !== 'boutique');
-    return sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(await withCounts(rows)), req), niveau_priorite: null });
+    return sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(await withCounts(rows)), req, { alleger: true }), niveau_priorite: null });
   }
 
   const filtresBase = [];
@@ -21283,7 +21323,7 @@ route("GET", "/api/evenements/recommandes", async (req, res, params, body, query
   // Brouillon + visibilité "boutique" — mêmes exclusions inconditionnelles que la branche
   // !hasPrefs ci-dessus (voir son commentaire : jamais de ?owner= sur cette route).
   rows = rows.filter(r => r.statut !== 'brouillon' && r.visibilite !== 'boutique');
-  return sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(await withCounts(rows)), req), niveau_priorite: niveauRetenu });
+  return sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(await withCounts(rows)), req, { alleger: true }), niveau_priorite: niveauRetenu });
 });
 
 route("GET", "/api/evenements", async (req, res, params, body, query) => {
@@ -21340,7 +21380,7 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   else if (query.gratuit === 'partiel') rows = rows.filter(r => participationEffective(r) === 'partiellement_payant');
   if (query.q) { const q = query.q.toLowerCase(); rows = rows.filter(r => (r.titre+r.lieu+r.description||"").toLowerCase().includes(q)); }
   const withCounts = await Promise.all(rows.map(async r => ({ ...r, nb_participants: (await db.prepare("SELECT COUNT(*) AS n FROM evenements_participants WHERE evenement_id=?").get(r.id))?.n || 0 })));
-  sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(withCounts), req) });
+  sendJSON(res, 200, { evenements: await protegerPdfListe(await enrichirAvecFicheMedia(withCounts), req, { alleger: true }) });
 });
 
 // Classification effective Gratuit/Partiellement payant/Payant (2026-09-24, "faciliter le
