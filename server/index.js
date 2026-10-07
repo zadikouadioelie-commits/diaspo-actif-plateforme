@@ -17556,23 +17556,23 @@ route("GET", "/api/profil/:id/activite", async (req, res, params) => {
 
   let items = [];
 
-  if ((cat === 'all' || cat === 'publications') && visOk('publications')) {
+  if ((cat === 'all' || cat === 'publications') && await visOk('publications')) {
     const rows = await db.prepare(`SELECT 'publication' AS type, id, contenu AS titre, categorie, created_at FROM fil_posts WHERE auteur_id=? ORDER BY created_at DESC LIMIT 50`).all(uid);
     rows.forEach(r => items.push({ type:'publication', id:r.id, titre:r.titre?.substring(0,120), categorie:r.categorie||'Publication', date:r.created_at, url:`/fil-actualite.html` }));
   }
-  if ((cat === 'all' || cat === 'evenements') && visOk('evenements')) {
+  if ((cat === 'all' || cat === 'evenements') && await visOk('evenements')) {
     try {
       const rows = await db.prepare(`SELECT 'evenement' AS type, id, titre, type_evt AS categorie, date_debut AS date FROM evenements WHERE organisateur_id=? ORDER BY date_debut DESC LIMIT 20`).all(uid);
       rows.forEach(r => items.push({ type:'evenement', id:r.id, titre:r.titre, categorie:r.categorie||'Événement', date:r.date, url:`/evenements.html` }));
     } catch(e) {}
   }
-  if ((cat === 'all' || cat === 'accreditations') && visOk('accreditations')) {
+  if ((cat === 'all' || cat === 'accreditations') && await visOk('accreditations')) {
     try {
       const rows = await db.prepare(`SELECT 'accreditation' AS type, id, type AS categorie, created_at AS date FROM accreditations_da WHERE user_id=? AND statut='active' ORDER BY created_at DESC LIMIT 10`).all(uid);
       rows.forEach(r => items.push({ type:'accreditation', id:r.id, titre:`Accréditation ${r.categorie}`, categorie:'Accréditation', date:r.date, url:`/profil.html?id=${uid}` }));
     } catch(e) {}
   }
-  if ((cat === 'all' || cat === 'commentaires') && visOk('commentaires')) {
+  if ((cat === 'all' || cat === 'commentaires') && await visOk('commentaires')) {
     try {
       const rows = await db.prepare(`SELECT 'commentaire' AS type, id, contenu AS titre, created_at AS date FROM fil_commentaires WHERE auteur_id=? ORDER BY created_at DESC LIMIT 20`).all(uid);
       rows.forEach(r => items.push({ type:'commentaire', id:r.id, titre:r.titre?.substring(0,100), categorie:'Commentaire', date:r.date, url:`/fil-actualite.html` }));
