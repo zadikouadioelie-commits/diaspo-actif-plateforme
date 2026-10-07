@@ -124,7 +124,7 @@
     fil: { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false },
     ev: { items: [], filtre: 'avenir', q: '', loaded: false },
     boutiques: { items: [], q: '', loaded: false },
-    ann: { type: '', q: '', items: [], total: 0, shown: 30, loaded: false },
+    ann: { type: '', q: '', pays: '', ville: '', domaine: '', origine: '', items: [], shown: 30, loaded: false, opts: null, open: {} },
     myInsc: new Set(), pane: null, chatTimer: null, convNames: {}
   };
   const TABS = ['accueil', 'evenements', 'annuaire', 'messages', 'boutiques', 'moi'];
@@ -492,60 +492,151 @@
      ANNUAIRE — initiatives, membres, collectivités (route /api/annuaire/recherche)
      ============================================================ */
   const ANN_TYPES = [['', 'Tous'], ['Initiative', 'Initiatives'], ['Utilisateurs', 'Membres'], ['Collectivité', 'Collectivités']];
+  /* Mêmes types que le filtre « Type d'organisme » de l'annuaire du site. */
+  const ANN_TYPE_OPTS = [['', 'Tous les types'], ['Utilisateurs', 'Membres'], ['Initiative', 'Initiatives (tous types)'], ['Association', 'Association'], ['Entreprise', 'Entreprise'], ['Institution', 'Institution'], ['Collectivité', 'Collectivité'], ['ONG', 'ONG'], ['Coopérative', 'Coopérative'], ['Média', 'Média'], ['Fondation', 'Fondation'], ['Particulier', 'Particulier'], ['Autre', 'Autre']];
+  const normTxt = s => String(s == null ? '' : s).toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const annAll = r => [
+    ...(r.initiatives || []).map(x => ({ k: 'i', rang: x._rang || 0, x })),
+    ...(r.utilisateurs || []).map(x => ({ k: 'u', rang: x._rang || 0, x })),
+    ...(r.organismes || []).map(x => ({ k: 'o', rang: x._rang || 0, x }))
+  ].sort((a, b) => a.rang - b.rang);
+  const domLabel = cle => { const d = (window.DOMAINES_ACTIVITE || []).find(z => z[0] === cle); return d ? d[2] : String(cle || '').replace(/_/g, ' '); };
+  const annOrigines = x => [x.origine1, x.origine2, x.pays_origine, x.owner_origine1, x.owner_origine2, x.nationalite1, x.nationalite2, x.pays_origine_institution].filter(Boolean);
+  /* Pays, ville, domaine et origine se filtrent ici (insensibles à la casse et aux accents) : le serveur compare à l'identique, « France » ≠ « france ». */
+  function annMatch(it) {
+    const x = it.x, A = S.ann;
+    if (A.pays && normTxt(x.pays) !== normTxt(A.pays)) return false;
+    if (A.ville && !normTxt(x.ville).includes(normTxt(A.ville))) return false;
+    if (A.domaine && x.domaine_principal !== A.domaine) return false;
+    if (A.origine && !annOrigines(x).some(v => normTxt(v).includes(normTxt(A.origine)))) return false;
+    return true;
+  }
+  const annNbFiltres = () => ['pays', 'ville', 'domaine', 'origine'].filter(k => S.ann[k]).length + (S.ann.type && !ANN_TYPES.some(t => t[0] === S.ann.type) ? 1 : 0);
+  function annPills() {
+    const A = S.ann, p = [];
+    if (A.type && !ANN_TYPES.some(t => t[0] === A.type)) p.push(['type', 'Type : ' + ((ANN_TYPE_OPTS.find(o => o[0] === A.type) || [])[1] || A.type)]);
+    if (A.pays) p.push(['pays', 'Pays : ' + A.pays]);
+    if (A.ville) p.push(['ville', 'Ville : ' + A.ville]);
+    if (A.domaine) p.push(['domaine', domLabel(A.domaine)]);
+    if (A.origine) p.push(['origine', 'Origine : ' + A.origine]);
+    return p.map(([k, l]) => `<button class="chip on" data-clear="${k}" aria-label="Retirer le filtre ${esc(l)}">${esc(l)} ✕</button>`).join('');
+  }
   function viewAnnuaire() {
     const el = $('#t-annuaire');
     el.innerHTML = `<div class="search">${ic('search', 's')}<input id="aq" type="search" placeholder="Nom, métier, ville, mot-clé…" aria-label="Rechercher dans l’annuaire" value="${esc(S.ann.q)}"></div>
       <div class="chips">${ANN_TYPES.map(([k, l]) => `<button class="chip ${S.ann.type === k ? 'on' : ''}" data-t="${esc(k)}">${l}</button>`).join('')}</div>
-      <div class="small muted" id="ann-count" style="margin:-2px 4px 10px"></div><div id="ann-list"></div><div id="ann-more"></div>`;
-    $$('.chip', el).forEach(c => c.onclick = () => { S.ann.type = c.dataset.t; S.ann.loaded = false; viewAnnuaire(); });
+      <div class="ann-bar"><button class="btn out sm" id="ann-fl">${ic('search', 's')} Filtres${annNbFiltres() ? ' (' + annNbFiltres() + ')' : ''}</button><div class="chips" id="ann-pills">${annPills()}</div></div>
+      <div class="small muted" id="ann-count" style="margin:0 4px 10px"></div><div id="ann-list"></div><div id="ann-more"></div>`;
+    $$('.chip[data-t]', el).forEach(c => c.onclick = () => { S.ann.type = c.dataset.t; S.ann.loaded = false; viewAnnuaire(); });
+    $$('[data-clear]', el).forEach(c => c.onclick = () => { S.ann[c.dataset.clear] = ''; if (c.dataset.clear === 'type') S.ann.loaded = false; viewAnnuaire(); });
+    $('#ann-fl').onclick = openAnnFilters;
     let t; $('#aq').oninput = e => { clearTimeout(t); t = setTimeout(() => { S.ann.q = e.target.value.trim(); S.ann.loaded = false; loadAnnuaire(); }, 350); };
     if (!S.ann.loaded) loadAnnuaire(); else paintAnnuaire();
   }
+  async function annFetch(q, type) {
+    const key = q + '|' + type; S.ann.cache = S.ann.cache || {};
+    if (S.ann.cache[key]) return S.ann.cache[key];
+    const p = new URLSearchParams({ q }); if (type) p.set('type', type);
+    const r = await api('/api/annuaire/recherche?' + p); S.ann.cache[key] = annAll(r); return S.ann.cache[key];
+  }
+  /* Options des filtres (pays, domaines, origines, villes) tirées de l'annuaire complet, chargé une seule fois. */
+  async function annOptions() {
+    if (S.ann.opts) return S.ann.opts;
+    const all = await annFetch('', ''); const uniq = (arr, f) => { const m = new Map(); arr.forEach(v => { const k = normTxt(v); if (k && !m.has(k)) m.set(k, f ? f(v) : v); }); return [...m.values()].sort((a, b) => String(a).localeCompare(String(b), 'fr')); };
+    const cap = s => { s = String(s).trim(); return s.charAt(0).toUpperCase() + s.slice(1); };
+    S.ann.opts = {
+      pays: uniq(all.map(i => i.x.pays), cap), villes: uniq(all.map(i => i.x.ville), cap),
+      origines: uniq(all.flatMap(i => annOrigines(i.x)), cap),
+      domaines: [...new Set(all.map(i => i.x.domaine_principal).filter(Boolean))].map(k => [k, domLabel(k)]).sort((a, b) => a[1].localeCompare(b[1], 'fr'))
+    };
+    return S.ann.opts;
+  }
   async function loadAnnuaire() {
     const l = $('#ann-list'); if (!l) return; l.innerHTML = '<div class="sk skc" style="height:96px"></div><div class="sk skc" style="height:96px"></div><div class="sk skc" style="height:96px"></div>';
-    const p = new URLSearchParams({ q: S.ann.q }); if (S.ann.type) p.set('type', S.ann.type);
-    try {
-      const r = await api('/api/annuaire/recherche?' + p);
-      const all = [
-        ...(r.initiatives || []).map(x => ({ k: 'i', rang: x._rang || 0, x })),
-        ...(r.utilisateurs || []).map(x => ({ k: 'u', rang: x._rang || 0, x })),
-        ...(r.organismes || []).map(x => ({ k: 'o', rang: x._rang || 0, x }))
-      ].sort((a, b) => a.rang - b.rang);
-      S.ann.items = all; S.ann.total = r.total || all.length; S.ann.shown = 30; S.ann.loaded = true; paintAnnuaire();
-    } catch (e) { l.innerHTML = `<div class="empty"><b>Annuaire indisponible</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`; $('#retry').onclick = loadAnnuaire; }
+    try { S.ann.items = await annFetch(S.ann.q, S.ann.type); S.ann.shown = 30; S.ann.loaded = true; paintAnnuaire(); }
+    catch (e) { l.innerHTML = `<div class="empty"><b>Annuaire indisponible</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`; $('#retry').onclick = loadAnnuaire; }
   }
+  async function openAnnFilters() {
+    const close = openSheet('<div class="sk" style="height:120px"></div>'); const sh = $('#sheet');
+    let o; try { o = await annOptions(); } catch (e) { close(); toast(e.message, true); return; }
+    const A = S.ann, sel = (id, lab, opts, val) => `<label class="fl" for="${id}">${lab}</label><select class="fi" id="${id}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${(v === '' ? !val : normTxt(v) === normTxt(val)) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    sh.querySelector('.sb').innerHTML = `<h2 style="margin:2px 0 4px;font-size:19px">Filtres de l’annuaire</h2>
+      <form id="ann-ff" novalidate>
+        ${sel('ff-type', 'Type d’initiative / d’organisme', ANN_TYPE_OPTS, A.type)}
+        ${sel('ff-pays', 'Pays de résidence', [['', 'Tous les pays'], ...o.pays.map(p => [p, p])], A.pays)}
+        <label class="fl" for="ff-ville">Ville</label><input class="fi" id="ff-ville" list="ff-villes" placeholder="Ex : Paris, Abidjan…" value="${esc(A.ville)}" autocomplete="off"><datalist id="ff-villes">${o.villes.slice(0, 400).map(v => `<option value="${esc(v)}">`).join('')}</datalist>
+        ${sel('ff-dom', 'Domaine d’activité', [['', 'Tous les domaines'], ...o.domaines], A.domaine)}
+        ${sel('ff-orig', 'Pays d’origine', [['', 'Tous les pays d’origine'], ...o.origines.map(p => [p, p])], A.origine)}
+        <div class="row" style="gap:10px;margin-top:16px"><button type="button" class="btn out sp" id="ff-reset">Réinitialiser</button><button type="submit" class="btn sp">Appliquer</button></div>
+      </form>`;
+    $('#ff-reset').onclick = () => { ['pays', 'ville', 'domaine', 'origine'].forEach(k => { A[k] = ''; }); const had = A.type && !ANN_TYPES.some(t => t[0] === A.type); if (had) { A.type = ''; A.loaded = false; } close(); viewAnnuaire(); };
+    $('#ann-ff').onsubmit = ev => {
+      ev.preventDefault(); const nt = $('#ff-type').value; if (nt !== A.type) { A.type = nt; A.loaded = false; }
+      A.pays = $('#ff-pays').value; A.ville = $('#ff-ville').value.trim(); A.domaine = $('#ff-dom').value; A.origine = $('#ff-orig').value;
+      close(); viewAnnuaire();
+    };
+  }
+  const descPlain = v => strip(v).replace(/\n{3,}/g, '\n\n');
   function annCard(it) {
-    const x = it.x; let nm, sub, badge, href, photo, uid, loc;
+    const x = it.x; let nm, desc, badge, href, photo, uid, loc, kind, fid, key = it.k + x.id;
     loc = [x.ville, x.pays].filter(Boolean).join(', ');
     if (it.k === 'i') {
-      nm = x.nom; badge = x.type || 'Initiative'; photo = x.logo_url; uid = x.owner_user_id;
-      sub = strip(x.slogan || x.description || ''); href = 'initiative.html?id=' + encodeURIComponent(x.slug || x.id);
+      nm = x.nom; badge = x.type || 'Initiative'; photo = x.logo_url; uid = x.owner_user_id; kind = 'initiative'; fid = x.id;
+      desc = descPlain(x.description || x.mission || x.slogan || ''); href = 'initiative.html?id=' + encodeURIComponent(x.slug || x.id);
     } else if (it.k === 'u') {
-      nm = [x.prenom, x.nom].filter(Boolean).join(' ') || x.nom; badge = 'Membre'; photo = x.photo_url; uid = x.id;
-      sub = strip(x.titre_pro || ''); href = 'profil.html?id=' + encodeURIComponent(x.id);
+      nm = [x.prenom, x.nom].filter(Boolean).join(' ') || x.nom; badge = 'Membre'; photo = x.photo_url; uid = x.id; kind = 'user'; fid = x.id;
+      desc = descPlain(x.bio || x.titre_pro || ''); href = 'profil.html?id=' + encodeURIComponent(x.id);
     } else {
       nm = x.nom_institution || x.nom; badge = x.role === 'administrateur' ? 'Diaspo’Actif' : (x.role === 'collectivite' ? 'Collectivité' : 'Institution'); photo = x.photo_url; uid = x.id;
-      sub = strip(x.bio || ''); href = 'profil.html?id=' + encodeURIComponent(x.id);
+      kind = x.role === 'collectivite' ? 'collectivite' : 'user'; fid = x.id; desc = descPlain(x.bio || ''); href = 'profil.html?id=' + encodeURIComponent(x.id);
     }
+    S.annNames = S.annNames || {}; if (uid) S.annNames[uid] = nm;
     const dom = it.k === 'i' && x.domaine ? `<span class="badge">${esc(x.domaine)}</span>` : '';
     const note = x.avis_total ? `<span class="badge o">★ ${esc(Number(x.avis_moyenne || 0).toFixed(1))} (${x.avis_total})</span>` : '';
-    return `<article class="card ann"><a class="ann-top" href="${href}"><div class="av big" style="border-radius:${it.k === 'u' ? '50%' : '16px'}">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nm))}</div>
+    const open = !!(S.ann.open && S.ann.open[key]);
+    return `<article class="card ann" data-key="${esc(key)}"><a class="ann-top" href="${href}"><div class="av big" style="border-radius:${it.k === 'u' ? '50%' : '16px'}">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nm))}</div>
       <div class="sp"><div class="nm" style="font-weight:700;font-size:16px;line-height:1.2">${esc(nm)}</div>
       <div class="meta" style="margin:2px 0">${loc ? ic('pin', 's') + '<span class="ell">' + esc(loc) + '</span>' : ''}</div>
       <div class="tags" style="margin:4px 0 0"><span class="badge ${it.k === 'u' ? '' : 'g'}">${esc(badge)}</span>${dom}${note}</div></div></a>
-      ${sub ? `<div class="small muted" style="padding:0 14px 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(sub)}</div>` : ''}
-      <div class="ann-act"><a class="btn sm out" href="${href}">Voir la fiche</a>${uid ? `<button class="btn sm" data-write="${uid}">${ic('chat', 's')} Écrire</button>` : ''}</div></article>`;
+      ${desc ? `<div class="ann-desc${open ? ' open' : ''}" data-desc>${esc(desc)}</div>` : ''}
+      <div class="ann-links">${desc ? `<button type="button" class="lnk" data-more hidden aria-expanded="${open}">${open ? 'Voir moins ▴' : 'Voir plus ▾'}</button>` : ''}<a class="lnk" href="${href}">Voir la fiche ›</a></div>
+      <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}">${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
   }
   function paintAnnuaire() {
     const l = $('#ann-list'); if (!l) return;
-    const a = S.ann.items;
-    $('#ann-count').textContent = a.length ? `${S.ann.total} résultat${S.ann.total > 1 ? 's' : ''}` : '';
-    if (!a.length) { l.innerHTML = `<div class="empty"><div class="ei">${ic('dir', 'l')}</div><b>Aucun résultat</b>Essayez un autre mot-clé ou un autre filtre.</div>`; $('#ann-more').innerHTML = ''; return; }
+    const a = S.ann.items.filter(annMatch);
+    $('#ann-count').textContent = a.length ? `${a.length} résultat${a.length > 1 ? 's' : ''}` : '';
+    if (!a.length) { l.innerHTML = `<div class="empty"><div class="ei">${ic('dir', 'l')}</div><b>Aucun résultat</b>Essayez un autre mot-clé ou retirez un filtre.</div>`; $('#ann-more').innerHTML = ''; return; }
     l.innerHTML = a.slice(0, S.ann.shown).map(annCard).join('');
-    $('#ann-more').innerHTML = a.length > S.ann.shown ? `<button class="btn out block" id="ann-next">Voir plus (${a.length - S.ann.shown})</button>` : '';
+    $('#ann-more').innerHTML = a.length > S.ann.shown ? `<button class="btn out block" id="ann-next">Voir plus de résultats (${a.length - S.ann.shown})</button>` : '';
     const n = $('#ann-next'); if (n) n.onclick = () => { S.ann.shown += 30; paintAnnuaire(); };
+    /* « Voir plus » n'apparaît que si la description dépasse 3 lignes. */
+    $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
   }
   document.addEventListener('click', async e => {
+    const more = e.target.closest('.ann [data-more]');
+    if (more) {
+      const card = more.closest('.ann'), d = card.querySelector('[data-desc]'), on = d.classList.toggle('open');
+      S.ann.open = S.ann.open || {}; S.ann.open[card.dataset.key] = on; more.textContent = on ? 'Voir moins ▴' : 'Voir plus ▾'; more.setAttribute('aria-expanded', String(on)); return;
+    }
+    const sup = e.target.closest('[data-sup]');
+    if (sup) { location.hash = '#/cagnottes/' + sup.dataset.sup; return; }
+    const fo = e.target.closest('[data-follow]');
+    if (fo) {
+      if (!(await needLogin('Connectez-vous pour vous abonner.'))) return;
+      const kind = fo.dataset.kind, id = fo.dataset.follow, on = fo.dataset.on === '1'; fo.disabled = true;
+      try {
+        let abonne;
+        if (kind === 'initiative') {
+          try { await api(`/api/initiatives/${id}/suivre`, { method: on ? 'DELETE' : 'POST' }); abonne = !on; }
+          catch (er) { if (er.status === 409) abonne = true; else throw er; }
+        } else if (kind === 'collectivite') { abonne = !!(await api(`/api/collectivites/${id}/abonnement`, { method: 'POST' })).abonne; }
+        else { await api(`/api/users/${id}/suivre`, { method: on ? 'DELETE' : 'POST' }); abonne = !on; }
+        fo.dataset.on = abonne ? '1' : '0'; fo.classList.toggle('sub', abonne);
+        fo.innerHTML = abonne ? `${ic('check', 's')} Abonné` : `${ic('bell', 's')} S’abonner`; toast(abonne ? 'Abonnement enregistré ✓' : 'Abonnement retiré');
+      } catch (er) { toast(er.message, true); }
+      fo.disabled = false; return;
+    }
     const w = e.target.closest('[data-write]'); if (!w) return;
     if (!(await needLogin('Connectez-vous pour écrire à ce compte.'))) return;
     w.disabled = true;
@@ -715,6 +806,7 @@
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
         <div class="row" style="flex-wrap:wrap;gap:8px">${S.me ? '' : '<a class="btn sm" href="inscription.html">Rejoindre la communauté</a>'}<a class="btn sm out" href="#/annuaire">Explorer l’annuaire</a></div></div></div>
+      <div class="mapcard"><canvas id="home-map" role="img" aria-label="Carte animée des déplacements des diasporas dans le monde"></canvas><div class="maplegend"><span><i style="background:#F59E0B;box-shadow:0 0 6px #F59E0B"></i>Pays d’origine</span><span><i style="background:#4A90D9;box-shadow:0 0 6px #4A90D9"></i>Pays de résidence</span></div></div>
       <div class="card"><div class="pad"><div class="small muted" style="font-weight:700;margin-bottom:6px">POURQUOI DIASPO’ACTIF ?</div>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
@@ -722,6 +814,7 @@
       <div class="h2">CE QUI SE PASSE EN CE MOMENT</div><div id="home-feed"></div>`;
     loadHome();
     viewFil();
+    if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }
   function loadHome() {
     const safe = fn => fn().catch(() => { });
@@ -791,11 +884,12 @@
       <div class="row small" style="margin:6px 0 12px">${montants ? `<span><b>${esc(money(got, c.devise))}</b>${obj ? ' sur ' + esc(money(obj, c.devise)) : ' collectés'}</span>` : '<span></span>'}<span class="sp"></span>${c.nb_contributeurs ? `<span class="muted">${c.nb_contributeurs} donateur${c.nb_contributeurs > 1 ? 's' : ''}</span>` : ''}</div>
       <a class="btn block sm" href="cagnotte.html?slug=${encodeURIComponent(c.slug)}">${ic('heart', 's')} Donner</a></div></article>`;
   }
-  async function paneCagnottes() {
-    setPane('Cagnottes et dons', '<div class="sk skc"></div><div class="sk skc"></div>');
+  async function paneCagnottes(owner) {
+    const nomOwner = owner && S.annNames && S.annNames[owner];
+    setPane(owner ? 'Soutenir' : 'Cagnottes et dons', '<div class="sk skc"></div><div class="sk skc"></div>');
     let pub = [], mes = null;
-    try { pub = (await api('/api/cagnottes/publiques')).cagnottes || []; } catch (e) { return setPane('Cagnottes et dons', `<div class="empty"><b>Indisponible</b>${esc(e.message)}</div>`); }
-    if (S.me && S.me.role === 'initiative') { try { mes = (await api('/api/cagnottes/mes')).cagnottes || []; } catch (e) { mes = []; } }
+    try { pub = (await api('/api/cagnottes/publiques' + (owner ? '?owner_user_id=' + encodeURIComponent(owner) : ''))).cagnottes || []; } catch (e) { return setPane('Cagnottes et dons', `<div class="empty"><b>Indisponible</b>${esc(e.message)}</div>`); }
+    if (!owner && S.me && S.me.role === 'initiative') { try { mes = (await api('/api/cagnottes/mes')).cagnottes || []; } catch (e) { mes = []; } }
     let html = '';
     if (mes) {
       const total = mes.reduce((n, c) => n + (Number(c.montant_collecte) || 0), 0);
@@ -805,8 +899,8 @@
         ${mes.slice(0, 5).map(c => `<div class="kv"><span class="ell" style="max-width:62%">${esc(md(strip(c.titre)))}</span><span>${esc(money(c.montant_collecte, c.devise))}</span></div>`).join('')}
         <a class="btn block sm ${lock ? 'out' : ''}" style="margin-top:12px" ${lock ? 'data-lock="1" href="#"' : 'href="dashboard-initiative.html#cagnottes"'}>${lock ? ic('lock', 's') + ' ' : ''}Gérer mes cagnottes ${lock ? '👑' : ''}</a></div></div>`;
     }
-    html += `<div class="h2" ${mes ? '' : 'style="margin-top:2px"'}>CAGNOTTES OUVERTES</div>` + (pub.length ? pub.map(cagnotteCard).join('') : `<div class="empty"><div class="ei">${ic('heart', 'l')}</div><b>Aucune cagnotte ouverte</b>Revenez bientôt.</div>`);
-    setPane('Cagnottes et dons', html);
+    html += `<div class="h2" ${mes ? '' : 'style="margin-top:2px"'}>${owner ? 'CAGNOTTES DE ' + esc(String(nomOwner || 'CE COMPTE').toUpperCase()) : 'CAGNOTTES OUVERTES'}</div>` + (pub.length ? pub.map(cagnotteCard).join('') : (owner ? `<div class="empty"><div class="ei">${ic('heart', 'l')}</div><b>Aucune cagnotte ouverte pour ${esc(nomOwner || 'ce compte')}</b>Ce compte n’a pas de cagnotte en cours pour le moment.<br><br><a class="btn out" href="#/cagnottes">Voir toutes les cagnottes</a></div>` : `<div class="empty"><div class="ei">${ic('heart', 'l')}</div><b>Aucune cagnotte ouverte</b>Revenez bientôt.</div>`));
+    setPane(owner ? 'Soutenir' + (nomOwner ? ' · ' + nomOwner : '') : 'Cagnottes et dons', html);
   }
 
   /* ---------- changement de compte (Liaison de comptes) ---------- */
@@ -882,23 +976,26 @@
       const locked = premiumLocked(l), d = typeof x.d === 'object' ? (x.d[role] || x.d.utilisateur) : x.d;
       const tag = l === 2 ? `<span class="prem">${locked ? '🔒' : '👑'} Premium</span>` : (l === 3 && S.premium && S.premium.concerne && !S.premium.actif ? '<span class="prem">👑 publier</span>' : '');
       const inner = `<span class="ic">${ic(locked ? 'lock' : x.i)}</span><span class="sp"><span class="t">${esc(x.t)}</span> ${tag}<br><span class="d">${esc(d)}</span></span><span class="ch">${ic('chev', 's')}</span>`;
-      if (locked) return `<a class="li dim" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
-      return `<a class="li" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
+      if (locked) return `<a class="li gold locked" href="#" data-lock="1" data-name="${esc(x.t)}">${inner}</a>`;
+      return `<a class="li${l === 2 ? ' gold' : ''}" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
     };
-    return { role, mods: MODS.map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
+    /* Comme le menu du site : les modules Premium (dorés) d'abord, puis les autres (blancs). */
+    return { role, premium: MODS.filter(x => lvl(x) === 2).map(li).join(''), mods: MODS.filter(x => lvl(x) !== 2).map(li).join(''), compte: MODS_COMPTE.map(li).join('') };
   }
   function openMenu() {
     if (!S.me) { openLogin(); return; }
     const m = S.me, resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email, nm = m.nom_affichage || resp;
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
-    const { mods, compte } = modulesHtml(m);
+    const { premium: modsPrem, mods, compte } = modulesHtml(m);
     const close = openSheet(`<div class="row" style="margin:0 0 6px"><div class="av big" style="width:48px;height:48px">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div style="font-weight:700;font-size:17px;line-height:1.2">${esc(nm)}</div><div class="small muted">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div></div></div>
       <div class="h2" style="margin-top:12px">MENU DES MODULES</div>
-      <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a>${mods}</div>
+      <div class="lst"><a class="li" href="#/accueil"><span class="ic">${ic('home')}</span><span class="sp"><span class="t">Accueil</span><br><span class="d">Tutoriels vidéo, actualités, initiatives</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
+      ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
+      <div class="h2">OUTILS</div><div class="lst">${mods}</div>
       <div class="h2">MON COMPTE</div><div class="lst">${compte}<a class="li" href="#/moi"><span class="ic">${ic('user')}</span><span class="sp"><span class="t">Mon espace</span><br><span class="d">Profil, tout le menu et les outils sur ordinateur</span></span><span class="ch">${ic('chev', 's')}</span></a></div>
       <button class="btn out block" id="menu-switch" style="margin-top:14px">${ic('people', 's')} Changer de compte</button>
       <button class="btn out block" id="menu-logout" style="margin-top:10px">${ic('logout', 's')} Se déconnecter</button>`);
-    const sh = $('#sheet');
+    const sh = $('#sheet'); sh.querySelector('.sh').classList.add('dark');
     /* un lien du menu referme la feuille ; les verrous Premium et le changement de compte ouvrent leur propre feuille */
     $$('a.li', sh).forEach(a => a.addEventListener('click', () => { if (!a.dataset.lock && !a.dataset.act) close(); }));
     $('#menu-switch').onclick = () => { close(); openSwitcher(); };
@@ -913,11 +1010,13 @@
     const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
     const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email; const nm = m.nom_affichage || resp;
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
-    const { mods, compte } = modulesHtml(m);
+    const { premium: modsPrem, mods, compte } = modulesHtml(m);
     el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
-      <div class="h2">MES MODULES</div><div class="lst">${mods}</div>
-      <div class="h2">MON COMPTE</div><div class="lst">${compte}</div>
+      <div class="mdark"><div class="h2" style="margin-top:0">MENU DES MODULES</div>
+        ${modsPrem ? `<div class="h2">⭐ MODULES PREMIUM</div><div class="lst">${modsPrem}</div>` : ''}
+        <div class="h2">OUTILS</div><div class="lst">${mods}</div>
+        <div class="h2">MON COMPTE</div><div class="lst">${compte}</div></div>
       ${role ? '' : '<p class="small muted" style="margin:12px 4px 0">Ce type de compte retrouve ses outils complets sur le site : <a href="dashboard-' + esc(m.role === 'administrateur' ? 'administrateur' : 'collectivite') + '.html" style="text-decoration:underline">ouvrir mon tableau de bord</a>.</p>'}
       <button class="toggle" id="desk-toggle" aria-expanded="false">${ic('desk', 's')} Disponible sur ordinateur (${MENU_DESK.length})</button>
       <div id="desk-list" hidden><p class="small muted" style="margin:10px 4px">Ces outils sont plus confortables sur grand écran. Ouvrez Diaspo’Actif depuis votre ordinateur pour les utiliser.</p><div class="lst">${MENU_DESK.map(t => `<div class="li dim"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">${esc(t)}</span></span></div>`).join('')}</div></div>
@@ -1002,7 +1101,7 @@
     else if (a === 'billet') paneBillet(b, c);
     else if (a === 'notifs') paneNotifs();
     else if (a === 'cr') paneCR(b);
-    else if (a === 'cagnottes') paneCagnottes();
+    else if (a === 'cagnottes') paneCagnottes(b);
     else if (a === 'videos') paneVideos();
     else if (a === 'video') paneVideo(b);
     else if (window.MMods && typeof window.MMods[a] === 'function') window.MMods[a](b, c);
