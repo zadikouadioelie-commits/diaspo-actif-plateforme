@@ -6428,6 +6428,32 @@ route("PUT", "/api/adhesion-formules/:id/toggle-actif", async (req, res, params,
   sendJSON(res, 200, { ok: true, actif: !!actif });
 });
 
+/* PUT /api/adhesion-formules/:id/officielle — désigne une formule DÉJÀ EXISTANTE comme l'adhésion
+   officielle de l'association (2026-10-07, demande explicite : un bouton « Définir comme
+   l'adhésion officielle » sur chaque formule). Même effet que « Créer l'adhésion officielle » :
+   adhAppliquerOfficielle() la retire d'abord de toutes les autres formules de l'initiative, donc
+   l'ancienne est remplacée automatiquement. Route dédiée plutôt que PUT /:id : celle-ci réécrit
+   tous les champs de la formule (nom, montants...) et les effacerait si on n'envoie que le statut.
+   Une formule désactivée est refusée : elle est invisible du public, le bouton « Adhérer à
+   l'initiative » ne pourrait pas la cibler. */
+route("PUT", "/api/adhesion-formules/:id/officielle", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const f = await db.prepare(`SELECT f.*, i.owner_user_id FROM adhesion_formules f JOIN initiatives i ON i.id=f.initiative_id WHERE f.id=?`).get(params.id);
+  if (!f) return sendJSON(res, 404, { error: "Formule introuvable." });
+  if (Number(f.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
+  if (!(await exigerPremium(user, res, "adhesions"))) return;
+  const officielle = body.officielle === undefined ? true : !!body.officielle;
+  if (officielle && !f.actif) {
+    return sendJSON(res, 400, { error: "Activez d'abord cette formule : une formule désactivée n'est pas visible du public, elle ne peut pas devenir l'adhésion officielle." });
+  }
+  const precedente = officielle
+    ? await db.prepare("SELECT id, nom FROM adhesion_formules WHERE initiative_id=? AND est_officielle=1 AND id<>?").get(f.initiative_id, f.id)
+    : null;
+  await adhAppliquerOfficielle(f.id, f.initiative_id, officielle);
+  sendJSON(res, 200, { ok: true, est_officielle: officielle, remplace: precedente ? { id: precedente.id, nom: precedente.nom } : null });
+});
+
 /* Calcule le statut effectif d'un membre (à_jour/non_à_jour) selon date_expiration.
    Ne remonte JAMAIS un statut explicite (en_attente/suspendu/non_a_jour, ex: paiement échoué)
    vers 'a_jour' — seul un nouveau paiement réussi peut le faire. Seule la transition

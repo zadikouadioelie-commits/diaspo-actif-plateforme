@@ -7579,13 +7579,13 @@ async function adhRenderFormules(){
               <button type="button" onclick="this.previousElementSibling.play();this.style.display='none';" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;">▶️</button>
             </div>` : ''}
           <div style="padding:14px;">
+            ${f.est_officielle ? `<div style="margin-bottom:8px;"><span title="Adhésion officielle de l'association — ciblée directement par le bouton public « Adhérer à l'initiative »" style="flex-shrink:0;background:linear-gradient(135deg,#B8860B,#FFD700 55%,#B8860B);color:#3A2A00;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;">⭐ Adhésion officielle</span></div>` : ''}
           <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
             ${!f.media_type ? `<div style="font-size:24px;">${f.icone||'🎫'}</div>` : ''}
             <div style="flex:1;min-width:0;">
               <div style="font-weight:700;font-size:14px;">${escH(f.nom)}</div>
               <div style="font-size:11px;color:var(--muted);">${ADH_TYPE_LABELS[f.type_contribution]||f.type_contribution}</div>
             </div>
-            ${f.est_officielle ? `<span title="Adhésion officielle de l'association — ciblée directement par le bouton public « Adhérer à l'initiative »" style="flex-shrink:0;background:linear-gradient(135deg,#B8860B,#FFD700 55%,#B8860B);color:#3A2A00;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;">⭐ Officielle</span>` : ''}
           </div>
           <div style="font-size:13px;font-weight:700;margin-bottom:6px;">
             ${f.montant_type==='fixe' ? `${f.montant_fixe} ${f.devise}` : f.montant_type==='libre' ? `Libre${f.montant_max?' (max '+f.montant_max+' '+f.devise+')':''}` : `Min. ${f.montant_min} ${f.devise}`}
@@ -7598,6 +7598,7 @@ async function adhRenderFormules(){
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="adhOuvrirEditionFormule(${f.id})">✏️ Modifier</button>
             <button class="btn btn-sm btn-outline" onclick="adhDupliquerFormule(${f.id})">📄 Dupliquer</button>
+            ${(!f.est_officielle && f.actif) ? `<button class="btn btn-sm btn-outline" style="color:#7C3AED;border-color:#7C3AED;" title="Cette formule devient celle que le bouton public « Adhérer à l'initiative » cible directement (elle remplace l'adhésion officielle actuelle, s'il y en a une)." onclick="adhDefinirOfficielle(${f.id}, '${escH(f.nom).replace(/'/g,"\\'")}')">⭐ Définir comme adhésion officielle</button>` : ''}
             ${f.actif ? `<button class="btn btn-sm btn-outline" onclick="adhOuvrirPartage(${f.id})">📤 Partager</button>` : ''}
             <button class="btn btn-sm btn-outline" onclick="adhToggleActifFormule(${f.id})">${f.actif?'🙈 Désactiver':'👁️ Activer'}</button>
             <button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="adhSupprimerFormule(${f.id},'${escH(f.nom).replace(/'/g,"\\'")}')">🗑️</button>
@@ -7928,6 +7929,19 @@ async function adhEnregistrerFormule(){
 async function adhToggleActifFormule(id){
   try{ await api('PUT', `/adhesion-formules/${id}/toggle-actif`, {}); adhRenderFormules(); }
   catch(e){ showToast(e.message, 'danger'); }
+}
+/* Désigne une formule existante comme l'adhésion officielle (2026-10-07) — même résultat que
+   « Créer l'adhésion officielle » : l'ancienne officielle est remplacée côté serveur
+   (adhAppliquerOfficielle), la nouvelle porte le badge et devient la cible du bouton public
+   « Adhérer à l'initiative ». Confirmation seulement quand une autre formule est remplacée. */
+async function adhDefinirOfficielle(id, nom){
+  const actuelle = ADH_FORMULES.find(x => x.est_officielle && Number(x.id) !== Number(id));
+  if(actuelle && !confirm(`« ${nom} » va remplacer « ${actuelle.nom} » comme adhésion officielle.\n\nLe bouton public « Adhérer à l'initiative » ciblera désormais « ${nom} ». Continuer ?`)) return;
+  try{
+    await api('PUT', `/adhesion-formules/${id}/officielle`, {});
+    await adhRenderFormules();
+    showToast(`⭐ « ${nom} » est maintenant l'adhésion officielle — c'est elle que cible le bouton « Adhérer à l'initiative ».`);
+  }catch(e){ showToast(e.message, 'danger'); }
 }
 async function adhDupliquerFormule(id){
   try{ await api('POST', `/adhesion-formules/${id}/dupliquer`, {}); adhRenderFormules(); showToast('Formule dupliquée — désactivée par défaut, à relire avant de la publier.'); }
