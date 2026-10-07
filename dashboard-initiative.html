@@ -5019,6 +5019,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
                 <strong style="font-size:15px;">${escH(c.titre)}</strong>
                 <span style="font-size:11px;font-weight:700;color:${st.color};background:${st.bg};border-radius:20px;padding:2px 10px;">${st.label}</span>
                 ${c.visibilite === 'privee' ? `<span style="font-size:11px;font-weight:700;color:var(--muted);background:var(--bg);border-radius:20px;padding:2px 10px;">🔒 Privée</span>` : ''}
+                <!-- Badge "Don récurrent" (2026-10-06, demande explicite) — type_don==='recurrent'
+                     est un champ distinct de est_vedette ("Mettre en avant partout" ci-dessus) :
+                     un seul par compte, et chaque contribution dessus crée un VRAI abonnement
+                     Stripe (prélèvement répété), pas juste un affichage permanent. Le badge le
+                     rend visible sur la carte, là où rien ne le distinguait avant. -->
+                ${c.type_don === 'recurrent' ? `<span style="font-size:11px;font-weight:700;color:#166534;background:#DCFCE7;border-radius:20px;padding:2px 10px;" title="Chaque contribution crée un prélèvement Stripe répété, sauf si le donateur décoche l'option sur la page publique.">🔁 Don récurrent</span>` : ''}
               </div>
               ${c.categorie ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escH(c.categorie)}</div>` : ''}
               <div style="font-size:13px;font-weight:700;">${objectifTxt}</div>

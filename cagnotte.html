@@ -304,6 +304,11 @@
         <input id="cg-part-prenom" type="text" placeholder="Prénom" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
         <input id="cg-part-email" type="email" placeholder="Adresse e-mail *" value="${escH(_invitationEmail)}" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">
         <div id="cg-part-email-note" style="display:none;font-size:11.5px;color:#1d4ed8;background:#eff6ff;border-radius:6px;padding:6px 8px;margin-bottom:10px;"></div>` : ''}
+        ${_cagnotte.type_don === 'recurrent' ? `
+        <label style="display:flex;align-items:flex-start;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:4px;background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;">
+          <input type="checkbox" id="cg-part-recurrent" checked style="margin-top:2px;">
+          <span>Don récurrent — ${({mensuel:'prélèvement mensuel',trimestriel:'prélèvement trimestriel',annuel:'prélèvement annuel'})[_cagnotte.recurrence_periodicite] || 'prélèvement mensuel'} automatique tant que vous ne l'arrêtez pas (gérable depuis « Mes dons récurrents »). Décochez pour faire un don unique à la place.</span>
+        </label>` : ''}
         <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;">
           <input type="checkbox" id="cg-part-anonyme"> Participer anonymement (mon nom ne sera pas affiché publiquement)
         </label>
@@ -369,6 +374,11 @@
         anonyme: document.getElementById('cg-part-anonyme').checked,
         message: document.getElementById('cg-part-message').value.trim() || undefined,
         invitation_token: invitationToken || undefined,
+        /* Don récurrent (2026-10-06, demande explicite) — la cagnotte est de type 'recurrent'
+           mais CE donateur peut décider individuellement de ne pas s'abonner (case décochée) :
+           recurrent_opt_out indique au serveur de créer un paiement unique pour cette
+           contribution précise, sans toucher au type_don de la cagnotte elle-même. */
+        recurrent_opt_out: document.getElementById('cg-part-recurrent') ? !document.getElementById('cg-part-recurrent').checked : undefined,
       })
     }).then(async r => { const d = await r.json(); if (!r.ok) throw d; return d; })
       .then(({ checkout_url }) => {

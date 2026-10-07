@@ -65,6 +65,15 @@ table.abo-hist td{padding:8px 10px;border-bottom:1px solid var(--border);}
       <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Consultez votre abonnement Premium, gérez sa facturation et son historique de paiements.</p>
     </div>
     <div id="abo-content"><div class="abo-empty">Chargement…</div></div>
+
+    <!-- Mes dons récurrents (2026-10-06, demande explicite) — même page que l'abonnement
+         Premium : même nature (prélèvement Stripe répété), même besoin de pouvoir l'arrêter
+         facilement, voir confirmerArretDon()/loadDonsRecurrents() plus bas. -->
+    <div style="margin:36px 0 24px;">
+      <h2 style="margin:0;font-size:19px;">🪙 Mes dons récurrents</h2>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:13.5px;">Les cagnottes auxquelles vous contribuez automatiquement, et leur prochain prélèvement.</p>
+    </div>
+    <div id="dons-content"><div class="abo-empty">Chargement…</div></div>
   </main>
 </div>
 
@@ -80,6 +89,19 @@ table.abo-hist td{padding:8px 10px;border-bottom:1px solid var(--border);}
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
       <button class="btn btn-outline" onclick="document.getElementById('modal-resilier-bg').classList.remove('open')">Annuler</button>
       <button class="btn" style="background:#dc2626;color:#fff;border:none;" id="resil-confirm-btn" onclick="confirmerResiliation()">Résilier mon abonnement</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ARRÊT D'UN DON RÉCURRENT -->
+<div class="modal-bg" id="modal-arret-don-bg" onclick="if(event.target===this)document.getElementById('modal-arret-don-bg').classList.remove('open')">
+  <div class="modal-box">
+    <h3 style="margin:0 0 12px;">Arrêter ce don récurrent</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin:0 0 14px;">Le dernier prélèvement déjà effectué reste acquis. Aucun autre prélèvement après le <strong id="arret-date-fin">—</strong>.</p>
+    <div id="arret-don-err" style="display:none;color:#D33;font-size:12.5px;margin-top:8px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-outline" onclick="document.getElementById('modal-arret-don-bg').classList.remove('open')">Annuler</button>
+      <button class="btn" style="background:#dc2626;color:#fff;border:none;" id="arret-don-confirm-btn" onclick="confirmerArretDon()">Arrêter ce don</button>
     </div>
   </div>
 </div>
@@ -190,9 +212,88 @@ async function reactiverAbonnement(accredId) {
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
+/* Mes dons récurrents (2026-10-06, demande explicite) — même structure que loadAbonnement()
+   ci-dessus, appliqué aux contributions de cagnotte plutôt qu'aux accréditations Premium. */
+let _contribIdCourant = null;
+async function loadDonsRecurrents() {
+  if (!ME) { document.getElementById('dons-content').innerHTML = '<div class="abo-empty">🔐 <a href="login.html">Connectez-vous</a> pour voir vos dons récurrents.</div>'; return; }
+  try {
+    const { dons } = await api('GET', '/mes-dons-recurrents');
+    const el = document.getElementById('dons-content');
+    if (!dons.length) {
+      el.innerHTML = `<div class="abo-card abo-empty">
+        <div style="font-size:44px;margin-bottom:10px;">🪙</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);">Aucun don récurrent actif</div>
+      </div>`;
+      return;
+    }
+    el.innerHTML = dons.map(d => {
+      const s = d.stripe;
+      const enArret = s?.annulation_programmee;
+      const pillLabel = enArret ? 'Arrêt programmé' : (s?.statut_stripe === 'active' ? 'Actif' : (s?.statut_stripe || '—'));
+      const pillColor = enArret ? '#f59e0b' : (s?.statut_stripe === 'active' ? '#22c55e' : '#94a3b8');
+      return `
+      <div class="abo-card">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          ${d.cagnotte_image ? `<img src="${escH(d.cagnotte_image)}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;">` : `<div style="width:48px;height:48px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;">🪙</div>`}
+          <div style="flex:1;min-width:160px;">
+            <a href="cagnotte.html?slug=${encodeURIComponent(d.cagnotte_slug)}" style="font-weight:700;font-size:14.5px;color:var(--text);text-decoration:none;">${escH(d.cagnotte_titre)}</a>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">
+              ${s?.montant != null ? fmtPrix(s.montant, s.devise) : fmtPrix(d.montant, d.devise)} ${INTERVALLE_LBL[s?.intervalle] || '/ mois'}
+            </div>
+          </div>
+          <span class="abo-pill" style="background:${pillColor};color:#fff;">${escH(pillLabel)}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:10px;">
+          ${enArret
+            ? `Dernier prélèvement déjà effectué, puis arrêt le ${fmtDate(s.periode_fin)}.`
+            : (s?.periode_fin ? `Prochain prélèvement le ${fmtDate(s.periode_fin)}.` : '')}
+        </div>
+        <div style="margin-top:12px;">
+          ${enArret
+            ? `<button class="btn btn-outline btn-sm" onclick="reactiverDonRecurrent(${d.contribution_id})">↺ Annuler l'arrêt</button>`
+            : `<button class="btn btn-sm" style="color:#dc2626;border:1px solid #dc2626;background:#fff;" onclick="ouvrirArretDon(${d.contribution_id}, '${escH(s?.periode_fin ? fmtDate(s.periode_fin) : 'la fin de la période en cours')}')">Arrêter ce don</button>`}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { document.getElementById('dons-content').innerHTML = '<div class="abo-empty">Erreur de chargement.</div>'; }
+}
+
+function ouvrirArretDon(contribId, dateFinTxt) {
+  _contribIdCourant = contribId;
+  document.getElementById('arret-date-fin').textContent = dateFinTxt;
+  document.getElementById('arret-don-err').style.display = 'none';
+  document.getElementById('modal-arret-don-bg').classList.add('open');
+}
+
+async function confirmerArretDon() {
+  const btn = document.getElementById('arret-don-confirm-btn');
+  const errBox = document.getElementById('arret-don-err');
+  btn.disabled = true; btn.textContent = 'Arrêt…';
+  try {
+    await api('POST', '/mes-dons-recurrents/' + _contribIdCourant + '/arreter');
+    document.getElementById('modal-arret-don-bg').classList.remove('open');
+    loadDonsRecurrents();
+  } catch(e) {
+    errBox.textContent = e.message || 'Impossible d\'arrêter ce don pour le moment.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Arrêter ce don';
+  }
+}
+
+async function reactiverDonRecurrent(contribId) {
+  if (!confirm('Annuler l\'arrêt et poursuivre ce don récurrent normalement ?')) return;
+  try {
+    await api('POST', '/mes-dons-recurrents/' + contribId + '/reactiver');
+    loadDonsRecurrents();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
 (async()=>{
   ME = await fetchCurrentUser();
   loadAbonnement();
+  loadDonsRecurrents();
 })();
 </script>
 <script src="/assets/cookies-banner.js"></script>

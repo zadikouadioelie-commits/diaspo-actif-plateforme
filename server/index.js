@@ -22307,8 +22307,12 @@ route("POST", "/api/cagnottes/:id/participer", async (req, res, params, body) =>
 
   const origin = getOrigin(req);
   /* Don récurrent (2026-09-28) — abonnement Stripe, même patron que l'adhésion périodique
-     (POST /api/adhesion-formules/:id/payer, mode: recurring ? "subscription" : "payment"). */
-  const recurrence = c.type_don === "recurrent" ? (CAGNOTTE_RECURRENCE[c.recurrence_periodicite] || CAGNOTTE_RECURRENCE.mensuel) : null;
+     (POST /api/adhesion-formules/:id/payer, mode: recurring ? "subscription" : "payment").
+     recurrent_opt_out (2026-10-06, demande explicite) : le type_don de la cagnotte est la
+     valeur PAR DÉFAUT, mais chaque donateur garde le choix individuel de ne pas s'abonner —
+     sans ça, personne ne pouvait faire un don ponctuel sur une cagnotte "recurrent", même en
+     le souhaitant explicitement. N'affecte que CETTE contribution, jamais cagnottes.type_don. */
+  const recurrence = (c.type_don === "recurrent" && !body?.recurrent_opt_out) ? (CAGNOTTE_RECURRENCE[c.recurrence_periodicite] || CAGNOTTE_RECURRENCE.mensuel) : null;
   try {
     /* Invité : pas de compte Stripe persistant côté plateforme — customer_email suffit, Stripe
        crée son propre Customer pour la session (même pattern que l'adhésion invitée). */
@@ -26587,6 +26591,87 @@ route("POST", "/api/mon-abonnement/:id/reactiver", async (req, res, params) => {
     SEC.logSecurity('abonnement_reactive', { user_id: user.id, accred_id: Number(params.id) });
     sendJSON(res, 200, { ok: true });
   } catch (e) { sendJSON(res, 500, SEC.safeError(e, "réactivation abonnement")); }
+});
+
+/* GET /api/mes-dons-recurrents — mes dons récurrents actifs (cagnottes), même patron que
+   GET /api/mon-abonnement ci-dessus : enrichi en direct depuis Stripe (source de vérité de la
+   facturation), un contributeur peut avoir plusieurs dons récurrents (contrairement aux
+   abonnements Premium, limités à un par type) donc pas de LIMIT ni de contrainte d'unicité ici.
+   2026-10-06, demande explicite : donner aux donateurs un moyen de voir et d'arrêter leurs
+   prélèvements répétés, jusqu'ici invisibles une fois le paiement initial effectué. */
+route("GET", "/api/mes-dons-recurrents", async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const lignes = await db.prepare(`
+    SELECT cc.id, cc.montant, cc.devise, cc.statut, cc.created_at, cc.stripe_subscription_id,
+           c.titre AS cagnotte_titre, c.slug AS cagnotte_slug, c.image_url AS cagnotte_image
+    FROM cagnotte_contributions cc JOIN cagnottes c ON c.id = cc.cagnotte_id
+    WHERE cc.user_id=? AND cc.stripe_subscription_id IS NOT NULL
+    ORDER BY cc.created_at DESC
+  `).all(user.id);
+  const { stripe } = require("./stripe-client");
+  const vus = new Set(); // une ligne par abonnement (la 1ère contribution), pas par facture renouvelée
+  const dons = [];
+  for (const l of lignes) {
+    if (vus.has(l.stripe_subscription_id)) continue;
+    vus.add(l.stripe_subscription_id);
+    let stripeInfo = null;
+    if (stripe) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(l.stripe_subscription_id);
+        const price = sub.items?.data?.[0]?.price;
+        stripeInfo = {
+          statut_stripe: sub.status,
+          periode_fin: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+          annulation_programmee: !!sub.cancel_at_period_end,
+          montant: price?.unit_amount != null ? price.unit_amount / 100 : null,
+          devise: price?.currency ? price.currency.toUpperCase() : null,
+          intervalle: price?.recurring?.interval || null,
+          intervalle_count: price?.recurring?.interval_count || 1,
+        };
+      } catch (e) { console.error('[mes-dons-recurrents] stripe.subscriptions.retrieve', l.stripe_subscription_id, e.message); }
+    }
+    dons.push({
+      contribution_id: l.id, cagnotte_titre: l.cagnotte_titre, cagnotte_slug: l.cagnotte_slug, cagnotte_image: l.cagnotte_image,
+      montant: l.montant, devise: l.devise, created_at: l.created_at,
+      stripe: stripeInfo,
+    });
+  }
+  sendJSON(res, 200, { dons });
+});
+
+/* POST /api/mes-dons-recurrents/:id/arreter — même logique que /api/mon-abonnement/:id/resilier :
+   programme l'arrêt à la fin de la période déjà payée, jamais immédiat. :id = contribution_id
+   (la ligne de la toute première contribution de cet abonnement, celle qui porte
+   stripe_subscription_id — voir checkout.session.completed plus haut). */
+route("POST", "/api/mes-dons-recurrents/:id/arreter", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ligne = await db.prepare("SELECT * FROM cagnotte_contributions WHERE id=? AND user_id=?").get(params.id, user.id);
+  if (!ligne || !ligne.stripe_subscription_id) return sendJSON(res, 404, { error: "Don récurrent introuvable." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Service de paiement momentanément indisponible." });
+  try {
+    const sub = await stripe.subscriptions.update(ligne.stripe_subscription_id, { cancel_at_period_end: true });
+    SEC.logSecurity('don_recurrent_arrete', { user_id: user.id, contribution_id: Number(params.id) });
+    sendJSON(res, 200, { ok: true, periode_fin: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "arrêt don récurrent")); }
+});
+
+/* POST /api/mes-dons-recurrents/:id/reactiver — annule un arrêt programmé, même règle que
+   /api/mon-abonnement/:id/reactiver. */
+route("POST", "/api/mes-dons-recurrents/:id/reactiver", async (req, res, params) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const ligne = await db.prepare("SELECT * FROM cagnotte_contributions WHERE id=? AND user_id=?").get(params.id, user.id);
+  if (!ligne || !ligne.stripe_subscription_id) return sendJSON(res, 404, { error: "Don récurrent introuvable." });
+  const { stripe } = require("./stripe-client");
+  if (!stripe) return sendJSON(res, 503, { error: "Service de paiement momentanément indisponible." });
+  try {
+    await stripe.subscriptions.update(ligne.stripe_subscription_id, { cancel_at_period_end: false });
+    SEC.logSecurity('don_recurrent_reactive', { user_id: user.id, contribution_id: Number(params.id) });
+    sendJSON(res, 200, { ok: true });
+  } catch (e) { sendJSON(res, 500, SEC.safeError(e, "réactivation don récurrent")); }
 });
 
 /* GET /api/accreditations/demandes — mes propres demandes (ancien + nouveau système) */
