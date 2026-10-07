@@ -19,6 +19,8 @@ const VERROU_MS = 15 * 60 * 1000;
 const DUREE_RECONNU_MS = 30 * 24 * 3600 * 1000;
 const MAX_ESSAIS = 5;
 const MAX_ENVOIS_EMAIL = 3;
+const MAX_DEFIS_PAR_HEURE = 6;
+const MAX_ESSAIS_CODE_NOTIF = 3;
 const DEFI_RE = /^[a-f0-9]{32}$/;
 
 const estDesactive = () => process.env.DESACTIVER_CONFIRMATION_APPAREIL === '1';
@@ -49,13 +51,21 @@ async function evaluer(db, { req, user, ip, notifier, creerDefi = true }) {
 
   const lignes = await db.prepare('SELECT appareil_id, last_seen_at, expire_at, type_appareil, navigateur, os FROM connexions WHERE user_id=? AND revoque_at IS NULL').all(user.id);
   const maintenant = horodatage(), limite = horodatage(-ACTIVITE_RECENTE_MS);
+  const maCategorie = Connexions.categorieDe(Connexions.analyserAppareil(req, ip).type);
+  /* Un ordinateur et un téléphone peuvent être connectés ensemble au même compte : seul un autre appareil de la MÊME catégorie compte. */
   const autresActives = lignes.filter(l => l.appareil_id !== appareilId
+    && Connexions.categorieDe(l.type_appareil) === maCategorie
     && (!l.expire_at || String(l.expire_at) >= maintenant) && String(l.last_seen_at || '') >= limite);
   if (!autresActives.length) return { ok: true };
   if (!creerDefi) return { requis: true };   // entrée sans mot de passe (DS-ID seul) : on n'ouvre pas de défi, on renvoie vers la page de connexion
 
   const nouveauCookie = !appareilId;
   if (!appareilId) appareilId = Connexions.nouvelAppareilId();
+
+  /* Plafond de demandes par compte : le code affiché sur l'appareil connecté n'a que 3 chiffres ; des essais répétés depuis de
+     nouveaux navigateurs ne doivent pas pouvoir le deviner. Au-delà de 6 demandes en 1 h : plus de nouvelle demande pendant 15 min. */
+  const recentes = await db.prepare('SELECT COUNT(*) AS n FROM confirmations_appareil WHERE user_id=? AND created_at > ?').get(user.id, horodatage(-3600 * 1000));
+  if (Number(recentes && recentes.n || 0) >= MAX_DEFIS_PAR_HEURE) return { bloque: true, reessayerDans: 15 * 60 };
 
   const verrou = await db.prepare("SELECT resolu_at FROM confirmations_appareil WHERE user_id=? AND appareil_id=? AND statut IN ('refusee','bloquee') AND resolu_at > ? ORDER BY resolu_at DESC LIMIT 1")
     .get(user.id, appareilId, horodatage(-VERROU_MS));
@@ -101,14 +111,26 @@ async function charger(db, req, defiId) {
   return { defi: d };
 }
 
-async function compterEchec(db, d) {
+async function compterEchec(db, d, max = MAX_ESSAIS) {
   const essais = Number(d.essais || 0) + 1;
-  if (essais >= MAX_ESSAIS) {
+  if (essais >= max) {
     await db.prepare("UPDATE confirmations_appareil SET essais=?, statut='bloquee', resolu_at=? WHERE id=?").run(essais, horodatage(), d.id);
     return { restants: 0, bloque: true };
   }
   await db.prepare('UPDATE confirmations_appareil SET essais=? WHERE id=?').run(essais, d.id);
-  return { restants: MAX_ESSAIS - essais, bloque: false };
+  return { restants: max - essais, bloque: false };
+}
+
+/* Code à 3 chiffres affiché dans les NOTIFICATIONS du compte, sur l'appareil déjà connecté (2026-10-07, demande du titulaire).
+   Dérivé (HMAC) de l'identifiant de la demande et d'un secret serveur : rien à stocker ; il vit aussi longtemps que la demande
+   (10 min) et ne vaut que pour CETTE demande. 3 essais maximum, puis la demande est bloquée. */
+function codeNotif(defiId) {
+  const h = crypto.createHmac('sha256', process.env.AUTH_SECRET || 'diaspo-actif-2026-secret').update('code-notif:' + defiId).digest();
+  return String(h.readUInt32BE(0) % 1000).padStart(3, '0');
+}
+function codeNotifValide(d, saisie) {
+  if (!/^\d{3}$/.test(String(saisie || '').trim())) return false;
+  return egalSur(codeNotif(d.id), String(saisie).trim());
 }
 
 /* Le DS-ID saisi est-il celui du compte du défi, ou d'un compte du même groupe de liaison ? */
@@ -181,5 +203,5 @@ function masquerEmail(email) {
 
 module.exports = {
   MAX_ESSAIS, estDesactive, estCompteDemo, estReconnu, evaluer, charger, compterEchec, dsIdValide,
-  preparerCodeEmail, codeEmailValide, valider, enAttente, incidents30j, refuser, masquerEmail,
+  preparerCodeEmail, codeEmailValide, codeNotif, codeNotifValide, MAX_ESSAIS_CODE_NOTIF, valider, enAttente, incidents30j, refuser, masquerEmail,
 };

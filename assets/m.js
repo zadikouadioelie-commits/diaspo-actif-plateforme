@@ -188,13 +188,21 @@
       const ouvert = (rep.deja_ouvert_sur || []).map(a => esc(a.libelle) + (a.il_y_a_min != null ? ' (actif ' + (a.il_y_a_min < 2 ? 'à l’instant' : a.il_y_a_min < 90 ? 'il y a ' + a.il_y_a_min + ' min' : a.il_y_a_min < 2880 ? 'il y a ' + Math.round(a.il_y_a_min / 60) + ' h' : 'il y a plus de 2 jours') + ')' : '')).join(' · ');
       sh.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-label="Confirmer la connexion"><div class="grip"></div><div class="sb">
         <h2 style="margin:4px 0 2px;font-size:20px">Confirmez que c’est bien vous</h2>
-        <p class="muted small" style="margin:0 0 ${ouvert ? 6 : 14}px">Ce compte est déjà connecté ailleurs. Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
+        <p class="muted small" style="margin:0 0 ${ouvert ? 6 : 14}px">Ce compte est déjà utilisé sur un autre appareil du même type (téléphone ou ordinateur). Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
         ${ouvert ? `<p class="small" style="margin:0 0 14px;padding:8px 10px;background:var(--sky-l);border-radius:10px"><b>Déjà connecté sur :</b> ${ouvert}</p>` : ''}
-        <div id="ca-dsid-box">
+        <div id="ca-notif-box">
+          <label class="small muted" for="ca-cn">Code à 3 chiffres affiché sur votre appareil déjà connecté</label>
+          <div class="search" style="border-radius:12px;margin:4px 0 8px"><input id="ca-cn" type="text" inputmode="numeric" maxlength="3" autocomplete="one-time-code" placeholder="000" style="letter-spacing:.3em;font-size:20px"></div>
+          <p class="muted small" style="margin:0 0 8px">Ouvrez les <b>notifications</b> (la cloche) de ce compte sur l’appareil déjà connecté : un code à 3 chiffres y est affiché, valable 10 minutes. Vous avez 3 essais.</p>
+          <button type="button" class="btn out block" id="ca-n-dsid" style="margin-top:4px">Utiliser mon DS-ID à la place</button>
+          <button type="button" class="btn out block" id="ca-n-email" style="margin-top:8px">Recevoir un code par e-mail</button>
+        </div>
+        <div id="ca-dsid-box" hidden>
           <label class="small muted" for="ca-dsid">Votre Code de Sécurité (DS-ID)</label>
           <div class="search" style="border-radius:12px;margin:4px 0 8px"><input id="ca-dsid" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DS-ID de ce compte ou d’un compte lié"></div>
           <p class="muted small" style="margin:0 0 8px">Vous le trouvez dans votre profil, section Confidentialité, sur l’appareil déjà connecté. Vous pouvez aussi saisir celui d’un de vos comptes liés.</p>
           <button type="button" class="btn out block" id="ca-vers-email" style="margin-top:4px">Je n’ai pas mon DS-ID : recevoir un code par e-mail</button>
+          <button type="button" class="btn out block" id="ca-d-notif" style="margin-top:8px">Utiliser le code affiché sur mon appareil connecté</button>
         </div>
         <div id="ca-email-box" hidden>
           <label class="small muted" for="ca-code">Code à 6 chiffres reçu par e-mail</label>
@@ -202,31 +210,35 @@
           <p id="ca-info" class="small" style="color:var(--green);margin:0 0 8px"></p>
           <button type="button" class="btn out block" id="ca-renvoyer" style="margin-top:4px">Renvoyer le code</button>
           <button type="button" class="btn out block" id="ca-vers-dsid" style="margin-top:8px">Utiliser mon DS-ID à la place</button>
+          <button type="button" class="btn out block" id="ca-e-notif" style="margin-top:8px">Utiliser le code affiché sur mon appareil connecté</button>
         </div>
         <p id="ca-err" class="small" style="color:var(--red);min-height:20px;margin:8px 2px" role="alert"></p>
         <button type="button" class="btn block" id="ca-ok">Confirmer</button>
         <button type="button" class="btn out block" id="ca-non" style="margin-top:10px">Annuler</button>
       </div></div>`;
-      let mode = 'dsid';
+      let mode = 'notif';
+      const CHAMP = { notif: '#ca-cn', dsid: '#ca-dsid', email: '#ca-code' };
       const err = m => { $('#ca-err').textContent = m || ''; };
-      const basculer = m => { mode = m; err(''); $('#ca-dsid-box').hidden = m !== 'dsid'; $('#ca-email-box').hidden = m !== 'email'; const f = $(m === 'dsid' ? '#ca-dsid' : '#ca-code'); if (f) f.focus(); };
+      const basculer = m => { mode = m; err(''); $('#ca-notif-box').hidden = m !== 'notif'; $('#ca-dsid-box').hidden = m !== 'dsid'; $('#ca-email-box').hidden = m !== 'email'; const f = $(CHAMP[m]); if (f) f.focus(); };
       const envoyer = async () => {
-        err(''); const b1 = $('#ca-vers-email'), b2 = $('#ca-renvoyer'); b1.disabled = true; b2.disabled = true;
+        err(''); const b1 = $('#ca-vers-email'), b2 = $('#ca-renvoyer'), b3 = $('#ca-n-email'); b1.disabled = true; b2.disabled = true; b3.disabled = true;
         try {
           const r = await api('/api/auth/confirmer-appareil/envoyer-code', { method: 'POST', body: { defi: rep.defi } });
           basculer('email'); $('#ca-info').textContent = 'Un code vient d’être envoyé à ' + (r.email_masque || rep.email_masque || 'votre adresse e-mail') + ' (valable 10 minutes).';
         } catch (e) { err(e.message || 'Envoi impossible.'); }
-        finally { b1.disabled = false; setTimeout(() => { b2.disabled = false; }, 20000); }
+        finally { b1.disabled = false; b3.disabled = false; setTimeout(() => { b2.disabled = false; }, 20000); }
       };
-      $('#ca-vers-email').onclick = envoyer; $('#ca-renvoyer').onclick = envoyer; $('#ca-vers-dsid').onclick = () => basculer('dsid');
+      $('#ca-vers-email').onclick = envoyer; $('#ca-n-email').onclick = envoyer; $('#ca-renvoyer').onclick = envoyer;
+      $('#ca-vers-dsid').onclick = () => basculer('dsid'); $('#ca-n-dsid').onclick = () => basculer('dsid');
+      $('#ca-d-notif').onclick = () => basculer('notif'); $('#ca-e-notif').onclick = () => basculer('notif');
       $('#ca-non').onclick = () => resolve(false);
       sh.onclick = e => { if (e.target === sh) resolve(false); };
       $('#ca-ok').onclick = async () => {
-        err(''); const saisie = ($(mode === 'dsid' ? '#ca-dsid' : '#ca-code').value || '').trim();
-        if (!saisie) { err(mode === 'dsid' ? 'Saisissez votre Code de Sécurité.' : 'Saisissez le code reçu par e-mail.'); return; }
+        err(''); const saisie = ($(CHAMP[mode]).value || '').trim();
+        if (!saisie) { err(mode === 'notif' ? 'Saisissez le code à 3 chiffres affiché sur votre appareil connecté.' : mode === 'dsid' ? 'Saisissez votre Code de Sécurité.' : 'Saisissez le code reçu par e-mail.'); return; }
         const btn = $('#ca-ok'); btn.disabled = true; btn.textContent = 'Vérification…';
         try {
-          await api('/api/auth/confirmer-appareil', { method: 'POST', body: mode === 'dsid' ? { defi: rep.defi, ds_id: saisie } : { defi: rep.defi, code: saisie } });
+          await api('/api/auth/confirmer-appareil', { method: 'POST', body: { defi: rep.defi, ...(mode === 'notif' ? { code_notif: saisie } : mode === 'dsid' ? { ds_id: saisie } : { code: saisie }) } });
           resolve(true);
         } catch (e) {
           const d = e.data || {};
@@ -235,7 +247,7 @@
           btn.disabled = false; btn.textContent = 'Confirmer';
         }
       };
-      setTimeout(() => { const f = $('#ca-dsid'); if (f) f.focus(); }, 60);
+      setTimeout(() => { const f = $('#ca-cn'); if (f) f.focus(); }, 60);
     });
   }
   function openLogin(reason) {

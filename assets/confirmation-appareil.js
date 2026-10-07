@@ -47,13 +47,21 @@
       const ouvert = (rep.deja_ouvert_sur || []).map(a => esc(a.libelle) + (a.il_y_a_min != null ? ' (actif ' + (a.il_y_a_min < 2 ? 'à l\'instant' : a.il_y_a_min < 90 ? 'il y a ' + a.il_y_a_min + ' min' : a.il_y_a_min < 2880 ? 'il y a ' + Math.round(a.il_y_a_min / 60) + ' h' : 'il y a plus de 2 jours') + ')' : '')).join(' · ');
       ov.innerHTML = `<div class="ca-box">
         <h3 id="ca-titre">🔐 Confirmez que c'est bien vous</h3>
-        <p>Ce compte est déjà connecté ailleurs. Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
+        <p>Ce compte est déjà utilisé sur un autre appareil du même type (téléphone ou ordinateur). Pour votre sécurité, prouvez que vous en êtes le titulaire : une seule fois, cet appareil sera ensuite reconnu pendant 30 jours.</p>
         ${ouvert ? `<p><strong>Déjà connecté sur :</strong> ${ouvert}</p>` : ''}
-        <div id="ca-mode-dsid">
+        <div id="ca-mode-notif">
+          <label for="ca-cn">Code à 3 chiffres affiché sur votre appareil déjà connecté</label>
+          <input id="ca-cn" type="text" inputmode="numeric" maxlength="3" autocomplete="one-time-code" placeholder="000" style="font-size:22px;">
+          <div class="ca-aide">Ouvrez les <strong>notifications</strong> (la cloche) de ce compte sur l'appareil déjà connecté : un code à 3 chiffres y est affiché, valable 10 minutes. Vous avez 3 essais.</div>
+          <button type="button" class="ca-lien" id="ca-n-dsid">Utiliser mon DS-ID à la place</button>
+          <button type="button" class="ca-lien" id="ca-n-email" style="display:block;">Recevoir un code par e-mail</button>
+        </div>
+        <div id="ca-mode-dsid" style="display:none;">
           <label for="ca-dsid">Votre Code de Sécurité (DS-ID)</label>
           <input id="ca-dsid" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DS-ID de ce compte ou d'un compte lié">
           <div class="ca-aide">Vous le trouvez dans votre profil, section <strong>Confidentialité</strong>, sur l'appareil déjà connecté. Vous pouvez aussi saisir celui d'un de vos comptes liés.</div>
           <button type="button" class="ca-lien" id="ca-vers-email">Je n'ai pas mon DS-ID : m'envoyer un code par e-mail</button>
+          <button type="button" class="ca-lien" id="ca-d-notif" style="display:block;">Utiliser le code affiché sur mon appareil connecté</button>
         </div>
         <div id="ca-mode-email" style="display:none;">
           <label for="ca-code">Code à 6 chiffres reçu par e-mail</label>
@@ -61,6 +69,7 @@
           <div class="ca-ok" id="ca-email-info"></div>
           <button type="button" class="ca-lien" id="ca-renvoyer">Renvoyer le code</button>
           <button type="button" class="ca-lien" id="ca-vers-dsid" style="display:block;">Utiliser mon DS-ID à la place</button>
+          <button type="button" class="ca-lien" id="ca-e-notif" style="display:block;">Utiliser le code affiché sur mon appareil connecté</button>
         </div>
         <div class="ca-err" id="ca-err" role="alert" aria-live="assertive"></div>
         <div class="ca-actions">
@@ -70,14 +79,16 @@
       </div>`;
       document.body.appendChild(ov);
       const $ = (id) => ov.querySelector('#' + id);
-      let mode = 'dsid';
+      let mode = 'notif';
+      const CHAMP = { notif: 'ca-cn', dsid: 'ca-dsid', email: 'ca-code' };
       const err = (m) => { $('ca-err').textContent = m || ''; };
       const fermer = () => ov.remove();
       const basculer = (m) => {
         mode = m; err('');
+        $('ca-mode-notif').style.display = m === 'notif' ? '' : 'none';
         $('ca-mode-dsid').style.display = m === 'dsid' ? '' : 'none';
         $('ca-mode-email').style.display = m === 'email' ? '' : 'none';
-        (m === 'dsid' ? $('ca-dsid') : $('ca-code')).focus();
+        $(CHAMP[m]).focus();
       };
 
       async function envoyerCode() {
@@ -93,6 +104,10 @@
       }
 
       $('ca-vers-email').addEventListener('click', envoyerCode);
+      $('ca-n-email').addEventListener('click', envoyerCode);
+      $('ca-n-dsid').addEventListener('click', () => basculer('dsid'));
+      $('ca-d-notif').addEventListener('click', () => basculer('notif'));
+      $('ca-e-notif').addEventListener('click', () => basculer('notif'));
       $('ca-renvoyer').addEventListener('click', envoyerCode);
       $('ca-vers-dsid').addEventListener('click', () => basculer('dsid'));
       $('ca-annuler').addEventListener('click', () => { fermer(); reject(new Error('Connexion annulée.')); });
@@ -100,11 +115,11 @@
 
       $('ca-valider').addEventListener('click', async () => {
         err('');
-        const saisie = (mode === 'dsid' ? $('ca-dsid') : $('ca-code')).value.trim();
-        if (!saisie) { err(mode === 'dsid' ? 'Saisissez votre Code de Sécurité.' : 'Saisissez le code reçu par e-mail.'); return; }
+        const saisie = $(CHAMP[mode]).value.trim();
+        if (!saisie) { err(mode === 'notif' ? 'Saisissez le code à 3 chiffres affiché sur votre appareil connecté.' : mode === 'dsid' ? 'Saisissez votre Code de Sécurité.' : 'Saisissez le code reçu par e-mail.'); return; }
         const btn = $('ca-valider'); btn.disabled = true; btn.textContent = 'Vérification…';
         try {
-          await api('POST', '/auth/confirmer-appareil', mode === 'dsid' ? { defi: rep.defi, ds_id: saisie } : { defi: rep.defi, code: saisie });
+          await api('POST', '/auth/confirmer-appareil', mode === 'notif' ? { defi: rep.defi, code_notif: saisie } : mode === 'dsid' ? { defi: rep.defi, ds_id: saisie } : { defi: rep.defi, code: saisie });
           fermer(); resolve();
         } catch (e) {
           const d = e.data || {};
@@ -113,7 +128,7 @@
           btn.disabled = false; btn.textContent = 'Confirmer';
         }
       });
-      setTimeout(() => $('ca-dsid').focus(), 50);
+      setTimeout(() => $('ca-cn').focus(), 50);
     });
   }
 

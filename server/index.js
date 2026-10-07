@@ -217,8 +217,8 @@ async function evaluerNouvelAppareil(req, user, ip, { viaDsId = false } = {}) {
   try {
     const v = await ConfirmationAppareil.evaluer(db, {
       req, user, ip, creerDefi: !viaDsId,
-      notifier: (d) => creerNotif(user.id, "connexion_suspecte", "Connexion en attente de confirmation",
-        `Une connexion est en cours depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. Si ce n'est pas vous, bloquez-la depuis le bandeau « Mes connexions ».`,
+      notifier: (d) => creerNotif(user.id, "connexion_suspecte", `Code de connexion : ${ConfirmationAppareil.codeNotif(d.id)}`,
+        `Une connexion est en cours depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. Si c'est vous, saisissez le code ${ConfirmationAppareil.codeNotif(d.id)} sur cet appareil (valable 10 minutes). Si ce n'est pas vous, ne le communiquez à personne et bloquez la connexion depuis le bandeau « Mes connexions ».`,
         { lien: "parametres-compte.html" }),
     });
     if (v.bloque) {
@@ -2399,20 +2399,21 @@ route("POST", "/api/auth/confirmer-appareil", async (req, res, params, body) => 
   const c = await ConfirmationAppareil.charger(db, req, body && body.defi);
   if (c.erreur) return sendJSON(res, c.code, { error: c.erreur });
   const d = c.defi;
-  const dsId = body && body.ds_id, code = body && body.code;
-  if (!dsId && !code) return sendJSON(res, 400, { error: "Saisissez votre Code de Sécurité (DS-ID) ou le code reçu par e-mail." });
-  const ok = dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
+  const dsId = body && body.ds_id, code = body && body.code, codeNotif = body && body.code_notif;
+  if (!dsId && !code && !codeNotif) return sendJSON(res, 400, { error: "Saisissez le code affiché sur votre appareil connecté, votre Code de Sécurité (DS-ID) ou le code reçu par e-mail." });
+  const via = codeNotif ? "notification" : dsId ? "ds_id" : "email";
+  const ok = codeNotif ? ConfirmationAppareil.codeNotifValide(d, codeNotif) : dsId ? await ConfirmationAppareil.dsIdValide(db, d.user_id, dsId) : ConfirmationAppareil.codeEmailValide(d, code);
   if (!ok) {
-    const r = await ConfirmationAppareil.compterEchec(db, d);
+    const r = await ConfirmationAppareil.compterEchec(db, d, codeNotif ? ConfirmationAppareil.MAX_ESSAIS_CODE_NOTIF : undefined);
     SEC.logSecurity("confirmation_appareil_echec", { ip, uid: Number(d.user_id), restants: r.restants });
     if (r.bloque) {
       try { await creerNotif(d.user_id, "connexion_suspecte", "Tentatives de connexion bloquées", `Plusieurs codes incorrects ont été saisis pour ouvrir votre compte depuis ${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""}. La connexion a été bloquée.`, { lien: "parametres-compte.html" }); } catch (_) {}
       return sendJSON(res, 429, { error: "Trop d'essais : cette connexion est bloquée pendant 15 minutes.", bloque: true });
     }
-    return sendJSON(res, 401, { error: dsId ? "Code de Sécurité incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
+    return sendJSON(res, 401, { error: dsId && !codeNotif ? "Code de Sécurité incorrect." : "Code incorrect ou expiré.", essais_restants: r.restants });
   }
-  await ConfirmationAppareil.valider(db, d, dsId ? "ds_id" : "email");
-  SEC.logSecurity("confirmation_appareil_ok", { ip, uid: Number(d.user_id), via: dsId ? "ds_id" : "email" });
+  await ConfirmationAppareil.valider(db, d, via);
+  SEC.logSecurity("confirmation_appareil_ok", { ip, uid: Number(d.user_id), via });
   try { await creerNotif(d.user_id, "appareil_confirme", "Nouvel appareil autorisé", `${Connexions.etiquette(d)}${d.ville ? " (" + d.ville + ")" : ""} a été autorisé à ouvrir votre compte. Ce n'est pas vous ? Déconnectez-le depuis « Mes connexions » et changez votre mot de passe.`, { lien: "parametres-compte.html" }); } catch (_) {}
   sendJSON(res, 200, { ok: true });
 });
