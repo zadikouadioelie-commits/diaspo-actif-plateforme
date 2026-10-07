@@ -63,11 +63,6 @@
            PROPRES formations, réservé Premium) — ceci est le catalogue pour en ACHETER. -->
       <a href="formations.html" data-aide="formations">🎓 Catalogue Formations</a>
 
-      <!-- Ajouté (2026-09-09), restriction bêta levée (2026-09-20) : module "Formulaires &
-           Inscriptions Événementielles", accessible à tout compte Initiative (voir
-           inscBetaAutorise() côté serveur). Pas un module Premium (aucun rapport avec
-           l'abonnement), donc placé hors du groupe ⭐ MODULES PREMIUM. -->
-      <a href="inscriptions-admin.html" id="sb-inscriptions-evt" data-aide="formulaires_inscription">📝 Formulaires &amp; Inscriptions</a>
 
       <div class="sb-group-lbl">⭐ MODULES PREMIUM</div>
       <a href="#crm" data-section="crm" data-aide="crm">🤝 CRM</a>
@@ -75,6 +70,10 @@
       <a href="#formations-gestion" data-section="formations-gestion" id="sb-formations-gestion" data-aide="diaspo_formation" style="display:none;">🎓 Diaspo Formation <span class="pill" id="formations-badge" style="display:none;"></span></a>
       <a href="#publicites-init" data-section="publicites-init" data-aide="publicites">📣 Publicités <span class="pill" id="init-pub-badge" style="display:none;"></span></a>
       <a href="#evenements" data-section="evenements" data-aide="evenements">📅 Mes événements</a>
+      <!-- Module « Formulaires de réponse et d'inscription » (2026-10-07, demande explicite : « accessible en Premium et en doré »).
+           Présenté comme module Premium (doré) mais jamais verrouillé : l'accès reste ouvert à tout compte
+           Initiative (voir inscBetaAutorise() côté serveur) — entrée badgeOnly dans SIDEBAR_PREMIUM_LINKS_TOUS. -->
+      <a href="inscriptions-admin.html" id="sb-inscriptions-evt" data-aide="formulaires_inscription">📝 Formulaires de réponse et d'inscription</a>
       <a href="business-plan.html" data-aide="business_plans">📋 Business Plans</a>
       <a href="#adhesions-init" data-section="adhesions-init" data-aide="cotisations_adhesions">🎫 Cotisations &amp; Adhésions</a>
       <a href="#votes-init" data-section="votes-init" data-aide="votes_securises">🗳️ Votes sécurisés</a>
@@ -10064,6 +10063,7 @@ async function initPremiumGates() {
     /* Recensement : création réellement réservée aux Initiatives Abonné côté serveur
        (hasAccreditation('initiative_abonne'), server/index.js ~39192) — verrouillage réel. */
     { href: 'recensement.html', context: 'recensement', intercept: true },
+    { href: 'inscriptions-admin.html', context: 'formulaires_inscription', badgeOnly: true },
   ];
   /* Modules dorés spécifiques à certains types — absents (ni socle, ni premium, ni expansion)
      pour les types non listés ici, donc masqués plutôt que simplement laissés non dorés. */

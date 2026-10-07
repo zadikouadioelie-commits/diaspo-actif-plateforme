@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" href="/assets/logo.png">
-<title>Formulaires & Inscriptions — Diaspo'Actif</title>
+<title>Formulaires de réponse et d'inscription — Diaspo'Actif</title>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Diaspo'Actif">
-<meta property="og:title" content="Formulaires &amp; Inscriptions — Diaspo'Actif">
+<meta property="og:title" content="Formulaires de réponse et d'inscription — Diaspo'Actif">
 <meta property="og:description" content="La plateforme mondiale de la diaspora engagée — actions locales, impact global.">
 <meta property="og:image" content="https://diaspoactif.com/assets/og-image.png">
 <meta property="og:url" content="https://diaspoactif.com/inscriptions-admin.html">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Formulaires &amp; Inscriptions — Diaspo'Actif">
+<meta name="twitter:title" content="Formulaires de réponse et d'inscription — Diaspo'Actif">
 <meta name="twitter:description" content="La plateforme mondiale de la diaspora engagée — actions locales, impact global.">
 <meta name="twitter:image" content="https://diaspoactif.com/assets/og-image.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -90,7 +90,7 @@
   <div class="brand">Diaspo'Actif</div>
   <a href="index.html">🏠 Accueil</a>
   <a href="dashboard-initiative.html">📊 Mon tableau de bord</a>
-  <a href="inscriptions-admin.html">📝 Formulaires & Inscriptions</a>
+  <a href="inscriptions-admin.html">📝 Formulaires de réponse et d'inscription</a>
   <!-- Cette page a son propre tiroir minimal (3 liens), pas le menu complet des modules
        (~30, celui de dashboard-initiative.html) -- même convention que profil-app.html et les
        autres pages sans tiroir riche (voir assets/app.js, commentaire sur #da-menu) : navigue
@@ -1167,9 +1167,9 @@ function renderListView() {
 
   return `
     <div style="max-width:1180px;margin:0 auto;padding:40px 28px;">
-      <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:8px;">Événements &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30);font-weight:500;">Formulaires &amp; Inscriptions</span></div>
+      <div style="font-size:12px;color:oklch(0.55 0.006 30);margin-bottom:8px;">Événements &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30);font-weight:500;">Formulaires de réponse et d'inscription</span></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:14px;">
-        <h1 style="margin:0;font-size:24px;font-weight:700;">Formulaires &amp; Inscriptions</h1>
+        <h1 style="margin:0;font-size:24px;font-weight:700;">Formulaires de réponse et d'inscription</h1>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;" data-action="ouvrirDefautsPartenairesSponsors" title="Repris automatiquement sur chaque nouvelle fiche d'inscription">⚙️ Partenaires &amp; sponsors par défaut</button>
           <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 20px;border-radius:8px;cursor:pointer;" data-action="createFiche">+ Créer une fiche d'inscription</button>
@@ -1218,7 +1218,7 @@ function renderDetailView() {
   const header = `
     <header style="background:#fff; border-bottom:1px solid oklch(0.9 0.004 30); padding:16px 28px;">
       <button data-action="backToList" style="background:none; border:none; color:oklch(0.32 0.09 258); font-size:13px; font-weight:600; cursor:pointer; padding:0; margin-bottom:8px; display:inline-flex; align-items:center; gap:4px;">← Retour</button>
-      <div style="font-size:12px; color:oklch(0.55 0.006 30); margin-bottom:8px;"><a href="javascript:void(0)" data-action="backToList">Formulaires &amp; Inscriptions</a> &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30); font-weight:500;">${escH(fiche.nom)}</span></div>
+      <div style="font-size:12px; color:oklch(0.55 0.006 30); margin-bottom:8px;"><a href="javascript:void(0)" data-action="backToList">Formulaires de réponse et d'inscription</a> &nbsp;›&nbsp; <span style="color:oklch(0.2 0.006 30); font-weight:500;">${escH(fiche.nom)}</span></div>
       <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <h1 style="margin:0; font-size:22px; font-weight:700;">${escH(fiche.nom)}</h1>

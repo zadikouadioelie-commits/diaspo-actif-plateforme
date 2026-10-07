@@ -46,7 +46,7 @@
     // route par entrée de MODULES, donc tout nouveau module futur n'a besoin que d'une seule
     // ligne ici, jamais d'un intent dédié à écrire à la main.
     parrainage:      { label: 'Parrainage & Invitations', url: '/parrainage.html',    icon: '🤝' },
-    inscriptions:    { label: 'Formulaires & Inscriptions', url: '/inscriptions-admin.html', icon: '📝' },
+    inscriptions:    { label: 'Formulaires de réponse et d\'inscription', url: '/inscriptions-admin.html', icon: '📝' },
   };
 
   // Raccourci pour construire un pattern "open" multi-verbes
