@@ -1175,8 +1175,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <div class="modal-box" style="max-width:560px;">
           <h3 style="margin:0 0 6px;">📝 Modèles de texte</h3>
           <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">Laissez vide pour garder le texte par défaut. Insérez ces variables où vous voulez, elles seront remplacées automatiquement : <code>{prenom}</code> <code>{nom}</code> <code>{formule}</code> <code>{initiative}</code></p>
-          <label style="font-size:12.5px;font-weight:700;">Message de relance <span style="font-weight:400;color:var(--muted);">— variables en plus : <code>{delai}</code> <code>{lien}</code></span></label>
-          <textarea id="adh-modele-relance" class="input" style="width:100%;box-sizing:border-box;min-height:70px;margin:4px 0 14px;font-family:inherit;" placeholder="Votre adhésion « {formule} » ({initiative}) {delai}."></textarea>
+          <label style="font-size:12.5px;font-weight:700;">Message de relance <span style="font-weight:400;color:var(--muted);">— variable en plus : <code>{delai}</code></span></label>
+          <textarea id="adh-modele-relance" class="input" style="width:100%;box-sizing:border-box;min-height:70px;margin:4px 0 6px;font-family:inherit;" placeholder="Votre adhésion « {formule} » ({initiative}) {delai}."></textarea>
+          <div style="font-size:12px;color:#1E40AF;background:#EFF6FF;border-radius:8px;padding:8px 10px;margin:0 0 14px;line-height:1.5;">🔗 Le <b>lien pour renouveler l'adhésion</b> est ajouté <b>automatiquement</b> à la fin de l'e-mail et de la notification : inutile de l'écrire. Pour le placer ailleurs dans votre texte, utilisez <code>{lien}</code> (il ne sera alors pas répété).</div>
+          <label style="font-size:12.5px;font-weight:700;">Autres liens pour régler l'adhésion <span style="font-weight:400;color:var(--muted);">— facultatif</span></label>
+          <textarea id="adh-liens-relance" class="input" rows="3" style="width:100%;box-sizing:border-box;margin:4px 0 4px;font-family:inherit;" placeholder="Collez ici vos liens, un par ligne (3 au maximum)&#10;https://…"></textarea>
+          <div style="font-size:11.5px;color:var(--muted);margin:0 0 14px;">Si votre association encaisse autrement (autre plateforme de paiement, virement…), ces liens sont ajoutés après le lien de renouvellement, dans l'e-mail et la notification.</div>
           <label style="font-size:12.5px;font-weight:700;">E-mail de reçu de paiement <span style="font-weight:400;color:var(--muted);">— variables en plus : <code>{montant}</code> <code>{devise}</code> <code>{numero_recu}</code></span></label>
           <textarea id="adh-modele-recu" class="input" style="width:100%;box-sizing:border-box;min-height:90px;margin:4px 0 14px;font-family:inherit;" placeholder="Bonjour {prenom}, votre paiement de {montant} {devise} pour « {formule} » a bien été reçu. Reçu {numero_recu}."></textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
@@ -7490,18 +7494,23 @@ async function adhOuvrirModelesConfig(){
     const data = r.initiative || r;
     document.getElementById('adh-modele-relance').value = data.adhesion_modele_relance || '';
     document.getElementById('adh-modele-recu').value = data.adhesion_modele_recu || '';
+    let liens = []; try { liens = JSON.parse(data.adhesion_liens_relance || '[]'); } catch (e) {}
+    document.getElementById('adh-liens-relance').value = (Array.isArray(liens) ? liens : []).join('\n');
   } catch(e){ /* modal s'ouvre quand même, champs vides */ }
   document.getElementById('modal-adh-modeles').style.display = 'flex';
 }
 async function adhEnregistrerModelesConfig(){
   const initId = window.__vitrineInitId;
   try{
-    await api('PUT', `/initiatives/${initId}/adhesion-modeles`, {
+    const brut = document.getElementById('adh-liens-relance').value.split(/[\s,;]+/).filter(Boolean);
+    const r = await api('PUT', `/initiatives/${initId}/adhesion-modeles`, {
       modele_relance: document.getElementById('adh-modele-relance').value,
       modele_recu: document.getElementById('adh-modele-recu').value,
+      liens_relance: brut,
     });
     document.getElementById('modal-adh-modeles').style.display = 'none';
-    showToast?.('✅ Modèles de texte enregistrés.');
+    const gardes = (r.liens_relance || []).length;
+    showToast?.(brut.length && gardes < brut.length ? `✅ Modèles enregistrés — ${gardes} lien(s) retenu(s) sur ${brut.length} (adresses http(s) valides, 3 au maximum).` : '✅ Modèles de texte enregistrés.');
   } catch(e){ showToast?.('Erreur : ' + e.message, 'danger'); }
 }
 

@@ -335,7 +335,7 @@ const CHAMPS_INITIATIVE_PRIVES = [
   'tel_responsable', 'tel_responsable_2', 'tel_responsable_3', 'email_responsable', 'genre_responsable',
   'numero_fiscal', 'stripe_identity_session_id', 'comment_entendu', 'attentes', 'autorisation_temoignage',
   'signalements_confirmes', 'vitrine_draft_json', 'adhesion_relances_jours', 'adhesion_modele_relance',
-  'adhesion_modele_recu', 'relance_avancement_mensuelle_le', 'liste_membres_generale_id',
+  'adhesion_modele_recu', 'adhesion_liens_relance', 'relance_avancement_mensuelle_le', 'liste_membres_generale_id',
 ];
 function assainirInitiativePublique(row, moi) {
   if (!row) return row;
@@ -5654,6 +5654,26 @@ function calculerDateExpirationAdhesion(formule, months) {
    (pas d'écran de diff technique prévu, juste un historique consultable). */
 /* Paramètres avancés (tâche #75) : substitue {placeholder} dans un modèle personnalisé.
    Les valeurs manquantes deviennent une chaîne vide plutôt que de casser le message. */
+/* Relance d'adhésion (2026-10-07, demande explicite) : le lien pour RENOUVELER part TOUJOURS avec le message, sans que l'association ait à écrire
+   {lien} dans son modèle ; elle peut en plus coller jusqu'à 3 liens de paiement à elle (autre plateforme, virement…). Si son modèle contient déjà
+   {lien}, le lien n'est pas répété (il devient cliquable dans le texte). Renvoie le texte (notification) et le HTML (e-mail). */
+function composerRelanceAdhesion({ message, prenom, lienRenouvellement, autresLiens, modeleContientLien }) {
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const autres = (Array.isArray(autresLiens) ? autresLiens : []).filter(l => /^https?:\/\//i.test(String(l)));
+  let texte = message;
+  if (!modeleContientLien) texte += ` Renouvelez ici : ${lienRenouvellement}`;
+  if (autres.length) texte += ` ${autres.length > 1 ? 'Autres moyens de régler' : 'Autre moyen de régler'} votre adhésion : ${autres.join(' · ')}`;
+  let messageHtml = esc(message).replace(/\n/g, '<br>');
+  if (modeleContientLien) messageHtml = messageHtml.split(esc(lienRenouvellement)).join(`<a href="${esc(lienRenouvellement)}" style="color:#2563EB;font-weight:700;">${esc(lienRenouvellement)}</a>`);
+  const bouton = `<p style="margin:18px 0;"><a href="${esc(lienRenouvellement)}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;padding:13px 26px;border-radius:10px;">Renouveler mon adhésion</a></p>`;
+  const html = `<p>Bonjour ${esc(prenom || '')},</p><p>${messageHtml}</p>`
+    + (modeleContientLien ? '' : bouton)
+    + (autres.length
+      ? `<p style="margin:16px 0 6px;color:#475569;">Vous préférez régler autrement ? ${autres.length > 1 ? 'Utilisez l’un de ces liens :' : 'Utilisez ce lien :'}</p>`
+        + autres.map(l => `<p style="margin:4px 0;"><a href="${esc(l)}" style="color:#2563EB;word-break:break-all;">${esc(l)}</a></p>`).join('')
+      : '');
+  return { texte, html };
+}
 function remplacerPlaceholders(template, vars) {
   return String(template).replace(/\{(\w+)\}/g, (_, cle) => (vars[cle] != null ? String(vars[cle]) : ''));
 }
@@ -6147,7 +6167,16 @@ route("PUT", "/api/initiatives/:id/adhesion-modeles", async (req, res, params, b
   const modeleRecu = body?.modele_recu != null ? String(body.modele_recu).slice(0, 2000).trim() : '';
   await db.prepare("UPDATE initiatives SET adhesion_modele_relance=?, adhesion_modele_recu=? WHERE id=?")
     .run(modeleRelance || null, modeleRecu || null, params.id);
-  sendJSON(res, 200, { ok: true });
+  /* Liens de paiement supplémentaires (2026-10-07) : jusqu'à 3 adresses http(s), collées une par ligne ; envoyées avec chaque relance. Écriture à part :
+     colonne absente tant que « Réparer la base » n'a pas été lancé, le reste de l'enregistrement n'est jamais bloqué. */
+  let liensEnregistres;
+  if (body?.liens_relance !== undefined) {
+    const brut = Array.isArray(body.liens_relance) ? body.liens_relance : String(body.liens_relance || '').split(/[\s,;]+/);
+    liensEnregistres = [...new Set(brut.map(l => String(l).trim()).filter(l => /^https?:\/\/[^\s<>"']{4,480}$/i.test(l)))].slice(0, 3);
+    try { await db.prepare("UPDATE initiatives SET adhesion_liens_relance=? WHERE id=?").run(liensEnregistres.length ? JSON.stringify(liensEnregistres) : null, params.id); }
+    catch (e) { logError(e, 'adhesion-liens-relance'); }
+  }
+  sendJSON(res, 200, { ok: true, liens_relance: liensEnregistres });
 });
 
 /* Adhésion officielle de l'association (2026-09-28, demande explicite, capture à l'appui) :
@@ -29933,6 +29962,9 @@ async function handleRequest(req, res) {
         LEFT JOIN users u ON u.id = m.linked_user_id
         WHERE m.date_expiration IS NOT NULL AND m.statut NOT IN ('suspendu','radie')
       `).all();
+      /* Liens de paiement supplémentaires de chaque association — lecture à part pour qu'une colonne absente ne bloque jamais les relances. */
+      const liensParInit = {};
+      try { (await db.prepare("SELECT id, adhesion_liens_relance AS l FROM initiatives WHERE adhesion_liens_relance IS NOT NULL").all()).forEach(r => { try { liensParInit[r.id] = JSON.parse(r.l); } catch (_) {} }); } catch (_) {}
 
       let envoyees = 0;
       for (const m of membres) {
@@ -29962,7 +29994,7 @@ async function handleRequest(req, res) {
           : joursRestants === 0
           ? `expire aujourd'hui`
           : `est expirée depuis ${-joursRestants} jour${-joursRestants > 1 ? 's' : ''}`;
-        const lienRenouvellement = `${process.env.PUBLIC_ORIGIN || 'https://diaspo-actif-plateforme.vercel.app'}/adhesions.html?initiative=${m.initiative_id}&formule=${m.formule_id}`;
+        const lienRenouvellement = `${process.env.PUBLIC_ORIGIN || 'https://diaspoactif.com'}/adhesions.html?initiative=${m.initiative_id}&formule=${m.formule_id}`;
         /* Paramètres avancés (tâche #75) : modèle personnalisable, ou phrase par défaut sinon. */
         const message = m.modele_relance
           ? remplacerPlaceholders(m.modele_relance, {
@@ -29971,21 +30003,22 @@ async function handleRequest(req, res) {
             })
           : `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) ${delaiTexte}${joursRestants < 0 ? '. Renouvelez-la dès maintenant.' : '.'}`;
 
+        const { texte: texteRelance, html: htmlRelance } = composerRelanceAdhesion({ message, prenom: m.prenom, lienRenouvellement, autresLiens: liensParInit[m.initiative_id], modeleContientLien: !!(m.modele_relance && /\{lien\}/.test(m.modele_relance)) });
         await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
-          .run(m.id, niveau, 'app', message);
+          .run(m.id, niveau, 'app', texteRelance);
 
         if (m.linked_user_id) {
-          creerNotif(m.linked_user_id, "adhesion_relance", "Rappel d'adhésion", message, { membre_id: m.id, lien: lienRenouvellement });
+          creerNotif(m.linked_user_id, "adhesion_relance", "Rappel d'adhésion", texteRelance, { membre_id: m.id, lien: lienRenouvellement });
         }
         if (m.user_email || m.email) {
           try {
             await sendEmail({
               to: m.user_email || m.email,
               subject: `Rappel — ${message}`,
-              html: `<p>Bonjour ${m.prenom || ''},</p><p>${message}</p><p><a href="${lienRenouvellement}">Renouveler maintenant en un clic</a></p>`,
+              html: htmlRelance,
             });
             await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
-              .run(m.id, niveau, 'email', message);
+              .run(m.id, niveau, 'email', texteRelance);
           } catch (e) { /* email indisponible (RESEND_API_KEY absent en local) — la relance app reste enregistrée */ }
         }
         envoyees++;
