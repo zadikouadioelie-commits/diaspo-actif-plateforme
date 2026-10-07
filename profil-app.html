@@ -3173,7 +3173,7 @@ async function renderVitrineVisitor(init) {
   </section>` : '';
 
   const produitsSec = ((articlesNonClasses.length || isOwn) && modOn('produits')) ? `<section id="pv-produits" class="pvt-section">
-    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;"><h3>Articles non classés</h3>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un article (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div>
+    <div class="pvt-section-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><h3>Articles non classés</h3><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span id="pvt-prod-more-slot"></span>${isOwn?`<button onclick="openProductModal()" ${produits.length>=MAX_PRODUITS_VITRINE?'disabled':''} style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">➕ Ajouter un article (${produits.length}/${MAX_PRODUITS_VITRINE})</button>`:''}</div></div>
     <div class="pvt-section-body"><div class="pvt-prodgrid" id="pvt-prodgrid">${!articlesNonClasses.length?`<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.${isOwn?' Ajoutez un article et rangez-le dans un catalogue depuis « Modifier ».':''}</div>`:''}</div></div>
   </section>` : '';
 
@@ -4813,25 +4813,34 @@ function pvtToggleDescription(btn) {
    révélé est mémorisé sur la grille elle-même (dataset), donc un rechargement ultérieur de la
    même grille (ajout/suppression d'un article) ne fait pas retomber l'affichage à 3 si le
    propriétaire avait déjà cliqué "Voir plus". */
-function pvtRenderProduitsPage(grid, items, ownerId, pageSize) {
+/* Nombre de colonnes réellement affichées par la grille (auto-fill) : un lot = une ligne COMPLÈTE,
+   pour qu'il n'y ait jamais de case vide à droite des cartes (demande du 2026-10-07 : « il ne doit pas
+   y avoir un vide là, mais le maximum de produits en affiche »). Repli sur 3 si la grille est masquée. */
+function pvtColonnes(grid) {
+  const n = (getComputedStyle(grid).gridTemplateColumns || '').split(' ').filter(v => /px|fr|%/.test(v)).length;
+  return n >= 2 ? n : 3;
+}
+function pvtRenderProduitsPage(grid, items, ownerId, pageSize, slot) {
   const shown = Math.min(Number(grid.dataset.pvtShown) || pageSize, items.length);
   grid.dataset.pvtShown = shown;
   grid.innerHTML = items.slice(0, shown).map(p => pvtProductCardHtml(p, ownerId)).join('');
-  let btn = grid.nextElementSibling;
-  if (!btn || !btn.classList || !btn.classList.contains('pvt-voir-plus')) btn = null;
+  /* Le bouton vit dans l'emplacement d'en-tête (même ligne que le titre de la section) quand il est
+     fourni, sinon sous la grille comme avant. */
+  const cherche = () => slot ? slot.querySelector('.pvt-voir-plus')
+    : (grid.nextElementSibling && grid.nextElementSibling.classList && grid.nextElementSibling.classList.contains('pvt-voir-plus') ? grid.nextElementSibling : null);
+  let btn = cherche();
   if (shown < items.length) {
     if (!btn) {
       btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'pvt-btn soft pvt-voir-plus';
-      btn.style.cssText = 'margin-top:12px;';
-      grid.insertAdjacentElement('afterend', btn);
+      btn.className = 'pvt-btn pvt-voir-plus';
+      if (slot) { btn.style.cssText = 'background:#2E74E0;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;'; slot.appendChild(btn); }
+      else { btn.classList.add('soft'); btn.style.cssText = 'margin-top:12px;'; grid.insertAdjacentElement('afterend', btn); }
     }
-    const reste = items.length - shown;
-    btn.textContent = `Voir plus (${reste} article${reste > 1 ? 's' : ''})`;
+    btn.textContent = slot ? "Voir plus d'articles" : `Voir plus (${items.length - shown} article${items.length - shown > 1 ? 's' : ''})`;
     btn.onclick = () => {
       grid.dataset.pvtShown = shown + pageSize;
-      pvtRenderProduitsPage(grid, items, ownerId, pageSize);
+      pvtRenderProduitsPage(grid, items, ownerId, pageSize, slot);
       if (isOwn) wireProductDrag(grid, _vitrineInit.id, null);
     };
   } else if (btn) {
@@ -4846,12 +4855,23 @@ function renderPvtProducts(produits, ownerId) {
   const visibles = isOwn ? produits : produits.filter(p => (p.statut||'disponible') !== 'masque');
   if (!visibles.length) {
     grid.innerHTML = `<div class="pvz-empty" style="grid-column:1/-1;">Aucun article non classé.</div>`;
-    const btn = grid.nextElementSibling;
-    if (btn && btn.classList && btn.classList.contains('pvt-voir-plus')) btn.remove();
+    const slotVide = document.getElementById('pvt-prod-more-slot');
+    const btn = slotVide && slotVide.querySelector('.pvt-voir-plus');
+    if (btn) btn.remove();
     return;
   }
-  pvtRenderProduitsPage(grid, visibles, ownerId, 3);
+  const slot = document.getElementById('pvt-prod-more-slot');
+  const colonnes = pvtColonnes(grid);
+  /* Si la largeur de la fenêtre change le nombre de colonnes, on repart d'une ligne complète. */
+  if (grid.dataset.pvtCols && Number(grid.dataset.pvtCols) !== colonnes) delete grid.dataset.pvtShown;
+  grid.dataset.pvtCols = colonnes;
+  pvtRenderProduitsPage(grid, visibles, ownerId, colonnes, slot);
   if (isOwn) wireProductDrag(grid, _vitrineInit.id, null);
+  if (!grid._pvtResize) {
+    let t = null;
+    grid._pvtResize = () => { clearTimeout(t); t = setTimeout(() => { if (document.body.contains(grid) && pvtColonnes(grid) !== Number(grid.dataset.pvtCols)) renderPvtProducts(produits, ownerId); }, 200); };
+    window.addEventListener('resize', grid._pvtResize);
+  }
 }
 
 /* Changer le thème de la vitrine (propriétaire uniquement — persistance) */
