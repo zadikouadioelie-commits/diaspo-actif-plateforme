@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="/assets/ui-enhancements.v2.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/compte-rendu.css?v=15">
+<link rel="stylesheet" href="assets/compte-rendu.css?v=19">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#ff6b00">
 <style>
@@ -528,7 +528,7 @@ function graphiquesHtml(cr) {
   if (profils.length) kpis.push([profils.length, profils.length > 1 ? 'personnes et organisations mises en lumière' : 'personne ou organisation mise en lumière']);
   if (comms.length) kpis.push([comms.length, comms.length > 1 ? 'communautés représentées' : 'communauté représentée']);
   kpis.push([Math.max(1, Math.round(total / 220)) + ' min', 'de lecture (' + total + ' mots)']);
-  let h = '<h2 id="cr-coup">En un coup d’œil</h2><div class="cr2-kpis">' + kpis.map(k => '<div class="cr2-kpi"><div class="n">' + esc(k[0]) + '</div><div class="l">' + esc(k[1]) + '</div></div>').join('') + '</div>';
+  let h = '<h2 id="cr-coup">En un coup d’œil</h2><div class="cr2-kpis">' + kpis.map(k => '<div class="cr2-kpi"><div class="n">' + esc(k[0]) + '</div><div class="l">' + esc(k[1]) + '</div></div>').join('') + '</div><div class="cr2-graphs">';
   if (cats.length) {
     const max = Math.max(...cats.map(c => c[1].length));
     h += '<div class="cr2-graph"><h4>Qui a été mis en lumière</h4><p class="src">Personnes et organisations citées, par catégorie.</p>' + cats.map(([k, noms]) =>
@@ -542,11 +542,12 @@ function graphiquesHtml(cr) {
       + comms.map(([k, noms], i) => '<li><span class="pt" style="background:' + COULEURS_GRAPH[i % COULEURS_GRAPH.length] + '"></span><span><b>' + esc(k) + '</b> · ' + noms.length + '<br><small>' + noms.map(nomLien).join(' · ') + '</small></span></li>').join('') + '</ul></div></div>';
   }
   if (parties.length >= 2) {
-    const mx = Math.max(...mots);
-    h += '<div class="cr2-graph"><h4>Le récit en un clin d’œil</h4><p class="src">Longueur de chaque partie, calculée automatiquement à partir du texte.</p>' + parties.map((d, i) =>
-      '<div class="cr2-bm"><span class="cr2-bm-t">' + svgIc(iconeDe(d), 'cr2-ic xs') + esc(d.titre || 'Texte') + '</span><span class="cr2-piste"><span class="cr2-barre" style="width:' + Math.round(mots[i] / mx * 100) + '%"></span></span><span class="cr2-bm-n">' + mots[i] + ' mots</span></div>').join('') + '</div>';
+    /* Au plus 8 barres (les parties les plus développées) : au-delà, le graphique rallongeait la page sans rien apprendre de plus. */
+    const mx = Math.max(...mots), plus = parties.map((d, i) => ({ d, n: mots[i] })).sort((a, b) => b.n - a.n).slice(0, 8);
+    h += '<div class="cr2-graph"><h4>' + (parties.length > 8 ? 'Les parties les plus développées' : 'Le récit en un clin d’œil') + '</h4><p class="src">' + (parties.length > 8 ? 'Les 8 parties les plus longues (en mots), calculées automatiquement.' : 'Longueur de chaque partie, calculée automatiquement à partir du texte.') + '</p>' + plus.map(({ d, n }) =>
+      '<div class="cr2-bm"><span class="cr2-bm-t">' + svgIc(iconeDe(d), 'cr2-ic xs') + esc(d.titre || 'Texte') + '</span><span class="cr2-piste"><span class="cr2-barre" style="width:' + Math.round(n / mx * 100) + '%"></span></span><span class="cr2-bm-n">' + n + ' mots</span></div>').join('') + '</div>';
   }
-  return h;
+  return h + '</div>';
 }
 
 const logoOrga = (cr, ev) => (cr && cr.logo_url) || (ev && ev.organisateur_officiel ? 'assets/logo.png' : '');
@@ -561,12 +562,17 @@ function partenairesHtml(cr, ev) {
     + '</section>';
 }
 
+/* Le récit détaillé en cartes sur plusieurs colonnes, avec aperçu et « Lire la suite » (2026-10-07) : moins de défilement. */
 function detailHtml(cr) {
   const l = partiesDe(cr);
   if (!l.length) return '';
   const libre = cr.type_cr === 'blanc';
-  return '<h2>Pour aller plus loin : le retour d\'expérience détaillé</h2>' + l.map((d, i) => '<section class="cr2-bloc" id="cr-p' + (i + 1) + '">'
-    + (libre ? '' : '<h3><span class="cr2-bulle">' + svgIc(iconeDe(d)) + '</span><span>' + esc(d.titre) + '</span></h3>') + corpsHtml(d.texte) + '</section>').join('');
+  return '<section class="cr2-recit" id="cr-recit"><div class="cr2-recit-head"><h2>Le récit détaillé</h2>'
+    + (libre ? '' : '<div class="cr2-recit-tools"><button type="button" class="cr-btn out" data-recit="ouvrir">Tout déplier</button><button type="button" class="cr-btn out" data-recit="fermer">Tout replier</button></div>') + '</div>'
+    + '<div class="cr2-cards' + (libre ? ' libre' : '') + '">' + l.map((d, i) => '<article class="cr2-card' + (libre ? ' open' : '') + '" id="cr-p' + (i + 1) + '">'
+      + (libre ? '' : '<h3 class="cr2-card-t"><span class="cr2-bulle">' + svgIc(iconeDe(d)) + '</span><span>' + esc(d.titre) + '</span></h3>')
+      + '<div class="cr2-card-b">' + corpsHtml(d.texte) + '</div>'
+      + (libre ? '' : '<button type="button" class="cr2-card-more" data-more hidden aria-expanded="false">Lire la suite ▾</button>') + '</article>').join('') + '</div></section>';
 }
 
 function etapeHtml(cr) {
@@ -662,41 +668,50 @@ function vuePublique() {
   root.classList.add('crp-wide');
   const brouillon = cr.statut !== 'publie';
   const parties = partiesDe(cr), graph = graphiquesHtml(cr), parts = partenairesHtml(cr, ev), logo = logoOrga(cr, ev);
-  /* Sommaire : [ancre, illustration, libellé], dans l'ordre de la page. */
-  const items = [['cr-resume', 'star', 'Résumé', 'L’essentiel']];
-  if (graph) items.push(['cr-coup', 'compass', 'En un coup d’œil', 'L’essentiel']);
-  if (cr.type_cr !== 'blanc') parties.forEach((p, i) => items.push(['cr-p' + (i + 1), iconeDe(p), p.titre || 'Texte', 'Le récit détaillé']));
-  if ((cr.forts || []).length) items.push(['cr-forts', 'star', 'Les temps forts', 'En bref']);
-  if (parts) items.push(['cr-partenaires', 'people', (cr.partenaires || []).length ? 'Organisation et partenaires' : 'Organisateur', 'En bref']);
-  const btnToc = it => '<button type="button" class="cr2-toc-i" data-t="' + it[0] + '">' + svgIc(it[1], 'cr2-ic xs') + '<span>' + esc(it[2]) + '</span></button>';
-  const toc = items.map(btnToc).join('');
-  /* Sommaire de bureau : trois groupes avec un titre (sur mobile, la barre horizontale reste sans titres). */
-  const tocGroupe = items.map((it, i) => (i === 0 || items[i - 1][3] !== it[3] ? '<div class="cr2-toc-g">' + esc(it[3]) + '</div>' : '') + btnToc(it)).join('');
-  const type = typeLibelle(cr);
+  const actions = ctaHtml(cr), forts = cr.forts || [], type = typeLibelle(cr);
+  const recitOk = cr.type_cr !== 'blanc' && parties.length > 0;
+  /* Barre de navigation fixe (2026-10-07, demande explicite : tout à portée de souris sans trop défiler) : les grandes
+     sections, un menu « Le récit » qui liste les parties, « Agir » et « Synthèse » toujours visibles. */
+  const bouton = (id, libelle) => '<button type="button" class="cr2-nav-i" data-t="' + id + '">' + esc(libelle) + '</button>';
+  const menuRecit = recitOk
+    ? '<button type="button" class="cr2-nav-i" id="cr-nav-recit" data-t="cr-recit" data-menu aria-haspopup="true" aria-expanded="false" aria-controls="cr-nav-pop">📖 Le récit ▾</button>' : '';
+  const popRecit = recitOk
+    ? '<div class="cr2-nav-pop" id="cr-nav-pop" hidden><button type="button" class="cr2-nav-pop-all" data-t="cr-recit">📖 Voir tout le récit</button><div class="cr2-nav-pop-l">'
+      + parties.map((p, i) => '<button type="button" data-part="cr-p' + (i + 1) + '">' + svgIc(iconeDe(p), 'cr2-ic xs') + '<span>' + esc(p.titre || 'Texte') + '</span></button>').join('') + '</div></div>' : '';
+  const nav = '<nav class="cr2-nav" id="cr-nav" aria-label="Navigation du compte-rendu"><div class="cr2-nav-in">'
+    + bouton('cr-resume', 'Résumé') + (graph ? bouton('cr-coup', 'Chiffres') : '') + menuRecit + (forts.length ? bouton('cr-forts', 'Temps forts') : '') + (parts ? bouton('cr-partenaires', 'Partenaires') : '')
+    + '<span class="cr2-nav-grow"></span>' + (actions ? '<button type="button" class="cr2-nav-agir" data-t="cr-agir">★ Agir</button>' : '')
+    + '<button type="button" class="cr2-nav-synth" data-synth aria-haspopup="dialog">📋 Synthèse</button></div>' + popRecit + '</nav>';
+  const synthese = '<div class="cr2-synth-row"><span class="cr2-help-wrap"><button type="button" class="cr2-help" data-help aria-label="À quoi sert la synthèse ?" aria-expanded="false" aria-controls="cr-help-pop">?</button><span class="cr2-help-pop" id="cr-help-pop" role="tooltip" hidden>La synthèse réunit l’essentiel du compte-rendu sur un seul écran : résumé, chiffres clés, temps forts, personnes mises en lumière, partenaires et suite à donner. Idéale pour aller vite, l’imprimer ou la partager.</span></span>'
+    + '<button type="button" class="cr2-synth-btn" data-synth aria-haspopup="dialog"><span aria-hidden="true">📋</span><span>Synthèse<small>Lire la synthèse</small></span></button></div>';
   root.innerHTML = (brouillon ? '<div class="crp-card" style="background:#FEF3C7;border-color:#F59E0B">Brouillon : seuls vous voyez ce compte-rendu. <a class="cr-link" href="compte-rendu.html?evt=' + ev.id + '&edition=1">Continuer la rédaction</a></div>' : '')
-    + '<div class="cr2-tools"><button type="button" class="cr2-synth-mini" data-synth>📋 Synthèse</button>Taille du texte <button type="button" class="cr2-fs" id="cr-fsm" aria-label="Réduire le texte">A−</button><button type="button" class="cr2-fs" id="cr-fsp" aria-label="Agrandir le texte">A+</button></div>'
-    + '<div class="cr2-mtoc" id="cr-mtoc">' + toc + '</div>'
-    + '<div class="cr2-layout"><nav class="cr2-toc" aria-label="Sommaire"><h2>Sommaire</h2>' + tocGroupe + '</nav>'
-    + '<article class="cr2-page"><header class="cr2-hero">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '')
+    + '<div class="cr2-tools">Taille du texte <button type="button" class="cr2-fs" id="cr-fsm" aria-label="Réduire le texte">A−</button><button type="button" class="cr2-fs" id="cr-fsp" aria-label="Agrandir le texte">A+</button></div>'
+    + nav
+    + '<div class="cr2-layout"><article class="cr2-page"><header class="cr2-hero">' + (logo ? '<img src="' + esc(logo) + '" alt="Logo ' + esc(ev.organisateur_nom || '') + '">' : '')
     + '<div class="tx"><div class="dev">' + (ev.organisateur_officiel ? 'Actions locales · Impact global' : esc(ev.organisateur_nom || '')) + '</div><h1>' + esc(cr.titre || ev.titre) + '</h1>'
     + '<div class="puces"><span>' + esc(fmtDateCourte(ev.date_evt)) + '</span>' + (ev.ville ? '<span>' + esc(ev.ville) + '</span>' : '') + (type ? '<span>' + esc(type) + '</span>' : '') + '</div></div></header>'
     + '<div class="cr2-in">'
-    + '<div class="cr2-actions"><div class="cr2-synth-row"><span class="cr2-help-wrap"><button type="button" class="cr2-help" data-help aria-label="À quoi sert la synthèse ?" aria-expanded="false" aria-controls="cr-help-pop">?</button><span class="cr2-help-pop" id="cr-help-pop" role="tooltip" hidden>La synthèse réunit l’essentiel du compte-rendu sur un seul écran : résumé, chiffres clés, temps forts, personnes mises en lumière, partenaires et suite à donner. Idéale pour aller vite, l’imprimer ou la partager.</span></span>'
-      + '<button type="button" class="cr2-synth-btn" data-synth aria-haspopup="dialog"><span aria-hidden="true">📋</span><span>Synthèse<small>Lire la synthèse</small></span></button></div>' + ctaHtml(cr) + '</div>'
+    /* Début de page côte à côte : l'affiche à gauche, le résumé, les boutons et la suite à droite. */
+    + '<div class="cr2-top' + (ev.image ? '' : ' sans') + '">'
     + (ev.image ? '<div class="cr2-affiche"><img src="' + esc(ev.image) + '" alt="Affiche de l\'événement" loading="lazy"></div>' : '')
+    + '<div class="cr2-top-r">'
     + '<div class="cr2-sous">Compte-rendu de ' + esc(ev.organisateur_nom || '') + (cr.published_at ? ' · publié le ' + esc(fmtDateCourte(cr.published_at)) : '') + '</div>'
     + '<div class="crp-chips" id="crp-chips">Avec : </div>'
     + '<div class="cr2-resume" id="cr-resume"><b>RÉSUMÉ</b>' + resumePageHtml(cr) + '</div>'
-    + etapeHtml(cr) + videoHtml(cr.video_url)
+    + '<div class="cr2-actions" id="cr-agir">' + synthese + actions + '</div>'
+    + etapeHtml(cr)
+    + '</div></div>'
+    + videoHtml(cr.video_url)
     + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
     + graph + detailHtml(cr)
-    + ((cr.forts || []).length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + cr.forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
+    + (forts.length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
     + parts
     + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a>' : '') + '</div>'
     + '<div id="crp-social"></div></div></article></div>';
   const z = $('#crp-chips'); z.innerHTML = 'Avec : ' + (d.identifies.length ? chipsIdentifies(d.peut_editer) : '<span class="crp-note">Personne n\'est encore identifié.</span>' + (d.peut_editer ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : ''));
   if (!d.identifies.length && !d.peut_editer) z.remove();
-  initLecture(items.map(i => i[0]));
+  initLecture(['cr-resume', 'cr-coup', 'cr-recit', 'cr-forts', 'cr-partenaires']);
+  initCartes(); initNav();
   chargerSocial();
   $$('[data-synth]').forEach(b => b.addEventListener('click', ouvrirSynthese));
   /* « ? » : bulle d'explication de la synthèse (clic ou touche Entrée ; se ferme par Échap ou un clic ailleurs). */
@@ -710,20 +725,64 @@ function vuePublique() {
   if (new URLSearchParams(location.search).get('synthese') === '1') ouvrirSynthese();
 }
 
-/* Sommaire (clic = défilement, partie en cours surlignée) et taille du texte réglable (mémorisée). */
+/* Cartes du récit : aperçu replié, « Lire la suite » seulement quand le texte déborde, « Tout déplier / Tout replier ». */
+function initCartes() {
+  const cartes = $$('.cr2-card');
+  const libelle = (c, ouvert) => { const m = $('[data-more]', c); if (m) { m.textContent = ouvert ? 'Réduire ▴' : 'Lire la suite ▾'; m.setAttribute('aria-expanded', ouvert ? 'true' : 'false'); } };
+  const evaluer = () => cartes.forEach(c => {
+    const b = $('.cr2-card-b', c), m = $('[data-more]', c); if (!b || !m) return;
+    const ouvert = c.classList.contains('open'), trop = !ouvert && b.scrollHeight > b.clientHeight + 6;
+    m.hidden = !(trop || ouvert); b.classList.toggle('coupe', trop);
+  });
+  cartes.forEach(c => { const m = $('[data-more]', c); if (m) m.addEventListener('click', () => { const o = c.classList.toggle('open'); libelle(c, o); evaluer(); if (!o) c.scrollIntoView({ block: 'nearest' }); }); });
+  $$('[data-recit]').forEach(b => b.addEventListener('click', () => { const ouvrir = b.dataset.recit === 'ouvrir'; cartes.forEach(c => { c.classList.toggle('open', ouvrir); libelle(c, ouvrir); }); evaluer(); }));
+  evaluer(); window.addEventListener('resize', evaluer); setTimeout(evaluer, 500); setTimeout(evaluer, 1800);
+}
+/* Menu « Le récit » de la barre fixe + bouton « haut de page ». */
+function initNav() {
+  const menu = $('[data-menu]'), pop = $('#cr-nav-pop');
+  if (menu && pop) {
+    const basculer = o => { pop.hidden = !o; menu.setAttribute('aria-expanded', o ? 'true' : 'false'); };
+    menu.addEventListener('click', e => { e.stopPropagation(); basculer(pop.hidden); });
+    $$('[data-t], [data-part]', pop).forEach(b => b.addEventListener('click', () => {
+      basculer(false); const el = document.getElementById(b.dataset.t || b.dataset.part); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }));
+    document.addEventListener('click', e => { if (!pop.hidden && !e.target.closest('.cr2-nav')) basculer(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden && !$('#cr-synth')) { basculer(false); menu.focus(); } });
+  }
+  /* Barre fixée par script : le « position:sticky » CSS ne marche pas ici (le corps de page du site porte un overflow qui en
+     fait un conteneur de défilement). Un repère invisible garde la place pour éviter tout saut de mise en page. */
+  const barre = $('#cr-nav');
+  if (barre) {
+    const repere = document.createElement('div'); repere.className = 'cr2-nav-repere'; barre.parentNode.insertBefore(repere, barre);
+    const maj = () => {
+      const r = repere.getBoundingClientRect(), fixe = r.top < 0;
+      if (fixe) { repere.style.height = barre.offsetHeight + 12 + 'px'; barre.classList.add('fixe'); barre.style.left = r.left + 'px'; barre.style.width = r.width + 'px'; }
+      else { barre.classList.remove('fixe'); barre.style.left = ''; barre.style.width = ''; repere.style.height = '0'; }
+    };
+    window.addEventListener('scroll', maj, { passive: true }); window.addEventListener('resize', maj); maj();
+  }
+  const haut = document.createElement('button');
+  haut.type = 'button'; haut.className = 'cr2-haut'; haut.setAttribute('aria-label', 'Retour en haut de la page'); haut.title = 'Haut de page'; haut.textContent = '↑'; haut.hidden = true;
+  haut.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.body.appendChild(haut);
+  window.addEventListener('scroll', () => { haut.hidden = window.scrollY < 700; }, { passive: true });
+}
+
+/* Barre fixe (clic = défilement, section en cours surlignée) et taille du texte réglable (mémorisée). */
 function initLecture(ids) {
   let fs = 18; try { const s = parseInt(localStorage.getItem('cr-fs2'), 10); if (s >= 14 && s <= 26) fs = s; } catch (_) {}
   const appliquer = () => { $('#crp').style.setProperty('--cr-fs', fs + 'px'); try { localStorage.setItem('cr-fs2', fs); } catch (_) {} };
   $('#cr-fsm').onclick = () => { if (fs > 14) { fs -= 1; appliquer(); } };
   $('#cr-fsp').onclick = () => { if (fs < 26) { fs += 1; appliquer(); } };
   appliquer();
-  const boutons = $$('.cr2-toc-i');
-  boutons.forEach(b => b.addEventListener('click', () => { const el = document.getElementById(b.dataset.t); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }));
+  $$('.cr2-nav-in [data-t]:not([data-menu])').forEach(b => b.addEventListener('click', () => { const el = document.getElementById(b.dataset.t); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }));
   const suivre = () => {
     let cur = ids[0];
     ids.forEach(id => { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < 150) cur = id; });
-    boutons.forEach(b => b.classList.toggle('on', b.dataset.t === cur));
-    const on = $('#cr-mtoc .cr2-toc-i.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+    $$('.cr2-nav-in .cr2-nav-i').forEach(b => b.classList.toggle('on', b.dataset.t === cur));
+    const on = $('.cr2-nav-in .cr2-nav-i.on'), barre = $('.cr2-nav-in');
+    if (on && barre && barre.scrollWidth > barre.clientWidth) barre.scrollTo({ left: on.offsetLeft - barre.clientWidth / 2 + on.clientWidth / 2, behavior: 'smooth' });
   };
   window.addEventListener('scroll', suivre, { passive: true }); suivre();
 }
