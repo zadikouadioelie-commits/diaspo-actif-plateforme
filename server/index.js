@@ -20498,8 +20498,15 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   const logo_url = crUrl(body.logo_url);
   const partenaires = (Array.isArray(body.partenaires) ? body.partenaires : []).slice(0, 12)
     .map(p => ({ nom: crTexte(p && p.nom, 80), description: crTexte(p && p.description, 300), lien: crUrl(p && p.lien), logo_url: crUrl(p && p.logo_url) })).filter(p => p.nom);
+  /* compte_id/compte_type : compte Diaspo'Actif lié (2026-10-07, demande explicite) — simple référence interne, non vérifiée
+     en base (même niveau de confiance que "lien" juste à côté, jamais vérifié non plus) ; un id invalide ne casse rien,
+     le lien pointera juste vers un profil introuvable. compte_texte reprend ce que l'auteur a tapé/collé, pour l'éditeur. */
   const profils = (Array.isArray(body.profils) ? body.profils : []).slice(0, 40)
-    .map(p => ({ nom: crTexte(p && p.nom, 80), categorie: crTexte(p && p.categorie, 60), communaute: crTexte(p && p.communaute, 40), lien: crUrl(p && p.lien) })).filter(p => p.nom);
+    .map(p => {
+      const compte_id = p && Number(p.compte_id) > 0 ? Number(p.compte_id) : null;
+      const compte_type = compte_id && ['u', 'i', 'c'].includes(p.compte_type) ? p.compte_type : null;
+      return { nom: crTexte(p && p.nom, 80), categorie: crTexte(p && p.categorie, 60), communaute: crTexte(p && p.communaute, 40), lien: crUrl(p && p.lien), compte_texte: crTexte(p && p.compte_texte, 160), compte_id, compte_type };
+    }).filter(p => p.nom);
   const champs = [
     crTexte(body.titre, 160) || evt.titre, type_cr, type_cr === 'autre' ? crTexte(body.type_libre, 60) || null : null, resume || null,
     JSON.stringify(details), JSON.stringify(forts), crTexte(body.etape_texte, 500) || null, crDateISO(body.etape_date),
@@ -22955,6 +22962,18 @@ route("DELETE", "/api/evenements/:id", async (req, res, params) => {
   await db.prepare("DELETE FROM insc_liens_controle WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM insc_fiches_evenements WHERE evenement_id=?").run(params.id);
   await db.prepare("UPDATE formulaires_inscription SET evenement_id=NULL WHERE evenement_id=?").run(params.id);
+  /* Bug réel découvert le 2026-10-07 en testant le module Compte-rendu (identification de comptes) :
+     même classe que le correctif insc_* ci-dessus, jamais traitée pour le compte-rendu — supprimer un
+     événement qui a ne serait-ce qu'un brouillon de compte-rendu, un commentaire, une réaction ou un
+     message reçu suffisait à faire échouer le DELETE (violation de contrainte FOREIGN KEY). Ce sont
+     tous des artefacts liés à CET événement précis (jamais de registre financier ni d'historique de
+     tiers à protéger comme pour les inscriptions/billets plus haut) : retirés sans condition. */
+  await db.prepare("DELETE FROM evenement_identifications WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM evenement_commentaires WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM evenement_reactions WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM evenement_cr_envois WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM evenement_cr_messages WHERE evenement_id=?").run(params.id);
+  await db.prepare("DELETE FROM evenement_comptes_rendus WHERE evenement_id=?").run(params.id);
   await db.prepare("DELETE FROM evenements WHERE id=?").run(params.id);
   if (estAdmin) SEC.logSecurity('evenement_force_deleted_by_admin', { admin_id: user.id, evenement_id: params.id, avait_participants: nbParticipants });
   sendJSON(res, 200, { ok: true });

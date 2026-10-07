@@ -123,7 +123,7 @@
 .crp-part-logo .cr-btn{padding:6px 10px;font-size:12.5px}
 .crp-part-f{flex:1;min-width:0;display:grid;gap:6px}.crp-part-f input{width:100%;box-sizing:border-box}
 .crp-x{border:none;background:none;color:#B91C1C;font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
-.crp-prof{display:grid;grid-template-columns:1.2fr 1.8fr .9fr 1.2fr 34px;gap:6px;margin-bottom:6px;align-items:center}
+.crp-prof{display:grid;grid-template-columns:1.1fr 1.5fr .8fr 1fr 1.2fr 34px;gap:6px;margin-bottom:6px;align-items:center}
 .crp-prof-h{margin-bottom:2px}
 .crp-prof-h span{font-size:12px;font-weight:700;color:var(--muted,#5B6B82);letter-spacing:.02em}
 .crp-prof-h em{font-weight:500;font-style:normal}

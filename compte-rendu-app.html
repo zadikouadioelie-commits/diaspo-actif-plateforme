@@ -101,6 +101,14 @@
 .crp-cm .bub{background:var(--bg,#F3F6FB);border-radius:12px;padding:7px 11px}
 .crp-cm small{display:block;color:var(--muted,#5B6B82);font-size:11.5px}
 .crp-cin{display:flex;gap:8px;margin-top:12px;position:relative}.crp-cin input{flex:1}
+/* Comptes Diaspo'Actif identifiés (2026-10-07, demande explicite) : grille de cartes sur la page publiée + style des champs liés dans l'éditeur. */
+.crp-idgrid{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.crp-idcard{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--border,#DCE4F0);border-radius:12px;padding:8px 12px;text-decoration:none;color:inherit;min-width:160px}
+.crp-idcard:hover{border-color:#2E74E0}
+.crp-idcard img{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:none}
+.crp-idav{width:34px;height:34px;border-radius:50%;background:#2E74E0;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none}
+.crp-idcard b{display:block;font-size:13.5px}
+.crp-idcard small{display:block;color:var(--muted,#5B6B82);font-size:11.5px}
 @media (max-width:560px){.crp-extform{grid-template-columns:1fr}.crp h1{font-size:20px}}
 </style>
 </head>
@@ -291,6 +299,7 @@ function brut(s) {
 }
 const RE_MENTION = /[@*]\[([^\]]+)\]\(([uic]):(\d+)\)/g;
 const hrefMention = (t, id) => ({ u: 'profil.html?id=', i: 'initiative.html?id=', c: 'profil-collectivite.html?id=' }[t]) + id;
+const ROLE_LABEL = { utilisateur: 'Membre', initiative: 'Initiative', collectivite: 'Collectivité', administrateur: 'Administrateur' };
 /* Page publique : HTML nettoyé, mentions en liens, et une liste d'au moins 6 éléments courts devient la grille de tuiles illustrées. */
 function richeVersPage(html) {
   const d = document.createElement('div'); d.innerHTML = nettoyerHtml(html);
@@ -411,6 +420,43 @@ function attachMention(el) {
   el.addEventListener('blur', () => setTimeout(close, 150));
 }
 
+/* ---------- champ « @ » générique réutilisable : autocomplétion de comptes, délègue l'action au choix (2026-10-07) ---------- */
+function attachCompteInput(el, onPick) {
+  let box = null, idx = 0, items = [], timer = null;
+  const close = () => { if (box) box.remove(); box = null; };
+  async function chercher(q) {
+    if (q.length < 2) { close(); return; }
+    try { const r = await api('GET', `/evenements/${ST.evtId}/identifications/suggestions?q=${encodeURIComponent(q)}`); items = (r.suggestions || []).slice(0, 6); } catch (_) { items = []; }
+    if (!items.length) { close(); return; }
+    idx = 0;
+    if (!box) { box = document.createElement('div'); box.className = 'crp-ac'; el.parentNode.style.position = 'relative'; el.parentNode.appendChild(box); box.style.left = '0'; box.style.top = (el.offsetTop + el.offsetHeight + 2) + 'px'; }
+    box.innerHTML = items.map((c, i) => '<div class="' + (i === 0 ? 'act' : '') + '" data-i="' + i + '"><b>' + esc(c.nom) + '</b> <span class="crp-note">' + esc(c.detail || '') + '</span></div>').join('');
+    $$('div', box).forEach(d => d.addEventListener('mousedown', ev => { ev.preventDefault(); choisir(items[d.dataset.i]); }));
+  }
+  function choisir(c) { close(); onPick(c); }
+  el.addEventListener('input', () => {
+    const v = el.value;
+    if (!/^@/.test(v)) { close(); return; }
+    clearTimeout(timer); timer = setTimeout(() => chercher(v.slice(1).toLowerCase()), 180);
+  });
+  el.addEventListener('keydown', e => {
+    if (!box) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); }
+    else if (e.key === 'Enter' || e.key === 'Tab') { if (box) { e.preventDefault(); choisir(items[idx]); } return; }
+    else if (e.key === 'Escape') { close(); return; } else return;
+    $$('div', box).forEach((d, i) => d.classList.toggle('act', i === idx));
+  });
+  el.addEventListener('blur', () => setTimeout(close, 150));
+}
+/* Reconnaît un lien de profil Diaspo'Actif collé tel quel (profil.html?id=, initiative.html?id=, profil-collectivite.html?id=),
+   avec ou sans domaine devant — même trio de formats que hrefMention(). */
+function compteDepuisLien(url) {
+  const m = String(url || '').match(/(profil-collectivite|profil|initiative)\.html\?(?:[^#]*&)?id=(\d+)/);
+  if (!m) return null;
+  return { type: m[1] === 'profil-collectivite' ? 'c' : m[1] === 'initiative' ? 'i' : 'u', id: Number(m[2]) };
+}
+
 /* ---------- identification des participants ---------- */
 function chipsIdentifies(editable) {
   const l = (ST.data.identifies || []).map(i => '<a class="crp-chip" href="profil.html?id=' + i.user_id + '">@' + esc(i.nom) + '</a>' + '').join('');
@@ -431,7 +477,11 @@ async function identModal() {
     let t; $('#idq', ov).addEventListener('input', () => { clearTimeout(t); t = setTimeout(draw, 250); }); draw(); $('#idok', ov).onclick = close;
   });
 }
-function refreshChips() { const z = $('#crp-chips'); if (z) z.innerHTML = chipsIdentifies(!!(ST.ed || ST.data.peut_editer)); }
+function refreshChips() {
+  const z = $('#crp-chips'); if (z) z.innerHTML = chipsIdentifies(!!(ST.ed || ST.data.peut_editer));
+  /* La cartouche « Compte Diaspo'Actif » de l'éditeur a son propre conteneur de chips, distinct de #crp-chips. */
+  const w = $('#ed-ident-chips'); if (w) w.innerHTML = chipsIdentifies(true);
+}
 document.addEventListener('click', async e => {
   if (e.target.closest('[data-ident]')) { identModal(); return; }
   const rm = e.target.closest('[data-idrm]');
@@ -602,7 +652,9 @@ function graphiquesHtml(cr) {
   const mots = parties.map(d => motsDe(d.texte)), total = motsDe(cr.resume) + mots.reduce((a, b) => a + b, 0);
   const groupe = (cle, vide) => { const m = new Map(); profils.forEach(p => { const k = (p[cle] || '').trim() || vide; if (!k) return; if (!m.has(k)) m.set(k, []); m.get(k).push(p); }); return [...m.entries()]; };
   /* Le nom devient cliquable quand un lien a été renseigné pour cette personne ou organisation. */
-  const nomLien = p => /^https?:\/\//i.test(p.lien || '') ? '<a class="cr2-nom-lien" href="' + esc(p.lien) + '" target="_blank" rel="noopener noreferrer">' + esc(p.nom) + '</a>' : esc(p.nom);
+  /* Compte Diaspo'Actif en priorité sur un lien externe quand les deux sont renseignés pour la même personne (choix explicite de l'utilisateur, 2026-10-07). */
+  const nomLien = p => p.compte_id ? '<a class="cr2-nom-lien" href="' + hrefMention(p.compte_type || 'u', p.compte_id) + '" target="_blank" rel="noopener noreferrer">' + esc(p.nom) + '</a>'
+    : /^https?:\/\//i.test(p.lien || '') ? '<a class="cr2-nom-lien" href="' + esc(p.lien) + '" target="_blank" rel="noopener noreferrer">' + esc(p.nom) + '</a>' : esc(p.nom);
   const cats = groupe('categorie', 'Autres'), comms = groupe('communaute', '');
   const kpis = [[parties.length, parties.length > 1 ? 'parties détaillées' : 'partie détaillée']];
   if (profils.length) kpis.push([profils.length, profils.length > 1 ? 'personnes et organisations mises en lumière' : 'personne ou organisation mise en lumière']);
@@ -793,7 +845,7 @@ function vuePublique() {
     ? '<div class="cr2-nav-pop" id="cr-nav-pop" hidden><button type="button" class="cr2-nav-pop-all" data-t="cr-recit">📖 Voir tout le récit</button><div class="cr2-nav-pop-l">'
       + parties.map((p, i) => '<button type="button" data-part="cr-p' + (i + 1) + '">' + svgIc(iconeDe(p), 'cr2-ic xs') + '<span>' + esc(p.titre || 'Texte') + '</span></button>').join('') + '</div></div>' : '';
   const nav = '<nav class="cr2-nav" id="cr-nav" aria-label="Navigation du compte-rendu"><div class="cr2-nav-in">'
-    + bouton('cr-resume', 'Résumé') + (graph ? bouton('cr-coup', 'Chiffres') : '') + menuRecit + (forts.length ? bouton('cr-forts', 'Temps forts') : '') + (parts ? bouton('cr-partenaires', 'Partenaires') : '')
+    + bouton('cr-resume', 'Résumé') + (graph ? bouton('cr-coup', 'Chiffres') : '') + menuRecit + (forts.length ? bouton('cr-forts', 'Temps forts') : '') + (parts ? bouton('cr-partenaires', 'Partenaires') : '') + (d.identifies.length ? bouton('cr-identifs', 'Compte Diaspo’Actif') : '')
     + '<span class="cr2-nav-grow"></span>' + agirNav.btn
     + '<button type="button" class="cr2-nav-synth" data-synth aria-haspopup="dialog">📋 Synthèse</button></div>' + popRecit + agirNav.pop + '</nav>';
   const synthese = '<div class="cr2-synth-row"><span class="cr2-help-wrap"><button type="button" class="cr2-help" data-help aria-label="À quoi sert la synthèse ?" aria-expanded="false" aria-controls="cr-help-pop">?</button><span class="cr2-help-pop" id="cr-help-pop" role="tooltip" hidden>La synthèse réunit l’essentiel du compte-rendu sur un seul écran : résumé, chiffres clés, temps forts, personnes mises en lumière, partenaires et suite à donner. Idéale pour aller vite, l’imprimer ou la partager.</span></span>'
@@ -820,12 +872,15 @@ function vuePublique() {
     + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
     + graph + detailHtml(cr)
     + (forts.length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
+    + (d.identifies.length ? '<h2 id="cr-identifs">Compte Diaspo’Actif</h2><p class="crp-note">Les comptes Diaspo’Actif identifiés pour ce compte-rendu.</p><div class="crp-idgrid">' + d.identifies.map(i => '<a class="crp-idcard" href="' + hrefMention('u', i.user_id) + '" target="_blank" rel="noopener">'
+      + (i.photo_url ? '<img src="' + esc(i.photo_url) + '" alt="">' : '<span class="crp-idav">' + esc((i.nom || '?')[0]) + '</span>')
+      + '<span><b>' + esc(i.nom) + '</b>' + (ROLE_LABEL[i.role] ? '<small>' + esc(ROLE_LABEL[i.role]) + '</small>' : '') + '</span></a>').join('') + '</div>' : '')
     + parts
     + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<button type="button" class="cr-btn out" data-msgs-recus>📨 Messages reçus</button><a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a>' : '') + '</div>'
     + '<div id="crp-social"></div></div></article></div>';
   const z = $('#crp-chips'); z.innerHTML = 'Avec : ' + (d.identifies.length ? chipsIdentifies(d.peut_editer) : '<span class="crp-note">Personne n\'est encore identifié.</span>' + (d.peut_editer ? '<button type="button" class="crp-chip add" data-ident>＋ Identifier un participant</button>' : ''));
   if (!d.identifies.length && !d.peut_editer) z.remove();
-  initLecture(['cr-resume', 'cr-coup', 'cr-recit', 'cr-forts', 'cr-partenaires']);
+  initLecture(['cr-resume', 'cr-coup', 'cr-recit', 'cr-forts', 'cr-identifs', 'cr-partenaires']);
   initCartes(); initNav();
   chargerSocial();
   $$('[data-synth]').forEach(b => b.addEventListener('click', ouvrirSynthese));
@@ -1039,7 +1094,7 @@ function vueEditeur() {
   drawTypes(); drawChamps(); drawForts(); drawPhotos(); refreshChips();
   drawLogo(); drawParts(); drawProfils(); ST.act = null; drawAction();
   $('#ed-partadd').onclick = () => { if (ed.partenaires.length < 12) { ed.partenaires.push({ nom: '', description: '', lien: '', logo_url: '' }); drawParts(); } };
-  $('#ed-profadd').onclick = () => { if (ed.profils.length < 40) { ed.profils.push({ nom: '', categorie: '', communaute: '', lien: '' }); drawProfils(); } };
+  $('#ed-profadd').onclick = () => { if (ed.profils.length < 40) { ed.profils.push({ nom: '', categorie: '', communaute: '', lien: '', compte_texte: '', compte_id: null, compte_type: null }); drawProfils(); } };
   $('#ed-fortadd').onclick = () => { const v = $('#ed-fortin').value.trim(); if (v) { ed.forts.push(v); $('#ed-fortin').value = ''; drawForts(); } };
   $('#ed-fortin').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#ed-fortadd').click(); } });
   $('#ed-addphoto').onclick = () => $('#ed-photofile').click();
@@ -1227,7 +1282,23 @@ async function drawAction() {
   h += '<div class="crp-auto-sep" aria-hidden="true"><span>Fonctionnement automatique</span></div>'
     + '<div class="crp-auto" role="note"><div class="crp-auto-h"><span class="crp-auto-ic" aria-hidden="true">🔒</span><div class="crp-auto-tt"><div class="crp-auto-t">💬 Laisser un message à l’organisateur</div><div class="crp-auto-s">Inclus automatiquement · non modifiable · rien à faire</div></div><span class="crp-auto-badge">Automatique</span></div>'
     + '<div class="crp-auto-b">Ce bouton est <b>automatiquement lié à tous vos comptes-rendus</b> : vous n’avez rien à configurer, vous ne pouvez ni le modifier ni le retirer. Le lecteur y laisse son nom, son prénom, son e-mail et un petit mot. Vous retrouvez les messages dans « 📨 Messages reçus » (sur la page du compte-rendu et dans « Gérer mes comptes-rendus »), avec une notification à chaque message.</div></div>';
+  /* Cartouche « Compte Diaspo'Actif » (2026-10-07, demande explicite) : identifier des comptes directement en rédigeant,
+     sans attendre la publication. Même liste que le bouton « + Identifier un participant » de la page publiée (les deux
+     coexistent, confirmé par l'utilisateur) : POST/DELETE /identifications, ST.data.identifies, chipsIdentifies(). */
+  h += '<div class="crp-lbl">Compte Diaspo’Actif</div>'
+    + '<div class="crp-fld"><label>Comptes identifiés <em>visibles par les lecteurs dans l’onglet « Compte Diaspo’Actif »</em></label>'
+    + '<div id="ed-ident-chips">' + chipsIdentifies(true) + '</div>'
+    + '<div class="crp-extform" style="grid-template-columns:1fr;margin-top:6px"><input id="ed-ident-input" autocomplete="off" placeholder="Ou tapez @ suivi d’un nom pour aller plus vite…"></div>'
+    + '<div class="crp-hint">La personne identifiée reçoit une notification.</div></div>';
   box.innerHTML = h;
+  const identInput = $('#ed-ident-input', box);
+  if (identInput) attachCompteInput(identInput, async c => {
+    identInput.value = ''; identInput.disabled = true;
+    try {
+      const rr = await api('POST', `/evenements/${ST.evtId}/identifications`, { user_id: c.user_id });
+      ST.data.identifies = rr.identifies; toast('Identifié(e) : notification envoyée'); refreshChips(); drawAction();
+    } catch (e) { toast(e.message || 'Erreur'); identInput.disabled = false; }
+  });
 
   const reset = () => { A.w = nouvelAssistant(); drawAction(); };
   const terminer = (bouton, lien) => {
@@ -1348,13 +1419,28 @@ function drawParts() {
 }
 function drawProfils() {
   const ed = ST.ed, box = $('#ed-profils');
-  box.innerHTML = (ed.profils.length ? '<div class="crp-prof crp-prof-h" aria-hidden="true"><span>Nom et prénom <em>(ou organisation)</em></span><span>Catégorie</span><span>Communauté d’origine</span><span>Lien <em>(facultatif)</em></span><span></span></div>' : '')
-    + ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" aria-label="Nom et prénom" placeholder="Nom et prénom (ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" aria-label="Catégorie" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" aria-label="Communauté d’origine" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><input data-fl="' + i + '" aria-label="Lien" placeholder="https://… lien (facultatif)" value="' + esc(p.lien) + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
+  box.innerHTML = (ed.profils.length ? '<div class="crp-prof crp-prof-h" aria-hidden="true"><span>Nom et prénom <em>(ou organisation)</em></span><span>Catégorie</span><span>Communauté d’origine</span><span>Lien <em>(facultatif)</em></span><span>Compte Diaspo’Actif <em>(facultatif)</em></span><span></span></div>' : '')
+    + ed.profils.map((p, i) => '<div class="crp-prof"><input data-fn="' + i + '" maxlength="80" aria-label="Nom et prénom" placeholder="Nom et prénom (ou organisation)" value="' + esc(p.nom) + '"><input data-fc="' + i + '" maxlength="60" list="dl-cats" aria-label="Catégorie" placeholder="Catégorie" value="' + esc(p.categorie) + '"><input data-fm="' + i + '" maxlength="40" aria-label="Communauté d’origine" placeholder="Communauté (facultatif)" value="' + esc(p.communaute) + '"><input data-fl="' + i + '" aria-label="Lien" placeholder="https://… lien (facultatif)" value="' + esc(p.lien) + '"><input data-fa="' + i + '" aria-label="Compte Diaspo’Actif" placeholder="@nom ou lien du profil…" value="' + esc(p.compte_texte || '') + '"><button type="button" class="crp-x" data-frm="' + i + '" title="Retirer">×</button></div>').join('')
     + '<datalist id="dl-cats">' + CATEGORIES_SUGGEREES.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist>';
   $$('[data-fn]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fn)].nom = x.value; }));
   $$('[data-fc]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fc)].categorie = x.value; }));
   $$('[data-fm]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fm)].communaute = x.value; }));
   $$('[data-fl]', box).forEach(x => x.addEventListener('input', () => { ed.profils[Number(x.dataset.fl)].lien = x.value; }));
+  /* Compte Diaspo'Actif par ligne (2026-10-07, demande explicite) : « @nom » avec autocomplétion (attachCompteInput, réutilisé
+     de la cartouche d'identification), ou un lien de profil collé tel quel (compteDepuisLien) — reconnu au clavier (debounce)
+     et à la perte de focus (pour le collage, qui ne déclenche pas forcément l'auto-complétion). */
+  $$('[data-fa]', box).forEach(x => {
+    const i = Number(x.dataset.fa);
+    x.addEventListener('input', () => { ed.profils[i].compte_texte = x.value; });
+    x.addEventListener('blur', () => {
+      const lien = compteDepuisLien(ed.profils[i].compte_texte);
+      if (lien) { ed.profils[i].compte_id = lien.id; ed.profils[i].compte_type = lien.type; }
+      else if (!/^@/.test(ed.profils[i].compte_texte || '')) { ed.profils[i].compte_id = null; ed.profils[i].compte_type = null; }
+    });
+    attachCompteInput(x, c => {
+      ed.profils[i].compte_texte = '@' + c.nom; ed.profils[i].compte_id = c.user_id; ed.profils[i].compte_type = 'u'; x.value = ed.profils[i].compte_texte;
+    });
+  });
   $$('[data-frm]', box).forEach(x => x.addEventListener('click', () => { ed.profils.splice(Number(x.dataset.frm), 1); drawProfils(); }));
   const add = $('#ed-profadd'); if (add) add.disabled = ed.profils.length >= 40;
 }
