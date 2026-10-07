@@ -31176,7 +31176,7 @@ async function handleRequest(req, res) {
   if (pathname === '/profil.html') {
     try {
       const uid = parsed.query.id;
-      const u = uid ? await db.prepare("SELECT id, nom, prenom, role, nom_institution FROM users WHERE id=?").get(uid) : null;
+      const u = uid ? await db.prepare("SELECT id, nom, prenom, role, nom_institution, photo_url, titre_pro, ville, pays, compte_masque FROM users WHERE id=?").get(uid) : null;
       const init = u ? await db.prepare("SELECT * FROM initiatives WHERE owner_user_id=?").get(u.id) : null;
       const filePath = path.join(ROOT, 'profil-app.html');
       let html = await fs.promises.readFile(filePath, 'utf8');
@@ -31191,7 +31191,15 @@ async function handleRequest(req, res) {
       }
 
       let title, description, image, noindex = false, jsonLd = '';
-      if (init && init.vitrine_active === 1) {
+      /* Image d'aperçu : uniquement une adresse (jamais une image intégrée en base64, trop lourde), rendue absolue. */
+      const imageAbs = v => { const s = String(v || ''); return /^https?:\/\//i.test(s) ? s : (/^\/[^\/]/.test(s) ? base + s : null); };
+      const sansHtml = v => String(v || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (u && Number(u.compte_masque) === 1) {
+        title = `Diaspo'Actif — Profil`;
+        description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
+        image = `${base}/assets/logo.png`;
+        noindex = true;
+      } else if (init && init.vitrine_active === 1) {
         title = `${init.nom} — Boutique | Diaspo'Actif`;
         description = (init.description || `Découvrez ${init.nom} et ses produits sur Diaspo'Actif.`).slice(0, 160);
         image = init.vitrine_banniere_url || `${base}/assets/logo.png`;
@@ -31202,9 +31210,11 @@ async function handleRequest(req, res) {
           address: adresseParts.length ? { "@type": "PostalAddress", addressLocality: init.vitrine_ville||undefined, addressRegion: init.vitrine_region||undefined, addressCountry: init.vitrine_pays||undefined } : undefined,
         })}</script>`;
       } else if (init && init.vitrine_active !== 1) {
-        title = `Diaspo'Actif — Profil`;
-        description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
-        image = `${base}/assets/logo.png`;
+        /* Initiative sans boutique (2026-10-07, partage d'un profil de l'annuaire) : l'aperçu du lien montre son nom, une courte description et son logo ;
+           la page reste hors des moteurs de recherche (noindex). */
+        title = `${init.nom} — Diaspo'Actif`;
+        description = (sansHtml(init.description || init.mission) || `Découvrez ${init.nom} sur Diaspo'Actif, la plateforme de la diaspora.`).slice(0, 160);
+        image = imageAbs(init.vitrine_banniere_url) || imageAbs(init.logo_url) || `${base}/assets/logo.png`;
         noindex = true;
       } else if (u) {
         // Comptes organisme (collectivité/administrateur) : le nom de la structure prime en SEO aussi.
@@ -31212,8 +31222,8 @@ async function handleRequest(req, res) {
           ? u.nom_institution
           : [u.prenom, u.nom].filter(Boolean).join(' ');
         title = `${nomAffiche} — Diaspo'Actif`;
-        description = `Profil de ${nomAffiche} sur Diaspo'Actif.`;
-        image = `${base}/assets/logo.png`;
+        description = `Profil de ${nomAffiche}${u.titre_pro ? ', ' + sansHtml(u.titre_pro) : ''}${u.ville ? ' (' + u.ville + ')' : ''} sur Diaspo'Actif, la plateforme de la diaspora.`.slice(0, 160);
+        image = imageAbs(u.photo_url) || `${base}/assets/logo.png`;
       } else {
         title = `Diaspo'Actif — Profil`;
         description = `Rejoignez Diaspo'Actif, la plateforme de la diaspora.`;
@@ -31233,6 +31243,9 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : `<link rel="can
 ${jsonLd}
 </head>`;
 
+      /* Les balises d'aperçu GÉNÉRIQUES de la page statique sont retirées avant d'ajouter les vraies : avec deux « og:title », les applications de messagerie
+         retiennent la première, donc affichaient « Diaspo'Actif — Profil » pour tout profil partagé. */
+      html = html.replace(/<meta (?:property="og:[^"]*"|name="twitter:[^"]*"|name="description")[^>]*>\s*/g, '').replace(/<link rel="canonical"[^>]*>\s*/g, '');
       html = html.replace(/<title>.*?<\/title>/, `<title>${escAttr(title)}</title>`).replace('</head>', metaBlock);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
       res.end(html);
