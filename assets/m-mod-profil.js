@@ -118,6 +118,8 @@
     const h = hero({ adherer: ['Association', 'ONG'].includes(r.type) && r.adhesions_ouvertes !== false && r.adhesions_ouvertes !== 0, uid: r.owner_user_id, fid: r.id, kind: 'initiative', nom: r.nom, sous: r.sigle || '', photo: r.logo_url, banner: r.vitrine_banniere_url || r.banniere_url, badges, loc: [r.ville, r.pays].filter(Boolean).join(', '), orig: [r.origine1 || r.owner_origine1, r.origine2 || r.owner_origine2].filter(Boolean).join(' · '),
       stats: [[r.abonnes || 0, 'abonnés'], [r.vues || r.nb_vues || 0, 'vues'], [avis.total ? Number(avis.moyenne || 0).toFixed(1) + '★' : '—', 'avis']] });
     setPane(r.nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="initiative.html?id=${encodeURIComponent(r.slug || r.id)}">${ic('out', 's')} Ouvrir la fiche complète sur le site</a>`);
+    /* Partager ce profil (2026-10-07) : lien public, lisible sans compte. */
+    if (A.paneShare) A.paneShare(location.origin + (r.owner_user_id ? '/profil.html?id=' + encodeURIComponent(r.owner_user_id) : '/initiative.html?id=' + encodeURIComponent(r.slug || r.id)) + '&r=' + A.jetonPartage(), r.nom);
   }
 
   async function compte(id) {
@@ -147,6 +149,7 @@
     const h = hero({ uid: p.id, fid: p.id, kind: p.role === 'collectivite' ? 'collectivite' : 'user', nom, sous: pro ? '' : (p.titre_pro || ''), photo: p.photo_url, banner: p.banner_url || p.vitrine_banniere_url, rond: !pro, badges,
       loc: [p.ville, p.pays].filter(Boolean).join(', '), orig: [p.origine1, p.origine2].filter(Boolean).join(' · '), stats: [[p.nbAbonnes || 0, 'abonnés'], [p.nbSuivis || 0, 'abonnements'], [(Array.isArray(p.publications) ? p.publications.length : 0), 'publications']] });
     setPane(nom, h + sections + `<a class="btn out block" style="margin:4px 0 8px" href="profil.html?id=${encodeURIComponent(p.id)}">${ic('out', 's')} Ouvrir le profil complet sur le site</a>`);
+    if (A.paneShare) A.paneShare(location.origin + '/profil.html?id=' + encodeURIComponent(p.id) + '&r=' + A.jetonPartage(), nom);
   }
 
   window.MMods.profil = function (b, c) {

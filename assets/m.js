@@ -624,7 +624,7 @@
     const part = e.type_participation === 'partiellement_payant' ? 'Partiellement payant' : paid ? 'Payant' : 'Gratuit';
     const inscrit = S.myInsc.has(Number(e.id));
     return `<a class="card ev" href="#/evenement/${e.id}" style="display:block">
-      <div class="cov">${p ? `<div class="dt"><b>${p.d}</b><span>${MOIS[p.m - 1]}</span></div>` : ''}${cov ? mediaBlock(cov, { alt: e.titre }) : `<div class="media" style="min-height:78px;background:linear-gradient(135deg,var(--navy),var(--navy2))"></div>`}</div>
+      <div class="cov">${(e.visibilite || 'public') === 'public' ? `<button type="button" class="ev-share" data-share-ev="${e.id}" data-share-titre="${esc(e.titre)}" aria-label="Partager cet événement">${ic('share', 's')}</button>` : ''}${p ? `<div class="dt"><b>${p.d}</b><span>${MOIS[p.m - 1]}</span></div>` : ''}${cov ? mediaBlock(cov, { alt: e.titre }) : `<div class="media" style="min-height:78px;background:linear-gradient(135deg,var(--navy),var(--navy2))"></div>`}</div>
       <div class="bd"><h3 class="tt">${esc(e.titre)}</h3>
         <div class="meta">${ic('clock', 's')}<span>${esc(dateLong(e.date_evt))}${e.heure_debut ? ' · ' + esc(String(e.heure_debut).slice(0, 5)) : ''}</span></div>
         <div class="meta">${ic('pin', 's')}<span class="ell">${esc([e.ville, e.pays].filter(Boolean).join(', ') || e.lieu || 'En ligne')}</span></div>
@@ -781,6 +781,9 @@
       kind = x.role === 'collectivite' ? 'collectivite' : 'user'; fid = x.id; desc = descPlain(x.bio || ''); href = '#/profil/' + encodeURIComponent(x.id);
     }
     S.annNames = S.annNames || {}; if (uid) S.annNames[uid] = nm;
+    /* Partage (2026-10-07) : adresse PUBLIQUE du profil, lisible sans compte (même adresse que le bouton « Partager » du site : le profil du compte, ou la fiche de l'initiative sans propriétaire). */
+    S.annShare = S.annShare || {};
+    S.annShare[key] = { nm, path: it.k === 'i' && !uid ? '/initiative.html?id=' + encodeURIComponent(x.slug || x.id) : '/profil.html?id=' + encodeURIComponent(it.k === 'i' ? uid : x.id) };
     const dom = it.k === 'i' && x.domaine ? `<span class="badge">${esc(x.domaine)}</span>` : '';
     const note = x.avis_total ? `<span class="badge o">★ ${esc(Number(x.avis_moyenne || 0).toFixed(1))} (${x.avis_total})</span>` : '';
     const open = !!(S.ann.open && S.ann.open[key]);
@@ -791,7 +794,7 @@
       <div class="tags" style="margin:4px 0 0"><span class="badge ${it.k === 'u' ? '' : 'g'}">${esc(badge)}</span>${dom}${note}</div></div></a>
       ${desc ? `<div class="ann-desc${open ? ' open' : ''}" data-desc>${esc(desc)}</div>` : ''}
       ${desc ? `<div class="ann-links"><button type="button" class="lnk" data-more hidden aria-expanded="${open}">${open ? 'Voir moins ▴' : 'Voir plus ▾'}</button></div>` : ''}
-      <div class="ann-act2"><a class="btn sm out" href="${href}">${ic('user', 's')} Profil public</a>${peutAdherer ? `<button type="button" class="btn sm navy" data-adh="${x.id}" data-nom="${esc(nm)}">${ic('people', 's')} Adhérer</button>` : ''}</div>
+      <div class="ann-act2"><a class="btn sm out" href="${href}">${ic('user', 's')} Profil public</a><button type="button" class="btn sm out" data-share-ann="${esc(key)}" aria-label="Partager ce profil">${ic('share', 's')} Partager</button>${peutAdherer ? `<button type="button" class="btn sm navy" data-adh="${x.id}" data-nom="${esc(nm)}">${ic('people', 's')} Adhérer</button>` : ''}</div>
       <div class="ann-act3">${uid ? `<button type="button" class="btn sm" data-sup="${uid}">${ic('heart', 's')} Soutenir</button><button type="button" class="btn sm out" data-write="${uid}">${ic('chat', 's')} Contacter</button>` : ''}<button type="button" class="btn sm out" data-follow="${fid}" data-kind="${kind}" data-on="0">${ic('bell', 's')} S’abonner</button></div></article>`;
   }
   function paintAnnuaire() {
@@ -833,6 +836,11 @@
     } catch (er) { toast(er.message, true); if (btn) btn.disabled = false; }
   }
   document.addEventListener('click', async e => {
+    /* Partager un profil de l'annuaire ou un événement de la liste : le lien s'ouvre sans compte, un jeton rend chaque envoi unique (aperçu WhatsApp). */
+    const shA = e.target.closest('[data-share-ann]');
+    if (shA) { e.preventDefault(); const s = (S.annShare || {})[shA.dataset.shareAnn]; if (s) partagerLien(location.origin + s.path + '&r=' + jetonPartage(), s.nm); return; }
+    const shE = e.target.closest('[data-share-ev]');
+    if (shE) { e.preventDefault(); e.stopPropagation(); partagerLien(location.origin + '/evenements.html?evt=' + encodeURIComponent(shE.dataset.shareEv) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), shE.dataset.shareTitre || 'Événement Diaspo’Actif'); return; }
     const ad = e.target.closest('[data-adh]');
     if (ad) { adherer(ad.dataset.adh, ad.dataset.nom || 'cette structure', ad); return; }
     const more = e.target.closest('.ann [data-more]');
@@ -1586,6 +1594,6 @@
     if ('serviceWorker' in navigator) { /* le site est « réseau uniquement » : rien à enregistrer */ }
   }
   window.MMods = window.MMods || {};
-  window.MApp = { S, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL };
+  window.MApp = { S, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, paneShare, partagerLien, jetonPartage, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL };
   init();
 })();

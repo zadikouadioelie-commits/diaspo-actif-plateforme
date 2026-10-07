@@ -2504,6 +2504,7 @@ async function initAnnuaire(){
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
           <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
+          <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nom || '').replace(/"/g,'&quot;')})">↗ Partager</button>
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${u.id}" data-relation-classe="ann-card-btn"></span>` : ''}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.role === 'initiative' ? `<button type="button" class="ann-card-btn ann-card-btn-affilier" data-affilier-nom="${nom.replace(/"/g,'&quot;')}" onclick="event.stopPropagation(); ouvrirAffiliationUtilisateur(${u.id}, this)">🔗 Affiliation</button>` : ''}
           ${adminAnnuaireBoutonsHtml(u.id, isOwn)}
@@ -2537,6 +2538,7 @@ async function initAnnuaire(){
         <div class="ann-card-foot" onclick="event.stopPropagation()">
           <a href="${profilHref}" class="ann-card-btn ann-card-btn-primary" onclick="event.stopPropagation()">👁 Voir le profil</a>
           <a href="${profilHref}#avis" class="ann-card-btn" onclick="event.stopPropagation()">⭐ Avis</a>
+          <button type="button" class="ann-card-btn" title="Envoyer ce profil à quelqu'un : le lien s'ouvre sans compte" onclick="event.stopPropagation(); openShareUrlModal(location.origin + '/' + '${profilHref}', ${JSON.stringify(nomAffiche || '').replace(/"/g,'&quot;')})">↗ Partager</button>
           ${abonnerBtn}
           ${!isOwn && typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? `<span data-relation-user="${o.id}" data-relation-classe="ann-card-btn"></span>` : ''}
           ${adminAnnuaireBoutonsHtml(o.id, isOwn)}
