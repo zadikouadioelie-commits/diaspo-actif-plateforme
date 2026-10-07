@@ -7757,17 +7757,28 @@ route("GET", "/api/initiatives/:id/vote-scrutins", async (req, res, params) => {
 });
 
 /* ── Supprimer un scrutin — uniquement en brouillon (aucun électeur/bulletin n'a encore pu être créé) ── */
-route("DELETE", "/api/vote-scrutins/:id", async (req, res, params) => {
+route("DELETE", "/api/vote-scrutins/:id", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const s = await db.prepare(`SELECT s.*, i.owner_user_id FROM vote_scrutins s JOIN initiatives i ON i.id=s.initiative_id WHERE s.id=?`).get(params.id);
   if (!s) return sendJSON(res, 404, { error: "Scrutin introuvable." });
   if (Number(s.owner_user_id) !== Number(user.id)) return sendJSON(res, 403, { error: "Réservé au propriétaire." });
   if (!(await exigerPremium(user, res, "votes"))) return;
+  /* Suppression (2026-10-07, bouton « Supprimer » de l'onglet Archivés) : un brouillon se supprime directement ; un scrutin ARCHIVÉ aussi, mais comme il peut
+     contenir des bulletins, des électeurs et un procès-verbal, il faut retaper son nom exact (confirmer_nom). Un scrutin ni brouillon ni archivé doit d'abord être
+     archivé. Tout ce qui s'y rattache est effacé (bulletins, électeurs, résolutions, documents, tentatives) ; l'opération est consignée au journal de sécurité. */
+  const archive = Number(s.archived) === 1;
   if (s.statut !== "brouillon") {
-    return sendJSON(res, 400, { error: "Seul un scrutin en brouillon peut être supprimé. Archivez plutôt ce scrutin pour conserver les votes." });
+    if (!archive) return sendJSON(res, 400, { error: "Archivez d'abord ce scrutin : seuls un brouillon ou un scrutin archivé peuvent être supprimés." });
+    if (String(body && body.confirmer_nom || "").trim() !== String(s.nom).trim()) return sendJSON(res, 400, { error: "Pour supprimer ce scrutin définitivement, tapez son nom exact." });
+  }
+  let nbBulletins = 0;
+  try { nbBulletins = Number((await db.prepare("SELECT COUNT(*) AS n FROM vote_bulletins WHERE scrutin_id=?").get(params.id))?.n) || 0; } catch (_) {}
+  for (const table of ["vote_bulletins", "vote_tentatives", "vote_documents", "vote_electeurs", "vote_resolutions"]) {
+    try { await db.prepare(`DELETE FROM ${table} WHERE scrutin_id=?`).run(params.id); } catch (e) { logError(e, "vote-scrutin-suppression-" + table); }
   }
   await db.prepare("DELETE FROM vote_scrutins WHERE id=?").run(params.id);
+  SEC.logSecurity("vote_scrutin_supprime", { uid: Number(user.id), scrutin: Number(params.id), nom: String(s.nom).slice(0, 80), statut: s.statut, archive, bulletins: nbBulletins });
   sendJSON(res, 200, { ok: true });
 });
 

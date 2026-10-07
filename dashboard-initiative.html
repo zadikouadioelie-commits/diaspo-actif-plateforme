@@ -8596,7 +8596,7 @@ async function voRenderScrutins(){
             ${s.statut==='ouvert'?`<button class="btn btn-sm btn-outline" onclick="voClorer(${s.id})">🔒 Clôturer</button>`:''}
             ${s.statut==='clos'?`<button class="btn btn-sm btn-outline" onclick="voVoirResultats(${s.id})">📊 Résultats</button>`:''}
             <button class="btn btn-sm btn-outline" onclick="voOuvrirCompteRendu(${s.id})">📄 Compte rendu</button>
-            ${!archived?`<button class="btn btn-sm btn-outline" onclick="voArchiver(${s.id})">🗄️ Archiver</button>`:`<button class="btn btn-sm btn-outline" onclick="voDesarchiver(${s.id})">↩️ Désarchiver</button>`}
+            ${!archived?`<button class="btn btn-sm btn-outline" onclick="voArchiver(${s.id})">🗄️ Archiver</button>`:`<button class="btn btn-sm btn-outline" onclick="voDesarchiver(${s.id})">↩️ Désarchiver</button><button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="voSupprimerArchive(${s.id},'${escH(s.nom).replace(/'/g,"\\'")}')">🗑️ Supprimer</button>`}
             ${s.statut==='brouillon'?`<button class="btn btn-sm btn-outline" style="color:#ef4444;border-color:#ef4444;" onclick="voSupprimer(${s.id},'${escH(s.nom).replace(/'/g,"\\'")}')">🗑️ Supprimer</button>`:''}
           </div>
         </div>`).join('')}
@@ -8987,6 +8987,14 @@ async function voOuvrirCompteRendu(id){
 async function voSupprimer(id, nom){
   if(!confirm(`Supprimer définitivement le scrutin « ${nom} » ? Cette action est irréversible.`)) return;
   try{ await api('DELETE', `/vote-scrutins/${id}`, {}); voRenderScrutins(); showToast('Scrutin supprimé.'); }
+  catch(e){ showToast(e.message, 'danger'); }
+}
+/* Suppression d'un scrutin ARCHIVÉ (2026-10-07) : irréversible — bulletins, électeurs, résolutions et documents disparaissent. Le nom exact est demandé. */
+async function voSupprimerArchive(id, nom){
+  const saisie = prompt(`Supprimer définitivement le scrutin « ${nom} » ?\n\nTout est effacé, sans retour possible : bulletins, liste des électeurs, résolutions, résultats et documents.\n\nPour confirmer, tapez le nom exact du scrutin :`);
+  if(saisie === null) return;
+  if(saisie.trim() !== String(nom).trim()){ showToast('Le nom saisi ne correspond pas : rien n\'a été supprimé.', 'warning'); return; }
+  try{ await api('DELETE', `/vote-scrutins/${id}`, { confirmer_nom: saisie.trim() }); voRenderScrutins(); showToast('Scrutin supprimé définitivement.'); }
   catch(e){ showToast(e.message, 'danger'); }
 }
 async function voArchiver(id){
