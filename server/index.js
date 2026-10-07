@@ -2485,6 +2485,7 @@ route("POST", "/api/auth/connexions/:id/deconnecter", async (req, res, params) =
 route("GET", "/api/auth/me", async (req, res) => {
   const user = await getCurrentUser(req);
   const pub = publicUser(user);
+  if (pub) { try { pub.nom_affichage = await nomCompteAffichage(user.id); } catch (e) { pub.nom_affichage = null; } }
 
   /* Indicateur d'origine manquante, calculé UNE SEULE FOIS ici et lu tel quel par le
      bandeau (assets/app.js) — pour ne pas dupliquer la définition de "origine complète"
@@ -11773,11 +11774,12 @@ async function comptesLiesListe(groupeId) {
   /* Statut calculé en JS plutôt qu'en SQL : même logique que partout ailleurs sur la
      plateforme (comparaison new Date() en JS), pas de CASE SQL à faire passer par la
      couche de traduction toPg pour un simple calcul dérivé. */
-  return rows.map(r => {
+  return Promise.all(rows.map(async r => {
     const statut = r.suspendu_definitif || (r.suspendu_jusqu_au && new Date(r.suspendu_jusqu_au) > new Date()) ? 'suspendu' : 'actif';
     const { suspendu_definitif, suspendu_jusqu_au, ...safe } = r;
-    return { ...safe, statut };
-  });
+    /* nom_affichage = nom du COMPTE (initiative, institution) ; le nom du responsable reste dans nom/prenom, information secondaire. */
+    return { ...safe, nom_affichage: await nomCompteAffichage(r.id), statut };
+  }));
 }
 
 route("GET", "/api/comptes-lies", async (req, res) => {
@@ -21084,6 +21086,8 @@ route("GET", "/api/evenements", async (req, res, params, body, query) => {
   const meListe = await getCurrentUser(req);
   const proprietaireDemandeSesPropres = meListe && query.owner && Number(query.owner) === Number(meListe.id);
   rows = rows.filter(r => r.statut !== 'brouillon' || proprietaireDemandeSesPropres || (meListe && meListe.role === 'administrateur'));
+  /* L'organisateur affiché est le nom du COMPTE (initiative, institution), jamais celui de son responsable. */
+  { const cacheOrg = {}; await Promise.all(rows.map(async r => { if (r.owner_user_id) { cacheOrg[r.owner_user_id] = cacheOrg[r.owner_user_id] || nomCompteAffichage(r.owner_user_id); r.organisateur_nom = (await cacheOrg[r.owner_user_id]) || r.organisateur_nom; } })); }
   /* Visibilité "🏬 Boutique uniquement" (2026-09-30, demande explicite : un événement RÉEL/publié,
      pas un brouillon, mais volontairement absent de la découverte générale — affiché seulement
      sur la page boutique de son organisateur. Même signature ?owner=<id> que "Mes événements"
@@ -22448,6 +22452,7 @@ route("GET", "/api/evenements/:id", async (req, res, params) => {
   const cagnottesLiees = (await db.prepare(
     "SELECT id, slug, titre, image_url, objectif_montant, montant_collecte, devise, statut_manuel, est_publiee, date_fin FROM cagnottes WHERE evenement_id=? AND est_publiee=1 AND visibilite='publique'"
   ).all(params.id)).map(cagnotteAvecStatut);
+  if (row.owner_user_id) { row.organisateur_nom = (await nomCompteAffichage(row.owner_user_id)) || row.organisateur_nom; }
   const [rowAvecFiche] = await enrichirAvecFicheMedia([row]);
   sendJSON(res, 200, { evenement: rowAvecFiche, participants, nb_participants: participants.length, cagnottes: cagnottesLiees });
 });

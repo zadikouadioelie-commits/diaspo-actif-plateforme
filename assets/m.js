@@ -180,7 +180,7 @@
         try {
           const r = await api('/api/auth/login', { method: 'POST', body: { email, password } });
           if (r.user) {
-            S.me = r.user; toast('Bienvenue ' + (r.user.prenom || '') + ' !'); close(true);
+            S.me = r.user; toast('Bienvenue' + (r.user.role === 'utilisateur' && r.user.prenom ? ' ' + r.user.prenom : '') + ' !'); close(true);
             await afterAuthChange();
           } else {
             err.innerHTML = esc(r.message || r.error || 'Une confirmation est nécessaire.') + ` <a href="login.html?redirect=${encodeURIComponent('/m.html')}" style="color:var(--navy2);font-weight:700;text-decoration:underline">Continuer sur la page de connexion</a>`;
@@ -368,7 +368,7 @@
         const r = await api(`/api/fil/${id}/commentaires`);
         const l = r.commentaires || [];
         /* Les comptes de démonstration sont masqués des listes publiques par la plateforme : on affiche quand même le commentaire qu'on vient d'écrire. */
-        if (mine && !l.some(c => c.contenu === mine)) l.push({ auteur_nom: [S.me.prenom, S.me.nom].filter(Boolean).join(' '), photo_url: S.me.photo_url, contenu: mine, created_at: new Date().toISOString() });
+        if (mine && !l.some(c => c.contenu === mine)) l.push({ auteur_nom: S.me.nom_affichage || [S.me.prenom, S.me.nom].filter(Boolean).join(' '), photo_url: S.me.photo_url, contenu: mine, created_at: new Date().toISOString() });
         $('#cmlist').innerHTML = l.length ? l.map(c => `<div class="cm"><div class="av">${c.photo_url ? `<img src="${attrUrl(c.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(c.auteur_nom))}</div><div class="sp"><div class="nm">${esc(c.auteur_nom)} <span class="muted small" style="font-weight:400">· ${esc(ago(c.created_at))}</span></div><p>${esc(c.contenu)}</p></div></div>`).join('')
           : '<div class="empty" style="padding:22px"><b>Aucun commentaire</b>Soyez le premier à réagir.</div>';
         if (btn) btn.querySelector('span').textContent = l.length || '';
@@ -817,8 +817,8 @@
     let list = [];
     try { list = (await api('/api/comptes-lies')).comptes || []; } catch (e) { toast(e.message, true); }
     const body = list.length ? list.map(c => {
-      const nm = [c.prenom, c.nom].filter(Boolean).join(' ') || c.nom; const actif = Number(c.id) === Number(S.me.id);
-      return `<div class="li" style="cursor:default"><div class="av">${c.photo_url ? `<img src="${attrUrl(c.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><span class="sp"><span class="t">${esc(nm)}</span><br><span class="d">${esc(ROLE_LABEL[c.role] || c.role)}${c.statut === 'suspendu' ? ' · suspendu' : ''}</span></span>${actif ? '<span class="badge g">Actif</span>' : (c.statut === 'suspendu' ? '' : `<button class="btn sm" data-sw="${c.id}">Basculer</button>`)}</div>`;
+      const resp = [c.prenom, c.nom].filter(Boolean).join(' ') || c.nom; const nm = c.nom_affichage || resp; const actif = Number(c.id) === Number(S.me.id);
+      return `<div class="li" style="cursor:default"><div class="av">${c.photo_url ? `<img src="${attrUrl(c.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><span class="sp"><span class="t">${esc(nm)}</span><br><span class="d">${esc(ROLE_LABEL[c.role] || c.role)}${c.statut === 'suspendu' ? ' · suspendu' : ''}</span>${c.role !== 'utilisateur' && resp && resp !== nm ? `<br><span class="d" style="font-size:10.5px;opacity:.75">resp. ${esc(resp)}</span>` : ''}</span>${actif ? '<span class="badge g">Actif</span>' : (c.statut === 'suspendu' ? '' : `<button class="btn sm" data-sw="${c.id}">Basculer</button>`)}</div>`;
     }).join('') : `<div class="empty" style="padding:22px"><div class="ei">${ic('people', 'l')}</div><b>Aucun compte lié</b>Reliez vos comptes (personnel, initiative…) pour passer de l’un à l’autre sans vous reconnecter.</div>`;
     sh.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-label="Changer de compte"><div class="grip"></div><h2 style="margin:0 0 8px;font-size:18px">Changer de compte</h2><div class="sb"><div class="lst">${list.length ? body : ''}</div>${list.length ? '' : body}</div>
       <a class="btn out block" style="margin-top:12px" href="comptes-lies.html">${ic('plus', 's')} ${list.length ? 'Gérer / lier un compte' : 'Lier un compte'}</a></div>`;
@@ -846,22 +846,22 @@
      r[rôle] : 0 absent · 1 libre · 2 Premium (verrouillé si expiré) · 3 libre, une partie est Premium
      ============================================================ */
   const MODS = [
-    { t: 'Mes événements', i: 'cal', h: 'dashboard-initiative.html#evenements', d: 'Créer et gérer vos événements', r: { initiative: 2 } },
-    { t: 'Cotisations et adhésions', i: 'people', h: 'dashboard-initiative.html#adhesions-init', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
-    { t: 'Messages de la boutique', i: 'shop', h: 'dashboard-initiative.html#messages-vitrine', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
+    { t: 'Mes événements', i: 'cal', h: '#/mesevenements', d: 'Créer et gérer vos événements', r: { initiative: 2 } },
+    { t: 'Cotisations et adhésions', i: 'people', h: '#/cotisations', d: 'Formules, adhérents, paiements', r: { initiative: 2 } },
+    { t: 'Messages de la boutique', i: 'shop', h: '#/msgboutique', d: 'Demandes reçues via votre boutique', r: { initiative: 2 } },
     { t: 'Messagerie', i: 'chat', h: '#/messages', d: 'Vos conversations', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Mes billets', i: 'ticket', h: '#/billets', d: 'Inscriptions et QR codes d’entrée', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Cagnottes et dons', i: 'heart', h: '#/cagnottes', d: { utilisateur: 'Soutenir les cagnottes ouvertes', initiative: 'Vos cagnottes et les dons reçus' }, r: { utilisateur: 1, initiative: 1 } },
-    { t: 'Mon Associé', i: 'people', h: 'mon-associe.html', d: { utilisateur: 'Consulter les annonces, candidater', initiative: 'Annonces d’associés · publier = Premium' }, r: { utilisateur: 1, initiative: 3 } },
-    { t: 'Mon Réseau Pro', i: 'brief', h: 'reseau.html', d: 'Contacts et réseau professionnel', r: { utilisateur: 2, initiative: 1 } },
-    { t: 'Business Plans', i: 'file', h: 'business-plan.html', d: 'Construire et défendre vos projets', r: { utilisateur: 2, initiative: 2 } },
-    { t: 'Formations', i: 'book', h: 'formations.html', d: 'Catalogue et formations suivies', r: { utilisateur: 1, initiative: 1 } },
-    { t: 'CV, lettres, candidatures', i: 'doc', h: 'dashboard-utilisateur.html', d: 'Vos documents de candidature', r: { utilisateur: 1 } },
-    { t: 'Parrainage', i: 'gift', h: 'parrainage.html', d: 'Invitez vos proches', r: { utilisateur: 1, initiative: 1 } }
+    { t: 'Mon Associé', i: 'people', h: '#/associe', d: { utilisateur: 'Consulter les annonces, candidater', initiative: 'Annonces d’associés · publier = Premium' }, r: { utilisateur: 1, initiative: 3 } },
+    { t: 'Mon Réseau Pro', i: 'brief', h: '#/reseaupro', d: 'Contacts et réseau professionnel', r: { utilisateur: 2, initiative: 1 } },
+    { t: 'Business Plans', i: 'file', h: '#/businessplan', d: 'Construire et défendre vos projets', r: { utilisateur: 2, initiative: 2 } },
+    { t: 'Formations', i: 'book', h: '#/formations', d: 'Catalogue et formations suivies', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'CV, lettres, candidatures', i: 'doc', h: '#/cvlettres', d: 'Vos documents de candidature', r: { utilisateur: 1 } },
+    { t: 'Parrainage', i: 'gift', h: '#/parrainage', d: 'Invitez vos proches', r: { utilisateur: 1, initiative: 1 } }
   ];
   const MODS_COMPTE = [
-    { t: 'Confidentialité', i: 'lock', h: 'confidentialite.html', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
-    { t: 'Mon abonnement', i: 'star', h: 'mon-abonnement.html', d: 'Premium et échéances', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Confidentialité', i: 'lock', h: '#/confidentialite', d: 'Vos données et votre visibilité', r: { utilisateur: 1, initiative: 1 } },
+    { t: 'Mon abonnement', i: 'star', h: '#/abonnement', d: 'Premium et échéances', r: { utilisateur: 1, initiative: 1 } },
     { t: 'Liaison de comptes', i: 'people', h: '#', act: 'switch', d: 'Passer d’un compte à un autre', r: { utilisateur: 1, initiative: 1 } }
   ];
   const MENU_DESK = ['Soumettre à Diaspo’Actif', 'Mes projets', 'Évaluation de projet', 'CRM partagé', 'Emploi et stages', 'Paiements', 'Mes demandes de devis', 'Ma localisation', 'Programmation', 'Support pilote', 'Apparence', 'Mes statistiques'];
@@ -877,7 +877,7 @@
       $('#go-login').onclick = () => openLogin(); return;
     }
     const m = S.me, role = (m.role === 'utilisateur' || m.role === 'initiative') ? m.role : null;
-    const nm = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email;
+    const resp = [m.prenom, m.nom].filter(Boolean).join(' ') || m.email; const nm = m.nom_affichage || resp;
     const prem = S.premium && S.premium.concerne ? (S.premium.actif ? '👑 Premium actif' : '🔒 Premium expiré') : '';
     const lvl = x => role ? (x.r[role] || 0) : (x.r.utilisateur === 1 && x.r.initiative === 1 ? 1 : 0);
     const li = x => {
@@ -889,7 +889,7 @@
       return `<a class="li" href="${esc(x.h)}" ${x.act ? `data-act="${x.act}"` : ''}>${inner}</a>`;
     };
     const mods = MODS.map(li).join(''), compte = MODS_COMPTE.map(li).join('');
-    el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div></div></a>
+    el.innerHTML = `<a class="me" href="profil-app.html?id=${encodeURIComponent(m.id)}"><div class="av big">${m.photo_url ? `<img src="${attrUrl(m.photo_url)}" alt="" onerror="this.remove()">` : esc(initials(nm))}</div><div class="sp"><div class="nm ell">${esc(nm)}</div><div class="sub">${esc(ROLE_LABEL[m.role] || m.role)}${prem ? ' · ' + prem : ''}</div><div class="sub" style="margin-top:2px">Voir mon profil ›</div>${m.role !== 'utilisateur' && resp && resp !== nm ? `<div class="sub" style="font-size:10.5px;opacity:.7;margin-top:2px">Responsable : ${esc(resp)}</div>` : ''}</div></a>
       <button class="btn out block" id="me-switch" style="margin:10px 0 0">${ic('people', 's')} Changer de compte</button>
       <div class="h2">MES MODULES</div><div class="lst">${mods}</div>
       <div class="h2">MON COMPTE</div><div class="lst">${compte}</div>
@@ -962,6 +962,12 @@
     p.hidden = true; document.body.style.overflow = ''; clearInterval(S.chatTimer); S.pane = null;
     const f = $('#pane-foot'); if (f) { f.innerHTML = ''; f.hidden = true; }
   }
+  const SITE_PAGES = { mesevenements: 'dashboard-initiative.html#evenements', cotisations: 'dashboard-initiative.html#adhesions-init', msgboutique: 'dashboard-initiative.html#messages-vitrine', associe: 'mon-associe.html', reseaupro: 'reseau.html', businessplan: 'business-plan.html', formations: 'formations.html', cvlettres: 'dashboard-utilisateur.html', parrainage: 'parrainage.html', confidentialite: 'confidentialite.html', abonnement: 'mon-abonnement.html' };
+  function openSheet(inner) {
+    const sh = $('#sheet'); sh.hidden = false; const close = () => { sh.hidden = true; sh.innerHTML = ''; };
+    sh.innerHTML = '<div class="sh" role="dialog" aria-modal="true"><div class="grip"></div><div class="sb">' + inner + '</div></div>';
+    sh.onclick = e => { if (e.target === sh) close(); }; return close;
+  }
   function openPane(a, b, c) {
     S.pane = { k: a === 'conv' ? 'conv' : a };
     const done = () => { renderTop(); };
@@ -974,7 +980,9 @@
     else if (a === 'cagnottes') paneCagnottes();
     else if (a === 'videos') paneVideos();
     else if (a === 'video') paneVideo(b);
-    else { location.hash = '#/fil'; return; }
+    else if (window.MMods && typeof window.MMods[a] === 'function') window.MMods[a](b, c);
+    else if (SITE_PAGES[a]) { location.replace(SITE_PAGES[a]); return; }
+    else { location.hash = '#/accueil'; return; }
     done();
   }
 
@@ -989,5 +997,7 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshBadges(); });
     if ('serviceWorker' in navigator) { /* le site est « réseau uniquement » : rien à enregistrer */ }
   }
+  window.MMods = window.MMods || {};
+  window.MApp = { S, api, esc, strip, md, linkify, richHtml, ic, ICONS, setPane, closePane, openSheet, toast, needLogin, openLogin, loginCard, mediaBlock, videoBlock, money, dateLong, parseDay, ago, hhmm, dayLabel, initials, attrUrl, safeUrl, premiumLocked, premiumSheet, loadPremium, afterAuthChange, ROLE_LABEL };
   init();
 })();
