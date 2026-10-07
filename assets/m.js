@@ -443,7 +443,7 @@
     if (more) { const c = more.parentNode.querySelector('[data-clamp]'); c.style.webkitLineClamp = 'unset'; c.style.display = 'block'; more.remove(); return; }
     const z = e.target.closest('[data-zoom]'); if (z) { zoom(z.dataset.zoom); return; }
     const a = e.target.closest('.post [data-act]'); if (!a) return;
-    const card = a.closest('.post'), id = card.dataset.id, post = S.fil.posts.find(p => String(p.id) === String(id));
+    const card = a.closest('.post'), id = card.dataset.id, post = S.fil.posts.find(p => String(p.id) === String(id)) || postCache[id];
     if (a.dataset.act === 'like') {
       if (!(await needLogin('Connectez-vous pour aimer une publication.'))) return;
       if (a.classList.contains('liked')) return; // l'API ne propose que l'ajout
@@ -456,9 +456,8 @@
     } else if (a.dataset.act === 'comment') {
       openComments(id, post, a);
     } else if (a.dataset.act === 'share') {
-      const url = location.origin + '/index.html';
-      const txt = strip((post && (post.titre || post.corps)) || 'Publication sur Diaspo’Actif');
-      try { if (navigator.share) await navigator.share({ title: 'Diaspo’Actif', text: txt, url }); else { await navigator.clipboard.writeText(url); toast('Lien copié'); } } catch (er) { /* annulé */ }
+      if (post && post.visibilite && post.visibilite !== 'public') return toast('Cette publication n’est pas publique : elle ne peut pas être partagée.', true);
+      partagerLien(location.origin + '/fil-actualite.html?post=' + encodeURIComponent(id) + '&r=' + jetonPartage(), strip((post && (post.titre || post.corps)) || 'Publication sur Diaspo’Actif').slice(0, 80));
     }
   });
 
@@ -664,6 +663,8 @@
       ${desc ? `<div class="card"><div class="pad rich" style="white-space:pre-line">${esc(desc)}</div></div>` : ''}
       ${e.lien_visio ? `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(e.lien_visio)}" target="_blank" rel="noopener">Rejoindre en visio ${ic('out', 's')}</a>` : ''}`;
     setPane(e.titre, html, cta);
+    /* Lien public (lisible sans compte) : seulement pour un événement public ; &via = qui partage (aperçu « X vous invite »). */
+    if ((e.visibilite || 'public') === 'public') paneShare(location.origin + '/evenements.html?evt=' + encodeURIComponent(id) + (S.me ? '&via=' + S.me.id : '') + '&r=' + jetonPartage(), e.titre);
     const j = $('#ev-join'); if (j) j.onclick = async () => {
       if (!(await needLogin('Connectez-vous pour vous inscrire à cet événement.'))) return paneEvent(id);
       j.disabled = true; j.textContent = 'Inscription…';
@@ -1014,6 +1015,7 @@
       ${r.peut_editer ? '<button type="button" class="btn out block" id="crrecus" style="margin-bottom:10px">📨 Messages reçus</button>' : ''}
       <a class="btn out block" href="compte-rendu.html?evt=${esc(id)}">Ouvrir la version complète ${ic('out', 's')}</a>`;
     setPane(c.titre || 'Compte-rendu', html, crBarHtml(c));
+    if (c.statut === 'publie') paneShare(location.origin + '/compte-rendu.html?evt=' + encodeURIComponent(id) + '&r=' + jetonPartage(), c.titre || ev.titre);
     /* barre du bas, toujours visible : « Synthèse » (+ « ? » qui l'explique) et « Agir » ; bloc d'action du haut : message à l'organisateur */
     const bulle = $('#cr-bulle'), qm = $('#cr-qm');
     $('#cr-synth').onclick = () => { bulle.hidden = true; qm.setAttribute('aria-expanded', 'false'); crSynthese(r, id); };
@@ -1023,6 +1025,20 @@
     if (sous === 'synthese') crSynthese(r, id);
     const bm = $('#crmsg'); if (bm) bm.onclick = () => crMessageSheet(id, ev);
     const br = $('#crrecus'); if (br) br.onclick = () => crMessagesRecus(id, c.titre || ev.titre);
+  }
+  /* Une publication ouverte par son lien de partage (#/post/ID), lisible sans compte si elle est publique (2026-10-07). */
+  const postCache = {};
+  async function panePost(id) {
+    setPane('Publication', '<div class="sk skc"></div><div class="sk skc" style="height:120px"></div>');
+    let r;
+    try { r = await api('/api/fil/' + encodeURIComponent(id)); }
+    catch (e) { return setPane('Publication', `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Publication introuvable</b>Elle a peut-être été supprimée, ou elle n’est plus publique.<br><br><a class="btn" href="#/accueil">Voir le fil d’actualité</a></div>`); }
+    const p = r.post; if (!p) return setPane('Publication', '<div class="empty"><b>Publication introuvable</b></div>');
+    postCache[p.id] = p;
+    const invite = S.me ? '' : '<div class="card" style="margin-top:12px"><div class="pad"><b>Rejoignez Diaspo’Actif</b><p class="small muted" style="margin:4px 0 10px">La plateforme de la diaspora engagée : réagissez, commentez et suivez vos organisations.</p><a class="btn sm" href="inscription.html">Créer un compte gratuit</a></div></div>';
+    setPane('Publication', '<div style="padding-top:12px">' + postHtml(p) + '</div>' + invite);
+    $$('#pane-body [data-clamp]').forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
+    if ((p.visibilite || 'public') === 'public') paneShare(location.origin + '/fil-actualite.html?post=' + encodeURIComponent(p.id) + '&r=' + jetonPartage(), strip(p.titre || p.corps || 'Publication sur Diaspo’Actif').slice(0, 80));
   }
   /* Action par défaut de tous les comptes-rendus (2026-10-07) : nom, prénom, e-mail, petit message — sans compte. */
   function crMessageSheet(id, ev) {
@@ -1459,13 +1475,30 @@
   }
 
   /* ---------- panneau plein écran ---------- */
+  /* Partage d'un lien public (2026-10-07, demande explicite) : événements, publications, comptes-rendus. Le destinataire ouvre le
+     lien SANS compte Diaspo'Actif (pages publiques, voir m-redirect.js pour l'arrivée sur téléphone). Pas de « text » : WhatsApp
+     collerait ce texte avant le lien au lieu de déplier l'aperçu (même constat que le partage d'événement du site). */
+  async function partagerLien(url, titre) {
+    try { if (navigator.share) { await navigator.share({ title: titre || 'Diaspo’Actif', url }); return; } }
+    catch (er) { if (er && er.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); toast('Lien copié ✓'); return; } catch (er) { /* presse-papiers refusé */ }
+    openSheet('<h3 style="margin:0 0 8px">Partager</h3><p class="small muted" style="margin:0 0 8px">Copiez ce lien : il s’ouvre sans compte.</p><input class="fi" id="sh-url" readonly value="' + esc(url) + '">');
+    const i = $('#sh-url'); if (i) { i.focus(); i.select(); }
+  }
+  /* Lien unique à chaque partage (&r=) : WhatsApp garde un aperçu raté pour toujours par adresse exacte (voir partagerEvenement du site). */
+  const jetonPartage = () => Date.now().toString(36);
+  function paneShare(url, titre) {
+    const b = $('#pane-share'); if (!b) return;
+    b.hidden = false; b.onclick = () => partagerLien(url, titre);
+  }
   function setPane(title, html, foot, keepFoot) {
     const p = $('#pane'); p.hidden = false; document.body.style.overflow = 'hidden';
     if (!p.dataset.built) {
-      p.innerHTML = `<div class="phead"><button class="ibtn" id="pane-back" aria-label="Retour">${ic('back')}</button><h2 id="pane-title"></h2></div><div class="pbody" id="pane-body"></div><div class="pfoot" id="pane-foot" hidden></div>`;
+      p.innerHTML = `<div class="phead"><button class="ibtn" id="pane-back" aria-label="Retour">${ic('back')}</button><h2 id="pane-title"></h2><button class="ibtn" id="pane-share" aria-label="Partager" hidden>${ic('share')}</button></div><div class="pbody" id="pane-body"></div><div class="pfoot" id="pane-foot" hidden></div>`;
       p.dataset.built = '1'; $('#pane-back').onclick = () => { if (history.length > 1) history.back(); else location.hash = '#/' + (S.tab || 'fil'); };
     }
     $('#pane-title').textContent = title || '';
+    const psh = $('#pane-share'); if (psh) { psh.hidden = true; psh.onclick = null; }
     const b = $('#pane-body'); b.innerHTML = html; if (!keepFoot || true) b.scrollTop = 0;
     const f = $('#pane-foot');
     if (keepFoot) { f.hidden = false; f.style.padding = '0'; }
@@ -1490,6 +1523,7 @@
     else if (a === 'billets') paneBillets();
     else if (a === 'billet') paneBillet(b, c);
     else if (a === 'notifs') paneNotifs();
+    else if (a === 'post') panePost(b);
     else if (a === 'cr') paneCR(b, c);
     else if (a === 'cagnottes') paneCagnottes(b);
     else if (a === 'videos') paneVideos();

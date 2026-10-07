@@ -13506,6 +13506,14 @@ route("GET", "/api/fil/:id", async (req, res, params) => {
   const cu = await getCurrentUser(req);
   const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(params.id);
   if (!p) return sendJSON(res, 404, { error: "Publication introuvable." });
+  /* Garde de visibilité (2026-10-07) : cette route est ouverte à tous (lien de partage lisible sans compte), elle ne
+     doit donc jamais livrer une publication brouillon/archivée/privée à un tiers, ni une publication réservée aux
+     membres (« membres », « abonnés ») à un visiteur non connecté. L'auteur et les administrateurs voient tout. */
+  const estAuteurPost = !!cu && (Number(cu.id) === Number(p.auteur_id) || cu.role === "administrateur");
+  if (!estAuteurPost) {
+    const vis = p.visibilite || "public";
+    if (["brouillon", "archive"].includes(p.statut) || vis === "prive" || (vis !== "public" && !cu)) return sendJSON(res, 404, { error: "Publication introuvable." });
+  }
   // Enregistrer la vue
   if (cu) { try { await db.prepare("INSERT OR IGNORE INTO fil_post_views (post_id, user_id) VALUES (?,?)").run(p.id, cu.id); } catch(e){} }
   sendJSON(res, 200, { post: await enrichPost(p, cu) });

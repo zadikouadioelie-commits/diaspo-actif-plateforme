@@ -32,6 +32,9 @@
     if (f === 'initiative.html' && q.id) return '#/profil/i/' + encodeURIComponent(q.id);
     if ((f === 'profil.html' || f === 'profil-app.html') && q.id) return '#/profil/' + encodeURIComponent(q.id);
     if (f === 'compte-rendu.html' && q.evt && !q.edition) return '#/cr/' + encodeURIComponent(q.evt) + (q.synthese === '1' ? '/synthese' : '');
+    /* Liens de partage (2026-10-07) : un événement ou une publication partagés s'ouvrent directement dans l'appli, sans compte. */
+    if ((f === 'evenements.html' || f === 'evenements-app.html') && q.evt) return '#/evenement/' + encodeURIComponent(q.evt);
+    if (f === 'fil-actualite.html' && q.post) return '#/post/' + encodeURIComponent(q.post);
     if (f === 'videos-tutoriels.html' && q.v) return '#/video/' + encodeURIComponent(q.v);
     if (f === 'compte-rendu.html' || f === 'profil.html' || f === 'profil-app.html' || f === 'initiative.html') return '';
     return Object.prototype.hasOwnProperty.call(PAGES, f) ? PAGES[f] : '';
