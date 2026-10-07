@@ -275,6 +275,30 @@
       </div>
 
       <div class="vit-filter-group">
+        <label>🚚 Livraison</label>
+        <select id="v-livraison">
+          <option value="">Peu importe</option>
+          <option value="expedition">Livraison à domicile</option>
+          <option value="retrait">Retrait sur place</option>
+        </select>
+      </div>
+
+      <div class="vit-filter-group">
+        <label>⭐ Note minimum</label>
+        <select id="v-note-min">
+          <option value="">Toutes les notes</option>
+          <option value="4">4★ et plus</option>
+          <option value="3">3★ et plus</option>
+        </select>
+      </div>
+
+      <div class="vit-filter-group" style="justify-content:flex-end;">
+        <label style="height:42px;display:flex;align-items:center;gap:6px;white-space:nowrap;text-transform:none;font-size:13.5px;font-weight:600;color:var(--text);">
+          <input type="checkbox" id="v-verifiee"> ✅ Vérifiées uniquement
+        </label>
+      </div>
+
+      <div class="vit-filter-group">
         <label>↕️ Trier par</label>
         <select id="v-tri">
           <option value="recent">Plus récentes</option>

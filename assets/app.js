@@ -3016,7 +3016,7 @@ async function initVitrines(){
   const urlParams = new URLSearchParams(window.location.search);
   const state = {
     q: urlParams.get("q") || "", type: urlParams.get("type") || "", domaine: urlParams.get("domaine") || "",
-    paysRes: "", paysOrig: "", tri: "recent",
+    paysRes: "", paysOrig: "", tri: "recent", livraison: "", noteMin: "", verifiee: false,
   };
   const motCleUrlEl = document.getElementById("v-motcle");
   if (state.q && motCleUrlEl) motCleUrlEl.value = state.q;
@@ -3032,6 +3032,9 @@ async function initVitrines(){
     if (state.paysRes) qs.set("pays", state.paysRes);
     if (state.paysOrig) qs.set("origine", state.paysOrig);
     if (state.tri) qs.set("tri", state.tri);
+    if (state.livraison) qs.set("livraison", state.livraison);
+    if (state.noteMin) qs.set("note_min", state.noteMin);
+    if (state.verifiee) qs.set("verifiee", "1");
     let rows = [];
     try {
       const r = await api("GET", "/vitrines?" + qs.toString());
@@ -3055,22 +3058,33 @@ async function initVitrines(){
     _motCleTimer = setTimeout(() => { state.q = motCleEl.value.trim(); apply(); }, 350);
   });
 
-  ["v-type", "v-domaine", "v-tri"].forEach(id => {
+  ["v-type", "v-domaine", "v-tri", "v-livraison", "v-note-min"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", () => {
       state.type = document.getElementById("v-type").value;
       state.domaine = document.getElementById("v-domaine").value;
       state.tri = document.getElementById("v-tri").value;
+      state.livraison = document.getElementById("v-livraison").value;
+      state.noteMin = document.getElementById("v-note-min").value;
       apply();
     });
   });
 
+  document.getElementById("v-verifiee")?.addEventListener("change", (e) => {
+    state.verifiee = e.target.checked;
+    apply();
+  });
+
   document.getElementById("v-btn-reset")?.addEventListener("click", () => {
     state.q = ""; state.type = ""; state.domaine = ""; state.paysRes = ""; state.paysOrig = ""; state.tri = "recent";
+    state.livraison = ""; state.noteMin = ""; state.verifiee = false;
     if (motCleEl) motCleEl.value = "";
     document.getElementById("v-type").value = "";
     document.getElementById("v-domaine").value = "";
     document.getElementById("v-tri").value = "recent";
+    document.getElementById("v-livraison").value = "";
+    document.getElementById("v-note-min").value = "";
+    document.getElementById("v-verifiee").checked = false;
     apply();
   });
 

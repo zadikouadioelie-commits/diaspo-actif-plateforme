@@ -3137,6 +3137,36 @@ async function renderVitrineVisitor(init) {
     </div>
   </section>`;
 
+  /* Filtres produits (2026-10-07, demande explicite : "il n'y a pas de filtre lorsqu'on
+     cherche [un produit dans] une boutique en particulier") — visiteur uniquement : le
+     propriétaire gère son catalogue par glisser-déposer (wireProductDrag/wireCatalogueDrag),
+     qui s'appuie sur l'ordre DOM courant pour reconstruire la liste envoyée au serveur ; si on
+     lui masquait des cartes via un filtre, un réordonnancement effectué pendant que le filtre
+     est actif enverrait une liste tronquée. 100% client (aucun appel réseau : tous les produits
+     — jusqu'à MAX_PRODUITS_VITRINE — sont déjà chargés d'un coup, voir ligne ~3070), donc
+     applicable aussi bien aux articles classés (par catalogue) qu'aux non classés : voir
+     pvtAppliquerFiltresProduits(), qui recalcule puis rappelle simplement renderPvtCatalogues/
+     renderPvtProducts avec un sous-ensemble filtré de `produits`, sans dupliquer leur logique
+     de rendu/pagination. N'apparaît que si le catalogue est assez fourni pour le justifier. */
+  const categoriesProduits = [...new Set(produits.map(p => p.categorie).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const filtresProduitsSec = (!isOwn && produits.length > 8) ? `<section class="pvt-section" style="padding:14px 20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <select id="pvt-f-categorie" style="flex:1;min-width:160px;padding:8px 10px;border-radius:8px;border:1px solid var(--vsoftbd,#e5e7eb);font-size:13px;">
+        <option value="">Toutes les catégories</option>
+        ${categoriesProduits.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+      </select>
+      <select id="pvt-f-livraison" style="flex:1;min-width:180px;padding:8px 10px;border-radius:8px;border:1px solid var(--vsoftbd,#e5e7eb);font-size:13px;">
+        <option value="">Retrait ou livraison</option>
+        <option value="expedition">🚚 Livraison à domicile</option>
+        <option value="retrait">🏪 Retrait sur place</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap;">
+        <input type="checkbox" id="pvt-f-dispo"> Disponibles uniquement
+      </label>
+      <span id="pvt-f-count" style="font-size:12px;color:var(--muted,#6B7686);margin-left:auto;"></span>
+    </div>
+  </section>` : '';
+
   /* Image à droite du texte (2026-09-29, demande explicite : "à droite... qu'il y a de la
      place vide") — purement illustrative, jamais requise. Masquée pour un visiteur si aucune
      image n'a été choisie (pas d'espace vide/placeholder montré au public) ; pour le
@@ -3695,6 +3725,7 @@ async function renderVitrineVisitor(init) {
       ${subnav}
       ${hero}
       ${actionbar}
+      ${filtresProduitsSec}
       ${sortedModuleSections}
       ${commandesSec}
       <div class="pvt-grid2">${promosSec}${meilleuresVentesSec}</div>
@@ -3707,6 +3738,13 @@ async function renderVitrineVisitor(init) {
 
   // Articles non classés (cartes stylées)
   renderPvtProducts(articlesNonClasses, ownerId);
+
+  // Filtres produits (visiteur) — voir filtresProduitsSec ci-dessus
+  if (document.getElementById('pvt-f-categorie')) {
+    ['pvt-f-categorie', 'pvt-f-livraison'].forEach(id => document.getElementById(id).addEventListener('change', () => pvtAppliquerFiltresProduits(catalogues, produits, ownerId)));
+    document.getElementById('pvt-f-dispo').addEventListener('change', () => pvtAppliquerFiltresProduits(catalogues, produits, ownerId));
+    document.getElementById('pvt-f-count').textContent = `${produits.length} produits`;
+  }
 
   // Commandes reçues, propriétaire uniquement (2026-09-30, voir commandesSec ci-dessus)
   if (isOwn) renderMesCommandes(init.id);
@@ -4880,6 +4918,31 @@ function renderPvtProducts(produits, ownerId) {
     grid._pvtResize = () => { clearTimeout(t); t = setTimeout(() => { if (document.body.contains(grid) && pvtColonnes(grid) !== Number(grid.dataset.pvtCols)) renderPvtProducts(produits, ownerId); }, 200); };
     window.addEventListener('resize', grid._pvtResize);
   }
+}
+
+/* Filtre produits (visiteur, voir filtresProduitsSec) — purement client : les produits sont
+   déjà tous chargés (pas de pagination côté API), donc on recalcule juste le sous-ensemble à
+   afficher et on rappelle renderPvtCatalogues/renderPvtProducts telles quelles, sans dupliquer
+   leur logique de rendu/pagination. */
+function pvtAppliquerFiltresProduits(catalogues, produitsTous, ownerId) {
+  const catEl = document.getElementById('pvt-f-categorie');
+  if (!catEl) return;
+  const categorie = catEl.value;
+  const livraison = document.getElementById('pvt-f-livraison').value;
+  const dispoSeul = document.getElementById('pvt-f-dispo').checked;
+  const filtres = produitsTous.filter(p => {
+    if (categorie && p.categorie !== categorie) return false;
+    if (livraison === 'expedition' && !p.livraison_expedition) return false;
+    if (livraison === 'retrait' && !p.livraison_retrait) return false;
+    if (dispoSeul && (p.statut || 'disponible') !== 'disponible') return false;
+    return true;
+  });
+  const prodGrid = document.getElementById('pvt-prodgrid');
+  if (prodGrid) delete prodGrid.dataset.pvtShown;
+  renderPvtCatalogues(catalogues, filtres, ownerId);
+  renderPvtProducts(filtres.filter(p => p.catalogue_id == null), ownerId);
+  const countEl = document.getElementById('pvt-f-count');
+  if (countEl) countEl.textContent = `${filtres.length} produit${filtres.length > 1 ? 's' : ''}`;
 }
 
 /* Changer le thème de la vitrine (propriétaire uniquement — persistance) */

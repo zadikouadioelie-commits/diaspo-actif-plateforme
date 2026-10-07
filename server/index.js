@@ -9050,6 +9050,23 @@ route("GET", "/api/vitrines", async (req, res, params, body, query) => {
   if (query.pays) rows = rows.filter(r => r.pays === query.pays);
   if (query.domaine) rows = rows.filter(r => r.domaine === query.domaine || safeParseArray(r.domaines_secondaires_json).includes(query.domaine));
   if (query.type) rows = rows.filter(r => r.type === query.type);
+  if (query.verifiee === '1') rows = rows.filter(r => !!r.organisation_verifiee);
+  if (query.note_min) {
+    const seuil = parseFloat(query.note_min);
+    if (!isNaN(seuil)) rows = rows.filter(r => (r.note_moyenne || 0) >= seuil);
+  }
+  /* Livraison (2026-10-07, demande explicite : filtres diaspora-pertinents sur l'annuaire des
+     boutiques) — un acheteur à l'étranger veut savoir AVANT d'ouvrir la fiche si l'expédition
+     est possible. Agrégé depuis produits_vitrine (livraison_expedition/livraison_retrait,
+     ajoutées le 2026-09-30 pour le module livraison/suivi de colis) : une boutique "a la
+     livraison" dès qu'un seul de ses produits disponibles la propose. */
+  if (query.livraison === 'expedition' || query.livraison === 'retrait') {
+    const colonne = query.livraison === 'expedition' ? 'livraison_expedition' : 'livraison_retrait';
+    const idsAvecLivraison = new Set((await db.prepare(
+      `SELECT DISTINCT initiative_id FROM produits_vitrine WHERE ${colonne}=1 AND (statut IS NULL OR statut='disponible')`
+    ).all()).map(r => Number(r.initiative_id)));
+    rows = rows.filter(r => idsAvecLivraison.has(Number(r.id)));
+  }
   if (query.origine) {
     const o = query.origine;
     rows = rows.filter(r => r.origine1 === o || r.origine2 === o || r.pays_origine === o || r.owner_origine1 === o || r.owner_origine2 === o);
