@@ -16070,7 +16070,7 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
   const f = await db.prepare("SELECT * FROM formations WHERE id=?").get(params.id);
   if (!f) return sendJSON(res, 404, { error: "Formation introuvable." });
   const isOwner = checkFormationOwner(f, user);
-  const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active'").get(params.id, user.id);
+  const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription && !isOwner) return sendJSON(res, 403, { error: "Vous devez être inscrit pour accéder à cette formation." });
 
   const progressionRows = inscription
@@ -16102,7 +16102,7 @@ route("GET", "/api/formations/:id/suivre", async (req, res, params) => {
 route("POST", "/api/formations/:id/lecons/:leconId/progression", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active'").get(params.id, user.id);
+  const inscription = await db.prepare("SELECT * FROM formation_inscriptions WHERE formation_id=? AND user_id=? AND statut='active' AND COALESCE(paiement_statut,'paye')<>'en_attente'").get(params.id, user.id);
   if (!inscription) return sendJSON(res, 403, { error: "Vous devez être inscrit pour suivre cette formation." });
   const termine = body.termine ? 1 : 0;
   const existe = await db.prepare("SELECT id FROM formation_lecons_progression WHERE inscription_id=? AND lecon_id=?").get(inscription.id, params.leconId);
