@@ -47,7 +47,9 @@
     desk: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
     people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14a5 5 0 0 1 4.5 5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>'
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    dir: '<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M17 5h4M17 9h4M17 13h4"/>',
+    doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>'
   };
   const ic = (n, cls) => `<svg class="i ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 
@@ -119,10 +121,11 @@
     fil: { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false },
     ev: { items: [], filtre: 'avenir', q: '', loaded: false },
     boutiques: { items: [], q: '', loaded: false },
+    ann: { type: '', q: '', items: [], total: 0, shown: 30, loaded: false },
     myInsc: new Set(), pane: null, chatTimer: null, convNames: {}
   };
-  const TABS = ['fil', 'evenements', 'messages', 'boutiques', 'moi'];
-  const TITLES = { fil: "Fil d'actualité", evenements: 'Événements', messages: 'Messages', boutiques: 'Boutiques', moi: 'Mon espace' };
+  const TABS = ['fil', 'evenements', 'annuaire', 'messages', 'boutiques', 'moi'];
+  const TITLES = { fil: "Fil d'actualité", evenements: 'Événements', annuaire: 'Annuaire', messages: 'Messages', boutiques: 'Boutiques', moi: 'Mon espace' };
   const scrollMem = {};
 
   /* ---------- connexion ---------- */
@@ -191,7 +194,7 @@
   async function needLogin(reason) { if (S.me) return true; return openLogin(reason); }
   async function afterAuthChange() {
     S.fil = { mode: 'tous', page: 1, pages: 1, posts: [], loaded: false };
-    S.ev.loaded = false; S.boutiques.loaded = false;
+    S.ev.loaded = false; S.boutiques.loaded = false; S.ann.loaded = false;
     await loadMe(); route(true);
   }
   async function logout() {
@@ -212,7 +215,7 @@
     paintBadges();
   }
   function renderTabs() {
-    const items = [['fil', 'Fil', 'fil'], ['evenements', 'Événements', 'cal'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user']];
+    const items = [['fil', 'Fil', 'fil'], ['evenements', 'Événements', 'cal'], ['annuaire', 'Annuaire', 'dir'], ['messages', 'Messages', 'chat'], ['boutiques', 'Boutiques', 'shop'], ['moi', 'Moi', 'user']];
     $('#tabs').innerHTML = items.map(([k, l, i]) => `<button data-tab="${k}" aria-label="${l}" ${S.tab === k ? 'aria-current="page"' : ''} class="${S.tab === k ? 'on' : ''}">${ic(i)}<span>${l}</span>${k === 'messages' ? '<span class="dot" id="tab-badge-messages" hidden></span>' : ''}</button>`).join('');
     $$('#tabs button').forEach(b => b.onclick = () => {
       if (S.tab === b.dataset.tab && !S.pane) { window.scrollTo({ top: 0, behavior: 'smooth' }); refreshTab(b.dataset.tab); }
@@ -239,12 +242,13 @@
     }
   }
   function renderTab(t) {
-    ({ fil: viewFil, evenements: viewEvents, messages: viewMessages, boutiques: viewBoutiques, moi: viewMoi })[t]();
+    ({ fil: viewFil, evenements: viewEvents, annuaire: viewAnnuaire, messages: viewMessages, boutiques: viewBoutiques, moi: viewMoi })[t]();
   }
   function refreshTab(t) {
     if (t === 'fil') { S.fil = { mode: S.fil.mode, page: 1, pages: 1, posts: [], loaded: false }; }
     if (t === 'evenements') S.ev.loaded = false;
     if (t === 'boutiques') S.boutiques.loaded = false;
+    if (t === 'annuaire') S.ann.loaded = false;
     renderTab(t);
   }
 
@@ -382,11 +386,15 @@
   /* ============================================================
      ÉVÉNEMENTS
      ============================================================ */
+  function isTermine(e) {
+    if (!e) return false; if (e.est_termine != null) return !!e.est_termine;
+    const d = String(e.date_fin || e.date_evt || '').slice(0, 10); return !!d && d < new Date().toISOString().slice(0, 10);
+  }
   function evtCover(e) { return e.image_couverture || e.image_url || ''; }
   function viewEvents() {
     const el = $('#t-evenements');
     el.innerHTML = `<div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div>
-      <div class="chips">${[['avenir', 'À venir'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions'], ['passes', 'Passés']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
+      <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       <div id="ev-list"></div>`;
     $$('.chip', el).forEach(c => c.onclick = async () => {
       if (c.dataset.f === 'mes' && !(await needLogin('Connectez-vous pour retrouver vos inscriptions.'))) return;
@@ -425,7 +433,7 @@
       <div class="bd"><h3 class="tt">${esc(e.titre)}</h3>
         <div class="meta">${ic('clock', 's')}<span>${esc(dateLong(e.date_evt))}${e.heure_debut ? ' · ' + esc(String(e.heure_debut).slice(0, 5)) : ''}</span></div>
         <div class="meta">${ic('pin', 's')}<span class="ell">${esc([e.ville, e.pays].filter(Boolean).join(', ') || e.lieu || 'En ligne')}</span></div>
-        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${part}</span>${e.est_termine ? '<span class="badge">Terminé</span>' : ''}${inscrit ? `<span class="badge g">${ic('check', 's')} Inscrit</span>` : ''}${e.nb_participants ? `<span class="badge">${e.nb_participants} inscrit${e.nb_participants > 1 ? 's' : ''}</span>` : ''}</div></div></a>`;
+        <div class="tags"><span class="badge ${paid ? 'o' : 'g'}">${part}</span>${e.est_termine ? '<span class="badge">Terminé</span>' : ''}${e.cr_statut === 'publie' ? `<span class="badge o">${ic('doc', 's')} Compte-rendu</span>` : ''}${inscrit ? `<span class="badge g">${ic('check', 's')} Inscrit</span>` : ''}${e.nb_participants ? `<span class="badge">${e.nb_participants} inscrit${e.nb_participants > 1 ? 's' : ''}</span>` : ''}</div></div></a>`;
   }
 
   async function paneEvent(id) {
@@ -440,8 +448,11 @@
     const paid = ev.prix_min > 0 || e.type_participation === 'payant';
     const desc = strip(e.description || '');
     const hasFiche = ev.fiche_id && ev.fiche_slug;
+    const termine = isTermine(ev) || isTermine(e);
+    let crDispo = ev.cr_statut === 'publie';
+    if (termine && !crDispo) { try { const c = await api(`/api/evenements/${encodeURIComponent(id)}/compte-rendu`); crDispo = !!c.a_compte_rendu; } catch (er) { /* pas de compte-rendu */ } }
     let cta;
-    if (ev.est_termine) cta = `<button class="btn block" disabled>Événement terminé</button>`;
+    if (termine) cta = crDispo ? `<a class="btn block" href="#/cr/${esc(id)}">${ic('doc', 's')} Lire le compte-rendu</a>` : `<button class="btn block" disabled>Événement terminé · pas de compte-rendu</button>`;
     else if (hasFiche) cta = `<a class="btn block" href="inscription-publique.html?slug=${encodeURIComponent(ev.fiche_slug)}">S’inscrire à l’événement</a>`;
     else if (e.lien_inscription && !inscrit) cta = `<a class="btn block" href="${attrUrl(e.lien_inscription)}" target="_blank" rel="noopener">S’inscrire ${ic('out', 's')}</a>`;
     else if (inscrit) cta = `<button class="btn out block" id="ev-quit">${ic('check', 's')} Je suis inscrit · Annuler</button>`;
@@ -468,6 +479,116 @@
       try { await api(`/api/evenements/${id}/quitter`, { method: 'DELETE' }); S.myInsc.delete(Number(id)); toast('Inscription annulée'); S.ev.loaded = false; paneEvent(id); }
       catch (er) { toast(er.message, true); }
     };
+  }
+
+  /* ============================================================
+     ANNUAIRE — initiatives, membres, collectivités (route /api/annuaire/recherche)
+     ============================================================ */
+  const ANN_TYPES = [['', 'Tous'], ['Initiative', 'Initiatives'], ['Utilisateurs', 'Membres'], ['Collectivité', 'Collectivités']];
+  function viewAnnuaire() {
+    const el = $('#t-annuaire');
+    el.innerHTML = `<div class="search">${ic('search', 's')}<input id="aq" type="search" placeholder="Nom, métier, ville, mot-clé…" aria-label="Rechercher dans l’annuaire" value="${esc(S.ann.q)}"></div>
+      <div class="chips">${ANN_TYPES.map(([k, l]) => `<button class="chip ${S.ann.type === k ? 'on' : ''}" data-t="${esc(k)}">${l}</button>`).join('')}</div>
+      <div class="small muted" id="ann-count" style="margin:-2px 4px 10px"></div><div id="ann-list"></div><div id="ann-more"></div>`;
+    $$('.chip', el).forEach(c => c.onclick = () => { S.ann.type = c.dataset.t; S.ann.loaded = false; viewAnnuaire(); });
+    let t; $('#aq').oninput = e => { clearTimeout(t); t = setTimeout(() => { S.ann.q = e.target.value.trim(); S.ann.loaded = false; loadAnnuaire(); }, 350); };
+    if (!S.ann.loaded) loadAnnuaire(); else paintAnnuaire();
+  }
+  async function loadAnnuaire() {
+    const l = $('#ann-list'); if (!l) return; l.innerHTML = '<div class="sk skc" style="height:96px"></div><div class="sk skc" style="height:96px"></div><div class="sk skc" style="height:96px"></div>';
+    const p = new URLSearchParams({ q: S.ann.q }); if (S.ann.type) p.set('type', S.ann.type);
+    try {
+      const r = await api('/api/annuaire/recherche?' + p);
+      const all = [
+        ...(r.initiatives || []).map(x => ({ k: 'i', rang: x._rang || 0, x })),
+        ...(r.utilisateurs || []).map(x => ({ k: 'u', rang: x._rang || 0, x })),
+        ...(r.organismes || []).map(x => ({ k: 'o', rang: x._rang || 0, x }))
+      ].sort((a, b) => a.rang - b.rang);
+      S.ann.items = all; S.ann.total = r.total || all.length; S.ann.shown = 30; S.ann.loaded = true; paintAnnuaire();
+    } catch (e) { l.innerHTML = `<div class="empty"><b>Annuaire indisponible</b>${esc(e.message)}<br><br><button class="btn sm" id="retry">Réessayer</button></div>`; $('#retry').onclick = loadAnnuaire; }
+  }
+  function annCard(it) {
+    const x = it.x; let nm, sub, badge, href, photo, uid, loc;
+    loc = [x.ville, x.pays].filter(Boolean).join(', ');
+    if (it.k === 'i') {
+      nm = x.nom; badge = x.type || 'Initiative'; photo = x.logo_url; uid = x.owner_user_id;
+      sub = strip(x.slogan || x.description || ''); href = 'initiative.html?id=' + encodeURIComponent(x.slug || x.id);
+    } else if (it.k === 'u') {
+      nm = [x.prenom, x.nom].filter(Boolean).join(' ') || x.nom; badge = 'Membre'; photo = x.photo_url; uid = x.id;
+      sub = strip(x.titre_pro || ''); href = 'profil.html?id=' + encodeURIComponent(x.id);
+    } else {
+      nm = x.nom_institution || x.nom; badge = x.role === 'administrateur' ? 'Diaspo’Actif' : (x.role === 'collectivite' ? 'Collectivité' : 'Institution'); photo = x.photo_url; uid = x.id;
+      sub = strip(x.bio || ''); href = 'profil.html?id=' + encodeURIComponent(x.id);
+    }
+    const dom = it.k === 'i' && x.domaine ? `<span class="badge">${esc(x.domaine)}</span>` : '';
+    const note = x.avis_total ? `<span class="badge o">★ ${esc(Number(x.avis_moyenne || 0).toFixed(1))} (${x.avis_total})</span>` : '';
+    return `<article class="card ann"><a class="ann-top" href="${href}"><div class="av big" style="border-radius:${it.k === 'u' ? '50%' : '16px'}">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nm))}</div>
+      <div class="sp"><div class="nm" style="font-weight:700;font-size:16px;line-height:1.2">${esc(nm)}</div>
+      <div class="meta" style="margin:2px 0">${loc ? ic('pin', 's') + '<span class="ell">' + esc(loc) + '</span>' : ''}</div>
+      <div class="tags" style="margin:4px 0 0"><span class="badge ${it.k === 'u' ? '' : 'g'}">${esc(badge)}</span>${dom}${note}</div></div></a>
+      ${sub ? `<div class="small muted" style="padding:0 14px 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(sub)}</div>` : ''}
+      <div class="ann-act"><a class="btn sm out" href="${href}">Voir la fiche</a>${uid ? `<button class="btn sm" data-write="${uid}">${ic('chat', 's')} Écrire</button>` : ''}</div></article>`;
+  }
+  function paintAnnuaire() {
+    const l = $('#ann-list'); if (!l) return;
+    const a = S.ann.items;
+    $('#ann-count').textContent = a.length ? `${S.ann.total} résultat${S.ann.total > 1 ? 's' : ''}` : '';
+    if (!a.length) { l.innerHTML = `<div class="empty"><div class="ei">${ic('dir', 'l')}</div><b>Aucun résultat</b>Essayez un autre mot-clé ou un autre filtre.</div>`; $('#ann-more').innerHTML = ''; return; }
+    l.innerHTML = a.slice(0, S.ann.shown).map(annCard).join('');
+    $('#ann-more').innerHTML = a.length > S.ann.shown ? `<button class="btn out block" id="ann-next">Voir plus (${a.length - S.ann.shown})</button>` : '';
+    const n = $('#ann-next'); if (n) n.onclick = () => { S.ann.shown += 30; paintAnnuaire(); };
+  }
+  document.addEventListener('click', async e => {
+    const w = e.target.closest('[data-write]'); if (!w) return;
+    if (!(await needLogin('Connectez-vous pour écrire à ce compte.'))) return;
+    w.disabled = true;
+    try { const r = await api('/api/conversations', { method: 'POST', body: { user_id: Number(w.dataset.write) } }); location.hash = '#/conv/' + r.conversation_id; }
+    catch (er) { toast(er.message, true); }
+    w.disabled = false;
+  });
+
+  /* ============================================================
+     COMPTE-RENDU D'ÉVÉNEMENT
+     ============================================================ */
+  const CR_OK = { P: 1, BR: 1, STRONG: 1, B: 1, EM: 1, I: 1, U: 1, UL: 1, OL: 1, LI: 1, A: 1, H1: 1, H2: 1, H3: 1, H4: 1, BLOCKQUOTE: 1 };
+  function richHtml(s) {
+    s = String(s == null ? '' : s).replace(/@\[([^\]]+)\]\([uic]:\d+\)/g, '@$1');
+    if (!/<(p|h[1-6]|ul|ol|li|blockquote|br|strong|em|b|i|u|a)[\s>\/]/i.test(s)) return linkify(md(s)).replace(/\n/g, '<br>');
+    const doc = new DOMParser().parseFromString('<div>' + s + '</div>', 'text/html');
+    (function walk(n) {
+      Array.from(n.childNodes).forEach(c => {
+        if (c.nodeType === 3) return;
+        if (c.nodeType !== 1 || !CR_OK[c.tagName]) { if (c.nodeType === 1 && /^(SCRIPT|STYLE|IFRAME|OBJECT)$/.test(c.tagName)) c.remove(); else { walk(c); while (c.firstChild) n.insertBefore(c.firstChild, c); c.remove(); } return; }
+        Array.from(c.attributes).forEach(a => { if (!(c.tagName === 'A' && a.name === 'href')) c.removeAttribute(a.name); });
+        if (c.tagName === 'A') { const h = c.getAttribute('href') || ''; if (!/^https?:/i.test(h)) c.removeAttribute('href'); else { c.setAttribute('target', '_blank'); c.setAttribute('rel', 'noopener'); } }
+        walk(c);
+      });
+    })(doc.body.firstChild);
+    return doc.body.firstChild.innerHTML;
+  }
+  async function paneCR(id) {
+    setPane('Compte-rendu', '<div class="sk skc"></div><div class="sk skc" style="height:120px"></div>');
+    let r; try { r = await api(`/api/evenements/${encodeURIComponent(id)}/compte-rendu`); } catch (e) { return setPane('Compte-rendu', `<div class="empty"><b>Compte-rendu indisponible</b>${esc(e.message)}</div>`); }
+    const ev = r.evenement || {}, c = r.compte_rendu;
+    if (!c) return setPane('Compte-rendu', `<div class="empty"><div class="ei">${ic('doc', 'l')}</div><b>Pas encore de compte-rendu</b>L’organisateur ne l’a pas encore publié.<br><br><a class="btn" href="#/evenement/${esc(id)}">Voir l’événement</a></div>`);
+    const medias = (c.medias || []).map(m => typeof m === 'string' ? m : (m && m.url)).filter(Boolean);
+    const html = `${ev.image ? mediaBlock(ev.image, { alt: ev.titre }) : ''}
+      <div class="card" style="margin-top:12px"><div class="pad"><div class="small muted" style="margin-bottom:4px">${ic('doc', 's')} Compte-rendu${c.published_at ? ' · ' + esc(ago(c.published_at)) : ''}</div>
+        <h2 style="margin:0 0 8px;font-size:21px;line-height:1.25">${esc(c.titre || ev.titre)}</h2>
+        <div class="meta">${ic('cal', 's')}<span>${esc(ev.titre || '')} · ${esc(dateLong(ev.date_evt))}</span></div>
+        ${ev.ville || ev.lieu ? `<div class="meta">${ic('pin', 's')}<span>${esc([ev.lieu, ev.ville, ev.pays].filter(Boolean).join(', '))}</span></div>` : ''}
+        ${ev.organisateur_nom ? `<div class="meta">${ic('user', 's')}<span>Par <b style="color:var(--text)">${esc(ev.organisateur_nom)}</b></span></div>` : ''}</div></div>
+      ${c.resume ? `<div class="card"><div class="pad rich">${richHtml(c.resume)}</div></div>` : ''}
+      ${(c.forts || []).length ? `<div class="h2">POINTS FORTS</div><div class="card"><div class="pad"><div class="tags" style="margin:0">${c.forts.map(f => `<span class="badge g">${esc(f)}</span>`).join('')}</div></div></div>` : ''}
+      ${(c.details || []).map(d => `<div class="card"><div class="pad">${d.titre ? `<h3 style="margin:0 0 6px;font-size:17px">${esc(d.titre)}</h3>` : ''}<div class="rich">${richHtml(d.texte)}</div></div></div>`).join('')}
+      ${c.video_url ? (/\.(mp4|webm)(\?|$)/i.test(c.video_url) ? videoBlock(c.video_url) : `<a class="btn out block" style="margin-bottom:12px" href="${attrUrl(c.video_url)}" target="_blank" rel="noopener">▶ Voir la vidéo ${ic('out', 's')}</a>`) : ''}
+      ${medias.length ? `<div class="h2">PHOTOS</div>${medias.map(u => `<div style="margin-bottom:10px;border-radius:14px;overflow:hidden">${mediaBlock(u)}</div>`).join('')}` : ''}
+      ${(c.partenaires || []).length ? `<div class="h2">PARTENAIRES</div><div class="lst">${c.partenaires.map(p => `<a class="li" ${p.lien ? `href="${attrUrl(p.lien)}" target="_blank" rel="noopener"` : ''}><span class="ic">${p.logo_url ? `<img src="${attrUrl(p.logo_url)}" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:10px">` : ic('people')}</span><span class="sp"><span class="t">${esc(p.nom)}</span>${p.description ? `<br><span class="d">${esc(p.description)}</span>` : ''}</span></a>`).join('')}</div>` : ''}
+      ${(r.identifies || []).length ? `<div class="h2">IDENTIFIÉS</div><div class="card"><div class="pad"><div class="tags" style="margin:0">${r.identifies.map(p => `<a class="badge" href="profil.html?id=${esc(p.user_id)}">${esc(p.nom)}</a>`).join('')}</div></div></div>` : ''}
+      ${c.etape_texte ? `<div class="card"><div class="pad"><div class="small muted">Prochaine étape${c.etape_date ? ' · ' + esc(dateLong(c.etape_date)) : ''}</div><p style="margin:4px 0 0">${esc(c.etape_texte)}</p></div></div>` : ''}
+      ${(c.actions || []).length ? c.actions.map(a => `<a class="btn block" style="margin-bottom:10px" href="${attrUrl(a.lien)}" target="_blank" rel="noopener">${esc(a.bouton)} ${ic('out', 's')}</a>`).join('') : (c.etape_bouton && c.etape_lien ? `<a class="btn block" style="margin-bottom:10px" href="${attrUrl(c.etape_lien)}" target="_blank" rel="noopener">${esc(c.etape_bouton)} ${ic('out', 's')}</a>` : '')}
+      <a class="btn out block" href="compte-rendu.html?evt=${esc(id)}">Ouvrir la version complète ${ic('out', 's')}</a>`;
+    setPane(c.titre || 'Compte-rendu', html);
   }
 
   /* ============================================================
@@ -656,6 +777,7 @@
     else if (a === 'billets') paneBillets();
     else if (a === 'billet') paneBillet(b, c);
     else if (a === 'notifs') paneNotifs();
+    else if (a === 'cr') paneCR(b);
     else { location.hash = '#/fil'; return; }
     done();
   }

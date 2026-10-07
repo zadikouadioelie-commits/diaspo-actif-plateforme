@@ -214,3 +214,12 @@ svg.i.l{width:28px;height:28px}
 .viewer button{position:absolute;top:calc(10px + env(safe-area-inset-top));right:10px;color:#fff;width:48px;height:48px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (min-width:600px){body{background:#DDE5F0}#app{box-shadow:0 0 40px rgba(13,43,78,.15)}}
+
+/* ---------- annuaire ---------- */
+.ann .ann-top{display:flex;gap:12px;align-items:center;padding:14px 14px 8px}
+.ann .av.big{width:60px;height:60px;border-radius:16px;font-size:20px;flex:none}
+.ann-act{display:flex;gap:8px;padding:2px 14px 14px}
+.ann-act .btn{flex:1;padding:0 10px}
+@media (max-width:380px){#tabs button{font-size:10.5px}}
+#tabs button span:not(.dot){max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 2px}
+#tabs .dot{right:calc(50% - 22px)}
