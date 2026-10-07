@@ -20451,10 +20451,11 @@ route("PUT", "/api/evenements/:id/compte-rendu", async (req, res, params, body) 
   const rr = crRiche(body.resume, CR_RESUME_MAX, 20000);
   if (rr.erreur) return sendJSON(res, 400, { error: `Le résumé dépasse ${CR_RESUME_MAX} caractères.` });
   const resume = rr.texte;
-  /* On retire les parties vides AVANT de limiter à 20 : les champs vides du canevas ne doivent pas occuper de place. */
+  /* On retire les parties vides AVANT de limiter : les champs vides du canevas ne doivent pas occuper de place.
+     Plafond 30 = jusqu'à 8 champs du canevas + 20 sections libres ajoutées par l'auteur (2026-10-07). */
   let partieTropLongue = false;
   const details = (Array.isArray(body.details) ? body.details : [])
-    .map(d => { const r = crRiche(d && d.texte, 10000, 40000); if (r.erreur) partieTropLongue = true; return { titre: crTexte(d && d.titre, 80), texte: r.texte || '', icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' }; }).filter(d => d.texte).slice(0, 20);
+    .map(d => { const r = crRiche(d && d.texte, 10000, 40000); if (r.erreur) partieTropLongue = true; return { titre: crTexte(d && d.titre, 80), texte: r.texte || '', icone: CR_ICONES.includes(d && d.icone) ? d.icone : '' }; }).filter(d => d.texte).slice(0, 30);
   if (partieTropLongue) return sendJSON(res, 400, { error: 'Une partie dépasse 10 000 caractères.' });
   const forts = (Array.isArray(body.forts) ? body.forts : []).slice(0, 12).map(f => crTexte(f, 80)).filter(Boolean);
   const medias = (Array.isArray(body.medias) ? body.medias : []).slice(0, 20).map(crUrl).filter(Boolean);

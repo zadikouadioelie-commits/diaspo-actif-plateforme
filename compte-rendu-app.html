@@ -46,6 +46,18 @@
 .crp-prefill{border:1.5px dashed #2E74E0;background:#E8F0FD;border-radius:12px;padding:12px 14px;margin:0 0 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .crp-prefill div{flex:1;min-width:220px;font-size:13.5px}
 .crp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+/* Sections libres (2026-10-07) : titre modifiable + monter/descendre/retirer, puis zone d'ajout avec suggestions. */
+.crp-xsec{border:1.5px solid var(--border,#DCE4F0);border-radius:12px;padding:12px;background:#FBFCFE}
+.crp-xhead{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.crp-xhead input{flex:1;min-width:0;font-weight:700}
+.crp-xbtn{flex-shrink:0;min-width:44px;height:44px;border:1.5px solid var(--border,#DCE4F0);background:#fff;border-radius:10px;cursor:pointer;font-size:16px;font-weight:800;color:#2E74E0;font-family:inherit}
+.crp-xbtn:disabled{opacity:.4;cursor:default}
+.crp-xbtn.crp-xdel{color:#dc2626}
+.crp-xbtn:focus-visible,.crp-chip.sg:focus-visible{outline:3px solid #F26422;outline-offset:2px}
+.crp-xadd{border:1.5px dashed var(--border,#DCE4F0);border-radius:12px;padding:14px;margin-top:6px;background:#F7FAFF}
+.crp-xadd .crp-xt{font-weight:800;font-size:14px}
+.crp-chip.sg{border:none;cursor:pointer;font-family:inherit;min-height:36px}
+.crp-chip.sg:disabled{opacity:.45;cursor:default}
 .crp-chip{background:#E8F0FD;color:#2E74E0;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:700;display:inline-flex;gap:6px;align-items:center;text-decoration:none}
 .crp-chip .x{cursor:pointer;opacity:.7;font-weight:800}
 .crp-chip.add{background:none;border:1.5px dashed var(--border,#DCE4F0);color:var(--muted,#5B6B82);cursor:pointer;font-family:inherit}
@@ -206,6 +218,25 @@ const CANEVAS = {
     ['Remerciements', "Participants, partenaires. @ ou * pour les identifier."]] },
   blanc: { label: '📄 Page blanche', hint: "Aucun guide : un seul grand espace de rédaction libre.", champs: [['Texte libre', "Écrivez comme vous le souhaitez."]] },
 };
+
+/* Sections libres (2026-10-07, demande explicite : « que les personnes puissent détailler au maximum leur événement »).
+   En plus des cases du modèle, l'auteur ajoute jusqu'à MAX_LIBRES sections avec le titre de son choix. Elles sont
+   enregistrées comme les autres sections (details : { titre, texte, icone }), donc rien ne change côté lecture publique,
+   e-mail ou comptes-rendus déjà publiés. */
+const MAX_LIBRES = 20;
+const SUGG_TITRES = {
+  forum: ['Table ronde', 'Masterclass', 'Atelier', 'Conférence', 'Présentation d’un partenaire', 'Témoignages'],
+  eco:   ['Table ronde', 'Atelier', 'Présentation d’un partenaire', 'Signature d’accord', 'Témoignages'],
+  fes:   ['Concert', 'Spectacle', 'Repas partagé', 'Animation', 'Témoignages'],
+  pol:   ['Intervention', 'Débat', 'Motion adoptée', 'Question du public'],
+  edu:   ['Atelier', 'Cours', 'Projet présenté', 'Témoignages'],
+  spi:   ['Temps de prière', 'Enseignement', 'Chants', 'Témoignages'],
+  san:   ['Atelier de prévention', 'Dépistage', 'Intervention d’un professionnel', 'Témoignages'],
+  ing:   ['Démonstration', 'Atelier technique', 'Projet présenté', 'Retour d’expérience'],
+};
+const SUGG_DEFAUT = ['Table ronde', 'Atelier', 'Conférence', 'Présentation', 'Témoignages', 'Autre moment fort'];
+const EXEMPLES_TITRE = ['Ex. Table ronde : le thème abordé', 'Ex. Atelier : le sujet traité', 'Ex. Présentation d’un partenaire : son nom et son offre'];
+const CONSIGNE_LIBRE = 'Racontez ce moment : qui est intervenu, ce qui a été dit, ce que vous en retenez. Une section sans texte n’est pas publiée.';
 
 const ST = { evtId: null, data: null, user: null, ed: null, mail: null };
 
@@ -962,7 +993,7 @@ function collecterEd() {
 }
 function bodyEd() {
   const ed = ST.ed;
-  const details = CANEVAS[ed.type].champs.map((c, i) => ({ titre: c[0], texte: ed.saisie[ed.type][i] || '', icone: (ed.icones[ed.type] || [])[i] || '' })).concat(ed.extras);
+  const details = CANEVAS[ed.type].champs.map((c, i) => ({ titre: c[0], texte: ed.saisie[ed.type][i] || '', icone: (ed.icones[ed.type] || [])[i] || '' })).concat(ed.extras.map(x => ({ ...x, titre: String(x.titre || '').trim() || (x.texte ? 'Autre moment' : '') })));
   return { titre: ed.titre, type_cr: ed.type, type_libre: ed.type === 'autre' ? ed.libre : '', resume: ed.resume, details, forts: ed.forts, etape_texte: ed.etape_texte, etape_date: ed.etape_date || null, etape_bouton: (ed.actions.find(x => x.bouton && x.lien) || {}).bouton || '', etape_lien: (ed.actions.find(x => x.bouton && x.lien) || {}).lien || '', actions: ed.actions.filter(x => x.bouton && x.lien), video_url: ed.video, medias: ed.medias, logo_url: ed.logo, partenaires: ed.partenaires, profils: ed.profils };
 }
 async function sauver(silencieux) {
@@ -1038,7 +1069,7 @@ function drawTypes() {
   $('#ed-typehint').textContent = CANEVAS[ed.type].hint; $('#ed-libre').style.display = ed.type === 'autre' ? 'block' : 'none';
   $$('#ed-types button').forEach(b => b.addEventListener('click', () => { collecterChamps(); ed.type = b.dataset.type; drawTypes(); drawChamps(); if (ed.type === 'autre') $('#ed-libre').focus(); }));
 }
-function collecterChamps() { $$('#ed-champs textarea[data-i]').forEach(t => { ST.ed.saisie[ST.ed.type][Number(t.dataset.i)] = pourEnvoi(t.value); }); $$('#ed-champs textarea[data-x]').forEach(t => { ST.ed.extras[Number(t.dataset.x)].texte = pourEnvoi(t.value); }); }
+function collecterChamps() { $$('#ed-champs textarea[data-i]').forEach(t => { ST.ed.saisie[ST.ed.type][Number(t.dataset.i)] = pourEnvoi(t.value); }); $$('#ed-champs textarea[data-x]').forEach(t => { ST.ed.extras[Number(t.dataset.x)].texte = pourEnvoi(t.value); }); $$('#ed-champs input[data-xt]').forEach(t => { ST.ed.extras[Number(t.dataset.xt)].titre = t.value; }); }
 function drawChamps() {
   const ed = ST.ed, box = $('#ed-champs'); box.innerHTML = '';
   CANEVAS[ed.type].champs.forEach((c, i) => {
@@ -1048,11 +1079,52 @@ function drawChamps() {
     if (ed.type !== 'blanc') { d.insertAdjacentHTML('beforeend', selectIcone('data-ic', i, (ed.icones[ed.type] || [])[i] || '')); $('select[data-ic]', d).addEventListener('change', e => { ed.icones[ed.type][i] = e.target.value; }); }
   });
   ed.extras.forEach((x, i) => {
-    const d = document.createElement('div'); d.className = 'crp-fld';
-    d.innerHTML = '<label>' + esc(x.titre) + ' <em>section conservée d\'un autre canevas</em></label><textarea data-x="' + i + '"></textarea>';
+    const d = document.createElement('div'); d.className = 'crp-fld crp-xsec';
+    d.innerHTML = '<label for="xt-' + i + '">Section ajoutée ' + (i + 1) + ' <em>facultatif</em></label>'
+      + '<div class="crp-xhead"><input id="xt-' + i + '" data-xt="' + i + '" maxlength="80" placeholder="' + esc(EXEMPLES_TITRE[i % EXEMPLES_TITRE.length]) + '" value="' + esc(x.titre) + '">'
+      + '<button type="button" class="crp-xbtn" data-xup="' + i + '" aria-label="Monter cette section"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
+      + '<button type="button" class="crp-xbtn" data-xdown="' + i + '" aria-label="Descendre cette section"' + (i === ed.extras.length - 1 ? ' disabled' : '') + '>↓</button>'
+      + '<button type="button" class="crp-xbtn crp-xdel" data-xdel="' + i + '" aria-label="Retirer cette section">✕</button></div>'
+      + '<textarea data-x="' + i + '"></textarea><div class="crp-hint">' + esc(CONSIGNE_LIBRE) + '</div>';
     const t = $('textarea', d); t.value = x.texte || ''; box.appendChild(d); riche(t); t.addEventListener('input', () => { x.texte = pourEnvoi(t.value); });
+    $('input[data-xt]', d).addEventListener('input', e => { x.titre = e.target.value; });
+    $('[data-xup]', d).onclick = () => deplacerSection(i, -1);
+    $('[data-xdown]', d).onclick = () => deplacerSection(i, 1);
+    $('[data-xdel]', d).onclick = () => retirerSection(i);
     d.insertAdjacentHTML('beforeend', selectIcone('data-xic', i, x.icone || '')); $('select[data-xic]', d).addEventListener('change', e => { x.icone = e.target.value; });
   });
+  if (ed.type !== 'blanc') {
+    const plein = ed.extras.length >= MAX_LIBRES, add = document.createElement('div'); add.className = 'crp-xadd';
+    add.innerHTML = '<div class="crp-xt">Détaillez davantage : ajoutez vos propres sections</div>'
+      + '<div class="crp-hint">Table ronde, atelier, intervention d’un partenaire… Donnez le titre de votre choix. ' + ed.extras.length + '/' + MAX_LIBRES + ' sections ajoutées.</div>'
+      + '<div class="crp-chips">' + (SUGG_TITRES[ed.type] || SUGG_DEFAUT).map(s => '<button type="button" class="crp-chip sg" data-sg="' + esc(s) + '"' + (plein ? ' disabled' : '') + '>＋ ' + esc(s) + '</button>').join('') + '</div>'
+      + '<button type="button" class="cr-btn sec" id="ed-addsec"' + (plein ? ' disabled' : '') + '>＋ Ajouter une section libre</button>';
+    box.appendChild(add);
+    $$('[data-sg]', add).forEach(b => { b.onclick = () => ajouterSection(b.dataset.sg + ' : '); });
+    $('#ed-addsec', add).onclick = () => ajouterSection('');
+  }
+}
+/* Chaque action relit d'abord les champs à l'écran (collecterEd/collecterChamps) pour ne rien perdre de ce qui vient d'être tapé. */
+function ajouterSection(titre) {
+  collecterEd(); collecterChamps();
+  const ed = ST.ed;
+  if (ed.extras.length >= MAX_LIBRES) { toast('Maximum atteint : ' + MAX_LIBRES + ' sections ajoutées.'); return; }
+  ed.extras.push({ titre: titre || '', texte: '', icone: '' });
+  drawChamps();
+  const champ = $$('#ed-champs input[data-xt]').pop();
+  if (champ) { champ.focus(); champ.setSelectionRange(champ.value.length, champ.value.length); champ.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+function deplacerSection(i, sens) {
+  collecterEd(); collecterChamps();
+  const a = ST.ed.extras, j = i + sens;
+  if (j < 0 || j >= a.length) return;
+  [a[i], a[j]] = [a[j], a[i]]; drawChamps();
+}
+function retirerSection(i) {
+  collecterEd(); collecterChamps();
+  const x = ST.ed.extras[i];
+  if (x && x.texte && !confirm('Retirer la section « ' + (x.titre || 'sans titre') + ' » et son contenu ?')) return;
+  ST.ed.extras.splice(i, 1); drawChamps();
 }
 /* ---------- boutons d'action : parcours guidé (2026-10-07, demande explicite) ----------
    Rien n'est affiché tant qu'on n'a pas choisi un modèle PUIS touché « Ajouter cette action » :
