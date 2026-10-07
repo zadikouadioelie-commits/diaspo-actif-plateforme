@@ -11312,6 +11312,20 @@ async function crmCollabRetirer(id) {
   try { await api('DELETE', `/crm/collaborateurs/${id}`); CRM_COLLAB_CACHE = null; crmChargerCollaborateurs(); } catch (e) { alert(e.message || 'Erreur.'); }
 }
 </script>
+<script>
+/* Création d'un don depuis l'éditeur d'actions d'un compte-rendu (2026-10-07) : ?nouveau_don=<titre>#cagnottes ouvre le formulaire de nouvelle cagnotte avec ce titre. */
+(function () {
+  var t = new URLSearchParams(location.search).get('nouveau_don'); if (!t) return;
+  var n = 0, iv = setInterval(async function () {
+    if (++n > 60) { clearInterval(iv); return; }
+    try {
+      if (!document.getElementById('cag-form-wrap') || typeof window.cagOpenForm !== 'function') return;
+      clearInterval(iv); await window.cagOpenForm(null);
+      var f = document.getElementById('cag-f-titre'); if (f) { f.value = t.slice(0, 120); f.focus(); }
+    } catch (e) { /* le formulaire reste ouvrable à la main */ }
+  }, 500);
+})();
+</script>
 </body>
 </html>
 

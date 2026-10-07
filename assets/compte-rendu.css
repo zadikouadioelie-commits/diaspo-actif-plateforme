@@ -380,3 +380,11 @@ body.cr-synth-open{overflow:hidden}
 .crp-auto-badge{background:#334155;color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
 .crp-auto-b{font-size:13.5px;line-height:1.55;color:#475569}
 .crp-auto-b b{color:#1E293B}
+
+/* Éditeur d'actions guidé (2026-10-07) */
+.crp-wiz{background:#F7FAFF;border-color:#BFD3F2}
+.crp-sug{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.crp-sug button{border:1px dashed #9DB6DD;background:#fff;color:#0D2B4E;border-radius:99px;padding:4px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.crp-sug button:hover{background:#EAF2FF;border-style:solid}
+.crp-act-recap{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.crp-act-btn{display:inline-block;background:#0D2B4E;color:#fff;border-radius:99px;padding:5px 14px;font-weight:700;font-size:13.5px}
