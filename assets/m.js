@@ -991,6 +991,9 @@
     $('#view').innerHTML = TABS.map(t => `<section id="t-${t}" hidden></section>`).join('');
     window.addEventListener('hashchange', () => route());
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { const v = $('.viewer'); if (v) v.remove(); } });
+    /* Les modules « m-mod-*.js » sont chargés en différé après ce fichier : on attend qu'ils soient tous exécutés (DOMContentLoaded) avant de router, sinon une route de module arrivait avant son enregistrement et renvoyait vers la page du site. */
+    /* readyState vaut déjà « interactive » pendant l'exécution des scripts différés : on attend l'événement, avec un délai de secours si jamais il est déjà passé. */
+    if (document.readyState !== 'complete') await Promise.race([new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true })), new Promise(r => setTimeout(r, 1500))]);
     await loadMe();
     route(true);
     setInterval(() => { if (!document.hidden) refreshBadges(); }, 45000);
