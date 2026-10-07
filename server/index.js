@@ -20024,6 +20024,20 @@ async function urlImagePartageEvenement(row) {
   }
   return defaut;
 }
+/* Pose les balises d'aperçu de lien (WhatsApp, réseaux) dans une page : remplace celles qui existent, ajoute les absentes. */
+function apercuLien(html, { titre, description, image, url }) {
+  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const metas = [['property', 'og:title', titre], ['property', 'og:description', description], ['property', 'og:image', image], ['property', 'og:url', url],
+    ['name', 'twitter:card', 'summary_large_image'], ['name', 'twitter:title', titre], ['name', 'twitter:description', description], ['name', 'twitter:image', image]];
+  let absentes = '';
+  for (const [attr, nom, val] of metas) {
+    const re = new RegExp(`<meta ${attr}="${nom}" content="[^"]*">`);
+    const tag = `<meta ${attr}="${nom}" content="${esc(val)}">`;
+    if (re.test(html)) html = html.replace(re, () => tag); else absentes += tag + '\n';
+  }
+  if (absentes) html = html.replace('</head>', () => absentes + '</head>');
+  return html.replace(/<title>[^<]*<\/title>/, () => `<title>${esc(titre)}</title>`);
+}
 route("GET", "/api/evenements/:id/couverture", async (req, res, params) => {
   const row = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
   if (!row || row.statut === 'brouillon' || row.visibilite === 'prive') return sendJSON(res, 404, { error: "Introuvable." });
@@ -31243,6 +31257,58 @@ ${jsonLd}
       return;
     } catch (e) {
       console.error('[SEO evenements.html]', e.message);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Erreur serveur.');
+      return;
+    }
+  }
+
+  /* Aperçu de lien dynamique d'une publication (?post=<id>) et d'un compte-rendu (?evt=<id>) partagés (2026-10-07, demande
+     explicite : même image/titre/résumé que le partage d'événement au lieu de la carte générique Diaspo'Actif). Même mécanique et
+     même raison que evenements.html juste au-dessus : tant qu'un fichier physique fil-actualite.html / compte-rendu.html existait,
+     Vercel le servait directement sans jamais passer par cette fonction — les pages sont donc servies depuis
+     fil-actualite-app.html / compte-rendu-app.html (l'adresse publique ne change pas, voir vercel.json). Lecture seule, repli
+     silencieux sur les balises génériques si l'élément est introuvable, non publié ou non public. */
+  if (pathname === '/fil-actualite.html' || pathname === '/compte-rendu.html') {
+    const estCR = pathname === '/compte-rendu.html';
+    try {
+      let html = await fs.promises.readFile(path.join(ROOT, estCR ? 'compte-rendu-app.html' : 'fil-actualite-app.html'), 'utf8');
+      try {
+        const base = 'https://diaspoactif.com';
+        const brut = s => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
+        if (estCR && parsed.query.evt) {
+          const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(parsed.query.evt);
+          const cr = evt ? await db.prepare("SELECT titre, resume, statut FROM evenement_comptes_rendus WHERE evenement_id=?").get(evt.id) : null;
+          if (evt && cr && cr.statut === 'publie' && evt.statut !== 'brouillon' && (evt.visibilite || 'public') === 'public') {
+            html = apercuLien(html, {
+              titre: `${cr.titre || evt.titre} — Compte-rendu | Diaspo'Actif`,
+              description: brut(cr.resume).slice(0, 200) || "Le compte-rendu de l'événement sur Diaspo'Actif.",
+              image: await urlImagePartageEvenement(evt),
+              url: `${base}/compte-rendu.html?evt=${evt.id}`,
+            });
+          }
+        } else if (!estCR && parsed.query.post) {
+          const p = await db.prepare("SELECT * FROM fil_posts WHERE id=?").get(parsed.query.post);
+          if (p && !['archive', 'brouillon'].includes(p.statut) && (p.visibilite || 'public') === 'public') {
+            const titrePost = brut(p.titre) || brut(p.corps != null ? p.corps : p.contenu).slice(0, 90);
+            let reste = brut(p.corps != null ? p.corps : p.contenu);
+            if (titrePost && reste.startsWith(titrePost)) reste = reste.slice(titrePost.length).trim();
+            let medias = []; try { medias = JSON.parse(p.medias || '[]'); } catch (_) {}
+            const u = medias.map(m => (m && typeof m === 'object') ? (m.type && m.type !== 'image' ? null : m.url) : m).filter(Boolean)[0] || p.media_url || '';
+            const image = /^https?:\/\//i.test(u) ? u : (u.startsWith('/') && !u.startsWith('//') ? base + u : `${base}/assets/og-image.png`);
+            html = apercuLien(html, {
+              titre: `${(titrePost || 'Publication').slice(0, 90)} — ${p.auteur_nom || "Diaspo'Actif"}`,
+              description: reste.slice(0, 200) || "Une publication sur Diaspo'Actif, la plateforme mondiale de la diaspora engagée.",
+              image, url: `${base}/fil-actualite.html?post=${p.id}`,
+            });
+          }
+        }
+      } catch (e) { console.error('[apercu-lien]', e.message); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      res.end(html);
+      return;
+    } catch (e) {
+      console.error('[SEO ' + pathname + ']', e.message);
       res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Erreur serveur.');
       return;

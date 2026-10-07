@@ -19,7 +19,7 @@
     'parrainage.html': '#/parrainage', 'mon-abonnement.html': '#/abonnement', 'confidentialite.html': '#/confidentialite',
     'reseau.html': '#/reseaupro', 'business-plan.html': '#/businessplan', 'mon-associe.html': '#/associe',
     'videos-tutoriels.html': '#/videos', 'cagnottes.html': '#/cagnottes',
-    'fil-actualite.html': '#/accueil', 'evenements.html': '#/evenements'
+    'fil-actualite.html': '#/accueil', 'fil-actualite-app.html': '#/accueil', 'evenements.html': '#/evenements'
   };
   /* Les tableaux de bord (dashboard-*.html) ne sont PAS redirigés : ils contiennent des outils qui n'existent pas encore dans l'appli. */
   /* Pages avec paramètre : initiative.html?id=X, profil.html?id=X, compte-rendu.html?evt=X, videos-tutoriels.html?v=X */
@@ -31,12 +31,12 @@
     var q = {}; String(search || '').replace(/^\?/, '').split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); });
     if (f === 'initiative.html' && q.id) return '#/profil/i/' + encodeURIComponent(q.id);
     if ((f === 'profil.html' || f === 'profil-app.html') && q.id) return '#/profil/' + encodeURIComponent(q.id);
-    if (f === 'compte-rendu.html' && q.evt && !q.edition) return '#/cr/' + encodeURIComponent(q.evt) + (q.synthese === '1' ? '/synthese' : '');
+    if ((f === 'compte-rendu.html' || f === 'compte-rendu-app.html') && q.evt && !q.edition) return '#/cr/' + encodeURIComponent(q.evt) + (q.synthese === '1' ? '/synthese' : '');
     /* Liens de partage (2026-10-07) : un événement ou une publication partagés s'ouvrent directement dans l'appli, sans compte. */
     if ((f === 'evenements.html' || f === 'evenements-app.html') && q.evt) return '#/evenement/' + encodeURIComponent(q.evt);
-    if (f === 'fil-actualite.html' && q.post) return '#/post/' + encodeURIComponent(q.post);
+    if ((f === 'fil-actualite.html' || f === 'fil-actualite-app.html') && q.post) return '#/post/' + encodeURIComponent(q.post);
     if (f === 'videos-tutoriels.html' && q.v) return '#/video/' + encodeURIComponent(q.v);
-    if (f === 'compte-rendu.html' || f === 'profil.html' || f === 'profil-app.html' || f === 'initiative.html') return '';
+    if (f === 'compte-rendu.html' || f === 'compte-rendu-app.html' || f === 'profil.html' || f === 'profil-app.html' || f === 'initiative.html') return '';
     return Object.prototype.hasOwnProperty.call(PAGES, f) ? PAGES[f] : '';
   }
   function telephone(ua, largeurEcran, tactile) {
