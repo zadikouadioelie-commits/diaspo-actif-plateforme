@@ -1,0 +1,41 @@
+/* ============================================================
+   DIASPO'ACTIF — Habillage « application téléphone » des pages d'entrée (connexion, inscription, mot de passe oublié).
+   Chargé UNIQUEMENT sur téléphone par assets/m-redirect.js. Mêmes couleurs que assets/m.css :
+   navy #0D2B4E · bleu #1E4F8A / #4490E2 · orange #F26422 (boutons : #B84C1A) · fond #EEF2F8.
+   Le fonctionnement de ces pages n'est pas touché : seul l'habillage change.
+   ============================================================ */
+html.m-site, html.m-site body { background: #EEF2F8 !important; color: #0D2B4E; font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; -webkit-text-size-adjust: 100%; }
+
+/* barre du haut de l'appli, à la place de la barre du site */
+#m-site-top { position: sticky; top: 0; z-index: 50; background: #0D2B4E; color: #fff; padding: env(safe-area-inset-top) 14px 0; }
+#m-site-top a { display: flex; align-items: center; gap: 10px; height: 56px; color: #fff; text-decoration: none; font-size: 17px; font-weight: 700; }
+#m-site-top img { width: 34px; height: 34px; border-radius: 9px; background: #fff; object-fit: contain; padding: 3px; }
+#m-site-top small { display: block; font-size: 11px; font-weight: 600; color: #cbd5e1; line-height: 1; margin-bottom: 2px; }
+html.m-site .topbar, html.m-site header.topbar, html.m-site .footer, html.m-site footer.footer, html.m-site .sidebar-toggle,
+html.m-site #admin-junior-lock, html.m-site #sidebar, html.m-site .mobile-bottom-nav { display: none !important; }
+
+/* contenu */
+html.m-site .page { background: transparent !important; min-height: 0; }
+html.m-site main, html.m-site .container, html.m-site .insc-wrap { padding: 14px 12px 28px !important; margin: 0 auto !important; max-width: 560px !important; width: 100% !important; box-sizing: border-box; }
+html.m-site .card, html.m-site .auth-form-card { background: #F9F8F3 !important; border: 1px solid #DCE4EF !important; border-radius: 14px !important; box-shadow: 0 2px 10px rgba(13, 43, 78, .08) !important; padding: 20px 16px !important; margin: 0 0 12px !important; max-width: none !important; }
+html.m-site h1, html.m-site h2, html.m-site h3 { color: #0D2B4E; }
+html.m-site h2 { font-size: 20px; }
+html.m-site .sub, html.m-site p { color: #5b6472; }
+
+/* champs : 16 px (évite le zoom automatique du téléphone), coins arrondis comme dans l'appli */
+html.m-site input:not([type=checkbox]):not([type=radio]):not([type=file]), html.m-site select, html.m-site textarea {
+  font-size: 16px !important; min-height: 46px; border: 1px solid #DCE4EF !important; border-radius: 12px !important; background: #fff !important; color: #0D2B4E; padding: 0 14px; box-sizing: border-box; max-width: 100%; }
+html.m-site textarea { padding: 10px 14px; min-height: 90px; }
+html.m-site label { font-size: 13px; color: #5b6472; font-weight: 600; }
+
+/* boutons */
+html.m-site .btn, html.m-site button.btn, html.m-site button[type=submit] {
+  min-height: 46px; border-radius: 30px !important; font-weight: 700; font-size: 15px; }
+html.m-site .btn-orange, html.m-site .btn-primary, html.m-site button[type=submit] { background: #B84C1A !important; border: 1.5px solid #B84C1A !important; color: #fff !important; }
+html.m-site .btn-outline, html.m-site .btn-secondary { background: #fff !important; color: #0D2B4E !important; border: 1.5px solid #DCE4EF !important; }
+html.m-site a { color: #1E4F8A; }
+html.m-site .auth-error { color: #B3261E; font-size: 13px; }
+
+/* aucun débordement horizontal */
+html.m-site body { overflow-x: hidden; }
+html.m-site img, html.m-site table { max-width: 100%; }

@@ -179,6 +179,63 @@
       } catch (e) { toast(e.message, true); b.disabled = false; b.innerHTML = old; }
     });
   }
+  /* Confirmation d'un nouvel appareil (même règle et mêmes routes que assets/confirmation-appareil.js sur le site) :
+     le compte est déjà ouvert ailleurs → Code de Sécurité (DS-ID) du compte ou d'un compte lié, ou code à 6 chiffres envoyé par e-mail.
+     Affichée dans la fenêtre de connexion, avec l'habillage de l'appli. Renvoie true si l'appareil est autorisé, false si la personne annule. */
+  function confirmerAppareil(rep, sh) {
+    return new Promise(resolve => {
+      sh.hidden = false;
+      sh.innerHTML = `<div class="sh" role="dialog" aria-modal="true" aria-label="Confirmer la connexion"><div class="grip"></div><div class="sb">
+        <h2 style="margin:4px 0 2px;font-size:20px">Confirmez que c’est bien vous</h2>
+        <p class="muted small" style="margin:0 0 14px">Votre compte est déjà ouvert sur un autre appareil. Pour votre sécurité, prouvez que vous en êtes le titulaire.</p>
+        <div id="ca-dsid-box">
+          <label class="small muted" for="ca-dsid">Votre Code de Sécurité (DS-ID)</label>
+          <div class="search" style="border-radius:12px;margin:4px 0 8px"><input id="ca-dsid" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DS-ID de ce compte ou d’un compte lié"></div>
+          <p class="muted small" style="margin:0 0 8px">Vous le trouvez dans votre profil, section Confidentialité, sur l’appareil déjà connecté. Vous pouvez aussi saisir celui d’un de vos comptes liés.</p>
+          <button type="button" class="btn out block" id="ca-vers-email" style="margin-top:4px">Je n’ai pas mon DS-ID : recevoir un code par e-mail</button>
+        </div>
+        <div id="ca-email-box" hidden>
+          <label class="small muted" for="ca-code">Code à 6 chiffres reçu par e-mail</label>
+          <div class="search" style="border-radius:12px;margin:4px 0 8px"><input id="ca-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000"></div>
+          <p id="ca-info" class="small" style="color:var(--green);margin:0 0 8px"></p>
+          <button type="button" class="btn out block" id="ca-renvoyer" style="margin-top:4px">Renvoyer le code</button>
+          <button type="button" class="btn out block" id="ca-vers-dsid" style="margin-top:8px">Utiliser mon DS-ID à la place</button>
+        </div>
+        <p id="ca-err" class="small" style="color:var(--red);min-height:20px;margin:8px 2px" role="alert"></p>
+        <button type="button" class="btn block" id="ca-ok">Confirmer</button>
+        <button type="button" class="btn out block" id="ca-non" style="margin-top:10px">Annuler</button>
+      </div></div>`;
+      let mode = 'dsid';
+      const err = m => { $('#ca-err').textContent = m || ''; };
+      const basculer = m => { mode = m; err(''); $('#ca-dsid-box').hidden = m !== 'dsid'; $('#ca-email-box').hidden = m !== 'email'; const f = $(m === 'dsid' ? '#ca-dsid' : '#ca-code'); if (f) f.focus(); };
+      const envoyer = async () => {
+        err(''); const b1 = $('#ca-vers-email'), b2 = $('#ca-renvoyer'); b1.disabled = true; b2.disabled = true;
+        try {
+          const r = await api('/api/auth/confirmer-appareil/envoyer-code', { method: 'POST', body: { defi: rep.defi } });
+          basculer('email'); $('#ca-info').textContent = 'Un code vient d’être envoyé à ' + (r.email_masque || rep.email_masque || 'votre adresse e-mail') + ' (valable 10 minutes).';
+        } catch (e) { err(e.message || 'Envoi impossible.'); }
+        finally { b1.disabled = false; setTimeout(() => { b2.disabled = false; }, 20000); }
+      };
+      $('#ca-vers-email').onclick = envoyer; $('#ca-renvoyer').onclick = envoyer; $('#ca-vers-dsid').onclick = () => basculer('dsid');
+      $('#ca-non').onclick = () => resolve(false);
+      sh.onclick = e => { if (e.target === sh) resolve(false); };
+      $('#ca-ok').onclick = async () => {
+        err(''); const saisie = ($(mode === 'dsid' ? '#ca-dsid' : '#ca-code').value || '').trim();
+        if (!saisie) { err(mode === 'dsid' ? 'Saisissez votre Code de Sécurité.' : 'Saisissez le code reçu par e-mail.'); return; }
+        const btn = $('#ca-ok'); btn.disabled = true; btn.textContent = 'Vérification…';
+        try {
+          await api('/api/auth/confirmer-appareil', { method: 'POST', body: mode === 'dsid' ? { defi: rep.defi, ds_id: saisie } : { defi: rep.defi, code: saisie } });
+          resolve(true);
+        } catch (e) {
+          const d = e.data || {};
+          err(e.message + (typeof d.essais_restants === 'number' ? ` (${d.essais_restants} essai${d.essais_restants > 1 ? 's' : ''} restant${d.essais_restants > 1 ? 's' : ''})` : ''));
+          if (d.bloque || e.status === 429 || e.status === 403 || e.status === 410) { btn.textContent = 'Bloqué'; return; }
+          btn.disabled = false; btn.textContent = 'Confirmer';
+        }
+      };
+      setTimeout(() => { const f = $('#ca-dsid'); if (f) f.focus(); }, 60);
+    });
+  }
   function openLogin(reason) {
     return new Promise(resolve => {
       const sh = $('#sheet'); sh.hidden = false;
@@ -205,15 +262,21 @@
         if (!email || !password) { err.textContent = 'Saisissez votre e-mail et votre mot de passe.'; return; }
         const go = $('#lgo'); go.disabled = true; go.textContent = 'Connexion…';
         try {
-          const r = await api('/api/auth/login', { method: 'POST', body: { email, password } });
+          let r = await api('/api/auth/login', { method: 'POST', body: { email, password } });
+          if (r.confirmation_requise) {
+            /* nouvel appareil : confirmation dans l'appli (DS-ID ou code e-mail), puis la connexion est rejouée automatiquement */
+            if (!(await confirmerAppareil(r, sh))) { close(false); return; }
+            r = await api('/api/auth/login', { method: 'POST', body: { email, password } });
+          }
           if (r.user) {
             S.me = r.user; toast('Bienvenue' + (r.user.role === 'utilisateur' && r.user.prenom ? ' ' + r.user.prenom : '') + ' !'); close(true);
             await afterAuthChange();
           } else {
-            err.innerHTML = esc(r.message || r.error || 'Une confirmation est nécessaire.') + ` <a href="login.html?redirect=${encodeURIComponent('/m.html')}" style="color:var(--navy2);font-weight:700;text-decoration:underline">Continuer sur la page de connexion</a>`;
+            err.innerHTML = esc(r.message || r.error || 'Connexion impossible.') + ` <a href="login.html?redirect=${encodeURIComponent('/m.html')}" style="color:var(--navy2);font-weight:700;text-decoration:underline">Continuer sur la page de connexion</a>`;
             go.disabled = false; go.textContent = 'Se connecter';
           }
         } catch (e) {
+          if (!document.body.contains(err)) { toast(e.message, true); close(false); return; } /* la fenêtre affichait la confirmation d'appareil */
           err.textContent = e.message; go.disabled = false; go.textContent = 'Se connecter';
         }
       };
@@ -1198,7 +1261,7 @@
       <button class="toggle" id="desk-toggle" aria-expanded="false">${ic('desk', 's')} Disponible sur ordinateur (${MENU_DESK.length})</button>
       <div id="desk-list" hidden><p class="small muted" style="margin:10px 4px">Ces outils sont plus confortables sur grand écran. Ouvrez Diaspo’Actif depuis votre ordinateur pour les utiliser.</p><div class="lst">${MENU_DESK.map(t => `<div class="li dim"><span class="ic">${ic('desk')}</span><span class="sp"><span class="t">${esc(t)}</span></span></div>`).join('')}</div></div>
       <button class="btn out block" id="logout" style="margin-top:18px">${ic('logout', 's')} Se déconnecter</button>
-      <p class="small muted" style="text-align:center;margin:14px 0 0">Version téléphone · <a href="index.html?version=ordinateur" style="text-decoration:underline">Version ordinateur</a> · <a href="dashboard-${esc(m.role === 'initiative' ? 'initiative' : (m.role === 'utilisateur' ? 'utilisateur' : 'collectivite'))}.html" style="text-decoration:underline">Ouvrir le site complet</a></p>`;
+      <p class="small muted" style="text-align:center;margin:14px 0 0">Version téléphone · <a href="index.html?version=ordinateur" style="text-decoration:underline">Version ordinateur</a> · <a href="dashboard-${esc(m.role === 'initiative' ? 'initiative' : (m.role === 'utilisateur' ? 'utilisateur' : 'collectivite'))}.html?version=ordinateur" style="text-decoration:underline">Ouvrir le site complet</a></p>`;
     $('#desk-toggle').onclick = e => { const l = $('#desk-list'); l.hidden = !l.hidden; e.currentTarget.setAttribute('aria-expanded', String(!l.hidden)); };
     $('#logout').onclick = logout; $('#me-switch').onclick = openSwitcher;
   }

@@ -115,6 +115,8 @@ function loginLandingUrl(user) {
     const redirect = new URLSearchParams(location.search).get("redirect");
     if (redirect && /^\/[^/\\]|^[a-z0-9_-]+\.html/i.test(redirect) && !/^\/\//.test(redirect)) return redirect;
   } catch (e) {}
+  /* Téléphone (2026-10-07) : après la connexion, l'appli remplace l'ancien espace (écran « Moi »). */
+  if ((user.role === "utilisateur" || user.role === "initiative") && window.MRedirect && window.MRedirect.estTelephone()) return "/m.html#/moi";
   if (user.role === "utilisateur" || user.role === "initiative") return "profil.html";
   if (user.role === "collectivite") return "profil-collectivite.html?id=" + user.id;
   return ROLE_DASHBOARD[user.role] || "index.html";
