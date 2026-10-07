@@ -913,6 +913,8 @@ const COLONNES_MIGRATION = [
     ['adhesion_formules', 'media_duree_secondes', 'INTEGER'],
     // Module Votes sécurisés
     ['vote_scrutins', 'archived', 'INTEGER DEFAULT 0'],
+    // Photo de couverture d'un scrutin (2026-10-07) — miroir exact de l'ALTER db.js.
+    ['vote_scrutins', 'image_url', 'TEXT'],
     // Liste de stockage des participants (Cotisations & Adhésions ↔ Réseau professionnel)
     ['adhesion_formules', 'liste_stockage_id', 'INTEGER'],
     // Profil public enrichi des initiatives

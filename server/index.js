@@ -7667,6 +7667,11 @@ async function verifyVoteDsId(userId, submittedCode) {
    criteresReseauPro.liste_id le renseignent. Si un même utilisateur est résolu par plusieurs
    sources dans le même appel, la dernière branche l'emporte sur liste_id — simplification
    assumée pour un enrichissement d'affichage, sans impact sur qui est effectivement électeur. */
+/* Photo de couverture d'un scrutin (2026-10-07) : adresse d'une image téléversée (https) ou fichier du dossier /uploads ; tout le reste est refusé. */
+function urlImageScrutin(v) {
+  const s = String(v == null ? '' : v).trim();
+  return (/^https?:\/\/[^\s"'<>]{4,500}$/i.test(s) || /^\/uploads\/[\w.\-]+$/.test(s)) ? s : null;
+}
 async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
   const userIds = new Map();
   if (sources.includes("tous_actifs")) {
@@ -7680,6 +7685,19 @@ async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
     rows.forEach(r => userIds.set(Number(r.user_id), null));
   }
   if (sources.includes("adhesion") || sources.includes("cotisation")) {
+    /* Quelle adhésion ? (2026-10-07, demande explicite) : par défaut l'ADHÉSION OFFICIELLE de l'initiative ; l'organisateur peut choisir une autre formule
+       ou « toutes ». Sans adhésion officielle définie, toutes les adhésions comptent. Une formule d'une autre initiative n'ouvre le vote à personne. */
+    const choix = criteresReseauPro?.formule_id;
+    let formuleVoulue = null;
+    if (choix === 'toutes') formuleVoulue = null;
+    else if (choix && choix !== 'officielle' && Number(choix)) {
+      const f = await db.prepare("SELECT id FROM adhesion_formules WHERE id=? AND initiative_id=?").get(Number(choix), initiativeId);
+      formuleVoulue = f ? Number(f.id) : -1;
+    } else {
+      const off = await db.prepare("SELECT id FROM adhesion_formules WHERE initiative_id=? AND est_officielle=1 LIMIT 1").get(initiativeId);
+      formuleVoulue = off ? Number(off.id) : null;
+    }
+    const dansFormule = m => formuleVoulue === null || Number(m.formule_id) === formuleVoulue;
     if (criteresReseauPro?.campagne_id) {
       /* Lié à une campagne d'adhésion précise (module Cotisations & Adhésions) : seuls les comptes
          ayant adhéré/renouvelé pendant la période de la campagne, et actuellement à jour, sont reconnus
@@ -7688,16 +7706,17 @@ async function resolveVoteElecteurs(initiativeId, sources, criteresReseauPro) {
       if (camp) {
         const debut = camp.date_debut || '1970-01-01';
         const fin = camp.date_fin || '9999-12-31';
-        const rows = await db.prepare(`
-          SELECT linked_user_id FROM adhesion_membres
-          WHERE initiative_id=? AND statut='a_jour' AND linked_user_id IS NOT NULL
+        /* « À jour » se calcule sur la date d'expiration (computeAdhesionStatut) : le statut enregistré reste « a_jour » même après l'échéance. */
+        const rows = (await db.prepare(`
+          SELECT * FROM adhesion_membres
+          WHERE initiative_id=? AND linked_user_id IS NOT NULL
             AND date_adhesion BETWEEN ? AND ?
-        `).all(initiativeId, debut, fin);
-        rows.forEach(r => userIds.add(Number(r.linked_user_id)));
+        `).all(initiativeId, debut, fin)).filter(m => dansFormule(m) && computeAdhesionStatut(m) === 'a_jour');
+        rows.forEach(r => userIds.set(Number(r.linked_user_id), null));
       }
     } else {
-      const rows = await db.prepare("SELECT linked_user_id FROM adhesion_membres WHERE initiative_id=? AND statut='a_jour' AND linked_user_id IS NOT NULL").all(initiativeId);
-      rows.forEach(r => userIds.add(Number(r.linked_user_id)));
+      const rows = (await db.prepare("SELECT * FROM adhesion_membres WHERE initiative_id=? AND linked_user_id IS NOT NULL").all(initiativeId)).filter(m => dansFormule(m) && computeAdhesionStatut(m) === 'a_jour');
+      rows.forEach(r => userIds.set(Number(r.linked_user_id), null));
     }
   }
   if (sources.includes("liste_perso") && criteresReseauPro?.liste_id) {
@@ -7793,6 +7812,9 @@ route("POST", "/api/initiatives/:id/vote-scrutins", async (req, res, params, bod
        vote_secret !== undefined ? (vote_secret ? 1 : 0) : 1,
        vote_nominatif ? 1 : 0, resultats_direct ? 1 : 0, pv_auto !== undefined ? (pv_auto ? 1 : 0) : 1,
        quorum_requis || 0)).lastInsertRowid;
+  /* Photo de couverture (2026-10-07) : écriture à part, la création du scrutin n'est jamais bloquée si la colonne manque. */
+  const imgNouveau = urlImageScrutin(body.image_url);
+  if (imgNouveau) { try { await db.prepare("UPDATE vote_scrutins SET image_url=? WHERE id=?").run(imgNouveau, id); } catch (e) { logError(e, 'vote-scrutin-image'); } }
   sendJSON(res, 201, { id });
 });
 
@@ -7816,6 +7838,7 @@ route("PUT", "/api/vote-scrutins/:id", async (req, res, params, body) => {
          vote_nominatif !== undefined ? (vote_nominatif ? 1 : 0) : s.vote_nominatif,
          resultats_direct !== undefined ? (resultats_direct ? 1 : 0) : s.resultats_direct,
          pv_auto !== undefined ? (pv_auto ? 1 : 0) : s.pv_auto, quorum_requis ?? s.quorum_requis, params.id);
+  if (body.image_url !== undefined) { try { await db.prepare("UPDATE vote_scrutins SET image_url=? WHERE id=?").run(urlImageScrutin(body.image_url), params.id); } catch (e) { logError(e, 'vote-scrutin-image'); } }
   sendJSON(res, 200, { ok: true });
 });
 
@@ -7906,7 +7929,7 @@ route("POST", "/api/vote-scrutins/:id/electeurs/resoudre", async (req, res, para
         await sendEmail({
           to: electeurUser.email,
           subject: `Invitation au vote — ${s.nom}`,
-          html: `<p>Bonjour ${electeurUser.nom || ""},</p><p>Vous êtes invité à participer au vote « ${s.nom} » organisé par ${s.init_nom}.</p>
+          html: `${s.image_url && /^https:\/\//i.test(s.image_url) ? `<p><img src="${s.image_url}" alt="" style="max-width:100%;border-radius:10px;"></p>` : ''}<p>Bonjour ${electeurUser.nom || ""},</p><p>Vous êtes invité à participer au vote « ${s.nom} » organisé par ${s.init_nom}.</p>
                  <p>Ouverture : ${s.date_ouverture || "à définir"}<br>Clôture : ${s.date_fermeture || "à définir"}</p>
                  <p>Pour voter, connectez-vous puis signez votre bulletin avec votre <strong>Code de Sécurité Diaspo'Actif (DS-ID)</strong>
                  ${electeurUser.ds_id ? '' : `(à générer dans <a href="${getOrigin(req)}/confidentialite.html">Confidentialité</a> si ce n'est pas déjà fait)`}.</p>`,
@@ -8106,7 +8129,7 @@ route("GET", "/api/mes-votes", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
   const rows = await db.prepare(`
-    SELECT vs.id, vs.nom, vs.type_scrutin, vs.statut, vs.date_ouverture, vs.date_fermeture, ve.a_vote, i.nom AS init_nom
+    SELECT vs.id, vs.nom, vs.type_scrutin, vs.statut, vs.date_ouverture, vs.date_fermeture, vs.image_url, ve.a_vote, i.nom AS init_nom
     FROM vote_electeurs ve JOIN vote_scrutins vs ON vs.id=ve.scrutin_id JOIN initiatives i ON i.id=vs.initiative_id
     WHERE ve.user_id=? ORDER BY vs.created_at DESC
   `).all(user.id);

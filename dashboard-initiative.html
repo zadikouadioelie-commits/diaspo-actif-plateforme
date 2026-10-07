@@ -1250,6 +1250,12 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         </select>
         <label style="font-size:12px;font-weight:700;">Description</label>
         <textarea id="vo-description" class="input" rows="2" style="margin:4px 0 10px;width:100%;"></textarea>
+        <label style="font-size:12px;font-weight:700;">🖼️ Photo de couverture <span style="font-weight:400;color:var(--muted);">(facultatif)</span></label>
+        <div id="vo-cover-apercu" style="display:none;height:130px;border-radius:12px;background-size:cover;background-position:center;margin:6px 0;"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin:4px 0 10px;flex-wrap:wrap;">
+          <input type="file" id="vo-cover-file" accept="image/jpeg,image/png,image/webp" onchange="voChoisirCouverture(this)" style="flex:1;min-width:180px;font-size:12px;">
+          <button type="button" id="vo-cover-retirer" class="btn btn-sm btn-outline" style="display:none;" onclick="voRetirerCouverture()">Retirer</button>
+        </div>
         <div style="display:flex;gap:10px;margin-bottom:10px;">
           <div style="flex:1;">
             <label style="font-size:12px;font-weight:700;">Ouverture</label>
@@ -1268,12 +1274,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <label style="font-size:12px;font-weight:700;">👥 Destinataires (qui pourra voter)</label>
         <p style="font-size:11px;color:var(--muted);margin:2px 0 6px;">Facultatif ici — vous pourrez aussi les choisir plus tard depuis la fiche du scrutin.</p>
         <div class="da-pill-group" style="margin:6px 0 10px;">
-          <label class="da-pill"><input type="checkbox" value="tous_actifs" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Tous les membres actifs</span></label>
           <label class="da-pill"><input type="checkbox" value="abonnes" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Abonnés</span></label>
           <label class="da-pill"><input type="checkbox" value="adhesion" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voCToggleCampagneRow(this.checked);"><span>Adhérents à jour</span></label>
           <label class="da-pill"><input type="checkbox" value="reseau_pro" class="vo-c-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voCToggleListeRow(this.checked);"><span>Réseau professionnel</span></label>
         </div>
         <div id="vo-c-campagne-row" style="display:none;margin-bottom:14px;">
+          <div id="vo-c-formule-bloc" style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:700;">Quelle adhésion ?</label>
+            <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Par défaut, l'adhésion officielle de votre initiative. Choisissez-en une autre si ce scrutin concerne un autre type d'adhésion.</p>
+            <select id="vo-c-crit-formule" class="input" style="width:100%;"></select>
+            <div id="vo-c-formule-info" style="display:none;font-size:12.5px;background:var(--bg);border-radius:8px;padding:8px 10px;"></div>
+          </div>
           <label style="font-size:12px;font-weight:700;">Campagne d'adhésion</label>
           <select id="vo-c-crit-campagne" class="input" style="width:100%;">
             <option value="">Toutes les adhésions à jour (sans filtrer par campagne)</option>
@@ -1326,12 +1337,17 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         <h3 style="margin:0 0 14px;">👥 Définir les électeurs</h3>
         <label style="font-size:12px;font-weight:700;">Sources</label>
         <div class="da-pill-group" style="margin:6px 0 14px;">
-          <label class="da-pill"><input type="checkbox" value="tous_actifs" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Tous les membres actifs</span></label>
           <label class="da-pill"><input type="checkbox" value="abonnes" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked)"><span>Abonnés</span></label>
           <label class="da-pill"><input type="checkbox" value="adhesion" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voToggleCampagneRow(this.checked);"><span>Adhérents à jour</span></label>
           <label class="da-pill"><input type="checkbox" value="reseau_pro" class="vo-source" onchange="this.closest('.da-pill').classList.toggle('checked',this.checked); voToggleListeRow(this.checked);"><span>Réseau professionnel</span></label>
         </div>
         <div id="vo-campagne-row" style="display:none;margin-bottom:14px;">
+          <div id="vo-formule-bloc" style="margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:700;">Quelle adhésion ?</label>
+            <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Par défaut, l'adhésion officielle de votre initiative. Choisissez-en une autre si ce scrutin concerne un autre type d'adhésion.</p>
+            <select id="vo-crit-formule" class="input" style="width:100%;"></select>
+            <div id="vo-formule-info" style="display:none;font-size:12.5px;background:var(--bg);border-radius:8px;padding:8px 10px;"></div>
+          </div>
           <label style="font-size:12px;font-weight:700;">Campagne d'adhésion</label>
           <p style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">La plateforme reconnaît automatiquement les comptes ayant adhéré/renouvelé pendant la période de cette campagne et actuellement à jour.</p>
           <select id="vo-crit-campagne" class="input" style="width:100%;">
@@ -8571,7 +8587,8 @@ async function voRenderScrutins(){
     }
     el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
       ${VO_SCRUTINS.map(s => `
-        <div class="card" style="padding:14px;">
+        <div class="card" style="padding:14px;overflow:hidden;">
+          ${s.image_url ? `<div style="height:110px;margin:-14px -14px 10px;background:url('${escH(s.image_url)}') center/cover;"></div>` : ''}
           <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${escH(s.nom)}</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${VO_TYPE_LABELS[s.type_scrutin]||s.type_scrutin} · ${VO_STATUT_LABELS[s.statut]||s.statut}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -8650,7 +8667,28 @@ async function voRenderPublies(){
 }
 const VO_SOURCE_LABELS = { tous_actifs: 'Tous les membres actifs', abonnes: 'Abonnés', adhesion: 'Adhérents à jour', cotisation: 'Adhérents à jour', liste_perso: 'Liste personnalisée', reseau_pro: 'Réseau professionnel' };
 
+/* Photo de couverture d'un scrutin (2026-10-07, demande explicite) : téléversée dès le choix du fichier (compressée), son adresse part avec la création. */
+let VO_COUVERTURE_URL = null;
+function voMajApercuCouverture(){
+  const ap = document.getElementById('vo-cover-apercu'), rt = document.getElementById('vo-cover-retirer');
+  if(!ap || !rt) return;
+  ap.style.display = VO_COUVERTURE_URL ? 'block' : 'none';
+  ap.style.backgroundImage = VO_COUVERTURE_URL ? `url('${VO_COUVERTURE_URL}')` : 'none';
+  rt.style.display = VO_COUVERTURE_URL ? 'inline-block' : 'none';
+}
+async function voChoisirCouverture(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  try{
+    const c = await compressImageFile(f, 1400, 700, 0.85);
+    VO_COUVERTURE_URL = await uploadMedia(c, 'evenement');
+    voMajApercuCouverture();
+  }catch(e){ showToast('Photo non enregistrée : '+(e.message||'erreur'), 'warning'); input.value=''; }
+}
+function voRetirerCouverture(){
+  VO_COUVERTURE_URL = null; const i = document.getElementById('vo-cover-file'); if(i) i.value=''; voMajApercuCouverture();
+}
 function voOuvrirCreationScrutin(){
+  VO_COUVERTURE_URL = null; { const i = document.getElementById('vo-cover-file'); if(i) i.value=''; } voMajApercuCouverture();
   document.getElementById('vo-nom').value = '';
   document.getElementById('vo-type').value = 'ag_ordinaire';
   document.getElementById('vo-description').value = '';
@@ -8665,9 +8703,30 @@ function voOuvrirCreationScrutin(){
   document.getElementById('modal-vo-scrutin').style.display = 'flex';
 }
 
+/* « Quelle adhésion ? » (2026-10-07) : l'adhésion officielle d'abord (choix par défaut), puis les autres formules actives, puis « toutes » ; quand il n'y a
+   qu'une seule adhésion, il n'y a rien à choisir et on l'affiche simplement. */
+async function voRemplirFormulesAdhesion(prefixe){
+  const sel = document.getElementById(prefixe + 'crit-formule'), info = document.getElementById(prefixe + 'formule-info');
+  if(!sel || !info) return;
+  sel.innerHTML = ''; sel.style.display = 'block'; info.style.display = 'none';
+  let formules = [];
+  try{ formules = (await api('GET', `/initiatives/${window.__vitrineInitId}/adhesion-formules`)).formules || []; }catch(e){}
+  const off = formules.find(f => Number(f.est_officielle) === 1);
+  const autres = formules.filter(f => !off || Number(f.id) !== Number(off.id));
+  if(off) sel.innerHTML += `<option value="officielle">⭐ Adhésion officielle — ${escH(off.nom)}</option>`;
+  autres.forEach(f => { sel.innerHTML += `<option value="${f.id}">${escH(f.nom)}</option>`; });
+  if(formules.length > 1) sel.innerHTML += '<option value="toutes">Toutes les adhésions</option>';
+  if(!off && formules.length > 1) sel.value = 'toutes';
+  if(formules.length <= 1){
+    sel.style.display = 'none'; info.style.display = 'block';
+    info.textContent = formules.length ? `Adhésion concernée : ${formules[0].nom}${off ? ' (adhésion officielle)' : ''}` : "Aucune adhésion n'est encore créée : personne ne sera ajouté. Créez d'abord une adhésion dans « Cotisations & Adhésions ».";
+  }
+}
+
 async function voCToggleCampagneRow(show){
   document.getElementById('vo-c-campagne-row').style.display = show ? 'block' : 'none';
   if(!show) return;
+  voRemplirFormulesAdhesion('vo-c-');
   const sel = document.getElementById('vo-c-crit-campagne');
   sel.innerHTML = '<option value="">Toutes les adhésions à jour (sans filtrer par campagne)</option>';
   try{
@@ -8700,6 +8759,7 @@ async function voResoudreDestinatairesDepuisCreation(scrutinId){
   if(!sources.length) return null;
   const criteres = {
     campagne_id: document.getElementById('vo-c-crit-campagne')?.value || undefined,
+    formule_id: document.getElementById('vo-c-crit-formule')?.value || undefined,
     liste_id: document.getElementById('vo-c-crit-liste')?.value || undefined,
   };
   try{
@@ -8722,6 +8782,7 @@ async function voEnregistrerScrutin(){
     vote_secret: document.getElementById('vo-secret').checked,
     resultats_direct: document.getElementById('vo-resultats-direct').checked,
     pv_auto: document.getElementById('vo-pv-auto').checked,
+    image_url: VO_COUVERTURE_URL || undefined,
   };
   try{
     const r = await api('POST', `/initiatives/${window.__vitrineInitId}/vote-scrutins`, payload);
@@ -8750,6 +8811,7 @@ async function voEnregistrerEtPublierScrutin(){
     vote_secret: document.getElementById('vo-secret').checked,
     resultats_direct: document.getElementById('vo-resultats-direct').checked,
     pv_auto: document.getElementById('vo-pv-auto').checked,
+    image_url: VO_COUVERTURE_URL || undefined,
   };
   let scrutinId;
   try{
@@ -8866,6 +8928,7 @@ function voOuvrirModalElecteurs(){
 async function voToggleCampagneRow(show){
   document.getElementById('vo-campagne-row').style.display = show ? 'block' : 'none';
   if(!show) return;
+  voRemplirFormulesAdhesion('vo-');
   const sel = document.getElementById('vo-crit-campagne');
   sel.innerHTML = '<option value="">Toutes les adhésions à jour (sans filtrer par campagne)</option>';
   try{
@@ -8894,6 +8957,7 @@ async function voResoudreElecteurs(){
   if(!sources.length){ showToast('Choisissez au moins une source.', 'warning'); return; }
   const criteres = {
     campagne_id: document.getElementById('vo-crit-campagne')?.value || undefined,
+    formule_id: document.getElementById('vo-crit-formule')?.value || undefined,
     liste_id: document.getElementById('vo-crit-liste')?.value || undefined,
   };
   try{

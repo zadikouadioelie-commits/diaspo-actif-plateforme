@@ -96,7 +96,8 @@ function renderListe(){
   }
   el.innerHTML = `<div class="vo-grid">
     ${MES_VOTES.map(v => `
-      <div class="vo-card">
+      <div class="vo-card" style="overflow:hidden;">
+        ${v.image_url ? `<div style="height:120px;margin:-16px -16px 10px;background:url('${escHtml(v.image_url)}') center/cover;"></div>` : ''}
         <div class="vo-nom">${escHtml(v.nom)}</div>
         <div class="vo-meta">${escHtml(v.init_nom)} — ${VOTE_TYPE_LABELS[v.type_scrutin]||v.type_scrutin} — ${VOTE_STATUT_LABELS[v.statut]||v.statut}</div>
         ${v.a_vote ? '<p style="color:#10b981;font-weight:700;">✅ Vous avez déjà voté</p>' :
