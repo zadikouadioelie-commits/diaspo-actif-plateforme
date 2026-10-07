@@ -19882,6 +19882,46 @@ async function enrichirAvecFicheMedia(rows) {
   });
 }
 
+/* Image d'un événement pour l'aperçu de lien (WhatsApp, réseaux) — 2026-10-07, demande explicite :
+   "à chaque fois qu'on partage un événement, il y a bien la photo choisie par le concepteur".
+   Même chaîne de repli que la cartouche (couverture → image → galerie → affiche de la fiche liée).
+   Une couverture stockée en data:image/...;base64 (événements créés avant l'hébergement CDN) n'est
+   pas lisible par un crawler : on la sert comme vraie image via GET /api/evenements/:id/couverture,
+   avec ?v=<empreinte> pour que l'URL change dès que la couverture change (cache WhatsApp). */
+async function couvertureBruteEvenement(row) {
+  let galerie = [];
+  try { galerie = Array.isArray(row.galerie_photos) ? row.galerie_photos : JSON.parse(row.galerie_photos || '[]'); } catch (_) {}
+  const direct = row.image_couverture || row.image_url || (galerie.filter(Boolean)[0]) || null;
+  if (direct) return direct;
+  try {
+    const enrichi = (await enrichirAvecFicheMedia([row]))[0];
+    return (enrichi.fiche_media && enrichi.fiche_media.affiche_url) || null;
+  } catch (_) { return null; }
+}
+async function urlImagePartageEvenement(row) {
+  const base = 'https://diaspoactif.com';
+  const defaut = `${base}/assets/og-image.png`;
+  const cover = await couvertureBruteEvenement(row);
+  if (!cover) return defaut;
+  if (/^https?:\/\//i.test(cover)) return cover;
+  if (cover.startsWith('/') && !cover.startsWith('//')) return base + cover;
+  if (/^data:image\/(jpeg|png|webp|gif);base64,/i.test(cover)) {
+    const v = crypto.createHash('md5').update(cover).digest('hex').slice(0, 10);
+    return `${base}/api/evenements/${row.id}/couverture?v=${v}`;
+  }
+  return defaut;
+}
+route("GET", "/api/evenements/:id/couverture", async (req, res, params) => {
+  const row = await db.prepare("SELECT * FROM evenements WHERE id=?").get(params.id);
+  if (!row || row.statut === 'brouillon' || row.visibilite === 'prive') return sendJSON(res, 404, { error: "Introuvable." });
+  const cover = await couvertureBruteEvenement(row);
+  const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/is.exec(cover || '');
+  if (!m) return sendJSON(res, 404, { error: "Aucune image intégrée." });
+  const buf = Buffer.from(m[2], 'base64');
+  res.writeHead(200, { 'Content-Type': m[1].toLowerCase(), 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400' });
+  res.end(buf);
+});
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PROMOTION J-7 D'UN ÉVÉNEMENT (2026-10-05, demande explicite)
    Un seul bouton pour le titulaire, utilisable UNE fois, de J-7 à la veille. Au clic :
@@ -30981,7 +31021,7 @@ ${jsonLd}
       let html = await fs.promises.readFile(path.join(ROOT, 'evenements-app.html'), 'utf8');
       if (parsed.query.evt) {
         try {
-          const evt = await db.prepare("SELECT id, titre, description, image_couverture, statut, visibilite FROM evenements WHERE id=?").get(parsed.query.evt);
+          const evt = await db.prepare("SELECT * FROM evenements WHERE id=?").get(parsed.query.evt);
           if (evt && evt.statut !== 'brouillon' && evt.visibilite !== 'prive') {
             const escAttr = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const base = 'https://diaspoactif.com';
@@ -30996,12 +31036,10 @@ ${jsonLd}
                alors faux, l'ancien code concaténait bêtement base+chemin et produisait une URL
                cassée du style diaspoactif.com/data:image/...). Repli sur l'image générique dans
                ce cas, comme si aucune couverture n'existait. */
-            let image = `${base}/assets/og-image.png`;
-            if (evt.image_couverture && evt.image_couverture.startsWith('http')) {
-              image = evt.image_couverture;
-            } else if (evt.image_couverture && evt.image_couverture.startsWith('/')) {
-              image = `${base}${evt.image_couverture}`;
-            }
+            /* 2026-10-07 : un data: URI n'est plus abandonné au profit de l'image générique — il est
+               servi comme vraie image (voir urlImagePartageEvenement()), avec la même chaîne de
+               repli que la cartouche (couverture → image → galerie → affiche de la fiche). */
+            const image = await urlImagePartageEvenement(evt);
             const pageUrl = `${base}/evenements.html?evt=${evt.id}`;
             html = html
               .replace(/<title>[^<]*<\/title>/, `<title>${escAttr(titre)}</title>`)
