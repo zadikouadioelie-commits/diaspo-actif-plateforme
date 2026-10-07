@@ -248,3 +248,12 @@ svg.i.l{width:28px;height:28px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--orange),var(--orange-d));border-radius:6px}
 .prem{display:inline-block;font-size:11px;font-weight:700;color:#7A5500;background:linear-gradient(135deg,#FFE29A,#F5C04A);border-radius:20px;padding:1px 8px;vertical-align:middle;margin-left:4px}
 .h2.row{align-items:baseline}
+
+/* ---------- bouton « Menu des modules » (même or que le bouton du site) ---------- */
+.menu-btn{flex:none;display:flex;align-items:center;gap:6px;height:38px;padding:0 12px 0 10px;border-radius:10px;background:linear-gradient(135deg,#F5D061,#C9971C);border:1px solid rgba(0,0,0,.08);color:#3A2600;font-weight:800;font-size:13.5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.menu-btn:active{transform:scale(.97)}
+.menu-btn svg.i{width:20px;height:20px;stroke-width:2.4}
+#top .logo{width:30px;height:30px}
+#top{gap:8px}
+#desk-banner{position:relative;z-index:200;background:#FFF7DB;color:#3A2600;border-bottom:2px solid #C9971C;padding:10px 14px;font-size:13px;line-height:1.35;font-family:"Segoe UI",system-ui,sans-serif}
+#desk-banner button{margin-left:6px;background:#3A2600;color:#fff;border-radius:14px;padding:3px 12px;font-weight:700}

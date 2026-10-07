@@ -210,9 +210,10 @@
   function renderTop() {
     const top = $('#top');
     const right = S.me
-      ? `<button class="ibtn" id="top-menu" aria-label="Menu des modules">${ic('menu')}</button><button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
+      ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
       : `<button class="pill-cta" id="top-login">Connexion</button>`;
-    top.innerHTML = `<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
+    const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
+    top.innerHTML = `${left}<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
       <h1><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1>${right}`;
     const l = $('#top-login'); if (l) l.onclick = () => openLogin();
     const sw = $('#top-switch'); if (sw) sw.onclick = openSwitcher;
@@ -1011,7 +1012,22 @@
   }
 
   /* ---------- démarrage ---------- */
+  /* Un téléphone dont le navigateur est réglé sur « Version pour ordinateur » (réglage mémorisé par site) affiche la page sur ~980 px de large :
+     tout paraît minuscule. On le détecte (écran tactile étroit, mais zone d'affichage large) et on explique comment corriger. */
+  function checkDesktopMode() {
+    try {
+      const touch = window.matchMedia && matchMedia('(any-pointer:coarse)').matches;
+      const sw = Math.min(screen.width, screen.height);
+      if (!touch || sw > 600 || window.innerWidth < 700) return;
+      if (sessionStorage.getItem('m-desk-off')) return;
+    } catch (e) { return; }
+    const b = document.createElement('div'); b.id = 'desk-banner'; b.setAttribute('role', 'alert');
+    b.innerHTML = '<b>Affichage réduit :</b> votre navigateur est en « version pour ordinateur ». Ouvrez le menu ⋮ du navigateur puis décochez <b>Version pour ordinateur</b> pour un affichage adapté au téléphone. <button type="button" aria-label="Fermer">OK</button>';
+    b.querySelector('button').onclick = () => { b.remove(); try { sessionStorage.setItem('m-desk-off', '1'); } catch (e) { } };
+    document.body.insertBefore(b, document.body.firstChild);
+  }
   async function init() {
+    checkDesktopMode();
     $('#view').innerHTML = TABS.map(t => `<section id="t-${t}" hidden></section>`).join('');
     window.addEventListener('hashchange', () => route());
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { const v = $('.viewer'); if (v) v.remove(); } });
