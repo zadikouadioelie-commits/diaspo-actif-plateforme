@@ -1124,6 +1124,63 @@ function iaDateCreation(v) {
   const d = new Date(s);
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 }
+/* « 📥 Importer des inscrits » (2026-10-07) — rattache à cette fiche des personnes inscrites ailleurs (fichier CSV : l'export de l'organisateur du site de
+   l'Acte Fondateur est lu tel quel). Étape 1 : analyse (rien n'est écrit) ; étape 2 : import. Aucun e-mail n'est envoyé aux personnes importées. */
+function iaOuvrirImportInscrits() {
+  const fiche = selectedFiche();
+  if (!fiche) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,20,30,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  let csv = '';
+  const champ = 'width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid oklch(0.85 0.004 30);border-radius:9px;font:inherit;font-size:13px;';
+  const dessiner = (apercu, resultat) => {
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:16px;max-width:620px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-sizing:border-box;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px;">
+          <h3 style="margin:0;font-size:17px;">📥 Importer des inscrits dans « ${escH(fiche.nom)} »</h3>
+          <button type="button" data-imp-fermer style="background:none;border:none;font-size:20px;cursor:pointer;color:oklch(0.55 0.006 30);flex-shrink:0;">✕</button>
+        </div>
+        <p style="font-size:12.5px;color:oklch(0.5 0.006 30);margin:0 0 12px;line-height:1.55;">Pour ajouter les personnes inscrites sur un autre site (par exemple l'Acte Fondateur). Déposez leur fichier <b>CSV</b> : la première ligne doit contenir les titres des colonnes (Nom, Prénom, Email, Téléphone…). Une colonne « Venu » = « oui » les marque présentes. Les adresses e-mail déjà inscrites sont ignorées, et <b>aucun e-mail n'est envoyé</b> aux personnes importées.</p>
+        <input type="file" id="imp-fichier" accept=".csv,text/csv,text/plain" style="${champ}">
+        <textarea id="imp-texte" rows="4" placeholder="… ou collez ici le contenu du fichier" style="${champ}margin-top:8px;resize:vertical;">${escH(csv)}</textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <button type="button" data-imp-analyser style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-weight:700;font-size:13px;padding:10px 18px;border-radius:9px;cursor:pointer;">Analyser le fichier</button>
+        </div>
+        ${apercu ? `<div style="background:oklch(0.97 0.01 258);border-radius:12px;padding:14px;margin-top:14px;font-size:13px;line-height:1.6;">
+          <b>${apercu.importables}</b> personne(s) importable(s) sur ${apercu.lignes_lues} ligne(s)${apercu.presents ? ` · dont <b>${apercu.presents}</b> marquée(s) présente(s)` : ''}<br>
+          ${apercu.doublons ? `${apercu.doublons} adresse(s) e-mail déjà inscrite(s), ignorée(s)<br>` : ''}${apercu.sans_identite ? `${apercu.sans_identite} ligne(s) sans nom ni e-mail, ignorée(s)<br>` : ''}
+          <span style="color:oklch(0.5 0.006 30);font-size:12px;">Colonnes reconnues : ${apercu.colonnes_reconnues.map(escH).join(', ') || '—'}.${apercu.colonnes_conservees.length ? ' Autres colonnes conservées dans la fiche de chaque personne : ' + apercu.colonnes_conservees.slice(0, 8).map(escH).join(', ') + (apercu.colonnes_conservees.length > 8 ? '…' : '') + '.' : ''}</span>
+          ${apercu.exemples.length ? `<div style="margin-top:8px;font-size:12px;">Exemples : ${apercu.exemples.map(x => escH((x.prenom + ' ' + x.nom).trim() + (x.email ? ' (' + x.email + ')' : ''))).join(' · ')}</div>` : ''}
+          ${apercu.importables ? `<button type="button" data-imp-importer style="margin-top:12px;background:#F26422;border:none;color:#1f0e02;font-weight:800;font-size:13px;padding:11px 18px;border-radius:9px;cursor:pointer;">Importer ${apercu.importables} inscrit(s)</button>` : ''}
+        </div>` : ''}
+        ${resultat ? `<div style="background:#DCFCE7;color:#166534;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13.5px;">✅ ${resultat.importes} inscrit(s) importé(s) dans cette fiche.</div>` : ''}
+      </div>`;
+  };
+  dessiner();
+  document.body.appendChild(overlay);
+  const lire = () => { const t = overlay.querySelector('#imp-texte'); if (t) csv = t.value; return csv; };
+  overlay.addEventListener('change', (e) => {
+    if (e.target.id !== 'imp-fichier' || !e.target.files[0]) return;
+    const fr = new FileReader();
+    fr.onload = () => { csv = String(fr.result || ''); dessiner(); };
+    fr.readAsText(e.target.files[0], 'utf-8');
+  });
+  overlay.addEventListener('click', async (e) => {
+    if (e.target === overlay || e.target.closest('[data-imp-fermer]')) { overlay.remove(); return; }
+    const analyser = e.target.closest('[data-imp-analyser]'), importer = e.target.closest('[data-imp-importer]');
+    if (!analyser && !importer) return;
+    lire();
+    const bouton = analyser || importer; bouton.disabled = true;
+    try {
+      if (analyser) { const a = await api('POST', `/insc/fiches/${fiche.id}/importer`, { csv, apercu: true }); dessiner(a); }
+      else {
+        const r = await api('POST', `/insc/fiches/${fiche.id}/importer`, { csv, apercu: false, origine: 'Import CSV' });
+        dessiner(null, r); ia_toast(`${r.importes} inscrit(s) importé(s).`, true);
+        await iaChargerFiche(state.selectedFicheId); render();
+      }
+    } catch (err) { ia_toast(err.message || 'Import impossible.', false); bouton.disabled = false; }
+  });
+}
 /* « 💛 Don / Cagnotte » (2026-10-07, demande explicite) — relie CE formulaire à un don ou à une cagnotte de l'organisateur, avec la
    possibilité d'en créer un(e) sur place quand il n'y en a pas encore. Aucun nouveau type de champ ni nouvelle route : on réutilise le
    lien déjà existant cagnottes.insc_fiche_id (PUT /api/cagnottes/:id) ; la page publique du formulaire affiche déjà le bouton « Soutenir »
@@ -1367,6 +1424,7 @@ function renderDetailView() {
           <button type="button" class="gt-launch-btn" style="margin-top:0;width:auto;display:inline-flex;" onclick="window.GuidedTour&&GuidedTour.start('inscriptions-admin')">🎥 Tutoriel</button>
           <button style="background:oklch(0.96 0.004 30); border:1px solid oklch(0.78 0.006 30); color:oklch(0.2 0.006 30); font-size:13px; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer;" data-action="goToPublic">Prévisualiser</button>
           <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="dupliquerFiche">📑 Dupliquer</button>
+          <button style="background:#fff;border:1px solid oklch(0.85 0.004 30);color:oklch(0.3 0.006 30);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;" data-action="importerInscrits" title="Ajouter à cette fiche des personnes inscrites ailleurs (fichier CSV)">📥 Importer des inscrits</button>
         </div>
       </div>
       <div style="display:flex; gap:20px; margin-top:10px; font-size:13px; color:oklch(0.5 0.006 30); flex-wrap:wrap;">
@@ -3092,6 +3150,7 @@ const actions = {
     state.activeTab = 'validation';
   },
   selectType(el) { state.selectedTypeId = parseInt(el.dataset.id); },
+  importerInscrits() { iaOuvrirImportInscrits(); },
   async dupliquerFiche() {
     try { const r = await api('POST', `/insc/fiches/${state.selectedFicheId}/dupliquer`, {}); ia_toast('Fiche dupliquée.', true); state.selectedFicheId = r.fiche_id; await iaChargerFiche(r.fiche_id); }
     catch (e) { ia_toast(e.message, false); }

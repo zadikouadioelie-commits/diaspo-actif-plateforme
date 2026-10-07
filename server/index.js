@@ -45952,6 +45952,89 @@ async function inscSlugUnique(nom, id) {
   }
   return `${base}-${crypto.randomBytes(3).toString("hex")}`;
 }
+/* ── Import d'inscrits depuis un fichier CSV (2026-10-07) ─────────────────────────────────────────────────────────────
+   Pour rattacher à une fiche les personnes inscrites AILLEURS (ex. le site séparé de l'Acte Fondateur, dont l'export CSV de l'organisateur est lu tel quel) :
+   elles deviennent des inscrits de la fiche — donc destinataires du compte-rendu, comptées dans la participation, visibles dans « Présences ». Aucun e-mail
+   n'est envoyé à l'import. Aperçu par défaut : rien n'est écrit tant que apercu n'est pas explicitement false. */
+function inscLireCsv(texte) {
+  const premiere = texte.split(/\r?\n/, 1)[0] || '';
+  const compte = s => premiere.split(s).length - 1;
+  const sep = [';', ',', '\t'].sort((a, b) => compte(b) - compte(a))[0];
+  const rows = []; let champ = '', ligne = [], q = false;
+  const fin = () => { ligne.push(champ); champ = ''; if (ligne.some(v => String(v).trim() !== '')) rows.push(ligne); ligne = []; };
+  for (let i = 0; i < texte.length; i++) {
+    const c = texte[i];
+    if (q) { if (c === '"') { if (texte[i + 1] === '"') { champ += '"'; i++; } else q = false; } else champ += c; }
+    else if (c === '"') q = true;
+    else if (c === sep) { ligne.push(champ); champ = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && texte[i + 1] === '\n') i++; fin(); }
+    else champ += c;
+  }
+  if (champ !== '' || ligne.length) fin();
+  return rows;
+}
+const INSC_CSV_COLONNES = {
+  nom: ['nom', 'nom de famille', 'last name', 'lastname', 'surname'],
+  prenom: ['prenom', 'first name', 'firstname', 'given name'],
+  email: ['email', 'e-mail', 'mail', 'adresse e-mail', 'adresse email', 'courriel'],
+  telephone: ['telephone', 'tel', 'phone', 'portable', 'mobile', 'numero de telephone'],
+  reference: ['reference', 'ref'],
+  venu: ['venu', 'present', 'presence', 'presente'],
+  inscrit_le: ['inscrit le', 'date d inscription', 'date inscription', 'date'],
+};
+route("POST", "/api/insc/fiches/:id/importer", async (req, res, params, body) => {
+  const { erreur, msg, fiche, user } = await inscFicheProprietaire(req, params.id);
+  if (erreur) return sendJSON(res, erreur, { error: msg });
+  const texte = String(body?.csv || '').replace(/^\uFEFF/, '').replace(/\u0000/g, '');
+  if (!texte.trim()) return sendJSON(res, 400, { error: "Déposez le fichier CSV ou collez son contenu." });
+  if (texte.length > 2000000) return sendJSON(res, 413, { error: "Fichier trop volumineux (2 Mo au plus)." });
+  const lignes = inscLireCsv(texte);
+  if (lignes.length < 2) return sendJSON(res, 400, { error: "Le fichier doit contenir une ligne d'en-têtes puis au moins une personne." });
+  const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’'_\-]/g, ' ').replace(/\s+/g, ' ').toLowerCase().trim();
+  const entetes = lignes[0].map(norm);
+  const col = {}; for (const [cle, noms] of Object.entries(INSC_CSV_COLONNES)) { const i = entetes.findIndex(h => noms.includes(h)); if (i >= 0) col[cle] = i; }
+  if (col.nom === undefined && col.prenom === undefined && col.email === undefined) return sendJSON(res, 400, { error: "Colonnes introuvables : le fichier doit au moins contenir « Nom », « Prénom » ou « Email » dans sa première ligne." });
+  const autres = lignes[0].map((h, i) => [i, String(h).trim()]).filter(([i, h]) => h && !Object.values(col).includes(i));
+  const existants = new Set((await db.prepare("SELECT LOWER(email) AS e FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule' AND email IS NOT NULL AND email<>''").all(fiche.id)).map(r => r.e));
+  /* Sans e-mail valide, une personne est reconnue par nom + prénom + téléphone : relancer le même import ne la recrée jamais. */
+  const cle = (n, p, tel) => `${String(n).toLowerCase()}|${String(p).toLowerCase()}|${String(tel || '')}`;
+  const existantsSansMail = new Set((await db.prepare("SELECT nom, prenom, telephone FROM insc_inscriptions WHERE fiche_id=? AND statut!='annule' AND (email IS NULL OR email='')").all(fiche.id)).map(r => cle(r.nom, r.prenom, r.telephone)));
+  const vus = new Set(), pret = []; let doublons = 0, sansNom = 0;
+  for (const l of lignes.slice(1, 2001)) {
+    const v = k => (col[k] !== undefined ? String(l[col[k]] ?? '').trim() : '');
+    const nom = v('nom').slice(0, 120), prenom = v('prenom').slice(0, 120);
+    const emailBrut = v('email').toLowerCase().slice(0, 200);
+    const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailBrut) ? emailBrut : '';
+    if (!nom && !prenom && !email) { sansNom++; continue; }
+    if (email && (existants.has(email) || vus.has(email))) { doublons++; continue; }
+    if (email) vus.add(email);
+    else { const k = cle(nom || '—', prenom, v('telephone').slice(0, 40)); if (existantsSansMail.has(k)) { doublons++; continue; } existantsSansMail.add(k); }
+    const extras = {}; autres.forEach(([i, h]) => { const x = String(l[i] ?? '').trim(); if (x) extras[h.slice(0, 60)] = x.slice(0, 500); });
+    const dateIns = /^\d{4}-\d{2}-\d{2}/.test(v('inscrit_le')) ? v('inscrit_le').slice(0, 10) : null;
+    pret.push({ nom: nom || (email ? email.split('@')[0] : '—'), prenom, email: email || null, telephone: v('telephone').slice(0, 40) || null, present: /^(oui|yes|1|vrai|present|présent)$/i.test(v('venu')), dateIns, extras });
+  }
+  const resume = { lignes_lues: lignes.length - 1, importables: pret.length, doublons, sans_identite: sansNom, colonnes_reconnues: Object.keys(col), colonnes_conservees: autres.map(a => a[1]).slice(0, 30), presents: pret.filter(p => p.present).length,
+    exemples: pret.slice(0, 5).map(p => ({ nom: p.nom, prenom: p.prenom, email: p.email, present: p.present })) };
+  if (body.apercu !== false) return sendJSON(res, 200, { apercu: true, ...resume });
+  let type = body.type_id ? await db.prepare("SELECT id FROM insc_types WHERE id=? AND fiche_id=?").get(body.type_id, fiche.id) : null;
+  if (!type) type = await db.prepare("SELECT id FROM insc_types WHERE fiche_id=? AND actif=1 ORDER BY ordre ASC, id ASC LIMIT 1").get(fiche.id);
+  if (!type) return sendJSON(res, 400, { error: "Créez d'abord un type d'inscription dans cette fiche, puis relancez l'import." });
+  const lie = await db.prepare("SELECT evenement_id FROM insc_fiches_evenements WHERE fiche_id=? ORDER BY id ASC LIMIT 1").get(fiche.id);
+  const origine = String(body.origine || 'Import CSV').slice(0, 80);
+  let importes = 0;
+  for (const p of pret) {
+    const reference = await inscGenererReference();
+    const reponses = { importe_depuis: origine, ...p.extras };
+    const dateSql = p.dateIns ? `${p.dateIns} 12:00:00` : null;
+    await db.prepare(`INSERT INTO insc_inscriptions (fiche_id, type_id, evenement_id, user_id, reference, nom, prenom, email, telephone, reponses_json, statut, statut_paiement, consentements_json, ip_creation${dateSql ? ', created_at' : ''})
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?${dateSql ? ',?' : ''})`)
+      .run(fiche.id, type.id, lie ? lie.evenement_id : null, null, reference, p.nom, p.prenom, p.email, p.telephone, JSON.stringify(reponses), p.present ? 'present' : 'confirme', 'non_concerne', '{}', 'import', ...(dateSql ? [dateSql] : []));
+    importes++;
+  }
+  await inscJournaliser(fiche.id, user, 'import', `${importes} inscrit(s) importé(s) depuis un fichier CSV (${origine}) ; ${doublons} doublon(s) ignoré(s).`);
+  sendJSON(res, 200, { apercu: false, importes, ...resume });
+});
+
 async function inscGenererReference() {
   const annee = new Date().getFullYear();
   for (let i = 0; i < 40; i++) {
