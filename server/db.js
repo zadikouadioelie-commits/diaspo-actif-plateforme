@@ -6566,6 +6566,17 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_origine_relances_user ON origine_relances(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_origine_relances_init ON origine_relances(initiative_id, created_at);
 
+    /* Relances « profil à compléter » (2026-10-08) : une ligne par notification envoyée (sans clé étrangère : ne doit jamais bloquer la suppression d'un compte) — sert à mesurer les 5 jours réels
+       entre deux relances et à faire tourner le texte (rang). Voir server/completude.js. */
+    CREATE TABLE IF NOT EXISTS completude_relances (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      rang        INTEGER NOT NULL DEFAULT 1,
+      pourcentage INTEGER,
+      created_at  TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_completude_relances_user ON completude_relances(user_id, created_at);
+
     /* ===== CARTE DIASPO'ACTIF — Affiliations =====
        Organisations qu'un membre déclare lui-même (nom + logo), affichées sur sa carte
        de profil condensée. Libre-service, sans validation admin (choix volontaire :

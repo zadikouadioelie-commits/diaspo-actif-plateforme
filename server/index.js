@@ -10170,10 +10170,7 @@ route("GET", "/api/initiatives/:id/score-activite", async (req, res, params) => 
   const nbMembres = (await db.prepare("SELECT COUNT(*) c FROM initiative_membres WHERE initiative_id=? AND statut='accepte'").get(init.id)).c;
 
   /* Complétude du profil : proportion de champs de présentation remplis */
-  const champsProfil = ['description','mission','historique','logo_url','site_web','adresse','vitrine_horaires','vitrine_services',
-                        'publics_json','besoins_json','realisations_json','galerie_json','reseaux_sociaux','annee_creation'];
-  const remplis = champsProfil.filter(c => init[c] != null && String(init[c]).trim() !== '' && String(init[c]) !== '[]' && String(init[c]) !== '{}').length;
-  const completude = Math.round((remplis / champsProfil.length) * 100);
+  const completude = Completude.evaluer('initiative', init).pct; // même liste que les alertes (server/completude.js)
 
   /* Pondération : publications 25 pts, événements 20, campagnes 15, membres 15, complétude 25 */
   const score = Math.min(100, Math.round(
@@ -17656,10 +17653,7 @@ route("GET", "/api/profil/:id/score-activite", async (req, res, params) => {
   // Comptes supprimés exclus (2026-09-09) — même correction que nbAbonnes/nbSuivis de GET /api/profil/:id.
   const nbAbonnes = (await db.prepare("SELECT COUNT(*) c FROM user_follows uf JOIN users u2 ON u2.id=uf.follower_id WHERE uf.followed_id=? AND u2.nom!='Compte supprimé'").get(u.id)).c;
   const nbSuivis = (await db.prepare("SELECT COUNT(*) c FROM user_follows uf JOIN users u2 ON u2.id=uf.followed_id WHERE uf.follower_id=? AND u2.nom!='Compte supprimé'").get(u.id)).c;
-  const champsProfil = ['bio','titre_pro','photo_url','competences','experiences','centres_interet',
-                        'publics_json','besoins_json','realisations_json','services_perso','reseaux_json','annee_debut'];
-  const remplis = champsProfil.filter(c => u[c] != null && String(u[c]).trim() !== '' && String(u[c]) !== '[]' && String(u[c]) !== '{}').length;
-  const completude = Math.round((remplis / champsProfil.length) * 100);
+  const completude = Completude.evaluer('utilisateur', u).pct; // même liste que les alertes (server/completude.js)
   const score = Math.min(100, Math.round(
     Math.min(pubs30j, 5) / 5 * 30 +
     Math.min(nbAbonnes, 20) / 20 * 20 +
@@ -21276,6 +21270,7 @@ route("POST", "/api/admin/annonces-officielles/:id/retirer", async (req, res, pa
    Privé  : chaque compte ne voit que ses propres décomptes (GET /api/honneur/mon-bareme).
    Admin  : classement détaillé, coups de pouce, origine des Premium, historique des lauréats.
    ══════════════════════════════════════════════════════════════════════════ */
+const Completude = require("./completude");
 const honneur = require("./honneur")({
   db, dateParisISO, nomCompteAffichage, creerNotif, logError,
   getStripe: () => { try { return require("./stripe-client").stripe; } catch (_) { return null; } },
@@ -30515,7 +30510,14 @@ async function handleRequest(req, res) {
         confirmationsEnvoyees++;
       }
 
-      sendJSON(res, 200, { ok: true, relances_envoyees: relancesEnvoyees, confirmations_envoyees: confirmationsEnvoyees });
+      /* Phase 2 (2026-10-08) : relances « profil à compléter » (jusqu'à 80 %), après celle de l'origine pour que la règle
+         « jamais deux notifications le même jour » puisse s'appuyer sur ce qui vient de partir. Isolée : une erreur ici ne
+         doit jamais faire échouer la relance d'origine déjà faite. */
+      let completudeBilan = null;
+      try { completudeBilan = await Completude.relancerProfilsIncomplets({ db, creerNotif, origine: ORIGIN_PUBLIC }); }
+      catch (e) { console.error('[completude-relances]', e.stack || e.message); completudeBilan = { erreur: e.message }; }
+
+      sendJSON(res, 200, { ok: true, relances_envoyees: relancesEnvoyees, confirmations_envoyees: confirmationsEnvoyees, completude: completudeBilan });
     } catch (e) {
       console.error('[origine-relances]', e.stack || e.message);
       sendJSON(res, 500, { error: 'Relances failed', detail: e.message });
