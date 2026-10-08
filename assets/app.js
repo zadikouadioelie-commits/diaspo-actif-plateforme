@@ -2278,16 +2278,60 @@ async function annInscrire(id, btn){
   }
 }
 
-/* ── Bouton "Adhérer" (Associations/ONG) — cartouches Annuaire/Vitrines + profil public.
-   Version simple : envoie une demande d'adhésion, sans choix de formule ni paiement (viendra
-   dans une étape suivante). Le bouton passe en état "Demande envoyée" une fois la demande créée. */
+/* ── Bouton « Adhérer à l'initiative » (Associations/ONG) — annuaire, boutiques, profil, page d'initiative,
+   page d'événement. (2026-10-08, demande explicite)
+   Il ouvre DIRECTEMENT le formulaire de l'adhésion OFFICIELLE de la structure — celle créée avec
+   « ⭐ Créer l'adhésion officielle » (dashboard-initiative.html), paiement compris — et RIEN d'autre : jamais
+   la liste des autres formules, jamais une cagnotte (elles vivent dans le bouton « Soutenir »).
+   Tant que l'association n'a pas créé son adhésion officielle, le bouton reste affiché mais indique
+   « Adhésion bientôt disponible » et n'a aucune action. */
+const ADHESION_BIENTOT_TEXTE = 'Adhésion bientôt disponible';
+const _adhesionOfficielle = new Map();   // id d'initiative -> id de la formule officielle, ou null (sans officielle)
+
+function appliquerAdhesionBientot(btn) {
+  if (!btn) return;
+  btn.textContent = ADHESION_BIENTOT_TEXTE;
+  btn.disabled = true;
+  btn.removeAttribute('onclick');
+  btn.classList.add('adh-bientot');
+  btn.title = "Cette structure n'a pas encore ouvert son adhésion en ligne.";
+  btn.setAttribute('aria-label', ADHESION_BIENTOT_TEXTE);
+}
+
+/* Un seul appel pour tous les boutons présents sur la page (serveur : GET /api/adhesions-officielles). */
+async function hydraterAdhesions(racine) {
+  const boutons = [...(racine || document).querySelectorAll('[data-adherer-init]:not([data-adh-verifie])')];
+  if (!boutons.length) return;
+  boutons.forEach(b => b.setAttribute('data-adh-verifie', '1'));
+  const ids = [...new Set(boutons.map(b => String(b.getAttribute('data-adherer-init'))))];
+  const aCharger = ids.filter(id => !_adhesionOfficielle.has(id));
+  for (let i = 0; i < aCharger.length; i += 100) {
+    const lot = aCharger.slice(i, i + 100);
+    try {
+      const r = await fetch('/api/adhesions-officielles?initiative_ids=' + lot.join(','), { credentials: 'same-origin' }).then(x => x.json());
+      lot.forEach(id => _adhesionOfficielle.set(id, r.officielles && r.officielles[id] != null ? Number(r.officielles[id]) : null));
+    } catch (e) { /* indisponible : les boutons restent actifs, le clic revérifiera */ }
+  }
+  boutons.forEach(b => { if (_adhesionOfficielle.get(String(b.getAttribute('data-adherer-init'))) === null) appliquerAdhesionBientot(b); });
+}
+window.hydraterAdhesions = hydraterAdhesions;
+
+(function surveillerBoutonsAdhesion() {
+  if (typeof document === 'undefined' || window.__adhObserver) return;
+  const style = document.createElement('style');
+  style.textContent = '.adh-bientot,.adh-bientot:hover{background:#e5e7eb!important;color:#6b7280!important;border-color:#d1d5db!important;cursor:not-allowed!important;box-shadow:none!important;opacity:1!important;}';
+  document.head.appendChild(style);
+  let t = null;
+  const lancer = () => { clearTimeout(t); t = setTimeout(() => hydraterAdhesions(), 150); };
+  window.__adhObserver = new MutationObserver(lancer);
+  const demarrer = () => { window.__adhObserver.observe(document.body, { childList: true, subtree: true }); lancer(); };
+  if (document.body) demarrer(); else document.addEventListener('DOMContentLoaded', demarrer);
+})();
+
 async function demanderAdhesion(initiativeId, btn){
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) { window.location.href = 'login.html'; return; }
   /* Garde-fou (2026-08-08) : le propriétaire ne peut pas adhérer à sa propre structure — on le
-     redirige directement vers la gestion de ses formules plutôt que de le laisser buter sur
-     l'erreur serveur "Vous ne pouvez pas adhérer à votre propre structure.". Les cartouches
-     qui connaissent déjà la réponse (annuaire, profil public) évitent même d'appeler cette
-     fonction pour l'owner, mais ce filet couvre tout appelant, présent ou futur. */
+     redirige vers la gestion de ses formules plutôt que de le laisser buter sur l'erreur serveur. */
   try {
     const init = await api('GET', `/initiatives/${initiativeId}`);
     const initData = init.initiative || init;
@@ -2296,41 +2340,17 @@ async function demanderAdhesion(initiativeId, btn){
       return;
     }
   } catch (e) { /* vérification impossible : on continue normalement */ }
-  /* Si l'association a configuré des formules de cotisation (module "Adhésions", payant ou
-     gratuit), on redirige vers la page dédiée qui gère déjà tout le reste : choix de la
-     formule, paiement Stripe, reçu, carte de membre. Sinon, simple demande sans paiement.
-     Formule "officielle" (2026-09-28, demande explicite) : une association peut avoir plusieurs
-     formules (ex. certaines réservées à un événement précis, "adhérer à une promotion") — une
-     seule représente l'adhésion générale à l'association elle-même (est_officielle=1, réglée
-     depuis dashboard-initiative.html). Ce bouton public cible directement CETTE formule via le
-     paramètre ?formule= déjà géré par adhesions.html (mécanisme du lien "📤 Partager"), pour ne
-     jamais exposer les autres formules internes/ciblées au visiteur qui clique "Adhérer à
-     l'initiative". Si aucune formule n'est encore marquée officielle (association pas encore
-     passée à ce réglage), on retombe sur l'ancien comportement : la liste complète. */
+  let officielle = null;
   try {
     const f = await api('GET', `/initiatives/${initiativeId}/adhesion-formules`);
-    if (f.formules && f.formules.length) {
-      const officielle = f.formules.find(x => x.est_officielle);
-      window.location.href = officielle
-        ? `adhesions.html?initiative=${initiativeId}&formule=${officielle.id}`
-        : `adhesions.html?initiative=${initiativeId}`;
-      return;
-    }
-  } catch (e) { /* pas de formules accessibles : on retombe sur la demande simple */ }
-
-  if (btn) { btn.disabled = true; btn.textContent = '…'; }
-  try {
-    const r = await api('POST', `/initiatives/${initiativeId}/demande-adhesion`);
-    if (btn) {
-      const dejaTexte = r.statut === 'acceptee' ? '✓ Membre' : '⏳ Demande envoyée';
-      btn.textContent = dejaTexte;
-      btn.style.opacity = '.8';
-    }
-    if (typeof showToast === 'function') showToast(r.statut === 'acceptee' ? '✅ Vous êtes déjà membre.' : '✅ Demande d\'adhésion envoyée !');
-  } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = "Adhérer à l'initiative"; }
-    alert(e.message || "Erreur lors de l'envoi de la demande.");
+    officielle = (f.formules || []).find(x => x.est_officielle) || null;
+  } catch (e) { /* formules inaccessibles : traité comme « pas encore disponible » */ }
+  if (!officielle) {
+    appliquerAdhesionBientot(btn);
+    if (typeof showToast === 'function') showToast("Cette structure n'a pas encore ouvert son adhésion — elle sera bientôt disponible.");
+    return;
   }
+  window.location.href = `adhesions.html?initiative=${initiativeId}&formule=${officielle.id}`;
 }
 window.demanderAdhesion = demanderAdhesion;
 

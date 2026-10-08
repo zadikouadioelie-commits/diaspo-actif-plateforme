@@ -150,11 +150,16 @@ async function init(){
   try {
     const r = await api('GET', `/initiatives/${INIT_ID}/adhesion-formules`);
     FORMULES = r.formules || [];
+    /* Lien ciblé sur UNE formule (bouton « Adhérer à l'initiative » = adhésion officielle, ou bouton
+       "📤 Partager", 2026-08-26) : ouvre directement le formulaire de paiement de cette formule et
+       n'affiche QUE celle-ci (2026-10-08, demande explicite : aucune autre adhésion derrière ce bouton ;
+       les autres vivent dans « Soutenir »). Si la formule visée n'existe plus, aucune autre n'est proposée. */
+    if (FORMULE_ID_PARAM) {
+      FORMULES = FORMULES.filter(f => f.id === Number(FORMULE_ID_PARAM));
+      const nomEl = document.getElementById('adh-init-nom');
+      if (nomEl) nomEl.textContent = nomEl.textContent.replace(' — choisissez une formule et adhérez en ligne.', ' — adhérez en ligne.');
+    }
     renderFormules();
-    /* Lien partagé ciblé sur une formule (bouton "📤 Partager", 2026-08-26) : ouvre directement
-       le formulaire de paiement de cette formule, sans que le visiteur ait à la repérer dans la
-       grille — même principe que le token d'invitation qui ouvre automatiquement la
-       participation en cagnotte.html. */
     if (FORMULE_ID_PARAM && paiement !== 'succes' && paiement !== 'annule') {
       const formulePartagee = FORMULES.find(f => f.id === Number(FORMULE_ID_PARAM));
       if (formulePartagee) ouvrirPaiement(formulePartagee.id);

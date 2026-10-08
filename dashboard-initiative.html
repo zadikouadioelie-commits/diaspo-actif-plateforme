@@ -242,6 +242,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   window.__vitrineInitId = init ? init.id : null;
   window.__vitrineActive = init ? Number(init.vitrine_active) : 0;
   window.__vitrineInitType = init ? init.type : null;
+  if (init) setTimeout(() => window.rappelAdhesionOfficielle && window.rappelAdhesionOfficielle(true), 0);
   if (init) initExpansionModules();
   if (init) { try { updateVitrineBadge(); } catch(e){} }
 
@@ -596,6 +597,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
         ${subBadgeHTML()}
       </div>
       <div class="notice" id="sub-notice">${subNoticeHTML()}</div>
+      <div id="rappel-adhesion-officielle"></div>
 
       <div class="grid grid-2" style="margin-bottom:20px;align-items:stretch;">
         <div class="price-card">
@@ -3412,6 +3414,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      (visibles par ailleurs en permanence, voir commentaire plus bas dans cette fonction). */
   const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue','formations-gestion'];
   window.initShowSection = function(name) {
+    if (window.rappelAdhesionOfficielle) window.rappelAdhesionOfficielle();
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
       if(el) el.style.display = s===name ? '' : 'none';
@@ -7829,6 +7832,50 @@ async function adhUploadMediaVideo(input){
   const fd = new FormData();
   fd.append('video', file);
   xhr.send(fd);
+}
+
+/* Rappel « Créez votre adhésion officielle » (2026-10-08, demande explicite) : une Association ou une ONG sans
+   adhésion officielle active voit ce bandeau en tête de son espace. Tant qu'elle n'existe pas, le bouton public
+   « Adhérer à l'initiative » (annuaire, boutiques, profil) affiche « Adhésion bientôt disponible » et n'a aucune
+   action. Le bandeau disparaît dès qu'une formule officielle active existe. `force` ignore l'anti-rebond. */
+let _rappelAdhDernier = 0;
+window.rappelAdhesionOfficielle = async function (force) {
+  const initId = window.__vitrineInitId, type = window.__vitrineInitType;
+  if (!initId || !['Association', 'ONG'].includes(type)) return;
+  if (!force && Date.now() - _rappelAdhDernier < 15000) return;
+  _rappelAdhDernier = Date.now();
+  let zone = document.getElementById('rappel-adhesion-officielle');
+  for (let i = 0; !zone && i < 40; i++) { await new Promise(r => setTimeout(r, 400)); zone = document.getElementById('rappel-adhesion-officielle'); }
+  if (!zone) return;
+  try {
+    const r0 = await api('GET', `/initiatives/${initId}`);
+    const d = r0.initiative || r0;
+    if (d.adhesions_ouvertes === 0 || d.adhesions_ouvertes === false) { zone.innerHTML = ''; return; }
+    const r = await api('GET', `/initiatives/${initId}/adhesion-formules/gestion`);
+    const ok = (r.formules || []).some(f => Number(f.est_officielle) === 1 && Number(f.actif) === 1);
+    zone.innerHTML = ok ? '' : `<div role="alert" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#F5F3FF;border:1.5px solid #7C3AED;border-radius:12px;padding:14px 16px;margin:0 0 16px;">
+      <div style="flex:1;min-width:240px;font-size:13.5px;line-height:1.5;color:#3b0764;"><strong>⭐ Créez votre adhésion officielle</strong><br>
+        Tant qu'elle n'existe pas, le bouton « Adhérer à l'initiative » de votre profil, de l'annuaire et des boutiques affiche <em>« Adhésion bientôt disponible »</em> à vos visiteurs, qui ne peuvent donc pas adhérer.</div>
+      <button type="button" class="btn" style="background:#7C3AED;color:#fff;" onclick="adhCreerOfficielleDepuisRappel()">⭐ Créer l'adhésion officielle</button>
+    </div>`;
+  } catch (e) { /* silencieux : le rappel est une aide, jamais bloquant */ }
+};
+/* L'espace est redessiné plusieurs fois pendant son chargement : à chaque nouvelle apparition de l'emplacement,
+   on réévalue (sinon un rendu ultérieur effacerait le rappel). */
+(function surveillerRappelAdhesion() {
+  const c = document.getElementById('dashboard-content');
+  if (!c) return;
+  let t;
+  new MutationObserver(() => {
+    const z = document.getElementById('rappel-adhesion-officielle');
+    if (z && !z.dataset.verifie) { z.dataset.verifie = '1'; clearTimeout(t); t = setTimeout(() => window.rappelAdhesionOfficielle && window.rappelAdhesionOfficielle(true), 200); }
+  }).observe(c, { childList: true, subtree: true });
+})();
+function adhCreerOfficielleDepuisRappel() {
+  const lien = document.querySelector('.sidebar a[data-section="adhesions-init"]');
+  if (lien) lien.click();
+  // N'ouvre le formulaire que si la section s'est réellement ouverte (un compte non Premium voit d'abord l'offre Premium).
+  setTimeout(() => { const sec = document.getElementById('adhesions-init'); if (sec && getComputedStyle(sec).display !== 'none') adhOuvrirCreationFormule(true); }, 450);
 }
 
 async function adhChoisirModeListe(mode){

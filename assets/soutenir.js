@@ -124,10 +124,18 @@ window.Soutenir = (function () {
 
   function sectionAutres(d, ownerId) {
     let h = '';
-    if (d.adhesion) {
-      h += `<div class="so-section"><h3>Devenir membre</h3>${choix(null, '🤝', 'Adhérer à l\'initiative',
-        'Rejoignez la structure comme membre (cotisation ou simple demande, selon l\'initiative).', '<span class="so-tag b">Adhésion</span>', '',
-        `Soutenir.adherer(${Number(d.adhesion.initiative_id)})`)}</div>`;
+    /* Autres adhésions seulement (2026-10-08, demande explicite) : l'adhésion à l'initiative elle-même
+       n'est proposée que par le bouton « Adhérer à l'initiative » — jamais ici. */
+    if (d.adhesions && d.adhesions.length && d.initiative) {
+      const lignes = d.adhesions.slice(0, 6).map(f => {
+        const prix = f.montant_type === 'libre' ? 'Montant libre'
+          : f.montant_type === 'minimum' || f.montant_type === 'min' ? (Number(f.montant_min) > 0 ? 'Dès ' + montant(f.montant_min, f.devise) : 'Montant libre')
+          : (Number(f.montant_fixe) > 0 ? montant(f.montant_fixe, f.devise) : 'Gratuit');
+        return choix(`adhesions.html?initiative=${encodeURIComponent(d.initiative.id)}&formule=${encodeURIComponent(f.id)}`, f.icone || '🎫', f.nom,
+          f.description ? String(f.description).replace(/<[^>]*>/g, ' ').slice(0, 110) : 'Une autre manière de rejoindre et de soutenir la structure.',
+          `<span class="so-tag b">${esc(prix)}</span>`);
+      }).join('');
+      h += `<div class="so-section"><h3>Adhésions</h3>${lignes}</div>`;
     }
     if (d.boutique) {
       h += `<div class="so-section"><h3>Acheter</h3>${choix(`profil.html?id=${encodeURIComponent(ownerId)}&vitrine=1`, '🏬', 'Visiter la boutique',
@@ -199,11 +207,5 @@ window.Soutenir = (function () {
     }
   }
 
-  function adherer(initiativeId) {
-    fermer();
-    if (typeof window.demanderAdhesion === 'function') window.demanderAdhesion(initiativeId, null);
-    else window.location.href = `adhesions.html?initiative=${encodeURIComponent(initiativeId)}`;
-  }
-
-  return { buttonHtml, hydrate, open, close: fermer, adherer };
+  return { buttonHtml, hydrate, open, close: fermer };
 })();

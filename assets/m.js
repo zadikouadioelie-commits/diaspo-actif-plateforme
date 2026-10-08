@@ -835,6 +835,7 @@
     const n = $('#ann-next'); if (n) n.onclick = () => { S.ann.shown += 30; paintAnnuaire(); };
     /* « Voir plus » n'apparaît que si la description dépasse 3 lignes. */
     $$('[data-desc]', l).forEach(d => { const b = d.parentNode.querySelector('[data-more]'); if (b && (d.classList.contains('open') || d.scrollHeight > d.clientHeight + 2)) b.hidden = false; });
+    hydraterAdhesionsM(l);
   }
   /* Adhérer : comme le site — formules de cotisation configurées => choix de la formule puis page d'adhésion (paiement) ; sinon simple demande à la structure. */
   const PERIODE = { cotisation_mensuelle: 'par mois', cotisation_trimestrielle: 'par trimestre', cotisation_semestrielle: 'par semestre', cotisation_annuelle: 'par an' };
@@ -851,16 +852,37 @@
       <button type="button" class="btn out block" id="adh-x" style="margin-top:4px">Plus tard</button>`);
     $('#adh-x').onclick = close;
   }
+  /* « Adhérer » = l'adhésion OFFICIELLE de la structure, et rien d'autre (2026-10-08, demande explicite) ;
+     sans adhésion officielle, le bouton reste affiché « Adhésion bientôt disponible », sans action. */
+  function adhesionBientot(btn) {
+    if (!btn) return;
+    btn.textContent = 'Adhésion bientôt disponible'; btn.disabled = true; btn.classList.add('adh-bientot');
+    btn.style.background = '#e5e7eb'; btn.style.color = '#6b7280'; btn.style.borderColor = '#d1d5db'; btn.style.cursor = 'not-allowed';
+    btn.title = 'Cette structure n’a pas encore ouvert son adhésion en ligne.';
+  }
+  async function hydraterAdhesionsM(racine) {
+    const bs = [...(racine || document).querySelectorAll('[data-adh]:not([data-adh-verifie])')];
+    if (!bs.length) return;
+    bs.forEach(b => b.setAttribute('data-adh-verifie', '1'));
+    const ids = [...new Set(bs.map(b => b.dataset.adh))];
+    for (let i = 0; i < ids.length; i += 100) {
+      const lot = ids.slice(i, i + 100);
+      try {
+        const r = await api('/api/adhesions-officielles?initiative_ids=' + lot.join(','));
+        const off = r.officielles || {};
+        bs.filter(b => lot.includes(b.dataset.adh) && off[b.dataset.adh] == null).forEach(adhesionBientot);
+      } catch (e) { /* indisponible : le clic revérifiera */ }
+    }
+  }
   async function adherer(id, nom, btn) {
     if (!(await needLogin('Connectez-vous pour adhérer à cette structure.'))) return;
     if (btn) btn.disabled = true;
     try {
-      let formules = []; try { formules = (await api(`/api/initiatives/${encodeURIComponent(id)}/adhesion-formules`)).formules || []; } catch (e) { /* pas de formules : demande simple */ }
-      if (formules.length) { if (btn) btn.disabled = false; return feuilleFormules(id, nom, formules.find(f => f.est_officielle) ? [formules.find(f => f.est_officielle)] : formules); }
-      const r = await api(`/api/initiatives/${encodeURIComponent(id)}/demande-adhesion`, { method: 'POST' });
-      const membre = r.statut === 'acceptee';
-      if (btn) { btn.innerHTML = membre ? `${ic('check', 's')} Membre` : `${ic('clock', 's')} Demande envoyée`; btn.classList.add('sub'); }
-      toast(membre ? 'Vous êtes déjà membre.' : (r.deja_existante ? 'Votre demande est déjà en cours.' : 'Demande d’adhésion envoyée ✓'));
+      let formules = []; try { formules = (await api(`/api/initiatives/${encodeURIComponent(id)}/adhesion-formules`)).formules || []; } catch (e) { /* formules inaccessibles : « bientôt disponible » */ }
+      const off = formules.find(f => f.est_officielle);
+      if (!off) { adhesionBientot(btn); toast('Cette structure n’a pas encore ouvert son adhésion — bientôt disponible.'); return; }
+      if (btn) btn.disabled = false;
+      return feuilleFormules(id, nom, [off]);
     } catch (er) { toast(er.message, true); if (btn) btn.disabled = false; }
   }
   document.addEventListener('click', async e => {

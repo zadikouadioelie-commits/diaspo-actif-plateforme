@@ -2076,7 +2076,7 @@ function renderVisitorProfile() {
   const adhererBtn = (!isOwn && isInit && ['Association','ONG'].includes(profil.initiative_type))
     ? (_statutAdhesion === 'acceptee' ? `<button class="pvz-btn" disabled>✓ Membre</button>`
       : _statutAdhesion === 'en_attente' ? `<button class="pvz-btn" disabled>⏳ Demande envoyée</button>`
-      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn adherer" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer à l'initiative</button>` : '')
+      : profil.adhesions_ouvertes !== false ? `<button class="pvz-btn adherer" data-adherer-init="${profil.initiative_id}" onclick="demanderAdhesion(${profil.initiative_id}, this)">Adhérer à l'initiative</button>` : '')
     : '';
   /* « Soutenir » (2026-10-07) : cartouche regroupant dons, cagnottes, adhésion, boutique et
      billets d'événements (assets/soutenir.js). Masqué tant que le serveur n'a pas confirmé au

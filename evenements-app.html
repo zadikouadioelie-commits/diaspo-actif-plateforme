@@ -2026,7 +2026,7 @@ window.openDetail = async function(id) {
       if (cont) {
         cont.innerHTML = statutAdh === 'acceptee' ? `<button class="btn btn-outline" disabled>✓ Membre</button>`
           : statutAdh === 'en_attente' ? `<button class="btn btn-outline" disabled>⏳ Demande envoyée</button>`
-          : `<button class="btn btn-adherer-violet" onclick="demanderAdhesion(${evt.init_id}, this)">🤝 Adhérer à l'initiative</button>`;
+          : `<button class="btn btn-adherer-violet" data-adherer-init="${evt.init_id}" onclick="demanderAdhesion(${evt.init_id}, this)">🤝 Adhérer à l'initiative</button>`;
       }
     }
   } catch(e) {

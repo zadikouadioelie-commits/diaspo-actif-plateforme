@@ -6166,6 +6166,21 @@ route("GET", "/api/initiatives/:id/adhesion-formules", async (req, res, params) 
   sendJSON(res, 200, { formules: rows, champs_catalogue: ADHESION_CHAMPS_STANDARD });
 });
 
+/* GET /api/adhesions-officielles?initiative_ids=1,2,3 — pour chaque initiative, l'id de sa formule
+   d'adhésion OFFICIELLE (active). Le bouton « Adhérer à l'initiative » ne mène QUE vers cette formule :
+   les cartes (annuaire, boutiques, profil, événement, téléphone) interrogent ici, en un seul appel, pour
+   savoir si le bouton est actif ou s'il doit afficher « Adhésion bientôt disponible » (2026-10-08). */
+route("GET", "/api/adhesions-officielles", async (req, res, params, body, query) => {
+  const ids = [...new Set(String(query?.initiative_ids || "").split(",").map(Number).filter(Boolean))].slice(0, 100);
+  const officielles = {};
+  if (ids.length) {
+    const ph = ids.map(() => "?").join(",");
+    const lignes = await db.prepare(`SELECT initiative_id, id FROM adhesion_formules WHERE initiative_id IN (${ph}) AND actif=1 AND est_officielle=1 ORDER BY id ASC`).all(...ids);
+    for (const l of lignes) if (officielles[l.initiative_id] == null) officielles[l.initiative_id] = Number(l.id);
+  }
+  sendJSON(res, 200, { officielles });
+});
+
 /* ── Formules : gestion complète (owner) ── */
 route("GET", "/api/initiatives/:id/adhesion-formules/gestion", async (req, res, params) => {
   const user = await getCurrentUser(req);
@@ -22182,6 +22197,18 @@ async function chargerSoutiens(ownerIds) {
     lignes.forEach(l => { produitsParInit[l.initiative_id] = Number(l.n); });
   }
 
+  /* Adhésions proposées dans « Soutenir » (2026-10-08, demande explicite) : toutes les formules actives SAUF
+     l'adhésion officielle — celle-ci n'appartient qu'au bouton « Adhérer à l'initiative ». */
+  const autresFormulesParInit = {};
+  if (initIds.length) {
+    const phF = initIds.map(() => "?").join(",");
+    const formules = await db.prepare(
+      `SELECT id, initiative_id, nom, description, type_contribution, montant_type, montant_fixe, montant_min, devise, icone
+       FROM adhesion_formules WHERE initiative_id IN (${phF}) AND actif=1 AND COALESCE(est_officielle,0)=0 ORDER BY ordre ASC, id ASC`
+    ).all(...initIds);
+    for (const f of formules) (autresFormulesParInit[f.initiative_id] = autresFormulesParInit[f.initiative_id] || []).push(f);
+  }
+
   for (const id of ids) {
     const init = initParOwner[id] || null;
     const boutiqueOuverte = !!init && init.vitrine_active !== 0 && (produitsParInit[init.id] || 0) > 0;
@@ -22191,7 +22218,7 @@ async function chargerSoutiens(ownerIds) {
       dons: donsParOwner[id] || [],
       evenements: evtsParOwner[id] || [],
       boutique: boutiqueOuverte ? { nb_produits: produitsParInit[init.id] } : null,
-      adhesion: adhesionOuverte ? { initiative_id: init.id } : null,
+      adhesions: adhesionOuverte ? (autresFormulesParInit[init.id] || []) : [],
     };
   }
   return resultat;
@@ -22205,8 +22232,8 @@ route("GET", "/api/soutenir-lot", async (req, res, params, body, query) => {
   const tous = await chargerSoutiens(ids);
   const soutiens = {};
   for (const [id, s] of Object.entries(tous)) {
-    if (s.dons.length || s.evenements.length || s.boutique || s.adhesion) {
-      soutiens[id] = { dons: s.dons.length, evenements: s.evenements.length, boutique: !!s.boutique, adhesion: !!s.adhesion };
+    if (s.dons.length || s.evenements.length || s.boutique || s.adhesions.length) {
+      soutiens[id] = { dons: s.dons.length, evenements: s.evenements.length, boutique: !!s.boutique, adhesion: s.adhesions.length > 0 };
     }
   }
   sendJSON(res, 200, { soutiens });
@@ -22226,7 +22253,10 @@ route("GET", "/api/soutenir/:ownerUserId", async (req, res, params) => {
       recurrence_periodicite: c.recurrence_periodicite, devise: c.devise || "EUR", objectif_montant: c.objectif_montant,
       montant_collecte: c.montant_collecte, pourcentage: c.pourcentage, nb_contributeurs: c.nb_contributeurs, date_fin: c.date_fin,
     })),
-    adhesion: s.adhesion,
+    adhesions: s.adhesions.map(f => ({
+      id: Number(f.id), nom: f.nom, description: f.description, type_contribution: f.type_contribution,
+      montant_type: f.montant_type, montant_fixe: f.montant_fixe, montant_min: f.montant_min, devise: f.devise, icone: f.icone,
+    })),
     boutique: s.boutique,
     evenements: s.evenements.slice(0, 6).map(e => ({
       id: e.id, titre: e.titre, date_evt: e.date_evt, heure_debut: e.heure_debut, ville: e.ville, pays: e.pays,
