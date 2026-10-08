@@ -108,9 +108,6 @@
       <a href="#avancement" data-section="avancement" data-aide="avancement_initiative" id="sb-avancement" style="display:none;">📈 Avancement de mon initiative</a>
       <a href="#soumission-da" data-section="soumission-da" data-aide="soumission_da">📤 Soumettre à Diaspo'Actif</a>
 
-      <div class="sb-group-lbl">AFFILIATION</div>
-      <a href="#affiliation" data-section="affiliation" data-aide="affiliation">🔗 Affiliation</a>
-
       <div class="sb-group-lbl">04 — TERRITOIRES</div>
       <a href="#zones" data-section="zones" data-aide="zones_action" style="display:none;">🟨 Zones d'action</a>
 
@@ -1193,9 +1190,70 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
         <button class="btn btn-sm" id="adh-tab-formules" onclick="adhSwitchTab('formules')">Formules</button>
         <button class="btn btn-sm btn-outline" id="adh-tab-registre" onclick="adhSwitchTab('registre')">Registre des membres</button>
+        <button class="btn btn-sm btn-outline" id="adh-tab-affiliation" onclick="adhSwitchTab('affiliation')">🔗 Membres affiliés</button>
         <button class="btn btn-sm btn-outline" id="adh-tab-stats" onclick="adhSwitchTab('stats')">Tableau de bord</button>
       </div>
       <div id="adhesions-init-content"><div style="text-align:center;padding:30px;color:var(--muted);">Chargement…</div></div>
+      <!-- Membres affiliés (2026-10-08, demande explicite : « mets-le directement dans cotisation et adhésion ») — ancien module « Affiliation », désormais un onglet de cette section. -->
+      <div id="adh-affiliation" style="display:none;">
+        <h3 style="margin:0 0 4px;">🔗 Membres affiliés</h3>
+        <p style="margin:0 0 20px;color:var(--muted);font-size:13px;">Identifiez officiellement les membres de votre organisation sur Diaspo'Actif.</p>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;">Inviter un compte</h3>
+          <div style="position:relative;max-width:420px;">
+            <!-- readonly retire au focus (2026-09-09, demande explicite : la suggestion d'adresse
+                 native du navigateur recouvrait la liste de comptes Diaspo'Actif) — astuce fiable
+                 pour empêcher Chrome de proposer son propre autofill "Adresses" : un champ marqué
+                 readonly au chargement de la page n'est jamais candidat à l'autofill, contrairement
+                 à autocomplete="off" seul, que Chrome ignore couramment sur les champs qu'il devine
+                 liés à un contact/e-mail (ex: le mot "email" dans le placeholder). name neutre et
+                 placeholder reformulé en complément, pour ne rien laisser deviner à Chrome. -->
+            <input type="text" id="aff-search-input" name="q_membre" placeholder="Rechercher un membre par nom ou coordonnée…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="this.removeAttribute('readonly'); if(!this.value.trim()) affChargerSuggestions('')">
+            <!-- position:fixed (coordonnées calculées en JS, voir affChargerSuggestions) plutôt que
+                 absolute : en absolute, la boîte flottait sur toute sa hauteur fixe (260px) sans
+                 tenir compte du contenu réel ni de la carte suivante — une ligne de suggestion se
+                 retrouvait parfois coupée pile à la frontière visuelle avec "Invitations en
+                 attente", donnant l'impression que les deux blocs fusionnaient (signalé par capture
+                 d'écran, 2026-09-10). En fixed, la boîte est positionnée par rapport au champ, pas
+                 à la carte qui la contient, et se referme au défilement (voir plus bas) au lieu de
+                 rester visuellement détachée. -->
+            <div id="aff-search-results" onmousedown="affDelegateSuggestionClick(event)" style="display:none;position:fixed;z-index:20;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
+          </div>
+          <!-- Sélection multiple (2026-09-09, demande explicite : "permet de sélectionner plusieurs
+               comptes" avant l'envoi) : chaque compte coché dans les suggestions ci-dessus devient
+               une puce ici, retirable individuellement ; le bouton n'apparaît que si au moins un
+               compte est sélectionné. -->
+          <div id="aff-selection-chips" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+          <button type="button" id="aff-envoyer-btn" class="btn btn-orange btn-sm" style="display:none;margin-top:10px;" onclick="affOuvrirInviteMultiple()">Envoyer l'affiliation</button>
+        </div>
+
+        <!-- Demandes reçues des comptes eux-mêmes (2026-09-09, bouton "Demander une affiliation"
+             sur les cartouches Annuaire) — sens inverse des invitations ci-dessous : ici c'est le
+             compte qui sollicite l'initiative, le responsable doit accepter ou décliner. Placée en
+             premier : c'est la seule liste qui attend une action du responsable. -->
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;">📥 Affiliations demandées</h3>
+          <div id="affiliation-list-demandes"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+        </div>
+
+        <!-- 3 listes distinctes par statut (2026-09-09, demande explicite), chaque compte affiché
+             dans une petite cartouche identique (voir affCartoucheHtml() / renderAffiliation()). -->
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;">📤 Invitations en attente</h3>
+          <div id="affiliation-list-attente"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 12px;">✅ Membres affiliés</h3>
+          <div id="affiliation-list-accepte"></div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 12px;">🚫 Invitations refusées</h3>
+          <div id="affiliation-list-refuse"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ══ SECTION 🗳️ VOTES SÉCURISÉS ══ -->
@@ -1911,66 +1969,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
       <div id="asso-doc-list"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
     </div>
 
-    <!-- ═══ SECTION AFFILIATION — identifier officiellement des membres (comptes utilisateur) ═══ -->
-    <div id="affiliation" style="display:none;">
-      <h2 style="margin:0 0 4px;">🔗 Affiliation</h2>
-      <p style="margin:0 0 20px;color:var(--muted);font-size:13px;">Identifiez officiellement les membres de votre organisation sur Diaspo'Actif.</p>
-
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 12px;">Inviter un compte</h3>
-        <div style="position:relative;max-width:420px;">
-          <!-- readonly retire au focus (2026-09-09, demande explicite : la suggestion d'adresse
-               native du navigateur recouvrait la liste de comptes Diaspo'Actif) — astuce fiable
-               pour empêcher Chrome de proposer son propre autofill "Adresses" : un champ marqué
-               readonly au chargement de la page n'est jamais candidat à l'autofill, contrairement
-               à autocomplete="off" seul, que Chrome ignore couramment sur les champs qu'il devine
-               liés à un contact/e-mail (ex: le mot "email" dans le placeholder). name neutre et
-               placeholder reformulé en complément, pour ne rien laisser deviner à Chrome. -->
-          <input type="text" id="aff-search-input" name="q_membre" placeholder="Rechercher un membre par nom ou coordonnée…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;" oninput="affChargerSuggestions(this.value.trim())" onfocus="this.removeAttribute('readonly'); if(!this.value.trim()) affChargerSuggestions('')">
-          <!-- position:fixed (coordonnées calculées en JS, voir affChargerSuggestions) plutôt que
-               absolute : en absolute, la boîte flottait sur toute sa hauteur fixe (260px) sans
-               tenir compte du contenu réel ni de la carte suivante — une ligne de suggestion se
-               retrouvait parfois coupée pile à la frontière visuelle avec "Invitations en
-               attente", donnant l'impression que les deux blocs fusionnaient (signalé par capture
-               d'écran, 2026-09-10). En fixed, la boîte est positionnée par rapport au champ, pas
-               à la carte qui la contient, et se referme au défilement (voir plus bas) au lieu de
-               rester visuellement détachée. -->
-          <div id="aff-search-results" onmousedown="affDelegateSuggestionClick(event)" style="display:none;position:fixed;z-index:20;max-height:260px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);"></div>
-        </div>
-        <!-- Sélection multiple (2026-09-09, demande explicite : "permet de sélectionner plusieurs
-             comptes" avant l'envoi) : chaque compte coché dans les suggestions ci-dessus devient
-             une puce ici, retirable individuellement ; le bouton n'apparaît que si au moins un
-             compte est sélectionné. -->
-        <div id="aff-selection-chips" style="display:none;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
-        <button type="button" id="aff-envoyer-btn" class="btn btn-orange btn-sm" style="display:none;margin-top:10px;" onclick="affOuvrirInviteMultiple()">Envoyer l'affiliation</button>
-      </div>
-
-      <!-- Demandes reçues des comptes eux-mêmes (2026-09-09, bouton "Demander une affiliation"
-           sur les cartouches Annuaire) — sens inverse des invitations ci-dessous : ici c'est le
-           compte qui sollicite l'initiative, le responsable doit accepter ou décliner. Placée en
-           premier : c'est la seule liste qui attend une action du responsable. -->
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 12px;">📥 Affiliations demandées</h3>
-        <div id="affiliation-list-demandes"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
-      </div>
-
-      <!-- 3 listes distinctes par statut (2026-09-09, demande explicite), chaque compte affiché
-           dans une petite cartouche identique (voir affCartoucheHtml() / renderAffiliation()). -->
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 12px;">📤 Invitations en attente</h3>
-        <div id="affiliation-list-attente"><div style="text-align:center;padding:20px;color:var(--muted);">Chargement…</div></div>
-      </div>
-
-      <div class="card" style="margin-bottom:20px;">
-        <h3 style="margin:0 0 12px;">✅ Membres affiliés</h3>
-        <div id="affiliation-list-accepte"></div>
-      </div>
-
-      <div class="card">
-        <h3 style="margin:0 0 12px;">🚫 Invitations refusées</h3>
-        <div id="affiliation-list-refuse"></div>
-      </div>
-    </div>
 
     <!-- Modale : inviter un membre (poste + message) -->
     <div id="aff-invite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
@@ -3389,8 +3387,11 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
      levé, quel que soit le statut Premium. Symptôme signalé : clic sur "Diaspo Formation"
      sans effet, restait sur les cartes "Paiements boutique"/"Vérification organisation"
      (visibles par ailleurs en permanence, voir commentaire plus bas dans cette fonction). */
-  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','affiliation','expansion-catalogue','formations-gestion'];
+  const INIT_SECTIONS = ['cockpit','crm','presentation','publications','cagnottes','avancement','soumission-da','evenements','billetterie-init','zones','stats-impact','paiement','accreditations','publicites-init','offres-emploi','recrutement','deals','messages-vitrine','parametres-vitrine','partenaires-liste','adhesions-init','votes-init','asso-accreditation','asso-documents','expansion-catalogue','formations-gestion'];
   window.initShowSection = function(name) {
+    /* L'ancien module « Affiliation » est désormais l'onglet « Membres affiliés » de Cotisations & Adhésions (2026-10-08) — les anciens liens (#affiliation, notifications d'invitation) y mènent. */
+    let ouvrirOngletAffil = false;
+    if (name === 'affiliation') { name = 'adhesions-init'; ouvrirOngletAffil = true; }
     if (window.rappelAdhesionOfficielle) window.rappelAdhesionOfficielle();
     INIT_SECTIONS.forEach(s => {
       const el = document.getElementById(s);
@@ -3421,7 +3422,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'parametres-vitrine') { renderStatutVitrineSection(); loadParametresVitrineFull(); }
     if (name === 'partenaires-liste') renderPartenairesListe();
     if (name === 'adhesions-init') {
-      adhSwitchTab('formules');
+      adhSwitchTab(ouvrirOngletAffil ? 'affiliation' : 'formules');
       adhSyncToggleOuvertes();
     }
     if (name === 'votes-init') voSwitchTab('scrutins');
@@ -3429,7 +3430,6 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
     if (name === 'offres-emploi') renderOffresEmploiInit();
     if (name === 'asso-accreditation') renderAssoAccreditation();
     if (name === 'asso-documents') renderAssoDocuments();
-    if (name === 'affiliation') renderAffiliation();
     if (name === 'expansion-catalogue') renderExpansionCatalogue();
     if (['evenements','publicites-init'].includes(name)) setTimeout(() => window.applyPremiumButtonStyles?.(), 50);
     window.scrollTo(0,0);
@@ -6018,7 +6018,7 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
   /* Section initiale : depuis le hash d'URL si valide (ex. O-Z, liens directs), sinon cockpit */
   function openFromHash() {
     const h = (location.hash || '').replace('#','');
-    if (h && INIT_SECTIONS.includes(h)) initShowSection(h);
+    if (h && (INIT_SECTIONS.includes(h) || h === 'affiliation')) initShowSection(h);   // « affiliation » = onglet de Cotisations & Adhésions (liens des notifications d'invitation)
     else initShowSection('cockpit');
   }
   SoumissionDA.render(document.getElementById('da-sda-mount'), { accredType: 'initiative_abonne' });
@@ -7582,10 +7582,14 @@ async function adhRenderJournal(membreId){
 
 function adhSwitchTab(tab){
   ADH_TAB = tab;
-  ['formules','registre','stats','campagnes','journal'].forEach(t => {
+  ['formules','registre','affiliation','stats','campagnes','journal'].forEach(t => {
     const btn = document.getElementById('adh-tab-'+t);
     if (btn) btn.className = t === tab ? 'btn btn-sm' : 'btn btn-sm btn-outline';
   });
+  /* Onglet « Membres affiliés » : panneau propre (ancien module Affiliation) au lieu du conteneur commun des autres onglets. */
+  { const c = document.getElementById('adhesions-init-content'), p = document.getElementById('adh-affiliation');
+    if (c) c.style.display = tab === 'affiliation' ? 'none' : ''; if (p) p.style.display = tab === 'affiliation' ? '' : 'none'; }
+  if (tab === 'affiliation') { renderAffiliation(); return; }
   if (tab === 'formules') adhRenderFormules();
   else if (tab === 'registre') adhRenderRegistre();
   else if (tab === 'stats') adhRenderStats();
