@@ -15313,6 +15313,20 @@ route("GET", "/api/initiatives/:id/mon-adhesion-membre", async (req, res, params
     : { membre_id: null, carte_physique });
 });
 
+/* POST /api/adhesion-paiements/:id/apercu-carte — aperçu de la carte physique pour un adhérent NON connecté qui vient de payer
+   (2026-10-08, demande explicite). Le paiement seul étant devinable (id séquentiel), l'e-mail saisi à l'adhésion doit correspondre ;
+   seuls prénom et nom sont renvoyés, et uniquement pour l'initiative officielle. */
+route("POST", "/api/adhesion-paiements/:id/apercu-carte", async (req, res, params, body) => {
+  const email = String((body && body.email) || '').trim().toLowerCase();
+  if (!email) return sendJSON(res, 400, { error: "E-mail requis." });
+  const r = await db.prepare("SELECT m.prenom, m.nom, m.email, m.initiative_id FROM adhesion_paiements p JOIN adhesion_membres m ON m.id = p.membre_id WHERE p.id=?").get(params.id);
+  const officielleId = await getInitiativeOfficielleId();
+  if (!r || String(r.email || '').trim().toLowerCase() !== email || !officielleId || Number(r.initiative_id) !== Number(officielleId)) {
+    return sendJSON(res, 200, { carte_physique: false });
+  }
+  sendJSON(res, 200, { carte_physique: true, prenom: r.prenom || '', nom: r.nom || '' });
+});
+
 /* GET /api/initiatives/:id/adhesion-demandes — liste des demandes reçues (propriétaire uniquement) */
 route("GET", "/api/initiatives/:id/adhesion-demandes", async (req, res, params) => {
   const user = await getCurrentUser(req);

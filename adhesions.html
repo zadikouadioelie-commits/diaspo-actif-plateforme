@@ -129,6 +129,13 @@ async function init(){
     if (!meApresPaiement.user) {
       let emailInvite = '';
       try { emailInvite = sessionStorage.getItem('adh_invite_email') || ''; sessionStorage.removeItem('adh_invite_email'); } catch(e) {}
+      /* Aperçu de la carte physique pour un invité (2026-10-08) : le nom saisi dans le formulaire, retrouvé via le paiement + l'e-mail. */
+      if (emailInvite && params.get('paiement_id')) {
+        try {
+          const ap = await api('POST', `/adhesion-paiements/${encodeURIComponent(params.get('paiement_id'))}/apercu-carte`, { email: emailInvite });
+          if (ap.carte_physique) { const z = document.getElementById('adh-carte-zone'); z.style.display = 'block'; z.innerHTML = carteVirtuelleHtml(ap.prenom, ap.nom); ajusterChampsCarte(z); }
+        } catch(e) {}
+      }
       let compteExistant = false;
       if (emailInvite) {
         try { compteExistant = (await api('GET', `/cagnottes/verifier-email?email=${encodeURIComponent(emailInvite)}`)).existe; } catch(e) {}
@@ -430,8 +437,8 @@ function carteVirtuelleHtml(prenom, nom){
       <div><div class="cp-card"><img src="assets/carte-membre-recto.webp" alt="Carte de membre Diaspo'Actif — recto"></div></div>
       <div><div class="cp-card">
         <img src="assets/carte-membre-verso.webp" alt="Carte de membre Diaspo'Actif — verso">
-        <div class="cp-champ" data-fit style="left:30.3%;top:5.99%;width:43.03%;height:9.09%;">${escHtml(prenom || '')}</div>
-        <div class="cp-champ" data-fit style="left:22.79%;top:19.29%;width:40.97%;height:8.87%;">${escHtml(nom || '')}</div>
+        <div class="cp-champ" data-fit style="left:30.3%;top:5.99%;width:43.03%;height:9.09%;"><span>${escHtml(prenom || '')}</span></div>
+        <div class="cp-champ" data-fit style="left:22.79%;top:19.29%;width:40.97%;height:8.87%;"><span>${escHtml(nom || '')}</span></div>
       </div></div>
     </div>
     <p class="cp-legende">Aperçu : la carte imprimée peut légèrement différer.</p>
@@ -439,8 +446,9 @@ function carteVirtuelleHtml(prenom, nom){
 }
 function ajusterChampsCarte(racine){
   (racine || document).querySelectorAll('.cp-champ[data-fit]').forEach(el => {
+    const texte = el.firstElementChild || el, marge = 2 * (parseFloat(getComputedStyle(el).paddingLeft) || 0);
     let taille = parseFloat(getComputedStyle(el).fontSize) || 16;
-    while (el.scrollWidth > el.clientWidth && taille > 8) { taille -= 1; el.style.fontSize = taille + 'px'; }
+    while (texte.offsetWidth > el.clientWidth - marge && taille > 6) { taille -= 0.5; el.style.fontSize = taille + 'px'; }
   });
 }
     const carte = await api('GET', `/adhesion-membres/${membreId}/carte`);
