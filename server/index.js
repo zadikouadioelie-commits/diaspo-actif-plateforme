@@ -15303,8 +15303,14 @@ route("GET", "/api/initiatives/:id/demande-adhesion", async (req, res, params) =
 route("GET", "/api/initiatives/:id/mon-adhesion-membre", async (req, res, params) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const m = await db.prepare("SELECT id FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, user.id);
-  sendJSON(res, 200, { membre_id: m ? m.id : null });
+  const m = await db.prepare("SELECT id, nom, prenom, statut, date_expiration FROM adhesion_membres WHERE initiative_id=? AND linked_user_id=?").get(params.id, user.id);
+  /* Carte physique (2026-10-08, demande explicite) : seule l'Initiative officielle Diaspo'Actif envoie une carte
+     imprimée par la poste — l'aperçu « votre carte » (adhesions.html) ne s'affiche donc que pour elle. */
+  const officielleId = await getInitiativeOfficielleId();
+  const carte_physique = !!officielleId && Number(params.id) === Number(officielleId);
+  sendJSON(res, 200, m
+    ? { membre_id: m.id, carte_physique, prenom: m.prenom || '', nom: m.nom || '', statut: computeAdhesionStatut(m) }
+    : { membre_id: null, carte_physique });
 });
 
 /* GET /api/initiatives/:id/adhesion-demandes — liste des demandes reçues (propriétaire uniquement) */

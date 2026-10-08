@@ -46,6 +46,17 @@
 .carte-membre .cm-init{font-size:13px;opacity:.85;margin-bottom:16px;}
 .carte-membre .cm-qr{background:#fff;border-radius:12px;padding:14px;display:flex;justify-content:center;margin-bottom:14px;}
 .carte-membre .cm-meta{font-size:12px;opacity:.85;display:flex;justify-content:space-between;}
+/* Aperçu de la carte physique (2026-10-08) : la photo de la vraie carte sert de fond, le prénom et le nom viennent se placer dans ses cases blanches. */
+.cp-bloc{max-width:900px;margin:0 auto 28px;}
+.cp-merci{background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fdba74;border-radius:14px;padding:18px 20px;margin-bottom:18px;color:#431407;}
+.cp-merci h3{margin:0 0 8px;font-size:18px;color:#9a3412;}
+.cp-merci p{margin:0 0 8px;font-size:14px;line-height:1.55;}
+.cp-merci p:last-child{margin-bottom:0;}
+.cp-faces{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;}
+.cp-card{position:relative;aspect-ratio:825/451;border-radius:3.2% / 5.8%;overflow:hidden;box-shadow:0 10px 28px rgba(43,22,8,.35);container-type:inline-size;background:#2b1608;}
+.cp-card img{display:block;width:100%;height:100%;}
+.cp-champ{position:absolute;display:flex;align-items:center;box-sizing:border-box;padding:0 1.8cqw;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:3.6cqw;color:#2b1608;white-space:nowrap;overflow:hidden;}
+.cp-legende{margin:8px 0 0;font-size:12px;color:var(--muted);text-align:center;}
 .notice{background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:14px;}
 </style>
 </head>
@@ -114,6 +125,7 @@ async function init(){
        telle quelle plutôt que dupliquée. */
     let meApresPaiement = { user: null };
     try { meApresPaiement = await api('GET', '/auth/me'); } catch(e) {}
+    if (meApresPaiement.user) { try { const adh = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`); if (adh.carte_physique && adh.membre_id) afficherMaCarte(); } catch(e) {} }
     if (!meApresPaiement.user) {
       let emailInvite = '';
       try { emailInvite = sessionStorage.getItem('adh_invite_email') || ''; sessionStorage.removeItem('adh_invite_email'); } catch(e) {}
@@ -401,10 +413,40 @@ async function afficherMaCarte(){
   try {
     /* Trouve la fiche membre de l'utilisateur connecté pour cette initiative (self-service, ne
        dépend pas d'être propriétaire — cf. GET /initiatives/:id/mon-adhesion-membre). */
-    const { membre_id: membreId } = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`);
+    const monAdh = await api('GET', `/initiatives/${INIT_ID}/mon-adhesion-membre`);
+    const membreId = monAdh.membre_id;
     if (!membreId) { zone.innerHTML = '<div class="notice">Vous n\'avez pas encore d\'adhésion pour cette initiative.</div>'; return; }
+/* Aperçu de la carte physique envoyée par la poste (initiative officielle uniquement). Prénom et nom sont écrits
+   dans les deux cases blanches de la carte ; un nom trop long est réduit jusqu'à tenir dans sa case. */
+function carteVirtuelleHtml(prenom, nom){
+  return `<div class="cp-bloc">
+    <div class="cp-merci">
+      <h3>🎉 Merci pour votre adhésion !</h3>
+      <p>Votre carte de membre vous sera <strong>envoyée par voie postale dans les plus brefs délais</strong>. Voici un aperçu de la carte que vous allez recevoir, à votre nom.</p>
+      <p>Gardez-la précieusement : elle vous sera utile lors de nos événements pour bénéficier d'un <strong>accès gratuit ou du tarif adhérent</strong>.</p>
+      <p>Merci de faire partie de la famille Diaspo'Actif — <em>actions locales, impact global</em>.</p>
+    </div>
+    <div class="cp-faces">
+      <div><div class="cp-card"><img src="assets/carte-membre-recto.webp" alt="Carte de membre Diaspo'Actif — recto"></div></div>
+      <div><div class="cp-card">
+        <img src="assets/carte-membre-verso.webp" alt="Carte de membre Diaspo'Actif — verso">
+        <div class="cp-champ" data-fit style="left:30.3%;top:5.99%;width:43.03%;height:9.09%;">${escHtml(prenom || '')}</div>
+        <div class="cp-champ" data-fit style="left:22.79%;top:19.29%;width:40.97%;height:8.87%;">${escHtml(nom || '')}</div>
+      </div></div>
+    </div>
+    <p class="cp-legende">Aperçu : la carte imprimée peut légèrement différer.</p>
+  </div>`;
+}
+function ajusterChampsCarte(racine){
+  (racine || document).querySelectorAll('.cp-champ[data-fit]').forEach(el => {
+    let taille = parseFloat(getComputedStyle(el).fontSize) || 16;
+    while (el.scrollWidth > el.clientWidth && taille > 8) { taille -= 1; el.style.fontSize = taille + 'px'; }
+  });
+}
     const carte = await api('GET', `/adhesion-membres/${membreId}/carte`);
-    zone.innerHTML = `
+    /* Carte physique : seulement pour l'initiative officielle, et une fois l'adhésion à jour (ou juste après un paiement réussi). */
+    const apercuPhysique = (monAdh.carte_physique && (monAdh.statut === 'a_jour' || params.get('paiement') === 'succes')) ? carteVirtuelleHtml(monAdh.prenom || carte.prenom, monAdh.nom || carte.nom) : '';
+    zone.innerHTML = apercuPhysique + (apercuPhysique ? '<h3 style="text-align:center;margin:0 0 12px;">Votre carte numérique</h3>' : '') + `
       <div class="carte-membre">
         <div class="cm-top">
           <strong>🎫 Carte de membre</strong>
@@ -431,6 +473,7 @@ async function afficherMaCarte(){
     }
   } catch(e) {
     zone.innerHTML = `<div class="notice">Erreur : ${e.message}</div>`;
+    ajusterChampsCarte(zone);
   }
 }
 
