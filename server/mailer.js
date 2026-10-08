@@ -1082,4 +1082,38 @@ function emailCodeConfirmationAppareil({ email, code, appareil, lieu }) {
   });
 }
 
-module.exports = { emailCodeConfirmationAppareil, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };
+/* Alerte après un changement de prénom/nom (2026-10-08) : envoyée à l'adresse du compte. */
+function emailNomModifie({ email, ancien, nouveau }) {
+  const esc = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return sendEmail({
+    to: email,
+    subject: "Votre nom a été modifié — Diaspo'Actif",
+    html: `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#F0F4FF;font-family:Inter,Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(37,99,235,.1);">
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1B3A6B);padding:32px;text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;">DIASPO'ACTIF</div>
+    </div>
+    <div style="padding:36px 32px;">
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#0D1B2A;">Votre nom a été modifié</h1>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">
+        Le nom de votre compte vient de passer de <strong>${esc(ancien)}</strong> à <strong>${esc(nouveau)}</strong>.
+      </p>
+      <p style="color:#475569;line-height:1.7;margin:0 0 16px;">C'est bien vous ? Il n'y a rien à faire.</p>
+      <p style="color:#B91C1C;line-height:1.7;margin:0;font-weight:700;">
+        Ce n'est pas vous ? Quelqu'un a accès à votre compte : changez immédiatement votre mot de passe depuis « Paramètres du compte » (cela déconnecte tous les autres appareils), puis écrivez-nous à contact@diaspoactif.com.
+      </p>
+    </div>
+    <div style="background:#F8FAFF;padding:16px 32px;text-align:center;border-top:1px solid #E8EFFE;">
+      <p style="margin:0;font-size:11px;color:#94A3B8;">Diaspo'Actif · contact@diaspoactif.com</p>
+    </div>
+  </div>
+</body>
+</html>`
+  });
+}
+
+module.exports = { emailNomModifie, emailCodeConfirmationAppareil, emailCompteRenduRelance, emailCompteRenduDiffusion, sendEmail, emailBienvenue, emailVerification, emailResetPassword, emailAccreditation, emailDeletionConfirmee, emailSuppressionProgrammee, emailCompteRestaure, emailConfirmationBillets, emailInvitationCagnotte, emailConfirmationParticipationCagnotte, emailAccesCagnottePrivee, emailDemandeDevisRecue, emailDemandeDevisReponse, emailConfirmationInscription, emailCommunicationInscription };

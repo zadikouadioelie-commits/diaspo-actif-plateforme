@@ -204,7 +204,7 @@
             ${isOwner ? `<button type="button" class="cda-avatar-edit" id="cda-avatar-edit" title="Changer la photo">📷</button>` : ''}
           </div>
           <div class="cda-headtext">
-            <div class="cda-name">${esc(nom)} ${verified ? '<span class="cda-verified" title="Identité vérifiée">✔</span>' : ''}${(badgesAffiliations || badgesPartenariats) ? `<span class="cda-name-badges">${badgesAffiliations}${badgesPartenariats}</span>` : ''}</div>
+            <div class="cda-name">${esc(nom)}${isOwner ? ` <button type="button" class="cda-edit-btn" id="cda-nom-edit" title="Corriger mon prénom / mon nom" aria-label="Modifier mon nom">✏️</button>` : ''} ${verified ? '<span class="cda-verified" title="Identité vérifiée">✔</span>' : ''}${(badgesAffiliations || badgesPartenariats) ? `<span class="cda-name-badges">${badgesAffiliations}${badgesPartenariats}</span>` : ''}</div>
             <div class="cda-info-row">
               ${chipPays(profil.pays, 'Pays de résidence', profil.pays)}
               ${chipInfo('📍', 'Ville de résidence', profil.ville)}
@@ -305,6 +305,9 @@
       const infoBtn = container.querySelector('#cda-info-edit');
       if (infoBtn) infoBtn.addEventListener('click', () => editInfos(container, profil, opts));
 
+      const nomBtn = container.querySelector('#cda-nom-edit');
+      if (nomBtn) nomBtn.addEventListener('click', () => editNom(container, profil, opts));
+
       const bioBtn = container.querySelector('#cda-bio-edit');
       if (bioBtn) bioBtn.addEventListener('click', () => editBio(container, profil, opts));
 
@@ -404,6 +407,28 @@
         } catch (e) { alert(e.message || 'Erreur.'); }
       });
     });
+  }
+
+  /* Corriger son prénom / nom (2026-10-08, demande explicite) — le mot de passe est exigé pour qu'on ne puisse pas
+     modifier l'identité d'une autre personne depuis une session ouverte ; le titulaire reçoit une alerte
+     (notification + e-mail). Voir POST /api/profil/nom (server/index.js). */
+  function editNom(container, profil, opts) {
+    openCdaModal('✏️ Corriger mon nom',
+      `<p style="margin:0 0 10px;font-size:12.5px;color:#64748B;line-height:1.5;">Ce nom s'affiche sur votre profil, vos publications et vos messages. Pour protéger votre identité, votre mot de passe est demandé et vous recevrez une alerte par e-mail.</p>
+       <label>Prénom</label><input id="cda-e-prenom" maxlength="60" autocomplete="given-name" value="${esc(profil.prenom||'')}">
+       <label>Nom <span style="color:#2563EB">*</span></label><input id="cda-e-nom" maxlength="80" autocomplete="family-name" value="${esc(profil.nom||'')}">
+       <label>Votre mot de passe <span style="color:#2563EB">*</span></label><input id="cda-e-mdp" type="password" autocomplete="current-password">
+       <p style="margin:8px 0 0;font-size:11.5px;color:#94A3B8;">⚠️ 2 modifications maximum par période de 30 jours. Une identité vérifiée ne peut plus être modifiée en ligne.</p>`,
+      async ov => {
+        const nom = ov.querySelector('#cda-e-nom').value.trim();
+        const mdp = ov.querySelector('#cda-e-mdp').value;
+        if (!nom) throw new Error('Le nom est obligatoire.');
+        if (!mdp) throw new Error('Saisissez votre mot de passe pour confirmer.');
+        const r = await window.api('POST', '/profil/nom', { prenom: ov.querySelector('#cda-e-prenom').value, nom, mot_de_passe: mdp });
+        profil.prenom = r.prenom; profil.nom = r.nom;
+        render(container, profil, opts);
+        if (typeof window.showToast === 'function') window.showToast('✅ Nom modifié — une alerte vous a été envoyée par e-mail.');
+      });
   }
 
   function editInfos(container, profil, opts) {

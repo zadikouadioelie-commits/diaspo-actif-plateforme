@@ -17764,11 +17764,18 @@ route("PUT", "/api/profil/profil-public", async (req, res, params, body) => {
 route("PUT", "/api/profil", async (req, res, params, body) => {
   const user = await getCurrentUser(req);
   if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
-  const { nom, prenom, ville, pays, bio, photo_url, banner_url, titre_pro,
+  const { ville, pays, bio, photo_url, banner_url, titre_pro,
           centres_interet, situation_pro, telephone, competences, experiences, theme_couleur } = body;
   const fields = [], vals = [];
-  if (nom)                   { fields.push("nom=?");           vals.push(nom); }
-  if (prenom !== undefined)  { fields.push("prenom=?");        vals.push(prenom); }
+  /* Le prénom et le nom ne se modifient PLUS par cette route (2026-10-08, demande explicite : empêcher qu'on
+     modifie l'identité d'autrui) : un client qui renvoie les valeurs actuelles inchangées est toléré, toute
+     valeur différente est refusée — le changement passe par POST /api/profil/nom (mot de passe exigé). */
+  if (body.nom !== undefined || body.prenom !== undefined) {
+    const actuel = await db.prepare("SELECT nom, prenom FROM users WHERE id=?").get(user.id);
+    const diffNom = body.nom !== undefined && String(body.nom || "").trim() !== String(actuel?.nom || "").trim() && String(body.nom || "").trim() !== "";
+    const diffPrenom = body.prenom !== undefined && String(body.prenom || "").trim() !== String(actuel?.prenom || "").trim();
+    if (diffNom || diffPrenom) return sendJSON(res, 403, { error: "Pour modifier votre prénom ou votre nom, utilisez « Modifier mon nom » : votre mot de passe est demandé pour protéger votre identité." });
+  }
   if (ville !== undefined)   { fields.push("ville=?");         vals.push(ville); }
   if (pays !== undefined)    { fields.push("pays=?");          vals.push(pays); }
   if (bio !== undefined)     { fields.push("bio=?");           vals.push(SEC.sanitizeRichHtml(bio)); }
@@ -17886,6 +17893,67 @@ route("PUT", "/api/profil", async (req, res, params, body) => {
     centres_interet: safeParse(up.centres_interet||"[]"), situation_pro: up.situation_pro, telephone: up.telephone,
     privacy: safeParse(up.privacy_json||"{}"), nom_structure: nomStructureOut,
     ...domaineOut, notif_emails_non_essentiels: up.notif_emails_non_essentiels==null ? true : !!up.notif_emails_non_essentiels } });
+});
+
+/* POST /api/profil/nom — corriger son prénom / nom (2026-10-08, demande explicite : « permets de le modifier, avec une
+   confirmation pour éviter que les gens ne modifient les identités d'autres personnes »).
+   Garde-fous : mot de passe du compte exigé (une session volée ne suffit pas), identité vérifiée = nom verrouillé,
+   2 changements maximum par période de 30 jours, journal des changements, alerte (notification + e-mail) envoyée
+   au titulaire après chaque changement. */
+route("POST", "/api/profil/nom", async (req, res, params, body) => {
+  const user = await getCurrentUser(req);
+  if (!user) return sendJSON(res, 401, { error: "Connexion requise." });
+  const lim = SEC.rateLimit(`profil-nom:${user.id}`, 10, 15 * 60 * 1000);
+  if (!lim.allowed) return sendJSON(res, 429, { error: `Trop de tentatives. Réessayez dans ${lim.retryAfter}s.` });
+
+  const nettoyer = (v, max) => SEC.sanitizeString(String(v == null ? "" : v), max).replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
+  const nouveauPrenom = nettoyer(body && body.prenom, 60);
+  const nouveauNom = nettoyer(body && body.nom, 80);
+  if (!nouveauNom) return sendJSON(res, 400, { error: "Le nom est obligatoire." });
+
+  const row = await db.prepare("SELECT nom, prenom, email, password_hash, password_salt, identite_verifiee FROM users WHERE id=?").get(user.id);
+  if (!row) return sendJSON(res, 404, { error: "Compte introuvable." });
+  if (Number(row.identite_verifiee) === 1 || row.identite_verifiee === true) {
+    return sendJSON(res, 403, { error: "Votre identité a été vérifiée : votre nom correspond à votre pièce d'identité et ne peut plus être modifié en ligne. Pour le corriger, écrivez-nous à contact@diaspoactif.com." });
+  }
+  if (!body || !body.mot_de_passe || !verifyPassword(String(body.mot_de_passe), row.password_salt, row.password_hash)) {
+    SEC.logSecurity("profil_nom_mdp_incorrect", { uid: Number(user.id) });
+    return sendJSON(res, 403, { error: "Mot de passe incorrect." });
+  }
+  const ancienPrenom = String(row.prenom || ""), ancienNom = String(row.nom || "");
+  if (nouveauPrenom === ancienPrenom && nouveauNom === ancienNom) return sendJSON(res, 400, { error: "Aucun changement : le nom saisi est identique à l'actuel." });
+
+  const depuis = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
+  const recents = await db.prepare("SELECT created_at FROM profil_nom_historique WHERE user_id=? AND created_at > ? ORDER BY created_at ASC").all(user.id, depuis);
+  if (recents.length >= 2) {
+    const dispo = new Date(new Date(String(recents[0].created_at).replace(" ", "T") + "Z").getTime() + 30 * 24 * 3600 * 1000);
+    return sendJSON(res, 429, { error: `Votre nom a déjà été modifié 2 fois ces 30 derniers jours. Une nouvelle modification sera possible à partir du ${dispo.toLocaleDateString("fr-FR")}.` });
+  }
+
+  await db.prepare("UPDATE users SET nom=?, prenom=? WHERE id=?").run(nouveauNom, nouveauPrenom || null, user.id);
+  const maintenant = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const ip = SEC.clientIp(req);
+  const ipMasquee = /^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip.split(".").slice(0, 2).join(".") + ".x.x" : "";
+  await db.prepare("INSERT INTO profil_nom_historique (user_id, ancien_prenom, ancien_nom, nouveau_prenom, nouveau_nom, ip_masquee, created_at) VALUES (?,?,?,?,?,?,?)")
+    .run(user.id, ancienPrenom, ancienNom, nouveauPrenom, nouveauNom, ipMasquee, maintenant);
+  SEC.logSecurity("profil_nom_modifie", { uid: Number(user.id) });
+
+  // Les anciens commentaires gardent le nom affiché au moment où ils ont été écrits : on les aligne sur le nouveau nom.
+  const affichage = await nomCompteAffichage(user.id);
+  try { await db.prepare("UPDATE fil_commentaires SET auteur_nom=? WHERE auteur_id=?").run(affichage, user.id); } catch (e) { console.error("[profil-nom:commentaires]", e.message); }
+
+  // Alerte au titulaire : notification + e-mail (best-effort, jamais bloquant).
+  const ancienAff = [ancienPrenom, ancienNom].filter(Boolean).join(" "), nouveauAff = [nouveauPrenom, nouveauNom].filter(Boolean).join(" ");
+  try { await creerNotif(user.id, "nom_modifie", "Votre nom a été modifié", `Votre nom est passé de « ${ancienAff} » à « ${nouveauAff} ». Ce n'est pas vous ? Changez votre mot de passe depuis les paramètres du compte.`, { lien: "parametres-compte.html" }); } catch (_) {}
+  try {
+    if (row.email) {
+      const { emailNomModifie } = require("./mailer");
+      const r = await emailNomModifie({ email: row.email, ancien: ancienAff, nouveau: nouveauAff });
+      if (!r || !r.ok) await logError(new Error(`E-mail d'alerte de changement de nom non envoyé : ${JSON.stringify(r && (r.error || r.reason) || "raison inconnue")}`), "profil-nom-email", req);
+    }
+  } catch (e) { console.error("[profil-nom:email]", e.message); }
+
+  sendJSON(res, 200, { ok: true, prenom: nouveauPrenom, nom: nouveauNom, affichage });
 });
 
 /* ---------- Changement de mot de passe (compte connecté) ----------

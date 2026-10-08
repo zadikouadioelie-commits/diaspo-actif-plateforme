@@ -151,6 +151,8 @@
           <div class="pc-field"><label>Nom</label><input id="pc-nom" value="${esc(profil.nom||'')}"></div>
         </div>
       `}
+      <div class="pc-field" id="pc-pwd-nom-wrap" style="display:none;"><label>Mot de passe (requis pour modifier le prénom ou le nom)</label><input id="pc-pwd-nom" type="password" autocomplete="current-password"></div>
+      <p class="pc-desc" style="margin:4px 0 0;">Changer le prénom ou le nom demande votre mot de passe et déclenche une alerte par e-mail. 2 modifications maximum par période de 30 jours ; une identité vérifiée ne peut plus être modifiée en ligne.</p>
       <button type="button" class="pc-btn pc-btn-save" id="pc-btn-identite">Enregistrer</button>
       <p class="pc-msg" id="pc-msg-identite"></p>
     </div>
@@ -237,13 +239,25 @@
     ]);
   }
 
+  /* Le mot de passe n'est demandé que si le prénom ou le nom change réellement (2026-10-08). */
+  const nomModifie = () => document.getElementById('pc-prenom').value.trim() !== (profil.prenom || '') || document.getElementById('pc-nom').value.trim() !== (profil.nom || '');
+  ['pc-prenom', 'pc-nom'].forEach(id => document.getElementById(id).addEventListener('input', () => {
+    document.getElementById('pc-pwd-nom-wrap').style.display = nomModifie() ? '' : 'none';
+  }));
   document.getElementById('pc-btn-identite').addEventListener('click', async () => {
     const btn = document.getElementById('pc-btn-identite'); btn.disabled = true;
     try {
-      const body = { prenom: document.getElementById('pc-prenom').value.trim(), nom: document.getElementById('pc-nom').value.trim() };
+      if (nomModifie()) {
+        const r = await api('POST', '/profil/nom', {
+          prenom: document.getElementById('pc-prenom').value, nom: document.getElementById('pc-nom').value,
+          mot_de_passe: document.getElementById('pc-pwd-nom').value,
+        });
+        profil.prenom = r.prenom; profil.nom = r.nom;
+        document.getElementById('pc-pwd-nom').value = '';
+        document.getElementById('pc-pwd-nom-wrap').style.display = 'none';
+      }
       const nomStructureEl = document.getElementById('pc-nom-structure');
-      if (nomStructureEl) body.nom_structure = nomStructureEl.value.trim();
-      await api('PUT', '/profil', body);
+      if (nomStructureEl) await api('PUT', '/profil', { nom_structure: nomStructureEl.value.trim() });
       showMsg('pc-msg-identite', 'Enregistré ✓', true);
     } catch(e) { showMsg('pc-msg-identite', e.message || 'Erreur.', false); }
     finally { btn.disabled = false; }

@@ -753,6 +753,9 @@ html, body { overflow-x:clip; }
 .pvz-hero-row { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
 .pvz-name-row { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .pvz-name { font-size:28px; font-weight:700; color:#122A4D; line-height:1.1; }
+.pvz-name-edit { border:none; background:rgba(47,107,237,.10); color:#2F6BED; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:13px; line-height:1; flex:none; }
+.pvz-name-edit:hover { background:rgba(47,107,237,.22); }
+.pvz-name-edit:focus-visible { outline:2px solid #2F6BED; outline-offset:2px; }
 .pvz-verified { display:inline-flex; align-items:center; gap:5px; background-color:var(--tp-light,#E4F0FB); color:var(--tp,#2F6BED); font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:999px; }
 .pvz-premium-badge { display:inline-flex; align-items:center; gap:4px; background:linear-gradient(135deg,#F5D061,#C9971C); color:#3A2600; font-size:11.5px; font-weight:800; padding:4px 10px; border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,.2); }
 .pvz-partenaire-badge { display:inline-flex; align-items:center; gap:5px; background:#FFF4EC; color:#B8460E; border:1px solid #F9C6A3; font-size:11.5px; font-weight:700; padding:4px 10px 4px 6px; border-radius:999px; }
@@ -2131,6 +2134,7 @@ function renderVisitorProfile() {
           <div style="min-width:0;">
             <div class="pvz-name-row">
               <h1 class="pvz-name">${esc(nom)}</h1>
+              ${isOwn && !['initiative','collectivite','administrateur'].includes(profil.role) ? `<button type="button" class="pvz-name-edit" onclick="openEditNom()" title="Corriger mon prénom ou mon nom" aria-label="Modifier mon nom">✏️</button>` : ''}
               ${isPremium ? `<span class="pvz-premium-badge" title="Membre Premium">👑 Premium</span>` : ''}
               ${(!isPremium && profil._decouverte_premium) ? window.decouvertePremiumBadgeHtml(profil._decouverte_premium.date_expiration) : ''}
               ${profil.role === 'partenaire' ? `<span class="pvz-premium-badge" title="Compte Partenaire Diaspo'Actif" style="background:linear-gradient(135deg,#2563EB,#1d4ed8);">🤝 Partenaire</span>` : ''}
@@ -8534,6 +8538,56 @@ function buildSectionUsers() {
 /* ======================================================
    ÉDITION IDENTITÉ (modale inline)
    ====================================================== */
+/* Corriger son prénom / nom (2026-10-08, demande explicite) : le mot de passe est exigé pour qu'on ne puisse pas
+   modifier l'identité d'une autre personne depuis une session ouverte ; le titulaire reçoit une alerte
+   (notification + e-mail). Voir POST /api/profil/nom (server/index.js). */
+function openEditNom() {
+  if (document.getElementById('pvz-nom-overlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'pvz-nom-overlay';
+  ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'pvz-nom-titre');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(18,32,56,.55);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;';
+  const champ = 'width:100%;box-sizing:border-box;border:1px solid rgba(18,32,56,.16);border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit;';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:22px;max-width:420px;width:100%;box-sizing:border-box;color:#111;color-scheme:light;">
+      <h3 id="pvz-nom-titre" style="margin:0 0 6px;font-size:17px;">✏️ Corriger mon nom</h3>
+      <p style="margin:0 0 14px;font-size:12.5px;color:#6b7280;line-height:1.5;">Ce nom est celui qui s'affiche sur votre profil, vos publications et vos messages. Pour protéger votre identité, votre mot de passe est demandé et vous recevrez une alerte par e-mail.</p>
+      <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;" for="pvz-nom-prenom">Prénom</label>
+      <input type="text" id="pvz-nom-prenom" maxlength="60" autocomplete="given-name" style="${champ}margin-bottom:10px;" value="${esc(profil.prenom || '')}">
+      <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;" for="pvz-nom-nom">Nom</label>
+      <input type="text" id="pvz-nom-nom" maxlength="80" autocomplete="family-name" style="${champ}margin-bottom:10px;" value="${esc(profil.nom || '')}">
+      <label style="font-size:12.5px;font-weight:700;display:block;margin-bottom:4px;" for="pvz-nom-mdp">Votre mot de passe</label>
+      <input type="password" id="pvz-nom-mdp" autocomplete="current-password" style="${champ}margin-bottom:6px;">
+      <p style="margin:0 0 12px;font-size:11.5px;color:#8794A7;">⚠️ 2 modifications maximum par période de 30 jours. Une identité vérifiée ne peut plus être modifiée en ligne.</p>
+      <div id="pvz-nom-err" role="alert" style="display:none;color:#dc2626;font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" id="pvz-nom-cancel" style="padding:8px 14px;border:1px solid rgba(18,32,56,.16);border-radius:8px;background:none;cursor:pointer;font-size:13px;">Annuler</button>
+        <button type="button" id="pvz-nom-save" style="padding:8px 16px;border:none;border-radius:8px;background:#2F6BED;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">Enregistrer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const fermer = () => ov.remove();
+  ov.addEventListener('click', (e) => { if (e.target === ov) fermer(); });
+  ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') fermer(); if (e.key === 'Enter' && e.target.tagName === 'INPUT') ov.querySelector('#pvz-nom-save').click(); });
+  ov.querySelector('#pvz-nom-cancel').onclick = fermer;
+  ov.querySelector('#pvz-nom-save').onclick = async (e) => {
+    const err = ov.querySelector('#pvz-nom-err'); err.style.display = 'none';
+    const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Enregistrement…';
+    try {
+      const r = await api('POST', '/profil/nom', {
+        prenom: ov.querySelector('#pvz-nom-prenom').value, nom: ov.querySelector('#pvz-nom-nom').value, mot_de_passe: ov.querySelector('#pvz-nom-mdp').value,
+      });
+      profil.prenom = r.prenom; profil.nom = r.nom;
+      fermer();
+      location.reload();
+    } catch (ex) {
+      err.textContent = ex.message || 'Erreur.'; err.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Enregistrer';
+    }
+  };
+  setTimeout(() => ov.querySelector('#pvz-nom-prenom').focus(), 50);
+}
+
 function openEditIdentity() {
   const ci = Array.isArray(profil.centres_interet) ? profil.centres_interet : [];
   const INTERETS = ['entrepreneuriat','investissement','emploi','formation','agriculture','santé','éducation','technologie','culture','sport','tourisme','autres'];
@@ -8551,8 +8605,9 @@ function openEditIdentity() {
     <h4 style="margin:0 0 12px;font-size:14px;">Modifier le profil</h4>
     ${isOrgRole ? `<div class="fg full"><div><label>Nom de la structure (affiché en priorité sur l'annuaire et le profil public)</label><input id="id-nom-structure" placeholder="Ex : Habitat Agricole" value="${esc(profil.nom_structure||'')}"></div></div>` : ''}
     <div class="fg">
-      <div><label>${isOrgRole ? 'Prénom du responsable' : 'Prénom'}</label><input id="id-prenom" value="${esc(profil.prenom||'')}"></div>
-      <div><label>${isOrgRole ? 'Nom du responsable' : 'Nom'}</label><input id="id-nom" value="${esc(profil.nom||'')}"></div>
+      <div><label>${isOrgRole ? 'Prénom du responsable' : 'Prénom'}</label><input id="id-prenom" value="${esc(profil.prenom||'')}" readonly style="background:#f3f4f6;cursor:not-allowed;"></div>
+      <div><label>${isOrgRole ? 'Nom du responsable' : 'Nom'}</label><input id="id-nom" value="${esc(profil.nom||'')}" readonly style="background:#f3f4f6;cursor:not-allowed;"></div>
+      <div class="full" style="grid-column:1/-1;margin:-4px 0 4px;"><button type="button" class="btn-cancel" style="padding:6px 12px;" onclick="openEditNom()">✏️ Corriger mon prénom / mon nom (mot de passe demandé)</button></div>
       <div><label>Titre professionnel</label><input id="id-titre" placeholder="Ex : CEO · Ingénieure · Étudiant" value="${esc(profil.titre_pro||'')}"></div>
       <div><label>Téléphone</label><input id="id-tel" type="tel" value="${esc(profil.telephone||'')}"></div>
       <div><label>Ville</label><input id="id-ville" value="${esc(profil.ville||'')}"></div>
@@ -8598,8 +8653,6 @@ async function saveIdentity() {
   err.style.display = 'none'; ok.style.display = 'none';
 
   const body = {
-    prenom:        document.getElementById('id-prenom').value.trim(),
-    nom:           document.getElementById('id-nom').value.trim() || profil.nom,
     titre_pro:     document.getElementById('id-titre').value.trim(),
     telephone:     document.getElementById('id-tel').value.trim(),
     ville:         document.getElementById('id-ville').value.trim(),

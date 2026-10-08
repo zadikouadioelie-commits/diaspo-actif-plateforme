@@ -5843,6 +5843,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appareils_principaux ON appareils_principaux(user_id, categorie);
 `);
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHANGEMENTS DE NOM (2026-10-08, demande explicite : corriger son prénom/nom, mais avec une confirmation
+   pour qu'on ne puisse pas modifier l'identité d'autrui). Chaque changement (mot de passe exigé) est
+   journalisé ici : historique pour le titulaire et plafond de 2 changements par période de 30 jours. */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS profil_nom_historique (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL,
+    ancien_prenom    TEXT,
+    ancien_nom       TEXT,
+    nouveau_prenom   TEXT,
+    nouveau_nom      TEXT,
+    ip_masquee       TEXT,
+    created_at       TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_profil_nom_historique ON profil_nom_historique(user_id, created_at);
+`);
+
 /* =====================================================================
    MODULE "PARTENARIAT" (2026-08-14) — Incrément 1 : fondations du rôle
    "partenaire" (cahier des charges : soumission de projets à Diaspo'Actif
