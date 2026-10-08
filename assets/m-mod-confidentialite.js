@@ -19,7 +19,7 @@
      PATCH /api/auth/pwa-prompt-preference { dismiss }
      GET  /api/push/vapid-public-key · POST /api/push/subscribe · POST /api/push/unsubscribe
 
-   Laissé à la page du site (explications + lien) : code de sécurité DS-ID, changement de
+   Laissé à la page du site (explications + lien) : changement de
    gestionnaire du compte, masquage du compte, lancement de la vérification d'identité Stripe.
    ============================================================ */
 (function () {
@@ -53,6 +53,10 @@
       .cf-row .t{font-weight:600;display:block}
       .cf-row .d{font-size:12.5px;color:var(--muted);display:block;line-height:1.3}
       .cf-row[disabled]{opacity:.6}
+      .cf-ds-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:800;letter-spacing:.12em;text-align:center;padding:18px 10px;margin:10px 0 6px;border-radius:14px;background:var(--sky-l);color:var(--navy);user-select:all;-webkit-user-select:all;word-break:break-all}
+      .cf-pwd{position:relative}
+      .cf-pwd .cf-in{padding-right:48px}
+      .cf-pwd button{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:42px;height:42px;font-size:18px;line-height:1}
       .cf-sw{position:relative;flex:none;width:52px;height:32px;border-radius:16px;background:#B8C4D6;transition:background .18s}
       .cf-sw::after{content:'';position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .18s}
       .cf-row[aria-checked=true] .cf-sw{background:var(--green)}
@@ -147,6 +151,65 @@
     $('#cf-sno').onclick = close;
   }
 
+  /* ---------- Code de sécurité (DS-ID) : mêmes règles que confidentialite.html (2026-10-08, demande explicite) ----------
+     Mot de passe requis à chaque consultation, affichage 30 secondes puis masquage automatique, une seule consultation par heure (le délai
+     est appliqué par le serveur AVANT le mot de passe : routes /api/profil/ds-id/status et /reveal). Le code n'est jamais gardé ailleurs que
+     dans cette feuille et il en est effacé à la fermeture. */
+  function feuilleDsId() {
+    let minuteur = null;
+    const close0 = openSheet('<div id="ds-zone"><div class="sk" style="height:80px"></div></div>');
+    const close = () => { clearInterval(minuteur); const z = $('#ds-zone'); if (z) z.textContent = ''; close0(); };
+    const sh = $('#sheet'); if (sh) sh.onclick = e => { if (e.target === sh) close(); };   /* fermeture par le fond : on efface aussi le code */
+    const zone = () => $('#ds-zone');
+    const entete = '<h2 class="cf-sheet-t">Code de sécurité (DS-ID)</h2>';
+    const duree = s => { const tot = Math.max(1, Math.ceil(s / 60)), h = Math.floor(tot / 60), m = tot % 60; return (h > 0 ? h + ' h' : '') + (h > 0 && m > 0 ? ' ' : '') + (m > 0 || !h ? m + ' min' : ''); };
+    const attente = secondes => {
+      clearInterval(minuteur);
+      if (!zone()) return;
+      zone().innerHTML = `${entete}<div class="cf-alert o" style="margin-bottom:12px">🔒 Nouvelle consultation possible dans ${esc(duree(secondes))}.</div><p class="cf-sheet-p">Pour protéger votre signature numérique, le DS-ID ne peut être consulté qu’une seule fois par heure, même avec le mot de passe.</p><button class="btn out block" id="ds-fermer">Fermer</button>`;
+      $('#ds-fermer').onclick = close;
+    };
+    const afficher = code => {
+      clearInterval(minuteur);
+      zone().innerHTML = `${entete}<div class="cf-ds-code" id="ds-code" aria-live="polite">${esc(code)}</div><p class="cf-hint" style="text-align:center">Masquage automatique dans <b id="ds-sec">30</b> s. Notez-le ou gardez cet écran ouvert : il ne s’affichera plus avant 1 heure.</p><button class="btn out block" id="ds-fermer" style="margin-top:12px">Masquer maintenant</button>`;
+      $('#ds-fermer').onclick = close;
+      let reste = 30;
+      minuteur = setInterval(() => {
+        reste--;
+        if (reste <= 0) { attente(3600); return; }
+        const c = $('#ds-sec'); if (c) c.textContent = reste; else clearInterval(minuteur);
+      }, 1000);
+    };
+    const formulaire = () => {
+      zone().innerHTML = `${entete}<p class="cf-sheet-p">Votre DS-ID est votre signature numérique personnelle : permanente, non modifiable, jamais visible par un administrateur. Elle sert à signer des partenariats et des <b>votes sécurisés</b>, et à autoriser un nouvel appareil.</p>
+        <label class="cf-lbl" for="ds-pwd">Votre mot de passe</label>
+        <div class="cf-pwd"><input class="cf-in" id="ds-pwd" type="password" autocomplete="current-password" placeholder="Mot de passe"><button type="button" id="ds-oeil" aria-label="Afficher le mot de passe">👁</button></div>
+        <p class="cf-hint">Le code s’affiche 30 secondes, une seule fois par heure.</p>
+        <p id="ds-err" class="small" style="color:var(--red);min-height:20px;margin:6px 2px" role="alert"></p>
+        <button class="btn block" id="ds-ok">Afficher mon DS-ID</button><button class="btn out block" id="ds-non" style="margin-top:10px">Annuler</button>`;
+      $('#ds-non').onclick = close;
+      $('#ds-oeil').onclick = () => { const i = $('#ds-pwd'); const clair = i.type === 'password'; i.type = clair ? 'text' : 'password'; $('#ds-oeil').setAttribute('aria-label', clair ? 'Masquer le mot de passe' : 'Afficher le mot de passe'); i.focus(); };
+      const valider = async () => {
+        const pwd = $('#ds-pwd').value, err = $('#ds-err');
+        if (!pwd) { err.textContent = 'Saisissez votre mot de passe.'; return; }
+        err.textContent = ''; const b = $('#ds-ok'); b.disabled = true; b.textContent = 'Vérification…';
+        try {
+          const r = await api('/api/profil/ds-id/reveal', { method: 'POST', body: { password: pwd } });
+          afficher(r.ds_id);
+        } catch (e) {
+          if (e.status === 401) { close(); await sessionExpiree(); return; }
+          if (e.data && e.data.minutes_restantes !== undefined) { attente(e.data.minutes_restantes * 60); return; }   /* le délai d'1 h est écoulé ailleurs : on l'affiche comme un délai */
+          err.textContent = e.message || 'Erreur de validation.'; b.disabled = false; b.textContent = 'Afficher mon DS-ID';
+        }
+      };
+      $('#ds-ok').onclick = valider;
+      $('#ds-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') valider(); });
+      setTimeout(() => { const i = $('#ds-pwd'); if (i) i.focus(); }, 60);
+    };
+    api('/api/profil/ds-id/status').then(s => { if (!zone()) return; if (s.secondes_restantes > 0) attente(s.secondes_restantes); else formulaire(); })
+      .catch(e => { if (!zone()) return; if (e.status === 401) { close(); sessionExpiree(); } else formulaire(); });
+  }
+
   /* ============================================================
      ÉCRAN PRINCIPAL
      ============================================================ */
@@ -189,6 +252,7 @@
         ${ligne('infos', 'file', 'Informations déclarées', 'Nom, naissance, e-mail, nationalités, origines')}
         ${ROLES_INSTITUTION.includes(role()) ? ligne('origine', 'home', 'Origine officielle de l’institution', 'Pays, région, ministère de tutelle') : ''}
         ${idLigne}
+        ${ligne('ds', 'lock', 'Code de sécurité (DS-ID)', 'Afficher mon code, protégé par mot de passe')}
         ${estInitiative() ? ligne('daid', 'doc', 'Identifiant public (DA-ID)', 'À imprimer ou partager : mène à votre fiche') : ''}
         ${ligne('niveaux', 'lock', 'Qui voit quoi ?', 'Public, réseau, confidentiel : les 3 niveaux')}
       </div>
@@ -199,7 +263,6 @@
       </div>
       <div class="h2">À FINIR SUR LE SITE</div>
       <div class="cf-card">
-        ${ligne('ds', 'lock', 'Code de sécurité (DS-ID)', 'Affichage protégé par mot de passe')}
         ${estInitiative() || role() === 'collectivite' ? ligne('gestionnaire', 'swap', 'Changer de gestionnaire du compte', 'Transférer la gestion à une autre personne') : ''}
         ${ligne('masquer', 'close', 'Masquer mon compte', 'Rendre votre profil invisible')}
       </div>
@@ -227,7 +290,7 @@
         case 'daid': feuilleDaId(); break;
         case 'push': basculerPush(b); break;
         case 'pwa': basculerPwa(b); break;
-        case 'ds': feuilleSite('Code de sécurité (DS-ID)', `<p class="cf-sheet-p">Votre DS-ID est votre signature numérique personnelle : permanente, non modifiable, jamais visible par un administrateur. Elle sert à signer des partenariats et des <b>votes sécurisés</b>.</p><p class="cf-sheet-p">Pour la protéger, il ne s’affiche qu’après saisie de votre mot de passe, pendant 30 secondes, une seule fois par heure.</p>`, 'Afficher mon DS-ID sur le site'); break;
+        case 'ds': feuilleDsId(); break;
         case 'gestionnaire': feuilleSite('Changer de gestionnaire du compte', `<p class="cf-sheet-p">Cette procédure transfère <b>définitivement</b> la gestion du compte à une autre personne : l’ancien gestionnaire est révoqué et un nouveau code confidentiel est généré.</p><p class="cf-sheet-p">Elle se déroule en plusieurs étapes verrouillées (codes reçus par e-mail, vérification d’identité, validation finale) avec un nombre de tentatives limité chaque mois.</p>`, 'Démarrer la procédure sur le site'); break;
         case 'masquer': feuilleSite('Masquer mon compte', `<p class="cf-sheet-p">Masquer votre compte rend votre profil public invisible aux autres utilisateurs. Vos données restent intactes : reconnectez-vous à tout moment pour le réafficher.</p><p class="cf-sheet-p">Par sécurité, cette action demande de confirmer avec votre mot de passe.</p>`, 'Masquer mon compte sur le site'); break;
       }
