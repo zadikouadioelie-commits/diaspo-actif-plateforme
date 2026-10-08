@@ -15,6 +15,12 @@ html.m-site, html.m-site body { background: #EEF2F8 !important; color: #0D2B4E; 
 #m-site-top small { display: block; font-size: 11px; font-weight: 600; color: #cbd5e1; line-height: 1; margin-bottom: 2px; }
 html.m-site .topbar, html.m-site header.topbar, html.m-site .footer, html.m-site footer.footer, html.m-site .sidebar-toggle,
 html.m-site #admin-junior-lock, html.m-site #sidebar, html.m-site .mobile-bottom-nav { display: none !important; }
+/* Bug réel trouvé en vérifiant (2026-10-08, capture à l'appui : "beaucoup de choses ici qui ne
+   sont pas visibles") — 3 pages (adhesions.html, billetterie.html, votes.html) ont un <nav
+   class="nav"> directement dans <body>, SANS le <header class="topbar"> qui l'enveloppe
+   partout ailleurs ; .topbar ci-dessus ne pouvait donc jamais le cacher sur ces 3 pages-là,
+   il restait affiché par-dessus/à côté de la barre de l'appli, minuscule et illisible. */
+html.m-site nav.nav { display: none !important; }
 
 /* contenu */
 html.m-site .page { background: transparent !important; min-height: 0; }
