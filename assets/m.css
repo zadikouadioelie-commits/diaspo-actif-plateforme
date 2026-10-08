@@ -315,7 +315,18 @@ svg.i.l{width:28px;height:28px}
 .sec-t .sic svg{width:18px;height:18px}
 .sec-more{flex:none;color:var(--orange-d);font-weight:800;font-size:14px;padding:8px 4px;white-space:nowrap}
 .sec-in{margin:0 0 10px;font-size:18px}
-#home-videos .sec{margin-top:8px}
+/* Cartouche « Tutoriels vidéo » (2026-10-08, demande explicite) : encadré marine à liseré orange, pour que la ligne des vidéos se distingue du reste de l'accueil */
+#home-videos{position:relative;margin:18px 0 20px;padding:2px 14px 10px;border-radius:22px;border:2px solid var(--orange);background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);box-shadow:0 10px 26px rgba(13,43,78,.3);overflow:hidden}
+#home-videos:empty{display:none}
+#home-videos .sec{margin:12px 0 12px}
+#home-videos .sec::before{background:rgba(255,255,255,.2)}
+#home-videos .sec-t{color:#fff}
+#home-videos .sec-t .sic{background:var(--orange);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+#home-videos .sec-more{color:#FFC9A8}
+#home-videos .sec-sub{color:#cdd7e6}
+#home-videos .vcard .vt{color:#fff}
+#home-videos .vcard .small.muted{color:#aebcd2}
+#home-videos .vth{border:1px solid rgba(255,255,255,.25)}
 
 /* ---------- bandeau de test privé ---------- */
 #test-ribbon{position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 6px);z-index:45;background:var(--orange-d);color:#fff;font:800 10.5px/1 "Segoe UI",system-ui,sans-serif;letter-spacing:.4px;padding:5px 12px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.3);pointer-events:none;opacity:.94}
