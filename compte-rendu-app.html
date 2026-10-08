@@ -878,9 +878,9 @@ function vuePublique() {
     + ((cr.medias || []).length ? '<div class="crp-photos" style="margin:12px 0">' + cr.medias.map(u => '<div style="width:150px;height:110px"><a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="" loading="lazy"></a></div>').join('') + '</div>' : '')
     + graph + detailHtml(cr)
     + (forts.length ? '<h2 id="cr-forts">Les temps forts</h2><div class="crp-tiles">' + forts.map((f, i) => '<div class="crp-tile" style="background:linear-gradient(135deg,' + GRAD[i % GRAD.length][0] + ',' + GRAD[i % GRAD.length][1] + ')">' + esc(f) + '</div>').join('') + '</div>' : '')
-    + (d.identifies.length ? '<h2 id="cr-identifs">Compte Diaspo’Actif</h2><p class="crp-note">Les comptes Diaspo’Actif identifiés pour ce compte-rendu.</p><div class="crp-idgrid">' + d.identifies.map(i => '<a class="crp-idcard" href="' + hrefMention('u', i.user_id) + '" target="_blank" rel="noopener">'
+    + (d.identifies.length ? '<div class="cr-dore"><div class="cr-dore-in"><h2 id="cr-identifs">Compte Diaspo’Actif</h2><p class="crp-note">Les comptes Diaspo’Actif identifiés pour ce compte-rendu.</p><div class="crp-idgrid">' + d.identifies.map(i => '<a class="crp-idcard" href="' + hrefMention('u', i.user_id) + '" target="_blank" rel="noopener">'
       + (i.photo_url ? '<img src="' + esc(i.photo_url) + '" alt="">' : '<span class="crp-idav">' + esc((i.nom || '?')[0]) + '</span>')
-      + '<span><b>' + esc(i.nom) + '</b>' + (ROLE_LABEL[i.role] ? '<small>' + esc(ROLE_LABEL[i.role]) + '</small>' : '') + '</span></a>').join('') + '</div>' : '')
+      + '<span><b>' + esc(i.nom) + '</b>' + (ROLE_LABEL[i.role] ? '<small>' + esc(ROLE_LABEL[i.role]) + '</small>' : '') + '</span></a>').join('') + '</div></div></div>' : '')
     + parts
     + '<div class="cr-btns" style="margin-top:22px"><a class="cr-btn sec" href="evenements.html?evt=' + ev.id + '">ℹ️ En savoir plus sur l\'événement</a>' + (d.peut_editer ? '<button type="button" class="cr-btn out" data-msgs-recus>📨 Messages reçus</button><a class="cr-btn out" href="compte-rendu.html?evt=' + ev.id + '&edition=1">✏️ Modifier</a><a class="cr-btn out" href="compte-rendu.html">📋 Gérer mes comptes-rendus</a>' : '') + '</div>'
     + '<div id="crp-social"></div></div></article></div>';

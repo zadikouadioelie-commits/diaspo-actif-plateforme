@@ -98,12 +98,32 @@
 .cr2-orga-l img{width:72px;height:72px;object-fit:contain;flex:none}
 .cr2-parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:0 0 12px}
 .cr2-part{min-width:0}
-.cr2-slot{display:grid;place-items:center;height:130px;border:2px dashed var(--cr-or);border-radius:16px;background:var(--cr-or-soft);overflow:hidden;padding:12px}
-.cr2-slot img{max-width:100%;max-height:100%;object-fit:contain;background:#fff;border-radius:10px;padding:8px}
+/* Logos de partenaires (2026-10-08, demande explicite : « qu'on voie bien chaque image téléchargée »). La zone suit la taille de
+   l'image au lieu d'une hauteur fixe de 130 px avec overflow:hidden, qui rognait les logos hauts ou larges. box-sizing:border-box
+   inclut le liseré blanc dans la limite max-width/max-height — sans lui l'image débordait puis était coupée. */
+.cr2-slot{display:flex;align-items:center;justify-content:center;min-height:170px;border:2px dashed var(--cr-or);border-radius:16px;background:var(--cr-or-soft);padding:14px}
+.cr2-slot img{display:block;box-sizing:border-box;max-width:100%;width:auto;height:auto;max-height:280px;object-fit:contain;background:#fff;border-radius:10px;padding:10px}
 .cr2-slot .ini{font-family:'Alfa Slab One',Georgia,serif;font-size:30px;color:var(--cr-bleu)}
 .cr2-part-nom{font-weight:800;margin-top:8px;font-size:16px}
 .cr2-bloc .cr2-part-txt{font-size:calc(var(--cr-fs) - 2px);line-height:1.6;margin:6px 0}
 .cr2-part-lien{font-size:14px;font-weight:700;color:var(--cr-bleu);text-decoration:none;border-bottom:2px solid var(--cr-or)}
+
+/* Cadre doré scintillant des comptes Diaspo'Actif identifiés (2026-10-08, demande explicite). Même langage que le bouton « Agir » :
+   dégradé or, halo qui pulse, reflet qui balaie le cadre, étoile qui scintille. Sans animation si le visiteur réduit les mouvements. */
+.cr-dore{position:relative;margin:26px 0 10px;padding:3px;border-radius:22px;overflow:hidden;background:linear-gradient(135deg,#FFF1B8,#E5AB2D 28%,#B8860B 52%,#F9DC7C 76%,#E5AB2D);box-shadow:0 6px 22px rgba(201,162,75,.38)}
+.cr-dore-in{position:relative;border-radius:19px;background:linear-gradient(180deg,#FFFDF5,#FBF4DE);padding:18px 22px 22px}
+.cr-dore-in h2{margin-top:0}
+.cr-dore-in:before{content:"✦";position:absolute;top:12px;right:18px;font-size:20px;line-height:1;color:#E5AB2D}
+.cr-dore:after{content:"";position:absolute;top:0;bottom:0;left:0;width:36%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);transform:translateX(-130%) skewX(-18deg);pointer-events:none}
+.cr-dore .crp-idcard{border-color:#E5C770;background:#fff}
+.cr-dore .crp-idcard:hover{border-color:#B8860B}
+@media(prefers-reduced-motion:no-preference){
+  .cr-dore{animation:cr-dore-halo 3.2s ease-in-out infinite}
+  .cr-dore:after{animation:cr2-reflet 4.4s ease-in-out infinite}
+  .cr-dore-in:before{animation:cr2-scintille 2s ease-in-out infinite}
+}
+@keyframes cr-dore-halo{0%,100%{box-shadow:0 0 0 0 rgba(229,171,45,0),0 6px 22px rgba(201,162,75,.38)}50%{box-shadow:0 0 0 5px rgba(229,171,45,.18),0 8px 30px rgba(229,171,45,.7)}}
+
 @media(max-width:880px){
   .cr2-layout{grid-template-columns:minmax(0,1fr)}
   .cr2-toc{display:none}
