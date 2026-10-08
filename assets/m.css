@@ -133,7 +133,7 @@ svg.i.l{width:28px;height:28px}
 .conv:last-child{border-bottom:none}
 .conv:active{background:rgba(13,43,78,.05)}
 .conv .nm{font-weight:700}
-.conv .tm{font-size:12px;color:var(--muted)}
+.conv .tm{font-size:12px;color:var(--muted);width:auto;flex:none;margin:0}  /* width:auto : la règle générique .tm{width:260px} (cartes) écrasait le nom de la personne à 0 de large dans la liste des conversations */
 .conv .pv{font-size:14px;color:var(--muted)}
 .conv.unread .pv{color:var(--text);font-weight:600}
 .unr{background:var(--orange-d);color:#fff;border-radius:11px;min-width:22px;height:22px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px}
@@ -437,3 +437,11 @@ button.li{background:none;font:inherit;color:inherit}
 /* Onglet Moi = profil public (2026-10-08) */
 .moi-bar{margin:0 0 12px}
 #moi-profil .pf-hero{margin-top:0}
+/* Conversations : bouton ⋯ (archiver dans un thème / supprimer) — 2026-10-08 */
+.convw{position:relative;border-bottom:1px solid var(--border)}
+.convw:last-child{border-bottom:none}
+.convw .conv{border-bottom:0;padding-right:56px}
+.conv-more{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:0;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.conv-more:active{background:rgba(13,43,78,.08)}
+.conv-more svg{width:20px;height:20px;fill:currentColor;stroke:none}
+.convw .unr{margin-right:4px}

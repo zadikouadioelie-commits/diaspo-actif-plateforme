@@ -49,6 +49,9 @@
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    more: '<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
     play: '<path d="M8 5l11 7-11 7z"/>',
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
@@ -1144,19 +1147,70 @@
     if (!S.me) { el.innerHTML = loginCard('Connectez-vous pour lire et envoyer vos messages.'); $('#go-login').onclick = () => openLogin(); return; }
     el.innerHTML = '<div class="sk skc" style="height:70px"></div><div class="sk skc" style="height:70px"></div>';
     try {
-      const r = await api('/api/conversations'); const tout = r.conversations || []; tout.forEach(x => { S.convNames[x.id] = x.avec_nom; });
-      S.unreadMsg = tout.reduce((n, x) => n + (Number(x.non_lus) || 0), 0); paintBadges();
+      const r = await api('/api/conversations' + (S.msgArch ? '?filtre=archives' : '')); const tout = r.conversations || []; tout.forEach(x => { S.convNames[x.id] = x.avec_nom; });
+      if (!S.msgArch) { S.unreadMsg = tout.reduce((n, x) => n + (Number(x.non_lus) || 0), 0); paintBadges(); }
       /* Onglets Classiques / Automatiques (2026-10-08) — uniquement pour le compte Diaspo'Actif Officiel (le serveur ne les active que pour lui) :
          les messages de bienvenue envoyés aux nouveaux comptes sont rangés à part. Le badge de non-lus ci-dessus compte tout. */
       const onglets = r.onglets && r.onglets.actifs ? r.onglets : null;
       const mode = onglets && S.msgOnglet === 'automatique' ? 'automatique' : 'classique';
-      const c = onglets ? tout.filter(x => !!x.automatique === (mode === 'automatique')) : tout;
+      const c0 = onglets && !S.msgArch ? tout.filter(x => !!x.automatique === (mode === 'automatique')) : tout;
+      /* Archivage par thème (2026-10-08) : « Messages » / « Archivés », puis un bouton par thème créé (le thème est un nom libre propre à chaque personne). */
+      const themes = [...new Set(tout.map(x => x.archive_dossier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+      if (S.msgArch && S.msgTheme && S.msgTheme !== '__sans' && !themes.includes(S.msgTheme)) S.msgTheme = '';
+      const c = S.msgArch && S.msgTheme ? c0.filter(x => (x.archive_dossier || '') === (S.msgTheme === '__sans' ? '' : S.msgTheme)) : c0;
+      const filtres = '<div class="chips" role="tablist"><button class="chip ' + (!S.msgArch ? 'on' : '') + '" data-msg-arch="0">💬 Messages</button><button class="chip ' + (S.msgArch ? 'on' : '') + '" data-msg-arch="1">' + ic('folder', 's') + ' Archivés</button></div>'
+        + (S.msgArch && (themes.length || tout.some(x => !x.archive_dossier)) ? '<div class="chips"><button class="chip ' + (!S.msgTheme ? 'on' : '') + '" data-msg-theme="">Tous les thèmes</button>' + themes.map(t => '<button class="chip ' + (S.msgTheme === t ? 'on' : '') + '" data-msg-theme="' + esc(t) + '">📁 ' + esc(t) + '</button>').join('') + (themes.length && tout.some(x => !x.archive_dossier) ? '<button class="chip ' + (S.msgTheme === '__sans' ? 'on' : '') + '" data-msg-theme="__sans">Sans thème</button>' : '') + '</div>' : '');
       const barre = onglets ? `<div class="chips" role="tablist"><button class="chip ${mode === 'classique' ? 'on' : ''}" data-msg-onglet="classique" role="tab" aria-selected="${mode === 'classique'}">💬 Classiques <span class="n">${onglets.classiques || 0}</span></button><button class="chip ${mode === 'automatique' ? 'on' : ''}" data-msg-onglet="automatique" role="tab" aria-selected="${mode === 'automatique'}">🤖 Automatiques <span class="n">${onglets.automatiques || 0}</span></button></div>` : '';
-      el.innerHTML = barre + (c.length ? `<div class="lst">${c.map(x => `<a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
-        <div class="sp"><div class="row"><span class="nm ell sp">${esc(x.avec_nom)}</span><span class="tm">${esc(ago(x.derniere_date))}</span></div><div class="pv ell">${esc(x.derniere_type && x.derniere_type !== 'text' ? '📎 Pièce jointe' : strip(x.derniere || x.sujet || 'Nouvelle conversation'))}</div></div>${x.non_lus > 0 ? `<span class="unr">${x.non_lus}</span>` : ''}</a>`).join('')}</div>`
-        : `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>${mode === 'automatique' ? 'Aucun message automatique' : 'Aucune conversation'}</b>${mode === 'automatique' ? 'Les messages de bienvenue sans réponse apparaissent ici.' : 'Contactez une boutique ou un membre depuis son profil pour démarrer un échange.'}</div>`);
+      el.innerHTML = filtres + (S.msgArch ? '' : barre) + (c.length ? `<div class="lst">${c.map(x => `<div class="convw"><a class="conv ${x.non_lus > 0 ? 'unread' : ''}" href="#/conv/${x.id}"><div class="av">${x.avec_photo ? `<img src="${attrUrl(x.avec_photo)}" alt="" onerror="this.remove()">` : esc(initials(x.avec_nom))}</div>
+        <div class="sp"><div class="row"><span class="nm ell sp">${esc(x.avec_nom)}</span><span class="tm">${esc(ago(x.derniere_date))}</span></div><div class="pv ell">${esc(x.derniere_type && x.derniere_type !== 'text' ? '📎 Pièce jointe' : strip(x.derniere || x.sujet || 'Nouvelle conversation'))}</div></div>${x.non_lus > 0 ? `<span class="unr">${x.non_lus}</span>` : ''}</a><button type="button" class="conv-more" data-cmore="${x.id}" aria-label="Actions sur cette conversation">${ic('more')}</button></div>`).join('')}</div>`
+        : `<div class="empty"><div class="ei">${ic('chat', 'l')}</div><b>${S.msgArch ? 'Aucune conversation archivée' : mode === 'automatique' ? 'Aucun message automatique' : 'Aucune conversation'}</b>${mode === 'automatique' ? 'Les messages de bienvenue sans réponse apparaissent ici.' : 'Contactez une boutique ou un membre depuis son profil pour démarrer un échange.'}</div>`);
       el.querySelectorAll('[data-msg-onglet]').forEach(b => { b.onclick = () => { S.msgOnglet = b.dataset.msgOnglet; viewMessages(); }; });
+      el.querySelectorAll('[data-msg-arch]').forEach(b => { b.onclick = () => { S.msgArch = b.dataset.msgArch === '1'; S.msgTheme = ''; viewMessages(); }; });
+      el.querySelectorAll('[data-msg-theme]').forEach(b => { b.onclick = () => { S.msgTheme = b.dataset.msgTheme; viewMessages(); }; });
+      el.querySelectorAll('[data-cmore]').forEach(b => { b.onclick = e => { e.preventDefault(); e.stopPropagation(); const x = tout.find(y => String(y.id) === b.dataset.cmore); if (x) convActions({ id: x.id, avec_nom: x.avec_nom, archive: !!x.archive, theme: x.archive_dossier || '' }, viewMessages); }; });
     } catch (e) { el.innerHTML = `<div class="empty"><b>Messagerie indisponible</b>${esc(e.message)}</div>`; }
+  }
+  /* ---------- archivage par thème et suppression d'une conversation (2026-10-08, demande explicite) ----------
+     Mêmes routes que messagerie.html : PATCH /api/conversations/:id/archive (désarchive si déjà archivée), GET …/archive-dossiers (thèmes déjà
+     créés), DELETE /api/conversations/:id (suppression de CÔTÉ UTILISATEUR : l'autre personne garde la conversation). Un « thème » est un nom
+     libre, propre à chaque personne, créé en archivant. */
+  function paneMore(fn) { const b = $('#pane-more'); if (!b) return; b.hidden = false; b.onclick = fn; }
+  function convActions(c, apres) {
+    const close = openSheet(`<h3 style="margin:0 0 2px">${esc(c.avec_nom || 'Conversation')}</h3>${c.archive && c.theme ? `<p class="small muted" style="margin:0 0 6px">${ic('folder', 's')} Thème : ${esc(c.theme)}</p>` : ''}
+      <div class="lst" style="margin-top:8px">
+        ${c.archive
+          ? `<button type="button" class="li" id="ca-un"><span class="ic">${ic('folder')}</span><span class="sp"><span class="t">Sortir des archives</span></span></button><button type="button" class="li" id="ca-theme"><span class="ic">${ic('swap')}</span><span class="sp"><span class="t">Changer de thème</span></span></button>`
+          : `<button type="button" class="li" id="ca-arch"><span class="ic">${ic('folder')}</span><span class="sp"><span class="t">Archiver dans un thème</span><br><span class="d">Rangez-la dans un thème que vous créez</span></span></button>`}
+        <button type="button" class="li" id="ca-del" style="color:#b91c1c"><span class="ic" style="color:#b91c1c">${ic('trash')}</span><span class="sp"><span class="t">Supprimer la conversation</span><br><span class="d">Elle disparaît de votre messagerie</span></span></button>
+      </div>`);
+    const un = $('#ca-un'), th = $('#ca-theme'), ar = $('#ca-arch');
+    if (un) un.onclick = async () => { try { await api(`/api/conversations/${c.id}/archive`, { method: 'PATCH', body: {} }); close(); toast('Conversation sortie des archives'); apres && apres(); } catch (e) { toast(e.message, true); } };
+    const choisir = () => { close(); choisirTheme(c, apres); };
+    if (th) th.onclick = choisir; if (ar) ar.onclick = choisir;
+    $('#ca-del').onclick = async () => {
+      if (!confirm('Supprimer cette conversation ? Elle disparaît de votre messagerie ; l’autre personne la conserve.')) return;
+      try { await api(`/api/conversations/${c.id}`, { method: 'DELETE' }); close(); toast('Conversation supprimée'); apres && apres(); } catch (e) { toast(e.message, true); }
+    };
+  }
+  async function choisirTheme(c, apres) {
+    let themes = []; try { themes = (await api('/api/conversations/archive-dossiers')).dossiers || []; } catch (e) { /* pas de thème existant */ }
+    const close = openSheet(`<h3 style="margin:0 0 4px">${ic('folder', 's')} Archiver dans un thème</h3><p class="small muted" style="margin:0 0 8px">Choisissez un thème existant ou créez-en un. Seul vous le voyez.</p>
+      ${themes.length ? `<div class="lst">${themes.map(t => `<button type="button" class="li" data-th="${esc(t)}"><span class="ic">${ic('folder')}</span><span class="sp"><span class="t">${esc(t)}</span></span></button>`).join('')}</div>` : ''}
+      <label class="fl" for="th-new">Nouveau thème</label><input class="fi" id="th-new" maxlength="60" placeholder="Ex : Anciens partenaires, À suivre…" autocomplete="off">
+      <button type="button" class="btn block" id="th-create" style="margin-top:10px" disabled>Créer le thème et archiver</button>
+      <button type="button" class="btn out block" id="th-none" style="margin-top:8px">Archiver sans thème</button>`);
+    const faire = async theme => {
+      try {
+        /* Changer de thème : la route bascule archivé/désarchivé, on sort d'abord de l'archive avant de ré-archiver dans le nouveau thème. */
+        if (c.archive) await api(`/api/conversations/${c.id}/archive`, { method: 'PATCH', body: {} });
+        const r = await api(`/api/conversations/${c.id}/archive`, { method: 'PATCH', body: { dossier: theme || '' } });
+        close(); toast(r.dossier ? `Archivée dans « ${r.dossier} »` : 'Conversation archivée'); apres && apres();
+      } catch (e) { toast(e.message, true); }
+    };
+    $$('[data-th]', $('#sheet')).forEach(b => { b.onclick = () => faire(b.dataset.th); });
+    const inp = $('#th-new'), cr = $('#th-create');
+    inp.oninput = () => { cr.disabled = !inp.value.trim(); };
+    cr.onclick = () => faire(inp.value.trim()); $('#th-none').onclick = () => faire('');
   }
   async function paneConv(id) {
     if (!S.me) { location.hash = '#/messages'; return; }
@@ -1175,6 +1229,8 @@
       if (!list) {
         setPane(S.convNames[id] || autre.nom || 'Conversation', `<div class="chat" id="chat">${html || '<div class="empty"><b>Aucun message</b>Écrivez le premier message.</div>'}</div>`, null, true);
         mountComposer(id, render);
+        const cv = r.conversation || {}, moi1 = Number(cv.user1_id) === Number(S.me.id);
+        paneMore(() => convActions({ id, avec_nom: S.convNames[id] || autre.nom || '', archive: !!(moi1 ? cv.archive_u1 : cv.archive_u2), theme: (moi1 ? cv.archive_dossier_u1 : cv.archive_dossier_u2) || '' }, () => { location.hash = '#/messages'; }));
       } else { list.innerHTML = html; }
       const body = $('.pbody'); if (body && (scroll || atBottom)) body.scrollTop = body.scrollHeight;
     };
@@ -1595,11 +1651,12 @@
   function setPane(title, html, foot, keepFoot) {
     const p = $('#pane'); p.hidden = false; document.body.style.overflow = 'hidden';
     if (!p.dataset.built) {
-      p.innerHTML = `<div class="phead"><button class="ibtn" id="pane-back" aria-label="Retour">${ic('back')}</button><h2 id="pane-title"></h2><button class="ibtn" id="pane-share" aria-label="Partager" hidden>${ic('share')}</button></div><div class="pbody" id="pane-body"></div><div class="pfoot" id="pane-foot" hidden></div>`;
+      p.innerHTML = `<div class="phead"><button class="ibtn" id="pane-back" aria-label="Retour">${ic('back')}</button><h2 id="pane-title"></h2><button class="ibtn" id="pane-share" aria-label="Partager" hidden>${ic('share')}</button><button class="ibtn" id="pane-more" aria-label="Actions" hidden>${ic('more')}</button></div><div class="pbody" id="pane-body"></div><div class="pfoot" id="pane-foot" hidden></div>`;
       p.dataset.built = '1'; $('#pane-back').onclick = () => { if (history.length > 1) history.back(); else location.hash = '#/' + (S.tab || 'fil'); };
     }
     $('#pane-title').textContent = title || '';
     const psh = $('#pane-share'); if (psh) { psh.hidden = true; psh.onclick = null; }
+    const pmo = $('#pane-more'); if (pmo) { pmo.hidden = true; pmo.onclick = null; }
     const b = $('#pane-body'); b.innerHTML = html; if (!keepFoot || true) b.scrollTop = 0;
     const f = $('#pane-foot');
     if (keepFoot) { f.hidden = false; f.style.padding = '0'; }
