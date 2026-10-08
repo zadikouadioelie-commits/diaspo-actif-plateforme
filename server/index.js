@@ -13106,6 +13106,30 @@ route("GET", "/api/initiatives/:id/membres", async (req, res, params) => {
   sendJSON(res, 200, { membres });
 });
 
+/* Garde-fou "profil public rempli" pour toute action d'affiliation (2026-10-08, demande
+   explicite : un compte qui reçoit une affiliation sans profil public rempli doit en être
+   empêché — étendue ensuite à TOUTE action d'affiliation, dans les deux sens (envoyer une
+   invitation/demande, ou l'accepter) et pour les deux rôles, "c'est une règle pour tout le
+   monde"). Réutilise le même calcul et le même seuil (80 %) que les relances automatiques de
+   profil (server/completude.js, SEUIL_PCT) plutôt qu'une règle inventée en double — un compte
+   relancé à 80% par ce mécanisme franchit donc aussi ce garde-fou au même moment.
+   Renvoie l'évaluation complète (pct + manquants_detail) et non un simple booléen : la demande
+   explicite de suite est de ne jamais laisser le compte dans le flou, mais de lister chaque
+   information manquante, cliquable, pour l'amener directement au bon endroit à remplir (voir
+   erreurProfilIncomplet ci-dessous, et assets/app.js côté client). */
+async function evaluerProfilPourAffiliation(role, idCompte) {
+  const ligne = role === 'initiative'
+    ? await db.prepare("SELECT * FROM initiatives WHERE id=?").get(idCompte)
+    : await db.prepare("SELECT * FROM users WHERE id=?").get(idCompte);
+  if (!ligne) return null; // ligne introuvable : pas le sujet de ce garde-fou, ne jamais bloquer dessus
+  return Completude.evaluer(role, ligne);
+}
+function erreurProfilIncomplet(ev, message) {
+  return { error: message, profil_pct: ev.pct, manquants: ev.manquants_detail };
+}
+const MSG_PROFIL_INCOMPLET_VALIDER = "Pour pouvoir valider votre affiliation, il vous faut remplir votre profil public.";
+const MSG_PROFIL_INCOMPLET_ENVOYER = "Pour pouvoir faire une affiliation, il vous faut remplir votre profil public.";
+
 /* Demande d'affiliation lancée par le compte utilisateur lui-même (2026-09-09, bouton
    "Demander une affiliation" sur les cartouches initiatives de l'annuaire) — sens inverse de
    la route d'invitation ci-dessous : ici c'est le compte qui sollicite l'initiative, pas
@@ -13117,6 +13141,8 @@ route("POST", "/api/initiatives/:id/demande-affiliation", async (req, res, param
   const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (init.owner_user_id === user.id) return sendJSON(res, 400, { error: "Vous ne pouvez pas demander une affiliation à votre propre initiative." });
+  const evDemandeAff = await evaluerProfilPourAffiliation('utilisateur', user.id);
+  if (evDemandeAff && evDemandeAff.pct < Completude.SEUIL_PCT) return sendJSON(res, 403, erreurProfilIncomplet(evDemandeAff, MSG_PROFIL_INCOMPLET_ENVOYER));
   try {
     await db.prepare("INSERT INTO initiative_membres (initiative_id, user_id, statut, origine) VALUES (?, ?, 'en_attente', 'demande')").run(params.id, user.id);
   } catch(e) {
@@ -13141,6 +13167,8 @@ route("POST", "/api/initiatives/:id/membres", async (req, res, params, body) => 
   const init = await db.prepare("SELECT id, nom, owner_user_id FROM initiatives WHERE id = ?").get(params.id);
   if (!init) return sendJSON(res, 404, { error: "Initiative introuvable." });
   if (init.owner_user_id !== user.id && user.role !== 'administrateur') return sendJSON(res, 403, { error: "Seul le responsable peut inviter des membres." });
+  const evInviterMembre = await evaluerProfilPourAffiliation('initiative', init.id);
+  if (evInviterMembre && evInviterMembre.pct < Completude.SEUIL_PCT) return sendJSON(res, 403, erreurProfilIncomplet(evInviterMembre, MSG_PROFIL_INCOMPLET_ENVOYER));
   const { userId, fonction, message } = body;
   if (!userId) return sendJSON(res, 400, { error: "userId requis." });
   const target = await db.prepare("SELECT id, nom, prenom FROM users WHERE id = ?").get(userId);
@@ -13181,6 +13209,14 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
       ? (init.owner_user_id === user.id || user.role === 'administrateur')
       : (user.id === parseInt(params.userId));
     if (!autorise) return sendJSON(res, 403, { error: estDemande ? "Seul le responsable de l'initiative peut répondre à cette demande." : "Vous ne pouvez modifier que votre propre affiliation." });
+    if (statut === 'accepte') {
+      // Celui qui ACCEPTE doit avoir son propre profil public rempli — l'initiative si elle
+      // répond à une demande, le compte s'il valide une invitation reçue (les deux sens).
+      const evAccepter = estDemande
+        ? await evaluerProfilPourAffiliation('initiative', init.id)
+        : await evaluerProfilPourAffiliation('utilisateur', user.id);
+      if (evAccepter && evAccepter.pct < Completude.SEUIL_PCT) return sendJSON(res, 403, erreurProfilIncomplet(evAccepter, MSG_PROFIL_INCOMPLET_VALIDER));
+    }
     await db.prepare("UPDATE initiative_membres SET statut = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(statut, params.id, params.userId);
     const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
     if (estDemande) {
@@ -13268,6 +13304,8 @@ route("POST", "/api/annuaire/inviter-affiliation/:userId", async (req, res, para
   if (user.role !== 'initiative') return sendJSON(res, 403, { error: "Seul un compte Initiative peut affilier un utilisateur." });
   const init = await db.prepare("SELECT id, nom FROM initiatives WHERE owner_user_id = ?").get(user.id);
   if (!init) return sendJSON(res, 404, { error: "Aucune initiative associée à ce compte." });
+  const evInviterAnnuaire = await evaluerProfilPourAffiliation('initiative', init.id);
+  if (evInviterAnnuaire && evInviterAnnuaire.pct < Completude.SEUIL_PCT) return sendJSON(res, 403, erreurProfilIncomplet(evInviterAnnuaire, MSG_PROFIL_INCOMPLET_ENVOYER));
   const target = await db.prepare("SELECT id, nom, prenom FROM users WHERE id = ?").get(params.userId);
   if (!target) return sendJSON(res, 404, { error: "Utilisateur introuvable." });
   const { fonction, message } = body;

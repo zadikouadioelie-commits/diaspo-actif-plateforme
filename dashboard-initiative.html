@@ -9872,7 +9872,10 @@ window.affAccepterDemande = async function(userId, nom) {
   try {
     await api('PUT', `/initiatives/${window.__vitrineInitId}/membres/${userId}`, { statut: 'accepte' });
     renderAffiliation();
-  } catch (e) { alert(e.message || 'Erreur.'); }
+  } catch (e) {
+    if (e.status === 403 && e.data && e.data.manquants && typeof afficherModalProfilIncomplet === 'function') { afficherModalProfilIncomplet(e); return; }
+    alert(e.message || 'Erreur.');
+  }
 };
 
 window.affRefuserDemande = async function(userId, nom) {

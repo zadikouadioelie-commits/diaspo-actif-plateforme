@@ -78,12 +78,13 @@ function evaluer(role, ligne) {
   const criteres = CRITERES[role];
   if (!criteres || !ligne) return null;
   const manquants = [];
+  const manquants_detail = [];
   let remplis = 0;
   for (const c of criteres) {
     if (c.cles.some(k => champRempli(ligne[k]))) remplis++;
-    else manquants.push(c.label);
+    else { manquants.push(c.label); manquants_detail.push({ cle: c.cles[0], label: c.label }); }
   }
-  return { pct: Math.round((remplis / criteres.length) * 100), remplis, total: criteres.length, manquants };
+  return { pct: Math.round((remplis / criteres.length) * 100), remplis, total: criteres.length, manquants, manquants_detail };
 }
 
 /* Instants stockés « YYYY-MM-DD HH:MM:SS » (UTC, SQLite) ou déjà Date/ISO (PostgreSQL) → millisecondes. */

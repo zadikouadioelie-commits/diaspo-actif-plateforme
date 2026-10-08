@@ -1990,6 +1990,31 @@ function render() {
       if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 600);
   }
+
+  /* Arrivée depuis la modale « Profil incomplet » qui bloque une action d'affiliation
+     (2026-10-08, demande explicite) — ?completer=champ&champ=<cle>&label=<libellé>, piloté par
+     les clés du système de complétude côté initiative (server/completude.js, CRITERES.initiative).
+     editVitrineText(field,...) est générique — fonctionne pour tout champ texte simple de la
+     vitrine (déjà utilisée telle quelle pour description/vitrine_services/vitrine_horaires) ; les
+     clés sans éditeur dédié (logo_url, publics_json, besoins_json, realisations_json,
+     galerie_json, reseaux_sociaux, annee_creation) retombent sur un défilement vers la bonne
+     section quand elle existe, sinon le haut de la vitrine + le libellé du champ manquant. */
+  const _champParamsInit = new URLSearchParams(location.search);
+  if (isOwn && _champParamsInit.get('completer') === 'champ') {
+    history.replaceState(null, '', location.pathname + location.hash);
+    const _cle = _champParamsInit.get('champ'), _label = _champParamsInit.get('label') || '';
+    const CHAMPS_TEXTE_VITRINE = { description: 'Décrivez votre activité…', mission: 'Quelle est votre mission ?', historique: 'Votre histoire…', vitrine_horaires: 'Ex : Lun-Ven 9h-18h…', vitrine_services: 'Décrivez vos services…' };
+    const SECTION_PAR_CHAMP = { site_web: 'pv-contact', adresse: 'pv-contact', reseaux_sociaux: 'pv-reseaux-sociaux', galerie_json: 'pv-galerie' };
+    setTimeout(() => {
+      if (CHAMPS_TEXTE_VITRINE[_cle] && typeof editVitrineText === 'function') {
+        editVitrineText(_cle, _label || _cle, CHAMPS_TEXTE_VITRINE[_cle]);
+        return;
+      }
+      const section = SECTION_PAR_CHAMP[_cle] && document.getElementById(SECTION_PAR_CHAMP[_cle]);
+      (section || document.getElementById('pvz-visitor') || document.body).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof showToast === 'function' && _label) showToast(`📝 À compléter : ${_label}`, 'info', 5000);
+    }, 600);
+  }
 }
 
 /* ======================================================

@@ -645,7 +645,10 @@ window.acceptFusionCagnotte = async function(notifId, contributionId, btnEl) {
 window.acceptAffiliation = async function(notifId, initiativeId, btnEl) {
   try {
     await api("PUT", `/initiatives/${initiativeId}/membres/${CURRENT_USER.id}`, { statut: "accepte" });
-  } catch(e) { alert("Erreur : " + (e.message || "")); return; }
+  } catch(e) {
+    if (e.status === 403 && e.data && e.data.manquants) { afficherModalProfilIncomplet(e); return; }
+    alert("Erreur : " + (e.message || "")); return;
+  }
   try { await api("PATCH", `/notifications/${notifId}/lire`); } catch{}
   const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
   if (item) {
@@ -2548,6 +2551,43 @@ async function demanderAdhesion(initiativeId, btn){
 }
 window.demanderAdhesion = demanderAdhesion;
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PROFIL INCOMPLET → BLOCAGE D'UNE ACTION D'AFFILIATION (2026-10-08, demande explicite)
+   ──────────────────────────────────────────────────────────────────────────
+   Le serveur refuse (403) toute action d'affiliation (envoyer, accepter — dans les deux sens,
+   utilisateur et initiative) tant que le profil public de l'auteur de l'action n'est pas rempli
+   à au moins 80 % (server/index.js, evaluerProfilPourAffiliation). La réponse porte alors
+   `manquants: [{cle,label}]` — PAS un simple message : la demande explicite de suite est de ne
+   jamais laisser le compte dans le flou, mais de lister chaque information manquante, cliquable,
+   pour l'amener directement sur son profil AVEC le bon éditeur déjà ouvert (mécanisme générique,
+   piloté par `cle`, pas un lien codé en dur par item — voir CRITERE_OUVRIR plus bas et le bloc
+   `?completer=champ&champ=` dans profil-app.html qui l'exploite à l'arrivée). Chaque lien s'ouvre
+   dans un nouvel onglet : la modale reste ouverte dans l'onglet d'origine, pour cocher les points
+   un par un sans perdre sa place, puis revenir cliquer l'action d'affiliation une fois réglé. */
+function afficherModalProfilIncomplet(e) {
+  const manquants = (e && e.data && Array.isArray(e.data.manquants)) ? e.data.manquants : null;
+  if (!manquants || !manquants.length) { alert(e.message || "Erreur."); return; }
+  document.getElementById('aff-profil-incomplet-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'aff-profil-incomplet-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,43,78,.55);z-index:2100;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const monId = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.id : '';
+  overlay.innerHTML = `
+    <div class="card" style="width:100%;max-width:440px;background:#fff;border-radius:12px;padding:20px;">
+      <h3 style="margin:0 0 6px;">📝 Profil incomplet (${e.data.profil_pct ?? 0} %)</h3>
+      <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;">${escH(e.message)} Cliquez sur chaque point pour le régler — chacun s'ouvre dans un nouvel onglet, revenez ici cocher le suivant.</p>
+      <div style="display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow-y:auto;">
+        ${manquants.map(m => `<a href="profil-app.html?id=${monId}&completer=champ&champ=${encodeURIComponent(m.cle)}&label=${encodeURIComponent(m.label)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:inherit;font-size:13px;">📝 ${escH(m.label)}</a>`).join('')}
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('aff-profil-incomplet-overlay').remove()">Fermer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+}
+window.afficherModalProfilIncomplet = afficherModalProfilIncomplet;
+
 /* ── Bouton "Demander une affiliation" — cartouches Annuaire (initiatives). Sens inverse du
    module Affiliation existant (dashboard-initiative.html) : ici c'est le compte qui sollicite
    l'initiative pour être identifié comme membre, pas l'initiative qui invite. Même comportement
@@ -2561,6 +2601,7 @@ async function demanderAffiliation(initiativeId, btn){
     if (typeof showToast === 'function') showToast("✅ Demande d'affiliation envoyée !");
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = "🔗 Affiliation"; }
+    if (e.status === 403 && e.data && e.data.manquants) { afficherModalProfilIncomplet(e); return; }
     alert(e.message || "Erreur lors de l'envoi de la demande.");
   }
 }
@@ -2619,6 +2660,7 @@ async function envoyerAffiliationUtilisateur(userId) {
     if (typeof showToast === 'function') showToast('✅ Invitation envoyée !');
   } catch (e) {
     sendBtn.disabled = false; sendBtn.textContent = "Envoyer l'invitation";
+    if (e.status === 403 && e.data && e.data.manquants) { document.getElementById('aff-user-modal-overlay')?.remove(); afficherModalProfilIncomplet(e); return; }
     errEl.textContent = e.message || "Erreur lors de l'envoi de l'invitation.";
     errEl.style.display = 'block';
   }
