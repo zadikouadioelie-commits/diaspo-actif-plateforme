@@ -1875,10 +1875,18 @@ route("POST", "/api/auth/reset-password", async (req, res, params, body) => {
 route("POST", "/api/auth/verify-email", async (req, res, params, body) => {
   const { token } = body;
   if (!token) return sendJSON(res, 400, { error: "Token requis" });
-  const user = await db.prepare("SELECT id, email_verif_expires FROM users WHERE email_verif_token=?").get(token);
-  if (!user) return sendJSON(res, 400, { error: "Lien invalide ou déjà utilisé." });
+  const user = await db.prepare("SELECT id, email_verifie, email_verif_expires FROM users WHERE email_verif_token=?").get(token);
+  if (!user) return sendJSON(res, 400, { error: "Ce lien n'est plus valide : un lien plus récent vous a peut-être été envoyé, ou votre adresse est déjà confirmée. Connectez-vous : si une confirmation est encore nécessaire, un bandeau vous permettra de renvoyer l'e-mail." });
+  /* Idempotent (2026-10-08, bug réel signalé : « je reçois le lien mais juste après il dit lien invalide ») :
+     le jeton était effacé dès la première ouverture, donc toute seconde ouverture du MÊME lien (double
+     chargement, appli installée + navigateur, analyse du lien par un antivirus/filtre de messagerie qui
+     l'exécute avant l'utilisateur) tombait sur « invalide » alors que l'adresse venait d'être confirmée.
+     Le jeton est désormais conservé : une adresse déjà confirmée répond simplement « confirmée ». Il reste
+     inutilisable pour autre chose (il ne fait que confirmer l'adresse) et un nouveau jeton le remplace dès
+     qu'un nouvel envoi est demandé. */
+  if (Number(user.email_verifie) === 1) return sendJSON(res, 200, { ok: true, deja_confirme: true });
   if (Date.now() > Number(user.email_verif_expires)) return sendJSON(res, 400, { error: "Lien expiré. Demandez un nouvel envoi depuis votre compte." });
-  await db.prepare("UPDATE users SET email_verifie=1, email_verif_token=NULL, email_verif_expires=NULL WHERE id=?").run(user.id);
+  await db.prepare("UPDATE users SET email_verifie=1 WHERE id=?").run(user.id);
   sendJSON(res, 200, { ok: true });
 });
 
@@ -2270,9 +2278,15 @@ route("POST", "/api/auth/resend-verification", async (req, res) => {
   const user = await db.prepare("SELECT id, email, prenom, nom, email_verifie FROM users WHERE id=?").get(cu.id);
   if (!user) return sendJSON(res, 404, { error: "Introuvable." });
   if (user.email_verifie) return sendJSON(res, 200, { ok: true, deja_verifie: true });
-  const verifToken = crypto.randomBytes(32).toString("hex");
-  const verifExpires = Date.now() + 24 * 3600000;
-  await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, user.id);
+  /* Réutilise le jeton encore valable au lieu d'en générer un nouveau (2026-10-08) : « Renvoyer l'e-mail »
+     invalidait jusqu'ici le lien de l'e-mail précédent — celui que la personne ouvrait justement, puisque
+     les deux e-mails se trouvent dans sa boîte — et elle tombait sur « lien invalide ». Tous les e-mails
+     reçus dans les 24 h portent maintenant un lien valable. */
+  const ancien = await db.prepare("SELECT email_verif_token, email_verif_expires FROM users WHERE id=?").get(user.id);
+  const reutilisable = ancien && ancien.email_verif_token && Number(ancien.email_verif_expires) > Date.now() + 3600000;
+  const verifToken = reutilisable ? ancien.email_verif_token : crypto.randomBytes(32).toString("hex");
+  const verifExpires = reutilisable ? Number(ancien.email_verif_expires) : Date.now() + 24 * 3600000;
+  if (!reutilisable) await db.prepare("UPDATE users SET email_verif_token=?, email_verif_expires=? WHERE id=?").run(verifToken, verifExpires, user.id);
   try {
     const { emailVerification } = require("./mailer");
     await emailVerification({ email: user.email, prenom: user.prenom || user.nom, token: verifToken });
