@@ -414,6 +414,12 @@
     const cr = src.compte_rendu || p.compte_rendu;
     let extra = '';
     if (promo && promo.id) extra = `<a class="promo row" href="#/evenement/${promo.id}"><div class="sp"><div class="small muted">Événement</div><b>${esc(promo.titre || '')}</b><div class="small muted">${esc(dateLong(promo.date_evt) || '')}</div></div>${ic('chev')}</a>`;
+    else if (cr && cr.titre && cr.evenement_id) {
+      /* Compte-rendu publié dans le fil (2026-10-08) : l'affiche de l'événement en tête (si la publication n'a pas de média) et une carte
+         qui ouvre le compte-rendu complet — avant, simple titre sans lien : impossible de le lire depuis le fil sur téléphone. */
+      if (!media && cr.image) media = mediaBlock(cr.image, { alt: cr.evenement_titre || cr.titre });
+      extra = `<a class="promo row" href="#/cr/${esc(cr.evenement_id)}"><div class="sp"><div class="small muted">Compte-rendu${cr.evenement_titre ? ' · ' + esc(cr.evenement_titre) : ''}</div><b>${esc(cr.titre)}</b><div class="small muted">Lire le compte-rendu complet</div></div>${ic('chev')}</a>`;
+    }
     else if (cr && cr.titre) extra = `<div class="promo"><div class="small muted">Compte-rendu</div><b>${esc(cr.titre)}</b></div>`;
     const liked = !!p.user_a_aime, nLike = (p.reactions && p.reactions.like) || 0;
     return `<article class="card post" data-id="${p.id}">
