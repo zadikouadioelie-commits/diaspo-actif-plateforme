@@ -426,14 +426,20 @@ function attachCompteInput(el, onPick) {
   const close = () => { if (box) box.remove(); box = null; };
   async function chercher(q) {
     if (q.length < 2) { close(); return; }
-    try { const r = await api('GET', `/evenements/${ST.evtId}/identifications/suggestions?q=${encodeURIComponent(q)}`); items = (r.suggestions || []).slice(0, 6); } catch (_) { items = []; }
-    if (!items.length) { close(); return; }
+    let erreur = false;
+    try { const r = await api('GET', `/evenements/${ST.evtId}/identifications/suggestions?q=${encodeURIComponent(q)}`); items = (r.suggestions || []).slice(0, 6); } catch (_) { items = []; erreur = true; }
     idx = 0;
     if (!box) { box = document.createElement('div'); box.className = 'crp-ac'; el.parentNode.style.position = 'relative'; el.parentNode.appendChild(box); box.style.left = '0'; box.style.top = (el.offsetTop + el.offsetHeight + 2) + 'px'; }
+    /* Un message plutôt que le silence (2026-10-08) : une recherche sans résultat ou en erreur ne doit jamais ressembler à une
+       fonction cassée — la personne doit savoir s'il faut corriger l'orthographe ou réessayer. */
+    if (!items.length) {
+      box.innerHTML = '<div style="cursor:default;color:var(--muted,#5B6B82)">' + (erreur ? 'La recherche est momentanément indisponible. Réessayez dans un instant.' : 'Aucun compte trouvé pour « ' + esc(q) + ' ». Vérifiez l’orthographe ou tapez une autre partie du nom.') + '</div>';
+      return;
+    }
     box.innerHTML = items.map((c, i) => '<div class="' + (i === 0 ? 'act' : '') + '" data-i="' + i + '"><b>' + esc(c.nom) + '</b> <span class="crp-note">' + esc(c.detail || '') + '</span></div>').join('');
     $$('div', box).forEach(d => d.addEventListener('mousedown', ev => { ev.preventDefault(); choisir(items[d.dataset.i]); }));
   }
-  function choisir(c) { close(); onPick(c); }
+  function choisir(c) { if (!c) return; close(); onPick(c); }
   el.addEventListener('input', () => {
     const v = el.value;
     if (!/^@/.test(v)) { close(); return; }

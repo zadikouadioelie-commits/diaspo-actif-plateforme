@@ -20618,11 +20618,15 @@ route("GET", "/api/evenements/:id/identifications/suggestions", async (req, res,
   /* Le « @ » ou « * » tapé en tête est ignoré (le champ de recherche n'en a pas besoin). */
   const q = String((query && query.q) || '').replace(/^[@*\s]+/, '').trim().toLowerCase();
   const ficheIdsSug = await crFicheIds(ctx.evt);
-  const inscrits = await db.prepare(`SELECT DISTINCT i.user_id, i.nom, i.prenom, i.statut, t.label AS type_label
+  /* Le rang de tri est une COLONNE du SELECT : PostgreSQL refuse un SELECT DISTINCT trié sur une expression absente de la
+     liste (« ORDER BY expressions must appear in select list »), ce que SQLite tolère — la route répondait 500 en production
+     et la recherche de comptes restait muette (2026-10-08). */
+  const inscrits = await db.prepare(`SELECT DISTINCT i.user_id, i.nom, i.prenom, i.statut, t.label AS type_label,
+      CASE WHEN i.statut='present' THEN 0 ELSE 1 END AS rang
       FROM insc_inscriptions i LEFT JOIN insc_types t ON t.id=i.type_id
       WHERE i.user_id IS NOT NULL AND i.statut NOT IN ('annule','liste_attente')
         AND (i.evenement_id=?${ficheIdsSug.length ? ` OR i.fiche_id IN (${ficheIdsSug.map(() => '?').join(',')})` : ''})
-      ORDER BY (i.statut='present') DESC, i.nom LIMIT 300`).all(ctx.evt.id, ...ficheIdsSug);
+      ORDER BY rang, i.nom LIMIT 300`).all(ctx.evt.id, ...ficheIdsSug);
   const deja = new Set((await crIdentifies(ctx.evt.id)).map(x => x.user_id));
   const vus = new Set();
   let liste = [];
