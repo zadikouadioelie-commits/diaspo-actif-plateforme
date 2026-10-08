@@ -20435,6 +20435,22 @@ async function crIdentifies(evenementId) {
 }
 
 /* GET — page du compte-rendu : l'événement, le compte-rendu (publié, ou brouillon pour son éditeur), les identifiés. */
+/* Comptes-rendus PUBLIÉS des événements publics, du plus récent au plus ancien (2026-10-08, demande explicite : tous les comptes-rendus
+   doivent figurer parmi les actualités de l'accueil téléphone, y compris ceux qui n'ont pas de publication dans le fil). Même carte que
+   celle d'une publication de compte-rendu du fil (carteCompteRenduPost) ; aucun contenu qui ne soit déjà public via /api/evenements/:id/compte-rendu. */
+route("GET", "/api/comptes-rendus/publies", async (req, res, params, body, query) => {
+  const limite = Math.min(Math.max(Number(query && query.limit) || 10, 1), 30);
+  const lignes = await db.prepare(`SELECT c.evenement_id AS id, COALESCE(c.published_at, c.updated_at) AS publie_le
+    FROM evenement_comptes_rendus c JOIN evenements e ON e.id = c.evenement_id
+    WHERE c.statut='publie' AND COALESCE(e.visibilite,'public')='public'
+    ORDER BY COALESCE(c.published_at, c.updated_at) DESC LIMIT ?`).all(limite);
+  const cartes = [];
+  for (const l of lignes) {
+    try { const c = await carteCompteRenduPost(l.id); if (c) cartes.push({ ...c, publie_le: l.publie_le }); } catch (_) { /* une carte en échec ne bloque pas les autres */ }
+  }
+  sendJSON(res, 200, { comptes_rendus: cartes });
+});
+
 route("GET", "/api/evenements/:id/compte-rendu", async (req, res, params) => {
   const ctx = await crChargerEvenement(req, res, params.id); if (!ctx) return;
   const { user, evt, edit } = ctx;

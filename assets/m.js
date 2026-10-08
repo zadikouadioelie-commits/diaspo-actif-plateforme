@@ -922,6 +922,32 @@
     })(doc.body.firstChild);
     return doc.body.firstChild.innerHTML;
   }
+  /* Cartouche d'un compte-rendu dans les actualités : affiche, titre, date, ville, organisateur, aperçu du résumé, « Voir plus » et « Compte-rendu ». */
+  function crCarte(c) {
+    const lien = '#/cr/' + encodeURIComponent(c.evenement_id);
+    const ap = strip(c.resume || '').replace(/\s+/g, ' ');
+    const coupe = ap.length > 260 ? (ap.lastIndexOf(' ', 260) > 180 ? ap.lastIndexOf(' ', 260) : 260) : -1;
+    const court = coupe > 0 ? ap.slice(0, coupe) + '…' : ap;
+    const meta = [dateLong(c.date_evt), c.ville].filter(Boolean).map(esc).join(' · ');
+    return `<article class="card crn">
+      ${c.image ? `<a class="crn-img" href="${lien}" aria-label="Ouvrir le compte-rendu"><img src="${attrUrl(c.image)}" alt="${esc(c.evenement_titre || c.titre)}" loading="lazy" onerror="this.parentNode.remove()"></a>` : ''}
+      <div class="pad"><span class="badge o">📝 Compte-rendu</span>
+        <h3 class="crn-t"><a href="${lien}">${esc(c.titre)}</a></h3>
+        ${c.evenement_titre && c.evenement_titre !== c.titre ? `<div class="small muted">Événement : ${esc(c.evenement_titre)}</div>` : ''}
+        ${meta ? `<div class="meta">${ic('cal', 's')}<span>${meta}</span></div>` : ''}
+        ${c.organisateur ? `<div class="meta">${ic('user', 's')}<span>Par <b style="color:var(--text)">${esc(c.organisateur)}</b></span></div>` : ''}
+        ${court ? `<p class="crn-ap">${esc(court)}</p><a class="crn-plus" href="${lien}">Voir plus ›</a>` : ''}
+        <div class="row" style="gap:8px;margin-top:10px"><a class="btn sm" href="${lien}">📝 Compte-rendu</a></div></div></article>`;
+  }
+  /* « Toutes les actualités » : tous les comptes-rendus publiés (même ceux sans publication dans le fil), puis le fil complet. */
+  async function paneActus() {
+    setPane('Actualités', `<div id="actu-crs"></div><div class="sec"><h2 class="sec-t"><span class="sic">${ic('fil')}</span><span>Publications</span></h2></div><div id="home-feed"></div>`);
+    api('/api/comptes-rendus/publies?limit=30').then(r => {
+      const l = r.comptes_rendus || [], el = $('#actu-crs'); if (!l.length || !el) return;
+      el.innerHTML = secHead('Comptes-rendus', 'doc') + l.map(crCarte).join('');
+    }).catch(() => { });
+    viewFil();
+  }
   /* ---------- Compte-rendu : bloc d'action, barre « Synthèse / Agir » et synthèse (2026-10-07) ----------
      Mêmes règles que compte-rendu.html : actions choisies par l'auteur (liens http/https) + « Laisser un message à l'organisateur » toujours
      proposé en dernier ; la synthèse est composée automatiquement de ce que l'auteur a déjà saisi. */
@@ -1197,13 +1223,13 @@
     return `<a class="vcard${wide ? ' wide' : ''}" href="#/video/${v.id}"><div class="vth">${videoThumb(v)}${bientot ? '<span class="vd" style="background:var(--orange-d)">Bientôt</span>' : (v.duree_secondes ? `<span class="vd">${fmtDuree(v.duree_secondes)}</span>` : '')}${bientot ? '' : '<span class="vp">▶</span>'}</div><div class="vt">${esc(v.titre)}</div>${v.categorie ? `<div class="small muted">${esc(v.categorie)}</div>` : ''}</a>`;
   }
   const miniCard = (href, photo, nom, sub, round) => `<a class="mc" href="${href}"><div class="av big" style="border-radius:${round ? '50%' : '16px'};margin:0 auto 8px">${photo ? `<img src="${attrUrl(photo)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(nom))}</div><div class="mn">${esc(nom)}</div>${sub ? `<div class="small muted ell">${esc(sub)}</div>` : ''}</a>`;
-  const SEC_ICONS = { 'home-honneur': 'star', 'home-videos': 'play', 'home-init': 'heart', 'home-shops': 'shop', 'home-temo': 'comment', 'home-part': 'people' };
+  const SEC_ICONS = { 'home-actus': 'fil', 'home-honneur': 'star', 'home-videos': 'play', 'home-init': 'heart', 'home-shops': 'shop', 'home-temo': 'comment', 'home-part': 'people' };
   const secHead = (titre, icone, more) => `<div class="sec"><h2 class="sec-t"><span class="sic">${ic(icone || 'star')}</span><span>${esc(titre)}</span></h2>${more || ''}</div>`;
   const homeBlock = (id, titre, html, more, sub) => { const el = $('#' + id); if (!el || !html) return; el.innerHTML = secHead(titre, SEC_ICONS[id], more) + (sub ? `<p class="sec-sub">${esc(sub)}</p>` : '') + html; };
 
   function viewAccueil() {
     const el = $('#t-accueil');
-    if (S.home.loaded && $('#home-feed', el)) return;
+    if (S.home.loaded && $('#home-actus', el)) return;
     S.home.loaded = true;
     el.innerHTML = `<div id="home-annonce"></div><div id="home-honneur"></div><div id="home-videos"></div>
       <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
@@ -1214,14 +1240,24 @@
       <div class="card"><div class="pad"><h2 class="sec-t sec-in"><span class="sic">${ic('star')}</span><span>Pourquoi Diaspo’Actif ?</span></h2>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>
         <div class="tags" style="margin:0"><span class="badge">👥 Rassembler les talents</span><span class="badge">🗂️ Organiser les initiatives</span><span class="badge">🚀 Mobiliser pour un impact durable</span></div></div></div>
-      <div id="home-init"></div><div id="home-shops"></div><div id="home-temo"></div><div id="home-part"></div>
-      ${secHead('Ce qui se passe en ce moment', 'fil')}<div id="home-feed"></div>`;
+      <div id="home-actus"></div><div id="home-init"></div><div id="home-shops"></div><div id="home-temo"></div><div id="home-part"></div>`;
     loadHome();
-    viewFil();
     if (window.MMap) { if (S.home.stopMap) S.home.stopMap(); S.home.stopMap = window.MMap.mount($('#home-map')); }
   }
   function loadHome() {
     const safe = fn => fn().catch(() => { });
+    safe(async () => {
+      /* Actualités (2026-10-08, demande explicite) : les comptes-rendus publiés passent en premier, en cartouches d'événement avec aperçu ; les
+         publications du fil complètent. Sans compte-rendu ni publication, le bloc n'apparaît pas. */
+      const [fr, cr] = await Promise.all([api('/api/fil?mode=tous&page=1&limit=10').catch(() => ({ posts: [] })), api('/api/comptes-rendus/publies?limit=10').catch(() => ({ comptes_rendus: [] }))]);
+      const crs = (cr.comptes_rendus || []).slice().sort((a, b) => String(b.publie_le || '').localeCompare(String(a.publie_le || ''))).slice(0, 3);
+      const autres = (fr.posts || []).filter(p => p.type !== 'compte_rendu' && !p.compte_rendu && postHtml(p));
+      const reste = autres.slice(0, Math.max(0, 5 - crs.length));
+      reste.forEach(p => { postCache[p.id] = p; });
+      if (!crs.length && !reste.length) return;
+      homeBlock('home-actus', 'Actualités', crs.map(crCarte).join('') + reste.map(postHtml).join(''), '<a href="#/actualites" class="sec-more">Toutes les actualités ›</a>', 'Les derniers comptes-rendus et publications de la communauté.');
+      $$('#home-actus [data-clamp]').forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
+    });
     safe(async () => {
       const a = ((await api('/api/annonces-officielles/actives')).annonces || [])[0]; if (!a) return;
       $('#home-annonce').innerHTML = `<div class="card">${a.image_url ? mediaBlock(a.image_url, { alt: a.titre }) : ''}<div class="pad"><span class="badge o">Annonce officielle</span><h3 style="margin:8px 0 4px;font-size:18px">${esc(a.titre)}</h3>${a.accroche ? `<p class="muted" style="margin:0 0 8px">${esc(strip(a.accroche))}</p>` : ''}${a.evenement_id ? `<a class="btn sm" href="#/evenement/${a.evenement_id}">Voir l’événement</a>` : ''}</div></div>`;
@@ -1542,6 +1578,7 @@
     else if (a === 'notifs') paneNotifs();
     else if (a === 'post') panePost(b);
     else if (a === 'cr') paneCR(b, c);
+    else if (a === 'actualites') paneActus();
     else if (a === 'cagnottes') paneCagnottes(b);
     else if (a === 'videos') paneVideos();
     else if (a === 'video') paneVideo(b);
