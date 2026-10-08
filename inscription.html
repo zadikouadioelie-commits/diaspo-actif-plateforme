@@ -188,7 +188,6 @@ input[type="checkbox"].charte-check:checked::after{content:'\2713';position:abso
         🏛 <strong>L'inscription en ligne des comptes étatiques n'est pas encore ouverte.</strong>
         En attendant, contactez-nous directement à <a href="mailto:contact@diaspoactif.com" style="color:#1E3A8A;font-weight:700;">contact@diaspoactif.com</a> pour créer votre compte.
       </div>
-      <div style="margin-top:24px;text-align:right"><button class="btn btn-orange" id="btn-next-1" disabled>Continuer &rarr;</button></div>
     </div>
     <p style="text-align:center;font-size:13px;color:var(--muted);margin-top:16px">Deja inscrit ? <a href="login.html" style="color:#2563EB;font-weight:700">Se connecter</a></p>
   </div>
@@ -1049,9 +1048,11 @@ document.querySelectorAll(".type-card[data-role]").forEach(card=>{
     document.querySelectorAll(".type-card").forEach(c=>c.classList.remove("selected"));
     card.classList.add("selected");
     currentRole=card.dataset.role;
-    document.getElementById("btn-next-1").disabled=false;
     const notice=document.getElementById("insc-etatique-bloque-notice");
     if(notice) notice.style.display="none";
+    /* Un seul clic (2026-10-08, demande explicite) : choisir « Utilisateur » ou « Initiative » ouvre aussitôt le formulaire, plus de bouton « Continuer ». */
+    goToStep(2);
+    window.scrollTo(0,0);
   });
 });
 /* Carte "Compte Étatique" temporairement bloquée (2026-08-18) : affiche l'instruction de
@@ -1060,12 +1061,10 @@ document.querySelectorAll(".type-card[data-role-bloque]").forEach(card=>{
   card.addEventListener("click",()=>{
     document.querySelectorAll(".type-card").forEach(c=>c.classList.remove("selected"));
     currentRole=null;
-    document.getElementById("btn-next-1").disabled=true;
     const notice=document.getElementById("insc-etatique-bloque-notice");
     if(notice){ notice.style.display=""; notice.scrollIntoView({behavior:"smooth",block:"nearest"}); }
   });
 });
-document.getElementById("btn-next-1").addEventListener("click",()=>{if(currentRole)goToStep(2);});
 ["utilisateur","initiative","collectivite"].forEach(r=>{
   document.getElementById("back-"+r).addEventListener("click",()=>{currentRole=r;goToStep(1);});
 });
