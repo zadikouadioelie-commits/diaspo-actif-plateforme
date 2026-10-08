@@ -18105,7 +18105,7 @@ route("POST", "/api/users/:id/suivre", async (req, res, params) => {
   const followedId = parseInt(params.id);
   try {
     await db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
-    const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId).n;
+    const n = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId)).n;
     // Notifie le compte suivi + propose un abonnement en retour (sauf s'il suit déjà)
     const dejaReciproque = await db.prepare("SELECT 1 FROM user_follows WHERE follower_id=? AND followed_id=?").get(followedId, me.id);
     if (!dejaReciproque) {
@@ -18124,7 +18124,7 @@ route("POST", "/api/users/:id/suivre-retour", async (req, res, params) => {
   if (me.id == followedId) return sendJSON(res, 400, { error: "Vous ne pouvez pas vous suivre vous-même." });
   try {
     await db.prepare("INSERT OR IGNORE INTO user_follows (follower_id, followed_id) VALUES (?,?)").run(me.id, followedId);
-    const n = await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId).n;
+    const n = (await db.prepare("SELECT COUNT(*) as n FROM user_follows WHERE followed_id=?").get(followedId)).n;
     sendJSON(res, 200, { ok: true, nbAbonnes: n });
   } catch(e) { sendJSON(res, 400, { error: e.message }); }
 });
@@ -32255,7 +32255,7 @@ ${jsonLd}
       try {
         const u = await db.prepare("SELECT google_calendar_sync_mode, google_calendar_refresh_token FROM users WHERE id=?").get(me.id);
         if (u?.google_calendar_sync_mode === 'diaspo_vers_google' && u.google_calendar_refresh_token) {
-          const ev = await (await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(r).lastInsertRowid);
+          const ev = await db.prepare("SELECT * FROM agenda_events WHERE id=?").get(r.lastInsertRowid);
           gcalPushEvent(me.id, ev).catch(() => {});
         }
       } catch (_) {}
@@ -32957,7 +32957,7 @@ ${jsonLd}
       const ts = new Date().toISOString();
       const modeFinal = mode === 'dynamique' ? 'dynamique' : 'figee';
       const filtresJson = filtres ? JSON.stringify(filtres) : null;
-      const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
+      const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id)).m;
       const id = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,mode,filtres_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
         .run(me.id, nom.trim(), description||null, couleur||'#1B3A6B', icone||'📋', notes||null, maxOrdre+1, modeFinal, filtresJson, ts, ts)).lastInsertRowid;
       if (filtres) {
@@ -33020,7 +33020,7 @@ ${jsonLd}
       const listes = await db.prepare(`SELECT * FROM listes_diffusion WHERE id IN (${liste_ids.map(()=>'?').join(',')}) AND proprietaire_id=?`).all(...liste_ids, me.id);
       if (listes.length !== liste_ids.length) return sendJSON(res, 403, { error: 'Accès refusé sur une des listes.' });
       const ts = new Date().toISOString();
-      const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
+      const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id)).m;
       const newId = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,ordre,mode,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
         .run(me.id, nom.trim(), `Fusion de : ${listes.map(l=>l.nom).join(', ')}`, listes[0].couleur, listes[0].icone, maxOrdre+1, 'figee', ts, ts)).lastInsertRowid;
       const seen = new Set();
@@ -33136,7 +33136,7 @@ ${jsonLd}
       const liste = await db.prepare(`SELECT * FROM listes_diffusion WHERE id=? AND proprietaire_id=?`).get(lid, me.id);
       if (!liste) return sendJSON(res, 404, { error: 'Liste introuvable.' });
       const ts = new Date().toISOString();
-      const maxOrdre = await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id).m;
+      const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM listes_diffusion WHERE proprietaire_id=?`).get(me.id)).m;
       const newId = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id,nom,description,couleur,icone,notes,ordre,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`)
         .run(me.id, `${liste.nom} (copie)`, liste.description, liste.couleur, liste.icone, liste.notes, maxOrdre+1, ts, ts)).lastInsertRowid;
       const contacts = await db.prepare(`SELECT * FROM listes_diffusion_contacts WHERE liste_id=?`).all(lid);
@@ -41855,7 +41855,7 @@ route("GET", "/api/observatoire/global", async (req, res) => {
     ORDER BY (nb_pubs + nb_evts*3 + nb_camps*2) DESC LIMIT 10`).all();
 
   /* Évolution mensuelle comptes */
-  const evolComptes = await db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM users GROUP BY mois ORDER BY mois DESC LIMIT 12`).all().reverse();
+  const evolComptes = (await db.prepare(`SELECT strftime('%Y-%m', created_at) AS mois, COUNT(*) AS n FROM users GROUP BY mois ORDER BY mois DESC LIMIT 12`).all()).reverse();
 
   /* Évolution pubs */
   const evolPubs = await db.prepare(`SELECT date(created_at) AS jour, COUNT(*) AS n FROM fil_posts WHERE date(created_at)>=? GROUP BY jour ORDER BY jour`).all(monthAgo);
