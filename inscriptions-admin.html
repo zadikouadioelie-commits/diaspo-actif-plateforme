@@ -1373,6 +1373,9 @@ function renderListView() {
         <h1 style="margin:0;font-size:24px;font-weight:700;">Formulaires de réponse et d'inscription</h1>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;" data-action="ouvrirDefautsPartenairesSponsors" title="Repris automatiquement sur chaque nouvelle fiche d'inscription">⚙️ Partenaires &amp; sponsors par défaut</button>
+          <!-- "📥 Formulaires partagés avec moi" (2026-10-08, demande explicite) — raccourci direct vers l'onglet
+               "Reçues" du panneau "Fiche partagée", sans passer par une fiche précise (voir ouvrirPartageGlobal). -->
+          <button style="background:#fff;border:1px solid oklch(0.8 0.006 30);color:oklch(0.2 0.006 30);font-size:13px;font-weight:600;padding:10px 16px;border-radius:8px;cursor:pointer;" data-action="ouvrirPartageGlobal" title="Toutes les fiches que d'autres initiatives vous ont partagées">📥 Formulaires partagés avec moi${state.partageRecues.length ? ` (${state.partageRecues.length})` : ''}</button>
           <button style="background:oklch(0.32 0.09 258);border:none;color:#fff;font-size:13.5px;font-weight:700;padding:11px 20px;border-radius:8px;cursor:pointer;" data-action="createFiche">+ Créer une fiche d'inscription</button>
         </div>
       </div>
@@ -1806,8 +1809,11 @@ function renderModalLiaison() {
    que je reçois"). */
 function renderModalPartage() {
   if (!state.modalPartageOuvert) return '';
-  const fiche = state.fiches.find(f => Number(f.id) === state.modalPartageFicheId);
-  if (!fiche) return '';
+  // modalPartageFicheId reste null quand la modale s'ouvre depuis le raccourci d'en-tête
+  // "📥 Formulaires partagés avec moi" (2026-10-08) — aucune fiche de départ dans ce cas, donc pas
+  // de "✨ Partager" possible (il faut choisir LA fiche à partager), seules Envoyées/Reçues le sont.
+  const fiche = state.modalPartageFicheId ? state.fiches.find(f => Number(f.id) === state.modalPartageFicheId) : null;
+  if (!fiche && state.partageOnglet === 'nouveau') state.partageOnglet = 'recues';
   const onglet = (libelle, cle, n) => `<button data-action="ongletPartage" data-onglet="${cle}" style="background:${state.partageOnglet === cle ? 'oklch(0.32 0.09 258)' : '#fff'}; color:${state.partageOnglet === cle ? '#fff' : 'oklch(0.2 0.006 30)'}; border:1px solid ${state.partageOnglet === cle ? 'oklch(0.32 0.09 258)' : 'oklch(0.85 0.004 30)'}; font-size:12px; font-weight:700; padding:7px 13px; border-radius:20px; cursor:pointer; white-space:nowrap;">${libelle}${n != null ? ` (${n})` : ''}</button>`;
   const ligneFiche = (nom, statut) => `<span style="font-weight:600;">${escH(nom)}</span><span style="font-size:11px;color:oklch(0.55 0.006 30);margin-left:6px;">${escH(statut)}</span>`;
   const fmt = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '';
@@ -1852,7 +1858,7 @@ function renderModalPartage() {
           <button data-action="fermerModalPartage" style="background:none; border:none; font-size:20px; cursor:pointer; color:oklch(0.55 0.006 30); flex-shrink:0;">✕</button>
         </div>
         <div style="display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;">
-          ${onglet('✨ Partager', 'nouveau')}
+          ${fiche ? onglet('✨ Partager', 'nouveau') : ''}
           ${onglet('📤 Envoyées', 'envoyees', state.partageEnvoyees.length)}
           ${onglet('📥 Reçues', 'recues', state.partageRecues.length)}
         </div>
@@ -3116,6 +3122,15 @@ const actions = {
     await actions.chargerPartages();
   },
   fermerModalPartage() { state.modalPartageOuvert = false; },
+  // Raccourci d'en-tête "📥 Formulaires partagés avec moi" (2026-10-08) — ouvre directement sur
+  // "Reçues", sans fiche de départ (modalPartageFicheId reste null : l'onglet "✨ Partager" s'en
+  // accommode, voir renderModalPartage()).
+  async ouvrirPartageGlobal() {
+    state.modalPartageFicheId = null;
+    state.modalPartageOuvert = true;
+    state.partageOnglet = 'recues';
+    await actions.chargerPartages();
+  },
   ongletPartage(el) { state.partageOnglet = el.dataset.onglet; },
   async chargerPartages() {
     try {
@@ -3937,6 +3952,10 @@ root.addEventListener('change', function (e) {
   }
   try {
     await iaChargerListe();
+    // Pastille "N" sur le bouton d'en-tête "📥 Formulaires partagés avec moi" (2026-10-08,
+    // demande explicite) — chargé une fois au démarrage pour que le nombre soit juste dès le
+    // premier affichage, sans attendre un clic.
+    await actions.chargerPartages();
     /* Lien direct depuis evenements.html (aperçu du modèle standard avant création d'un
        événement) — ?fiche=<id> ouvre directement le détail plutôt que la liste. */
     const ficheIdParam = new URLSearchParams(location.search).get('fiche');
