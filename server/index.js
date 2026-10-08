@@ -335,7 +335,7 @@ const CHAMPS_INITIATIVE_PRIVES = [
   'tel_responsable', 'tel_responsable_2', 'tel_responsable_3', 'email_responsable', 'genre_responsable',
   'numero_fiscal', 'stripe_identity_session_id', 'comment_entendu', 'attentes', 'autorisation_temoignage',
   'signalements_confirmes', 'vitrine_draft_json', 'adhesion_relances_jours', 'adhesion_modele_relance',
-  'adhesion_modele_recu', 'adhesion_liens_relance', 'relance_avancement_mensuelle_le', 'liste_membres_generale_id',
+  'adhesion_modele_recu', 'adhesion_liens_relance', 'relance_avancement_mensuelle_le', 'liste_membres_generale_id', 'liste_affiliations_id',
 ];
 function assainirInitiativePublique(row, moi) {
   if (!row) return row;
@@ -6210,6 +6210,42 @@ async function getOuCreerListeGenerale(initiativeId) {
   return id;
 }
 
+/* Liste de diffusion « Toutes les affiliations » (2026-10-09, demande explicite : « ajoute comme liste de diffusion toutes les
+   affiliations ») — une par initiative, qui reflète EXACTEMENT les affiliations acceptées (module Affiliations, initiative_membres).
+   Contrairement à « Tous les membres » (registre à vie), elle suit l'état réel : un compte y entre dès que son affiliation est acceptée
+   et en sort quand elle prend fin. Les contacts sans compte que l'association y aurait ajoutés à la main sont conservés. */
+async function getOuCreerListeAffiliations(initiativeId) {
+  const init = await db.prepare("SELECT liste_affiliations_id, owner_user_id, nom FROM initiatives WHERE id=?").get(initiativeId);
+  if (!init || !init.owner_user_id) return null;
+  if (init.liste_affiliations_id) {
+    const ok = await db.prepare("SELECT id FROM listes_diffusion WHERE id=?").get(init.liste_affiliations_id);
+    if (ok) return init.liste_affiliations_id;
+  }
+  const id = (await db.prepare(`INSERT INTO listes_diffusion (proprietaire_id, nom, description, icone) VALUES (?,?,?,?)`)
+    .run(init.owner_user_id, 'Toutes les affiliations',
+      `Tous les comptes affiliés à « ${init.nom} » (affiliation acceptée) — mise à jour automatiquement à chaque nouvelle affiliation ou fin d'affiliation. Créée automatiquement.`,
+      '🤝')).lastInsertRowid;
+  await db.prepare("UPDATE initiatives SET liste_affiliations_id=? WHERE id=?").run(id, initiativeId);
+  return id;
+}
+async function syncListeAffiliations(initiativeId) {
+  try {
+    const listeId = await getOuCreerListeAffiliations(initiativeId);
+    if (!listeId) return;
+    const affilies = await db.prepare(`SELECT m.user_id, u.email, u.nom, u.prenom FROM initiative_membres m JOIN users u ON u.id=m.user_id
+      WHERE m.initiative_id=? AND m.statut='accepte' AND u.nom != 'Compte supprimé'`).all(initiativeId);
+    const actuels = await db.prepare("SELECT id, user_id FROM listes_diffusion_contacts WHERE liste_id=?").all(listeId);
+    const voulus = new Set(affilies.map(a => Number(a.user_id)));
+    for (const c of actuels) {
+      if (c.user_id != null && !voulus.has(Number(c.user_id))) await db.prepare("DELETE FROM listes_diffusion_contacts WHERE id=?").run(c.id);
+    }
+    const presents = new Set(actuels.map(c => Number(c.user_id)));
+    for (const a of affilies) {
+      if (!presents.has(Number(a.user_id))) await ajouterContactListe(listeId, { linked_user_id: a.user_id, email: a.email, prenom: a.prenom, nom: a.nom });
+    }
+  } catch (e) { console.error('[liste-affiliations]', e.message); }
+}
+
 async function ajouterAListeStockage(formuleId, membre) {
   const formule = await db.prepare("SELECT liste_stockage_id, initiative_id FROM adhesion_formules WHERE id=?").get(formuleId);
   if (!formule) return;
@@ -6250,6 +6286,7 @@ async function syncAffiliationDepuisAdhesion(membre, statutAffiliation) {
       await db.prepare(`INSERT INTO initiative_membres (initiative_id,user_id,fonction,statut,formule_id,mode_adhesion,date_debut,date_fin) VALUES (?,?,?,?,?,?,?,?)`)
         .run(membre.initiative_id, membre.linked_user_id, 'Membre', statutAffiliation, membre.formule_id || null, modeAdhesion, membre.date_adhesion || null, membre.date_expiration || null);
     }
+    await syncListeAffiliations(membre.initiative_id);
   } catch (e) { console.error('[sync-affiliation]', e.message); }
 }
 
@@ -13218,6 +13255,7 @@ route("PUT", "/api/initiatives/:id/membres/:userId", async (req, res, params, bo
       if (evAccepter && evAccepter.pct < Completude.SEUIL_PCT) return sendJSON(res, 403, erreurProfilIncomplet(evAccepter, MSG_PROFIL_INCOMPLET_VALIDER));
     }
     await db.prepare("UPDATE initiative_membres SET statut = ?, updated_at = datetime('now') WHERE initiative_id = ? AND user_id = ?").run(statut, params.id, params.userId);
+    await syncListeAffiliations(params.id);
     const u = await db.prepare("SELECT nom, prenom FROM users WHERE id = ?").get(parseInt(params.userId));
     if (estDemande) {
       const msgs = {
@@ -13273,6 +13311,7 @@ route("DELETE", "/api/initiatives/:id/membres/:userId", async (req, res, params)
     return sendJSON(res, 403, { error: "Action non autorisée." });
   const membre = await db.prepare("SELECT statut FROM initiative_membres WHERE initiative_id = ? AND user_id = ?").get(params.id, params.userId);
   await db.prepare("DELETE FROM initiative_membres WHERE initiative_id = ? AND user_id = ?").run(params.id, params.userId);
+  await syncListeAffiliations(params.id);
   /* Notifier l'autre partie (celle qui n'a pas initié la suppression) */
   const estInitiePasResponsable = user.id === parseInt(params.userId);
   const destinataireId = estInitiePasResponsable ? init.owner_user_id : parseInt(params.userId);
@@ -19733,16 +19772,22 @@ route("GET", "/api/ads/:id/stats", async (req, res, params) => {
 /* POST /api/ads/create — crée une campagne (multipart: media image/vidéo) */
 /* Compte le nombre de comptes correspondant à un ciblage géo + listes Réseau Pro (cumulatif). */
 async function adsComptesCiblage({ zones = [], ville, departement, region, pays, listes = [] }) {
-  let sql = "SELECT COUNT(DISTINCT u.id) AS n FROM users u WHERE u.role != 'administrateur' AND (u.compte_masque IS NULL OR u.compte_masque=0)";
+  let sql = `SELECT COUNT(DISTINCT u.id) AS n FROM users u WHERE ${ADS_COMPTES_REELS}`;
   const args = [];
   const zoneConds = [];
   if ((zones.includes('ville') || zones.includes('commune')) && ville) { zoneConds.push('u.ville=?'); args.push(ville); }
   if (zones.includes('departement') && departement) { zoneConds.push('u.departement_exercice=?'); args.push(departement); }
   if (zones.includes('region') && region) { zoneConds.push('u.region_exercice=?'); args.push(region); }
-  if (zones.includes('pays') && pays) { zoneConds.push('u.pays=?'); args.push(pays); }
+  if (zones.includes('pays') && pays) { zoneConds.push('LOWER(TRIM(u.pays))=LOWER(TRIM(?))'); args.push(pays); }
   if (zoneConds.length) sql += ' AND (' + zoneConds.join(' OR ') + ')';
   if (listes.length) {
     const ph = listes.map(() => '?').join(',');
+/* « Vrais » comptes joignables par une publicité (2026-10-09, bug réel : l'audience estimée affichait 136 comptes alors que la
+   plateforme n'en compte que 45 — le calcul incluait 86 comptes supprimés/anonymisés (nom « Compte supprimé ») et 5 comptes de
+   démonstration, que tous les autres compteurs de la plateforme excluent déjà). Même filtre pour le total ET la répartition. */
+const ADS_COMPTES_REELS = "u.role != 'administrateur' AND (u.compte_masque IS NULL OR u.compte_masque=0) AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND u.nom != 'Compte supprimé'";
+/* Pays saisis librement (« France », « france », « FRANCE »…) : on les compare sans tenir compte de la casse ni des espaces. */
+const memePays = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== '';
     sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id IS NOT NULL)`;
     args.push(...listes);
   }
@@ -19759,24 +19804,41 @@ route("GET", "/api/ads/audience-preview", async (req, res, params, body, query) 
   try { listes = JSON.parse(query.listes || "[]"); } catch (_) {}
   const criteres = { zones, ville: query.ville || null, departement: query.departement || null, region: query.region || null, pays: query.pays || null, listes: listes.map(Number).filter(Boolean) };
   const total = await adsComptesCiblage(criteres);
-  // Répartition par pays (top 5) sur le même périmètre, pour l'aperçu
+  /* Répartition par pays sur le même périmètre ET le même filtre que le total : les graphies d'un même pays sont fusionnées
+     (« France » + « france » + « FRANCE »), les comptes sans pays sont comptés à part (« Non renseigné »), et les pays au-delà
+     des 5 premiers sont regroupés en « Autres » — la somme des lignes égale donc toujours le total affiché. */
   let repartitionPays = [];
   try {
-    let sql = "SELECT u.pays, COUNT(*) AS n FROM users u WHERE u.role != 'administrateur' AND u.pays IS NOT NULL";
+    let sql = `SELECT u.pays, COUNT(DISTINCT u.id) AS n FROM users u WHERE ${ADS_COMPTES_REELS}`;
     const args = [];
     const zoneConds = [];
     if ((zones.includes('ville') || zones.includes('commune')) && criteres.ville) { zoneConds.push('u.ville=?'); args.push(criteres.ville); }
     if (zones.includes('departement') && criteres.departement) { zoneConds.push('u.departement_exercice=?'); args.push(criteres.departement); }
     if (zones.includes('region') && criteres.region) { zoneConds.push('u.region_exercice=?'); args.push(criteres.region); }
-    if (zones.includes('pays') && criteres.pays) { zoneConds.push('u.pays=?'); args.push(criteres.pays); }
+    if (zones.includes('pays') && criteres.pays) { zoneConds.push('LOWER(TRIM(u.pays))=LOWER(TRIM(?))'); args.push(criteres.pays); }
     if (zoneConds.length) sql += ' AND (' + zoneConds.join(' OR ') + ')';
     if (criteres.listes.length) {
       const ph = criteres.listes.map(() => '?').join(',');
       sql += ` AND u.id IN (SELECT user_id FROM listes_diffusion_contacts WHERE liste_id IN (${ph}) AND user_id IS NOT NULL)`;
       args.push(...criteres.listes);
     }
-    sql += " GROUP BY u.pays ORDER BY n DESC LIMIT 5";
-    repartitionPays = await db.prepare(sql).all(...args);
+    sql += " GROUP BY u.pays";
+    const brut = await db.prepare(sql).all(...args);
+    const fusion = new Map();
+    for (const r of brut) {
+      const cle = String(r.pays || '').trim().toLowerCase();
+      const e = fusion.get(cle) || { n: 0, meilleur: null, nMeilleur: -1 };
+      e.n += Number(r.n); if (Number(r.n) > e.nMeilleur) { e.meilleur = String(r.pays || '').trim(); e.nMeilleur = Number(r.n); }
+      fusion.set(cle, e);
+    }
+    const joli = s => (s === s.toLowerCase() || s === s.toUpperCase()) ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
+    const lignes = [...fusion.entries()].map(([cle, e]) => ({ pays: cle ? joli(e.meilleur) : 'Non renseigné', n: e.n, vide: !cle }));
+    const renseignes = lignes.filter(l => !l.vide).sort((a, b) => b.n - a.n);
+    const vide = lignes.find(l => l.vide);
+    repartitionPays = renseignes.slice(0, 5).map(l => ({ pays: l.pays, n: l.n }));
+    const autres = renseignes.slice(5).reduce((s, l) => s + l.n, 0);
+    if (autres) repartitionPays.push({ pays: 'Autres', n: autres });
+    if (vide) repartitionPays.push({ pays: vide.pays, n: vide.n });
   } catch (_) {}
   sendJSON(res, 200, { total, repartition_pays: repartitionPays });
 });
@@ -19911,12 +19973,12 @@ route("GET", "/api/ads/servir", async (req, res, params, body, query) => {
       if (!geoOk && zones.includes('departement') && c.cible_departement && user.departement_exercice === c.cible_departement) geoOk = true;
       if (!geoOk && zones.includes('region') && c.cible_region && user.region_exercice === c.cible_region) geoOk = true;
       const cp = safeParse(c.cible_pays);
-      if (!geoOk && zones.includes('pays') && Array.isArray(cp) && cp.length && cp.includes(user.pays)) geoOk = true;
+      if (!geoOk && zones.includes('pays') && Array.isArray(cp) && cp.length && cp.some(p => memePays(p, user.pays))) geoOk = true;
       if (!geoOk) continue;
     } else {
       // Rétrocompatibilité : ancien ciblage cible_pays seul, sans cible_zones défini
       const cp = safeParse(c.cible_pays);
-      if (Array.isArray(cp) && cp.length && (!user || !cp.includes(user.pays))) continue;
+      if (Array.isArray(cp) && cp.length && (!user || !cp.some(p => memePays(p, user.pays)))) continue;
     }
     const cibleListes = safeParseArray(c.cible_listes);
     if (cibleListes.length) {
@@ -33281,6 +33343,12 @@ ${jsonLd}
       const listes = await db.prepare(sql).all(...args);
       return sendJSON(res, 200, { listes });
     }
+      /* « Toutes les affiliations » : créée au premier affichage (rattrapage des affiliations existantes) puis resynchronisée —
+         la liste est donc toujours le reflet réel des affiliations acceptées, même si un chemin d'affiliation l'avait ignorée. */
+      if (q.archived !== '1') {
+        const mesInitiatives = await db.prepare("SELECT id FROM initiatives WHERE owner_user_id=?").all(me.id);
+        for (const i of mesInitiatives) await syncListeAffiliations(i.id);
+      }
 
     /* ── Applique un objet de filtres à une requête SQL sur `users` — utilisé par génération intelligente + refresh dynamique ── */
     function appliquerFiltresListe(filtres) {
