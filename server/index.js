@@ -6006,6 +6006,16 @@ function sanitizeChampsConfig(raw) {
   }
   return out;
 }
+/* Rubriques personnalisables du formulaire d'adhésion (2026-10-08) : titres renommés des 3 blocs de texte + rubriques ajoutées (titre + texte). */
+function sanitizeRubriques(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const titres = {};
+  for (const k of ['intro', 'conditions', 'reglement']) { const t = String((raw.titres && raw.titres[k]) ?? '').trim().slice(0, 80); if (t) titres[k] = t; }
+  const extra = (Array.isArray(raw.extra) ? raw.extra : []).slice(0, 10)
+    .map(r => ({ titre: String((r && r.titre) ?? '').trim().slice(0, 80), texte: String((r && r.texte) ?? '').trim().slice(0, 20000) }))
+    .filter(r => r.titre || r.texte).map(r => ({ titre: r.titre || 'Information', texte: r.texte }));
+  return (Object.keys(titres).length || extra.length) ? JSON.stringify({ titres, extra }) : null;
+}
 function sanitizeChampsCustom(raw) {
   let arr; try { arr = Array.isArray(raw) ? raw : JSON.parse(raw || '[]'); } catch (e) { arr = []; }
   if (!Array.isArray(arr)) return [];
@@ -6350,6 +6360,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
        JSON.stringify(sanitizeChampsConfig(champs_config)), JSON.stringify(sanitizeChampsCustom(champs_custom)),
        reglement_interieur_texte ? String(reglement_interieur_texte).slice(0, 20000) : null,
        (() => { const c = sanitizeRelancesFormule(relances_config); return c ? JSON.stringify(c) : null; })())).lastInsertRowid;
+  if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), id);
   if (body.est_officielle) await adhAppliquerOfficielle(id, params.id, true);
   sendJSON(res, 201, { id });
 });
@@ -6432,6 +6443,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          reglement_interieur_texte !== undefined ? (reglement_interieur_texte ? String(reglement_interieur_texte).slice(0, 20000) : null) : f.reglement_interieur_texte,
          relances_config !== undefined ? (() => { const c = sanitizeRelancesFormule(relances_config); return c ? JSON.stringify(c) : null; })() : f.relances_config_json,
          params.id);
+  if (body.rubriques !== undefined) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(sanitizeRubriques(body.rubriques), f.id);
   if (body.est_officielle !== undefined) await adhAppliquerOfficielle(f.id, f.initiative_id, !!body.est_officielle);
   sendJSON(res, 200, { ok: true });
 });
@@ -6468,6 +6480,7 @@ route("POST", "/api/adhesion-formules/:id/dupliquer", async (req, res, params) =
        f.devise, f.modes_paiement_json, maxOrdre + 1, f.mode_validite === 'collectif' ? 'individuel' : f.mode_validite,
        f.duree_valeur, f.duree_unite, f.duree_illimitee, f.max_adherents,
        f.texte_intro, f.conditions_adhesion, f.reglement_pdf_url, f.statuts_pdf_url, f.champs_config_json, f.champs_custom_json, f.reglement_interieur_texte, f.relances_config_json)).lastInsertRowid;
+  if (f.rubriques_json) await db.prepare('UPDATE adhesion_formules SET rubriques_json=? WHERE id=?').run(f.rubriques_json, id);
   sendJSON(res, 201, { id });
 });
 

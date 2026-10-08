@@ -7024,6 +7024,9 @@ db.exec(`
     /* Règlement intérieur rédigé directement dans le formulaire (2026-10-08, demande explicite) : texte affiché aux personnes qui adhèrent,
        en plus du PDF facultatif reglement_pdf_url. */
     if (!adhFCols.includes('reglement_interieur_texte')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN reglement_interieur_texte TEXT");
+    /* Rubriques personnalisables du formulaire d'adhésion (2026-10-08, demande explicite) : { titres:{intro,conditions,reglement}, extra:[{titre,texte}] } —
+       titres renommés des 3 blocs de texte + rubriques ajoutées avec leur propre titre. NULL = titres par défaut, aucune rubrique en plus. */
+    if (!adhFCols.includes('rubriques_json'))        db.exec("ALTER TABLE adhesion_formules ADD COLUMN rubriques_json TEXT");
     /* Rappels de renouvellement propres à la formule (2026-10-08, demande explicite) : { jours:[30,7,0,-1], canal:'email'|'notification'|'les_deux' }.
        NULL = la formule reprend les réglages généraux de l'association (initiatives.adhesion_relances_jours) et le canal « les deux ». */
     if (!adhFCols.includes('relances_config_json'))      db.exec("ALTER TABLE adhesion_formules ADD COLUMN relances_config_json TEXT");
