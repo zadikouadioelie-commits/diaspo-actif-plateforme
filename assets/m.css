@@ -413,3 +413,17 @@ button.li{background:none;font:inherit;color:inherit}
 .crn-btns{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .crn-btns .cr-synth{flex:none;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;min-height:46px}
 @media (prefers-reduced-motion:reduce){.crn-band:before,.crn-band:after{animation:none}}
+
+/* Actualités autres que les comptes-rendus : cartouche VERT scintillant (le compte-rendu reste bleu scintillant) (2026-10-08) */
+.post.actu{overflow:hidden;border:2px solid #15803d;box-shadow:0 0 0 3px rgba(21,128,61,.16),0 8px 22px rgba(11,31,92,.14)}
+.actu-band{position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;padding:10px 14px;color:#fff;font-size:13.5px;letter-spacing:.08em;background:linear-gradient(135deg,#166534 0%,#15803d 45%,#22c55e 100%)}
+.actu-band>*{position:relative;z-index:1}
+.actu-band b{font-weight:800}
+.actu-band small{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:0;opacity:.92}
+.actu-band:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(220,252,231,.9) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.8) 0 1.5px,transparent 2.1px);background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:cr-scint 3.2s ease-in-out infinite}
+.actu-band:after{content:"";position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.45),transparent);animation:cr-reflet 4.2s ease-in-out infinite;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.actu-band:before,.actu-band:after{animation:none}}
+
+/* Actualité repliable : la carte se recale sous la barre du haut quand on la replie (2026-10-08) */
+.post{scroll-margin-top:66px}
+.post .lnk{min-height:36px}

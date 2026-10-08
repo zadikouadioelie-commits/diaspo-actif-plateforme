@@ -437,7 +437,7 @@
   }
   function paintFil() {
     const list = $('#fil-list'), more = $('#fil-more'); if (!list) return;
-    const html = S.fil.posts.map(postHtml).join('');
+    const html = S.fil.posts.filter(p => p.type !== 'compte_rendu' && !p.compte_rendu).map(p => actuVerte(postHtml(p))).join('');
     if (!html) {
       list.innerHTML = `<div class="empty"><div class="ei">${ic('fil', 'l')}</div><b>${S.fil.mode === 'suivis' ? 'Rien à afficher pour l’instant' : 'Aucune publication'}</b>${esc(S.fil.conseil || 'Revenez bientôt : la communauté publie chaque jour.')}</div>`;
       more.innerHTML = ''; return;
@@ -449,7 +449,17 @@
   }
   document.addEventListener('click', async e => {
     const more = e.target.closest('[data-more]');
-    if (more) { const c = more.parentNode.querySelector('[data-clamp]'); c.style.webkitLineClamp = 'unset'; c.style.display = 'block'; more.remove(); return; }
+    if (more) {
+      /* « Voir la suite » ⇄ « Replier » (2026-10-08, demande explicite) : une fois dépliée, l'actualité se replie d'un appui et la page remonte en haut de la carte,
+         pour ne pas avoir à faire défiler pour redescendre. */
+      const c = more.parentNode.querySelector('[data-clamp]'), carte = more.closest('.post');
+      if (c.dataset.ouvert !== '1') { c.dataset.ouvert = '1'; c.style.webkitLineClamp = 'unset'; c.style.display = 'block'; more.textContent = 'Replier ▲'; more.setAttribute('aria-expanded', 'true'); }
+      else {
+        c.dataset.ouvert = ''; c.style.webkitLineClamp = ''; c.style.display = ''; more.textContent = 'Voir la suite'; more.setAttribute('aria-expanded', 'false');
+        if (carte && carte.getBoundingClientRect().top < 64) carte.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
+      return;
+    }
     const z = e.target.closest('[data-zoom]'); if (z) { zoom(z.dataset.zoom); return; }
     const a = e.target.closest('.post [data-act]'); if (!a) return;
     const card = a.closest('.post'), id = card.dataset.id, post = S.fil.posts.find(p => String(p.id) === String(id)) || postCache[id];
@@ -922,6 +932,12 @@
     })(doc.body.firstChild);
     return doc.body.firstChild.innerHTML;
   }
+  /* Actualité autre qu'un compte-rendu : même publication, habillée VERT scintillant (le compte-rendu est BLEU scintillant) pour que les deux ne se confondent
+     jamais dans le bloc « Actualités ». Seules les publications (article) reçoivent le bandeau ; les cartes spéciales restent telles quelles. */
+  function actuVerte(html) {
+    if (!html || html.indexOf('<article class="card post"') !== 0) return html;
+    return html.replace('<article class="card post"', '<article class="card post actu"').replace(/^(<article[^>]*>)/, '$1<div class="actu-band"><span aria-hidden="true">📰</span><b>ACTUALITÉ</b><small>de la communauté</small></div>');
+  }
   /* Cartouche d'un compte-rendu dans les actualités : affiche, titre, date, ville, organisateur, aperçu du résumé, « Voir plus » et « Compte-rendu ». */
   function crCarte(c) {
     const lien = '#/cr/' + encodeURIComponent(c.evenement_id);
@@ -1256,7 +1272,7 @@
       const reste = autres.slice(0, Math.max(0, 5 - crs.length));
       reste.forEach(p => { postCache[p.id] = p; });
       if (!crs.length && !reste.length) return;
-      homeBlock('home-actus', 'Actualités', crs.map(crCarte).join('') + reste.map(postHtml).join(''), '<a href="#/actualites" class="sec-more">Toutes les actualités ›</a>', 'Les derniers comptes-rendus et publications de la communauté.');
+      homeBlock('home-actus', 'Actualités', crs.map(crCarte).join('') + reste.map(p => actuVerte(postHtml(p))).join(''), '<a href="#/actualites" class="sec-more">Toutes les actualités ›</a>', 'Les derniers comptes-rendus et publications de la communauté.');
       $$('#home-actus [data-clamp]').forEach(c => { if (c.scrollHeight > c.clientHeight + 2) { const b = c.parentNode.querySelector('[data-more]'); if (b) b.hidden = false; } });
     });
     safe(async () => {
