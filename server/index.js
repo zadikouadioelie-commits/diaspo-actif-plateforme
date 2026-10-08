@@ -8946,7 +8946,16 @@ route("GET", "/api/annuaire/recherche", async (req, res, params, body, query) =>
     resultats.push({ type: 'organisme', score, geo: geoRang(o.ville, o.pays), data: o });
   });
 
-  resultats.sort((a, b) => (b.score - a.score) || (b.geo - a.geo));
+  /* Comptes sans photo en bas de liste (2026-10-08, demande explicite : « les derniers des initiatives et les derniers des comptes
+     utilisateurs à chaque fois »). « Photo » = l'image que la carte affiche réellement : bannière de vitrine ou logo pour une initiative,
+     photo ou bannière pour un membre / une collectivité. Sans recherche, tous les scores valent 1 : la photo décide seule et les comptes
+     sans visuel passent après tous les autres. Avec une recherche, la pertinence reste prioritaire (un compte exact sans photo doit
+     rester trouvable en tête), la photo ne départage que les ex æquo. */
+  const annuaireAPhoto = r => r.type === 'initiative'
+    ? !!(String(r.data.vitrine_banniere_url || '').trim() || String(r.data.logo_url || '').trim())
+    : !!(String(r.data.photo_url || '').trim() || String(r.data.banner_url || '').trim());
+  resultats.forEach(r => { r.photo = annuaireAPhoto(r) ? 1 : 0; });
+  resultats.sort((a, b) => (b.score - a.score) || (b.photo - a.photo) || (b.geo - a.geo));
 
   // Vue par défaut (sans recherche) : épingle les 3 comptes de démonstration en tête
   // (Utilisateur, Initiative, Collectivité) pour une simulation immédiatement représentative.
@@ -9001,6 +9010,9 @@ route("GET", "/api/annuaire/utilisateurs", async (req, res, params, body, query)
   if (query.nom) { const q = query.nom.toLowerCase(); rows = rows.filter(r => (r.nom||"").toLowerCase().includes(q)); }
   if (query.prenom) { const q = query.prenom.toLowerCase(); rows = rows.filter(r => (r.prenom||"").toLowerCase().includes(q)); }
   if (query.ville) { const q = query.ville.toLowerCase(); rows = rows.filter(r => (r.ville||"").toLowerCase().includes(q)); }
+  /* Membres sans photo en dernier (2026-10-08) — tri stable : l'ordre d'origine est conservé dans chaque groupe. */
+  const avecPhoto = r => !!(String(r.photo_url || '').trim() || String(r.banner_url || '').trim());
+  rows = [...rows.filter(avecPhoto), ...rows.filter(r => !avecPhoto(r))];
   rows = await attachAvisAggregate(rows, 'id');
   sendJSON(res, 200, { users: rows });
 });
