@@ -34,7 +34,11 @@ svg.i.l{width:28px;height:28px}
 .ibtn{position:relative;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
 .ibtn:active{background:rgba(255,255,255,.14)}
 .dot{position:absolute;top:5px;right:4px;min-width:18px;height:18px;border-radius:9px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--navy)}
-.pill-cta{background:var(--orange-d);color:#fff;border-radius:30px;padding:9px 16px;font-weight:700;font-size:14px}
+.pill-cta{background:var(--orange-d);color:#fff;border-radius:30px;padding:9px 16px;font-weight:700;font-size:14px;white-space:nowrap}
+/* Paire Connexion / Créer un compte dans le bandeau (2026-10-08, demande explicite : le bouton
+   « Créer un compte » avait disparu du bandeau de l'accueil mobile — seule la connexion y était). */
+.top-auth{display:flex;align-items:center;gap:6px}
+.pill-cta.ghost{background:transparent;border:1.5px solid rgba(255,255,255,.55);padding:7.5px 12px;font-size:12.5px}
 
 /* ---------- contenu ---------- */
 #view{padding:12px 12px calc(var(--nav-h) + env(safe-area-inset-bottom) + 18px)}

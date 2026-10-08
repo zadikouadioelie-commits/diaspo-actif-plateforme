@@ -46,18 +46,23 @@
   }
   /* Conservé pour les tests uniquement : la bascule ne s'en sert plus (voir plus bas). */
   function venantDeLApp(ref) { return /^https?:\/\/[^\/]+\/m\.html/i.test(String(ref || '')); }
-  /* Pages d'entrée sans équivalent dans l'appli (connexion, inscription, mot de passe oublié) : sur téléphone elles gardent leur
-     fonctionnement mais prennent l'habillage de l'appli (assets/m-site.css + barre du haut). */
-  var HABILLEES = { 'login.html': 1, 'inscription.html': 1, 'mot-de-passe-oublie.html': 1 };
+  /* Pages sans équivalent dans l'appli : sur téléphone elles gardent leur fonctionnement propre mais prennent
+     l'habillage de l'appli (assets/m-site.css + barre du haut). TOUTE page sans redirection directe (cible()
+     vide) est concernée, plus de liste figée — décidé le 2026-10-08, demande explicite « plus aucune ancienne
+     version visuelle sur téléphone, sans exception » (tableaux de bord, administration, site vitrine inclus). */
+  var LIBELLES_HABILLAGE = { 'login.html': 'Connexion', 'inscription.html': 'Créer un compte', 'mot-de-passe-oublie.html': 'Mot de passe oublié' };
+  function escHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function habiller(f) {
-    if (!HABILLEES[f]) return;
-    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/assets/m-site.css?v=20261007a'; document.head.appendChild(l);
+    var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/assets/m-site.css?v=20261008a'; document.head.appendChild(l);
     document.documentElement.classList.add('m-site');
     var barre = function () {
       if (document.getElementById('m-site-top')) return;
+      /* Libellé connu sinon le <title> de la page, débarrassé de "Diaspo'Actif" (déjà repris par le logo juste
+         au-dessus) — présent indifféremment en préfixe ("Diaspo'Actif — X") ou en suffixe ("X — Diaspo'Actif"). */
+      var titre = LIBELLES_HABILLAGE[f] || String(document.title || '')
+        .replace(/^Diaspo['’]Actif\s*[—-]\s*/i, '').replace(/\s*[—-]\s*Diaspo['’]Actif\s*$/i, '').trim();
       var t = document.createElement('div'); t.id = 'm-site-top';
-      t.innerHTML = '<a href="/m.html#/accueil" aria-label="Retour à l’accueil"><img src="/assets/logo.png" alt=""><span><small>Diaspo’Actif</small>' +
-        ({ 'login.html': 'Connexion', 'inscription.html': 'Créer un compte', 'mot-de-passe-oublie.html': 'Mot de passe oublié' }[f]) + '</span></a>';
+      t.innerHTML = '<a href="/m.html#/accueil" aria-label="Retour à l’accueil"><img src="/assets/logo.png" alt=""><span><small>Diaspo’Actif</small>' + escHtml(titre) + '</span></a>';
       document.body.insertBefore(t, document.body.firstChild);
     };
     if (document.body) barre(); else document.addEventListener('DOMContentLoaded', barre);

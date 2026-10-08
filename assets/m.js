@@ -314,7 +314,10 @@
     const top = $('#top');
     const right = S.me
       ? `<button class="ibtn" id="top-switch" aria-label="Changer de compte">${ic('swap')}</button><a class="ibtn" href="#/notifs" aria-label="Notifications">${ic('bell')}<span class="dot" id="notif-badge" hidden></span></a>`
-      : `<button class="pill-cta" id="top-login">Connexion</button>`;
+      /* Bouton « Créer un compte » restauré dans le bandeau (2026-10-08, demande explicite) : avait
+         disparu de la nouvelle interface téléphone, seule « Connexion » y figurait — à la différence
+         du bandeau du site (assets/app.js) qui a toujours les deux côte à côte. */
+      : `<div class="top-auth"><a class="pill-cta ghost" href="inscription.html">Créer un compte</a><button class="pill-cta" id="top-login">Connexion</button></div>`;
     const left = S.me ? `<button class="menu-btn" id="top-menu" aria-label="Menu des modules">${ic('menu')}<span>Menu</span></button>` : '';
     top.innerHTML = `${left}<img class="logo" src="assets/logo.svg" alt="" onerror="this.style.display='none'">
       <h1><span class="brand-s">Diaspo’Actif</span><span id="top-title">${esc(TITLES[S.tab] || '')}</span></h1>${right}`;
@@ -1200,7 +1203,7 @@
       <div class="card hero"><div class="pad"><div class="small" style="font-weight:700;color:var(--orange-d)">🌍 Réseau diaspora mondial</div>
         <h2 style="margin:6px 0 8px;font-size:20px;line-height:1.25">Connecter les diasporas, valoriser les talents, accélérer le développement des territoires.</h2>
         <p class="muted small" style="margin:0 0 12px">Des passerelles entre pays d’origine et pays d’accueil, grâce aux compétences, projets, organisations et initiatives portés par les diasporas du monde entier.</p>
-        <div class="row" style="flex-wrap:wrap;gap:8px">${S.me ? '' : '<a class="btn sm" href="inscription.html">Rejoindre la communauté</a>'}<a class="btn sm out" href="#/annuaire">Explorer l’annuaire</a></div></div></div>
+        <div class="row" style="flex-wrap:wrap;gap:8px">${S.me ? '' : '<a class="btn sm" href="inscription.html">Créer un compte</a>'}<a class="btn sm out" href="#/annuaire">Explorer l’annuaire</a></div></div></div>
       <div class="mapcard"><canvas id="home-map" role="img" aria-label="Carte animée des déplacements des diasporas dans le monde"></canvas><div class="maplegend"><span><i style="background:#F59E0B;box-shadow:0 0 6px #F59E0B"></i>Pays d’origine</span><span><i style="background:#4A90D9;box-shadow:0 0 6px #4A90D9"></i>Pays de résidence</span></div></div>
       <div class="card"><div class="pad"><h2 class="sec-t sec-in"><span class="sic">${ic('star')}</span><span>Pourquoi Diaspo’Actif ?</span></h2>
         <p style="margin:0 0 10px">La diaspora africaine est un levier de développement majeur, mais ses initiatives restent dispersées, invisibles, sans réseau. Diaspo’Actif change ça.</p>

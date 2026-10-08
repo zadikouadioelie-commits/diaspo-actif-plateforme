@@ -1,5 +1,7 @@
 /* ============================================================
-   DIASPO'ACTIF — Habillage « application téléphone » des pages d'entrée (connexion, inscription, mot de passe oublié).
+   DIASPO'ACTIF — Habillage « application téléphone » de toute page du site sans écran dédié dans l'appli
+   (2026-10-08 : étendu de 3 pages à toutes, sur demande explicite — plus aucune ancienne apparence visuelle
+   sur téléphone, y compris tableaux de bord, administration et site vitrine).
    Chargé UNIQUEMENT sur téléphone par assets/m-redirect.js. Mêmes couleurs que assets/m.css :
    navy #0D2B4E · bleu #1E4F8A / #4490E2 · orange #F26422 (boutons : #B84C1A) · fond #EEF2F8.
    Le fonctionnement de ces pages n'est pas touché : seul l'habillage change.
