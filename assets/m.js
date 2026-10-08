@@ -930,14 +930,15 @@
     const court = coupe > 0 ? ap.slice(0, coupe) + '…' : ap;
     const meta = [dateLong(c.date_evt), c.ville].filter(Boolean).map(esc).join(' · ');
     return `<article class="card crn">
+      <div class="crn-band"><span aria-hidden="true">📝</span><b>COMPTE-RENDU</b><small>de l’événement</small></div>
       ${c.image ? `<a class="crn-img" href="${lien}" aria-label="Ouvrir le compte-rendu"><img src="${attrUrl(c.image)}" alt="${esc(c.evenement_titre || c.titre)}" loading="lazy" onerror="this.parentNode.remove()"></a>` : ''}
-      <div class="pad"><span class="badge o">📝 Compte-rendu</span>
+      <div class="pad">
         <h3 class="crn-t"><a href="${lien}">${esc(c.titre)}</a></h3>
         ${c.evenement_titre && c.evenement_titre !== c.titre ? `<div class="small muted">Événement : ${esc(c.evenement_titre)}</div>` : ''}
         ${meta ? `<div class="meta">${ic('cal', 's')}<span>${meta}</span></div>` : ''}
         ${c.organisateur ? `<div class="meta">${ic('user', 's')}<span>Par <b style="color:var(--text)">${esc(c.organisateur)}</b></span></div>` : ''}
         ${court ? `<p class="crn-ap">${esc(court)}</p><a class="crn-plus" href="${lien}">Voir plus ›</a>` : ''}
-        <div class="row" style="gap:8px;margin-top:10px"><a class="btn sm" href="${lien}">📝 Compte-rendu</a></div></div></article>`;
+        <div class="crn-btns"><a class="cr-bleu" href="${lien}">📝<span>Lire le compte-rendu</span><i aria-hidden="true">→</i></a><a class="cr-synth" href="${lien}/synthese"><span aria-hidden="true">📋</span> Synthèse</a></div></div></article>`;
   }
   /* « Toutes les actualités » : tous les comptes-rendus publiés (même ceux sans publication dans le fil), puis le fil complet. */
   async function paneActus() {

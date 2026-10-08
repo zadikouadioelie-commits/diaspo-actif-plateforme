@@ -395,10 +395,21 @@ button.li{background:none;font:inherit;color:inherit}
 .ev .ev-share svg{width:18px;height:18px}
 
 /* ---------- Actualités : cartouche de compte-rendu (2026-10-08) ---------- */
-.crn{overflow:hidden;border:1.5px solid #C9A24B;box-shadow:0 0 0 3px rgba(201,162,75,.14),var(--shadow)}
+.crn{overflow:hidden;border:2px solid #1558C8;box-shadow:0 0 0 3px rgba(21,88,200,.16),0 8px 22px rgba(11,31,92,.18)}
 .crn-img{display:block;background:#0B1F5C}
 .crn-img img{display:block;width:100%;max-height:230px;object-fit:cover}
 .crn-t{margin:8px 0 4px;font-size:19px;line-height:1.25;color:#0B1F5C}
 .crn-t a{color:inherit}
 .crn-ap{margin:8px 0 4px;font-size:14.5px;line-height:1.5;color:var(--text)}
 .crn-plus{display:inline-block;color:var(--orange-d);font-weight:800;font-size:14px;padding:4px 0}
+
+/* Cartouche de compte-rendu : même bleu scintillant que le compte-rendu ouvert, pour ne jamais la confondre avec une cartouche d'événement (2026-10-08) */
+.crn-band{position:relative;overflow:hidden;display:flex;align-items:center;gap:8px;padding:10px 14px;color:#fff;font-size:13.5px;letter-spacing:.08em;background:linear-gradient(135deg,#0A2F7A 0%,#1558C8 45%,#2E8BFF 100%)}
+.crn-band>*{position:relative;z-index:1}
+.crn-band b{font-weight:800}
+.crn-band small{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:0;opacity:.9}
+.crn-band:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.95) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(190,225,255,.9) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.8) 0 1.5px,transparent 2.1px);background-size:46px 46px,31px 31px,67px 67px;background-position:0 0,13px 19px,29px 7px;animation:cr-scint 3.2s ease-in-out infinite}
+.crn-band:after{content:"";position:absolute;top:0;left:-60%;width:35%;height:100%;background:linear-gradient(115deg,transparent,rgba(255,255,255,.45),transparent);animation:cr-reflet 4.2s ease-in-out infinite;pointer-events:none}
+.crn-btns{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.crn-btns .cr-synth{flex:none;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;min-height:46px}
+@media (prefers-reduced-motion:reduce){.crn-band:before,.crn-band:after{animation:none}}
