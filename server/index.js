@@ -13457,6 +13457,69 @@ route("POST", "/api/fil/:id/commentaires", async (req, res, params, body) => {
 });
 
 /* ---------- Meta du fil (mes follows pour l'UI) ---------- */
+/* GET /api/fil/medias — liste publique des photos OU des vidéos des publications (2026-10-08, demande explicite : « swiper pour
+   voir toutes les autres vidéos de la personne… ou de la plateforme »). Alimente le visionneur plein écran (assets/media-viewer.js).
+   type=photo|video ; auteur_id= (facultatif : seulement cette personne) ; avant=<id de publication> (plus anciennes) ou
+   apres=<id> (plus récentes) — pagination par curseur : on ne compte jamais deux fois une publication. Une ligne par PUBLICATION
+   (ses médias du type demandé regroupés) : le balayage vertical passe de publication en publication, l'horizontal entre ses médias.
+   Seulement le public : publiée, visibilité « public », jamais un compte de démonstration. */
+const FIL_MEDIA_VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i, FIL_MEDIA_IMAGE_RE = /\.(jpe?g|png|gif|webp|avif)(\?|#|$)/i;
+function filMediasDuPost(p) {
+  let l = []; try { l = JSON.parse(p.medias || '[]'); } catch (_) {}
+  if (!Array.isArray(l)) l = [];
+  if (p.media_url) l.unshift({ type: p.media_type || '', url: p.media_url });
+  return l.map(m => (typeof m === 'string' ? { url: m } : m)).filter(m => m && typeof m.url === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.url))
+    .map(m => {
+      const kind = (m.type === 'video' || FIL_MEDIA_VIDEO_RE.test(m.url)) ? 'video' : ((m.type === 'image' || m.type === 'photo' || FIL_MEDIA_IMAGE_RE.test(m.url)) ? 'photo' : null);
+      return kind ? { kind, url: m.url, poster: (typeof m.poster === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.poster)) ? m.poster : (typeof m.thumbnail === 'string' && /^(https?:\/\/|\/[^\/])/i.test(m.thumbnail) ? m.thumbnail : null) } : null;
+    }).filter(Boolean);
+}
+route("GET", "/api/fil/medias", async (req, res, params, body, query) => {
+  const cu = await getCurrentUser(req);
+  const kind = query.type === 'video' ? 'video' : 'photo';
+  const auteurId = Number(query.auteur_id) || null;
+  const limite = Math.min(Math.max(Number(query.limit) || 10, 1), 30);
+  const plusRecents = !!query.apres;
+  let curseur = Number(plusRecents ? query.apres : query.avant) || null;
+  const plain = s => String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
+  const items = []; let epuise = false, limiteAtteinte = false;
+  for (let tour = 0; tour < 6 && !limiteAtteinte && !epuise; tour++) {
+    const args = [];
+    let sql = `SELECT p.* FROM fil_posts p JOIN users u ON u.id=p.auteur_id
+      WHERE COALESCE(p.statut,'publie') NOT IN ('archive','brouillon') AND COALESCE(p.visibilite,'public')='public'
+        AND (u.is_demo IS NULL OR u.is_demo=FALSE) AND ((p.medias IS NOT NULL AND p.medias NOT IN ('[]','')) OR p.media_url IS NOT NULL)`;
+    if (auteurId) { sql += " AND p.auteur_id=?"; args.push(auteurId); }
+    if (curseur) { sql += plusRecents ? " AND p.id>?" : " AND p.id<?"; args.push(curseur); }
+    sql += plusRecents ? " ORDER BY p.id ASC LIMIT 40" : " ORDER BY p.id DESC LIMIT 40";
+    const rows = await db.prepare(sql).all(...args);
+    if (!rows.length) { epuise = true; break; }
+    for (const p of rows) {
+      curseur = Number(p.id);
+      const medias = filMediasDuPost(p).filter(m => m.kind === kind);
+      if (!medias.length) continue;
+      const likes = await db.prepare("SELECT COUNT(*) AS n FROM fil_reactions WHERE post_id=? AND type='like'").get(p.id);
+      const comm = await db.prepare("SELECT COUNT(*) AS n FROM fil_commentaires WHERE post_id=?").get(p.id);
+      const aime = cu ? !!await db.prepare("SELECT 1 FROM fil_reactions WHERE post_id=? AND user_id=? AND type='like'").get(p.id, cu.id) : false;
+      let photo = null;
+      try {
+        const u = await db.prepare("SELECT photo_url, role FROM users WHERE id=?").get(p.auteur_id);
+        photo = u ? u.photo_url : null;
+        if (u && u.role === 'initiative') { const init = await db.prepare("SELECT logo_url FROM initiatives WHERE owner_user_id=?").get(p.auteur_id); if (init && init.logo_url) photo = init.logo_url; }
+      } catch (_) {}
+      const titre = plain(p.titre), corps = plain(p.corps != null ? p.corps : p.contenu);
+      items.push({
+        post_id: Number(p.id), auteur_id: Number(p.auteur_id), auteur_nom: await nomCompteAffichage(p.auteur_id), auteur_photo: photo,
+        kind, medias: medias.slice(0, 10).map(m => ({ kind: m.kind, url: m.url, poster: m.poster })),
+        titre: titre.slice(0, 120), extrait: (titre && corps.startsWith(titre) ? corps.slice(titre.length).trim() : corps).slice(0, 180),
+        nb_likes: likes ? Number(likes.n) : 0, nb_commentaires: comm ? Number(comm.n) : 0, a_aime: aime, created_at: p.created_at,
+      });
+      if (items.length >= limite) { limiteAtteinte = true; break; }
+    }
+    if (!limiteAtteinte && rows.length < 40) epuise = true;
+  }
+  sendJSON(res, 200, { items, kind, suivant: epuise ? null : curseur });
+});
+
 route("GET", "/api/fil/meta", async (req, res) => {
   const cu = await getCurrentUser(req);
   if (!cu) return sendJSON(res, 200, { suivis_users: [], suivis_initiatives: [] });

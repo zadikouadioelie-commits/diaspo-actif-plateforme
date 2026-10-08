@@ -226,6 +226,16 @@ function avatarHTML(post, size=40) {
 }
 
 /* ── Rendu médias ── */
+/* Charge une seule fois le visionneur plein écran (assets/media-viewer.js + .css) la première fois qu'une publication à média s'ouvre. */
+let _visionneurPromesse = null;
+function chargerVisionneur() {
+  if (window.MediaViewer) return Promise.resolve();
+  if (!_visionneurPromesse) _visionneurPromesse = new Promise(resolve => {
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/assets/media-viewer.css?v=20261008a'; document.head.appendChild(l);
+    const s = document.createElement('script'); s.src = '/assets/media-viewer.js?v=20261008a'; s.onload = () => resolve(); s.onerror = () => resolve(); document.head.appendChild(s);
+  });
+  return _visionneurPromesse;
+}
 function renderMedias(post) {
   const medias = (() => { try { return JSON.parse(post.medias || '[]'); } catch(e) { return []; } })();
   const items = [];
@@ -1654,6 +1664,12 @@ const Posts = {
       texteSurMedia = true;
     }
     document.getElementById('pd-media').innerHTML = mediaHtml;
+    /* Visionneur plein écran (2026-10-08) : un clic sur la photo / le bouton « Plein écran » ouvre assets/media-viewer.js, qui permet
+       de balayer vers les autres photos ou vidéos (de la personne ou de toute la plateforme). Chargé à la demande : aucune page à modifier. */
+    if (!annonceDetail && !crDetail && aImageOuVideo(post)) {
+      const zoneMedia = document.getElementById('pd-media');
+      chargerVisionneur().then(() => { if (window.MediaViewer && document.getElementById('pd-media') === zoneMedia) MediaViewer.attachDetail(zoneMedia, post); });
+    }
     document.getElementById('pd-caption').style.display = texteSurMedia ? 'none' : '';
 
     const profil = post.auteur_profil || {};

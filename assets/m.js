@@ -114,6 +114,7 @@
     const p = poster ? attrUrl(poster) : '';
     return `<div class="media"><video controls playsinline preload="metadata" ${p ? `poster="${p}"` : ''} src="${u}"></video></div>`;
   }
+  const MV_OPTS = { onOpenPost: id => { location.hash = '#/post/' + id; }, onOpenProfile: id => { location.hash = '#/profil/' + id; } };
   function zoom(src) {
     const v = document.createElement('div'); v.className = 'viewer';
     v.innerHTML = `<img src="${esc(src)}" alt=""><button aria-label="Fermer">${ic('close', 'l')}</button>`;
@@ -408,7 +409,7 @@
     const imgs = items.filter(m => m.type === 'image' || (!m.type && /\.(jpe?g|png|gif|webp)/i.test(m.url || '')));
     const vid = items.find(m => m.type === 'video' || /\.(mp4|webm)/i.test(m.url || ''));
     let media = '';
-    if (vid) media = videoBlock(vid.url);
+    if (vid) media = '<div class="mv-wrap">' + videoBlock(vid.url) + '<button type="button" class="mv-expand" data-mv-video aria-label="Voir en plein écran et parcourir les vidéos">⤢ Plein écran</button></div>';
     else if (imgs.length) media = mediaBlock(imgs[0].url, { more: imgs.length > 1 ? imgs.length - 1 : 0 });
     const promo = p.evenement_promo || null;
     const cr = src.compte_rendu || p.compte_rendu;
@@ -460,7 +461,11 @@
       }
       return;
     }
-    const z = e.target.closest('[data-zoom]'); if (z) { zoom(z.dataset.zoom); return; }
+    /* Visionneur plein écran (2026-10-08) : la photo ou la vidéo d'une actualité s'ouvre dans le visionneur, où l'on balaie vers les autres. */
+    const mvv = e.target.closest('[data-mv-video]');
+    if (mvv && window.MediaViewer) { const c = mvv.closest('article.post'); if (c) { MediaViewer.open({ kind: 'video', post_id: c.dataset.id }, MV_OPTS); return; } }
+    const z = e.target.closest('[data-zoom]');
+    if (z) { const c = z.closest('article.post'); if (c && window.MediaViewer) { MediaViewer.open({ kind: 'photo', post_id: c.dataset.id, url: z.dataset.zoom }, MV_OPTS); return; } zoom(z.dataset.zoom); return; }
     const a = e.target.closest('.post [data-act]'); if (!a) return;
     const card = a.closest('.post'), id = card.dataset.id, post = S.fil.posts.find(p => String(p.id) === String(id)) || postCache[id];
     if (a.dataset.act === 'like') {
@@ -601,7 +606,8 @@
 
   function viewEvents() {
     const el = $('#t-evenements');
-    el.innerHTML = `<div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div>
+    /* Entrée « ⚡ Événement flash » + « ? » (comptes Initiative seulement) — fournie par le module Mes événements, vide sinon. */
+    el.innerHTML = `${(window.MMods && window.MMods.flashCarte) ? window.MMods.flashCarte() : ''}<div class="search">${ic('search', 's')}<input id="evq" type="search" placeholder="Rechercher un événement…" aria-label="Rechercher un événement" value="${esc(S.ev.q)}"></div>
       <div class="chips">${[['avenir', 'À venir'], ['passes', 'Terminés'], ['gratuit', 'Gratuits'], ['mes', 'Mes inscriptions']].map(([k, l]) => `<button class="chip ${S.ev.filtre === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
       <div id="ev-bar"></div><div class="small muted" id="ev-count" style="margin:0 4px 10px"></div><div id="ev-list"></div>`;
     $$('.chip[data-f]', el).forEach(c => c.onclick = async () => {
