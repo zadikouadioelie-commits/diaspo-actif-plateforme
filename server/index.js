@@ -6198,6 +6198,18 @@ route("PUT", "/api/initiatives/:id/adhesions-ouvertes", async (req, res, params,
   sendJSON(res, 200, { ok: true, adhesions_ouvertes: !!ouvertes });
 });
 
+/* Rappels propres à une formule (2026-10-08) : valide une configuration { jours:[…], canal } venue du formulaire ou de la base.
+   jours : entiers de -10 (10 jours après la fin) à 90 (90 jours avant), sans doublon, 10 au plus ; liste vide = aucun rappel.
+   Renvoie null si la valeur n'est pas exploitable (la formule retombe alors sur les réglages généraux). */
+const ADHESION_CANAUX_RAPPEL = ['email', 'notification', 'les_deux'];
+function sanitizeRelancesFormule(brut) {
+  let c = brut;
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch (_) { return null; } }
+  if (!c || typeof c !== 'object' || !Array.isArray(c.jours)) return null;
+  const jours = [...new Set(c.jours.map(j => Math.round(Number(j))).filter(j => Number.isFinite(j) && j >= -10 && j <= 90))].sort((a, b) => b - a).slice(0, 10);
+  return { jours, canal: ADHESION_CANAUX_RAPPEL.includes(c.canal) ? c.canal : 'les_deux' };
+}
+
 /* ── Délais de relance personnalisables (tâche #71) — propriétaire uniquement.
    Tableau de décalages en jours (positif = avant expiration, négatif = après),
    ex. [30,7,0,-1]. Validation minimale : entiers entre -90 et 90, max 10 valeurs. ── */
@@ -6264,7 +6276,7 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
           media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin,
           duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents,
-          texte_intro, conditions_adhesion, reglement_pdf_url, statuts_pdf_url, champs_config, champs_custom } = body;
+          texte_intro, conditions_adhesion, reglement_pdf_url, statuts_pdf_url, reglement_interieur_texte, relances_config, champs_config, champs_custom } = body;
   if (!nom?.trim()) return sendJSON(res, 400, { error: "Nom de la formule requis." });
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
@@ -6307,8 +6319,8 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
   }
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(params.id)).m;
   const id = (await db.prepare(`
-    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,media_type,media_url,media_duree_secondes,liste_stockage_id,mode_validite,periode_collective_debut,periode_collective_fin,duree_valeur,duree_unite,duree_illimitee,renouvellement_auto_collectif,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json,reglement_interieur_texte,relances_config_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(params.id, nom.trim(), description || null, couleur || '#f97316', icone || '🎫',
        type_contribution || 'cotisation_annuelle', montant_type || 'fixe', montant_fixe ?? null, montant_min ?? null, montant_max ?? null,
        devise || 'EUR', JSON.stringify(sanitizeAdhesionModes(modes_paiement)), maxOrdre + 1,
@@ -6318,7 +6330,9 @@ route("POST", "/api/initiatives/:id/adhesion-formules", async (req, res, params,
        duree_illimitee ? null : (duree_valeur ? Number(duree_valeur) : null), dureeUnite, duree_illimitee ? 1 : 0,
        (modeValidite === 'collectif' && renouvellement_auto_collectif) ? 1 : 0, max_adherents ? Number(max_adherents) : null,
        texte_intro || null, conditions_adhesion || null, reglement_pdf_url || null, statuts_pdf_url || null,
-       JSON.stringify(sanitizeChampsConfig(champs_config)), JSON.stringify(sanitizeChampsCustom(champs_custom)))).lastInsertRowid;
+       JSON.stringify(sanitizeChampsConfig(champs_config)), JSON.stringify(sanitizeChampsCustom(champs_custom)),
+       reglement_interieur_texte ? String(reglement_interieur_texte).slice(0, 20000) : null,
+       (() => { const c = sanitizeRelancesFormule(relances_config); return c ? JSON.stringify(c) : null; })())).lastInsertRowid;
   if (body.est_officielle) await adhAppliquerOfficielle(id, params.id, true);
   sendJSON(res, 201, { id });
 });
@@ -6334,7 +6348,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
   const { nom, description, couleur, icone, type_contribution, montant_type, montant_fixe, montant_min, montant_max, devise, modes_paiement,
           media_type, media_url, media_duree_secondes, liste_stockage_id, mode_validite, periode_collective_debut, periode_collective_fin,
           duree_valeur, duree_unite, duree_illimitee, renouvellement_auto_collectif, max_adherents,
-          texte_intro, conditions_adhesion, reglement_pdf_url, statuts_pdf_url, champs_config, champs_custom } = body;
+          texte_intro, conditions_adhesion, reglement_pdf_url, statuts_pdf_url, reglement_interieur_texte, relances_config, champs_config, champs_custom } = body;
   if (media_type && !ADHESION_MEDIA_TYPES.includes(media_type)) return sendJSON(res, 400, { error: "Type de média invalide." });
   if (media_type && !media_url) return sendJSON(res, 400, { error: "Le fichier média n'a pas été téléversé — réessayez ou choisissez « Aucun »." });
   if (media_type === 'video' && Number(media_duree_secondes) > ADHESION_MEDIA_MAX_DUREE) {
@@ -6380,7 +6394,7 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
       media_type=?, media_url=?, media_duree_secondes=?, liste_stockage_id=COALESCE(?,liste_stockage_id),
       mode_validite=?, periode_collective_debut=?, periode_collective_fin=?,
       duree_valeur=?, duree_unite=?, duree_illimitee=?, renouvellement_auto_collectif=?, max_adherents=?,
-      texte_intro=?, conditions_adhesion=?, reglement_pdf_url=?, statuts_pdf_url=?, champs_config_json=?, champs_custom_json=?,
+      texte_intro=?, conditions_adhesion=?, reglement_pdf_url=?, statuts_pdf_url=?, champs_config_json=?, champs_custom_json=?, reglement_interieur_texte=?, relances_config_json=?,
       updated_at=datetime('now')
     WHERE id=?`)
     .run(nom || null, description ?? f.description, couleur || null, icone || null, type_contribution || null, montant_type || null,
@@ -6398,6 +6412,8 @@ route("PUT", "/api/adhesion-formules/:id", async (req, res, params, body) => {
          statuts_pdf_url !== undefined ? (statuts_pdf_url || null) : f.statuts_pdf_url,
          champs_config !== undefined ? JSON.stringify(sanitizeChampsConfig(champs_config)) : f.champs_config_json,
          champs_custom !== undefined ? JSON.stringify(sanitizeChampsCustom(champs_custom)) : f.champs_custom_json,
+         reglement_interieur_texte !== undefined ? (reglement_interieur_texte ? String(reglement_interieur_texte).slice(0, 20000) : null) : f.reglement_interieur_texte,
+         relances_config !== undefined ? (() => { const c = sanitizeRelancesFormule(relances_config); return c ? JSON.stringify(c) : null; })() : f.relances_config_json,
          params.id);
   if (body.est_officielle !== undefined) await adhAppliquerOfficielle(f.id, f.initiative_id, !!body.est_officielle);
   sendJSON(res, 200, { ok: true });
@@ -6429,12 +6445,12 @@ route("POST", "/api/adhesion-formules/:id/dupliquer", async (req, res, params) =
   if (!(await exigerPremium(user, res, "adhesions"))) return;
   const maxOrdre = (await db.prepare(`SELECT COALESCE(MAX(ordre),0) AS m FROM adhesion_formules WHERE initiative_id=?`).get(f.initiative_id)).m;
   const id = (await db.prepare(`
-    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,actif,mode_validite,duree_valeur,duree_unite,duree_illimitee,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO adhesion_formules (initiative_id,nom,description,couleur,icone,type_contribution,montant_type,montant_fixe,montant_min,montant_max,devise,modes_paiement_json,ordre,actif,mode_validite,duree_valeur,duree_unite,duree_illimitee,max_adherents,texte_intro,conditions_adhesion,reglement_pdf_url,statuts_pdf_url,champs_config_json,champs_custom_json,reglement_interieur_texte,relances_config_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(f.initiative_id, `${f.nom} (copie)`, f.description, f.couleur, f.icone, f.type_contribution, f.montant_type, f.montant_fixe, f.montant_min, f.montant_max,
        f.devise, f.modes_paiement_json, maxOrdre + 1, f.mode_validite === 'collectif' ? 'individuel' : f.mode_validite,
        f.duree_valeur, f.duree_unite, f.duree_illimitee, f.max_adherents,
-       f.texte_intro, f.conditions_adhesion, f.reglement_pdf_url, f.statuts_pdf_url, f.champs_config_json, f.champs_custom_json)).lastInsertRowid;
+       f.texte_intro, f.conditions_adhesion, f.reglement_pdf_url, f.statuts_pdf_url, f.champs_config_json, f.champs_custom_json, f.reglement_interieur_texte, f.relances_config_json)).lastInsertRowid;
   sendJSON(res, 201, { id });
 });
 
@@ -30255,6 +30271,10 @@ async function handleRequest(req, res) {
       const liensParInit = {};
       try { (await db.prepare("SELECT id, adhesion_liens_relance AS l FROM initiatives WHERE adhesion_liens_relance IS NOT NULL").all()).forEach(r => { try { liensParInit[r.id] = JSON.parse(r.l); } catch (_) {} }); } catch (_) {}
 
+      /* Rappels propres à chaque formule (2026-10-08) — lecture à part : une colonne absente ne doit jamais bloquer les relances. */
+      const relancesParFormule = {};
+      try { (await db.prepare("SELECT id, relances_config_json AS c FROM adhesion_formules WHERE relances_config_json IS NOT NULL").all()).forEach(r => { const c = sanitizeRelancesFormule(r.c); if (c) relancesParFormule[Number(r.id)] = c; }); } catch (_) {}
+
       let envoyees = 0;
       for (const m of membres) {
         const expiration = new Date(m.date_expiration);
@@ -30263,8 +30283,14 @@ async function handleRequest(req, res) {
            décalages (positif = jours avant expiration, négatif = jours après). Défaut =
            comportement historique J-30/J-7/jour J/lendemain. */
         let joursConfig;
-        try { joursConfig = JSON.parse(m.relances_config_json || '[30,7,0,-1]'); }
-        catch (e) { joursConfig = [30, 7, 0, -1]; }
+        /* La formule peut avoir ses propres rappels (délais + canal) ; sinon réglages généraux de l'association, e-mail ET notification. */
+        const cfgFormule = relancesParFormule[Number(m.formule_id)] || null;
+        const canalRappel = cfgFormule ? cfgFormule.canal : 'les_deux';
+        if (cfgFormule) joursConfig = cfgFormule.jours;
+        else {
+          try { joursConfig = JSON.parse(m.relances_config_json || '[30,7,0,-1]'); }
+          catch (e) { joursConfig = [30, 7, 0, -1]; }
+        }
         if (!Array.isArray(joursConfig) || !joursConfig.length) continue;
         if (!joursConfig.includes(joursRestants)) continue;
         const niveau = `j${joursRestants}`;
@@ -30293,13 +30319,17 @@ async function handleRequest(req, res) {
           : `Votre adhésion « ${m.formule_nom} » (${m.init_nom}) ${delaiTexte}${joursRestants < 0 ? '. Renouvelez-la dès maintenant.' : '.'}`;
 
         const { texte: texteRelance, html: htmlRelance } = composerRelanceAdhesion({ message, prenom: m.prenom, lienRenouvellement, autresLiens: liensParInit[m.initiative_id], modeleContientLien: !!(m.modele_relance && /\{lien\}/.test(m.modele_relance)) });
-        await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
-          .run(m.id, niveau, 'app', texteRelance);
-
-        if (m.linked_user_id) {
+        /* Canal choisi pour la formule : notification Diaspo'Actif (réservée aux adhérents ayant un compte), e-mail, ou les deux. Le journal
+           adhesion_relances garde une ligne par canal réellement utilisé — c'est aussi lui qui évite le doublon d'un même rappel. */
+        const veutNotif = canalRappel !== 'email', veutMail = canalRappel !== 'notification';
+        let envoye = false;
+        if (veutNotif && m.linked_user_id) {
+          await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
+            .run(m.id, niveau, 'app', texteRelance);
           creerNotif(m.linked_user_id, "adhesion_relance", "Rappel d'adhésion", texteRelance, { membre_id: m.id, lien: lienRenouvellement });
+          envoye = true;
         }
-        if (m.user_email || m.email) {
+        if (veutMail && (m.user_email || m.email)) {
           try {
             await sendEmail({
               to: m.user_email || m.email,
@@ -30308,9 +30338,10 @@ async function handleRequest(req, res) {
             });
             await db.prepare(`INSERT INTO adhesion_relances (membre_id, niveau, canal, message) VALUES (?,?,?,?)`)
               .run(m.id, niveau, 'email', texteRelance);
-          } catch (e) { /* email indisponible (RESEND_API_KEY absent en local) — la relance app reste enregistrée */ }
+            envoye = true;
+          } catch (e) { /* email indisponible (RESEND_API_KEY absent en local) — la notification, si elle était demandée, reste enregistrée */ }
         }
-        envoyees++;
+        if (envoye) envoyees++;
       }
 
       /* Retrait des listes de diffusion à l'expiration (incrément 5, 2026-08-07) : le statut

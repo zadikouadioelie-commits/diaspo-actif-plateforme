@@ -7021,6 +7021,12 @@ db.exec(`
     if (!adhFCols.includes('conditions_adhesion'))   db.exec("ALTER TABLE adhesion_formules ADD COLUMN conditions_adhesion TEXT");
     if (!adhFCols.includes('reglement_pdf_url'))     db.exec("ALTER TABLE adhesion_formules ADD COLUMN reglement_pdf_url TEXT");
     if (!adhFCols.includes('statuts_pdf_url'))       db.exec("ALTER TABLE adhesion_formules ADD COLUMN statuts_pdf_url TEXT");
+    /* Règlement intérieur rédigé directement dans le formulaire (2026-10-08, demande explicite) : texte affiché aux personnes qui adhèrent,
+       en plus du PDF facultatif reglement_pdf_url. */
+    if (!adhFCols.includes('reglement_interieur_texte')) db.exec("ALTER TABLE adhesion_formules ADD COLUMN reglement_interieur_texte TEXT");
+    /* Rappels de renouvellement propres à la formule (2026-10-08, demande explicite) : { jours:[30,7,0,-1], canal:'email'|'notification'|'les_deux' }.
+       NULL = la formule reprend les réglages généraux de l'association (initiatives.adhesion_relances_jours) et le canal « les deux ». */
+    if (!adhFCols.includes('relances_config_json'))      db.exec("ALTER TABLE adhesion_formules ADD COLUMN relances_config_json TEXT");
     if (!adhFCols.includes('champs_config_json'))    db.exec("ALTER TABLE adhesion_formules ADD COLUMN champs_config_json TEXT DEFAULT '{}'");
     if (!adhFCols.includes('champs_custom_json'))    db.exec("ALTER TABLE adhesion_formules ADD COLUMN champs_custom_json TEXT DEFAULT '[]'");
     /* Module Adhésions — cahier des charges 2026-08-06, incrément 1 : durée personnalisée en

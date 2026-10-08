@@ -1487,9 +1487,13 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <label style="font-size:12px;font-weight:700;">Conditions d'adhésion</label>
             <textarea id="adh-f-conditions" class="input" rows="10" placeholder="Ex. engagement moral, durée d'engagement, etc." style="margin:4px 0 10px;width:100%;resize:vertical;min-height:150px;"></textarea>
 
+            <label style="font-size:12px;font-weight:700;">Règlement intérieur <span style="color:var(--muted);font-weight:400;">(texte)</span></label>
+            <textarea id="adh-f-reglement-texte" class="input" rows="10" maxlength="20000" placeholder="Rédigez ici le règlement intérieur : droits et devoirs des membres, fonctionnement, cotisation, sanctions, etc." style="margin:4px 0 4px;width:100%;resize:vertical;min-height:150px;"></textarea>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Affiché aux personnes qui adhèrent, dans une zone qu'elles peuvent faire défiler. Vous pouvez aussi joindre le document en PDF ci-dessous.</p>
+
             <div style="display:flex;gap:10px;margin-bottom:10px;">
               <div style="flex:1;">
-                <label style="font-size:12px;font-weight:700;">Règlement intérieur (PDF)</label>
+                <label style="font-size:12px;font-weight:700;">Règlement intérieur (PDF, facultatif)</label>
                 <input type="file" id="adh-f-reglement-file" accept="application/pdf" style="margin-top:4px;width:100%;font-size:11.5px;" onchange="adhUploaderDocumentFormule(this,'reglement')">
                 <div id="adh-f-reglement-statut" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
               </div>
@@ -1507,6 +1511,29 @@ if (typeof REGLE_ACCREDITATIONS_DA === 'undefined') {
             <label style="font-size:12px;font-weight:700;">Champs personnalisés</label>
             <div id="adh-f-champs-custom" style="display:flex;flex-direction:column;gap:6px;margin:4px 0 8px;"></div>
             <button type="button" class="btn btn-sm btn-outline" onclick="adhAjouterChampCustom()">➕ Ajouter un champ personnalisé</button>
+          </div>
+        </details>
+
+        <details id="adh-f-relances-details" style="margin:4px 0 14px;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:700;">🔔 Rappels de renouvellement (combien, quand, par quel moyen)</summary>
+          <div style="margin-top:12px;">
+            <label class="da-pill checked" id="adh-f-relances-general-pill" style="display:inline-flex;margin-bottom:8px;"><input type="checkbox" id="adh-f-relances-general" checked onchange="adhRelancesBasculerGeneral()"><span>Reprendre les réglages généraux de l'association</span></label>
+            <div id="adh-f-relances-general-resume" style="font-size:11.5px;color:var(--muted);margin-bottom:6px;"></div>
+            <div id="adh-f-relances-editeur" style="display:none;">
+              <label style="font-size:12px;font-weight:700;">Rappels envoyés à l'adhérent</label>
+              <p style="font-size:11px;color:var(--muted);margin:2px 0 8px;">Chaque ligne est un rappel. Choisissez le nombre de jours avant ou après la fin de l'adhésion (jusqu'à 90 jours avant et 10 jours après, 10 rappels au plus). Aucun rappel : supprimez toutes les lignes.</p>
+              <div id="adh-f-relances-liste" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+              <button type="button" class="btn btn-sm btn-outline" onclick="adhRelancesAjouter()">➕ Ajouter un rappel</button>
+
+              <label style="font-size:12px;font-weight:700;display:block;margin-top:14px;">Par quel moyen ?</label>
+              <div class="da-pill-group" style="margin:6px 0 6px;">
+                <label class="da-pill" id="adh-f-relances-canal-email"><input type="radio" name="adh-f-relances-canal" value="email" onchange="adhRelancesChoisirCanal('email')"><span>✉️ E-mail</span></label>
+                <label class="da-pill" id="adh-f-relances-canal-notification"><input type="radio" name="adh-f-relances-canal" value="notification" onchange="adhRelancesChoisirCanal('notification')"><span>🔔 Notification Diaspo'Actif</span></label>
+                <label class="da-pill checked" id="adh-f-relances-canal-les_deux"><input type="radio" name="adh-f-relances-canal" value="les_deux" checked onchange="adhRelancesChoisirCanal('les_deux')"><span>✉️🔔 Les deux</span></label>
+              </div>
+              <p style="font-size:11px;color:var(--muted);margin:0;">La notification Diaspo'Actif n'atteint que les adhérents qui ont un compte ; les adhérents sans compte ne reçoivent que l'e-mail.</p>
+              <div id="adh-f-relances-apercu" style="font-size:11.5px;background:#f9fafb;border-radius:8px;padding:8px 10px;margin-top:10px;"></div>
+            </div>
           </div>
         </details>
 
@@ -7348,6 +7375,87 @@ const ADH_CHAMPS_CATALOGUE = [
 ];
 let ADH_F_CHAMPS_CUSTOM = [];
 let ADH_F_DOCS = { reglement_pdf_url: null, statuts_pdf_url: null };
+/* Rappels de renouvellement propres à la formule (2026-10-08). general=true : on reprend les réglages de l'association (rien n'est enregistré sur la formule). */
+let ADH_F_RELANCES = { general: true, jours: [30, 7, 0, -1], canal: 'les_deux' };
+const ADH_RELANCES_CANAL_LIBELLE = { email: 'par e-mail', notification: 'par notification Diaspo’Actif', les_deux: 'par e-mail et par notification Diaspo’Actif' };
+function adhRelancesLibelleJour(j) { return j > 0 ? `${j} jour${j > 1 ? 's' : ''} avant la fin` : j === 0 ? 'le jour de la fin' : `${-j} jour${-j > 1 ? 's' : ''} après la fin`; }
+function adhRelancesCollecterLignes() {
+  const jours = [];
+  document.querySelectorAll('#adh-f-relances-liste .adh-rel-ligne').forEach(l => {
+    const sens = l.querySelector('.adh-rel-sens').value, n = Math.round(Number(l.querySelector('.adh-rel-n').value) || 0);
+    if (sens === 'jour') jours.push(0);
+    else if (sens === 'avant') jours.push(Math.min(90, Math.max(1, n)));
+    else jours.push(-Math.min(10, Math.max(1, n)));
+  });
+  return [...new Set(jours)].sort((a, b) => b - a);
+}
+function adhRelancesRendre() {
+  const liste = document.getElementById('adh-f-relances-liste'); if (!liste) return;
+  liste.innerHTML = ADH_F_RELANCES.jours.map(j => `
+    <div class="adh-rel-ligne" style="display:flex;gap:6px;align-items:center;">
+      <input type="number" class="input adh-rel-n" min="1" max="${j < 0 ? 10 : 90}" value="${Math.abs(j) || 1}" style="width:70px;${j === 0 ? 'display:none;' : ''}" oninput="adhRelancesMaj()">
+      <select class="input adh-rel-sens" style="flex:1;" onchange="adhRelancesSens(this)">
+        <option value="avant" ${j > 0 ? 'selected' : ''}>jours avant la fin</option>
+        <option value="jour" ${j === 0 ? 'selected' : ''}>le jour de la fin</option>
+        <option value="apres" ${j < 0 ? 'selected' : ''}>jours après la fin</option>
+      </select>
+      <button type="button" class="btn btn-sm btn-outline" title="Supprimer ce rappel" onclick="adhRelancesRetirer(this)">✕</button>
+    </div>`).join('') || '<div style="font-size:11.5px;color:var(--muted);">Aucun rappel : l’adhérent ne sera pas relancé.</div>';
+  adhRelancesApercu();
+}
+function adhRelancesSens(sel) {
+  const l = sel.closest('.adh-rel-ligne'), n = l.querySelector('.adh-rel-n');
+  n.style.display = sel.value === 'jour' ? 'none' : '';
+  n.max = sel.value === 'apres' ? 10 : 90;
+  if (!n.value || Number(n.value) < 1) n.value = 1;
+  adhRelancesMaj();
+}
+function adhRelancesMaj() { ADH_F_RELANCES.jours = adhRelancesCollecterLignes(); adhRelancesApercu(); }
+function adhRelancesAjouter() {
+  adhRelancesMaj();
+  if (ADH_F_RELANCES.jours.length >= 10) { alert('10 rappels au maximum.'); return; }
+  const pris = new Set(ADH_F_RELANCES.jours);
+  const suggestion = [30, 15, 7, 3, 1, 0, -1, -3, -7, -10].find(j => !pris.has(j));
+  if (suggestion === undefined) return;
+  ADH_F_RELANCES.jours.push(suggestion); ADH_F_RELANCES.jours.sort((a, b) => b - a);
+  adhRelancesRendre();
+}
+function adhRelancesRetirer(btn) { btn.closest('.adh-rel-ligne').remove(); adhRelancesMaj(); adhRelancesRendre(); }
+function adhRelancesChoisirCanal(c) {
+  ADH_F_RELANCES.canal = c;
+  ['email', 'notification', 'les_deux'].forEach(k => document.getElementById('adh-f-relances-canal-' + k)?.classList.toggle('checked', k === c));
+  adhRelancesApercu();
+}
+function adhRelancesBasculerGeneral() {
+  const g = document.getElementById('adh-f-relances-general').checked;
+  ADH_F_RELANCES.general = g;
+  document.getElementById('adh-f-relances-general-pill').classList.toggle('checked', g);
+  document.getElementById('adh-f-relances-editeur').style.display = g ? 'none' : 'block';
+  if (!g) adhRelancesRendre();
+  adhRelancesResumeGeneral();
+}
+function adhRelancesResumeGeneral() {
+  const el = document.getElementById('adh-f-relances-general-resume'); if (!el) return;
+  const j = (typeof ADH_RELANCES_JOURS !== 'undefined' ? ADH_RELANCES_JOURS : [30, 7, 0, -1]).slice().sort((a, b) => b - a);
+  el.textContent = ADH_F_RELANCES.general ? `Réglages généraux actuels : ${j.map(adhRelancesLibelleJour).join(' · ')} — par e-mail et par notification Diaspo’Actif.` : '';
+}
+function adhRelancesApercu() {
+  const el = document.getElementById('adh-f-relances-apercu'); if (!el) return;
+  const j = ADH_F_RELANCES.jours;
+  el.innerHTML = j.length ? `<b>${j.length} rappel${j.length > 1 ? 's' : ''}</b> ${ADH_RELANCES_CANAL_LIBELLE[ADH_F_RELANCES.canal]} : ${j.map(adhRelancesLibelleJour).join(' · ')}.` : '<b>Aucun rappel</b> pour cette formule.';
+}
+/* Remplit l'éditeur à l'ouverture du formulaire : cfg = relances_config_json de la formule (chaîne JSON) ou vide = réglages généraux. */
+function adhRelancesCharger(cfg) {
+  let c = null; try { c = cfg ? JSON.parse(cfg) : null; } catch (e) {}
+  ADH_F_RELANCES = c && Array.isArray(c.jours)
+    ? { general: false, jours: c.jours.map(Number).sort((a, b) => b - a), canal: ['email', 'notification', 'les_deux'].includes(c.canal) ? c.canal : 'les_deux' }
+    : { general: true, jours: (typeof ADH_RELANCES_JOURS !== 'undefined' ? ADH_RELANCES_JOURS : [30, 7, 0, -1]).slice().sort((a, b) => b - a), canal: 'les_deux' };
+  const g = document.getElementById('adh-f-relances-general'); if (!g) return;
+  g.checked = ADH_F_RELANCES.general;
+  const r = document.querySelector(`input[name="adh-f-relances-canal"][value="${ADH_F_RELANCES.canal}"]`); if (r) r.checked = true;
+  adhRelancesChoisirCanal(ADH_F_RELANCES.canal);
+  adhRelancesBasculerGeneral();
+}
 
 function adhRenderChampsStandard(config){
   const el = document.getElementById('adh-f-champs-standard');
@@ -7767,6 +7875,8 @@ function adhOuvrirCreationFormule(officielle){
   adhToggleModeValidite();
   document.getElementById('adh-f-texte-intro').value = '';
   document.getElementById('adh-f-conditions').value = '';
+  document.getElementById('adh-f-reglement-texte').value = '';
+  adhRelancesCharger(null);
   document.getElementById('adh-f-reglement-file').value = '';
   document.getElementById('adh-f-statuts-file').value = '';
   document.getElementById('adh-f-reglement-statut').textContent = '';
@@ -7815,6 +7925,8 @@ function adhOuvrirEditionFormule(id){
   adhToggleModeValidite();
   document.getElementById('adh-f-texte-intro').value = f.texte_intro || '';
   document.getElementById('adh-f-conditions').value = f.conditions_adhesion || '';
+  document.getElementById('adh-f-reglement-texte').value = f.reglement_interieur_texte || '';
+  adhRelancesCharger(f.relances_config_json);
   document.getElementById('adh-f-reglement-file').value = '';
   document.getElementById('adh-f-statuts-file').value = '';
   document.getElementById('adh-f-reglement-statut').textContent = f.reglement_pdf_url ? '✅ Document déjà envoyé' : '';
@@ -7927,6 +8039,8 @@ async function adhEnregistrerFormule(){
     max_adherents: maxAdherents ? Number(maxAdherents) : null,
     texte_intro: document.getElementById('adh-f-texte-intro').value || null,
     conditions_adhesion: document.getElementById('adh-f-conditions').value || null,
+    reglement_interieur_texte: document.getElementById('adh-f-reglement-texte').value || null,
+    relances_config: (() => { if (document.getElementById('adh-f-relances-general').checked) return null; adhRelancesMaj(); return { jours: ADH_F_RELANCES.jours, canal: ADH_F_RELANCES.canal }; })(),
     reglement_pdf_url: ADH_F_DOCS.reglement_pdf_url,
     statuts_pdf_url: ADH_F_DOCS.statuts_pdf_url,
     champs_config: Object.fromEntries(Array.from(document.querySelectorAll('.adh-champ-mode')).map(sel => [sel.dataset.key, sel.value])),
